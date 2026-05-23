@@ -110,7 +110,6 @@ impl EditorUi {
 
         // Push editor selection to scene (editor UI is the authority)
         scene.selected_entity_id = self.selected_entity_id;
-
         // 1. TOP HEADER PANEL (Controls engine state) — ALWAYS VISIBLE
         egui::TopBottomPanel::top("Header Panel").frame(
             egui::Frame::none().fill(egui::Color32::from_rgb(14, 14, 22))
@@ -118,9 +117,6 @@ impl EditorUi {
                 .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(26, 24, 38)))
         ).show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.heading("🛰️ ANTIGRAVITY ENGINE");
-                ui.separator();
-
                 // Play / Stop controls with purple highlight on the active state button
                 let purple_bg = egui::Color32::from_rgb(90, 50, 180);
 

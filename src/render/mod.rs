@@ -184,6 +184,11 @@ pub struct Renderer {
     grid_vertex_buffer: Option<wgpu::Buffer>,
     grid_count: u32,
 
+    axis_x_buffer: Option<wgpu::Buffer>,
+    axis_y_buffer: Option<wgpu::Buffer>,
+    axis_z_buffer: Option<wgpu::Buffer>,
+    axis_count: u32,
+
     pub skybox_renderer: skybox::SkyboxRenderer,
     pub shadow_renderer: shadows::ShadowRenderer,
     pub skybox_texture: Option<Rc<GpuTexture>>,
@@ -584,6 +589,10 @@ impl Renderer {
             default_texture,
             grid_vertex_buffer: None,
             grid_count: 0,
+            axis_x_buffer: None,
+            axis_y_buffer: None,
+            axis_z_buffer: None,
+            axis_count: 0,
             skybox_renderer,
             shadow_renderer,
             skybox_texture: None,
@@ -594,6 +603,7 @@ impl Renderer {
         };
 
         renderer.generate_grid_mesh();
+        renderer.generate_axis_arrows();
         renderer
     }
 
@@ -849,6 +859,92 @@ impl Renderer {
             usage: wgpu::BufferUsages::VERTEX,
         }));
         self.grid_count = count;
+    }
+
+    /// Pre-generates 3D line-based arrows for X, Y, Z global translation axes
+    fn generate_axis_arrows(&mut self) {
+        let axis_length = 2.0;
+        let arrow_head_length = 0.35;
+        let arrow_head_width = 0.12;
+        let uv = [0.0, 0.0];
+        let normal = Vec3::Y;
+
+        // X Axis (Red)
+        let mut x_verts = Vec::new();
+        let t_x = Vec3::new(axis_length, 0.0, 0.0);
+        let s_x = Vec3::new(axis_length - arrow_head_length, 0.0, 0.0);
+        x_verts.push(Vertex::new(Vec3::ZERO, normal, uv));
+        x_verts.push(Vertex::new(t_x, normal, uv));
+        // Arrowhead
+        let a_x1 = s_x + Vec3::new(0.0, arrow_head_width, 0.0);
+        let a_x2 = s_x - Vec3::new(0.0, arrow_head_width, 0.0);
+        let a_x3 = s_x + Vec3::new(0.0, 0.0, arrow_head_width);
+        let a_x4 = s_x - Vec3::new(0.0, 0.0, arrow_head_width);
+        x_verts.push(Vertex::new(t_x, normal, uv)); x_verts.push(Vertex::new(a_x1, normal, uv));
+        x_verts.push(Vertex::new(t_x, normal, uv)); x_verts.push(Vertex::new(a_x2, normal, uv));
+        x_verts.push(Vertex::new(t_x, normal, uv)); x_verts.push(Vertex::new(a_x3, normal, uv));
+        x_verts.push(Vertex::new(t_x, normal, uv)); x_verts.push(Vertex::new(a_x4, normal, uv));
+        x_verts.push(Vertex::new(a_x1, normal, uv)); x_verts.push(Vertex::new(a_x3, normal, uv));
+        x_verts.push(Vertex::new(a_x3, normal, uv)); x_verts.push(Vertex::new(a_x2, normal, uv));
+        x_verts.push(Vertex::new(a_x2, normal, uv)); x_verts.push(Vertex::new(a_x4, normal, uv));
+        x_verts.push(Vertex::new(a_x4, normal, uv)); x_verts.push(Vertex::new(a_x1, normal, uv));
+
+        // Y Axis (Green)
+        let mut y_verts = Vec::new();
+        let t_y = Vec3::new(0.0, axis_length, 0.0);
+        let s_y = Vec3::new(0.0, axis_length - arrow_head_length, 0.0);
+        y_verts.push(Vertex::new(Vec3::ZERO, normal, uv));
+        y_verts.push(Vertex::new(t_y, normal, uv));
+        // Arrowhead
+        let a_y1 = s_y + Vec3::new(arrow_head_width, 0.0, 0.0);
+        let a_y2 = s_y - Vec3::new(arrow_head_width, 0.0, 0.0);
+        let a_y3 = s_y + Vec3::new(0.0, 0.0, arrow_head_width);
+        let a_y4 = s_y - Vec3::new(0.0, 0.0, arrow_head_width);
+        y_verts.push(Vertex::new(t_y, normal, uv)); y_verts.push(Vertex::new(a_y1, normal, uv));
+        y_verts.push(Vertex::new(t_y, normal, uv)); y_verts.push(Vertex::new(a_y2, normal, uv));
+        y_verts.push(Vertex::new(t_y, normal, uv)); y_verts.push(Vertex::new(a_y3, normal, uv));
+        y_verts.push(Vertex::new(t_y, normal, uv)); y_verts.push(Vertex::new(a_y4, normal, uv));
+        y_verts.push(Vertex::new(a_y1, normal, uv)); y_verts.push(Vertex::new(a_y3, normal, uv));
+        y_verts.push(Vertex::new(a_y3, normal, uv)); y_verts.push(Vertex::new(a_y2, normal, uv));
+        y_verts.push(Vertex::new(a_y2, normal, uv)); y_verts.push(Vertex::new(a_y4, normal, uv));
+        y_verts.push(Vertex::new(a_y4, normal, uv)); y_verts.push(Vertex::new(a_y1, normal, uv));
+
+        // Z Axis (Blue)
+        let mut z_verts = Vec::new();
+        let t_z = Vec3::new(0.0, 0.0, axis_length);
+        let s_z = Vec3::new(0.0, 0.0, axis_length - arrow_head_length);
+        z_verts.push(Vertex::new(Vec3::ZERO, normal, uv));
+        z_verts.push(Vertex::new(t_z, normal, uv));
+        // Arrowhead
+        let a_z1 = s_z + Vec3::new(arrow_head_width, 0.0, 0.0);
+        let a_z2 = s_z - Vec3::new(arrow_head_width, 0.0, 0.0);
+        let a_z3 = s_z + Vec3::new(0.0, arrow_head_width, 0.0);
+        let a_z4 = s_z - Vec3::new(0.0, -arrow_head_width, 0.0);
+        z_verts.push(Vertex::new(t_z, normal, uv)); z_verts.push(Vertex::new(a_z1, normal, uv));
+        z_verts.push(Vertex::new(t_z, normal, uv)); z_verts.push(Vertex::new(a_z2, normal, uv));
+        z_verts.push(Vertex::new(t_z, normal, uv)); z_verts.push(Vertex::new(a_z3, normal, uv));
+        z_verts.push(Vertex::new(t_z, normal, uv)); z_verts.push(Vertex::new(a_z4, normal, uv));
+        z_verts.push(Vertex::new(a_z1, normal, uv)); z_verts.push(Vertex::new(a_z3, normal, uv));
+        z_verts.push(Vertex::new(a_z3, normal, uv)); z_verts.push(Vertex::new(a_z2, normal, uv));
+        z_verts.push(Vertex::new(a_z2, normal, uv)); z_verts.push(Vertex::new(a_z4, normal, uv));
+        z_verts.push(Vertex::new(a_z4, normal, uv)); z_verts.push(Vertex::new(a_z1, normal, uv));
+
+        self.axis_x_buffer = Some(self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Axis X Buffer"),
+            contents: bytemuck::cast_slice(&x_verts),
+            usage: wgpu::BufferUsages::VERTEX,
+        }));
+        self.axis_y_buffer = Some(self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Axis Y Buffer"),
+            contents: bytemuck::cast_slice(&y_verts),
+            usage: wgpu::BufferUsages::VERTEX,
+        }));
+        self.axis_z_buffer = Some(self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Axis Z Buffer"),
+            contents: bytemuck::cast_slice(&z_verts),
+            usage: wgpu::BufferUsages::VERTEX,
+        }));
+        self.axis_count = x_verts.len() as u32;
     }
 
     /// Renders the 3D scene inside a viewport render pass
@@ -1128,7 +1224,7 @@ impl Renderer {
                     if entity.active && entity.mesh.is_some() {
                         if let Some(gpu_mesh) = self.gpu_meshes.get(&selected_id) {
                             // Scale up the model matrix slightly for the outline hull
-                            let outline_scale = 1.03;
+                            let outline_scale = 1.05;
                             let scaled_transform = Mat4::from_scale_rotation_translation(
                                 entity.transform.scale * outline_scale,
                                 entity.transform.rotation,
@@ -1137,7 +1233,7 @@ impl Renderer {
 
                             let outline_uniform = EntityUniform {
                                 model_matrix: scaled_transform.to_cols_array(),
-                                color_tint: [0.45, 0.15, 1.0, 1.0], // Neon purple outline
+                                color_tint: [1.0, 0.5, 0.0, 1.0], // Vibrant glowing orange outline
                                 use_texture: 0,
                                 is_lit: 0,
                                 metallic: 0.0,
@@ -1215,6 +1311,7 @@ impl Renderer {
         if editor_mode {
             for entity in &scene.entities {
                 if !entity.active { continue; }
+                if scene.selected_entity_id == Some(entity.id) { continue; }
                 if let Some(col) = &entity.collider {
                     if !col.active { continue; }
 
@@ -1292,6 +1389,58 @@ impl Renderer {
                     });
 
                     aabb_resources.push((aabb_wire_buffer, entity_buf, default_bones_buf, col_bind_group));
+                }
+            }
+        }
+
+        // Pre-create axis arrows for the selected entity in EditorMode
+        let mut axis_arrow_resources = Vec::new();
+        if editor_mode {
+            if let Some(selected_id) = scene.selected_entity_id {
+                if let Some(_entity) = scene.entities.iter().find(|e| e.id == selected_id) {
+                    let world_matrix = scene.compute_world_matrix(selected_id);
+                    let world_pos = world_matrix.col(3).truncate();
+                    let arrow_model_matrix = Mat4::from_translation(world_pos);
+
+                    let colors = [
+                        [1.0, 0.1, 0.1, 1.0], // X: Red
+                        [0.1, 0.9, 0.1, 1.0], // Y: Green
+                        [0.1, 0.4, 1.0, 1.0], // Z: Blue
+                    ];
+
+                    for (i, color) in colors.iter().enumerate() {
+                        let entity_uniform = EntityUniform {
+                            model_matrix: arrow_model_matrix.to_cols_array(),
+                            color_tint: *color,
+                            use_texture: 0,
+                            is_lit: 0,
+                            metallic: 0.0,
+                            roughness: 0.5,
+                        };
+
+                        let entity_buf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("Axis Arrow Uniform"),
+                            contents: bytemuck::bytes_of(&entity_uniform),
+                            usage: wgpu::BufferUsages::UNIFORM,
+                        });
+
+                        let default_bones_buf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("Axis Arrow Bones"),
+                            contents: bytemuck::bytes_of(&default_bones),
+                            usage: wgpu::BufferUsages::UNIFORM,
+                        });
+
+                        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                            label: Some("Axis Arrow Bind Group"),
+                            layout: &self.entity_bones_layout,
+                            entries: &[
+                                wgpu::BindGroupEntry { binding: 0, resource: entity_buf.as_entire_binding() },
+                                wgpu::BindGroupEntry { binding: 1, resource: default_bones_buf.as_entire_binding() },
+                            ],
+                        });
+
+                        axis_arrow_resources.push((i, entity_buf, default_bones_buf, bind_group));
+                    }
                 }
             }
         }
@@ -1421,6 +1570,25 @@ impl Renderer {
                 }
             }
 
+            // Render Selection Outline Silhouette (if in editor mode)
+            if editor_mode {
+                if let Some((selected_id, _outline_ent_buf, _outline_bones_buf, outline_bind_group, num_indices)) = &outline_resources {
+                    if let Some(gpu_mesh) = self.gpu_meshes.get(selected_id) {
+                        let tex = solid_render_resources.iter()
+                            .find(|(id, _, _, _, _, _)| id == selected_id)
+                            .map(|(_, _, _, _, tex, _)| tex)
+                            .unwrap_or(&self.default_texture);
+
+                        render_pass.set_pipeline(&self.outline_pipeline);
+                        render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
+                        render_pass.set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                        render_pass.set_bind_group(1, outline_bind_group, &[]);
+                        render_pass.set_bind_group(2, &tex.bind_group, &[]);
+                        render_pass.draw_indexed(0..*num_indices, 0, 0..1);
+                    }
+                }
+            }
+
             // Render Skybox last (optimization)
             if let Some(skybox_tex) = &self.skybox_texture {
                 self.skybox_renderer.draw(&mut render_pass, &self.global_bind_group, skybox_tex);
@@ -1445,6 +1613,21 @@ impl Renderer {
                     render_pass.set_vertex_buffer(0, aabb_wire_buffer.slice(..));
                     render_pass.set_bind_group(1, col_bind_group, &[]);
                     render_pass.draw(0..24, 0..1);
+                }
+
+                // C. Draw global axis arrows overlay for the selected entity
+                for (i, _entity_buf, _default_bones_buf, bind_group) in &axis_arrow_resources {
+                    let buffer = match i {
+                        0 => &self.axis_x_buffer,
+                        1 => &self.axis_y_buffer,
+                        2 => &self.axis_z_buffer,
+                        _ => &None,
+                    };
+                    if let Some(buf) = buffer {
+                        render_pass.set_vertex_buffer(0, buf.slice(..));
+                        render_pass.set_bind_group(1, bind_group, &[]);
+                        render_pass.draw(0..self.axis_count, 0..1);
+                    }
                 }
             }
 
