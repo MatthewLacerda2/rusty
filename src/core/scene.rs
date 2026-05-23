@@ -180,6 +180,17 @@ pub struct HealthComponent {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NavMeshAgentComponent {
+    pub active: bool,
+    pub radius: f32,
+    pub target: Vec3,
+    pub speed: f32,
+    pub acceleration: f32,
+    pub stopping_distance: f32,
+    pub velocity: Vec3,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Entity {
     pub id: u32,
     pub name: String,
@@ -194,6 +205,7 @@ pub struct Entity {
     pub collider: Option<ColliderComponent>,
     pub rigidbody: Option<RigidBodyComponent>,
     pub health: Option<HealthComponent>,
+    pub nav_agent: Option<NavMeshAgentComponent>,
     pub parent_id: Option<u32>,
     pub children: Vec<u32>,
 }
@@ -214,6 +226,7 @@ impl Entity {
             collider: None,
             rigidbody: None,
             health: None,
+            nav_agent: None,
             parent_id: None,
             children: Vec::new(),
         }

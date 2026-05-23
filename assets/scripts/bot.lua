@@ -5,8 +5,12 @@ BotAI.health = 100.0
 
 function BotAI.Start(entity_id)
     Transform.SetPosition(entity_id, 8.0, 1.0, 8.0)
+    NavMeshAgent.SetActive(entity_id, true)
+    NavMeshAgent.SetSpeed(entity_id, 3.5)
+    NavMeshAgent.SetAcceleration(entity_id, 8.0)
+    NavMeshAgent.SetStoppingDistance(entity_id, 2.5) -- Stop 2.5 units away from player
     Animator.Play(entity_id, "Walk")
-    print("[Lua] Bot initialized at position (8, 1, 8)")
+    print("[Lua] Bot initialized at position (8, 1, 8) with NavMeshAgent")
 end
 
 function BotAI.Update(entity_id, delta_time)
@@ -19,17 +23,19 @@ function BotAI.Update(entity_id, delta_time)
     local pos_x, pos_y, pos_z = Transform.GetPosition(entity_id)
     local target_x, target_y, target_z = Transform.GetPosition(player_id)
     
-    -- Request path array from the engine's baked navigation system
-    local next_x, next_y, next_z = Navigation.GetNextPathStep(pos_x, pos_y, pos_z, target_x, target_y, target_z)
-    
-    -- Interpolate towards the next step
-    Transform.MoveTowards(entity_id, next_x, next_y, next_z, 3.0 * delta_time)
+    -- Dynamic path target tracking
+    NavMeshAgent.SetTarget(entity_id, target_x, target_y, target_z)
 
-    -- Spin the entity dynamically to look in direction of player
-    let_dx = target_x - pos_x
-    let_dz = target_z - pos_z
-    local angle = math.atan2(let_dx, let_dz) * (180.0 / math.pi)
-    Transform.SetRotation(entity_id, 0.0, angle, 0.0)
+    -- Dynamic rotation towards movement velocity direction and clean animation transition
+    local vx, vy, vz = NavMeshAgent.GetVelocity(entity_id)
+    let_speed_sq = vx * vx + vz * vz
+    if let_speed_sq > 0.01 then
+        local angle = math.atan2(vx, vz) * (180.0 / math.pi)
+        Transform.SetRotation(entity_id, 0.0, angle, 0.0)
+        Animator.Play(entity_id, "Walk")
+    else
+        Animator.Play(entity_id, "Idle")
+    end
 end
 
 function BotAI.Damage(entity_id, amount)

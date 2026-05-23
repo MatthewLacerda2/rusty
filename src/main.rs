@@ -448,6 +448,13 @@ return BotAI
                             // 2. Update active Lua scripting systems
                             script_manager.update_scripts(delta_time);
 
+                            // Tick NavMesh Agents
+                            {
+                                let mut s = scene.borrow_mut();
+                                let nav_graph = nav.borrow();
+                                nav_graph.tick_nav_agents(&mut s, delta_time);
+                            }
+
                             // 3. Tick Physics Engine
                             let trigger_events = {
                                 let mut s = scene.borrow_mut();

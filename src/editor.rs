@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 use glam::Vec3;
 
-use crate::core::scene::{Scene, Entity, TransformComponent, MeshComponent, TextureComponent, ScriptComponent, AnimatorComponent, LightComponent, LightType, ColliderComponent, ColliderShape, RigidBodyComponent, HealthComponent};
+use crate::core::scene::{Scene, Entity, TransformComponent, MeshComponent, TextureComponent, ScriptComponent, AnimatorComponent, LightComponent, LightType, ColliderComponent, ColliderShape, RigidBodyComponent, HealthComponent, NavMeshAgentComponent};
 use crate::scripting::{ConsoleLogs, LogLevel};
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
@@ -649,6 +649,48 @@ impl EditorUi {
                             }
                         }
 
+                        // 3EH. NavMeshAgent Component
+                        if let Some(agent) = &mut entity.nav_agent {
+                            ui.separator();
+                            ui.heading("🛰️ NavMesh Agent Component");
+                            ui.checkbox(&mut agent.active, "Active");
+
+                            ui.horizontal(|ui| {
+                                ui.label("Speed:");
+                                ui.add(egui::DragValue::new(&mut agent.speed).speed(0.05).clamp_range(0.0..=100.0));
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Acceleration:");
+                                ui.add(egui::DragValue::new(&mut agent.acceleration).speed(0.05).clamp_range(0.0..=100.0));
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Stopping Distance:");
+                                ui.add(egui::DragValue::new(&mut agent.stopping_distance).speed(0.05).clamp_range(0.0..=50.0));
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Radius:");
+                                ui.add(egui::DragValue::new(&mut agent.radius).speed(0.05).clamp_range(0.01..=10.0));
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Target:");
+                                ui.add(egui::DragValue::new(&mut agent.target.x).speed(0.1));
+                                ui.add(egui::DragValue::new(&mut agent.target.y).speed(0.1));
+                                ui.add(egui::DragValue::new(&mut agent.target.z).speed(0.1));
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label(format!("Velocity: [{:.2}, {:.2}, {:.2}]", agent.velocity.x, agent.velocity.y, agent.velocity.z));
+                            });
+
+                            if ui.button("🗑 Remove NavMesh Agent").clicked() {
+                                entity.nav_agent = None;
+                            }
+                        }
+
                         // 3F. Add Component Option
                         ui.separator();
                         ui.menu_button("➕ Add Component", |ui| {
@@ -704,6 +746,20 @@ impl EditorUi {
                                         roughness: 0.5,
                                         metallic_map: None,
                                         roughness_map: None,
+                                    });
+                                    ui.close_menu();
+                                }
+                            }
+                            if entity.nav_agent.is_none() {
+                                if ui.button("NavMesh Agent Component").clicked() {
+                                    entity.nav_agent = Some(NavMeshAgentComponent {
+                                        active: true,
+                                        radius: 0.5,
+                                        target: Vec3::new(8.0, 1.0, 8.0),
+                                        speed: 3.0,
+                                        acceleration: 5.0,
+                                        stopping_distance: 0.5,
+                                        velocity: Vec3::ZERO,
                                     });
                                     ui.close_menu();
                                 }

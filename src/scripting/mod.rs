@@ -313,6 +313,114 @@ impl ScriptManager {
 
         lua.globals().set("Navigation", nav_table).map_err(|e| e.to_string())?;
 
+        // 6B. NavMeshAgent Namespace
+        let agent_table = lua.create_table().map_err(|e| e.to_string())?;
+        
+        let scene_clone = Rc::clone(&self.scene);
+        agent_table.set("SetTarget", lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
+            let mut s = scene_clone.borrow_mut();
+            if let Some(e) = s.get_entity_mut(id) {
+                if let Some(agent) = &mut e.nav_agent {
+                    agent.target = Vec3::new(x, y, z);
+                }
+            }
+            Ok(())
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        agent_table.set("GetTarget", lua.create_function(move |_, id: u32| {
+            let s = scene_clone.borrow();
+            if let Some(e) = s.get_entity(id) {
+                if let Some(agent) = &e.nav_agent {
+                    let t = agent.target;
+                    return Ok((t.x, t.y, t.z));
+                }
+            }
+            Ok((0.0, 0.0, 0.0))
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        agent_table.set("SetSpeed", lua.create_function(move |_, (id, speed): (u32, f32)| {
+            let mut s = scene_clone.borrow_mut();
+            if let Some(e) = s.get_entity_mut(id) {
+                if let Some(agent) = &mut e.nav_agent {
+                    agent.speed = speed;
+                }
+            }
+            Ok(())
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        agent_table.set("SetAcceleration", lua.create_function(move |_, (id, acc): (u32, f32)| {
+            let mut s = scene_clone.borrow_mut();
+            if let Some(e) = s.get_entity_mut(id) {
+                if let Some(agent) = &mut e.nav_agent {
+                    agent.acceleration = acc;
+                }
+            }
+            Ok(())
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        agent_table.set("SetStoppingDistance", lua.create_function(move |_, (id, dist): (u32, f32)| {
+            let mut s = scene_clone.borrow_mut();
+            if let Some(e) = s.get_entity_mut(id) {
+                if let Some(agent) = &mut e.nav_agent {
+                    agent.stopping_distance = dist;
+                }
+            }
+            Ok(())
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        agent_table.set("SetRadius", lua.create_function(move |_, (id, r): (u32, f32)| {
+            let mut s = scene_clone.borrow_mut();
+            if let Some(e) = s.get_entity_mut(id) {
+                if let Some(agent) = &mut e.nav_agent {
+                    agent.radius = r;
+                }
+            }
+            Ok(())
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        agent_table.set("IsAtTarget", lua.create_function(move |_, id: u32| {
+            let s = scene_clone.borrow();
+            if let Some(e) = s.get_entity(id) {
+                if let Some(agent) = &e.nav_agent {
+                    let current_pos = e.transform.position;
+                    let to_target = agent.target - current_pos;
+                    return Ok(to_target.length() <= agent.stopping_distance);
+                }
+            }
+            Ok(true)
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        agent_table.set("GetVelocity", lua.create_function(move |_, id: u32| {
+            let s = scene_clone.borrow();
+            if let Some(e) = s.get_entity(id) {
+                if let Some(agent) = &e.nav_agent {
+                    let v = agent.velocity;
+                    return Ok((v.x, v.y, v.z));
+                }
+            }
+            Ok((0.0, 0.0, 0.0))
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        agent_table.set("SetActive", lua.create_function(move |_, (id, active): (u32, bool)| {
+            let mut s = scene_clone.borrow_mut();
+            if let Some(e) = s.get_entity_mut(id) {
+                if let Some(agent) = &mut e.nav_agent {
+                    agent.active = active;
+                }
+            }
+            Ok(())
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        lua.globals().set("NavMeshAgent", agent_table).map_err(|e| e.to_string())?;
+
         // 7. Physics Namespace
         let physics_table = lua.create_table().map_err(|e| e.to_string())?;
         let scene_clone = Rc::clone(&self.scene);

@@ -238,4 +238,72 @@ impl NavigationGraph {
         // Cost: 1.0 cardinal, 1.414 diagonal
         dmin * 1.414 + (dmax - dmin) * 1.0
     }
+
+    /// Steers and updates positions of active NavMesh agents in the scene,
+    /// constraining them strictly to walkable NavMesh cells using a 2D sliding projection check.
+    pub fn tick_nav_agents(&self, scene: &mut Scene, delta_time: f32) {
+        for entity in &mut scene.entities {
+            if !entity.active {
+                continue;
+            }
+
+            if let Some(agent) = &mut entity.nav_agent {
+                if !agent.active {
+                    continue;
+                }
+
+                let current_pos = entity.transform.position;
+                let to_target = agent.target - current_pos;
+                let dist = to_target.length();
+
+                if dist > agent.stopping_distance {
+                    // Query next path node
+                    let next_step = self.get_next_path_step(current_pos, agent.target);
+                    let to_next = next_step - current_pos;
+                    let to_next_dir = to_next.normalize_or_zero();
+
+                    // Accelerate steering velocity
+                    let desired_vel = to_next_dir * agent.speed;
+                    let diff_vel = desired_vel - agent.velocity;
+                    agent.velocity += diff_vel * (agent.acceleration * delta_time).min(1.0);
+
+                    // Proposed step
+                    let proposed_pos_x = current_pos + Vec3::new(agent.velocity.x * delta_time, 0.0, 0.0);
+                    let mut final_pos = current_pos;
+
+                    // Test X movement slide
+                    let (gx, gz) = self.world_to_grid(proposed_pos_x);
+                    if self.is_walkable(gx, gz) {
+                        final_pos.x = proposed_pos_x.x;
+                    } else {
+                        agent.velocity.x = 0.0;
+                    }
+
+                    // Test Z movement slide
+                    let proposed_pos_z = final_pos + Vec3::new(0.0, 0.0, agent.velocity.z * delta_time);
+                    let (gx, gz) = self.world_to_grid(proposed_pos_z);
+                    if self.is_walkable(gx, gz) {
+                        final_pos.z = proposed_pos_z.z;
+                    } else {
+                        agent.velocity.z = 0.0;
+                    }
+
+                    // Preserve original Y position
+                    final_pos.y = current_pos.y;
+
+                    // Apply the constrained position to entity transform
+                    entity.transform.position = final_pos;
+                } else {
+                    // Decelerate to zero velocity when close
+                    agent.velocity -= agent.velocity * (agent.acceleration * delta_time).min(1.0);
+                    if agent.velocity.length_squared() < 0.001 {
+                        agent.velocity = Vec3::ZERO;
+                    }
+                }
+
+                // Keep entity's collider bounds aligned with transform positioning
+                entity.update_collider(None);
+            }
+        }
+    }
 }
