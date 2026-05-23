@@ -11,6 +11,7 @@ use crate::navigation::NavigationGraph;
 
 pub struct EditorUi {
     pub selected_entity_id: Option<u32>,
+    pub is_dirty: bool,
     new_entity_name: String,
     new_entity_type: String,
     new_script_path: String,
@@ -22,6 +23,7 @@ impl EditorUi {
     pub fn new() -> Self {
         Self {
             selected_entity_id: None,
+            is_dirty: true,
             new_entity_name: "New Primitive".to_string(),
             new_entity_type: "Box".to_string(),
             new_script_path: "project/assets/scripts/bot.lua".to_string(),
@@ -391,6 +393,7 @@ impl EditorUi {
 
                         if pos_changed || rot_changed || scl_changed {
                             entity.update_collider(parent_mat);
+                            self.is_dirty = true;
                             if entity.is_static {
                                 pending_nav_bake = true;
                             }
@@ -483,32 +486,46 @@ impl EditorUi {
                             ui.heading("💡 Light Component");
                             
                             let mut color_arr = [light.color.x, light.color.y, light.color.z];
+                            let mut light_changed = false;
                             ui.horizontal(|ui| {
                                 ui.label("Color:");
-                                ui.color_edit_button_rgb(&mut color_arr);
+                                if ui.color_edit_button_rgb(&mut color_arr).changed() {
+                                    light_changed = true;
+                                }
                             });
-                            light.color = Vec3::new(color_arr[0], color_arr[1], color_arr[2]);
+                            if light_changed {
+                                light.color = Vec3::new(color_arr[0], color_arr[1], color_arr[2]);
+                                self.is_dirty = true;
+                            }
 
                             ui.horizontal(|ui| {
                                 ui.label("Intensity:");
-                                ui.add(egui::Slider::new(&mut light.intensity, 0.0..=20.0));
+                                if ui.add(egui::Slider::new(&mut light.intensity, 0.0..=20.0)).changed() {
+                                    self.is_dirty = true;
+                                }
                             });
 
                             if light.light_type == LightType::Point || light.light_type == LightType::Spotlight {
                                 ui.horizontal(|ui| {
                                     ui.label("Range:");
-                                    ui.add(egui::Slider::new(&mut light.range, 0.1..=100.0));
+                                    if ui.add(egui::Slider::new(&mut light.range, 0.1..=100.0)).changed() {
+                                        self.is_dirty = true;
+                                    }
                                 });
                             }
 
                             if light.light_type == LightType::Spotlight {
                                 ui.horizontal(|ui| {
                                     ui.label("Inner Cone:");
-                                    ui.add(egui::Slider::new(&mut light.inner_cone, 0.0..=90.0));
+                                    if ui.add(egui::Slider::new(&mut light.inner_cone, 0.0..=90.0)).changed() {
+                                        self.is_dirty = true;
+                                    }
                                 });
                                 ui.horizontal(|ui| {
                                     ui.label("Outer Cone:");
-                                    ui.add(egui::Slider::new(&mut light.outer_cone, 0.0..=90.0));
+                                    if ui.add(egui::Slider::new(&mut light.outer_cone, 0.0..=90.0)).changed() {
+                                        self.is_dirty = true;
+                                    }
                                 });
                             }
                         }
@@ -705,6 +722,42 @@ impl EditorUi {
                         nav.bake(scene);
                     }
                 } else {
+                    ui.heading("🌍 Global Scene Settings");
+                    ui.separator();
+                    ui.add_space(5.0);
+
+                    // 1. Skybox Path
+                    ui.horizontal(|ui| {
+                        ui.label("Skybox:");
+                        let response = ui.text_edit_singleline(&mut scene.skybox_path);
+                        if response.changed() {
+                            self.is_dirty = true;
+                        }
+                    });
+                    ui.colored_label(egui::Color32::from_rgb(120, 120, 140), "Provide a path to a panoramic image\n(e.g. assets/textures/sky.png)");
+                    ui.add_space(8.0);
+
+                    // 2. Ambient Light Color
+                    ui.label("Ambient Color:");
+                    ui.horizontal(|ui| {
+                        let mut color_arr = [scene.ambient_color.x, scene.ambient_color.y, scene.ambient_color.z];
+                        if ui.color_edit_button_rgb(&mut color_arr).changed() {
+                            scene.ambient_color = Vec3::new(color_arr[0], color_arr[1], color_arr[2]);
+                            self.is_dirty = true;
+                        }
+                    });
+                    ui.add_space(8.0);
+
+                    // 3. Ambient Light Intensity
+                    ui.label("Ambient Intensity:");
+                    let response = ui.add(egui::Slider::new(&mut scene.ambient_intensity, 0.0..=5.0).text("intensity"));
+                    if response.changed() {
+                        self.is_dirty = true;
+                    }
+                    
+                    ui.add_space(15.0);
+                    ui.separator();
+                    ui.add_space(5.0);
                     ui.colored_label(egui::Color32::from_rgb(100, 100, 130), "Select an entity from Hierarchy\nto inspect properties.");
                 }
             });

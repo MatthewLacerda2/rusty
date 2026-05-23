@@ -169,6 +169,66 @@ impl ScriptManager {
 
         lua.globals().set("Transform", transform_table).map_err(|e| e.to_string())?;
 
+        // 2B. Material Namespace
+        let material_table = lua.create_table().map_err(|e| e.to_string())?;
+        
+        let scene_clone = Rc::clone(&self.scene);
+        material_table.set("SetMetallic", lua.create_function(move |_, (id, val): (u32, f32)| {
+            let mut s = scene_clone.borrow_mut();
+            if let Some(e) = s.get_entity_mut(id) {
+                if let Some(tex) = &mut e.texture {
+                    tex.metallic = val;
+                }
+            }
+            Ok(())
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        material_table.set("SetRoughness", lua.create_function(move |_, (id, val): (u32, f32)| {
+            let mut s = scene_clone.borrow_mut();
+            if let Some(e) = s.get_entity_mut(id) {
+                if let Some(tex) = &mut e.texture {
+                    tex.roughness = val;
+                }
+            }
+            Ok(())
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        material_table.set("SetMetallicMap", lua.create_function(move |_, (id, path): (u32, String)| {
+            let mut s = scene_clone.borrow_mut();
+            if let Some(e) = s.get_entity_mut(id) {
+                if let Some(tex) = &mut e.texture {
+                    tex.metallic_map = Some(path);
+                }
+            }
+            Ok(())
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        material_table.set("SetRoughnessMap", lua.create_function(move |_, (id, path): (u32, String)| {
+            let mut s = scene_clone.borrow_mut();
+            if let Some(e) = s.get_entity_mut(id) {
+                if let Some(tex) = &mut e.texture {
+                    tex.roughness_map = Some(path);
+                }
+            }
+            Ok(())
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        material_table.set("SetTexture", lua.create_function(move |_, (id, path): (u32, String)| {
+            let mut s = scene_clone.borrow_mut();
+            if let Some(e) = s.get_entity_mut(id) {
+                if let Some(tex) = &mut e.texture {
+                    tex.path = path;
+                }
+            }
+            Ok(())
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        lua.globals().set("Material", material_table).map_err(|e| e.to_string())?;
+
         // 3. Animator Namespace
         let animator_table = lua.create_table().map_err(|e| e.to_string())?;
         let scene_clone = Rc::clone(&self.scene);

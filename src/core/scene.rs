@@ -252,11 +252,27 @@ impl Entity {
     }
 }
 
+fn default_skybox_path() -> String {
+    "".to_string()
+}
+fn default_ambient_color() -> Vec3 {
+    Vec3::new(0.03, 0.03, 0.045)
+}
+fn default_ambient_intensity() -> f32 {
+    0.24
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Scene {
     pub entities: Vec<Entity>,
     pub next_entity_id: u32,
     pub selected_entity_id: Option<u32>,
+    #[serde(default = "default_skybox_path")]
+    pub skybox_path: String,
+    #[serde(default = "default_ambient_color")]
+    pub ambient_color: Vec3,
+    #[serde(default = "default_ambient_intensity")]
+    pub ambient_intensity: f32,
 }
 
 impl Default for Scene {
@@ -265,9 +281,13 @@ impl Default for Scene {
             entities: Vec::new(),
             next_entity_id: 1,
             selected_entity_id: None,
+            skybox_path: default_skybox_path(),
+            ambient_color: default_ambient_color(),
+            ambient_intensity: default_ambient_intensity(),
         }
     }
 }
+
 
 impl Scene {
     pub fn new() -> Self {

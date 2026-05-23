@@ -1,4 +1,6 @@
 pub mod mesh;
+pub mod skybox;
+pub mod shadows;
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -179,9 +181,16 @@ pub struct Renderer {
     pub gpu_textures: HashMap<String, Rc<GpuTexture>>,
     pub default_texture: Rc<GpuTexture>,
 
-    // Debug line buffers
     grid_vertex_buffer: Option<wgpu::Buffer>,
     grid_count: u32,
+
+    pub skybox_renderer: skybox::SkyboxRenderer,
+    pub shadow_renderer: shadows::ShadowRenderer,
+    pub skybox_texture: Option<Rc<GpuTexture>>,
+    pub skybox_path: String,
+    pub shadow_layout: wgpu::BindGroupLayout,
+    pub shadow_uniform_buffer: wgpu::Buffer,
+    pub shadow_bind_group: wgpu::BindGroup,
 }
 
 impl Renderer {
@@ -348,6 +357,75 @@ impl Renderer {
             source: wgpu::ShaderSource::Wgsl(include_str!("../../assets/shaders/shader.wgsl").into()),
         });
 
+        // Initialize Shadow map system
+        let shadow_renderer = shadows::ShadowRenderer::new(&device);
+
+        let shadow_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Shadow Uniform Buffer"),
+            size: 64, // Mat4 size
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let shadow_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Main Shadow Bind Group Layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Depth,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+                    count: None,
+                },
+            ],
+        });
+
+        let shadow_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Main Shadow Bind Group"),
+            layout: &shadow_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: shadow_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&shadow_renderer.active_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&shadow_renderer.sampler),
+                },
+            ],
+        });
+
+        // Initialize Skybox Renderer
+        let skybox_renderer = skybox::SkyboxRenderer::new(
+            &device,
+            &texture_layout,
+            &camera_lighting_layout,
+            surface_format,
+        );
+
         // 9. Create Render Pipelines
         let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
@@ -355,6 +433,7 @@ impl Renderer {
                 &camera_lighting_layout,
                 &entity_bones_layout,
                 &texture_layout,
+                &shadow_layout,
             ],
             push_constant_ranges: &[],
         });
@@ -504,6 +583,13 @@ impl Renderer {
             default_texture,
             grid_vertex_buffer: None,
             grid_count: 0,
+            skybox_renderer,
+            shadow_renderer,
+            skybox_texture: None,
+            skybox_path: "".to_string(),
+            shadow_layout,
+            shadow_uniform_buffer,
+            shadow_bind_group,
         };
 
         renderer.generate_grid_mesh();
@@ -807,6 +893,16 @@ impl Renderer {
             self.load_texture(&path);
         }
 
+        // Update skybox texture if path changed
+        if !scene.skybox_path.is_empty() && self.skybox_path != scene.skybox_path {
+            let path = scene.skybox_path.clone();
+            self.skybox_path = path.clone();
+            self.skybox_texture = Some(self.load_texture(&path));
+        } else if scene.skybox_path.is_empty() {
+            self.skybox_path = "".to_string();
+            self.skybox_texture = None;
+        }
+
         // 1. Write Camera Matrix Uniform
         let aspect = self.size.width as f32 / self.size.height as f32;
         let view_proj = camera.build_view_projection(aspect);
@@ -821,8 +917,8 @@ impl Renderer {
         // 2. Build and Write Lighting Uniforms
         let mut lighting_uniform = LightingUniform {
             ambient: AmbientLightUniform {
-                color: [0.03, 0.03, 0.045], // Very subtle ambient (0.3x of original)
-                intensity: 0.24,
+                color: scene.ambient_color.to_array(),
+                intensity: scene.ambient_intensity,
             },
             dir_light: DirectionalLightUniform {
                 direction: [-0.5, -1.0, -0.3], // Sun shining downwards diagonally
@@ -1255,6 +1351,29 @@ impl Renderer {
             label: Some("Scene Render Encoder"),
         });
 
+        // A. Shadow depth sweep passes
+        let mut dir_light_dir = Vec3::new(-0.5, -1.0, -0.3).normalize();
+        for entity in &scene.entities {
+            if entity.active {
+                if let Some(light) = &entity.light {
+                    if light.light_type == LightType::Directional {
+                        dir_light_dir = (entity.transform.rotation * Vec3::NEG_Z).normalize();
+                    }
+                }
+            }
+        }
+        self.shadow_renderer.update_light_space(&self.queue, dir_light_dir, camera.position);
+        self.queue.write_buffer(
+            &self.shadow_uniform_buffer,
+            0,
+            bytemuck::bytes_of(&self.shadow_renderer.light_space_matrix.to_cols_array()),
+        );
+
+        if !self.shadow_renderer.is_static_cached {
+            self.shadow_renderer.render_static(&self.device, &mut encoder, scene, &self.gpu_meshes);
+        }
+        self.shadow_renderer.render_dynamic(&self.device, &mut encoder, scene, &self.gpu_meshes);
+
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Scene Render Pass"),
@@ -1286,6 +1405,7 @@ impl Renderer {
             // Set global bindings
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.global_bind_group, &[]);
+            render_pass.set_bind_group(3, &self.shadow_bind_group, &[]);
 
             // Render Solid Entities
             for (id, _ent_buf, _bones_buf, bind_group, tex, num_indices) in &solid_render_resources {
@@ -1296,6 +1416,11 @@ impl Renderer {
                     render_pass.set_bind_group(2, &tex.bind_group, &[]);
                     render_pass.draw_indexed(0..*num_indices, 0, 0..1);
                 }
+            }
+
+            // Render Skybox last (optimization)
+            if let Some(skybox_tex) = &self.skybox_texture {
+                self.skybox_renderer.draw(&mut render_pass, &self.global_bind_group, skybox_tex);
             }
 
             // 5. Render debug overlay tools

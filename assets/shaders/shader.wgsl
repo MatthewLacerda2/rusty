@@ -74,6 +74,14 @@ var t_diffuse: texture_2d<f32>;
 @group(2) @binding(1)
 var s_diffuse: sampler;
 
+@group(3) @binding(0)
+var<uniform> light_space: mat4x4<f32>;
+@group(3) @binding(1)
+var t_shadow: texture_depth_2d;
+@group(3) @binding(2)
+var s_shadow: sampler_comparison;
+
+
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
@@ -191,6 +199,38 @@ fn calculate_pbr(
     return (diffuse + specular) * radiance * NdotL;
 }
 
+fn calculate_shadow(world_pos: vec3<f32>, N: vec3<f32>) -> f32 {
+    let light_space_pos = light_space * vec4<f32>(world_pos, 1.0);
+    let proj_coords = light_space_pos.xyz / light_space_pos.w;
+    
+    let flip_y = vec3<f32>(
+        proj_coords.x * 0.5 + 0.5,
+        -proj_coords.y * 0.5 + 0.5,
+        proj_coords.z
+    );
+    
+    if (flip_y.x < 0.0 || flip_y.x > 1.0 || flip_y.y < 0.0 || flip_y.y > 1.0 || flip_y.z > 1.0) {
+        return 1.0;
+    }
+    
+    let bias = max(0.005 * (1.0 - dot(N, normalize(-lighting.dir_light.direction))), 0.0005);
+    let current_depth = flip_y.z - bias;
+    
+    var shadow = 0.0;
+    let size = textureDimensions(t_shadow);
+    let texel_size = vec2<f32>(1.0 / f32(size.x), 1.0 / f32(size.y));
+    
+    for (var x = -1; x <= 1; x = x + 1) {
+        for (var y = -1; y <= 1; y = y + 1) {
+            let offset = vec2<f32>(f32(x), f32(y)) * texel_size;
+            shadow += textureSampleCompare(t_shadow, s_shadow, flip_y.xy + offset, current_depth);
+        }
+    }
+    shadow /= 9.0;
+    
+    return shadow;
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var base_color: vec4<f32>;
@@ -220,7 +260,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // 2. Directional Light
     let L_dir = normalize(-lighting.dir_light.direction);
     let radiance_dir = lighting.dir_light.color * lighting.dir_light.intensity;
-    lighting_color += calculate_pbr(N, V, L_dir, radiance_dir, F0, metallic, roughness, albedo);
+    let shadow = calculate_shadow(in.world_position, N);
+    lighting_color += calculate_pbr(N, V, L_dir, radiance_dir, F0, metallic, roughness, albedo) * shadow;
+
 
     // 3. Point Lights
     for (var i = 0u; i < lighting.num_point_lights; i = i + 1u) {

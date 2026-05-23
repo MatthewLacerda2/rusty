@@ -561,6 +561,10 @@ return BotAI
                                 let mut c = console.borrow_mut();
                                 let mut n = nav.borrow_mut();
                                 editor_ui.draw(&egui_ctx, &mut s, &mut c, &mut n, &mut is_playing, fps, current_frame_duration);
+                                if editor_ui.is_dirty {
+                                    renderer.shadow_renderer.is_static_cached = false;
+                                    editor_ui.is_dirty = false;
+                                }
                             }
 
                             let full_output = egui_ctx.end_frame();
