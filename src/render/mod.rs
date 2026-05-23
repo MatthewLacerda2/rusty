@@ -924,10 +924,10 @@ impl Renderer {
                 intensity: scene.ambient_intensity,
             },
             dir_light: DirectionalLightUniform {
-                direction: [-0.5, -1.0, -0.3], // Sun shining downwards diagonally
+                direction: [0.0, -1.0, 0.0],
                 _pad1: 0.0,
-                color: [1.0, 0.95, 0.85], // Warm yellow sunlight
-                intensity: 1.2,
+                color: [1.0, 1.0, 1.0],
+                intensity: 0.0,
                 _pad2: [0.0; 4],
             },
             point_lights: [PointLightUniform {
@@ -1365,7 +1365,7 @@ impl Renderer {
                 }
             }
         }
-        self.shadow_renderer.update_light_space(&self.queue, dir_light_dir, camera.position);
+        self.shadow_renderer.update_light_space(&self.queue, dir_light_dir);
         self.queue.write_buffer(
             &self.shadow_uniform_buffer,
             0,

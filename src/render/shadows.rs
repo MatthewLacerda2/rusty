@@ -214,11 +214,12 @@ impl ShadowRenderer {
         }
     }
 
-    pub fn update_light_space(&mut self, queue: &wgpu::Queue, light_dir: Vec3, camera_pos: Vec3) {
+    pub fn update_light_space(&mut self, queue: &wgpu::Queue, light_dir: Vec3) {
         let norm_dir = light_dir.normalize();
-        // Position the shadow camera looking at the player/main scene area
-        let shadow_cam_pos = camera_pos - norm_dir * 45.0;
-        let view = Mat4::look_at_rh(shadow_cam_pos, camera_pos, Vec3::Y);
+        // Position the shadow camera looking at the center of the scene
+        let center = Vec3::ZERO;
+        let shadow_cam_pos = center - norm_dir * 45.0;
+        let view = Mat4::look_at_rh(shadow_cam_pos, center, Vec3::Y);
         
         // Orthographic projection suitable for typical scenes
         let proj = Mat4::orthographic_rh(-30.0, 30.0, -30.0, 30.0, 1.0, 100.0);
