@@ -422,6 +422,61 @@ impl EditorUi {
                             ui.label(format!("Geometry: {} verts | {} indices", mesh.vertices.len(), mesh.indices.len()));
                         }
 
+                        // 3B2. Material / Texture Component
+                        if let Some(tex) = &mut entity.texture {
+                            ui.separator();
+                            ui.heading("🎨 Material / Texture Component");
+                            
+                            ui.horizontal(|ui| {
+                                ui.label("Albedo Map Path:");
+                                ui.text_edit_singleline(&mut tex.path);
+                            });
+                            
+                            ui.horizontal(|ui| {
+                                ui.label("Metallic:");
+                                ui.add(egui::Slider::new(&mut tex.metallic, 0.0..=1.0));
+                            });
+                            
+                            ui.horizontal(|ui| {
+                                ui.label("Roughness:");
+                                ui.add(egui::Slider::new(&mut tex.roughness, 0.0..=1.0));
+                            });
+
+                            let mut has_metallic_map = tex.metallic_map.is_some();
+                            if ui.checkbox(&mut has_metallic_map, "Use Metallic Map").changed() {
+                                if has_metallic_map {
+                                    tex.metallic_map = Some("".to_string());
+                                } else {
+                                    tex.metallic_map = None;
+                                }
+                            }
+                            if let Some(map_path) = &mut tex.metallic_map {
+                                ui.horizontal(|ui| {
+                                    ui.label("  Path:");
+                                    ui.text_edit_singleline(map_path);
+                                });
+                            }
+
+                            let mut has_roughness_map = tex.roughness_map.is_some();
+                            if ui.checkbox(&mut has_roughness_map, "Use Roughness Map").changed() {
+                                if has_roughness_map {
+                                    tex.roughness_map = Some("".to_string());
+                                } else {
+                                    tex.roughness_map = None;
+                                }
+                            }
+                            if let Some(map_path) = &mut tex.roughness_map {
+                                ui.horizontal(|ui| {
+                                    ui.label("  Path:");
+                                    ui.text_edit_singleline(map_path);
+                                });
+                            }
+                            
+                            if ui.button("🗑 Remove Material").clicked() {
+                                entity.texture = None;
+                            }
+                        }
+
                         // 3C. Light configuration
                         if let Some(light) = &mut entity.light {
                             ui.separator();
@@ -627,6 +682,19 @@ impl EditorUi {
                                     ui.close_menu();
                                 }
                             }
+                            if entity.texture.is_none() {
+                                if ui.button("Material / Texture Component").clicked() {
+                                    entity.texture = Some(TextureComponent {
+                                        path: "".to_string(),
+                                        is_dirty: true,
+                                        metallic: 0.0,
+                                        roughness: 0.5,
+                                        metallic_map: None,
+                                        roughness_map: None,
+                                    });
+                                    ui.close_menu();
+                                }
+                            }
                         });
                     }
                     
@@ -689,7 +757,14 @@ impl EditorUi {
                                     if let Some(selected_id) = self.selected_entity_id {
                                         if ui.small_button("Apply to Selected").clicked() {
                                             if let Some(ent) = scene.get_entity_mut(selected_id) {
-                                                ent.texture = Some(TextureComponent { path: path.clone(), is_dirty: true });
+                                                ent.texture = Some(TextureComponent {
+                                                    path: path.clone(),
+                                                    is_dirty: true,
+                                                    metallic: 0.0,
+                                                    roughness: 0.5,
+                                                    metallic_map: None,
+                                                    roughness_map: None,
+                                                });
                                             }
                                         }
                                     }

@@ -53,6 +53,18 @@ pub struct MeshComponent {
 pub struct TextureComponent {
     pub path: String,
     pub is_dirty: bool,
+    #[serde(default)]
+    pub metallic: f32,
+    #[serde(default = "default_roughness")]
+    pub roughness: f32,
+    #[serde(default)]
+    pub metallic_map: Option<String>,
+    #[serde(default)]
+    pub roughness_map: Option<String>,
+}
+
+fn default_roughness() -> f32 {
+    0.5
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

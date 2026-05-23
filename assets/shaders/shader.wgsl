@@ -49,8 +49,8 @@ struct EntityUniforms {
     color_tint: vec4<f32>,
     use_texture: u32,
     is_lit: u32,
-    _pad1: u32,
-    _pad2: u32,
+    metallic: f32,
+    roughness: f32,
 };
 
 struct BoneUniforms {
@@ -124,6 +124,73 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     return out;
 }
 
+const PI: f32 = 3.14159265359;
+
+fn DistributionGGX(N: vec3<f32>, H: vec3<f32>, roughness: f32) -> f32 {
+    let a = roughness * roughness;
+    let a2 = a * a;
+    let NdotH = max(dot(N, H), 0.0);
+    let NdotH2 = NdotH * NdotH;
+
+    let nom   = a2;
+    let denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    return nom / (PI * denom * denom);
+}
+
+fn GeometrySchlickGGX(NdotV: f32, roughness: f32) -> f32 {
+    let r = (roughness + 1.0);
+    let k = (r * r) / 8.0;
+
+    let nom   = NdotV;
+    let denom = NdotV * (1.0 - k) + k;
+
+    return nom / denom;
+}
+
+fn GeometrySmith(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, roughness: f32) -> f32 {
+    let NdotV = max(dot(N, V), 0.0);
+    let NdotL = max(dot(N, L), 0.0);
+    let ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    let ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx2 * ggx1;
+}
+
+fn FresnelSchlick(cosTheta: f32, F0: vec3<f32>) -> vec3<f32> {
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+fn calculate_pbr(
+    N: vec3<f32>, 
+    V: vec3<f32>, 
+    L: vec3<f32>, 
+    radiance: vec3<f32>, 
+    F0: vec3<f32>, 
+    metallic: f32, 
+    roughness: f32, 
+    albedo: vec3<f32>
+) -> vec3<f32> {
+    let H = normalize(L + V);
+    let NdotL = max(dot(N, L), 0.0);
+    let NdotV = max(dot(N, V), 0.0);
+
+    let D = DistributionGGX(N, H, roughness);
+    let G = GeometrySmith(N, V, L, roughness);
+    let F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+
+    let kS = F;
+    var kD = vec3<f32>(1.0) - kS;
+    kD *= 1.0 - metallic;
+
+    let numerator = D * G * F;
+    let denominator = 4.0 * NdotV * NdotL + 0.0001;
+    let specular = numerator / denominator;
+
+    let diffuse = kD * albedo / PI;
+
+    return (diffuse + specular) * radiance * NdotL;
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var base_color: vec4<f32>;
@@ -141,15 +208,19 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let N = normalize(in.world_normal);
     let V = normalize(camera.camera_pos - in.world_position);
 
-    // 1. Ambient Contribution
-    var lighting_color = lighting.ambient.color * lighting.ambient.intensity;
+    let albedo = base_color.rgb;
+    let metallic = clamp(entity.metallic, 0.0, 1.0);
+    let roughness = clamp(entity.roughness, 0.04, 1.0);
+
+    let F0 = mix(vec3<f32>(0.04), albedo, metallic);
+
+    // 1. Ambient lighting term (diffuse ambient)
+    var lighting_color = lighting.ambient.color * lighting.ambient.intensity * albedo * (1.0 - metallic);
 
     // 2. Directional Light
     let L_dir = normalize(-lighting.dir_light.direction);
-    let diff_dir = max(dot(N, L_dir), 0.0);
-    let H_dir = normalize(L_dir + V);
-    let spec_dir = pow(max(dot(N, H_dir), 0.0), 32.0); // specular shininess
-    lighting_color += lighting.dir_light.color * lighting.dir_light.intensity * (diff_dir + spec_dir * 0.5);
+    let radiance_dir = lighting.dir_light.color * lighting.dir_light.intensity;
+    lighting_color += calculate_pbr(N, V, L_dir, radiance_dir, F0, metallic, roughness, albedo);
 
     // 3. Point Lights
     for (var i = 0u; i < lighting.num_point_lights; i = i + 1u) {
@@ -160,39 +231,26 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             continue;
         }
         let L = normalize(light_dir);
-        
-        // Attenuation model
         let atten = 1.0 / (d * d + 1.0);
-        let diff = max(dot(N, L), 0.0);
-        let H = normalize(L + V);
-        let spec = pow(max(dot(N, H), 0.0), 32.0);
-
-        lighting_color += light.color * light.intensity * atten * (diff + spec * 0.5);
+        let radiance = light.color * light.intensity * atten;
+        lighting_color += calculate_pbr(N, V, L, radiance, F0, metallic, roughness, albedo);
     }
 
-    // 4. Spotlight (Flashlight style)
+    // 4. Spotlight
     let spot = lighting.spot_light;
     let spot_dir = spot.position - in.world_position;
     let spot_dist = length(spot_dir);
     if (spot_dist <= spot.range) {
         let L_spot = normalize(spot_dir);
-        
-        // Cosine of angle between spotlight vector and light ray
         let theta = dot(L_spot, normalize(-spot.direction));
         
         if (theta > spot.outer_cone) {
-            // Smooth edge interpolation
             let intensity = clamp((theta - spot.outer_cone) / (spot.inner_cone - spot.outer_cone), 0.0, 1.0);
             let atten = 1.0 / (spot_dist * spot_dist + 1.0);
-            
-            let diff = max(dot(N, L_spot), 0.0);
-            let H = normalize(L_spot + V);
-            let spec = pow(max(dot(N, H), 0.0), 32.0);
-
-            lighting_color += spot.color * spot.intensity * atten * intensity * (diff + spec * 0.5);
+            let radiance = spot.color * spot.intensity * atten * intensity;
+            lighting_color += calculate_pbr(N, V, L_spot, radiance, F0, metallic, roughness, albedo);
         }
     }
 
-    let final_color = vec4<f32>(base_color.rgb * lighting_color, base_color.a);
-    return final_color;
+    return vec4<f32>(lighting_color, base_color.a);
 }

@@ -123,8 +123,8 @@ struct EntityUniform {
     color_tint: [f32; 4],
     use_texture: u32,
     is_lit: u32,
-    _pad1: u32,
-    _pad2: u32,
+    metallic: f32,
+    roughness: f32,
 }
 
 #[repr(C)]
@@ -946,13 +946,19 @@ impl Renderer {
                         [1.0, 1.0, 1.0, 1.0]
                     };
 
+                    let (metallic, roughness) = if let Some(t_comp) = &entity.texture {
+                        (t_comp.metallic, t_comp.roughness)
+                    } else {
+                        (0.0, 0.5)
+                    };
+
                     let entity_uniform = EntityUniform {
                         model_matrix: model_matrix.to_cols_array(),
                         color_tint,
                         use_texture: if entity.texture.is_some() { 1 } else { 0 },
                         is_lit,
-                        _pad1: 0,
-                        _pad2: 0,
+                        metallic,
+                        roughness,
                     };
 
                     let entity_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -1035,8 +1041,8 @@ impl Renderer {
                                 color_tint: [0.45, 0.15, 1.0, 1.0], // Neon purple outline
                                 use_texture: 0,
                                 is_lit: 0,
-                                _pad1: 0,
-                                _pad2: 0,
+                                metallic: 0.0,
+                                roughness: 0.5,
                             };
 
                             let outline_ent_buf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -1080,8 +1086,8 @@ impl Renderer {
                     color_tint: [0.15, 0.15, 0.22, 1.0], // Neon slate blue grid
                     use_texture: 0,
                     is_lit: 0,
-                    _pad1: 0,
-                    _pad2: 0,
+                    metallic: 0.0,
+                    roughness: 0.5,
                 };
                 let grid_buf_unif = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Grid Unif"),
@@ -1163,8 +1169,8 @@ impl Renderer {
                         color_tint: tint_color,
                         use_texture: 0,
                         is_lit: 0,
-                        _pad1: 0,
-                        _pad2: 0,
+                        metallic: 0.0,
+                        roughness: 0.5,
                     };
 
                     let entity_buf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -1218,8 +1224,8 @@ impl Renderer {
                 color_tint: [0.0, 1.0, 0.3, 1.0], // Neon green pathline
                 use_texture: 0,
                 is_lit: 0,
-                _pad1: 0,
-                _pad2: 0,
+                metallic: 0.0,
+                roughness: 0.5,
             };
 
             let entity_buf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
