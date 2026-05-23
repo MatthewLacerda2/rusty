@@ -930,7 +930,7 @@ impl Renderer {
                 if let Some(gpu_mesh) = self.gpu_meshes.get(&entity.id) {
                     // Prepare entity uniform buffer
                     let is_lit = if entity.light.is_some() { 0u32 } else { 1u32 };
-                    let model_matrix = entity.transform.to_matrix();
+                    let model_matrix = scene.compute_world_matrix(entity.id);
                     
                     let color_tint = if let Some(health) = &entity.health {
                         if health.is_dead {
@@ -1314,12 +1314,7 @@ impl Renderer {
                 }
             }
 
-            // C. Draw glowing neon green A* Pathfinding route (drawn in both play and editor if active)
-            if let Some((path_buffer, _entity_buf, _default_bones_buf, path_bind_group, num_vertices)) = &path_resources {
-                render_pass.set_vertex_buffer(0, path_buffer.slice(..));
-                render_pass.set_bind_group(1, path_bind_group, &[]);
-                render_pass.draw(0..*num_vertices, 0..1);
-            }
+
         } // End of Render Pass
 
         // 6. Submit Render commands

@@ -44,4 +44,9 @@ function BotAI.Damage(entity_id, amount)
     end
 end
 
+-- OnTrigger callback hook triggered when this entity overlaps with a trigger collider
+function BotAI.OnTrigger(self_id, other_id)
+    print("[Lua] 🟢 OnTrigger overlap event! Entity " .. self_id .. " intersected trigger with entity " .. other_id)
+end
+
 return BotAI

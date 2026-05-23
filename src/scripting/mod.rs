@@ -102,8 +102,8 @@ impl ScriptManager {
             let mut s = scene_clone.borrow_mut();
             if let Some(e) = s.get_entity_mut(id) {
                 e.transform.position = Vec3::new(x, y, z);
-                e.update_collider();
             }
+            s.update_entity_collider(id);
             Ok(())
         }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
 
@@ -123,8 +123,8 @@ impl ScriptManager {
             let mut s = scene_clone.borrow_mut();
             if let Some(e) = s.get_entity_mut(id) {
                 e.transform.set_euler_angles(Vec3::new(x, y, z));
-                e.update_collider();
             }
+            s.update_entity_collider(id);
             Ok(())
         }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
 
@@ -144,8 +144,8 @@ impl ScriptManager {
             let mut s = scene_clone.borrow_mut();
             if let Some(e) = s.get_entity_mut(id) {
                 e.transform.scale = Vec3::new(x, y, z);
-                e.update_collider();
             }
+            s.update_entity_collider(id);
             Ok(())
         }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
 
@@ -162,8 +162,8 @@ impl ScriptManager {
                 } else {
                     e.transform.position += dir.normalize() * step;
                 }
-                e.update_collider();
             }
+            s.update_entity_collider(id);
             Ok(())
         }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
 
@@ -252,6 +252,57 @@ impl ScriptManager {
         }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
 
         lua.globals().set("Navigation", nav_table).map_err(|e| e.to_string())?;
+
+        // 7. Physics Namespace
+        let physics_table = lua.create_table().map_err(|e| e.to_string())?;
+        let scene_clone = Rc::clone(&self.scene);
+        physics_table.set("GetVelocity", lua.create_function(move |_, id: u32| {
+            let s = scene_clone.borrow();
+            if let Some(e) = s.get_entity(id) {
+                if let Some(rb) = &e.rigidbody {
+                    return Ok((rb.velocity.x, rb.velocity.y, rb.velocity.z));
+                }
+            }
+            Ok((0.0, 0.0, 0.0))
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        physics_table.set("SetVelocity", lua.create_function(move |_, (id, vx, vy, vz): (u32, f32, f32, f32)| {
+            let mut s = scene_clone.borrow_mut();
+            if let Some(e) = s.get_entity_mut(id) {
+                if let Some(rb) = &mut e.rigidbody {
+                    rb.velocity = Vec3::new(vx, vy, vz);
+                }
+            }
+            Ok(())
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        physics_table.set("AddForce", lua.create_function(move |_, (id, fx, fy, fz): (u32, f32, f32, f32)| {
+            let mut s = scene_clone.borrow_mut();
+            if let Some(e) = s.get_entity_mut(id) {
+                if let Some(rb) = &mut e.rigidbody {
+                    if !rb.is_kinematic {
+                        let acc = Vec3::new(fx, fy, fz) / rb.mass.max(0.0001);
+                        rb.velocity += acc;
+                    }
+                }
+            }
+            Ok(())
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        physics_table.set("SetKinematic", lua.create_function(move |_, (id, is_kinematic): (u32, bool)| {
+            let mut s = scene_clone.borrow_mut();
+            if let Some(e) = s.get_entity_mut(id) {
+                if let Some(rb) = &mut e.rigidbody {
+                    rb.is_kinematic = is_kinematic;
+                }
+            }
+            Ok(())
+        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        lua.globals().set("Physics", physics_table).map_err(|e| e.to_string())?;
 
         self.lua = Some(lua);
         self.entity_scripts.clear();
@@ -376,6 +427,39 @@ impl ScriptManager {
                                     anim.freeze = true;
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Invokes the OnTrigger callback on scripts of entities involved in a trigger overlap
+    pub fn dispatch_trigger_events(&mut self, events: Vec<(u32, u32)>) {
+        let lua = match &self.lua {
+            Some(l) => l,
+            None => return,
+        };
+
+        for (id_a, id_b) in events {
+            if let Some(key_a) = self.entity_scripts.get(&id_a) {
+                if let Ok(table) = lua.registry_value::<Table>(key_a) {
+                    if let Ok(trigger_fn) = table.get::<_, mlua::Function>("OnTrigger") {
+                        if let Err(e) = trigger_fn.call::<_, ()>((id_a, id_b)) {
+                            self.console.borrow_mut().error(format!(
+                                "[Lua Error] OnTrigger on entity {} failed: {}", id_a, e
+                            ));
+                        }
+                    }
+                }
+            }
+            if let Some(key_b) = self.entity_scripts.get(&id_b) {
+                if let Ok(table) = lua.registry_value::<Table>(key_b) {
+                    if let Ok(trigger_fn) = table.get::<_, mlua::Function>("OnTrigger") {
+                        if let Err(e) = trigger_fn.call::<_, ()>((id_b, id_a)) {
+                            self.console.borrow_mut().error(format!(
+                                "[Lua Error] OnTrigger on entity {} failed: {}", id_b, e
+                            ));
                         }
                     }
                 }

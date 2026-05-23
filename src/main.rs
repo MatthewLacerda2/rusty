@@ -18,7 +18,7 @@ use winit::{
 };
 use glam::Vec3;
 
-use crate::core::scene::{self, Scene, LightType, LightComponent, ColliderComponent, HealthComponent, AnimatorComponent, ScriptComponent};
+use crate::core::scene::{self, Scene, LightType, LightComponent, ColliderComponent, ColliderShape, RigidBodyComponent, HealthComponent, AnimatorComponent, ScriptComponent};
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scripting::{ScriptManager, ConsoleLogs};
@@ -31,10 +31,51 @@ fn main() {
     env_logger::init();
     println!("[Engine] Starting Antigravity Engine 3D...");
 
-    // 1. Setup local asset structure
-    std::fs::create_dir_all("assets/scripts").ok();
-    std::fs::create_dir_all("assets/textures").ok();
-    std::fs::create_dir_all("assets/models").ok();
+    // 1. Setup local asset structure inside git-ignored project folder
+    std::fs::create_dir_all("project/assets/scripts").ok();
+    std::fs::create_dir_all("project/assets/textures").ok();
+    std::fs::create_dir_all("project/assets/models").ok();
+    std::fs::create_dir_all("project/assets/audio").ok();
+    std::fs::create_dir_all("project/scenes").ok();
+
+    // Ensure default demo bot.lua exists in project/assets/scripts/
+    if !std::path::Path::new("project/assets/scripts/bot.lua").exists() {
+        if let Ok(default_code) = std::fs::read_to_string("assets/scripts/bot.lua") {
+            std::fs::write("project/assets/scripts/bot.lua", default_code).ok();
+        } else {
+            let fallback_lua = r#"
+local BotAI = {}
+BotAI.health = 100.0
+function BotAI.Start(entity_id)
+    Transform.SetPosition(entity_id, 8.0, 1.0, 8.0)
+    Animator.Play(entity_id, "Walk")
+end
+function BotAI.Update(entity_id, delta_time)
+    local player_id = Scene.FindEntityByName("Player")
+    if player_id then
+        local pos_x, pos_y, pos_z = Transform.GetPosition(entity_id)
+        local target_x, target_y, target_z = Transform.GetPosition(player_id)
+        local next_x, next_y, next_z = Navigation.GetNextPathStep(pos_x, pos_y, pos_z, target_x, target_y, target_z)
+        Transform.MoveTowards(entity_id, next_x, next_y, next_z, 3.0 * delta_time)
+        local let_dx = target_x - pos_x
+        local let_dz = target_z - pos_z
+        local angle = math.atan2(let_dx, let_dz) * (180.0 / math.pi)
+        Transform.SetRotation(entity_id, 0.0, angle, 0.0)
+    end
+end
+function BotAI.Damage(entity_id, amount)
+    BotAI.health = BotAI.health - amount
+    if BotAI.health <= 0.0 then
+        Animator.Play(entity_id, "Death")
+    else
+        Animator.Play(entity_id, "Hit")
+    end
+end
+return BotAI
+"#;
+            std::fs::write("project/assets/scripts/bot.lua", fallback_lua).ok();
+        }
+    }
 
     // 2. Initialize Window Event Loop
     let event_loop = EventLoop::new().unwrap();
@@ -95,7 +136,13 @@ fn main() {
             indices: idx_floor,
             is_dirty: std::cell::Cell::new(true),
         });
-        floor.collider = Some(ColliderComponent { active: true, aabb_min: Vec3::ZERO, aabb_max: Vec3::ZERO });
+        floor.collider = Some(ColliderComponent {
+            active: true,
+            shape: ColliderShape::Box { size: Vec3::new(15.0, 0.1, 15.0) },
+            is_trigger: false,
+            aabb_min: Vec3::ZERO,
+            aabb_max: Vec3::ZERO,
+        });
 
         // B. Add Player Camera Anchor (so we can inspect / track player in Hierarchy)
         let player_id = s.add_entity("Player".to_string());
@@ -108,7 +155,20 @@ fn main() {
             indices: idx_player,
             is_dirty: std::cell::Cell::new(true),
         });
-        player.collider = Some(ColliderComponent { active: true, aabb_min: Vec3::ZERO, aabb_max: Vec3::ZERO });
+        player.collider = Some(ColliderComponent {
+            active: true,
+            shape: ColliderShape::Cylinder { radius: 0.5, height: 1.6 },
+            is_trigger: false,
+            aabb_min: Vec3::ZERO,
+            aabb_max: Vec3::ZERO,
+        });
+        player.rigidbody = Some(RigidBodyComponent {
+            active: true,
+            is_kinematic: true,
+            mass: 80.0,
+            velocity: Vec3::ZERO,
+            use_gravity: false,
+        });
 
         // C. Add Static Obstacle Walls (to test dynamic A* path avoidance!)
         let wall1_id = s.add_entity("Obstacle_Wall_Left".to_string());
@@ -123,7 +183,13 @@ fn main() {
             indices: idx_w1,
             is_dirty: std::cell::Cell::new(true),
         });
-        wall1.collider = Some(ColliderComponent { active: true, aabb_min: Vec3::ZERO, aabb_max: Vec3::ZERO });
+        wall1.collider = Some(ColliderComponent {
+            active: true,
+            shape: ColliderShape::Box { size: Vec3::ONE },
+            is_trigger: false,
+            aabb_min: Vec3::ZERO,
+            aabb_max: Vec3::ZERO,
+        });
 
         let wall2_id = s.add_entity("Obstacle_Wall_Right".to_string());
         let wall2 = s.get_entity_mut(wall2_id).unwrap();
@@ -137,7 +203,13 @@ fn main() {
             indices: idx_w2,
             is_dirty: std::cell::Cell::new(true),
         });
-        wall2.collider = Some(ColliderComponent { active: true, aabb_min: Vec3::ZERO, aabb_max: Vec3::ZERO });
+        wall2.collider = Some(ColliderComponent {
+            active: true,
+            shape: ColliderShape::Box { size: Vec3::ONE },
+            is_trigger: false,
+            aabb_min: Vec3::ZERO,
+            aabb_max: Vec3::ZERO,
+        });
 
         // E. Add Dynamic Enemy Bot entity
         let enemy_id = s.add_entity("Enemy_1".to_string());
@@ -150,7 +222,20 @@ fn main() {
             indices: idx_enemy,
             is_dirty: std::cell::Cell::new(true),
         });
-        enemy.collider = Some(ColliderComponent { active: true, aabb_min: Vec3::ZERO, aabb_max: Vec3::ZERO });
+        enemy.collider = Some(ColliderComponent {
+            active: true,
+            shape: ColliderShape::Box { size: Vec3::new(1.3, 2.0, 1.3) },
+            is_trigger: false,
+            aabb_min: Vec3::ZERO,
+            aabb_max: Vec3::ZERO,
+        });
+        enemy.rigidbody = Some(RigidBodyComponent {
+            active: true,
+            is_kinematic: true,
+            mass: 80.0,
+            velocity: Vec3::ZERO,
+            use_gravity: false,
+        });
         enemy.health = Some(HealthComponent { current_health: 100.0, max_health: 100.0, is_dead: false });
         enemy.animator = Some(AnimatorComponent {
             current_clip: "Walk".to_string(),
@@ -161,11 +246,12 @@ fn main() {
         });
         // Auto-assign bot.lua script
         enemy.script = Some(ScriptComponent {
-            path: "assets/scripts/bot.lua".to_string(),
+            path: "project/assets/scripts/bot.lua".to_string(),
             is_loaded: false,
         });
 
         s.update_all_colliders();
+        nav.borrow_mut().bake(&s);
     }
 
     // 6. Editor state values
@@ -323,10 +409,7 @@ fn main() {
                                 last_path_bake = now;
                             }
 
-                            // 1. Update active Lua scripting systems
-                            script_manager.update_scripts(delta_time);
-
-                            // 2. PlayMode Input Controls (Drive the Player entity movement & look)
+                            // 1. PlayMode Input Controls (Drive the Player entity movement & look)
                             {
                                 let mut s = scene.borrow_mut();
                                 let inp = input.borrow();
@@ -343,8 +426,8 @@ fn main() {
                                     let speed = 5.0 * delta_time;
                                     if let Some(player) = s.get_entity_mut(2) {
                                         player.transform.position += move_dir.normalize() * speed;
-                                        player.update_collider();
                                     }
+                                    s.update_entity_collider(2);
                                 }
 
                                 // Look rotations using Arrow Keys
@@ -361,6 +444,20 @@ fn main() {
                                     camera.position = player.transform.position + offset;
                                 }
                             } // s and inp dropped here
+
+                            // 2. Update active Lua scripting systems
+                            script_manager.update_scripts(delta_time);
+
+                            // 3. Tick Physics Engine
+                            let trigger_events = {
+                                let mut s = scene.borrow_mut();
+                                crate::physics::tick_physics(&mut s, delta_time)
+                            };
+
+                            // 4. Dispatch script trigger callbacks
+                            if !trigger_events.is_empty() {
+                                script_manager.dispatch_trigger_events(trigger_events);
+                            }
 
                             // 3. Shooting & Hitscan calculations (Triggered on Space key or Left Click)
                             {
@@ -462,7 +559,8 @@ fn main() {
                             {
                                 let mut s = scene.borrow_mut();
                                 let mut c = console.borrow_mut();
-                                editor_ui.draw(&egui_ctx, &mut s, &mut c, &mut is_playing, fps, current_frame_duration);
+                                let mut n = nav.borrow_mut();
+                                editor_ui.draw(&egui_ctx, &mut s, &mut c, &mut n, &mut is_playing, fps, current_frame_duration);
                             }
 
                             let full_output = egui_ctx.end_frame();

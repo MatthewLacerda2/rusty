@@ -4,9 +4,10 @@ use std::fs;
 use std::path::Path;
 use glam::Vec3;
 
-use crate::core::scene::{Scene, Entity, TransformComponent, MeshComponent, TextureComponent, ScriptComponent, AnimatorComponent, LightComponent, LightType, ColliderComponent, HealthComponent};
+use crate::core::scene::{Scene, Entity, TransformComponent, MeshComponent, TextureComponent, ScriptComponent, AnimatorComponent, LightComponent, LightType, ColliderComponent, ColliderShape, RigidBodyComponent, HealthComponent};
 use crate::scripting::{ConsoleLogs, LogLevel};
 use crate::core::input::InputState;
+use crate::navigation::NavigationGraph;
 
 pub struct EditorUi {
     pub selected_entity_id: Option<u32>,
@@ -23,7 +24,7 @@ impl EditorUi {
             selected_entity_id: None,
             new_entity_name: "New Primitive".to_string(),
             new_entity_type: "Box".to_string(),
-            new_script_path: "assets/scripts/bot.lua".to_string(),
+            new_script_path: "project/assets/scripts/bot.lua".to_string(),
             assets_scripts: Vec::new(),
             assets_textures: Vec::new(),
         }
@@ -69,7 +70,7 @@ impl EditorUi {
         self.assets_textures.clear();
 
         // Scan scripts
-        if let Ok(entries) = fs::read_dir("assets/scripts") {
+        if let Ok(entries) = fs::read_dir("project/assets/scripts") {
             for entry in entries.flatten() {
                 if let Some(path_str) = entry.path().to_str() {
                     if path_str.ends_with(".lua") {
@@ -80,7 +81,7 @@ impl EditorUi {
         }
 
         // Scan textures
-        if let Ok(entries) = fs::read_dir("assets/textures") {
+        if let Ok(entries) = fs::read_dir("project/assets/textures") {
             for entry in entries.flatten() {
                 if let Some(path_str) = entry.path().to_str() {
                     let path_lower = path_str.to_lowercase();
@@ -97,6 +98,7 @@ impl EditorUi {
         ctx: &egui::Context,
         scene: &mut Scene,
         console: &mut ConsoleLogs,
+        nav: &mut NavigationGraph,
         is_playing: &mut bool,
         fps: f32,
         frame_time: f32,
@@ -148,6 +150,27 @@ impl EditorUi {
                     ui.separator();
                     ui.label(format!("Mode: {}", if *is_playing { "🎮 PLAYMODE" } else { "🛠️ EDITORMODE" }));
 
+                    if !*is_playing {
+                        ui.separator();
+                        if ui.button("💾 Save").clicked() {
+                            if let Err(err) = scene.save_to_file("project/scenes/demo.scene") {
+                                console.error(format!("Failed to save scene: {}", err));
+                            } else {
+                                console.info("Scene saved successfully to project/scenes/demo.scene".to_string());
+                            }
+                        }
+                        if ui.button("📂 Load").clicked() {
+                            if let Err(err) = scene.load_from_file("project/scenes/demo.scene") {
+                                console.error(format!("Failed to load scene: {}", err));
+                            } else {
+                                console.info("Scene loaded successfully from project/scenes/demo.scene".to_string());
+                                self.selected_entity_id = None;
+                                scene.selected_entity_id = None;
+                                nav.bake(scene);
+                            }
+                        }
+                    }
+
                     // Statistics alignment on right side
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.label(format!("Frame Time: {:.2} ms", frame_time));
@@ -175,27 +198,8 @@ impl EditorUi {
                 // List active entities
                 egui::ScrollArea::vertical().max_height(250.0).show(ui, |ui| {
                     for entity in &scene.entities {
-                        let is_selected = self.selected_entity_id == Some(entity.id);
-                        
-                        let display_label = if let Some(h) = &entity.health {
-                            if h.is_dead {
-                                format!("💀 {} (Dead)", entity.name)
-                            } else {
-                                format!("👾 {}", entity.name)
-                            }
-                        } else if entity.light.is_some() {
-                            format!("💡 {}", entity.name)
-                        } else {
-                            format!("📦 {}", entity.name)
-                        };
-
-                        let response = ui.selectable_label(is_selected, display_label);
-                        if response.clicked() {
-                            if is_selected {
-                                self.selected_entity_id = None;
-                            } else {
-                                self.selected_entity_id = Some(entity.id);
-                            }
+                        if entity.parent_id.is_none() {
+                            draw_entity_node(ui, entity.id, scene, &mut self.selected_entity_id, 0.0);
                         }
                     }
                 });
@@ -231,22 +235,46 @@ impl EditorUi {
                             "Box" => {
                                 let (v, idx) = crate::primitives::generate_box(1.5, 1.5, 1.5);
                                 ent.mesh = Some(MeshComponent { primitive_type: "Box".to_string(), vertices: v, indices: idx, is_dirty: std::cell::Cell::new(true) });
-                                ent.collider = Some(ColliderComponent { active: true, aabb_min: Vec3::ZERO, aabb_max: Vec3::ZERO });
+                                ent.collider = Some(ColliderComponent {
+                                    active: true,
+                                    shape: ColliderShape::Box { size: Vec3::new(1.5, 1.5, 1.5) },
+                                    is_trigger: false,
+                                    aabb_min: Vec3::ZERO,
+                                    aabb_max: Vec3::ZERO,
+                                });
                             }
                             "Sphere" => {
                                 let (v, idx) = crate::primitives::generate_sphere(1.0, 16, 16);
                                 ent.mesh = Some(MeshComponent { primitive_type: "Sphere".to_string(), vertices: v, indices: idx, is_dirty: std::cell::Cell::new(true) });
-                                ent.collider = Some(ColliderComponent { active: true, aabb_min: Vec3::ZERO, aabb_max: Vec3::ZERO });
+                                ent.collider = Some(ColliderComponent {
+                                    active: true,
+                                    shape: ColliderShape::Sphere { radius: 1.0 },
+                                    is_trigger: false,
+                                    aabb_min: Vec3::ZERO,
+                                    aabb_max: Vec3::ZERO,
+                                });
                             }
                             "Plane" => {
                                 let (v, idx) = crate::primitives::generate_plane(15.0, 15.0);
                                 ent.mesh = Some(MeshComponent { primitive_type: "Plane".to_string(), vertices: v, indices: idx, is_dirty: std::cell::Cell::new(true) });
-                                ent.collider = Some(ColliderComponent { active: true, aabb_min: Vec3::ZERO, aabb_max: Vec3::ZERO });
+                                ent.collider = Some(ColliderComponent {
+                                    active: true,
+                                    shape: ColliderShape::Box { size: Vec3::new(15.0, 0.1, 15.0) },
+                                    is_trigger: false,
+                                    aabb_min: Vec3::ZERO,
+                                    aabb_max: Vec3::ZERO,
+                                });
                             }
                             "Cylinder" => {
                                 let (v, idx) = crate::primitives::generate_cylinder(Vec3::new(0.0, -1.0, 0.0), Vec3::new(0.0, 1.0, 0.0), 0.7, 16);
                                 ent.mesh = Some(MeshComponent { primitive_type: "Cylinder".to_string(), vertices: v, indices: idx, is_dirty: std::cell::Cell::new(true) });
-                                ent.collider = Some(ColliderComponent { active: true, aabb_min: Vec3::ZERO, aabb_max: Vec3::ZERO });
+                                ent.collider = Some(ColliderComponent {
+                                    active: true,
+                                    shape: ColliderShape::Cylinder { radius: 0.7, height: 2.0 },
+                                    is_trigger: false,
+                                    aabb_min: Vec3::ZERO,
+                                    aabb_max: Vec3::ZERO,
+                                });
                             }
                             "Point Light" => {
                                 ent.transform.position = Vec3::new(0.0, 3.0, 0.0);
@@ -265,7 +293,7 @@ impl EditorUi {
                             }
                             _ => {}
                         }
-                        ent.update_collider();
+                        ent.update_collider(None);
                         self.selected_entity_id = Some(id);
                         self.new_entity_name = format!("New Primitive {}", id + 1);
                     }
@@ -290,6 +318,32 @@ impl EditorUi {
                 ui.add_space(5.0);
 
                 if let Some(selected_id) = self.selected_entity_id {
+                    let mut pending_parent_change = None;
+                    let mut pending_nav_bake = false;
+
+                    let current_parent_id = scene.get_entity(selected_id).and_then(|e| e.parent_id);
+                    let parent_mat = current_parent_id.map(|p| scene.compute_world_matrix(p));
+                    let selected_parent_name = if let Some(p_id) = current_parent_id {
+                        scene.get_entity(p_id).map(|e| e.name.clone()).unwrap_or("None".to_string())
+                    } else {
+                        "None".to_string()
+                    };
+
+                    let valid_parents: Vec<(u32, String)> = scene.entities.iter()
+                        .filter(|e| e.id != selected_id)
+                        .filter(|e| {
+                            let mut curr = e.id;
+                            while let Some(ancestor) = scene.get_entity(curr).and_then(|x| x.parent_id) {
+                                if ancestor == selected_id {
+                                    return false;
+                                }
+                                curr = ancestor;
+                            }
+                            true
+                        })
+                        .map(|e| (e.id, e.name.clone()))
+                        .collect();
+
                     if let Some(entity) = scene.get_entity_mut(selected_id) {
                         // Editable name and status
                         ui.horizontal(|ui| {
@@ -297,7 +351,9 @@ impl EditorUi {
                             ui.text_edit_singleline(&mut entity.name);
                         });
                         ui.checkbox(&mut entity.active, "Active / Visible");
-                        ui.checkbox(&mut entity.is_static, "Static (blocks navmesh)");
+                        if ui.checkbox(&mut entity.is_static, "Static (blocks navmesh)").changed() {
+                            pending_nav_bake = true;
+                        }
                         ui.separator();
 
                         // 3A. Transform Editor
@@ -334,8 +390,29 @@ impl EditorUi {
                         });
 
                         if pos_changed || rot_changed || scl_changed {
-                            entity.update_collider();
+                            entity.update_collider(parent_mat);
+                            if entity.is_static {
+                                pending_nav_bake = true;
+                            }
                         }
+
+                        // Parenting Editor
+                        ui.separator();
+                        ui.heading("🔗 Parent-Child Link");
+                        
+                        let mut current_sel = selected_parent_name.clone();
+                        egui::ComboBox::from_label("Parent")
+                            .selected_text(selected_parent_name.clone())
+                            .show_ui(ui, |ui| {
+                                if ui.selectable_value(&mut current_sel, "None".to_string(), "None").clicked() {
+                                    pending_parent_change = Some(None);
+                                }
+                                for (candidate_id, name) in &valid_parents {
+                                    if ui.selectable_value(&mut current_sel, name.clone(), name).clicked() {
+                                        pending_parent_change = Some(Some(*candidate_id));
+                                    }
+                                }
+                            });
 
                         // 3B. Mesh details
                         if let Some(mesh) = &entity.mesh {
@@ -417,12 +494,99 @@ impl EditorUi {
                             ui.checkbox(&mut health.is_dead, "Is Dead");
                         }
 
+                        // 3EE. Collider Component
+                        if let Some(collider) = &mut entity.collider {
+                            ui.separator();
+                            ui.heading("🟢 Collider Component");
+                            ui.checkbox(&mut collider.active, "Active");
+                            ui.checkbox(&mut collider.is_trigger, "Is Trigger");
+
+                            let mut shape_type = match &collider.shape {
+                                ColliderShape::Box { .. } => "Box",
+                                ColliderShape::Sphere { .. } => "Sphere",
+                                ColliderShape::Cylinder { .. } => "Cylinder",
+                            };
+
+                            let old_shape_type = shape_type;
+                            egui::ComboBox::from_label("Shape")
+                                .selected_text(shape_type)
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(&mut shape_type, "Box", "Box");
+                                    ui.selectable_value(&mut shape_type, "Sphere", "Sphere");
+                                    ui.selectable_value(&mut shape_type, "Cylinder", "Cylinder");
+                                });
+
+                            if shape_type != old_shape_type {
+                                collider.shape = match shape_type {
+                                    "Box" => ColliderShape::Box { size: Vec3::ONE },
+                                    "Sphere" => ColliderShape::Sphere { radius: 0.5 },
+                                    "Cylinder" => ColliderShape::Cylinder { radius: 0.5, height: 1.0 },
+                                    _ => ColliderShape::Box { size: Vec3::ONE },
+                                };
+                                pending_nav_bake = true;
+                            }
+
+                            match &mut collider.shape {
+                                ColliderShape::Box { size } => {
+                                    ui.horizontal(|ui| {
+                                        ui.label("Size:");
+                                        ui.add(egui::DragValue::new(&mut size.x).speed(0.05).clamp_range(0.01..=100.0));
+                                        ui.add(egui::DragValue::new(&mut size.y).speed(0.05).clamp_range(0.01..=100.0));
+                                        ui.add(egui::DragValue::new(&mut size.z).speed(0.05).clamp_range(0.01..=100.0));
+                                    });
+                                }
+                                ColliderShape::Sphere { radius } => {
+                                    ui.horizontal(|ui| {
+                                        ui.label("Radius:");
+                                        ui.add(egui::DragValue::new(radius).speed(0.05).clamp_range(0.01..=100.0));
+                                    });
+                                }
+                                ColliderShape::Cylinder { radius, height } => {
+                                    ui.horizontal(|ui| {
+                                        ui.label("Radius:");
+                                        ui.add(egui::DragValue::new(radius).speed(0.05).clamp_range(0.01..=100.0));
+                                        ui.label("Height:");
+                                        ui.add(egui::DragValue::new(height).speed(0.05).clamp_range(0.01..=100.0));
+                                    });
+                                }
+                            }
+
+                            if ui.button("🗑 Remove Collider").clicked() {
+                                entity.collider = None;
+                            }
+                        }
+
+                        // 3EG. RigidBody Component
+                        if let Some(rb) = &mut entity.rigidbody {
+                            ui.separator();
+                            ui.heading("📦 RigidBody Component");
+                            ui.checkbox(&mut rb.active, "Active");
+                            ui.checkbox(&mut rb.is_kinematic, "Is Kinematic");
+                            ui.checkbox(&mut rb.use_gravity, "Use Gravity");
+
+                            ui.horizontal(|ui| {
+                                ui.label("Mass:");
+                                ui.add(egui::DragValue::new(&mut rb.mass).speed(0.05).clamp_range(0.01..=1000.0));
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Velocity:");
+                                ui.add(egui::DragValue::new(&mut rb.velocity.x).speed(0.1));
+                                ui.add(egui::DragValue::new(&mut rb.velocity.y).speed(0.1));
+                                ui.add(egui::DragValue::new(&mut rb.velocity.z).speed(0.1));
+                            });
+
+                            if ui.button("🗑 Remove RigidBody").clicked() {
+                                entity.rigidbody = None;
+                            }
+                        }
+
                         // 3F. Add Component Option
                         ui.separator();
                         ui.menu_button("➕ Add Component", |ui| {
                             if entity.script.is_none() {
                                 if ui.button("Script Component").clicked() {
-                                    entity.script = Some(ScriptComponent { path: "assets/scripts/bot.lua".to_string(), is_loaded: false });
+                                    entity.script = Some(ScriptComponent { path: "project/assets/scripts/bot.lua".to_string(), is_loaded: false });
                                     ui.close_menu();
                                 }
                             }
@@ -435,12 +599,42 @@ impl EditorUi {
                             if entity.health.is_none() {
                                 if ui.button("Health Component (Enemies)").clicked() {
                                     entity.health = Some(HealthComponent { current_health: 100.0, max_health: 100.0, is_dead: false });
-                                    // Make sure animator walks
                                     entity.animator = Some(AnimatorComponent { current_clip: "Idle".to_string(), time: 0.0, speed: 2.0, is_playing: true, freeze: false });
                                     ui.close_menu();
                                 }
                             }
+                            if entity.collider.is_none() {
+                                if ui.button("Collider Component").clicked() {
+                                    entity.collider = Some(ColliderComponent {
+                                        active: true,
+                                        shape: ColliderShape::Box { size: Vec3::ONE },
+                                        is_trigger: false,
+                                        aabb_min: Vec3::ZERO,
+                                        aabb_max: Vec3::ZERO,
+                                    });
+                                    ui.close_menu();
+                                }
+                            }
+                            if entity.rigidbody.is_none() {
+                                if ui.button("RigidBody Component").clicked() {
+                                    entity.rigidbody = Some(RigidBodyComponent {
+                                        active: true,
+                                        is_kinematic: false,
+                                        mass: 1.0,
+                                        velocity: Vec3::ZERO,
+                                        use_gravity: true,
+                                    });
+                                    ui.close_menu();
+                                }
+                            }
                         });
+                    }
+                    
+                    if let Some(new_parent) = pending_parent_change {
+                        let _ = scene.set_parent(selected_id, new_parent);
+                    }
+                    if pending_nav_bake {
+                        nav.bake(scene);
                     }
                 } else {
                     ui.colored_label(egui::Color32::from_rgb(100, 100, 130), "Select an entity from Hierarchy\nto inspect properties.");
@@ -533,5 +727,49 @@ impl EditorUi {
                     });
                 });
             });
+    }
+}
+
+fn draw_entity_node(
+    ui: &mut egui::Ui,
+    entity_id: u32,
+    scene: &Scene,
+    selected_entity_id: &mut Option<u32>,
+    depth: f32,
+) {
+    if let Some(entity) = scene.get_entity(entity_id) {
+        let is_selected = *selected_entity_id == Some(entity.id);
+        
+        let display_label = if let Some(h) = &entity.health {
+            if h.is_dead {
+                format!("💀 {} (Dead)", entity.name)
+            } else {
+                format!("👾 {}", entity.name)
+            }
+        } else if entity.light.is_some() {
+            format!("💡 {}", entity.name)
+        } else {
+            format!("📦 {}", entity.name)
+        };
+
+        ui.horizontal(|ui| {
+            ui.add_space(depth * 15.0); // Indentation for nesting
+            
+            // Parent-child expansion prefix
+            let prefix = if !entity.children.is_empty() { "▼ " } else { "  " };
+            let response = ui.selectable_label(is_selected, format!("{}{}", prefix, display_label));
+            if response.clicked() {
+                if is_selected {
+                    *selected_entity_id = None;
+                } else {
+                    *selected_entity_id = Some(entity.id);
+                }
+            }
+        });
+
+        // Draw descendants with increased indentation
+        for &child_id in &entity.children {
+            draw_entity_node(ui, child_id, scene, selected_entity_id, depth + 1.0);
+        }
     }
 }

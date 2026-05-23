@@ -1,0 +1,254 @@
+{
+  "entities": [
+    {
+      "id": 1,
+      "name": "Floor_Plane",
+      "active": true,
+      "is_static": true,
+      "transform": {
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          2.5,
+          1.0,
+          2.5
+        ]
+      },
+      "mesh": {
+        "primitive_type": "Plane"
+      },
+      "texture": null,
+      "script": null,
+      "animator": null,
+      "light": null,
+      "collider": {
+        "active": true,
+        "aabb_min": [
+          -18.75,
+          0.0,
+          -18.75
+        ],
+        "aabb_max": [
+          18.75,
+          0.0,
+          18.75
+        ]
+      },
+      "health": null,
+      "parent_id": null,
+      "children": []
+    },
+    {
+      "id": 2,
+      "name": "Player",
+      "active": true,
+      "is_static": false,
+      "transform": {
+        "position": [
+          -5.573031,
+          1.5,
+          0.6997933
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "mesh": {
+        "primitive_type": "Cylinder"
+      },
+      "texture": null,
+      "script": null,
+      "animator": null,
+      "light": null,
+      "collider": {
+        "active": true,
+        "aabb_min": [
+          -6.073031,
+          0.7,
+          0.19979328
+        ],
+        "aabb_max": [
+          -5.073031,
+          2.3,
+          1.1997933
+        ]
+      },
+      "health": null,
+      "parent_id": null,
+      "children": []
+    },
+    {
+      "id": 3,
+      "name": "Obstacle_Wall_Left",
+      "active": true,
+      "is_static": true,
+      "transform": {
+        "position": [
+          3.0,
+          1.0,
+          2.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          2.0,
+          4.0
+        ]
+      },
+      "mesh": {
+        "primitive_type": "Box"
+      },
+      "texture": null,
+      "script": null,
+      "animator": null,
+      "light": null,
+      "collider": {
+        "active": true,
+        "aabb_min": [
+          2.5,
+          0.0,
+          0.0
+        ],
+        "aabb_max": [
+          3.5,
+          2.0,
+          4.0
+        ]
+      },
+      "health": null,
+      "parent_id": null,
+      "children": []
+    },
+    {
+      "id": 4,
+      "name": "Obstacle_Wall_Right",
+      "active": true,
+      "is_static": true,
+      "transform": {
+        "position": [
+          -3.0,
+          1.0,
+          4.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          4.0,
+          2.0,
+          1.0
+        ]
+      },
+      "mesh": {
+        "primitive_type": "Box"
+      },
+      "texture": null,
+      "script": null,
+      "animator": null,
+      "light": null,
+      "collider": {
+        "active": true,
+        "aabb_min": [
+          -5.0,
+          0.0,
+          3.5
+        ],
+        "aabb_max": [
+          -1.0,
+          2.0,
+          4.5
+        ]
+      },
+      "health": null,
+      "parent_id": null,
+      "children": []
+    },
+    {
+      "id": 5,
+      "name": "Enemy_1",
+      "active": true,
+      "is_static": false,
+      "transform": {
+        "position": [
+          -5.573031,
+          1.5,
+          0.6997933
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "mesh": {
+        "primitive_type": "Box"
+      },
+      "texture": null,
+      "script": {
+        "path": "assets/scripts/bot.lua",
+        "is_loaded": false
+      },
+      "animator": {
+        "current_clip": "Walk",
+        "time": 20.598879,
+        "speed": 3.0,
+        "is_playing": true,
+        "freeze": false
+      },
+      "light": null,
+      "collider": {
+        "active": true,
+        "aabb_min": [
+          -6.223031,
+          0.5,
+          0.049793303
+        ],
+        "aabb_max": [
+          -4.923031,
+          2.5,
+          1.3497932
+        ]
+      },
+      "health": {
+        "current_health": 100.0,
+        "max_health": 100.0,
+        "is_dead": false
+      },
+      "parent_id": null,
+      "children": []
+    }
+  ],
+  "next_entity_id": 6,
+  "selected_entity_id": null
+}
