@@ -482,6 +482,7 @@ impl Renderer {
                 &camera_lighting_layout,
                 &entity_bones_layout,
                 &texture_layout,
+                &shadow_layout,
             ],
             push_constant_ranges: &[],
         });
