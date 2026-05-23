@@ -5,8 +5,8 @@ use std::path::Path;
 use mlua::{Lua, Table, RegistryKey};
 use glam::Vec3;
 
-use crate::scene::Scene;
-use crate::input::InputState;
+use crate::core::scene::Scene;
+use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 
 pub struct ConsoleLogs {

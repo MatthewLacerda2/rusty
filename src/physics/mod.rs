@@ -1,5 +1,5 @@
 use glam::Vec3;
-use crate::scene::Scene;
+use crate::core::scene::Scene;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Ray {

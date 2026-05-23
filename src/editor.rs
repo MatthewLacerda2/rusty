@@ -4,9 +4,9 @@ use std::fs;
 use std::path::Path;
 use glam::Vec3;
 
-use crate::scene::{Scene, Entity, TransformComponent, MeshComponent, TextureComponent, ScriptComponent, AnimatorComponent, LightComponent, LightType, ColliderComponent, HealthComponent};
+use crate::core::scene::{Scene, Entity, TransformComponent, MeshComponent, TextureComponent, ScriptComponent, AnimatorComponent, LightComponent, LightType, ColliderComponent, HealthComponent};
 use crate::scripting::{ConsoleLogs, LogLevel};
-use crate::input::InputState;
+use crate::core::input::InputState;
 
 pub struct EditorUi {
     pub selected_entity_id: Option<u32>,

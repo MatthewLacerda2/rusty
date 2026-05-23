@@ -1,3 +1,5 @@
+pub mod mesh;
+
 use std::rc::Rc;
 use std::sync::Arc;
 use std::cell::RefCell;
@@ -6,8 +8,8 @@ use wgpu::util::DeviceExt;
 use glam::{Vec3, Mat4, Quat};
 use image::GenericImageView;
 
-use crate::primitives::Vertex;
-use crate::scene::{Scene, Entity, LightType, LightComponent};
+use self::mesh::Vertex;
+use crate::core::scene::{Scene, Entity, LightType, LightComponent};
 
 // Camera representation
 pub struct Camera {
@@ -343,7 +345,7 @@ impl Renderer {
         // 8. Compile WGSL Shader
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Forward Lit Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("../../assets/shaders/shader.wgsl").into()),
         });
 
         // 9. Create Render Pipelines

@@ -1,6 +1,6 @@
 use glam::Vec3;
 use std::collections::{BinaryHeap, HashMap};
-use crate::scene::Scene;
+use crate::core::scene::Scene;
 
 #[derive(Copy, Clone, PartialEq)]
 struct NodeState {

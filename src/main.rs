@@ -1,10 +1,8 @@
-mod primitives;
-mod scene;
-mod input;
+mod core;
 mod navigation;
 mod physics;
 mod scripting;
-mod renderer;
+mod render;
 mod editor;
 
 use std::rc::Rc;
@@ -20,11 +18,12 @@ use winit::{
 };
 use glam::Vec3;
 
-use crate::scene::{Scene, LightType, LightComponent, ColliderComponent, HealthComponent, AnimatorComponent, ScriptComponent};
-use crate::input::InputState;
+use crate::core::scene::{self, Scene, LightType, LightComponent, ColliderComponent, HealthComponent, AnimatorComponent, ScriptComponent};
+use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scripting::{ScriptManager, ConsoleLogs};
-use crate::renderer::{Renderer, Camera};
+use crate::render::{Renderer, Camera};
+use crate::render::mesh as primitives;
 use crate::editor::EditorUi;
 use crate::physics::{Ray, cast_ray_in_scene};
 
