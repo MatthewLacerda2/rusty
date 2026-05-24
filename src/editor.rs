@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 use glam::Vec3;
 
-use crate::core::scene::{Scene, Entity, TransformComponent, MeshComponent, TextureComponent, ScriptComponent, AnimatorComponent, LightComponent, LightType, ColliderComponent, ColliderShape, RigidBodyComponent, HealthComponent, NavMeshAgentComponent};
+use crate::core::scene::{Scene, Entity, TransformComponent, MeshComponent, TextureComponent, ScriptComponent, AnimatorComponent, LightComponent, LightType, ColliderComponent, ColliderShape, RigidBodyComponent, HealthComponent, NavMeshAgentComponent, CameraComponent, VisualCorrectionComponent};
 use crate::scripting::{ConsoleLogs, LogLevel};
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
@@ -343,6 +343,10 @@ impl EditorUi {
                         .collect();
 
                     if let Some(entity) = scene.get_entity_mut(selected_id) {
+                        // Enforce Visual Correction depends on Camera Component
+                        if entity.camera.is_none() && entity.visual_correction.is_some() {
+                            entity.visual_correction = None;
+                        }
                         // Editable name and status
                         ui.horizontal(|ui| {
                             ui.label("Name:");
@@ -691,6 +695,101 @@ impl EditorUi {
                             }
                         }
 
+                        // Camera Component panel
+                        if let Some(cam) = &mut entity.camera {
+                            ui.separator();
+                            ui.heading("🎥 Camera Component");
+                            
+                            ui.horizontal(|ui| {
+                                ui.label("FOV:");
+                                ui.add(egui::Slider::new(&mut cam.fov, 1.0..=120.0));
+                            });
+                            
+                            ui.horizontal(|ui| {
+                                ui.label("Near Clip:");
+                                ui.add(egui::DragValue::new(&mut cam.near).speed(0.01).clamp_range(0.01..=10.0));
+                            });
+                            
+                            ui.horizontal(|ui| {
+                                ui.label("Far Clip:");
+                                ui.add(egui::DragValue::new(&mut cam.far).speed(1.0).clamp_range(1.0..=1000.0));
+                            });
+
+                            ui.checkbox(&mut cam.motion_blur_active, "Intrinsic Motion Blur");
+                            
+                            if cam.motion_blur_active {
+                                ui.horizontal(|ui| {
+                                    ui.label("  Samples:");
+                                    ui.add(egui::Slider::new(&mut cam.motion_blur_samples, 4..=64));
+                                });
+                            }
+                            
+                            if ui.button("🗑 Remove Camera").clicked() {
+                                entity.camera = None;
+                                entity.visual_correction = None;
+                            }
+                        }
+
+                        // Visual Correction Component panel
+                        if let Some(vc) = &mut entity.visual_correction {
+                            ui.separator();
+                            ui.heading("🎨 Visual Correction Component");
+                            
+                            ui.checkbox(&mut vc.active, "Enable Visual Correction");
+                            
+                            ui.add_space(3.0);
+                            ui.label("✨ Bloom");
+                            ui.checkbox(&mut vc.bloom_active, "  Bloom Active");
+                            if vc.bloom_active {
+                                ui.horizontal(|ui| {
+                                    ui.label("    Intensity:");
+                                    ui.add(egui::Slider::new(&mut vc.bloom_intensity, 0.0..=5.0));
+                                });
+                                ui.horizontal(|ui| {
+                                    ui.label("    Threshold:");
+                                    ui.add(egui::Slider::new(&mut vc.bloom_threshold, 0.0..=1.0));
+                                });
+                            }
+
+                            ui.add_space(3.0);
+                            ui.label("🌈 Color Correction");
+                            ui.horizontal(|ui| {
+                                ui.label("  Exposure (EV):");
+                                ui.add(egui::Slider::new(&mut vc.exposure, -4.0..=4.0));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("  Contrast:");
+                                ui.add(egui::Slider::new(&mut vc.contrast, 0.0..=2.0));
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("  Saturation:");
+                                ui.add(egui::Slider::new(&mut vc.saturation, 0.0..=2.0));
+                            });
+
+                            ui.add_space(3.0);
+                            ui.label("🪞 Screen Space Reflections (SSR)");
+                            ui.checkbox(&mut vc.ssr_active, "  SSR Active");
+                            if vc.ssr_active {
+                                ui.horizontal(|ui| {
+                                    ui.label("    Quality:");
+                                    egui::ComboBox::from_label("")
+                                        .selected_text(&vc.ssr_quality)
+                                        .show_ui(ui, |ui| {
+                                            ui.selectable_value(&mut vc.ssr_quality, "Low".to_string(), "Low");
+                                            ui.selectable_value(&mut vc.ssr_quality, "Medium".to_string(), "Medium");
+                                            ui.selectable_value(&mut vc.ssr_quality, "High".to_string(), "High");
+                                            ui.selectable_value(&mut vc.ssr_quality, "Ultra".to_string(), "Ultra");
+                                        });
+                                });
+                                ui.checkbox(&mut vc.ssr_temporal_upsampling, "    Temporal Upsampling");
+                            }
+
+                            ui.add_space(5.0);
+                            if ui.button("🗑 Remove Visual Correction").clicked() {
+                                entity.visual_correction = None;
+                            }
+                        }
+
                         // 3F. Add Component Option
                         ui.separator();
                         ui.menu_button("➕ Add Component", |ui| {
@@ -760,6 +859,36 @@ impl EditorUi {
                                         acceleration: 5.0,
                                         stopping_distance: 0.5,
                                         velocity: Vec3::ZERO,
+                                    });
+                                    ui.close_menu();
+                                }
+                            }
+                            if entity.camera.is_none() {
+                                if ui.button("📷 Camera Component").clicked() {
+                                    entity.camera = Some(CameraComponent {
+                                        active: true,
+                                        fov: 45.0,
+                                        near: 0.1,
+                                        far: 200.0,
+                                        motion_blur_active: true,
+                                        motion_blur_samples: 16,
+                                    });
+                                    ui.close_menu();
+                                }
+                            }
+                            if entity.camera.is_some() && entity.visual_correction.is_none() {
+                                if ui.button("🎨 Visual Correction Component").clicked() {
+                                    entity.visual_correction = Some(VisualCorrectionComponent {
+                                        active: true,
+                                        bloom_active: true,
+                                        bloom_intensity: 1.0,
+                                        bloom_threshold: 0.8,
+                                        exposure: 0.0,
+                                        contrast: 1.0,
+                                        saturation: 1.0,
+                                        ssr_active: true,
+                                        ssr_quality: "High".to_string(),
+                                        ssr_temporal_upsampling: true,
                                     });
                                     ui.close_menu();
                                 }
