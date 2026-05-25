@@ -4,6 +4,8 @@ use std::fs;
 use std::path::Path;
 use glam::Vec3;
 
+pub mod inspectors;
+
 use crate::core::scene::{Scene, Entity, TransformComponent, MeshComponent, TextureComponent, ScriptComponent, AnimatorComponent, LightComponent, LightType, ColliderComponent, ColliderShape, RigidBodyComponent, HealthComponent, NavMeshAgentComponent, CameraComponent, VisualCorrectionComponent};
 use crate::scripting::{ConsoleLogs, LogLevel};
 use crate::core::input::InputState;
@@ -11,24 +13,53 @@ use crate::navigation::NavigationGraph;
 
 pub struct EditorUi {
     pub selected_entity_id: Option<u32>,
+    pub selected_asset_path: Option<String>,
+    pub current_dir: String,
     pub is_dirty: bool,
     new_entity_name: String,
     new_entity_type: String,
     new_script_path: String,
     assets_scripts: Vec<String>,
     assets_textures: Vec<String>,
+
+    // Custom asset inspector properties
+    pub asset_image_wrap: String,
+    pub asset_image_filter: String,
+    pub asset_image_mipmaps: bool,
+    pub asset_audio_volume: f32,
+    pub asset_audio_pitch: f32,
+    pub asset_audio_loop: bool,
+    pub asset_audio_playing: bool,
+    pub asset_audio_play_time: Option<std::time::Instant>,
+    pub asset_model_scale: f32,
+    pub asset_model_import_normals: bool,
+    pub asset_script_content: String,
 }
 
 impl EditorUi {
     pub fn new() -> Self {
         Self {
             selected_entity_id: None,
+            selected_asset_path: None,
+            current_dir: "project".to_string(),
             is_dirty: true,
             new_entity_name: "New Primitive".to_string(),
             new_entity_type: "Box".to_string(),
             new_script_path: "project/assets/scripts/bot.lua".to_string(),
             assets_scripts: Vec::new(),
             assets_textures: Vec::new(),
+
+            asset_image_wrap: "Repeat".to_string(),
+            asset_image_filter: "Linear".to_string(),
+            asset_image_mipmaps: true,
+            asset_audio_volume: 0.8,
+            asset_audio_pitch: 1.0,
+            asset_audio_loop: false,
+            asset_audio_playing: false,
+            asset_audio_play_time: None,
+            asset_model_scale: 1.0,
+            asset_model_import_normals: true,
+            asset_script_content: String::new(),
         }
     }
 
@@ -66,7 +97,7 @@ impl EditorUi {
         ctx.set_style(style);
     }
 
-    /// Read local assets folders to populate Asset Browser
+    /// Read local assets folders to populate Asset Browser (legacy scan, kept for compatibility)
     pub fn scan_assets(&mut self) {
         self.assets_scripts.clear();
         self.assets_textures.clear();
@@ -102,14 +133,15 @@ impl EditorUi {
         console: &mut ConsoleLogs,
         nav: &mut NavigationGraph,
         is_playing: &mut bool,
-        fps: f32,
-        frame_time: f32,
+        _fps: f32,
+        _frame_time: f32,
     ) {
         self.apply_theme(ctx);
         self.scan_assets();
 
         // Push editor selection to scene (editor UI is the authority)
         scene.selected_entity_id = self.selected_entity_id;
+        
         // 1. TOP HEADER PANEL (Controls engine state) — ALWAYS VISIBLE
         egui::TopBottomPanel::top("Header Panel").frame(
             egui::Frame::none().fill(egui::Color32::from_rgb(14, 14, 22))
@@ -117,11 +149,9 @@ impl EditorUi {
                 .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(26, 24, 38)))
         ).show(ctx, |ui| {
             ui.horizontal(|ui| {
-                // Play / Stop controls with purple highlight on the active state button
                 let purple_bg = egui::Color32::from_rgb(90, 50, 180);
 
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    // Play button: purple bg when in PlayMode
                     let play_btn = if *is_playing {
                         egui::Button::new(egui::RichText::new("▶ Play").color(egui::Color32::WHITE).strong())
                             .fill(purple_bg)
@@ -132,7 +162,6 @@ impl EditorUi {
                         *is_playing = true;
                     }
 
-                    // Stop button: purple bg when in EditorMode
                     let stop_btn = if !*is_playing {
                         egui::Button::new(egui::RichText::new("■ Stop").color(egui::Color32::WHITE).strong())
                             .fill(purple_bg)
@@ -148,38 +177,27 @@ impl EditorUi {
                     ui.separator();
                     ui.label(format!("Mode: {}", if *is_playing { "🎮 PLAYMODE" } else { "🛠️ EDITORMODE" }));
 
-                    if !*is_playing {
-                        ui.separator();
-                        if ui.button("💾 Save").clicked() {
+                    // Quick scene save/load buttons in header
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.button("💾 Save Scene").clicked() {
                             if let Err(err) = scene.save_to_file("project/scenes/demo.scene") {
                                 console.error(format!("Failed to save scene: {}", err));
                             } else {
                                 console.info("Scene saved successfully to project/scenes/demo.scene".to_string());
                             }
                         }
-                        if ui.button("📂 Load").clicked() {
+                        if ui.button("📂 Load Scene").clicked() {
                             if let Err(err) = scene.load_from_file("project/scenes/demo.scene") {
                                 console.error(format!("Failed to load scene: {}", err));
                             } else {
                                 console.info("Scene loaded successfully from project/scenes/demo.scene".to_string());
-                                self.selected_entity_id = None;
-                                scene.selected_entity_id = None;
-                                nav.bake(scene);
                             }
                         }
-                    }
-
-                    // Statistics alignment on right side
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label(format!("Frame Time: {:.2} ms", frame_time));
-                        ui.separator();
-                        ui.label(format!("FPS: {:.0}", fps));
                     });
                 });
             });
         });
 
-        // If in PlayMode, hide side editor bars to maximize immersive viewport renders
         if *is_playing {
             return;
         }
@@ -197,7 +215,7 @@ impl EditorUi {
                 egui::ScrollArea::vertical().max_height(250.0).show(ui, |ui| {
                     for entity in &scene.entities {
                         if entity.parent_id.is_none() {
-                            draw_entity_node(ui, entity.id, scene, &mut self.selected_entity_id, 0.0);
+                            draw_entity_node(ui, entity.id, scene, &mut self.selected_entity_id, &mut self.selected_asset_path, 0.0);
                         }
                     }
                 });
@@ -219,81 +237,35 @@ impl EditorUi {
                             ui.selectable_value(&mut self.new_entity_type, "Sphere".to_string(), "Sphere Mesh");
                             ui.selectable_value(&mut self.new_entity_type, "Plane".to_string(), "Plane Mesh");
                             ui.selectable_value(&mut self.new_entity_type, "Cylinder".to_string(), "Cylinder Mesh");
-                            ui.selectable_value(&mut self.new_entity_type, "Point Light".to_string(), "Point Light");
-                            ui.selectable_value(&mut self.new_entity_type, "Spotlight".to_string(), "Spotlight");
+                            ui.selectable_value(&mut self.new_entity_type, "PointLight".to_string(), "💡 Point Light");
+                            ui.selectable_value(&mut self.new_entity_type, "DirectionalLight".to_string(), "☀️ Dir Light");
                         });
 
-                    if ui.button("➕ Add").clicked() {
-                        let name = self.new_entity_name.clone();
-                        let id = scene.add_entity(name.clone());
-                        let ent = scene.get_entity_mut(id).unwrap();
-
-                        // Configure mesh type
-                        match self.new_entity_type.as_str() {
-                            "Box" => {
-                                let (v, idx) = crate::primitives::generate_box(1.5, 1.5, 1.5);
+                    if ui.button("➕ Create").clicked() {
+                        let new_id = scene.add_entity(self.new_entity_name.clone());
+                        let name_lower = self.new_entity_type.to_lowercase();
+                        if let Some(ent) = scene.get_entity_mut(new_id) {
+                            if name_lower == "box" {
+                                let (v, idx) = crate::render::mesh::generate_box(1.0, 1.0, 1.0);
                                 ent.mesh = Some(MeshComponent { primitive_type: "Box".to_string(), vertices: v, indices: idx, is_dirty: std::cell::Cell::new(true) });
-                                ent.collider = Some(ColliderComponent {
-                                    active: true,
-                                    shape: ColliderShape::Box { size: Vec3::new(1.5, 1.5, 1.5) },
-                                    is_trigger: false,
-                                    aabb_min: Vec3::ZERO,
-                                    aabb_max: Vec3::ZERO,
-                                });
-                            }
-                            "Sphere" => {
-                                let (v, idx) = crate::primitives::generate_sphere(1.0, 16, 16);
+                            } else if name_lower == "sphere" {
+                                let (v, idx) = crate::render::mesh::generate_sphere(1.0, 16, 16);
                                 ent.mesh = Some(MeshComponent { primitive_type: "Sphere".to_string(), vertices: v, indices: idx, is_dirty: std::cell::Cell::new(true) });
-                                ent.collider = Some(ColliderComponent {
-                                    active: true,
-                                    shape: ColliderShape::Sphere { radius: 1.0 },
-                                    is_trigger: false,
-                                    aabb_min: Vec3::ZERO,
-                                    aabb_max: Vec3::ZERO,
-                                });
-                            }
-                            "Plane" => {
-                                let (v, idx) = crate::primitives::generate_plane(15.0, 15.0);
+                            } else if name_lower == "plane" {
+                                let (v, idx) = crate::render::mesh::generate_plane(15.0, 15.0);
                                 ent.mesh = Some(MeshComponent { primitive_type: "Plane".to_string(), vertices: v, indices: idx, is_dirty: std::cell::Cell::new(true) });
-                                ent.collider = Some(ColliderComponent {
-                                    active: true,
-                                    shape: ColliderShape::Box { size: Vec3::new(15.0, 0.1, 15.0) },
-                                    is_trigger: false,
-                                    aabb_min: Vec3::ZERO,
-                                    aabb_max: Vec3::ZERO,
-                                });
-                            }
-                            "Cylinder" => {
-                                let (v, idx) = crate::primitives::generate_cylinder(Vec3::new(0.0, -1.0, 0.0), Vec3::new(0.0, 1.0, 0.0), 0.7, 16);
+                            } else if name_lower == "cylinder" {
+                                let (v, idx) = crate::render::mesh::generate_cylinder(Vec3::new(0.0, -0.5, 0.0), Vec3::new(0.0, 0.5, 0.0), 0.5, 12);
                                 ent.mesh = Some(MeshComponent { primitive_type: "Cylinder".to_string(), vertices: v, indices: idx, is_dirty: std::cell::Cell::new(true) });
-                                ent.collider = Some(ColliderComponent {
-                                    active: true,
-                                    shape: ColliderShape::Cylinder { radius: 0.7, height: 2.0 },
-                                    is_trigger: false,
-                                    aabb_min: Vec3::ZERO,
-                                    aabb_max: Vec3::ZERO,
-                                });
+                            } else if name_lower == "pointlight" {
+                                ent.light = Some(LightComponent { light_type: LightType::Point, color: Vec3::ONE, intensity: 1.5, range: 10.0, inner_cone: 0.0, outer_cone: 0.0 });
+                            } else if name_lower == "directionallight" {
+                                ent.light = Some(LightComponent { light_type: LightType::Directional, color: Vec3::new(1.0, 0.95, 0.8), intensity: 2.0, range: 0.0, inner_cone: 0.0, outer_cone: 0.0 });
                             }
-                            "Point Light" => {
-                                ent.transform.position = Vec3::new(0.0, 3.0, 0.0);
-                                ent.light = Some(LightComponent { light_type: LightType::Point, color: Vec3::new(1.0, 1.0, 1.0), intensity: 2.0, range: 10.0, inner_cone: 0.0, outer_cone: 0.0 });
-                                // Light mesh visualizer
-                                let (v, idx) = crate::primitives::generate_sphere(0.2, 8, 8);
-                                ent.mesh = Some(MeshComponent { primitive_type: "Sphere".to_string(), vertices: v, indices: idx, is_dirty: std::cell::Cell::new(true) });
-                            }
-                            "Spotlight" => {
-                                ent.transform.position = Vec3::new(0.0, 4.0, 0.0);
-                                ent.transform.set_euler_angles(Vec3::new(-90.0, 0.0, 0.0)); // Downward
-                                ent.light = Some(LightComponent { light_type: LightType::Spotlight, color: Vec3::new(1.0, 1.0, 1.0), intensity: 3.0, range: 15.0, inner_cone: 15.0, outer_cone: 30.0 });
-                                // Light mesh visualizer
-                                let (v, idx) = crate::primitives::generate_cylinder(Vec3::new(0.0, -0.2, 0.0), Vec3::new(0.0, 0.2, 0.0), 0.15, 8);
-                                ent.mesh = Some(MeshComponent { primitive_type: "Cylinder".to_string(), vertices: v, indices: idx, is_dirty: std::cell::Cell::new(true) });
-                            }
-                            _ => {}
+                            self.selected_entity_id = Some(new_id);
+                            self.selected_asset_path = None; // clear asset selection
+                            self.is_dirty = true;
                         }
-                        ent.update_collider(None);
-                        self.selected_entity_id = Some(id);
-                        self.new_entity_name = format!("New Primitive {}", id + 1);
                     }
                 });
 
@@ -306,7 +278,7 @@ impl EditorUi {
                 }
             });
 
-        // 3. RIGHT PANEL: Inspector (Mutates properties of the selected Entity)
+        // 3. RIGHT PANEL: Properties Inspector
         egui::SidePanel::right("Inspector Panel")
             .width_range(260.0..=340.0)
             .frame(egui::Frame::none().fill(egui::Color32::from_rgb(10, 10, 15)).inner_margin(10.0))
@@ -343,11 +315,10 @@ impl EditorUi {
                         .collect();
 
                     if let Some(entity) = scene.get_entity_mut(selected_id) {
-                        // Enforce Visual Correction depends on Camera Component
                         if entity.camera.is_none() && entity.visual_correction.is_some() {
                             entity.visual_correction = None;
                         }
-                        // Editable name and status
+
                         ui.horizontal(|ui| {
                             ui.label("Name:");
                             ui.text_edit_singleline(&mut entity.name);
@@ -358,7 +329,7 @@ impl EditorUi {
                         }
                         ui.separator();
 
-                        // 3A. Transform Editor
+                        // 3A. Transform Editor with Integrated Parenting
                         ui.heading("📐 Transform");
                         let trans = &mut entity.transform;
 
@@ -399,23 +370,24 @@ impl EditorUi {
                             }
                         }
 
-                        // Parenting Editor
-                        ui.separator();
-                        ui.heading("🔗 Parent-Child Link");
-                        
-                        let mut current_sel = selected_parent_name.clone();
-                        egui::ComboBox::from_label("Parent")
-                            .selected_text(selected_parent_name.clone())
-                            .show_ui(ui, |ui| {
-                                if ui.selectable_value(&mut current_sel, "None".to_string(), "None").clicked() {
-                                    pending_parent_change = Some(None);
-                                }
-                                for (candidate_id, name) in &valid_parents {
-                                    if ui.selectable_value(&mut current_sel, name.clone(), name).clicked() {
-                                        pending_parent_change = Some(Some(*candidate_id));
+                        // Integrated Parenting directly under Transform
+                        ui.add_space(5.0);
+                        ui.horizontal(|ui| {
+                            ui.label("Parent:");
+                            let mut current_sel = selected_parent_name.clone();
+                            egui::ComboBox::from_id_source("ParentSelectionCombo")
+                                .selected_text(selected_parent_name.clone())
+                                .show_ui(ui, |ui| {
+                                    if ui.selectable_value(&mut current_sel, "None".to_string(), "None").clicked() {
+                                        pending_parent_change = Some(None);
                                     }
-                                }
-                            });
+                                    for (candidate_id, name) in &valid_parents {
+                                        if ui.selectable_value(&mut current_sel, name.clone(), name).clicked() {
+                                            pending_parent_change = Some(Some(*candidate_id));
+                                        }
+                                    }
+                                });
+                        });
 
                         // 3B. Mesh details
                         if let Some(mesh) = &entity.mesh {
@@ -538,7 +510,6 @@ impl EditorUi {
                                 ui.text_edit_singleline(&mut script.path);
                             });
                             
-                            // Check file exists
                             let exists = Path::new(&script.path).exists();
                             if exists {
                                 ui.colored_label(egui::Color32::from_rgb(0, 242, 254), "✔ Loaded and ready to run");
@@ -902,6 +873,9 @@ impl EditorUi {
                     if pending_nav_bake {
                         nav.bake(scene);
                     }
+                } else if let Some(ref asset_path) = self.selected_asset_path {
+                    // Modular Asset Inspectors dispatch call
+                    inspectors::draw_inspector(ui, self, scene, console, asset_path);
                 } else {
                     ui.heading("🌍 Global Scene Settings");
                     ui.separator();
@@ -939,11 +913,11 @@ impl EditorUi {
                     ui.add_space(15.0);
                     ui.separator();
                     ui.add_space(5.0);
-                    ui.colored_label(egui::Color32::from_rgb(100, 100, 130), "Select an entity from Hierarchy\nto inspect properties.");
+                    ui.colored_label(egui::Color32::from_rgb(100, 100, 130), "Select an entity from Hierarchy\nor click a project asset to inspect.");
                 }
             });
 
-        // 4. BOTTOM PANEL: Split into Asset Browser (Left) and Developer Log Console (Right)
+        // 4. BOTTOM PANEL: Folder Explorer & Console Logs
         egui::TopBottomPanel::bottom("Bottom Panel")
             .min_height(160.0)
             .frame(
@@ -953,57 +927,97 @@ impl EditorUi {
             )
             .show(ctx, |ui| {
                 ui.columns(2, |columns| {
-                    // LEFT COLUMN: Asset Browser
+                    // LEFT COLUMN: Unity-style Folder Explorer
                     let ui_l = &mut columns[0];
-                    ui_l.heading("📁 Asset Browser");
+                    ui_l.horizontal(|ui| {
+                        ui.heading("📁 Project Assets");
+                        if ui.button("⟲ Root").clicked() {
+                            self.current_dir = "project".to_string();
+                        }
+                    });
                     ui_l.separator();
-                    ui_l.add_space(3.0);
 
-                    egui::ScrollArea::vertical().id_source("AssetsScroll").max_height(120.0).show(ui_l, |ui| {
-                        ui.label("📜 Scripts:");
-                        if self.assets_scripts.is_empty() {
-                            ui.colored_label(egui::Color32::GRAY, "  (Empty scripts folder)");
-                        } else {
-                            for path in &self.assets_scripts {
-                                let filename = Path::new(path).file_name().and_then(|f| f.to_str()).unwrap_or(path);
-                                ui.horizontal(|ui| {
-                                    ui.label(format!("  📄 {}", filename));
-                                    if let Some(selected_id) = self.selected_entity_id {
-                                        if ui.small_button("Attach to Selected").clicked() {
-                                            if let Some(ent) = scene.get_entity_mut(selected_id) {
-                                                ent.script = Some(ScriptComponent { path: path.clone(), is_loaded: false });
-                                            }
-                                        }
-                                    }
-                                });
+                    // Draw Breadcrumb Bar
+                    ui_l.horizontal(|ui| {
+                        let parts: Vec<&str> = self.current_dir.split('/').filter(|s| !s.is_empty()).collect();
+                        let mut path_acc = String::new();
+                        for (i, part) in parts.iter().enumerate() {
+                            if i > 0 {
+                                ui.label(">");
+                            }
+                            if !path_acc.is_empty() {
+                                path_acc.push('/');
+                            }
+                            path_acc.push_str(part);
+                            
+                            let current_path = path_acc.clone();
+                            if ui.selectable_label(self.current_dir == current_path, *part).clicked() {
+                                self.current_dir = current_path;
                             }
                         }
+                    });
+                    ui_l.add_space(5.0);
 
-                        ui.add_space(5.0);
-                        ui.label("🖼️ Textures:");
-                        if self.assets_textures.is_empty() {
-                            ui.colored_label(egui::Color32::GRAY, "  (Empty textures folder)");
-                        } else {
-                            for path in &self.assets_textures {
-                                let filename = Path::new(path).file_name().and_then(|f| f.to_str()).unwrap_or(path);
+                    egui::ScrollArea::vertical().id_source("FolderExplorerScroll").max_height(120.0).show(ui_l, |ui| {
+                        if let Ok(entries) = std::fs::read_dir(&self.current_dir) {
+                            let mut dirs = Vec::new();
+                            let mut files = Vec::new();
+
+                            for entry in entries.flatten() {
+                                let path = entry.path();
+                                let path_str = path.to_string_lossy().to_string().replace("\\", "/");
+                                if path.is_dir() {
+                                    dirs.push(path_str);
+                                } else {
+                                    files.push(path_str);
+                                }
+                            }
+                            dirs.sort();
+                            files.sort();
+
+                            // Subdirectories
+                            for dir_path in dirs {
+                                let folder_name = Path::new(&dir_path).file_name().and_then(|s| s.to_str()).unwrap_or("Folder");
                                 ui.horizontal(|ui| {
-                                    ui.label(format!("  🖼️ {}", filename));
-                                    if let Some(selected_id) = self.selected_entity_id {
-                                        if ui.small_button("Apply to Selected").clicked() {
-                                            if let Some(ent) = scene.get_entity_mut(selected_id) {
-                                                ent.texture = Some(TextureComponent {
-                                                    path: path.clone(),
-                                                    is_dirty: true,
-                                                    metallic: 0.0,
-                                                    roughness: 0.5,
-                                                    metallic_map: None,
-                                                    roughness_map: None,
-                                                });
+                                    if ui.button(format!("📁 {}", folder_name)).clicked() {
+                                        self.current_dir = dir_path;
+                                    }
+                                });
+                            }
+
+                            // Files
+                            for file_path in files {
+                                let filename = Path::new(&file_path).file_name().and_then(|s| s.to_str()).unwrap_or("File");
+                                
+                                let extension = Path::new(&file_path).extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+                                let icon = match extension.as_str() {
+                                    "png" | "tga" | "jpg" | "jpeg" => "🖼️",
+                                    "wav" | "mp3" | "ogg" => "🎵",
+                                    "scene" => "🎬",
+                                    "fbx" | "obj" => "📐",
+                                    "lua" => "📄",
+                                    _ => "📝",
+                                };
+
+                                let is_selected = self.selected_asset_path.as_ref() == Some(&file_path);
+                                
+                                ui.horizontal(|ui| {
+                                    let label_res = ui.selectable_label(is_selected, format!("{} {}", icon, filename));
+                                    if label_res.clicked() {
+                                        self.selected_asset_path = Some(file_path.clone());
+                                        self.selected_entity_id = None; // Deselect scene entity!
+                                        
+                                        // Load initial data for script editing
+                                        if extension == "lua" {
+                                            if let Ok(content) = std::fs::read_to_string(&file_path) {
+                                                self.asset_script_content = content;
                                             }
                                         }
                                     }
                                 });
                             }
+                        } else {
+                            ui.colored_label(egui::Color32::RED, "Failed to read directory.");
                         }
                     });
 
@@ -1026,9 +1040,9 @@ impl EditorUi {
                         } else {
                             for (msg, level) in &console.messages {
                                 let color = match level {
-                                    LogLevel::Info => egui::Color32::from_rgb(220, 220, 230),      // White
-                                    LogLevel::Warning => egui::Color32::from_rgb(255, 200, 50),     // Yellow
-                                    LogLevel::Error => egui::Color32::from_rgb(255, 60, 100),       // Bright Red
+                                    LogLevel::Info => egui::Color32::from_rgb(220, 220, 230),
+                                    LogLevel::Warning => egui::Color32::from_rgb(255, 200, 50),
+                                    LogLevel::Error => egui::Color32::from_rgb(255, 60, 100),
                                 };
                                 ui.colored_label(color, format!("  {}", msg));
                             }
@@ -1044,6 +1058,7 @@ fn draw_entity_node(
     entity_id: u32,
     scene: &Scene,
     selected_entity_id: &mut Option<u32>,
+    selected_asset_path: &mut Option<String>,
     depth: f32,
 ) {
     if let Some(entity) = scene.get_entity(entity_id) {
@@ -1062,9 +1077,8 @@ fn draw_entity_node(
         };
 
         ui.horizontal(|ui| {
-            ui.add_space(depth * 15.0); // Indentation for nesting
+            ui.add_space(depth * 15.0);
             
-            // Parent-child expansion prefix
             let prefix = if !entity.children.is_empty() { "▼ " } else { "  " };
             let response = ui.selectable_label(is_selected, format!("{}{}", prefix, display_label));
             if response.clicked() {
@@ -1072,13 +1086,13 @@ fn draw_entity_node(
                     *selected_entity_id = None;
                 } else {
                     *selected_entity_id = Some(entity.id);
+                    *selected_asset_path = None; // Deselect active asset inspection
                 }
             }
         });
 
-        // Draw descendants with increased indentation
         for &child_id in &entity.children {
-            draw_entity_node(ui, child_id, scene, selected_entity_id, depth + 1.0);
+            draw_entity_node(ui, child_id, scene, selected_entity_id, selected_asset_path, depth + 1.0);
         }
     }
 }
