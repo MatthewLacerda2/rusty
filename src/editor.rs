@@ -239,6 +239,7 @@ impl EditorUi {
                             ui.selectable_value(&mut self.new_entity_type, "Cylinder".to_string(), "Cylinder Mesh");
                             ui.selectable_value(&mut self.new_entity_type, "PointLight".to_string(), "💡 Point Light");
                             ui.selectable_value(&mut self.new_entity_type, "DirectionalLight".to_string(), "☀️ Dir Light");
+                            ui.selectable_value(&mut self.new_entity_type, "SpotLight".to_string(), "🔦 Spot Light");
                         });
 
                     if ui.button("➕ Create").clicked() {
@@ -258,9 +259,11 @@ impl EditorUi {
                                 let (v, idx) = crate::render::mesh::generate_cylinder(Vec3::new(0.0, -0.5, 0.0), Vec3::new(0.0, 0.5, 0.0), 0.5, 12);
                                 ent.mesh = Some(MeshComponent { primitive_type: "Cylinder".to_string(), vertices: v, indices: idx, is_dirty: std::cell::Cell::new(true) });
                             } else if name_lower == "pointlight" {
-                                ent.light = Some(LightComponent { light_type: LightType::Point, color: Vec3::ONE, intensity: 1.5, range: 10.0, inner_cone: 0.0, outer_cone: 0.0 });
+                                ent.light = Some(LightComponent { light_type: LightType::Point, color: Vec3::ONE, intensity: 1.5, range: 10.0, inner_cone: 30.0, outer_cone: 45.0 });
                             } else if name_lower == "directionallight" {
                                 ent.light = Some(LightComponent { light_type: LightType::Directional, color: Vec3::new(1.0, 0.95, 0.8), intensity: 2.0, range: 0.0, inner_cone: 0.0, outer_cone: 0.0 });
+                            } else if name_lower == "spotlight" {
+                                ent.light = Some(LightComponent { light_type: LightType::Spotlight, color: Vec3::ONE, intensity: 2.0, range: 15.0, inner_cone: 30.0, outer_cone: 45.0 });
                             }
                             self.selected_entity_id = Some(new_id);
                             self.selected_asset_path = None; // clear asset selection
@@ -457,6 +460,38 @@ impl EditorUi {
                             ui.separator();
                             ui.heading("💡 Light Component");
                             
+                            // Type selection (Spot, Directional, Point)
+                            ui.horizontal(|ui| {
+                                ui.label("Type:");
+                                let current_type_name = match light.light_type {
+                                    LightType::Point => "Point",
+                                    LightType::Directional => "Directional",
+                                    LightType::Spotlight => "Spot",
+                                    LightType::Ambient => "Ambient",
+                                };
+                                egui::ComboBox::from_id_source("LightTypeSelector")
+                                    .selected_text(current_type_name)
+                                    .show_ui(ui, |ui| {
+                                        if ui.selectable_label(light.light_type == LightType::Point, "Point").clicked() {
+                                            light.light_type = LightType::Point;
+                                            self.is_dirty = true;
+                                        }
+                                        if ui.selectable_label(light.light_type == LightType::Directional, "Directional").clicked() {
+                                            light.light_type = LightType::Directional;
+                                            self.is_dirty = true;
+                                        }
+                                        if ui.selectable_label(light.light_type == LightType::Spotlight, "Spot").clicked() {
+                                            light.light_type = LightType::Spotlight;
+                                            self.is_dirty = true;
+                                            // Provide sensible default cones if they were zero
+                                            if light.inner_cone == 0.0 && light.outer_cone == 0.0 {
+                                                light.inner_cone = 30.0;
+                                                light.outer_cone = 45.0;
+                                            }
+                                        }
+                                    });
+                            });
+
                             let mut color_arr = [light.color.x, light.color.y, light.color.z];
                             let mut light_changed = false;
                             ui.horizontal(|ui| {
@@ -477,28 +512,42 @@ impl EditorUi {
                                 }
                             });
 
+                            // For spot and point, choose distance
                             if light.light_type == LightType::Point || light.light_type == LightType::Spotlight {
                                 ui.horizontal(|ui| {
-                                    ui.label("Range:");
+                                    ui.label("Distance:");
                                     if ui.add(egui::Slider::new(&mut light.range, 0.1..=100.0)).changed() {
                                         self.is_dirty = true;
                                     }
                                 });
                             }
 
+                            // For spot, choose FOV (Outer Cone) and optionally Inner Cone
                             if light.light_type == LightType::Spotlight {
                                 ui.horizontal(|ui| {
-                                    ui.label("Inner Cone:");
-                                    if ui.add(egui::Slider::new(&mut light.inner_cone, 0.0..=90.0)).changed() {
+                                    ui.label("FOV (Outer Cone):");
+                                    if ui.add(egui::Slider::new(&mut light.outer_cone, 0.1..=90.0).suffix("°")).changed() {
                                         self.is_dirty = true;
+                                        if light.inner_cone > light.outer_cone {
+                                            light.inner_cone = light.outer_cone;
+                                        }
                                     }
                                 });
                                 ui.horizontal(|ui| {
-                                    ui.label("Outer Cone:");
-                                    if ui.add(egui::Slider::new(&mut light.outer_cone, 0.0..=90.0)).changed() {
+                                    ui.label("Inner Cone:");
+                                    if ui.add(egui::Slider::new(&mut light.inner_cone, 0.0..=90.0).suffix("°")).changed() {
                                         self.is_dirty = true;
+                                        if light.inner_cone > light.outer_cone {
+                                            light.outer_cone = light.inner_cone;
+                                        }
                                     }
                                 });
+                            }
+
+                            ui.add_space(5.0);
+                            if ui.button("🗑 Remove Light").clicked() {
+                                entity.light = None;
+                                self.is_dirty = true;
                             }
                         }
 
@@ -771,8 +820,8 @@ impl EditorUi {
                                 }
                             }
                             if entity.light.is_none() {
-                                if ui.button("Point Light Component").clicked() {
-                                    entity.light = Some(LightComponent { light_type: LightType::Point, color: Vec3::ONE, intensity: 1.5, range: 10.0, inner_cone: 0.0, outer_cone: 0.0 });
+                                if ui.button("💡 Light Component").clicked() {
+                                    entity.light = Some(LightComponent { light_type: LightType::Point, color: Vec3::ONE, intensity: 1.5, range: 10.0, inner_cone: 30.0, outer_cone: 45.0 });
                                     ui.close_menu();
                                 }
                             }
@@ -873,9 +922,9 @@ impl EditorUi {
                     if pending_nav_bake {
                         nav.bake(scene);
                     }
-                } else if let Some(ref asset_path) = self.selected_asset_path {
+                } else if let Some(asset_path) = self.selected_asset_path.clone() {
                     // Modular Asset Inspectors dispatch call
-                    inspectors::draw_inspector(ui, self, scene, console, asset_path);
+                    inspectors::draw_inspector(ui, self, scene, console, &asset_path);
                 } else {
                     ui.heading("🌍 Global Scene Settings");
                     ui.separator();
@@ -938,6 +987,7 @@ impl EditorUi {
                     ui_l.separator();
 
                     // Draw Breadcrumb Bar
+                    let mut new_dir = None;
                     ui_l.horizontal(|ui| {
                         let parts: Vec<&str> = self.current_dir.split('/').filter(|s| !s.is_empty()).collect();
                         let mut path_acc = String::new();
@@ -952,10 +1002,13 @@ impl EditorUi {
                             
                             let current_path = path_acc.clone();
                             if ui.selectable_label(self.current_dir == current_path, *part).clicked() {
-                                self.current_dir = current_path;
+                                new_dir = Some(current_path);
                             }
                         }
                     });
+                    if let Some(dir) = new_dir {
+                        self.current_dir = dir;
+                    }
                     ui_l.add_space(5.0);
 
                     egui::ScrollArea::vertical().id_source("FolderExplorerScroll").max_height(120.0).show(ui_l, |ui| {
@@ -977,7 +1030,7 @@ impl EditorUi {
 
                             // Subdirectories
                             for dir_path in dirs {
-                                let folder_name = Path::new(&dir_path).file_name().and_then(|s| s.to_str()).unwrap_or("Folder");
+                                let folder_name = Path::new(&dir_path).file_name().and_then(|s| s.to_str()).unwrap_or("Folder").to_string();
                                 ui.horizontal(|ui| {
                                     if ui.button(format!("📁 {}", folder_name)).clicked() {
                                         self.current_dir = dir_path;

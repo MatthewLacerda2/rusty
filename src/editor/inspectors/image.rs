@@ -68,27 +68,32 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
         ui.colored_label(egui::Color32::GRAY, "No entities in scene to apply texture to.");
     } else {
         ui.label("Choose an entity to apply this texture:");
-        let mut selected_ent_name = "Select Entity...".to_string();
+        let selected_ent_name = "Select Entity...".to_string();
         
+        let mut clicked_entity_id = None;
         egui::ComboBox::from_id_source("ApplyTextureToEntity")
             .selected_text(selected_ent_name)
             .show_ui(ui, |ui| {
                 for entity in &scene.entities {
                     if ui.selectable_label(false, &entity.name).clicked() {
-                        if let Some(ent) = scene.get_entity_mut(entity.id) {
-                            ent.texture = Some(TextureComponent {
-                                path: path.to_string(),
-                                is_dirty: true,
-                                metallic: 0.0,
-                                roughness: 0.5,
-                                metallic_map: None,
-                                roughness_map: None,
-                            });
-                            editor.is_dirty = true;
-                        }
+                        clicked_entity_id = Some(entity.id);
                     }
                 }
             });
+
+        if let Some(entity_id) = clicked_entity_id {
+            if let Some(ent) = scene.get_entity_mut(entity_id) {
+                ent.texture = Some(TextureComponent {
+                    path: path.to_string(),
+                    is_dirty: true,
+                    metallic: 0.0,
+                    roughness: 0.5,
+                    metallic_map: None,
+                    roughness_map: None,
+                });
+                editor.is_dirty = true;
+            }
+        }
     }
 }
 

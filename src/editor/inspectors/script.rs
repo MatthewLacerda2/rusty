@@ -72,24 +72,31 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, console
         ui.colored_label(egui::Color32::GRAY, "No entities in scene to attach script to.");
     } else {
         ui.label("Select an entity to attach this script:");
-        let mut selected_ent_name = "Select Entity...".to_string();
+        let selected_ent_name = "Select Entity...".to_string();
         
+        let mut clicked_entity_id = None;
+        let mut clicked_entity_name = String::new();
         egui::ComboBox::from_id_source("AttachScriptToEntity")
             .selected_text(selected_ent_name)
             .show_ui(ui, |ui| {
                 for entity in &scene.entities {
                     if ui.selectable_label(false, &entity.name).clicked() {
-                        if let Some(ent) = scene.get_entity_mut(entity.id) {
-                            ent.script = Some(ScriptComponent {
-                                path: path.to_string(),
-                                is_loaded: false,
-                            });
-                            editor.is_dirty = true;
-                            console.info(format!("Attached script {} to {}", filename, entity.name));
-                        }
+                        clicked_entity_id = Some(entity.id);
+                        clicked_entity_name = entity.name.clone();
                     }
                 }
             });
+
+        if let Some(entity_id) = clicked_entity_id {
+            if let Some(ent) = scene.get_entity_mut(entity_id) {
+                ent.script = Some(ScriptComponent {
+                    path: path.to_string(),
+                    is_loaded: false,
+                });
+                editor.is_dirty = true;
+                console.info(format!("Attached script {} to {}", filename, clicked_entity_name));
+            }
+        }
     }
 }
 
