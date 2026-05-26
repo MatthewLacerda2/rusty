@@ -113,9 +113,9 @@ struct LightingUniform {
     point_lights: [PointLightUniform; 4],
     spot_light: SpotlightUniform,
     num_point_lights: u32,
-    _pad1: f32,
-    _pad2: f32,
-    _pad3: f32,
+    ssr_active: f32,
+    ssr_quality: f32,
+    ssr_temporal_upsampling: f32,
 }
 
 #[repr(C)]
@@ -249,9 +249,9 @@ impl Renderer {
         let (depth_texture, depth_view) = Self::create_depth_resources(&device, &config);
 
         // 6. Create Bind Group Layouts
-        // Group 0: Camera (0) & Lighting (1)
+        // Group 0: Camera (0), Lighting (1), Skybox Texture (2), Skybox Sampler (3)
         let camera_lighting_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Camera & Lighting Layout"),
+            label: Some("Camera, Lighting & Skybox Layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -271,6 +271,22 @@ impl Renderer {
                         has_dynamic_offset: false,
                         min_binding_size: None,
                     },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
             ],
@@ -326,6 +342,9 @@ impl Renderer {
             ],
         });
 
+        // 10. Generate default grid checker texture (moved up to bind statically to global layouts)
+        let default_texture = Rc::new(Self::create_default_checkerboard_texture(&device, &queue, &texture_layout));
+
         // 7. Create Global Uniform Buffers
         let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Camera Uniform Buffer"),
@@ -352,6 +371,14 @@ impl Renderer {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: lighting_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&default_texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&default_texture.sampler),
                 },
             ],
         });
@@ -564,8 +591,7 @@ impl Renderer {
             multiview: None,
         });
 
-        // 10. Generate default high-quality grid checker texture
-        let default_texture = Rc::new(Self::create_default_checkerboard_texture(&device, &queue, &texture_layout));
+
 
         let mut renderer = Self {
             device,
@@ -1047,9 +1073,9 @@ impl Renderer {
                 _pad3: 0.0,
             },
             num_point_lights: 0,
-            _pad1: 0.0,
-            _pad2: 0.0,
-            _pad3: 0.0,
+            ssr_active: 0.0,
+            ssr_quality: 0.0,
+            ssr_temporal_upsampling: 0.0,
         };
 
         // Populate dynamic lights from the scene
@@ -1107,6 +1133,35 @@ impl Renderer {
             }
         }
         lighting_uniform.num_point_lights = pt_idx as u32;
+
+        // Scan scene for active Visual Correction components (SSR)
+        let mut ssr_active = 0.0;
+        let mut ssr_quality = 2.0; // High default
+        let mut ssr_temporal = 0.0;
+
+        for entity in &scene.entities {
+            if !entity.active { continue; }
+            if let Some(vc) = &entity.visual_correction {
+                if vc.ssr_active {
+                    ssr_active = 1.0;
+                }
+                ssr_quality = match vc.ssr_quality.as_str() {
+                    "Low" => 0.0,
+                    "Medium" => 1.0,
+                    "High" => 2.0,
+                    "Ultra" => 3.0,
+                    _ => 2.0,
+                };
+                if vc.ssr_temporal_upsampling {
+                    ssr_temporal = 1.0;
+                }
+            }
+        }
+
+        lighting_uniform.ssr_active = ssr_active;
+        lighting_uniform.ssr_quality = ssr_quality;
+        lighting_uniform.ssr_temporal_upsampling = ssr_temporal;
+
         self.queue.write_buffer(&self.lighting_buffer, 0, bytemuck::bytes_of(&lighting_uniform));
 
         // 3. Pre-create all uniform buffers and bind groups to extend lifetimes
@@ -1525,6 +1580,38 @@ impl Renderer {
             self.shadow_renderer.render_static(&self.device, &mut encoder, scene, &self.gpu_meshes);
         }
         self.shadow_renderer.render_dynamic(&self.device, &mut encoder, scene, &self.gpu_meshes);
+
+        // Dynamic global bind group updates to bind active skybox view & sampler for reflections
+        let skybox_view = self.skybox_texture.as_ref()
+            .map(|tex| &tex.view)
+            .unwrap_or(&self.default_texture.view);
+            
+        let skybox_sampler = self.skybox_texture.as_ref()
+            .map(|tex| &tex.sampler)
+            .unwrap_or(&self.default_texture.sampler);
+            
+        self.global_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Global Bind Group with Reflections"),
+            layout: &self.camera_lighting_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.camera_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: self.lighting_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(skybox_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(skybox_sampler),
+                },
+            ],
+        });
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

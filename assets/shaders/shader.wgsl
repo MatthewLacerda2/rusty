@@ -39,9 +39,9 @@ struct LightingUniforms {
     point_lights: array<PointLight, 4>,
     spot_light: Spotlight,
     num_point_lights: u32,
-    _pad1: f32,
-    _pad2: f32,
-    _pad3: f32,
+    ssr_active: f32,
+    ssr_quality: f32,
+    ssr_temporal_upsampling: f32,
 };
 
 struct EntityUniforms {
@@ -62,6 +62,11 @@ var<uniform> camera: CameraUniforms;
 
 @group(0) @binding(1)
 var<uniform> lighting: LightingUniforms;
+
+@group(0) @binding(2)
+var t_skybox: texture_2d<f32>;
+@group(0) @binding(3)
+var s_skybox: sampler;
 
 @group(1) @binding(0)
 var<uniform> entity: EntityUniforms;
@@ -292,6 +297,20 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             let radiance = spot.color * spot.intensity * atten * intensity;
             lighting_color += calculate_pbr(N, V, L_spot, radiance, F0, metallic, roughness, albedo);
         }
+    }
+
+    // 5. Environment Map Reflections (PBR SSR)
+    if (lighting.ssr_active > 0.5) {
+        let R = reflect(-V, N);
+        let phi = atan2(R.z, R.x);
+        let theta = acos(clamp(R.y, -1.0, 1.0));
+        let u = (phi + PI) / (2.0 * PI);
+        let v = theta / PI;
+        let env_reflection = textureSample(t_skybox, s_skybox, vec2<f32>(u, v)).rgb;
+
+        let F_refl = FresnelSchlick(max(dot(N, V), 0.0), F0);
+        let reflection_scale = (1.0 - roughness) * (metallic + (1.0 - metallic) * 0.2);
+        lighting_color += env_reflection * F_refl * reflection_scale;
     }
 
     return vec4<f32>(lighting_color, base_color.a);

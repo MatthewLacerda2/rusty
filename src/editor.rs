@@ -416,17 +416,37 @@ impl EditorUi {
                         });
 
                         // 3B. Mesh details
+                        let mut remove_mesh = false;
                         if let Some(mesh) = &entity.mesh {
                             ui.separator();
-                            ui.heading("📦 Mesh Filter");
+                            ui.horizontal(|ui| {
+                                ui.heading("📦 Mesh Filter");
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button("🗑").on_hover_text("Remove Mesh Filter").clicked() {
+                                        remove_mesh = true;
+                                    }
+                                });
+                            });
                             ui.label(format!("Type: {} primitive", mesh.primitive_type));
                             ui.label(format!("Geometry: {} verts | {} indices", mesh.vertices.len(), mesh.indices.len()));
                         }
+                        if remove_mesh {
+                            entity.mesh = None;
+                            self.is_dirty = true;
+                        }
 
                         // 3B2. Material / Texture Component
+                        let mut remove_texture = false;
                         if let Some(tex) = &mut entity.texture {
                             ui.separator();
-                            ui.heading("🎨 Material / Texture Component");
+                            ui.horizontal(|ui| {
+                                ui.heading("🎨 Material / Texture Component");
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button("🗑").on_hover_text("Remove Material").clicked() {
+                                        remove_texture = true;
+                                    }
+                                });
+                            });
                             
                             ui.horizontal(|ui| {
                                 ui.label("Albedo Map Path:");
@@ -472,16 +492,24 @@ impl EditorUi {
                                     ui.text_edit_singleline(map_path);
                                 });
                             }
-                            
-                            if ui.button("🗑 Remove Material").clicked() {
-                                entity.texture = None;
-                            }
+                        }
+                        if remove_texture {
+                            entity.texture = None;
+                            self.is_dirty = true;
                         }
 
                         // 3C. Light configuration
+                        let mut remove_light = false;
                         if let Some(light) = &mut entity.light {
                             ui.separator();
-                            ui.heading("💡 Light Component");
+                            ui.horizontal(|ui| {
+                                ui.heading("💡 Light Component");
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button("🗑").on_hover_text("Remove Light").clicked() {
+                                        remove_light = true;
+                                    }
+                                });
+                            });
                             
                             // Type selection (Spot, Directional, Point)
                             ui.horizontal(|ui| {
@@ -566,18 +594,24 @@ impl EditorUi {
                                     }
                                 });
                             }
-
-                            ui.add_space(5.0);
-                            if ui.button("🗑 Remove Light").clicked() {
-                                entity.light = None;
-                                self.is_dirty = true;
-                            }
+                        }
+                        if remove_light {
+                            entity.light = None;
+                            self.is_dirty = true;
                         }
 
                         // 3D. Script bindings
+                        let mut remove_script = false;
                         if let Some(script) = &mut entity.script {
                             ui.separator();
-                            ui.heading("📜 Lua Script Component");
+                            ui.horizontal(|ui| {
+                                ui.heading("📜 Lua Script Component");
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button("🗑").on_hover_text("Remove Script").clicked() {
+                                        remove_script = true;
+                                    }
+                                });
+                            });
                             ui.horizontal(|ui| {
                                 ui.text_edit_singleline(&mut script.path);
                             });
@@ -588,16 +622,24 @@ impl EditorUi {
                             } else {
                                 ui.colored_label(egui::Color32::from_rgb(255, 60, 100), "❌ File not found!");
                             }
-
-                            if ui.button("🗑 Remove Script").clicked() {
-                                entity.script = None;
-                            }
+                        }
+                        if remove_script {
+                            entity.script = None;
+                            self.is_dirty = true;
                         }
 
                         // 3E. Health component
+                        let mut remove_health = false;
                         if let Some(health) = &mut entity.health {
                             ui.separator();
-                            ui.heading("❤️ Health Component");
+                            ui.horizontal(|ui| {
+                                ui.heading("❤️ Health Component");
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button("🗑").on_hover_text("Remove Health").clicked() {
+                                        remove_health = true;
+                                    }
+                                });
+                            });
                             ui.horizontal(|ui| {
                                 ui.label("Current HP:");
                                 ui.add(egui::DragValue::new(&mut health.current_health));
@@ -608,11 +650,24 @@ impl EditorUi {
                             });
                             ui.checkbox(&mut health.is_dead, "Is Dead");
                         }
+                        if remove_health {
+                            entity.health = None;
+                            entity.animator = None;
+                            self.is_dirty = true;
+                        }
 
                         // 3EE. Collider Component
+                        let mut remove_collider = false;
                         if let Some(collider) = &mut entity.collider {
                             ui.separator();
-                            ui.heading("🟢 Collider Component");
+                            ui.horizontal(|ui| {
+                                ui.heading("🟢 Collider Component");
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button("🗑").on_hover_text("Remove Collider").clicked() {
+                                        remove_collider = true;
+                                    }
+                                });
+                            });
                             ui.checkbox(&mut collider.active, "Active");
                             ui.checkbox(&mut collider.is_trigger, "Is Trigger");
 
@@ -665,16 +720,24 @@ impl EditorUi {
                                     });
                                 }
                             }
-
-                            if ui.button("🗑 Remove Collider").clicked() {
-                                entity.collider = None;
-                            }
+                        }
+                        if remove_collider {
+                            entity.collider = None;
+                            self.is_dirty = true;
                         }
 
                         // 3EG. RigidBody Component
+                        let mut remove_rigidbody = false;
                         if let Some(rb) = &mut entity.rigidbody {
                             ui.separator();
-                            ui.heading("📦 RigidBody Component");
+                            ui.horizontal(|ui| {
+                                ui.heading("📦 RigidBody Component");
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button("🗑").on_hover_text("Remove RigidBody").clicked() {
+                                        remove_rigidbody = true;
+                                    }
+                                });
+                            });
                             ui.checkbox(&mut rb.active, "Active");
                             ui.checkbox(&mut rb.is_kinematic, "Is Kinematic");
                             ui.checkbox(&mut rb.use_gravity, "Use Gravity");
@@ -690,16 +753,24 @@ impl EditorUi {
                                 ui.add(egui::DragValue::new(&mut rb.velocity.y).speed(0.1));
                                 ui.add(egui::DragValue::new(&mut rb.velocity.z).speed(0.1));
                             });
-
-                            if ui.button("🗑 Remove RigidBody").clicked() {
-                                entity.rigidbody = None;
-                            }
+                        }
+                        if remove_rigidbody {
+                            entity.rigidbody = None;
+                            self.is_dirty = true;
                         }
 
                         // 3EH. NavMeshAgent Component
+                        let mut remove_nav_agent = false;
                         if let Some(agent) = &mut entity.nav_agent {
                             ui.separator();
-                            ui.heading("🛰️ NavMesh Agent Component");
+                            ui.horizontal(|ui| {
+                                ui.heading("🛰️ NavMesh Agent Component");
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button("🗑").on_hover_text("Remove NavMesh Agent").clicked() {
+                                        remove_nav_agent = true;
+                                    }
+                                });
+                            });
                             ui.checkbox(&mut agent.active, "Active");
 
                             ui.horizontal(|ui| {
@@ -732,16 +803,24 @@ impl EditorUi {
                             ui.horizontal(|ui| {
                                 ui.label(format!("Velocity: [{:.2}, {:.2}, {:.2}]", agent.velocity.x, agent.velocity.y, agent.velocity.z));
                             });
-
-                            if ui.button("🗑 Remove NavMesh Agent").clicked() {
-                                entity.nav_agent = None;
-                            }
+                        }
+                        if remove_nav_agent {
+                            entity.nav_agent = None;
+                            self.is_dirty = true;
                         }
 
                         // Camera Component panel
+                        let mut remove_camera = false;
                         if let Some(cam) = &mut entity.camera {
                             ui.separator();
-                            ui.heading("🎥 Camera Component");
+                            ui.horizontal(|ui| {
+                                ui.heading("🎥 Camera Component");
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button("🗑").on_hover_text("Remove Camera").clicked() {
+                                        remove_camera = true;
+                                    }
+                                });
+                            });
                             
                             ui.horizontal(|ui| {
                                 ui.label("FOV:");
@@ -766,17 +845,25 @@ impl EditorUi {
                                     ui.add(egui::Slider::new(&mut cam.motion_blur_samples, 4..=64));
                                 });
                             }
-                            
-                            if ui.button("🗑 Remove Camera").clicked() {
-                                entity.camera = None;
-                                entity.visual_correction = None;
-                            }
+                        }
+                        if remove_camera {
+                            entity.camera = None;
+                            entity.visual_correction = None;
+                            self.is_dirty = true;
                         }
 
                         // Visual Correction Component panel
+                        let mut remove_vc = false;
                         if let Some(vc) = &mut entity.visual_correction {
                             ui.separator();
-                            ui.heading("🎨 Visual Correction Component");
+                            ui.horizontal(|ui| {
+                                ui.heading("🎨 Visual Correction Component");
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button("🗑").on_hover_text("Remove Visual Correction").clicked() {
+                                        remove_vc = true;
+                                    }
+                                });
+                            });
                             
                             ui.checkbox(&mut vc.active, "Enable Visual Correction");
                             
@@ -826,11 +913,10 @@ impl EditorUi {
                                 });
                                 ui.checkbox(&mut vc.ssr_temporal_upsampling, "    Temporal Upsampling");
                             }
-
-                            ui.add_space(5.0);
-                            if ui.button("🗑 Remove Visual Correction").clicked() {
-                                entity.visual_correction = None;
-                            }
+                        }
+                        if remove_vc {
+                            entity.visual_correction = None;
+                            self.is_dirty = true;
                         }
 
                         // 3F. Add Component Option
