@@ -1051,61 +1051,70 @@ impl EditorUi {
 
                     egui::ScrollArea::vertical().id_source("FolderExplorerScroll").max_height(120.0).show(ui, |ui| {
                         if let Ok(entries) = std::fs::read_dir(&self.current_dir) {
-                            let mut dirs = Vec::new();
-                            let mut files = Vec::new();
+                            let mut entries_list = Vec::new();
 
                             for entry in entries.flatten() {
                                 let path = entry.path();
                                 let path_str = path.to_string_lossy().to_string().replace("\\", "/");
-                                if path.is_dir() {
-                                    dirs.push(path_str);
-                                } else {
-                                    files.push(path_str);
+                                let is_dir = path.is_dir();
+                                entries_list.push((path_str, is_dir));
+                            }
+
+                            // Sort entries alphabetically by file/folder name
+                            entries_list.sort_by(|a, b| {
+                                let name_a = Path::new(&a.0).file_name().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+                                let name_b = Path::new(&b.0).file_name().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+                                name_a.cmp(&name_b)
+                            });
+
+                            // Render parent directory ".." option if not at the root
+                            if self.current_dir != "project" {
+                                if let Some(parent) = Path::new(&self.current_dir).parent() {
+                                    let parent_str = parent.to_string_lossy().to_string().replace("\\", "/");
+                                    ui.horizontal(|ui| {
+                                        if ui.button("📁 ↩ .. (Go Up)").clicked() {
+                                            self.current_dir = parent_str;
+                                        }
+                                    });
                                 }
                             }
-                            dirs.sort();
-                            files.sort();
 
-                            // Subdirectories
-                            for dir_path in dirs {
-                                let folder_name = Path::new(&dir_path).file_name().and_then(|s| s.to_str()).unwrap_or("Folder").to_string();
-                                ui.horizontal(|ui| {
-                                    if ui.button(format!("📁 {}", folder_name)).clicked() {
-                                        self.current_dir = dir_path;
-                                    }
-                                });
-                            }
+                            for (path_str, is_dir) in entries_list {
+                                let filename = Path::new(&path_str).file_name().and_then(|s| s.to_str()).unwrap_or("File").to_string();
+                                if is_dir {
+                                    ui.horizontal(|ui| {
+                                        if ui.button(format!("📁 {}", filename)).clicked() {
+                                            self.current_dir = path_str;
+                                        }
+                                    });
+                                } else {
+                                    let extension = Path::new(&path_str).extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+                                    let icon = match extension.as_str() {
+                                        "png" | "tga" | "jpg" | "jpeg" => "🖼️",
+                                        "wav" | "mp3" | "ogg" => "🎵",
+                                        "scene" => "🎬",
+                                        "fbx" | "obj" => "📐",
+                                        "lua" => "📄",
+                                        _ => "📝",
+                                    };
 
-                            // Files
-                            for file_path in files {
-                                let filename = Path::new(&file_path).file_name().and_then(|s| s.to_str()).unwrap_or("File");
-                                
-                                let extension = Path::new(&file_path).extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
-                                let icon = match extension.as_str() {
-                                    "png" | "tga" | "jpg" | "jpeg" => "🖼️",
-                                    "wav" | "mp3" | "ogg" => "🎵",
-                                    "scene" => "🎬",
-                                    "fbx" | "obj" => "📐",
-                                    "lua" => "📄",
-                                    _ => "📝",
-                                };
-
-                                let is_selected = self.selected_asset_path.as_ref() == Some(&file_path);
-                                
-                                ui.horizontal(|ui| {
-                                    let label_res = ui.selectable_label(is_selected, format!("{} {}", icon, filename));
-                                    if label_res.clicked() {
-                                        self.selected_asset_path = Some(file_path.clone());
-                                        self.selected_entity_id = None; // Deselect scene entity!
-                                        
-                                        // Load initial data for script editing
-                                        if extension == "lua" {
-                                            if let Ok(content) = std::fs::read_to_string(&file_path) {
-                                                self.asset_script_content = content;
+                                    let is_selected = self.selected_asset_path.as_ref() == Some(&path_str);
+                                    
+                                    ui.horizontal(|ui| {
+                                        let label_res = ui.selectable_label(is_selected, format!("{} {}", icon, filename));
+                                        if label_res.clicked() {
+                                            self.selected_asset_path = Some(path_str.clone());
+                                            self.selected_entity_id = None; // Deselect scene entity!
+                                            
+                                            // Load initial data for script editing
+                                            if extension == "lua" {
+                                                if let Ok(content) = std::fs::read_to_string(&path_str) {
+                                                    self.asset_script_content = content;
+                                                }
                                             }
                                         }
-                                    }
-                                });
+                                    });
+                                }
                             }
                         } else {
                             ui.colored_label(egui::Color32::RED, "Failed to read directory.");
