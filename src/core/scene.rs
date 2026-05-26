@@ -61,10 +61,16 @@ pub struct TextureComponent {
     pub metallic_map: Option<String>,
     #[serde(default)]
     pub roughness_map: Option<String>,
+    #[serde(default = "default_color")]
+    pub color: [f32; 3],
 }
 
 fn default_roughness() -> f32 {
     0.5
+}
+
+fn default_color() -> [f32; 3] {
+    [1.0, 1.0, 1.0]
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

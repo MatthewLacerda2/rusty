@@ -90,6 +90,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
                     roughness: 0.5,
                     metallic_map: None,
                     roughness_map: None,
+                    color: [1.0, 1.0, 1.0],
                 });
                 editor.is_dirty = true;
             }

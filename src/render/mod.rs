@@ -1182,7 +1182,9 @@ impl Renderer {
                     let is_lit = if entity.light.is_some() { 0u32 } else { 1u32 };
                     let model_matrix = scene.compute_world_matrix(entity.id);
                     
-                    let color_tint = if let Some(health) = &entity.health {
+                    let color_tint = if let Some(t_comp) = &entity.texture {
+                        [t_comp.color[0], t_comp.color[1], t_comp.color[2], 1.0]
+                    } else if let Some(health) = &entity.health {
                         if health.is_dead {
                             [0.2, 0.2, 0.2, 1.0]
                         } else {
@@ -1205,7 +1207,7 @@ impl Renderer {
                     let entity_uniform = EntityUniform {
                         model_matrix: model_matrix.to_cols_array(),
                         color_tint,
-                        use_texture: if entity.texture.is_some() { 1 } else { 0 },
+                        use_texture: if entity.texture.is_some() && !entity.texture.as_ref().unwrap().path.is_empty() { 1 } else { 0 },
                         is_lit,
                         metallic,
                         roughness,

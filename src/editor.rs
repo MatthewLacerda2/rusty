@@ -313,7 +313,8 @@ impl EditorUi {
                 ui.separator();
                 ui.add_space(5.0);
 
-                if let Some(selected_id) = self.selected_entity_id {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    if let Some(selected_id) = self.selected_entity_id {
                     let mut pending_parent_change = None;
                     let mut pending_nav_bake = false;
 
@@ -451,6 +452,13 @@ impl EditorUi {
                             ui.horizontal(|ui| {
                                 ui.label("Albedo Map Path:");
                                 ui.text_edit_singleline(&mut tex.path);
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Color Tint:");
+                                if ui.color_edit_button_rgb(&mut tex.color).changed() {
+                                    self.is_dirty = true;
+                                }
                             });
                             
                             ui.horizontal(|ui| {
@@ -974,6 +982,7 @@ impl EditorUi {
                                         roughness: 0.5,
                                         metallic_map: None,
                                         roughness_map: None,
+                                        color: [1.0, 1.0, 1.0],
                                     });
                                     ui.close_menu();
                                 }
@@ -1073,6 +1082,7 @@ impl EditorUi {
                     ui.add_space(5.0);
                     ui.colored_label(egui::Color32::from_rgb(100, 100, 130), "Select an entity from Hierarchy\nor click a project asset to inspect.");
                 }
+                });
             });
 
         // 4. BOTTOM PANEL: Folder Explorer & Console Logs
