@@ -1072,7 +1072,7 @@ impl EditorUi {
                                 if let Some(parent) = Path::new(&self.current_dir).parent() {
                                     let parent_str = parent.to_string_lossy().to_string().replace("\\", "/");
                                     ui.horizontal(|ui| {
-                                        if ui.button("📁 ↩ .. (Go Up)").clicked() {
+                                        if ui.selectable_label(false, "📁 .. (Go Up)").clicked() {
                                             self.current_dir = parent_str;
                                         }
                                     });
@@ -1083,7 +1083,7 @@ impl EditorUi {
                                 let filename = Path::new(&path_str).file_name().and_then(|s| s.to_str()).unwrap_or("File").to_string();
                                 if is_dir {
                                     ui.horizontal(|ui| {
-                                        if ui.button(format!("📁 {}", filename)).clicked() {
+                                        if ui.selectable_label(false, format!("📁 {}", filename)).clicked() {
                                             self.current_dir = path_str;
                                         }
                                     });
