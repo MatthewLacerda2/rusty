@@ -830,6 +830,10 @@ impl EditorUi {
                                 });
                             });
                             
+                            // Force high-quality motion blur by default under the hood
+                            cam.motion_blur_active = true;
+                            cam.motion_blur_samples = 64;
+
                             ui.horizontal(|ui| {
                                 ui.label("FOV:");
                                 ui.add(egui::Slider::new(&mut cam.fov, 1.0..=120.0));
@@ -845,14 +849,7 @@ impl EditorUi {
                                 ui.add(egui::DragValue::new(&mut cam.far).speed(1.0).clamp_range(1.0..=1000.0));
                             });
 
-                            ui.checkbox(&mut cam.motion_blur_active, "Intrinsic Motion Blur");
-                            
-                            if cam.motion_blur_active {
-                                ui.horizontal(|ui| {
-                                    ui.label("  Samples:");
-                                    ui.add(egui::Slider::new(&mut cam.motion_blur_samples, 4..=64));
-                                });
-                            }
+                            ui.colored_label(egui::Color32::from_rgb(0, 242, 254), "✔ Intrinsic Motion Blur (Active | 64 Samples)");
                         }
                         if remove_camera {
                             entity.camera = None;
@@ -1009,7 +1006,7 @@ impl EditorUi {
                                         near: 0.1,
                                         far: 200.0,
                                         motion_blur_active: true,
-                                        motion_blur_samples: 16,
+                                        motion_blur_samples: 64,
                                     });
                                     ui.close_menu();
                                 }
