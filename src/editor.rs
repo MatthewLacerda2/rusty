@@ -34,6 +34,7 @@ pub struct EditorUi {
     pub asset_model_scale: f32,
     pub asset_model_import_normals: bool,
     pub asset_script_content: String,
+    pub active_bottom_tab: String,
 }
 
 impl EditorUi {
@@ -60,39 +61,53 @@ impl EditorUi {
             asset_model_scale: 1.0,
             asset_model_import_normals: true,
             asset_script_content: String::new(),
+            active_bottom_tab: "assets".to_string(),
         }
     }
 
-    /// Set up futuristic sci-fi dark theme styling in egui
+    /// Set up high-end professional dark theme styling with subtle cyan/teal accents (Unreal/Blender style)
     pub fn apply_theme(&self, ctx: &egui::Context) {
         let mut style = (*ctx.style()).clone();
         
         let visuals = &mut style.visuals;
         visuals.dark_mode = true;
-        visuals.override_text_color = Some(egui::Color32::from_rgb(220, 225, 240));
+        visuals.override_text_color = Some(egui::Color32::from_rgb(228, 230, 235));
         
-        // Deep space background fills
-        visuals.widgets.noninteractive.bg_fill = egui::Color32::from_rgb(10, 10, 15);
-        visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, egui::Color32::from_rgb(32, 28, 48));
+        // Professional slate-gray-blue obsidian theme
+        let bg_dark = egui::Color32::from_rgb(16, 16, 22);       // Main panels
+        let border_color = egui::Color32::from_rgb(35, 35, 45);  // Borders
+        let widget_inactive = egui::Color32::from_rgb(28, 28, 36);
+        let widget_hovered = egui::Color32::from_rgb(38, 38, 50);
+        let widget_active = egui::Color32::from_rgb(46, 46, 62);
         
-        // Slate violet buttons in inactive state
-        visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(20, 18, 30);
-        visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 50, 95));
+        let accent_cyan = egui::Color32::from_rgb(0, 229, 255);
+        let accent_teal = egui::Color32::from_rgb(0, 242, 254);
         
-        // Glowing cyan highlights for hover states
-        visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(28, 25, 45);
-        visuals.widgets.hovered.fg_stroke = egui::Stroke::new(1.5, egui::Color32::from_rgb(0, 229, 255));
+        visuals.widgets.noninteractive.bg_fill = bg_dark;
+        visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, border_color);
         
-        // Glowing neon aqua for active click states
-        visuals.widgets.active.bg_fill = egui::Color32::from_rgb(35, 30, 60);
-        visuals.widgets.active.fg_stroke = egui::Stroke::new(2.0, egui::Color32::from_rgb(0, 242, 254));
+        // Inactive widgets
+        visuals.widgets.inactive.bg_fill = widget_inactive;
+        visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, border_color);
+        visuals.widgets.inactive.rounding = egui::Rounding::same(4.0);
         
-        visuals.selection.bg_fill = egui::Color32::from_rgb(48, 40, 90);
+        // Hovered widgets
+        visuals.widgets.hovered.bg_fill = widget_hovered;
+        visuals.widgets.hovered.fg_stroke = egui::Stroke::new(1.2, accent_cyan);
+        visuals.widgets.hovered.rounding = egui::Rounding::same(4.0);
         
-        visuals.window_rounding = egui::Rounding::same(10.0);
-        visuals.widgets.inactive.rounding = egui::Rounding::same(5.0);
-        visuals.widgets.hovered.rounding = egui::Rounding::same(5.0);
-        visuals.widgets.active.rounding = egui::Rounding::same(5.0);
+        // Active/Focused widgets
+        visuals.widgets.active.bg_fill = widget_active;
+        visuals.widgets.active.fg_stroke = egui::Stroke::new(1.5, accent_teal);
+        visuals.widgets.active.rounding = egui::Rounding::same(4.0);
+        
+        visuals.selection.bg_fill = egui::Color32::from_rgb(0, 75, 90);
+        
+        visuals.window_rounding = egui::Rounding::same(6.0);
+        
+        // Tight spacing and clean layout parameters
+        style.spacing.item_spacing = egui::vec2(6.0, 6.0);
+        style.spacing.button_padding = egui::vec2(8.0, 4.0);
         
         ctx.set_style(style);
     }
@@ -144,12 +159,12 @@ impl EditorUi {
         
         // 1. TOP HEADER PANEL (Controls engine state) — ALWAYS VISIBLE
         egui::TopBottomPanel::top("Header Panel").frame(
-            egui::Frame::none().fill(egui::Color32::from_rgb(14, 14, 22))
+            egui::Frame::none().fill(egui::Color32::from_rgb(22, 22, 30))
                 .inner_margin(8.0)
-                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(26, 24, 38)))
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(30, 30, 40)))
         ).show(ctx, |ui| {
             ui.horizontal(|ui| {
-                let purple_bg = egui::Color32::from_rgb(90, 50, 180);
+                let purple_bg = egui::Color32::from_rgb(124, 77, 255); // Premium indigo
 
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                     let play_btn = if *is_playing {
@@ -205,7 +220,11 @@ impl EditorUi {
         // 2. LEFT PANEL: Scene Hierarchy
         egui::SidePanel::left("Hierarchy Panel")
             .width_range(220.0..=300.0)
-            .frame(egui::Frame::none().fill(egui::Color32::from_rgb(10, 10, 15)).inner_margin(10.0))
+            .frame(
+                egui::Frame::none().fill(egui::Color32::from_rgb(14, 14, 20))
+                    .inner_margin(10.0)
+                    .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(30, 30, 40)))
+            )
             .show(ctx, |ui| {
                 ui.heading("📁 Scene Hierarchy");
                 ui.separator();
@@ -284,7 +303,11 @@ impl EditorUi {
         // 3. RIGHT PANEL: Properties Inspector
         egui::SidePanel::right("Inspector Panel")
             .width_range(260.0..=340.0)
-            .frame(egui::Frame::none().fill(egui::Color32::from_rgb(10, 10, 15)).inner_margin(10.0))
+            .frame(
+                egui::Frame::none().fill(egui::Color32::from_rgb(14, 14, 20))
+                    .inner_margin(10.0)
+                    .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(30, 30, 40)))
+            )
             .show(ctx, |ui| {
                 ui.heading("🔬 Properties Inspector");
                 ui.separator();
@@ -970,25 +993,40 @@ impl EditorUi {
         egui::TopBottomPanel::bottom("Bottom Panel")
             .min_height(160.0)
             .frame(
-                egui::Frame::none().fill(egui::Color32::from_rgb(10, 10, 15))
+                egui::Frame::none().fill(egui::Color32::from_rgb(14, 14, 20))
                     .inner_margin(8.0)
-                    .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(26, 24, 38)))
+                    .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(30, 30, 40)))
             )
             .show(ctx, |ui| {
-                ui.columns(2, |columns| {
-                    // LEFT COLUMN: Unity-style Folder Explorer
-                    let ui_l = &mut columns[0];
-                    ui_l.horizontal(|ui| {
-                        ui.heading("📁 Project Assets");
-                        if ui.button("⟲ Root").clicked() {
-                            self.current_dir = "project".to_string();
+                // Tab Header Bar
+                ui.horizontal(|ui| {
+                    if ui.selectable_label(self.active_bottom_tab == "assets", "📁 Project Assets").clicked() {
+                        self.active_bottom_tab = "assets".to_string();
+                    }
+                    if ui.selectable_label(self.active_bottom_tab == "console", "📟 Developer Console").clicked() {
+                        self.active_bottom_tab = "console".to_string();
+                    }
+
+                    // Align dynamic tab utility button on the right
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if self.active_bottom_tab == "console" {
+                            if ui.button("🗑 Clear Console").clicked() {
+                                console.messages.clear();
+                            }
+                        } else {
+                            if ui.button("⟲ Root").clicked() {
+                                self.current_dir = "project".to_string();
+                            }
                         }
                     });
-                    ui_l.separator();
+                });
+                ui.separator();
+                ui.add_space(3.0);
 
+                if self.active_bottom_tab == "assets" {
                     // Draw Breadcrumb Bar
                     let mut new_dir = None;
-                    ui_l.horizontal(|ui| {
+                    ui.horizontal(|ui| {
                         let parts: Vec<&str> = self.current_dir.split('/').filter(|s| !s.is_empty()).collect();
                         let mut path_acc = String::new();
                         for (i, part) in parts.iter().enumerate() {
@@ -1009,9 +1047,9 @@ impl EditorUi {
                     if let Some(dir) = new_dir {
                         self.current_dir = dir;
                     }
-                    ui_l.add_space(5.0);
+                    ui.add_space(5.0);
 
-                    egui::ScrollArea::vertical().id_source("FolderExplorerScroll").max_height(120.0).show(ui_l, |ui| {
+                    egui::ScrollArea::vertical().id_source("FolderExplorerScroll").max_height(120.0).show(ui, |ui| {
                         if let Ok(entries) = std::fs::read_dir(&self.current_dir) {
                             let mut dirs = Vec::new();
                             let mut files = Vec::new();
@@ -1073,21 +1111,8 @@ impl EditorUi {
                             ui.colored_label(egui::Color32::RED, "Failed to read directory.");
                         }
                     });
-
-                    // RIGHT COLUMN: Developer Console
-                    let ui_r = &mut columns[1];
-                    ui_r.horizontal(|ui| {
-                        ui.heading("📟 Developer Console");
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.button("Clear").clicked() {
-                                console.messages.clear();
-                            }
-                        });
-                    });
-                    ui_r.separator();
-                    ui_r.add_space(3.0);
-
-                    egui::ScrollArea::vertical().id_source("ConsoleScroll").max_height(120.0).show(ui_r, |ui| {
+                } else if self.active_bottom_tab == "console" {
+                    egui::ScrollArea::vertical().id_source("ConsoleScroll").max_height(120.0).show(ui, |ui| {
                         if console.messages.is_empty() {
                             ui.colored_label(egui::Color32::from_rgb(100, 100, 130), "  No execution logs yet. Logs will print when running.");
                         } else {
@@ -1101,7 +1126,7 @@ impl EditorUi {
                             }
                         }
                     });
-                });
+                }
             });
     }
 }
