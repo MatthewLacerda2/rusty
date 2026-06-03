@@ -184,7 +184,13 @@ fn calculate_pbr(
     albedo: vec3<f32>
 ) -> vec3<f32> {
     let H = normalize(L + V);
-    let NdotL = max(dot(N, L), 0.0);
+    let NdotL_raw = dot(N, L);
+    
+    // Half-Lambert diffuse wrapping (retro CS 1.6 / GoldSrc look)
+    let half_lambert = pow(NdotL_raw * 0.5 + 0.5, 2.0);
+    
+    // Standard lighting factors for specular and math stability
+    let NdotL = max(NdotL_raw, 0.0);
     let NdotV = max(dot(N, V), 0.0);
 
     let D = DistributionGGX(N, H, roughness);
@@ -201,7 +207,7 @@ fn calculate_pbr(
 
     let diffuse = kD * albedo / PI;
 
-    return (diffuse + specular) * radiance * NdotL;
+    return diffuse * radiance * half_lambert + specular * radiance * NdotL;
 }
 
 fn calculate_shadow(world_pos: vec3<f32>, N: vec3<f32>) -> f32 {
@@ -259,8 +265,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let F0 = mix(vec3<f32>(0.04), albedo, metallic);
 
-    // 1. Ambient lighting term (diffuse ambient)
-    var lighting_color = lighting.ambient.color * lighting.ambient.intensity * albedo * (1.0 - metallic);
+    // 1. Ambient lighting term (Hemispherical Sky-Ground Ambient)
+    let sky_color = lighting.ambient.color;
+    let ground_color = sky_color * 0.25; // ground is darker and cooler/desaturated
+    let ambient_grad = mix(ground_color, sky_color, N.y * 0.5 + 0.5);
+    var lighting_color = ambient_grad * lighting.ambient.intensity * albedo * (1.0 - metallic);
 
     // 2. Directional Light
     let L_dir = normalize(-lighting.dir_light.direction);
