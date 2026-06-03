@@ -127,6 +127,43 @@ impl NavigationGraph {
         self.walkability[self.index(gx, gz)]
     }
 
+    /// Finds the closest walkable grid node in concentric rings up to radius 5 if the original node is blocked.
+    pub fn closest_walkable(&self, gx: i32, gz: i32) -> (i32, i32) {
+        if self.is_walkable(gx, gz) {
+            return (gx, gz);
+        }
+
+        let mut best_dist = f32::MAX;
+        let mut best_node = (gx, gz);
+
+        // Search concentric square rings up to radius 5
+        for r in 1_i32..=5_i32 {
+            let mut found = false;
+            for dx in -r..=r {
+                for dz in -r..=r {
+                    // Check only the border of the ring to prioritize closest distance
+                    if dx.abs() != r && dz.abs() != r {
+                        continue;
+                    }
+                    let nx = gx + dx;
+                    let nz = gz + dz;
+                    if self.is_walkable(nx, nz) {
+                        let dist_sq = (dx * dx + dz * dz) as f32;
+                        if dist_sq < best_dist {
+                            best_dist = dist_sq;
+                            best_node = (nx, nz);
+                            found = true;
+                        }
+                    }
+                }
+            }
+            if found {
+                break;
+            }
+        }
+        best_node
+    }
+
     /// Queries the next logical step along the shortest path
     pub fn get_next_path_step(&self, start: Vec3, target: Vec3) -> Vec3 {
         let (sx, sz) = self.world_to_grid(start);
@@ -145,6 +182,9 @@ impl NavigationGraph {
                 let next_node_world = self.grid_to_world(nx, nz);
                 // Keep the target Y or height constant to match original start
                 return Vec3::new(next_node_world.x, start.y, next_node_world.z);
+            } else if path.len() == 1 {
+                // Already at the closest walkable node to target, direct move to target
+                return target;
             }
         }
 
@@ -153,7 +193,14 @@ impl NavigationGraph {
     }
 
     /// Core A* algorithm returning list of grid coordinates (x, z)
-    pub fn find_path(&self, sx: i32, sz: i32, tx: i32, tz: i32) -> Option<Vec<(i32, i32)>> {
+    pub fn find_path(&self, raw_sx: i32, raw_sz: i32, raw_tx: i32, raw_tz: i32) -> Option<Vec<(i32, i32)>> {
+        let (sx, sz) = self.closest_walkable(raw_sx, raw_sz);
+        let (tx, tz) = self.closest_walkable(raw_tx, raw_tz);
+
+        if sx == tx && sz == tz {
+            return Some(vec![(sx, sz)]);
+        }
+
         let mut open_set = BinaryHeap::new();
         let mut g_score = HashMap::new();
         let mut came_from = HashMap::new();
