@@ -1,10 +1,16 @@
 use std::path::Path;
 
+use crate::core::scene::Scene;
 use crate::editor::EditorUi;
 use crate::scripting::{ConsoleLogs, LogLevel};
 
 /// BOTTOM PANEL: Folder Explorer & Console Logs
-pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, console: &mut ConsoleLogs) {
+pub fn draw(
+    editor: &mut EditorUi,
+    ctx: &egui::Context,
+    scene: &mut Scene,
+    console: &mut ConsoleLogs,
+) {
     egui::TopBottomPanel::bottom("Bottom Panel")
         .min_height(160.0)
         .frame(
@@ -47,14 +53,19 @@ pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, console: &mut ConsoleLog
             ui.add_space(3.0);
 
             if editor.active_bottom_tab == "assets" {
-                draw_assets(editor, ui);
+                draw_assets(editor, scene, console, ui);
             } else if editor.active_bottom_tab == "console" {
                 draw_console(console, ui);
             }
         });
 }
 
-fn draw_assets(editor: &mut EditorUi, ui: &mut egui::Ui) {
+fn draw_assets(
+    editor: &mut EditorUi,
+    scene: &mut Scene,
+    console: &mut ConsoleLogs,
+    ui: &mut egui::Ui,
+) {
     // Draw Breadcrumb Bar
     let mut new_dir = None;
     ui.horizontal(|ui| {
@@ -174,6 +185,12 @@ fn draw_assets(editor: &mut EditorUi, ui: &mut egui::Ui) {
                                     }
                                 }
                             }
+                            // Double-click a `.scene` to load it (single active
+                            // scene: this REPLACES the World) and make it the
+                            // current scene Save writes back to.
+                            if extension == "scene" && label_res.double_clicked() {
+                                load_scene(editor, scene, console, &path_str, &filename);
+                            }
                         });
                     }
                 }
@@ -181,6 +198,26 @@ fn draw_assets(editor: &mut EditorUi, ui: &mut egui::Ui) {
                 ui.colored_label(egui::Color32::RED, "Failed to read directory.");
             }
         });
+}
+
+/// Load a scene file into the live World and adopt it as the current scene.
+fn load_scene(
+    editor: &mut EditorUi,
+    scene: &mut Scene,
+    console: &mut ConsoleLogs,
+    path: &str,
+    filename: &str,
+) {
+    match scene.load_from_file(path) {
+        Ok(_) => {
+            editor.current_scene_path = Some(path.to_string());
+            editor.selected_entity_id = None;
+            editor.selected_asset_path = None;
+            editor.is_dirty = true;
+            console.info(format!("Loaded scene from {}", filename));
+        }
+        Err(e) => console.error(format!("Failed to load scene: {}", e)),
+    }
 }
 
 fn draw_console(console: &mut ConsoleLogs, ui: &mut egui::Ui) {

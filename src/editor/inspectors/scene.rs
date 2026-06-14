@@ -67,6 +67,7 @@ pub fn draw(
     {
         match scene.load_from_file(path) {
             Ok(_) => {
+                editor.current_scene_path = Some(path.to_string());
                 editor.selected_entity_id = None;
                 editor.selected_asset_path = None;
                 editor.is_dirty = true;

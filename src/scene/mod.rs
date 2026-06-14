@@ -13,7 +13,16 @@
 //!
 //! Submodules:
 //!   serialize — World <-> SceneData
-//!   io        — save/load, path + extension, current-scene-path
+//!   io        — save/load, path + extension, default-scene seeding
 //!   snapshot  — edit-mode snapshot/restore around Play
-//!
-//! Status: SCAFFOLD — structure only; not yet implemented.
+
+pub mod io;
+pub mod serialize;
+pub mod snapshot;
+
+pub use io::{
+    is_scene_path, load_from_file, save_to_file, seed_default_scene, DEFAULT_SCENE_PATH,
+    DEFAULT_SCENE_SOURCE, SCENE_EXTENSION,
+};
+pub use serialize::{apply_scene_data, to_scene_data, SceneData};
+pub use snapshot::SceneSnapshot;

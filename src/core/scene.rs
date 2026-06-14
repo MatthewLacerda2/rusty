@@ -10,7 +10,6 @@
 //! (`use crate::core::scene::{…Component}`) keep compiling unchanged.
 
 use glam::{Mat4, Vec3};
-use serde::{Deserialize, Serialize};
 
 use crate::ecs::world::{Ref, RefMut};
 use crate::ecs::World;
@@ -39,21 +38,6 @@ pub struct Scene {
     pub skybox_path: String,
     pub ambient_color: Vec3,
     pub ambient_intensity: f32,
-}
-
-/// On-disk document. Matches the legacy `Scene` JSON layout exactly so existing
-/// `.scene` files round-trip unchanged.
-#[derive(Serialize, Deserialize)]
-struct SceneData {
-    entities: Vec<Entity>,
-    next_entity_id: u32,
-    selected_entity_id: Option<u32>,
-    #[serde(default = "default_skybox_path")]
-    skybox_path: String,
-    #[serde(default = "default_ambient_color")]
-    ambient_color: Vec3,
-    #[serde(default = "default_ambient_intensity")]
-    ambient_intensity: f32,
 }
 
 impl Default for Scene {
@@ -191,61 +175,15 @@ impl Scene {
         Ok(())
     }
 
+    /// Serialize the live World to `path`. Delegates to `crate::scene::io`,
+    /// which owns the on-disk `SceneData` document.
     pub fn save_to_file(&self, path: &str) -> Result<(), String> {
-        let data = SceneData {
-            entities: self.world.collect_entities(),
-            next_entity_id: self.world.next_id(),
-            selected_entity_id: self.selected_entity_id,
-            skybox_path: self.skybox_path.clone(),
-            ambient_color: self.ambient_color,
-            ambient_intensity: self.ambient_intensity,
-        };
-        let json = serde_json::to_string_pretty(&data)
-            .map_err(|e| format!("Failed to serialize scene: {}", e))?;
-        std::fs::write(path, json).map_err(|e| format!("Failed to write scene file: {}", e))?;
-        Ok(())
+        crate::scene::save_to_file(self, path)
     }
 
+    /// Load `path`, REPLACING this scene's World (single active scene).
+    /// Delegates to `crate::scene::io`; meshes are rehydrated from disk there.
     pub fn load_from_file(&mut self, path: &str) -> Result<(), String> {
-        let json = std::fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read scene file: {}", e))?;
-        let mut data: SceneData = serde_json::from_str(&json)
-            .map_err(|e| format!("Failed to deserialize scene: {}", e))?;
-
-        // Regenerate primitive meshes based on primitive_type
-        for entity in &mut data.entities {
-            if let Some(mesh) = &mut entity.mesh {
-                let p_type = mesh.primitive_type.as_str();
-                let (vertices, indices) = match p_type {
-                    "Box" => crate::render::mesh::generate_box(1.0, 1.0, 1.0),
-                    "Sphere" => crate::render::mesh::generate_sphere(1.0, 16, 16),
-                    "Plane" => crate::render::mesh::generate_plane(15.0, 15.0),
-                    "Cylinder" => crate::render::mesh::generate_cylinder(
-                        glam::Vec3::new(0.0, -0.5, 0.0),
-                        glam::Vec3::new(0.0, 0.5, 0.0),
-                        0.5,
-                        12,
-                    ),
-                    _ => (Vec::new(), Vec::new()),
-                };
-                mesh.vertices = vertices;
-                mesh.indices = indices;
-                mesh.is_dirty.set(true);
-            }
-        }
-
-        // Rebuild the World from the loaded entities, preserving order + ids.
-        self.world.clear();
-        for entity in data.entities {
-            self.world.insert_entity(entity);
-        }
-        self.world.bump_next_id(data.next_entity_id);
-        self.selected_entity_id = data.selected_entity_id;
-        self.skybox_path = data.skybox_path;
-        self.ambient_color = data.ambient_color;
-        self.ambient_intensity = data.ambient_intensity;
-
-        self.update_all_colliders();
-        Ok(())
+        crate::scene::load_from_file(self, path)
     }
 }

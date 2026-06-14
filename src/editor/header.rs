@@ -62,26 +62,32 @@ pub fn draw(
                         }
                     ));
 
-                    // Quick scene save/load buttons in header
+                    // Quick scene save/load buttons in header. Save writes back to
+                    // the CURRENT scene path (set on load / double-click), falling
+                    // back to the seeded default scene.
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let path = editor
+                            .current_scene_path
+                            .clone()
+                            .unwrap_or_else(|| crate::scene::DEFAULT_SCENE_PATH.to_string());
                         if ui.button("💾 Save Scene").clicked() {
-                            if let Err(err) = scene.save_to_file("project/scenes/demo.scene") {
-                                console.error(format!("Failed to save scene: {}", err));
-                            } else {
-                                console.info(
-                                    "Scene saved successfully to project/scenes/demo.scene"
-                                        .to_string(),
-                                );
+                            match scene.save_to_file(&path) {
+                                Ok(_) => {
+                                    editor.current_scene_path = Some(path.clone());
+                                    console.info(format!("Scene saved to {}", path));
+                                }
+                                Err(err) => console.error(format!("Failed to save scene: {}", err)),
                             }
                         }
                         if ui.button("📂 Load Scene").clicked() {
-                            if let Err(err) = scene.load_from_file("project/scenes/demo.scene") {
-                                console.error(format!("Failed to load scene: {}", err));
-                            } else {
-                                console.info(
-                                    "Scene loaded successfully from project/scenes/demo.scene"
-                                        .to_string(),
-                                );
+                            match scene.load_from_file(&path) {
+                                Ok(_) => {
+                                    editor.current_scene_path = Some(path.clone());
+                                    editor.selected_entity_id = None;
+                                    editor.is_dirty = true;
+                                    console.info(format!("Scene loaded from {}", path));
+                                }
+                                Err(err) => console.error(format!("Failed to load scene: {}", err)),
                             }
                         }
                     });
