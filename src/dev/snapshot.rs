@@ -34,13 +34,15 @@ fn entity_json(e: &crate::core::scene::Entity) -> Value {
 pub fn snapshot(world: &GameWorld) -> Value {
     let scene = world.scene.borrow();
     let entities: Vec<Value> = scene.iter().map(|e| entity_json(&e)).collect();
+    let cam = world.camera.borrow();
     json!({
         "frame": world.play_frame(),
         "play_state": if world.is_playing { "playing" } else { "editor" },
         "camera": {
-            "pos": vec3(world.camera.position),
-            "yaw": world.camera.yaw,
-            "pitch": world.camera.pitch,
+            "pos": vec3(cam.position),
+            "yaw": cam.yaw,
+            "pitch": cam.pitch,
+            "fov": cam.fov,
         },
         "entities": entities,
     })

@@ -1,3 +1,5 @@
+mod bindings;
+
 use glam::Vec3;
 use mlua::{Lua, RegistryKey, Table};
 use std::cell::RefCell;
@@ -8,6 +10,8 @@ use std::rc::Rc;
 use crate::core::input::InputState;
 use crate::core::scene::Scene;
 use crate::navigation::NavigationGraph;
+use crate::render::Camera;
+use crate::time::Time;
 
 pub struct ConsoleLogs {
     pub messages: Vec<(String, LogLevel)>,
@@ -54,6 +58,8 @@ pub struct ScriptManager {
     input: Rc<RefCell<InputState>>,
     nav: Rc<RefCell<NavigationGraph>>,
     console: Rc<RefCell<ConsoleLogs>>,
+    camera: Rc<RefCell<Camera>>,
+    time: Rc<RefCell<Time>>,
 }
 
 impl ScriptManager {
@@ -62,6 +68,8 @@ impl ScriptManager {
         input: Rc<RefCell<InputState>>,
         nav: Rc<RefCell<NavigationGraph>>,
         console: Rc<RefCell<ConsoleLogs>>,
+        camera: Rc<RefCell<Camera>>,
+        time: Rc<RefCell<Time>>,
     ) -> Self {
         Self {
             lua: None,
@@ -70,6 +78,8 @@ impl ScriptManager {
             input,
             nav,
             console,
+            camera,
+            time,
         }
     }
 
@@ -693,6 +703,18 @@ impl ScriptManager {
             .set("Physics", physics_table)
             .map_err(|e| e.to_string())?;
 
+        // 8. Issue #5 namespaces: Health, Time, Camera, writable Input, Physics
+        //    Raycast/Shoot, and (dev-only) Debug. Implemented in `bindings.rs` to
+        //    keep this monolith from growing without bound.
+        bindings::register(
+            &lua,
+            &self.scene,
+            &self.input,
+            &self.camera,
+            &self.time,
+            &self.console,
+        )?;
+
         self.lua = Some(lua);
         self.entity_scripts.clear();
 
@@ -871,5 +893,99 @@ impl ScriptManager {
     pub fn shutdown(&mut self) {
         self.entity_scripts.clear();
         self.lua = None;
+    }
+
+    /// Run a Lua chunk against the live runtime. Test-only entry point for the
+    /// issue-#5 API coverage; the windowed/headless paths drive scripts through
+    /// the lifecycle callbacks instead.
+    #[cfg(test)]
+    fn exec(&self, code: &str) -> Result<(), String> {
+        let lua = self.lua.as_ref().ok_or("runtime not initialized")?;
+        lua.load(code).exec().map_err(|e| e.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::components::HealthComponent;
+    use crate::render::Camera;
+    use crate::time::Time;
+
+    fn manager() -> (ScriptManager, Rc<RefCell<Scene>>, Rc<RefCell<Camera>>) {
+        let mut raw = Scene::new();
+        let id = raw.add_entity("Target".to_string());
+        if let Some(mut e) = raw.get_entity_mut(id) {
+            e.health = Some(HealthComponent {
+                current_health: 100.0,
+                max_health: 100.0,
+                is_dead: false,
+            });
+        }
+        let scene = Rc::new(RefCell::new(raw));
+        let input = Rc::new(RefCell::new(InputState::new()));
+        let nav = Rc::new(RefCell::new(NavigationGraph::new(
+            -10.0, 10.0, -10.0, 10.0, 1.0,
+        )));
+        let console = Rc::new(RefCell::new(ConsoleLogs::new()));
+        let camera = Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0)));
+        let time = Rc::new(RefCell::new(Time::new()));
+        time.borrow_mut().advance(0.25);
+        let mut m = ScriptManager::new(
+            Rc::clone(&scene),
+            input,
+            nav,
+            console,
+            Rc::clone(&camera),
+            time,
+        );
+        m.init_runtime().expect("runtime inits");
+        (m, scene, camera)
+    }
+
+    #[test]
+    fn health_get_damage_heal_roundtrip() {
+        let (m, scene, _cam) = manager();
+        m.exec("Health.Damage(1, 30)").unwrap();
+        m.exec("Health.Heal(1, 5)").unwrap();
+        let hp = scene
+            .borrow()
+            .get_entity(1)
+            .and_then(|e| e.health.as_ref().map(|h| h.current_health));
+        assert_eq!(hp, Some(75.0));
+    }
+
+    #[test]
+    fn time_namespace_reads_clock() {
+        let (m, _scene, _cam) = manager();
+        m.exec("assert(Time.deltaTime() == 0.25)").unwrap();
+        m.exec("assert(Time.fixedDeltaTime() > 0)").unwrap();
+        m.exec("assert(Time.frameCount() == 1)").unwrap();
+    }
+
+    #[test]
+    fn camera_set_moves_shared_camera() {
+        let (m, _scene, cam) = manager();
+        m.exec("Camera.SetPosition(1, 2, 3); Camera.SetFov(60)")
+            .unwrap();
+        assert_eq!(cam.borrow().position, Vec3::new(1.0, 2.0, 3.0));
+        assert_eq!(cam.borrow().fov, 60.0);
+    }
+
+    #[test]
+    fn input_press_release_is_writable() {
+        let (m, _scene, _cam) = manager();
+        m.exec("Input.Press('W'); assert(Input.IsKeyDown('W'))")
+            .unwrap();
+        m.exec("Input.Release('W'); assert(not Input.IsKeyDown('W'))")
+            .unwrap();
+    }
+
+    #[test]
+    fn raycast_misses_into_empty_space() {
+        let (m, _scene, _cam) = manager();
+        // Target has no collider, so nothing to hit.
+        m.exec("local hit = Physics.Raycast(0,0,0, 1,0,0); assert(hit == false)")
+            .unwrap();
     }
 }
