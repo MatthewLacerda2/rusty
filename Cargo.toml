@@ -3,6 +3,25 @@ name = "rusty"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "rusty"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rusty"
+path = "src/main.rs"
+
+# Headless deterministic runner (the agent's hands). Dev-only: stripped from ship
+# builds. Build/run with `--features dev`.
+[[bin]]
+name = "play"
+path = "src/bin/play.rs"
+required-features = ["dev"]
+
+[features]
+# The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
+dev = []
+
 [dependencies]
 winit = { version = "0.29.10" }
 wgpu = { version = "0.19.4" }

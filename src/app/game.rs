@@ -8,7 +8,6 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::time::Instant;
 
 use glam::Vec3;
 
@@ -37,7 +36,9 @@ pub struct GameWorld {
     pub is_playing: bool,
     pub(super) was_playing: bool,
     pub(super) pathfinding_points: Vec<Vec3>,
-    pub(super) last_path_bake: Instant,
+    /// Play-mode frame counter. Drives nav rebaking off a deterministic tick count
+    /// instead of the wall clock, so a fixed-timestep replay is bit-for-bit stable.
+    pub(super) play_frame: u64,
 }
 
 impl GameWorld {
@@ -63,7 +64,7 @@ impl GameWorld {
             is_playing: false,
             was_playing: false,
             pathfinding_points: Vec::new(),
-            last_path_bake: Instant::now(),
+            play_frame: 0,
         }
     }
 
@@ -83,6 +84,11 @@ impl GameWorld {
         &self.pathfinding_points
     }
 
+    /// Number of play-mode frames simulated since the last `enter_play`.
+    pub fn play_frame(&self) -> u64 {
+        self.play_frame
+    }
+
     fn handle_transition(&mut self) -> PlayTransition {
         let transition = if self.is_playing && !self.was_playing {
             self.enter_play();
@@ -98,6 +104,7 @@ impl GameWorld {
     }
 
     fn enter_play(&mut self) {
+        self.play_frame = 0;
         if let Some(player) = self.scene.borrow().get_entity(2) {
             self.camera.position = player.transform.position + Vec3::new(0.0, 1.5, -4.5);
             self.camera.yaw = 90.0;
@@ -133,6 +140,7 @@ impl GameWorld {
     fn exit_play(&mut self) {
         self.script_manager.shutdown();
         self.pathfinding_points.clear();
+        self.play_frame = 0;
     }
 
     /// Editor-mode free-fly camera (no entity simulation).
