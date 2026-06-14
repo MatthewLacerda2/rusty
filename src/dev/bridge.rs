@@ -106,6 +106,20 @@ fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
         lua.create_function(move |_, path: String| Ok(h.borrow_mut().screenshot(path)))?,
     )?;
 
+    // AttachPlayerBot(path) -> bool. Tag the Player with a bot-player script so the
+    // headless world runs it from Update() on the first Step. Call this BEFORE any
+    // Step — scripts load when the world enters play mode (first tick). Returns true
+    // if a Player entity was found and tagged.
+    let world = world_of(harness);
+    t.set(
+        "AttachPlayerBot",
+        lua.create_function(move |_, path: String| {
+            let w = world.borrow();
+            let attached = super::botplayer::attach_player_bot(&mut w.scene.borrow_mut(), &path);
+            Ok(attached)
+        })?,
+    )?;
+
     lua.globals().set("Harness", t)
 }
 
