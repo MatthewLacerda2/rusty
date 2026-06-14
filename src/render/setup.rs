@@ -61,6 +61,20 @@ impl Renderer {
         };
         surface.configure(&device, &config);
 
+        Self::from_parts(device, queue, Some(surface), config, size)
+    }
+
+    /// Shared constructor body: builds all pipelines, layouts, buffers and bind
+    /// groups from an already-created device/queue. Both the windowed (`new`) and
+    /// the headless offscreen (`new_headless`) paths funnel through here, so they
+    /// produce a byte-identical renderer apart from the optional window surface.
+    pub(super) fn from_parts(
+        device: wgpu::Device,
+        queue: wgpu::Queue,
+        surface: Option<wgpu::Surface<'static>>,
+        config: wgpu::SurfaceConfiguration,
+        size: winit::dpi::PhysicalSize<u32>,
+    ) -> Self {
         // 5. Create Depth Texture
         let (depth_texture, depth_view) = Self::create_depth_resources(&device, &config);
 
@@ -158,7 +172,7 @@ impl Renderer {
             &device,
             &texture_layout,
             &camera_lighting_layout,
-            surface_format,
+            config.format,
         );
 
         // 9. Create Render Pipelines
@@ -241,7 +255,9 @@ impl Renderer {
             self.size = new_size;
             self.config.width = new_size.width;
             self.config.height = new_size.height;
-            self.surface.configure(&self.device, &self.config);
+            if let Some(surface) = &self.surface {
+                surface.configure(&self.device, &self.config);
+            }
             let (depth_tex, depth_view) = Self::create_depth_resources(&self.device, &self.config);
             self.depth_texture = depth_tex;
             self.depth_view = depth_view;

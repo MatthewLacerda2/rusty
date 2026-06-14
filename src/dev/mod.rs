@@ -13,13 +13,15 @@
 //!   scenario    — loads and runs a `.lua` scenario, captures observations
 //!   bridge      — Lua bindings for the scenario VM (the control surface)
 //!   demo_scene  — headless demo scene builder (mirrors the windowed scene)
+//!   screenshot  — offscreen render -> PNG (the GPU "eyes"); skips if no adapter
 //!   snapshot    — world -> JSON observation
 //!
-//! Status: harness + scenario runner implemented (issue #3). screenshot/botplayer
-//! (the GPU "eyes" + bot pattern notes) remain scaffolds for a later phase.
+//! Status: harness + scenario runner implemented (issue #3); offscreen screenshot
+//! implemented (issue #7). botplayer (bot pattern notes) remains a scaffold.
 
 pub mod bridge;
 pub mod demo_scene;
 pub mod harness;
 pub mod scenario;
+pub mod screenshot;
 pub mod snapshot;
