@@ -56,8 +56,48 @@ pub fn draw(
                 draw_assets(editor, scene, console, ui);
             } else if editor.active_bottom_tab == "console" {
                 draw_console(console, ui);
+                #[cfg(feature = "dev")]
+                draw_repl_input(editor, ui);
             }
         });
+}
+
+/// Floating console shown during Play (dev builds only): the log buffer plus the
+/// live Lua REPL input line, so you can call the API while the game runs.
+#[cfg(feature = "dev")]
+pub fn draw_play_console(editor: &mut EditorUi, ctx: &egui::Context, console: &mut ConsoleLogs) {
+    egui::Window::new("📟 Developer Console")
+        .default_height(220.0)
+        .default_width(520.0)
+        .anchor(egui::Align2::LEFT_BOTTOM, egui::vec2(8.0, -8.0))
+        .show(ctx, |ui| {
+            draw_console(console, ui);
+            draw_repl_input(editor, ui);
+        });
+}
+
+/// The REPL input line. On submit it stashes the text in `editor.pending_repl`;
+/// the front-end drains that and runs it through the single `dev::console`
+/// evaluator against the live runtime (so windowed and headless can't drift).
+#[cfg(feature = "dev")]
+fn draw_repl_input(editor: &mut EditorUi, ui: &mut egui::Ui) {
+    ui.separator();
+    ui.horizontal(|ui| {
+        ui.label("lua>");
+        let resp = ui.add(
+            egui::TextEdit::singleline(&mut editor.repl_input.buffer)
+                .desired_width(f32::INFINITY)
+                .hint_text("e.g. print(Transform.GetPosition(Scene.FindEntityByName(\"Player\")))")
+                .font(egui::TextStyle::Monospace),
+        );
+        let submit = resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+        if submit {
+            if let Some(line) = editor.repl_input.take_submit() {
+                editor.pending_repl = Some(line);
+            }
+            resp.request_focus();
+        }
+    });
 }
 
 fn draw_assets(

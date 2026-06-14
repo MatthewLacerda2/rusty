@@ -42,6 +42,15 @@ pub struct EditorUi {
     pub asset_model_import_normals: bool,
     pub asset_script_content: String,
     pub active_bottom_tab: String,
+
+    /// Live Lua REPL input line (dev builds only). The editor only collects the
+    /// submitted text here; the front-end (main.rs) drains `pending_repl` and runs
+    /// it through the single `dev::console` evaluator against the live runtime.
+    #[cfg(feature = "dev")]
+    pub repl_input: crate::dev::console::ReplInput,
+    /// A line the user submitted this frame, awaiting evaluation by the front-end.
+    #[cfg(feature = "dev")]
+    pub pending_repl: Option<String>,
 }
 
 impl EditorUi {
@@ -70,6 +79,11 @@ impl EditorUi {
             asset_model_import_normals: true,
             asset_script_content: String::new(),
             active_bottom_tab: "assets".to_string(),
+
+            #[cfg(feature = "dev")]
+            repl_input: crate::dev::console::ReplInput::new(),
+            #[cfg(feature = "dev")]
+            pending_repl: None,
         }
     }
 
@@ -169,6 +183,12 @@ impl EditorUi {
         header::draw(self, ctx, scene, console, is_playing);
 
         if *is_playing {
+            // The runtime is only live during play, so the REPL belongs here. Show a
+            // floating console (log + input line) so you can call the API while the
+            // game runs. Dev builds only — stripped from ship builds with the rest of
+            // the agentic layer.
+            #[cfg(feature = "dev")]
+            bottom_panel::draw_play_console(self, ctx, console);
             return;
         }
 
