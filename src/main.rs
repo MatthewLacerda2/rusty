@@ -115,144 +115,154 @@ return BotAI
 
         // A. Add Floor Plane (Procedural XZ grid)
         let floor_id = s.add_entity("Floor_Plane".to_string());
-        let floor = s.get_entity_mut(floor_id).unwrap();
-        floor.transform.scale = Vec3::new(2.5, 1.0, 2.5); // Large floor area
-        floor.is_static = true;
-        let (v_floor, idx_floor) = primitives::generate_plane(15.0, 15.0);
-        floor.mesh = Some(scene::MeshComponent {
-            primitive_type: "Plane".to_string(),
-            vertices: v_floor,
-            indices: idx_floor,
-            is_dirty: std::cell::Cell::new(true),
-        });
-        floor.collider = Some(ColliderComponent {
-            active: true,
-            shape: ColliderShape::Box {
-                size: Vec3::new(15.0, 0.1, 15.0),
-            },
-            is_trigger: false,
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
-        });
+        {
+            let mut floor = s.get_entity_mut(floor_id).unwrap();
+            floor.transform.scale = Vec3::new(2.5, 1.0, 2.5); // Large floor area
+            floor.is_static = true;
+            let (v_floor, idx_floor) = primitives::generate_plane(15.0, 15.0);
+            floor.mesh = Some(scene::MeshComponent {
+                primitive_type: "Plane".to_string(),
+                vertices: v_floor,
+                indices: idx_floor,
+                is_dirty: scene::DirtyFlag::new(true),
+            });
+            floor.collider = Some(ColliderComponent {
+                active: true,
+                shape: ColliderShape::Box {
+                    size: Vec3::new(15.0, 0.1, 15.0),
+                },
+                is_trigger: false,
+                aabb_min: Vec3::ZERO,
+                aabb_max: Vec3::ZERO,
+            });
+        }
 
         // B. Add Player Camera Anchor
         let player_id = s.add_entity("Player".to_string());
-        let player = s.get_entity_mut(player_id).unwrap();
-        player.transform.position = Vec3::new(0.0, 1.5, -6.0);
-        let (v_player, idx_player) = primitives::generate_cylinder(
-            Vec3::new(0.0, -0.8, 0.0),
-            Vec3::new(0.0, 0.8, 0.0),
-            0.5,
-            12,
-        );
-        player.mesh = Some(scene::MeshComponent {
-            primitive_type: "Cylinder".to_string(),
-            vertices: v_player,
-            indices: idx_player,
-            is_dirty: std::cell::Cell::new(true),
-        });
-        player.collider = Some(ColliderComponent {
-            active: true,
-            shape: ColliderShape::Cylinder {
-                radius: 0.5,
-                height: 1.6,
-            },
-            is_trigger: false,
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
-        });
-        player.rigidbody = Some(RigidBodyComponent {
-            active: true,
-            is_kinematic: true,
-            mass: 80.0,
-            velocity: Vec3::ZERO,
-            use_gravity: false,
-        });
+        {
+            let mut player = s.get_entity_mut(player_id).unwrap();
+            player.transform.position = Vec3::new(0.0, 1.5, -6.0);
+            let (v_player, idx_player) = primitives::generate_cylinder(
+                Vec3::new(0.0, -0.8, 0.0),
+                Vec3::new(0.0, 0.8, 0.0),
+                0.5,
+                12,
+            );
+            player.mesh = Some(scene::MeshComponent {
+                primitive_type: "Cylinder".to_string(),
+                vertices: v_player,
+                indices: idx_player,
+                is_dirty: scene::DirtyFlag::new(true),
+            });
+            player.collider = Some(ColliderComponent {
+                active: true,
+                shape: ColliderShape::Cylinder {
+                    radius: 0.5,
+                    height: 1.6,
+                },
+                is_trigger: false,
+                aabb_min: Vec3::ZERO,
+                aabb_max: Vec3::ZERO,
+            });
+            player.rigidbody = Some(RigidBodyComponent {
+                active: true,
+                is_kinematic: true,
+                mass: 80.0,
+                velocity: Vec3::ZERO,
+                use_gravity: false,
+            });
+        }
 
         // C. Add Static Obstacle Walls (to test dynamic A* path avoidance!)
         let wall1_id = s.add_entity("Obstacle_Wall_Left".to_string());
-        let wall1 = s.get_entity_mut(wall1_id).unwrap();
-        wall1.transform.position = Vec3::new(3.0, 1.0, 2.0);
-        wall1.transform.scale = Vec3::new(1.0, 2.0, 4.0);
-        wall1.is_static = true;
-        let (v_w1, idx_w1) = primitives::generate_box(1.0, 1.0, 1.0);
-        wall1.mesh = Some(scene::MeshComponent {
-            primitive_type: "Box".to_string(),
-            vertices: v_w1,
-            indices: idx_w1,
-            is_dirty: std::cell::Cell::new(true),
-        });
-        wall1.collider = Some(ColliderComponent {
-            active: true,
-            shape: ColliderShape::Box { size: Vec3::ONE },
-            is_trigger: false,
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
-        });
+        {
+            let mut wall1 = s.get_entity_mut(wall1_id).unwrap();
+            wall1.transform.position = Vec3::new(3.0, 1.0, 2.0);
+            wall1.transform.scale = Vec3::new(1.0, 2.0, 4.0);
+            wall1.is_static = true;
+            let (v_w1, idx_w1) = primitives::generate_box(1.0, 1.0, 1.0);
+            wall1.mesh = Some(scene::MeshComponent {
+                primitive_type: "Box".to_string(),
+                vertices: v_w1,
+                indices: idx_w1,
+                is_dirty: scene::DirtyFlag::new(true),
+            });
+            wall1.collider = Some(ColliderComponent {
+                active: true,
+                shape: ColliderShape::Box { size: Vec3::ONE },
+                is_trigger: false,
+                aabb_min: Vec3::ZERO,
+                aabb_max: Vec3::ZERO,
+            });
+        }
 
         let wall2_id = s.add_entity("Obstacle_Wall_Right".to_string());
-        let wall2 = s.get_entity_mut(wall2_id).unwrap();
-        wall2.transform.position = Vec3::new(-3.0, 1.0, 4.0);
-        wall2.transform.scale = Vec3::new(4.0, 2.0, 1.0);
-        wall2.is_static = true;
-        let (v_w2, idx_w2) = primitives::generate_box(1.0, 1.0, 1.0);
-        wall2.mesh = Some(scene::MeshComponent {
-            primitive_type: "Box".to_string(),
-            vertices: v_w2,
-            indices: idx_w2,
-            is_dirty: std::cell::Cell::new(true),
-        });
-        wall2.collider = Some(ColliderComponent {
-            active: true,
-            shape: ColliderShape::Box { size: Vec3::ONE },
-            is_trigger: false,
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
-        });
+        {
+            let mut wall2 = s.get_entity_mut(wall2_id).unwrap();
+            wall2.transform.position = Vec3::new(-3.0, 1.0, 4.0);
+            wall2.transform.scale = Vec3::new(4.0, 2.0, 1.0);
+            wall2.is_static = true;
+            let (v_w2, idx_w2) = primitives::generate_box(1.0, 1.0, 1.0);
+            wall2.mesh = Some(scene::MeshComponent {
+                primitive_type: "Box".to_string(),
+                vertices: v_w2,
+                indices: idx_w2,
+                is_dirty: scene::DirtyFlag::new(true),
+            });
+            wall2.collider = Some(ColliderComponent {
+                active: true,
+                shape: ColliderShape::Box { size: Vec3::ONE },
+                is_trigger: false,
+                aabb_min: Vec3::ZERO,
+                aabb_max: Vec3::ZERO,
+            });
+        }
 
         // E. Add Dynamic Enemy Bot entity
         let enemy_id = s.add_entity("Enemy_1".to_string());
-        let enemy = s.get_entity_mut(enemy_id).unwrap();
-        enemy.transform.position = Vec3::new(8.0, 1.0, 8.0);
-        let (v_enemy, idx_enemy) = primitives::generate_box(1.3, 2.0, 1.3);
-        enemy.mesh = Some(scene::MeshComponent {
-            primitive_type: "Box".to_string(),
-            vertices: v_enemy,
-            indices: idx_enemy,
-            is_dirty: std::cell::Cell::new(true),
-        });
-        enemy.collider = Some(ColliderComponent {
-            active: true,
-            shape: ColliderShape::Box {
-                size: Vec3::new(1.3, 2.0, 1.3),
-            },
-            is_trigger: false,
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
-        });
-        enemy.rigidbody = Some(RigidBodyComponent {
-            active: true,
-            is_kinematic: true,
-            mass: 80.0,
-            velocity: Vec3::ZERO,
-            use_gravity: false,
-        });
-        enemy.health = Some(HealthComponent {
-            current_health: 100.0,
-            max_health: 100.0,
-            is_dead: false,
-        });
-        enemy.animator = Some(AnimatorComponent {
-            current_clip: "Walk".to_string(),
-            time: 0.0,
-            speed: 3.0,
-            is_playing: true,
-            freeze: false,
-        });
-        enemy.script = Some(ScriptComponent {
-            path: "project/assets/scripts/bot.lua".to_string(),
-            is_loaded: false,
-        });
+        {
+            let mut enemy = s.get_entity_mut(enemy_id).unwrap();
+            enemy.transform.position = Vec3::new(8.0, 1.0, 8.0);
+            let (v_enemy, idx_enemy) = primitives::generate_box(1.3, 2.0, 1.3);
+            enemy.mesh = Some(scene::MeshComponent {
+                primitive_type: "Box".to_string(),
+                vertices: v_enemy,
+                indices: idx_enemy,
+                is_dirty: scene::DirtyFlag::new(true),
+            });
+            enemy.collider = Some(ColliderComponent {
+                active: true,
+                shape: ColliderShape::Box {
+                    size: Vec3::new(1.3, 2.0, 1.3),
+                },
+                is_trigger: false,
+                aabb_min: Vec3::ZERO,
+                aabb_max: Vec3::ZERO,
+            });
+            enemy.rigidbody = Some(RigidBodyComponent {
+                active: true,
+                is_kinematic: true,
+                mass: 80.0,
+                velocity: Vec3::ZERO,
+                use_gravity: false,
+            });
+            enemy.health = Some(HealthComponent {
+                current_health: 100.0,
+                max_health: 100.0,
+                is_dead: false,
+            });
+            enemy.animator = Some(AnimatorComponent {
+                current_clip: "Walk".to_string(),
+                time: 0.0,
+                speed: 3.0,
+                is_playing: true,
+                freeze: false,
+            });
+            enemy.script = Some(ScriptComponent {
+                path: "project/assets/scripts/bot.lua".to_string(),
+                is_loaded: false,
+            });
+        }
 
         s.update_all_colliders();
         nav.borrow_mut().bake(&s);

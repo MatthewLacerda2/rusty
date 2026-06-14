@@ -137,8 +137,7 @@ fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
             let s = w.scene.borrow();
             let hp = s
                 .get_entity(id)
-                .and_then(|e| e.health.as_ref())
-                .map(|h| h.current_health)
+                .and_then(|e| e.health.as_ref().map(|h| h.current_health))
                 .unwrap_or(0.0);
             Ok(hp)
         })?,
@@ -154,8 +153,7 @@ fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
             let s = w.scene.borrow();
             let clip = s
                 .get_entity(id)
-                .and_then(|e| e.animator.as_ref())
-                .map(|a| a.current_clip.clone())
+                .and_then(|e| e.animator.as_ref().map(|a| a.current_clip.clone()))
                 .unwrap_or_default();
             Ok(clip)
         })?,

@@ -17,7 +17,7 @@ impl Renderer {
     ) -> Vec<AxisResource> {
         let mut axis_arrow_resources = Vec::new();
         if let Some(selected_id) = scene.selected_entity_id {
-            if scene.entities.iter().any(|e| e.id == selected_id) {
+            if scene.get_entity(selected_id).is_some() {
                 let world_matrix = scene.compute_world_matrix(selected_id);
                 let world_pos = world_matrix.col(3).truncate();
                 let arrow_model_matrix = Mat4::from_translation(world_pos);

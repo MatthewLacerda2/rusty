@@ -33,7 +33,7 @@ fn entity_json(e: &crate::core::scene::Entity) -> Value {
 /// Build the full world snapshot.
 pub fn snapshot(world: &GameWorld) -> Value {
     let scene = world.scene.borrow();
-    let entities: Vec<Value> = scene.entities.iter().map(entity_json).collect();
+    let entities: Vec<Value> = scene.iter().map(|e| entity_json(&e)).collect();
     json!({
         "frame": world.play_frame(),
         "play_state": if world.is_playing { "playing" } else { "editor" },

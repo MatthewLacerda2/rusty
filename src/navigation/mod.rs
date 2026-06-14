@@ -83,7 +83,7 @@ impl NavigationGraph {
         // Reset walkability
         self.walkability.fill(true);
 
-        for entity in &scene.entities {
+        for entity in scene.iter() {
             // Only static colliders block pathfinding
             if !entity.active || !entity.is_static {
                 continue;
@@ -306,7 +306,12 @@ impl NavigationGraph {
     /// Steers and updates positions of active NavMesh agents in the scene,
     /// constraining them strictly to walkable NavMesh cells using a 2D sliding projection check.
     pub fn tick_nav_agents(&self, scene: &mut Scene, delta_time: f32) {
-        for entity in &mut scene.entities {
+        for id in scene.entity_ids() {
+            let mut entity_guard = match scene.get_entity_mut(id) {
+                Some(e) => e,
+                None => continue,
+            };
+            let entity: &mut crate::core::scene::Entity = &mut entity_guard;
             if !entity.active {
                 continue;
             }

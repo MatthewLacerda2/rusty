@@ -7,7 +7,7 @@
 use glam::Vec3;
 
 use crate::core::scene::{
-    AnimatorComponent, ColliderComponent, ColliderShape, HealthComponent, MeshComponent,
+    AnimatorComponent, ColliderComponent, ColliderShape, DirtyFlag, HealthComponent, MeshComponent,
     RigidBodyComponent, Scene, ScriptComponent,
 };
 use crate::render::mesh as primitives;
@@ -27,7 +27,7 @@ fn mesh(primitive_type: &str, data: (Vec<primitives::Vertex>, Vec<u32>)) -> Mesh
         primitive_type: primitive_type.to_string(),
         vertices: data.0,
         indices: data.1,
-        is_dirty: std::cell::Cell::new(true),
+        is_dirty: DirtyFlag::new(true),
     }
 }
 
@@ -43,73 +43,91 @@ fn kinematic_body() -> RigidBodyComponent {
 
 /// Build the standard demo scene used by both the editor and the harness.
 /// `bot_script` is the path to the enemy's Lua brain (may be empty to skip).
+///
+/// Each entity's `RefMut` guard is scoped so it drops before the next `Scene`
+/// call — required now that the Scene is hecs-backed and hands out borrow guards.
 pub fn build(scene: &mut Scene, bot_script: &str) {
     // 1 — Floor (id 1)
     let floor_id = scene.add_entity("Floor_Plane".to_string());
-    let floor = scene.get_entity_mut(floor_id).unwrap();
-    floor.transform.scale = Vec3::new(2.5, 1.0, 2.5);
-    floor.is_static = true;
-    floor.mesh = Some(mesh("Plane", primitives::generate_plane(15.0, 15.0)));
-    floor.collider = Some(box_collider(Vec3::new(15.0, 0.1, 15.0)));
+    {
+        let mut floor = scene.get_entity_mut(floor_id).unwrap();
+        floor.transform.scale = Vec3::new(2.5, 1.0, 2.5);
+        floor.is_static = true;
+        floor.mesh = Some(mesh("Plane", primitives::generate_plane(15.0, 15.0)));
+        floor.collider = Some(box_collider(Vec3::new(15.0, 0.1, 15.0)));
+    }
 
     // 2 — Player (id 2)
     let player_id = scene.add_entity("Player".to_string());
-    let player = scene.get_entity_mut(player_id).unwrap();
-    player.transform.position = Vec3::new(0.0, 1.5, -6.0);
-    player.mesh = Some(mesh(
-        "Cylinder",
-        primitives::generate_cylinder(Vec3::new(0.0, -0.8, 0.0), Vec3::new(0.0, 0.8, 0.0), 0.5, 12),
-    ));
-    player.collider = Some(ColliderComponent {
-        shape: ColliderShape::Cylinder {
-            radius: 0.5,
-            height: 1.6,
-        },
-        ..box_collider(Vec3::ONE)
-    });
-    player.rigidbody = Some(kinematic_body());
+    {
+        let mut player = scene.get_entity_mut(player_id).unwrap();
+        player.transform.position = Vec3::new(0.0, 1.5, -6.0);
+        player.mesh = Some(mesh(
+            "Cylinder",
+            primitives::generate_cylinder(
+                Vec3::new(0.0, -0.8, 0.0),
+                Vec3::new(0.0, 0.8, 0.0),
+                0.5,
+                12,
+            ),
+        ));
+        player.collider = Some(ColliderComponent {
+            shape: ColliderShape::Cylinder {
+                radius: 0.5,
+                height: 1.6,
+            },
+            ..box_collider(Vec3::ONE)
+        });
+        player.rigidbody = Some(kinematic_body());
+    }
 
     // 3, 4 — Obstacle walls
     let wall1_id = scene.add_entity("Obstacle_Wall_Left".to_string());
-    let wall1 = scene.get_entity_mut(wall1_id).unwrap();
-    wall1.transform.position = Vec3::new(3.0, 1.0, 2.0);
-    wall1.transform.scale = Vec3::new(1.0, 2.0, 4.0);
-    wall1.is_static = true;
-    wall1.mesh = Some(mesh("Box", primitives::generate_box(1.0, 1.0, 1.0)));
-    wall1.collider = Some(box_collider(Vec3::ONE));
+    {
+        let mut wall1 = scene.get_entity_mut(wall1_id).unwrap();
+        wall1.transform.position = Vec3::new(3.0, 1.0, 2.0);
+        wall1.transform.scale = Vec3::new(1.0, 2.0, 4.0);
+        wall1.is_static = true;
+        wall1.mesh = Some(mesh("Box", primitives::generate_box(1.0, 1.0, 1.0)));
+        wall1.collider = Some(box_collider(Vec3::ONE));
+    }
 
     let wall2_id = scene.add_entity("Obstacle_Wall_Right".to_string());
-    let wall2 = scene.get_entity_mut(wall2_id).unwrap();
-    wall2.transform.position = Vec3::new(-3.0, 1.0, 4.0);
-    wall2.transform.scale = Vec3::new(4.0, 2.0, 1.0);
-    wall2.is_static = true;
-    wall2.mesh = Some(mesh("Box", primitives::generate_box(1.0, 1.0, 1.0)));
-    wall2.collider = Some(box_collider(Vec3::ONE));
+    {
+        let mut wall2 = scene.get_entity_mut(wall2_id).unwrap();
+        wall2.transform.position = Vec3::new(-3.0, 1.0, 4.0);
+        wall2.transform.scale = Vec3::new(4.0, 2.0, 1.0);
+        wall2.is_static = true;
+        wall2.mesh = Some(mesh("Box", primitives::generate_box(1.0, 1.0, 1.0)));
+        wall2.collider = Some(box_collider(Vec3::ONE));
+    }
 
     // 5 — Enemy_1 (id 5)
     let enemy_id = scene.add_entity("Enemy_1".to_string());
-    let enemy = scene.get_entity_mut(enemy_id).unwrap();
-    enemy.transform.position = Vec3::new(8.0, 1.0, 8.0);
-    enemy.mesh = Some(mesh("Box", primitives::generate_box(1.3, 2.0, 1.3)));
-    enemy.collider = Some(box_collider(Vec3::new(1.3, 2.0, 1.3)));
-    enemy.rigidbody = Some(kinematic_body());
-    enemy.health = Some(HealthComponent {
-        current_health: 100.0,
-        max_health: 100.0,
-        is_dead: false,
-    });
-    enemy.animator = Some(AnimatorComponent {
-        current_clip: "Walk".to_string(),
-        time: 0.0,
-        speed: 3.0,
-        is_playing: true,
-        freeze: false,
-    });
-    if !bot_script.is_empty() {
-        enemy.script = Some(ScriptComponent {
-            path: bot_script.to_string(),
-            is_loaded: false,
+    {
+        let mut enemy = scene.get_entity_mut(enemy_id).unwrap();
+        enemy.transform.position = Vec3::new(8.0, 1.0, 8.0);
+        enemy.mesh = Some(mesh("Box", primitives::generate_box(1.3, 2.0, 1.3)));
+        enemy.collider = Some(box_collider(Vec3::new(1.3, 2.0, 1.3)));
+        enemy.rigidbody = Some(kinematic_body());
+        enemy.health = Some(HealthComponent {
+            current_health: 100.0,
+            max_health: 100.0,
+            is_dead: false,
         });
+        enemy.animator = Some(AnimatorComponent {
+            current_clip: "Walk".to_string(),
+            time: 0.0,
+            speed: 3.0,
+            is_playing: true,
+            freeze: false,
+        });
+        if !bot_script.is_empty() {
+            enemy.script = Some(ScriptComponent {
+                path: bot_script.to_string(),
+                is_loaded: false,
+            });
+        }
     }
 
     scene.update_all_colliders();

@@ -25,7 +25,7 @@ impl Renderer {
 
         // Update meshes
         let mut mesh_updates = Vec::new();
-        for entity in &scene.entities {
+        for entity in scene.iter() {
             if !entity.active {
                 continue;
             }
@@ -43,7 +43,7 @@ impl Renderer {
 
         // Preload textures
         let mut tex_paths = Vec::new();
-        for entity in &scene.entities {
+        for entity in scene.iter() {
             if !entity.active {
                 continue;
             }
@@ -178,7 +178,7 @@ impl Renderer {
 
         // Populate dynamic lights from the scene
         let mut pt_idx = 0;
-        for entity in &scene.entities {
+        for entity in scene.iter() {
             if !entity.active {
                 continue;
             }
@@ -239,7 +239,7 @@ impl Renderer {
         let mut ssr_quality = 2.0; // High default
         let mut ssr_temporal = 0.0;
 
-        for entity in &scene.entities {
+        for entity in scene.iter() {
             if !entity.active {
                 continue;
             }

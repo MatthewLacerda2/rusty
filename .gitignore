@@ -37,3 +37,6 @@ auxmd.md
 
 # Background-agent git worktrees (transient; auto-cleaned)
 .claude/worktrees/
+
+# Harness run artifacts
+out/

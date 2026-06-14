@@ -105,10 +105,16 @@ impl GameWorld {
 
     fn enter_play(&mut self) {
         self.play_frame = 0;
-        if let Some(player) = self.scene.borrow().get_entity(2) {
-            self.camera.position = player.transform.position + Vec3::new(0.0, 1.5, -4.5);
-            self.camera.yaw = 90.0;
-            self.camera.pitch = -10.0;
+        {
+            let scene = self.scene.borrow();
+            let player = scene
+                .find_entity_by_name("Player")
+                .and_then(|id| scene.get_entity(id));
+            if let Some(player) = player {
+                self.camera.position = player.transform.position + Vec3::new(0.0, 1.5, -4.5);
+                self.camera.yaw = 90.0;
+                self.camera.pitch = -10.0;
+            }
         }
         self.console
             .borrow_mut()
@@ -123,7 +129,6 @@ impl GameWorld {
         let to_load: Vec<(u32, String)> = self
             .scene
             .borrow()
-            .entities
             .iter()
             .filter_map(|e| e.script.as_ref().map(|s| (e.id, s.path.clone())))
             .collect();

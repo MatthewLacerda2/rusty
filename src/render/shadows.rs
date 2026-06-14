@@ -236,7 +236,7 @@ impl ShadowRenderer {
         gpu_meshes: &HashMap<u32, crate::render::GpuMesh>,
     ) {
         let mut render_resources = Vec::new();
-        for entity in &scene.entities {
+        for entity in scene.iter() {
             if !entity.active || !entity.is_static {
                 continue;
             }
@@ -329,7 +329,7 @@ impl ShadowRenderer {
         );
 
         let mut render_resources = Vec::new();
-        for entity in &scene.entities {
+        for entity in scene.iter() {
             if !entity.active || entity.is_static {
                 continue;
             }
