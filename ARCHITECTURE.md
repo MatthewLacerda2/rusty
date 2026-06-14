@@ -32,11 +32,12 @@ the World.
 ## Components — per-entity data (the Unity-style "classes")
 
 First-class, engine-provided; systems expect them. Custom behaviour goes in
-*scripts*, not new built-in components.
+*scripts*, not new built-in components. **Every entity has exactly one `Transform`
+(mandatory, like Unity — cannot be removed); all other components are optional.**
 
 | Component | Status | Unity analog |
 |---|---|---|
-| `Transform` | `[now]` | Transform |
+| `Transform` ⭐ **mandatory** | `[now]` | Transform (every entity has one; not optional) |
 | `Mesh` | `[now]` | MeshFilter/MeshRenderer |
 | `Texture`/Material | `[now]` | Material |
 | `Camera` | `[now]` | Camera |
