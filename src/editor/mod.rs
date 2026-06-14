@@ -18,6 +18,9 @@ use crate::scripting::ConsoleLogs;
 pub struct EditorUi {
     pub selected_entity_id: Option<u32>,
     pub selected_asset_path: Option<String>,
+    /// The scene file the editor is currently editing. Save writes back HERE;
+    /// double-clicking a `.scene` in the assets browser loads it and sets this.
+    pub current_scene_path: Option<String>,
     pub current_dir: String,
     pub is_dirty: bool,
     new_entity_name: String,
@@ -46,6 +49,7 @@ impl EditorUi {
         Self {
             selected_entity_id: None,
             selected_asset_path: None,
+            current_scene_path: None,
             current_dir: "project".to_string(),
             is_dirty: true,
             new_entity_name: "New Primitive".to_string(),
@@ -175,6 +179,6 @@ impl EditorUi {
         inspector::draw(self, ctx, scene, console, nav);
 
         // 4. BOTTOM PANEL: Folder Explorer & Console Logs
-        bottom_panel::draw(self, ctx, console);
+        bottom_panel::draw(self, ctx, scene, console);
     }
 }

@@ -15,6 +15,7 @@ use crate::core::input::InputState;
 use crate::core::scene::Scene;
 use crate::navigation::NavigationGraph;
 use crate::render::Camera;
+use crate::scene::SceneSnapshot;
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
 
@@ -41,6 +42,9 @@ pub struct GameWorld {
     /// Play-mode frame counter. Drives nav rebaking off a deterministic tick count
     /// instead of the wall clock, so a fixed-timestep replay is bit-for-bit stable.
     pub(super) play_frame: u64,
+    /// Edit-mode scene captured on Play and restored on Stop, so play-mode
+    /// mutations never leak back into the authoritative edit scene (Unity-style).
+    pub(super) edit_snapshot: Option<SceneSnapshot>,
 }
 
 impl GameWorld {
@@ -76,6 +80,7 @@ impl GameWorld {
             was_playing: false,
             pathfinding_points: Vec::new(),
             play_frame: 0,
+            edit_snapshot: None,
         }
     }
 
@@ -118,6 +123,9 @@ impl GameWorld {
     fn enter_play(&mut self) {
         self.play_frame = 0;
         self.time.borrow_mut().reset();
+        // Snapshot the authoritative edit scene so Stop can restore it, discarding
+        // every play-mode mutation (script/physics moves, health, spawns/despawns).
+        self.edit_snapshot = Some(SceneSnapshot::capture(&self.scene.borrow()));
         {
             let scene = self.scene.borrow();
             let player = scene
@@ -160,6 +168,11 @@ impl GameWorld {
         self.script_manager.shutdown();
         self.pathfinding_points.clear();
         self.play_frame = 0;
+        // Restore the edit scene captured on Play, discarding play-mode state.
+        if let Some(snapshot) = self.edit_snapshot.take() {
+            snapshot.restore(&mut self.scene.borrow_mut());
+            self.nav.borrow_mut().bake(&self.scene.borrow());
+        }
     }
 
     /// Editor-mode free-fly camera (no entity simulation).
