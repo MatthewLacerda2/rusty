@@ -77,10 +77,8 @@ fn limit_for(path: &Path) -> usize {
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let is_test = p.contains("/tests/")
-        || p.contains("/fixtures/")
-        || name.ends_with("_test.rs")
-        || name.starts_with("test_");
+    let in_test_dir = p.split('/').any(|seg| seg == "tests" || seg == "fixtures");
+    let is_test = in_test_dir || name.ends_with("_test.rs") || name.starts_with("test_");
     if is_test {
         MAX_TEST_FILE_LINES
     } else {
@@ -93,7 +91,12 @@ fn check_file(path: &Path) -> Option<String> {
     let lines = content.lines().count();
     let limit = limit_for(path);
     if lines > limit {
-        Some(format!("FILE_TOO_LONG {} {}/{}", normalize(path), lines, limit))
+        Some(format!(
+            "FILE_TOO_LONG {} {}/{}",
+            normalize(path),
+            lines,
+            limit
+        ))
     } else {
         None
     }
@@ -138,5 +141,31 @@ fn report(violations: &[String]) {
             "\n{} file(s) over the size cap. Split them meaningfully (see docs/linting.md).",
             violations.len()
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn normal_files_get_the_default_cap() {
+        assert_eq!(limit_for(Path::new("src/render/mod.rs")), MAX_FILE_LINES);
+    }
+
+    #[test]
+    fn test_and_fixture_files_get_the_tight_cap() {
+        assert_eq!(limit_for(Path::new("tests/foo.rs")), MAX_TEST_FILE_LINES);
+        assert_eq!(limit_for(Path::new("src/bar_test.rs")), MAX_TEST_FILE_LINES);
+        assert_eq!(
+            limit_for(Path::new("src/fixtures/baz.rs")),
+            MAX_TEST_FILE_LINES
+        );
+    }
+
+    #[test]
+    fn normalize_strips_leading_dot_slash() {
+        assert_eq!(normalize(Path::new("./src/main.rs")), "src/main.rs");
     }
 }
