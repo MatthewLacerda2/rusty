@@ -29,3 +29,6 @@ auxmd.md
 
 # Lint reports
 .lint/
+
+# Background-agent git worktrees (transient; auto-cleaned)
+.claude/worktrees/
