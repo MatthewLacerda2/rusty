@@ -391,9 +391,10 @@ return BotAI
                         // Render the 3D scene (Forward unlit/lit + gizmos line drawers)
                         {
                             let s = game.scene.borrow();
+                            let cam = game.camera.borrow();
                             renderer.render(
                                 &s,
-                                &game.camera,
+                                &cam,
                                 &view,
                                 !game.is_playing,
                                 game.pathfinding_points(),

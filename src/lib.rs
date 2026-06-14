@@ -13,6 +13,7 @@ pub mod navigation;
 pub mod physics;
 pub mod render;
 pub mod scripting;
+pub mod time;
 
 #[cfg(feature = "dev")]
 pub mod dev;

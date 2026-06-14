@@ -16,6 +16,7 @@ use crate::core::scene::Scene;
 use crate::navigation::NavigationGraph;
 use crate::render::Camera;
 use crate::scripting::{ConsoleLogs, ScriptManager};
+use crate::time::Time;
 
 /// Reported by `tick` so the platform layer can react (e.g. grab the cursor)
 /// without the simulation knowing about the window.
@@ -32,7 +33,8 @@ pub struct GameWorld {
     pub nav: Rc<RefCell<NavigationGraph>>,
     pub console: Rc<RefCell<ConsoleLogs>>,
     pub script_manager: ScriptManager,
-    pub camera: Camera,
+    pub camera: Rc<RefCell<Camera>>,
+    pub time: Rc<RefCell<Time>>,
     pub is_playing: bool,
     pub(super) was_playing: bool,
     pub(super) pathfinding_points: Vec<Vec3>,
@@ -48,11 +50,19 @@ impl GameWorld {
         nav: Rc<RefCell<NavigationGraph>>,
         console: Rc<RefCell<ConsoleLogs>>,
     ) -> Self {
+        let camera = Rc::new(RefCell::new(Camera::new(
+            Vec3::new(0.0, 5.0, -10.0),
+            90.0,
+            -20.0,
+        )));
+        let time = Rc::new(RefCell::new(Time::new()));
         let script_manager = ScriptManager::new(
             Rc::clone(&scene),
             Rc::clone(&input),
             Rc::clone(&nav),
             Rc::clone(&console),
+            Rc::clone(&camera),
+            Rc::clone(&time),
         );
         Self {
             scene,
@@ -60,7 +70,8 @@ impl GameWorld {
             nav,
             console,
             script_manager,
-            camera: Camera::new(Vec3::new(0.0, 5.0, -10.0), 90.0, -20.0),
+            camera,
+            time,
             is_playing: false,
             was_playing: false,
             pathfinding_points: Vec::new(),
@@ -72,6 +83,7 @@ impl GameWorld {
     /// the caller can handle platform-only concerns (cursor grab/visibility).
     pub fn tick(&mut self, dt: f32) -> PlayTransition {
         let transition = self.handle_transition();
+        self.time.borrow_mut().advance(dt);
         if self.is_playing {
             super::play::run(self, dt);
         } else {
@@ -105,15 +117,17 @@ impl GameWorld {
 
     fn enter_play(&mut self) {
         self.play_frame = 0;
+        self.time.borrow_mut().reset();
         {
             let scene = self.scene.borrow();
             let player = scene
                 .find_entity_by_name("Player")
                 .and_then(|id| scene.get_entity(id));
             if let Some(player) = player {
-                self.camera.position = player.transform.position + Vec3::new(0.0, 1.5, -4.5);
-                self.camera.yaw = 90.0;
-                self.camera.pitch = -10.0;
+                let mut cam = self.camera.borrow_mut();
+                cam.position = player.transform.position + Vec3::new(0.0, 1.5, -4.5);
+                cam.yaw = 90.0;
+                cam.pitch = -10.0;
             }
         }
         self.console
@@ -151,36 +165,37 @@ impl GameWorld {
     /// Editor-mode free-fly camera (no entity simulation).
     fn editor_fly(&mut self, dt: f32) {
         let inp = self.input.borrow();
+        let mut cam = self.camera.borrow_mut();
         let mut move_dir = Vec3::ZERO;
         if inp.is_key_down("W") {
-            move_dir += self.camera.forward();
+            move_dir += cam.forward();
         }
         if inp.is_key_down("S") {
-            move_dir -= self.camera.forward();
+            move_dir -= cam.forward();
         }
         if inp.is_key_down("A") {
-            move_dir -= self.camera.right();
+            move_dir -= cam.right();
         }
         if inp.is_key_down("D") {
-            move_dir += self.camera.right();
+            move_dir += cam.right();
         }
         if move_dir.length_squared() > 0.001 {
-            self.camera.position += move_dir.normalize() * 10.0 * dt;
+            cam.position += move_dir.normalize() * 10.0 * dt;
         }
 
         let look = 90.0 * dt;
         if inp.is_key_down("LEFT") {
-            self.camera.yaw -= look;
+            cam.yaw -= look;
         }
         if inp.is_key_down("RIGHT") {
-            self.camera.yaw += look;
+            cam.yaw += look;
         }
         if inp.is_key_down("UP") {
-            self.camera.pitch += look;
+            cam.pitch += look;
         }
         if inp.is_key_down("DOWN") {
-            self.camera.pitch -= look;
+            cam.pitch -= look;
         }
-        self.camera.pitch = self.camera.pitch.clamp(-80.0, 80.0);
+        cam.pitch = cam.pitch.clamp(-80.0, 80.0);
     }
 }

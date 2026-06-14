@@ -74,17 +74,18 @@ fn drive_player(g: &mut GameWorld, dt: f32) {
     let mut move_dir = Vec3::ZERO;
     {
         let inp = g.input.borrow();
+        let cam = g.camera.borrow();
         if inp.is_key_down("W") {
-            move_dir += g.camera.forward();
+            move_dir += cam.forward();
         }
         if inp.is_key_down("S") {
-            move_dir -= g.camera.forward();
+            move_dir -= cam.forward();
         }
         if inp.is_key_down("A") {
-            move_dir -= g.camera.right();
+            move_dir -= cam.right();
         }
         if inp.is_key_down("D") {
-            move_dir += g.camera.right();
+            move_dir += cam.right();
         }
     }
     move_dir.y = 0.0;
@@ -101,20 +102,21 @@ fn drive_player(g: &mut GameWorld, dt: f32) {
 
     {
         let inp = g.input.borrow();
+        let mut cam = g.camera.borrow_mut();
         let look = 90.0 * dt;
         if inp.is_key_down("LEFT") {
-            g.camera.yaw -= look;
+            cam.yaw -= look;
         }
         if inp.is_key_down("RIGHT") {
-            g.camera.yaw += look;
+            cam.yaw += look;
         }
         if inp.is_key_down("UP") {
-            g.camera.pitch += look;
+            cam.pitch += look;
         }
         if inp.is_key_down("DOWN") {
-            g.camera.pitch -= look;
+            cam.pitch -= look;
         }
-        g.camera.pitch = g.camera.pitch.clamp(-80.0, 80.0);
+        cam.pitch = cam.pitch.clamp(-80.0, 80.0);
     }
 
     let s = g.scene.borrow();
@@ -122,8 +124,9 @@ fn drive_player(g: &mut GameWorld, dt: f32) {
         .find_entity_by_name(PLAYER_NAME)
         .and_then(|id| s.get_entity(id));
     if let Some(player) = player {
-        let offset = -g.camera.forward() * 4.5 + Vec3::new(0.0, 1.5, 0.0);
-        g.camera.position = player.transform.position + offset;
+        let mut cam = g.camera.borrow_mut();
+        let offset = -cam.forward() * 4.5 + Vec3::new(0.0, 1.5, 0.0);
+        cam.position = player.transform.position + offset;
     }
 }
 
@@ -152,7 +155,10 @@ fn hitscan(g: &mut GameWorld) {
         .borrow_mut()
         .info("💥 Fired hitscan laser beam!".to_string());
 
-    let ray = Ray::new(g.camera.position, g.camera.forward());
+    let ray = {
+        let cam = g.camera.borrow();
+        Ray::new(cam.position, cam.forward())
+    };
     let hit = {
         let s = g.scene.borrow();
         cast_ray_in_scene(&ray, &s)
