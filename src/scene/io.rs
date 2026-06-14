@@ -4,7 +4,7 @@
 //! REPLACES the current World (no multi-scene).
 //!
 //! Editor integration:
-//!   - EditorUi.current_scene_path: Option<String> — Save writes back HERE
+//!   - `EditorUi.current_scene_path: Option<String>` — Save writes back HERE
 //!     (not a hardcoded demo path); Load (incl. double-click in the assets
 //!     browser) sets it.
 //!   - one standardised scene extension (`.scene`, JSON inside).

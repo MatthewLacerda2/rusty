@@ -265,12 +265,12 @@ impl NavigationGraph {
                 }
 
                 // For diagonal movements, prevent corner-cutting through blocked cardinal obstacles
-                if dx != 0 && dz != 0 {
-                    if !self.is_walkable(current.x + dx, current.z)
-                        || !self.is_walkable(current.x, current.z + dz)
-                    {
-                        continue;
-                    }
+                if dx != 0
+                    && dz != 0
+                    && (!self.is_walkable(current.x + dx, current.z)
+                        || !self.is_walkable(current.x, current.z + dz))
+                {
+                    continue;
                 }
 
                 let neighbor_key = (nx, nz);

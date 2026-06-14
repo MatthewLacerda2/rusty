@@ -131,7 +131,6 @@ return BotAI
     let mut frame_count = 0;
     let mut fps = 60.0;
     let mut last_fps_update = Instant::now();
-    let mut current_frame_duration = 0.0;
 
     // 8. Execute Window Event Loop
     let _ = event_loop.run(move |event, elwt| {
@@ -199,7 +198,7 @@ return BotAI
                         let now = Instant::now();
                         let delta_time = now.duration_since(last_frame_time).as_secs_f32();
                         last_frame_time = now;
-                        current_frame_duration = delta_time * 1000.0;
+                        let current_frame_duration = delta_time * 1000.0;
 
                         frame_count += 1;
                         if now.duration_since(last_fps_update) >= Duration::from_secs(1) {

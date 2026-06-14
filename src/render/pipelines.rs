@@ -138,6 +138,10 @@ pub(super) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayo
 }
 
 /// Builds the forward-lit, line debug, and outline pipelines.
+// wgpu pipeline construction legitimately threads several distinct GPU resources
+// (device, shader, format, four bind-group layouts); bundling them into a struct
+// would only add an indirection without clarifying intent.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn create_pipelines(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,

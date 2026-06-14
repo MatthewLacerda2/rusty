@@ -126,13 +126,13 @@ pub fn generate_sphere(radius: f32, rings: u32, sectors: u32) -> (Vec<Vertex>, V
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
 
-    let R = 1.0 / (rings as f32);
-    let S = 1.0 / (sectors as f32);
+    let ring_step = 1.0 / (rings as f32);
+    let sector_step = 1.0 / (sectors as f32);
 
     for r in 0..=rings {
         for s in 0..=sectors {
-            let theta = (r as f32) * std::f32::consts::PI * R;
-            let phi = (s as f32) * 2.0 * std::f32::consts::PI * S;
+            let theta = (r as f32) * std::f32::consts::PI * ring_step;
+            let phi = (s as f32) * 2.0 * std::f32::consts::PI * sector_step;
 
             let x = theta.sin() * phi.cos();
             let y = theta.cos();
@@ -140,7 +140,7 @@ pub fn generate_sphere(radius: f32, rings: u32, sectors: u32) -> (Vec<Vertex>, V
 
             let norm = Vec3::new(x, y, z);
             let pos = norm * radius;
-            let uv = [(s as f32) * S, 1.0 - (r as f32) * R];
+            let uv = [(s as f32) * sector_step, 1.0 - (r as f32) * ring_step];
 
             vertices.push(Vertex::new(pos, norm, uv));
         }
@@ -196,7 +196,6 @@ pub fn generate_cylinder(
     let mut indices = Vec::new();
 
     let d_vec = p2 - p1;
-    let len = d_vec.length();
     let dir = d_vec.normalize();
 
     // Create orthonormal basis (dir, u, v)

@@ -3,9 +3,9 @@
 //! A scenario is a normal `.lua` file (tagged dev-only) that drives the headless
 //! harness through the SAME observe/act surface an agent uses. The loop is:
 //!
-//!   1. write   project/scenarios/<name>.lua
+//!   1. write   `project/scenarios/<name>.lua`
 //!   2. run     `cargo run --bin play --features dev -- <scenario> <out_dir>`
-//!   3. read    <out_dir>/results.json + console.log
+//!   3. read    `<out_dir>/results.json` + `console.log`
 //!
 //! Example scenario:
 //!   local enemy = Scene.FindEntityByName("Enemy_1")

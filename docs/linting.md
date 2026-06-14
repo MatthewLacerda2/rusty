@@ -7,10 +7,11 @@ result is written to `.lint/report.txt` so an agent can read exactly what failed
 | Check | Tool | Rule |
 |---|---|---|
 | Style | rustfmt (`rustfmt.toml`) | `cargo fmt --check` |
-| Code smells | clippy (`clippy.toml`) | report-only for now; flip to `-D warnings` after migration |
-| Function ("endpoint") length | clippy `too_many_lines` | `too-many-lines-threshold = 50` |
+| Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (both feature sets) |
+| Function ("endpoint") length | clippy `too_many_lines` | `too-many-lines-threshold = 50` — configured but not yet gated (legacy burn-down) |
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines |
+| Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation` |
 
 ## Run it
 ```

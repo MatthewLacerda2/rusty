@@ -14,6 +14,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
+mod determinism;
+
 const MAX_FILE_LINES: usize = 300;
 /// Test/fixture files get a looser cap than source: Rust test files legitimately
 /// bundle several `#[test]` fns plus fixtures, and over-splitting them hurts
@@ -24,6 +26,14 @@ const REPORT: &str = ".lint/report.txt";
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+
+    // `--determinism` runs the sim-purity guard instead of the size gate: it fails
+    // if wall-clock / unseeded-RNG calls leak into the deterministic sim modules.
+    if args.iter().any(|a| a == "--determinism") {
+        determinism::run();
+        return;
+    }
+
     let files = if args.is_empty() {
         scan_dir(Path::new("src"))
     } else {
