@@ -9,6 +9,8 @@ agent can drive, observe, and play-test it headlessly.
   the agentic dev layer).
 - **ARCHITECTURE.md** — inventory of resources, components, systems, and classes
   (each tagged `[now]` / `[new]` / `[partial]`).
+- **auxmd.md** *(gitignored)* — the operator's short-term scratchpad; read it if a
+  session points you there.
 
 ## Conventions that matter
 - **ECS via `hecs`.** `Transform` is the one mandatory component; all others optional.
