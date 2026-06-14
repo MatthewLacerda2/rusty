@@ -1,6 +1,11 @@
-//! src/app/mod.rs — App + run-loop orchestration
+//! src/app/ — the application spine: a tickable GameWorld decoupled from winit/wgpu.
 //!
-//! Owns the World, Resources and Schedule; advances stages each frame. Replaces the hand-inlined loop in main.rs.
-//!
-//! Allowed deps: hecs, app::*, components, time. NOT render/editor/dev.
-//! Status: SCAFFOLD — structure only; not yet implemented.
+//! Phase 0 of the migration: the simulation that used to live inline in main.rs's
+//! event loop now lives in `GameWorld::tick`, which knows nothing about the window
+//! or the GPU. This is what makes headless play possible. The full Schedule/System
+//! registry (the other scaffold files here) arrives in Phase 1 with hecs.
+
+pub mod game;
+mod play;
+
+pub use game::{GameWorld, PlayTransition};

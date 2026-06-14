@@ -1,31 +1,35 @@
+mod app;
 mod core;
+mod editor;
 mod navigation;
 mod physics;
-mod scripting;
 mod render;
-mod editor;
+mod scripting;
 
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::cell::RefCell;
-use std::collections::HashSet;
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 use winit::{
-    event::{Event, WindowEvent, DeviceEvent, ElementState, KeyEvent},
+    event::{ElementState, Event, KeyEvent, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder,
     keyboard::{KeyCode, PhysicalKey},
+    window::WindowBuilder,
 };
+
 use glam::Vec3;
 
-use crate::core::scene::{self, Scene, LightType, LightComponent, ColliderComponent, ColliderShape, RigidBodyComponent, HealthComponent, AnimatorComponent, ScriptComponent};
+use crate::app::{GameWorld, PlayTransition};
 use crate::core::input::InputState;
-use crate::navigation::NavigationGraph;
-use crate::scripting::{ScriptManager, ConsoleLogs};
-use crate::render::{Renderer, Camera};
-use crate::render::mesh as primitives;
+use crate::core::scene::{
+    self, AnimatorComponent, ColliderComponent, ColliderShape, HealthComponent,
+    RigidBodyComponent, ScriptComponent, Scene,
+};
 use crate::editor::EditorUi;
-use crate::physics::{Ray, cast_ray_in_scene};
+use crate::navigation::NavigationGraph;
+use crate::render::mesh as primitives;
+use crate::render::Renderer;
+use crate::scripting::ConsoleLogs;
 
 fn main() {
     env_logger::init();
@@ -84,13 +88,13 @@ return BotAI
             .with_title("Rusty 3D Game Engine & Editor")
             .with_inner_size(winit::dpi::PhysicalSize::new(1280, 720))
             .build(&event_loop)
-            .unwrap()
+            .unwrap(),
     );
 
     // 3. Initialize Core Render Engine & egui Context
     let mut renderer = pollster::block_on(Renderer::new(Arc::clone(&window)));
     let egui_ctx = egui::Context::default();
-    
+
     // Egui state integration
     let mut egui_winit = egui_winit::State::new(
         egui_ctx.clone(),
@@ -99,25 +103,13 @@ return BotAI
         Some(window.scale_factor() as f32),
         None,
     );
-    let mut egui_renderer = egui_wgpu::Renderer::new(
-        &renderer.device,
-        renderer.config.format,
-        None,
-        1,
-    );
+    let mut egui_renderer = egui_wgpu::Renderer::new(&renderer.device, renderer.config.format, None, 1);
 
-    // 4. Initialize Core Engine Systems
+    // 4. Initialize Core Engine Systems (shared simulation state)
     let scene = Rc::new(RefCell::new(Scene::new()));
     let input = Rc::new(RefCell::new(InputState::new()));
     let nav = Rc::new(RefCell::new(NavigationGraph::new(-20.0, 20.0, -20.0, 20.0, 1.0)));
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-    
-    let mut script_manager = ScriptManager::new(
-        Rc::clone(&scene),
-        Rc::clone(&input),
-        Rc::clone(&nav),
-        Rc::clone(&console),
-    );
 
     // 5. Populate Beautiful Demo 3D Scene
     {
@@ -144,11 +136,12 @@ return BotAI
             aabb_max: Vec3::ZERO,
         });
 
-        // B. Add Player Camera Anchor (so we can inspect / track player in Hierarchy)
+        // B. Add Player Camera Anchor
         let player_id = s.add_entity("Player".to_string());
         let player = s.get_entity_mut(player_id).unwrap();
         player.transform.position = Vec3::new(0.0, 1.5, -6.0);
-        let (v_player, idx_player) = primitives::generate_cylinder(Vec3::new(0.0, -0.8, 0.0), Vec3::new(0.0, 0.8, 0.0), 0.5, 12);
+        let (v_player, idx_player) =
+            primitives::generate_cylinder(Vec3::new(0.0, -0.8, 0.0), Vec3::new(0.0, 0.8, 0.0), 0.5, 12);
         player.mesh = Some(scene::MeshComponent {
             primitive_type: "Cylinder".to_string(),
             vertices: v_player,
@@ -244,7 +237,6 @@ return BotAI
             is_playing: true,
             freeze: false,
         });
-        // Auto-assign bot.lua script
         enemy.script = Some(ScriptComponent {
             path: "project/assets/scripts/bot.lua".to_string(),
             is_loaded: false,
@@ -254,26 +246,19 @@ return BotAI
         nav.borrow_mut().bake(&s);
     }
 
-    // 6. Editor state values
+    // 6. Wrap the shared sim state in the window/GPU-agnostic GameWorld.
+    let mut game = GameWorld::new(scene, input, nav, console);
+
+    // 7. Editor + timing state (front-end only)
     let mut editor_ui = EditorUi::new();
-    let mut camera = Camera::new(Vec3::new(0.0, 5.0, -10.0), 90.0, -20.0);
-    
-    // Core game state
-    let mut is_playing = false;
-    let mut was_playing_last_frame = false;
-    
-    // Timing counters
     let mut last_frame_time = Instant::now();
     let mut frame_count = 0;
     let mut fps = 60.0;
     let mut last_fps_update = Instant::now();
     let mut current_frame_duration = 0.0;
 
-    let mut pathfinding_points = Vec::new();
-    let mut last_path_bake = Instant::now();
-
-    // 7. Execute Window Event Loop
-    event_loop.run(move |event, elwt| {
+    // 8. Execute Window Event Loop
+    let _ = event_loop.run(move |event, elwt| {
         elwt.set_control_flow(ControlFlow::Poll);
 
         match event {
@@ -285,40 +270,44 @@ return BotAI
                     WindowEvent::Resized(physical_size) => {
                         renderer.resize(*physical_size);
                     }
-                    WindowEvent::KeyboardInput { event: KeyEvent { physical_key: PhysicalKey::Code(key), state, .. }, .. } => {
+                    WindowEvent::KeyboardInput {
+                        event: KeyEvent { physical_key: PhysicalKey::Code(key), state, .. },
+                        ..
+                    } => {
                         let pressed = *state == ElementState::Pressed;
-                        let mut inp = input.borrow_mut();
-
-                        match key {
-                            KeyCode::KeyW => inp.set_key_state("W", pressed),
-                            KeyCode::KeyA => inp.set_key_state("A", pressed),
-                            KeyCode::KeyS => inp.set_key_state("S", pressed),
-                            KeyCode::KeyD => inp.set_key_state("D", pressed),
-                            KeyCode::ArrowUp => inp.set_key_state("UP", pressed),
-                            KeyCode::ArrowDown => inp.set_key_state("DOWN", pressed),
-                            KeyCode::ArrowLeft => inp.set_key_state("LEFT", pressed),
-                            KeyCode::ArrowRight => inp.set_key_state("RIGHT", pressed),
-                            KeyCode::Space => {
-                                inp.space_pressed = pressed;
-                                inp.set_key_state("SPACE", pressed);
-                            }
-                            KeyCode::Escape => {
-                                if pressed && is_playing {
-                                    // Hit ESC in PlayMode to unlock cursor
-                                    is_playing = false;
-                                    console.borrow_mut().info("Unlocked cursor, entering EditorMode".to_string());
+                        {
+                            let mut inp = game.input.borrow_mut();
+                            match key {
+                                KeyCode::KeyW => inp.set_key_state("W", pressed),
+                                KeyCode::KeyA => inp.set_key_state("A", pressed),
+                                KeyCode::KeyS => inp.set_key_state("S", pressed),
+                                KeyCode::KeyD => inp.set_key_state("D", pressed),
+                                KeyCode::ArrowUp => inp.set_key_state("UP", pressed),
+                                KeyCode::ArrowDown => inp.set_key_state("DOWN", pressed),
+                                KeyCode::ArrowLeft => inp.set_key_state("LEFT", pressed),
+                                KeyCode::ArrowRight => inp.set_key_state("RIGHT", pressed),
+                                KeyCode::Space => {
+                                    inp.space_pressed = pressed;
+                                    inp.set_key_state("SPACE", pressed);
                                 }
+                                _ => {}
                             }
-                            _ => {}
+                        }
+                        // Hit ESC in PlayMode to unlock cursor (platform-side transition)
+                        if *key == KeyCode::Escape && pressed && game.is_playing {
+                            game.is_playing = false;
+                            game.console
+                                .borrow_mut()
+                                .info("Unlocked cursor, entering EditorMode".to_string());
                         }
                     }
                     WindowEvent::MouseInput { state, button, .. } => {
                         if *button == winit::event::MouseButton::Left {
-                            input.borrow_mut().mouse_left_clicked = *state == ElementState::Pressed;
+                            game.input.borrow_mut().mouse_left_clicked = *state == ElementState::Pressed;
                         }
                     }
                     WindowEvent::CursorMoved { position, .. } => {
-                        input.borrow_mut().mouse_position = (position.x, position.y);
+                        game.input.borrow_mut().mouse_position = (position.x, position.y);
                     }
                     WindowEvent::RedrawRequested => {
                         // Compute timing metrics
@@ -334,211 +323,18 @@ return BotAI
                             last_fps_update = now;
                         }
 
-                        // State Machine Transitions
-                        if is_playing && !was_playing_last_frame {
-                            // ENTERING PLAYMODE: Lock cursor, reset & initialize mlua scripting context
-                            window.set_cursor_grab(winit::window::CursorGrabMode::Confined).ok();
-                            window.set_cursor_visible(false);
-                            console.borrow_mut().info("Capturing cursor, entering PlayMode!".to_string());
-
-                            // Place camera behind Player cylinder
-                            let s = scene.borrow();
-                            if let Some(player) = s.get_entity(2) { // Player is ID 2
-                                camera.position = player.transform.position + Vec3::new(0.0, 1.5, -4.5);
-                                camera.yaw = 90.0;
-                                camera.pitch = -10.0;
+                        // Advance the simulation (decoupled from window + GPU).
+                        let transition = game.tick(delta_time);
+                        match transition {
+                            PlayTransition::Entered => {
+                                window.set_cursor_grab(winit::window::CursorGrabMode::Confined).ok();
+                                window.set_cursor_visible(false);
                             }
-                            drop(s);
-
-                            // Trigger scripting reload
-                            if let Err(err) = script_manager.init_runtime() {
-                                console.borrow_mut().error(format!("Lua init error: {}", err));
-                            } else {
-                                // Load script files assigned in the scene
-                                let s = scene.borrow();
-                                let mut to_load = Vec::new();
-                                for entity in &s.entities {
-                                    if let Some(script) = &entity.script {
-                                        to_load.push((entity.id, script.path.clone()));
-                                    }
-                                }
-                                drop(s);
-
-                                for (id, path) in to_load {
-                                    if let Err(e) = script_manager.load_entity_script(id, &path) {
-                                        console.borrow_mut().error(format!("Lua compile error (Entity {}): {}", id, e));
-                                    }
-                                }
-                                script_manager.start_scripts();
+                            PlayTransition::Exited => {
+                                window.set_cursor_grab(winit::window::CursorGrabMode::None).ok();
+                                window.set_cursor_visible(true);
                             }
-                        } else if !is_playing && was_playing_last_frame {
-                            // ENTERING EDITORMODE: Unlock cursor, shut down script runtime
-                            window.set_cursor_grab(winit::window::CursorGrabMode::None).ok();
-                            window.set_cursor_visible(true);
-                            script_manager.shutdown();
-                            pathfinding_points.clear();
-                        }
-                        was_playing_last_frame = is_playing;
-
-                        // Ticking game mechanics
-                        if is_playing {
-                            // Dynamic A* Pathfinding grid rebaking (Runs once per second to prevent GPU lag)
-                            if now.duration_since(last_path_bake) >= Duration::from_secs(1) {
-                                let s = scene.borrow();
-                                nav.borrow_mut().bake(&s);
-                                
-                                // Visualize current pathfinding from Enemy 1 to Player
-                                if let Some(enemy) = s.get_entity(5) { // Enemy 1 is ID 5
-                                    if let Some(player) = s.get_entity(2) {
-                                        let grid = nav.borrow();
-                                        let (es_x, es_z) = grid.world_to_grid(enemy.transform.position);
-                                        let (pl_x, pl_z) = grid.world_to_grid(player.transform.position);
-                                        
-                                        // Run internal A* path solver
-                                        let mut pts = Vec::new();
-                                        pts.push(enemy.transform.position);
-                                        if let Some(grid_pts) = grid.find_path(es_x, es_z, pl_x, pl_z) {
-                                            for &(gx, gz) in &grid_pts {
-                                                pts.push(grid.grid_to_world(gx, gz));
-                                            }
-                                        }
-                                        pts.push(player.transform.position);
-                                        pathfinding_points = pts;
-                                    }
-                                }
-                                last_path_bake = now;
-                            }
-
-                            // 1. PlayMode Input Controls (Drive the Player entity movement & look)
-                            {
-                                let mut s = scene.borrow_mut();
-                                let inp = input.borrow();
-
-                                let mut move_dir = Vec3::ZERO;
-                                if inp.is_key_down("W") { move_dir += camera.forward(); }
-                                if inp.is_key_down("S") { move_dir -= camera.forward(); }
-                                if inp.is_key_down("A") { move_dir -= camera.right(); }
-                                if inp.is_key_down("D") { move_dir += camera.right(); }
-                                // Flatten Y axis so player doesn't fly upwards when looking up
-                                move_dir.y = 0.0;
-
-                                if move_dir.length_squared() > 0.001 {
-                                    let speed = 5.0 * delta_time;
-                                    if let Some(player) = s.get_entity_mut(2) {
-                                        player.transform.position += move_dir.normalize() * speed;
-                                    }
-                                    s.update_entity_collider(2);
-                                }
-
-                                // Look rotations using Arrow Keys
-                                let look_speed = 90.0 * delta_time;
-                                if inp.is_key_down("LEFT") { camera.yaw -= look_speed; }
-                                if inp.is_key_down("RIGHT") { camera.yaw += look_speed; }
-                                if inp.is_key_down("UP") { camera.pitch += look_speed; }
-                                if inp.is_key_down("DOWN") { camera.pitch -= look_speed; }
-                                camera.pitch = camera.pitch.clamp(-80.0, 80.0);
-
-                                // Snap camera target position slightly behind player
-                                if let Some(player) = s.get_entity(2) {
-                                    let offset = -camera.forward() * 4.5 + Vec3::new(0.0, 1.5, 0.0);
-                                    camera.position = player.transform.position + offset;
-                                }
-                            } // s and inp dropped here
-
-                            // 2. Update active Lua scripting systems
-                            script_manager.update_scripts(delta_time);
-
-                            // Tick NavMesh Agents
-                            {
-                                let mut s = scene.borrow_mut();
-                                let nav_graph = nav.borrow();
-                                nav_graph.tick_nav_agents(&mut s, delta_time);
-                            }
-
-                            // 3. Tick Physics Engine
-                            let trigger_events = {
-                                let mut s = scene.borrow_mut();
-                                crate::physics::tick_physics(&mut s, delta_time)
-                            };
-
-                            // 4. Dispatch script trigger callbacks
-                            if !trigger_events.is_empty() {
-                                script_manager.dispatch_trigger_events(trigger_events);
-                            }
-
-                            // 3. Shooting & Hitscan calculations (Triggered on Space key or Left Click)
-                            {
-                                let should_shoot = {
-                                    let inp = input.borrow();
-                                    inp.mouse_left_clicked || inp.space_pressed
-                                };
-
-                                if should_shoot {
-                                    {
-                                        let mut inp_mut = input.borrow_mut();
-                                        inp_mut.mouse_left_clicked = false;
-                                        inp_mut.space_pressed = false;
-                                        inp_mut.set_key_state("SPACE", false);
-                                    }
-
-                                    console.borrow_mut().info("💥 Fired hitscan laser beam!".to_string());
-                                    let shoot_ray = Ray::new(camera.position, camera.forward());
-
-                                    let hit_result = {
-                                        let s = scene.borrow();
-                                        cast_ray_in_scene(&shoot_ray, &s)
-                                    };
-
-                                    if let Some((hit_id, hit_t)) = hit_result {
-                                        let name = {
-                                            let s = scene.borrow();
-                                            s.get_entity(hit_id).map(|e| e.name.clone())
-                                        };
-                                        if let Some(name) = name {
-                                            console.borrow_mut().info(format!(
-                                                "  🎯 Direct hit! Struck {} at distance t={:.2} units", name, hit_t
-                                            ));
-                                        }
-                                        script_manager.trigger_damage(hit_id, 25.0);
-                                    } else {
-                                        console.borrow_mut().info("  💨 Shot missed into empty space.".to_string());
-                                    }
-                                }
-                            }
-
-                            // 4. Animator update ticks
-                            {
-                                let mut s = scene.borrow_mut();
-                                for entity in &mut s.entities {
-                                    if entity.active {
-                                        if let Some(anim) = &mut entity.animator {
-                                            if anim.is_playing && !anim.freeze {
-                                                anim.time += delta_time;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            // Editor Mode: Standard free camera fly controls
-                            let inp = input.borrow();
-                            let mut move_dir = Vec3::ZERO;
-                            if inp.is_key_down("W") { move_dir += camera.forward(); }
-                            if inp.is_key_down("S") { move_dir -= camera.forward(); }
-                            if inp.is_key_down("A") { move_dir -= camera.right(); }
-                            if inp.is_key_down("D") { move_dir += camera.right(); }
-
-                            if move_dir.length_squared() > 0.001 {
-                                let speed = 10.0 * delta_time;
-                                camera.position += move_dir.normalize() * speed;
-                            }
-
-                            let look_speed = 90.0 * delta_time;
-                            if inp.is_key_down("LEFT") { camera.yaw -= look_speed; }
-                            if inp.is_key_down("RIGHT") { camera.yaw += look_speed; }
-                            if inp.is_key_down("UP") { camera.pitch += look_speed; }
-                            if inp.is_key_down("DOWN") { camera.pitch -= look_speed; }
-                            camera.pitch = camera.pitch.clamp(-80.0, 80.0);
+                            PlayTransition::None => {}
                         }
 
                         // --- GPU RENDER TICK ---
@@ -553,8 +349,8 @@ return BotAI
 
                         // Render the 3D scene (Forward unlit/lit + gizmos line drawers)
                         {
-                            let s = scene.borrow();
-                            renderer.render(&s, &camera, &view, !is_playing, &pathfinding_points);
+                            let s = game.scene.borrow();
+                            renderer.render(&s, &game.camera, &view, !game.is_playing, game.pathfinding_points());
                         }
 
                         // Render Egui Overlay (header always visible, side panels only in editor mode)
@@ -562,12 +358,20 @@ return BotAI
                             let raw_input = egui_winit.take_egui_input(&window);
                             egui_ctx.begin_frame(raw_input);
 
-                            // Draw Editor dashboard UI (header always, side panels only in EditorMode)
+                            // Draw Editor dashboard UI
                             {
-                                let mut s = scene.borrow_mut();
-                                let mut c = console.borrow_mut();
-                                let mut n = nav.borrow_mut();
-                                editor_ui.draw(&egui_ctx, &mut s, &mut c, &mut n, &mut is_playing, fps, current_frame_duration);
+                                let mut s = game.scene.borrow_mut();
+                                let mut c = game.console.borrow_mut();
+                                let mut n = game.nav.borrow_mut();
+                                editor_ui.draw(
+                                    &egui_ctx,
+                                    &mut s,
+                                    &mut c,
+                                    &mut n,
+                                    &mut game.is_playing,
+                                    fps,
+                                    current_frame_duration,
+                                );
                                 if editor_ui.is_dirty {
                                     renderer.shadow_renderer.is_static_cached = false;
                                     editor_ui.is_dirty = false;
@@ -577,7 +381,6 @@ return BotAI
                             let full_output = egui_ctx.end_frame();
                             let paint_jobs = egui_ctx.tessellate(full_output.shapes, full_output.pixels_per_point);
 
-                            // Upload egui textures
                             let screen_descriptor = egui_wgpu::ScreenDescriptor {
                                 size_in_pixels: [renderer.config.width, renderer.config.height],
                                 pixels_per_point: window.scale_factor() as f32,
@@ -587,10 +390,10 @@ return BotAI
                                 egui_renderer.update_texture(&renderer.device, &renderer.queue, *id, image_delta);
                             }
 
-                            // Write Egui vertex/index buffers
-                            let mut encoder = renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                                label: Some("Egui Render Encoder"),
-                            });
+                            let mut encoder =
+                                renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                                    label: Some("Egui Render Encoder"),
+                                });
 
                             egui_renderer.update_buffers(
                                 &renderer.device,
@@ -607,7 +410,7 @@ return BotAI
                                         view: &view,
                                         resolve_target: None,
                                         ops: wgpu::Operations {
-                                            load: wgpu::LoadOp::Load, // Don't clear! Draw egui ON TOP of 3D scene texture
+                                            load: wgpu::LoadOp::Load,
                                             store: wgpu::StoreOp::Store,
                                         },
                                     })],
@@ -619,16 +422,13 @@ return BotAI
                                 egui_renderer.render(&mut render_pass, &paint_jobs, &screen_descriptor);
                             }
 
-                            // Submit egui commands
                             renderer.queue.submit(std::iter::once(encoder.finish()));
 
-                            // Free egui textures
                             for id in &full_output.textures_delta.free {
                                 egui_renderer.free_texture(id);
                             }
                         }
 
-                        // Present texture swapchain
                         frame.present();
                     }
                     _ => {}
