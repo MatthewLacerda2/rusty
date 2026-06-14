@@ -22,6 +22,7 @@
 
 pub mod botplayer;
 pub mod bridge;
+pub mod console;
 pub mod demo_scene;
 pub mod harness;
 pub mod scenario;

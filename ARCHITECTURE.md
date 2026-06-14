@@ -63,7 +63,7 @@ order modules `register` them.
 - `load_default_scene` `[new]` (seed + load `assets/scenes/default.scene`; replaces the procedural demo in `main.rs`) · `bake_navmesh` `[now]`
 
 **FixedUpdate** (deterministic, fixed dt — what the harness steps)
-- `physics_tick` `[now]` (gravity, box-clip, triggers)
+- `physics_tick` `[now]` (rapier3d: rigid bodies + colliders, gravity, stepping, transform writeback, trigger/collision pairs)
 - `script_fixed_update` `[new]` (MonoBehaviour `FixedUpdate`)
 - `nav_agent_tick` `[now]` (move agents along paths)
 - `rebake_navmesh` `[partial]` (today a wall-clock 1s timer → frame-count based)
@@ -112,7 +112,7 @@ order modules `register` them.
 | Type | Status | Where |
 |---|---|---|
 | `Renderer`, `ShadowRenderer`, `Skybox`, `Vertex` | `[now]` | `render/` |
-| `Ray` + ray-AABB cast | `[now]` | `physics/` |
+| `PhysicsWorld` (rapier3d), `Ray` + ray-AABB/parry cast | `[now]` | `physics/` |
 | `ScriptManager` | `[now]` | `scripting/` |
 | `EditorUi` + inspectors | `[now]` | `editor/` |
 | `NavigationGraph` | `[now]` | `navigation/` |

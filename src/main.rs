@@ -280,6 +280,19 @@ return BotAI
                                 }
                             }
 
+                            // Drain a submitted REPL line through the single live
+                            // evaluator. Dev builds only — the console input line
+                            // and the harness share `dev::console::evaluate_line`.
+                            #[cfg(feature = "dev")]
+                            if let Some(line) = editor_ui.pending_repl.take() {
+                                let mut c = game.console.borrow_mut();
+                                let _ = rusty::dev::console::evaluate_line(
+                                    &game.script_manager,
+                                    &mut c,
+                                    &line,
+                                );
+                            }
+
                             let full_output = egui_ctx.end_frame();
                             let paint_jobs = egui_ctx
                                 .tessellate(full_output.shapes, full_output.pixels_per_point);

@@ -31,6 +31,7 @@ egui-winit = { version = "0.27.2", default-features = false, features = ["clipbo
 mlua = { version = "0.9.2", features = ["lua54", "vendored"] }
 glam = { version = "0.25.0", features = ["bytemuck", "serde"] }
 hecs = { version = "0.10.5" }
+rapier3d = { version = "0.19.0" }
 image = { version = "0.24.9", default-features = false, features = ["png", "tga"] }
 tobj = { version = "4.0.2" }
 bytemuck = { version = "1.16.1", features = ["derive"] }
