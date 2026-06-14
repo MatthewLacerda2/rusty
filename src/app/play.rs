@@ -8,7 +8,6 @@
 use glam::Vec3;
 
 use super::game::GameWorld;
-use crate::physics::{cast_ray_in_scene, tick_physics, Ray};
 
 const PLAYER_NAME: &str = "Player";
 const ENEMY_NAME: &str = "Enemy_1";
@@ -27,7 +26,10 @@ pub(super) fn run(g: &mut GameWorld, dt: f32) {
 
     let triggers = {
         let mut s = g.scene.borrow_mut();
-        tick_physics(&mut s, dt)
+        match g.physics.as_mut() {
+            Some(physics) => physics.step(&mut s, dt),
+            None => Vec::new(),
+        }
     };
     if !triggers.is_empty() {
         g.script_manager.dispatch_trigger_events(triggers);
@@ -155,14 +157,21 @@ fn hitscan(g: &mut GameWorld) {
         .borrow_mut()
         .info("💥 Fired hitscan laser beam!".to_string());
 
-    let ray = {
+    let (origin, dir) = {
         let cam = g.camera.borrow();
-        Ray::new(cam.position, cam.forward())
+        (cam.position, cam.forward())
     };
-    let hit = {
-        let s = g.scene.borrow();
-        cast_ray_in_scene(&ray, &s)
-    };
+    // Route the hitscan through rapier/parry's query pipeline. Skip the Player
+    // (so the shot can't self-hit) and dead entities, matching the old behaviour.
+    let hit = g.physics.as_ref().and_then(|physics| {
+        physics.cast_ray(origin, dir, f32::MAX).filter(|&(id, _)| {
+            let s = g.scene.borrow();
+            let ok = s.get_entity(id).map_or(false, |e| {
+                e.name != "Player" && e.health.as_ref().map_or(true, |h| !h.is_dead)
+            });
+            ok
+        })
+    });
     match hit {
         Some((hit_id, hit_t)) => {
             let name = g.scene.borrow().get_entity(hit_id).map(|e| e.name.clone());
