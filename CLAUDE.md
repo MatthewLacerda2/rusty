@@ -7,8 +7,9 @@ agent can drive, observe, and play-test it headlessly.
 ## Start here
 - **README.md** — how the engine works (brief on the Unity-shaped parts, detailed on
   the agentic dev layer).
-- **ARCHITECTURE.md** — inventory of resources, components, systems, and classes
-  (each tagged `[now]` / `[new]` / `[partial]`).
+- **ARCHITECTURE.md** — the module map + conceptual overview of the engine.
+- **docs/** — `linting.md` (the gate), `testing.md`, `scripting-api.md` (the Lua API
+  game scripts use). The Rust API is generated: `cargo doc --no-deps`.
 - **auxmd.md** *(gitignored)* — the operator's short-term scratchpad; read it if a
   session points you there.
 
@@ -25,12 +26,26 @@ agent can drive, observe, and play-test it headlessly.
 Commits are blocked unless the checks pass; failures are written to
 `.lint/report.txt`. See **docs/linting.md**.
 - Size gate: `cargo run --manifest-path tools/lint/Cargo.toml` (files ≤ 300 lines,
-  test/fixture files ≤ 150). Function length + code smells are clippy's job
-  (`clippy.toml`); style is rustfmt (`rustfmt.toml`).
+  test/fixture files ≤ 150). Style is rustfmt; **clippy is a hard gate** (`-D
+  warnings`, both feature sets).
+- **Determinism guard:** `cargo run --manifest-path tools/lint/Cargo.toml --
+  --determinism` — fails on wall-clock / unseeded RNG in the sim modules (`app`,
+  `scripting`, `physics`, `navigation`); it protects the harness's reproducibility.
 - `tools/lint/baseline.txt` grandfathers the legacy monoliths. It's a **burn-down
   list** — remove entries as you split/migrate, never add to it.
 
 ## Status
-The engine currently runs from the legacy modules (`core/`, `render/`, `physics/`,
-`scripting/`, `navigation/`, `editor/`). The `app/`, `ecs/`, `scene/`, `api/`, `dev/`
-trees are scaffolded and being migrated into — see README's *Migration* section.
+**Phase 2 complete & merged.** `app/`, `ecs/`, `components/`, `scene/`, `api/`,
+`dev/` are implemented: hecs ECS storage, the headless harness + `play` binary, the
+scripting API (Health/Time/Camera/Physics/Input/Debug), scene save/load
+(`assets/scenes/default.scene` + clone-on-Play), offscreen screenshots, the
+console+REPL, the bot-player, and rapier3d physics. `main` is branch-protected
+(CI green + up-to-date required to merge).
+
+**Resuming a fresh session?** The open GitHub **PRs and issues are the live to-do
+list** — list them first. Phase 3 (human-overseen) currently covers: particles,
+post-FX (the UI-only "dead knobs"), raycast unification, de-hardcoding
+gameplay→scripts, and the kinematic character controller. Known leftover weeds to
+root out: `entity.name == "Player"` branches in physics/render, the winit-only
+`space_pressed`/`mouse_left_clicked` input fields, and the `"Antigravity"` boot
+print (all tracked in the de-hardcode issue).
