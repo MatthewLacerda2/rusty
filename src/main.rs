@@ -1,11 +1,3 @@
-mod app;
-mod core;
-mod editor;
-mod navigation;
-mod physics;
-mod render;
-mod scripting;
-
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -19,17 +11,17 @@ use winit::{
 
 use glam::Vec3;
 
-use crate::app::{GameWorld, PlayTransition};
-use crate::core::input::InputState;
-use crate::core::scene::{
+use rusty::app::{GameWorld, PlayTransition};
+use rusty::core::input::InputState;
+use rusty::core::scene::{
     self, AnimatorComponent, ColliderComponent, ColliderShape, HealthComponent, RigidBodyComponent,
     Scene, ScriptComponent,
 };
-use crate::editor::EditorUi;
-use crate::navigation::NavigationGraph;
-use crate::render::mesh as primitives;
-use crate::render::Renderer;
-use crate::scripting::ConsoleLogs;
+use rusty::editor::EditorUi;
+use rusty::navigation::NavigationGraph;
+use rusty::render::mesh as primitives;
+use rusty::render::Renderer;
+use rusty::scripting::ConsoleLogs;
 
 fn main() {
     env_logger::init();

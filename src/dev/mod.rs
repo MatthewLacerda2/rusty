@@ -9,10 +9,17 @@
 //! behaviour).
 //!
 //! Submodules:
-//!   console     — log sink + live Lua REPL (call the API live, windowed or headless)
 //!   harness     — headless deterministic runner: Step / StepUntil / results.json
 //!   scenario    — loads and runs a `.lua` scenario, captures observations
-//!   screenshot  — offscreen wgpu render -> PNG (the agent's "eyes")
-//!   botplayer   — pattern notes: a normal script tagged dev-only that drives Input
+//!   bridge      — Lua bindings for the scenario VM (the control surface)
+//!   demo_scene  — headless demo scene builder (mirrors the windowed scene)
+//!   snapshot    — world -> JSON observation
 //!
-//! Status: SCAFFOLD — structure only; not yet implemented.
+//! Status: harness + scenario runner implemented (issue #3). screenshot/botplayer
+//! (the GPU "eyes" + bot pattern notes) remain scaffolds for a later phase.
+
+pub mod bridge;
+pub mod demo_scene;
+pub mod harness;
+pub mod scenario;
+pub mod snapshot;

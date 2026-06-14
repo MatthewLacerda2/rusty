@@ -4,8 +4,6 @@
 //! still hardcoded (Player = 2, Enemy = 5) to keep Phase 0 a pure relocation; they
 //! become name/handle lookups in Phase 1. Order matches the original loop exactly.
 
-use std::time::{Duration, Instant};
-
 use glam::Vec3;
 
 use super::game::GameWorld;
@@ -13,6 +11,11 @@ use crate::physics::{cast_ray_in_scene, tick_physics, Ray};
 
 const PLAYER_ID: u32 = 2;
 const ENEMY_ID: u32 = 5;
+
+/// Rebake cadence in play-mode frames. At the fixed 1/60 timestep this is "once a
+/// second", but the trigger is the frame count, not the wall clock — that is what
+/// makes a headless replay deterministic.
+const REBAKE_INTERVAL_FRAMES: u64 = 60;
 
 /// Run one play-mode frame.
 pub(super) fn run(g: &mut GameWorld, dt: f32) {
@@ -31,12 +34,13 @@ pub(super) fn run(g: &mut GameWorld, dt: f32) {
 
     hitscan(g);
     animate(g, dt);
+    g.play_frame += 1;
 }
 
-/// Rebake the navmesh once per second and recompute the Enemy→Player debug path.
+/// Rebake the navmesh once per second (every `REBAKE_INTERVAL_FRAMES` frames) and
+/// recompute the Enemy→Player debug path.
 fn rebake_and_path(g: &mut GameWorld) {
-    let now = Instant::now();
-    if now.duration_since(g.last_path_bake) < Duration::from_secs(1) {
+    if g.play_frame % REBAKE_INTERVAL_FRAMES != 0 {
         return;
     }
     let s = g.scene.borrow();
@@ -54,7 +58,6 @@ fn rebake_and_path(g: &mut GameWorld) {
         pts.push(player.transform.position);
         g.pathfinding_points = pts;
     }
-    g.last_path_bake = now;
 }
 
 /// Drive the Player entity from input and keep the third-person camera behind it.
