@@ -25,12 +25,16 @@ ehthumbs.db
 
 #Project Specifics
 auxmd.md
-# Ignore the local project tree, but keep the committed sample scenarios
-# (the harness's fixtures). The parent must be re-included before the children.
+# Ignore the local project tree, but keep the committed sample scenarios and the
+# example bot-player scripts (the harness's fixtures). The parent must be re-included
+# before the children.
 /project/*
 !/project/scenarios/
 /project/scenarios/*
 !/project/scenarios/*.lua
+!/project/scripts/
+/project/scripts/*
+!/project/scripts/*.lua
 
 # Lint reports
 .lint/

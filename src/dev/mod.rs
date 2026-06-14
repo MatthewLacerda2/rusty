@@ -12,13 +12,15 @@
 //!   harness     — headless deterministic runner: Step / StepUntil / results.json
 //!   scenario    — loads and runs a `.lua` scenario, captures observations
 //!   bridge      — Lua bindings for the scenario VM (the control surface)
+//!   botplayer   — bot-player pattern notes + helper to attach a bot to the Player
 //!   demo_scene  — headless demo scene builder (mirrors the windowed scene)
 //!   screenshot  — offscreen render -> PNG (the GPU "eyes"); skips if no adapter
 //!   snapshot    — world -> JSON observation
 //!
 //! Status: harness + scenario runner implemented (issue #3); offscreen screenshot
-//! implemented (issue #7). botplayer (bot pattern notes) remains a scaffold.
+//! implemented (issue #7); bot-player example implemented (issue #10).
 
+pub mod botplayer;
 pub mod bridge;
 pub mod console;
 pub mod demo_scene;
