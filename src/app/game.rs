@@ -14,6 +14,7 @@ use glam::Vec3;
 use crate::core::input::InputState;
 use crate::core::scene::Scene;
 use crate::navigation::NavigationGraph;
+use crate::physics::PhysicsWorld;
 use crate::render::Camera;
 use crate::scene::SceneSnapshot;
 use crate::scripting::{ConsoleLogs, ScriptManager};
@@ -45,6 +46,9 @@ pub struct GameWorld {
     /// Edit-mode scene captured on Play and restored on Stop, so play-mode
     /// mutations never leak back into the authoritative edit scene (Unity-style).
     pub(super) edit_snapshot: Option<SceneSnapshot>,
+    /// rapier3d simulation, rebuilt from the scene on entering Play and torn down
+    /// on Stop. `None` in edit mode (no body/collision sim runs there).
+    pub(super) physics: Option<PhysicsWorld>,
 }
 
 impl GameWorld {
@@ -81,6 +85,7 @@ impl GameWorld {
             pathfinding_points: Vec::new(),
             play_frame: 0,
             edit_snapshot: None,
+            physics: None,
         }
     }
 
@@ -162,12 +167,17 @@ impl GameWorld {
             }
         }
         self.script_manager.start_scripts();
+
+        // Build the rapier world from the (post-start) scene: bodies + colliders
+        // for every entity with a ColliderComponent. Stepped each frame in play.
+        self.physics = Some(PhysicsWorld::from_scene(&self.scene.borrow()));
     }
 
     fn exit_play(&mut self) {
         self.script_manager.shutdown();
         self.pathfinding_points.clear();
         self.play_frame = 0;
+        self.physics = None;
         // Restore the edit scene captured on Play, discarding play-mode state.
         if let Some(snapshot) = self.edit_snapshot.take() {
             snapshot.restore(&mut self.scene.borrow_mut());
