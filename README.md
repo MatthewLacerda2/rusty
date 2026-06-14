@@ -30,6 +30,7 @@ src/
 ├── time/         Time resource + deterministic fixed-timestep clock
 ├── transform/    Transform component + parent/child hierarchy
 ├── components/   First-class built-in components (Mesh, Collider, Rigidbody, NavMeshAgent, …)
+├── scene/        Save/load + snapshot: SceneData document, single active scene, clone-on-Play
 ├── api/          The STABLE engine API — shared by Lua scripts, the console, and bots
 ├── dev/          THE AGENTIC LAYER (dev-only, compiled out of ship builds)   ← see below
 │
@@ -59,6 +60,14 @@ src/
 - **No event bus, no plugin trait.** Deliberately. Cross-system signals (a hit, a
   trigger) are direct typed returns, not `SendMessage`-style indirection. Modules
   wire themselves up with a plain `register(&mut app)` fn, not a `Plugin` trait.
+- **Scenes.** One active scene (no multi-scene / open-world); loading replaces the
+  World. The on-disk format is a serde `SceneData` document storing *references +
+  component values*, never GPU buffers (rehydrated on load). **Edit-mode is
+  authoritative:** Play runs on a clone and Stop restores it, so saving always
+  persists your edit state. Double-click a scene in the assets browser to load it.
+  There's always a checked-in default scene (`assets/scenes/default.scene`, seeded
+  into `project/scenes/` on boot) — the bot-chase demo with a sun and a non-white
+  skybox.
 
 Unity → rusty quick map: `GameObject/Transform` → entity + `Transform`;
 `MonoBehaviour` → Lua script; `Rigidbody/Collider/Camera/Light/Animator/NavMeshAgent`
@@ -172,8 +181,10 @@ moves into, in this order (each step keeps the app building):
 
 1. **Decouple the tick + abstract input** → `app/`, `time/`, writable `api/input.rs`.
 2. **Adopt `hecs`** → `ecs/`; move components from `core/scene.rs` into `components/`.
-3. **Formalise the API** → `api/` (add `Health`, `Time`, `Raycast`/`Shoot`, `Camera`).
-4. **Build the dev layer** → `dev/` (console/REPL, harness, screenshot, bot-player).
-5. **Split into a Cargo workspace** once the boundaries above hold.
+3. **Scene save/load** → `scene/` (SceneData document, clone-on-Play); externalise the
+   procedural demo into `assets/scenes/default.scene`.
+4. **Formalise the API** → `api/` (add `Health`, `Time`, `Raycast`/`Shoot`, `Camera`).
+5. **Build the dev layer** → `dev/` (console/REPL, harness, screenshot, bot-player).
+6. **Split into a Cargo workspace** once the boundaries above hold.
 
 [`hecs`]: https://crates.io/crates/hecs

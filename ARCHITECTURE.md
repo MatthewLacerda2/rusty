@@ -24,7 +24,7 @@ the World.
 | `ActiveCamera` | `[now]` | the camera the renderer uses (`Camera`) |
 | `PlayState` | `[partial]` | editor-vs-play; today a bare `is_playing: bool` |
 | `Renderer` | `[now]` | wgpu device/queue/surface/pipelines (render-side only) |
-| `EditorState` | `[now]` | egui editor UI state (`EditorUi`) |
+| `EditorState` | `[partial]` | egui editor UI state (`EditorUi`); add `current_scene_path` |
 | `AssetServer` | `[new]` | typed asset handles + cache (replaces passing path strings) — later |
 
 ---
@@ -59,7 +59,7 @@ A system is a plain `fn(&mut World, &mut Resources)`. Order within a stage is th
 order modules `register` them.
 
 **Startup**
-- `load_scene` `[now]` · `bake_navmesh` `[now]`
+- `load_default_scene` `[new]` (seed + load `assets/scenes/default.scene`; replaces the procedural demo in `main.rs`) · `bake_navmesh` `[now]`
 
 **FixedUpdate** (deterministic, fixed dt — what the harness steps)
 - `physics_tick` `[now]` (gravity, box-clip, triggers)
@@ -76,6 +76,7 @@ order modules `register` them.
 - `animator_update` `[now]`
 - `free_fly_camera` `[now]` (editor mode)
 - `play_state_transitions` `[partial]` (enter/exit play; today inline)
+- `snapshot_on_play` / `restore_on_stop` `[new]` (clone edit scene on Play, restore on Stop)
 
 **LateUpdate**
 - `camera_follow` `[partial]` (third-person follow; today inline)
@@ -92,6 +93,16 @@ order modules `register` them.
 
 `App` · `Schedule` · `Stage` · `System` · `Resources` · `World` (hecs wrapper) ·
 `EntityId` (generational) · `Commands` (deferred spawn/despawn).
+
+## Scene & serialization — `scene/`
+
+| Type / file | Status | Role |
+|---|---|---|
+| `SceneData` (`scene/mod.rs`) | `[new]` | serde document: entities + component values + settings (the on-disk format) |
+| `scene/serialize.rs` | `[new]` | `World` ↔ `SceneData`; serializable-component registry; rehydrate refs (no GPU buffers) |
+| `scene/io.rs` | `[new]` | save/load, single active scene, `current_scene_path`, default-scene seeding |
+| `scene/snapshot.rs` | `[new]` | clone-on-Play / restore-on-Stop |
+| `assets/scenes/default.scene` | `[new]` | checked-in bot-chase demo (floor, player, enemy, walls, sun, non-white skybox) |
 
 ---
 
