@@ -1,12 +1,13 @@
 name: ci
 on:
   pull_request:
-  push:
-    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
 
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain (from rust-toolchain.toml)
@@ -22,6 +23,7 @@ jobs:
 
   deny:
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     continue-on-error: true # report-only supply-chain audit
     steps:
       - uses: actions/checkout@v4
