@@ -1,0 +1,250 @@
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::sync::Arc;
+
+use super::pipelines;
+use super::{shadows, skybox};
+use super::{CameraUniform, LightingUniform, Renderer};
+
+impl Renderer {
+    pub async fn new(window: Arc<winit::window::Window>) -> Self {
+        let size = window.inner_size();
+
+        // 1. Create wgpu Instance
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::all(),
+            ..Default::default()
+        });
+
+        // 2. Create Surface & Adapter
+        let surface = instance.create_surface(window).unwrap();
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await
+            .expect("Failed to find wgpu adapter");
+
+        // 3. Create Device & Queue
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
+                    label: None,
+                },
+                None,
+            )
+            .await
+            .expect("Failed to create wgpu device");
+
+        // 4. Configure surface swapchain
+        let surface_caps = surface.get_capabilities(&adapter);
+        let surface_format = surface_caps
+            .formats
+            .iter()
+            .copied()
+            .find(|f| f.is_srgb())
+            .unwrap_or(surface_caps.formats[0]);
+
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: surface_format,
+            width: size.width,
+            height: size.height,
+            present_mode: wgpu::PresentMode::Fifo,
+            alpha_mode: surface_caps.alpha_modes[0],
+            view_formats: vec![],
+            desired_maximum_frame_latency: 2,
+        };
+        surface.configure(&device, &config);
+
+        // 5. Create Depth Texture
+        let (depth_texture, depth_view) = Self::create_depth_resources(&device, &config);
+
+        // 6. Create Bind Group Layouts
+        let camera_lighting_layout = pipelines::create_camera_lighting_layout(&device);
+        let entity_bones_layout = pipelines::create_entity_bones_layout(&device);
+        let texture_layout = pipelines::create_texture_layout(&device);
+
+        // 10. Generate default grid checker texture (moved up to bind statically to global layouts)
+        let default_texture = Rc::new(Self::create_default_checkerboard_texture(
+            &device,
+            &queue,
+            &texture_layout,
+        ));
+
+        // 7. Create Global Uniform Buffers
+        let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Camera Uniform Buffer"),
+            size: std::mem::size_of::<CameraUniform>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let lighting_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Lighting Uniform Buffer"),
+            size: std::mem::size_of::<LightingUniform>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let global_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Global Bind Group"),
+            layout: &camera_lighting_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: camera_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: lighting_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&default_texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&default_texture.sampler),
+                },
+            ],
+        });
+
+        // 8. Compile WGSL Shader
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Forward Lit Shader"),
+            source: wgpu::ShaderSource::Wgsl(
+                include_str!("../../assets/shaders/shader.wgsl").into(),
+            ),
+        });
+
+        // Initialize Shadow map system
+        let shadow_renderer = shadows::ShadowRenderer::new(&device);
+
+        let shadow_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Shadow Uniform Buffer"),
+            size: 64, // Mat4 size
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let shadow_layout = pipelines::create_shadow_layout(&device);
+
+        let shadow_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Main Shadow Bind Group"),
+            layout: &shadow_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: shadow_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&shadow_renderer.active_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&shadow_renderer.sampler),
+                },
+            ],
+        });
+
+        // Initialize Skybox Renderer
+        let skybox_renderer = skybox::SkyboxRenderer::new(
+            &device,
+            &texture_layout,
+            &camera_lighting_layout,
+            surface_format,
+        );
+
+        // 9. Create Render Pipelines
+        let (render_pipeline, line_pipeline, outline_pipeline) = pipelines::create_pipelines(
+            &device,
+            &shader,
+            config.format,
+            &camera_lighting_layout,
+            &entity_bones_layout,
+            &texture_layout,
+            &shadow_layout,
+        );
+
+        let mut renderer = Self {
+            device,
+            queue,
+            surface,
+            config,
+            size,
+            render_pipeline,
+            line_pipeline,
+            outline_pipeline,
+            camera_lighting_layout,
+            entity_bones_layout,
+            texture_layout,
+            camera_buffer,
+            lighting_buffer,
+            global_bind_group,
+            depth_texture,
+            depth_view,
+            gpu_meshes: HashMap::new(),
+            gpu_textures: HashMap::new(),
+            default_texture,
+            grid_vertex_buffer: None,
+            grid_count: 0,
+            axis_x_buffer: None,
+            axis_y_buffer: None,
+            axis_z_buffer: None,
+            axis_count: 0,
+            skybox_renderer,
+            shadow_renderer,
+            skybox_texture: None,
+            skybox_path: "".to_string(),
+            shadow_layout,
+            shadow_uniform_buffer,
+            shadow_bind_group,
+        };
+
+        renderer.generate_grid_mesh();
+        renderer.generate_axis_arrows();
+        renderer
+    }
+
+    pub(super) fn create_depth_resources(
+        device: &wgpu::Device,
+        config: &wgpu::SurfaceConfiguration,
+    ) -> (wgpu::Texture, wgpu::TextureView) {
+        let size = wgpu::Extent3d {
+            width: config.width,
+            height: config.height,
+            depth_or_array_layers: 1,
+        };
+        let desc = wgpu::TextureDescriptor {
+            label: Some("Depth Texture"),
+            size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        };
+        let texture = device.create_texture(&desc);
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        (texture, view)
+    }
+
+    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+        if new_size.width > 0 && new_size.height > 0 {
+            self.size = new_size;
+            self.config.width = new_size.width;
+            self.config.height = new_size.height;
+            self.surface.configure(&self.device, &self.config);
+            let (depth_tex, depth_view) = Self::create_depth_resources(&self.device, &self.config);
+            self.depth_texture = depth_tex;
+            self.depth_view = depth_view;
+        }
+    }
+}

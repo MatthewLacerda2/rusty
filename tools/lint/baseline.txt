@@ -6,6 +6,5 @@ src/editor.rs
 src/main.rs
 src/navigation/mod.rs
 src/physics/mod.rs
-src/render/mod.rs
 src/render/shadows.rs
 src/scripting/mod.rs
