@@ -1,0 +1,6 @@
+# Per-function line cap — the Rust analog of the 50-line endpoint rule.
+# Enforced via the `clippy::too_many_lines` lint (pedantic group).
+too-many-lines-threshold = 50
+too-many-arguments-threshold = 6
+cognitive-complexity-threshold = 20
+type-complexity-threshold = 250

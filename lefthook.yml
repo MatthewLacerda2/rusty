@@ -1,0 +1,16 @@
+# Local commit gate. Install once per clone:  lefthook install
+# Runs the same checks as CI (.github/workflows/lint.yml). Bypass in a pinch with
+# `git commit --no-verify`, but CI re-runs it and gates the PR.
+pre-commit:
+  parallel: true
+  commands:
+    fmt:
+      glob: "*.rs"
+      run: rustfmt --edition 2021 --check {staged_files}
+    size:
+      glob: "*.rs"
+      run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- {staged_files}
+    clippy:
+      # Report-only until the legacy modules are migrated. To make it a hard gate,
+      # drop the trailing `|| true` and append `-- -D warnings -W clippy::too_many_lines`.
+      run: cargo clippy --quiet --no-deps 2>&1 | tee .lint/clippy.txt || true

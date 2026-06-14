@@ -1,0 +1,29 @@
+name: lint
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Ensure rustfmt + clippy
+        run: rustup component add rustfmt clippy
+      - name: Format check (changed files only)
+        run: |
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          files=$(git diff --name-only --diff-filter=d "$base" HEAD -- '*.rs' || true)
+          if [ -n "$files" ]; then
+            echo "Checking: $files"
+            rustfmt --edition 2021 --check $files
+          else
+            echo "No Rust files changed."
+          fi
+      - name: Size gate (full scan; legacy grandfathered via baseline)
+        run: cargo run --quiet --manifest-path tools/lint/Cargo.toml
+      - name: Clippy (report-only for now)
+        run: cargo clippy --no-deps || true

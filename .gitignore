@@ -26,3 +26,6 @@ ehthumbs.db
 #Project Specifics
 auxmd.md
 /project/
+
+# Lint reports
+.lint/

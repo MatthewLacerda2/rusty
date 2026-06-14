@@ -1,0 +1,11 @@
+# Files grandfathered past the size cap (legacy monoliths).
+# Path-matched, so they're skipped regardless of exact line count.
+# Burn this list down during migration; do NOT add new entries.
+src/core/scene.rs
+src/editor.rs
+src/main.rs
+src/navigation/mod.rs
+src/physics/mod.rs
+src/render/mod.rs
+src/render/shadows.rs
+src/scripting/mod.rs

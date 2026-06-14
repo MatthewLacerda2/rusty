@@ -1,0 +1,11 @@
+[package]
+name = "lint"
+version = "0.1.0"
+edition = "2021"
+
+# Standalone — do not absorb into (or get absorbed by) the engine crate.
+[workspace]
+
+[[bin]]
+name = "lint"
+path = "src/main.rs"
