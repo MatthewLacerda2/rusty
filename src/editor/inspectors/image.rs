@@ -1,14 +1,17 @@
+use crate::core::scene::{Scene, TextureComponent};
+use crate::editor::EditorUi;
 use std::fs;
 use std::path::Path;
-use crate::editor::EditorUi;
-use crate::core::scene::{Scene, TextureComponent};
 
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &str) {
-    let filename = Path::new(path).file_name().and_then(|f| f.to_str()).unwrap_or(path);
-    
+    let filename = Path::new(path)
+        .file_name()
+        .and_then(|f| f.to_str())
+        .unwrap_or(path);
+
     ui.heading(format!("🖼️ Image: {}", filename));
     ui.add_space(5.0);
-    
+
     // File metadata card
     egui::Frame::none()
         .fill(egui::Color32::from_rgb(20, 18, 30))
@@ -40,7 +43,11 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
             .selected_text(&editor.asset_image_wrap)
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut editor.asset_image_wrap, "Repeat".to_string(), "Repeat");
-                ui.selectable_value(&mut editor.asset_image_wrap, "Clamp".to_string(), "Clamp to Edge");
+                ui.selectable_value(
+                    &mut editor.asset_image_wrap,
+                    "Clamp".to_string(),
+                    "Clamp to Edge",
+                );
                 ui.selectable_value(&mut editor.asset_image_wrap, "Mirror".to_string(), "Mirror");
             });
     });
@@ -50,8 +57,16 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
         egui::ComboBox::from_id_source("ImgFilterMode")
             .selected_text(&editor.asset_image_filter)
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut editor.asset_image_filter, "Linear".to_string(), "Linear (Smooth)");
-                ui.selectable_value(&mut editor.asset_image_filter, "Nearest".to_string(), "Nearest (Pixelated)");
+                ui.selectable_value(
+                    &mut editor.asset_image_filter,
+                    "Linear".to_string(),
+                    "Linear (Smooth)",
+                );
+                ui.selectable_value(
+                    &mut editor.asset_image_filter,
+                    "Nearest".to_string(),
+                    "Nearest (Pixelated)",
+                );
             });
     });
 
@@ -65,11 +80,14 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     ui.add_space(5.0);
 
     if scene.entities.is_empty() {
-        ui.colored_label(egui::Color32::GRAY, "No entities in scene to apply texture to.");
+        ui.colored_label(
+            egui::Color32::GRAY,
+            "No entities in scene to apply texture to.",
+        );
     } else {
         ui.label("Choose an entity to apply this texture:");
         let selected_ent_name = "Select Entity...".to_string();
-        
+
         let mut clicked_entity_id = None;
         egui::ComboBox::from_id_source("ApplyTextureToEntity")
             .selected_text(selected_ent_name)

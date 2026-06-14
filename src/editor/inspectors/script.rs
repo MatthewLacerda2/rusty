@@ -1,15 +1,24 @@
+use crate::core::scene::{Scene, ScriptComponent};
+use crate::editor::EditorUi;
+use crate::scripting::ConsoleLogs;
 use std::fs;
 use std::path::Path;
-use crate::editor::EditorUi;
-use crate::core::scene::{Scene, ScriptComponent};
-use crate::scripting::ConsoleLogs;
 
-pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs, path: &str) {
-    let filename = Path::new(path).file_name().and_then(|f| f.to_str()).unwrap_or(path);
-    
+pub fn draw(
+    ui: &mut egui::Ui,
+    editor: &mut EditorUi,
+    scene: &mut Scene,
+    console: &mut ConsoleLogs,
+    path: &str,
+) {
+    let filename = Path::new(path)
+        .file_name()
+        .and_then(|f| f.to_str())
+        .unwrap_or(path);
+
     ui.heading(format!("📄 Script: {}", filename));
     ui.add_space(5.0);
-    
+
     // File metadata card
     egui::Frame::none()
         .fill(egui::Color32::from_rgb(20, 18, 30))
@@ -43,13 +52,16 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, console
                 egui::TextEdit::multiline(&mut editor.asset_script_content)
                     .font(egui::FontId::monospace(12.0))
                     .desired_width(f32::INFINITY)
-                    .desired_rows(12)
+                    .desired_rows(12),
             );
         });
 
     ui.add_space(5.0);
-    
-    if ui.add(egui::Button::new("💾 Save Script Changes").min_size(egui::Vec2::new(140.0, 26.0))).clicked() {
+
+    if ui
+        .add(egui::Button::new("💾 Save Script Changes").min_size(egui::Vec2::new(140.0, 26.0)))
+        .clicked()
+    {
         match fs::write(path, &editor.asset_script_content) {
             Ok(_) => {
                 console.info(format!("Saved script changes to {}", filename));
@@ -69,11 +81,14 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, console
     ui.add_space(5.0);
 
     if scene.entities.is_empty() {
-        ui.colored_label(egui::Color32::GRAY, "No entities in scene to attach script to.");
+        ui.colored_label(
+            egui::Color32::GRAY,
+            "No entities in scene to attach script to.",
+        );
     } else {
         ui.label("Select an entity to attach this script:");
         let selected_ent_name = "Select Entity...".to_string();
-        
+
         let mut clicked_entity_id = None;
         let mut clicked_entity_name = String::new();
         egui::ComboBox::from_id_source("AttachScriptToEntity")
@@ -94,7 +109,10 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, console
                     is_loaded: false,
                 });
                 editor.is_dirty = true;
-                console.info(format!("Attached script {} to {}", filename, clicked_entity_name));
+                console.info(format!(
+                    "Attached script {} to {}",
+                    filename, clicked_entity_name
+                ));
             }
         }
     }

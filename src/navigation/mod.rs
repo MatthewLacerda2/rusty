@@ -1,6 +1,6 @@
+use crate::core::scene::Scene;
 use glam::Vec3;
 use std::collections::{BinaryHeap, HashMap};
-use crate::core::scene::Scene;
 
 #[derive(Copy, Clone, PartialEq)]
 struct NodeState {
@@ -14,7 +14,10 @@ impl Eq for NodeState {}
 
 impl Ord for NodeState {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.f_score.partial_cmp(&self.f_score).unwrap_or(std::cmp::Ordering::Equal)
+        other
+            .f_score
+            .partial_cmp(&self.f_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
     }
 }
 
@@ -59,10 +62,7 @@ impl NavigationGraph {
     pub fn world_to_grid(&self, pos: Vec3) -> (i32, i32) {
         let x = ((pos.x - self.min_x) / self.grid_spacing).round() as i32;
         let z = ((pos.z - self.min_z) / self.grid_spacing).round() as i32;
-        (
-            x.clamp(0, self.width - 1),
-            z.clamp(0, self.height - 1)
-        )
+        (x.clamp(0, self.width - 1), z.clamp(0, self.height - 1))
     }
 
     /// Converts grid coordinates to world coordinate (x, 0, z)
@@ -70,7 +70,7 @@ impl NavigationGraph {
         Vec3::new(
             self.min_x + (gx as f32) * self.grid_spacing,
             0.0,
-            self.min_z + (gz as f32) * self.grid_spacing
+            self.min_z + (gz as f32) * self.grid_spacing,
         )
     }
 
@@ -109,8 +109,11 @@ impl NavigationGraph {
                 for gz in 0..self.height {
                     for gx in 0..self.width {
                         let w_pos = self.grid_to_world(gx, gz);
-                        if w_pos.x >= obstacle_min_x && w_pos.x <= obstacle_max_x &&
-                           w_pos.z >= obstacle_min_z && w_pos.z <= obstacle_max_z {
+                        if w_pos.x >= obstacle_min_x
+                            && w_pos.x <= obstacle_max_x
+                            && w_pos.z >= obstacle_min_z
+                            && w_pos.z <= obstacle_max_z
+                        {
                             let idx = self.index(gx, gz);
                             self.walkability[idx] = false;
                         }
@@ -193,7 +196,13 @@ impl NavigationGraph {
     }
 
     /// Core A* algorithm returning list of grid coordinates (x, z)
-    pub fn find_path(&self, raw_sx: i32, raw_sz: i32, raw_tx: i32, raw_tz: i32) -> Option<Vec<(i32, i32)>> {
+    pub fn find_path(
+        &self,
+        raw_sx: i32,
+        raw_sz: i32,
+        raw_tx: i32,
+        raw_tz: i32,
+    ) -> Option<Vec<(i32, i32)>> {
         let (sx, sz) = self.closest_walkable(raw_sx, raw_sz);
         let (tx, tz) = self.closest_walkable(raw_tx, raw_tz);
 
@@ -237,8 +246,14 @@ impl NavigationGraph {
 
             // Neighbors (8-way movement)
             let dirs = [
-                (1, 0, 1.0), (-1, 0, 1.0), (0, 1, 1.0), (0, -1, 1.0), // Cardinal
-                (1, 1, 1.414), (1, -1, 1.414), (-1, 1, 1.414), (-1, -1, 1.414) // Diagonal
+                (1, 0, 1.0),
+                (-1, 0, 1.0),
+                (0, 1, 1.0),
+                (0, -1, 1.0), // Cardinal
+                (1, 1, 1.414),
+                (1, -1, 1.414),
+                (-1, 1, 1.414),
+                (-1, -1, 1.414), // Diagonal
             ];
 
             for &(dx, dz, cost) in &dirs {
@@ -251,7 +266,9 @@ impl NavigationGraph {
 
                 // For diagonal movements, prevent corner-cutting through blocked cardinal obstacles
                 if dx != 0 && dz != 0 {
-                    if !self.is_walkable(current.x + dx, current.z) || !self.is_walkable(current.x, current.z + dz) {
+                    if !self.is_walkable(current.x + dx, current.z)
+                        || !self.is_walkable(current.x, current.z + dz)
+                    {
                         continue;
                     }
                 }
@@ -315,7 +332,8 @@ impl NavigationGraph {
                     agent.velocity += diff_vel * (agent.acceleration * delta_time).min(1.0);
 
                     // Proposed step
-                    let proposed_pos_x = current_pos + Vec3::new(agent.velocity.x * delta_time, 0.0, 0.0);
+                    let proposed_pos_x =
+                        current_pos + Vec3::new(agent.velocity.x * delta_time, 0.0, 0.0);
                     let mut final_pos = current_pos;
 
                     // Test X movement slide
@@ -327,7 +345,8 @@ impl NavigationGraph {
                     }
 
                     // Test Z movement slide
-                    let proposed_pos_z = final_pos + Vec3::new(0.0, 0.0, agent.velocity.z * delta_time);
+                    let proposed_pos_z =
+                        final_pos + Vec3::new(0.0, 0.0, agent.velocity.z * delta_time);
                     let (gx, gz) = self.world_to_grid(proposed_pos_z);
                     if self.is_walkable(gx, gz) {
                         final_pos.z = proposed_pos_z.z;

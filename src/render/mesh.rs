@@ -50,22 +50,56 @@ pub fn generate_box(width: f32, height: f32, depth: f32) -> (Vec<Vertex>, Vec<u3
     // 6 faces of a cube (4 vertices per face)
     let faces = [
         // Front face (+Z)
-        (Vec3::new(-w, -h,  d), Vec3::new( w, -h,  d), Vec3::new( w,  h,  d), Vec3::new(-w,  h,  d), Vec3::new(0.0, 0.0, 1.0)),
+        (
+            Vec3::new(-w, -h, d),
+            Vec3::new(w, -h, d),
+            Vec3::new(w, h, d),
+            Vec3::new(-w, h, d),
+            Vec3::new(0.0, 0.0, 1.0),
+        ),
         // Back face (-Z)
-        (Vec3::new( w, -h, -d), Vec3::new(-w, -h, -d), Vec3::new(-w,  h, -d), Vec3::new( w,  h, -d), Vec3::new(0.0, 0.0, -1.0)),
+        (
+            Vec3::new(w, -h, -d),
+            Vec3::new(-w, -h, -d),
+            Vec3::new(-w, h, -d),
+            Vec3::new(w, h, -d),
+            Vec3::new(0.0, 0.0, -1.0),
+        ),
         // Right face (+X)
-        (Vec3::new( w, -h,  d), Vec3::new( w, -h, -d), Vec3::new( w,  h, -d), Vec3::new( w,  h,  d), Vec3::new(1.0, 0.0, 0.0)),
+        (
+            Vec3::new(w, -h, d),
+            Vec3::new(w, -h, -d),
+            Vec3::new(w, h, -d),
+            Vec3::new(w, h, d),
+            Vec3::new(1.0, 0.0, 0.0),
+        ),
         // Left face (-X)
-        (Vec3::new(-w, -h, -d), Vec3::new(-w, -h,  d), Vec3::new(-w,  h,  d), Vec3::new(-w,  h, -d), Vec3::new(-1.0, 0.0, 0.0)),
+        (
+            Vec3::new(-w, -h, -d),
+            Vec3::new(-w, -h, d),
+            Vec3::new(-w, h, d),
+            Vec3::new(-w, h, -d),
+            Vec3::new(-1.0, 0.0, 0.0),
+        ),
         // Top face (+Y)
-        (Vec3::new(-w,  h,  d), Vec3::new( w,  h,  d), Vec3::new( w,  h, -d), Vec3::new(-w,  h, -d), Vec3::new(0.0, 1.0, 0.0)),
+        (
+            Vec3::new(-w, h, d),
+            Vec3::new(w, h, d),
+            Vec3::new(w, h, -d),
+            Vec3::new(-w, h, -d),
+            Vec3::new(0.0, 1.0, 0.0),
+        ),
         // Bottom face (-Y)
-        (Vec3::new(-w, -h, -d), Vec3::new( w, -h, -d), Vec3::new( w, -h,  d), Vec3::new(-w, -h,  d), Vec3::new(0.0, -1.0, 0.0)),
+        (
+            Vec3::new(-w, -h, -d),
+            Vec3::new(w, -h, -d),
+            Vec3::new(w, -h, d),
+            Vec3::new(-w, -h, d),
+            Vec3::new(0.0, -1.0, 0.0),
+        ),
     ];
 
-    let uv_coords = [
-        [0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]
-    ];
+    let uv_coords = [[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]];
 
     for (i, &(p0, p1, p2, p3, norm)) in faces.iter().enumerate() {
         let base_idx = (i * 4) as u32;
@@ -141,21 +175,23 @@ pub fn generate_plane(width: f32, depth: f32) -> (Vec<Vertex>, Vec<u32>) {
 
     let vertices = vec![
         Vertex::new(Vec3::new(-w, 0.0, -d), norm, [0.0, 0.0]),
-        Vertex::new(Vec3::new( w, 0.0, -d), norm, [1.0, 0.0]),
-        Vertex::new(Vec3::new( w, 0.0,  d), norm, [1.0, 1.0]),
-        Vertex::new(Vec3::new(-w, 0.0,  d), norm, [0.0, 1.0]),
+        Vertex::new(Vec3::new(w, 0.0, -d), norm, [1.0, 0.0]),
+        Vertex::new(Vec3::new(w, 0.0, d), norm, [1.0, 1.0]),
+        Vertex::new(Vec3::new(-w, 0.0, d), norm, [0.0, 1.0]),
     ];
 
-    let indices = vec![
-        0, 2, 1,
-        0, 3, 2,
-    ];
+    let indices = vec![0, 2, 1, 0, 3, 2];
 
     (vertices, indices)
 }
 
 /// Generates a cylinder between two arbitrary 3D points
-pub fn generate_cylinder(p1: Vec3, p2: Vec3, radius: f32, segments: u32) -> (Vec<Vertex>, Vec<u32>) {
+pub fn generate_cylinder(
+    p1: Vec3,
+    p2: Vec3,
+    radius: f32,
+    segments: u32,
+) -> (Vec<Vertex>, Vec<u32>) {
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
 

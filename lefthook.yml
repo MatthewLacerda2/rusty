@@ -6,7 +6,7 @@ pre-commit:
   commands:
     fmt:
       glob: "*.rs"
-      run: rustfmt --edition 2021 --check {staged_files}
+      run: cargo fmt --all --check
     size:
       glob: "*.rs"
       run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- {staged_files}

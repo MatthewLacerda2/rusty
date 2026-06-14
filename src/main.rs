@@ -22,8 +22,8 @@ use glam::Vec3;
 use crate::app::{GameWorld, PlayTransition};
 use crate::core::input::InputState;
 use crate::core::scene::{
-    self, AnimatorComponent, ColliderComponent, ColliderShape, HealthComponent,
-    RigidBodyComponent, ScriptComponent, Scene,
+    self, AnimatorComponent, ColliderComponent, ColliderShape, HealthComponent, RigidBodyComponent,
+    Scene, ScriptComponent,
 };
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
@@ -103,18 +103,23 @@ return BotAI
         Some(window.scale_factor() as f32),
         None,
     );
-    let mut egui_renderer = egui_wgpu::Renderer::new(&renderer.device, renderer.config.format, None, 1);
+    let mut egui_renderer =
+        egui_wgpu::Renderer::new(&renderer.device, renderer.config.format, None, 1);
 
     // 4. Initialize Core Engine Systems (shared simulation state)
     let scene = Rc::new(RefCell::new(Scene::new()));
     let input = Rc::new(RefCell::new(InputState::new()));
-    let nav = Rc::new(RefCell::new(NavigationGraph::new(-20.0, 20.0, -20.0, 20.0, 1.0)));
+    let nav = Rc::new(RefCell::new(NavigationGraph::new(
+        -20.0, 20.0, -20.0, 20.0, 1.0,
+    )));
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
 
     // 5. Populate Beautiful Demo 3D Scene
     {
         let mut s = scene.borrow_mut();
-        console.borrow_mut().info("Loading default demo scene assets...".to_string());
+        console
+            .borrow_mut()
+            .info("Loading default demo scene assets...".to_string());
 
         // A. Add Floor Plane (Procedural XZ grid)
         let floor_id = s.add_entity("Floor_Plane".to_string());
@@ -130,7 +135,9 @@ return BotAI
         });
         floor.collider = Some(ColliderComponent {
             active: true,
-            shape: ColliderShape::Box { size: Vec3::new(15.0, 0.1, 15.0) },
+            shape: ColliderShape::Box {
+                size: Vec3::new(15.0, 0.1, 15.0),
+            },
             is_trigger: false,
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
@@ -140,8 +147,12 @@ return BotAI
         let player_id = s.add_entity("Player".to_string());
         let player = s.get_entity_mut(player_id).unwrap();
         player.transform.position = Vec3::new(0.0, 1.5, -6.0);
-        let (v_player, idx_player) =
-            primitives::generate_cylinder(Vec3::new(0.0, -0.8, 0.0), Vec3::new(0.0, 0.8, 0.0), 0.5, 12);
+        let (v_player, idx_player) = primitives::generate_cylinder(
+            Vec3::new(0.0, -0.8, 0.0),
+            Vec3::new(0.0, 0.8, 0.0),
+            0.5,
+            12,
+        );
         player.mesh = Some(scene::MeshComponent {
             primitive_type: "Cylinder".to_string(),
             vertices: v_player,
@@ -150,7 +161,10 @@ return BotAI
         });
         player.collider = Some(ColliderComponent {
             active: true,
-            shape: ColliderShape::Cylinder { radius: 0.5, height: 1.6 },
+            shape: ColliderShape::Cylinder {
+                radius: 0.5,
+                height: 1.6,
+            },
             is_trigger: false,
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
@@ -217,7 +231,9 @@ return BotAI
         });
         enemy.collider = Some(ColliderComponent {
             active: true,
-            shape: ColliderShape::Box { size: Vec3::new(1.3, 2.0, 1.3) },
+            shape: ColliderShape::Box {
+                size: Vec3::new(1.3, 2.0, 1.3),
+            },
             is_trigger: false,
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
@@ -229,7 +245,11 @@ return BotAI
             velocity: Vec3::ZERO,
             use_gravity: false,
         });
-        enemy.health = Some(HealthComponent { current_health: 100.0, max_health: 100.0, is_dead: false });
+        enemy.health = Some(HealthComponent {
+            current_health: 100.0,
+            max_health: 100.0,
+            is_dead: false,
+        });
         enemy.animator = Some(AnimatorComponent {
             current_clip: "Walk".to_string(),
             time: 0.0,
@@ -262,7 +282,10 @@ return BotAI
         elwt.set_control_flow(ControlFlow::Poll);
 
         match event {
-            Event::WindowEvent { window_id, ref event } if window_id == window.id() => {
+            Event::WindowEvent {
+                window_id,
+                ref event,
+            } if window_id == window.id() => {
                 // Always feed events to egui so the header panel with Play/Stop buttons works
                 let _ = egui_winit.on_window_event(&window, event);
                 match event {
@@ -271,7 +294,12 @@ return BotAI
                         renderer.resize(*physical_size);
                     }
                     WindowEvent::KeyboardInput {
-                        event: KeyEvent { physical_key: PhysicalKey::Code(key), state, .. },
+                        event:
+                            KeyEvent {
+                                physical_key: PhysicalKey::Code(key),
+                                state,
+                                ..
+                            },
                         ..
                     } => {
                         let pressed = *state == ElementState::Pressed;
@@ -303,7 +331,8 @@ return BotAI
                     }
                     WindowEvent::MouseInput { state, button, .. } => {
                         if *button == winit::event::MouseButton::Left {
-                            game.input.borrow_mut().mouse_left_clicked = *state == ElementState::Pressed;
+                            game.input.borrow_mut().mouse_left_clicked =
+                                *state == ElementState::Pressed;
                         }
                     }
                     WindowEvent::CursorMoved { position, .. } => {
@@ -327,11 +356,15 @@ return BotAI
                         let transition = game.tick(delta_time);
                         match transition {
                             PlayTransition::Entered => {
-                                window.set_cursor_grab(winit::window::CursorGrabMode::Confined).ok();
+                                window
+                                    .set_cursor_grab(winit::window::CursorGrabMode::Confined)
+                                    .ok();
                                 window.set_cursor_visible(false);
                             }
                             PlayTransition::Exited => {
-                                window.set_cursor_grab(winit::window::CursorGrabMode::None).ok();
+                                window
+                                    .set_cursor_grab(winit::window::CursorGrabMode::None)
+                                    .ok();
                                 window.set_cursor_visible(true);
                             }
                             PlayTransition::None => {}
@@ -345,12 +378,20 @@ return BotAI
                                 return;
                             }
                         };
-                        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
+                        let view = frame
+                            .texture
+                            .create_view(&wgpu::TextureViewDescriptor::default());
 
                         // Render the 3D scene (Forward unlit/lit + gizmos line drawers)
                         {
                             let s = game.scene.borrow();
-                            renderer.render(&s, &game.camera, &view, !game.is_playing, game.pathfinding_points());
+                            renderer.render(
+                                &s,
+                                &game.camera,
+                                &view,
+                                !game.is_playing,
+                                game.pathfinding_points(),
+                            );
                         }
 
                         // Render Egui Overlay (header always visible, side panels only in editor mode)
@@ -379,7 +420,8 @@ return BotAI
                             }
 
                             let full_output = egui_ctx.end_frame();
-                            let paint_jobs = egui_ctx.tessellate(full_output.shapes, full_output.pixels_per_point);
+                            let paint_jobs = egui_ctx
+                                .tessellate(full_output.shapes, full_output.pixels_per_point);
 
                             let screen_descriptor = egui_wgpu::ScreenDescriptor {
                                 size_in_pixels: [renderer.config.width, renderer.config.height],
@@ -387,13 +429,19 @@ return BotAI
                             };
 
                             for (id, image_delta) in &full_output.textures_delta.set {
-                                egui_renderer.update_texture(&renderer.device, &renderer.queue, *id, image_delta);
+                                egui_renderer.update_texture(
+                                    &renderer.device,
+                                    &renderer.queue,
+                                    *id,
+                                    image_delta,
+                                );
                             }
 
-                            let mut encoder =
-                                renderer.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                            let mut encoder = renderer.device.create_command_encoder(
+                                &wgpu::CommandEncoderDescriptor {
                                     label: Some("Egui Render Encoder"),
-                                });
+                                },
+                            );
 
                             egui_renderer.update_buffers(
                                 &renderer.device,
@@ -404,22 +452,29 @@ return BotAI
                             );
 
                             {
-                                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                                    label: Some("Egui Render Pass"),
-                                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                                        view: &view,
-                                        resolve_target: None,
-                                        ops: wgpu::Operations {
-                                            load: wgpu::LoadOp::Load,
-                                            store: wgpu::StoreOp::Store,
-                                        },
-                                    })],
-                                    depth_stencil_attachment: None,
-                                    timestamp_writes: None,
-                                    occlusion_query_set: None,
-                                });
+                                let mut render_pass =
+                                    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                                        label: Some("Egui Render Pass"),
+                                        color_attachments: &[Some(
+                                            wgpu::RenderPassColorAttachment {
+                                                view: &view,
+                                                resolve_target: None,
+                                                ops: wgpu::Operations {
+                                                    load: wgpu::LoadOp::Load,
+                                                    store: wgpu::StoreOp::Store,
+                                                },
+                                            },
+                                        )],
+                                        depth_stencil_attachment: None,
+                                        timestamp_writes: None,
+                                        occlusion_query_set: None,
+                                    });
 
-                                egui_renderer.render(&mut render_pass, &paint_jobs, &screen_descriptor);
+                                egui_renderer.render(
+                                    &mut render_pass,
+                                    &paint_jobs,
+                                    &screen_descriptor,
+                                );
                             }
 
                             renderer.queue.submit(std::iter::once(encoder.finish()));

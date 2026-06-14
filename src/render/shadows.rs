@@ -1,8 +1,8 @@
-use glam::{Vec3, Mat4};
-use std::collections::HashMap;
-use wgpu::util::DeviceExt;
 use crate::core::scene::Scene;
 use crate::render::mesh::Vertex;
+use glam::{Mat4, Vec3};
+use std::collections::HashMap;
+use wgpu::util::DeviceExt;
 
 pub struct ShadowRenderer {
     pub static_texture: wgpu::Texture,
@@ -12,13 +12,13 @@ pub struct ShadowRenderer {
     pub sampler: wgpu::Sampler,
     pub bind_group_layout: wgpu::BindGroupLayout,
     pub bind_group: wgpu::BindGroup,
-    
+
     pipeline: wgpu::RenderPipeline,
     light_space_buffer: wgpu::Buffer,
     pub light_space_matrix: Mat4,
-    
+
     pub is_static_cached: bool,
-    
+
     global_bind_group: wgpu::BindGroup,
     entity_layout: wgpu::BindGroupLayout,
 }
@@ -33,7 +33,7 @@ impl ShadowRenderer {
             height: Self::SHADOW_SIZE,
             depth_or_array_layers: 1,
         };
-        
+
         let desc = wgpu::TextureDescriptor {
             label: Some("Shadow Depth Texture"),
             size,
@@ -41,16 +41,19 @@ impl ShadowRenderer {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::COPY_DST,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         };
-        
+
         let static_texture = device.create_texture(&desc);
         let static_view = static_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        
+
         let active_texture = device.create_texture(&desc);
         let active_view = active_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        
+
         // Sampler with comparison for hardware PCF shadows
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Shadow Sampler"),
@@ -63,7 +66,7 @@ impl ShadowRenderer {
             compare: Some(wgpu::CompareFunction::LessEqual),
             ..Default::default()
         });
-        
+
         // Bind group layout to expose shadow depth map to main shader
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Shadow Map Bind Group Layout"),
@@ -86,7 +89,7 @@ impl ShadowRenderer {
                 },
             ],
         });
-        
+
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Shadow Map Bind Group"),
             layout: &bind_group_layout,
@@ -101,72 +104,65 @@ impl ShadowRenderer {
                 },
             ],
         });
-        
+
         // Compile shadow map shader
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shadow Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../../assets/shaders/shadow.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(
+                include_str!("../../assets/shaders/shadow.wgsl").into(),
+            ),
         });
-        
+
         let light_space_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Shadow Light Space Buffer"),
             size: 64, // Mat4 size
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        
+
         let global_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Shadow Global Layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
                 },
-            ],
+                count: None,
+            }],
         });
-        
+
         let global_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Shadow Global Bind Group"),
             layout: &global_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: light_space_buffer.as_entire_binding(),
-                },
-            ],
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: light_space_buffer.as_entire_binding(),
+            }],
         });
-        
+
         let entity_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Shadow Entity Layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
                 },
-            ],
+                count: None,
+            }],
         });
-        
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Shadow Pipeline Layout"),
-            bind_group_layouts: &[
-                &global_layout,
-                &entity_layout,
-            ],
+            bind_group_layouts: &[&global_layout, &entity_layout],
             push_constant_ranges: &[],
         });
-        
+
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Shadow Render Pipeline"),
             layout: Some(&pipeline_layout),
@@ -196,7 +192,7 @@ impl ShadowRenderer {
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
         });
-        
+
         Self {
             static_texture,
             static_view,
@@ -220,12 +216,16 @@ impl ShadowRenderer {
         let center = Vec3::ZERO;
         let shadow_cam_pos = center - norm_dir * 45.0;
         let view = Mat4::look_at_rh(shadow_cam_pos, center, Vec3::Y);
-        
+
         // Orthographic projection suitable for typical scenes
         let proj = Mat4::orthographic_rh(-30.0, 30.0, -30.0, 30.0, 1.0, 100.0);
         self.light_space_matrix = proj * view;
-        
-        queue.write_buffer(&self.light_space_buffer, 0, bytemuck::bytes_of(&self.light_space_matrix.to_cols_array()));
+
+        queue.write_buffer(
+            &self.light_space_buffer,
+            0,
+            bytemuck::bytes_of(&self.light_space_matrix.to_cols_array()),
+        );
     }
 
     pub fn render_static(
@@ -249,18 +249,16 @@ impl ShadowRenderer {
                         contents: bytemuck::bytes_of(&model_arr),
                         usage: wgpu::BufferUsages::UNIFORM,
                     });
-                    
+
                     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                         label: Some("Shadow Static Entity Bind Group"),
                         layout: &self.entity_layout,
-                        entries: &[
-                            wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: entity_buf.as_entire_binding(),
-                            },
-                        ],
+                        entries: &[wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: entity_buf.as_entire_binding(),
+                        }],
                     });
-                    
+
                     render_resources.push((entity.id, bind_group, gpu_mesh.num_indices));
                 }
             }
@@ -288,7 +286,10 @@ impl ShadowRenderer {
             for (id, bind_group, num_indices) in &render_resources {
                 if let Some(gpu_mesh) = gpu_meshes.get(id) {
                     render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
-                    render_pass.set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                    render_pass.set_index_buffer(
+                        gpu_mesh.index_buffer.slice(..),
+                        wgpu::IndexFormat::Uint32,
+                    );
                     render_pass.set_bind_group(1, bind_group, &[]);
                     render_pass.draw_indexed(0..*num_indices, 0, 0..1);
                 }
@@ -310,7 +311,7 @@ impl ShadowRenderer {
             height: Self::SHADOW_SIZE,
             depth_or_array_layers: 1,
         };
-        
+
         encoder.copy_texture_to_texture(
             wgpu::ImageCopyTexture {
                 texture: &self.static_texture,
@@ -341,18 +342,16 @@ impl ShadowRenderer {
                         contents: bytemuck::bytes_of(&model_arr),
                         usage: wgpu::BufferUsages::UNIFORM,
                     });
-                    
+
                     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                         label: Some("Shadow Dynamic Entity Bind Group"),
                         layout: &self.entity_layout,
-                        entries: &[
-                            wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: entity_buf.as_entire_binding(),
-                            },
-                        ],
+                        entries: &[wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: entity_buf.as_entire_binding(),
+                        }],
                     });
-                    
+
                     render_resources.push((entity.id, bind_group, gpu_mesh.num_indices));
                 }
             }
@@ -380,7 +379,10 @@ impl ShadowRenderer {
             for (id, bind_group, num_indices) in &render_resources {
                 if let Some(gpu_mesh) = gpu_meshes.get(id) {
                     render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
-                    render_pass.set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                    render_pass.set_index_buffer(
+                        gpu_mesh.index_buffer.slice(..),
+                        wgpu::IndexFormat::Uint32,
+                    );
                     render_pass.set_bind_group(1, bind_group, &[]);
                     render_pass.draw_indexed(0..*num_indices, 0, 0..1);
                 }

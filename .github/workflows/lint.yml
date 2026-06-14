@@ -13,16 +13,10 @@ jobs:
           fetch-depth: 0
       - name: Ensure rustfmt + clippy
         run: rustup component add rustfmt clippy
-      - name: Format check (changed files only)
+      - name: Format check (whole crate; rustfmt follows mod tree)
         run: |
-          base="${{ github.event.pull_request.base.sha || github.event.before }}"
-          files=$(git diff --name-only --diff-filter=d "$base" HEAD -- '*.rs' || true)
-          if [ -n "$files" ]; then
-            echo "Checking: $files"
-            rustfmt --edition 2021 --check $files
-          else
-            echo "No Rust files changed."
-          fi
+          cargo fmt --all --check
+          cargo fmt --manifest-path tools/lint/Cargo.toml --check
       - name: Size gate (full scan; legacy grandfathered via baseline)
         run: cargo run --quiet --manifest-path tools/lint/Cargo.toml
       - name: Clippy (report-only for now)

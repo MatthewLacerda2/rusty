@@ -1,6 +1,6 @@
-use glam::{Vec3, Quat, Mat4};
 use crate::render::mesh::Vertex;
-use serde::{Serialize, Deserialize};
+use glam::{Mat4, Quat, Vec3};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TransformComponent {
@@ -141,18 +141,12 @@ impl ColliderComponent {
             }
             ColliderShape::Sphere { radius } => {
                 let r = *radius;
-                vec![
-                    Vec3::new(-r, -r, -r),
-                    Vec3::new(r, r, r),
-                ]
+                vec![Vec3::new(-r, -r, -r), Vec3::new(r, r, r)]
             }
             ColliderShape::Cylinder { radius, height } => {
                 let r = *radius;
                 let h = *height * 0.5;
-                vec![
-                    Vec3::new(-r, -h, -r),
-                    Vec3::new(r, h, r),
-                ]
+                vec![Vec3::new(-r, -h, -r), Vec3::new(r, h, r)]
             }
         };
 
@@ -335,7 +329,6 @@ impl Default for Scene {
     }
 }
 
-
 impl Scene {
     pub fn new() -> Self {
         Self::default()
@@ -364,7 +357,8 @@ impl Scene {
     }
 
     pub fn find_entity_by_name(&self, name: &str) -> Option<u32> {
-        self.entities.iter()
+        self.entities
+            .iter()
             .find(|e| e.name == name && e.active)
             .map(|e| e.id)
     }
@@ -403,7 +397,7 @@ impl Scene {
             if entity_id == p_id {
                 return Err("An entity cannot be parented to itself.".to_string());
             }
-            
+
             // Traverse up from parent_id to check if entity_id is an ancestor
             let mut current = p_id;
             while let Some(ancestor_parent) = self.get_entity(current).and_then(|e| e.parent_id) {
@@ -446,8 +440,7 @@ impl Scene {
     pub fn save_to_file(&self, path: &str) -> Result<(), String> {
         let json = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize scene: {}", e))?;
-        std::fs::write(path, json)
-            .map_err(|e| format!("Failed to write scene file: {}", e))?;
+        std::fs::write(path, json).map_err(|e| format!("Failed to write scene file: {}", e))?;
         Ok(())
     }
 
@@ -456,7 +449,7 @@ impl Scene {
             .map_err(|e| format!("Failed to read scene file: {}", e))?;
         let mut loaded_scene: Scene = serde_json::from_str(&json)
             .map_err(|e| format!("Failed to deserialize scene: {}", e))?;
-        
+
         // Regenerate primitive meshes based on primitive_type
         for entity in &mut loaded_scene.entities {
             if let Some(mesh) = &mut entity.mesh {
@@ -465,7 +458,12 @@ impl Scene {
                     "Box" => crate::render::mesh::generate_box(1.0, 1.0, 1.0),
                     "Sphere" => crate::render::mesh::generate_sphere(1.0, 16, 16),
                     "Plane" => crate::render::mesh::generate_plane(15.0, 15.0),
-                    "Cylinder" => crate::render::mesh::generate_cylinder(glam::Vec3::new(0.0, -0.5, 0.0), glam::Vec3::new(0.0, 0.5, 0.0), 0.5, 12),
+                    "Cylinder" => crate::render::mesh::generate_cylinder(
+                        glam::Vec3::new(0.0, -0.5, 0.0),
+                        glam::Vec3::new(0.0, 0.5, 0.0),
+                        0.5,
+                        12,
+                    ),
                     _ => (Vec::new(), Vec::new()),
                 };
                 mesh.vertices = vertices;

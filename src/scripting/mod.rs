@@ -1,12 +1,12 @@
-use std::rc::Rc;
+use glam::Vec3;
+use mlua::{Lua, RegistryKey, Table};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::Path;
-use mlua::{Lua, Table, RegistryKey};
-use glam::Vec3;
+use std::rc::Rc;
 
-use crate::core::scene::Scene;
 use crate::core::input::InputState;
+use crate::core::scene::Scene;
 use crate::navigation::NavigationGraph;
 
 pub struct ConsoleLogs {
@@ -22,7 +22,9 @@ pub enum LogLevel {
 
 impl ConsoleLogs {
     pub fn new() -> Self {
-        Self { messages: Vec::new() }
+        Self {
+            messages: Vec::new(),
+        }
     }
 
     pub fn info(&mut self, msg: String) {
@@ -77,400 +79,622 @@ impl ScriptManager {
 
         // 1. Override print to write to our console panel
         let console_clone = Rc::clone(&self.console);
-        let print_fn = lua.create_function(move |_, msg: String| {
-            console_clone.borrow_mut().info(msg);
-            Ok(())
-        }).map_err(|e| e.to_string())?;
-        lua.globals().set("print", print_fn).map_err(|e| e.to_string())?;
+        let print_fn = lua
+            .create_function(move |_, msg: String| {
+                console_clone.borrow_mut().info(msg);
+                Ok(())
+            })
+            .map_err(|e| e.to_string())?;
+        lua.globals()
+            .set("print", print_fn)
+            .map_err(|e| e.to_string())?;
 
         // 2. Transform Namespace
         let transform_table = lua.create_table().map_err(|e| e.to_string())?;
         let scene_clone = Rc::clone(&self.scene);
-        
-        transform_table.set("GetPosition", lua.create_function(move |_, id: u32| {
-            let s = scene_clone.borrow();
-            if let Some(e) = s.get_entity(id) {
-                let pos = e.transform.position;
-                Ok((pos.x, pos.y, pos.z))
-            } else {
-                Ok((0.0, 0.0, 0.0))
-            }
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+
+        transform_table
+            .set(
+                "GetPosition",
+                lua.create_function(move |_, id: u32| {
+                    let s = scene_clone.borrow();
+                    if let Some(e) = s.get_entity(id) {
+                        let pos = e.transform.position;
+                        Ok((pos.x, pos.y, pos.z))
+                    } else {
+                        Ok((0.0, 0.0, 0.0))
+                    }
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        transform_table.set("SetPosition", lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                e.transform.position = Vec3::new(x, y, z);
-            }
-            s.update_entity_collider(id);
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        transform_table
+            .set(
+                "SetPosition",
+                lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        e.transform.position = Vec3::new(x, y, z);
+                    }
+                    s.update_entity_collider(id);
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        transform_table.set("GetRotation", lua.create_function(move |_, id: u32| {
-            let s = scene_clone.borrow();
-            if let Some(e) = s.get_entity(id) {
-                let rot = e.transform.euler_angles();
-                Ok((rot.x, rot.y, rot.z))
-            } else {
-                Ok((0.0, 0.0, 0.0))
-            }
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        transform_table
+            .set(
+                "GetRotation",
+                lua.create_function(move |_, id: u32| {
+                    let s = scene_clone.borrow();
+                    if let Some(e) = s.get_entity(id) {
+                        let rot = e.transform.euler_angles();
+                        Ok((rot.x, rot.y, rot.z))
+                    } else {
+                        Ok((0.0, 0.0, 0.0))
+                    }
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        transform_table.set("SetRotation", lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                e.transform.set_euler_angles(Vec3::new(x, y, z));
-            }
-            s.update_entity_collider(id);
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        transform_table
+            .set(
+                "SetRotation",
+                lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        e.transform.set_euler_angles(Vec3::new(x, y, z));
+                    }
+                    s.update_entity_collider(id);
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        transform_table.set("GetScale", lua.create_function(move |_, id: u32| {
-            let s = scene_clone.borrow();
-            if let Some(e) = s.get_entity(id) {
-                let scl = e.transform.scale;
-                Ok((scl.x, scl.y, scl.z))
-            } else {
-                Ok((1.0, 1.0, 1.0))
-            }
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        transform_table
+            .set(
+                "GetScale",
+                lua.create_function(move |_, id: u32| {
+                    let s = scene_clone.borrow();
+                    if let Some(e) = s.get_entity(id) {
+                        let scl = e.transform.scale;
+                        Ok((scl.x, scl.y, scl.z))
+                    } else {
+                        Ok((1.0, 1.0, 1.0))
+                    }
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        transform_table.set("SetScale", lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                e.transform.scale = Vec3::new(x, y, z);
-            }
-            s.update_entity_collider(id);
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        transform_table
+            .set(
+                "SetScale",
+                lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        e.transform.scale = Vec3::new(x, y, z);
+                    }
+                    s.update_entity_collider(id);
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        transform_table.set("MoveTowards", lua.create_function(move |_, (id, tx, ty, tz, step): (u32, f32, f32, f32, f32)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                let pos = e.transform.position;
-                let target = Vec3::new(tx, ty, tz);
-                let dir = target - pos;
-                let len = dir.length();
-                if len <= step || len < 0.001 {
-                    e.transform.position = target;
-                } else {
-                    e.transform.position += dir.normalize() * step;
-                }
-            }
-            s.update_entity_collider(id);
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        transform_table
+            .set(
+                "MoveTowards",
+                lua.create_function(
+                    move |_, (id, tx, ty, tz, step): (u32, f32, f32, f32, f32)| {
+                        let mut s = scene_clone.borrow_mut();
+                        if let Some(e) = s.get_entity_mut(id) {
+                            let pos = e.transform.position;
+                            let target = Vec3::new(tx, ty, tz);
+                            let dir = target - pos;
+                            let len = dir.length();
+                            if len <= step || len < 0.001 {
+                                e.transform.position = target;
+                            } else {
+                                e.transform.position += dir.normalize() * step;
+                            }
+                        }
+                        s.update_entity_collider(id);
+                        Ok(())
+                    },
+                )
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
-        lua.globals().set("Transform", transform_table).map_err(|e| e.to_string())?;
+        lua.globals()
+            .set("Transform", transform_table)
+            .map_err(|e| e.to_string())?;
 
         // 2B. Material Namespace
         let material_table = lua.create_table().map_err(|e| e.to_string())?;
-        
-        let scene_clone = Rc::clone(&self.scene);
-        material_table.set("SetMetallic", lua.create_function(move |_, (id, val): (u32, f32)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(tex) = &mut e.texture {
-                    tex.metallic = val;
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        material_table.set("SetRoughness", lua.create_function(move |_, (id, val): (u32, f32)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(tex) = &mut e.texture {
-                    tex.roughness = val;
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        material_table
+            .set(
+                "SetMetallic",
+                lua.create_function(move |_, (id, val): (u32, f32)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(tex) = &mut e.texture {
+                            tex.metallic = val;
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        material_table.set("SetMetallicMap", lua.create_function(move |_, (id, path): (u32, String)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(tex) = &mut e.texture {
-                    tex.metallic_map = Some(path);
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        material_table
+            .set(
+                "SetRoughness",
+                lua.create_function(move |_, (id, val): (u32, f32)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(tex) = &mut e.texture {
+                            tex.roughness = val;
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        material_table.set("SetRoughnessMap", lua.create_function(move |_, (id, path): (u32, String)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(tex) = &mut e.texture {
-                    tex.roughness_map = Some(path);
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        material_table
+            .set(
+                "SetMetallicMap",
+                lua.create_function(move |_, (id, path): (u32, String)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(tex) = &mut e.texture {
+                            tex.metallic_map = Some(path);
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        material_table.set("SetTexture", lua.create_function(move |_, (id, path): (u32, String)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(tex) = &mut e.texture {
-                    tex.path = path;
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        material_table
+            .set(
+                "SetRoughnessMap",
+                lua.create_function(move |_, (id, path): (u32, String)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(tex) = &mut e.texture {
+                            tex.roughness_map = Some(path);
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
-        lua.globals().set("Material", material_table).map_err(|e| e.to_string())?;
+        let scene_clone = Rc::clone(&self.scene);
+        material_table
+            .set(
+                "SetTexture",
+                lua.create_function(move |_, (id, path): (u32, String)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(tex) = &mut e.texture {
+                            tex.path = path;
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
+
+        lua.globals()
+            .set("Material", material_table)
+            .map_err(|e| e.to_string())?;
 
         // 3. Animator Namespace
         let animator_table = lua.create_table().map_err(|e| e.to_string())?;
         let scene_clone = Rc::clone(&self.scene);
         let console_clone = Rc::clone(&self.console);
-        animator_table.set("Play", lua.create_function(move |_, (id, clip): (u32, String)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(anim) = &mut e.animator {
-                    anim.current_clip = clip.clone();
-                    anim.is_playing = true;
-                    anim.freeze = false;
-                    console_clone.borrow_mut().info(format!("Entity {} playing animation: {}", e.name, clip));
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        animator_table
+            .set(
+                "Play",
+                lua.create_function(move |_, (id, clip): (u32, String)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(anim) = &mut e.animator {
+                            anim.current_clip = clip.clone();
+                            anim.is_playing = true;
+                            anim.freeze = false;
+                            console_clone
+                                .borrow_mut()
+                                .info(format!("Entity {} playing animation: {}", e.name, clip));
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        animator_table.set("Crossfade", lua.create_function(move |_, (id, clip, _duration): (u32, String, f32)| {
-            // Simplify crossfade to standard play in our component
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(anim) = &mut e.animator {
-                    anim.current_clip = clip;
-                    anim.is_playing = true;
-                    anim.freeze = false;
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        animator_table
+            .set(
+                "Crossfade",
+                lua.create_function(move |_, (id, clip, _duration): (u32, String, f32)| {
+                    // Simplify crossfade to standard play in our component
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(anim) = &mut e.animator {
+                            anim.current_clip = clip;
+                            anim.is_playing = true;
+                            anim.freeze = false;
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        animator_table.set("Stop", lua.create_function(move |_, id: u32| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(anim) = &mut e.animator {
-                    anim.is_playing = false;
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        animator_table
+            .set(
+                "Stop",
+                lua.create_function(move |_, id: u32| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(anim) = &mut e.animator {
+                            anim.is_playing = false;
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
-        lua.globals().set("Animator", animator_table).map_err(|e| e.to_string())?;
+        lua.globals()
+            .set("Animator", animator_table)
+            .map_err(|e| e.to_string())?;
 
         // 4. Input Namespace
         let input_table = lua.create_table().map_err(|e| e.to_string())?;
         let input_clone = Rc::clone(&self.input);
-        input_table.set("IsKeyDown", lua.create_function(move |_, key_name: String| {
-            Ok(input_clone.borrow().is_key_down(&key_name))
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        input_table
+            .set(
+                "IsKeyDown",
+                lua.create_function(move |_, key_name: String| {
+                    Ok(input_clone.borrow().is_key_down(&key_name))
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
-        lua.globals().set("Input", input_table).map_err(|e| e.to_string())?;
+        lua.globals()
+            .set("Input", input_table)
+            .map_err(|e| e.to_string())?;
 
         // 5. Scene Namespace
         let scene_table = lua.create_table().map_err(|e| e.to_string())?;
         let scene_clone = Rc::clone(&self.scene);
-        scene_table.set("FindEntityByName", lua.create_function(move |_, name: String| {
-            let s = scene_clone.borrow();
-            Ok(s.find_entity_by_name(&name))
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        scene_table
+            .set(
+                "FindEntityByName",
+                lua.create_function(move |_, name: String| {
+                    let s = scene_clone.borrow();
+                    Ok(s.find_entity_by_name(&name))
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
         let console_clone = Rc::clone(&self.console);
-        scene_table.set("DestroyEntity", lua.create_function(move |_, id: u32| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                e.active = false;
-                console_clone.borrow_mut().info(format!("Entity {} destroyed (deactivated)", e.name));
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        scene_table
+            .set(
+                "DestroyEntity",
+                lua.create_function(move |_, id: u32| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        e.active = false;
+                        console_clone
+                            .borrow_mut()
+                            .info(format!("Entity {} destroyed (deactivated)", e.name));
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
-        lua.globals().set("Scene", scene_table).map_err(|e| e.to_string())?;
+        lua.globals()
+            .set("Scene", scene_table)
+            .map_err(|e| e.to_string())?;
 
         // 6. Navigation Namespace
         let nav_table = lua.create_table().map_err(|e| e.to_string())?;
         let nav_clone = Rc::clone(&self.nav);
-        nav_table.set("GetNextPathStep", lua.create_function(move |_, (cx, cy, cz, tx, ty, tz): (f32, f32, f32, f32, f32, f32)| {
-            let step = nav_clone.borrow().get_next_path_step(Vec3::new(cx, cy, cz), Vec3::new(tx, ty, tz));
-            Ok((step.x, step.y, step.z))
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        nav_table
+            .set(
+                "GetNextPathStep",
+                lua.create_function(
+                    move |_, (cx, cy, cz, tx, ty, tz): (f32, f32, f32, f32, f32, f32)| {
+                        let step = nav_clone
+                            .borrow()
+                            .get_next_path_step(Vec3::new(cx, cy, cz), Vec3::new(tx, ty, tz));
+                        Ok((step.x, step.y, step.z))
+                    },
+                )
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
-        lua.globals().set("Navigation", nav_table).map_err(|e| e.to_string())?;
+        lua.globals()
+            .set("Navigation", nav_table)
+            .map_err(|e| e.to_string())?;
 
         // 6B. NavMeshAgent Namespace
         let agent_table = lua.create_table().map_err(|e| e.to_string())?;
-        
-        let scene_clone = Rc::clone(&self.scene);
-        agent_table.set("SetTarget", lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(agent) = &mut e.nav_agent {
-                    agent.target = Vec3::new(x, y, z);
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        agent_table.set("GetTarget", lua.create_function(move |_, id: u32| {
-            let s = scene_clone.borrow();
-            if let Some(e) = s.get_entity(id) {
-                if let Some(agent) = &e.nav_agent {
-                    let t = agent.target;
-                    return Ok((t.x, t.y, t.z));
-                }
-            }
-            Ok((0.0, 0.0, 0.0))
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        agent_table
+            .set(
+                "SetTarget",
+                lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(agent) = &mut e.nav_agent {
+                            agent.target = Vec3::new(x, y, z);
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        agent_table.set("SetSpeed", lua.create_function(move |_, (id, speed): (u32, f32)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(agent) = &mut e.nav_agent {
-                    agent.speed = speed;
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        agent_table
+            .set(
+                "GetTarget",
+                lua.create_function(move |_, id: u32| {
+                    let s = scene_clone.borrow();
+                    if let Some(e) = s.get_entity(id) {
+                        if let Some(agent) = &e.nav_agent {
+                            let t = agent.target;
+                            return Ok((t.x, t.y, t.z));
+                        }
+                    }
+                    Ok((0.0, 0.0, 0.0))
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        agent_table.set("SetAcceleration", lua.create_function(move |_, (id, acc): (u32, f32)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(agent) = &mut e.nav_agent {
-                    agent.acceleration = acc;
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        agent_table
+            .set(
+                "SetSpeed",
+                lua.create_function(move |_, (id, speed): (u32, f32)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(agent) = &mut e.nav_agent {
+                            agent.speed = speed;
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        agent_table.set("SetStoppingDistance", lua.create_function(move |_, (id, dist): (u32, f32)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(agent) = &mut e.nav_agent {
-                    agent.stopping_distance = dist;
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        agent_table
+            .set(
+                "SetAcceleration",
+                lua.create_function(move |_, (id, acc): (u32, f32)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(agent) = &mut e.nav_agent {
+                            agent.acceleration = acc;
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        agent_table.set("SetRadius", lua.create_function(move |_, (id, r): (u32, f32)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(agent) = &mut e.nav_agent {
-                    agent.radius = r;
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        agent_table
+            .set(
+                "SetStoppingDistance",
+                lua.create_function(move |_, (id, dist): (u32, f32)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(agent) = &mut e.nav_agent {
+                            agent.stopping_distance = dist;
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        agent_table.set("IsAtTarget", lua.create_function(move |_, id: u32| {
-            let s = scene_clone.borrow();
-            if let Some(e) = s.get_entity(id) {
-                if let Some(agent) = &e.nav_agent {
-                    let current_pos = e.transform.position;
-                    let to_target = agent.target - current_pos;
-                    return Ok(to_target.length() <= agent.stopping_distance);
-                }
-            }
-            Ok(true)
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        agent_table
+            .set(
+                "SetRadius",
+                lua.create_function(move |_, (id, r): (u32, f32)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(agent) = &mut e.nav_agent {
+                            agent.radius = r;
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        agent_table.set("GetVelocity", lua.create_function(move |_, id: u32| {
-            let s = scene_clone.borrow();
-            if let Some(e) = s.get_entity(id) {
-                if let Some(agent) = &e.nav_agent {
-                    let v = agent.velocity;
-                    return Ok((v.x, v.y, v.z));
-                }
-            }
-            Ok((0.0, 0.0, 0.0))
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        agent_table
+            .set(
+                "IsAtTarget",
+                lua.create_function(move |_, id: u32| {
+                    let s = scene_clone.borrow();
+                    if let Some(e) = s.get_entity(id) {
+                        if let Some(agent) = &e.nav_agent {
+                            let current_pos = e.transform.position;
+                            let to_target = agent.target - current_pos;
+                            return Ok(to_target.length() <= agent.stopping_distance);
+                        }
+                    }
+                    Ok(true)
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        agent_table.set("SetActive", lua.create_function(move |_, (id, active): (u32, bool)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(agent) = &mut e.nav_agent {
-                    agent.active = active;
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        agent_table
+            .set(
+                "GetVelocity",
+                lua.create_function(move |_, id: u32| {
+                    let s = scene_clone.borrow();
+                    if let Some(e) = s.get_entity(id) {
+                        if let Some(agent) = &e.nav_agent {
+                            let v = agent.velocity;
+                            return Ok((v.x, v.y, v.z));
+                        }
+                    }
+                    Ok((0.0, 0.0, 0.0))
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
-        lua.globals().set("NavMeshAgent", agent_table).map_err(|e| e.to_string())?;
+        let scene_clone = Rc::clone(&self.scene);
+        agent_table
+            .set(
+                "SetActive",
+                lua.create_function(move |_, (id, active): (u32, bool)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(agent) = &mut e.nav_agent {
+                            agent.active = active;
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
+
+        lua.globals()
+            .set("NavMeshAgent", agent_table)
+            .map_err(|e| e.to_string())?;
 
         // 7. Physics Namespace
         let physics_table = lua.create_table().map_err(|e| e.to_string())?;
         let scene_clone = Rc::clone(&self.scene);
-        physics_table.set("GetVelocity", lua.create_function(move |_, id: u32| {
-            let s = scene_clone.borrow();
-            if let Some(e) = s.get_entity(id) {
-                if let Some(rb) = &e.rigidbody {
-                    return Ok((rb.velocity.x, rb.velocity.y, rb.velocity.z));
-                }
-            }
-            Ok((0.0, 0.0, 0.0))
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-
-        let scene_clone = Rc::clone(&self.scene);
-        physics_table.set("SetVelocity", lua.create_function(move |_, (id, vx, vy, vz): (u32, f32, f32, f32)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(rb) = &mut e.rigidbody {
-                    rb.velocity = Vec3::new(vx, vy, vz);
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-
-        let scene_clone = Rc::clone(&self.scene);
-        physics_table.set("AddForce", lua.create_function(move |_, (id, fx, fy, fz): (u32, f32, f32, f32)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(rb) = &mut e.rigidbody {
-                    if !rb.is_kinematic {
-                        let acc = Vec3::new(fx, fy, fz) / rb.mass.max(0.0001);
-                        rb.velocity += acc;
+        physics_table
+            .set(
+                "GetVelocity",
+                lua.create_function(move |_, id: u32| {
+                    let s = scene_clone.borrow();
+                    if let Some(e) = s.get_entity(id) {
+                        if let Some(rb) = &e.rigidbody {
+                            return Ok((rb.velocity.x, rb.velocity.y, rb.velocity.z));
+                        }
                     }
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+                    Ok((0.0, 0.0, 0.0))
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
         let scene_clone = Rc::clone(&self.scene);
-        physics_table.set("SetKinematic", lua.create_function(move |_, (id, is_kinematic): (u32, bool)| {
-            let mut s = scene_clone.borrow_mut();
-            if let Some(e) = s.get_entity_mut(id) {
-                if let Some(rb) = &mut e.rigidbody {
-                    rb.is_kinematic = is_kinematic;
-                }
-            }
-            Ok(())
-        }).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        physics_table
+            .set(
+                "SetVelocity",
+                lua.create_function(move |_, (id, vx, vy, vz): (u32, f32, f32, f32)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(rb) = &mut e.rigidbody {
+                            rb.velocity = Vec3::new(vx, vy, vz);
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
 
-        lua.globals().set("Physics", physics_table).map_err(|e| e.to_string())?;
+        let scene_clone = Rc::clone(&self.scene);
+        physics_table
+            .set(
+                "AddForce",
+                lua.create_function(move |_, (id, fx, fy, fz): (u32, f32, f32, f32)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(rb) = &mut e.rigidbody {
+                            if !rb.is_kinematic {
+                                let acc = Vec3::new(fx, fy, fz) / rb.mass.max(0.0001);
+                                rb.velocity += acc;
+                            }
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
+
+        let scene_clone = Rc::clone(&self.scene);
+        physics_table
+            .set(
+                "SetKinematic",
+                lua.create_function(move |_, (id, is_kinematic): (u32, bool)| {
+                    let mut s = scene_clone.borrow_mut();
+                    if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(rb) = &mut e.rigidbody {
+                            rb.is_kinematic = is_kinematic;
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
+
+        lua.globals()
+            .set("Physics", physics_table)
+            .map_err(|e| e.to_string())?;
 
         self.lua = Some(lua);
         self.entity_scripts.clear();
@@ -491,11 +715,13 @@ impl ScriptManager {
 
         // Load the script chunk
         let chunk = lua.load(&script_code);
-        let table: Table = chunk.eval()
+        let table: Table = chunk
+            .eval()
             .map_err(|e| format!("Syntax error compiling {}: {}", script_path, e))?;
 
         // Cache the returned lifecycle table in the Lua registry
-        let reg_key = lua.create_registry_value(table)
+        let reg_key = lua
+            .create_registry_value(table)
             .map_err(|e| format!("Failed to register script table: {}", e))?;
 
         self.entity_scripts.insert(entity_id, reg_key);
@@ -517,9 +743,9 @@ impl ScriptManager {
                 if let Ok(table) = lua.registry_value::<Table>(key) {
                     if let Ok(start_fn) = table.get::<_, mlua::Function>("Start") {
                         if let Err(e) = start_fn.call::<_, ()>(id) {
-                            self.console.borrow_mut().error(format!(
-                                "[Lua Error] Start on entity {} failed: {}", id, e
-                            ));
+                            self.console
+                                .borrow_mut()
+                                .error(format!("[Lua Error] Start on entity {} failed: {}", id, e));
                         }
                     }
                 }
@@ -536,7 +762,9 @@ impl ScriptManager {
 
         // Filter active entities in the scene that have scripts
         let scene = self.scene.borrow();
-        let ids: Vec<u32> = self.entity_scripts.keys()
+        let ids: Vec<u32> = self
+            .entity_scripts
+            .keys()
             .copied()
             .filter(|&id| {
                 if let Some(e) = scene.get_entity(id) {
@@ -554,7 +782,8 @@ impl ScriptManager {
                     if let Ok(update_fn) = table.get::<_, mlua::Function>("Update") {
                         if let Err(e) = update_fn.call::<_, ()>((id, delta_time)) {
                             self.console.borrow_mut().error(format!(
-                                "[Lua Error] Update on entity {} failed: {}", id, e
+                                "[Lua Error] Update on entity {} failed: {}",
+                                id, e
                             ));
                         }
                     }
@@ -575,7 +804,8 @@ impl ScriptManager {
                 if let Ok(damage_fn) = table.get::<_, mlua::Function>("Damage") {
                     if let Err(e) = damage_fn.call::<_, ()>((entity_id, amount)) {
                         self.console.borrow_mut().error(format!(
-                            "[Lua Error] Damage callback on entity {} failed: {}", entity_id, e
+                            "[Lua Error] Damage callback on entity {} failed: {}",
+                            entity_id, e
                         ));
                     }
                 } else {
@@ -615,7 +845,8 @@ impl ScriptManager {
                     if let Ok(trigger_fn) = table.get::<_, mlua::Function>("OnTrigger") {
                         if let Err(e) = trigger_fn.call::<_, ()>((id_a, id_b)) {
                             self.console.borrow_mut().error(format!(
-                                "[Lua Error] OnTrigger on entity {} failed: {}", id_a, e
+                                "[Lua Error] OnTrigger on entity {} failed: {}",
+                                id_a, e
                             ));
                         }
                     }
@@ -626,7 +857,8 @@ impl ScriptManager {
                     if let Ok(trigger_fn) = table.get::<_, mlua::Function>("OnTrigger") {
                         if let Err(e) = trigger_fn.call::<_, ()>((id_b, id_a)) {
                             self.console.borrow_mut().error(format!(
-                                "[Lua Error] OnTrigger on entity {} failed: {}", id_b, e
+                                "[Lua Error] OnTrigger on entity {} failed: {}",
+                                id_b, e
                             ));
                         }
                     }

@@ -1,7 +1,7 @@
-use std::rc::Rc;
-use wgpu::util::DeviceExt;
 use crate::render::mesh::Vertex;
 use crate::render::GpuTexture;
+use std::rc::Rc;
+use wgpu::util::DeviceExt;
 
 pub struct SkyboxRenderer {
     pipeline: wgpu::RenderPipeline,
@@ -20,15 +20,14 @@ impl SkyboxRenderer {
         // Compile skybox shader
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Skybox Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../../assets/shaders/skybox.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(
+                include_str!("../../assets/shaders/skybox.wgsl").into(),
+            ),
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Skybox Pipeline Layout"),
-            bind_group_layouts: &[
-                camera_lighting_layout,
-                texture_layout,
-            ],
+            bind_group_layouts: &[camera_lighting_layout, texture_layout],
             push_constant_ranges: &[],
         });
 

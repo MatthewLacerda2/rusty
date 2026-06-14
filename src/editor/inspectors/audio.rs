@@ -1,14 +1,17 @@
+use crate::editor::EditorUi;
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
-use crate::editor::EditorUi;
 
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, path: &str) {
-    let filename = Path::new(path).file_name().and_then(|f| f.to_str()).unwrap_or(path);
-    
+    let filename = Path::new(path)
+        .file_name()
+        .and_then(|f| f.to_str())
+        .unwrap_or(path);
+
     ui.heading(format!("🎵 Audio: {}", filename));
     ui.add_space(5.0);
-    
+
     // File metadata card
     egui::Frame::none()
         .fill(egui::Color32::from_rgb(20, 18, 30))
@@ -100,7 +103,10 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, path: &str) {
 
     ui.add_space(5.0);
     let current_sec = progress * total_duration;
-    ui.label(format!("Time: {:.1}s / {:.1}s", current_sec, total_duration));
+    ui.label(format!(
+        "Time: {:.1}s / {:.1}s",
+        current_sec, total_duration
+    ));
     ui.add(egui::ProgressBar::new(progress).show_percentage());
 }
 

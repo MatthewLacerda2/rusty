@@ -1,15 +1,24 @@
+use crate::core::scene::Scene;
+use crate::editor::EditorUi;
+use crate::scripting::ConsoleLogs;
 use std::fs;
 use std::path::Path;
-use crate::editor::EditorUi;
-use crate::core::scene::Scene;
-use crate::scripting::ConsoleLogs;
 
-pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs, path: &str) {
-    let filename = Path::new(path).file_name().and_then(|f| f.to_str()).unwrap_or(path);
-    
+pub fn draw(
+    ui: &mut egui::Ui,
+    editor: &mut EditorUi,
+    scene: &mut Scene,
+    console: &mut ConsoleLogs,
+    path: &str,
+) {
+    let filename = Path::new(path)
+        .file_name()
+        .and_then(|f| f.to_str())
+        .unwrap_or(path);
+
     ui.heading(format!("🎬 Scene: {}", filename));
     ui.add_space(5.0);
-    
+
     // File metadata card
     let size_str = if let Ok(meta) = fs::metadata(path) {
         format_size(meta.len())
@@ -52,7 +61,10 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, console
     ui.add_space(8.0);
 
     // Button to load scene
-    if ui.add(egui::Button::new("📂 Load Scene").min_size(egui::Vec2::new(120.0, 30.0))).clicked() {
+    if ui
+        .add(egui::Button::new("📂 Load Scene").min_size(egui::Vec2::new(120.0, 30.0)))
+        .clicked()
+    {
         match scene.load_from_file(path) {
             Ok(_) => {
                 editor.selected_entity_id = None;
@@ -69,7 +81,10 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, console
     ui.add_space(8.0);
 
     // Button to save/overwrite scene
-    if ui.add(egui::Button::new("💾 Overwrite with Current").min_size(egui::Vec2::new(120.0, 30.0))).clicked() {
+    if ui
+        .add(egui::Button::new("💾 Overwrite with Current").min_size(egui::Vec2::new(120.0, 30.0)))
+        .clicked()
+    {
         match scene.save_to_file(path) {
             Ok(_) => {
                 console.info(format!("Overwrote scene file: {}", filename));

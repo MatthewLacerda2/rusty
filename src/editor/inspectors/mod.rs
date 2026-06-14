@@ -1,20 +1,26 @@
-pub mod image;
 pub mod audio;
-pub mod scene;
+pub mod image;
 pub mod model;
+pub mod scene;
 pub mod script;
 
-use crate::editor::EditorUi;
 use crate::core::scene::Scene;
+use crate::editor::EditorUi;
 use crate::scripting::ConsoleLogs;
 
-pub fn draw_inspector(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs, path: &str) {
+pub fn draw_inspector(
+    ui: &mut egui::Ui,
+    editor: &mut EditorUi,
+    scene: &mut Scene,
+    console: &mut ConsoleLogs,
+    path: &str,
+) {
     let extension = std::path::Path::new(path)
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_lowercase();
-        
+
     match extension.as_str() {
         "png" | "tga" | "jpg" | "jpeg" => {
             image::draw(ui, editor, scene, path);
@@ -39,7 +45,10 @@ pub fn draw_inspector(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scen
             ui.heading(format!("📝 File: {}", filename));
             ui.add_space(5.0);
             ui.label(format!("Path: {}", path));
-            ui.colored_label(egui::Color32::GRAY, "Unsupported file extension for specialized inspection.");
+            ui.colored_label(
+                egui::Color32::GRAY,
+                "Unsupported file extension for specialized inspection.",
+            );
         }
     }
 }
