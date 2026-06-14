@@ -1,4 +1,4 @@
-use crate::core::scene::Entity;
+use crate::core::scene::{Entity, Tonemap};
 
 /// Camera Component panel
 pub fn draw_camera(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
@@ -100,6 +100,20 @@ pub fn draw_visual_correction(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: 
         ui.horizontal(|ui| {
             ui.label("  Saturation:");
             ui.add(egui::Slider::new(&mut vc.saturation, 0.0..=2.0));
+        });
+        ui.horizontal(|ui| {
+            ui.label("  Tonemap:");
+            egui::ComboBox::from_id_source("tonemap")
+                .selected_text(format!("{:?}", vc.tonemap))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut vc.tonemap, Tonemap::Aces, "ACES");
+                    ui.selectable_value(&mut vc.tonemap, Tonemap::Reinhard, "Reinhard");
+                    ui.selectable_value(&mut vc.tonemap, Tonemap::None, "None");
+                });
+        });
+        ui.horizontal(|ui| {
+            ui.label("  Gamma:");
+            ui.add(egui::Slider::new(&mut vc.gamma, 1.0..=3.0));
         });
 
         ui.add_space(3.0);

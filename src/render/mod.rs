@@ -1,4 +1,5 @@
 pub mod mesh;
+pub mod postfx;
 pub mod shadows;
 pub mod skybox;
 
@@ -10,8 +11,10 @@ mod draw_pass;
 mod draw_path;
 mod draw_resources;
 mod pipelines;
+mod postfx_params;
 mod setup;
 mod setup_headless;
+mod setup_resize;
 mod textures;
 
 use std::collections::HashMap;
@@ -165,4 +168,9 @@ pub struct Renderer {
     pub shadow_layout: wgpu::BindGroupLayout,
     pub shadow_uniform_buffer: wgpu::Buffer,
     pub shadow_bind_group: wgpu::BindGroup,
+
+    /// Post-process chain (color correction, bloom, motion blur, SSR).
+    pub post_fx: postfx::PostFx,
+    /// Active scalability tier; gates which post-FX passes run + buffer sizes.
+    pub quality: postfx::QualityPreset,
 }
