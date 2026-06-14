@@ -1,127 +1,67 @@
-# Architecture: Systems & Classes
+# Architecture: the conceptual model
 
-A flat inventory of what this engine is made of, so the moving parts are visible
-before any of them are implemented.
+A stable, high-level map of *how the engine is shaped* — the kinds of moving parts
+and how they fit together. It deliberately does **not** enumerate every concrete
+type or track per-item status; that inventory drifts. For the live, exact list:
 
-**Legend:** `[now]` already exists in the legacy code · `[new]` expected, not yet
-written · `[partial]` exists but incomplete.
-
----
-
-## Resources — engine singletons (one instance per World)
-
-Unity analog: the engine statics (`Time`, `Input`, …). Today these are the
-`Rc<RefCell<…>>` values handed around in `main.rs`; they become resources stored in
-the World.
-
-| Resource | Status | Role |
-|---|---|---|
-| `Time` | `[new]` | delta, fixed_delta, frame_count, total time; drives the fixed clock |
-| `InputState` | `[partial]` | key/mouse state — read today; needs **writable** path for bots |
-| `NavigationGraph` | `[now]` | baked navmesh grid + A* |
-| `Console` | `[partial]` | log buffer today (`ConsoleLogs`); add the live REPL |
-| `ScriptRuntime` | `[now]` | the mlua state + loaded entity scripts (`ScriptManager`) |
-| `ActiveCamera` | `[now]` | the camera the renderer uses (`Camera`) |
-| `PlayState` | `[partial]` | editor-vs-play; today a bare `is_playing: bool` |
-| `Renderer` | `[now]` | wgpu device/queue/surface/pipelines (render-side only) |
-| `EditorState` | `[partial]` | egui editor UI state (`EditorUi`); add `current_scene_path` |
-| `AssetServer` | `[new]` | typed asset handles + cache (replaces passing path strings) — later |
+- **Engine types & systems** → the rustdoc reference (`cargo doc --no-deps`,
+  published to GitHub Pages) — generated from the `///` comments on the real code.
+- **Script API surface** → [`docs/scripting-api.md`](docs/scripting-api.md).
+- **Module tree & the Unity-shaped / agentic story** → [`README.md`](README.md).
 
 ---
 
-## Components — per-entity data (the Unity-style "classes")
+## The five kinds of moving part
 
-First-class, engine-provided; systems expect them. Custom behaviour goes in
-*scripts*, not new built-in components. **Every entity has exactly one `Transform`
-(mandatory, like Unity — cannot be removed); all other components are optional.**
+Everything in the engine is one of these. Unity analogs in parentheses.
 
-| Component | Status | Unity analog |
-|---|---|---|
-| `Transform` ⭐ **mandatory** | `[now]` | Transform (every entity has one; not optional) |
-| `Mesh` | `[now]` | MeshFilter/MeshRenderer |
-| `Texture`/Material | `[now]` | Material |
-| `Camera` | `[now]` | Camera |
-| `Light` (+`LightType`) | `[now]` | Light |
-| `Collider` (+`ColliderShape`) | `[now]` | Collider |
-| `Rigidbody` | `[now]` | Rigidbody |
-| `Health` | `[now]` | (gameplay) |
-| `Animator` | `[now]` | Animator |
-| `NavMeshAgent` | `[now]` | NavMeshAgent |
-| `Script` | `[partial]` | MonoBehaviour ref; add `dev_only` flag |
-| `VisualCorrection` | `[now]` | post-process volume |
-| `AudioSource` | `[new]` | AudioSource — when an audio system lands |
-| `ParticleEmitter` | `[new]` | ParticleSystem — later |
+1. **Resources** — engine singletons, one per World (Unity's engine statics:
+   `Time`, `Input`, the nav graph, the console, the active camera, play-state, the
+   renderer). Global state the systems read and write.
 
----
+2. **Components** — per-entity data, the Unity-style "classes" (`Transform`,
+   `Mesh`, `Camera`, `Light`, `Collider`, `Rigidbody`, `NavMeshAgent`, `Health`,
+   `Animator`, …). First-class and engine-provided; systems expect them. **Every
+   entity has exactly one `Transform` (mandatory, cannot be removed); all other
+   components are optional.** Custom behaviour goes in *scripts*, never in new
+   built-in components.
 
-## Systems — per-frame logic, grouped by stage
+3. **Systems** — per-frame logic, a plain `fn(&mut World, &mut Resources)`, grouped
+   into ordered stages (`Startup` once, then each frame
+   `FixedUpdate → Update → LateUpdate → Render`). Order within a stage is the order
+   modules `register` them. `FixedUpdate` is the deterministic, fixed-dt stage the
+   headless harness steps.
 
-A system is a plain `fn(&mut World, &mut Resources)`. Order within a stage is the
-order modules `register` them.
+4. **Scene & serialization** — one active scene as a serde `SceneData` document
+   (references + values, no GPU buffers). Save/load replaces the World; a
+   clone-on-Play / restore-on-Stop snapshot makes edit-mode authoritative, mirroring
+   Unity's play-mode behaviour.
 
-**Startup**
-- `load_default_scene` `[new]` (seed + load `assets/scenes/default.scene`; replaces the procedural demo in `main.rs`) · `bake_navmesh` `[now]`
-
-**FixedUpdate** (deterministic, fixed dt — what the harness steps)
-- `physics_tick` `[now]` (rapier3d: rigid bodies + colliders, gravity, stepping, transform writeback, trigger/collision pairs)
-- `script_fixed_update` `[new]` (MonoBehaviour `FixedUpdate`)
-- `nav_agent_tick` `[now]` (move agents along paths)
-- `rebake_navmesh` `[partial]` (today a wall-clock 1s timer → frame-count based)
-
-**Update**
-- `gather_input` `[now]`
-- `player_controller` `[partial]` (input→player; today hardcoded in `main.rs`, becomes a system reading `Input`)
-- `script_start` / `script_update` `[now]`
-- `hitscan_shoot` `[partial]` (raycast on fire; today inline in `main.rs`)
-- `dispatch_triggers` `[now]` (physics → script `OnTrigger`/`OnDamage`)
-- `animator_update` `[now]`
-- `free_fly_camera` `[now]` (editor mode)
-- `play_state_transitions` `[partial]` (enter/exit play; today inline)
-- `snapshot_on_play` / `restore_on_stop` `[new]` (clone edit scene on Play, restore on Stop)
-
-**LateUpdate**
-- `camera_follow` `[partial]` (third-person follow; today inline)
-- `update_colliders` / `propagate_hierarchy` `[now]` (world AABBs, parent matrices)
-
-**Render**
-- `render_scene` `[now]` (forward lit + gizmos + pathfinding lines)
-- `editor_ui` `[now]` (egui panels)
-- `screenshot` `[new]` (dev-only, offscreen → PNG)
+5. **The API surface** — one stable set of namespaces (`Transform`, `Input`,
+   `Time`, `Physics`, `Scene`, `Animator`, `Nav`, `Health`, `Camera`, `Material`,
+   and the dev-only `Debug`) shared by gameplay scripts, the console REPL, and
+   bot-players. One surface, three callers — they can never drift apart.
 
 ---
 
-## Core types — `app/` + `ecs/` (all `[new]`)
+## The invariants that hold it together
 
-`App` · `Schedule` · `Stage` · `System` · `Resources` · `World` (hecs wrapper) ·
-`EntityId` (generational) · `Commands` (deferred spawn/despawn).
-
-## Scene & serialization — `scene/`
-
-| Type / file | Status | Role |
-|---|---|---|
-| `SceneData` (`scene/mod.rs`) | `[new]` | serde document: entities + component values + settings (the on-disk format) |
-| `scene/serialize.rs` | `[new]` | `World` ↔ `SceneData`; serializable-component registry; rehydrate refs (no GPU buffers) |
-| `scene/io.rs` | `[new]` | save/load, single active scene, `current_scene_path`, default-scene seeding |
-| `scene/snapshot.rs` | `[new]` | clone-on-Play / restore-on-Stop |
-| `assets/scenes/default.scene` | `[new]` | checked-in bot-chase demo (floor, player, enemy, walls, sun, non-white skybox) |
+- **The simulation knows nothing about rendering.** That separation is what makes
+  headless, deterministic play possible — the harness steps the sim with no GPU.
+- **Determinism.** The sim is a pure function of (seed, inputs, fixed dt). Wall-clock
+  reads and unseeded RNG are banned from the sim modules (`app`, `scripting`,
+  `physics`, `navigation`) and live only in the platform layer (`main.rs`, `render`,
+  `dev`). Enforced by the determinism guard in `tools/lint`.
+- **No event bus, no plugin trait.** Cross-system signals are direct typed returns;
+  modules wire up via a plain `register(&mut app)` fn.
+- **Dev-only layer compiles out.** The console/REPL, harness, bot-players and
+  `Debug.*` are `#[cfg(feature = "dev")]` and stripped from ship builds.
 
 ---
 
-## Subsystem types (the bigger non-component structs)
+## Status
 
-| Type | Status | Where |
-|---|---|---|
-| `Renderer`, `ShadowRenderer`, `Skybox`, `Vertex` | `[now]` | `render/` |
-| `PhysicsWorld` (rapier3d), `Ray` + ray-AABB/parry cast | `[now]` | `physics/` |
-| `ScriptManager` | `[now]` | `scripting/` |
-| `EditorUi` + inspectors | `[now]` | `editor/` |
-| `NavigationGraph` | `[now]` | `navigation/` |
-| `Console` (REPL), `Harness`, `Scenario`, `Screenshot` | `[new]` | `dev/` |
-
----
-
-## API modules — `api/` (Lua/console/bot bindings, not classes)
-
-`Transform` · `Input` (read + **write**) · `Time` · `Physics` (+ `Raycast`/`Shoot`) ·
-`Scene` · `Animator` · `Nav` · `Health` · `Camera` · `Material` · `Debug` (dev-only).
-One stable surface, shared by gameplay scripts, the console REPL, and bot-players.
+The engine currently runs from the legacy modules (`core/`, `render/`, `physics/`,
+`scripting/`, `navigation/`, `editor/`); the `app/`, `ecs/`, `scene/`, `api/`,
+`dev/` trees are the scaffold being migrated into. See the README's *Migration*
+section for the target shape.

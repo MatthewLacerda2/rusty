@@ -20,7 +20,7 @@ pub(super) enum BodyClass {
 pub(super) fn classify(is_static: bool, rb: Option<&RigidBodyComponent>) -> BodyClass {
     if is_static {
         BodyClass::Static
-    } else if rb.map_or(true, |r| r.is_kinematic) {
+    } else if rb.is_none_or(|r| r.is_kinematic) {
         BodyClass::Kinematic
     } else {
         BodyClass::Dynamic

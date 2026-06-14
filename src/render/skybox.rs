@@ -1,6 +1,5 @@
 use crate::render::mesh::Vertex;
 use crate::render::GpuTexture;
-use std::rc::Rc;
 use wgpu::util::DeviceExt;
 
 pub struct SkyboxRenderer {

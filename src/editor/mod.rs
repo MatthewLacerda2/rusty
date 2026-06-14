@@ -25,7 +25,6 @@ pub struct EditorUi {
     pub is_dirty: bool,
     new_entity_name: String,
     new_entity_type: String,
-    new_script_path: String,
     assets_scripts: Vec<String>,
     assets_textures: Vec<String>,
 
@@ -53,6 +52,12 @@ pub struct EditorUi {
     pub pending_repl: Option<String>,
 }
 
+impl Default for EditorUi {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EditorUi {
     pub fn new() -> Self {
         Self {
@@ -63,7 +68,6 @@ impl EditorUi {
             is_dirty: true,
             new_entity_name: "New Primitive".to_string(),
             new_entity_type: "Box".to_string(),
-            new_script_path: "project/assets/scripts/bot.lua".to_string(),
             assets_scripts: Vec::new(),
             assets_textures: Vec::new(),
 
@@ -163,6 +167,11 @@ impl EditorUi {
         }
     }
 
+    // The editor draw entry point threads the live engine state (scene, console,
+    // nav, play flag) plus the per-frame HUD metrics; these are distinct mutable
+    // borrows that a parameter struct could not group without fighting the borrow
+    // checker. Legacy signature — left as-is pending the App/Resources migration.
+    #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &mut self,
         ctx: &egui::Context,

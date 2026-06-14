@@ -1,0 +1,48 @@
+name: docs
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Publish the rustdoc engine reference to GitHub Pages. The Pages source must be
+# set to "GitHub Actions" in the repo settings for the deploy step to take effect.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One in-flight Pages deploy at a time; don't cancel a running publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+      - name: System libs for winit/wgpu builds
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev
+      - name: Build rustdoc (engine reference, no deps)
+        run: cargo doc --no-deps --features dev
+      - name: Redirect index -> crate root
+        run: echo '<meta http-equiv="refresh" content="0; url=rusty/index.html">' > target/doc/index.html
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: target/doc
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

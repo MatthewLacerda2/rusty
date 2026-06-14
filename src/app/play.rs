@@ -43,7 +43,7 @@ pub(super) fn run(g: &mut GameWorld, dt: f32) {
 /// Rebake the navmesh once per second (every `REBAKE_INTERVAL_FRAMES` frames) and
 /// recompute the Enemy→Player debug path.
 fn rebake_and_path(g: &mut GameWorld) {
-    if g.play_frame % REBAKE_INTERVAL_FRAMES != 0 {
+    if !g.play_frame.is_multiple_of(REBAKE_INTERVAL_FRAMES) {
         return;
     }
     let s = g.scene.borrow();
@@ -166,8 +166,8 @@ fn hitscan(g: &mut GameWorld) {
     let hit = g.physics.as_ref().and_then(|physics| {
         physics.cast_ray(origin, dir, f32::MAX).filter(|&(id, _)| {
             let s = g.scene.borrow();
-            let ok = s.get_entity(id).map_or(false, |e| {
-                e.name != "Player" && e.health.as_ref().map_or(true, |h| !h.is_dead)
+            let ok = s.get_entity(id).is_some_and(|e| {
+                e.name != "Player" && e.health.as_ref().is_none_or(|h| !h.is_dead)
             });
             ok
         })

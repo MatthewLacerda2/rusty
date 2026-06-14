@@ -24,6 +24,12 @@ pub enum LogLevel {
     Error,
 }
 
+impl Default for ConsoleLogs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConsoleLogs {
     pub fn new() -> Self {
         Self {
