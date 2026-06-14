@@ -15,7 +15,10 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 
 const MAX_FILE_LINES: usize = 300;
-const MAX_TEST_FILE_LINES: usize = 50;
+/// Test/fixture files get a looser cap than source: Rust test files legitimately
+/// bundle several `#[test]` fns plus fixtures, and over-splitting them hurts
+/// readability more than it helps.
+const MAX_TEST_FILE_LINES: usize = 150;
 const BASELINE: &str = "tools/lint/baseline.txt";
 const REPORT: &str = ".lint/report.txt";
 
