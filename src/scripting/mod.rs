@@ -903,6 +903,64 @@ impl ScriptManager {
         let lua = self.lua.as_ref().ok_or("runtime not initialized")?;
         lua.load(code).exec().map_err(|e| e.to_string())
     }
+
+    /// Whether the live runtime exists yet (only during play / a loaded scenario).
+    pub fn is_live(&self) -> bool {
+        self.lua.is_some()
+    }
+
+    /// Evaluate ONE line of Lua against the LIVE runtime and return the result as
+    /// a display string. This is the single evaluator behind both the in-editor
+    /// console input line and the headless harness, so the two can never drift.
+    ///
+    /// A REPL line is first tried as an expression (`return <line>`) so values are
+    /// echoed back; if that fails to compile it is run as a statement (assignments,
+    /// `print(...)`, control flow). Multiple returned values are comma-joined.
+    pub fn eval(&self, line: &str) -> Result<String, String> {
+        let lua = self
+            .lua
+            .as_ref()
+            .ok_or_else(|| "runtime not initialized (enter Play to evaluate)".to_string())?;
+
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            return Ok(String::new());
+        }
+
+        // Try as an expression first so REPL lines echo their value.
+        let values = match lua
+            .load(format!("return {}", trimmed))
+            .eval::<mlua::MultiValue>()
+        {
+            Ok(v) => v,
+            Err(_) => lua
+                .load(trimmed)
+                .eval::<mlua::MultiValue>()
+                .map_err(|e| e.to_string())?,
+        };
+
+        let rendered = values
+            .iter()
+            .map(value_to_string)
+            .collect::<Vec<_>>()
+            .join(", ");
+        Ok(rendered)
+    }
+}
+
+/// Render a single Lua value for the REPL echo. Mirrors Lua's `tostring`/`print`
+/// for the common cases (nil/bool/number/string) and falls back to a typed tag.
+fn value_to_string(value: &mlua::Value) -> String {
+    match value {
+        mlua::Value::Nil => "nil".to_string(),
+        mlua::Value::Boolean(b) => b.to_string(),
+        mlua::Value::Integer(i) => i.to_string(),
+        mlua::Value::Number(n) => n.to_string(),
+        mlua::Value::String(s) => s.to_str().map(|s| s.to_string()).unwrap_or_default(),
+        mlua::Value::Table(_) => "<table>".to_string(),
+        mlua::Value::Function(_) => "<function>".to_string(),
+        other => format!("<{}>", other.type_name()),
+    }
 }
 
 #[cfg(test)]

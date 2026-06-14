@@ -20,6 +20,7 @@
 //! implemented (issue #7). botplayer (bot pattern notes) remains a scaffold.
 
 pub mod bridge;
+pub mod console;
 pub mod demo_scene;
 pub mod harness;
 pub mod scenario;
