@@ -98,6 +98,14 @@ fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
         lua.create_function(move |_, ()| Ok(h.borrow().frame()))?,
     )?;
 
+    // Screenshot(path) -> bool. Renders the current scene/camera offscreen to a
+    // PNG. Returns false (no error) when no GPU/software adapter is available.
+    let h = Rc::clone(harness);
+    t.set(
+        "Screenshot",
+        lua.create_function(move |_, path: String| Ok(h.borrow_mut().screenshot(path)))?,
+    )?;
+
     lua.globals().set("Harness", t)
 }
 

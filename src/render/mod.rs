@@ -11,12 +11,14 @@ mod draw_path;
 mod draw_resources;
 mod pipelines;
 mod setup;
+mod setup_headless;
 mod textures;
 
 use std::collections::HashMap;
 use std::rc::Rc;
 
 pub use camera::Camera;
+pub use setup_headless::OFFSCREEN_FORMAT;
 
 // Represent memory layouts for GPU Uniforms
 #[repr(C)]
@@ -118,7 +120,9 @@ pub struct GpuTexture {
 pub struct Renderer {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    pub surface: wgpu::Surface<'static>,
+    /// `None` in the headless (offscreen screenshot) path — there is no window
+    /// surface to present to, only an offscreen colour texture.
+    pub surface: Option<wgpu::Surface<'static>>,
     pub config: wgpu::SurfaceConfiguration,
     pub size: winit::dpi::PhysicalSize<u32>,
 

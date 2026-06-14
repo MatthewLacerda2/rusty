@@ -116,6 +116,37 @@ impl Harness {
         super::snapshot::snapshot(&self.world.borrow())
     }
 
+    /// Render the current scene/camera offscreen and write a PNG to `path`.
+    ///
+    /// Returns `true` if a frame was captured, `false` if no GPU/software adapter
+    /// is available (skipped gracefully — never panics). Logs the outcome.
+    pub fn screenshot(&mut self, path: impl AsRef<Path>) -> bool {
+        let path = path.as_ref().to_path_buf();
+        let result = super::screenshot::capture_world(
+            &self.world.borrow(),
+            &path,
+            super::screenshot::DEFAULT_WIDTH,
+            super::screenshot::DEFAULT_HEIGHT,
+        );
+        match result {
+            Ok(true) => {
+                self.log(format!("Screenshot written: {}", path.display()));
+                true
+            }
+            Ok(false) => {
+                self.log(format!(
+                    "Screenshot skipped (no GPU adapter): {}",
+                    path.display()
+                ));
+                false
+            }
+            Err(e) => {
+                self.console.borrow_mut().error(format!("[Harness] {e}"));
+                false
+            }
+        }
+    }
+
     /// True if every recorded expectation passed.
     pub fn all_passed(&self) -> bool {
         self.expectations.iter().all(|e| e.passed)

@@ -373,7 +373,11 @@ return BotAI
                         }
 
                         // --- GPU RENDER TICK ---
-                        let frame = match renderer.surface.get_current_texture() {
+                        let window_surface = renderer
+                            .surface
+                            .as_ref()
+                            .expect("windowed renderer must have a surface");
+                        let frame = match window_surface.get_current_texture() {
                             Ok(f) => f,
                             Err(e) => {
                                 eprintln!("[WGPU] Swapchain error: {}", e);
