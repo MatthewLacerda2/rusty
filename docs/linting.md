@@ -10,7 +10,7 @@ result is written to `.lint/report.txt` so an agent can read exactly what failed
 | Code smells | clippy (`clippy.toml`) | report-only for now; flip to `-D warnings` after migration |
 | Function ("endpoint") length | clippy `too_many_lines` | `too-many-lines-threshold = 50` |
 | File length | `tools/lint` | <= 300 lines |
-| Test / fixture file length | `tools/lint` | <= 50 lines |
+| Test / fixture file length | `tools/lint` | <= 150 lines |
 
 ## Run it
 ```

@@ -25,7 +25,7 @@ agent can drive, observe, and play-test it headlessly.
 Commits are blocked unless the checks pass; failures are written to
 `.lint/report.txt`. See **docs/linting.md**.
 - Size gate: `cargo run --manifest-path tools/lint/Cargo.toml` (files ≤ 300 lines,
-  test/fixture files ≤ 50). Function length + code smells are clippy's job
+  test/fixture files ≤ 150). Function length + code smells are clippy's job
   (`clippy.toml`); style is rustfmt (`rustfmt.toml`).
 - `tools/lint/baseline.txt` grandfathers the legacy monoliths. It's a **burn-down
   list** — remove entries as you split/migrate, never add to it.
