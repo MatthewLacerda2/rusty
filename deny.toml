@@ -1,5 +1,11 @@
 [advisories]
 yanked = "warn"
+ignore = [
+  # `paste` is unmaintained (archived upstream) but only reaches us transitively
+  # via wgpu → wgpu-hal → metal; there is no safe upgrade and it is NOT a
+  # vulnerability. Real vulnerabilities still fail the (report-only) deny job.
+  "RUSTSEC-2024-0436",
+]
 
 [bans]
 multiple-versions = "warn"
