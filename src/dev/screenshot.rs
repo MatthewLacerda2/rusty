@@ -82,7 +82,7 @@ pub fn capture_world(
     height: u32,
 ) -> Result<bool, String> {
     let scene = world.scene.borrow();
-    capture(&scene, &world.camera, path, width, height)
+    capture(&scene, &world.camera.borrow(), path, width, height)
 }
 
 /// Copy the rendered texture back to the CPU as tightly-packed RGBA8 bytes.
