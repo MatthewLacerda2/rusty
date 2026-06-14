@@ -31,7 +31,7 @@ impl Renderer {
 
         // A. Shadow depth sweep passes
         let mut dir_light_dir = Vec3::new(-0.5, -1.0, -0.3).normalize();
-        for entity in &scene.entities {
+        for entity in scene.iter() {
             if entity.active {
                 if let Some(light) = &entity.light {
                     if light.light_type == LightType::Directional {

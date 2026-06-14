@@ -91,7 +91,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
         let scale = editor.asset_model_scale;
         let (v, idx) = crate::render::mesh::generate_box(scale, scale, scale);
 
-        if let Some(ent) = scene.get_entity_mut(new_ent_id) {
+        if let Some(mut ent) = scene.get_entity_mut(new_ent_id) {
             ent.mesh = Some(crate::core::scene::MeshComponent {
                 primitive_type: if is_fbx {
                     "FBX".to_string()
@@ -100,7 +100,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
                 },
                 vertices: v,
                 indices: idx,
-                is_dirty: std::cell::Cell::new(true),
+                is_dirty: crate::core::scene::DirtyFlag::new(true),
             });
             editor.is_dirty = true;
 

@@ -79,7 +79,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     ui.heading("Apply to Scene Entity");
     ui.add_space(5.0);
 
-    if scene.entities.is_empty() {
+    if scene.is_empty() {
         ui.colored_label(
             egui::Color32::GRAY,
             "No entities in scene to apply texture to.",
@@ -92,7 +92,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
         egui::ComboBox::from_id_source("ApplyTextureToEntity")
             .selected_text(selected_ent_name)
             .show_ui(ui, |ui| {
-                for entity in &scene.entities {
+                for entity in scene.iter() {
                     if ui.selectable_label(false, &entity.name).clicked() {
                         clicked_entity_id = Some(entity.id);
                     }
@@ -100,7 +100,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
             });
 
         if let Some(entity_id) = clicked_entity_id {
-            if let Some(ent) = scene.get_entity_mut(entity_id) {
+            if let Some(mut ent) = scene.get_entity_mut(entity_id) {
                 ent.texture = Some(TextureComponent {
                     path: path.to_string(),
                     is_dirty: true,

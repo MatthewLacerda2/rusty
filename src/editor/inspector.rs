@@ -1,6 +1,6 @@
 use glam::Vec3;
 
-use crate::core::scene::Scene;
+use crate::core::scene::{Entity, Scene};
 use crate::editor::{
     inspector_add, inspector_camera, inspector_gameplay, inspector_render, inspector_transform,
 };
@@ -63,12 +63,15 @@ fn draw_entity_inspector(
         "None".to_string()
     };
 
-    let valid_parents: Vec<(u32, String)> = scene
-        .entities
+    let candidates: Vec<(u32, String)> = scene
         .iter()
         .filter(|e| e.id != selected_id)
-        .filter(|e| {
-            let mut curr = e.id;
+        .map(|e| (e.id, e.name.clone()))
+        .collect();
+    let valid_parents: Vec<(u32, String)> = candidates
+        .into_iter()
+        .filter(|(id, _)| {
+            let mut curr = *id;
             while let Some(ancestor) = scene.get_entity(curr).and_then(|x| x.parent_id) {
                 if ancestor == selected_id {
                     return false;
@@ -77,10 +80,10 @@ fn draw_entity_inspector(
             }
             true
         })
-        .map(|e| (e.id, e.name.clone()))
         .collect();
 
-    if let Some(entity) = scene.get_entity_mut(selected_id) {
+    if let Some(mut entity_guard) = scene.get_entity_mut(selected_id) {
+        let entity: &mut Entity = &mut entity_guard;
         if entity.camera.is_none() && entity.visual_correction.is_some() {
             entity.visual_correction = None;
         }

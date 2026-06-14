@@ -5,7 +5,9 @@
 //! gated behind the `dev` Cargo feature and stripped from ship builds.
 
 pub mod app;
+pub mod components;
 pub mod core;
+pub mod ecs;
 pub mod editor;
 pub mod navigation;
 pub mod physics;

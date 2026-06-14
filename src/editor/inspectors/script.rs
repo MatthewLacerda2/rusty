@@ -80,7 +80,7 @@ pub fn draw(
     ui.heading("Attach to Scene Entity");
     ui.add_space(5.0);
 
-    if scene.entities.is_empty() {
+    if scene.is_empty() {
         ui.colored_label(
             egui::Color32::GRAY,
             "No entities in scene to attach script to.",
@@ -94,7 +94,7 @@ pub fn draw(
         egui::ComboBox::from_id_source("AttachScriptToEntity")
             .selected_text(selected_ent_name)
             .show_ui(ui, |ui| {
-                for entity in &scene.entities {
+                for entity in scene.iter() {
                     if ui.selectable_label(false, &entity.name).clicked() {
                         clicked_entity_id = Some(entity.id);
                         clicked_entity_name = entity.name.clone();
@@ -103,7 +103,7 @@ pub fn draw(
             });
 
         if let Some(entity_id) = clicked_entity_id {
-            if let Some(ent) = scene.get_entity_mut(entity_id) {
+            if let Some(mut ent) = scene.get_entity_mut(entity_id) {
                 ent.script = Some(ScriptComponent {
                     path: path.to_string(),
                     is_loaded: false,

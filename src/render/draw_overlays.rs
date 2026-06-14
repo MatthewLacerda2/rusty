@@ -57,7 +57,7 @@ impl Renderer {
         default_bones: &BoneUniform,
     ) -> Vec<AabbResource> {
         let mut aabb_resources = Vec::new();
-        for entity in &scene.entities {
+        for entity in scene.iter() {
             if !entity.active {
                 continue;
             }

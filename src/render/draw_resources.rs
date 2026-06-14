@@ -44,7 +44,7 @@ impl Renderer {
         default_bones: &BoneUniform,
     ) -> Vec<SolidResource> {
         let mut solid_render_resources = Vec::new();
-        for entity in &scene.entities {
+        for entity in scene.iter() {
             if !entity.active {
                 continue;
             }
@@ -172,7 +172,7 @@ impl Renderer {
         default_bones: &BoneUniform,
     ) -> Option<OutlineResource> {
         let selected_id = scene.selected_entity_id?;
-        let entity = scene.entities.iter().find(|e| e.id == selected_id)?;
+        let entity = scene.get_entity(selected_id)?;
         if !(entity.active && entity.mesh.is_some()) {
             return None;
         }

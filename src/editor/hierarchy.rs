@@ -22,17 +22,20 @@ pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
             egui::ScrollArea::vertical()
                 .max_height(250.0)
                 .show(ui, |ui| {
-                    for entity in &scene.entities {
-                        if entity.parent_id.is_none() {
-                            draw_entity_node(
-                                ui,
-                                entity.id,
-                                scene,
-                                &mut editor.selected_entity_id,
-                                &mut editor.selected_asset_path,
-                                0.0,
-                            );
-                        }
+                    let root_ids: Vec<u32> = scene
+                        .iter()
+                        .filter(|e| e.parent_id.is_none())
+                        .map(|e| e.id)
+                        .collect();
+                    for entity_id in root_ids {
+                        draw_entity_node(
+                            ui,
+                            entity_id,
+                            scene,
+                            &mut editor.selected_entity_id,
+                            &mut editor.selected_asset_path,
+                            0.0,
+                        );
                     }
                 });
 
@@ -104,14 +107,14 @@ pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
 fn create_entity(editor: &mut EditorUi, scene: &mut Scene) {
     let new_id = scene.add_entity(editor.new_entity_name.clone());
     let name_lower = editor.new_entity_type.to_lowercase();
-    if let Some(ent) = scene.get_entity_mut(new_id) {
+    if let Some(mut ent) = scene.get_entity_mut(new_id) {
         if name_lower == "box" {
             let (v, idx) = crate::render::mesh::generate_box(1.0, 1.0, 1.0);
             ent.mesh = Some(MeshComponent {
                 primitive_type: "Box".to_string(),
                 vertices: v,
                 indices: idx,
-                is_dirty: std::cell::Cell::new(true),
+                is_dirty: crate::core::scene::DirtyFlag::new(true),
             });
         } else if name_lower == "sphere" {
             let (v, idx) = crate::render::mesh::generate_sphere(1.0, 16, 16);
@@ -119,7 +122,7 @@ fn create_entity(editor: &mut EditorUi, scene: &mut Scene) {
                 primitive_type: "Sphere".to_string(),
                 vertices: v,
                 indices: idx,
-                is_dirty: std::cell::Cell::new(true),
+                is_dirty: crate::core::scene::DirtyFlag::new(true),
             });
         } else if name_lower == "plane" {
             let (v, idx) = crate::render::mesh::generate_plane(15.0, 15.0);
@@ -127,7 +130,7 @@ fn create_entity(editor: &mut EditorUi, scene: &mut Scene) {
                 primitive_type: "Plane".to_string(),
                 vertices: v,
                 indices: idx,
-                is_dirty: std::cell::Cell::new(true),
+                is_dirty: crate::core::scene::DirtyFlag::new(true),
             });
         } else if name_lower == "cylinder" {
             let (v, idx) = crate::render::mesh::generate_cylinder(
@@ -140,7 +143,7 @@ fn create_entity(editor: &mut EditorUi, scene: &mut Scene) {
                 primitive_type: "Cylinder".to_string(),
                 vertices: v,
                 indices: idx,
-                is_dirty: std::cell::Cell::new(true),
+                is_dirty: crate::core::scene::DirtyFlag::new(true),
             });
         } else if name_lower == "pointlight" {
             ent.light = Some(LightComponent {
@@ -184,7 +187,11 @@ fn draw_entity_node(
     selected_asset_path: &mut Option<String>,
     depth: f32,
 ) {
-    if let Some(entity) = scene.get_entity(entity_id) {
+    let children: Vec<u32> = {
+        let entity = match scene.get_entity(entity_id) {
+            Some(e) => e,
+            None => return,
+        };
         let is_selected = *selected_entity_id == Some(entity.id);
 
         let display_label = if let Some(h) = &entity.health {
@@ -218,15 +225,17 @@ fn draw_entity_node(
             }
         });
 
-        for &child_id in &entity.children {
-            draw_entity_node(
-                ui,
-                child_id,
-                scene,
-                selected_entity_id,
-                selected_asset_path,
-                depth + 1.0,
-            );
-        }
+        entity.children.clone()
+    };
+
+    for child_id in children {
+        draw_entity_node(
+            ui,
+            child_id,
+            scene,
+            selected_entity_id,
+            selected_asset_path,
+            depth + 1.0,
+        );
     }
 }

@@ -98,11 +98,10 @@ impl ScriptManager {
                 "GetPosition",
                 lua.create_function(move |_, id: u32| {
                     let s = scene_clone.borrow();
-                    if let Some(e) = s.get_entity(id) {
-                        let pos = e.transform.position;
-                        Ok((pos.x, pos.y, pos.z))
-                    } else {
-                        Ok((0.0, 0.0, 0.0))
+                    let pos = s.get_entity(id).map(|e| e.transform.position);
+                    match pos {
+                        Some(pos) => Ok((pos.x, pos.y, pos.z)),
+                        None => Ok((0.0, 0.0, 0.0)),
                     }
                 })
                 .map_err(|e| e.to_string())?,
@@ -115,7 +114,7 @@ impl ScriptManager {
                 "SetPosition",
                 lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         e.transform.position = Vec3::new(x, y, z);
                     }
                     s.update_entity_collider(id);
@@ -131,11 +130,10 @@ impl ScriptManager {
                 "GetRotation",
                 lua.create_function(move |_, id: u32| {
                     let s = scene_clone.borrow();
-                    if let Some(e) = s.get_entity(id) {
-                        let rot = e.transform.euler_angles();
-                        Ok((rot.x, rot.y, rot.z))
-                    } else {
-                        Ok((0.0, 0.0, 0.0))
+                    let rot = s.get_entity(id).map(|e| e.transform.euler_angles());
+                    match rot {
+                        Some(rot) => Ok((rot.x, rot.y, rot.z)),
+                        None => Ok((0.0, 0.0, 0.0)),
                     }
                 })
                 .map_err(|e| e.to_string())?,
@@ -148,7 +146,7 @@ impl ScriptManager {
                 "SetRotation",
                 lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         e.transform.set_euler_angles(Vec3::new(x, y, z));
                     }
                     s.update_entity_collider(id);
@@ -164,11 +162,10 @@ impl ScriptManager {
                 "GetScale",
                 lua.create_function(move |_, id: u32| {
                     let s = scene_clone.borrow();
-                    if let Some(e) = s.get_entity(id) {
-                        let scl = e.transform.scale;
-                        Ok((scl.x, scl.y, scl.z))
-                    } else {
-                        Ok((1.0, 1.0, 1.0))
+                    let scl = s.get_entity(id).map(|e| e.transform.scale);
+                    match scl {
+                        Some(scl) => Ok((scl.x, scl.y, scl.z)),
+                        None => Ok((1.0, 1.0, 1.0)),
                     }
                 })
                 .map_err(|e| e.to_string())?,
@@ -181,7 +178,7 @@ impl ScriptManager {
                 "SetScale",
                 lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         e.transform.scale = Vec3::new(x, y, z);
                     }
                     s.update_entity_collider(id);
@@ -198,7 +195,7 @@ impl ScriptManager {
                 lua.create_function(
                     move |_, (id, tx, ty, tz, step): (u32, f32, f32, f32, f32)| {
                         let mut s = scene_clone.borrow_mut();
-                        if let Some(e) = s.get_entity_mut(id) {
+                        if let Some(mut e) = s.get_entity_mut(id) {
                             let pos = e.transform.position;
                             let target = Vec3::new(tx, ty, tz);
                             let dir = target - pos;
@@ -230,7 +227,7 @@ impl ScriptManager {
                 "SetMetallic",
                 lua.create_function(move |_, (id, val): (u32, f32)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(tex) = &mut e.texture {
                             tex.metallic = val;
                         }
@@ -247,7 +244,7 @@ impl ScriptManager {
                 "SetRoughness",
                 lua.create_function(move |_, (id, val): (u32, f32)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(tex) = &mut e.texture {
                             tex.roughness = val;
                         }
@@ -264,7 +261,7 @@ impl ScriptManager {
                 "SetMetallicMap",
                 lua.create_function(move |_, (id, path): (u32, String)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(tex) = &mut e.texture {
                             tex.metallic_map = Some(path);
                         }
@@ -281,7 +278,7 @@ impl ScriptManager {
                 "SetRoughnessMap",
                 lua.create_function(move |_, (id, path): (u32, String)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(tex) = &mut e.texture {
                             tex.roughness_map = Some(path);
                         }
@@ -298,7 +295,7 @@ impl ScriptManager {
                 "SetTexture",
                 lua.create_function(move |_, (id, path): (u32, String)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(tex) = &mut e.texture {
                             tex.path = path;
                         }
@@ -322,7 +319,7 @@ impl ScriptManager {
                 "Play",
                 lua.create_function(move |_, (id, clip): (u32, String)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(anim) = &mut e.animator {
                             anim.current_clip = clip.clone();
                             anim.is_playing = true;
@@ -345,7 +342,7 @@ impl ScriptManager {
                 lua.create_function(move |_, (id, clip, _duration): (u32, String, f32)| {
                     // Simplify crossfade to standard play in our component
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(anim) = &mut e.animator {
                             anim.current_clip = clip;
                             anim.is_playing = true;
@@ -364,7 +361,7 @@ impl ScriptManager {
                 "Stop",
                 lua.create_function(move |_, id: u32| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(anim) = &mut e.animator {
                             anim.is_playing = false;
                         }
@@ -417,7 +414,7 @@ impl ScriptManager {
                 "DestroyEntity",
                 lua.create_function(move |_, id: u32| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         e.active = false;
                         console_clone
                             .borrow_mut()
@@ -464,7 +461,7 @@ impl ScriptManager {
                 "SetTarget",
                 lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(agent) = &mut e.nav_agent {
                             agent.target = Vec3::new(x, y, z);
                         }
@@ -499,7 +496,7 @@ impl ScriptManager {
                 "SetSpeed",
                 lua.create_function(move |_, (id, speed): (u32, f32)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(agent) = &mut e.nav_agent {
                             agent.speed = speed;
                         }
@@ -516,7 +513,7 @@ impl ScriptManager {
                 "SetAcceleration",
                 lua.create_function(move |_, (id, acc): (u32, f32)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(agent) = &mut e.nav_agent {
                             agent.acceleration = acc;
                         }
@@ -533,7 +530,7 @@ impl ScriptManager {
                 "SetStoppingDistance",
                 lua.create_function(move |_, (id, dist): (u32, f32)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(agent) = &mut e.nav_agent {
                             agent.stopping_distance = dist;
                         }
@@ -550,7 +547,7 @@ impl ScriptManager {
                 "SetRadius",
                 lua.create_function(move |_, (id, r): (u32, f32)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(agent) = &mut e.nav_agent {
                             agent.radius = r;
                         }
@@ -604,7 +601,7 @@ impl ScriptManager {
                 "SetActive",
                 lua.create_function(move |_, (id, active): (u32, bool)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(agent) = &mut e.nav_agent {
                             agent.active = active;
                         }
@@ -644,7 +641,7 @@ impl ScriptManager {
                 "SetVelocity",
                 lua.create_function(move |_, (id, vx, vy, vz): (u32, f32, f32, f32)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(rb) = &mut e.rigidbody {
                             rb.velocity = Vec3::new(vx, vy, vz);
                         }
@@ -661,7 +658,7 @@ impl ScriptManager {
                 "AddForce",
                 lua.create_function(move |_, (id, fx, fy, fz): (u32, f32, f32, f32)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(rb) = &mut e.rigidbody {
                             if !rb.is_kinematic {
                                 let acc = Vec3::new(fx, fy, fz) / rb.mass.max(0.0001);
@@ -681,7 +678,7 @@ impl ScriptManager {
                 "SetKinematic",
                 lua.create_function(move |_, (id, is_kinematic): (u32, bool)| {
                     let mut s = scene_clone.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(id) {
+                    if let Some(mut e) = s.get_entity_mut(id) {
                         if let Some(rb) = &mut e.rigidbody {
                             rb.is_kinematic = is_kinematic;
                         }
@@ -811,12 +808,14 @@ impl ScriptManager {
                 } else {
                     // Fallback default: directly reduce health component in scene if script has no custom damage function
                     let mut s = self.scene.borrow_mut();
-                    if let Some(e) = s.get_entity_mut(entity_id) {
+                    if let Some(mut e_guard) = s.get_entity_mut(entity_id) {
+                        let e: &mut crate::core::scene::Entity = &mut e_guard;
+                        let name = e.name.clone();
                         if let Some(health) = &mut e.health {
                             health.current_health -= amount;
                             self.console.borrow_mut().info(format!(
                                 "Entity {} took {} standard hit (HP: {}/{})",
-                                e.name, amount, health.current_health, health.max_health
+                                name, amount, health.current_health, health.max_health
                             ));
                             if health.current_health <= 0.0 {
                                 health.is_dead = true;
@@ -827,6 +826,7 @@ impl ScriptManager {
                             }
                         }
                     }
+                    drop(s);
                 }
             }
         }

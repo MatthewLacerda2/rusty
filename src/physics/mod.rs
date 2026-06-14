@@ -1,6 +1,24 @@
 use crate::core::scene::{ColliderComponent, ColliderShape, Scene};
 use glam::{Mat4, Vec3};
 
+/// Body class for the collision solver: 0 = static, 1 = kinematic (or no
+/// rigidbody), 2 = dynamic. Read by stable id so no hecs borrow is held across
+/// the mutations the solver performs.
+fn body_type(scene: &Scene, id: u32) -> u8 {
+    match scene.get_entity(id) {
+        Some(e) => {
+            if e.is_static {
+                0
+            } else if e.rigidbody.as_ref().map_or(true, |r| r.is_kinematic) {
+                1
+            } else {
+                2
+            }
+        }
+        None => 1,
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct Ray {
     pub origin: Vec3,
@@ -76,7 +94,7 @@ pub fn cast_ray_in_scene(ray: &Ray, scene: &Scene) -> Option<(u32, f32)> {
     let mut closest_entity = None;
     let mut min_t = f32::MAX;
 
-    for entity in &scene.entities {
+    for entity in scene.iter() {
         if !entity.active {
             continue;
         }
@@ -544,18 +562,19 @@ pub fn tick_physics(scene: &mut Scene, delta_time: f32) -> Vec<(u32, u32)> {
 
     // A. Apply Gravity & Update Positions for dynamic RigidBodies
     let gravity = Vec3::new(0.0, -9.81, 0.0);
-    for entity in &mut scene.entities {
-        if !entity.active {
-            continue;
-        }
-
-        if let Some(rb) = &mut entity.rigidbody {
-            if rb.active && !rb.is_kinematic {
-                if rb.use_gravity {
-                    rb.velocity += gravity * delta_time;
+    for id in scene.entity_ids() {
+        if let Some(mut entity) = scene.get_entity_mut(id) {
+            if !entity.active {
+                continue;
+            }
+            if let Some(rb) = &mut entity.rigidbody {
+                if rb.active && !rb.is_kinematic {
+                    if rb.use_gravity {
+                        rb.velocity += gravity * delta_time;
+                    }
+                    let step = rb.velocity * delta_time;
+                    entity.transform.position += step;
                 }
-
-                entity.transform.position += rb.velocity * delta_time;
             }
         }
     }
@@ -564,37 +583,36 @@ pub fn tick_physics(scene: &mut Scene, delta_time: f32) -> Vec<(u32, u32)> {
     scene.update_all_colliders();
 
     // C. Collision Resolution (Iterative solver passes)
-    let num_entities = scene.entities.len();
+    let ids = scene.entity_ids();
+    let num_entities = ids.len();
     let num_passes = 2;
 
     for _pass in 0..num_passes {
         for i in 0..num_entities {
             for j in (i + 1)..num_entities {
-                let (id_a, id_b) = {
-                    let ent_a = &scene.entities[i];
-                    let ent_b = &scene.entities[j];
-                    if !ent_a.active || !ent_b.active {
+                let (id_a, id_b) = (ids[i], ids[j]);
+                {
+                    let active = match (scene.get_entity(id_a), scene.get_entity(id_b)) {
+                        (Some(a), Some(b)) => a.active && b.active,
+                        _ => false,
+                    };
+                    if !active {
                         continue;
                     }
-                    (ent_a.id, ent_b.id)
-                };
+                }
 
                 // 1. Broadphase AABB Check
-                let (col_a_active, col_a_trigger, aabb_min_a, aabb_max_a) = {
-                    let ent_a = &scene.entities[i];
-                    match &ent_a.collider {
+                let (col_a_active, col_a_trigger, aabb_min_a, aabb_max_a) =
+                    match scene.get_entity(id_a).and_then(|e| e.collider.clone()) {
                         Some(c) => (c.active, c.is_trigger, c.aabb_min, c.aabb_max),
                         None => (false, false, Vec3::ZERO, Vec3::ZERO),
-                    }
-                };
+                    };
 
-                let (col_b_active, col_b_trigger, aabb_min_b, aabb_max_b) = {
-                    let ent_b = &scene.entities[j];
-                    match &ent_b.collider {
+                let (col_b_active, col_b_trigger, aabb_min_b, aabb_max_b) =
+                    match scene.get_entity(id_b).and_then(|e| e.collider.clone()) {
                         Some(c) => (c.active, c.is_trigger, c.aabb_min, c.aabb_max),
                         None => (false, false, Vec3::ZERO, Vec3::ZERO),
-                    }
-                };
+                    };
 
                 if !col_a_active || !col_b_active {
                     continue;
@@ -608,15 +626,13 @@ pub fn tick_physics(scene: &mut Scene, delta_time: f32) -> Vec<(u32, u32)> {
                 let world_matrix_a = scene.compute_world_matrix(id_a);
                 let world_matrix_b = scene.compute_world_matrix(id_b);
 
-                let contact = {
-                    let ent_a = &scene.entities[i];
-                    let ent_b = &scene.entities[j];
-                    test_narrowphase_collision(
-                        ent_a.collider.as_ref().unwrap(),
-                        &world_matrix_a,
-                        ent_b.collider.as_ref().unwrap(),
-                        &world_matrix_b,
-                    )
+                let collider_a = scene.get_entity(id_a).and_then(|e| e.collider.clone());
+                let collider_b = scene.get_entity(id_b).and_then(|e| e.collider.clone());
+                let contact = match (collider_a, collider_b) {
+                    (Some(ca), Some(cb)) => {
+                        test_narrowphase_collision(&ca, &world_matrix_a, &cb, &world_matrix_b)
+                    }
+                    _ => None,
                 };
 
                 if let Some(contact) = contact {
@@ -625,33 +641,15 @@ pub fn tick_physics(scene: &mut Scene, delta_time: f32) -> Vec<(u32, u32)> {
                         continue;
                     }
 
-                    let type_a = {
-                        let ent_a = &scene.entities[i];
-                        if ent_a.is_static {
-                            0
-                        } else if ent_a.rigidbody.as_ref().map_or(true, |r| r.is_kinematic) {
-                            1
-                        } else {
-                            2
-                        }
-                    };
-                    let type_b = {
-                        let ent_b = &scene.entities[j];
-                        if ent_b.is_static {
-                            0
-                        } else if ent_b.rigidbody.as_ref().map_or(true, |r| r.is_kinematic) {
-                            1
-                        } else {
-                            2
-                        }
-                    };
+                    let type_a = body_type(scene, id_a);
+                    let type_b = body_type(scene, id_b);
 
                     match (type_a, type_b) {
                         (0, 0) => {}
 
                         (0, 1) | (0, 2) => {
                             let push = -contact.normal * contact.depth;
-                            if let Some(ent_b_mut) = scene.get_entity_mut(id_b) {
+                            if let Some(mut ent_b_mut) = scene.get_entity_mut(id_b) {
                                 ent_b_mut.transform.position += push;
                                 if let Some(rb_b) = &mut ent_b_mut.rigidbody {
                                     let normal_vel = rb_b.velocity.dot(contact.normal);
@@ -665,7 +663,7 @@ pub fn tick_physics(scene: &mut Scene, delta_time: f32) -> Vec<(u32, u32)> {
 
                         (1, 0) | (2, 0) => {
                             let push = contact.normal * contact.depth;
-                            if let Some(ent_a_mut) = scene.get_entity_mut(id_a) {
+                            if let Some(mut ent_a_mut) = scene.get_entity_mut(id_a) {
                                 ent_a_mut.transform.position += push;
                                 if let Some(rb_a) = &mut ent_a_mut.rigidbody {
                                     let normal_vel = rb_a.velocity.dot(contact.normal);
@@ -681,12 +679,12 @@ pub fn tick_physics(scene: &mut Scene, delta_time: f32) -> Vec<(u32, u32)> {
                             let push_a = contact.normal * (contact.depth * 0.5);
                             let push_b = -contact.normal * (contact.depth * 0.5);
 
-                            if let Some(ent_a_mut) = scene.get_entity_mut(id_a) {
+                            if let Some(mut ent_a_mut) = scene.get_entity_mut(id_a) {
                                 ent_a_mut.transform.position += push_a;
                             }
                             scene.update_entity_collider(id_a);
 
-                            if let Some(ent_b_mut) = scene.get_entity_mut(id_b) {
+                            if let Some(mut ent_b_mut) = scene.get_entity_mut(id_b) {
                                 ent_b_mut.transform.position += push_b;
                             }
                             scene.update_entity_collider(id_b);
@@ -694,7 +692,7 @@ pub fn tick_physics(scene: &mut Scene, delta_time: f32) -> Vec<(u32, u32)> {
 
                         (1, 2) => {
                             let push = -contact.normal * contact.depth;
-                            if let Some(ent_b_mut) = scene.get_entity_mut(id_b) {
+                            if let Some(mut ent_b_mut) = scene.get_entity_mut(id_b) {
                                 ent_b_mut.transform.position += push;
                                 if let Some(rb_b) = &mut ent_b_mut.rigidbody {
                                     let normal_vel = rb_b.velocity.dot(contact.normal);
@@ -708,7 +706,7 @@ pub fn tick_physics(scene: &mut Scene, delta_time: f32) -> Vec<(u32, u32)> {
 
                         (2, 1) => {
                             let push = contact.normal * contact.depth;
-                            if let Some(ent_a_mut) = scene.get_entity_mut(id_a) {
+                            if let Some(mut ent_a_mut) = scene.get_entity_mut(id_a) {
                                 ent_a_mut.transform.position += push;
                                 if let Some(rb_a) = &mut ent_a_mut.rigidbody {
                                     let normal_vel = rb_a.velocity.dot(contact.normal);
@@ -724,7 +722,7 @@ pub fn tick_physics(scene: &mut Scene, delta_time: f32) -> Vec<(u32, u32)> {
                             let push_a = contact.normal * (contact.depth * 0.5);
                             let push_b = -contact.normal * (contact.depth * 0.5);
 
-                            if let Some(ent_a_mut) = scene.get_entity_mut(id_a) {
+                            if let Some(mut ent_a_mut) = scene.get_entity_mut(id_a) {
                                 ent_a_mut.transform.position += push_a;
                                 if let Some(rb_a) = &mut ent_a_mut.rigidbody {
                                     let normal_vel = rb_a.velocity.dot(contact.normal);
@@ -735,7 +733,7 @@ pub fn tick_physics(scene: &mut Scene, delta_time: f32) -> Vec<(u32, u32)> {
                             }
                             scene.update_entity_collider(id_a);
 
-                            if let Some(ent_b_mut) = scene.get_entity_mut(id_b) {
+                            if let Some(mut ent_b_mut) = scene.get_entity_mut(id_b) {
                                 ent_b_mut.transform.position += push_b;
                                 if let Some(rb_b) = &mut ent_b_mut.rigidbody {
                                     let normal_vel = rb_b.velocity.dot(contact.normal);

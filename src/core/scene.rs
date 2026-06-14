@@ -1,297 +1,27 @@
-use crate::render::mesh::Vertex;
-use glam::{Mat4, Quat, Vec3};
+//! src/core/scene.rs — Scene façade over the hecs-backed `ecs::World`.
+//!
+//! Storage now lives in `ecs::World` (one `Entity` bundle per hecs entity, with
+//! generational handles and a stable-id + name lookup). `Scene` keeps the
+//! engine-level scene scalars (selection, skybox, ambient light) and the
+//! parenting / collider / serialization helpers that operate across the World.
+//!
+//! The component structs themselves were moved to `crate::components`; they are
+//! re-exported here so the many existing consumers
+//! (`use crate::core::scene::{…Component}`) keep compiling unchanged.
+
+use glam::{Mat4, Vec3};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TransformComponent {
-    pub position: Vec3,
-    pub rotation: Quat, // We will also support Euler representation in UI
-    pub scale: Vec3,
-}
+use crate::ecs::world::{Ref, RefMut};
+use crate::ecs::World;
 
-impl Default for TransformComponent {
-    fn default() -> Self {
-        Self {
-            position: Vec3::ZERO,
-            rotation: Quat::IDENTITY,
-            scale: Vec3::ONE,
-        }
-    }
-}
-
-impl TransformComponent {
-    pub fn to_matrix(&self) -> Mat4 {
-        Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.position)
-    }
-
-    pub fn euler_angles(&self) -> Vec3 {
-        let (yaw, pitch, roll) = self.rotation.to_euler(glam::EulerRot::YXZ);
-        Vec3::new(pitch.to_degrees(), yaw.to_degrees(), roll.to_degrees())
-    }
-
-    pub fn set_euler_angles(&mut self, euler_deg: Vec3) {
-        let yaw = euler_deg.y.to_radians();
-        let pitch = euler_deg.x.to_radians();
-        let roll = euler_deg.z.to_radians();
-        self.rotation = Quat::from_euler(glam::EulerRot::YXZ, yaw, pitch, roll);
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct MeshComponent {
-    pub primitive_type: String, // "Box", "Sphere", "Plane", "Cylinder", "FBX"
-    #[serde(skip)]
-    pub vertices: Vec<Vertex>,
-    #[serde(skip)]
-    pub indices: Vec<u32>,
-    // For GPU rendering, we hold the loaded state or buffers in the renderer
-    #[serde(skip)]
-    pub is_dirty: std::cell::Cell<bool>, // Set to true when mesh data changes to update GPU buffers
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TextureComponent {
-    pub path: String,
-    pub is_dirty: bool,
-    #[serde(default)]
-    pub metallic: f32,
-    #[serde(default = "default_roughness")]
-    pub roughness: f32,
-    #[serde(default)]
-    pub metallic_map: Option<String>,
-    #[serde(default)]
-    pub roughness_map: Option<String>,
-    #[serde(default = "default_color")]
-    pub color: [f32; 3],
-}
-
-fn default_roughness() -> f32 {
-    0.5
-}
-
-fn default_color() -> [f32; 3] {
-    [1.0, 1.0, 1.0]
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ScriptComponent {
-    pub path: String,
-    pub is_loaded: bool,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AnimatorComponent {
-    pub current_clip: String,
-    pub time: f32,
-    pub speed: f32,
-    pub is_playing: bool,
-    pub freeze: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum LightType {
-    Ambient,
-    Directional,
-    Point,
-    Spotlight,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct LightComponent {
-    pub light_type: LightType,
-    pub color: Vec3,
-    pub intensity: f32,
-    pub range: f32,
-    pub inner_cone: f32, // Degrees
-    pub outer_cone: f32, // Degrees
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub enum ColliderShape {
-    Box { size: Vec3 },
-    Sphere { radius: f32 },
-    Cylinder { radius: f32, height: f32 },
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ColliderComponent {
-    pub active: bool,
-    pub shape: ColliderShape,
-    pub is_trigger: bool,
-    // Cached world space bounds
-    pub aabb_min: Vec3,
-    pub aabb_max: Vec3,
-}
-
-impl ColliderComponent {
-    pub fn calculate_world_aabb(&self, world_mat: Mat4) -> (Vec3, Vec3) {
-        let local_corners = match &self.shape {
-            ColliderShape::Box { size } => {
-                let h = *size * 0.5;
-                vec![
-                    Vec3::new(-h.x, -h.y, -h.z),
-                    Vec3::new(-h.x, -h.y, h.z),
-                    Vec3::new(-h.x, h.y, -h.z),
-                    Vec3::new(-h.x, h.y, h.z),
-                    Vec3::new(h.x, -h.y, -h.z),
-                    Vec3::new(h.x, -h.y, h.z),
-                    Vec3::new(h.x, h.y, -h.z),
-                    Vec3::new(h.x, h.y, h.z),
-                ]
-            }
-            ColliderShape::Sphere { radius } => {
-                let r = *radius;
-                vec![Vec3::new(-r, -r, -r), Vec3::new(r, r, r)]
-            }
-            ColliderShape::Cylinder { radius, height } => {
-                let r = *radius;
-                let h = *height * 0.5;
-                vec![Vec3::new(-r, -h, -r), Vec3::new(r, h, r)]
-            }
-        };
-
-        let mut min = Vec3::splat(f32::MAX);
-        let mut max = Vec3::splat(f32::MIN);
-
-        for &corner in &local_corners {
-            let world_pos = world_mat.transform_point3(corner);
-            min = min.min(world_pos);
-            max = max.max(world_pos);
-        }
-
-        (min, max)
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct RigidBodyComponent {
-    pub active: bool,
-    pub is_kinematic: bool,
-    pub mass: f32,
-    pub velocity: Vec3,
-    pub use_gravity: bool,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct HealthComponent {
-    pub current_health: f32,
-    pub max_health: f32,
-    pub is_dead: bool,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NavMeshAgentComponent {
-    pub active: bool,
-    pub radius: f32,
-    pub target: Vec3,
-    pub speed: f32,
-    pub acceleration: f32,
-    pub stopping_distance: f32,
-    pub velocity: Vec3,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CameraComponent {
-    pub active: bool,
-    pub fov: f32,
-    pub near: f32,
-    pub far: f32,
-    pub motion_blur_active: bool,
-    pub motion_blur_samples: u32,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct VisualCorrectionComponent {
-    pub active: bool,
-    pub bloom_active: bool,
-    pub bloom_intensity: f32,
-    pub bloom_threshold: f32,
-    pub exposure: f32,
-    pub contrast: f32,
-    pub saturation: f32,
-    pub ssr_active: bool,
-    pub ssr_quality: String, // "Low", "Medium", "High", "Ultra"
-    pub ssr_temporal_upsampling: bool,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Entity {
-    pub id: u32,
-    pub name: String,
-    pub active: bool,
-    pub is_static: bool,
-    pub transform: TransformComponent,
-    pub mesh: Option<MeshComponent>,
-    pub texture: Option<TextureComponent>,
-    pub script: Option<ScriptComponent>,
-    pub animator: Option<AnimatorComponent>,
-    pub light: Option<LightComponent>,
-    pub collider: Option<ColliderComponent>,
-    pub rigidbody: Option<RigidBodyComponent>,
-    pub health: Option<HealthComponent>,
-    pub nav_agent: Option<NavMeshAgentComponent>,
-    pub camera: Option<CameraComponent>,
-    pub visual_correction: Option<VisualCorrectionComponent>,
-    pub parent_id: Option<u32>,
-    pub children: Vec<u32>,
-}
-
-impl Entity {
-    pub fn new(id: u32, name: String) -> Self {
-        Self {
-            id,
-            name,
-            active: true,
-            is_static: false,
-            transform: TransformComponent::default(),
-            mesh: None,
-            texture: None,
-            script: None,
-            animator: None,
-            light: None,
-            collider: None,
-            rigidbody: None,
-            health: None,
-            nav_agent: None,
-            camera: None,
-            visual_correction: None,
-            parent_id: None,
-            children: Vec::new(),
-        }
-    }
-
-    pub fn compute_world_aabb(&self, world_matrix: Mat4) -> Option<(Vec3, Vec3)> {
-        let mesh = self.mesh.as_ref()?;
-        if mesh.vertices.is_empty() {
-            return None;
-        }
-
-        let mut min = Vec3::splat(f32::MAX);
-        let mut max = Vec3::splat(f32::MIN);
-
-        for v in &mesh.vertices {
-            let local_pos = Vec3::from_array(v.position);
-            let world_pos = world_matrix.transform_point3(local_pos);
-            min = min.min(world_pos);
-            max = max.max(world_pos);
-        }
-
-        Some((min, max))
-    }
-
-    pub fn update_collider(&mut self, parent_world_matrix: Option<Mat4>) {
-        if let Some(col) = &mut self.collider {
-            let world_matrix = if let Some(parent_mat) = parent_world_matrix {
-                parent_mat * self.transform.to_matrix()
-            } else {
-                self.transform.to_matrix()
-            };
-            let (min, max) = col.calculate_world_aabb(world_matrix);
-            col.aabb_min = min;
-            col.aabb_max = max;
-        }
-    }
-}
+// Re-export the migrated component types so legacy `core::scene::…` paths resolve.
+pub use crate::components::{
+    AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, DirtyFlag, Entity,
+    HealthComponent, LightComponent, LightType, MeshComponent, NavMeshAgentComponent,
+    RigidBodyComponent, ScriptComponent, TextureComponent, TransformComponent,
+    VisualCorrectionComponent,
+};
 
 fn default_skybox_path() -> String {
     "".to_string()
@@ -303,24 +33,33 @@ fn default_ambient_intensity() -> f32 {
     0.24
 }
 
-#[derive(Serialize, Deserialize)]
 pub struct Scene {
-    pub entities: Vec<Entity>,
-    pub next_entity_id: u32,
+    pub world: World,
     pub selected_entity_id: Option<u32>,
-    #[serde(default = "default_skybox_path")]
     pub skybox_path: String,
-    #[serde(default = "default_ambient_color")]
     pub ambient_color: Vec3,
-    #[serde(default = "default_ambient_intensity")]
     pub ambient_intensity: f32,
+}
+
+/// On-disk document. Matches the legacy `Scene` JSON layout exactly so existing
+/// `.scene` files round-trip unchanged.
+#[derive(Serialize, Deserialize)]
+struct SceneData {
+    entities: Vec<Entity>,
+    next_entity_id: u32,
+    selected_entity_id: Option<u32>,
+    #[serde(default = "default_skybox_path")]
+    skybox_path: String,
+    #[serde(default = "default_ambient_color")]
+    ambient_color: Vec3,
+    #[serde(default = "default_ambient_intensity")]
+    ambient_intensity: f32,
 }
 
 impl Default for Scene {
     fn default() -> Self {
         Self {
-            entities: Vec::new(),
-            next_entity_id: 1,
+            world: World::new(),
             selected_entity_id: None,
             skybox_path: default_skybox_path(),
             ambient_color: default_ambient_color(),
@@ -335,32 +74,47 @@ impl Scene {
     }
 
     pub fn add_entity(&mut self, name: String) -> u32 {
-        let id = self.next_entity_id;
-        self.next_entity_id += 1;
-        self.entities.push(Entity::new(id, name));
-        id
+        self.world.spawn(name)
     }
 
     pub fn destroy_entity(&mut self, id: u32) {
-        self.entities.retain(|e| e.id != id);
+        self.world.despawn(id);
         if self.selected_entity_id == Some(id) {
             self.selected_entity_id = None;
         }
     }
 
-    pub fn get_entity(&self, id: u32) -> Option<&Entity> {
-        self.entities.iter().find(|e| e.id == id)
+    pub fn get_entity(&self, id: u32) -> Option<Ref<'_, Entity>> {
+        self.world.get(id)
     }
 
-    pub fn get_entity_mut(&mut self, id: u32) -> Option<&mut Entity> {
-        self.entities.iter_mut().find(|e| e.id == id)
+    pub fn get_entity_mut(&mut self, id: u32) -> Option<RefMut<'_, Entity>> {
+        self.world.get_mut(id)
     }
 
     pub fn find_entity_by_name(&self, name: &str) -> Option<u32> {
-        self.entities
-            .iter()
-            .find(|e| e.name == name && e.active)
-            .map(|e| e.id)
+        self.world.find_by_name(name)
+    }
+
+    /// Iterate entities in insertion order (immutably). Replaces the legacy
+    /// `&scene.entities` iteration; each item is a borrow guard derefing to
+    /// `&Entity`.
+    pub fn iter(&self) -> impl Iterator<Item = Ref<'_, Entity>> {
+        let world = &self.world;
+        world.ids().iter().filter_map(move |&id| world.get(id))
+    }
+
+    /// Stable ids in insertion order.
+    pub fn entity_ids(&self) -> Vec<u32> {
+        self.world.ids().to_vec()
+    }
+
+    pub fn entity_count(&self) -> usize {
+        self.world.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.world.is_empty()
     }
 
     pub fn compute_world_matrix(&self, entity_id: u32) -> Mat4 {
@@ -379,13 +133,13 @@ impl Scene {
     pub fn update_entity_collider(&mut self, id: u32) {
         let parent_id = self.get_entity(id).and_then(|e| e.parent_id);
         let parent_mat = parent_id.map(|p| self.compute_world_matrix(p));
-        if let Some(entity) = self.get_entity_mut(id) {
+        if let Some(mut entity) = self.get_entity_mut(id) {
             entity.update_collider(parent_mat);
         }
     }
 
     pub fn update_all_colliders(&mut self) {
-        let ids: Vec<u32> = self.entities.iter().map(|e| e.id).collect();
+        let ids = self.world.ids().to_vec();
         for id in ids {
             self.update_entity_collider(id);
         }
@@ -416,21 +170,21 @@ impl Scene {
         };
 
         if let Some(old_p) = old_parent_id {
-            if let Some(parent) = self.get_entity_mut(old_p) {
+            if let Some(mut parent) = self.get_entity_mut(old_p) {
                 parent.children.retain(|&c| c != entity_id);
             }
         }
 
         // 3. Set new parent and update children list
         if let Some(new_p) = parent_id {
-            if let Some(parent) = self.get_entity_mut(new_p) {
+            if let Some(mut parent) = self.get_entity_mut(new_p) {
                 parent.children.push(entity_id);
             } else {
                 return Err("Parent entity not found.".to_string());
             }
         }
 
-        if let Some(entity) = self.get_entity_mut(entity_id) {
+        if let Some(mut entity) = self.get_entity_mut(entity_id) {
             entity.parent_id = parent_id;
         }
 
@@ -438,7 +192,15 @@ impl Scene {
     }
 
     pub fn save_to_file(&self, path: &str) -> Result<(), String> {
-        let json = serde_json::to_string_pretty(self)
+        let data = SceneData {
+            entities: self.world.collect_entities(),
+            next_entity_id: self.world.next_id(),
+            selected_entity_id: self.selected_entity_id,
+            skybox_path: self.skybox_path.clone(),
+            ambient_color: self.ambient_color,
+            ambient_intensity: self.ambient_intensity,
+        };
+        let json = serde_json::to_string_pretty(&data)
             .map_err(|e| format!("Failed to serialize scene: {}", e))?;
         std::fs::write(path, json).map_err(|e| format!("Failed to write scene file: {}", e))?;
         Ok(())
@@ -447,11 +209,11 @@ impl Scene {
     pub fn load_from_file(&mut self, path: &str) -> Result<(), String> {
         let json = std::fs::read_to_string(path)
             .map_err(|e| format!("Failed to read scene file: {}", e))?;
-        let mut loaded_scene: Scene = serde_json::from_str(&json)
+        let mut data: SceneData = serde_json::from_str(&json)
             .map_err(|e| format!("Failed to deserialize scene: {}", e))?;
 
         // Regenerate primitive meshes based on primitive_type
-        for entity in &mut loaded_scene.entities {
+        for entity in &mut data.entities {
             if let Some(mesh) = &mut entity.mesh {
                 let p_type = mesh.primitive_type.as_str();
                 let (vertices, indices) = match p_type {
@@ -472,7 +234,17 @@ impl Scene {
             }
         }
 
-        *self = loaded_scene;
+        // Rebuild the World from the loaded entities, preserving order + ids.
+        self.world.clear();
+        for entity in data.entities {
+            self.world.insert_entity(entity);
+        }
+        self.world.bump_next_id(data.next_entity_id);
+        self.selected_entity_id = data.selected_entity_id;
+        self.skybox_path = data.skybox_path;
+        self.ambient_color = data.ambient_color;
+        self.ambient_intensity = data.ambient_intensity;
+
         self.update_all_colliders();
         Ok(())
     }
