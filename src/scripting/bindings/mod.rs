@@ -20,28 +20,35 @@ use mlua::{Function, Lua, Table};
 
 use crate::core::input::InputState;
 use crate::core::scene::Scene;
+use crate::physics::PhysicsWorld;
 use crate::render::Camera;
 use crate::scripting::ConsoleLogs;
 use crate::time::Time;
 
 type Reg = Result<(), String>;
 
+/// The shared engine-resource handles the issue-#5 namespaces bind against.
+/// Bundled into one struct so `register` stays a single argument past the
+/// runtime — the live `physics` handle is what lets `Physics.Raycast`/`Shoot`
+/// reach the same rapier world the engine hitscan uses.
+pub struct BindingCtx {
+    pub scene: Rc<RefCell<Scene>>,
+    pub input: Rc<RefCell<InputState>>,
+    pub camera: Rc<RefCell<Camera>>,
+    pub time: Rc<RefCell<Time>>,
+    pub physics: Rc<RefCell<Option<PhysicsWorld>>>,
+    pub console: Rc<RefCell<ConsoleLogs>>,
+}
+
 /// Register every issue-#5 namespace onto `lua`.
-pub fn register(
-    lua: &Lua,
-    scene: &Rc<RefCell<Scene>>,
-    input: &Rc<RefCell<InputState>>,
-    camera: &Rc<RefCell<Camera>>,
-    time: &Rc<RefCell<Time>>,
-    console: &Rc<RefCell<ConsoleLogs>>,
-) -> Reg {
-    combat::register_health(lua, scene, console)?;
-    combat::register_physics_hitscan(lua, scene, console)?;
-    world::register_time(lua, time)?;
-    world::register_camera(lua, camera)?;
-    world::register_input_writable(lua, input)?;
+pub fn register(lua: &Lua, ctx: &BindingCtx) -> Reg {
+    combat::register_health(lua, &ctx.scene, &ctx.console)?;
+    combat::register_physics_hitscan(lua, &ctx.scene, &ctx.physics, &ctx.console)?;
+    world::register_time(lua, &ctx.time)?;
+    world::register_camera(lua, &ctx.camera)?;
+    world::register_input_writable(lua, &ctx.input)?;
     #[cfg(feature = "dev")]
-    world::register_debug(lua, console)?;
+    world::register_debug(lua, &ctx.console)?;
     Ok(())
 }
 

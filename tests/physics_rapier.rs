@@ -115,6 +115,40 @@ fn raycast_hits_nearest_collider() {
 }
 
 #[test]
+fn cast_ray_filtered_skips_excluded_and_reports_next() {
+    // Two boxes in a line along +Z. The filter rejecting the nearer one must make
+    // the ray pass *through* it and report the farther — not miss. This is the
+    // skip-and-continue behaviour the engine hitscan and Lua bindings share (#31).
+    let mut scene = Scene::new();
+    let near = scene.add_entity("Near".to_string());
+    {
+        let mut e = scene.get_entity_mut(near).unwrap();
+        e.transform.position = Vec3::new(0.0, 0.0, 3.0);
+        e.is_static = true;
+        e.collider = Some(box_collider(Vec3::new(2.0, 2.0, 2.0), false));
+    }
+    let far = scene.add_entity("Far".to_string());
+    {
+        let mut e = scene.get_entity_mut(far).unwrap();
+        e.transform.position = Vec3::new(0.0, 0.0, 8.0);
+        e.is_static = true;
+        e.collider = Some(box_collider(Vec3::new(2.0, 2.0, 2.0), false));
+    }
+    let physics = PhysicsWorld::from_scene(&scene);
+
+    // Unfiltered: hits the nearer box.
+    assert_eq!(
+        physics
+            .cast_ray(Vec3::ZERO, Vec3::Z, 100.0)
+            .map(|(id, _)| id),
+        Some(near),
+    );
+    // Reject the nearer box: the ray continues and reports the farther one.
+    let hit = physics.cast_ray_filtered(Vec3::ZERO, Vec3::Z, 100.0, |id| id != near);
+    assert_eq!(hit.map(|(id, _)| id), Some(far));
+}
+
+#[test]
 fn trigger_overlap_reports_pair() {
     let mut scene = Scene::new();
     let a = scene.add_entity("Sensor".to_string());

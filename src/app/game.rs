@@ -47,8 +47,10 @@ pub struct GameWorld {
     /// mutations never leak back into the authoritative edit scene (Unity-style).
     pub(super) edit_snapshot: Option<SceneSnapshot>,
     /// rapier3d simulation, rebuilt from the scene on entering Play and torn down
-    /// on Stop. `None` in edit mode (no body/collision sim runs there).
-    pub(super) physics: Option<PhysicsWorld>,
+    /// on Stop. `None` in edit mode (no body/collision sim runs there). Shared
+    /// (via `Rc`) with the script runtime so `Physics.Raycast`/`Shoot` cast
+    /// against the very same world the engine hitscan does (#31).
+    pub(super) physics: Rc<RefCell<Option<PhysicsWorld>>>,
 }
 
 impl GameWorld {
@@ -85,7 +87,7 @@ impl GameWorld {
             pathfinding_points: Vec::new(),
             play_frame: 0,
             edit_snapshot: None,
-            physics: None,
+            physics: Rc::new(RefCell::new(None)),
         }
     }
 
@@ -153,7 +155,7 @@ impl GameWorld {
             .borrow_mut()
             .info("Capturing cursor, entering PlayMode!".to_string());
 
-        if let Err(err) = self.script_manager.init_runtime() {
+        if let Err(err) = self.script_manager.init_runtime(&self.physics) {
             self.console
                 .borrow_mut()
                 .error(format!("Lua init error: {}", err));
@@ -176,14 +178,15 @@ impl GameWorld {
 
         // Build the rapier world from the (post-start) scene: bodies + colliders
         // for every entity with a ColliderComponent. Stepped each frame in play.
-        self.physics = Some(PhysicsWorld::from_scene(&self.scene.borrow()));
+        // Shared with the script runtime's Physics.Raycast/Shoot bindings.
+        *self.physics.borrow_mut() = Some(PhysicsWorld::from_scene(&self.scene.borrow()));
     }
 
     fn exit_play(&mut self) {
         self.script_manager.shutdown();
         self.pathfinding_points.clear();
         self.play_frame = 0;
-        self.physics = None;
+        *self.physics.borrow_mut() = None;
         // Restore the edit scene captured on Play, discarding play-mode state.
         if let Some(snapshot) = self.edit_snapshot.take() {
             snapshot.restore(&mut self.scene.borrow_mut());

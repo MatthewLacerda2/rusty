@@ -26,7 +26,7 @@ pub(super) fn run(g: &mut GameWorld, dt: f32) {
 
     let triggers = {
         let mut s = g.scene.borrow_mut();
-        match g.physics.as_mut() {
+        match g.physics.borrow_mut().as_mut() {
             Some(physics) => physics.step(&mut s, dt),
             None => Vec::new(),
         }
@@ -161,15 +161,14 @@ fn hitscan(g: &mut GameWorld) {
         let cam = g.camera.borrow();
         (cam.position, cam.forward())
     };
-    // Route the hitscan through rapier/parry's query pipeline. Skip the Player
-    // (so the shot can't self-hit) and dead entities, matching the old behaviour.
-    let hit = g.physics.as_ref().and_then(|physics| {
-        physics.cast_ray(origin, dir, f32::MAX).filter(|&(id, _)| {
-            let s = g.scene.borrow();
-            let ok = s.get_entity(id).is_some_and(|e| {
-                e.name != "Player" && e.health.as_ref().is_none_or(|h| !h.is_dead)
-            });
-            ok
+    // Route the hitscan through rapier/parry's query pipeline under the shared
+    // `is_hittable` filter — the exact path the Lua `Physics.Shoot` binding takes,
+    // so the two agree for the same ray (#31). The filter skips the Player (so the
+    // shot can't self-hit) and dead entities *during* traversal, hitting whatever
+    // accepted collider is nearest rather than missing on the player.
+    let hit = g.physics.borrow().as_ref().and_then(|physics| {
+        physics.cast_ray_filtered(origin, dir, f32::MAX, |id| {
+            crate::physics::is_hittable(&g.scene.borrow(), id)
         })
     });
     match hit {
