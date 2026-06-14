@@ -93,9 +93,15 @@ impl GameWorld {
     /// the caller can handle platform-only concerns (cursor grab/visibility).
     pub fn tick(&mut self, dt: f32) -> PlayTransition {
         let transition = self.handle_transition();
-        self.time.borrow_mut().advance(dt);
+        // `advance` records raw `dt` (unscaled) and the scaled `delta_time`.
+        // The game sim integrates the scaled value; the editor camera uses raw.
+        let scaled_dt = {
+            let mut time = self.time.borrow_mut();
+            time.advance(dt);
+            time.delta_time
+        };
         if self.is_playing {
-            super::play::run(self, dt);
+            super::play::run(self, scaled_dt);
         } else {
             self.editor_fly(dt);
         }

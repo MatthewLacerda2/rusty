@@ -13,7 +13,8 @@ use crate::render::Camera;
 use crate::scripting::ConsoleLogs;
 use crate::time::Time;
 
-/// `Time.deltaTime/fixedDeltaTime/frameCount` — read-only accessors.
+/// `Time.deltaTime` (scaled) / `unscaledDeltaTime` (raw) / `fixedDeltaTime` /
+/// `frameCount` accessors plus `SetTimeScale` / `GetTimeScale`.
 pub fn register_time(lua: &Lua, time: &Rc<RefCell<Time>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -22,6 +23,13 @@ pub fn register_time(lua: &Lua, time: &Rc<RefCell<Time>>) -> Reg {
         &table,
         "deltaTime",
         lua.create_function(move |_, ()| Ok(t.borrow().delta_time)),
+    )?;
+
+    let t = Rc::clone(time);
+    put(
+        &table,
+        "unscaledDeltaTime",
+        lua.create_function(move |_, ()| Ok(t.borrow().unscaled_delta_time)),
     )?;
 
     let t = Rc::clone(time);
@@ -36,6 +44,23 @@ pub fn register_time(lua: &Lua, time: &Rc<RefCell<Time>>) -> Reg {
         &table,
         "frameCount",
         lua.create_function(move |_, ()| Ok(t.borrow().frame_count)),
+    )?;
+
+    let t = Rc::clone(time);
+    put(
+        &table,
+        "SetTimeScale",
+        lua.create_function(move |_, scale: f32| {
+            t.borrow_mut().set_time_scale(scale);
+            Ok(())
+        }),
+    )?;
+
+    let t = Rc::clone(time);
+    put(
+        &table,
+        "GetTimeScale",
+        lua.create_function(move |_, ()| Ok(t.borrow().time_scale)),
     )?;
 
     lua.globals().set("Time", table).map_err(|e| e.to_string())
