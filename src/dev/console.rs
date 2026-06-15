@@ -108,7 +108,8 @@ mod tests {
             Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0))),
             Rc::new(RefCell::new(Time::new())),
         );
-        m.init_runtime().expect("runtime inits");
+        m.init_runtime(&Rc::new(RefCell::new(None)))
+            .expect("runtime inits");
         (m, console)
     }
 

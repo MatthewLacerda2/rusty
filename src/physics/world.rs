@@ -33,18 +33,19 @@ pub struct PhysicsWorld {
     islands: IslandManager,
     broad_phase: DefaultBroadPhase,
     narrow_phase: NarrowPhase,
-    bodies: RigidBodySet,
-    colliders: ColliderSet,
+    pub(super) bodies: RigidBodySet,
+    pub(super) colliders: ColliderSet,
     impulse_joints: ImpulseJointSet,
     multibody_joints: MultibodyJointSet,
     ccd_solver: CCDSolver,
-    query_pipeline: QueryPipeline,
+    /// Exposed to the `physics` module (see `query`) for ray casts.
+    pub(super) query_pipeline: QueryPipeline,
     /// Collide-and-slide controller for kinematic (player/enemy) bodies.
     character_controller: KinematicCharacterController,
     /// stable entity id -> rigid-body handle.
     id_to_body: HashMap<u32, RigidBodyHandle>,
     /// collider handle -> stable entity id (for event/raycast lookup).
-    collider_to_id: HashMap<ColliderHandle, u32>,
+    pub(super) collider_to_id: HashMap<ColliderHandle, u32>,
     /// stable entity id -> its trigger flag (sensors surface trigger pairs).
     id_is_trigger: HashMap<u32, bool>,
 }
@@ -276,20 +277,5 @@ impl PhysicsWorld {
             }
             scene.update_entity_collider(id);
         }
-    }
-
-    /// Closest collider hit by `ray` within `max_toi`, as (entity id, toi).
-    pub fn cast_ray(&self, origin: Vec3, dir: Vec3, max_toi: f32) -> Option<(u32, f32)> {
-        let ray = Ray::new(to_na_vec(origin).into(), to_na_vec(dir.normalize()));
-        self.query_pipeline
-            .cast_ray(
-                &self.bodies,
-                &self.colliders,
-                &ray,
-                max_toi,
-                true,
-                QueryFilter::default(),
-            )
-            .and_then(|(handle, toi)| self.collider_to_id.get(&handle).map(|&id| (id, toi)))
     }
 }

@@ -89,8 +89,14 @@ impl ScriptManager {
         }
     }
 
-    /// Initializes a fresh Lua environment and registers all required namespaces
-    pub fn init_runtime(&mut self) -> Result<(), String> {
+    /// Initializes a fresh Lua environment and registers all required namespaces.
+    /// `physics` is the live rapier world shared with `GameWorld`; the
+    /// `Physics.Raycast`/`Shoot` bindings cast against it so scripts and the
+    /// engine hitscan agree. It is `None` until Play builds the world.
+    pub fn init_runtime(
+        &mut self,
+        physics: &Rc<RefCell<Option<crate::physics::PhysicsWorld>>>,
+    ) -> Result<(), String> {
         let lua = Lua::new();
 
         // 1. Override print to write to our console panel
@@ -711,15 +717,17 @@ impl ScriptManager {
 
         // 8. Issue #5 namespaces: Health, Time, Camera, writable Input, Physics
         //    Raycast/Shoot, and (dev-only) Debug. Implemented in `bindings.rs` to
-        //    keep this monolith from growing without bound.
-        bindings::register(
-            &lua,
-            &self.scene,
-            &self.input,
-            &self.camera,
-            &self.time,
-            &self.console,
-        )?;
+        //    keep this monolith from growing without bound. Physics.Raycast/Shoot
+        //    need the live rapier world (#31), so it rides along in the context.
+        let ctx = bindings::BindingCtx {
+            scene: Rc::clone(&self.scene),
+            input: Rc::clone(&self.input),
+            camera: Rc::clone(&self.camera),
+            time: Rc::clone(&self.time),
+            physics: Rc::clone(physics),
+            console: Rc::clone(&self.console),
+        };
+        bindings::register(&lua, &ctx)?;
 
         self.lua = Some(lua);
         self.entity_scripts.clear();
@@ -1003,7 +1011,9 @@ mod tests {
             Rc::clone(&camera),
             time,
         );
-        m.init_runtime().expect("runtime inits");
+        // No live physics world in these unit tests, so Physics.Raycast/Shoot miss.
+        let physics = Rc::new(RefCell::new(None));
+        m.init_runtime(&physics).expect("runtime inits");
         (m, scene, camera)
     }
 
@@ -1051,5 +1061,64 @@ mod tests {
         // Target has no collider, so nothing to hit.
         m.exec("local hit = Physics.Raycast(0,0,0, 1,0,0); assert(hit == false)")
             .unwrap();
+    }
+
+    /// #31: a script's `Physics.Raycast` and the engine's `cast_ray` resolve to
+    /// the *same* entity for the same ray, because both go through the one rapier
+    /// world. The binding casts against the live world shared via the handle.
+    #[test]
+    fn raycast_matches_engine_cast_through_rapier() {
+        use crate::components::{ColliderComponent, ColliderShape};
+        use crate::physics::PhysicsWorld;
+
+        let mut raw = Scene::new();
+        let target = raw.add_entity("Target".to_string());
+        if let Some(mut e) = raw.get_entity_mut(target) {
+            e.transform.position = Vec3::new(0.0, 0.0, 5.0);
+            e.is_static = true;
+            e.collider = Some(ColliderComponent {
+                active: true,
+                shape: ColliderShape::Box {
+                    size: Vec3::splat(2.0),
+                },
+                is_trigger: false,
+                aabb_min: Vec3::ZERO,
+                aabb_max: Vec3::ZERO,
+            });
+        }
+        let scene = Rc::new(RefCell::new(raw));
+        let input = Rc::new(RefCell::new(InputState::new()));
+        let nav = Rc::new(RefCell::new(NavigationGraph::new(
+            -10.0, 10.0, -10.0, 10.0, 1.0,
+        )));
+        let console = Rc::new(RefCell::new(ConsoleLogs::new()));
+        let camera = Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0)));
+        let time = Rc::new(RefCell::new(Time::new()));
+        let mut m = ScriptManager::new(Rc::clone(&scene), input, nav, console, camera, time);
+        let physics = Rc::new(RefCell::new(Some(PhysicsWorld::from_scene(
+            &scene.borrow(),
+        ))));
+        m.init_runtime(&physics).expect("runtime inits");
+
+        // Engine path: cast straight down +Z, expect the target.
+        let engine = physics
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .cast_ray(Vec3::ZERO, Vec3::Z, f32::MAX)
+            .map(|(id, _)| id);
+        assert_eq!(engine, Some(target), "engine cast should hit the target");
+
+        // Script path: the binding returns (hit, id, dist); pull the id back out.
+        let lua_id: u32 = m
+            .eval("select(2, Physics.Raycast(0,0,0, 0,0,1))")
+            .unwrap()
+            .split(',')
+            .next()
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+        assert_eq!(Some(lua_id), engine, "script raycast must match the engine");
     }
 }
