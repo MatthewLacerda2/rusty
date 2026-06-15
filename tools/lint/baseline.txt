@@ -4,4 +4,3 @@
 src/main.rs
 src/navigation/mod.rs
 src/render/shadows.rs
-src/scripting/mod.rs
