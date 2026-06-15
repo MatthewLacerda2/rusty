@@ -42,6 +42,10 @@ pub struct EditorUi {
     pub asset_script_content: String,
     pub active_bottom_tab: String,
 
+    /// Selected post-FX scalability tier. main.rs syncs this onto the renderer
+    /// each frame so Low/Medium/High gate which passes run + buffer sizes.
+    pub quality_preset: crate::render::postfx::QualityPreset,
+
     /// Live Lua REPL input line (dev builds only). The editor only collects the
     /// submitted text here; the front-end (main.rs) drains `pending_repl` and runs
     /// it through the single `dev::console` evaluator against the live runtime.
@@ -83,6 +87,7 @@ impl EditorUi {
             asset_model_import_normals: true,
             asset_script_content: String::new(),
             active_bottom_tab: "assets".to_string(),
+            quality_preset: crate::render::postfx::QualityPreset::default(),
 
             #[cfg(feature = "dev")]
             repl_input: crate::dev::console::ReplInput::new(),

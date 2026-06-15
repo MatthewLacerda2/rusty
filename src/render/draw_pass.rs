@@ -6,22 +6,33 @@ use glam::Vec3;
 use super::draw_resources::{
     AabbResource, AxisResource, GridResource, OutlineResource, SolidResource,
 };
+use super::postfx::{PostFxContext, PostParams};
 use super::Renderer;
 use crate::core::scene::{LightType, Scene};
+
+/// Per-frame post-FX inputs threaded into the scene pass (kept in one struct so
+/// `execute_scene_pass` doesn't blow the arg budget further).
+pub(super) struct ScenePassFrame<'a> {
+    pub view_texture: &'a wgpu::TextureView,
+    pub editor_mode: bool,
+    pub post_params: PostParams,
+    pub bloom_enabled: bool,
+}
 
 impl Renderer {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn execute_scene_pass(
         &mut self,
         scene: &Scene,
-        view_texture: &wgpu::TextureView,
-        editor_mode: bool,
+        frame: ScenePassFrame<'_>,
         solid_render_resources: &[SolidResource],
         outline_resources: &Option<OutlineResource>,
         grid_resources: &Option<GridResource>,
         aabb_resources: &[AabbResource],
         axis_arrow_resources: &[AxisResource],
     ) {
+        let view_texture = frame.view_texture;
+        let editor_mode = frame.editor_mode;
         // 4. Render Pass Setup
         let mut encoder = self
             .device
@@ -95,7 +106,9 @@ impl Renderer {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Scene Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: view_texture,
+                    // Scene draws into the HDR offscreen target; the post-FX
+                    // composite then writes the corrected image to `view_texture`.
+                    view: &self.post_fx.scene_hdr.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -215,7 +228,26 @@ impl Renderer {
             }
         } // End of Render Pass
 
-        // 6. Submit Render commands
+        // 6. Submit the scene pass (it filled the HDR target + depth).
         self.queue.submit(std::iter::once(encoder.finish()));
+
+        // 7. Run the post-process chain: HDR scene + depth -> corrected output.
+        let skybox_view = self
+            .skybox_texture
+            .as_ref()
+            .map(|tex| &tex.view)
+            .unwrap_or(&self.default_texture.view);
+        let ctx = PostFxContext {
+            depth_view: &self.depth_view,
+            skybox_view,
+            output: view_texture,
+        };
+        self.post_fx.run(
+            &self.device,
+            &self.queue,
+            ctx,
+            frame.post_params,
+            frame.bloom_enabled,
+        );
     }
 }

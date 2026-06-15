@@ -3,7 +3,7 @@ use glam::Vec3;
 use crate::core::scene::{
     AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, Entity, HealthComponent,
     LightComponent, LightType, NavMeshAgentComponent, RigidBodyComponent, ScriptComponent,
-    TextureComponent, VisualCorrectionComponent,
+    TextureComponent, Tonemap, VisualCorrectionComponent,
 };
 
 /// 3F. Add Component Option
@@ -113,6 +113,8 @@ pub fn draw(ui: &mut egui::Ui, entity: &mut Entity) {
                 ssr_active: true,
                 ssr_quality: "High".to_string(),
                 ssr_temporal_upsampling: true,
+                tonemap: Tonemap::Aces,
+                gamma: 2.2,
             });
             ui.close_menu();
         }

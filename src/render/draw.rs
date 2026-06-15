@@ -4,6 +4,8 @@
 
 use glam::Vec3;
 
+use super::draw_pass::ScenePassFrame;
+use super::postfx_params::build_post_params;
 use super::{
     AmbientLightUniform, Camera, CameraUniform, DirectionalLightUniform, LightingUniform,
     PointLightUniform, Renderer, SpotlightUniform,
@@ -123,10 +125,28 @@ impl Renderer {
         // Pre-create Path vertices
         let _path_resources = self.precreate_path(pathfinding_points, &default_bones);
 
-        self.execute_scene_pass(
+        // Build the post-FX params from the scene's visual-correction knobs.
+        let (mut post_params, bloom_enabled) = build_post_params(
             scene,
+            self.quality,
+            view_proj,
+            self.post_fx.prev_view_proj,
+            camera.position.to_array(),
+        );
+        // Texel size of the (reduced-res) bloom buffer for the blur pass.
+        post_params.misc[1] = 1.0 / self.post_fx.bloom_size.0 as f32;
+        post_params.misc[2] = 1.0 / self.post_fx.bloom_size.1 as f32;
+        self.post_fx.prev_view_proj = view_proj;
+
+        let frame = ScenePassFrame {
             view_texture,
             editor_mode,
+            post_params,
+            bloom_enabled,
+        };
+        self.execute_scene_pass(
+            scene,
+            frame,
             &solid_render_resources,
             &outline_resources,
             &grid_resources,
