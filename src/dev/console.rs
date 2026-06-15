@@ -85,9 +85,9 @@ impl ReplInput {
 mod tests {
     use super::*;
     use crate::core::input::InputState;
-    use crate::core::scene::Scene;
     use crate::navigation::NavigationGraph;
     use crate::render::Camera;
+    use crate::scene::Scene;
     use crate::time::Time;
     use glam::Vec3;
     use std::cell::RefCell;

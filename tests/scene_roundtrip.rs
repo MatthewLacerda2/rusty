@@ -1,7 +1,7 @@
 //! Scene save/load round-trip + edit-mode snapshot/restore (issue #6).
 
 use glam::Vec3;
-use rusty::core::scene::Scene;
+use rusty::scene::Scene;
 use rusty::scene::SceneSnapshot;
 
 fn tmp(name: &str) -> String {
@@ -19,11 +19,11 @@ fn save_load_preserves_values_and_rehydrates_mesh() {
     {
         let mut e = scene.get_entity_mut(id).unwrap();
         e.transform.position = Vec3::new(1.0, 2.0, 3.0);
-        e.mesh = Some(rusty::core::scene::MeshComponent {
+        e.mesh = Some(rusty::scene::MeshComponent {
             primitive_type: "Box".to_string(),
             vertices: Vec::new(),
             indices: Vec::new(),
-            is_dirty: rusty::core::scene::DirtyFlag::new(true),
+            is_dirty: rusty::scene::DirtyFlag::new(true),
         });
     }
     let path = tmp("rusty_scene_roundtrip.scene");

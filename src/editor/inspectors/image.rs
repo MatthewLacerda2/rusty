@@ -1,5 +1,5 @@
-use crate::core::scene::{Scene, TextureComponent};
 use crate::editor::EditorUi;
+use crate::scene::{Scene, TextureComponent};
 use std::fs;
 use std::path::Path;
 

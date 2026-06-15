@@ -2,8 +2,8 @@
 
 use glam::Vec3;
 use rusty::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
-use rusty::core::scene::Scene;
 use rusty::physics::PhysicsWorld;
+use rusty::scene::Scene;
 
 fn box_collider(size: Vec3, is_trigger: bool) -> ColliderComponent {
     ColliderComponent {

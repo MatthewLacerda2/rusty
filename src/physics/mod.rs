@@ -15,7 +15,7 @@ mod world;
 
 pub use world::PhysicsWorld;
 
-use crate::core::scene::Scene;
+use crate::scene::Scene;
 
 /// The hitscan acceptance test shared by the engine hitscan and the Lua
 /// `Physics.Raycast`/`Shoot` bindings: never hit a dead entity. This is the only

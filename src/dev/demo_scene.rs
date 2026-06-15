@@ -6,11 +6,11 @@
 
 use glam::Vec3;
 
-use crate::core::scene::{
+use crate::render::mesh as primitives;
+use crate::scene::{
     AnimatorComponent, ColliderComponent, ColliderShape, DirtyFlag, HealthComponent, MeshComponent,
     RigidBodyComponent, Scene, ScriptComponent, TextureComponent,
 };
-use crate::render::mesh as primitives;
 
 /// Bundled default player brain (movement + camera + weapon), seeded next to
 /// `bot.lua` and attached to the Player. Game logic, not engine logic.

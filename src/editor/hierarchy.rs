@@ -1,7 +1,7 @@
 use glam::Vec3;
 
-use crate::core::scene::{LightComponent, LightType, MeshComponent, Scene};
 use crate::editor::EditorUi;
+use crate::scene::{LightComponent, LightType, MeshComponent, Scene};
 
 /// LEFT PANEL: Scene Hierarchy
 pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
@@ -114,7 +114,7 @@ fn create_entity(editor: &mut EditorUi, scene: &mut Scene) {
                 primitive_type: "Box".to_string(),
                 vertices: v,
                 indices: idx,
-                is_dirty: crate::core::scene::DirtyFlag::new(true),
+                is_dirty: crate::scene::DirtyFlag::new(true),
             });
         } else if name_lower == "sphere" {
             let (v, idx) = crate::render::mesh::generate_sphere(1.0, 16, 16);
@@ -122,7 +122,7 @@ fn create_entity(editor: &mut EditorUi, scene: &mut Scene) {
                 primitive_type: "Sphere".to_string(),
                 vertices: v,
                 indices: idx,
-                is_dirty: crate::core::scene::DirtyFlag::new(true),
+                is_dirty: crate::scene::DirtyFlag::new(true),
             });
         } else if name_lower == "plane" {
             let (v, idx) = crate::render::mesh::generate_plane(15.0, 15.0);
@@ -130,7 +130,7 @@ fn create_entity(editor: &mut EditorUi, scene: &mut Scene) {
                 primitive_type: "Plane".to_string(),
                 vertices: v,
                 indices: idx,
-                is_dirty: crate::core::scene::DirtyFlag::new(true),
+                is_dirty: crate::scene::DirtyFlag::new(true),
             });
         } else if name_lower == "cylinder" {
             let (v, idx) = crate::render::mesh::generate_cylinder(
@@ -143,7 +143,7 @@ fn create_entity(editor: &mut EditorUi, scene: &mut Scene) {
                 primitive_type: "Cylinder".to_string(),
                 vertices: v,
                 indices: idx,
-                is_dirty: crate::core::scene::DirtyFlag::new(true),
+                is_dirty: crate::scene::DirtyFlag::new(true),
             });
         } else if name_lower == "pointlight" {
             ent.light = Some(LightComponent {

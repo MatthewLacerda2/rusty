@@ -1,11 +1,11 @@
 use glam::Vec3;
 
-use crate::core::scene::{Entity, Scene};
 use crate::editor::{
     inspector_add, inspector_camera, inspector_gameplay, inspector_render, inspector_transform,
 };
 use crate::editor::{inspectors, EditorUi};
 use crate::navigation::NavigationGraph;
+use crate::scene::{Entity, Scene};
 use crate::scripting::ConsoleLogs;
 
 /// RIGHT PANEL: Properties Inspector

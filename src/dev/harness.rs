@@ -22,8 +22,8 @@ use serde_json::{json, Value};
 
 use crate::app::GameWorld;
 use crate::core::input::InputState;
-use crate::core::scene::Scene;
 use crate::navigation::NavigationGraph;
+use crate::scene::Scene;
 use crate::scripting::{ConsoleLogs, LogLevel};
 
 /// The simulation timestep. 60 Hz, fixed — the source of determinism.
