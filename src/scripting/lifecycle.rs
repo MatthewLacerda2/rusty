@@ -16,16 +16,19 @@ impl ScriptManager {
         ids.sort_unstable();
 
         for id in ids {
-            if let Some(key) = self.entity_scripts.get(&id) {
-                if let Ok(table) = lua.registry_value::<Table>(key) {
-                    if let Ok(start_fn) = table.get::<_, mlua::Function>("Start") {
-                        if let Err(e) = start_fn.call::<_, ()>(id) {
-                            self.console
-                                .borrow_mut()
-                                .error(format!("[Lua Error] Start on entity {} failed: {}", id, e));
-                        }
-                    }
-                }
+            let Some(key) = self.entity_scripts.get(&id) else {
+                continue;
+            };
+            let Ok(table) = lua.registry_value::<Table>(key) else {
+                continue;
+            };
+            let Ok(start_fn) = table.get::<_, mlua::Function>("Start") else {
+                continue;
+            };
+            if let Err(e) = start_fn.call::<_, ()>(id) {
+                self.console
+                    .borrow_mut()
+                    .error(format!("[Lua Error] Start on entity {} failed: {}", id, e));
             }
         }
     }
@@ -59,17 +62,19 @@ impl ScriptManager {
         ids.sort_unstable();
 
         for id in ids {
-            if let Some(key) = self.entity_scripts.get(&id) {
-                if let Ok(table) = lua.registry_value::<Table>(key) {
-                    if let Ok(update_fn) = table.get::<_, mlua::Function>("Update") {
-                        if let Err(e) = update_fn.call::<_, ()>((id, delta_time)) {
-                            self.console.borrow_mut().error(format!(
-                                "[Lua Error] Update on entity {} failed: {}",
-                                id, e
-                            ));
-                        }
-                    }
-                }
+            let Some(key) = self.entity_scripts.get(&id) else {
+                continue;
+            };
+            let Ok(table) = lua.registry_value::<Table>(key) else {
+                continue;
+            };
+            let Ok(update_fn) = table.get::<_, mlua::Function>("Update") else {
+                continue;
+            };
+            if let Err(e) = update_fn.call::<_, ()>((id, delta_time)) {
+                self.console
+                    .borrow_mut()
+                    .error(format!("[Lua Error] Update on entity {} failed: {}", id, e));
             }
         }
     }
@@ -82,28 +87,22 @@ impl ScriptManager {
         };
 
         for (id_a, id_b) in events {
-            if let Some(key_a) = self.entity_scripts.get(&id_a) {
-                if let Ok(table) = lua.registry_value::<Table>(key_a) {
-                    if let Ok(trigger_fn) = table.get::<_, mlua::Function>("OnTrigger") {
-                        if let Err(e) = trigger_fn.call::<_, ()>((id_a, id_b)) {
-                            self.console.borrow_mut().error(format!(
-                                "[Lua Error] OnTrigger on entity {} failed: {}",
-                                id_a, e
-                            ));
-                        }
-                    }
-                }
-            }
-            if let Some(key_b) = self.entity_scripts.get(&id_b) {
-                if let Ok(table) = lua.registry_value::<Table>(key_b) {
-                    if let Ok(trigger_fn) = table.get::<_, mlua::Function>("OnTrigger") {
-                        if let Err(e) = trigger_fn.call::<_, ()>((id_b, id_a)) {
-                            self.console.borrow_mut().error(format!(
-                                "[Lua Error] OnTrigger on entity {} failed: {}",
-                                id_b, e
-                            ));
-                        }
-                    }
+            // Notify each side of the overlap, in order: A about B, then B about A.
+            for (id, other) in [(id_a, id_b), (id_b, id_a)] {
+                let Some(key) = self.entity_scripts.get(&id) else {
+                    continue;
+                };
+                let Ok(table) = lua.registry_value::<Table>(key) else {
+                    continue;
+                };
+                let Ok(trigger_fn) = table.get::<_, mlua::Function>("OnTrigger") else {
+                    continue;
+                };
+                if let Err(e) = trigger_fn.call::<_, ()>((id, other)) {
+                    self.console.borrow_mut().error(format!(
+                        "[Lua Error] OnTrigger on entity {} failed: {}",
+                        id, e
+                    ));
                 }
             }
         }
