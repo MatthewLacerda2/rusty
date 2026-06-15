@@ -12,9 +12,18 @@ agent can drive, observe, and play-test it headlessly.
   session points you there.
 
 ## How we work
-- **Flow:** discuss the idea → write a GitHub issue for it → implement it in a pull
-  request. New work starts as an issue, not as a surprise diff; the PR references the
-  issue it closes.
+- **The gates (push back before you build).** An idea becomes an issue only when all
+  three hold; if any fails, **push back instead of complying**:
+  1. **Understanding.** Claude actually understands the idea — the user has a clear
+     intent and Claude can restate it. If unsure, restate it back and confirm before
+     proceeding; don't guess.
+  2. **Value.** The issue adds real value to the project. No busywork, no features for
+     their own sake.
+  3. **Craft.** It follows Rust/Lua good practices and the gold standards of game-engine
+     design and architecture. If it doesn't, say so and propose the right shape.
+- **Flow:** discuss the idea (if needed) → write a GitHub issue for it → batch it (mark
+  dependencies) → implement it in a pull request → merge. New work starts as an issue,
+  not as a surprise diff; the PR references the issue it closes.
 - **Infrastructure-first (NOT "make it up as we go").** We do **not** improvise or pile
   on features ad hoc. Whenever we find a problem — something that already bites or will
   bite more than once, a pattern worth adopting, or a gold-standard practice we should
@@ -22,6 +31,27 @@ agent can drive, observe, and play-test it headlessly.
   **not** have the right to add more features/shenanigans until the
   infrastructure/architecture itself is improved first. Fix the foundation, then build
   on it. Each such fix gets its own issue when it carries its own responsibility.
+- **Batching & dependencies.** Once an issue is written, record how it relates to the
+  others so sessions can fan out subagents on independent issues in parallel. In the
+  issue body add a `## Dependencies` block with `Blocked by: #N` / `Blocks: #N` lines,
+  and use GitHub **sub-issues** when one issue is literal groundwork for another. Two
+  issues block each other when one **lays the groundwork** for the next, **makes it
+  meaningfully easier**, or would **conflict too much** if done concurrently. Use your
+  best judgment.
+- **Pull requests.** Each PR's description says **what changed and why**, not how you
+  got there — include process only when it's needed to understand the diff. Open it
+  **ready for review** unless you need help, in which case leave it a **draft and say
+  why** (blocked on another issue, needs a brand-new PR, software/hardware constraints,
+  human intervention, etc.).
+- **Merging — serialized, one at a time.** When a PR is ready, CI/CD runs; once it's
+  green you may merge to `main` right away. If it conflicts or fails, fix it until it
+  passes; if it's taking too many iterations (≈3 fix attempts at the same failure, or a
+  failure that needs a decision you can't make), mark it a **draft** and hand it to the
+  user. Because Rust is compiled, two PRs can each be green alone yet break `main`
+  together (a rename, a changed signature, a moved module — no textual conflict catches
+  it). So merging **cannot be parallelized**: rebase each PR onto the latest `main` →
+  CI green on that rebased state → merge → repeat, one PR at a time. The only exception
+  is a PR that touches **only** Markdown.
 
 ## Architecture — the conceptual model
 A high-level map of how the engine is shaped. It deliberately doesn't enumerate every
