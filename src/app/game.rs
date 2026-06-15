@@ -1,10 +1,17 @@
 //! src/app/game.rs — GameWorld: the simulation, decoupled from window and GPU.
 //!
-//! Owns the scene, input, navigation, console, script runtime and camera, and
-//! advances them one frame via `tick(dt)`. The windowed front-end (main.rs) and a
-//! future headless harness both drive the same `tick`; only the input source and
-//! the rendering differ. Entity/component storage is the hecs-backed
-//! `ecs::World`, owned by `scene::Scene` (which adds the scene-level state).
+//! Owns the world of record ([`World`] — a handle to the active `Scene`) and the
+//! engine singletons ([`Resources`] — input, nav, console, camera, time, the live
+//! rapier world, the script runtime, and the play-mode bookkeeping). It advances
+//! both one frame via `tick(dt)`. The windowed front-end (main.rs) and the headless
+//! harness drive the same `tick`; only the input source and the rendering differ.
+//!
+//! A system is the canonical two-argument `fn(&mut World, &mut Resources)` (#39):
+//! `tick` threads `(&mut self.world, &mut self.resources)` through the schedule, so
+//! the borrow checker keeps world-storage and engine-state distinct at the system
+//! boundary. The handles inside `Resources` are still `Rc<RefCell<…>>` (the mlua
+//! closures capture them); converting that script surface off `Rc<RefCell>` is the
+//! follow-up the issue flags as its hardest part.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -19,7 +26,7 @@ use crate::scene::{Scene, SceneSnapshot};
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
 
-use super::Schedule;
+use super::{Resources, World};
 
 /// Reported by `tick` so the platform layer can react (e.g. grab the cursor)
 /// without the simulation knowing about the window.
@@ -30,32 +37,12 @@ pub enum PlayTransition {
     Exited,
 }
 
+/// The simulation: the world of record plus its engine singletons. Splits the old
+/// monolithic struct into [`World`] (storage) and [`Resources`] (engine state) so
+/// the two are threaded into systems as distinct `&mut` references.
 pub struct GameWorld {
-    pub scene: Rc<RefCell<Scene>>,
-    pub input: Rc<RefCell<InputState>>,
-    pub nav: Rc<RefCell<NavigationGraph>>,
-    pub console: Rc<RefCell<ConsoleLogs>>,
-    pub script_manager: ScriptManager,
-    pub camera: Rc<RefCell<Camera>>,
-    pub time: Rc<RefCell<Time>>,
-    pub is_playing: bool,
-    pub(super) was_playing: bool,
-    pub(super) pathfinding_points: Vec<Vec3>,
-    /// Play-mode frame counter. Drives nav rebaking off a deterministic tick count
-    /// instead of the wall clock, so a fixed-timestep replay is bit-for-bit stable.
-    pub(super) play_frame: u64,
-    /// Edit-mode scene captured on Play and restored on Stop, so play-mode
-    /// mutations never leak back into the authoritative edit scene (Unity-style).
-    pub(super) edit_snapshot: Option<SceneSnapshot>,
-    /// rapier3d simulation, rebuilt from the scene on entering Play and torn down
-    /// on Stop. `None` in edit mode (no body/collision sim runs there). Shared
-    /// (via `Rc`) with the script runtime so `Physics.Raycast`/`Shoot` cast
-    /// against the very same world the engine hitscan does (#31).
-    pub(super) physics: Rc<RefCell<Option<PhysicsWorld>>>,
-    /// The ordered per-stage system registry that drives the tick. Built once at
-    /// construction from `app::build()`, where every module self-registers its
-    /// systems. Replaces the old hand-wired `play.rs` call sequence.
-    schedule: Schedule,
+    pub world: World,
+    pub resources: Resources,
 }
 
 impl GameWorld {
@@ -71,30 +58,66 @@ impl GameWorld {
             -20.0,
         )));
         let time = Rc::new(RefCell::new(Time::new()));
-        let script_manager = ScriptManager::new(
+        let resources = Resources::new(
             Rc::clone(&scene),
-            Rc::clone(&input),
-            Rc::clone(&nav),
-            Rc::clone(&console),
+            input,
+            nav,
+            console,
             Rc::clone(&camera),
             Rc::clone(&time),
         );
         Self {
-            scene,
-            input,
-            nav,
-            console,
-            script_manager,
-            camera,
-            time,
-            is_playing: false,
-            was_playing: false,
-            pathfinding_points: Vec::new(),
-            play_frame: 0,
-            edit_snapshot: None,
-            physics: Rc::new(RefCell::new(None)),
-            schedule: super::build().into_schedule(),
+            world: World::new(scene),
+            resources,
         }
+    }
+
+    // --- Accessors: the shared engine-state handles. The editor, renderer and the
+    //     headless dev tools borrow these cells directly, exactly as before. ---
+
+    /// The active scene (the world of record).
+    pub fn scene(&self) -> &Rc<RefCell<Scene>> {
+        &self.world.scene
+    }
+
+    /// The input resource.
+    pub fn input(&self) -> &Rc<RefCell<InputState>> {
+        &self.resources.input
+    }
+
+    /// The navigation graph resource.
+    pub fn nav(&self) -> &Rc<RefCell<NavigationGraph>> {
+        &self.resources.nav
+    }
+
+    /// The console log buffer resource.
+    pub fn console(&self) -> &Rc<RefCell<ConsoleLogs>> {
+        &self.resources.console
+    }
+
+    /// The active camera resource.
+    pub fn camera(&self) -> &Rc<RefCell<Camera>> {
+        &self.resources.camera
+    }
+
+    /// The frame-clock resource.
+    pub fn time(&self) -> &Rc<RefCell<Time>> {
+        &self.resources.time
+    }
+
+    /// The live script runtime.
+    pub fn script_manager(&self) -> &ScriptManager {
+        &self.resources.script_manager
+    }
+
+    /// Whether the simulation is in play mode.
+    pub fn is_playing(&self) -> bool {
+        self.resources.is_playing
+    }
+
+    /// Enter or leave play mode (the platform layer flips this on a button / ESC).
+    pub fn set_playing(&mut self, playing: bool) {
+        self.resources.is_playing = playing;
     }
 
     /// Advance the simulation by `dt` seconds. Returns any play-state transition so
@@ -104,125 +127,139 @@ impl GameWorld {
         // `advance` records raw `dt` (unscaled) and the scaled `delta_time`.
         // The game sim integrates the scaled value; the editor camera uses raw.
         let scaled_dt = {
-            let mut time = self.time.borrow_mut();
+            let mut time = self.resources.time.borrow_mut();
             time.advance(dt);
             time.delta_time
         };
-        if self.is_playing {
-            // Run the schedule's per-frame stages. The schedule is moved out for
-            // the call (its systems take `&mut self`) and restored after, avoiding
-            // a self-aliasing borrow. The `Startup` stage runs once, on the Play
-            // transition handled in `enter_play`.
-            self.run_schedule_frame(scaled_dt);
+        if self.resources.is_playing {
+            // Run the schedule's per-frame stages against (&mut World, &mut
+            // Resources). The schedule is moved out of `Resources` for the call (its
+            // systems take `&mut Resources`) and restored after, avoiding a
+            // self-aliasing borrow. `Startup` runs once, in `enter_play`.
+            self.resources.frame_dt = scaled_dt;
+            self.run_schedule_frame();
         } else {
             self.editor_fly(dt);
         }
         transition
     }
 
-    /// Run the schedule's per-frame stages against `self`. The schedule is borrowed
-    /// out via `mem::take` for the duration so its systems can take `&mut self`.
-    fn run_schedule_frame(&mut self, dt: f32) {
-        let schedule = std::mem::take(&mut self.schedule);
-        schedule.run_frame(self, dt);
-        self.schedule = schedule;
+    /// Run the schedule's per-frame stages. The schedule is moved out of `Resources`
+    /// for the duration so its systems can take `&mut Resources`.
+    fn run_schedule_frame(&mut self) {
+        let schedule = std::mem::take(&mut self.resources.schedule);
+        schedule.run_frame(&mut self.world, &mut self.resources);
+        self.resources.schedule = schedule;
     }
 
     pub fn pathfinding_points(&self) -> &[Vec3] {
-        &self.pathfinding_points
+        &self.resources.pathfinding_points
     }
 
     /// Number of play-mode frames simulated since the last `enter_play`.
     pub fn play_frame(&self) -> u64 {
-        self.play_frame
+        self.resources.play_frame
     }
 
     fn handle_transition(&mut self) -> PlayTransition {
-        let transition = if self.is_playing && !self.was_playing {
+        let transition = if self.resources.is_playing && !self.resources.was_playing {
             self.enter_play();
             PlayTransition::Entered
-        } else if !self.is_playing && self.was_playing {
+        } else if !self.resources.is_playing && self.resources.was_playing {
             self.exit_play();
             PlayTransition::Exited
         } else {
             PlayTransition::None
         };
-        self.was_playing = self.is_playing;
+        self.resources.was_playing = self.resources.is_playing;
         transition
     }
 
     fn enter_play(&mut self) {
-        self.play_frame = 0;
-        self.time.borrow_mut().reset();
+        self.resources.play_frame = 0;
+        self.resources.time.borrow_mut().reset();
         // Snapshot the authoritative edit scene so Stop can restore it, discarding
         // every play-mode mutation (script/physics moves, health, spawns/despawns).
-        self.edit_snapshot = Some(SceneSnapshot::capture(&self.scene.borrow()));
+        self.resources.edit_snapshot = Some(SceneSnapshot::capture(&self.world.scene.borrow()));
         {
-            let scene = self.scene.borrow();
+            let scene = self.world.scene.borrow();
             let player = scene
                 .find_entity_by_name("Player")
                 .and_then(|id| scene.get_entity(id));
             if let Some(player) = player {
-                let mut cam = self.camera.borrow_mut();
+                let mut cam = self.resources.camera.borrow_mut();
                 cam.position = player.transform.position + Vec3::new(0.0, 1.5, -4.5);
                 cam.yaw = 90.0;
                 cam.pitch = -10.0;
             }
         }
-        self.console
+        self.resources
+            .console
             .borrow_mut()
             .info("Capturing cursor, entering PlayMode!".to_string());
 
-        if let Err(err) = self.script_manager.init_runtime(&self.physics) {
-            self.console
+        if let Err(err) = self
+            .resources
+            .script_manager
+            .init_runtime(&self.resources.physics)
+        {
+            self.resources
+                .console
                 .borrow_mut()
                 .error(format!("Lua init error: {}", err));
             return;
         }
         let to_load: Vec<(u32, String)> = self
+            .world
             .scene
             .borrow()
             .iter()
             .filter_map(|e| e.script.as_ref().map(|s| (e.id, s.path.clone())))
             .collect();
         for (id, path) in to_load {
-            if let Err(e) = self.script_manager.load_entity_script(id, &path) {
-                self.console
+            if let Err(e) = self.resources.script_manager.load_entity_script(id, &path) {
+                self.resources
+                    .console
                     .borrow_mut()
                     .error(format!("Lua compile error (Entity {}): {}", id, e));
             }
         }
-        self.script_manager.start_scripts();
+        self.resources.script_manager.start_scripts();
 
         // Build the rapier world from the (post-start) scene: bodies + colliders
         // for every entity with a ColliderComponent. Stepped each frame in play.
         // Shared with the script runtime's Physics.Raycast/Shoot bindings.
-        *self.physics.borrow_mut() = Some(PhysicsWorld::from_scene(&self.scene.borrow()));
+        *self.resources.physics.borrow_mut() =
+            Some(PhysicsWorld::from_scene(&self.world.scene.borrow()));
 
         // Run the one-shot `Startup` stage now that the Play session is fully set
         // up. No built-in module registers Startup systems yet; this is the wired
         // hook modules will register into (Unity's `Start`).
-        let schedule = std::mem::take(&mut self.schedule);
-        schedule.run_startup(self, 0.0);
-        self.schedule = schedule;
+        self.resources.frame_dt = 0.0;
+        let schedule = std::mem::take(&mut self.resources.schedule);
+        schedule.run_startup(&mut self.world, &mut self.resources);
+        self.resources.schedule = schedule;
     }
 
     fn exit_play(&mut self) {
-        self.script_manager.shutdown();
-        self.pathfinding_points.clear();
-        self.play_frame = 0;
-        *self.physics.borrow_mut() = None;
+        self.resources.script_manager.shutdown();
+        self.resources.pathfinding_points.clear();
+        self.resources.play_frame = 0;
+        *self.resources.physics.borrow_mut() = None;
         // Restore the edit scene captured on Play, discarding play-mode state.
-        if let Some(snapshot) = self.edit_snapshot.take() {
-            snapshot.restore(&mut self.scene.borrow_mut());
-            self.nav.borrow_mut().bake(&self.scene.borrow());
+        if let Some(snapshot) = self.resources.edit_snapshot.take() {
+            snapshot.restore(&mut self.world.scene.borrow_mut());
+            self.resources
+                .nav
+                .borrow_mut()
+                .bake(&self.world.scene.borrow());
         }
     }
 
     /// Editor-mode free-fly camera (no entity simulation).
     fn editor_fly(&mut self, dt: f32) {
-        let inp = self.input.borrow();
-        let mut cam = self.camera.borrow_mut();
+        let inp = self.resources.input.borrow();
+        let mut cam = self.resources.camera.borrow_mut();
         let mut move_dir = Vec3::ZERO;
         if inp.is_key_down("W") {
             move_dir += cam.forward();

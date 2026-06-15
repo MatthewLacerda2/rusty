@@ -1,6 +1,119 @@
-//! src/app/resources.rs — Resource store
+//! src/app/resources.rs — Resources: the engine singletons systems read and write.
 //!
-//! Global singletons (Time, InputState, NavGraph, Console). Unity analog: engine statics. Replaces the Rc<RefCell> graph.
+//! The Unity-style engine statics — one set per `GameWorld`: input, the nav graph,
+//! the console, the active camera, the frame clock, the live rapier world, and the
+//! script runtime — plus the play-mode bookkeeping the tick advances (play-state,
+//! the frame counter, the edit-mode snapshot, the per-frame dt). Storage of record
+//! (the `Scene`) is NOT here; it is threaded alongside `Resources` as the `&mut
+//! Scene` world argument, so a system sees `(&mut Scene, &mut Resources)` — the
+//! canonical two-argument form (issue #39). The borrow checker now keeps the world
+//! and the resources distinct at the system boundary.
 //!
-//! Allowed deps: time, input.
-//! Status: SCAFFOLD — structure only; not yet implemented.
+//! The engine-resource fields are still `Rc<RefCell<…>>` handles: the mlua script
+//! closures capture them with a `'static` lifetime, and the editor / renderer share
+//! the very same cells. Converting that script-facing surface fully off `Rc<RefCell>`
+//! is a follow-up (issue #39's hardest part). Threading `&mut Scene`/`&mut Resources`
+//! through the system call path — done here — removes the borrow-panic risk from the
+//! engine systems themselves: they no longer reach through one opaque blob.
+//!
+//! Allowed deps: app::*, core, navigation, physics, render, scene, scripting, time.
+
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use crate::core::input::InputState;
+use crate::navigation::NavigationGraph;
+use crate::physics::PhysicsWorld;
+use crate::render::Camera;
+use crate::scene::{Scene, SceneSnapshot};
+use crate::scripting::{ConsoleLogs, ScriptManager};
+use crate::time::Time;
+
+use super::Schedule;
+
+/// The engine singletons (Unity's engine statics) plus the play-mode bookkeeping the
+/// tick advances. Threaded into every system as the second argument, beside the
+/// `&mut Scene` world. The `Rc<RefCell<…>>` handles are shared with the Lua runtime
+/// and the editor; the play-state scalars are owned outright.
+pub struct Resources {
+    pub input: Rc<RefCell<InputState>>,
+    pub nav: Rc<RefCell<NavigationGraph>>,
+    pub console: Rc<RefCell<ConsoleLogs>>,
+    pub camera: Rc<RefCell<Camera>>,
+    pub time: Rc<RefCell<Time>>,
+    pub script_manager: ScriptManager,
+    /// rapier3d simulation, rebuilt from the scene on Play and torn down on Stop.
+    /// `None` in edit mode. Shared (via `Rc`) with the script runtime so
+    /// `Physics.Raycast`/`Shoot` cast against the very same world the engine
+    /// hitscan does (#31).
+    pub physics: Rc<RefCell<Option<PhysicsWorld>>>,
+    pub is_playing: bool,
+    pub(super) was_playing: bool,
+    pub(super) pathfinding_points: Vec<glam::Vec3>,
+    /// Play-mode frame counter. Drives nav rebaking off a deterministic tick count
+    /// instead of the wall clock, so a fixed-timestep replay is bit-for-bit stable.
+    pub(super) play_frame: u64,
+    /// Edit-mode scene captured on Play and restored on Stop, so play-mode mutations
+    /// never leak back into the authoritative edit scene (Unity-style).
+    pub(super) edit_snapshot: Option<SceneSnapshot>,
+    /// The scaled per-frame delta (`Time::delta_time`) for the tick in flight, set by
+    /// `GameWorld::tick` before the schedule runs. Systems read it instead of taking
+    /// `dt` as a third argument, keeping the call shape `(&mut Scene, &mut Resources)`.
+    pub(super) frame_dt: f32,
+    /// The ordered per-stage system registry that drives the tick. Built once at
+    /// construction from `app::build()`, where every module self-registers.
+    pub(super) schedule: Schedule,
+}
+
+impl Resources {
+    /// Build the resource set from the shared engine-state handles. The script
+    /// runtime is wired to the same cells so live scripts and the engine agree.
+    pub fn new(
+        scene: Rc<RefCell<Scene>>,
+        input: Rc<RefCell<InputState>>,
+        nav: Rc<RefCell<NavigationGraph>>,
+        console: Rc<RefCell<ConsoleLogs>>,
+        camera: Rc<RefCell<Camera>>,
+        time: Rc<RefCell<Time>>,
+    ) -> Self {
+        let script_manager = ScriptManager::new(
+            scene,
+            Rc::clone(&input),
+            Rc::clone(&nav),
+            Rc::clone(&console),
+            Rc::clone(&camera),
+            Rc::clone(&time),
+        );
+        Self {
+            input,
+            nav,
+            console,
+            camera,
+            time,
+            script_manager,
+            physics: Rc::new(RefCell::new(None)),
+            is_playing: false,
+            was_playing: false,
+            pathfinding_points: Vec::new(),
+            play_frame: 0,
+            edit_snapshot: None,
+            frame_dt: 0.0,
+            schedule: super::build().into_schedule(),
+        }
+    }
+
+    /// The scaled per-frame delta for the tick in flight (`Time::delta_time`).
+    pub fn dt(&self) -> f32 {
+        self.frame_dt
+    }
+
+    /// Number of play-mode frames simulated since the last `enter_play`.
+    pub fn play_frame(&self) -> u64 {
+        self.play_frame
+    }
+
+    /// The debug nav path computed by the play-mode nav system.
+    pub fn pathfinding_points(&self) -> &[glam::Vec3] {
+        &self.pathfinding_points
+    }
+}

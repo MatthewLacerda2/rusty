@@ -40,14 +40,14 @@ fn run_emitter(seed: u64, frames: u32) -> Vec<(Vec3, f32, f32)> {
     let world = build_world(scene);
     {
         let mut w = world.borrow_mut();
-        w.is_playing = true;
+        w.set_playing(true);
         for _ in 0..frames {
             w.tick(1.0 / 60.0);
         }
     }
 
     let w = world.borrow();
-    let scene = w.scene.borrow();
+    let scene = w.scene().borrow();
     let e = scene.get_entity(id).unwrap();
     e.particles
         .as_ref()
@@ -114,13 +114,13 @@ fn max_particles_cap_is_respected() {
     let world = build_world(scene);
     {
         let mut w = world.borrow_mut();
-        w.is_playing = true;
+        w.set_playing(true);
         for _ in 0..120 {
             w.tick(1.0 / 60.0);
         }
     }
     let w = world.borrow();
-    let scene = w.scene.borrow();
+    let scene = w.scene().borrow();
     let count = scene
         .get_entity(id)
         .unwrap()

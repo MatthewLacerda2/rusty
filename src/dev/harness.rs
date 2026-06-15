@@ -72,7 +72,7 @@ impl Harness {
             Rc::clone(&console),
         );
         // Headless harness always runs the simulation (play mode).
-        world.is_playing = true;
+        world.set_playing(true);
 
         Self {
             world: Rc::new(RefCell::new(world)),
