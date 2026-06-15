@@ -9,7 +9,7 @@ use glam::Vec3;
 use crate::render::mesh as primitives;
 use crate::scene::{
     AnimatorComponent, ColliderComponent, ColliderShape, DirtyFlag, HealthComponent, MeshComponent,
-    RigidBodyComponent, Scene, ScriptComponent,
+    RigidBodyComponent, Scene, ScriptComponent, TextureComponent,
 };
 
 /// Bundled default player brain (movement + camera + weapon), seeded next to
@@ -32,6 +32,19 @@ fn mesh(primitive_type: &str, data: (Vec<primitives::Vertex>, Vec<u32>)) -> Mesh
         vertices: data.0,
         indices: data.1,
         is_dirty: DirtyFlag::new(true),
+    }
+}
+
+/// Colour-only texture component (empty path => no albedo map, just a tint).
+fn tint(color: [f32; 3]) -> TextureComponent {
+    TextureComponent {
+        path: String::new(),
+        is_dirty: false,
+        metallic: 0.0,
+        roughness: 0.5,
+        metallic_map: None,
+        roughness_map: None,
+        color,
     }
 }
 
@@ -83,6 +96,9 @@ pub fn build(scene: &mut Scene, bot_script: &str) {
             ..box_collider(Vec3::ONE)
         });
         player.rigidbody = Some(kinematic_body());
+        // Blue tint via the texture component (empty path => colour-only). The
+        // renderer reads colour from components, never from the entity name.
+        player.texture = Some(tint([0.3, 0.6, 1.0]));
         // The Player's movement + camera + weapon are NOT engine code: they live in
         // the bundled default player_controller.lua, attached here like any script.
         player.script = Some(ScriptComponent {

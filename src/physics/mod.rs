@@ -18,11 +18,14 @@ pub use world::PhysicsWorld;
 use crate::scene::Scene;
 
 /// The hitscan acceptance test shared by the engine hitscan and the Lua
-/// `Physics.Raycast`/`Shoot` bindings: never hit the Player (the shooter) or a
-/// dead entity. Routing both casts through this one predicate is what makes them
-/// return identical hits for the same ray.
+/// `Physics.Raycast`/`Shoot` bindings: never hit a dead entity. This is the only
+/// rule the engine imposes — it carries no notion of who the "shooter" is. A
+/// script excludes its own entity (so a shot can't hit the shooter) by passing an
+/// `ignore_id` to `Physics.Raycast`/`Shoot`; the engine never special-cases a
+/// name. Routing both casts through this one predicate is what makes them return
+/// identical hits for the same ray.
 pub fn is_hittable(scene: &Scene, id: u32) -> bool {
     scene
         .get_entity(id)
-        .is_some_and(|e| e.name != "Player" && e.health.as_ref().is_none_or(|h| !h.is_dead))
+        .is_some_and(|e| e.health.as_ref().is_none_or(|h| !h.is_dead))
 }
