@@ -8,6 +8,7 @@
 //! query pipeline instead.
 
 mod build;
+mod character;
 mod convert;
 mod world;
 
