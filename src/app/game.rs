@@ -3,8 +3,8 @@
 //! Owns the scene, input, navigation, console, script runtime and camera, and
 //! advances them one frame via `tick(dt)`. The windowed front-end (main.rs) and a
 //! future headless harness both drive the same `tick`; only the input source and
-//! the rendering differ. Storage is still the legacy `Scene` (Phase 0); the hecs
-//! migration is Phase 1.
+//! the rendering differ. Entity/component storage is the hecs-backed
+//! `ecs::World`, owned by `scene::Scene` (which adds the scene-level state).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -12,11 +12,10 @@ use std::rc::Rc;
 use glam::Vec3;
 
 use crate::core::input::InputState;
-use crate::core::scene::Scene;
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
 use crate::render::Camera;
-use crate::scene::SceneSnapshot;
+use crate::scene::{Scene, SceneSnapshot};
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
 

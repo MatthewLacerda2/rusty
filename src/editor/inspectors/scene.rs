@@ -1,5 +1,5 @@
-use crate::core::scene::Scene;
 use crate::editor::EditorUi;
+use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 use std::fs;
 use std::path::Path;

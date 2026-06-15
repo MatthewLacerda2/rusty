@@ -4,8 +4,8 @@ pub mod model;
 pub mod scene;
 pub mod script;
 
-use crate::core::scene::Scene;
 use crate::editor::EditorUi;
+use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 pub fn draw_inspector(

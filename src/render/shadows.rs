@@ -1,5 +1,5 @@
-use crate::core::scene::Scene;
 use crate::render::mesh::Vertex;
+use crate::scene::Scene;
 use glam::{Mat4, Vec3};
 use std::collections::HashMap;
 use wgpu::util::DeviceExt;

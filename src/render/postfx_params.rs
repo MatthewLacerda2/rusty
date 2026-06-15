@@ -7,7 +7,7 @@
 use glam::Mat4;
 
 use super::postfx::{PostParams, QualityPreset};
-use crate::core::scene::Scene;
+use crate::scene::Scene;
 
 /// Scan `scene` for the first active visual-correction volume and matching camera
 /// settings, and pack them into a `PostParams` for `postfx.wgsl`. Returns the
@@ -79,7 +79,7 @@ pub fn build_post_params(
 mod tests {
     use super::*;
     use crate::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
-    use crate::core::scene::Scene;
+    use crate::scene::Scene;
 
     fn scene_with_vc(vc: VisualCorrectionComponent, cam: Option<CameraComponent>) -> Scene {
         let mut scene = Scene::new();

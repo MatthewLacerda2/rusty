@@ -62,12 +62,14 @@ local function aim_camera(entity_id, dt)
 end
 
 -- Fire a hitscan on the rising edge of the shoot key (one shot per press).
-local function shoot(self)
+-- Passes entity_id as the ignore id so the shot can't hit the shooter itself —
+-- the "don't hit the Player" rule lives HERE, not as a name check in the engine.
+local function shoot(self, entity_id)
     local down = Input.IsKeyDown(SHOOT_KEY)
     if down and not self.shoot_was_down then
         local cx, cy, cz = Camera.GetPosition()
         local fx, fy, fz = Camera.GetForward()
-        Physics.Shoot(cx, cy, cz, fx, fy, fz, SHOOT_DAMAGE)
+        Physics.Shoot(cx, cy, cz, fx, fy, fz, SHOOT_DAMAGE, entity_id)
     end
     self.shoot_was_down = down
 end
@@ -77,7 +79,7 @@ end
 function PlayerController.drive(self, entity_id, dt)
     move(entity_id, dt)
     aim_camera(entity_id, dt)
-    shoot(self)
+    shoot(self, entity_id)
 end
 
 function PlayerController.Start(entity_id)

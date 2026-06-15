@@ -13,7 +13,7 @@ fn vec3(v: glam::Vec3) -> Value {
 }
 
 /// Snapshot a single entity into the stable observation shape.
-fn entity_json(e: &crate::core::scene::Entity) -> Value {
+fn entity_json(e: &crate::scene::Entity) -> Value {
     let health = e
         .health
         .as_ref()
