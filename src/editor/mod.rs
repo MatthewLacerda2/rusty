@@ -1,6 +1,8 @@
 use std::fs;
 
 pub mod bottom_panel;
+mod content_browser;
+mod content_grid;
 pub mod header;
 pub mod hierarchy;
 mod hierarchy_tree;
@@ -53,6 +55,8 @@ pub struct EditorUi {
     pub asset_model_import_normals: bool,
     pub asset_script_content: String,
     pub active_bottom_tab: String,
+    /// Content-browser name filter (the search bar above the tile grid).
+    pub asset_search: String,
 
     /// Whether the About dialog (File-bar → About) is currently open.
     pub show_about: bool,
@@ -109,6 +113,7 @@ impl EditorUi {
             asset_model_import_normals: true,
             asset_script_content: String::new(),
             active_bottom_tab: "assets".to_string(),
+            asset_search: String::new(),
             show_about: false,
             theme: theme::Theme::dark(),
             fonts_installed: false,
