@@ -11,16 +11,17 @@ pub fn draw(
     console: &mut ConsoleLogs,
     is_playing: &mut bool,
 ) {
+    let t = editor.theme;
     egui::TopBottomPanel::top("Header Panel")
         .frame(
             egui::Frame::none()
-                .fill(egui::Color32::from_rgb(22, 22, 30))
-                .inner_margin(8.0)
-                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(30, 30, 40))),
+                .fill(t.bg_tier2)
+                .inner_margin(t.space_sm)
+                .stroke(egui::Stroke::new(1.0, t.border)),
         )
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
-                let purple_bg = egui::Color32::from_rgb(124, 77, 255); // Premium indigo
+                let purple_bg = t.accent_purple;
 
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                     let play_btn = if *is_playing {

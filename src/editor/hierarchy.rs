@@ -5,16 +5,21 @@ use crate::scene::{LightComponent, LightType, MeshComponent, Scene};
 
 /// LEFT PANEL: Scene Hierarchy
 pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
+    let t = editor.theme;
     egui::SidePanel::left("Hierarchy Panel")
-        .width_range(220.0..=300.0)
+        .resizable(true)
+        .width_range(220.0..=340.0)
         .frame(
             egui::Frame::none()
-                .fill(egui::Color32::from_rgb(14, 14, 20))
-                .inner_margin(10.0)
-                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(30, 30, 40))),
+                .fill(t.bg_tier1)
+                .inner_margin(t.space_md)
+                .stroke(egui::Stroke::new(1.0, t.border)),
         )
         .show(ctx, |ui| {
-            ui.heading("📁 Scene Hierarchy");
+            ui.heading(format!(
+                "{}  Scene Hierarchy",
+                egui_phosphor::regular::TREE_STRUCTURE
+            ));
             ui.separator();
             ui.add_space(5.0);
 

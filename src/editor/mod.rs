@@ -10,6 +10,7 @@ mod inspector_gameplay;
 mod inspector_render;
 mod inspector_transform;
 pub mod inspectors;
+pub mod theme;
 
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
@@ -41,6 +42,13 @@ pub struct EditorUi {
     pub asset_model_import_normals: bool,
     pub asset_script_content: String,
     pub active_bottom_tab: String,
+
+    /// The active visual theme — the single source of truth for editor colors,
+    /// spacing and the type scale. Panels read tokens from here (or via
+    /// `theme::from_ui`) instead of hardcoding colors.
+    pub theme: theme::Theme,
+    /// Phosphor icon font is registered once, lazily, on the first draw.
+    fonts_installed: bool,
 
     /// Selected post-FX scalability tier. main.rs syncs this onto the renderer
     /// each frame so Low/Medium/High gate which passes run + buffer sizes.
@@ -87,6 +95,8 @@ impl EditorUi {
             asset_model_import_normals: true,
             asset_script_content: String::new(),
             active_bottom_tab: "assets".to_string(),
+            theme: theme::Theme::dark(),
+            fonts_installed: false,
             quality_preset: crate::render::postfx::QualityPreset::default(),
 
             #[cfg(feature = "dev")]
@@ -96,51 +106,14 @@ impl EditorUi {
         }
     }
 
-    /// Set up high-end professional dark theme styling with subtle cyan/teal accents (Unreal/Blender style)
-    pub fn apply_theme(&self, ctx: &egui::Context) {
-        let mut style = (*ctx.style()).clone();
-
-        let visuals = &mut style.visuals;
-        visuals.dark_mode = true;
-        visuals.override_text_color = Some(egui::Color32::from_rgb(228, 230, 235));
-
-        // Professional slate-gray-blue obsidian theme
-        let bg_dark = egui::Color32::from_rgb(16, 16, 22); // Main panels
-        let border_color = egui::Color32::from_rgb(35, 35, 45); // Borders
-        let widget_inactive = egui::Color32::from_rgb(28, 28, 36);
-        let widget_hovered = egui::Color32::from_rgb(38, 38, 50);
-        let widget_active = egui::Color32::from_rgb(46, 46, 62);
-
-        let accent_cyan = egui::Color32::from_rgb(0, 229, 255);
-        let accent_teal = egui::Color32::from_rgb(0, 242, 254);
-
-        visuals.widgets.noninteractive.bg_fill = bg_dark;
-        visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, border_color);
-
-        // Inactive widgets
-        visuals.widgets.inactive.bg_fill = widget_inactive;
-        visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, border_color);
-        visuals.widgets.inactive.rounding = egui::Rounding::same(4.0);
-
-        // Hovered widgets
-        visuals.widgets.hovered.bg_fill = widget_hovered;
-        visuals.widgets.hovered.fg_stroke = egui::Stroke::new(1.2, accent_cyan);
-        visuals.widgets.hovered.rounding = egui::Rounding::same(4.0);
-
-        // Active/Focused widgets
-        visuals.widgets.active.bg_fill = widget_active;
-        visuals.widgets.active.fg_stroke = egui::Stroke::new(1.5, accent_teal);
-        visuals.widgets.active.rounding = egui::Rounding::same(4.0);
-
-        visuals.selection.bg_fill = egui::Color32::from_rgb(0, 75, 90);
-
-        visuals.window_rounding = egui::Rounding::same(6.0);
-
-        // Tight spacing and clean layout parameters
-        style.spacing.item_spacing = egui::vec2(6.0, 6.0);
-        style.spacing.button_padding = egui::vec2(8.0, 4.0);
-
-        ctx.set_style(style);
+    /// Apply the active theme: register the Phosphor icon font once, then push the
+    /// token-derived [`egui::Style`] for this frame. See [`theme::Theme`].
+    pub fn apply_theme(&mut self, ctx: &egui::Context) {
+        if !self.fonts_installed {
+            theme::Theme::install_fonts(ctx);
+            self.fonts_installed = true;
+        }
+        self.theme.apply(ctx);
     }
 
     /// Read local assets folders to populate Asset Browser (legacy scan, kept for compatibility)

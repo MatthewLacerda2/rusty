@@ -16,16 +16,21 @@ pub fn draw(
     console: &mut ConsoleLogs,
     nav: &mut NavigationGraph,
 ) {
+    let t = editor.theme;
     egui::SidePanel::right("Inspector Panel")
-        .width_range(260.0..=340.0)
+        .resizable(true)
+        .width_range(260.0..=380.0)
         .frame(
             egui::Frame::none()
-                .fill(egui::Color32::from_rgb(14, 14, 20))
-                .inner_margin(10.0)
-                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(30, 30, 40))),
+                .fill(t.bg_tier1)
+                .inner_margin(t.space_md)
+                .stroke(egui::Stroke::new(1.0, t.border)),
         )
         .show(ctx, |ui| {
-            ui.heading("🔬 Properties Inspector");
+            ui.heading(format!(
+                "{}  Inspector",
+                egui_phosphor::regular::SLIDERS_HORIZONTAL
+            ));
             ui.separator();
             ui.add_space(5.0);
 
@@ -137,7 +142,8 @@ fn draw_entity_inspector(
 }
 
 fn draw_global_settings(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
-    ui.heading("🌍 Global Scene Settings");
+    let t = crate::editor::theme::from_ui(ui);
+    ui.heading(format!("{}  Scene Settings", egui_phosphor::regular::GLOBE));
     ui.separator();
     ui.add_space(5.0);
 
@@ -150,7 +156,7 @@ fn draw_global_settings(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
         }
     });
     ui.colored_label(
-        egui::Color32::from_rgb(120, 120, 140),
+        t.text_secondary,
         "Provide a path to a panoramic image\n(e.g. assets/textures/sky.png)",
     );
     ui.add_space(8.0);
@@ -182,7 +188,7 @@ fn draw_global_settings(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
     ui.separator();
     ui.add_space(5.0);
     ui.colored_label(
-        egui::Color32::from_rgb(100, 100, 130),
+        t.text_secondary,
         "Select an entity from Hierarchy\nor click a project asset to inspect.",
     );
 }

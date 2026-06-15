@@ -20,14 +20,12 @@ pub fn draw_script(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) 
             ui.text_edit_singleline(&mut script.path);
         });
 
+        let t = crate::editor::theme::from_ui(ui);
         let exists = Path::new(&script.path).exists();
         if exists {
-            ui.colored_label(
-                egui::Color32::from_rgb(0, 242, 254),
-                "✔ Loaded and ready to run",
-            );
+            ui.colored_label(t.accent_blue, "✔ Loaded and ready to run");
         } else {
-            ui.colored_label(egui::Color32::from_rgb(255, 60, 100), "❌ File not found!");
+            ui.colored_label(t.danger, "❌ File not found!");
         }
     }
     if remove_script {
