@@ -43,7 +43,14 @@ fn main() {
     );
 
     // 3. Initialize Core Render Engine & egui Context
-    let mut renderer = pollster::block_on(Renderer::new(Arc::clone(&window)));
+    let mut renderer = match pollster::block_on(Renderer::new(Arc::clone(&window))) {
+        Ok(r) => r,
+        Err(err) => {
+            eprintln!("[Engine] Could not initialize the renderer: {err}");
+            eprintln!("[Engine] No compatible GPU is available — exiting.");
+            std::process::exit(1);
+        }
+    };
     let egui_ctx = egui::Context::default();
 
     // Egui state integration
@@ -112,6 +119,13 @@ fn main() {
                     WindowEvent::CloseRequested => elwt.exit(),
                     WindowEvent::Resized(physical_size) => {
                         renderer.resize(*physical_size);
+                    }
+                    WindowEvent::ScaleFactorChanged { .. } => {
+                        // A DPI / display change (e.g. dragging between Retina and
+                        // non-Retina monitors) can invalidate the swapchain without a
+                        // Resized event. Reconfigure to the window's current inner size
+                        // so the surface stays valid.
+                        renderer.resize(window.inner_size());
                     }
                     WindowEvent::KeyboardInput {
                         event:
@@ -185,16 +199,30 @@ fn main() {
                         }
 
                         // --- GPU RENDER TICK ---
-                        let window_surface = renderer
-                            .surface
-                            .as_ref()
-                            .expect("windowed renderer must have a surface");
-                        let frame = match window_surface.get_current_texture() {
+                        let surface_frame = {
+                            let window_surface = renderer
+                                .surface
+                                .as_ref()
+                                .expect("windowed renderer must have a surface");
+                            window_surface.get_current_texture()
+                        };
+                        // Variant-specific surface recovery. `Lost`/`Outdated` only
+                        // recover by reconfiguring the surface — which never happens on
+                        // the per-frame path otherwise (only on Resized), so a surface
+                        // lost without a resize event would log forever. Reuse
+                        // `resize` (it reconfigures and guards zero-size) to recover.
+                        let frame = match surface_frame {
                             Ok(f) => f,
-                            Err(e) => {
-                                eprintln!("[WGPU] Swapchain error: {}", e);
+                            Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                                renderer.resize(renderer.size);
                                 return;
                             }
+                            Err(wgpu::SurfaceError::OutOfMemory) => {
+                                eprintln!("[WGPU] Surface out of memory — exiting");
+                                elwt.exit();
+                                return;
+                            }
+                            Err(wgpu::SurfaceError::Timeout) => return,
                         };
                         let view = frame
                             .texture
