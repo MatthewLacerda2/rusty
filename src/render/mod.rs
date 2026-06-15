@@ -17,6 +17,7 @@ mod postfx_params;
 mod setup;
 mod setup_headless;
 mod setup_resize;
+mod shadows_render;
 mod textures;
 
 use std::collections::HashMap;
