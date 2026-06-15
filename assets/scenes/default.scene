@@ -87,7 +87,19 @@
       "mesh": {
         "primitive_type": "Cylinder"
       },
-      "texture": null,
+      "texture": {
+        "path": "",
+        "is_dirty": false,
+        "metallic": 0.0,
+        "roughness": 0.5,
+        "metallic_map": null,
+        "roughness_map": null,
+        "color": [
+          0.3,
+          0.6,
+          1.0
+        ]
+      },
       "script": {
         "path": "project/assets/scripts/player_controller.lua",
         "is_loaded": false

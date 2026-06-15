@@ -1,5 +1,5 @@
-use crate::core::scene::Scene;
 use crate::editor::EditorUi;
+use crate::scene::Scene;
 use std::fs;
 use std::path::Path;
 
@@ -92,7 +92,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
         let (v, idx) = crate::render::mesh::generate_box(scale, scale, scale);
 
         if let Some(mut ent) = scene.get_entity_mut(new_ent_id) {
-            ent.mesh = Some(crate::core::scene::MeshComponent {
+            ent.mesh = Some(crate::scene::MeshComponent {
                 primitive_type: if is_fbx {
                     "FBX".to_string()
                 } else {
@@ -100,7 +100,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
                 },
                 vertices: v,
                 indices: idx,
-                is_dirty: crate::core::scene::DirtyFlag::new(true),
+                is_dirty: crate::scene::DirtyFlag::new(true),
             });
             editor.is_dirty = true;
 

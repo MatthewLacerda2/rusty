@@ -104,8 +104,12 @@ Rigidbody control plus raycast queries. `Raycast`/`Shoot` return
 | `Physics.SetVelocity` | `(id, vx, vy, vz)` | — |
 | `Physics.AddForce` | `(id, fx, fy, fz)` | — |
 | `Physics.SetKinematic` | `(id, is_kinematic)` | — |
-| `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz)` | `hit, entity_id, distance` |
-| `Physics.Shoot` | `(ox, oy, oz, dx, dy, dz, damage)` | `hit, entity_id, distance` (applies damage on hit) |
+| `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id])` | `hit, entity_id, distance` |
+| `Physics.Shoot` | `(ox, oy, oz, dx, dy, dz, damage [, ignore_id])` | `hit, entity_id, distance` (applies damage on hit) |
+
+The optional trailing `ignore_id` skips one entity in the cast — pass the shooter's
+own id so a shot can't hit its source. The engine has no built-in "don't hit the
+player" rule; the only thing it never hits is a dead entity.
 
 ## `Health`
 

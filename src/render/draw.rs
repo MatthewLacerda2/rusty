@@ -10,7 +10,7 @@ use super::{
     AmbientLightUniform, Camera, CameraUniform, DirectionalLightUniform, LightingUniform,
     PointLightUniform, Renderer, SpotlightUniform,
 };
-use crate::core::scene::{LightType, Scene};
+use crate::scene::{LightType, Scene};
 
 impl Renderer {
     /// Renders the 3D scene inside a viewport render pass

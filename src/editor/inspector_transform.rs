@@ -1,6 +1,6 @@
 use glam::Mat4;
 
-use crate::core::scene::Entity;
+use crate::scene::Entity;
 
 /// Transform editor with integrated parenting controls.
 #[allow(clippy::too_many_arguments)]

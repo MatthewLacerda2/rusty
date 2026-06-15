@@ -1,5 +1,5 @@
-use crate::core::scene::{Scene, ScriptComponent};
 use crate::editor::EditorUi;
+use crate::scene::{Scene, ScriptComponent};
 use crate::scripting::ConsoleLogs;
 use std::fs;
 use std::path::Path;

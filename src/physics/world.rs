@@ -24,7 +24,7 @@ use rapier3d::prelude::*;
 use super::build::{build_shape, classify, is_kinematic, order_pair, BodyClass};
 use super::character;
 use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
-use crate::core::scene::Scene;
+use crate::scene::Scene;
 
 pub struct PhysicsWorld {
     gravity: Vector<Real>,

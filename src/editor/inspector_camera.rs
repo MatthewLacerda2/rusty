@@ -1,4 +1,4 @@
-use crate::core::scene::{Entity, Tonemap};
+use crate::scene::{Entity, Tonemap};
 
 /// Camera Component panel
 pub fn draw_camera(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {

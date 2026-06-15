@@ -8,7 +8,7 @@ use super::draw_resources::{
 };
 use super::postfx::{PostFxContext, PostParams};
 use super::{Camera, Renderer};
-use crate::core::scene::{LightType, Scene};
+use crate::scene::{LightType, Scene};
 
 /// Per-frame post-FX inputs threaded into the scene pass (kept in one struct so
 /// `execute_scene_pass` doesn't blow the arg budget further).

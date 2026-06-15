@@ -9,9 +9,9 @@
 
 use glam::Vec3;
 use rusty::components::Tonemap;
-use rusty::core::scene::{MeshComponent, Scene, VisualCorrectionComponent};
 use rusty::dev::screenshot::capture;
 use rusty::render::Camera;
+use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
 
 fn tmp(name: &str) -> std::path::PathBuf {
     std::env::temp_dir().join(name)
@@ -44,7 +44,7 @@ fn scene_with_exposure(exposure: f32) -> Scene {
         primitive_type: "Box".to_string(),
         vertices,
         indices,
-        is_dirty: rusty::core::scene::DirtyFlag::new(true),
+        is_dirty: rusty::scene::DirtyFlag::new(true),
     });
     e.visual_correction = Some(vc(exposure));
     drop(e);

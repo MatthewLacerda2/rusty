@@ -11,8 +11,8 @@ use glam::Vec3;
 use rusty::app::GameWorld;
 use rusty::components::particle::{EmitMode, ParticleBlend, ParticleEmitterComponent};
 use rusty::core::input::InputState;
-use rusty::core::scene::Scene;
 use rusty::navigation::NavigationGraph;
+use rusty::scene::Scene;
 use rusty::scripting::ConsoleLogs;
 
 /// Build a play-mode world with a single seeded emitter and run `frames` ticks,
