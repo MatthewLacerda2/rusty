@@ -13,22 +13,24 @@
 
 use glam::Vec3;
 
-use super::game::GameWorld;
+use super::resources::Resources;
+use super::world::World;
 use crate::components::particle::{
     CollisionResponse, EmitMode, Particle, ParticleEmitterComponent, ParticleRng,
 };
 use crate::physics::PhysicsWorld;
 
-/// Advance every emitter in the scene by `dt`. The one localised call wired into
-/// the play loop.
-pub(super) fn tick_particles(g: &mut GameWorld, dt: f32) {
-    let ids = g.scene.borrow().entity_ids();
+/// Advance every emitter in the scene by `res.dt()`. The one localised call wired
+/// into the play loop, now a canonical `fn(&mut World, &mut Resources)` system.
+pub(super) fn tick_particles(world: &mut World, res: &mut Resources) {
+    let dt = res.frame_dt;
+    let ids = world.scene.borrow().entity_ids();
     for id in ids {
         // Pull the emitter + spawn origin out, simulate, then write it back. Taking
         // the component out avoids holding the scene borrow across the physics
         // ray-casts (which immutably borrow the scene through the filter).
         let taken = {
-            let mut scene = g.scene.borrow_mut();
+            let mut scene = world.scene.borrow_mut();
             let mut entity = match scene.get_entity_mut(id) {
                 Some(e) => e,
                 None => continue,
@@ -46,9 +48,9 @@ pub(super) fn tick_particles(g: &mut GameWorld, dt: f32) {
             None => continue,
         };
 
-        simulate_emitter(&mut emitter, origin, dt, &g.physics);
+        simulate_emitter(&mut emitter, origin, dt, &res.physics);
 
-        if let Some(mut entity) = g.scene.borrow_mut().get_entity_mut(id) {
+        if let Some(mut entity) = world.scene.borrow_mut().get_entity_mut(id) {
             entity.particles = Some(emitter);
         }
     }

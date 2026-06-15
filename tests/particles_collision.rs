@@ -74,13 +74,13 @@ fn run(scene: Scene, emitter: u32, frames: u32) -> (usize, f32, bool) {
     let world = build_world(scene);
     {
         let mut w = world.borrow_mut();
-        w.is_playing = true;
+        w.set_playing(true);
         for _ in 0..frames {
             w.tick(1.0 / 60.0);
         }
     }
     let w = world.borrow();
-    let scene = w.scene.borrow();
+    let scene = w.scene().borrow();
     let e = scene.get_entity(emitter).unwrap();
     let ps = &e.particles.as_ref().unwrap().runtime.particles;
     let max_x = ps.iter().map(|p| p.position.x).fold(f32::MIN, f32::max);

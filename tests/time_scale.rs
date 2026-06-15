@@ -12,9 +12,9 @@ fn travel_at_scale(scale: f32, frames: u32) -> f32 {
 
     let (player_id, start) = {
         let world = h.world.borrow();
-        world.time.borrow_mut().set_time_scale(scale);
-        world.input.borrow_mut().set_key_state("W", true);
-        let scene = world.scene.borrow();
+        world.time().borrow_mut().set_time_scale(scale);
+        world.input().borrow_mut().set_key_state("W", true);
+        let scene = world.scene().borrow();
         let id = scene.find_entity_by_name("Player").expect("Player exists");
         let pos = scene.get_entity(id).unwrap().transform.position;
         (id, pos)
@@ -23,7 +23,7 @@ fn travel_at_scale(scale: f32, frames: u32) -> f32 {
     h.step(frames);
 
     let world = h.world.borrow();
-    let scene = world.scene.borrow();
+    let scene = world.scene().borrow();
     let end = scene.get_entity(player_id).unwrap().transform.position;
     (end - start).length()
 }

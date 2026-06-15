@@ -13,10 +13,16 @@
 //! run, and `GameWorld::tick` drives the schedule. `FixedUpdate` is the
 //! deterministic fixed-dt stage the headless harness steps, so every simulation
 //! system belongs there; the per-frame order is unchanged.
+//!
+//! Each system is the canonical `fn(&mut World, &mut Resources)` (#39): the scene
+//! is reached through `world.scene` (a short-lived borrow, so re-entrant scripts can
+//! borrow it too), the engine singletons through `res`, and the scaled per-frame
+//! delta through `res.dt()`.
 
-use super::game::GameWorld;
 use super::registry::App;
+use super::resources::Resources;
 use super::stage::Stage;
+use super::world::World;
 
 const PLAYER_NAME: &str = "Player";
 const ENEMY_NAME: &str = "Enemy_1";
@@ -39,37 +45,38 @@ pub(super) fn register(app: &mut App) {
 }
 
 /// Drive every entity script's `Update`.
-fn update_scripts(g: &mut GameWorld, dt: f32) {
-    g.script_manager.update_scripts(dt);
+fn update_scripts(_world: &mut World, res: &mut Resources) {
+    res.script_manager.update_scripts(res.frame_dt);
 }
 
 /// Step the rapier world and dispatch any resulting trigger events to scripts.
-fn step_physics(g: &mut GameWorld, dt: f32) {
+fn step_physics(world: &mut World, res: &mut Resources) {
+    let dt = res.frame_dt;
     let triggers = {
-        let mut s = g.scene.borrow_mut();
-        match g.physics.borrow_mut().as_mut() {
+        let mut s = world.scene.borrow_mut();
+        match res.physics.borrow_mut().as_mut() {
             Some(physics) => physics.step(&mut s, dt),
             None => Vec::new(),
         }
     };
     if !triggers.is_empty() {
-        g.script_manager.dispatch_trigger_events(triggers);
+        res.script_manager.dispatch_trigger_events(triggers);
     }
 }
 
 /// Advance the deterministic play-mode frame counter (drives the rebake cadence).
-fn advance_frame(g: &mut GameWorld, _dt: f32) {
-    g.play_frame += 1;
+fn advance_frame(_world: &mut World, res: &mut Resources) {
+    res.play_frame += 1;
 }
 
 /// Rebake the navmesh once per second (every `REBAKE_INTERVAL_FRAMES` frames) and
 /// recompute the Enemy→Player debug path.
-fn rebake_and_path(g: &mut GameWorld, _dt: f32) {
-    if !g.play_frame.is_multiple_of(REBAKE_INTERVAL_FRAMES) {
+fn rebake_and_path(world: &mut World, res: &mut Resources) {
+    if !res.play_frame.is_multiple_of(REBAKE_INTERVAL_FRAMES) {
         return;
     }
-    let s = g.scene.borrow();
-    g.nav.borrow_mut().bake(&s);
+    let s = world.scene.borrow();
+    res.nav.borrow_mut().bake(&s);
     let enemy_pos = s
         .find_entity_by_name(ENEMY_NAME)
         .and_then(|id| s.get_entity(id))
@@ -79,7 +86,7 @@ fn rebake_and_path(g: &mut GameWorld, _dt: f32) {
         .and_then(|id| s.get_entity(id))
         .map(|e| e.transform.position);
     if let (Some(enemy_pos), Some(player_pos)) = (enemy_pos, player_pos) {
-        let grid = g.nav.borrow();
+        let grid = res.nav.borrow();
         let (es_x, es_z) = grid.world_to_grid(enemy_pos);
         let (pl_x, pl_z) = grid.world_to_grid(player_pos);
         let mut pts = vec![enemy_pos];
@@ -89,18 +96,19 @@ fn rebake_and_path(g: &mut GameWorld, _dt: f32) {
             }
         }
         pts.push(player_pos);
-        g.pathfinding_points = pts;
+        res.pathfinding_points = pts;
     }
 }
 
-fn tick_nav(g: &mut GameWorld, dt: f32) {
-    let mut s = g.scene.borrow_mut();
-    let nav = g.nav.borrow();
-    nav.tick_nav_agents(&mut s, dt);
+fn tick_nav(world: &mut World, res: &mut Resources) {
+    let mut s = world.scene.borrow_mut();
+    let nav = res.nav.borrow();
+    nav.tick_nav_agents(&mut s, res.frame_dt);
 }
 
-fn animate(g: &mut GameWorld, dt: f32) {
-    let mut s = g.scene.borrow_mut();
+fn animate(world: &mut World, res: &mut Resources) {
+    let dt = res.frame_dt;
+    let mut s = world.scene.borrow_mut();
     for id in s.entity_ids() {
         if let Some(mut entity) = s.get_entity_mut(id) {
             if !entity.active {

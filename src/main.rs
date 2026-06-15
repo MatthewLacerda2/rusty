@@ -124,7 +124,7 @@ fn main() {
                     } => {
                         let pressed = *state == ElementState::Pressed;
                         {
-                            let mut inp = game.input.borrow_mut();
+                            let mut inp = game.input().borrow_mut();
                             match key {
                                 KeyCode::KeyW => inp.set_key_state("W", pressed),
                                 KeyCode::KeyA => inp.set_key_state("A", pressed),
@@ -142,15 +142,15 @@ fn main() {
                             }
                         }
                         // Hit ESC in PlayMode to unlock cursor (platform-side transition)
-                        if *key == KeyCode::Escape && pressed && game.is_playing {
-                            game.is_playing = false;
-                            game.console
+                        if *key == KeyCode::Escape && pressed && game.is_playing() {
+                            game.set_playing(false);
+                            game.console()
                                 .borrow_mut()
                                 .info("Unlocked cursor, entering EditorMode".to_string());
                         }
                     }
                     WindowEvent::CursorMoved { position, .. } => {
-                        game.input.borrow_mut().mouse_position = (position.x, position.y);
+                        game.input().borrow_mut().mouse_position = (position.x, position.y);
                     }
                     WindowEvent::RedrawRequested => {
                         // Compute timing metrics
@@ -202,13 +202,13 @@ fn main() {
 
                         // Render the 3D scene (Forward unlit/lit + gizmos line drawers)
                         {
-                            let s = game.scene.borrow();
-                            let cam = game.camera.borrow();
+                            let s = game.scene().borrow();
+                            let cam = game.camera().borrow();
                             renderer.render(
                                 &s,
                                 &cam,
                                 &view,
-                                !game.is_playing,
+                                !game.is_playing(),
                                 game.pathfinding_points(),
                             );
                         }
@@ -220,15 +220,15 @@ fn main() {
 
                             // Draw Editor dashboard UI
                             {
-                                let mut s = game.scene.borrow_mut();
-                                let mut c = game.console.borrow_mut();
-                                let mut n = game.nav.borrow_mut();
+                                let mut s = game.world.scene.borrow_mut();
+                                let mut c = game.resources.console.borrow_mut();
+                                let mut n = game.resources.nav.borrow_mut();
                                 editor_ui.draw(
                                     &egui_ctx,
                                     &mut s,
                                     &mut c,
                                     &mut n,
-                                    &mut game.is_playing,
+                                    &mut game.resources.is_playing,
                                     fps,
                                     current_frame_duration,
                                 );
@@ -245,9 +245,9 @@ fn main() {
                             // and the harness share `dev::console::evaluate_line`.
                             #[cfg(feature = "dev")]
                             if let Some(line) = editor_ui.pending_repl.take() {
-                                let mut c = game.console.borrow_mut();
+                                let mut c = game.resources.console.borrow_mut();
                                 let _ = rusty::dev::console::evaluate_line(
-                                    &game.script_manager,
+                                    game.script_manager(),
                                     &mut c,
                                     &line,
                                 );

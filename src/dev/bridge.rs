@@ -116,7 +116,7 @@ fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
         "AttachPlayerBot",
         lua.create_function(move |_, path: String| {
             let w = world.borrow();
-            let attached = super::botplayer::attach_player_bot(&mut w.scene.borrow_mut(), &path);
+            let attached = super::botplayer::attach_player_bot(&mut w.scene().borrow_mut(), &path);
             Ok(attached)
         })?,
     )?;
@@ -130,7 +130,7 @@ fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     scene_t.set(
         "FindEntityByName",
         lua.create_function(move |_, name: String| {
-            Ok(world.borrow().scene.borrow().find_entity_by_name(&name))
+            Ok(world.borrow().scene().borrow().find_entity_by_name(&name))
         })?,
     )?;
     lua.globals().set("Scene", scene_t)?;
@@ -141,7 +141,7 @@ fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
         "GetPosition",
         lua.create_function(move |_, id: u32| {
             let w = world.borrow();
-            let s = w.scene.borrow();
+            let s = w.scene().borrow();
             let p = s
                 .get_entity(id)
                 .map(|e| e.transform.position)
@@ -157,7 +157,7 @@ fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
         "Get",
         lua.create_function(move |_, id: u32| {
             let w = world.borrow();
-            let s = w.scene.borrow();
+            let s = w.scene().borrow();
             let hp = s
                 .get_entity(id)
                 .and_then(|e| e.health.as_ref().map(|h| h.current_health))
@@ -173,7 +173,7 @@ fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
         "GetClip",
         lua.create_function(move |_, id: u32| {
             let w = world.borrow();
-            let s = w.scene.borrow();
+            let s = w.scene().borrow();
             let clip = s
                 .get_entity(id)
                 .and_then(|e| e.animator.as_ref().map(|a| a.current_clip.clone()))
@@ -191,7 +191,7 @@ fn register_input(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     t.set(
         "Press",
         lua.create_function(move |_, key: String| {
-            world.borrow().input.borrow_mut().press(&key);
+            world.borrow().input().borrow_mut().press(&key);
             Ok(())
         })?,
     )?;
@@ -200,7 +200,7 @@ fn register_input(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     t.set(
         "Release",
         lua.create_function(move |_, key: String| {
-            world.borrow().input.borrow_mut().release(&key);
+            world.borrow().input().borrow_mut().release(&key);
             Ok(())
         })?,
     )?;
