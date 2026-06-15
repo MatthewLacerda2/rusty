@@ -5,7 +5,6 @@
 | Unit tests | `#[cfg(test)] mod tests` in the same file | `cargo test` |
 | Integration tests | `tests/*.rs` (crate-level) | `cargo test` |
 | Harness scenarios | `project/scenarios/*.lua` (dev-only) | the headless `play` binary |
-| Snapshot tests | `insta` snapshots of `results.json` (later) | `cargo insta test` |
 
 ## Rules
 - Test and fixture files are capped at **150 lines** by the size gate
