@@ -140,6 +140,7 @@ impl Renderer {
 
         let frame = ScenePassFrame {
             view_texture,
+            camera,
             editor_mode,
             post_params,
             bloom_enabled,

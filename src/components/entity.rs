@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     AnimatorComponent, CameraComponent, ColliderComponent, HealthComponent, LightComponent,
-    MeshComponent, NavMeshAgentComponent, RigidBodyComponent, ScriptComponent, TextureComponent,
-    TransformComponent, VisualCorrectionComponent,
+    MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent, RigidBodyComponent,
+    ScriptComponent, TextureComponent, TransformComponent, VisualCorrectionComponent,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -33,6 +33,8 @@ pub struct Entity {
     pub nav_agent: Option<NavMeshAgentComponent>,
     pub camera: Option<CameraComponent>,
     pub visual_correction: Option<VisualCorrectionComponent>,
+    #[serde(default)]
+    pub particles: Option<ParticleEmitterComponent>,
     pub parent_id: Option<u32>,
     pub children: Vec<u32>,
 }
@@ -56,6 +58,7 @@ impl Entity {
             nav_agent: None,
             camera: None,
             visual_correction: None,
+            particles: None,
             parent_id: None,
             children: Vec::new(),
         }

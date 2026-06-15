@@ -7,13 +7,14 @@ use super::draw_resources::{
     AabbResource, AxisResource, GridResource, OutlineResource, SolidResource,
 };
 use super::postfx::{PostFxContext, PostParams};
-use super::Renderer;
+use super::{Camera, Renderer};
 use crate::core::scene::{LightType, Scene};
 
 /// Per-frame post-FX inputs threaded into the scene pass (kept in one struct so
 /// `execute_scene_pass` doesn't blow the arg budget further).
 pub(super) struct ScenePassFrame<'a> {
     pub view_texture: &'a wgpu::TextureView,
+    pub camera: &'a Camera,
     pub editor_mode: bool,
     pub post_params: PostParams,
     pub bloom_enabled: bool,
@@ -32,6 +33,7 @@ impl Renderer {
         axis_arrow_resources: &[AxisResource],
     ) {
         let view_texture = frame.view_texture;
+        let camera = frame.camera;
         let editor_mode = frame.editor_mode;
         // 4. Render Pass Setup
         let mut encoder = self
@@ -230,6 +232,10 @@ impl Renderer {
 
         // 6. Submit the scene pass (it filled the HDR target + depth).
         self.queue.submit(std::iter::once(encoder.finish()));
+
+        // 6b. Draw billboard particles into the HDR target (after solids/skybox,
+        // before post-FX) so bloom/tonemap apply to additive sparks/fire.
+        self.draw_particles(scene, camera);
 
         // 7. Run the post-process chain: HDR scene + depth -> corrected output.
         let skybox_view = self
