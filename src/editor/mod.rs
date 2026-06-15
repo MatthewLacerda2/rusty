@@ -3,6 +3,7 @@ use std::fs;
 pub mod bottom_panel;
 pub mod header;
 pub mod hierarchy;
+mod hierarchy_tree;
 pub mod inspector;
 mod inspector_add;
 mod inspector_camera;
