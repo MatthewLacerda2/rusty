@@ -5,13 +5,39 @@ components, scripts with `Update()`), built with **agentic coding in mind** — 
 agent can drive, observe, and play-test it headlessly.
 
 ## Start here
-- **README.md** — how the engine works (brief on the Unity-shaped parts, detailed on
-  the agentic dev layer).
-- **ARCHITECTURE.md** — the module map + conceptual overview of the engine.
+- **README.md** — what the engine is and what you can do with it.
 - **docs/** — `linting.md` (the gate), `testing.md`, `scripting-api.md` (the Lua API
-  game scripts use). The Rust API is generated: `cargo doc --no-deps`.
+  game scripts use). The Rust API reference is generated: `cargo doc --no-deps`.
 - **auxmd.md** *(gitignored)* — the operator's short-term scratchpad; read it if a
   session points you there.
+
+## Architecture — the conceptual model
+A high-level map of how the engine is shaped. It deliberately doesn't enumerate every
+concrete type — that inventory lives in the rustdoc reference (`cargo doc --no-deps`)
+and the script surface in `docs/scripting-api.md`. Everything in the engine is one of
+five kinds of moving part (Unity analogs in parentheses):
+
+1. **Resources** — engine singletons, one per World (Unity's engine statics: `Time`,
+   `Input`, the nav graph, the console, the active camera, play-state, the renderer).
+   Global state the systems read and write.
+2. **Components** — per-entity data, the Unity-style "classes" (`Transform`, `Mesh`,
+   `Camera`, `Light`, `Collider`, `Rigidbody`, `NavMeshAgent`, `Health`, `Animator`,
+   …). First-class and engine-provided; systems expect them. Every entity has exactly
+   one `Transform` (mandatory, cannot be removed); all others are optional. Custom
+   behaviour goes in *scripts*, never in new built-in components.
+3. **Systems** — per-frame logic, a plain `fn(&mut World, &mut Resources)`, grouped
+   into ordered stages (`Startup` once, then each frame
+   `FixedUpdate → Update → LateUpdate → Render`). Order within a stage is the order
+   modules `register` them. `FixedUpdate` is the deterministic, fixed-dt stage the
+   headless harness steps.
+4. **Scene & serialization** — one active scene as a serde `SceneData` document
+   (references + values, no GPU buffers). Save/load replaces the World; a
+   clone-on-Play / restore-on-Stop snapshot makes edit-mode authoritative, mirroring
+   Unity's play-mode behaviour.
+5. **The API surface** — one stable set of namespaces (`Transform`, `Input`, `Time`,
+   `Physics`, `Scene`, `Animator`, `Nav`, `Health`, `Camera`, `Material`, and the
+   dev-only `Debug`) shared by gameplay scripts, the console REPL, and bot-players.
+   One surface, three callers — they never drift apart.
 
 ## Conventions that matter
 - **ECS via `hecs`.** `Transform` is the one mandatory component; all others optional.
@@ -19,34 +45,20 @@ agent can drive, observe, and play-test it headlessly.
   cross-system signals are direct typed returns.
 - **Dev-only build profile.** The console/REPL, harness, bot-players, and `Debug.*`
   live behind the `dev` Cargo feature and are stripped from ship builds.
+- **Determinism.** The sim is a pure function of (seed, inputs, fixed dt). Wall-clock
+  reads and unseeded RNG are banned from the sim modules (`app`, `scripting`,
+  `physics`, `navigation`); the platform layer (`main.rs`, `render`, `dev`) is exempt.
 - **Use `glam`** for all math; keep egui / wgpu / mlua decoupled.
-- **Single crate** for now; split into a Cargo workspace later.
+- **Single crate.**
 
 ## Commit gate (programmatic — no AI needed)
 Commits are blocked unless the checks pass; failures are written to
 `.lint/report.txt`. See **docs/linting.md**.
 - Size gate: `cargo run --manifest-path tools/lint/Cargo.toml` (files ≤ 300 lines,
-  test/fixture files ≤ 150). Style is rustfmt; **clippy is a hard gate** (`-D
+  test/fixture files ≤ 150). Style is rustfmt; **clippy is a hard gate** in CI (`-D
   warnings`, both feature sets).
 - **Determinism guard:** `cargo run --manifest-path tools/lint/Cargo.toml --
   --determinism` — fails on wall-clock / unseeded RNG in the sim modules (`app`,
   `scripting`, `physics`, `navigation`); it protects the harness's reproducibility.
-- `tools/lint/baseline.txt` grandfathers the legacy monoliths. It's a **burn-down
-  list** — remove entries as you split/migrate, never add to it.
-
-## Status
-**Phase 2 complete & merged.** `app/`, `ecs/`, `components/`, `scene/`, `api/`,
-`dev/` are implemented: hecs ECS storage, the headless harness + `play` binary, the
-scripting API (Health/Time/Camera/Physics/Input/Debug), scene save/load
-(`assets/scenes/default.scene` + clone-on-Play), offscreen screenshots, the
-console+REPL, the bot-player, and rapier3d physics. `main` is branch-protected
-(CI green + up-to-date required to merge).
-
-**Resuming a fresh session?** The open GitHub **PRs and issues are the live to-do
-list** — list them first. Phase 3 (human-overseen) currently covers: particles,
-post-FX (the UI-only "dead knobs"), raycast unification, de-hardcoding
-gameplay→scripts, and the kinematic character controller. The de-hardcode issue
-moved the player controller / weapon / damage into bundled Lua scripts and removed
-the winit-only `space_pressed`/`mouse_left_clicked` input fields and the
-`"Antigravity"` boot print; the remaining `entity.name == "Player"` branches in
-physics/render are the last weed to root out there.
+- `tools/lint/baseline.txt` grandfathers the files that currently exceed the size
+  cap. It's a **burn-down list** — remove entries as you split them, never add to it.
