@@ -5,8 +5,10 @@
 //! from the scene on entering Play and stepped once per fixed physics tick:
 //!
 //!   1. `sync_to_rapier`  — push the (externally mutated) component transforms and
-//!      velocities into rapier. Kinematic bodies get a next-pose target; dynamic
-//!      bodies get their pose + linear velocity; static bodies stay put.
+//!      velocities into rapier. Kinematic bodies (player/enemy) are routed through
+//!      the `KinematicCharacterController` (collide-and-slide vs. walls; see
+//!      `character`) and given the corrected next pose; dynamic bodies get their
+//!      pose + linear velocity; static bodies stay put.
 //!   2. `step`            — advance the rapier world by `dt` under gravity.
 //!   3. `sync_from_rapier`— write the integrated transforms + velocities back onto
 //!      the entities, and return the trigger/collision pairs scripts expect.
@@ -16,9 +18,11 @@
 use std::collections::HashMap;
 
 use glam::Vec3;
+use rapier3d::control::KinematicCharacterController;
 use rapier3d::prelude::*;
 
 use super::build::{build_shape, classify, is_kinematic, order_pair, BodyClass};
+use super::character;
 use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
 use crate::core::scene::Scene;
 
@@ -35,6 +39,8 @@ pub struct PhysicsWorld {
     multibody_joints: MultibodyJointSet,
     ccd_solver: CCDSolver,
     query_pipeline: QueryPipeline,
+    /// Collide-and-slide controller for kinematic (player/enemy) bodies.
+    character_controller: KinematicCharacterController,
     /// stable entity id -> rigid-body handle.
     id_to_body: HashMap<u32, RigidBodyHandle>,
     /// collider handle -> stable entity id (for event/raycast lookup).
@@ -60,6 +66,7 @@ impl PhysicsWorld {
             multibody_joints: MultibodyJointSet::new(),
             ccd_solver: CCDSolver::new(),
             query_pipeline: QueryPipeline::new(),
+            character_controller: character::controller(),
             id_to_body: HashMap::new(),
             collider_to_id: HashMap::new(),
             id_is_trigger: HashMap::new(),
@@ -126,8 +133,12 @@ impl PhysicsWorld {
     }
 
     /// Push current component state into rapier before stepping.
-    fn sync_to_rapier(&mut self, scene: &Scene) {
-        for (&id, &handle) in &self.id_to_body {
+    fn sync_to_rapier(&mut self, scene: &Scene, dt: f32) {
+        // Snapshot handles to avoid borrowing the map while the body sets below
+        // borrow `self.bodies` / `self.colliders` mutably or immutably.
+        let entries: Vec<(u32, RigidBodyHandle)> =
+            self.id_to_body.iter().map(|(&id, &h)| (id, h)).collect();
+        for (id, handle) in entries {
             let (pos, rot, vel, active, kinematic, is_static) = {
                 let entity = match scene.get_entity(id) {
                     Some(e) => e,
@@ -149,16 +160,32 @@ impl PhysicsWorld {
                 )
             };
 
-            let body = match self.bodies.get_mut(handle) {
-                Some(b) => b,
-                None => continue,
-            };
+            if self.bodies.get(handle).is_none() {
+                continue;
+            }
+            if kinematic {
+                // Route the script/input-set move through the controller so the
+                // body collides-and-slides against walls instead of teleporting.
+                let next = character::corrected_next_pose(
+                    &self.character_controller,
+                    character::RapierRefs {
+                        bodies: &self.bodies,
+                        colliders: &self.colliders,
+                        queries: &self.query_pipeline,
+                    },
+                    handle,
+                    to_iso(pos, rot),
+                    dt,
+                );
+                let body = &mut self.bodies[handle];
+                body.set_enabled(active);
+                body.set_next_kinematic_position(next);
+                continue;
+            }
+            let body = &mut self.bodies[handle];
             body.set_enabled(active);
             if is_static {
                 body.set_position(to_iso(pos, rot), true);
-            } else if kinematic {
-                // Drive kinematic bodies to their script/input-set pose this step.
-                body.set_next_kinematic_position(to_iso(pos, rot));
             } else {
                 // Dynamic: trust rapier for pose, but let scripts inject velocity
                 // (SetVelocity / AddForce mutate the component between ticks).
@@ -170,7 +197,7 @@ impl PhysicsWorld {
     /// Advance the rapier world by `dt` and surface trigger/collision pairs.
     pub fn step(&mut self, scene: &mut Scene, dt: f32) -> Vec<(u32, u32)> {
         self.integration_parameters.dt = dt;
-        self.sync_to_rapier(scene);
+        self.sync_to_rapier(scene, dt);
 
         self.physics_pipeline.step(
             &self.gravity,
