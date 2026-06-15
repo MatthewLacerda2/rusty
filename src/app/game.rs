@@ -20,6 +20,8 @@ use crate::scene::SceneSnapshot;
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
 
+use super::Schedule;
+
 /// Reported by `tick` so the platform layer can react (e.g. grab the cursor)
 /// without the simulation knowing about the window.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -51,6 +53,10 @@ pub struct GameWorld {
     /// (via `Rc`) with the script runtime so `Physics.Raycast`/`Shoot` cast
     /// against the very same world the engine hitscan does (#31).
     pub(super) physics: Rc<RefCell<Option<PhysicsWorld>>>,
+    /// The ordered per-stage system registry that drives the tick. Built once at
+    /// construction from `app::build()`, where every module self-registers its
+    /// systems. Replaces the old hand-wired `play.rs` call sequence.
+    schedule: Schedule,
 }
 
 impl GameWorld {
@@ -88,6 +94,7 @@ impl GameWorld {
             play_frame: 0,
             edit_snapshot: None,
             physics: Rc::new(RefCell::new(None)),
+            schedule: super::build().into_schedule(),
         }
     }
 
@@ -103,11 +110,23 @@ impl GameWorld {
             time.delta_time
         };
         if self.is_playing {
-            super::play::run(self, scaled_dt);
+            // Run the schedule's per-frame stages. The schedule is moved out for
+            // the call (its systems take `&mut self`) and restored after, avoiding
+            // a self-aliasing borrow. The `Startup` stage runs once, on the Play
+            // transition handled in `enter_play`.
+            self.run_schedule_frame(scaled_dt);
         } else {
             self.editor_fly(dt);
         }
         transition
+    }
+
+    /// Run the schedule's per-frame stages against `self`. The schedule is borrowed
+    /// out via `mem::take` for the duration so its systems can take `&mut self`.
+    fn run_schedule_frame(&mut self, dt: f32) {
+        let schedule = std::mem::take(&mut self.schedule);
+        schedule.run_frame(self, dt);
+        self.schedule = schedule;
     }
 
     pub fn pathfinding_points(&self) -> &[Vec3] {
@@ -180,6 +199,13 @@ impl GameWorld {
         // for every entity with a ColliderComponent. Stepped each frame in play.
         // Shared with the script runtime's Physics.Raycast/Shoot bindings.
         *self.physics.borrow_mut() = Some(PhysicsWorld::from_scene(&self.scene.borrow()));
+
+        // Run the one-shot `Startup` stage now that the Play session is fully set
+        // up. No built-in module registers Startup systems yet; this is the wired
+        // hook modules will register into (Unity's `Start`).
+        let schedule = std::mem::take(&mut self.schedule);
+        schedule.run_startup(self, 0.0);
+        self.schedule = schedule;
     }
 
     fn exit_play(&mut self) {
