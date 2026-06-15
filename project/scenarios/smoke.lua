@@ -29,10 +29,15 @@ local moved = math.abs(ex - sx) + math.abs(ez - sz)
 Harness.Expect(moved > 0.1, "holding W moves the player")
 Harness.Expect(Harness.Frame() == 120, "exactly 120 ticks were simulated")
 
--- StepUntil: skip up to 120 more ticks; the enemy keeps its Walk clip the whole time.
-local stopped = Harness.StepUntil(function()
-    return Animator.GetClip(enemy) ~= "Walk"
+-- The player is now driven by the bundled player_controller.lua and the enemy by
+-- bot.lua — pure script-driven gameplay (no engine control scheme). Skip ahead and
+-- confirm the enemy's animator is being driven by its script the whole window (its
+-- clip is always one of its real clips, never empty).
+local broke = Harness.StepUntil(function()
+    local clip = Animator.GetClip(enemy)
+    return clip ~= "Walk" and clip ~= "Idle"
 end, 120)
-Harness.Expect(stopped == false, "enemy stays in Walk for the observation window")
+Harness.Expect(broke == false, "enemy animator stays script-driven (Walk/Idle)")
+Harness.Log(string.format("enemy clip at end: %s", Animator.GetClip(enemy)))
 
 Harness.Log("smoke scenario complete")

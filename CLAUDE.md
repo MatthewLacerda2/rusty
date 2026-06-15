@@ -45,7 +45,8 @@ console+REPL, the bot-player, and rapier3d physics. `main` is branch-protected
 **Resuming a fresh session?** The open GitHub **PRs and issues are the live to-do
 list** — list them first. Phase 3 (human-overseen) currently covers: particles,
 post-FX (the UI-only "dead knobs"), raycast unification, de-hardcoding
-gameplay→scripts, and the kinematic character controller. Known leftover weeds to
-root out: `entity.name == "Player"` branches in physics/render, the winit-only
-`space_pressed`/`mouse_left_clicked` input fields, and the `"Antigravity"` boot
-print (all tracked in the de-hardcode issue).
+gameplay→scripts, and the kinematic character controller. The de-hardcode issue
+moved the player controller / weapon / damage into bundled Lua scripts and removed
+the winit-only `space_pressed`/`mouse_left_clicked` input fields and the
+`"Antigravity"` boot print; the remaining `entity.name == "Player"` branches in
+physics/render are the last weed to root out there.

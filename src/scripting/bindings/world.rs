@@ -90,6 +90,29 @@ pub fn register_camera(lua: &Lua, camera: &Rc<RefCell<Camera>>) -> Reg {
         }),
     )?;
 
+    // Forward / right basis vectors derived from yaw+pitch. Pure engine math
+    // (`Camera::forward`/`right`) exposed so a controller script can move and aim
+    // relative to where the camera looks, instead of re-deriving the trig in Lua.
+    let c = Rc::clone(camera);
+    put(
+        &table,
+        "GetForward",
+        lua.create_function(move |_, ()| {
+            let f = c.borrow().forward();
+            Ok((f.x, f.y, f.z))
+        }),
+    )?;
+
+    let c = Rc::clone(camera);
+    put(
+        &table,
+        "GetRight",
+        lua.create_function(move |_, ()| {
+            let r = c.borrow().right();
+            Ok((r.x, r.y, r.z))
+        }),
+    )?;
+
     let c = Rc::clone(camera);
     put(
         &table,

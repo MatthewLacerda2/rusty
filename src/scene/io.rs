@@ -29,6 +29,13 @@ pub const DEFAULT_SCENE_SOURCE: &str = "assets/scenes/default.scene";
 /// Where the default scene is seeded into the gitignored project workspace.
 pub const DEFAULT_SCENE_PATH: &str = "project/scenes/default.scene";
 
+/// Tracked authoritative copies of the bundled default scripts (the player
+/// controller + the enemy brain) that ship WITH the engine.
+pub const DEFAULT_SCRIPTS_SOURCE_DIR: &str = "assets/scripts";
+/// Where the bundled scripts are seeded into the gitignored project workspace, so
+/// scenes referencing `project/assets/scripts/<name>.lua` resolve on boot.
+pub const DEFAULT_SCRIPTS_DEST_DIR: &str = "project/assets/scripts";
+
 /// True if `path` looks like a scene file (`.scene`).
 pub fn is_scene_path(path: &str) -> bool {
     Path::new(path)
@@ -72,4 +79,30 @@ pub fn seed_default_scene() -> String {
         }
     }
     DEFAULT_SCENE_PATH.to_string()
+}
+
+/// Seed the bundled default scripts (`assets/scripts/*.lua`) into the gitignored
+/// `project/assets/scripts/` workspace on boot, the same pattern as the scene and
+/// `bot.lua`. Existing files are left untouched so local edits survive. Idempotent.
+pub fn seed_default_scripts() {
+    std::fs::create_dir_all(DEFAULT_SCRIPTS_DEST_DIR).ok();
+    let Ok(entries) = std::fs::read_dir(DEFAULT_SCRIPTS_SOURCE_DIR) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_lua = path.extension().and_then(|e| e.to_str()) == Some("lua");
+        if !is_lua {
+            continue;
+        }
+        let Some(name) = path.file_name() else {
+            continue;
+        };
+        let dest = Path::new(DEFAULT_SCRIPTS_DEST_DIR).join(name);
+        if !dest.exists() {
+            if let Ok(contents) = std::fs::read_to_string(&path) {
+                std::fs::write(&dest, contents).ok();
+            }
+        }
+    }
 }

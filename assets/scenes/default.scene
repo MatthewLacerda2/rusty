@@ -88,7 +88,10 @@
         "primitive_type": "Cylinder"
       },
       "texture": null,
-      "script": null,
+      "script": {
+        "path": "project/assets/scripts/player_controller.lua",
+        "is_loaded": false
+      },
       "animator": null,
       "light": null,
       "collider": {

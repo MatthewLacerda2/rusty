@@ -50,6 +50,11 @@ impl Harness {
     /// Build a harness around a freshly populated demo world and enter play mode.
     /// `bot_script` is the enemy brain path (empty to skip scripts).
     pub fn new(out_dir: impl AsRef<Path>, bot_script: &str) -> Self {
+        // Headless runs don't boot through main.rs, so seed the bundled default
+        // scripts (the Player's controller + enemy brain) into the project workspace
+        // here too, exactly as the windowed boot does.
+        crate::scene::seed_default_scripts();
+
         let mut scene = Scene::new();
         super::demo_scene::build(&mut scene, bot_script);
 

@@ -21,8 +21,8 @@ pub mod serialize;
 pub mod snapshot;
 
 pub use io::{
-    is_scene_path, load_from_file, save_to_file, seed_default_scene, DEFAULT_SCENE_PATH,
-    DEFAULT_SCENE_SOURCE, SCENE_EXTENSION,
+    is_scene_path, load_from_file, save_to_file, seed_default_scene, seed_default_scripts,
+    DEFAULT_SCENE_PATH, DEFAULT_SCENE_SOURCE, SCENE_EXTENSION,
 };
 pub use serialize::{apply_scene_data, to_scene_data, SceneData};
 pub use snapshot::SceneSnapshot;

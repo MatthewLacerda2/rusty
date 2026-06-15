@@ -10,8 +10,8 @@
 //! Example scenario:
 //!   local enemy = Scene.FindEntityByName("Enemy_1")
 //!   Input.Press("W"); Harness.Step(120)            -- walk 2s @ 1/60
-//!   Input.Click(); Harness.Step(1)
-//!   Harness.Expect(Health.Get(enemy) < 100, "hitscan should damage enemy")
+//!   Input.Press("SPACE"); Harness.Step(1); Input.Release("SPACE")
+//!   Harness.Expect(Health.Get(enemy) < 100, "the weapon script should damage enemy")
 //!
 //! Runs in its own Lua VM, separate from the gameplay scripts inside `GameWorld`.
 
@@ -36,6 +36,11 @@ pub struct RunReport {
 pub fn run(scenario_path: &Path, out_dir: &Path) -> Result<RunReport, String> {
     let code = std::fs::read_to_string(scenario_path)
         .map_err(|e| format!("Failed to read scenario {}: {}", scenario_path.display(), e))?;
+
+    // Seed the bundled default scripts before deciding what to attach, so the very
+    // first run and every rerun see the same files — otherwise the enemy brain would
+    // be absent on the first run and present afterwards, breaking byte-determinism.
+    crate::scene::seed_default_scripts();
 
     let bot = if Path::new(DEFAULT_BOT_SCRIPT).exists() {
         DEFAULT_BOT_SCRIPT
