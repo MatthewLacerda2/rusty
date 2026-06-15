@@ -34,4 +34,4 @@ pub use rigidbody::RigidBodyComponent;
 pub use script::ScriptComponent;
 pub use texture::TextureComponent;
 pub use transform::TransformComponent;
-pub use visual_correction::VisualCorrectionComponent;
+pub use visual_correction::{Tonemap, VisualCorrectionComponent};

@@ -1,5 +1,6 @@
 use crate::core::scene::Scene;
 use crate::editor::EditorUi;
+use crate::render::postfx::QualityPreset;
 use crate::scripting::ConsoleLogs;
 
 /// TOP HEADER PANEL (Controls engine state) — ALWAYS VISIBLE
@@ -61,6 +62,30 @@ pub fn draw(
                             "🛠️ EDITORMODE"
                         }
                     ));
+
+                    // Post-FX scalability tier. Low keeps the integrated-GPU
+                    // notebook at ~30fps (no SSR / motion blur, smaller bloom).
+                    ui.separator();
+                    ui.label("Quality:");
+                    egui::ComboBox::from_id_source("quality_preset")
+                        .selected_text(format!("{:?}", editor.quality_preset))
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(
+                                &mut editor.quality_preset,
+                                QualityPreset::Low,
+                                "Low",
+                            );
+                            ui.selectable_value(
+                                &mut editor.quality_preset,
+                                QualityPreset::Medium,
+                                "Medium",
+                            );
+                            ui.selectable_value(
+                                &mut editor.quality_preset,
+                                QualityPreset::High,
+                                "High",
+                            );
+                        });
 
                     // Quick scene save/load buttons in header. Save writes back to
                     // the CURRENT scene path (set on load / double-click), falling

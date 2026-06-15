@@ -8,6 +8,7 @@
 //! (`cast_ray_in_scene`) has been retired.
 
 mod build;
+mod character;
 mod convert;
 mod world;
 
