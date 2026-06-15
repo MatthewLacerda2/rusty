@@ -43,6 +43,9 @@ pub struct EditorUi {
     pub asset_script_content: String,
     pub active_bottom_tab: String,
 
+    /// Whether the About dialog (File-bar → About) is currently open.
+    pub show_about: bool,
+
     /// The active visual theme — the single source of truth for editor colors,
     /// spacing and the type scale. Panels read tokens from here (or via
     /// `theme::from_ui`) instead of hardcoding colors.
@@ -95,6 +98,7 @@ impl EditorUi {
             asset_model_import_normals: true,
             asset_script_content: String::new(),
             active_bottom_tab: "assets".to_string(),
+            show_about: false,
             theme: theme::Theme::dark(),
             fonts_installed: false,
             quality_preset: crate::render::postfx::QualityPreset::default(),
