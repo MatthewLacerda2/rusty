@@ -18,7 +18,7 @@ use crate::ecs::World;
 pub use crate::components::{
     AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, DirtyFlag, Entity,
     HealthComponent, LightComponent, LightType, MeshComponent, NavMeshAgentComponent,
-    RigidBodyComponent, ScriptComponent, TextureComponent, TransformComponent,
+    RigidBodyComponent, ScriptComponent, TextureComponent, Tonemap, TransformComponent,
     VisualCorrectionComponent,
 };
 

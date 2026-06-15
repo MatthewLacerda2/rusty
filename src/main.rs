@@ -277,6 +277,8 @@ return BotAI
                                     renderer.shadow_renderer.is_static_cached = false;
                                     editor_ui.is_dirty = false;
                                 }
+                                // Apply the selected post-FX scalability tier.
+                                renderer.set_quality(editor_ui.quality_preset);
                             }
 
                             // Drain a submitted REPL line through the single live
