@@ -6,7 +6,8 @@
 //!
 //! Tables: Harness.{Step,StepUntil,Snapshot,Log,Expect,Frame}, plus read helpers
 //! Scene.FindEntityByName / Transform.GetPosition / Health.Get / Animator.GetClip and
-//! the writable Input.{Press,Release,Click}.
+//! the writable Input.{Press,Release}. Shooting is just pressing the SPACE key the
+//! player-controller script edge-detects — there is no separate click/shoot signal.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -200,15 +201,6 @@ fn register_input(lua: &Lua, harness: &Shared) -> LuaResult<()> {
         "Release",
         lua.create_function(move |_, key: String| {
             world.borrow().input.borrow_mut().release(&key);
-            Ok(())
-        })?,
-    )?;
-
-    let world = world_of(harness);
-    t.set(
-        "Click",
-        lua.create_function(move |_, ()| {
-            world.borrow().input.borrow_mut().mouse_left_clicked = true;
             Ok(())
         })?,
     )?;

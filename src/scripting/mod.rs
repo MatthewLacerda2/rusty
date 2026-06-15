@@ -769,7 +769,10 @@ impl ScriptManager {
             None => return,
         };
 
-        let ids: Vec<u32> = self.entity_scripts.keys().copied().collect();
+        // Sorted so script Start order is deterministic (HashMap iteration order
+        // varies per run); replays must be byte-identical.
+        let mut ids: Vec<u32> = self.entity_scripts.keys().copied().collect();
+        ids.sort_unstable();
 
         for id in ids {
             if let Some(key) = self.entity_scripts.get(&id) {
@@ -795,7 +798,7 @@ impl ScriptManager {
 
         // Filter active entities in the scene that have scripts
         let scene = self.scene.borrow();
-        let ids: Vec<u32> = self
+        let mut ids: Vec<u32> = self
             .entity_scripts
             .keys()
             .copied()
@@ -808,6 +811,11 @@ impl ScriptManager {
             })
             .collect();
         drop(scene);
+        // Sorted so per-frame Update order is deterministic (HashMap iteration
+        // order varies per run). Gameplay now happens inside scripts — e.g. the
+        // weapon's Physics.Shoot vs. the enemy's animation Update race in the
+        // kill frame — so a stable order is what keeps replays byte-identical.
+        ids.sort_unstable();
 
         for id in ids {
             if let Some(key) = self.entity_scripts.get(&id) {
@@ -820,49 +828,6 @@ impl ScriptManager {
                             ));
                         }
                     }
-                }
-            }
-        }
-    }
-
-    /// Triggers damage callback on the target entity's script if it exists
-    pub fn trigger_damage(&mut self, entity_id: u32, amount: f32) {
-        let lua = match &self.lua {
-            Some(l) => l,
-            None => return,
-        };
-
-        if let Some(key) = self.entity_scripts.get(&entity_id) {
-            if let Ok(table) = lua.registry_value::<Table>(key) {
-                if let Ok(damage_fn) = table.get::<_, mlua::Function>("Damage") {
-                    if let Err(e) = damage_fn.call::<_, ()>((entity_id, amount)) {
-                        self.console.borrow_mut().error(format!(
-                            "[Lua Error] Damage callback on entity {} failed: {}",
-                            entity_id, e
-                        ));
-                    }
-                } else {
-                    // Fallback default: directly reduce health component in scene if script has no custom damage function
-                    let mut s = self.scene.borrow_mut();
-                    if let Some(mut e_guard) = s.get_entity_mut(entity_id) {
-                        let e: &mut crate::core::scene::Entity = &mut e_guard;
-                        let name = e.name.clone();
-                        if let Some(health) = &mut e.health {
-                            health.current_health -= amount;
-                            self.console.borrow_mut().info(format!(
-                                "Entity {} took {} standard hit (HP: {}/{})",
-                                name, amount, health.current_health, health.max_health
-                            ));
-                            if health.current_health <= 0.0 {
-                                health.is_dead = true;
-                                if let Some(anim) = &mut e.animator {
-                                    anim.current_clip = "Death".to_string();
-                                    anim.freeze = true;
-                                }
-                            }
-                        }
-                    }
-                    drop(s);
                 }
             }
         }

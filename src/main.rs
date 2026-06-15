@@ -19,53 +19,18 @@ use rusty::scripting::ConsoleLogs;
 
 fn main() {
     env_logger::init();
-    println!("[Engine] Starting Antigravity Engine 3D...");
+    println!("[Engine] Starting rusty 3D engine...");
 
     // 1. Setup local asset structure inside git-ignored project folder
-    std::fs::create_dir_all("project/assets/scripts").ok();
     std::fs::create_dir_all("project/assets/textures").ok();
     std::fs::create_dir_all("project/assets/models").ok();
     std::fs::create_dir_all("project/assets/audio").ok();
     std::fs::create_dir_all("project/scenes").ok();
 
-    // Ensure default demo bot.lua exists in project/assets/scripts/
-    if !std::path::Path::new("project/assets/scripts/bot.lua").exists() {
-        if let Ok(default_code) = std::fs::read_to_string("assets/scripts/bot.lua") {
-            std::fs::write("project/assets/scripts/bot.lua", default_code).ok();
-        } else {
-            let fallback_lua = r#"
-local BotAI = {}
-BotAI.health = 100.0
-function BotAI.Start(entity_id)
-    Transform.SetPosition(entity_id, 8.0, 1.0, 8.0)
-    Animator.Play(entity_id, "Walk")
-end
-function BotAI.Update(entity_id, delta_time)
-    local player_id = Scene.FindEntityByName("Player")
-    if player_id then
-        local pos_x, pos_y, pos_z = Transform.GetPosition(entity_id)
-        local target_x, target_y, target_z = Transform.GetPosition(player_id)
-        local next_x, next_y, next_z = Navigation.GetNextPathStep(pos_x, pos_y, pos_z, target_x, target_y, target_z)
-        Transform.MoveTowards(entity_id, next_x, next_y, next_z, 3.0 * delta_time)
-        local let_dx = target_x - pos_x
-        local let_dz = target_z - pos_z
-        local angle = math.atan2(let_dx, let_dz) * (180.0 / math.pi)
-        Transform.SetRotation(entity_id, 0.0, angle, 0.0)
-    end
-end
-function BotAI.Damage(entity_id, amount)
-    BotAI.health = BotAI.health - amount
-    if BotAI.health <= 0.0 then
-        Animator.Play(entity_id, "Death")
-    else
-        Animator.Play(entity_id, "Hit")
-    end
-end
-return BotAI
-"#;
-            std::fs::write("project/assets/scripts/bot.lua", fallback_lua).ok();
-        }
-    }
+    // Seed the bundled default scripts (player_controller.lua, bot.lua) into the
+    // gitignored project workspace, the same way the default scene is seeded. These
+    // are GAME scripts that ship with the engine; the play loop runs no gameplay.
+    rusty::scene::seed_default_scripts();
 
     // 2. Initialize Window Event Loop
     let event_loop = EventLoop::new().unwrap();
@@ -169,10 +134,10 @@ return BotAI
                                 KeyCode::ArrowDown => inp.set_key_state("DOWN", pressed),
                                 KeyCode::ArrowLeft => inp.set_key_state("LEFT", pressed),
                                 KeyCode::ArrowRight => inp.set_key_state("RIGHT", pressed),
-                                KeyCode::Space => {
-                                    inp.space_pressed = pressed;
-                                    inp.set_key_state("SPACE", pressed);
-                                }
+                                // The shoot button is just the SPACE key; the player
+                                // controller script edge-detects it. No engine-side
+                                // "shoot" field — gameplay reads the key like any other.
+                                KeyCode::Space => inp.set_key_state("SPACE", pressed),
                                 _ => {}
                             }
                         }
@@ -182,12 +147,6 @@ return BotAI
                             game.console
                                 .borrow_mut()
                                 .info("Unlocked cursor, entering EditorMode".to_string());
-                        }
-                    }
-                    WindowEvent::MouseInput { state, button, .. } => {
-                        if *button == winit::event::MouseButton::Left {
-                            game.input.borrow_mut().mouse_left_clicked =
-                                *state == ElementState::Pressed;
                         }
                     }
                     WindowEvent::CursorMoved { position, .. } => {

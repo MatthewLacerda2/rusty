@@ -1,21 +1,30 @@
 -- project/scripts/bot_player.lua — DEV-ONLY bot-player (won't ship).
 --
 -- Attached to the Player, this script plays the game the way a human would: it drives
--- the WRITABLE Input from Update() — pressing the same W/A/S/D + arrow keys winit would
--- inject — to navigate toward the enemy and aim the follow-camera at it. The actual
--- trigger-pull is a hitscan: Input.Press("SPACE") is a winit-only signal the play loop
--- consumes from its own field, so the bot fires the laser through Physics.Shoot, the
--- same engine API the shoot button ultimately calls.
+-- the WRITABLE Input from Update() — pressing the same W/A/S/D + arrow + SPACE keys
+-- winit would inject — to navigate toward the enemy, aim the follow-camera at it, and
+-- pull the trigger. It presses keys ONLY; the bundled player_controller turns those
+-- presses into movement, camera follow, and the hitscan shot. So the bot exercises
+-- the exact same control path a human does, validating that the de-hardcoded
+-- player_controller.lua actually plays the demo.
 --
--- Determinism: it only reads scene state + Time, never the wall clock, so a headless
+-- Because one entity has one script slot, attaching the bot replaces the Player's
+-- controller; the bot therefore loads the shared controller and runs its drive() each
+-- frame, after injecting input — identical to the controller reading live input.
+--
+-- Determinism: it reads scene state + Time only, never the wall clock, so a headless
 -- replay is identical every run.
 
 local Bot = {}
 
+-- The bundled default controller, shared verbatim so the bot drives the SAME
+-- movement/camera/weapon code the human-attached Player uses.
+local Controller = dofile("project/assets/scripts/player_controller.lua")
+
 local ENEMY = "Enemy_1"
 local SHOOT_RANGE = 14.0    -- start firing once within this distance
 local AIM_TOLERANCE = 6.0   -- degrees of yaw error we tolerate before shooting
-local DAMAGE = 25.0         -- per-shot hitscan damage (matches the player's laser)
+local SHOOT_KEY = "SPACE"   -- the trigger key the controller fires on (rising edge)
 local SHOOT_COOLDOWN = 12   -- frames between shots (fire ~5x/second @ 60Hz)
 
 -- Wrap a degree delta into (-180, 180].
@@ -28,6 +37,7 @@ end
 function Bot.Start(entity_id)
     Bot.cooldown = 0
     Bot.shots = 0
+    Controller.Start(entity_id)
     print("[bot_player] online — hunting " .. ENEMY)
 end
 
@@ -43,6 +53,7 @@ function Bot.Update(entity_id, delta_time)
         Input.Release("W")
         Input.Release("LEFT")
         Input.Release("RIGHT")
+        Input.Release(SHOOT_KEY)
         return
     end
 
@@ -53,7 +64,7 @@ function Bot.Update(entity_id, delta_time)
 
     -- The follow-camera's forward is (cos(yaw), _, sin(yaw)); the bearing to the enemy
     -- in that same convention is atan2(dz, dx). Steer the camera by pressing the arrow
-    -- keys the play loop maps to yaw — exactly what a human would hold.
+    -- keys the controller maps to yaw — exactly what a human would hold.
     local want_yaw = math.atan2(dz, dx) * 180.0 / math.pi
     local yaw_err = wrap_deg(want_yaw - Camera.GetYaw())
     Input.Release("LEFT")
@@ -71,28 +82,22 @@ function Bot.Update(entity_id, delta_time)
         Input.Release("W")
     end
 
-    -- Fire when in range and roughly on-target. Shoot the real hitscan along the live
-    -- camera ray (the same ray the shoot button casts), respecting a frame cooldown.
+    -- Pull the trigger when in range and on-target. Press SPACE for one frame so the
+    -- controller sees a rising edge and fires; release it the rest of the cooldown so
+    -- the next press re-triggers. The controller (not the bot) casts the hitscan.
     if Bot.cooldown > 0 then
         Bot.cooldown = Bot.cooldown - 1
+        Input.Release(SHOOT_KEY)
     end
     if dist <= SHOOT_RANGE and math.abs(yaw_err) <= AIM_TOLERANCE and Bot.cooldown == 0 then
-        local cx, cy, cz = Camera.GetPosition()
-        -- Reconstruct the camera forward from yaw/pitch, matching Camera::forward():
-        -- (cos(yaw)cos(pitch), sin(pitch), sin(yaw)cos(pitch)).
-        local yaw_r = Camera.GetYaw() * math.pi / 180.0
-        local pitch_r = Camera.GetPitch() * math.pi / 180.0
-        local cp = math.cos(pitch_r)
-        local fx = math.cos(yaw_r) * cp
-        local fy = math.sin(pitch_r)
-        local fz = math.sin(yaw_r) * cp
-        local hit, hit_id = Physics.Shoot(cx, cy, cz, fx, fy, fz, DAMAGE)
+        Input.Press(SHOOT_KEY)
         Bot.cooldown = SHOOT_COOLDOWN
         Bot.shots = Bot.shots + 1
-        if hit and hit_id == enemy then
-            print("[bot_player] hit " .. ENEMY .. " (shot " .. Bot.shots .. ")")
-        end
     end
+
+    -- Run the shared controller with the input we just injected: it moves the Player,
+    -- trails the camera, and fires on the SPACE rising edge.
+    Controller.drive(Bot, entity_id, delta_time)
 end
 
 return Bot

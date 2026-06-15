@@ -1,11 +1,12 @@
-//! src/app/play.rs — play-mode systems, lifted verbatim out of main.rs's god-loop.
+//! src/app/play.rs — play-mode systems.
 //!
-//! Each free function is a "system" operating on the `GameWorld`. Entity lookups
-//! go through the World's name map (the demo's "Player" and "Enemy_1"); the old
-//! hardcoded `Player == 2` / `Enemy == 5` ids are gone. Order matches the
-//! original loop exactly.
-
-use glam::Vec3;
+//! Each free function is an engine "system" operating on the `GameWorld`. There is
+//! NO gameplay here: no control scheme, no weapon, no damage constants. The player
+//! controller, the weapon, and the health/death behaviour are bundled GAME scripts
+//! (`assets/scripts/player_controller.lua`, `bot.lua`) attached to entities; the
+//! loop below only runs systems (nav, physics, scripts, animator). Entity lookups
+//! for the debug nav path still go through the name map (the demo's "Player" /
+//! "Enemy_1"); that is debug visualisation, not gameplay.
 
 use super::game::GameWorld;
 
@@ -17,10 +18,10 @@ const ENEMY_NAME: &str = "Enemy_1";
 /// makes a headless replay deterministic.
 const REBAKE_INTERVAL_FRAMES: u64 = 60;
 
-/// Run one play-mode frame.
+/// Run one play-mode frame — engine systems only. Gameplay (player control, the
+/// weapon, damage/death) lives in the entities' scripts, driven by `update_scripts`.
 pub(super) fn run(g: &mut GameWorld, dt: f32) {
     rebake_and_path(g);
-    drive_player(g, dt);
     g.script_manager.update_scripts(dt);
     tick_nav(g, dt);
 
@@ -35,7 +36,6 @@ pub(super) fn run(g: &mut GameWorld, dt: f32) {
         g.script_manager.dispatch_trigger_events(triggers);
     }
 
-    hitscan(g);
     animate(g, dt);
     super::particles::tick_particles(g, dt);
     g.play_frame += 1;
@@ -72,122 +72,10 @@ fn rebake_and_path(g: &mut GameWorld) {
     }
 }
 
-/// Drive the Player entity from input and keep the third-person camera behind it.
-fn drive_player(g: &mut GameWorld, dt: f32) {
-    let mut move_dir = Vec3::ZERO;
-    {
-        let inp = g.input.borrow();
-        let cam = g.camera.borrow();
-        if inp.is_key_down("W") {
-            move_dir += cam.forward();
-        }
-        if inp.is_key_down("S") {
-            move_dir -= cam.forward();
-        }
-        if inp.is_key_down("A") {
-            move_dir -= cam.right();
-        }
-        if inp.is_key_down("D") {
-            move_dir += cam.right();
-        }
-    }
-    move_dir.y = 0.0;
-    if move_dir.length_squared() > 0.001 {
-        let speed = 5.0 * dt;
-        let mut s = g.scene.borrow_mut();
-        if let Some(player_id) = s.find_entity_by_name(PLAYER_NAME) {
-            if let Some(mut player) = s.get_entity_mut(player_id) {
-                player.transform.position += move_dir.normalize() * speed;
-            }
-            s.update_entity_collider(player_id);
-        }
-    }
-
-    {
-        let inp = g.input.borrow();
-        let mut cam = g.camera.borrow_mut();
-        let look = 90.0 * dt;
-        if inp.is_key_down("LEFT") {
-            cam.yaw -= look;
-        }
-        if inp.is_key_down("RIGHT") {
-            cam.yaw += look;
-        }
-        if inp.is_key_down("UP") {
-            cam.pitch += look;
-        }
-        if inp.is_key_down("DOWN") {
-            cam.pitch -= look;
-        }
-        cam.pitch = cam.pitch.clamp(-80.0, 80.0);
-    }
-
-    let s = g.scene.borrow();
-    let player = s
-        .find_entity_by_name(PLAYER_NAME)
-        .and_then(|id| s.get_entity(id));
-    if let Some(player) = player {
-        let mut cam = g.camera.borrow_mut();
-        let offset = -cam.forward() * 4.5 + Vec3::new(0.0, 1.5, 0.0);
-        cam.position = player.transform.position + offset;
-    }
-}
-
 fn tick_nav(g: &mut GameWorld, dt: f32) {
     let mut s = g.scene.borrow_mut();
     let nav = g.nav.borrow();
     nav.tick_nav_agents(&mut s, dt);
-}
-
-/// Fire a hitscan ray on Space / left-click and damage whatever it strikes.
-fn hitscan(g: &mut GameWorld) {
-    let should_shoot = {
-        let inp = g.input.borrow();
-        inp.mouse_left_clicked || inp.space_pressed
-    };
-    if !should_shoot {
-        return;
-    }
-    {
-        let mut inp = g.input.borrow_mut();
-        inp.mouse_left_clicked = false;
-        inp.space_pressed = false;
-        inp.set_key_state("SPACE", false);
-    }
-    g.console
-        .borrow_mut()
-        .info("💥 Fired hitscan laser beam!".to_string());
-
-    let (origin, dir) = {
-        let cam = g.camera.borrow();
-        (cam.position, cam.forward())
-    };
-    // Route the hitscan through rapier/parry's query pipeline under the shared
-    // `is_hittable` filter — the exact path the Lua `Physics.Shoot` binding takes,
-    // so the two agree for the same ray (#31). The filter skips the Player (so the
-    // shot can't self-hit) and dead entities *during* traversal, hitting whatever
-    // accepted collider is nearest rather than missing on the player.
-    let hit = g.physics.borrow().as_ref().and_then(|physics| {
-        physics.cast_ray_filtered(origin, dir, f32::MAX, |id| {
-            crate::physics::is_hittable(&g.scene.borrow(), id)
-        })
-    });
-    match hit {
-        Some((hit_id, hit_t)) => {
-            let name = g.scene.borrow().get_entity(hit_id).map(|e| e.name.clone());
-            if let Some(name) = name {
-                g.console.borrow_mut().info(format!(
-                    "  🎯 Direct hit! Struck {} at distance t={:.2} units",
-                    name, hit_t
-                ));
-            }
-            g.script_manager.trigger_damage(hit_id, 25.0);
-        }
-        None => g
-            .console
-            .borrow_mut()
-            .info("  💨 Shot missed into empty space.".to_string()),
-    }
 }
 
 fn animate(g: &mut GameWorld, dt: f32) {

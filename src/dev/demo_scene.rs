@@ -12,6 +12,10 @@ use crate::core::scene::{
 };
 use crate::render::mesh as primitives;
 
+/// Bundled default player brain (movement + camera + weapon), seeded next to
+/// `bot.lua` and attached to the Player. Game logic, not engine logic.
+pub const PLAYER_CONTROLLER_SCRIPT: &str = "project/assets/scripts/player_controller.lua";
+
 fn box_collider(size: Vec3) -> ColliderComponent {
     ColliderComponent {
         active: true,
@@ -79,6 +83,12 @@ pub fn build(scene: &mut Scene, bot_script: &str) {
             ..box_collider(Vec3::ONE)
         });
         player.rigidbody = Some(kinematic_body());
+        // The Player's movement + camera + weapon are NOT engine code: they live in
+        // the bundled default player_controller.lua, attached here like any script.
+        player.script = Some(ScriptComponent {
+            path: PLAYER_CONTROLLER_SCRIPT.to_string(),
+            is_loaded: false,
+        });
     }
 
     // 3, 4 — Obstacle walls
