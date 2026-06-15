@@ -769,7 +769,10 @@ impl ScriptManager {
             None => return,
         };
 
-        let ids: Vec<u32> = self.entity_scripts.keys().copied().collect();
+        // Sorted so script Start order is deterministic (HashMap iteration order
+        // varies per run); replays must be byte-identical.
+        let mut ids: Vec<u32> = self.entity_scripts.keys().copied().collect();
+        ids.sort_unstable();
 
         for id in ids {
             if let Some(key) = self.entity_scripts.get(&id) {
@@ -795,7 +798,7 @@ impl ScriptManager {
 
         // Filter active entities in the scene that have scripts
         let scene = self.scene.borrow();
-        let ids: Vec<u32> = self
+        let mut ids: Vec<u32> = self
             .entity_scripts
             .keys()
             .copied()
@@ -808,6 +811,11 @@ impl ScriptManager {
             })
             .collect();
         drop(scene);
+        // Sorted so per-frame Update order is deterministic (HashMap iteration
+        // order varies per run). Gameplay now happens inside scripts — e.g. the
+        // weapon's Physics.Shoot vs. the enemy's animation Update race in the
+        // kill frame — so a stable order is what keeps replays byte-identical.
+        ids.sort_unstable();
 
         for id in ids {
             if let Some(key) = self.entity_scripts.get(&id) {
