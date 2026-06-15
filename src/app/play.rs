@@ -19,6 +19,8 @@
 //! borrow it too), the engine singletons through `res`, and the scaled per-frame
 //! delta through `res.dt()`.
 
+use crate::scripting::ScriptCtx;
+
 use super::registry::App;
 use super::resources::Resources;
 use super::stage::Stage;
@@ -44,23 +46,62 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, advance_frame);
 }
 
-/// Drive every entity script's `Update`.
-fn update_scripts(_world: &mut World, res: &mut Resources) {
-    res.script_manager.update_scripts(res.frame_dt);
+/// Drive every entity script's `Update`. A disjoint-field destructure of
+/// `&mut Resources` hands the script runtime `&mut ScriptManager` alongside the
+/// other engine state simultaneously (disjoint borrows of one struct are legal),
+/// plus `&mut world.scene`, so the run can borrow them all through a scope (#57).
+fn update_scripts(world: &mut World, res: &mut Resources) {
+    let dt = res.frame_dt;
+    let Resources {
+        script_manager,
+        input,
+        nav,
+        console,
+        camera,
+        time,
+        physics,
+        ..
+    } = res;
+    let mut ctx = ScriptCtx {
+        scene: &mut world.scene,
+        input,
+        nav,
+        console,
+        camera,
+        time,
+        physics,
+    };
+    script_manager.update_scripts(&mut ctx, dt);
 }
 
 /// Step the rapier world and dispatch any resulting trigger events to scripts.
 fn step_physics(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
-    let triggers = {
-        let mut s = world.scene.borrow_mut();
-        match res.physics.borrow_mut().as_mut() {
-            Some(physics) => physics.step(&mut s, dt),
-            None => Vec::new(),
-        }
+    let triggers = match res.physics.as_mut() {
+        Some(physics) => physics.step(&mut world.scene, dt),
+        None => Vec::new(),
     };
     if !triggers.is_empty() {
-        res.script_manager.dispatch_trigger_events(triggers);
+        let Resources {
+            script_manager,
+            input,
+            nav,
+            console,
+            camera,
+            time,
+            physics,
+            ..
+        } = res;
+        let mut ctx = ScriptCtx {
+            scene: &mut world.scene,
+            input,
+            nav,
+            console,
+            camera,
+            time,
+            physics,
+        };
+        script_manager.dispatch_trigger_events(&mut ctx, triggers);
     }
 }
 
@@ -75,8 +116,8 @@ fn rebake_and_path(world: &mut World, res: &mut Resources) {
     if !res.play_frame.is_multiple_of(REBAKE_INTERVAL_FRAMES) {
         return;
     }
-    let s = world.scene.borrow();
-    res.nav.borrow_mut().bake(&s);
+    let s = &world.scene;
+    res.nav.bake(s);
     let enemy_pos = s
         .find_entity_by_name(ENEMY_NAME)
         .and_then(|id| s.get_entity(id))
@@ -86,7 +127,7 @@ fn rebake_and_path(world: &mut World, res: &mut Resources) {
         .and_then(|id| s.get_entity(id))
         .map(|e| e.transform.position);
     if let (Some(enemy_pos), Some(player_pos)) = (enemy_pos, player_pos) {
-        let grid = res.nav.borrow();
+        let grid = &res.nav;
         let (es_x, es_z) = grid.world_to_grid(enemy_pos);
         let (pl_x, pl_z) = grid.world_to_grid(player_pos);
         let mut pts = vec![enemy_pos];
@@ -101,14 +142,12 @@ fn rebake_and_path(world: &mut World, res: &mut Resources) {
 }
 
 fn tick_nav(world: &mut World, res: &mut Resources) {
-    let mut s = world.scene.borrow_mut();
-    let nav = res.nav.borrow();
-    nav.tick_nav_agents(&mut s, res.frame_dt);
+    res.nav.tick_nav_agents(&mut world.scene, res.frame_dt);
 }
 
 fn animate(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
-    let mut s = world.scene.borrow_mut();
+    let s = &mut world.scene;
     for id in s.entity_ids() {
         if let Some(mut entity) = s.get_entity_mut(id) {
             if !entity.active {

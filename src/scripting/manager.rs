@@ -1,93 +1,63 @@
 use mlua::{Lua, RegistryKey, Table};
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::Path;
-use std::rc::Rc;
 
-use crate::api::{self, ApiCtx};
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
+use crate::physics::PhysicsWorld;
 use crate::render::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
 
 use super::console::ConsoleLogs;
 
+/// The live engine state a script run borrows. Bundled so the run methods
+/// (`start_scripts`/`update_scripts`/`dispatch_trigger_events`/`eval`) take a
+/// single argument. Every field is a plain `&mut` to the owned engine state the
+/// systems hold (#57) — no `Rc`, no `RefCell`. The run method wraps each one in a
+/// transient stack `RefCell` and opens ONE `lua.scope` around the lifecycle calls,
+/// so the bindings reach the very same values without heap-shared mutability.
+pub struct ScriptCtx<'a> {
+    pub scene: &'a mut Scene,
+    pub input: &'a mut InputState,
+    pub nav: &'a mut NavigationGraph,
+    pub console: &'a mut ConsoleLogs,
+    pub camera: &'a mut Camera,
+    pub time: &'a mut Time,
+    pub physics: &'a mut Option<PhysicsWorld>,
+}
+
+/// The Lua runtime. Holds ONLY the `Lua` state and the per-entity script tables
+/// cached in the Lua registry; it no longer owns any engine-state handles (#57).
+/// The bindings are registered per-run inside `lua.scope` over borrowed engine
+/// state (see [`ScriptCtx`]), not once with a `'static` lifetime.
 pub struct ScriptManager {
     pub(super) lua: Option<Lua>,
     pub(super) entity_scripts: HashMap<u32, RegistryKey>,
-    pub(super) scene: Rc<RefCell<Scene>>,
-    pub(super) input: Rc<RefCell<InputState>>,
-    pub(super) nav: Rc<RefCell<NavigationGraph>>,
-    pub(super) console: Rc<RefCell<ConsoleLogs>>,
-    pub(super) camera: Rc<RefCell<Camera>>,
-    pub(super) time: Rc<RefCell<Time>>,
+}
+
+impl Default for ScriptManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ScriptManager {
-    pub fn new(
-        scene: Rc<RefCell<Scene>>,
-        input: Rc<RefCell<InputState>>,
-        nav: Rc<RefCell<NavigationGraph>>,
-        console: Rc<RefCell<ConsoleLogs>>,
-        camera: Rc<RefCell<Camera>>,
-        time: Rc<RefCell<Time>>,
-    ) -> Self {
+    pub fn new() -> Self {
         Self {
             lua: None,
             entity_scripts: HashMap::new(),
-            scene,
-            input,
-            nav,
-            console,
-            camera,
-            time,
         }
     }
 
-    /// Initializes a fresh Lua environment and registers all required namespaces.
-    /// `physics` is the live rapier world shared with `GameWorld`; the
-    /// `Physics.Raycast`/`Shoot` bindings cast against it so scripts and the
-    /// engine hitscan agree. It is `None` until Play builds the world.
-    pub fn init_runtime(
-        &mut self,
-        physics: &Rc<RefCell<Option<crate::physics::PhysicsWorld>>>,
-    ) -> Result<(), String> {
+    /// Create a fresh Lua environment and clear the cached script tables. The API
+    /// surface is NOT registered here — it is wired per-run inside a `lua.scope`
+    /// over borrowed engine state (see [`ScriptCtx`]), so the bindings capture
+    /// non-`'static` references to the live owned data (#57).
+    pub fn init_runtime(&mut self) -> Result<(), String> {
         let lua = Lua::new();
-
-        // 1. Override print to write to our console panel
-        let console_clone = Rc::clone(&self.console);
-        let print_fn = lua
-            .create_function(move |_, msg: String| {
-                console_clone.borrow_mut().info(msg);
-                Ok(())
-            })
-            .map_err(|e| e.to_string())?;
-        lua.globals()
-            .set("print", print_fn)
-            .map_err(|e| e.to_string())?;
-
-        // 2. Register the whole stable API surface. Every namespace
-        //    (`Transform`, `Material`, `Animator`, `Input`, `Scene`, `Navigation`,
-        //    `NavMeshAgent`, `Physics`, `Health`, `Time`, `Camera`, and the
-        //    dev-only `Debug`) is owned by the `api/` tree — the single surface
-        //    shared by gameplay scripts, the console REPL and bot-players. The
-        //    live `physics` handle rides along so `Physics.Raycast`/`Shoot` reach
-        //    the same rapier world the engine hitscan uses (#31).
-        let ctx = ApiCtx {
-            scene: Rc::clone(&self.scene),
-            input: Rc::clone(&self.input),
-            nav: Rc::clone(&self.nav),
-            camera: Rc::clone(&self.camera),
-            time: Rc::clone(&self.time),
-            physics: Rc::clone(physics),
-            console: Rc::clone(&self.console),
-        };
-        api::register(&lua, &ctx)?;
-
         self.lua = Some(lua);
         self.entity_scripts.clear();
-
         Ok(())
     }
 
@@ -124,13 +94,15 @@ impl ScriptManager {
         self.lua = None;
     }
 
-    /// Run a Lua chunk against the live runtime. Test-only entry point for the
-    /// issue-#5 API coverage; the windowed/headless paths drive scripts through
-    /// the lifecycle callbacks instead.
+    /// Run a Lua chunk against the live runtime, registering the API over `ctx`
+    /// for the call. Test-only entry point for the issue-#5 API coverage; the
+    /// windowed/headless paths drive scripts through the lifecycle callbacks.
     #[cfg(test)]
-    pub(super) fn exec(&self, code: &str) -> Result<(), String> {
+    pub(super) fn exec(&self, ctx: &mut ScriptCtx, code: &str) -> Result<(), String> {
         let lua = self.lua.as_ref().ok_or("runtime not initialized")?;
-        lua.load(code).exec().map_err(|e| e.to_string())
+        super::lifecycle::with_api_scope(lua, ctx, |lua| {
+            lua.load(code).exec().map_err(|e| e.to_string())
+        })
     }
 
     /// Whether the live runtime exists yet (only during play / a loaded scenario).

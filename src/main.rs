@@ -1,7 +1,5 @@
 mod render_loop;
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 use winit::{
@@ -67,13 +65,11 @@ fn main() {
     let mut egui_renderer =
         egui_wgpu::Renderer::new(&renderer.device, renderer.config.format, None, 1);
 
-    // 4. Initialize Core Engine Systems (shared simulation state)
-    let scene = Rc::new(RefCell::new(Scene::new()));
-    let input = Rc::new(RefCell::new(InputState::new()));
-    let nav = Rc::new(RefCell::new(NavigationGraph::new(
-        -20.0, 20.0, -20.0, 20.0, 1.0,
-    )));
-    let console = Rc::new(RefCell::new(ConsoleLogs::new()));
+    // 4. Initialize Core Engine Systems (owned simulation state)
+    let mut scene = Scene::new();
+    let input = InputState::new();
+    let mut nav = NavigationGraph::new(-20.0, 20.0, -20.0, 20.0, 1.0);
+    let mut console = ConsoleLogs::new();
 
     // 5. Seed and load the default scene.
     //
@@ -83,19 +79,14 @@ fn main() {
     // scene. The harness can boot any scene file the same way.
     let boot_scene_path = rusty::scene::seed_default_scene();
     {
-        let mut s = scene.borrow_mut();
-        console
-            .borrow_mut()
-            .info(format!("Loading scene from {}...", boot_scene_path));
-        if let Err(err) = s.load_from_file(&boot_scene_path) {
-            console
-                .borrow_mut()
-                .error(format!("Failed to load default scene: {}", err));
+        console.info(format!("Loading scene from {}...", boot_scene_path));
+        if let Err(err) = scene.load_from_file(&boot_scene_path) {
+            console.error(format!("Failed to load default scene: {}", err));
         }
-        nav.borrow_mut().bake(&s);
+        nav.bake(&scene);
     }
 
-    // 6. Wrap the shared sim state in the window/GPU-agnostic GameWorld.
+    // 6. Wrap the owned sim state in the window/GPU-agnostic GameWorld.
     let mut game = GameWorld::new(scene, input, nav, console);
 
     // 7. Editor + timing state (front-end only)
@@ -143,7 +134,7 @@ fn main() {
                     } => {
                         let pressed = *state == ElementState::Pressed;
                         {
-                            let mut inp = game.input().borrow_mut();
+                            let inp = game.input_mut();
                             match key {
                                 KeyCode::KeyW => inp.set_key_state("W", pressed),
                                 KeyCode::KeyA => inp.set_key_state("A", pressed),
@@ -163,13 +154,12 @@ fn main() {
                         // Hit ESC in PlayMode to unlock cursor (platform-side transition)
                         if *key == KeyCode::Escape && pressed && game.is_playing() {
                             game.set_playing(false);
-                            game.console()
-                                .borrow_mut()
+                            game.console_mut()
                                 .info("Unlocked cursor, entering EditorMode".to_string());
                         }
                     }
                     WindowEvent::CursorMoved { position, .. } => {
-                        game.input().borrow_mut().mouse_position = (position.x, position.y);
+                        game.input_mut().mouse_position = (position.x, position.y);
                     }
                     WindowEvent::RedrawRequested => {
                         run_frame(

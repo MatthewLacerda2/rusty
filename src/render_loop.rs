@@ -100,17 +100,13 @@ pub fn run_frame(
         .create_view(&wgpu::TextureViewDescriptor::default());
 
     // Render the 3D scene (Forward unlit/lit + gizmos line drawers)
-    {
-        let s = game.scene().borrow();
-        let cam = game.camera().borrow();
-        renderer.render(
-            &s,
-            &cam,
-            &view,
-            !game.is_playing(),
-            game.pathfinding_points(),
-        );
-    }
+    renderer.render(
+        game.scene(),
+        game.camera(),
+        &view,
+        !game.is_playing(),
+        game.pathfinding_points(),
+    );
 
     // Render Egui Overlay (header always visible, side panels only in editor mode)
     {
@@ -119,14 +115,11 @@ pub fn run_frame(
 
         // Draw Editor dashboard UI
         {
-            let mut s = game.world.scene.borrow_mut();
-            let mut c = game.resources.console.borrow_mut();
-            let mut n = game.resources.nav.borrow_mut();
             editor_ui.draw(
                 egui_ctx,
-                &mut s,
-                &mut c,
-                &mut n,
+                &mut game.world.scene,
+                &mut game.resources.console,
+                &mut game.resources.nav,
                 &mut game.resources.is_playing,
                 timing.fps,
                 current_frame_duration,
@@ -141,11 +134,32 @@ pub fn run_frame(
 
         // Drain a submitted REPL line through the single live
         // evaluator. Dev builds only — the console input line
-        // and the harness share `dev::console::evaluate_line`.
+        // and the harness share `dev::console::evaluate_line`. The
+        // evaluator borrows the live sim state through a scope (#57).
         #[cfg(feature = "dev")]
         if let Some(line) = editor_ui.pending_repl.take() {
-            let mut c = game.resources.console.borrow_mut();
-            let _ = rusty::dev::console::evaluate_line(game.script_manager(), &mut c, &line);
+            use rusty::app::Resources;
+            use rusty::scripting::ScriptCtx;
+            let Resources {
+                script_manager,
+                input,
+                nav,
+                console,
+                camera,
+                time,
+                physics,
+                ..
+            } = &mut game.resources;
+            let mut ctx = ScriptCtx {
+                scene: &mut game.world.scene,
+                input,
+                nav,
+                console,
+                camera,
+                time,
+                physics,
+            };
+            let _ = rusty::dev::console::evaluate_line(script_manager, &mut ctx, &line);
         }
 
         let full_output = egui_ctx.end_frame();

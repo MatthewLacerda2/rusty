@@ -8,54 +8,57 @@
 //! Scene.FindEntityByName / Transform.GetPosition / Health.Get / Animator.GetClip and
 //! the writable Input.{Press,Release}. Shooting is just pressing the SPACE key the
 //! player-controller script edge-detects — there is no separate click/shoot signal.
+//!
+//! The scenario VM drives the harness through a transient `RefCell<&mut Harness>`
+//! opened for the scenario's run (#57): the bindings are scoped callbacks that
+//! `borrow_mut()` it transiently and drop the borrow before re-entering Lua (e.g.
+//! `StepUntil`'s predicate call). No `Rc`, no shared interior mutability.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use glam::Vec3;
-use mlua::{Function, Lua, Result as LuaResult};
+use mlua::{Function, Lua, Result as LuaResult, Scope};
 
-use super::harness::{Harness, FIXED_DT};
-use crate::app::GameWorld;
+use super::harness::Harness;
 
-type Shared = Rc<RefCell<Harness>>;
+/// The borrowed harness the scenario bindings drive, shared for the run's scope.
+type Cell<'a> = RefCell<&'a mut Harness>;
 
-fn world_of(h: &Shared) -> Rc<RefCell<GameWorld>> {
-    Rc::clone(&h.borrow().world)
-}
-
-/// Register every scenario-facing table on `lua`'s globals.
-pub fn register(lua: &Lua, harness: &Shared) -> LuaResult<()> {
-    register_harness(lua, harness)?;
-    register_scene(lua, harness)?;
-    register_input(lua, harness)?;
+/// Register every scenario-facing table on `lua`'s globals via scoped callbacks
+/// over the borrowed `harness` cell.
+pub fn register<'a, 'scope>(
+    scope: &Scope<'a, 'scope>,
+    lua: &'a Lua,
+    harness: &'scope Cell<'scope>,
+) -> LuaResult<()> {
+    register_harness(scope, lua, harness)?;
+    register_scene(scope, lua, harness)?;
+    register_input(scope, lua, harness)?;
     Ok(())
 }
 
-fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
+fn register_harness<'a, 'scope>(
+    scope: &Scope<'a, 'scope>,
+    lua: &'a Lua,
+    harness: &'scope Cell<'scope>,
+) -> LuaResult<()> {
     let t = lua.create_table()?;
 
-    let world = world_of(harness);
     t.set(
         "Step",
-        lua.create_function(move |_, n: u32| {
-            let mut w = world.borrow_mut();
-            for _ in 0..n {
-                w.tick(FIXED_DT);
-            }
+        scope.create_function(move |_, n: u32| {
+            harness.borrow_mut().step(n);
             Ok(())
         })?,
     )?;
 
-    let world = world_of(harness);
     t.set(
         "StepUntil",
-        lua.create_function(move |_, (pred, max): (Function, u32)| {
+        scope.create_function(move |_, (pred, max): (Function, u32)| {
             for _ in 0..max {
-                {
-                    let mut w = world.borrow_mut();
-                    w.tick(FIXED_DT);
-                }
+                // Drop the harness borrow before calling back into Lua: the
+                // predicate may itself touch the scenario surface re-entrantly.
+                harness.borrow_mut().step(1);
                 if pred.call::<_, bool>(())? {
                     return Ok(true);
                 }
@@ -66,57 +69,51 @@ fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
 
     // Snapshot is returned as a pretty JSON string — the agent reads it from
     // results.json anyway; in-scenario it is handy for logging a checkpoint.
-    let h = Rc::clone(harness);
     t.set(
         "Snapshot",
-        lua.create_function(move |_, ()| {
-            let snap = h.borrow().snapshot();
+        scope.create_function(move |_, ()| {
+            let snap = harness.borrow().snapshot();
             Ok(serde_json::to_string_pretty(&snap).unwrap_or_default())
         })?,
     )?;
 
-    let h = Rc::clone(harness);
     t.set(
         "Log",
-        lua.create_function(move |_, msg: String| {
-            h.borrow_mut().log(msg);
+        scope.create_function(move |_, msg: String| {
+            harness.borrow_mut().log(msg);
             Ok(())
         })?,
     )?;
 
-    let h = Rc::clone(harness);
     t.set(
         "Expect",
-        lua.create_function(move |_, (cond, msg): (bool, String)| {
-            h.borrow_mut().expect(cond, msg);
+        scope.create_function(move |_, (cond, msg): (bool, String)| {
+            harness.borrow_mut().expect(cond, msg);
             Ok(())
         })?,
     )?;
 
-    let h = Rc::clone(harness);
     t.set(
         "Frame",
-        lua.create_function(move |_, ()| Ok(h.borrow().frame()))?,
+        scope.create_function(move |_, ()| Ok(harness.borrow().frame()))?,
     )?;
 
     // Screenshot(path) -> bool. Renders the current scene/camera offscreen to a
     // PNG. Returns false (no error) when no GPU/software adapter is available.
-    let h = Rc::clone(harness);
     t.set(
         "Screenshot",
-        lua.create_function(move |_, path: String| Ok(h.borrow_mut().screenshot(path)))?,
+        scope.create_function(move |_, path: String| Ok(harness.borrow_mut().screenshot(path)))?,
     )?;
 
     // AttachPlayerBot(path) -> bool. Tag the Player with a bot-player script so the
     // headless world runs it from Update() on the first Step. Call this BEFORE any
     // Step — scripts load when the world enters play mode (first tick). Returns true
     // if a Player entity was found and tagged.
-    let world = world_of(harness);
     t.set(
         "AttachPlayerBot",
-        lua.create_function(move |_, path: String| {
-            let w = world.borrow();
-            let attached = super::botplayer::attach_player_bot(&mut w.scene().borrow_mut(), &path);
+        scope.create_function(move |_, path: String| {
+            let mut h = harness.borrow_mut();
+            let attached = super::botplayer::attach_player_bot(h.world.scene_mut(), &path);
             Ok(attached)
         })?,
     )?;
@@ -124,25 +121,28 @@ fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     lua.globals().set("Harness", t)
 }
 
-fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
+fn register_scene<'a, 'scope>(
+    scope: &Scope<'a, 'scope>,
+    lua: &'a Lua,
+    harness: &'scope Cell<'scope>,
+) -> LuaResult<()> {
     let scene_t = lua.create_table()?;
-    let world = world_of(harness);
     scene_t.set(
         "FindEntityByName",
-        lua.create_function(move |_, name: String| {
-            Ok(world.borrow().scene().borrow().find_entity_by_name(&name))
+        scope.create_function(move |_, name: String| {
+            Ok(harness.borrow().world.scene().find_entity_by_name(&name))
         })?,
     )?;
     lua.globals().set("Scene", scene_t)?;
 
     let transform_t = lua.create_table()?;
-    let world = world_of(harness);
     transform_t.set(
         "GetPosition",
-        lua.create_function(move |_, id: u32| {
-            let w = world.borrow();
-            let s = w.scene().borrow();
-            let p = s
+        scope.create_function(move |_, id: u32| {
+            let h = harness.borrow();
+            let p = h
+                .world
+                .scene()
                 .get_entity(id)
                 .map(|e| e.transform.position)
                 .unwrap_or(Vec3::ZERO);
@@ -152,13 +152,13 @@ fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     lua.globals().set("Transform", transform_t)?;
 
     let health_t = lua.create_table()?;
-    let world = world_of(harness);
     health_t.set(
         "Get",
-        lua.create_function(move |_, id: u32| {
-            let w = world.borrow();
-            let s = w.scene().borrow();
-            let hp = s
+        scope.create_function(move |_, id: u32| {
+            let h = harness.borrow();
+            let hp = h
+                .world
+                .scene()
                 .get_entity(id)
                 .and_then(|e| e.health.as_ref().map(|h| h.current_health))
                 .unwrap_or(0.0);
@@ -168,13 +168,13 @@ fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     lua.globals().set("Health", health_t)?;
 
     let anim_t = lua.create_table()?;
-    let world = world_of(harness);
     anim_t.set(
         "GetClip",
-        lua.create_function(move |_, id: u32| {
-            let w = world.borrow();
-            let s = w.scene().borrow();
-            let clip = s
+        scope.create_function(move |_, id: u32| {
+            let h = harness.borrow();
+            let clip = h
+                .world
+                .scene()
                 .get_entity(id)
                 .and_then(|e| e.animator.as_ref().map(|a| a.current_clip.clone()))
                 .unwrap_or_default();
@@ -184,23 +184,25 @@ fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     lua.globals().set("Animator", anim_t)
 }
 
-fn register_input(lua: &Lua, harness: &Shared) -> LuaResult<()> {
+fn register_input<'a, 'scope>(
+    scope: &Scope<'a, 'scope>,
+    lua: &'a Lua,
+    harness: &'scope Cell<'scope>,
+) -> LuaResult<()> {
     let t = lua.create_table()?;
 
-    let world = world_of(harness);
     t.set(
         "Press",
-        lua.create_function(move |_, key: String| {
-            world.borrow().input().borrow_mut().press(&key);
+        scope.create_function(move |_, key: String| {
+            harness.borrow_mut().world.input_mut().press(&key);
             Ok(())
         })?,
     )?;
 
-    let world = world_of(harness);
     t.set(
         "Release",
-        lua.create_function(move |_, key: String| {
-            world.borrow().input().borrow_mut().release(&key);
+        scope.create_function(move |_, key: String| {
+            harness.borrow_mut().world.input_mut().release(&key);
             Ok(())
         })?,
     )?;

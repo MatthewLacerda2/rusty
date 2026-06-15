@@ -1,26 +1,29 @@
 //! src/api/material.rs — `Material` namespace.
 //!
 //! `SetMetallic/Roughness`, their map variants, and `SetTexture` over an
-//! entity's optional texture component.
+//! entity's optional texture component. Scoped callbacks over a borrowed
+//! `&RefCell<&mut Scene>` (#57).
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
-use mlua::Lua;
+use mlua::{Lua, Scope};
 
 use super::{put, Reg};
 use crate::scene::Scene;
 
 /// Register the `Material` namespace onto `lua`.
-pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
+pub fn register<'a, 'scope>(
+    scope: &Scope<'a, 'scope>,
+    lua: &'a Lua,
+    scene: &'scope RefCell<&'scope mut Scene>,
+) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    let s = Rc::clone(scene);
     put(
         &table,
         "SetMetallic",
-        lua.create_function(move |_, (id, val): (u32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(move |_, (id, val): (u32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(tex) = &mut e.texture {
                     tex.metallic = val;
@@ -30,12 +33,11 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         &table,
         "SetRoughness",
-        lua.create_function(move |_, (id, val): (u32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(move |_, (id, val): (u32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(tex) = &mut e.texture {
                     tex.roughness = val;
@@ -45,12 +47,11 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         &table,
         "SetMetallicMap",
-        lua.create_function(move |_, (id, path): (u32, String)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(move |_, (id, path): (u32, String)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(tex) = &mut e.texture {
                     tex.metallic_map = Some(path);
@@ -60,12 +61,11 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         &table,
         "SetRoughnessMap",
-        lua.create_function(move |_, (id, path): (u32, String)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(move |_, (id, path): (u32, String)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(tex) = &mut e.texture {
                     tex.roughness_map = Some(path);
@@ -75,12 +75,11 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         &table,
         "SetTexture",
-        lua.create_function(move |_, (id, path): (u32, String)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(move |_, (id, path): (u32, String)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(tex) = &mut e.texture {
                     tex.path = path;

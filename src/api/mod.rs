@@ -7,6 +7,14 @@
 //! owns the runtime and lifecycle; `api` owns the surface. One surface, three
 //! callers — they never drift apart.
 //!
+//! The bindings no longer capture `Rc<RefCell>` clones with a `'static` lifetime
+//! (#57). They are SCOPED callbacks (`scope.create_function`) registered per-run
+//! inside `lua.scope`, capturing borrowed `&RefCell<&mut T>` references that point
+//! straight at the owned engine state the systems hold. The transient `RefCell`s
+//! are stack locals at the script-run boundary, NOT fields of `Resources`/`World`:
+//! they let several re-entrant bindings share `&mut Scene` &c. for the scope's
+//! duration without any heap-shared interior mutability.
+//!
 //! Allowed deps: core, components, physics, navigation, render, time, scripting.
 
 pub mod animator;
@@ -23,9 +31,8 @@ pub mod time;
 pub mod transform;
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
-use mlua::{Function, Lua, Table};
+use mlua::{Function, Lua, Scope, Table};
 
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
@@ -38,38 +45,44 @@ use crate::time::Time;
 /// Result alias every namespace registrar returns.
 pub type Reg = Result<(), String>;
 
-/// The shared engine-resource handles every namespace binds against. Bundled
-/// into one struct so each registrar takes a single context. The live `physics`
-/// handle is what lets `Physics.Raycast`/`Shoot` reach the same rapier world the
-/// engine hitscan uses; it is `None` until Play builds the world.
-pub struct ApiCtx {
-    pub scene: Rc<RefCell<Scene>>,
-    pub input: Rc<RefCell<InputState>>,
-    pub nav: Rc<RefCell<NavigationGraph>>,
-    pub camera: Rc<RefCell<Camera>>,
-    pub time: Rc<RefCell<Time>>,
-    pub physics: Rc<RefCell<Option<PhysicsWorld>>>,
-    pub console: Rc<RefCell<ConsoleLogs>>,
+/// The shared engine state every namespace binds against, each borrowed through a
+/// transient `RefCell` that lives for the script-run scope. Bundled into one
+/// struct so each registrar takes a single context. The live `physics` cell is
+/// what lets `Physics.Raycast`/`Shoot` reach the same rapier world the engine
+/// hitscan uses; the inner `Option` is `None` until Play builds the world.
+pub struct ApiCtx<'a> {
+    pub scene: &'a RefCell<&'a mut Scene>,
+    pub input: &'a RefCell<&'a mut InputState>,
+    pub nav: &'a RefCell<&'a mut NavigationGraph>,
+    pub camera: &'a RefCell<&'a mut Camera>,
+    pub time: &'a RefCell<&'a mut Time>,
+    pub physics: &'a RefCell<&'a mut Option<PhysicsWorld>>,
+    pub console: &'a RefCell<&'a mut ConsoleLogs>,
 }
 
-/// Register every namespace onto `lua`. This is the one place the whole script
-/// surface is wired up, shared by gameplay scripts, the console REPL and
-/// bot-players.
-pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
-    transform::register(lua, &ctx.scene)?;
-    material::register(lua, &ctx.scene)?;
-    animator::register(lua, &ctx.scene, &ctx.console)?;
-    input::register_readable(lua, &ctx.input)?;
-    scene::register(lua, &ctx.scene, &ctx.console)?;
-    nav::register(lua, &ctx.scene, &ctx.nav)?;
-    physics::register(lua, &ctx.scene)?;
-    health::register(lua, &ctx.scene, &ctx.console)?;
-    physics::register_hitscan(lua, &ctx.scene, &ctx.physics, &ctx.console)?;
-    time::register(lua, &ctx.time)?;
-    camera::register(lua, &ctx.camera)?;
-    input::register_writable(lua, &ctx.input)?;
+/// Register every namespace onto `lua` via scoped callbacks. This is the one place
+/// the whole script surface is wired up, shared by gameplay scripts, the console
+/// REPL and bot-players. Called once per run, inside `lua.scope`, so the bindings
+/// borrow the live engine state for exactly the scope's duration.
+pub fn register<'a, 'scope>(
+    scope: &Scope<'a, 'scope>,
+    lua: &'a Lua,
+    ctx: &'scope ApiCtx<'scope>,
+) -> Reg {
+    transform::register(scope, lua, ctx.scene)?;
+    material::register(scope, lua, ctx.scene)?;
+    animator::register(scope, lua, ctx.scene, ctx.console)?;
+    input::register_readable(scope, lua, ctx.input)?;
+    scene::register(scope, lua, ctx.scene, ctx.console)?;
+    nav::register(scope, lua, ctx.scene, ctx.nav)?;
+    physics::register(scope, lua, ctx.scene)?;
+    health::register(scope, lua, ctx.scene, ctx.console)?;
+    physics::register_hitscan(scope, lua, ctx.scene, ctx.physics, ctx.console)?;
+    time::register(scope, lua, ctx.time)?;
+    camera::register(scope, lua, ctx.camera)?;
+    input::register_writable(scope, lua, ctx.input)?;
     #[cfg(feature = "dev")]
-    debug::register(lua, &ctx.console)?;
+    debug::register(scope, lua, ctx.console)?;
     Ok(())
 }
 

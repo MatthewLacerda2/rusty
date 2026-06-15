@@ -1,34 +1,38 @@
 //! src/api/animator.rs — `Animator` namespace.
 //!
 //! `Play`/`Crossfade`/`Stop` over an entity's optional animator component.
-//! `Crossfade` is simplified to a plain play in our component model.
+//! `Crossfade` is simplified to a plain play in our component model. Scoped
+//! callbacks over the borrowed scene + console (#57).
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
-use mlua::Lua;
+use mlua::{Lua, Scope};
 
 use super::{put, Reg};
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the `Animator` namespace onto `lua`.
-pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<ConsoleLogs>>) -> Reg {
+pub fn register<'a, 'scope>(
+    scope: &Scope<'a, 'scope>,
+    lua: &'a Lua,
+    scene: &'scope RefCell<&'scope mut Scene>,
+    console: &'scope RefCell<&'scope mut ConsoleLogs>,
+) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    let s = Rc::clone(scene);
-    let c = Rc::clone(console);
     put(
         &table,
         "Play",
-        lua.create_function(move |_, (id, clip): (u32, String)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(move |_, (id, clip): (u32, String)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(anim) = &mut e.animator {
                     anim.current_clip = clip.clone();
                     anim.is_playing = true;
                     anim.freeze = false;
-                    c.borrow_mut()
+                    console
+                        .borrow_mut()
                         .info(format!("Entity {} playing animation: {}", e.name, clip));
                 }
             }
@@ -36,13 +40,12 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<Cons
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         &table,
         "Crossfade",
-        lua.create_function(move |_, (id, clip, _duration): (u32, String, f32)| {
+        scope.create_function(move |_, (id, clip, _duration): (u32, String, f32)| {
             // Simplify crossfade to standard play in our component
-            let mut scene = s.borrow_mut();
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(anim) = &mut e.animator {
                     anim.current_clip = clip;
@@ -54,12 +57,11 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<Cons
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         &table,
         "Stop",
-        lua.create_function(move |_, id: u32| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(move |_, id: u32| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(anim) = &mut e.animator {
                     anim.is_playing = false;

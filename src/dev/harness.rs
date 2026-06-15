@@ -12,11 +12,12 @@
 //! Determinism contract: fixed timestep + frame-count timers (no wall-clock reads in
 //! the tick), so a scenario replays identically every run.
 //!
+//! The harness owns the `GameWorld` outright — no `Rc<RefCell>` (#57). The scenario
+//! VM drives it through a transient `RefCell<&mut GameWorld>` opened in `bridge`.
+//!
 //! A run produces: <out_dir>/results.json + <out_dir>/console.log.
 
-use std::cell::RefCell;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 use serde_json::{json, Value};
 
@@ -24,7 +25,7 @@ use crate::app::GameWorld;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
-use crate::scripting::{ConsoleLogs, LogLevel};
+use crate::scripting::LogLevel;
 
 /// The simulation timestep. 60 Hz, fixed — the source of determinism.
 pub const FIXED_DT: f32 = 1.0 / 60.0;
@@ -39,8 +40,7 @@ pub struct Expectation {
 
 /// The headless harness: owns the world and the run record.
 pub struct Harness {
-    pub world: Rc<RefCell<GameWorld>>,
-    pub console: Rc<RefCell<ConsoleLogs>>,
+    pub world: GameWorld,
     pub logs: Vec<String>,
     pub expectations: Vec<Expectation>,
     out_dir: PathBuf,
@@ -58,25 +58,17 @@ impl Harness {
         let mut scene = Scene::new();
         super::demo_scene::build(&mut scene, bot_script);
 
-        let nav = NavigationGraph::new(-20.0, 20.0, -20.0, 20.0, 1.0);
-        let scene = Rc::new(RefCell::new(scene));
-        let input = Rc::new(RefCell::new(InputState::new()));
-        let nav = Rc::new(RefCell::new(nav));
-        let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-        nav.borrow_mut().bake(&scene.borrow());
+        let mut nav = NavigationGraph::new(-20.0, 20.0, -20.0, 20.0, 1.0);
+        let input = InputState::new();
+        let console = crate::scripting::ConsoleLogs::new();
+        nav.bake(&scene);
 
-        let mut world = GameWorld::new(
-            Rc::clone(&scene),
-            Rc::clone(&input),
-            Rc::clone(&nav),
-            Rc::clone(&console),
-        );
+        let mut world = GameWorld::new(scene, input, nav, console);
         // Headless harness always runs the simulation (play mode).
         world.set_playing(true);
 
         Self {
-            world: Rc::new(RefCell::new(world)),
-            console,
+            world,
             logs: Vec::new(),
             expectations: Vec::new(),
             out_dir: out_dir.as_ref().to_path_buf(),
@@ -84,21 +76,22 @@ impl Harness {
     }
 
     /// Advance the simulation by exactly `n` fixed ticks.
-    pub fn step(&self, n: u32) {
-        let mut world = self.world.borrow_mut();
+    pub fn step(&mut self, n: u32) {
         for _ in 0..n {
-            world.tick(FIXED_DT);
+            self.world.tick(FIXED_DT);
         }
     }
 
     /// Current play-mode frame count.
     pub fn frame(&self) -> u64 {
-        self.world.borrow().play_frame()
+        self.world.play_frame()
     }
 
     /// Record a free-form observation line.
     pub fn log(&mut self, msg: String) {
-        self.console.borrow_mut().info(format!("[Harness] {}", msg));
+        self.world
+            .console_mut()
+            .info(format!("[Harness] {}", msg));
         self.logs.push(msg);
     }
 
@@ -106,8 +99,8 @@ impl Harness {
     pub fn expect(&mut self, passed: bool, message: String) {
         let frame = self.frame();
         let tag = if passed { "PASS" } else { "FAIL" };
-        self.console
-            .borrow_mut()
+        self.world
+            .console_mut()
             .info(format!("[Expect:{}] {}", tag, message));
         self.expectations.push(Expectation {
             passed,
@@ -118,7 +111,7 @@ impl Harness {
 
     /// JSON snapshot of the current world state.
     pub fn snapshot(&self) -> Value {
-        super::snapshot::snapshot(&self.world.borrow())
+        super::snapshot::snapshot(&self.world)
     }
 
     /// Render the current scene/camera offscreen and write a PNG to `path`.
@@ -128,7 +121,7 @@ impl Harness {
     pub fn screenshot(&mut self, path: impl AsRef<Path>) -> bool {
         let path = path.as_ref().to_path_buf();
         let result = super::screenshot::capture_world(
-            &self.world.borrow(),
+            &self.world,
             &path,
             super::screenshot::DEFAULT_WIDTH,
             super::screenshot::DEFAULT_HEIGHT,
@@ -146,7 +139,7 @@ impl Harness {
                 false
             }
             Err(e) => {
-                self.console.borrow_mut().error(format!("[Harness] {e}"));
+                self.world.console_mut().error(format!("[Harness] {e}"));
                 false
             }
         }
@@ -179,7 +172,7 @@ impl Harness {
 
         let console_path = self.out_dir.join("console.log");
         let mut buf = String::new();
-        for (msg, level) in &self.console.borrow().messages {
+        for (msg, level) in &self.world.console().messages {
             let tag = match level {
                 LogLevel::Info => "INFO",
                 LogLevel::Warning => "WARN",

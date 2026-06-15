@@ -6,7 +6,7 @@ use rusty::dev::harness::Harness;
 
 #[test]
 fn step_advances_fixed_frames() {
-    let h = Harness::new(std::env::temp_dir().join("rusty_test_a"), "");
+    let mut h = Harness::new(std::env::temp_dir().join("rusty_test_a"), "");
     h.step(120);
     assert_eq!(h.frame(), 120);
 }
@@ -14,7 +14,7 @@ fn step_advances_fixed_frames() {
 #[test]
 fn fixed_timestep_replay_is_deterministic() {
     let run = || {
-        let h = Harness::new(std::env::temp_dir().join("rusty_test_b"), "");
+        let mut h = Harness::new(std::env::temp_dir().join("rusty_test_b"), "");
         h.step(200);
         h.snapshot().to_string()
     };

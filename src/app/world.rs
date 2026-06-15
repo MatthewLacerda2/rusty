@@ -7,32 +7,26 @@
 //! and engine-state from aliasing at the system boundary — no more one opaque
 //! `GameWorld` blob the systems reach through.
 //!
-//! The `Scene` is still held behind an `Rc<RefCell<…>>`: the mlua script closures
-//! capture that exact cell with a `'static` lifetime (they call `Scene.SetPosition`
-//! &c. mid-tick), and the editor / renderer share it too. A system therefore reads
-//! the scene through a short-lived `borrow()`/`borrow_mut()` — exactly as before —
-//! rather than holding a long `&mut Scene` that would deadlock a re-entrant script
-//! call. Lifting the script surface fully off `Rc<RefCell>` is the follow-up the
-//! issue flags as its hardest part.
+//! The `Scene` is owned outright — plain data, no `Rc<RefCell>` (#57). A system
+//! takes `&mut world.scene` directly. The Lua runtime no longer captures the scene
+//! with a `'static` lifetime; instead it runs inside a `lua.scope` over a borrowed
+//! `&mut Scene`, so re-entrant `Scene.SetPosition` &c. calls reach the very same
+//! scene the system is holding without any heap-shared interior mutability.
 //!
 //! Allowed deps: scene.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use crate::scene::Scene;
 
-/// The world of record threaded into every system as `&mut World`. A thin handle to
-/// the active `Scene`; the `Rc<RefCell<…>>` is shared with the Lua runtime and the
-/// editor, so systems borrow it transiently rather than holding it open across a
-/// re-entrant script call.
+/// The world of record threaded into every system as `&mut World`. Owns the active
+/// `Scene` outright; systems take `&mut world.scene` directly, and the script
+/// runtime borrows it through a scoped callback for the duration of a run.
 pub struct World {
-    pub scene: Rc<RefCell<Scene>>,
+    pub scene: Scene,
 }
 
 impl World {
-    /// Wrap a shared scene handle as the world of record.
-    pub fn new(scene: Rc<RefCell<Scene>>) -> Self {
+    /// Wrap an owned scene as the world of record.
+    pub fn new(scene: Scene) -> Self {
         Self { scene }
     }
 }

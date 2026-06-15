@@ -11,14 +11,15 @@
 //! within a stage is registration order.
 //!
 //! A system is the canonical two-argument `fn(&mut World, &mut Resources)` (issue
-//! #39): [`World`] is the storage of record (a handle to the active `Scene`),
-//! [`Resources`] is the engine singletons. `GameWorld` owns one of each and threads
-//! the pair through the schedule. The engine-state handles inside `Resources` are
-//! still `Rc<RefCell<…>>` — the mlua script closures capture them — but the systems
-//! no longer reach through one opaque blob; the borrow checker now separates world
-//! from resources at the call boundary.
+//! #39): [`World`] is the storage of record (the active `Scene`), [`Resources`] is
+//! the engine singletons. `GameWorld` owns one of each and threads the pair through
+//! the schedule. Both halves own PLAIN data — no `Rc`, no `RefCell` (#57): the mlua
+//! script bindings no longer capture engine state with a `'static` lifetime; a
+//! script run opens a `lua.scope` over the borrowed sim data instead. The borrow
+//! checker separates world from resources at the call boundary.
 
 pub mod game;
+mod game_play;
 mod particles;
 mod play;
 mod registry;

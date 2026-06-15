@@ -17,7 +17,7 @@
 //!
 //! Allowed deps: scripting (mlua), api.
 
-use crate::scripting::{ConsoleLogs, ScriptManager};
+use crate::scripting::{ScriptCtx, ScriptManager};
 
 /// Evaluate one REPL line against the live runtime and log the outcome.
 ///
@@ -25,25 +25,28 @@ use crate::scripting::{ConsoleLogs, ScriptManager};
 /// error (error level). Returns the raw `Ok(result)` / `Err(message)` so callers
 /// (the harness) can assert on it without scraping the log buffer. Blank lines are
 /// ignored and produce no log noise.
+///
+/// The console it logs to is the SAME `ctx.console` the evaluator binds inside its
+/// scope (#57), so the prompt echo and result land in the one live console buffer.
 pub fn evaluate_line(
     scripts: &ScriptManager,
-    console: &mut ConsoleLogs,
+    ctx: &mut ScriptCtx,
     line: &str,
 ) -> Result<String, String> {
     if line.trim().is_empty() {
         return Ok(String::new());
     }
 
-    console.info(format!("> {}", line));
-    match scripts.eval(line) {
+    ctx.console.info(format!("> {}", line));
+    match scripts.eval(ctx, line) {
         Ok(result) => {
             if !result.is_empty() {
-                console.info(result.clone());
+                ctx.console.info(result.clone());
             }
             Ok(result)
         }
         Err(err) => {
-            console.error(err.clone());
+            ctx.console.error(err.clone());
             Err(err)
         }
     }
@@ -88,72 +91,93 @@ mod tests {
     use crate::navigation::NavigationGraph;
     use crate::render::Camera;
     use crate::scene::Scene;
+    use crate::scripting::ConsoleLogs;
     use crate::time::Time;
     use glam::Vec3;
-    use std::cell::RefCell;
-    use std::rc::Rc;
 
-    fn live_manager() -> (ScriptManager, Rc<RefCell<ConsoleLogs>>) {
-        let mut raw = Scene::new();
-        raw.add_entity("Player".to_string());
-        let scene = Rc::new(RefCell::new(raw));
-        let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-        let mut m = ScriptManager::new(
-            Rc::clone(&scene),
-            Rc::new(RefCell::new(InputState::new())),
-            Rc::new(RefCell::new(NavigationGraph::new(
-                -5.0, 5.0, -5.0, 5.0, 1.0,
-            ))),
-            Rc::clone(&console),
-            Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0))),
-            Rc::new(RefCell::new(Time::new())),
-        );
-        m.init_runtime(&Rc::new(RefCell::new(None)))
-            .expect("runtime inits");
-        (m, console)
+    /// The owned engine state a REPL test borrows into a `ScriptCtx`.
+    struct Env {
+        scene: Scene,
+        input: InputState,
+        nav: NavigationGraph,
+        console: ConsoleLogs,
+        camera: Camera,
+        time: Time,
+        physics: Option<crate::physics::PhysicsWorld>,
+    }
+
+    impl Env {
+        fn new() -> Self {
+            Self {
+                scene: Scene::new(),
+                input: InputState::new(),
+                nav: NavigationGraph::new(-5.0, 5.0, -5.0, 5.0, 1.0),
+                console: ConsoleLogs::new(),
+                camera: Camera::new(Vec3::ZERO, 0.0, 0.0),
+                time: Time::new(),
+                physics: None,
+            }
+        }
+
+        fn ctx(&mut self) -> ScriptCtx<'_> {
+            ScriptCtx {
+                scene: &mut self.scene,
+                input: &mut self.input,
+                nav: &mut self.nav,
+                console: &mut self.console,
+                camera: &mut self.camera,
+                time: &mut self.time,
+                physics: &mut self.physics,
+            }
+        }
+    }
+
+    fn live_manager() -> (ScriptManager, Env) {
+        let mut env = Env::new();
+        env.scene.add_entity("Player".to_string());
+        let mut m = ScriptManager::new();
+        m.init_runtime().expect("runtime inits");
+        (m, env)
     }
 
     #[test]
     fn expression_line_echoes_value() {
-        let (m, console) = live_manager();
-        let mut logs = ConsoleLogs::new();
-        let out = evaluate_line(&m, &mut logs, "1 + 2").unwrap();
+        let (m, mut env) = live_manager();
+        let out = evaluate_line(&m, &mut env.ctx(), "1 + 2").unwrap();
         assert_eq!(out, "3");
         // prompt echo + result line
-        assert_eq!(logs.messages.len(), 2);
-        assert_eq!(logs.messages[0].0, "> 1 + 2");
-        assert_eq!(logs.messages[1].0, "3");
-        let _ = console;
+        assert_eq!(env.console.messages.len(), 2);
+        assert_eq!(env.console.messages[0].0, "> 1 + 2");
+        assert_eq!(env.console.messages[1].0, "3");
     }
 
     #[test]
     fn live_api_call_resolves_against_scene() {
-        let (m, _console) = live_manager();
-        let mut logs = ConsoleLogs::new();
+        let (m, mut env) = live_manager();
         // Player is entity 1; FindEntityByName must hit the live scene.
-        let out = evaluate_line(&m, &mut logs, "Scene.FindEntityByName(\"Player\")").unwrap();
+        let out =
+            evaluate_line(&m, &mut env.ctx(), "Scene.FindEntityByName(\"Player\")").unwrap();
         assert_eq!(out, "1");
     }
 
     #[test]
     fn statement_line_runs_without_echo() {
-        let (m, console) = live_manager();
-        let mut logs = ConsoleLogs::new();
+        let (m, mut env) = live_manager();
         // A statement has no return value, so the REPL echoes nothing. print()
-        // routes through the ScriptManager's own console sink (the same shared
-        // buffer in production), not the evaluator's return value.
-        let out = evaluate_line(&m, &mut logs, "print(\"hi\")").unwrap();
+        // routes through the borrowed console sink (the same buffer the prompt
+        // echo lands in), not the evaluator's return value.
+        let out = evaluate_line(&m, &mut env.ctx(), "print(\"hi\")").unwrap();
         assert_eq!(out, "");
-        assert!(console.borrow().messages.iter().any(|(m, _)| m == "hi"));
+        assert!(env.console.messages.iter().any(|(m, _)| m == "hi"));
     }
 
     #[test]
     fn errors_are_logged_and_returned() {
-        let (m, _console) = live_manager();
-        let mut logs = ConsoleLogs::new();
-        let err = evaluate_line(&m, &mut logs, "this is not lua %%%").unwrap_err();
+        let (m, mut env) = live_manager();
+        let err = evaluate_line(&m, &mut env.ctx(), "this is not lua %%%").unwrap_err();
         assert!(!err.is_empty());
-        assert!(logs
+        assert!(env
+            .console
             .messages
             .iter()
             .any(|(_, lvl)| *lvl == crate::scripting::LogLevel::Error));
@@ -161,21 +185,10 @@ mod tests {
 
     #[test]
     fn eval_without_runtime_reports_not_live() {
-        let scene = Rc::new(RefCell::new(Scene::new()));
-        let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-        let m = ScriptManager::new(
-            Rc::clone(&scene),
-            Rc::new(RefCell::new(InputState::new())),
-            Rc::new(RefCell::new(NavigationGraph::new(
-                -5.0, 5.0, -5.0, 5.0, 1.0,
-            ))),
-            console,
-            Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0))),
-            Rc::new(RefCell::new(Time::new())),
-        );
+        let m = ScriptManager::new();
+        let mut env = Env::new();
         assert!(!m.is_live());
-        let mut logs = ConsoleLogs::new();
-        assert!(evaluate_line(&m, &mut logs, "1 + 1").is_err());
+        assert!(evaluate_line(&m, &mut env.ctx(), "1 + 1").is_err());
     }
 
     #[test]

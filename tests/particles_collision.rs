@@ -2,9 +2,6 @@
 //! collider must either die on contact or bounce back off it. Exercised through the
 //! real play loop so the rapier world is built exactly as in-game.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use glam::Vec3;
 use rusty::app::GameWorld;
 use rusty::components::particle::{CollisionResponse, EmitMode, ParticleEmitterComponent};
@@ -58,29 +55,22 @@ fn scene_with_wall(response: CollisionResponse) -> (Scene, u32) {
     (scene, emitter)
 }
 
-fn build_world(scene: Scene) -> Rc<RefCell<GameWorld>> {
-    let scene = Rc::new(RefCell::new(scene));
-    let input = Rc::new(RefCell::new(InputState::new()));
-    let nav = Rc::new(RefCell::new(NavigationGraph::new(
-        -20.0, 20.0, -20.0, 20.0, 1.0,
-    )));
-    let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-    Rc::new(RefCell::new(GameWorld::new(scene, input, nav, console)))
+fn build_world(scene: Scene) -> GameWorld {
+    let input = InputState::new();
+    let nav = NavigationGraph::new(-20.0, 20.0, -20.0, 20.0, 1.0);
+    let console = ConsoleLogs::new();
+    GameWorld::new(scene, input, nav, console)
 }
 
 /// Run `frames` ticks and return the emitter's live particles' max X reached and
 /// whether any are still moving in +X (positive vx).
 fn run(scene: Scene, emitter: u32, frames: u32) -> (usize, f32, bool) {
-    let world = build_world(scene);
-    {
-        let mut w = world.borrow_mut();
-        w.set_playing(true);
-        for _ in 0..frames {
-            w.tick(1.0 / 60.0);
-        }
+    let mut world = build_world(scene);
+    world.set_playing(true);
+    for _ in 0..frames {
+        world.tick(1.0 / 60.0);
     }
-    let w = world.borrow();
-    let scene = w.scene().borrow();
+    let scene = world.scene();
     let e = scene.get_entity(emitter).unwrap();
     let ps = &e.particles.as_ref().unwrap().runtime.particles;
     let max_x = ps.iter().map(|p| p.position.x).fold(f32::MIN, f32::max);

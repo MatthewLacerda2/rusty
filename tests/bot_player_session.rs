@@ -10,11 +10,8 @@ use rusty::dev::scenario;
 
 #[test]
 fn attach_player_bot_tags_the_player() {
-    let h = Harness::new(std::env::temp_dir().join("rusty_bot_attach"), "");
-    let attached = attach_player_bot(
-        &mut h.world.borrow().scene().borrow_mut(),
-        PLAYER_BOT_SCRIPT,
-    );
+    let mut h = Harness::new(std::env::temp_dir().join("rusty_bot_attach"), "");
+    let attached = attach_player_bot(h.world.scene_mut(), PLAYER_BOT_SCRIPT);
     assert!(attached, "demo scene has a Player to tag");
 }
 

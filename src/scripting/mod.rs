@@ -11,7 +11,7 @@ mod lifecycle;
 mod manager;
 
 pub use console::{ConsoleLogs, LogLevel};
-pub use manager::ScriptManager;
+pub use manager::{ScriptCtx, ScriptManager};
 
 #[cfg(test)]
 mod tests;

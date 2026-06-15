@@ -2,26 +2,30 @@
 //!
 //! `Health.Get/Set/Heal/Damage` over `components::health::HealthComponent`.
 //! `apply_damage` is shared with `Physics.Shoot`, which is hitscan-plus-damage.
+//! Scoped callbacks over the borrowed scene + console (#57).
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
-use mlua::Lua;
+use mlua::{Lua, Scope};
 
 use super::{put, Reg};
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the `Health` namespace onto `lua`.
-pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<ConsoleLogs>>) -> Reg {
+pub fn register<'a, 'scope>(
+    scope: &Scope<'a, 'scope>,
+    lua: &'a Lua,
+    scene: &'scope RefCell<&'scope mut Scene>,
+    console: &'scope RefCell<&'scope mut ConsoleLogs>,
+) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    let s = Rc::clone(scene);
     put(
         &table,
         "Get",
-        lua.create_function(move |_, id: u32| {
-            let scene = s.borrow();
+        scope.create_function(move |_, id: u32| {
+            let scene = scene.borrow();
             let hp = scene
                 .get_entity(id)
                 .and_then(|e| e.health.as_ref().map(|h| (h.current_health, h.max_health)));
@@ -29,12 +33,11 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<Cons
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         &table,
         "Set",
-        lua.create_function(move |_, (id, value): (u32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(move |_, (id, value): (u32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(h) = &mut e.health {
                     h.current_health = value.clamp(0.0, h.max_health);
@@ -45,12 +48,11 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<Cons
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         &table,
         "Heal",
-        lua.create_function(move |_, (id, amount): (u32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(move |_, (id, amount): (u32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(h) = &mut e.health {
                     h.current_health = (h.current_health + amount).min(h.max_health);
@@ -63,13 +65,11 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<Cons
         }),
     )?;
 
-    let s = Rc::clone(scene);
-    let c = Rc::clone(console);
     put(
         &table,
         "Damage",
-        lua.create_function(move |_, (id, amount): (u32, f32)| {
-            apply_damage(&s, &c, id, amount);
+        scope.create_function(move |_, (id, amount): (u32, f32)| {
+            apply_damage(scene, console, id, amount);
             Ok(())
         }),
     )?;
@@ -80,16 +80,17 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<Cons
 }
 
 /// Reduce an entity's health, flag death + freeze its death clip, and log it.
-/// Shared by `Health.Damage` and `Physics.Shoot`.
+/// Shared by `Health.Damage` and `Physics.Shoot`. Operates through the borrowed
+/// scene / console cells so the mutation lands on the live owned state.
 pub(crate) fn apply_damage(
-    scene: &Rc<RefCell<Scene>>,
-    console: &Rc<RefCell<ConsoleLogs>>,
+    scene: &RefCell<&mut Scene>,
+    console: &RefCell<&mut ConsoleLogs>,
     id: u32,
     amount: f32,
 ) {
-    let mut scene = scene.borrow_mut();
     let mut died: Option<String> = None;
     {
+        let mut scene = scene.borrow_mut();
         if let Some(mut e) = scene.get_entity_mut(id) {
             let name = e.name.clone();
             if let Some(h) = &mut e.health {
@@ -103,9 +104,8 @@ pub(crate) fn apply_damage(
                     died = Some(name);
                 }
             }
-        }
+        };
     }
-    drop(scene);
     if let Some(name) = died {
         console.borrow_mut().info(format!("{} died", name));
     }

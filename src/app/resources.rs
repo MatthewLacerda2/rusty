@@ -6,26 +6,22 @@
 //! the frame counter, the edit-mode snapshot, the per-frame dt). Storage of record
 //! (the `Scene`) is NOT here; it is threaded alongside `Resources` as the `&mut
 //! Scene` world argument, so a system sees `(&mut Scene, &mut Resources)` — the
-//! canonical two-argument form (issue #39). The borrow checker now keeps the world
+//! canonical two-argument form (issue #39). The borrow checker keeps the world
 //! and the resources distinct at the system boundary.
 //!
-//! The engine-resource fields are still `Rc<RefCell<…>>` handles: the mlua script
-//! closures capture them with a `'static` lifetime, and the editor / renderer share
-//! the very same cells. Converting that script-facing surface fully off `Rc<RefCell>`
-//! is a follow-up (issue #39's hardest part). Threading `&mut Scene`/`&mut Resources`
-//! through the system call path — done here — removes the borrow-panic risk from the
-//! engine systems themselves: they no longer reach through one opaque blob.
+//! The engine-resource fields are PLAIN owned data — no `Rc`, no `RefCell` (#57).
+//! Systems take `&mut res.nav` &c. directly. The mlua script runtime no longer
+//! captures these with a `'static` lifetime: a script run opens a `lua.scope` over
+//! the borrowed sim data, so the bindings reach the very same owned values the
+//! systems hold, without any heap-shared interior mutability.
 //!
 //! Allowed deps: app::*, core, navigation, physics, render, scene, scripting, time.
-
-use std::cell::RefCell;
-use std::rc::Rc;
 
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
 use crate::render::Camera;
-use crate::scene::{Scene, SceneSnapshot};
+use crate::scene::SceneSnapshot;
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
 
@@ -33,20 +29,20 @@ use super::Schedule;
 
 /// The engine singletons (Unity's engine statics) plus the play-mode bookkeeping the
 /// tick advances. Threaded into every system as the second argument, beside the
-/// `&mut Scene` world. The `Rc<RefCell<…>>` handles are shared with the Lua runtime
-/// and the editor; the play-state scalars are owned outright.
+/// `&mut Scene` world. All fields are owned plain data; a script run borrows them
+/// transiently through a `lua.scope`, and the editor / renderer borrow them too.
 pub struct Resources {
-    pub input: Rc<RefCell<InputState>>,
-    pub nav: Rc<RefCell<NavigationGraph>>,
-    pub console: Rc<RefCell<ConsoleLogs>>,
-    pub camera: Rc<RefCell<Camera>>,
-    pub time: Rc<RefCell<Time>>,
+    pub input: InputState,
+    pub nav: NavigationGraph,
+    pub console: ConsoleLogs,
+    pub camera: Camera,
+    pub time: Time,
     pub script_manager: ScriptManager,
     /// rapier3d simulation, rebuilt from the scene on Play and torn down on Stop.
-    /// `None` in edit mode. Shared (via `Rc`) with the script runtime so
+    /// `None` in edit mode. Borrowed (not shared) into the script runtime so
     /// `Physics.Raycast`/`Shoot` cast against the very same world the engine
     /// hitscan does (#31).
-    pub physics: Rc<RefCell<Option<PhysicsWorld>>>,
+    pub physics: Option<PhysicsWorld>,
     pub is_playing: bool,
     pub(super) was_playing: bool,
     pub(super) pathfinding_points: Vec<glam::Vec3>,
@@ -66,32 +62,17 @@ pub struct Resources {
 }
 
 impl Resources {
-    /// Build the resource set from the shared engine-state handles. The script
-    /// runtime is wired to the same cells so live scripts and the engine agree.
-    pub fn new(
-        scene: Rc<RefCell<Scene>>,
-        input: Rc<RefCell<InputState>>,
-        nav: Rc<RefCell<NavigationGraph>>,
-        console: Rc<RefCell<ConsoleLogs>>,
-        camera: Rc<RefCell<Camera>>,
-        time: Rc<RefCell<Time>>,
-    ) -> Self {
-        let script_manager = ScriptManager::new(
-            scene,
-            Rc::clone(&input),
-            Rc::clone(&nav),
-            Rc::clone(&console),
-            Rc::clone(&camera),
-            Rc::clone(&time),
-        );
+    /// Build the resource set from owned engine state. The script runtime starts
+    /// empty (its Lua state is created on Play) and borrows these fields per-run.
+    pub fn new(input: InputState, nav: NavigationGraph, console: ConsoleLogs) -> Self {
         Self {
             input,
             nav,
             console,
-            camera,
-            time,
-            script_manager,
-            physics: Rc::new(RefCell::new(None)),
+            camera: Camera::new(glam::Vec3::new(0.0, 5.0, -10.0), 90.0, -20.0),
+            time: Time::new(),
+            script_manager: ScriptManager::new(),
+            physics: None,
             is_playing: false,
             was_playing: false,
             pathfinding_points: Vec::new(),

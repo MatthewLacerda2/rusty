@@ -4,9 +4,6 @@
 //! independent runs — the contract that lets the headless harness reproduce
 //! particle behaviour. Driven through the real play loop (`GameWorld::tick`).
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use glam::Vec3;
 use rusty::app::GameWorld;
 use rusty::components::particle::{EmitMode, ParticleBlend, ParticleEmitterComponent};
@@ -37,17 +34,13 @@ fn run_emitter(seed: u64, frames: u32) -> Vec<(Vec3, f32, f32)> {
         });
     }
 
-    let world = build_world(scene);
-    {
-        let mut w = world.borrow_mut();
-        w.set_playing(true);
-        for _ in 0..frames {
-            w.tick(1.0 / 60.0);
-        }
+    let mut world = build_world(scene);
+    world.set_playing(true);
+    for _ in 0..frames {
+        world.tick(1.0 / 60.0);
     }
 
-    let w = world.borrow();
-    let scene = w.scene().borrow();
+    let scene = world.scene();
     let e = scene.get_entity(id).unwrap();
     e.particles
         .as_ref()
@@ -59,14 +52,11 @@ fn run_emitter(seed: u64, frames: u32) -> Vec<(Vec3, f32, f32)> {
         .collect()
 }
 
-fn build_world(scene: Scene) -> Rc<RefCell<GameWorld>> {
-    let scene = Rc::new(RefCell::new(scene));
-    let input = Rc::new(RefCell::new(InputState::new()));
-    let nav = Rc::new(RefCell::new(NavigationGraph::new(
-        -20.0, 20.0, -20.0, 20.0, 1.0,
-    )));
-    let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-    Rc::new(RefCell::new(GameWorld::new(scene, input, nav, console)))
+fn build_world(scene: Scene) -> GameWorld {
+    let input = InputState::new();
+    let nav = NavigationGraph::new(-20.0, 20.0, -20.0, 20.0, 1.0);
+    let console = ConsoleLogs::new();
+    GameWorld::new(scene, input, nav, console)
 }
 
 #[test]
@@ -111,16 +101,12 @@ fn max_particles_cap_is_respected() {
             ..Default::default()
         });
     }
-    let world = build_world(scene);
-    {
-        let mut w = world.borrow_mut();
-        w.set_playing(true);
-        for _ in 0..120 {
-            w.tick(1.0 / 60.0);
-        }
+    let mut world = build_world(scene);
+    world.set_playing(true);
+    for _ in 0..120 {
+        world.tick(1.0 / 60.0);
     }
-    let w = world.borrow();
-    let scene = w.scene().borrow();
+    let scene = world.scene();
     let count = scene
         .get_entity(id)
         .unwrap()

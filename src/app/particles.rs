@@ -24,14 +24,13 @@ use crate::physics::PhysicsWorld;
 /// into the play loop, now a canonical `fn(&mut World, &mut Resources)` system.
 pub(super) fn tick_particles(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
-    let ids = world.scene.borrow().entity_ids();
+    let ids = world.scene.entity_ids();
     for id in ids {
         // Pull the emitter + spawn origin out, simulate, then write it back. Taking
-        // the component out avoids holding the scene borrow across the physics
-        // ray-casts (which immutably borrow the scene through the filter).
+        // the component out keeps the scene mutation localised; the physics ray-casts
+        // read only the (separate) rapier world.
         let taken = {
-            let mut scene = world.scene.borrow_mut();
-            let mut entity = match scene.get_entity_mut(id) {
+            let mut entity = match world.scene.get_entity_mut(id) {
                 Some(e) => e,
                 None => continue,
             };
@@ -50,7 +49,7 @@ pub(super) fn tick_particles(world: &mut World, res: &mut Resources) {
 
         simulate_emitter(&mut emitter, origin, dt, &res.physics);
 
-        if let Some(mut entity) = world.scene.borrow_mut().get_entity_mut(id) {
+        if let Some(mut entity) = world.scene.get_entity_mut(id) {
             entity.particles = Some(emitter);
         }
     }
@@ -61,7 +60,7 @@ fn simulate_emitter(
     emitter: &mut ParticleEmitterComponent,
     origin: Vec3,
     dt: f32,
-    physics: &std::rc::Rc<std::cell::RefCell<Option<PhysicsWorld>>>,
+    physics: &Option<PhysicsWorld>,
 ) {
     if !emitter.runtime.initialized {
         emitter.runtime.rng = ParticleRng::new(emitter.seed);
@@ -140,12 +139,11 @@ fn spawn_one(emitter: &mut ParticleEmitterComponent, origin: Vec3) -> Particle {
 fn integrate_and_collide(
     emitter: &mut ParticleEmitterComponent,
     dt: f32,
-    physics: &std::rc::Rc<std::cell::RefCell<Option<PhysicsWorld>>>,
+    physics: &Option<PhysicsWorld>,
 ) {
     let gravity = emitter.gravity;
     let response = emitter.collision;
     let bounciness = emitter.bounciness;
-    let phys = physics.borrow();
 
     emitter.runtime.particles.retain_mut(|p| {
         p.velocity += gravity * dt;
@@ -153,7 +151,7 @@ fn integrate_and_collide(
 
         let mut alive = true;
         if response != CollisionResponse::None {
-            if let Some(world) = phys.as_ref() {
+            if let Some(world) = physics.as_ref() {
                 alive = resolve_collision(p, &mut step, world, response, bounciness);
             }
         }

@@ -17,7 +17,6 @@
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 use mlua::Lua;
 
@@ -47,29 +46,34 @@ pub fn run(scenario_path: &Path, out_dir: &Path) -> Result<RunReport, String> {
     } else {
         ""
     };
-    let harness = Rc::new(RefCell::new(Harness::new(out_dir, bot)));
+    let mut harness = Harness::new(out_dir, bot);
 
     let lua = Lua::new();
-    super::bridge::register(&lua, &harness).map_err(|e| format!("Lua bridge error: {}", e))?;
-
-    let exec = lua
-        .load(&code)
-        .set_name(scenario_path.to_string_lossy())
-        .exec();
+    // Drive the harness through a transient `RefCell<&mut Harness>` for the scope of
+    // the scenario run; the bridge registers its tables as scoped callbacks over it.
+    let exec = {
+        let cell = RefCell::new(&mut harness);
+        lua.scope(|scope| {
+            super::bridge::register(scope, &lua, &cell)?;
+            Ok(lua
+                .load(&code)
+                .set_name(scenario_path.to_string_lossy())
+                .exec())
+        })
+        .map_err(|e| format!("Lua bridge error: {}", e))?
+    };
     if let Err(e) = &exec {
         harness
-            .borrow()
-            .console
-            .borrow_mut()
+            .world
+            .console_mut()
             .error(format!("[Scenario error] {}", e));
     }
 
-    let h = harness.borrow();
-    let results_path = h
+    let results_path = harness
         .write_results()
         .map_err(|e| format!("Failed to write results: {}", e))?;
     Ok(RunReport {
         results_path,
-        passed: h.all_passed() && exec.is_ok(),
+        passed: harness.all_passed() && exec.is_ok(),
     })
 }
