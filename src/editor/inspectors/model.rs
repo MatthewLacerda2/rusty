@@ -15,7 +15,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
 
     // File metadata card
     egui::Frame::none()
-        .fill(egui::Color32::from_rgb(20, 18, 30))
+        .fill(crate::editor::theme::from_ui(ui).bg_tier2)
         .inner_margin(8.0)
         .rounding(6.0)
         .show(ui, |ui| {

@@ -11,13 +11,15 @@ pub fn draw(
     scene: &mut Scene,
     console: &mut ConsoleLogs,
 ) {
+    let t = editor.theme;
     egui::TopBottomPanel::bottom("Bottom Panel")
+        .resizable(true)
         .min_height(160.0)
         .frame(
             egui::Frame::none()
-                .fill(egui::Color32::from_rgb(14, 14, 20))
-                .inner_margin(8.0)
-                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(30, 30, 40))),
+                .fill(t.bg_tier1)
+                .inner_margin(t.space_sm)
+                .stroke(egui::Stroke::new(1.0, t.border)),
         )
         .show(ctx, |ui| {
             // Tab Header Bar
@@ -261,21 +263,22 @@ fn load_scene(
 }
 
 fn draw_console(console: &mut ConsoleLogs, ui: &mut egui::Ui) {
+    let t = crate::editor::theme::from_ui(ui);
     egui::ScrollArea::vertical()
         .id_source("ConsoleScroll")
         .max_height(120.0)
         .show(ui, |ui| {
             if console.messages.is_empty() {
                 ui.colored_label(
-                    egui::Color32::from_rgb(100, 100, 130),
+                    t.text_secondary,
                     "  No execution logs yet. Logs will print when running.",
                 );
             } else {
                 for (msg, level) in &console.messages {
                     let color = match level {
-                        LogLevel::Info => egui::Color32::from_rgb(220, 220, 230),
-                        LogLevel::Warning => egui::Color32::from_rgb(255, 200, 50),
-                        LogLevel::Error => egui::Color32::from_rgb(255, 60, 100),
+                        LogLevel::Info => t.text_primary,
+                        LogLevel::Warning => t.accent_yellow,
+                        LogLevel::Error => t.danger,
                     };
                     ui.colored_label(color, format!("  {}", msg));
                 }

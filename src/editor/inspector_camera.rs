@@ -42,7 +42,7 @@ pub fn draw_camera(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) 
         });
 
         ui.colored_label(
-            egui::Color32::from_rgb(0, 242, 254),
+            crate::editor::theme::from_ui(ui).accent_blue,
             "✔ Intrinsic Motion Blur (Active | 64 Samples)",
         );
     }
