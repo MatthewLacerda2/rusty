@@ -4,6 +4,7 @@
 //! headless `play` binary (`bin/play.rs`) share one simulation. The `dev` tree is
 //! gated behind the `dev` Cargo feature and stripped from ship builds.
 
+pub mod api;
 pub mod app;
 pub mod components;
 pub mod core;
