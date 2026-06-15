@@ -7,8 +7,8 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::{global_table, put, Reg};
-use crate::core::scene::Scene;
 use crate::physics::{is_hittable, PhysicsWorld};
+use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// `Health.Get/Set/Heal/Damage` over the `HealthComponent`.

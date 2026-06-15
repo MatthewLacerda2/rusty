@@ -7,7 +7,7 @@ use wgpu::util::DeviceExt;
 use super::draw_resources::{AabbResource, GridResource};
 use super::mesh::Vertex;
 use super::{BoneUniform, EntityUniform, Renderer};
-use crate::core::scene::Scene;
+use crate::scene::Scene;
 
 impl Renderer {
     pub(super) fn precreate_grid(&self, default_bones: &BoneUniform) -> Option<GridResource> {

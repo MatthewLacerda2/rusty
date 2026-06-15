@@ -1,20 +1,20 @@
-//! src/core/scene.rs — Scene façade over the hecs-backed `ecs::World`.
+//! src/scene/scene.rs — Scene: the hecs-backed `ecs::World` plus scene-level state.
 //!
-//! Storage now lives in `ecs::World` (one `Entity` bundle per hecs entity, with
-//! generational handles and a stable-id + name lookup). `Scene` keeps the
-//! engine-level scene scalars (selection, skybox, ambient light) and the
-//! parenting / collider / serialization helpers that operate across the World.
-//!
-//! The component structs themselves were moved to `crate::components`; they are
-//! re-exported here so the many existing consumers
-//! (`use crate::core::scene::{…Component}`) keep compiling unchanged.
+//! Entity/component storage of record is `ecs::World` (one `Entity` bundle per
+//! hecs entity, generational handles + stable-id/name lookup). `Scene` owns that
+//! `World` together with the engine-level scene scalars (selection, skybox,
+//! ambient light) and the parenting / collider / serialization helpers that
+//! operate across the World — concerns that must NOT live inside `ecs::World`
+//! (whose deps are restricted to hecs + components). This wrapper lives in the
+//! `scene` layer, which is allowed to depend on `crate::scene` and rendering.
 
 use glam::{Mat4, Vec3};
 
 use crate::ecs::world::{Ref, RefMut};
 use crate::ecs::World;
 
-// Re-export the migrated component types so legacy `core::scene::…` paths resolve.
+// Re-export the component types so the many existing `scene::…Component` paths
+// resolve. The structs themselves live in `crate::components`.
 pub use crate::components::{
     AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, CollisionResponse,
     DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent, LightType, MeshComponent,

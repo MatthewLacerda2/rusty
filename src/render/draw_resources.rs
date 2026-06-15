@@ -9,7 +9,7 @@ use std::rc::Rc;
 use wgpu::util::DeviceExt;
 
 use super::{BoneUniform, EntityUniform, GpuTexture, Renderer};
-use crate::core::scene::Scene;
+use crate::scene::Scene;
 
 pub(super) type SolidResource = (
     u32,

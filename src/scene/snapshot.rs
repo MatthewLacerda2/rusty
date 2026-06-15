@@ -12,8 +12,8 @@
 //!
 //! Allowed deps: scene::serialize, ecs.
 
-use crate::core::scene::Scene;
 use crate::scene::serialize::{apply_scene_data, to_scene_data, SceneData};
+use crate::scene::Scene;
 
 /// A frozen copy of the edit-mode scene, taken when entering Play.
 pub struct SceneSnapshot {

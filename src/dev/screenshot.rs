@@ -17,8 +17,8 @@
 use std::path::Path;
 
 use crate::app::GameWorld;
-use crate::core::scene::Scene;
 use crate::render::{Camera, Renderer, OFFSCREEN_FORMAT};
+use crate::scene::Scene;
 
 /// Default screenshot dimensions (16:9), matching the editor window aspect.
 pub const DEFAULT_WIDTH: u32 = 1280;

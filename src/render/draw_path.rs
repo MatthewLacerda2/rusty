@@ -7,7 +7,7 @@ use wgpu::util::DeviceExt;
 use super::draw_resources::{AxisResource, PathResource};
 use super::mesh::Vertex;
 use super::{BoneUniform, EntityUniform, Renderer};
-use crate::core::scene::Scene;
+use crate::scene::Scene;
 
 impl Renderer {
     pub(super) fn precreate_axis_arrows(

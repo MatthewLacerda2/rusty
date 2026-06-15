@@ -18,8 +18,8 @@
 
 use std::path::Path;
 
-use crate::core::scene::Scene;
 use crate::scene::serialize::{apply_scene_data, to_scene_data, SceneData};
+use crate::scene::Scene;
 
 /// The one standardised scene file extension (JSON inside).
 pub const SCENE_EXTENSION: &str = "scene";

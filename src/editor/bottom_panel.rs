@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use crate::core::scene::Scene;
 use crate::editor::EditorUi;
+use crate::scene::Scene;
 use crate::scripting::{ConsoleLogs, LogLevel};
 
 /// BOTTOM PANEL: Folder Explorer & Console Logs
