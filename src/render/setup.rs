@@ -198,6 +198,9 @@ impl Renderer {
             quality.bloom_divisor(),
         );
 
+        // Billboard particle pass — reuses the texture layout for sprites.
+        let particle_renderer = super::particles::ParticleRenderer::new(&device, &texture_layout);
+
         let mut renderer = Self {
             device,
             queue,
@@ -233,6 +236,7 @@ impl Renderer {
             shadow_bind_group,
             post_fx,
             quality,
+            particle_renderer,
         };
 
         renderer.generate_grid_mesh();

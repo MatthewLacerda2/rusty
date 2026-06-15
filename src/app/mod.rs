@@ -6,6 +6,7 @@
 //! registry (the other scaffold files here) arrives in Phase 1 with hecs.
 
 pub mod game;
+mod particles;
 mod play;
 
 pub use game::{GameWorld, PlayTransition};

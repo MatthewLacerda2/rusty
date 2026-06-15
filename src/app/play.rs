@@ -37,6 +37,7 @@ pub(super) fn run(g: &mut GameWorld, dt: f32) {
 
     hitscan(g);
     animate(g, dt);
+    super::particles::tick_particles(g, dt);
     g.play_frame += 1;
 }
 

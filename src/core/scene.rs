@@ -16,10 +16,10 @@ use crate::ecs::World;
 
 // Re-export the migrated component types so legacy `core::scene::…` paths resolve.
 pub use crate::components::{
-    AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, DirtyFlag, Entity,
-    HealthComponent, LightComponent, LightType, MeshComponent, NavMeshAgentComponent,
-    RigidBodyComponent, ScriptComponent, TextureComponent, Tonemap, TransformComponent,
-    VisualCorrectionComponent,
+    AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, CollisionResponse,
+    DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent, LightType, MeshComponent,
+    NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent, RigidBodyComponent,
+    ScriptComponent, TextureComponent, Tonemap, TransformComponent, VisualCorrectionComponent,
 };
 
 fn default_skybox_path() -> String {

@@ -16,6 +16,7 @@ pub mod health;
 pub mod light;
 pub mod mesh;
 pub mod nav_agent;
+pub mod particle;
 pub mod rigidbody;
 pub mod script;
 pub mod texture;
@@ -30,6 +31,9 @@ pub use health::HealthComponent;
 pub use light::{LightComponent, LightType};
 pub use mesh::{DirtyFlag, MeshComponent};
 pub use nav_agent::NavMeshAgentComponent;
+pub use particle::{
+    CollisionResponse, EmitMode, Particle, ParticleBlend, ParticleEmitterComponent,
+};
 pub use rigidbody::RigidBodyComponent;
 pub use script::ScriptComponent;
 pub use texture::TextureComponent;
