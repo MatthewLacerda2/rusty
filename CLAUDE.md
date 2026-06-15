@@ -11,6 +11,18 @@ agent can drive, observe, and play-test it headlessly.
 - **auxmd.md** *(gitignored)* — the operator's short-term scratchpad; read it if a
   session points you there.
 
+## How we work
+- **Flow:** discuss the idea → write a GitHub issue for it → implement it in a pull
+  request. New work starts as an issue, not as a surprise diff; the PR references the
+  issue it closes.
+- **Infrastructure-first (NOT "make it up as we go").** We do **not** improvise or pile
+  on features ad hoc. Whenever we find a problem — something that already bites or will
+  bite more than once, a pattern worth adopting, or a gold-standard practice we should
+  have had — we **document it and implement it right away**, before continuing. We do
+  **not** have the right to add more features/shenanigans until the
+  infrastructure/architecture itself is improved first. Fix the foundation, then build
+  on it. Each such fix gets its own issue when it carries its own responsibility.
+
 ## Architecture — the conceptual model
 A high-level map of how the engine is shaped. It deliberately doesn't enumerate every
 concrete type — that inventory lives in the rustdoc reference (`cargo doc --no-deps`)
