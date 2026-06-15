@@ -11,10 +11,10 @@ use winit::{
 
 use rusty::app::{GameWorld, PlayTransition};
 use rusty::core::input::InputState;
-use rusty::core::scene::Scene;
 use rusty::editor::EditorUi;
 use rusty::navigation::NavigationGraph;
 use rusty::render::Renderer;
+use rusty::scene::Scene;
 use rusty::scripting::ConsoleLogs;
 
 fn main() {

@@ -9,7 +9,7 @@ use std::rc::Rc;
 use wgpu::util::DeviceExt;
 
 use super::{BoneUniform, EntityUniform, GpuTexture, Renderer};
-use crate::core::scene::Scene;
+use crate::scene::Scene;
 
 pub(super) type SolidResource = (
     u32,
@@ -55,6 +55,9 @@ impl Renderer {
                     let is_lit = if entity.light.is_some() { 0u32 } else { 1u32 };
                     let model_matrix = scene.compute_world_matrix(entity.id);
 
+                    // Tint is driven by components only — never by entity name. A
+                    // game colours its entities via the `texture` component's
+                    // `color`; the engine carries no per-name colour assumptions.
                     let color_tint = if let Some(t_comp) = &entity.texture {
                         [t_comp.color[0], t_comp.color[1], t_comp.color[2], 1.0]
                     } else if let Some(health) = &entity.health {
@@ -63,10 +66,6 @@ impl Renderer {
                         } else {
                             [1.0, 1.0, 1.0, 1.0]
                         }
-                    } else if entity.name.starts_with("Enemy") {
-                        [1.0, 0.3, 0.3, 1.0]
-                    } else if entity.name == "Player" {
-                        [0.3, 0.6, 1.0, 1.0]
                     } else {
                         [1.0, 1.0, 1.0, 1.0]
                     };

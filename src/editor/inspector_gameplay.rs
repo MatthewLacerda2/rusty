@@ -1,7 +1,7 @@
 use glam::Vec3;
 use std::path::Path;
 
-use crate::core::scene::{ColliderShape, Entity};
+use crate::scene::{ColliderShape, Entity};
 
 /// 3D. Script bindings
 pub fn draw_script(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {

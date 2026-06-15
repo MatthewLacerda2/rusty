@@ -28,10 +28,10 @@ use std::rc::Rc;
 use mlua::{Function, Lua, Table};
 
 use crate::core::input::InputState;
-use crate::core::scene::Scene;
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
 use crate::render::Camera;
+use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 use crate::time::Time;
 

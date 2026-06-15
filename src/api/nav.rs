@@ -10,8 +10,8 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::{put, Reg};
-use crate::core::scene::Scene;
 use crate::navigation::NavigationGraph;
+use crate::scene::Scene;
 
 /// Register the `Navigation` and `NavMeshAgent` namespaces onto `lua`.
 pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, nav: &Rc<RefCell<NavigationGraph>>) -> Reg {

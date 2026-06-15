@@ -9,7 +9,7 @@ use std::rc::Rc;
 use mlua::Lua;
 
 use super::{put, Reg};
-use crate::core::scene::Scene;
+use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the `Health` namespace onto `lua`.

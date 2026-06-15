@@ -9,8 +9,8 @@ use glam::Vec3;
 use rusty::app::GameWorld;
 use rusty::components::particle::{CollisionResponse, EmitMode, ParticleEmitterComponent};
 use rusty::core::input::InputState;
-use rusty::core::scene::{ColliderComponent, ColliderShape, Scene};
 use rusty::navigation::NavigationGraph;
+use rusty::scene::{ColliderComponent, ColliderShape, Scene};
 use rusty::scripting::ConsoleLogs;
 
 /// Build a world: a static wall at x=+3 and an emitter at the origin firing one

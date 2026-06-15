@@ -11,7 +11,7 @@
 //!
 //! Allowed deps: api (writable Input).
 
-use crate::core::scene::{Scene, ScriptComponent};
+use crate::scene::{Scene, ScriptComponent};
 
 /// Canonical path to the example bot-player script (attached to the Player).
 pub const PLAYER_BOT_SCRIPT: &str = "project/scripts/bot_player.lua";

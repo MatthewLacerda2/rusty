@@ -1,4 +1,4 @@
-use crate::core::scene::Scene;
+use crate::scene::Scene;
 use glam::Vec3;
 use std::collections::{BinaryHeap, HashMap};
 
@@ -311,7 +311,7 @@ impl NavigationGraph {
                 Some(e) => e,
                 None => continue,
             };
-            let entity: &mut crate::core::scene::Entity = &mut entity_guard;
+            let entity: &mut crate::scene::Entity = &mut entity_guard;
             if !entity.active {
                 continue;
             }

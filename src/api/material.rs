@@ -9,7 +9,7 @@ use std::rc::Rc;
 use mlua::Lua;
 
 use super::{put, Reg};
-use crate::core::scene::Scene;
+use crate::scene::Scene;
 
 /// Register the `Material` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {

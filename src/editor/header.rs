@@ -1,6 +1,6 @@
-use crate::core::scene::Scene;
 use crate::editor::EditorUi;
 use crate::render::postfx::QualityPreset;
+use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// TOP HEADER PANEL (Controls engine state) — ALWAYS VISIBLE

@@ -1,6 +1,6 @@
 use glam::Vec3;
 
-use crate::core::scene::{Entity, LightType};
+use crate::scene::{Entity, LightType};
 
 /// 3B. Mesh details
 pub fn draw_mesh(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {

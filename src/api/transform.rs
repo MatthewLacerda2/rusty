@@ -10,7 +10,7 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::{put, Reg};
-use crate::core::scene::Scene;
+use crate::scene::Scene;
 
 /// Register the `Transform` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {

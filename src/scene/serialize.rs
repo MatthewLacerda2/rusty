@@ -16,8 +16,8 @@ use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
 use crate::components::Entity;
-use crate::core::scene::Scene;
 use crate::render::mesh as primitives;
+use crate::scene::Scene;
 
 fn default_skybox_path() -> String {
     String::new()

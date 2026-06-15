@@ -1,6 +1,6 @@
 use glam::Vec3;
 
-use crate::core::scene::{
+use crate::scene::{
     AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, Entity, HealthComponent,
     LightComponent, LightType, NavMeshAgentComponent, RigidBodyComponent, ScriptComponent,
     TextureComponent, Tonemap, VisualCorrectionComponent,

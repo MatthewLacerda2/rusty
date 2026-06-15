@@ -14,8 +14,8 @@ use mlua::Lua;
 
 use super::health::apply_damage;
 use super::{global_table, put, Reg};
-use crate::core::scene::Scene;
 use crate::physics::{is_hittable, PhysicsWorld};
+use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the rigidbody half of `Physics` (velocity/force/kinematic) onto
@@ -110,9 +110,19 @@ pub fn register_hitscan(
         &table,
         "Raycast",
         lua.create_function(
-            move |_, (ox, oy, oz, dx, dy, dz): (f32, f32, f32, f32, f32, f32)| {
-                // (hit, entity_id, distance) — hit=false ⇒ id/dist are 0.
-                match cast(&p, &s, Vec3::new(ox, oy, oz), Vec3::new(dx, dy, dz)) {
+            move |_,
+                  (ox, oy, oz, dx, dy, dz, ignore): (
+                f32,
+                f32,
+                f32,
+                f32,
+                f32,
+                f32,
+                Option<u32>,
+            )| {
+                // (hit, entity_id, distance) — hit=false ⇒ id/dist are 0. The
+                // optional trailing `ignore` id is skipped (e.g. the shooter).
+                match cast(&p, &s, Vec3::new(ox, oy, oz), Vec3::new(dx, dy, dz), ignore) {
                     Some((id, t)) => Ok((true, id, t)),
                     None => Ok((false, 0u32, 0.0f32)),
                 }
@@ -127,8 +137,18 @@ pub fn register_hitscan(
         &table,
         "Shoot",
         lua.create_function(
-            move |_, (ox, oy, oz, dx, dy, dz, damage): (f32, f32, f32, f32, f32, f32, f32)| {
-                match cast(&p, &s, Vec3::new(ox, oy, oz), Vec3::new(dx, dy, dz)) {
+            move |_,
+                  (ox, oy, oz, dx, dy, dz, damage, ignore): (
+                f32,
+                f32,
+                f32,
+                f32,
+                f32,
+                f32,
+                f32,
+                Option<u32>,
+            )| {
+                match cast(&p, &s, Vec3::new(ox, oy, oz), Vec3::new(dx, dy, dz), ignore) {
                     Some((id, t)) => {
                         apply_damage(&s, &c, id, damage);
                         Ok((true, id, t))
@@ -143,15 +163,19 @@ pub fn register_hitscan(
 }
 
 /// Cast `origin`→`dir` through the live rapier world under the shared hitscan
-/// filter ([`is_hittable`]). Returns `None` when no physics world exists yet
-/// (edit mode / no Play has built one) or on a miss.
+/// filter ([`is_hittable`]), additionally skipping `ignore` (the shooter's own
+/// entity, so a shot can't hit its source). Returns `None` when no physics world
+/// exists yet (edit mode / no Play has built one) or on a miss.
 fn cast(
     physics: &Rc<RefCell<Option<PhysicsWorld>>>,
     scene: &Rc<RefCell<Scene>>,
     origin: Vec3,
     dir: Vec3,
+    ignore: Option<u32>,
 ) -> Option<(u32, f32)> {
     let physics = physics.borrow();
     let physics = physics.as_ref()?;
-    physics.cast_ray_filtered(origin, dir, f32::MAX, |id| is_hittable(&scene.borrow(), id))
+    physics.cast_ray_filtered(origin, dir, f32::MAX, |id| {
+        Some(id) != ignore && is_hittable(&scene.borrow(), id)
+    })
 }

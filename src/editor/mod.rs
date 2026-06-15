@@ -11,8 +11,8 @@ mod inspector_render;
 mod inspector_transform;
 pub mod inspectors;
 
-use crate::core::scene::Scene;
 use crate::navigation::NavigationGraph;
+use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 pub struct EditorUi {

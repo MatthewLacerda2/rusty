@@ -13,7 +13,7 @@ use wgpu::util::DeviceExt;
 use super::particles::{ParticleGlobals, ParticleInstance};
 use super::{Camera, GpuTexture, Renderer};
 use crate::components::particle::ParticleBlend;
-use crate::core::scene::Scene;
+use crate::scene::Scene;
 
 /// Camera-facing billboard basis (right, up). Derived from the camera forward, with
 /// a fallback when the camera looks near straight up/down — there `forward × Y`
