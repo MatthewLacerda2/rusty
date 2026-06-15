@@ -1,28 +1,26 @@
+use egui_phosphor::regular as icon;
 use glam::Vec3;
 
+use crate::editor::inspector_card::component_card;
 use crate::scene::{Entity, LightType};
 
 /// 3B. Mesh details
 pub fn draw_mesh(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
-    let mut remove_mesh = false;
-    if let Some(mesh) = &entity.mesh {
-        ui.separator();
-        ui.horizontal(|ui| {
-            ui.heading("📦 Mesh Filter");
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("🗑").on_hover_text("Remove Mesh Filter").clicked() {
-                    remove_mesh = true;
-                }
-            });
-        });
-        ui.label(format!("Type: {} primitive", mesh.primitive_type));
-        ui.label(format!(
-            "Geometry: {} verts | {} indices",
-            mesh.vertices.len(),
-            mesh.indices.len()
-        ));
+    if entity.mesh.is_none() {
+        return;
     }
-    if remove_mesh {
+    let mut remove = false;
+    component_card(ui, icon::CUBE, "Mesh Filter", Some(&mut remove), |ui| {
+        if let Some(mesh) = &entity.mesh {
+            ui.label(format!("Type: {} primitive", mesh.primitive_type));
+            ui.label(format!(
+                "Geometry: {} verts | {} indices",
+                mesh.vertices.len(),
+                mesh.indices.len()
+            ));
+        }
+    });
+    if remove {
         entity.mesh = None;
         *is_dirty = true;
     }
@@ -30,18 +28,14 @@ pub fn draw_mesh(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
 
 /// 3B2. Material / Texture Component
 pub fn draw_texture(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
-    let mut remove_texture = false;
-    if let Some(tex) = &mut entity.texture {
-        ui.separator();
-        ui.horizontal(|ui| {
-            ui.heading("🎨 Material / Texture Component");
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("🗑").on_hover_text("Remove Material").clicked() {
-                    remove_texture = true;
-                }
-            });
-        });
-
+    if entity.texture.is_none() {
+        return;
+    }
+    let mut remove = false;
+    component_card(ui, icon::PAINT_BRUSH, "Material", Some(&mut remove), |ui| {
+        let Some(tex) = &mut entity.texture else {
+            return;
+        };
         ui.horizontal(|ui| {
             ui.label("Albedo Map Path:");
             ui.text_edit_singleline(&mut tex.path);
@@ -69,11 +63,7 @@ pub fn draw_texture(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool)
             .checkbox(&mut has_metallic_map, "Use Metallic Map")
             .changed()
         {
-            if has_metallic_map {
-                tex.metallic_map = Some("".to_string());
-            } else {
-                tex.metallic_map = None;
-            }
+            tex.metallic_map = has_metallic_map.then(String::new);
         }
         if let Some(map_path) = &mut tex.metallic_map {
             ui.horizontal(|ui| {
@@ -87,11 +77,7 @@ pub fn draw_texture(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool)
             .checkbox(&mut has_roughness_map, "Use Roughness Map")
             .changed()
         {
-            if has_roughness_map {
-                tex.roughness_map = Some("".to_string());
-            } else {
-                tex.roughness_map = None;
-            }
+            tex.roughness_map = has_roughness_map.then(String::new);
         }
         if let Some(map_path) = &mut tex.roughness_map {
             ui.horizontal(|ui| {
@@ -99,8 +85,8 @@ pub fn draw_texture(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool)
                 ui.text_edit_singleline(map_path);
             });
         }
-    }
-    if remove_texture {
+    });
+    if remove {
         entity.texture = None;
         *is_dirty = true;
     }
@@ -108,19 +94,15 @@ pub fn draw_texture(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool)
 
 /// 3C. Light configuration
 pub fn draw_light(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
-    let mut remove_light = false;
-    if let Some(light) = &mut entity.light {
-        ui.separator();
-        ui.horizontal(|ui| {
-            ui.heading("💡 Light Component");
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("🗑").on_hover_text("Remove Light").clicked() {
-                    remove_light = true;
-                }
-            });
-        });
+    if entity.light.is_none() {
+        return;
+    }
+    let mut remove = false;
+    component_card(ui, icon::LIGHTBULB, "Light", Some(&mut remove), |ui| {
+        let Some(light) = &mut entity.light else {
+            return;
+        };
 
-        // Type selection (Spot, Directional, Point)
         ui.horizontal(|ui| {
             ui.label("Type:");
             let current_type_name = match light.light_type {
@@ -152,7 +134,6 @@ pub fn draw_light(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
                     {
                         light.light_type = LightType::Spotlight;
                         *is_dirty = true;
-                        // Provide sensible default cones if they were zero
                         if light.inner_cone == 0.0 && light.outer_cone == 0.0 {
                             light.inner_cone = 30.0;
                             light.outer_cone = 45.0;
@@ -162,17 +143,13 @@ pub fn draw_light(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
         });
 
         let mut color_arr = [light.color.x, light.color.y, light.color.z];
-        let mut light_changed = false;
         ui.horizontal(|ui| {
             ui.label("Color:");
             if ui.color_edit_button_rgb(&mut color_arr).changed() {
-                light_changed = true;
+                light.color = Vec3::new(color_arr[0], color_arr[1], color_arr[2]);
+                *is_dirty = true;
             }
         });
-        if light_changed {
-            light.color = Vec3::new(color_arr[0], color_arr[1], color_arr[2]);
-            *is_dirty = true;
-        }
 
         ui.horizontal(|ui| {
             ui.label("Intensity:");
@@ -184,7 +161,6 @@ pub fn draw_light(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
             }
         });
 
-        // For spot and point, choose distance
         if light.light_type == LightType::Point || light.light_type == LightType::Spotlight {
             ui.horizontal(|ui| {
                 ui.label("Distance:");
@@ -197,7 +173,6 @@ pub fn draw_light(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
             });
         }
 
-        // For spot, choose FOV (Outer Cone) and optionally Inner Cone
         if light.light_type == LightType::Spotlight {
             ui.horizontal(|ui| {
                 ui.label("FOV (Outer Cone):");
@@ -224,8 +199,8 @@ pub fn draw_light(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
                 }
             });
         }
-    }
-    if remove_light {
+    });
+    if remove {
         entity.light = None;
         *is_dirty = true;
     }
