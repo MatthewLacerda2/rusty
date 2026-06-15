@@ -7,6 +7,7 @@ mod hierarchy_tree;
 pub mod inspector;
 mod inspector_add;
 mod inspector_camera;
+mod inspector_card;
 mod inspector_gameplay;
 mod inspector_render;
 mod inspector_transform;
@@ -16,6 +17,15 @@ pub mod theme;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
+
+/// What the Inspector panel is currently showing. The three modes are mutually
+/// exclusive; the editor derives this from its selection state each frame so the
+/// inspector dispatches on an explicit target rather than an implicit fall-through.
+pub enum InspectorTarget {
+    Entity(u32),
+    Asset(String),
+    SceneSettings,
+}
 
 pub struct EditorUi {
     pub selected_entity_id: Option<u32>,
@@ -108,6 +118,19 @@ impl EditorUi {
             repl_input: crate::dev::console::ReplInput::new(),
             #[cfg(feature = "dev")]
             pending_repl: None,
+        }
+    }
+
+    /// The inspector's current target, derived from the (mutually exclusive)
+    /// selection state: a selected entity wins, else a selected asset, else the
+    /// scene settings.
+    pub fn inspector_target(&self) -> InspectorTarget {
+        if let Some(id) = self.selected_entity_id {
+            InspectorTarget::Entity(id)
+        } else if let Some(path) = &self.selected_asset_path {
+            InspectorTarget::Asset(path.clone())
+        } else {
+            InspectorTarget::SceneSettings
         }
     }
 

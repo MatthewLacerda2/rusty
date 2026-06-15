@@ -1,9 +1,11 @@
 use glam::Vec3;
 
+use egui_phosphor::regular as icon;
+
 use crate::editor::{
     inspector_add, inspector_camera, inspector_gameplay, inspector_render, inspector_transform,
 };
-use crate::editor::{inspectors, EditorUi};
+use crate::editor::{inspectors, EditorUi, InspectorTarget};
 use crate::navigation::NavigationGraph;
 use crate::scene::{Entity, Scene};
 use crate::scripting::ConsoleLogs;
@@ -35,13 +37,17 @@ pub fn draw(
             ui.add_space(5.0);
 
             egui::ScrollArea::vertical().show(ui, |ui| {
-                if let Some(selected_id) = editor.selected_entity_id {
-                    draw_entity_inspector(editor, ui, scene, nav, selected_id);
-                } else if let Some(asset_path) = editor.selected_asset_path.clone() {
-                    // Modular Asset Inspectors dispatch call
-                    inspectors::draw_inspector(ui, editor, scene, console, &asset_path);
-                } else {
-                    draw_global_settings(editor, ui, scene);
+                // Dispatch on the explicit inspector target (mutually exclusive).
+                match editor.inspector_target() {
+                    InspectorTarget::Entity(selected_id) => {
+                        draw_entity_inspector(editor, ui, scene, nav, selected_id);
+                    }
+                    InspectorTarget::Asset(asset_path) => {
+                        inspectors::draw_inspector(ui, editor, scene, console, &asset_path);
+                    }
+                    InspectorTarget::SceneSettings => {
+                        draw_global_settings(editor, ui, scene);
+                    }
                 }
             });
         });
@@ -93,18 +99,32 @@ fn draw_entity_inspector(
             entity.visual_correction = None;
         }
 
-        ui.horizontal(|ui| {
-            ui.label("Name:");
-            ui.text_edit_singleline(&mut entity.name);
-        });
-        ui.checkbox(&mut entity.active, "Active / Visible");
-        if ui
-            .checkbox(&mut entity.is_static, "Static (blocks navmesh)")
-            .changed()
-        {
-            pending_nav_bake = true;
-        }
-        ui.separator();
+        // Unity-style object header: name + active/static toggles, on a raised card.
+        let t = editor.theme;
+        egui::Frame::none()
+            .fill(t.bg_tier2)
+            .inner_margin(t.space_sm)
+            .rounding(4.0)
+            .stroke(egui::Stroke::new(1.0, t.border))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.colored_label(t.text_secondary, icon::CUBE_FOCUS);
+                    ui.add(
+                        egui::TextEdit::singleline(&mut entity.name).desired_width(f32::INFINITY),
+                    );
+                });
+                ui.horizontal(|ui| {
+                    ui.checkbox(&mut entity.active, "Active");
+                    if ui
+                        .checkbox(&mut entity.is_static, "Static")
+                        .on_hover_text("Blocks the navmesh")
+                        .changed()
+                    {
+                        pending_nav_bake = true;
+                    }
+                });
+            });
+        ui.add_space(t.space_xs);
 
         inspector_transform::draw(
             ui,

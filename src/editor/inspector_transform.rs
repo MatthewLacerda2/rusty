@@ -1,5 +1,7 @@
+use egui_phosphor::regular as icon;
 use glam::Mat4;
 
+use crate::editor::inspector_card::component_card;
 use crate::scene::Entity;
 
 /// Transform editor with integrated parenting controls.
@@ -14,8 +16,32 @@ pub fn draw(
     pending_nav_bake: &mut bool,
     is_dirty: &mut bool,
 ) {
-    // 3A. Transform Editor with Integrated Parenting
-    ui.heading("📐 Transform");
+    // Transform is mandatory: a foldout card with no remove button.
+    component_card(ui, icon::ARROWS_OUT_CARDINAL, "Transform", None, |ui| {
+        draw_body(
+            ui,
+            entity,
+            parent_mat,
+            selected_parent_name,
+            valid_parents,
+            pending_parent_change,
+            pending_nav_bake,
+            is_dirty,
+        );
+    });
+}
+
+#[allow(clippy::too_many_arguments)]
+fn draw_body(
+    ui: &mut egui::Ui,
+    entity: &mut Entity,
+    parent_mat: Option<Mat4>,
+    selected_parent_name: &str,
+    valid_parents: &[(u32, String)],
+    pending_parent_change: &mut Option<Option<u32>>,
+    pending_nav_bake: &mut bool,
+    is_dirty: &mut bool,
+) {
     let is_static = entity.is_static;
     let trans = &mut entity.transform;
 
