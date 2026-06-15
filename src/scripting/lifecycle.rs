@@ -14,11 +14,7 @@ use super::manager::{ScriptCtx, ScriptManager};
 /// bindings can share `&mut Scene` &c. without any heap-shared interior
 /// mutability (#57). `body` runs the lifecycle/REPL calls; the `console` cell is
 /// reachable inside `body` for error logging via [`ScriptManager`]'s helpers.
-pub(super) fn with_api_scope<R>(
-    lua: &Lua,
-    ctx: &mut ScriptCtx,
-    body: impl FnOnce(&Lua) -> R,
-) -> R {
+pub(super) fn with_api_scope<R>(lua: &Lua, ctx: &mut ScriptCtx, body: impl FnOnce(&Lua) -> R) -> R {
     let scene = RefCell::new(&mut *ctx.scene);
     let input = RefCell::new(&mut *ctx.input);
     let nav = RefCell::new(&mut *ctx.nav);
@@ -105,7 +101,10 @@ impl ScriptManager {
                     continue;
                 };
                 if let Err(e) = start_fn.call::<_, ()>(id) {
-                    log_error(lua, format!("[Lua Error] Start on entity {} failed: {}", id, e));
+                    log_error(
+                        lua,
+                        format!("[Lua Error] Start on entity {} failed: {}", id, e),
+                    );
                 }
             }
         });

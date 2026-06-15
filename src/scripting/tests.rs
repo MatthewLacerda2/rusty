@@ -87,8 +87,11 @@ fn time_namespace_reads_clock() {
 #[test]
 fn camera_set_moves_shared_camera() {
     let (m, mut env) = manager();
-    m.exec(&mut env.ctx(), "Camera.SetPosition(1, 2, 3); Camera.SetFov(60)")
-        .unwrap();
+    m.exec(
+        &mut env.ctx(),
+        "Camera.SetPosition(1, 2, 3); Camera.SetFov(60)",
+    )
+    .unwrap();
     assert_eq!(env.camera.position, Vec3::new(1.0, 2.0, 3.0));
     assert_eq!(env.camera.fov, 60.0);
 }
@@ -96,10 +99,16 @@ fn camera_set_moves_shared_camera() {
 #[test]
 fn input_press_release_is_writable() {
     let (m, mut env) = manager();
-    m.exec(&mut env.ctx(), "Input.Press('W'); assert(Input.IsKeyDown('W'))")
-        .unwrap();
-    m.exec(&mut env.ctx(), "Input.Release('W'); assert(not Input.IsKeyDown('W'))")
-        .unwrap();
+    m.exec(
+        &mut env.ctx(),
+        "Input.Press('W'); assert(Input.IsKeyDown('W'))",
+    )
+    .unwrap();
+    m.exec(
+        &mut env.ctx(),
+        "Input.Release('W'); assert(not Input.IsKeyDown('W'))",
+    )
+    .unwrap();
 }
 
 #[test]

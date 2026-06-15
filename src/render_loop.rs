@@ -174,12 +174,11 @@ pub fn run_frame(
             egui_renderer.update_texture(&renderer.device, &renderer.queue, *id, image_delta);
         }
 
-        let mut encoder =
-            renderer
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Egui Render Encoder"),
-                });
+        let mut encoder = renderer
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Egui Render Encoder"),
+            });
 
         egui_renderer.update_buffers(
             &renderer.device,

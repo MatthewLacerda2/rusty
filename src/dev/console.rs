@@ -155,8 +155,7 @@ mod tests {
     fn live_api_call_resolves_against_scene() {
         let (m, mut env) = live_manager();
         // Player is entity 1; FindEntityByName must hit the live scene.
-        let out =
-            evaluate_line(&m, &mut env.ctx(), "Scene.FindEntityByName(\"Player\")").unwrap();
+        let out = evaluate_line(&m, &mut env.ctx(), "Scene.FindEntityByName(\"Player\")").unwrap();
         assert_eq!(out, "1");
     }
 

@@ -24,9 +24,7 @@ pub fn register<'a, 'scope>(
     put(
         &table,
         "FindEntityByName",
-        scope.create_function(move |_, name: String| {
-            Ok(scene.borrow().find_entity_by_name(&name))
-        }),
+        scope.create_function(move |_, name: String| Ok(scene.borrow().find_entity_by_name(&name))),
     )?;
 
     put(

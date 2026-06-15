@@ -89,9 +89,7 @@ impl Harness {
 
     /// Record a free-form observation line.
     pub fn log(&mut self, msg: String) {
-        self.world
-            .console_mut()
-            .info(format!("[Harness] {}", msg));
+        self.world.console_mut().info(format!("[Harness] {}", msg));
         self.logs.push(msg);
     }
 
