@@ -8,7 +8,12 @@ use super::{shadows, skybox};
 use super::{CameraUniform, LightingUniform, Renderer};
 
 impl Renderer {
-    pub async fn new(window: Arc<winit::window::Window>) -> Self {
+    /// Build the windowed renderer. Returns `Err` with a human-readable message
+    /// when surface/adapter/device acquisition fails (unsupported or broken GPU
+    /// drivers), so `main` can report it cleanly and exit instead of unwinding
+    /// through a panic + backtrace. Mirrors the graceful headless path in
+    /// `setup_headless.rs`.
+    pub async fn new(window: Arc<winit::window::Window>) -> Result<Self, String> {
         let size = window.inner_size();
 
         // 1. Create wgpu Instance
@@ -18,7 +23,9 @@ impl Renderer {
         });
 
         // 2. Create Surface & Adapter
-        let surface = instance.create_surface(window).unwrap();
+        let surface = instance
+            .create_surface(window)
+            .map_err(|e| format!("failed to create a render surface for the window: {e}"))?;
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -26,7 +33,9 @@ impl Renderer {
                 force_fallback_adapter: false,
             })
             .await
-            .expect("Failed to find wgpu adapter");
+            .ok_or_else(|| {
+                "no compatible GPU adapter found (check your graphics drivers)".to_string()
+            })?;
 
         // 3. Create Device & Queue
         let (device, queue) = adapter
@@ -39,7 +48,7 @@ impl Renderer {
                 None,
             )
             .await
-            .expect("Failed to create wgpu device");
+            .map_err(|e| format!("failed to create a GPU device: {e}"))?;
 
         // 4. Configure surface swapchain
         let surface_caps = surface.get_capabilities(&adapter);
@@ -62,7 +71,7 @@ impl Renderer {
         };
         surface.configure(&device, &config);
 
-        Self::from_parts(device, queue, Some(surface), config, size)
+        Ok(Self::from_parts(device, queue, Some(surface), config, size))
     }
 
     /// Shared constructor body: builds all pipelines, layouts, buffers and bind
