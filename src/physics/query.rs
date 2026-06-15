@@ -8,7 +8,7 @@
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::convert::to_na_vec;
+use super::convert::{from_na_vec, to_na_vec};
 use super::world::PhysicsWorld;
 
 impl PhysicsWorld {
@@ -39,5 +39,33 @@ impl PhysicsWorld {
         self.query_pipeline
             .cast_ray(&self.bodies, &self.colliders, &ray, max_toi, true, filter)
             .and_then(|(handle, toi)| self.collider_to_id.get(&handle).map(|&id| (id, toi)))
+    }
+
+    /// Closest hit by `ray` within `max_toi`, returning the time-of-impact and the
+    /// world-space surface normal at the hit point. Used by the particle system to
+    /// reflect a bouncing particle off the surface it struck. `solid = true` so a
+    /// ray starting inside a collider reports `toi = 0` rather than passing through.
+    pub fn cast_ray_with_normal(
+        &self,
+        origin: Vec3,
+        dir: Vec3,
+        max_toi: f32,
+    ) -> Option<(f32, Vec3)> {
+        let ray = Ray::new(to_na_vec(origin).into(), to_na_vec(dir.normalize()));
+        self.query_pipeline
+            .cast_ray_and_get_normal(
+                &self.bodies,
+                &self.colliders,
+                &ray,
+                max_toi,
+                true,
+                QueryFilter::default(),
+            )
+            .map(|(_, intersection)| {
+                (
+                    intersection.time_of_impact,
+                    from_na_vec(intersection.normal),
+                )
+            })
     }
 }

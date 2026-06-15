@@ -10,6 +10,8 @@ mod draw_overlays;
 mod draw_pass;
 mod draw_path;
 mod draw_resources;
+mod particles;
+mod particles_draw;
 mod pipelines;
 mod postfx_params;
 mod setup;
@@ -173,4 +175,7 @@ pub struct Renderer {
     pub post_fx: postfx::PostFx,
     /// Active scalability tier; gates which post-FX passes run + buffer sizes.
     pub quality: postfx::QualityPreset,
+
+    /// Billboard particle pass (draws into the HDR target before post-FX).
+    particle_renderer: particles::ParticleRenderer,
 }
