@@ -10,6 +10,7 @@
 mod build;
 mod character;
 mod convert;
+mod query;
 mod world;
 
 pub use world::PhysicsWorld;
