@@ -181,6 +181,42 @@ camera culling masks).
 | `Layers.GetName` | `(index)` | the slot's name, or `Layer N` if unnamed |
 | `Layers.NameToIndex` | `(name)` | layer index, or `nil` if unknown |
 
+## `Graphics`
+
+Live control over the engine's **existing** post-FX and quality knobs, so a script
+can drive its own settings logic. The per-volume getters/setters target the first
+**active** `VisualCorrectionComponent` (color/bloom/SSR) and the first **active**
+`CameraComponent` (motion blur) in the scene — the same volume `build_post_params`
+packs into the GPU uniform each frame, so a write here takes effect next frame.
+Getters return a neutral default when no active volume/camera exists.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Graphics.GetBloomActive` / `SetBloomActive` | `()` / `(bool)` | `bool` |
+| `Graphics.GetBloomIntensity` / `SetBloomIntensity` | `()` / `(value)` | `number` (≥ 0) |
+| `Graphics.GetBloomThreshold` / `SetBloomThreshold` | `()` / `(value)` | `number` (≥ 0) |
+| `Graphics.GetExposure` / `SetExposure` | `()` / `(ev)` | `number` (EV) |
+| `Graphics.GetContrast` / `SetContrast` | `()` / `(value)` | `number` |
+| `Graphics.GetSaturation` / `SetSaturation` | `()` / `(value)` | `number` |
+| `Graphics.GetGamma` / `SetGamma` | `()` / `(value)` | `number` (clamped ≥ 0.01) |
+| `Graphics.GetTonemap` / `SetTonemap` | `()` / `(name)` | `"None"` / `"Reinhard"` / `"Aces"` |
+| `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
+| `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | `string` |
+| `Graphics.GetMotionBlurActive` / `SetMotionBlurActive` | `()` / `(bool)` | `bool` |
+| `Graphics.GetMotionBlurSamples` / `SetMotionBlurSamples` | `()` / `(n)` | `number` (clamped 2–32) |
+| `Graphics.GetQuality` / `SetQuality` | `()` / `(name)` | `"Low"` / `"Medium"` / `"High"` |
+
+The global **quality preset** gates the heavier passes (SSR is High-tier only;
+motion blur is off on Low). `SetQuality` writes a shared resource cell that the
+platform layer reads each frame and hands to the renderer, which reallocates its
+bloom buffers when the tier actually changes. Unrecognized tonemap/quality names
+are ignored (the current value is kept).
+
+**Determinism.** Every `Graphics` write is **one-way** into render-only state: the
+post-FX volume and the preset cell are read by the render layer, never by
+`FixedUpdate`. Toggling these knobs therefore cannot change how the deterministic
+sim evolves, and a headless replay stays bit-for-bit stable regardless of them.
+
 ## `Storage`
 
 A namespaced, JSON-backed key-value store that survives across runs — the engine's

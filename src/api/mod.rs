@@ -3,7 +3,7 @@
 //! The single stable API surface shared by Lua scripts, the console REPL and
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
 //! `Scene`, `Health`, `Camera`, `Animator`, `Nav`, `Material`, `Particles`,
-//! `Layers`, `Storage`, plus the dev-only `Debug`) is registered from this tree
+//! `Layers`, `Graphics`, `Storage`, plus the dev-only `Debug`) is registered from this tree
 //! onto the live Lua runtime.
 //! `scripting`
 //! owns the runtime and lifecycle; `api` owns the surface. One surface, three
@@ -15,6 +15,7 @@ pub mod animator;
 pub mod camera;
 #[cfg(feature = "dev")]
 pub mod debug;
+pub mod graphics;
 pub mod health;
 pub mod input;
 pub mod layers;
@@ -36,6 +37,7 @@ use crate::core::input::InputState;
 use crate::core::storage::Storage;
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
+use crate::render::postfx::QualityPreset;
 use crate::render::Camera;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
@@ -57,6 +59,9 @@ pub struct ApiCtx {
     pub physics: Rc<RefCell<Option<PhysicsWorld>>>,
     pub console: Rc<RefCell<ConsoleLogs>>,
     pub storage: Rc<RefCell<Storage>>,
+    /// Global post-FX scalability tier, shared with the platform layer so a
+    /// `Graphics.SetQuality` write reaches `renderer.set_quality`.
+    pub quality: Rc<RefCell<QualityPreset>>,
 }
 
 /// Register every namespace onto `lua`. This is the one place the whole script
@@ -76,6 +81,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     camera::register(lua, &ctx.camera)?;
     particle::register(lua, &ctx.scene)?;
     layers::register(lua, &ctx.scene)?;
+    graphics::register(lua, &ctx.scene, &ctx.quality)?;
     storage::register(lua, &ctx.storage)?;
     input::register_writable(lua, &ctx.input)?;
     #[cfg(feature = "dev")]
