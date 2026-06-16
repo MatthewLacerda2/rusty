@@ -15,6 +15,7 @@ pub mod animator;
 pub mod camera;
 #[cfg(feature = "dev")]
 pub mod debug;
+pub mod decals;
 pub mod health;
 pub mod input;
 pub mod layers;
@@ -75,6 +76,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     time::register(lua, &ctx.time)?;
     camera::register(lua, &ctx.camera)?;
     particle::register(lua, &ctx.scene)?;
+    decals::register(lua, &ctx.scene)?;
     layers::register(lua, &ctx.scene)?;
     storage::register(lua, &ctx.storage)?;
     input::register_writable(lua, &ctx.input)?;

@@ -210,6 +210,9 @@ impl Renderer {
         // Billboard particle pass — reuses the texture layout for sprites.
         let particle_renderer = super::particles::ParticleRenderer::new(&device, &texture_layout);
 
+        // Box-projector decal pass — reuses the texture layout for decal sprites.
+        let decal_renderer = super::decals::DecalRenderer::new(&device, &texture_layout);
+
         let mut renderer = Self {
             device,
             queue,
@@ -246,6 +249,7 @@ impl Renderer {
             post_fx,
             quality,
             particle_renderer,
+            decal_renderer,
         };
 
         renderer.generate_grid_mesh();
