@@ -17,6 +17,7 @@
 //!   io        — save/load, path + extension, default-scene seeding
 //!   snapshot  — edit-mode snapshot/restore around Play
 
+pub mod collision_matrix;
 pub mod io;
 pub mod layers;
 #[allow(clippy::module_inception)]
@@ -24,6 +25,7 @@ pub mod scene;
 pub mod serialize;
 pub mod snapshot;
 
+pub use collision_matrix::CollisionMatrix;
 pub use io::{
     is_scene_path, load_from_file, save_to_file, seed_default_scene, seed_default_scripts,
     DEFAULT_SCENE_PATH, DEFAULT_SCENE_SOURCE, SCENE_EXTENSION,

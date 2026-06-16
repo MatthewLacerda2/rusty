@@ -60,6 +60,10 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     // 4. Tags & Layers — rename the project's shared layer slots, referenced by an
     // entity's Layer dropdown in the entity inspector.
     draw_layers(editor, ui, scene);
+    ui.add_space(8.0);
+
+    // 5. Layer Collision Matrix — which layer collides with which (#91).
+    draw_collision_matrix(editor, ui, scene);
 
     ui.add_space(15.0);
     ui.separator();
@@ -98,4 +102,43 @@ fn draw_layers(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
             });
         }
     });
+}
+
+/// The Unity-style Layer Collision Matrix: a clickable grid over the named layers
+/// (layer 0 plus any named slots). Unchecking a cell stops those two layers from
+/// colliding; the matrix is symmetric and persists with the scene.
+fn draw_collision_matrix(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
+    let t = theme::from_ui(ui);
+    egui::CollapsingHeader::new(format!("{}  Layer Collision Matrix", icon::STACK)).show(
+        ui,
+        |ui| {
+            ui.colored_label(t.text_secondary, "Unchecked pairs never collide.");
+            let layers: Vec<(u8, String)> = (0..LAYER_COUNT as u8)
+                .filter(|&i| i == 0 || !scene.layers.name(i).is_empty())
+                .map(|i| (i, scene.layers.label(i)))
+                .collect();
+            egui::Grid::new("collision_matrix_grid")
+                .striped(true)
+                .show(ui, |ui| {
+                    // Header row: a blank corner, then one column per layer (index label,
+                    // full name on hover, to keep the grid compact).
+                    ui.label("");
+                    for (j, name) in &layers {
+                        ui.label(format!("{j}")).on_hover_text(name);
+                    }
+                    ui.end_row();
+                    for (i, name) in &layers {
+                        ui.label(name);
+                        for (j, _) in &layers {
+                            let mut on = scene.collision_matrix.can_collide(*i, *j);
+                            if ui.checkbox(&mut on, "").changed() {
+                                scene.collision_matrix.set_collision(*i, *j, on);
+                                editor.is_dirty = true;
+                            }
+                        }
+                        ui.end_row();
+                    }
+                });
+        },
+    );
 }

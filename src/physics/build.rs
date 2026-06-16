@@ -51,6 +51,22 @@ pub(super) fn build_shape(shape: &ColliderShape, scale: Vec3) -> Collider {
     }
 }
 
+/// rapier collision + solver groups for a collider on `layer`: it is a member of
+/// its own layer bit, and collides only with the layers `filter_mask` permits — the
+/// row the collision matrix (#91) provides for `layer`. A symmetric matrix makes the
+/// pairwise rapier test reduce to `can_collide(a, b)`.
+pub(super) fn interaction_groups(layer: u8, filter_mask: u32) -> InteractionGroups {
+    let membership = if (layer as usize) < 32 {
+        1u32 << layer
+    } else {
+        0
+    };
+    InteractionGroups::new(
+        Group::from_bits_truncate(membership),
+        Group::from_bits_truncate(filter_mask),
+    )
+}
+
 /// Canonical (low, high) ordering so trigger-pair dedup is stable.
 pub(super) fn order_pair(a: u32, b: u32) -> (u32, u32) {
     if a <= b {

@@ -12,6 +12,7 @@ use glam::{Mat4, Vec3};
 
 use crate::ecs::world::{Ref, RefMut};
 use crate::ecs::World;
+use crate::scene::collision_matrix::CollisionMatrix;
 use crate::scene::layers::LayerRegistry;
 
 // Re-export the component types so the many existing `scene::…Component` paths
@@ -42,6 +43,9 @@ pub struct Scene {
     /// The project's shared Layers registry (Unity's Tags & Layers). Serialized
     /// with the scene; the per-entity `layer` index points into it.
     pub layers: LayerRegistry,
+    /// Unity's Layer Collision Matrix: which layer collides with which. Drives
+    /// rapier `InteractionGroups` on collider build (#91); serialized with the scene.
+    pub collision_matrix: CollisionMatrix,
 }
 
 impl Default for Scene {
@@ -53,6 +57,7 @@ impl Default for Scene {
             ambient_color: default_ambient_color(),
             ambient_intensity: default_ambient_intensity(),
             layers: LayerRegistry::default(),
+            collision_matrix: CollisionMatrix::default(),
         }
     }
 }
