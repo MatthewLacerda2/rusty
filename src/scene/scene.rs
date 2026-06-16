@@ -12,6 +12,7 @@ use glam::{Mat4, Vec3};
 
 use crate::ecs::world::{Ref, RefMut};
 use crate::ecs::World;
+use crate::scene::layers::LayerRegistry;
 
 // Re-export the component types so the many existing `scene::…Component` paths
 // resolve. The structs themselves live in `crate::components`.
@@ -38,6 +39,9 @@ pub struct Scene {
     pub skybox_path: String,
     pub ambient_color: Vec3,
     pub ambient_intensity: f32,
+    /// The project's shared Layers registry (Unity's Tags & Layers). Serialized
+    /// with the scene; the per-entity `layer` index points into it.
+    pub layers: LayerRegistry,
 }
 
 impl Default for Scene {
@@ -48,6 +52,7 @@ impl Default for Scene {
             skybox_path: default_skybox_path(),
             ambient_color: default_ambient_color(),
             ambient_intensity: default_ambient_intensity(),
+            layers: LayerRegistry::default(),
         }
     }
 }

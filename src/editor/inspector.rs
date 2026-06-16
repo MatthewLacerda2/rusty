@@ -1,14 +1,12 @@
-use glam::Vec3;
-
 use egui_phosphor::regular as icon;
 
 use crate::editor::{
     inspector_add, inspector_camera, inspector_gameplay, inspector_particles, inspector_render,
-    inspector_transform,
+    inspector_settings, inspector_transform,
 };
 use crate::editor::{inspectors, EditorUi, InspectorTarget};
 use crate::navigation::NavigationGraph;
-use crate::scene::{Entity, Scene};
+use crate::scene::{Entity, Scene, LAYER_COUNT};
 use crate::scripting::ConsoleLogs;
 
 /// RIGHT PANEL: Properties Inspector
@@ -59,7 +57,7 @@ pub fn draw(
                         inspectors::draw_inspector(ui, editor, scene, console, &asset_path);
                     }
                     InspectorTarget::SceneSettings => {
-                        draw_global_settings(editor, ui, scene);
+                        inspector_settings::draw(editor, ui, scene);
                     }
                 }
             });
@@ -97,6 +95,14 @@ fn draw_entity_inspector(
 ) {
     let mut pending_parent_change = None;
     let mut pending_nav_bake = false;
+    let mut layer_changed = false;
+
+    // The layer dropdown labels (one per registry slot). Collected up front because
+    // the entity guard below borrows the whole `Scene`, so `scene.layers` can't be
+    // read while it's alive.
+    let layer_labels: Vec<String> = (0..LAYER_COUNT)
+        .map(|i| scene.layers.label(i as u8))
+        .collect();
 
     let current_parent_id = scene.get_entity(selected_id).and_then(|e| e.parent_id);
     let parent_mat = current_parent_id.map(|p| scene.compute_world_matrix(p));
@@ -158,6 +164,25 @@ fn draw_entity_inspector(
                         pending_nav_bake = true;
                     }
                 });
+                ui.horizontal(|ui| {
+                    ui.label("Layer:");
+                    let selected = layer_labels
+                        .get(entity.layer as usize)
+                        .cloned()
+                        .unwrap_or_default();
+                    egui::ComboBox::from_id_source("entity_layer")
+                        .selected_text(selected)
+                        .show_ui(ui, |ui| {
+                            for (i, label) in layer_labels.iter().enumerate() {
+                                if ui
+                                    .selectable_value(&mut entity.layer, i as u8, label)
+                                    .clicked()
+                                {
+                                    layer_changed = true;
+                                }
+                            }
+                        });
+                });
             });
         ui.add_space(t.space_xs);
 
@@ -190,62 +215,13 @@ fn draw_entity_inspector(
         inspector_add::draw(ui, entity);
     }
 
+    if layer_changed {
+        editor.is_dirty = true;
+    }
     if let Some(new_parent) = pending_parent_change {
         let _ = scene.set_parent(selected_id, new_parent);
     }
     if pending_nav_bake {
         nav.bake(scene);
     }
-}
-
-fn draw_global_settings(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
-    let t = crate::editor::theme::from_ui(ui);
-    ui.heading(format!("{}  Scene Settings", egui_phosphor::regular::GLOBE));
-    ui.separator();
-    ui.add_space(5.0);
-
-    // 1. Skybox Path
-    ui.horizontal(|ui| {
-        ui.label("Skybox:");
-        let response = ui.text_edit_singleline(&mut scene.skybox_path);
-        if response.changed() {
-            editor.is_dirty = true;
-        }
-    });
-    ui.colored_label(
-        t.text_secondary,
-        "Provide a path to a panoramic image\n(e.g. assets/textures/sky.png)",
-    );
-    ui.add_space(8.0);
-
-    // 2. Ambient Light Color
-    ui.label("Ambient Color:");
-    ui.horizontal(|ui| {
-        let mut color_arr = [
-            scene.ambient_color.x,
-            scene.ambient_color.y,
-            scene.ambient_color.z,
-        ];
-        if ui.color_edit_button_rgb(&mut color_arr).changed() {
-            scene.ambient_color = Vec3::new(color_arr[0], color_arr[1], color_arr[2]);
-            editor.is_dirty = true;
-        }
-    });
-    ui.add_space(8.0);
-
-    // 3. Ambient Light Intensity
-    ui.label("Ambient Intensity:");
-    let response =
-        ui.add(egui::Slider::new(&mut scene.ambient_intensity, 0.0..=5.0).text("intensity"));
-    if response.changed() {
-        editor.is_dirty = true;
-    }
-
-    ui.add_space(15.0);
-    ui.separator();
-    ui.add_space(5.0);
-    ui.colored_label(
-        t.text_secondary,
-        "Select an entity from Hierarchy\nor click a project asset to inspect.",
-    );
 }

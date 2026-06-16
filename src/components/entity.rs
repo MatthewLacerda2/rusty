@@ -21,6 +21,12 @@ pub struct Entity {
     pub name: String,
     pub active: bool,
     pub is_static: bool,
+    /// Index into the project's shared Layers registry (Unity's per-object layer).
+    /// Defaults to 0 (`"Default"`); `#[serde(default)]` so pre-#90 scenes load.
+    /// Groundwork for the collision matrix (#91) and camera culling masks (#92) —
+    /// it carries no behaviour on its own yet.
+    #[serde(default)]
+    pub layer: u8,
     pub transform: TransformComponent,
     pub mesh: Option<MeshComponent>,
     pub texture: Option<TextureComponent>,
@@ -46,6 +52,7 @@ impl Entity {
             name,
             active: true,
             is_static: false,
+            layer: 0,
             transform: TransformComponent::default(),
             mesh: None,
             texture: None,
