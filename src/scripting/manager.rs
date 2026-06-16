@@ -6,6 +6,7 @@ use std::rc::Rc;
 
 use crate::api::{self, ApiCtx};
 use crate::core::input::InputState;
+use crate::core::storage::Storage;
 use crate::navigation::NavigationGraph;
 use crate::render::Camera;
 use crate::scene::Scene;
@@ -22,6 +23,10 @@ pub struct ScriptManager {
     pub(super) console: Rc<RefCell<ConsoleLogs>>,
     pub(super) camera: Rc<RefCell<Camera>>,
     pub(super) time: Rc<RefCell<Time>>,
+    /// The persistent key-value store, shared with the app so it can flush at
+    /// boundaries. Injected by `Resources` via [`ScriptManager::set_storage`];
+    /// defaults to an empty, pathless store (harness/tests never touch disk).
+    pub(super) storage: Rc<RefCell<Storage>>,
 }
 
 impl ScriptManager {
@@ -42,7 +47,14 @@ impl ScriptManager {
             console,
             camera,
             time,
+            storage: Rc::new(RefCell::new(Storage::new())),
         }
+    }
+
+    /// Inject the shared persistent store. `Resources` calls this so the script
+    /// runtime, the console REPL and the app all read/write the same `Storage`.
+    pub fn set_storage(&mut self, storage: Rc<RefCell<Storage>>) {
+        self.storage = storage;
     }
 
     /// Initializes a fresh Lua environment and registers all required namespaces.
@@ -82,6 +94,7 @@ impl ScriptManager {
             time: Rc::clone(&self.time),
             physics: Rc::clone(physics),
             console: Rc::clone(&self.console),
+            storage: Rc::clone(&self.storage),
         };
         api::register(&lua, &ctx)?;
 

@@ -22,6 +22,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::core::input::InputState;
+use crate::core::storage::Storage;
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
 use crate::render::Camera;
@@ -47,6 +48,11 @@ pub struct Resources {
     /// `Physics.Raycast`/`Shoot` cast against the very same world the engine
     /// hitscan does (#31).
     pub physics: Rc<RefCell<Option<PhysicsWorld>>>,
+    /// Persistent key-value store (issue #86). Shared with the script runtime; the
+    /// platform layer loads it at startup ([`Storage::open`]) and flushes it at
+    /// boundaries (Stop / quit). Empty + pathless in the harness, so headless runs
+    /// never read a real save and stay reproducible.
+    pub storage: Rc<RefCell<Storage>>,
     pub is_playing: bool,
     pub(super) was_playing: bool,
     pub(super) pathfinding_points: Vec<glam::Vec3>,
@@ -76,7 +82,7 @@ impl Resources {
         camera: Rc<RefCell<Camera>>,
         time: Rc<RefCell<Time>>,
     ) -> Self {
-        let script_manager = ScriptManager::new(
+        let mut script_manager = ScriptManager::new(
             scene,
             Rc::clone(&input),
             Rc::clone(&nav),
@@ -84,6 +90,10 @@ impl Resources {
             Rc::clone(&camera),
             Rc::clone(&time),
         );
+        // One store shared by the script runtime and the app. Pathless until the
+        // platform layer binds it to a file at startup.
+        let storage = Rc::new(RefCell::new(Storage::new()));
+        script_manager.set_storage(Rc::clone(&storage));
         Self {
             input,
             nav,
@@ -91,6 +101,7 @@ impl Resources {
             camera,
             time,
             script_manager,
+            storage,
             physics: Rc::new(RefCell::new(None)),
             is_playing: false,
             was_playing: false,
@@ -105,6 +116,16 @@ impl Resources {
     /// The scaled per-frame delta for the tick in flight (`Time::delta_time`).
     pub fn dt(&self) -> f32 {
         self.frame_dt
+    }
+
+    /// Flush the persistent store at a boundary (Stop / quit), logging any failure
+    /// to the console. A no-op when the store is pathless (harness/tests).
+    pub fn flush_storage(&self) {
+        if let Err(err) = self.storage.borrow().flush() {
+            self.console
+                .borrow_mut()
+                .error(format!("Failed to flush storage: {}", err));
+        }
     }
 
     /// Number of play-mode frames simulated since the last `enter_play`.
