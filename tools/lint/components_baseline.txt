@@ -1,0 +1,19 @@
+# Components grandfathered past the 4-axis completeness gate (#81).
+# Format: `<component_field> <axis>` (axes: add_menu, inspector, api).
+# Burn-down only (#82) — remove a line when the axis is closed; never add one.
+# The particle system is deliberately NOT here: it is the first fully-green component.
+#
+# `api` here means "no namespace named after the component". Some of these are
+# partly served by a shared namespace (collider/rigidbody by Physics, nav_agent by
+# Nav, texture by Material); #82 decides per component whether to add a dedicated
+# namespace or waive the axis.
+mesh add_menu
+mesh api
+texture api
+script api
+animator add_menu
+light api
+collider api
+rigidbody api
+nav_agent api
+visual_correction api
