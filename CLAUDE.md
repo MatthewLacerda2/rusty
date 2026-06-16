@@ -97,6 +97,11 @@ five kinds of moving part (Unity analogs in parentheses):
   `physics`, `navigation`); the platform layer (`main.rs`, `render`, `dev`) is exempt.
 - **Use `glam`** for all math; keep egui / wgpu / mlua decoupled.
 - **Single crate.**
+- **Asset sources are glTF/OBJ, never `.blend`.** Authored 3D content comes from
+  Blender's native glTF 2.0 export (or `glTF`/`glb`/`obj`/`fbx` from elsewhere). The
+  engine reads those interchange formats directly and **never parses `.blend` nor
+  shells out to Blender** — the import path must not drift toward a Blender
+  dependency. glTF 2.0 is first-class; `.obj` is static-mesh only.
 
 ## Commit gate (programmatic — no AI needed)
 Commits are blocked unless the checks pass; failures are written to

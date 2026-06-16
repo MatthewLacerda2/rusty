@@ -25,6 +25,15 @@ editor — and a lot faster.
 - **A real 3D engine underneath:** rendering, physics (rapier3d), navigation/navmesh,
   shadows, a skybox, and a post-processing chain.
 
+## Assets
+
+Authored 3D assets come from **Blender** (its native glTF 2.0 export), or are
+`glTF` / `glb` / `obj` / `fbx` files brought in, downloaded, or exported from
+anywhere else. The engine reads those standard interchange formats directly — it
+**never parses `.blend` and never shells out to Blender** as a subprocess (the
+fragile Unity-style convenience that breaks the moment Blender isn't installed).
+glTF 2.0 is the first-class path; `.obj` covers static meshes.
+
 ## Built to be played by an agent
 
 The headline feature: the entire simulation runs **headlessly** — no window, no GPU —
