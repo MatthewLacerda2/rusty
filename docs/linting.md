@@ -12,6 +12,7 @@ result is written to `.lint/report.txt` so an agent can read exactly what failed
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines |
 | Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation` |
+| Component completeness | `tools/lint -- --components` | every built-in component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
 
 ## Run it
 ```
@@ -28,6 +29,18 @@ cargo clippy --no-deps                                   # smells
 `tools/lint/baseline.txt` grandfathers the files that already exceed the cap. It is a
 **TODO list, not a pardon**: as a file is split, remove its entry. Never add new
 entries. When the file is empty, the size gate is fully on.
+
+## Component completeness (`--components`)
+A built-in component is only "done" when it appears on all four axes that
+deliberately live in non-dependent layers: a field on `Entity`, an Add Component
+entry (`inspector_add.rs`), an inspector card (some `inspector_*.rs`), and an API
+namespace (`src/api/<x>.rs` registered in `api/mod.rs` and documented in
+`scripting-api.md`). The gate discovers components from `Entity`'s
+`Option<…Component>` fields — so a new one can't slip through — and fails on any
+missing axis. `tools/lint/components_baseline.txt` grandfathers today's incomplete
+components as `<component> <axis>` lines (the same burn-down rule as above; #82
+removes them one axis at a time). The particle system is intentionally absent from
+that baseline — it is the gate's first fully-green component.
 
 ## Clippy: CI vs local
 Clippy lints the whole crate (it can't be scoped to changed files). In **CI** it's a

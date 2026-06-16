@@ -104,7 +104,8 @@ pub fn draw(
 
         if let Some(entity_id) = clicked_entity_id {
             if let Some(mut ent) = scene.get_entity_mut(entity_id) {
-                ent.script = Some(ScriptComponent {
+                // An entity can hold many scripts (#83); append rather than replace.
+                ent.scripts.push(ScriptComponent {
                     path: path.to_string(),
                     is_loaded: false,
                 });

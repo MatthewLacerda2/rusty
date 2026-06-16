@@ -19,17 +19,19 @@ pub const PLAYER_BOT_SCRIPT: &str = "project/scripts/bot_player.lua";
 /// Attach a bot-player script to the entity named `Player` in `scene`.
 ///
 /// Called *before* the first headless tick, so the script is picked up when the
-/// world enters play mode (`enter_play` reads every entity's `ScriptComponent`).
-/// Returns `true` if a Player was found and tagged, `false` otherwise.
+/// world enters play mode (`enter_play` reads every entity's `scripts`). The bot
+/// brain *drives* the Player, so it REPLACES the human controller script(s)
+/// rather than running alongside them. Returns `true` if a Player was found and
+/// tagged, `false` otherwise.
 pub fn attach_player_bot(scene: &mut Scene, script_path: &str) -> bool {
     let Some(player_id) = scene.find_entity_by_name("Player") else {
         return false;
     };
     if let Some(mut player) = scene.get_entity_mut(player_id) {
-        player.script = Some(ScriptComponent {
+        player.scripts = vec![ScriptComponent {
             path: script_path.to_string(),
             is_loaded: false,
-        });
+        }];
         return true;
     }
     false

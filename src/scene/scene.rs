@@ -18,10 +18,11 @@ use crate::scene::layers::LayerRegistry;
 // Re-export the component types so the many existing `scene::…Component` paths
 // resolve. The structs themselves live in `crate::components`.
 pub use crate::components::{
-    AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, CollisionResponse,
-    DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent, LightType, MeshComponent,
-    NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent, RigidBodyComponent,
-    ScriptComponent, TextureComponent, Tonemap, TransformComponent, VisualCorrectionComponent,
+    AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape,
+    CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent, LightType,
+    MeshComponent, NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent,
+    RigidBodyComponent, ScriptComponent, TextureComponent, Tonemap, TransformComponent,
+    VisualCorrectionComponent,
 };
 
 fn default_skybox_path() -> String {

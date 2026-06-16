@@ -42,6 +42,7 @@ fn scene_with_exposure(exposure: f32) -> Scene {
     let (vertices, indices) = rusty::render::mesh::generate_box(2.0, 2.0, 2.0);
     e.mesh = Some(MeshComponent {
         primitive_type: "Box".to_string(),
+        asset_ref: None,
         vertices,
         indices,
         is_dirty: rusty::scene::DirtyFlag::new(true),

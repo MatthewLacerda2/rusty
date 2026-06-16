@@ -14,6 +14,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
+mod components;
 mod determinism;
 
 const MAX_FILE_LINES: usize = 300;
@@ -31,6 +32,14 @@ fn main() {
     // if wall-clock / unseeded-RNG calls leak into the deterministic sim modules.
     if args.iter().any(|a| a == "--determinism") {
         determinism::run();
+        return;
+    }
+
+    // `--components` runs the 4-axis component-completeness gate (#81): every
+    // built-in component must have an Entity field, an Add Component entry, an
+    // inspector card, and an API namespace, or be grandfathered in the baseline.
+    if args.iter().any(|a| a == "--components") {
+        components::run();
         return;
     }
 
