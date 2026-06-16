@@ -88,6 +88,7 @@ pub fn draw_collider(
                 ColliderShape::Box { .. } => "Box",
                 ColliderShape::Sphere { .. } => "Sphere",
                 ColliderShape::Cylinder { .. } => "Cylinder",
+                ColliderShape::Mesh { .. } => "Mesh",
             };
             let old_shape_type = shape_type;
             egui::ComboBox::from_label("Shape")
@@ -131,6 +132,14 @@ pub fn draw_collider(
                         ui.label("Height:");
                         drag(ui, height);
                     });
+                }
+                ColliderShape::Mesh { convex, .. } => {
+                    // Baked from the imported mesh (#77): no editable extents, but
+                    // the hull/trimesh choice can still be flipped here.
+                    ui.label("Baked from imported mesh");
+                    if ui.checkbox(convex, "Convex hull").changed() {
+                        *pending_nav_bake = true;
+                    }
                 }
             }
         },

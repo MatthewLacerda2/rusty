@@ -151,4 +151,26 @@ fn sidecar_round_trips_and_caches_sub_objects() {
     assert_eq!(loaded.sub_objects, vec!["Quad".to_string()]);
     assert_eq!(loaded.scale, 1.0);
     assert!(loaded.import_normals);
+    // A fresh sidecar requests no mesh colliders (#77).
+    assert!(loaded.colliders.is_empty());
+}
+
+#[test]
+fn sidecar_persists_mesh_collider_choice() {
+    let path = tmp("collider_quad.obj");
+    std::fs::write(&path, TRIANGLE_OBJ).unwrap();
+    let mut settings = import_and_sync_sidecar(&path)
+        .map(|a| sidecar::load(&path).unwrap().with_sub_objects(&a))
+        .unwrap();
+    settings
+        .colliders
+        .insert("Quad".to_string(), MeshColliderKind::Convex);
+    sidecar::save(&path, &settings).unwrap();
+
+    let loaded = sidecar::load(&path).unwrap();
+    assert_eq!(
+        loaded.colliders.get("Quad"),
+        Some(&MeshColliderKind::Convex)
+    );
+    assert!(loaded.colliders.get("Quad").unwrap().is_convex());
 }
