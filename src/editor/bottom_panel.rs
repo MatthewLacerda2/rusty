@@ -18,7 +18,7 @@ pub fn draw(
     }
     egui::TopBottomPanel::bottom("Bottom Panel")
         .resizable(true)
-        .min_height(160.0)
+        .min_height(112.0)
         .frame(
             egui::Frame::none()
                 .fill(t.bg_tier1)

@@ -24,7 +24,7 @@ pub fn draw(
     }
     egui::SidePanel::right("Inspector Panel")
         .resizable(true)
-        .width_range(260.0..=380.0)
+        .width_range(182.0..=380.0)
         .frame(
             egui::Frame::none()
                 .fill(t.bg_tier1)
