@@ -78,7 +78,7 @@ pub fn build_post_params(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
+    use crate::components::{CameraComponent, ClearFlags, Tonemap, VisualCorrectionComponent};
     use crate::scene::Scene;
 
     fn scene_with_vc(vc: VisualCorrectionComponent, cam: Option<CameraComponent>) -> Scene {
@@ -115,6 +115,8 @@ mod tests {
             near: 0.1,
             far: 100.0,
             culling_mask: u32::MAX,
+            render_order: 0,
+            clear_flags: ClearFlags::Skybox,
             motion_blur_active: true,
             motion_blur_samples: 16,
         }

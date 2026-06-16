@@ -2,7 +2,7 @@ use egui_phosphor::regular as icon;
 
 use crate::editor::inspector_card::component_card;
 use crate::editor::theme;
-use crate::scene::{Entity, Tonemap};
+use crate::scene::{ClearFlags, Entity, Tonemap};
 
 /// Camera Component panel. `named_layers` are the `(index, label)` slots offered in
 /// the culling-mask checklist (layer 0 + named user slots).
@@ -45,6 +45,7 @@ pub fn draw_camera(
             );
         });
         draw_culling_mask(ui, &mut cam.culling_mask, named_layers, is_dirty);
+        draw_stacking(ui, &mut cam.render_order, &mut cam.clear_flags, is_dirty);
         ui.colored_label(
             theme::from_ui(ui).accent_blue,
             "✔ Intrinsic Motion Blur (Active | 64 Samples)",
@@ -89,6 +90,45 @@ fn draw_culling_mask(
             *is_dirty = true;
         }
     }
+}
+
+/// Camera-stack controls (#93): the stacking `render_order` (Unity "Depth") and the
+/// `clear_flags` that decide how this camera composites over the ones below it.
+fn draw_stacking(
+    ui: &mut egui::Ui,
+    render_order: &mut i32,
+    clear_flags: &mut ClearFlags,
+    is_dirty: &mut bool,
+) {
+    ui.add_space(3.0);
+    ui.horizontal(|ui| {
+        ui.label("Render Order (Depth):");
+        if ui
+            .add(egui::DragValue::new(render_order).speed(1))
+            .changed()
+        {
+            *is_dirty = true;
+        }
+    });
+    ui.horizontal(|ui| {
+        ui.label("Clear Flags:");
+        egui::ComboBox::from_id_source("clear_flags")
+            .selected_text(match clear_flags {
+                ClearFlags::Skybox => "Skybox",
+                ClearFlags::SolidColor => "Solid Color",
+                ClearFlags::DepthOnly => "Depth Only",
+            })
+            .show_ui(ui, |ui| {
+                let mut pick = |ui: &mut egui::Ui, value, label| {
+                    if ui.selectable_value(clear_flags, value, label).changed() {
+                        *is_dirty = true;
+                    }
+                };
+                pick(ui, ClearFlags::Skybox, "Skybox");
+                pick(ui, ClearFlags::SolidColor, "Solid Color");
+                pick(ui, ClearFlags::DepthOnly, "Depth Only");
+            });
+    });
 }
 
 /// Visual Correction Component panel
