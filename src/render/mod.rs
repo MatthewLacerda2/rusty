@@ -5,6 +5,8 @@ pub mod skybox;
 
 mod camera;
 mod debug_meshes;
+pub mod decals;
+mod decals_draw;
 mod draw;
 mod draw_overlays;
 mod draw_pass;
@@ -178,4 +180,8 @@ pub struct Renderer {
 
     /// Billboard particle pass (draws into the HDR target before post-FX).
     particle_renderer: particles::ParticleRenderer,
+
+    /// Box-projector decal pass (draws into the HDR target after solids/skybox,
+    /// reconstructing the underlying surface from the scene depth target).
+    decal_renderer: decals::DecalRenderer,
 }

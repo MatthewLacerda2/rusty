@@ -46,6 +46,11 @@ pub struct Scene {
     /// Unity's Layer Collision Matrix: which layer collides with which. Drives
     /// rapier `InteractionGroups` on collider build (#91); serialized with the scene.
     pub collision_matrix: CollisionMatrix,
+    /// Runtime box-projector decals (bullet holes, scorch, blood splats). These are
+    /// ephemeral *visual* state spawned from raycast hits, NOT serialized scene
+    /// data — the decal renderer reads them each frame and projects them onto the
+    /// surfaces they overlap. Bounded FIFO (oldest evicted past `MAX_DECALS`).
+    pub decals: Vec<crate::render::decals::Decal>,
 }
 
 impl Default for Scene {
@@ -58,6 +63,7 @@ impl Default for Scene {
             ambient_intensity: default_ambient_intensity(),
             layers: LayerRegistry::default(),
             collision_matrix: CollisionMatrix::default(),
+            decals: Vec::new(),
         }
     }
 }
@@ -65,6 +71,44 @@ impl Default for Scene {
 impl Scene {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Spawn a box-projector decal at a surface hit (the point + outward normal
+    /// already produced by `Physics.Raycast`/`Physics.Shoot`). `size` is the
+    /// stamp's width/height in world units; `depth` how far the box projects
+    /// through the surface; `rotation_deg` spins the stamp around its axis;
+    /// `color` tints the texel (alpha scales the blend); `texture` is the decal
+    /// sprite (or the default checker). The registry is a bounded FIFO so spam
+    /// can't grow it without limit.
+    #[allow(clippy::too_many_arguments)]
+    pub fn spawn_decal(
+        &mut self,
+        point: Vec3,
+        normal: Vec3,
+        size: f32,
+        depth: f32,
+        rotation_deg: f32,
+        color: [f32; 4],
+        texture: Option<String>,
+    ) {
+        let decal = crate::render::decals::Decal::from_hit(
+            point,
+            normal,
+            size.max(1.0e-4),
+            depth.max(1.0e-4),
+            rotation_deg,
+            color,
+            texture,
+        );
+        if self.decals.len() >= crate::render::decals::MAX_DECALS {
+            self.decals.remove(0);
+        }
+        self.decals.push(decal);
+    }
+
+    /// Drop every live decal (e.g. on level reset).
+    pub fn clear_decals(&mut self) {
+        self.decals.clear();
     }
 
     pub fn add_entity(&mut self, name: String) -> u32 {

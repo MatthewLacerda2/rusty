@@ -165,6 +165,26 @@ actually spawned (the `max_particles` cap may swallow some).
 | `Particles.GetCount` | `(id)` | live particle count |
 | `Particles.Clear` | `(id)` | — (despawns all live particles) |
 
+## `Decals`
+
+Stamp **box-projector decals** (bullet holes, scorch, blood splats) onto the
+surface a shot hit. A decal is a projected *volume*, not a flat sticker: the decal
+pass reconstructs the underlying surface from the scene depth and wraps the texture
+onto whatever geometry the box overlaps. Spawn from the world point + surface
+normal a hit already gives you (`Physics.Raycast` returns `(hit, id, distance)`, so
+the point is `origin + dir * distance`; supply the surface normal). The registry is
+a bounded FIFO — oldest decals are evicted past the cap.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Decals.Spawn` | `(x,y,z, nx,ny,nz, [size], [texture], [rotation_deg], [r,g,b,a])` | — |
+| `Decals.Count` | `()` | live decal count |
+| `Decals.Clear` | `()` | — (drops every live decal) |
+
+`size` (default `0.5`) is the stamp's width/height in world units; `texture` is the
+decal sprite path (default checker); `rotation_deg` spins the stamp around its
+projection axis; `r,g,b,a` tints the texel (default opaque white).
+
 ## `Layers`
 
 An entity's layer is a single index (`0..31`) into the project's shared Layers

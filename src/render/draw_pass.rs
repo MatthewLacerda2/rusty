@@ -233,6 +233,11 @@ impl Renderer {
         // 6. Submit the scene pass (it filled the HDR target + depth).
         self.queue.submit(std::iter::once(encoder.finish()));
 
+        // 6a. Project box-decals over the lit surfaces (reads the scene depth to
+        // reconstruct the underlying geometry). Runs after solids/skybox so it
+        // overlays the lit colour, before particles + post-FX.
+        self.draw_decals(scene, camera);
+
         // 6b. Draw billboard particles into the HDR target (after solids/skybox,
         // before post-FX) so bloom/tonemap apply to additive sparks/fire.
         self.draw_particles(scene, camera);
