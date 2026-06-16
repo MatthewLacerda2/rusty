@@ -1,14 +1,17 @@
-//! src/asset/gltf_import.rs — glTF 2.0 import (`.gltf` + `.glb`), meshes + materials.
+//! src/asset/gltf_import.rs — glTF 2.0 import (`.gltf` + `.glb`), meshes,
+//! materials and skin bindings.
 //!
-//! Skinning and animation are out of scope here (issue #79); this reads static
-//! geometry and the base-color material values. Pure data — the `gltf` crate +
-//! `glam`, never wgpu/egui/mlua.
+//! Reads static geometry, base-color material values, and (issue #79) the skin:
+//! per-vertex `JOINTS_0`/`WEIGHTS_0` plus the skeleton (`gltf_skin`). Animation
+//! clips remain out of scope (#80). Pure data — the `gltf` crate + `glam`, never
+//! wgpu/egui/mlua.
 //!
 //! Each glTF *mesh* becomes one addressable `SubMesh`; its primitives are merged
 //! (index offsets fixed up) into one vertex/index stream, since a primitive split
 //! is a material boundary, not a separate addressable object.
 
-use super::mesh_data::{ImportedAsset, MaterialData, MeshVertex, SubMesh};
+use super::gltf_skin;
+use super::mesh_data::{ImportedAsset, MaterialData, MeshVertex, SkinData, SubMesh};
 use super::ImportError;
 use std::path::Path;
 
@@ -19,10 +22,11 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
         gltf::import(path).map_err(|e| ImportError::Parse(e.to_string()))?;
 
     let materials = document.materials().map(material_data).collect();
+    let skins = gltf_skin::skins_by_mesh(&document, &buffers);
 
     let sub_meshes = document
         .meshes()
-        .map(|mesh| sub_mesh_from_gltf(&mesh, &buffers))
+        .map(|mesh| sub_mesh_from_gltf(&mesh, &buffers, skins.get(&mesh.index()).cloned()))
         .collect();
 
     Ok(ImportedAsset {
@@ -39,7 +43,11 @@ fn material_data(material: gltf::Material) -> MaterialData {
     }
 }
 
-fn sub_mesh_from_gltf(mesh: &gltf::Mesh, buffers: &[gltf::buffer::Data]) -> SubMesh {
+fn sub_mesh_from_gltf(
+    mesh: &gltf::Mesh,
+    buffers: &[gltf::buffer::Data],
+    skin: Option<SkinData>,
+) -> SubMesh {
     let id = mesh
         .name()
         .map(str::to_string)
@@ -70,11 +78,26 @@ fn sub_mesh_from_gltf(mesh: &gltf::Mesh, buffers: &[gltf::buffer::Data]) -> SubM
             .map(|t| t.into_f32().collect())
             .unwrap_or_else(|| vec![[0.0, 0.0]; positions.len()]);
 
+        // Skin bindings are per-primitive and index into `skin.joints()` order.
+        let joints: Vec<[u16; 4]> = reader
+            .read_joints(0)
+            .map(|j| j.into_u16().collect())
+            .unwrap_or_default();
+        let weights: Vec<[f32; 4]> = reader
+            .read_weights(0)
+            .map(|w| w.into_f32().collect())
+            .unwrap_or_default();
+
         let base = vertices.len() as u32;
         for (i, position) in positions.iter().enumerate() {
             let normal = normals.get(i).copied().unwrap_or([0.0, 1.0, 0.0]);
             let uv = uvs.get(i).copied().unwrap_or([0.0, 0.0]);
-            vertices.push(MeshVertex::new(*position, normal, uv));
+            let mut vertex = MeshVertex::new(*position, normal, uv);
+            if let (Some(j), Some(w)) = (joints.get(i), weights.get(i)) {
+                let ji = [j[0] as u32, j[1] as u32, j[2] as u32, j[3] as u32];
+                vertex = vertex.with_skin(ji, *w);
+            }
+            vertices.push(vertex);
         }
 
         match reader.read_indices() {
@@ -89,5 +112,6 @@ fn sub_mesh_from_gltf(mesh: &gltf::Mesh, buffers: &[gltf::buffer::Data]) -> SubM
         vertices,
         indices,
         material,
+        skin,
     }
 }

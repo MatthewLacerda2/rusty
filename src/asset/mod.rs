@@ -17,11 +17,12 @@
 //! scene-load re-import is deterministic given the same file.
 
 pub mod gltf_import;
+pub mod gltf_skin;
 pub mod mesh_data;
 pub mod obj_import;
 pub mod sidecar;
 
-pub use mesh_data::{ImportedAsset, MaterialData, MeshVertex, SubMesh};
+pub use mesh_data::{ImportedAsset, MaterialData, MeshVertex, SkinData, SubMesh};
 pub use sidecar::{import_and_sync_sidecar, ImportSettings};
 
 use std::path::Path;

@@ -32,6 +32,7 @@ fn mesh(primitive_type: &str, data: (Vec<primitives::Vertex>, Vec<u32>)) -> Mesh
         asset_ref: None,
         vertices: data.0,
         indices: data.1,
+        bind_palette: Vec::new(),
         is_dirty: DirtyFlag::new(true),
     }
 }

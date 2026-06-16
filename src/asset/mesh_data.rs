@@ -5,16 +5,21 @@
 //! The scene layer converts a `MeshVertex` into the render `Vertex` when it
 //! rehydrates a mesh, so the importer never depends on wgpu/egui/mlua.
 
-use glam::Vec3;
+use glam::{Mat4, Vec3};
 
-/// One vertex of imported geometry: position, normal and a single UV channel.
-/// Skin weights (joints) are intentionally absent here — they land with the
-/// skinning issue (#79); this foundation is static meshes + materials only.
+/// One vertex of imported geometry: position, normal, a single UV channel and the
+/// optional skin binding. `joint_indices` index into the sub-mesh's [`SkinData`]
+/// joints (and thus the GPU bone palette); `joint_weights` are the linear-blend
+/// weights. Unskinned vertices (every primitive, and any glTF mesh without a skin)
+/// default to the identity binding — bone 0, full weight — so the shader leaves
+/// them untouched (#79).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MeshVertex {
     pub position: [f32; 3],
     pub normal: [f32; 3],
     pub tex_coords: [f32; 2],
+    pub joint_indices: [u32; 4],
+    pub joint_weights: [f32; 4],
 }
 
 impl MeshVertex {
@@ -23,7 +28,46 @@ impl MeshVertex {
             position,
             normal,
             tex_coords,
+            joint_indices: [0, 0, 0, 0],
+            joint_weights: [1.0, 0.0, 0.0, 0.0],
         }
+    }
+
+    /// Attach a skin binding (glTF `JOINTS_0`/`WEIGHTS_0`) to a vertex.
+    pub fn with_skin(mut self, joint_indices: [u32; 4], joint_weights: [f32; 4]) -> Self {
+        self.joint_indices = joint_indices;
+        self.joint_weights = joint_weights;
+        self
+    }
+}
+
+/// A sub-mesh's skeleton, parsed from a glTF `skin`: one inverse-bind matrix and
+/// one bind-pose global (model-space) transform per joint, in `skin.joints` order
+/// — the same order the per-vertex `joint_indices` reference.
+///
+/// At bind pose the skinning matrix for each joint is `bind_global * inverse_bind`,
+/// which is the identity by construction (the inverse-bind is the inverse of the
+/// joint's global bind transform). Storing both halves rather than only the product
+/// keeps the rig data the animation runtime (#80) will pose, while letting the
+/// renderer upload the bind-pose palette today (#79).
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct SkinData {
+    /// Inverse bind matrix per joint.
+    pub inverse_bind: Vec<Mat4>,
+    /// Global (model-space) transform of each joint node at bind time, already
+    /// expressed relative to the skinned mesh node so the palette is mesh-local.
+    pub bind_global: Vec<Mat4>,
+}
+
+impl SkinData {
+    /// The bind-pose bone palette: `bind_global[j] * inverse_bind[j]` per joint.
+    /// Joints are paired in order; a length mismatch is truncated to the shorter.
+    pub fn bind_palette(&self) -> Vec<Mat4> {
+        self.bind_global
+            .iter()
+            .zip(self.inverse_bind.iter())
+            .map(|(g, ib)| *g * *ib)
+            .collect()
     }
 }
 
@@ -59,6 +103,10 @@ pub struct SubMesh {
     pub vertices: Vec<MeshVertex>,
     pub indices: Vec<u32>,
     pub material: Option<usize>,
+    /// The skeleton bound to this sub-mesh, when the source declared a glTF `skin`.
+    /// `None` for static meshes (every `.obj`, and any glTF mesh without a skin);
+    /// the per-vertex bindings then stay at their unskinned identity default.
+    pub skin: Option<SkinData>,
 }
 
 impl SubMesh {

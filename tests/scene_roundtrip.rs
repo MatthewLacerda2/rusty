@@ -24,6 +24,7 @@ fn save_load_preserves_values_and_rehydrates_mesh() {
             asset_ref: None,
             vertices: Vec::new(),
             indices: Vec::new(),
+            bind_palette: Vec::new(),
             is_dirty: rusty::scene::DirtyFlag::new(true),
         });
     }
