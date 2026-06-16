@@ -10,13 +10,16 @@
 //! primitive meshes from `primitive_type`, and the collider world AABBs — so the
 //! file stays human-readable/diffable and small.
 //!
-//! Allowed deps: ecs, components.
+//! Allowed deps: ecs, components, asset (for re-importing `"Asset"` meshes),
+//! render::mesh (the `Vertex` type rehydration targets).
 
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
+use crate::asset::{self, MeshVertex, SubMesh};
 use crate::components::Entity;
 use crate::render::mesh as primitives;
+use crate::render::mesh::Vertex;
 use crate::scene::collision_matrix::CollisionMatrix;
 use crate::scene::layers::LayerRegistry;
 use crate::scene::Scene;
@@ -72,8 +75,41 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
     }
 }
 
-/// Rebuild a primitive mesh's vertex/index data from its `primitive_type` name.
-/// GPU buffers are never stored on disk, only rebuilt here.
+/// Convert one imported `MeshVertex` (pure data) into the renderer's `Vertex`.
+/// Imported static meshes carry no skin weights yet (#79), so joints default to
+/// the unskinned identity, exactly as `Vertex::new` would.
+fn vertex_from_imported(v: &MeshVertex) -> Vertex {
+    Vertex {
+        position: v.position,
+        normal: v.normal,
+        tex_coords: v.tex_coords,
+        joint_indices: [0, 0, 0, 0],
+        joint_weights: [1.0, 0.0, 0.0, 0.0],
+    }
+}
+
+/// Geometry for an imported sub-mesh, ready for the GPU buffer rebuild.
+fn imported_to_render(sub: &SubMesh) -> (Vec<Vertex>, Vec<u32>) {
+    let vertices = sub.vertices.iter().map(vertex_from_imported).collect();
+    (vertices, sub.indices.clone())
+}
+
+/// Re-import an `"Asset"` mesh's geometry from its path-based `asset_ref`
+/// (`path::sub_object`). On failure (missing/renamed source — the accepted
+/// path-based trade-off) the mesh rehydrates empty rather than aborting the load.
+fn rehydrate_asset_mesh(asset_ref: &Option<String>) -> (Vec<Vertex>, Vec<u32>) {
+    match asset_ref {
+        Some(reference) => match asset::import_sub_mesh(reference) {
+            Ok(sub) => imported_to_render(&sub),
+            Err(_) => (Vec::new(), Vec::new()),
+        },
+        None => (Vec::new(), Vec::new()),
+    }
+}
+
+/// Rebuild each mesh's vertex/index data from its on-disk REFERENCE: a primitive
+/// from `primitive_type`, or an imported sub-mesh from `asset_ref` when the type
+/// is `"Asset"`. GPU buffers are never stored on disk, only rebuilt here.
 fn rehydrate_meshes(data: &mut SceneData) {
     for entity in &mut data.entities {
         if let Some(mesh) = &mut entity.mesh {
@@ -87,12 +123,28 @@ fn rehydrate_meshes(data: &mut SceneData) {
                     0.5,
                     12,
                 ),
+                "Asset" => rehydrate_asset_mesh(&mesh.asset_ref),
                 _ => (Vec::new(), Vec::new()),
             };
             mesh.vertices = vertices;
             mesh.indices = indices;
             mesh.is_dirty.set(true);
         }
+    }
+}
+
+/// Build an `"Asset"` mesh component from a path-based reference, importing its
+/// geometry up front. The reference is the only identity stored; on save the
+/// vertices are dropped and re-imported from it (see `rehydrate_meshes`). Returns
+/// an empty-geometry component if the import fails.
+pub fn asset_mesh_component(reference: &str) -> crate::scene::MeshComponent {
+    let (vertices, indices) = rehydrate_asset_mesh(&Some(reference.to_string()));
+    crate::scene::MeshComponent {
+        primitive_type: "Asset".to_string(),
+        asset_ref: Some(reference.to_string()),
+        vertices,
+        indices,
+        is_dirty: crate::scene::DirtyFlag::new(true),
     }
 }
 

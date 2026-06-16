@@ -24,7 +24,7 @@ pub mod transform;
 pub mod visual_correction;
 
 pub use animator::AnimatorComponent;
-pub use camera::CameraComponent;
+pub use camera::{CameraComponent, ClearFlags};
 pub use collider::{ColliderComponent, ColliderShape};
 pub use entity::Entity;
 pub use health::HealthComponent;

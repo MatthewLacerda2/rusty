@@ -2,9 +2,10 @@ use egui_phosphor::regular as icon;
 use glam::Vec3;
 
 use crate::scene::{
-    AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, Entity, HealthComponent,
-    LightComponent, LightType, NavMeshAgentComponent, ParticleEmitterComponent, RigidBodyComponent,
-    ScriptComponent, TextureComponent, Tonemap, VisualCorrectionComponent,
+    AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape, Entity,
+    HealthComponent, LightComponent, LightType, NavMeshAgentComponent, ParticleEmitterComponent,
+    RigidBodyComponent, ScriptComponent, TextureComponent, Tonemap, VisualCorrectionComponent,
+    DEFAULT_SCRIPTS_DEST_DIR,
 };
 
 /// 3F. Add Component — Unity-style full-width pill that opens the component menu.
@@ -22,19 +23,11 @@ pub fn draw(ui: &mut egui::Ui, entity: &mut Entity) {
 }
 
 fn add_menu(ui: &mut egui::Ui, entity: &mut Entity) {
-    // Lua scripts carry the moon glyph (the per-type icons for the other built-ins
-    // are the burn-down in #82); the particle system gets the sparkle below.
-    if entity.script.is_none()
-        && ui
-            .button(format!("{}  Script Component", icon::MOON))
-            .clicked()
-    {
-        entity.script = Some(ScriptComponent {
-            path: "project/assets/scripts/bot.lua".to_string(),
-            is_loaded: false,
-        });
-        ui.close_menu();
-    }
+    // Every project `.lua` that exposes a lifecycle table is a MonoBehaviour and
+    // is offered here with the moon glyph (the per-type icons for the other
+    // built-ins are the burn-down in #82); helper modules without a lifecycle
+    // table are not. An entity can hold many scripts (#83), so each pick appends.
+    add_script_menu(ui, entity);
     if entity.light.is_none() && ui.button("Light Component").clicked() {
         entity.light = Some(LightComponent {
             light_type: LightType::Point,
@@ -112,6 +105,8 @@ fn add_menu(ui: &mut egui::Ui, entity: &mut Entity) {
             near: 0.1,
             far: 200.0,
             culling_mask: u32::MAX,
+            render_order: 0,
+            clear_flags: ClearFlags::Skybox,
             motion_blur_active: true,
             motion_blur_samples: 64,
         });
@@ -144,5 +139,30 @@ fn add_menu(ui: &mut egui::Ui, entity: &mut Entity) {
             gamma: 2.2,
         });
         ui.close_menu();
+    }
+}
+
+/// List the project's MonoBehaviour scripts (any `.lua` exposing a lifecycle
+/// table) under the moon glyph; picking one appends a `ScriptComponent` to the
+/// entity's `scripts` (#83). Duplicates are allowed, mirroring Unity. When the
+/// project has no such scripts, a disabled hint is shown instead.
+fn add_script_menu(ui: &mut egui::Ui, entity: &mut Entity) {
+    let scripts = crate::scripting::monobehaviour_scripts(DEFAULT_SCRIPTS_DEST_DIR);
+    if scripts.is_empty() {
+        ui.add_enabled(
+            false,
+            egui::Button::new(format!("{}  No script behaviours found", icon::MOON)),
+        );
+        return;
+    }
+    for path in scripts {
+        let label = crate::scripting::script_label(&path);
+        if ui.button(format!("{}  {}", icon::MOON, label)).clicked() {
+            entity.scripts.push(ScriptComponent {
+                path,
+                is_loaded: false,
+            });
+            ui.close_menu();
+        }
     }
 }

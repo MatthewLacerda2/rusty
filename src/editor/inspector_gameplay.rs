@@ -6,28 +6,30 @@ use crate::editor::inspector_card::component_card;
 use crate::editor::theme;
 use crate::scene::{ColliderShape, Entity};
 
-/// 3D. Script bindings
+/// 3D. Script bindings — one card per attached script (#83). An entity can carry
+/// many scripts; each renders as its own removable Lua Script card.
 pub fn draw_script(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
-    if entity.script.is_none() {
-        return;
-    }
-    let mut remove = false;
-    component_card(ui, icon::SCROLL, "Lua Script", Some(&mut remove), |ui| {
-        let Some(script) = &mut entity.script else {
-            return;
-        };
-        ui.horizontal(|ui| {
-            ui.text_edit_singleline(&mut script.path);
+    // Collect the index to remove (if any) so we don't mutate the vec mid-draw.
+    let mut remove_index: Option<usize> = None;
+    for (i, script) in entity.scripts.iter_mut().enumerate() {
+        let mut remove = false;
+        component_card(ui, icon::SCROLL, "Lua Script", Some(&mut remove), |ui| {
+            ui.horizontal(|ui| {
+                ui.text_edit_singleline(&mut script.path);
+            });
+            let t = theme::from_ui(ui);
+            if Path::new(&script.path).exists() {
+                ui.colored_label(t.accent_blue, "✔ Loaded and ready to run");
+            } else {
+                ui.colored_label(t.danger, "❌ File not found!");
+            }
         });
-        let t = theme::from_ui(ui);
-        if Path::new(&script.path).exists() {
-            ui.colored_label(t.accent_blue, "✔ Loaded and ready to run");
-        } else {
-            ui.colored_label(t.danger, "❌ File not found!");
+        if remove {
+            remove_index = Some(i);
         }
-    });
-    if remove {
-        entity.script = None;
+    }
+    if let Some(i) = remove_index {
+        entity.scripts.remove(i);
         *is_dirty = true;
     }
 }
