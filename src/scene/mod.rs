@@ -18,6 +18,7 @@
 //!   snapshot  — edit-mode snapshot/restore around Play
 
 pub mod io;
+pub mod layers;
 #[allow(clippy::module_inception)]
 pub mod scene;
 pub mod serialize;
@@ -27,6 +28,7 @@ pub use io::{
     is_scene_path, load_from_file, save_to_file, seed_default_scene, seed_default_scripts,
     DEFAULT_SCENE_PATH, DEFAULT_SCENE_SOURCE, SCENE_EXTENSION,
 };
+pub use layers::{LayerRegistry, LAYER_COUNT};
 pub use scene::{
     AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, CollisionResponse,
     DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent, LightType, MeshComponent,

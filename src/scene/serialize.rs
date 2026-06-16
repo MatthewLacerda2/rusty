@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::components::Entity;
 use crate::render::mesh as primitives;
+use crate::scene::layers::LayerRegistry;
 use crate::scene::Scene;
 
 fn default_skybox_path() -> String {
@@ -46,6 +47,10 @@ pub struct SceneData {
     pub ambient_color: Vec3,
     #[serde(default = "default_ambient_intensity")]
     pub ambient_intensity: f32,
+    /// Project layer names. `#[serde(default)]` so pre-#90 scenes load with the
+    /// stock registry ("Default" + 31 unnamed slots).
+    #[serde(default)]
+    pub layers: LayerRegistry,
 }
 
 /// Read the live World's component values out into a serializable document.
@@ -57,6 +62,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         skybox_path: scene.skybox_path.clone(),
         ambient_color: scene.ambient_color,
         ambient_intensity: scene.ambient_intensity,
+        layers: scene.layers.clone(),
     }
 }
 
@@ -98,6 +104,8 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     scene.skybox_path = data.skybox_path;
     scene.ambient_color = data.ambient_color;
     scene.ambient_intensity = data.ambient_intensity;
+    data.layers.normalize();
+    scene.layers = data.layers;
 
     scene.update_all_colliders();
 }

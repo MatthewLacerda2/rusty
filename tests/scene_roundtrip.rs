@@ -40,6 +40,27 @@ fn save_load_preserves_values_and_rehydrates_mesh() {
 }
 
 #[test]
+fn save_load_preserves_layer_names_and_entity_layer() {
+    let mut scene = Scene::new();
+    scene.layers.set_name(3, "Enemy");
+    let id = scene.add_entity("Grunt".to_string());
+    scene.get_entity_mut(id).unwrap().layer = 3;
+
+    let path = tmp("rusty_layers_roundtrip.scene");
+    scene.save_to_file(&path).unwrap();
+
+    let mut loaded = Scene::new();
+    loaded.load_from_file(&path).unwrap();
+    // The registry name and the entity's layer index both survive the round-trip.
+    assert_eq!(loaded.layers.name(3), "Enemy");
+    assert_eq!(loaded.layers.index_of("Enemy"), Some(3));
+    assert_eq!(loaded.get_entity(id).unwrap().layer, 3);
+    // Layer 0 stays the fixed Default and cannot be renamed.
+    scene.layers.set_name(0, "NotDefault");
+    assert_eq!(scene.layers.name(0), "Default");
+}
+
+#[test]
 fn snapshot_restore_discards_mutations() {
     let mut scene = Scene::new();
     let id = scene.add_entity("Player".to_string());
