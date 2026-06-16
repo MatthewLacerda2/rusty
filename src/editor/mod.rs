@@ -11,6 +11,7 @@ mod inspector_add;
 mod inspector_camera;
 mod inspector_card;
 mod inspector_gameplay;
+mod inspector_particles;
 mod inspector_render;
 mod inspector_transform;
 pub mod inspectors;

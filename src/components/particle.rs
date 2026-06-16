@@ -238,4 +238,59 @@ impl ParticleEmitterComponent {
     pub fn live_count(&self) -> usize {
         self.runtime.particles.len()
     }
+
+    /// Seed the runtime PRNG for the current Play session if it hasn't been yet.
+    /// Idempotent — safe to call before any spawn, whether from the sim tick or a
+    /// script-driven `Particles.Emit`/`Burst`.
+    pub fn ensure_initialized(&mut self) {
+        if !self.runtime.initialized {
+            self.runtime.rng = ParticleRng::new(self.seed);
+            self.runtime.initialized = true;
+        }
+    }
+
+    /// Build one particle at `origin` from the current config, drawing direction
+    /// jitter from the seeded PRNG. Shared by the sim's continuous/burst emission
+    /// and the scripting `Particles` namespace so both stay deterministic.
+    pub fn spawn_particle(&mut self, origin: Vec3) -> Particle {
+        let spread = self.spread;
+        let speed = self.speed;
+        let base = self.direction.normalize_or_zero();
+        let rng = &mut self.runtime.rng;
+        // Cone spread: perturb the base direction by a random offset scaled by spread.
+        let jitter = Vec3::new(rng.signed(), rng.signed(), rng.signed()) * spread;
+        let dir = (base + jitter).normalize_or_zero();
+        let velocity = if dir == Vec3::ZERO {
+            Vec3::ZERO
+        } else {
+            dir * speed
+        };
+        Particle {
+            position: origin,
+            velocity,
+            age: 0.0,
+            lifetime: self.lifetime,
+            size_start: self.size_start,
+            size_end: self.size_end,
+            color: self.color,
+        }
+    }
+
+    /// Spawn up to `count` particles at `origin`, honouring the `max_particles`
+    /// cap (spawns past the cap are dropped). Returns the number actually spawned.
+    /// Seeds the runtime on first use.
+    pub fn emit_at(&mut self, origin: Vec3, count: u32) -> u32 {
+        self.ensure_initialized();
+        let cap = self.max_particles as usize;
+        let mut spawned = 0;
+        for _ in 0..count {
+            if self.runtime.particles.len() >= cap {
+                break;
+            }
+            let p = self.spawn_particle(origin);
+            self.runtime.particles.push(p);
+            spawned += 1;
+        }
+        spawned
+    }
 }
