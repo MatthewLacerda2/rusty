@@ -1,18 +1,14 @@
 //! src/render/decals.rs — URP-style box-projector decals: data + GPU resources.
 //!
 //! A decal is a *volume* (an oriented box), not a flat sticker. The decal pass
-//! draws each box; for every covered fragment it reconstructs the underlying
-//! surface world-position from the scene depth buffer, transforms it into the
-//! box's local space, rejects anything outside the unit cube, and projects the
-//! decal texture along the box's local axes. The result alpha-blends over the lit
-//! HDR colour — so the texture *wraps* whatever geometry the box overlaps (curved
-//! walls, sloped floors), exactly like a deferred decal but done forward-style by
-//! sampling the existing depth target.
-//!
-//! This module owns the decal *data* (a render-side registry on `Scene`) and the
-//! GPU pipeline/buffers. The per-frame draw orchestration lives in `decals_draw`.
-//! Keeping decals as render-side state (not an `Entity` component) keeps them off
-//! the ECS `--components` gate while still being spawnable from a raycast hit.
+//! draws each box; per covered fragment it reconstructs the surface world-position
+//! from the scene depth buffer, transforms into box-local space, rejects anything
+//! outside the unit cube, and projects the texture along the box axes — so it
+//! *wraps* whatever geometry the box overlaps, deferred-style but done forward by
+//! sampling the existing depth target. This module owns the decal data + GPU
+//! pipeline/buffers; per-frame draw orchestration lives in `decals_draw`. Decals
+//! are render-side state (not an `Entity` component), so they stay off the
+//! `--components` gate while still spawnable from a raycast hit.
 
 use glam::{Mat4, Quat, Vec3};
 
@@ -45,6 +41,7 @@ impl Decal {
     /// the (outward) surface normal. `size` is width/height of the stamp; `depth`
     /// how far the box projects through the surface. The box straddles the surface
     /// and is oriented so its local −Z aims into the surface (along −normal).
+    #[allow(clippy::too_many_arguments)]
     pub fn from_hit(
         point: Vec3,
         normal: Vec3,
@@ -160,14 +157,19 @@ impl DecalRenderer {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Decal Pipeline Layout"),
-            bind_group_layouts: &[&globals_layout, &decal_layout, &depth_layout, texture_layout],
+            bind_group_layouts: &[
+                &globals_layout,
+                &decal_layout,
+                &depth_layout,
+                texture_layout,
+            ],
             push_constant_ranges: &[],
         });
 
         let pipeline = Self::pipeline(device, &shader, &pipeline_layout);
 
         // Unit cube spanning [-0.5, 0.5]³ (8 corners, 36 indices).
-        let (verts, indices) = unit_cube();
+        let (verts, indices) = super::decals_draw::unit_cube();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Decal Cube Vertices"),
             contents: bytemuck::cast_slice(&verts),
@@ -249,7 +251,7 @@ impl DecalRenderer {
             vertex: wgpu::VertexState {
                 module: shader,
                 entry_point: "vs_main",
-                buffers: &[decal_vertex_layout()],
+                buffers: &[super::decals_draw::decal_vertex_layout()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shader,
@@ -274,37 +276,4 @@ impl DecalRenderer {
             multiview: None,
         })
     }
-}
-
-/// Vertex layout for the decal cube: just a local-space position.
-fn decal_vertex_layout() -> wgpu::VertexBufferLayout<'static> {
-    const ATTRIBS: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![0 => Float32x3];
-    wgpu::VertexBufferLayout {
-        array_stride: (3 * std::mem::size_of::<f32>()) as wgpu::BufferAddress,
-        step_mode: wgpu::VertexStepMode::Vertex,
-        attributes: &ATTRIBS,
-    }
-}
-
-/// Unit cube spanning `[-0.5, 0.5]³` as 8 corners + 36 CCW indices.
-fn unit_cube() -> ([[f32; 3]; 8], [u16; 36]) {
-    let verts = [
-        [-0.5, -0.5, -0.5],
-        [0.5, -0.5, -0.5],
-        [0.5, 0.5, -0.5],
-        [-0.5, 0.5, -0.5],
-        [-0.5, -0.5, 0.5],
-        [0.5, -0.5, 0.5],
-        [0.5, 0.5, 0.5],
-        [-0.5, 0.5, 0.5],
-    ];
-    let indices = [
-        0u16, 1, 2, 0, 2, 3, // -Z
-        4, 6, 5, 4, 7, 6, // +Z
-        0, 4, 5, 0, 5, 1, // -Y
-        3, 2, 6, 3, 6, 7, // +Y
-        0, 3, 7, 0, 7, 4, // -X
-        1, 5, 6, 1, 6, 2, // +X
-    ];
-    (verts, indices)
 }

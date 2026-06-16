@@ -149,3 +149,36 @@ impl Renderer {
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 }
+
+/// Vertex layout for the decal cube: just a local-space position.
+pub(super) fn decal_vertex_layout() -> wgpu::VertexBufferLayout<'static> {
+    const ATTRIBS: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![0 => Float32x3];
+    wgpu::VertexBufferLayout {
+        array_stride: (3 * std::mem::size_of::<f32>()) as wgpu::BufferAddress,
+        step_mode: wgpu::VertexStepMode::Vertex,
+        attributes: &ATTRIBS,
+    }
+}
+
+/// Unit cube spanning `[-0.5, 0.5]³` as 8 corners + 36 CCW indices.
+pub(super) fn unit_cube() -> ([[f32; 3]; 8], [u16; 36]) {
+    let verts = [
+        [-0.5, -0.5, -0.5],
+        [0.5, -0.5, -0.5],
+        [0.5, 0.5, -0.5],
+        [-0.5, 0.5, -0.5],
+        [-0.5, -0.5, 0.5],
+        [0.5, -0.5, 0.5],
+        [0.5, 0.5, 0.5],
+        [-0.5, 0.5, 0.5],
+    ];
+    let indices = [
+        0u16, 1, 2, 0, 2, 3, // -Z
+        4, 6, 5, 4, 7, 6, // +Z
+        0, 4, 5, 0, 5, 1, // -Y
+        3, 2, 6, 3, 6, 7, // +Y
+        0, 3, 7, 0, 7, 4, // -X
+        1, 5, 6, 1, 6, 2, // +X
+    ];
+    (verts, indices)
+}

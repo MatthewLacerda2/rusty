@@ -37,21 +37,19 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
     put(
         &table,
         "Spawn",
-        lua.create_function(
-            move |_, args: Variadic<mlua::Value>| {
-                let p = spawn_params_from(&args)?;
-                s.borrow_mut().spawn_decal(
-                    p.point,
-                    p.normal,
-                    p.size,
-                    p.size.max(DEFAULT_DEPTH),
-                    p.rotation_deg,
-                    p.color,
-                    p.texture,
-                );
-                Ok(())
-            },
-        ),
+        lua.create_function(move |_, args: Variadic<mlua::Value>| {
+            let p = spawn_params_from(&args)?;
+            s.borrow_mut().spawn_decal(
+                p.point,
+                p.normal,
+                p.size,
+                p.size.max(DEFAULT_DEPTH),
+                p.rotation_deg,
+                p.color,
+                p.texture,
+            );
+            Ok(())
+        }),
     )?;
 
     // Decals.Count() — number of live decals (after FIFO eviction).
