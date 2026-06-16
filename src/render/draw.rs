@@ -70,6 +70,11 @@ impl Renderer {
             };
             self.execute_scene_pass(scene, frame, &solid_render_resources, &overlays);
 
+            // Project box-decals over this camera's lit surfaces (reads the scene
+            // depth to reconstruct geometry), after solids/skybox and before the
+            // additive particles so decals sit on the surface, not over the sparks.
+            self.draw_decals(scene, cam);
+
             // Billboard particles for this camera (after solids, before the next pass).
             self.draw_particles(scene, cam);
 
