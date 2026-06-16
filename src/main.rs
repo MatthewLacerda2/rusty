@@ -11,11 +11,34 @@ use winit::{
 
 use rusty::app::{GameWorld, PlayTransition};
 use rusty::core::input::InputState;
+use rusty::core::keymap::{Keymap, KEYBINDINGS_KEY, KEYBINDINGS_NAMESPACE};
 use rusty::editor::EditorUi;
 use rusty::navigation::NavigationGraph;
 use rusty::render::Renderer;
 use rusty::scene::Scene;
 use rusty::scripting::ConsoleLogs;
+
+/// The stable physical-key name (uppercase) the engine speaks for a winit
+/// `KeyCode`, or `None` for keys the sim has no logical name for. This is the
+/// hardware-side identity name; the [`Keymap`] then remaps it to a logical key
+/// before the simulation ever sees it.
+fn physical_key_name(key: KeyCode) -> Option<&'static str> {
+    Some(match key {
+        KeyCode::KeyW => "W",
+        KeyCode::KeyA => "A",
+        KeyCode::KeyS => "S",
+        KeyCode::KeyD => "D",
+        KeyCode::ArrowUp => "UP",
+        KeyCode::ArrowDown => "DOWN",
+        KeyCode::ArrowLeft => "LEFT",
+        KeyCode::ArrowRight => "RIGHT",
+        // The shoot button is just the SPACE key; the player controller script
+        // edge-detects it. No engine-side "shoot" field — gameplay reads the key
+        // like any other.
+        KeyCode::Space => "SPACE",
+        _ => return None,
+    })
+}
 
 fn main() {
     env_logger::init();
@@ -109,6 +132,23 @@ fn main() {
             .error(format!("Failed to load storage: {}", err));
     }
 
+    // Physical→logical key remap (issue #88): rebindable controls applied here, at
+    // the input source, BEFORE the sim reads any key — so the simulation only ever
+    // sees logical keys and stays a pure function of its inputs. Loaded from the
+    // persistent store; a missing/empty binding blob means the identity (default)
+    // mapping. The harness and bot-players inject logical keys directly and bypass
+    // this entirely. Rebind at runtime by writing the `keybindings.bindings` blob
+    // via the `Storage` API, then reloading the keymap from it.
+    let keymap = match game
+        .resources
+        .storage
+        .borrow()
+        .get(KEYBINDINGS_NAMESPACE, KEYBINDINGS_KEY)
+    {
+        Some(blob) => Keymap::from_json(&blob),
+        None => Keymap::new(),
+    };
+
     // 7. Editor + timing state (front-end only)
     let mut editor_ui = EditorUi::new();
     // Adopt the boot scene as the current scene so Save writes back to it.
@@ -151,23 +191,11 @@ fn main() {
                         ..
                     } => {
                         let pressed = *state == ElementState::Pressed;
-                        {
-                            let mut inp = game.input().borrow_mut();
-                            match key {
-                                KeyCode::KeyW => inp.set_key_state("W", pressed),
-                                KeyCode::KeyA => inp.set_key_state("A", pressed),
-                                KeyCode::KeyS => inp.set_key_state("S", pressed),
-                                KeyCode::KeyD => inp.set_key_state("D", pressed),
-                                KeyCode::ArrowUp => inp.set_key_state("UP", pressed),
-                                KeyCode::ArrowDown => inp.set_key_state("DOWN", pressed),
-                                KeyCode::ArrowLeft => inp.set_key_state("LEFT", pressed),
-                                KeyCode::ArrowRight => inp.set_key_state("RIGHT", pressed),
-                                // The shoot button is just the SPACE key; the player
-                                // controller script edge-detects it. No engine-side
-                                // "shoot" field — gameplay reads the key like any other.
-                                KeyCode::Space => inp.set_key_state("SPACE", pressed),
-                                _ => {}
-                            }
+                        // Translate the physical key to its hardware name, remap it
+                        // to a logical key via the keymap, then write logical state.
+                        if let Some(physical) = physical_key_name(*key) {
+                            let logical = keymap.resolve(physical);
+                            game.input().borrow_mut().set_key_state(&logical, pressed);
                         }
                         // Hit ESC in PlayMode to unlock cursor (platform-side transition)
                         if *key == KeyCode::Escape && pressed && game.is_playing() {
