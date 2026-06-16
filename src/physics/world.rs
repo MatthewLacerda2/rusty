@@ -22,7 +22,7 @@ use rapier3d::control::KinematicCharacterController;
 use rapier3d::prelude::*;
 
 use super::build::{
-    build_shape, classify, interaction_groups, is_kinematic, order_pair, BodyClass,
+    build_shape, collider_inputs, interaction_groups, is_kinematic, order_pair, BodyClass,
 };
 use super::character;
 use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
@@ -82,45 +82,30 @@ impl PhysicsWorld {
 
     fn build_bodies(&mut self, scene: &Scene) {
         for id in scene.entity_ids() {
-            let (pos, rot, scale, shape, is_trigger, is_static, rb_class, velocity, layer) = {
-                let entity = match scene.get_entity(id) {
-                    Some(e) => e,
-                    None => continue,
-                };
-                let collider = match &entity.collider {
-                    Some(c) if c.active => c.clone(),
-                    _ => continue,
-                };
-                let class = classify(entity.is_static, entity.rigidbody.as_ref());
-                let vel = entity
-                    .rigidbody
-                    .as_ref()
-                    .map(|r| r.velocity)
-                    .unwrap_or(Vec3::ZERO);
-                (
-                    entity.transform.position,
-                    entity.transform.rotation,
-                    entity.transform.scale,
-                    collider.shape,
-                    collider.is_trigger,
-                    entity.is_static,
-                    class,
-                    vel,
-                    entity.layer,
-                )
+            let Some(inp) = scene.get_entity(id).as_deref().and_then(collider_inputs) else {
+                continue;
             };
 
-            let body_builder = match rb_class {
+            // Build the collider first: a mesh collider with missing/degenerate
+            // geometry yields `None`, in which case the entity gets no body at all.
+            let mesh_ref = inp
+                .mesh_geom
+                .as_ref()
+                .map(|(p, i)| (p.as_slice(), i.as_slice()));
+            let Some(mut collider) = build_shape(&inp.shape, inp.scale, mesh_ref) else {
+                continue;
+            };
+
+            let body_builder = match inp.class {
                 BodyClass::Static => RigidBodyBuilder::fixed(),
                 BodyClass::Kinematic => RigidBodyBuilder::kinematic_position_based(),
-                BodyClass::Dynamic => RigidBodyBuilder::dynamic().linvel(to_na_vec(velocity)),
+                BodyClass::Dynamic => RigidBodyBuilder::dynamic().linvel(to_na_vec(inp.velocity)),
             }
-            .position(to_iso(pos, rot));
+            .position(to_iso(inp.pos, inp.rot));
 
             let body_handle = self.bodies.insert(body_builder.build());
 
-            let mut collider = build_shape(&shape, scale);
-            collider.set_sensor(is_trigger);
+            collider.set_sensor(inp.is_trigger);
             collider.set_active_events(ActiveEvents::COLLISION_EVENTS);
             // The demo's bodies are kinematic/static, so the default
             // "only-if-one-is-dynamic" filtering would suppress every player↔wall
@@ -130,7 +115,8 @@ impl PhysicsWorld {
             // is a member of its own layer and filters to the layers it may collide
             // with. Set on both collision and solver groups so contact generation
             // and the solver agree.
-            let groups = interaction_groups(layer, scene.collision_matrix.filter_mask(layer));
+            let groups =
+                interaction_groups(inp.layer, scene.collision_matrix.filter_mask(inp.layer));
             collider.set_collision_groups(groups);
             collider.set_solver_groups(groups);
             let collider_handle =
@@ -139,7 +125,8 @@ impl PhysicsWorld {
 
             self.id_to_body.insert(id, body_handle);
             self.collider_to_id.insert(collider_handle, id);
-            self.id_is_trigger.insert(id, is_trigger || is_static);
+            self.id_is_trigger
+                .insert(id, inp.is_trigger || inp.is_static);
         }
     }
 

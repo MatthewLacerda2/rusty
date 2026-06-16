@@ -23,7 +23,7 @@ pub mod obj_import;
 pub mod sidecar;
 
 pub use mesh_data::{ImportedAsset, MaterialData, MeshVertex, SkinData, SubMesh};
-pub use sidecar::{import_and_sync_sidecar, ImportSettings};
+pub use sidecar::{import_and_sync_sidecar, ImportSettings, MeshColliderKind};
 
 use std::path::Path;
 
