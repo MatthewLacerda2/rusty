@@ -168,6 +168,7 @@ fn mesh_component(
         asset_ref: None,
         vertices,
         indices,
+        bind_palette: Vec::new(),
         is_dirty: crate::scene::DirtyFlag::new(true),
     }
 }

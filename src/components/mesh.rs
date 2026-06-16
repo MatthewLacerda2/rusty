@@ -57,6 +57,12 @@ pub struct MeshComponent {
     pub vertices: Vec<Vertex>,
     #[serde(skip)]
     pub indices: Vec<u32>,
+    /// The bind-pose bone palette for a skinned `"Asset"` mesh, indexed by joint
+    /// (matching the vertices' `joint_indices`). Empty for static/primitive meshes.
+    /// Like `vertices`, it is never persisted — it is rehydrated from the imported
+    /// skin on scene load (#79); the renderer uploads it to the GPU bone buffer.
+    #[serde(skip)]
+    pub bind_palette: Vec<glam::Mat4>,
     // For GPU rendering, we hold the loaded state or buffers in the renderer
     #[serde(skip)]
     pub is_dirty: DirtyFlag, // Set to true when mesh data changes to update GPU buffers

@@ -4,7 +4,7 @@
 //! `Renderer::render` so each block returns owned resources that outlive the
 //! render pass. Behavior unchanged.
 
-use glam::{Mat4, Quat, Vec3};
+use glam::Mat4;
 use std::rc::Rc;
 use wgpu::util::DeviceExt;
 
@@ -83,7 +83,7 @@ impl Renderer {
                 continue;
             }
 
-            if let Some(_mesh) = &entity.mesh {
+            if let Some(mesh) = &entity.mesh {
                 if let Some(gpu_mesh) = self.gpu_meshes.get(&entity.id) {
                     // Prepare entity uniform buffer
                     let is_lit = if entity.light.is_some() { 0u32 } else { 1u32 };
@@ -133,21 +133,14 @@ impl Renderer {
                                 usage: wgpu::BufferUsages::UNIFORM,
                             });
 
-                    // Set bones buffer
+                    // Upload the mesh's bind-pose bone palette (#79). Skinned
+                    // `"Asset"` meshes supply a real palette computed from their
+                    // imported skeleton; primitives and static meshes leave an
+                    // empty palette, so the GPU bones stay at identity and the
+                    // skinning shader is a no-op for them.
                     let mut bones_data = *default_bones;
-                    if let Some(anim) = &entity.animator {
-                        if anim.is_playing && !anim.freeze {
-                            let wave = (anim.time * anim.speed).sin() * 0.15;
-                            let joint_rot = Quat::from_rotation_z(wave);
-                            let joint_matrix = Mat4::from_scale_rotation_translation(
-                                Vec3::ONE,
-                                joint_rot,
-                                Vec3::ZERO,
-                            );
-                            for i in 1..4 {
-                                bones_data.bones[i] = joint_matrix.to_cols_array();
-                            }
-                        }
+                    for (i, bone) in mesh.bind_palette.iter().take(64).enumerate() {
+                        bones_data.bones[i] = bone.to_cols_array();
                     }
 
                     let bones_buffer =

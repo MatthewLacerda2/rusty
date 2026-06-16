@@ -45,6 +45,7 @@ fn scene_with_exposure(exposure: f32) -> Scene {
         asset_ref: None,
         vertices,
         indices,
+        bind_palette: Vec::new(),
         is_dirty: rusty::scene::DirtyFlag::new(true),
     });
     e.visual_correction = Some(vc(exposure));

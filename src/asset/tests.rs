@@ -1,6 +1,6 @@
 //! src/asset/tests.rs — importer unit tests over tiny embedded fixtures.
 
-use super::fixtures::{TRIANGLE_GLTF, TRIANGLE_OBJ};
+use super::fixtures::{SKINNED_GLTF, TRIANGLE_GLTF, TRIANGLE_OBJ};
 use super::*;
 use std::path::PathBuf;
 
@@ -42,6 +42,54 @@ fn gltf_imports_mesh_and_material() {
     assert_eq!(tri.material, Some(0));
     assert_eq!(asset.materials[0].name, "Red");
     assert_eq!(asset.materials[0].base_color, [1.0, 0.0, 0.0, 1.0]);
+}
+
+#[test]
+fn gltf_imports_skin_and_bind_pose_palette() {
+    // The skinned glTF references a sibling `model.bin`; write both, then import.
+    let dir = std::env::temp_dir().join("rusty_skin_fixture");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("model.bin"), super::fixtures::skinned_buffer()).unwrap();
+    let gltf_path = dir.join("model.gltf");
+    std::fs::write(&gltf_path, SKINNED_GLTF).unwrap();
+
+    let asset = import_file(&gltf_path).unwrap();
+    let sub = asset.sub_mesh("Skinned").unwrap();
+
+    // Per-vertex skin bindings flowed through into the mesh vertices.
+    assert_eq!(sub.vertices.len(), 3);
+    assert_eq!(sub.vertices[0].joint_indices, [0, 0, 0, 0]);
+    assert_eq!(sub.vertices[1].joint_indices, [1, 0, 0, 0]);
+    assert_eq!(sub.vertices[2].joint_indices, [0, 1, 0, 0]);
+    assert_eq!(sub.vertices[2].joint_weights, [0.5, 0.5, 0.0, 0.0]);
+
+    // The skeleton parsed: two joints, one inverse-bind matrix each.
+    let skin = sub.skin.as_ref().expect("skinned sub-mesh has a skeleton");
+    assert_eq!(skin.inverse_bind.len(), 2);
+    assert_eq!(skin.bind_global.len(), 2);
+
+    // The bind-pose palette is the identity by construction — this validates both
+    // the hierarchy walk (joint1 inherits joint0's transform) and the inverse-bind
+    // read, since each joint's global is exactly cancelled by its inverse-bind.
+    let palette = skin.bind_palette();
+    assert_eq!(palette.len(), 2);
+    for m in palette {
+        assert!(
+            m.abs_diff_eq(glam::Mat4::IDENTITY, 1e-5),
+            "bind-pose joint matrix should be identity, got {m:?}"
+        );
+    }
+}
+
+#[test]
+fn obj_has_no_skin() {
+    let path = tmp("noskin.obj");
+    std::fs::write(&path, TRIANGLE_OBJ).unwrap();
+    let sub = import_file(&path).unwrap().sub_meshes.remove(0);
+    assert!(sub.skin.is_none());
+    // Unskinned vertices keep the identity binding (bone 0, full weight).
+    assert_eq!(sub.vertices[0].joint_indices, [0, 0, 0, 0]);
+    assert_eq!(sub.vertices[0].joint_weights, [1.0, 0.0, 0.0, 0.0]);
 }
 
 #[test]
