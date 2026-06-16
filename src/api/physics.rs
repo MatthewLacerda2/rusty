@@ -15,7 +15,7 @@ use mlua::Lua;
 use super::health::apply_damage;
 use super::{global_table, put, Reg};
 use crate::physics::{is_hittable, PhysicsWorld};
-use crate::scene::Scene;
+use crate::scene::{layer_in_mask, Scene};
 use crate::scripting::ConsoleLogs;
 
 /// Register the rigidbody half of `Physics` (velocity/force/kinematic) onto
@@ -111,7 +111,7 @@ pub fn register_hitscan(
         "Raycast",
         lua.create_function(
             move |_,
-                  (ox, oy, oz, dx, dy, dz, ignore): (
+                  (ox, oy, oz, dx, dy, dz, ignore, mask): (
                 f32,
                 f32,
                 f32,
@@ -119,10 +119,19 @@ pub fn register_hitscan(
                 f32,
                 f32,
                 Option<u32>,
+                Option<u32>,
             )| {
                 // (hit, entity_id, distance) — hit=false ⇒ id/dist are 0. The
-                // optional trailing `ignore` id is skipped (e.g. the shooter).
-                match cast(&p, &s, Vec3::new(ox, oy, oz), Vec3::new(dx, dy, dz), ignore) {
+                // optional trailing `ignore` id is skipped (e.g. the shooter); the
+                // optional `mask` limits hits to entities on those layers (#91).
+                match cast(
+                    &p,
+                    &s,
+                    Vec3::new(ox, oy, oz),
+                    Vec3::new(dx, dy, dz),
+                    ignore,
+                    mask,
+                ) {
                     Some((id, t)) => Ok((true, id, t)),
                     None => Ok((false, 0u32, 0.0f32)),
                 }
@@ -138,7 +147,7 @@ pub fn register_hitscan(
         "Shoot",
         lua.create_function(
             move |_,
-                  (ox, oy, oz, dx, dy, dz, damage, ignore): (
+                  (ox, oy, oz, dx, dy, dz, damage, ignore, mask): (
                 f32,
                 f32,
                 f32,
@@ -147,8 +156,16 @@ pub fn register_hitscan(
                 f32,
                 f32,
                 Option<u32>,
+                Option<u32>,
             )| {
-                match cast(&p, &s, Vec3::new(ox, oy, oz), Vec3::new(dx, dy, dz), ignore) {
+                match cast(
+                    &p,
+                    &s,
+                    Vec3::new(ox, oy, oz),
+                    Vec3::new(dx, dy, dz),
+                    ignore,
+                    mask,
+                ) {
                     Some((id, t)) => {
                         apply_damage(&s, &c, id, damage);
                         Ok((true, id, t))
@@ -172,10 +189,22 @@ fn cast(
     origin: Vec3,
     dir: Vec3,
     ignore: Option<u32>,
+    mask: Option<u32>,
 ) -> Option<(u32, f32)> {
     let physics = physics.borrow();
     let physics = physics.as_ref()?;
+    let scene = scene.borrow();
     physics.cast_ray_filtered(origin, dir, f32::MAX, |id| {
-        Some(id) != ignore && is_hittable(&scene.borrow(), id)
+        if Some(id) == ignore || !is_hittable(&scene, id) {
+            return false;
+        }
+        // A layer mask (bit per layer) limits hits to entities on those layers;
+        // absent, every layer is eligible. Excluded colliders are passed through.
+        match mask {
+            Some(m) => scene
+                .get_entity(id)
+                .is_some_and(|e| layer_in_mask(e.layer, m)),
+            None => true,
+        }
     })
 }

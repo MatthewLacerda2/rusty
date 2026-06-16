@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::components::Entity;
 use crate::render::mesh as primitives;
+use crate::scene::collision_matrix::CollisionMatrix;
 use crate::scene::layers::LayerRegistry;
 use crate::scene::Scene;
 
@@ -51,6 +52,10 @@ pub struct SceneData {
     /// stock registry ("Default" + 31 unnamed slots).
     #[serde(default)]
     pub layers: LayerRegistry,
+    /// Layer collision matrix. `#[serde(default)]` so pre-#91 scenes load with the
+    /// all-pairs-collide default (preserving their behaviour).
+    #[serde(default)]
+    pub collision_matrix: CollisionMatrix,
 }
 
 /// Read the live World's component values out into a serializable document.
@@ -63,6 +68,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         ambient_color: scene.ambient_color,
         ambient_intensity: scene.ambient_intensity,
         layers: scene.layers.clone(),
+        collision_matrix: scene.collision_matrix.clone(),
     }
 }
 
@@ -106,6 +112,7 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     scene.ambient_intensity = data.ambient_intensity;
     data.layers.normalize();
     scene.layers = data.layers;
+    scene.collision_matrix = data.collision_matrix;
 
     scene.update_all_colliders();
 }

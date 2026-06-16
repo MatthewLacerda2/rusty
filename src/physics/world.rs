@@ -21,7 +21,9 @@ use glam::Vec3;
 use rapier3d::control::KinematicCharacterController;
 use rapier3d::prelude::*;
 
-use super::build::{build_shape, classify, is_kinematic, order_pair, BodyClass};
+use super::build::{
+    build_shape, classify, interaction_groups, is_kinematic, order_pair, BodyClass,
+};
 use super::character;
 use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
 use crate::scene::Scene;
@@ -80,7 +82,7 @@ impl PhysicsWorld {
 
     fn build_bodies(&mut self, scene: &Scene) {
         for id in scene.entity_ids() {
-            let (pos, rot, scale, shape, is_trigger, is_static, rb_class, velocity) = {
+            let (pos, rot, scale, shape, is_trigger, is_static, rb_class, velocity, layer) = {
                 let entity = match scene.get_entity(id) {
                     Some(e) => e,
                     None => continue,
@@ -104,6 +106,7 @@ impl PhysicsWorld {
                     entity.is_static,
                     class,
                     vel,
+                    entity.layer,
                 )
             };
 
@@ -123,6 +126,13 @@ impl PhysicsWorld {
             // "only-if-one-is-dynamic" filtering would suppress every player↔wall
             // and player↔enemy pair. Enable all type combinations.
             collider.set_active_collision_types(ActiveCollisionTypes::all());
+            // The collision matrix (#91) decides which layers interact: a collider
+            // is a member of its own layer and filters to the layers it may collide
+            // with. Set on both collision and solver groups so contact generation
+            // and the solver agree.
+            let groups = interaction_groups(layer, scene.collision_matrix.filter_mask(layer));
+            collider.set_collision_groups(groups);
+            collider.set_solver_groups(groups);
             let collider_handle =
                 self.colliders
                     .insert_with_parent(collider, body_handle, &mut self.bodies);

@@ -61,6 +61,30 @@ fn save_load_preserves_layer_names_and_entity_layer() {
 }
 
 #[test]
+fn save_load_preserves_collision_matrix() {
+    let mut scene = Scene::new();
+    // Default: every pair collides (including a layer with itself).
+    assert!(scene.collision_matrix.can_collide(1, 2));
+    assert!(scene.collision_matrix.can_collide(0, 0));
+
+    // Unchecking a cell is symmetric.
+    scene.collision_matrix.set_collision(1, 2, false);
+    assert!(!scene.collision_matrix.can_collide(1, 2));
+    assert!(!scene.collision_matrix.can_collide(2, 1));
+    // Other pairs are untouched.
+    assert!(scene.collision_matrix.can_collide(1, 3));
+
+    let path = tmp("rusty_collision_matrix_roundtrip.scene");
+    scene.save_to_file(&path).unwrap();
+
+    let mut loaded = Scene::new();
+    loaded.load_from_file(&path).unwrap();
+    assert!(!loaded.collision_matrix.can_collide(1, 2));
+    assert!(!loaded.collision_matrix.can_collide(2, 1));
+    assert!(loaded.collision_matrix.can_collide(1, 3));
+}
+
+#[test]
 fn snapshot_restore_discards_mutations() {
     let mut scene = Scene::new();
     let id = scene.add_entity("Player".to_string());

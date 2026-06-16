@@ -104,12 +104,18 @@ Rigidbody control plus raycast queries. `Raycast`/`Shoot` return
 | `Physics.SetVelocity` | `(id, vx, vy, vz)` | — |
 | `Physics.AddForce` | `(id, fx, fy, fz)` | — |
 | `Physics.SetKinematic` | `(id, is_kinematic)` | — |
-| `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id])` | `hit, entity_id, distance` |
-| `Physics.Shoot` | `(ox, oy, oz, dx, dy, dz, damage [, ignore_id])` | `hit, entity_id, distance` (applies damage on hit) |
+| `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` |
+| `Physics.Shoot` | `(ox, oy, oz, dx, dy, dz, damage [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` (applies damage on hit) |
 
 The optional trailing `ignore_id` skips one entity in the cast — pass the shooter's
 own id so a shot can't hit its source. The engine has no built-in "don't hit the
 player" rule; the only thing it never hits is a dead entity.
+
+The optional `layer_mask` is a Unity-style bitmask (one bit per layer): the cast
+only hits entities whose layer's bit is set, ignoring all others. Build one from a
+layer name with `1 << Layers.NameToIndex("Enemy")`, or OR several together. Omit it
+(or pass `nil`) to hit every layer. This is independent of the **Layer Collision
+Matrix** (Scene Settings), which governs which layers physically collide.
 
 ## `Health`
 
