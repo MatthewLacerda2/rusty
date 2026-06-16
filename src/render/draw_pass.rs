@@ -1,40 +1,68 @@
 //! Shadow depth passes, dynamic global bind-group update, and the main scene
-//! render pass. Extracted verbatim from the original `Renderer::render`.
+//! render pass. The per-camera stacking loop + post-FX live in `draw`.
 
 use glam::Vec3;
 
-use super::draw_resources::{
-    AabbResource, AxisResource, GridResource, OutlineResource, SolidResource,
-};
-use super::postfx::{PostFxContext, PostParams};
-use super::{Camera, Renderer};
-use crate::scene::{LightType, Scene};
+use super::draw_resources::{Overlays, SolidResource};
+use super::Renderer;
+use crate::scene::{ClearFlags, LightType, Scene};
 
-/// Per-frame post-FX inputs threaded into the scene pass (kept in one struct so
-/// `execute_scene_pass` doesn't blow the arg budget further).
-pub(super) struct ScenePassFrame<'a> {
-    pub view_texture: &'a wgpu::TextureView,
-    pub camera: &'a Camera,
+/// The framebuffer clear behavior for one camera in the stack (#93). Derived from the
+/// camera's [`ClearFlags`] and whether it is the first (bottom) pass of the frame.
+#[derive(Clone, Copy)]
+pub(super) struct PassClear {
+    /// `Some(backdrop)` clears color to that RGBA; `None` loads the existing color so
+    /// this camera composites on top of what is already drawn (`DepthOnly`).
+    pub color: Option<wgpu::Color>,
+    /// The camera's clear flags, kept so the pass only redraws the skybox for a
+    /// `Skybox` camera (a `DepthOnly` overlay must not paint over the world).
+    pub flags: ClearFlags,
+}
+
+/// The dark editor/world backdrop the base camera clears to.
+const BACKDROP: wgpu::Color = wgpu::Color {
+    r: 0.06,
+    g: 0.06,
+    b: 0.08,
+    a: 1.0,
+};
+
+impl PassClear {
+    /// Resolve the clear ops for a pass. The bottom pass always clears color (nothing
+    /// is under it); `DepthOnly` preserves color so a viewmodel/UI camera layers on
+    /// top of the world. Every camera clears depth, so stacked geometry never clips
+    /// against the layer below — the FPS viewmodel fix.
+    pub(super) fn for_pass(is_first: bool, flags: ClearFlags) -> Self {
+        let color = match flags {
+            ClearFlags::Skybox | ClearFlags::SolidColor => Some(BACKDROP),
+            // A DepthOnly bottom pass has nothing to composite over, so clear anyway.
+            ClearFlags::DepthOnly if is_first => Some(BACKDROP),
+            ClearFlags::DepthOnly => None,
+        };
+        Self { color, flags }
+    }
+}
+
+/// Per-camera inputs threaded into the scene pass.
+pub(super) struct ScenePassFrame {
     pub editor_mode: bool,
-    pub post_params: PostParams,
-    pub bloom_enabled: bool,
+    pub clear: PassClear,
 }
 
 impl Renderer {
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn execute_scene_pass(
         &mut self,
         scene: &Scene,
-        frame: ScenePassFrame<'_>,
+        frame: ScenePassFrame,
         solid_render_resources: &[SolidResource],
-        outline_resources: &Option<OutlineResource>,
-        grid_resources: &Option<GridResource>,
-        aabb_resources: &[AabbResource],
-        axis_arrow_resources: &[AxisResource],
+        overlays: &Overlays,
     ) {
-        let view_texture = frame.view_texture;
-        let camera = frame.camera;
         let editor_mode = frame.editor_mode;
+        let clear = frame.clear;
+        let outline_resources = &overlays.outline;
+        let grid_resources = &overlays.grid;
+        let aabb_resources = &overlays.aabb;
+        let axis_arrow_resources = &overlays.axis;
         // 4. Render Pass Setup
         let mut encoder = self
             .device
@@ -110,20 +138,22 @@ impl Renderer {
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     // Scene draws into the HDR offscreen target; the post-FX
                     // composite then writes the corrected image to `view_texture`.
+                    // A `DepthOnly` camera loads the existing color (composites over
+                    // the world); other cameras clear to the backdrop (#93).
                     view: &self.post_fx.scene_hdr.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.06, // Sleek modern dark backdrop
-                            g: 0.06,
-                            b: 0.08,
-                            a: 1.0,
-                        }),
+                        load: match clear.color {
+                            Some(c) => wgpu::LoadOp::Clear(c),
+                            None => wgpu::LoadOp::Load,
+                        },
                         store: wgpu::StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &self.depth_view,
+                    // Every camera clears depth so its geometry sorts independently of
+                    // the layer below — a viewmodel never clips through walls.
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: wgpu::StoreOp::Store,
@@ -183,10 +213,16 @@ impl Renderer {
                 }
             }
 
-            // Render Skybox last (optimization)
-            if let Some(skybox_tex) = &self.skybox_texture {
-                self.skybox_renderer
-                    .draw(&mut render_pass, &self.global_bind_group, skybox_tex);
+            // Render Skybox last (optimization). Only a Skybox camera paints it — a
+            // DepthOnly/SolidColor overlay must not overwrite the world below it.
+            if clear.flags == ClearFlags::Skybox {
+                if let Some(skybox_tex) = &self.skybox_texture {
+                    self.skybox_renderer.draw(
+                        &mut render_pass,
+                        &self.global_bind_group,
+                        skybox_tex,
+                    );
+                }
             }
 
             // 5. Render debug overlay tools
@@ -230,30 +266,8 @@ impl Renderer {
             }
         } // End of Render Pass
 
-        // 6. Submit the scene pass (it filled the HDR target + depth).
+        // 6. Submit the scene pass (it filled the HDR target + depth). Particles +
+        // post-FX run from the per-camera loop in `draw`.
         self.queue.submit(std::iter::once(encoder.finish()));
-
-        // 6b. Draw billboard particles into the HDR target (after solids/skybox,
-        // before post-FX) so bloom/tonemap apply to additive sparks/fire.
-        self.draw_particles(scene, camera);
-
-        // 7. Run the post-process chain: HDR scene + depth -> corrected output.
-        let skybox_view = self
-            .skybox_texture
-            .as_ref()
-            .map(|tex| &tex.view)
-            .unwrap_or(&self.default_texture.view);
-        let ctx = PostFxContext {
-            depth_view: &self.depth_view,
-            skybox_view,
-            output: view_texture,
-        };
-        self.post_fx.run(
-            &self.device,
-            &self.queue,
-            ctx,
-            frame.post_params,
-            frame.bloom_enabled,
-        );
     }
 }

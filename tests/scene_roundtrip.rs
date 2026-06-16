@@ -21,6 +21,7 @@ fn save_load_preserves_values_and_rehydrates_mesh() {
         e.transform.position = Vec3::new(1.0, 2.0, 3.0);
         e.mesh = Some(rusty::scene::MeshComponent {
             primitive_type: "Box".to_string(),
+            asset_ref: None,
             vertices: Vec::new(),
             indices: Vec::new(),
             is_dirty: rusty::scene::DirtyFlag::new(true),

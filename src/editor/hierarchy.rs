@@ -165,6 +165,7 @@ fn mesh_component(
 ) -> MeshComponent {
     MeshComponent {
         primitive_type: kind.to_string(),
+        asset_ref: None,
         vertices,
         indices,
         is_dirty: crate::scene::DirtyFlag::new(true),

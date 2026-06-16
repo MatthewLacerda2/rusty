@@ -43,7 +43,16 @@ impl Clone for DirtyFlag {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MeshComponent {
-    pub primitive_type: String, // "Box", "Sphere", "Plane", "Cylinder", "FBX"
+    /// How this mesh's geometry is rehydrated on load. `"Box"`/`"Sphere"`/
+    /// `"Plane"`/`"Cylinder"` rebuild a primitive; `"Asset"` re-imports an
+    /// authored source file (see `asset_ref`). GPU buffers are never persisted.
+    pub primitive_type: String,
+    /// Path-based reference into an imported source file, `path::sub_object`
+    /// (e.g. `project/models/crates.glb::Barrel`). Present iff
+    /// `primitive_type == "Asset"`; the scene layer re-imports it on load. This is
+    /// the only identity stored — the `.meta` sidecar holds settings, never this.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asset_ref: Option<String>,
     #[serde(skip)]
     pub vertices: Vec<Vertex>,
     #[serde(skip)]

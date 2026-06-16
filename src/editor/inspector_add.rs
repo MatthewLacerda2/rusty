@@ -2,9 +2,9 @@ use egui_phosphor::regular as icon;
 use glam::Vec3;
 
 use crate::scene::{
-    AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, Entity, HealthComponent,
-    LightComponent, LightType, NavMeshAgentComponent, ParticleEmitterComponent, RigidBodyComponent,
-    ScriptComponent, TextureComponent, Tonemap, VisualCorrectionComponent,
+    AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape, Entity,
+    HealthComponent, LightComponent, LightType, NavMeshAgentComponent, ParticleEmitterComponent,
+    RigidBodyComponent, ScriptComponent, TextureComponent, Tonemap, VisualCorrectionComponent,
     DEFAULT_SCRIPTS_DEST_DIR,
 };
 
@@ -105,6 +105,8 @@ fn add_menu(ui: &mut egui::Ui, entity: &mut Entity) {
             near: 0.1,
             far: 200.0,
             culling_mask: u32::MAX,
+            render_order: 0,
+            clear_flags: ClearFlags::Skybox,
             motion_blur_active: true,
             motion_blur_samples: 64,
         });

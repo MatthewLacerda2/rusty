@@ -210,35 +210,48 @@ fn calculate_pbr(
     return diffuse * radiance * half_lambert + specular * radiance * NdotL;
 }
 
+// Percentage-closer filtering (PCF) kernel radius, in texels. The kernel is a
+// square of side (2 * PCF_RADIUS + 1): radius 1 -> 3x3 (9 taps), radius 2 -> 5x5
+// (25 taps). Raising it widens the penumbra and softens the shadow edge at a
+// linear cost in samples. This is the tunable "sample count" knob for the soft
+// shadow filter; bump it for softer edges, drop it for sharper/cheaper shadows.
+const PCF_RADIUS: i32 = 2;
+
 fn calculate_shadow(world_pos: vec3<f32>, N: vec3<f32>) -> f32 {
     let light_space_pos = light_space * vec4<f32>(world_pos, 1.0);
     let proj_coords = light_space_pos.xyz / light_space_pos.w;
-    
+
     let flip_y = vec3<f32>(
         proj_coords.x * 0.5 + 0.5,
         -proj_coords.y * 0.5 + 0.5,
         proj_coords.z
     );
-    
+
     if (flip_y.x < 0.0 || flip_y.x > 1.0 || flip_y.y < 0.0 || flip_y.y > 1.0 || flip_y.z > 1.0) {
         return 1.0;
     }
-    
+
     let bias = max(0.005 * (1.0 - dot(N, normalize(-lighting.dir_light.direction))), 0.0005);
     let current_depth = flip_y.z - bias;
-    
-    var shadow = 0.0;
+
     let size = textureDimensions(t_shadow);
     let texel_size = vec2<f32>(1.0 / f32(size.x), 1.0 / f32(size.y));
-    
-    for (var x = -1; x <= 1; x = x + 1) {
-        for (var y = -1; y <= 1; y = y + 1) {
+
+    // NxN PCF: average the hardware depth comparisons over a square texel
+    // neighbourhood. Each tap is already bilinearly filtered by the comparison
+    // sampler, so this stacks a wider blur on top of hardware PCF for a soft,
+    // FEAR-era shadow edge instead of a single hard step.
+    var shadow = 0.0;
+    var taps = 0.0;
+    for (var x = -PCF_RADIUS; x <= PCF_RADIUS; x = x + 1) {
+        for (var y = -PCF_RADIUS; y <= PCF_RADIUS; y = y + 1) {
             let offset = vec2<f32>(f32(x), f32(y)) * texel_size;
             shadow += textureSampleCompare(t_shadow, s_shadow, flip_y.xy + offset, current_depth);
+            taps += 1.0;
         }
     }
-    shadow /= 9.0;
-    
+    shadow /= taps;
+
     return shadow;
 }
 

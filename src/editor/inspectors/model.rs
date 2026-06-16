@@ -8,7 +8,11 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
         .file_name()
         .and_then(|f| f.to_str())
         .unwrap_or(path);
-    let is_fbx = filename.to_lowercase().ends_with(".fbx");
+    let ext = Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_uppercase();
 
     ui.heading(format!("📐 Model: {}", filename));
     ui.add_space(5.0);
@@ -27,15 +31,14 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
                     "Unknown size".to_string()
                 };
                 ui.label(format!("Size: {}", size_str));
-                ui.label(format!(
-                    "Type: {} Model Asset",
-                    if is_fbx { "FBX" } else { "OBJ" }
-                ));
+                ui.label(format!("Type: {} Model Asset", ext));
             });
         });
     ui.add_space(10.0);
     ui.separator();
     ui.add_space(5.0);
+
+    draw_sub_objects(ui, path);
 
     // Model settings
     ui.heading("Model Import Settings");
@@ -80,34 +83,59 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
         .add(egui::Button::new("➕ Instantiate into Scene").min_size(egui::Vec2::new(140.0, 30.0)))
         .clicked()
     {
-        let stem = Path::new(path)
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("Model")
-            .to_string();
-        let new_ent_id = scene.add_entity(format!("{}_Instance", stem));
+        instantiate(editor, scene, path);
+    }
+}
 
-        // Generate placeholder box geometry
-        let scale = editor.asset_model_scale;
-        let (v, idx) = crate::render::mesh::generate_box(scale, scale, scale);
-
-        if let Some(mut ent) = scene.get_entity_mut(new_ent_id) {
-            ent.mesh = Some(crate::scene::MeshComponent {
-                primitive_type: if is_fbx {
-                    "FBX".to_string()
-                } else {
-                    "OBJ".to_string()
-                },
-                vertices: v,
-                indices: idx,
-                is_dirty: crate::scene::DirtyFlag::new(true),
-            });
-            editor.is_dirty = true;
-
-            // Unity-like convenience: auto-select the instantiated object and focus on it!
-            editor.selected_entity_id = Some(new_ent_id);
-            editor.selected_asset_path = None;
+/// List the addressable sub-objects the source file exposes (`path::<id>`). Reads
+/// the `.meta` sidecar's cached map when present, else imports the file once and
+/// writes the sidecar. This is the Content Browser surfacing a file's sub-objects.
+fn draw_sub_objects(ui: &mut egui::Ui, path: &str) {
+    let ids = match crate::asset::sidecar::load(Path::new(path)) {
+        Ok(s) if !s.sub_objects.is_empty() => s.sub_objects,
+        _ => crate::asset::import_and_sync_sidecar(Path::new(path))
+            .map(|a| a.sub_mesh_ids())
+            .unwrap_or_default(),
+    };
+    ui.heading(format!("Sub-Objects ({})", ids.len()));
+    ui.add_space(5.0);
+    if ids.is_empty() {
+        ui.colored_label(egui::Color32::GRAY, "No importable sub-meshes found.");
+    } else {
+        for id in &ids {
+            ui.label(format!(
+                "• {}::{}",
+                crate::editor::content_browser::file_name(path),
+                id
+            ));
         }
+    }
+    ui.add_space(10.0);
+    ui.separator();
+    ui.add_space(5.0);
+}
+
+/// Import the source file and instantiate each addressable sub-object as its own
+/// entity carrying a path-based `"Asset"` mesh reference (`path::sub_object`). The
+/// geometry is re-imported on every scene load — no GPU buffers are persisted.
+fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
+    let asset = match crate::asset::import_and_sync_sidecar(Path::new(path)) {
+        Ok(a) => a,
+        Err(_) => return,
+    };
+    let mut last = None;
+    for id in asset.sub_mesh_ids() {
+        let reference = format!("{}{}{}", path, crate::asset::REF_SEPARATOR, id);
+        let ent_id = scene.add_entity(id.clone());
+        if let Some(mut ent) = scene.get_entity_mut(ent_id) {
+            ent.mesh = Some(crate::scene::asset_mesh_component(&reference));
+        }
+        last = Some(ent_id);
+    }
+    if let Some(ent_id) = last {
+        editor.is_dirty = true;
+        editor.selected_entity_id = Some(ent_id);
+        editor.selected_asset_path = None;
     }
 }
 

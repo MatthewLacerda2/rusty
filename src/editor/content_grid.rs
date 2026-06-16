@@ -128,7 +128,7 @@ fn type_glyph(ext: &str) -> &'static str {
         "png" | "tga" | "jpg" | "jpeg" => icon::IMAGE,
         "wav" | "mp3" | "ogg" => icon::MUSIC_NOTES,
         "scene" => icon::FILM_SLATE,
-        "fbx" | "obj" => icon::CUBE,
+        "fbx" | "obj" | "gltf" | "glb" => icon::CUBE,
         "lua" => icon::FILE_CODE,
         _ => icon::FILE,
     }

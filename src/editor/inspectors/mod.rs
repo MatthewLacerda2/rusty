@@ -31,7 +31,7 @@ pub fn draw_inspector(
         "scene" => {
             scene::draw(ui, editor, scene, console, path);
         }
-        "fbx" | "obj" => {
+        "fbx" | "obj" | "gltf" | "glb" => {
             model::draw(ui, editor, scene, path);
         }
         "lua" => {
