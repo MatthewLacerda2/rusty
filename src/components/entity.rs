@@ -16,6 +16,7 @@ use super::{
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(from = "EntityRepr")]
 pub struct Entity {
     pub id: u32,
     pub name: String,
@@ -30,7 +31,11 @@ pub struct Entity {
     pub transform: TransformComponent,
     pub mesh: Option<MeshComponent>,
     pub texture: Option<TextureComponent>,
-    pub script: Option<ScriptComponent>,
+    /// An entity can carry MANY scripts, each its own MonoBehaviour-equivalent
+    /// Lua lifecycle table (#83). `#[serde(default)]` plus the legacy `script`
+    /// field in [`EntityRepr`] keep pre-#83 single-`script` scenes loadable.
+    #[serde(default)]
+    pub scripts: Vec<ScriptComponent>,
     pub animator: Option<AnimatorComponent>,
     pub light: Option<LightComponent>,
     pub collider: Option<ColliderComponent>,
@@ -45,6 +50,74 @@ pub struct Entity {
     pub children: Vec<u32>,
 }
 
+/// On-disk shape used only for deserialization, so old single-`script` scenes
+/// (pre-#83) keep loading. It accepts both the new `scripts: Vec<…>` and the
+/// legacy `script: Option<…>` keys; the `From` impl migrates the singular into
+/// the vec. Serialization always goes through `Entity` directly (new `scripts`
+/// key), so files written today never carry the legacy field.
+#[derive(Deserialize)]
+struct EntityRepr {
+    id: u32,
+    name: String,
+    active: bool,
+    is_static: bool,
+    #[serde(default)]
+    layer: u8,
+    transform: TransformComponent,
+    mesh: Option<MeshComponent>,
+    texture: Option<TextureComponent>,
+    #[serde(default)]
+    scripts: Vec<ScriptComponent>,
+    /// Legacy singular field (pre-#83), migrated into `scripts` by `From`.
+    #[serde(default)]
+    script: Option<ScriptComponent>,
+    animator: Option<AnimatorComponent>,
+    light: Option<LightComponent>,
+    collider: Option<ColliderComponent>,
+    rigidbody: Option<RigidBodyComponent>,
+    health: Option<HealthComponent>,
+    nav_agent: Option<NavMeshAgentComponent>,
+    camera: Option<CameraComponent>,
+    visual_correction: Option<VisualCorrectionComponent>,
+    #[serde(default)]
+    particles: Option<ParticleEmitterComponent>,
+    parent_id: Option<u32>,
+    children: Vec<u32>,
+}
+
+impl From<EntityRepr> for Entity {
+    fn from(r: EntityRepr) -> Self {
+        let mut scripts = r.scripts;
+        // Migrate a pre-#83 single `script` into the plural vec, ahead of any
+        // (normally empty) new-format scripts, so legacy attachments still run.
+        if let Some(legacy) = r.script {
+            scripts.insert(0, legacy);
+        }
+        Self {
+            id: r.id,
+            name: r.name,
+            active: r.active,
+            is_static: r.is_static,
+            layer: r.layer,
+            transform: r.transform,
+            mesh: r.mesh,
+            texture: r.texture,
+            scripts,
+            animator: r.animator,
+            light: r.light,
+            collider: r.collider,
+            rigidbody: r.rigidbody,
+            health: r.health,
+            nav_agent: r.nav_agent,
+            camera: r.camera,
+            visual_correction: r.visual_correction,
+            particles: r.particles,
+            parent_id: r.parent_id,
+            children: r.children,
+        }
+    }
+}
+
 impl Entity {
     pub fn new(id: u32, name: String) -> Self {
         Self {
@@ -56,7 +129,7 @@ impl Entity {
             transform: TransformComponent::default(),
             mesh: None,
             texture: None,
-            script: None,
+            scripts: Vec::new(),
             animator: None,
             light: None,
             collider: None,

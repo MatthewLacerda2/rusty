@@ -10,16 +10,17 @@ impl ScriptManager {
             None => return,
         };
 
-        // Sorted so script Start order is deterministic (HashMap iteration order
-        // varies per run); replays must be byte-identical.
-        let mut ids: Vec<u32> = self.entity_scripts.keys().copied().collect();
-        ids.sort_unstable();
+        // Sorted by (entity, script index) so Start order is deterministic
+        // (HashMap iteration order varies per run); replays must be byte-identical.
+        let mut keys: Vec<(u32, usize)> = self.entity_scripts.keys().copied().collect();
+        keys.sort_unstable();
 
-        for id in ids {
-            let Some(key) = self.entity_scripts.get(&id) else {
+        for key in keys {
+            let id = key.0;
+            let Some(reg) = self.entity_scripts.get(&key) else {
                 continue;
             };
-            let Ok(table) = lua.registry_value::<Table>(key) else {
+            let Ok(table) = lua.registry_value::<Table>(reg) else {
                 continue;
             };
             let Ok(start_fn) = table.get::<_, mlua::Function>("Start") else {
@@ -40,32 +41,31 @@ impl ScriptManager {
             None => return,
         };
 
-        // Filter active entities in the scene that have scripts
+        // Keep scripts whose owning entity is present and active.
         let scene = self.scene.borrow();
-        let mut ids: Vec<u32> = self
+        let mut keys: Vec<(u32, usize)> = self
             .entity_scripts
             .keys()
             .copied()
-            .filter(|&id| {
-                if let Some(e) = scene.get_entity(id) {
-                    e.active
-                } else {
-                    false
-                }
+            .filter(|&(id, _)| match scene.get_entity(id) {
+                Some(e) => e.active,
+                None => false,
             })
             .collect();
         drop(scene);
-        // Sorted so per-frame Update order is deterministic (HashMap iteration
-        // order varies per run). Gameplay now happens inside scripts — e.g. the
-        // weapon's Physics.Shoot vs. the enemy's animation Update race in the
-        // kill frame — so a stable order is what keeps replays byte-identical.
-        ids.sort_unstable();
+        // Sorted by (entity, script index) so per-frame Update order is
+        // deterministic (HashMap iteration order varies per run). Gameplay now
+        // happens inside scripts — e.g. the weapon's Physics.Shoot vs. the enemy's
+        // animation Update race in the kill frame — so a stable order is what keeps
+        // replays byte-identical.
+        keys.sort_unstable();
 
-        for id in ids {
-            let Some(key) = self.entity_scripts.get(&id) else {
+        for key in keys {
+            let id = key.0;
+            let Some(reg) = self.entity_scripts.get(&key) else {
                 continue;
             };
-            let Ok(table) = lua.registry_value::<Table>(key) else {
+            let Ok(table) = lua.registry_value::<Table>(reg) else {
                 continue;
             };
             let Ok(update_fn) = table.get::<_, mlua::Function>("Update") else {
@@ -89,20 +89,31 @@ impl ScriptManager {
         for (id_a, id_b) in events {
             // Notify each side of the overlap, in order: A about B, then B about A.
             for (id, other) in [(id_a, id_b), (id_b, id_a)] {
-                let Some(key) = self.entity_scripts.get(&id) else {
-                    continue;
-                };
-                let Ok(table) = lua.registry_value::<Table>(key) else {
-                    continue;
-                };
-                let Ok(trigger_fn) = table.get::<_, mlua::Function>("OnTrigger") else {
-                    continue;
-                };
-                if let Err(e) = trigger_fn.call::<_, ()>((id, other)) {
-                    self.console.borrow_mut().error(format!(
-                        "[Lua Error] OnTrigger on entity {} failed: {}",
-                        id, e
-                    ));
+                // An entity may carry many scripts (#83): notify each, in
+                // ascending script-index order so dispatch stays deterministic.
+                let mut indices: Vec<usize> = self
+                    .entity_scripts
+                    .keys()
+                    .filter(|&&(eid, _)| eid == id)
+                    .map(|&(_, idx)| idx)
+                    .collect();
+                indices.sort_unstable();
+                for idx in indices {
+                    let Some(reg) = self.entity_scripts.get(&(id, idx)) else {
+                        continue;
+                    };
+                    let Ok(table) = lua.registry_value::<Table>(reg) else {
+                        continue;
+                    };
+                    let Ok(trigger_fn) = table.get::<_, mlua::Function>("OnTrigger") else {
+                        continue;
+                    };
+                    if let Err(e) = trigger_fn.call::<_, ()>((id, other)) {
+                        self.console.borrow_mut().error(format!(
+                            "[Lua Error] OnTrigger on entity {} failed: {}",
+                            id, e
+                        ));
+                    }
                 }
             }
         }
