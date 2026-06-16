@@ -32,10 +32,10 @@ pub use io::{
 };
 pub use layers::{layer_in_mask, LayerRegistry, LAYER_COUNT};
 pub use scene::{
-    AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, CollisionResponse,
-    DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent, LightType, MeshComponent,
-    NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent, RigidBodyComponent,
-    Scene, ScriptComponent, TextureComponent, Tonemap, TransformComponent,
+    AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape,
+    CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent, LightType,
+    MeshComponent, NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent,
+    RigidBodyComponent, Scene, ScriptComponent, TextureComponent, Tonemap, TransformComponent,
     VisualCorrectionComponent,
 };
 pub use serialize::{apply_scene_data, to_scene_data, SceneData};
