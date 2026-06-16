@@ -306,8 +306,23 @@ fn main() {
                                     renderer.shadow_renderer.is_static_cached = false;
                                     editor_ui.is_dirty = false;
                                 }
-                                // Apply the selected post-FX scalability tier.
-                                renderer.set_quality(editor_ui.quality_preset);
+                                // Apply the selected post-FX scalability tier. The
+                                // editor dropdown and `Graphics.SetQuality` (script)
+                                // both feed one shared cell: reflect a script-driven
+                                // change back into the dropdown, push the editor's
+                                // choice into the cell, then hand the result to the
+                                // renderer (`set_quality` guards the bloom realloc).
+                                {
+                                    let cell = game.script_manager().quality_cell();
+                                    let scripted = *cell.borrow();
+                                    if scripted != editor_ui.quality_preset
+                                        && editor_ui.quality_preset == renderer.quality
+                                    {
+                                        editor_ui.quality_preset = scripted;
+                                    }
+                                    *cell.borrow_mut() = editor_ui.quality_preset;
+                                    renderer.set_quality(editor_ui.quality_preset);
+                                }
                             }
 
                             // Drain a submitted REPL line through the single live

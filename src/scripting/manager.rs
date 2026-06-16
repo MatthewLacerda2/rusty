@@ -8,6 +8,7 @@ use crate::api::{self, ApiCtx};
 use crate::core::input::InputState;
 use crate::core::storage::Storage;
 use crate::navigation::NavigationGraph;
+use crate::render::postfx::QualityPreset;
 use crate::render::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
@@ -31,6 +32,10 @@ pub struct ScriptManager {
     /// boundaries. Injected by `Resources` via [`ScriptManager::set_storage`];
     /// defaults to an empty, pathless store (harness/tests never touch disk).
     pub(super) storage: Rc<RefCell<Storage>>,
+    /// Global post-FX scalability tier (`Graphics.Get/SetQuality`). Shared with
+    /// the platform layer, which reads it each frame and hands it to
+    /// `renderer.set_quality`; defaults to `Medium` (harness/tests need no GPU).
+    pub(super) quality: Rc<RefCell<QualityPreset>>,
 }
 
 impl ScriptManager {
@@ -52,6 +57,7 @@ impl ScriptManager {
             camera,
             time,
             storage: Rc::new(RefCell::new(Storage::new())),
+            quality: Rc::new(RefCell::new(QualityPreset::default())),
         }
     }
 
@@ -59,6 +65,19 @@ impl ScriptManager {
     /// runtime, the console REPL and the app all read/write the same `Storage`.
     pub fn set_storage(&mut self, storage: Rc<RefCell<Storage>>) {
         self.storage = storage;
+    }
+
+    /// Inject the shared quality-preset cell. The platform layer keeps this cell
+    /// in sync with the renderer's tier, so `Graphics.SetQuality` from a script
+    /// reaches `renderer.set_quality` (which guards the bloom-buffer realloc).
+    pub fn set_quality_cell(&mut self, quality: Rc<RefCell<QualityPreset>>) {
+        self.quality = quality;
+    }
+
+    /// Handle to the shared quality-preset cell, so the platform layer can read a
+    /// script-driven tier change and apply it to the renderer.
+    pub fn quality_cell(&self) -> Rc<RefCell<QualityPreset>> {
+        Rc::clone(&self.quality)
     }
 
     /// Initializes a fresh Lua environment and registers all required namespaces.
@@ -99,6 +118,7 @@ impl ScriptManager {
             physics: Rc::clone(physics),
             console: Rc::clone(&self.console),
             storage: Rc::clone(&self.storage),
+            quality: Rc::clone(&self.quality),
         };
         api::register(&lua, &ctx)?;
 
