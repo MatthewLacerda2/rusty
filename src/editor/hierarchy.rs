@@ -14,7 +14,7 @@ pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
     }
     egui::SidePanel::left("Hierarchy Panel")
         .resizable(true)
-        .width_range(220.0..=340.0)
+        .width_range(154.0..=340.0)
         .frame(
             egui::Frame::none()
                 .fill(t.bg_tier1)
