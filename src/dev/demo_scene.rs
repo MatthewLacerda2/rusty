@@ -29,6 +29,7 @@ fn box_collider(size: Vec3) -> ColliderComponent {
 fn mesh(primitive_type: &str, data: (Vec<primitives::Vertex>, Vec<u32>)) -> MeshComponent {
     MeshComponent {
         primitive_type: primitive_type.to_string(),
+        asset_ref: None,
         vertices: data.0,
         indices: data.1,
         is_dirty: DirtyFlag::new(true),

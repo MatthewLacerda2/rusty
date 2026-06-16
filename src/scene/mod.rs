@@ -38,5 +38,5 @@ pub use scene::{
     RigidBodyComponent, Scene, ScriptComponent, TextureComponent, Tonemap, TransformComponent,
     VisualCorrectionComponent,
 };
-pub use serialize::{apply_scene_data, to_scene_data, SceneData};
+pub use serialize::{apply_scene_data, asset_mesh_component, to_scene_data, SceneData};
 pub use snapshot::SceneSnapshot;
