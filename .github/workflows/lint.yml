@@ -5,9 +5,28 @@ on:
   workflow_dispatch:
 
 jobs:
-  lint:
+  # Markdown-only PRs skip the Rust lint/format/clippy gates. Gated via job-level
+  # `if` (a skipped job still satisfies a required check) rather than workflow
+  # `paths-ignore` (which would leave a required check stuck pending). See CLAUDE.md.
+  changes:
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    outputs:
+      code: ${{ steps.filter.outputs.code || 'true' }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            code:
+              - '!**/*.md'
+
+  lint:
+    needs: changes
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
     steps:
       - uses: actions/checkout@v4
         with:
