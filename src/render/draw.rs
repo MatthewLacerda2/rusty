@@ -92,7 +92,8 @@ impl Renderer {
         // so that they outlive the render pass and prevent lifetime borrow-checker errors.
         let default_bones = Self::default_bones();
 
-        let solid_render_resources = self.precreate_solid_resources(scene, &default_bones);
+        let solid_render_resources =
+            self.precreate_solid_resources(scene, &default_bones, camera.culling_mask);
 
         // Pre-create outline resources for selected entity silhouette (editor mode only)
         let outline_resources = if editor_mode {

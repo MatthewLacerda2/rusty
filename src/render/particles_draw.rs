@@ -42,7 +42,7 @@ impl Renderer {
     /// Draw every emitter's live particles into the HDR scene target. Called from
     /// the scene pass after solids/skybox, before the post-FX chain runs.
     pub(super) fn draw_particles(&mut self, scene: &Scene, camera: &Camera) {
-        let batches = self.collect_particle_batches(scene);
+        let batches = self.collect_particle_batches(scene, camera.culling_mask);
         if batches.is_empty() {
             return;
         }
@@ -134,12 +134,16 @@ impl Renderer {
 
     /// Gather live particles from every active emitter into per-(blend,texture)
     /// batches, resolving each emitter's sprite (or the default checker texture).
-    fn collect_particle_batches(&mut self, scene: &Scene) -> Vec<ParticleBatch> {
+    fn collect_particle_batches(&mut self, scene: &Scene, culling_mask: u32) -> Vec<ParticleBatch> {
         // Pre-load every referenced sprite texture (mutably borrows self), then
         // build the batches in a second pass.
         let mut specs: Vec<(ParticleBlend, Option<String>, Vec<ParticleInstance>)> = Vec::new();
         for entity in scene.iter() {
             if !entity.active {
+                continue;
+            }
+            // Emitters on a layer the camera culls don't draw (#92).
+            if !crate::scene::layer_in_mask(entity.layer, culling_mask) {
                 continue;
             }
             let Some(emitter) = &entity.particles else {

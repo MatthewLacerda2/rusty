@@ -104,6 +104,13 @@ fn draw_entity_inspector(
         .map(|i| scene.layers.label(i as u8))
         .collect();
 
+    // Layers offered in the camera culling-mask checklist: layer 0 plus any named
+    // user slots (unnamed slots are noise, mirroring Unity's mask dropdown).
+    let named_layers: Vec<(u8, String)> = (0..LAYER_COUNT as u8)
+        .filter(|&i| i == 0 || !scene.layers.name(i).is_empty())
+        .map(|i| (i, scene.layers.label(i)))
+        .collect();
+
     let current_parent_id = scene.get_entity(selected_id).and_then(|e| e.parent_id);
     let parent_mat = current_parent_id.map(|p| scene.compute_world_matrix(p));
     let selected_parent_name = if let Some(p_id) = current_parent_id {
@@ -207,7 +214,7 @@ fn draw_entity_inspector(
         inspector_gameplay::draw_rigidbody(ui, entity, &mut editor.is_dirty);
         inspector_gameplay::draw_nav_agent(ui, entity, &mut editor.is_dirty);
 
-        inspector_camera::draw_camera(ui, entity, &mut editor.is_dirty);
+        inspector_camera::draw_camera(ui, entity, &named_layers, &mut editor.is_dirty);
         inspector_camera::draw_visual_correction(ui, entity, &mut editor.is_dirty);
 
         inspector_particles::draw(ui, entity, &mut editor.is_dirty);

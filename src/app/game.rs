@@ -141,6 +141,7 @@ impl GameWorld {
         } else {
             self.editor_fly(dt);
         }
+        self.sync_render_camera();
         transition
     }
 

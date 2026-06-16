@@ -42,10 +42,15 @@ impl Renderer {
         &self,
         scene: &Scene,
         default_bones: &BoneUniform,
+        culling_mask: u32,
     ) -> Vec<SolidResource> {
         let mut solid_render_resources = Vec::new();
         for entity in scene.iter() {
             if !entity.active {
+                continue;
+            }
+            // Skip meshes the active camera's culling mask excludes (#92).
+            if !crate::scene::layer_in_mask(entity.layer, culling_mask) {
                 continue;
             }
 
