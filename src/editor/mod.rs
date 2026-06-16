@@ -61,6 +61,12 @@ pub struct EditorUi {
     /// Whether the About dialog (File-bar → About) is currently open.
     pub show_about: bool,
 
+    /// Whether each dockable panel is expanded. Collapsing shrinks the panel to a
+    /// thin rail with a caret that brings it back. Pure runtime UI state.
+    pub hierarchy_open: bool,
+    pub inspector_open: bool,
+    pub bottom_open: bool,
+
     /// The active visual theme — the single source of truth for editor colors,
     /// spacing and the type scale. Panels read tokens from here (or via
     /// `theme::from_ui`) instead of hardcoding colors.
@@ -115,6 +121,9 @@ impl EditorUi {
             active_bottom_tab: "assets".to_string(),
             asset_search: String::new(),
             show_about: false,
+            hierarchy_open: true,
+            inspector_open: true,
+            bottom_open: true,
             theme: theme::Theme::dark(),
             fonts_installed: false,
             quality_preset: crate::render::postfx::QualityPreset::default(),

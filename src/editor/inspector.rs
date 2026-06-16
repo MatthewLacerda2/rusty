@@ -19,6 +19,10 @@ pub fn draw(
     nav: &mut NavigationGraph,
 ) {
     let t = editor.theme;
+    if !editor.inspector_open {
+        draw_collapsed(ctx, t, &mut editor.inspector_open);
+        return;
+    }
     egui::SidePanel::right("Inspector Panel")
         .resizable(true)
         .width_range(260.0..=380.0)
@@ -29,10 +33,18 @@ pub fn draw(
                 .stroke(egui::Stroke::new(1.0, t.border)),
         )
         .show(ctx, |ui| {
-            ui.heading(format!(
-                "{}  Inspector",
-                egui_phosphor::regular::SLIDERS_HORIZONTAL
-            ));
+            ui.horizontal(|ui| {
+                ui.heading(format!("{}  Inspector", icon::SLIDERS_HORIZONTAL));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .button(icon::CARET_RIGHT)
+                        .on_hover_text("Collapse")
+                        .clicked()
+                    {
+                        editor.inspector_open = false;
+                    }
+                });
+            });
             ui.separator();
             ui.add_space(5.0);
 
@@ -50,6 +62,28 @@ pub fn draw(
                     }
                 }
             });
+        });
+}
+
+/// Collapsed state: a thin rail with a caret that reopens the inspector panel.
+fn draw_collapsed(ctx: &egui::Context, t: crate::editor::theme::Theme, open: &mut bool) {
+    egui::SidePanel::right("Inspector Rail")
+        .resizable(false)
+        .exact_width(26.0)
+        .frame(
+            egui::Frame::none()
+                .fill(t.bg_tier1)
+                .inner_margin(t.space_xs)
+                .stroke(egui::Stroke::new(1.0, t.border)),
+        )
+        .show(ctx, |ui| {
+            if ui
+                .button(icon::CARET_LEFT)
+                .on_hover_text("Expand")
+                .clicked()
+            {
+                *open = true;
+            }
         });
 }
 
