@@ -5,9 +5,29 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-test:
+  # Detect whether the PR changes anything other than Markdown. Markdown-only PRs
+  # skip the heavy Rust jobs below (see the merging note in CLAUDE.md). We gate via
+  # job-level `if` (a skipped job still satisfies a required check) rather than
+  # workflow `paths-ignore` (which would leave a required check stuck pending).
+  changes:
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    outputs:
+      code: ${{ steps.filter.outputs.code || 'true' }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            code:
+              - '!**/*.md'
+
+  build-test:
+    needs: changes
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain (from rust-toolchain.toml)
@@ -28,8 +48,11 @@ jobs:
         run: cargo test --manifest-path tools/lint/Cargo.toml --locked
 
   deny:
+    needs: changes
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
     continue-on-error: true # report-only supply-chain audit
     steps:
       - uses: actions/checkout@v4

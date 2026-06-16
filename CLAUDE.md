@@ -21,9 +21,12 @@ agent can drive, observe, and play-test it headlessly.
      their own sake.
   3. **Craft.** It follows Rust/Lua good practices and the gold standards of game-engine
      design and architecture. If it doesn't, say so and propose the right shape.
-- **Flow:** discuss the idea (if needed) → write a GitHub issue for it → batch it (mark
-  dependencies) → implement it in a pull request → merge. New work starts as an issue,
-  not as a surprise diff; the PR references the issue it closes.
+- **Flow:** discuss the idea (if needed) → write a GitHub issue for it → mark its
+  dependencies → implement it in a pull request → merge. New work normally starts as an
+  issue, not a surprise diff, and that PR references the issue it closes. **Issue-less PRs
+  are allowed** for small, self-contained changes — docs, CI/tooling tweaks, trivial
+  fixes — where writing a separate issue would add nothing; the PR description still has
+  to clear the three gates above.
 - **Infrastructure-first (NOT "make it up as we go").** We do **not** improvise or pile
   on features ad hoc. Whenever we find a problem — something that already bites or will
   bite more than once, a pattern worth adopting, or a gold-standard practice we should
@@ -31,13 +34,14 @@ agent can drive, observe, and play-test it headlessly.
   **not** have the right to add more features/shenanigans until the
   infrastructure/architecture itself is improved first. Fix the foundation, then build
   on it. Each such fix gets its own issue when it carries its own responsibility.
-- **Batching & dependencies.** Once an issue is written, record how it relates to the
-  others so sessions can fan out subagents on independent issues in parallel. In the
-  issue body add a `## Dependencies` block with `Blocked by: #N` / `Blocks: #N` lines,
-  and use GitHub **sub-issues** when one issue is literal groundwork for another. Two
-  issues block each other when one **lays the groundwork** for the next, **makes it
-  meaningfully easier**, or would **conflict too much** if done concurrently. Use your
-  best judgment.
+- **Dependencies (not batches).** Once an issue is written, record how it relates to the
+  others using GitHub's native issue **relationships** — set `Blocked by` / `Blocks`
+  directly on the issue, and use GitHub **sub-issues** when one issue is literal
+  groundwork for another. Two issues are linked when one **lays the groundwork** for the
+  next, **makes it meaningfully easier**, or would **conflict too much** if done
+  concurrently; use your best judgment. There are no rigid batches: the dependency graph
+  *is* the plan. Any issue with no open blockers is fair game, and independent issues can
+  be worked in parallel — stay flexible and efficient.
 - **Pull requests.** Each PR's description says **what changed and why**, not how you
   got there — include process only when it's needed to understand the diff. Open it
   **ready for review** unless you need help, in which case leave it a **draft and say
@@ -51,7 +55,8 @@ agent can drive, observe, and play-test it headlessly.
   together (a rename, a changed signature, a moved module — no textual conflict catches
   it). So merging **cannot be parallelized**: rebase each PR onto the latest `main` →
   CI green on that rebased state → merge → repeat, one PR at a time. The only exception
-  is a PR that touches **only** Markdown.
+  is a PR that touches **only** Markdown — CI is skipped for Markdown-only PRs, so they
+  needn't be serialized and can merge freely.
 
 ## Architecture — the conceptual model
 A high-level map of how the engine is shaped. It deliberately doesn't enumerate every
