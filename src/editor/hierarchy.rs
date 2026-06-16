@@ -8,6 +8,10 @@ use crate::scene::{LightComponent, LightType, MeshComponent, Scene};
 /// creation toolbar pinned at the top.
 pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
     let t = editor.theme;
+    if !editor.hierarchy_open {
+        draw_collapsed(ctx, t, &mut editor.hierarchy_open);
+        return;
+    }
     egui::SidePanel::left("Hierarchy Panel")
         .resizable(true)
         .width_range(220.0..=340.0)
@@ -18,7 +22,18 @@ pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
                 .stroke(egui::Stroke::new(1.0, t.border)),
         )
         .show(ctx, |ui| {
-            ui.heading(format!("{}  Scene Hierarchy", icon::TREE_STRUCTURE));
+            ui.horizontal(|ui| {
+                ui.heading(format!("{}  Scene Hierarchy", icon::TREE_STRUCTURE));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .button(icon::CARET_LEFT)
+                        .on_hover_text("Collapse")
+                        .clicked()
+                    {
+                        editor.hierarchy_open = false;
+                    }
+                });
+            });
             draw_toolbar(editor, scene, ui);
             ui.separator();
             ui.add_space(t.space_xs);
@@ -40,6 +55,28 @@ pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
                     );
                 }
             });
+        });
+}
+
+/// Collapsed state: a thin rail with a caret that reopens the hierarchy panel.
+fn draw_collapsed(ctx: &egui::Context, t: crate::editor::theme::Theme, open: &mut bool) {
+    egui::SidePanel::left("Hierarchy Rail")
+        .resizable(false)
+        .exact_width(26.0)
+        .frame(
+            egui::Frame::none()
+                .fill(t.bg_tier1)
+                .inner_margin(t.space_xs)
+                .stroke(egui::Stroke::new(1.0, t.border)),
+        )
+        .show(ctx, |ui| {
+            if ui
+                .button(icon::CARET_RIGHT)
+                .on_hover_text("Expand")
+                .clicked()
+            {
+                *open = true;
+            }
         });
 }
 

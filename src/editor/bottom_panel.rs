@@ -12,6 +12,10 @@ pub fn draw(
     console: &mut ConsoleLogs,
 ) {
     let t = editor.theme;
+    if !editor.bottom_open {
+        draw_collapsed(ctx, t, &mut editor.bottom_open);
+        return;
+    }
     egui::TopBottomPanel::bottom("Bottom Panel")
         .resizable(true)
         .min_height(160.0)
@@ -43,8 +47,15 @@ pub fn draw(
                     editor.active_bottom_tab = "console".to_string();
                 }
 
-                // Align dynamic tab utility button on the right
+                // Align the collapse caret and dynamic tab utility button on the right
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .button(icon::CARET_DOWN)
+                        .on_hover_text("Collapse")
+                        .clicked()
+                    {
+                        editor.bottom_open = false;
+                    }
                     if editor.active_bottom_tab == "console" {
                         if ui.button(format!("{}  Clear", icon::TRASH)).clicked() {
                             console.messages.clear();
@@ -64,6 +75,30 @@ pub fn draw(
                 #[cfg(feature = "dev")]
                 draw_repl_input(editor, ui);
             }
+        });
+}
+
+/// Collapsed state: a short rail with a caret that reopens the bottom panel.
+fn draw_collapsed(ctx: &egui::Context, t: crate::editor::theme::Theme, open: &mut bool) {
+    egui::TopBottomPanel::bottom("Bottom Rail")
+        .resizable(false)
+        .exact_height(28.0)
+        .frame(
+            egui::Frame::none()
+                .fill(t.bg_tier1)
+                .inner_margin(t.space_sm)
+                .stroke(egui::Stroke::new(1.0, t.border)),
+        )
+        .show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                if ui.button(icon::CARET_UP).on_hover_text("Expand").clicked() {
+                    *open = true;
+                }
+                ui.colored_label(
+                    t.text_secondary,
+                    format!("{}  Content / Console", icon::FOLDERS),
+                );
+            });
         });
 }
 
