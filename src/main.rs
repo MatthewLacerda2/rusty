@@ -95,6 +95,20 @@ fn main() {
     // 6. Wrap the shared sim state in the window/GPU-agnostic GameWorld.
     let mut game = GameWorld::new(scene, input, nav, console);
 
+    // Bind the persistent store to its file and load it once — this boundary read
+    // is a sim input. Writes flush at Stop and on loop exit (below). The harness
+    // leaves the store pathless so headless runs never read this file.
+    if let Err(err) = game
+        .resources
+        .storage
+        .borrow_mut()
+        .open(rusty::core::storage::DEFAULT_STORAGE_PATH)
+    {
+        game.console()
+            .borrow_mut()
+            .error(format!("Failed to load storage: {}", err));
+    }
+
     // 7. Editor + timing state (front-end only)
     let mut editor_ui = EditorUi::new();
     // Adopt the boot scene as the current scene so Save writes back to it.
@@ -353,6 +367,11 @@ fn main() {
             }
             Event::AboutToWait => {
                 window.request_redraw();
+            }
+            // Quit boundary: persist the store however the loop is exiting (window
+            // close, menu quit, surface OOM). A no-op when the store is pathless.
+            Event::LoopExiting => {
+                game.resources.flush_storage();
             }
             _ => {}
         }

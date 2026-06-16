@@ -175,6 +175,26 @@ camera culling masks).
 | `Layers.GetName` | `(index)` | the slot's name, or `Layer N` if unnamed |
 | `Layers.NameToIndex` | `(name)` | layer index, or `nil` if unknown |
 
+## `Storage`
+
+A namespaced, JSON-backed key-value store that survives across runs — the engine's
+PlayerPrefs analog, backed by `project/storage.json` (human-readable so an agent can
+diff a save in a PR). A value may be a scalar **or** a structured table.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Storage.Set` | `(namespace, key, value)` | — (value: number / string / bool / table) |
+| `Storage.Get` | `(namespace, key)` | the value, or `nil` |
+| `Storage.Has` | `(namespace, key)` | `bool` |
+| `Storage.Delete` | `(namespace, key)` | `bool` (whether something was removed) |
+| `Storage.GetTable` | `(namespace)` | the whole namespace as a table, or `nil` |
+| `Storage.SetTable` | `(namespace, table)` | — (replace a whole namespace at once) |
+
+**Determinism.** Reads resolve from an in-memory snapshot loaded once at a boundary
+(startup); writes mutate that snapshot and are persisted only at boundaries (Stop /
+quit), never inside `FixedUpdate`. The headless harness runs the store **pathless**,
+so it never reads a developer's real save and replays stay reproducible.
+
 ## `Debug` — **dev builds only**
 
 Mirrors Unity's `[Conditional]` `Debug`. Registered only under the `dev` Cargo

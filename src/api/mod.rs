@@ -3,8 +3,8 @@
 //! The single stable API surface shared by Lua scripts, the console REPL and
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
 //! `Scene`, `Health`, `Camera`, `Animator`, `Nav`, `Material`, `Particles`,
-//! `Layers`, plus the dev-only `Debug`) is registered from this tree onto the live
-//! Lua runtime.
+//! `Layers`, `Storage`, plus the dev-only `Debug`) is registered from this tree
+//! onto the live Lua runtime.
 //! `scripting`
 //! owns the runtime and lifecycle; `api` owns the surface. One surface, three
 //! callers — they never drift apart.
@@ -23,6 +23,7 @@ pub mod nav;
 pub mod particle;
 pub mod physics;
 pub mod scene;
+pub mod storage;
 pub mod time;
 pub mod transform;
 
@@ -32,6 +33,7 @@ use std::rc::Rc;
 use mlua::{Function, Lua, Table};
 
 use crate::core::input::InputState;
+use crate::core::storage::Storage;
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
 use crate::render::Camera;
@@ -54,6 +56,7 @@ pub struct ApiCtx {
     pub time: Rc<RefCell<Time>>,
     pub physics: Rc<RefCell<Option<PhysicsWorld>>>,
     pub console: Rc<RefCell<ConsoleLogs>>,
+    pub storage: Rc<RefCell<Storage>>,
 }
 
 /// Register every namespace onto `lua`. This is the one place the whole script
@@ -73,6 +76,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     camera::register(lua, &ctx.camera)?;
     particle::register(lua, &ctx.scene)?;
     layers::register(lua, &ctx.scene)?;
+    storage::register(lua, &ctx.storage)?;
     input::register_writable(lua, &ctx.input)?;
     #[cfg(feature = "dev")]
     debug::register(lua, &ctx.console)?;

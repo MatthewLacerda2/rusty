@@ -83,6 +83,24 @@ fn input_press_release_is_writable() {
 }
 
 #[test]
+fn storage_roundtrips_scalars_and_tables() {
+    let (m, _scene, _cam) = manager();
+    // Scalar set/get + Has/Delete.
+    m.exec("Storage.Set('audio', 'volume', 0.5)").unwrap();
+    m.exec("assert(Storage.Get('audio', 'volume') == 0.5)")
+        .unwrap();
+    m.exec("assert(Storage.Has('audio', 'volume'))").unwrap();
+    m.exec("assert(Storage.Delete('audio', 'volume'))").unwrap();
+    m.exec("assert(Storage.Get('audio', 'volume') == nil)")
+        .unwrap();
+    // Structured whole-namespace blob via SetTable/GetTable.
+    m.exec("Storage.SetTable('binds', { jump = 'Space', n = 3 })")
+        .unwrap();
+    m.exec("local b = Storage.GetTable('binds'); assert(b.jump == 'Space' and b.n == 3)")
+        .unwrap();
+}
+
+#[test]
 fn raycast_misses_into_empty_space() {
     let (m, _scene, _cam) = manager();
     // Target has no collider, so nothing to hit.
