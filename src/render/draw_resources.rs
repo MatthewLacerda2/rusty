@@ -31,10 +31,39 @@ pub(super) type PathResource = (
     u32,
 );
 
+/// The editor-only overlay resources for one scene pass (selection outline, grid,
+/// collider AABBs, axis arrows). Empty outside editor mode. Bundled so the scene pass
+/// and the per-camera loop pass a single value instead of four (#93).
+#[derive(Default)]
+pub(super) struct Overlays {
+    pub outline: Option<OutlineResource>,
+    pub grid: Option<GridResource>,
+    pub aabb: Vec<AabbResource>,
+    pub axis: Vec<AxisResource>,
+}
+
 impl Renderer {
     pub(super) fn default_bones() -> BoneUniform {
         BoneUniform {
             bones: [Mat4::IDENTITY.to_cols_array(); 64],
+        }
+    }
+
+    /// Pre-create the editor overlay resources for a pass; all-empty in play mode.
+    pub(super) fn precreate_overlays(
+        &self,
+        scene: &Scene,
+        default_bones: &BoneUniform,
+        editor_mode: bool,
+    ) -> Overlays {
+        if !editor_mode {
+            return Overlays::default();
+        }
+        Overlays {
+            outline: self.precreate_outline(scene, default_bones),
+            grid: self.precreate_grid(default_bones),
+            aabb: self.precreate_aabb(scene, default_bones),
+            axis: self.precreate_axis_arrows(scene, default_bones),
         }
     }
 
