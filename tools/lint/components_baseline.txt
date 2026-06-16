@@ -1,0 +1,12 @@
+# Components grandfathered past the 4-axis completeness gate (--components).
+# Format: "<field> <axis>" where axis is field|add_menu|inspector|api|docs.
+# Burn this list down (issue #82) — each line is one component still missing one
+# axis; delete the line when the axis is closed. Never add new entries.
+animator add_menu
+animator inspector
+collider api
+light api
+mesh add_menu
+mesh api
+script api
+visual_correction api
