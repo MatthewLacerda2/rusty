@@ -86,6 +86,42 @@ fn save_load_preserves_collision_matrix() {
 }
 
 #[test]
+fn legacy_single_script_scene_loads_into_scripts_vec() {
+    // Build + save a scene with one script, then rewrite the on-disk JSON to the
+    // pre-#83 singular `"script": {…}` shape and prove it deserializes into the
+    // new `scripts` vec (serde back-compat for old saves).
+    let mut scene = Scene::new();
+    let id = scene.add_entity("Bot".to_string());
+    scene
+        .get_entity_mut(id)
+        .unwrap()
+        .scripts
+        .push(rusty::scene::ScriptComponent {
+            path: "project/assets/scripts/bot.lua".to_string(),
+            is_loaded: false,
+        });
+    let path = tmp("rusty_legacy_script.scene");
+    scene.save_to_file(&path).unwrap();
+
+    // Downgrade the saved file to the legacy singular key via the JSON tree, so
+    // the rewrite is independent of the pretty-printer's exact formatting.
+    let json = std::fs::read_to_string(&path).unwrap();
+    let mut doc: serde_json::Value = serde_json::from_str(&json).unwrap();
+    let ent = &mut doc["entities"][0];
+    let one = ent["scripts"][0].clone();
+    let obj = ent.as_object_mut().unwrap();
+    obj.remove("scripts");
+    obj.insert("script".to_string(), one);
+    std::fs::write(&path, serde_json::to_string_pretty(&doc).unwrap()).unwrap();
+
+    let mut loaded = Scene::new();
+    loaded.load_from_file(&path).unwrap();
+    let e = loaded.get_entity(id).unwrap();
+    assert_eq!(e.scripts.len(), 1);
+    assert_eq!(e.scripts[0].path, "project/assets/scripts/bot.lua");
+}
+
+#[test]
 fn snapshot_restore_discards_mutations() {
     let mut scene = Scene::new();
     let id = scene.add_entity("Player".to_string());

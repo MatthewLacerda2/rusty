@@ -16,7 +16,11 @@ use super::console::ConsoleLogs;
 
 pub struct ScriptManager {
     pub(super) lua: Option<Lua>,
-    pub(super) entity_scripts: HashMap<u32, RegistryKey>,
+    /// One lifecycle table per attached script, keyed by `(entity_id,
+    /// script_index)`. An entity can carry many scripts (#83); each keeps its own
+    /// state, and the index is the slot in the entity's `scripts` vec so two
+    /// scripts on one entity never collide.
+    pub(super) entity_scripts: HashMap<(u32, usize), RegistryKey>,
     pub(super) scene: Rc<RefCell<Scene>>,
     pub(super) input: Rc<RefCell<InputState>>,
     pub(super) nav: Rc<RefCell<NavigationGraph>>,
@@ -104,8 +108,15 @@ impl ScriptManager {
         Ok(())
     }
 
-    /// Loads and runs a script file, then registers its lifecycle methods
-    pub fn load_entity_script(&mut self, entity_id: u32, script_path: &str) -> Result<(), String> {
+    /// Loads and runs one of an entity's scripts, then registers its lifecycle
+    /// methods. `script_index` is the slot in the entity's `scripts` vec, so an
+    /// entity's many scripts (#83) each get their own keyed lifecycle table.
+    pub fn load_entity_script(
+        &mut self,
+        entity_id: u32,
+        script_index: usize,
+        script_path: &str,
+    ) -> Result<(), String> {
         let lua = self.lua.as_ref().ok_or("Lua runtime not initialized")?;
 
         if !Path::new(script_path).exists() {
@@ -126,7 +137,8 @@ impl ScriptManager {
             .create_registry_value(table)
             .map_err(|e| format!("Failed to register script table: {}", e))?;
 
-        self.entity_scripts.insert(entity_id, reg_key);
+        self.entity_scripts
+            .insert((entity_id, script_index), reg_key);
 
         Ok(())
     }

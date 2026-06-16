@@ -210,19 +210,20 @@ impl GameWorld {
                 .error(format!("Lua init error: {}", err));
             return;
         }
-        let to_load: Vec<(u32, String)> = self
-            .world
-            .scene
-            .borrow()
-            .iter()
-            .filter_map(|e| e.script.as_ref().map(|s| (e.id, s.path.clone())))
-            .collect();
-        for (id, path) in to_load {
-            if let Err(e) = self.resources.script_manager.load_entity_script(id, &path) {
-                self.resources
-                    .console
-                    .borrow_mut()
-                    .error(format!("Lua compile error (Entity {}): {}", id, e));
+        // Each entity can carry many scripts (#83); load each, keyed by its slot.
+        let mut to_load: Vec<(u32, usize, String)> = Vec::new();
+        for e in self.world.scene.borrow().iter() {
+            let rows = e.scripts.iter().enumerate();
+            to_load.extend(rows.map(|(i, s)| (e.id, i, s.path.clone())));
+        }
+        for (id, index, path) in to_load {
+            if let Err(e) = self
+                .resources
+                .script_manager
+                .load_entity_script(id, index, &path)
+            {
+                let msg = format!("Lua compile error (Entity {}): {}", id, e);
+                self.resources.console.borrow_mut().error(msg);
             }
         }
         self.resources.script_manager.start_scripts();

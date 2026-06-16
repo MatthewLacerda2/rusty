@@ -102,7 +102,7 @@ pub fn build(scene: &mut Scene, bot_script: &str) {
         player.texture = Some(tint([0.3, 0.6, 1.0]));
         // The Player's movement + camera + weapon are NOT engine code: they live in
         // the bundled default player_controller.lua, attached here like any script.
-        player.script = Some(ScriptComponent {
+        player.scripts.push(ScriptComponent {
             path: PLAYER_CONTROLLER_SCRIPT.to_string(),
             is_loaded: false,
         });
@@ -150,7 +150,7 @@ pub fn build(scene: &mut Scene, bot_script: &str) {
             freeze: false,
         });
         if !bot_script.is_empty() {
-            enemy.script = Some(ScriptComponent {
+            enemy.scripts.push(ScriptComponent {
                 path: bot_script.to_string(),
                 is_loaded: false,
             });

@@ -7,10 +7,12 @@
 //! here so the public surface stays a flat `crate::scripting::*`.
 
 mod console;
+mod discovery;
 mod lifecycle;
 mod manager;
 
 pub use console::{ConsoleLogs, LogLevel};
+pub use discovery::{monobehaviour_scripts, script_label};
 pub use manager::ScriptManager;
 
 #[cfg(test)]
