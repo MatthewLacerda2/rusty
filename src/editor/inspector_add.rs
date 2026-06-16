@@ -3,8 +3,8 @@ use glam::Vec3;
 
 use crate::scene::{
     AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, Entity, HealthComponent,
-    LightComponent, LightType, NavMeshAgentComponent, RigidBodyComponent, ScriptComponent,
-    TextureComponent, Tonemap, VisualCorrectionComponent,
+    LightComponent, LightType, NavMeshAgentComponent, ParticleEmitterComponent, RigidBodyComponent,
+    ScriptComponent, TextureComponent, Tonemap, VisualCorrectionComponent,
 };
 
 /// 3F. Add Component — Unity-style full-width pill that opens the component menu.
@@ -22,7 +22,13 @@ pub fn draw(ui: &mut egui::Ui, entity: &mut Entity) {
 }
 
 fn add_menu(ui: &mut egui::Ui, entity: &mut Entity) {
-    if entity.script.is_none() && ui.button("Script Component").clicked() {
+    // Lua scripts carry the moon glyph (the per-type icons for the other built-ins
+    // are the burn-down in #82); the particle system gets the sparkle below.
+    if entity.script.is_none()
+        && ui
+            .button(format!("{}  Script Component", icon::MOON))
+            .clicked()
+    {
         entity.script = Some(ScriptComponent {
             path: "project/assets/scripts/bot.lua".to_string(),
             is_loaded: false,
@@ -108,6 +114,14 @@ fn add_menu(ui: &mut egui::Ui, entity: &mut Entity) {
             motion_blur_active: true,
             motion_blur_samples: 64,
         });
+        ui.close_menu();
+    }
+    if entity.particles.is_none()
+        && ui
+            .button(format!("{}  Particle System", icon::SPARKLE))
+            .clicked()
+    {
+        entity.particles = Some(ParticleEmitterComponent::default());
         ui.close_menu();
     }
     if entity.camera.is_some()

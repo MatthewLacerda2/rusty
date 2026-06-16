@@ -3,7 +3,8 @@ use glam::Vec3;
 use egui_phosphor::regular as icon;
 
 use crate::editor::{
-    inspector_add, inspector_camera, inspector_gameplay, inspector_render, inspector_transform,
+    inspector_add, inspector_camera, inspector_gameplay, inspector_particles, inspector_render,
+    inspector_transform,
 };
 use crate::editor::{inspectors, EditorUi, InspectorTarget};
 use crate::navigation::NavigationGraph;
@@ -183,6 +184,8 @@ fn draw_entity_inspector(
 
         inspector_camera::draw_camera(ui, entity, &mut editor.is_dirty);
         inspector_camera::draw_visual_correction(ui, entity, &mut editor.is_dirty);
+
+        inspector_particles::draw(ui, entity, &mut editor.is_dirty);
 
         inspector_add::draw(ui, entity);
     }

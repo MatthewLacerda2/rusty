@@ -16,7 +16,7 @@ use glam::Vec3;
 use super::resources::Resources;
 use super::world::World;
 use crate::components::particle::{
-    CollisionResponse, EmitMode, Particle, ParticleEmitterComponent, ParticleRng,
+    CollisionResponse, EmitMode, Particle, ParticleEmitterComponent,
 };
 use crate::physics::PhysicsWorld;
 
@@ -63,10 +63,7 @@ fn simulate_emitter(
     dt: f32,
     physics: &std::rc::Rc<std::cell::RefCell<Option<PhysicsWorld>>>,
 ) {
-    if !emitter.runtime.initialized {
-        emitter.runtime.rng = ParticleRng::new(emitter.seed);
-        emitter.runtime.initialized = true;
-    }
+    emitter.ensure_initialized();
 
     if emitter.active {
         emit(emitter, origin, dt);
@@ -102,37 +99,9 @@ fn emit(emitter: &mut ParticleEmitterComponent, origin: Vec3, dt: f32) {
         }
     };
 
-    let cap = emitter.max_particles as usize;
-    for _ in 0..to_spawn {
-        if emitter.runtime.particles.len() >= cap {
-            break;
-        }
-        let p = spawn_one(emitter, origin);
-        emitter.runtime.particles.push(p);
-    }
-}
-
-/// Build one particle from the emitter config + a draw from the seeded PRNG.
-fn spawn_one(emitter: &mut ParticleEmitterComponent, origin: Vec3) -> Particle {
-    let rng = &mut emitter.runtime.rng;
-    let base = emitter.direction.normalize_or_zero();
-    // Cone spread: perturb the base direction by a random offset scaled by spread.
-    let jitter = Vec3::new(rng.signed(), rng.signed(), rng.signed()) * emitter.spread;
-    let dir = (base + jitter).normalize_or_zero();
-    let velocity = if dir == Vec3::ZERO {
-        Vec3::ZERO
-    } else {
-        dir * emitter.speed
-    };
-    Particle {
-        position: origin,
-        velocity,
-        age: 0.0,
-        lifetime: emitter.lifetime,
-        size_start: emitter.size_start,
-        size_end: emitter.size_end,
-        color: emitter.color,
-    }
+    // Spawning (cone spread + cap) lives on the component so the scripting
+    // `Particles` namespace shares the exact same deterministic path.
+    emitter.emit_at(origin, to_spawn);
 }
 
 /// Integrate each particle (gravity + velocity), resolve a collision against the
