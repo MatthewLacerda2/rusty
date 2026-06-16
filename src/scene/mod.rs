@@ -28,7 +28,7 @@ pub use io::{
     is_scene_path, load_from_file, save_to_file, seed_default_scene, seed_default_scripts,
     DEFAULT_SCENE_PATH, DEFAULT_SCENE_SOURCE, SCENE_EXTENSION,
 };
-pub use layers::{LayerRegistry, LAYER_COUNT};
+pub use layers::{layer_in_mask, LayerRegistry, LAYER_COUNT};
 pub use scene::{
     AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, CollisionResponse,
     DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent, LightType, MeshComponent,

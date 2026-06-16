@@ -19,6 +19,14 @@ pub const LAYER_COUNT: usize = 32;
 /// The reserved name of layer 0, which is fixed.
 pub const DEFAULT_LAYER_NAME: &str = "Default";
 
+/// Whether `layer` is a member of the membership set `mask` (one bit per layer).
+/// Shared by the camera culling masks (#92) and the collision matrix (#91). A
+/// layer index at or past [`LAYER_COUNT`] is never in any mask (and can't overflow
+/// the shift).
+pub fn layer_in_mask(layer: u8, mask: u32) -> bool {
+    (layer as usize) < LAYER_COUNT && (mask & (1u32 << layer)) != 0
+}
+
 /// The project's named layers: exactly [`LAYER_COUNT`] slots indexed by layer.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LayerRegistry {

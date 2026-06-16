@@ -111,6 +111,7 @@ fn add_menu(ui: &mut egui::Ui, entity: &mut Entity) {
             fov: 45.0,
             near: 0.1,
             far: 200.0,
+            culling_mask: u32::MAX,
             motion_blur_active: true,
             motion_blur_samples: 64,
         });

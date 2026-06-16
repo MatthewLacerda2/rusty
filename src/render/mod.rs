@@ -22,7 +22,7 @@ mod textures;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub use camera::Camera;
+pub use camera::{sync_lens_from_scene, Camera};
 pub use setup_headless::OFFSCREEN_FORMAT;
 
 // Represent memory layouts for GPU Uniforms

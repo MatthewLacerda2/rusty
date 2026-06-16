@@ -4,8 +4,14 @@ use crate::editor::inspector_card::component_card;
 use crate::editor::theme;
 use crate::scene::{Entity, Tonemap};
 
-/// Camera Component panel
-pub fn draw_camera(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
+/// Camera Component panel. `named_layers` are the `(index, label)` slots offered in
+/// the culling-mask checklist (layer 0 + named user slots).
+pub fn draw_camera(
+    ui: &mut egui::Ui,
+    entity: &mut Entity,
+    named_layers: &[(u8, String)],
+    is_dirty: &mut bool,
+) {
     if entity.camera.is_none() {
         return;
     }
@@ -38,6 +44,7 @@ pub fn draw_camera(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) 
                     .clamp_range(1.0..=1000.0),
             );
         });
+        draw_culling_mask(ui, &mut cam.culling_mask, named_layers, is_dirty);
         ui.colored_label(
             theme::from_ui(ui).accent_blue,
             "✔ Intrinsic Motion Blur (Active | 64 Samples)",
@@ -47,6 +54,40 @@ pub fn draw_camera(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) 
         entity.camera = None;
         entity.visual_correction = None;
         *is_dirty = true;
+    }
+}
+
+/// The Unity-style culling-mask checklist: one checkbox per offered layer, plus
+/// Everything/Nothing shortcuts. Toggling a layer flips its bit in `mask`.
+fn draw_culling_mask(
+    ui: &mut egui::Ui,
+    mask: &mut u32,
+    named_layers: &[(u8, String)],
+    is_dirty: &mut bool,
+) {
+    ui.add_space(3.0);
+    ui.label("Culling Mask");
+    ui.horizontal(|ui| {
+        if ui.small_button("Everything").clicked() {
+            *mask = u32::MAX;
+            *is_dirty = true;
+        }
+        if ui.small_button("Nothing").clicked() {
+            *mask = 0;
+            *is_dirty = true;
+        }
+    });
+    for (index, label) in named_layers {
+        let bit = 1u32 << *index;
+        let mut on = *mask & bit != 0;
+        if ui.checkbox(&mut on, label).changed() {
+            if on {
+                *mask |= bit;
+            } else {
+                *mask &= !bit;
+            }
+            *is_dirty = true;
+        }
     }
 }
 
