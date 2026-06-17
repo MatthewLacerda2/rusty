@@ -65,6 +65,7 @@ fn kinematic_body() -> RigidBodyComponent {
 ///
 /// Each entity's `RefMut` guard is scoped so it drops before the next `Scene`
 /// call — required now that the Scene is hecs-backed and hands out borrow guards.
+#[allow(clippy::too_many_lines)]
 pub fn build(scene: &mut Scene, bot_script: &str) {
     // 1 — Floor (id 1)
     let floor_id = scene.add_entity("Floor_Plane".to_string());

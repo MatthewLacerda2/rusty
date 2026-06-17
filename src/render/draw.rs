@@ -166,6 +166,7 @@ impl Renderer {
 
     /// Builds the per-frame lighting uniform by scanning the scene's lights and
     /// visual-correction (SSR) settings.
+    #[allow(clippy::too_many_lines)]
     fn build_lighting_uniform(&self, scene: &Scene) -> LightingUniform {
         let mut lighting_uniform = LightingUniform {
             ambient: AmbientLightUniform {

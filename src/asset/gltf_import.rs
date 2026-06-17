@@ -43,6 +43,7 @@ fn material_data(material: gltf::Material) -> MaterialData {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn sub_mesh_from_gltf(
     mesh: &gltf::Mesh,
     buffers: &[gltf::buffer::Data],

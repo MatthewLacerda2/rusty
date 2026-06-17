@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Instant;
 
+#[allow(clippy::too_many_lines)]
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, path: &str) {
     let filename = Path::new(path)
         .file_name()

@@ -5,6 +5,7 @@ use crate::scene::Scene;
 use crate::scripting::{ConsoleLogs, LogLevel};
 
 /// BOTTOM PANEL: Folder Explorer & Console Logs
+#[allow(clippy::too_many_lines)]
 pub fn draw(
     editor: &mut EditorUi,
     ctx: &egui::Context,

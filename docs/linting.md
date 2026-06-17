@@ -8,7 +8,7 @@ result is written to `.lint/report.txt` so an agent can read exactly what failed
 |---|---|---|
 | Style | rustfmt (`rustfmt.toml`) | `cargo fmt --check` |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (both feature sets) |
-| Function ("endpoint") length | clippy `too_many_lines` | `too-many-lines-threshold = 50` — configured in `clippy.toml`, not wired into CI |
+| Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), enforced via `-D clippy::too_many_lines`; legacy functions grandfathered with inline `#[allow]` |
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines |
 | Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation` |
@@ -42,9 +42,21 @@ components as `<component> <axis>` lines (the same burn-down rule as above; #82
 removes them one axis at a time). The particle system is intentionally absent from
 that baseline — it is the gate's first fully-green component.
 
+## The function-length cap (`too_many_lines`)
+The 50-line per-function cap is a **hard clippy gate** (`-D clippy::too_many_lines`,
+both feature sets). The functions that predate the cap are grandfathered with an
+inline `#[allow(clippy::too_many_lines)]` on each one. That attribute **is** the
+burn-down list — count it with:
+```
+rg -c 'allow\(clippy::too_many_lines\)' src
+```
+Same rule as the size baseline: as you split a grandfathered function under 50 lines,
+delete its `#[allow]`; **never add a new one**. When none remain, the cap is
+unconditionally on for the whole crate.
+
 ## Clippy: CI vs local
 Clippy lints the whole crate (it can't be scoped to changed files). In **CI** it's a
-hard gate — every warning fails the build, for both feature sets. The local
-pre-commit hook runs clippy **report-only** (it writes `.lint/clippy.txt` and never
-blocks the commit) so a commit isn't held up by an unrelated crate-wide warning; CI
-is the durable gate that gates the PR.
+hard gate — every warning (plus the function-length cap) fails the build, for both
+feature sets. The local pre-commit hook (`lefthook.yml`) runs the same hard clippy
+gate on the default feature set; CI additionally covers the dev feature set and is
+the durable gate that gates the PR.
