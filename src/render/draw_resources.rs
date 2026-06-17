@@ -8,18 +8,29 @@ use glam::Mat4;
 use std::rc::Rc;
 use wgpu::util::DeviceExt;
 
-use super::{BoneUniform, EntityUniform, GpuTexture, Renderer};
+use super::{BoneUniform, EntityUniform, GpuTexture, MeshId, Renderer};
 use crate::scene::Scene;
 
+// The leading `u32` is the entity id (identity — e.g. matching the selected
+// entity's texture for its outline); `MeshId` is the geometry key the render pass
+// resolves the shared vertex/index buffers through (#127).
 pub(super) type SolidResource = (
     u32,
+    MeshId,
     wgpu::Buffer,
     wgpu::Buffer,
     wgpu::BindGroup,
     Rc<GpuTexture>,
     u32,
 );
-pub(super) type OutlineResource = (u32, wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup, u32);
+pub(super) type OutlineResource = (
+    u32,
+    MeshId,
+    wgpu::Buffer,
+    wgpu::Buffer,
+    wgpu::BindGroup,
+    u32,
+);
 pub(super) type GridResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
 pub(super) type AabbResource = (wgpu::Buffer, wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
 pub(super) type AxisResource = (usize, wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
@@ -85,7 +96,8 @@ impl Renderer {
             }
 
             if let Some(mesh) = &entity.mesh {
-                if let Some(gpu_mesh) = self.gpu_meshes.get(&entity.id) {
+                let mesh_id = MeshId::from_mesh(mesh);
+                if let Some(gpu_mesh) = self.gpu_meshes.get(&mesh_id) {
                     // Prepare entity uniform buffer
                     let is_lit = if entity.light.is_some() { 0u32 } else { 1u32 };
                     let model_matrix = scene.compute_world_matrix(entity.id);
@@ -181,6 +193,7 @@ impl Renderer {
 
                     solid_render_resources.push((
                         entity.id,
+                        mesh_id,
                         entity_buffer,
                         bones_buffer,
                         entity_bind_group,
@@ -201,10 +214,11 @@ impl Renderer {
     ) -> Option<OutlineResource> {
         let selected_id = scene.selected_entity_id?;
         let entity = scene.get_entity(selected_id)?;
-        if !(entity.active && entity.mesh.is_some()) {
+        let mesh_id = MeshId::from_mesh(entity.mesh.as_ref()?);
+        if !entity.active {
             return None;
         }
-        let gpu_mesh = self.gpu_meshes.get(&selected_id)?;
+        let gpu_mesh = self.gpu_meshes.get(&mesh_id)?;
 
         // Scale up the model matrix slightly for the outline hull
         let outline_scale = 1.05;
@@ -254,6 +268,7 @@ impl Renderer {
 
         Some((
             selected_id,
+            mesh_id,
             outline_ent_buf,
             outline_bones_buf,
             outline_bind_group,
