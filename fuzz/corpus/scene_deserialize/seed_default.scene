@@ -1,0 +1,411 @@
+{
+  "entities": [
+    {
+      "id": 1,
+      "name": "Floor_Plane",
+      "active": true,
+      "is_static": true,
+      "transform": {
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          2.5,
+          1.0,
+          2.5
+        ]
+      },
+      "mesh": {
+        "primitive_type": "Plane"
+      },
+      "texture": null,
+      "script": null,
+      "animator": null,
+      "light": null,
+      "collider": {
+        "active": true,
+        "shape": {
+          "Box": {
+            "size": [
+              15.0,
+              0.1,
+              15.0
+            ]
+          }
+        },
+        "is_trigger": false,
+        "aabb_min": [
+          -18.75,
+          -0.05,
+          -18.75
+        ],
+        "aabb_max": [
+          18.75,
+          0.05,
+          18.75
+        ]
+      },
+      "rigidbody": null,
+      "health": null,
+      "nav_agent": null,
+      "camera": null,
+      "visual_correction": null,
+      "parent_id": null,
+      "children": []
+    },
+    {
+      "id": 2,
+      "name": "Player",
+      "active": true,
+      "is_static": false,
+      "transform": {
+        "position": [
+          0.0,
+          1.5,
+          -6.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "mesh": {
+        "primitive_type": "Cylinder"
+      },
+      "texture": {
+        "path": "",
+        "is_dirty": false,
+        "metallic": 0.0,
+        "roughness": 0.5,
+        "metallic_map": null,
+        "roughness_map": null,
+        "color": [
+          0.3,
+          0.6,
+          1.0
+        ]
+      },
+      "script": {
+        "path": "project/assets/scripts/player_controller.lua",
+        "is_loaded": false
+      },
+      "animator": null,
+      "light": null,
+      "collider": {
+        "active": true,
+        "shape": {
+          "Cylinder": {
+            "radius": 0.5,
+            "height": 1.6
+          }
+        },
+        "is_trigger": false,
+        "aabb_min": [
+          -0.5,
+          0.7,
+          -6.5
+        ],
+        "aabb_max": [
+          0.5,
+          2.3,
+          -5.5
+        ]
+      },
+      "rigidbody": {
+        "active": true,
+        "is_kinematic": true,
+        "mass": 80.0,
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "use_gravity": false
+      },
+      "health": null,
+      "nav_agent": null,
+      "camera": null,
+      "visual_correction": null,
+      "parent_id": null,
+      "children": []
+    },
+    {
+      "id": 3,
+      "name": "Obstacle_Wall_Left",
+      "active": true,
+      "is_static": true,
+      "transform": {
+        "position": [
+          3.0,
+          1.0,
+          2.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          2.0,
+          4.0
+        ]
+      },
+      "mesh": {
+        "primitive_type": "Box"
+      },
+      "texture": null,
+      "script": null,
+      "animator": null,
+      "light": null,
+      "collider": {
+        "active": true,
+        "shape": {
+          "Box": {
+            "size": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          }
+        },
+        "is_trigger": false,
+        "aabb_min": [
+          2.5,
+          0.0,
+          0.0
+        ],
+        "aabb_max": [
+          3.5,
+          2.0,
+          4.0
+        ]
+      },
+      "rigidbody": null,
+      "health": null,
+      "nav_agent": null,
+      "camera": null,
+      "visual_correction": null,
+      "parent_id": null,
+      "children": []
+    },
+    {
+      "id": 4,
+      "name": "Obstacle_Wall_Right",
+      "active": true,
+      "is_static": true,
+      "transform": {
+        "position": [
+          -3.0,
+          1.0,
+          4.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          4.0,
+          2.0,
+          1.0
+        ]
+      },
+      "mesh": {
+        "primitive_type": "Box"
+      },
+      "texture": null,
+      "script": null,
+      "animator": null,
+      "light": null,
+      "collider": {
+        "active": true,
+        "shape": {
+          "Box": {
+            "size": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          }
+        },
+        "is_trigger": false,
+        "aabb_min": [
+          -5.0,
+          0.0,
+          3.5
+        ],
+        "aabb_max": [
+          -1.0,
+          2.0,
+          4.5
+        ]
+      },
+      "rigidbody": null,
+      "health": null,
+      "nav_agent": null,
+      "camera": null,
+      "visual_correction": null,
+      "parent_id": null,
+      "children": []
+    },
+    {
+      "id": 5,
+      "name": "Sun",
+      "active": true,
+      "is_static": true,
+      "transform": {
+        "position": [
+          0.0,
+          12.0,
+          0.0
+        ],
+        "rotation": [
+          -0.40821794,
+          -0.23456973,
+          -0.10938166,
+          0.8754261
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "mesh": null,
+      "texture": null,
+      "script": null,
+      "animator": null,
+      "light": {
+        "light_type": "Directional",
+        "color": [
+          1.0,
+          0.95,
+          0.85
+        ],
+        "intensity": 1.2,
+        "range": 0.0,
+        "inner_cone": 0.0,
+        "outer_cone": 0.0
+      },
+      "collider": null,
+      "rigidbody": null,
+      "health": null,
+      "nav_agent": null,
+      "camera": null,
+      "visual_correction": null,
+      "parent_id": null,
+      "children": []
+    },
+    {
+      "id": 6,
+      "name": "Enemy_1",
+      "active": true,
+      "is_static": false,
+      "transform": {
+        "position": [
+          8.0,
+          1.0,
+          8.0
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "mesh": {
+        "primitive_type": "Box"
+      },
+      "texture": null,
+      "script": {
+        "path": "project/assets/scripts/bot.lua",
+        "is_loaded": false
+      },
+      "animator": {
+        "current_clip": "Walk",
+        "time": 0.0,
+        "speed": 3.0,
+        "is_playing": true,
+        "freeze": false
+      },
+      "light": null,
+      "collider": {
+        "active": true,
+        "shape": {
+          "Box": {
+            "size": [
+              1.3,
+              2.0,
+              1.3
+            ]
+          }
+        },
+        "is_trigger": false,
+        "aabb_min": [
+          7.35,
+          0.0,
+          7.35
+        ],
+        "aabb_max": [
+          8.65,
+          2.0,
+          8.65
+        ]
+      },
+      "rigidbody": {
+        "active": true,
+        "is_kinematic": true,
+        "mass": 80.0,
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "use_gravity": false
+      },
+      "health": {
+        "current_health": 100.0,
+        "max_health": 100.0,
+        "is_dead": false
+      },
+      "nav_agent": null,
+      "camera": null,
+      "visual_correction": null,
+      "parent_id": null,
+      "children": []
+    }
+  ],
+  "next_entity_id": 7,
+  "selected_entity_id": null,
+  "skybox_path": "",
+  "ambient_color": [
+    0.16,
+    0.1,
+    0.22
+  ],
+  "ambient_intensity": 0.35
+}

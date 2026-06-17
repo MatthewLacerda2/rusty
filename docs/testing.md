@@ -38,3 +38,26 @@ not gate. The plan is to record a baseline and then **ratchet** — fail only on
 regression below it — rather than gate on a brittle absolute percentage. Run it
 locally with `cargo llvm-cov --summary-only` (add `--features dev` for the
 dev-only surface).
+
+## Fuzzing (local-first)
+The scene-load path is a parser eating untrusted input (hand-edited or corrupt
+save files), so it gets a [`cargo-fuzz`](https://github.com/rust-fuzz/cargo-fuzz)
+target in `fuzz/`. The target (`scene_deserialize`) mirrors `load_from_file`:
+arbitrary bytes → UTF-8 → `SceneData` (serde) → `apply_scene_data` (the
+rehydration that rebuilds meshes/colliders/skeletons), surfacing panics, hangs,
+and unguarded `unwrap`s.
+
+libFuzzer is **nightly-only**, so `fuzz/` is its own workspace — deliberately
+out of the pinned-`1.94.1` build, the size/determinism gates, and `cargo-deny`.
+It is **local-first / on-demand**:
+
+```
+cargo +nightly fuzz run scene_deserialize          # fuzz until you stop it
+cargo +nightly fuzz run scene_deserialize -- -max_total_time=60   # time-boxed
+```
+
+The committed `fuzz/corpus/scene_deserialize/` seeds the coverage-guided mutator
+with the default scene plus a couple of minimal documents; new interesting inputs
+accrete there. There is no CI gate — fuzzing is run for as long as the operator
+wants; a short time-boxed CI smoke batch could be added later as a separate
+nightly workflow if regression pressure is wanted.
