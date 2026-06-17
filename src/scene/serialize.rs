@@ -88,62 +88,91 @@ fn vertex_from_imported(v: &MeshVertex) -> Vertex {
     }
 }
 
-/// Geometry + bind-pose bone palette for an imported sub-mesh, ready for the GPU
-/// buffer rebuild. The palette is empty for a static (skinless) sub-mesh.
-fn imported_to_render(sub: &SubMesh) -> (Vec<Vertex>, Vec<u32>, Vec<Mat4>) {
-    let vertices = sub.vertices.iter().map(vertex_from_imported).collect();
-    let palette = sub
-        .skin
-        .as_ref()
-        .map(|s| s.bind_palette())
-        .unwrap_or_default();
-    (vertices, sub.indices.clone(), palette)
+/// The non-serialized data a mesh component is rebuilt with on load: GPU-ready
+/// geometry plus the imported rig (bind palette, skeleton, clips). A primitive or a
+/// failed import yields the empty default — no skin, no clips, GPU bones at identity.
+#[derive(Default)]
+struct RehydratedMesh {
+    vertices: Vec<Vertex>,
+    indices: Vec<u32>,
+    bind_palette: Vec<Mat4>,
+    skin: Option<crate::asset::SkinData>,
+    clips: Vec<crate::asset::AnimationClip>,
 }
 
-/// Re-import an `"Asset"` mesh's geometry + bind-pose palette from its path-based
-/// `asset_ref` (`path::sub_object`). On failure (missing/renamed source — the
-/// accepted path-based trade-off) the mesh rehydrates empty rather than aborting
-/// the load.
-fn rehydrate_asset_mesh(asset_ref: &Option<String>) -> (Vec<Vertex>, Vec<u32>, Vec<Mat4>) {
-    match asset_ref {
-        Some(reference) => match asset::import_sub_mesh(reference) {
-            Ok(sub) => imported_to_render(&sub),
-            Err(_) => (Vec::new(), Vec::new(), Vec::new()),
-        },
-        None => (Vec::new(), Vec::new(), Vec::new()),
+impl RehydratedMesh {
+    /// A primitive's geometry with no rig — primitives are never skinned/animated.
+    fn primitive(geometry: (Vec<Vertex>, Vec<u32>)) -> Self {
+        Self {
+            vertices: geometry.0,
+            indices: geometry.1,
+            ..Self::default()
+        }
+    }
+
+    /// Pull geometry + the full rig (bind palette, skeleton, clips) out of an
+    /// imported sub-mesh.
+    fn from_sub_mesh(sub: &SubMesh) -> Self {
+        let bind_palette = sub
+            .skin
+            .as_ref()
+            .map(|s| s.bind_palette())
+            .unwrap_or_default();
+        Self {
+            vertices: sub.vertices.iter().map(vertex_from_imported).collect(),
+            indices: sub.indices.clone(),
+            bind_palette,
+            skin: sub.skin.clone(),
+            clips: sub.clips.clone(),
+        }
     }
 }
 
-/// Tag a primitive's `(vertices, indices)` with an empty bone palette — primitives
-/// are never skinned.
-fn with_empty_palette(geometry: (Vec<Vertex>, Vec<u32>)) -> (Vec<Vertex>, Vec<u32>, Vec<Mat4>) {
-    (geometry.0, geometry.1, Vec::new())
+/// Re-import an `"Asset"` mesh's geometry + rig from its path-based `asset_ref`
+/// (`path::sub_object`). On failure (missing/renamed source — the accepted
+/// path-based trade-off) the mesh rehydrates empty rather than aborting the load.
+fn rehydrate_asset_mesh(asset_ref: &Option<String>) -> RehydratedMesh {
+    match asset_ref {
+        Some(reference) => match asset::import_sub_mesh(reference) {
+            Ok(sub) => RehydratedMesh::from_sub_mesh(&sub),
+            Err(_) => RehydratedMesh::default(),
+        },
+        None => RehydratedMesh::default(),
+    }
 }
 
-/// Rebuild each mesh's vertex/index data from its on-disk REFERENCE: a primitive
-/// from `primitive_type`, or an imported sub-mesh from `asset_ref` when the type
-/// is `"Asset"`. GPU buffers are never stored on disk, only rebuilt here.
+/// Rebuild one mesh's vertex/index data + rig from its on-disk REFERENCE: a
+/// primitive from `primitive_type`, or an imported sub-mesh from `asset_ref` when
+/// the type is `"Asset"`. GPU buffers are never stored on disk, only rebuilt here.
+fn rehydrate_one(primitive_type: &str, asset_ref: &Option<String>) -> RehydratedMesh {
+    match primitive_type {
+        "Box" => RehydratedMesh::primitive(primitives::generate_box(1.0, 1.0, 1.0)),
+        "Sphere" => RehydratedMesh::primitive(primitives::generate_sphere(1.0, 16, 16)),
+        "Plane" => RehydratedMesh::primitive(primitives::generate_plane(15.0, 15.0)),
+        "Cylinder" => RehydratedMesh::primitive(primitives::generate_cylinder(
+            Vec3::new(0.0, -0.5, 0.0),
+            Vec3::new(0.0, 0.5, 0.0),
+            0.5,
+            12,
+        )),
+        "Asset" => rehydrate_asset_mesh(asset_ref),
+        _ => RehydratedMesh::default(),
+    }
+}
+
+/// Rebuild every mesh in the document from its reference (see [`rehydrate_one`]).
 fn rehydrate_meshes(data: &mut SceneData) {
     for entity in &mut data.entities {
         if let Some(mesh) = &mut entity.mesh {
-            // Primitives are skinless: an empty palette leaves the GPU bones at
-            // identity. Only an `"Asset"` mesh can carry a real skin (#79).
-            let (vertices, indices, palette) = match mesh.primitive_type.as_str() {
-                "Box" => with_empty_palette(primitives::generate_box(1.0, 1.0, 1.0)),
-                "Sphere" => with_empty_palette(primitives::generate_sphere(1.0, 16, 16)),
-                "Plane" => with_empty_palette(primitives::generate_plane(15.0, 15.0)),
-                "Cylinder" => with_empty_palette(primitives::generate_cylinder(
-                    Vec3::new(0.0, -0.5, 0.0),
-                    Vec3::new(0.0, 0.5, 0.0),
-                    0.5,
-                    12,
-                )),
-                "Asset" => rehydrate_asset_mesh(&mesh.asset_ref),
-                _ => (Vec::new(), Vec::new(), Vec::new()),
-            };
-            mesh.vertices = vertices;
-            mesh.indices = indices;
-            mesh.bind_palette = palette;
+            let rebuilt = rehydrate_one(&mesh.primitive_type, &mesh.asset_ref);
+            mesh.vertices = rebuilt.vertices;
+            mesh.indices = rebuilt.indices;
+            mesh.bind_palette = rebuilt.bind_palette;
+            mesh.skin = rebuilt.skin;
+            mesh.clips = rebuilt.clips;
+            // A freshly rehydrated mesh starts at its rest pose; the animation
+            // system repopulates the posed palette once a clip plays.
+            mesh.pose_palette = Vec::new();
             mesh.is_dirty.set(true);
         }
     }
@@ -154,13 +183,16 @@ fn rehydrate_meshes(data: &mut SceneData) {
 /// vertices are dropped and re-imported from it (see `rehydrate_meshes`). Returns
 /// an empty-geometry component if the import fails.
 pub fn asset_mesh_component(reference: &str) -> crate::scene::MeshComponent {
-    let (vertices, indices, bind_palette) = rehydrate_asset_mesh(&Some(reference.to_string()));
+    let rebuilt = rehydrate_asset_mesh(&Some(reference.to_string()));
     crate::scene::MeshComponent {
         primitive_type: "Asset".to_string(),
         asset_ref: Some(reference.to_string()),
-        vertices,
-        indices,
-        bind_palette,
+        vertices: rebuilt.vertices,
+        indices: rebuilt.indices,
+        bind_palette: rebuilt.bind_palette,
+        skin: rebuilt.skin,
+        clips: rebuilt.clips,
+        pose_palette: Vec::new(),
         is_dirty: crate::scene::DirtyFlag::new(true),
     }
 }

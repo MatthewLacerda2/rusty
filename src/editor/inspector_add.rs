@@ -60,10 +60,9 @@ fn add_lighting_combat(ui: &mut egui::Ui, entity: &mut Entity) {
     if entity.animator.is_none() && ui.button("Animator Component").clicked() {
         entity.animator = Some(AnimatorComponent {
             current_clip: "Idle".to_string(),
-            time: 0.0,
             speed: 2.0,
             is_playing: true,
-            freeze: false,
+            ..Default::default()
         });
         ui.close_menu();
     }

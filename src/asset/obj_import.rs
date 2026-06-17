@@ -90,5 +90,6 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model) -> SubMesh {
         material: mesh.material_id,
         // `.obj` is static-mesh only: no skin/anim, ever.
         skin: None,
+        clips: Vec::new(),
     }
 }

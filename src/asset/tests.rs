@@ -82,6 +82,44 @@ fn gltf_imports_skin_and_bind_pose_palette() {
 }
 
 #[test]
+fn gltf_imports_named_animation_clip() {
+    use super::fixtures_anim::{animated_buffer, ANIMATED_GLTF};
+    let dir = std::env::temp_dir().join("rusty_anim_fixture");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("anim.bin"), animated_buffer()).unwrap();
+    let gltf_path = dir.join("model.gltf");
+    std::fs::write(&gltf_path, ANIMATED_GLTF).unwrap();
+
+    let asset = import_file(&gltf_path).unwrap();
+    let sub = asset.sub_mesh("Animated").unwrap();
+
+    // The clip imported, named, attached to the skinned sub-mesh, with one track per
+    // joint slot.
+    assert_eq!(sub.clips.len(), 1);
+    let clip = &sub.clips[0];
+    assert_eq!(clip.name, "Wave");
+    assert_eq!(clip.tracks.len(), 2);
+    // Duration is the latest key time.
+    assert!((clip.duration - 1.0).abs() < 1e-6);
+
+    // The channel targeting Joint0 (slot 0) populated its translation track; the
+    // keyframes are [0,1] s → [(0,0,0),(2,0,0)].
+    let t = &clip.tracks[0].translation;
+    assert_eq!(t.times, vec![0.0, 1.0]);
+    assert_eq!(t.values[1], glam::Vec3::new(2.0, 0.0, 0.0));
+    // Joint1 (slot 1) is never targeted: its tracks stay empty.
+    assert!(clip.tracks[1].is_empty());
+}
+
+#[test]
+fn obj_has_no_clips() {
+    let path = tmp("noskin_clips.obj");
+    std::fs::write(&path, TRIANGLE_OBJ).unwrap();
+    let sub = import_file(&path).unwrap().sub_meshes.remove(0);
+    assert!(sub.clips.is_empty());
+}
+
+#[test]
 fn obj_has_no_skin() {
     let path = tmp("noskin.obj");
     std::fs::write(&path, TRIANGLE_OBJ).unwrap();

@@ -16,13 +16,16 @@
 //! determinism-guarded sim trees (`app`/`scripting`/`physics`/`navigation`); a
 //! scene-load re-import is deterministic given the same file.
 
+pub mod anim_data;
+pub mod gltf_anim;
 pub mod gltf_import;
 pub mod gltf_skin;
 pub mod mesh_data;
 pub mod obj_import;
 pub mod sidecar;
 
-pub use mesh_data::{ImportedAsset, MaterialData, MeshVertex, SkinData, SubMesh};
+pub use anim_data::{AnimationClip, Interpolation, JointTrack, Track};
+pub use mesh_data::{ImportedAsset, JointTransform, MaterialData, MeshVertex, SkinData, SubMesh};
 pub use sidecar::{import_and_sync_sidecar, ImportSettings, MeshColliderKind};
 
 use std::path::Path;
@@ -129,5 +132,7 @@ pub fn import_sub_mesh(reference: &str) -> Result<SubMesh, ImportError> {
 
 #[cfg(test)]
 mod fixtures;
+#[cfg(test)]
+mod fixtures_anim;
 #[cfg(test)]
 mod tests;

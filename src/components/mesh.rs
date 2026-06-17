@@ -8,6 +8,7 @@
 //! immutably) and is sound to mark `Sync` because the whole engine runs on a
 //! single thread.
 
+use crate::asset::{AnimationClip, SkinData};
 use crate::render::mesh::Vertex;
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
@@ -63,7 +64,34 @@ pub struct MeshComponent {
     /// skin on scene load (#79); the renderer uploads it to the GPU bone buffer.
     #[serde(skip)]
     pub bind_palette: Vec<glam::Mat4>,
+    /// The imported skeleton for a skinned `"Asset"` mesh, used by the animation
+    /// runtime (#80) to pose the joints. `None` for static/primitive meshes.
+    /// Rehydrated from the source on load, never serialized (like `vertices`).
+    #[serde(skip)]
+    pub skin: Option<SkinData>,
+    /// The animation clips that drive this mesh's skeleton, keyed by name from the
+    /// source file (#80). Empty for unanimated/static meshes; rehydrated on load.
+    #[serde(skip)]
+    pub clips: Vec<AnimationClip>,
+    /// The currently *posed* bone palette, written each frame by the animation
+    /// system (#80) when a clip is driving this skeleton. Empty when no animation is
+    /// active; the renderer then falls back to `bind_palette` (the rest pose). Like
+    /// the bind palette it is runtime-only and never serialized.
+    #[serde(skip)]
+    pub pose_palette: Vec<glam::Mat4>,
     // For GPU rendering, we hold the loaded state or buffers in the renderer
     #[serde(skip)]
     pub is_dirty: DirtyFlag, // Set to true when mesh data changes to update GPU buffers
+}
+
+impl MeshComponent {
+    /// The bone palette the renderer should upload: the live posed palette when an
+    /// animation is driving the skeleton, otherwise the static bind pose.
+    pub fn active_palette(&self) -> &[glam::Mat4] {
+        if self.pose_palette.is_empty() {
+            &self.bind_palette
+        } else {
+            &self.pose_palette
+        }
+    }
 }

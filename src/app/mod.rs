@@ -18,6 +18,7 @@
 //! no longer reach through one opaque blob; the borrow checker now separates world
 //! from resources at the call boundary.
 
+pub mod animation;
 mod camera_sync;
 pub mod game;
 mod particles;

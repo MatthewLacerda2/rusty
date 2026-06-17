@@ -5,7 +5,8 @@
 //! The scene layer converts a `MeshVertex` into the render `Vertex` when it
 //! rehydrates a mesh, so the importer never depends on wgpu/egui/mlua.
 
-use glam::{Mat4, Vec3};
+use super::anim_data::AnimationClip;
+use glam::{Mat4, Quat, Vec3};
 
 /// One vertex of imported geometry: position, normal, a single UV channel and the
 /// optional skin binding. `joint_indices` index into the sub-mesh's [`SkinData`]
@@ -57,6 +58,21 @@ pub struct SkinData {
     /// Global (model-space) transform of each joint node at bind time, already
     /// expressed relative to the skinned mesh node so the palette is mesh-local.
     pub bind_global: Vec<Mat4>,
+    /// Local bind-pose transform (TRS) of each joint node, in joint order. This is
+    /// the rest pose the animation runtime (#80) overrides per channel before
+    /// re-composing the joint globals; untouched channels keep these defaults.
+    pub local_bind: Vec<JointTransform>,
+    /// Parent joint *slot* of each joint (the index into this skin's joint arrays),
+    /// or `None` for a joint whose parent is not itself a joint (a skeleton root).
+    /// Drives the hierarchy composition when posing.
+    pub parents: Vec<Option<usize>>,
+    /// glTF node index of each joint, in joint order — the key animation channels
+    /// target. Lets the clip importer map a channel's node onto a joint slot.
+    pub joint_nodes: Vec<usize>,
+    /// Inverse of the skinned mesh node's global bind transform. Left-multiplying a
+    /// posed joint global by this re-expresses the palette in mesh-local space, the
+    /// same convention `bind_global` already bakes in.
+    pub mesh_inverse: Mat4,
 }
 
 impl SkinData {
@@ -68,6 +84,32 @@ impl SkinData {
             .zip(self.inverse_bind.iter())
             .map(|(g, ib)| *g * *ib)
             .collect()
+    }
+}
+
+/// A joint's local transform as decomposed translation / rotation / scale — the
+/// form glTF animation channels address (separate T/R/S paths) and the form the
+/// keyframe sampler interpolates. Composes to a `Mat4` via [`JointTransform::matrix`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct JointTransform {
+    pub translation: Vec3,
+    pub rotation: Quat,
+    pub scale: Vec3,
+}
+
+impl Default for JointTransform {
+    fn default() -> Self {
+        Self {
+            translation: Vec3::ZERO,
+            rotation: Quat::IDENTITY,
+            scale: Vec3::ONE,
+        }
+    }
+}
+
+impl JointTransform {
+    pub fn matrix(&self) -> Mat4 {
+        Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.translation)
     }
 }
 
@@ -107,6 +149,10 @@ pub struct SubMesh {
     /// `None` for static meshes (every `.obj`, and any glTF mesh without a skin);
     /// the per-vertex bindings then stay at their unskinned identity default.
     pub skin: Option<SkinData>,
+    /// The animation clips that drive this sub-mesh's skeleton, in document order
+    /// (#80). Empty for a static mesh or a skinned mesh the source never animates;
+    /// each clip's tracks are keyed by the `skin`'s joint slots.
+    pub clips: Vec<AnimationClip>,
 }
 
 impl SubMesh {

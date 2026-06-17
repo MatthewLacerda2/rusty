@@ -45,13 +45,15 @@ PBR material params and texture maps on an entity's renderer.
 
 ## `Animator`
 
-Drive an entity's animation clips.
+Drive an entity's animation clips. Clips are imported from the entity's skinned
+glTF mesh (its `animations`); the named `clip` selects one to play. A keyframe
+sampler poses the skeleton each fixed step, so playback is deterministic.
 
-| Function | Signature |
-|---|---|
-| `Animator.Play` | `(id, clip)` |
-| `Animator.Crossfade` | `(id, clip, duration)` |
-| `Animator.Stop` | `(id)` |
+| Function | Signature | Notes |
+|---|---|---|
+| `Animator.Play` | `(id, clip)` | Hard-cut to `clip` from its start. |
+| `Animator.Crossfade` | `(id, clip, duration)` | Blend out of the current clip over `duration` seconds (a zero/negative duration, or a fade into the current clip, degrades to `Play`). |
+| `Animator.Stop` | `(id)` | Halt playback (freezes the pose). |
 
 ## `Input`
 
