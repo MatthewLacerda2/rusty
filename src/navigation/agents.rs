@@ -61,8 +61,9 @@ impl NavigationGraph {
 
     /// Returns the world position the agent should steer toward this frame,
     /// using the cached path (re-planning only when invalid) and advancing the
-    /// cursor past any waypoints already reached. Y is taken from the agent so
-    /// horizontal steering matches the legacy `get_next_path_step` behaviour.
+    /// cursor past any waypoints already reached. Waypoints carry the baked surface
+    /// height (#130) so the goal follows ramps/stairs in `y`; the reached test stays
+    /// on the XZ plane so a height delta never strands the cursor on a waypoint.
     fn cached_next_step(&self, agent: &mut NavMeshAgentComponent, current_pos: Vec3) -> Vec3 {
         if self.path_cache_invalid(agent) {
             self.plan_agent_path(agent, current_pos);
@@ -79,7 +80,7 @@ impl NavigationGraph {
         }
         agent.frames_since_replan = agent.frames_since_replan.saturating_add(1);
         match agent.cached_path.get(agent.path_cursor) {
-            Some(wp) => Vec3::new(wp.x, current_pos.y, wp.z),
+            Some(wp) => *wp,
             None => agent.target,
         }
     }
@@ -122,7 +123,9 @@ impl NavigationGraph {
     }
 
     /// Accelerate the agent toward its next waypoint and return the new, slide-
-    /// constrained position (Y preserved). Mutates `agent.velocity` in place.
+    /// constrained position. Steering velocity is planar (XZ): horizontal speed is
+    /// unaffected by climbing, and the agent snaps to the baked surface height of
+    /// the cell it ends on (#130) — `y` follows ramps/stairs instead of preserved.
     fn steer_agent(
         &self,
         agent: &mut NavMeshAgentComponent,
@@ -132,19 +135,26 @@ impl NavigationGraph {
         // Query the next waypoint from the agent's cached path,
         // re-planning with A* only when the cache is invalid (#126).
         let next_step = self.cached_next_step(agent, current_pos);
-        let to_next_dir = (next_step - current_pos).normalize_or_zero();
+        // Steer on the XZ plane so a tall step doesn't inflate the move distance.
+        let mut to_next_dir = next_step - current_pos;
+        to_next_dir.y = 0.0;
+        let to_next_dir = to_next_dir.normalize_or_zero();
 
-        // Accelerate steering velocity
+        // Accelerate steering velocity (kept planar; y is snapped, not integrated).
         let desired_vel = to_next_dir * agent.speed;
         let diff_vel = desired_vel - agent.velocity;
         agent.velocity += diff_vel * (agent.acceleration * delta_time).min(1.0);
+        agent.velocity.y = 0.0;
 
+        let (cx, cz) = self.world_to_grid(current_pos);
         let mut final_pos = current_pos;
 
-        // Test X movement slide
+        // Test X movement slide: only step onto a cell reachable from the current
+        // one (walkable AND within the step/slope limit), so agents climb ramps and
+        // stairs but never slide up a wall face (#130).
         let proposed_pos_x = current_pos + Vec3::new(agent.velocity.x * delta_time, 0.0, 0.0);
         let (gx, gz) = self.world_to_grid(proposed_pos_x);
-        if self.is_walkable(gx, gz) {
+        if self.step_connected(cx, cz, gx, gz) {
             final_pos.x = proposed_pos_x.x;
         } else {
             agent.velocity.x = 0.0;
@@ -153,14 +163,15 @@ impl NavigationGraph {
         // Test Z movement slide
         let proposed_pos_z = final_pos + Vec3::new(0.0, 0.0, agent.velocity.z * delta_time);
         let (gx, gz) = self.world_to_grid(proposed_pos_z);
-        if self.is_walkable(gx, gz) {
+        if self.step_connected(cx, cz, gx, gz) {
             final_pos.z = proposed_pos_z.z;
         } else {
             agent.velocity.z = 0.0;
         }
 
-        // Preserve original Y position
-        final_pos.y = current_pos.y;
+        // Snap Y to the baked surface under the new XZ — the agent rides the ramp.
+        let (gx, gz) = self.world_to_grid(final_pos);
+        final_pos.y = self.height_at(gx, gz);
         final_pos
     }
 }
