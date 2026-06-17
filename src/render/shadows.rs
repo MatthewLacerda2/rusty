@@ -235,15 +235,16 @@ impl ShadowRenderer {
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         scene: &Scene,
-        gpu_meshes: &HashMap<u32, crate::render::GpuMesh>,
+        gpu_meshes: &HashMap<crate::render::MeshId, crate::render::GpuMesh>,
     ) {
         let mut render_resources = Vec::new();
         for entity in scene.iter() {
             if !entity.active || !entity.is_static {
                 continue;
             }
-            if entity.mesh.is_some() {
-                if let Some(gpu_mesh) = gpu_meshes.get(&entity.id) {
+            if let Some(mesh) = &entity.mesh {
+                let mesh_id = crate::render::MeshId::from_mesh(mesh);
+                if let Some(gpu_mesh) = gpu_meshes.get(&mesh_id) {
                     let model_matrix = scene.compute_world_matrix(entity.id);
                     let model_arr = model_matrix.to_cols_array();
                     let entity_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -261,7 +262,7 @@ impl ShadowRenderer {
                         }],
                     });
 
-                    render_resources.push((entity.id, bind_group, gpu_mesh.num_indices));
+                    render_resources.push((mesh_id, bind_group, gpu_mesh.num_indices));
                 }
             }
         }
@@ -307,7 +308,7 @@ impl ShadowRenderer {
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         scene: &Scene,
-        gpu_meshes: &HashMap<u32, crate::render::GpuMesh>,
+        gpu_meshes: &HashMap<crate::render::MeshId, crate::render::GpuMesh>,
     ) {
         let size = wgpu::Extent3d {
             width: Self::SHADOW_SIZE,
@@ -336,8 +337,9 @@ impl ShadowRenderer {
             if !entity.active || entity.is_static {
                 continue;
             }
-            if entity.mesh.is_some() {
-                if let Some(gpu_mesh) = gpu_meshes.get(&entity.id) {
+            if let Some(mesh) = &entity.mesh {
+                let mesh_id = crate::render::MeshId::from_mesh(mesh);
+                if let Some(gpu_mesh) = gpu_meshes.get(&mesh_id) {
                     let model_matrix = scene.compute_world_matrix(entity.id);
                     let model_arr = model_matrix.to_cols_array();
                     let entity_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -355,7 +357,7 @@ impl ShadowRenderer {
                         }],
                     });
 
-                    render_resources.push((entity.id, bind_group, gpu_mesh.num_indices));
+                    render_resources.push((mesh_id, bind_group, gpu_mesh.num_indices));
                 }
             }
         }

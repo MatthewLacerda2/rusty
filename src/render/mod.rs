@@ -116,6 +116,26 @@ pub struct GpuMesh {
     pub num_indices: u32,
 }
 
+/// Stable identity for a mesh's GPU geometry, derived from its *source*
+/// (`primitive_type` + `asset_ref`) rather than the entity referencing it (#127).
+/// Many entities sharing the same primitive or imported asset therefore map to a
+/// single `MeshId` and share one vertex/index buffer pair instead of allocating
+/// N copies. The string form keeps a future runtime-mutated mesh expressible with
+/// its own unique key (e.g. by entity id) without colliding with the shared ones.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct MeshId(pub String);
+
+impl MeshId {
+    /// Geometry key for a mesh component: `"<primitive_type>|<asset_ref>"`.
+    pub fn from_mesh(mesh: &crate::scene::MeshComponent) -> Self {
+        MeshId(format!(
+            "{}|{}",
+            mesh.primitive_type,
+            mesh.asset_ref.as_deref().unwrap_or("")
+        ))
+    }
+}
+
 // Stores GPU handlers for textures
 pub struct GpuTexture {
     pub texture: wgpu::Texture,
@@ -152,8 +172,9 @@ pub struct Renderer {
     depth_texture: wgpu::Texture,
     depth_view: wgpu::TextureView,
 
-    // Asset Cache mapping Entity IDs to GPU buffers
-    pub gpu_meshes: HashMap<u32, GpuMesh>,
+    // Asset cache keyed by mesh-asset identity (#127): identical geometry shared
+    // across entities resolves to one buffer pair, not one per entity.
+    pub gpu_meshes: HashMap<MeshId, GpuMesh>,
     pub gpu_textures: HashMap<String, Rc<GpuTexture>>,
     pub default_texture: Rc<GpuTexture>,
 
@@ -184,4 +205,47 @@ pub struct Renderer {
     /// Box-projector decal pass (draws into the HDR target after solids/skybox,
     /// reconstructing the underlying surface from the scene depth target).
     decal_renderer: decals::DecalRenderer,
+}
+
+#[cfg(test)]
+mod mesh_id_tests {
+    use super::MeshId;
+    use crate::scene::{DirtyFlag, MeshComponent};
+
+    fn mesh(primitive: &str, asset: Option<&str>) -> MeshComponent {
+        MeshComponent {
+            primitive_type: primitive.to_string(),
+            asset_ref: asset.map(String::from),
+            vertices: Vec::new(),
+            indices: Vec::new(),
+            bind_palette: Vec::new(),
+            is_dirty: DirtyFlag::new(false),
+        }
+    }
+
+    #[test]
+    fn identical_geometry_shares_one_id() {
+        // The key is the source, not the entity: two box meshes dedup to one
+        // buffer; two references to the same asset sub-object likewise.
+        assert_eq!(
+            MeshId::from_mesh(&mesh("Box", None)),
+            MeshId::from_mesh(&mesh("Box", None))
+        );
+        assert_eq!(
+            MeshId::from_mesh(&mesh("Asset", Some("models/crates.glb::Barrel"))),
+            MeshId::from_mesh(&mesh("Asset", Some("models/crates.glb::Barrel"))),
+        );
+    }
+
+    #[test]
+    fn distinct_geometry_gets_distinct_ids() {
+        assert_ne!(
+            MeshId::from_mesh(&mesh("Box", None)),
+            MeshId::from_mesh(&mesh("Sphere", None))
+        );
+        assert_ne!(
+            MeshId::from_mesh(&mesh("Asset", Some("models/crates.glb::Barrel"))),
+            MeshId::from_mesh(&mesh("Asset", Some("models/crates.glb::Crate"))),
+        );
+    }
 }

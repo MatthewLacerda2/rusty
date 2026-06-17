@@ -88,21 +88,8 @@ impl Renderer {
     /// Upload/refresh per-frame GPU assets (meshes, textures, skybox) shared by every
     /// camera in the stack. Borrow-splits cleanly before the render passes begin.
     fn upload_scene_assets(&mut self, scene: &Scene) {
-        let mut mesh_updates = Vec::new();
-        for entity in scene.iter() {
-            if !entity.active {
-                continue;
-            }
-            if let Some(mesh) = &entity.mesh {
-                if !self.gpu_meshes.contains_key(&entity.id) || mesh.is_dirty.get() {
-                    mesh_updates.push((entity.id, mesh.vertices.clone(), mesh.indices.clone()));
-                    mesh.is_dirty.set(false);
-                }
-            }
-        }
-        for (id, vertices, indices) in mesh_updates {
-            self.update_gpu_mesh(id, &vertices, &indices);
-        }
+        // Mesh upload + dedup-by-asset-identity lives next to `update_gpu_mesh`.
+        self.upload_scene_meshes(scene);
 
         let mut tex_paths = Vec::new();
         for entity in scene.iter() {
