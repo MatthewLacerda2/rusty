@@ -7,6 +7,7 @@ use std::rc::Rc;
 use crate::api::{self, ApiCtx};
 use crate::core::input::InputState;
 use crate::core::storage::Storage;
+use crate::core::video::VideoSettings;
 use crate::navigation::NavigationGraph;
 use crate::render::postfx::QualityPreset;
 use crate::render::Camera;
@@ -36,6 +37,11 @@ pub struct ScriptManager {
     /// the platform layer, which reads it each frame and hands it to
     /// `renderer.set_quality`; defaults to `Medium` (harness/tests need no GPU).
     pub(super) quality: Rc<RefCell<QualityPreset>>,
+    /// Runtime video settings (`Video.*`: resolution / vsync / fullscreen). Shared
+    /// with the platform layer, which reads it each frame and reconfigures the
+    /// surface + window; defaults to the windowed boot settings (harness needs no
+    /// window).
+    pub(super) video: Rc<RefCell<VideoSettings>>,
 }
 
 impl ScriptManager {
@@ -58,6 +64,7 @@ impl ScriptManager {
             time,
             storage: Rc::new(RefCell::new(Storage::new())),
             quality: Rc::new(RefCell::new(QualityPreset::default())),
+            video: Rc::new(RefCell::new(VideoSettings::default())),
         }
     }
 
@@ -78,6 +85,19 @@ impl ScriptManager {
     /// script-driven tier change and apply it to the renderer.
     pub fn quality_cell(&self) -> Rc<RefCell<QualityPreset>> {
         Rc::clone(&self.quality)
+    }
+
+    /// Inject the shared video-settings cell. The platform layer keeps this in sync
+    /// with the live surface/window, so `Video.*` writes from a script reach the
+    /// wgpu surface (resolution / present mode) and the winit window (fullscreen).
+    pub fn set_video_cell(&mut self, video: Rc<RefCell<VideoSettings>>) {
+        self.video = video;
+    }
+
+    /// Handle to the shared video-settings cell, so the platform layer can read a
+    /// script-driven resolution / vsync / fullscreen change and apply it.
+    pub fn video_cell(&self) -> Rc<RefCell<VideoSettings>> {
+        Rc::clone(&self.video)
     }
 
     /// Initializes a fresh Lua environment and registers all required namespaces.
@@ -119,6 +139,7 @@ impl ScriptManager {
             console: Rc::clone(&self.console),
             storage: Rc::clone(&self.storage),
             quality: Rc::clone(&self.quality),
+            video: Rc::clone(&self.video),
         };
         api::register(&lua, &ctx)?;
 

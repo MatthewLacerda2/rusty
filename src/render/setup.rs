@@ -47,28 +47,20 @@ impl Renderer {
             .await
             .map_err(|e| format!("failed to create a GPU device: {e}"))?;
 
-        // 4. Configure surface swapchain
+        // 4. Configure surface swapchain.
         let surface_caps = surface.get_capabilities(&adapter);
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .copied()
-            .find(|f| f.is_srgb())
-            .unwrap_or(surface_caps.formats[0]);
-
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width: size.width,
-            height: size.height,
-            present_mode: wgpu::PresentMode::Fifo,
-            alpha_mode: surface_caps.alpha_modes[0],
-            view_formats: vec![],
-            desired_maximum_frame_latency: 2,
-        };
+        let config = surface_config(&surface_caps, size);
         surface.configure(&device, &config);
 
-        Ok(Self::from_parts(device, queue, Some(surface), config, size))
+        let present_modes = surface_caps.present_modes.clone();
+        Ok(Self::from_parts(
+            device,
+            queue,
+            Some(surface),
+            config,
+            size,
+            present_modes,
+        ))
     }
 
     /// Shared constructor body: builds all pipelines, layouts, buffers and bind
@@ -81,6 +73,7 @@ impl Renderer {
         surface: Option<wgpu::Surface<'static>>,
         config: wgpu::SurfaceConfiguration,
         size: winit::dpi::PhysicalSize<u32>,
+        present_modes: Vec<wgpu::PresentMode>,
     ) -> Self {
         // All GPU resources (depth, layouts, buffers, bind groups, pipelines and
         // the auxiliary passes) are built up-front in `build_parts`; here we only
@@ -122,6 +115,7 @@ impl Renderer {
             shadow_bind_group: p.shadow_bind_group,
             post_fx: p.post_fx,
             quality: p.quality,
+            present_modes,
             particle_renderer: p.particle_renderer,
             decal_renderer: p.decal_renderer,
         };
@@ -129,5 +123,30 @@ impl Renderer {
         renderer.generate_grid_mesh();
         renderer.generate_axis_arrows();
         renderer
+    }
+}
+
+/// Build the swapchain config for a window of `size` from the surface caps: prefer
+/// an sRGB format, and boot with vsync on (`Fifo`, supported on every backend).
+/// Vsync is toggled later via [`Renderer::set_vsync`] (issue #89).
+fn surface_config(
+    caps: &wgpu::SurfaceCapabilities,
+    size: winit::dpi::PhysicalSize<u32>,
+) -> wgpu::SurfaceConfiguration {
+    let format = caps
+        .formats
+        .iter()
+        .copied()
+        .find(|f| f.is_srgb())
+        .unwrap_or(caps.formats[0]);
+    wgpu::SurfaceConfiguration {
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        format,
+        width: size.width,
+        height: size.height,
+        present_mode: wgpu::PresentMode::Fifo,
+        alpha_mode: caps.alpha_modes[0],
+        view_formats: vec![],
+        desired_maximum_frame_latency: 2,
     }
 }

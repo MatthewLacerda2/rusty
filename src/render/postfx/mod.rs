@@ -118,3 +118,44 @@ pub struct PostFx {
 
 /// HDR scene colour format — float so bright pixels survive for bloom/tonemap.
 pub const HDR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+
+#[cfg(test)]
+mod tests {
+    use super::QualityPreset;
+
+    /// `Renderer::set_quality` reallocates the bloom buffers only when the new tier
+    /// changes their resolution divisor. This pins the divisor-per-tier decision —
+    /// the GPU-free half of that reallocation — so a live preset switch resizes
+    /// correctly. (The actual texture realloc needs a device and can't run
+    /// headless; this asserts what reconfiguration each tier requests.)
+    #[test]
+    fn bloom_divisor_changes_with_tier() {
+        assert_eq!(QualityPreset::Low.bloom_divisor(), 4);
+        assert_eq!(QualityPreset::Medium.bloom_divisor(), 2);
+        assert_eq!(QualityPreset::High.bloom_divisor(), 2);
+
+        // Low<->Medium crosses a divisor boundary => a switch must realloc.
+        assert_ne!(
+            QualityPreset::Low.bloom_divisor(),
+            QualityPreset::Medium.bloom_divisor()
+        );
+        // Medium<->High keeps the same bloom size => realloc can be skipped.
+        assert_eq!(
+            QualityPreset::Medium.bloom_divisor(),
+            QualityPreset::High.bloom_divisor()
+        );
+    }
+
+    /// SSR is the High-tier-only pass; motion blur is off only on Low. A live
+    /// preset switch toggles these passes, so the gating decisions are pinned here.
+    #[test]
+    fn ssr_is_high_only_and_motion_blur_off_only_on_low() {
+        assert!(!QualityPreset::Low.screen_space_ssr());
+        assert!(!QualityPreset::Medium.screen_space_ssr());
+        assert!(QualityPreset::High.screen_space_ssr());
+
+        assert!(!QualityPreset::Low.motion_blur());
+        assert!(QualityPreset::Medium.motion_blur());
+        assert!(QualityPreset::High.motion_blur());
+    }
+}
