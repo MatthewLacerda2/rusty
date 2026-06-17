@@ -33,8 +33,10 @@ fn add_menu(ui: &mut egui::Ui, entity: &mut Entity) {
     add_render_components(ui, entity);
 }
 
-/// Add-menu entries for light, health (+ animator) and collider. Each entry is
-/// offered only when absent.
+/// Add-menu entries for light, health, animator and collider. Each entry is
+/// offered only when absent. Animator now has its own entry (#82) — it used to be
+/// created only as a side-effect of Health, which left it without an Add Component
+/// axis of its own.
 fn add_lighting_combat(ui: &mut egui::Ui, entity: &mut Entity) {
     if entity.light.is_none() && ui.button("Light Component").clicked() {
         entity.light = Some(LightComponent {
@@ -53,6 +55,9 @@ fn add_lighting_combat(ui: &mut egui::Ui, entity: &mut Entity) {
             max_health: 100.0,
             is_dead: false,
         });
+        ui.close_menu();
+    }
+    if entity.animator.is_none() && ui.button("Animator Component").clicked() {
         entity.animator = Some(AnimatorComponent {
             current_clip: "Idle".to_string(),
             time: 0.0,

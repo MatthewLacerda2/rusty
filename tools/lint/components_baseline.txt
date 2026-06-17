@@ -1,19 +1,15 @@
 # Components grandfathered past the 4-axis completeness gate (#81).
 # Format: `<component_field> <axis>` (axes: add_menu, inspector, api).
 # Burn-down only (#82) — remove a line when the axis is closed; never add one.
-# The particle system is deliberately NOT here: it is the first fully-green component.
 #
-# `api` here means "no namespace named after the component". Some of these are
-# partly served by a shared namespace (collider/rigidbody by Physics, nav_agent by
-# Nav, texture by Material); #82 decides per component whether to add a dedicated
-# namespace or waive the axis.
-mesh add_menu
-mesh api
-texture api
-script api
-animator add_menu
-light api
-collider api
-rigidbody api
-nav_agent api
-visual_correction api
+# EMPTY as of #82: every grandfathered gap is now either CLOSED (animator got its
+# own Add Component entry; `light` got a real `src/api/light.rs` namespace) or a
+# documented WAIVE in the gate itself (`WAIVERS` in tools/lint/src/components.rs)
+# for axes deliberately served by a shared namespace (texture->Material,
+# collider/rigidbody->Physics, nav_agent->NavMeshAgent, visual_correction->Graphics)
+# or a content-driven workflow (mesh add_menu / api). The stale `script api` line
+# was dropped — `scripts` is a `Vec`, never discovered by the gate.
+#
+# This is the burn-down list for axes we still intend to IMPLEMENT; it is empty.
+# Decisions to NOT implement an axis live in `WAIVERS`, where each carries its
+# written justification (auditable in git), so they are never silent skips.
