@@ -1,9 +1,12 @@
+# The CI `deny` job is a BLOCKING gate (no continue-on-error): a new RUSTSEC
+# advisory or a non-allow-listed license fails the build. Override only by adding
+# a reviewed, deliberate `ignore`/`allow` entry here — never by relaxing CI.
 [advisories]
 yanked = "warn"
 ignore = [
   # `paste` is unmaintained (archived upstream) but only reaches us transitively
   # via wgpu → wgpu-hal → metal; there is no safe upgrade and it is NOT a
-  # vulnerability. Real vulnerabilities still fail the (report-only) deny job.
+  # vulnerability. Real RUSTSEC vulnerabilities still fail the deny job.
   "RUSTSEC-2024-0436",
 ]
 
@@ -12,9 +15,20 @@ multiple-versions = "warn"
 wildcards = "allow"
 
 [licenses]
+# Explicit allow-list: a dependency under any other license fails CI. Add a
+# license here only as a reviewed, deliberate decision.
 allow = [
   "MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception",
   "BSD-2-Clause", "BSD-3-Clause", "ISC", "Zlib",
   "Unicode-DFS-2016", "Unicode-3.0", "MPL-2.0", "CC0-1.0",
+  # Boost Software License — permissive, OSI-approved. Reaches us via the winit
+  # clipboard path (clipboard-win, error-code).
+  "BSL-1.0",
+  # Permissive font licenses for the default fonts egui's `epaint` bundles
+  # (SIL Open Font License, Ubuntu Font License). They cover font assets, not code.
+  "OFL-1.1", "LicenseRef-UFL-1.0",
 ]
 confidence-threshold = 0.8
+# Skip our own unpublished crate (`publish = false`); it has no license field and
+# we never ship it to a registry. Dependencies are still fully gated.
+private = { ignore = true }
