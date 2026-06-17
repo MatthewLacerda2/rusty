@@ -12,8 +12,15 @@ use crate::editor::EditorUi;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
+/// A click on a content tile, resolved after the grid is drawn (so the borrow on
+/// `editor` is released before the action mutates it).
+enum TileAction {
+    Navigate(String),
+    Load(String, String),
+    Select(String),
+}
+
 /// Render the tile grid for the current folder and apply any click action.
-#[allow(clippy::too_many_lines)]
 pub fn draw(
     editor: &mut EditorUi,
     scene: &mut Scene,
@@ -21,10 +28,31 @@ pub fn draw(
     ui: &mut egui::Ui,
 ) {
     let dir = editor.current_dir.clone();
-    let Ok(read) = std::fs::read_dir(&dir) else {
+    let Some(entries) = read_entries(&dir) else {
         ui.colored_label(editor.theme.danger, "Failed to read directory.");
         return;
     };
+
+    let search = editor.asset_search.to_lowercase();
+    let t = editor.theme;
+    let selected = editor.selected_asset_path.clone();
+
+    let action = ui
+        .horizontal_wrapped(|ui| draw_grid(ui, t, &dir, &entries, &search, selected.as_deref()))
+        .inner;
+
+    match action {
+        Some(TileAction::Navigate(d)) => editor.current_dir = d,
+        Some(TileAction::Load(p, n)) => load_scene(editor, scene, console, &p, &n),
+        Some(TileAction::Select(p)) => select_asset(editor, p),
+        None => {}
+    }
+}
+
+/// Read the folder into `(path, is_dir)` pairs sorted folders-first, then
+/// alphabetically. Returns `None` if the directory can't be read.
+fn read_entries(dir: &str) -> Option<Vec<(String, bool)>> {
+    let read = std::fs::read_dir(dir).ok()?;
     let mut entries: Vec<(String, bool)> = read
         .flatten()
         .map(|e| {
@@ -32,69 +60,67 @@ pub fn draw(
             (p.to_string_lossy().replace('\\', "/"), p.is_dir())
         })
         .collect();
-    // Folders first, then alphabetical.
     entries.sort_by(|a, b| b.1.cmp(&a.1).then(file_name(&a.0).cmp(&file_name(&b.0))));
+    Some(entries)
+}
 
-    let search = editor.asset_search.to_lowercase();
-    let t = editor.theme;
-    let selected = editor.selected_asset_path.clone();
-
-    let mut nav_to = None;
-    let mut select = None;
-    let mut load = None;
-    ui.horizontal_wrapped(|ui| {
-        if dir != ROOT {
-            if let Some(parent) = Path::new(&dir).parent() {
-                let up = tile(
-                    ui,
-                    t,
-                    "..",
-                    icon::ARROW_BEND_LEFT_UP,
-                    t.text_secondary,
-                    false,
-                );
-                if up.clicked() {
-                    nav_to = Some(parent.to_string_lossy().replace('\\', "/"));
-                }
+/// Draw the up-tile (when not at root) plus a tile per visible entry, returning
+/// the first click action triggered this frame (if any).
+fn draw_grid(
+    ui: &mut egui::Ui,
+    t: Theme,
+    dir: &str,
+    entries: &[(String, bool)],
+    search: &str,
+    selected: Option<&str>,
+) -> Option<TileAction> {
+    let mut action = None;
+    if dir != ROOT {
+        if let Some(parent) = Path::new(dir).parent() {
+            let up = tile(
+                ui,
+                t,
+                "..",
+                icon::ARROW_BEND_LEFT_UP,
+                t.text_secondary,
+                false,
+            );
+            if up.clicked() {
+                action = Some(TileAction::Navigate(
+                    parent.to_string_lossy().replace('\\', "/"),
+                ));
             }
         }
-        for (path, is_dir) in &entries {
-            let name = file_name(path);
-            if !search.is_empty() && !name.to_lowercase().contains(&search) {
-                continue;
-            }
-            let ext = extension(path);
-            let glyph = if *is_dir {
-                icon::FOLDER
-            } else {
-                type_glyph(&ext)
-            };
-            let color = if *is_dir {
-                t.text_secondary
-            } else {
-                t.asset_color(&ext)
-            };
-            let is_sel = selected.as_deref() == Some(path.as_str());
-            let resp = tile(ui, t, &name, glyph, color, is_sel);
-            if *is_dir {
-                if resp.clicked() {
-                    nav_to = Some(path.clone());
-                }
-            } else if ext == "scene" && resp.double_clicked() {
-                load = Some((path.clone(), name.clone()));
-            } else if resp.clicked() {
-                select = Some(path.clone());
-            }
-        }
-    });
-
-    if let Some(d) = nav_to {
-        editor.current_dir = d;
-    } else if let Some((p, n)) = load {
-        load_scene(editor, scene, console, &p, &n);
-    } else if let Some(p) = select {
-        select_asset(editor, p);
     }
+    for (path, is_dir) in entries {
+        let name = file_name(path);
+        if !search.is_empty() && !name.to_lowercase().contains(search) {
+            continue;
+        }
+        let ext = extension(path);
+        let glyph = if *is_dir {
+            icon::FOLDER
+        } else {
+            type_glyph(&ext)
+        };
+        let color = if *is_dir {
+            t.text_secondary
+        } else {
+            t.asset_color(&ext)
+        };
+        let is_sel = selected == Some(path.as_str());
+        let resp = tile(ui, t, &name, glyph, color, is_sel);
+        if *is_dir {
+            if resp.clicked() {
+                action = Some(TileAction::Navigate(path.clone()));
+            }
+        } else if ext == "scene" && resp.double_clicked() {
+            action = Some(TileAction::Load(path.clone(), name.clone()));
+        } else if resp.clicked() {
+            action = Some(TileAction::Select(path.clone()));
+        }
+    }
+    action
 }
 
 /// A single asset/folder tile: a type glyph over a (truncated) name. Returns a

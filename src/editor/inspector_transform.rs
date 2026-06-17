@@ -32,7 +32,6 @@ pub fn draw(
 }
 
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_lines)]
 fn draw_body(
     ui: &mut egui::Ui,
     entity: &mut Entity,
@@ -46,85 +45,9 @@ fn draw_body(
     let is_static = entity.is_static;
     let trans = &mut entity.transform;
 
-    let mut pos_changed = false;
-    let mut rot_changed = false;
-    let mut scl_changed = false;
-
-    ui.label("Position:");
-    ui.horizontal(|ui| {
-        ui.label("X");
-        pos_changed |= ui
-            .add(egui::DragValue::new(&mut trans.position.x).speed(0.1))
-            .changed();
-        ui.label("Y");
-        pos_changed |= ui
-            .add(egui::DragValue::new(&mut trans.position.y).speed(0.1))
-            .changed();
-        ui.label("Z");
-        pos_changed |= ui
-            .add(egui::DragValue::new(&mut trans.position.z).speed(0.1))
-            .changed();
-    });
-
-    ui.label("Rotation (Degrees):");
-    let mut euler = trans.euler_angles();
-    ui.horizontal(|ui| {
-        ui.label("X");
-        rot_changed |= ui
-            .add(
-                egui::DragValue::new(&mut euler.x)
-                    .speed(1.0)
-                    .clamp_range(-180.0..=180.0),
-            )
-            .changed();
-        ui.label("Y");
-        rot_changed |= ui
-            .add(
-                egui::DragValue::new(&mut euler.y)
-                    .speed(1.0)
-                    .clamp_range(-180.0..=180.0),
-            )
-            .changed();
-        ui.label("Z");
-        rot_changed |= ui
-            .add(
-                egui::DragValue::new(&mut euler.z)
-                    .speed(1.0)
-                    .clamp_range(-180.0..=180.0),
-            )
-            .changed();
-    });
-    if rot_changed {
-        trans.set_euler_angles(euler);
-    }
-
-    ui.label("Scale:");
-    ui.horizontal(|ui| {
-        ui.label("X");
-        scl_changed |= ui
-            .add(
-                egui::DragValue::new(&mut trans.scale.x)
-                    .speed(0.05)
-                    .clamp_range(0.01..=20.0),
-            )
-            .changed();
-        ui.label("Y");
-        scl_changed |= ui
-            .add(
-                egui::DragValue::new(&mut trans.scale.y)
-                    .speed(0.05)
-                    .clamp_range(0.01..=20.0),
-            )
-            .changed();
-        ui.label("Z");
-        scl_changed |= ui
-            .add(
-                egui::DragValue::new(&mut trans.scale.z)
-                    .speed(0.05)
-                    .clamp_range(0.01..=20.0),
-            )
-            .changed();
-    });
+    let pos_changed = draw_position(ui, trans);
+    let rot_changed = draw_rotation(ui, trans);
+    let scl_changed = draw_scale(ui, trans);
 
     if pos_changed || rot_changed || scl_changed {
         entity.update_collider(parent_mat);
@@ -134,7 +57,99 @@ fn draw_body(
         }
     }
 
-    // Integrated Parenting directly under Transform
+    draw_parent_selector(
+        ui,
+        selected_parent_name,
+        valid_parents,
+        pending_parent_change,
+    );
+}
+
+/// The Position row (x/y/z drag fields). Returns whether any axis changed.
+fn draw_position(ui: &mut egui::Ui, trans: &mut crate::components::TransformComponent) -> bool {
+    ui.label("Position:");
+    ui.horizontal(|ui| {
+        ui.label("X");
+        let mut c = ui
+            .add(egui::DragValue::new(&mut trans.position.x).speed(0.1))
+            .changed();
+        ui.label("Y");
+        c |= ui
+            .add(egui::DragValue::new(&mut trans.position.y).speed(0.1))
+            .changed();
+        ui.label("Z");
+        c |= ui
+            .add(egui::DragValue::new(&mut trans.position.z).speed(0.1))
+            .changed();
+        c
+    })
+    .inner
+}
+
+/// The Rotation row in degrees. Writes back the euler angles when changed and
+/// returns whether any axis changed.
+fn draw_rotation(ui: &mut egui::Ui, trans: &mut crate::components::TransformComponent) -> bool {
+    ui.label("Rotation (Degrees):");
+    let mut euler = trans.euler_angles();
+    let rot_changed = ui
+        .horizontal(|ui| {
+            ui.label("X");
+            let mut c = drag_angle(ui, &mut euler.x);
+            ui.label("Y");
+            c |= drag_angle(ui, &mut euler.y);
+            ui.label("Z");
+            c |= drag_angle(ui, &mut euler.z);
+            c
+        })
+        .inner;
+    if rot_changed {
+        trans.set_euler_angles(euler);
+    }
+    rot_changed
+}
+
+/// A single degree drag field clamped to [-180, 180]. Returns whether it changed.
+fn drag_angle(ui: &mut egui::Ui, value: &mut f32) -> bool {
+    ui.add(
+        egui::DragValue::new(value)
+            .speed(1.0)
+            .clamp_range(-180.0..=180.0),
+    )
+    .changed()
+}
+
+/// The Scale row (x/y/z drag fields). Returns whether any axis changed.
+fn draw_scale(ui: &mut egui::Ui, trans: &mut crate::components::TransformComponent) -> bool {
+    ui.label("Scale:");
+    ui.horizontal(|ui| {
+        ui.label("X");
+        let mut c = drag_scale(ui, &mut trans.scale.x);
+        ui.label("Y");
+        c |= drag_scale(ui, &mut trans.scale.y);
+        ui.label("Z");
+        c |= drag_scale(ui, &mut trans.scale.z);
+        c
+    })
+    .inner
+}
+
+/// A single scale drag field clamped to [0.01, 20]. Returns whether it changed.
+fn drag_scale(ui: &mut egui::Ui, value: &mut f32) -> bool {
+    ui.add(
+        egui::DragValue::new(value)
+            .speed(0.05)
+            .clamp_range(0.01..=20.0),
+    )
+    .changed()
+}
+
+/// The integrated parent-selection combo box directly under Transform.
+fn draw_parent_selector(
+    ui: &mut egui::Ui,
+    selected_parent_name: &str,
+    valid_parents: &[(u32, String)],
+    pending_parent_change: &mut Option<Option<u32>>,
+) {
     ui.add_space(5.0);
     ui.horizontal(|ui| {
         ui.label("Parent:");

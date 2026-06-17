@@ -86,7 +86,17 @@ fn draw_collapsed(ctx: &egui::Context, t: crate::editor::theme::Theme, open: &mu
         });
 }
 
-#[allow(clippy::too_many_lines)]
+/// Read-only context the inspector needs that borrows the whole `Scene`, gathered
+/// up front because the entity guard below borrows it mutably for the rest of the
+/// frame.
+struct InspectorContext {
+    layer_labels: Vec<String>,
+    named_layers: Vec<(u8, String)>,
+    parent_mat: Option<glam::Mat4>,
+    selected_parent_name: String,
+    valid_parents: Vec<(u32, String)>,
+}
+
 fn draw_entity_inspector(
     editor: &mut EditorUi,
     ui: &mut egui::Ui,
@@ -98,9 +108,58 @@ fn draw_entity_inspector(
     let mut pending_nav_bake = false;
     let mut layer_changed = false;
 
-    // The layer dropdown labels (one per registry slot). Collected up front because
-    // the entity guard below borrows the whole `Scene`, so `scene.layers` can't be
-    // read while it's alive.
+    let cx = gather_context(scene, selected_id);
+
+    if let Some(mut entity_guard) = scene.get_entity_mut(selected_id) {
+        let entity: &mut Entity = &mut entity_guard;
+        if entity.camera.is_none() && entity.visual_correction.is_some() {
+            entity.visual_correction = None;
+        }
+
+        draw_object_header(
+            ui,
+            editor.theme,
+            entity,
+            &cx.layer_labels,
+            &mut pending_nav_bake,
+            &mut layer_changed,
+        );
+
+        inspector_transform::draw(
+            ui,
+            entity,
+            cx.parent_mat,
+            &cx.selected_parent_name,
+            &cx.valid_parents,
+            &mut pending_parent_change,
+            &mut pending_nav_bake,
+            &mut editor.is_dirty,
+        );
+
+        draw_components(
+            ui,
+            entity,
+            &cx.named_layers,
+            &mut editor.is_dirty,
+            &mut pending_nav_bake,
+        );
+    }
+
+    if layer_changed {
+        editor.is_dirty = true;
+    }
+    if let Some(new_parent) = pending_parent_change {
+        let _ = scene.set_parent(selected_id, new_parent);
+    }
+    if pending_nav_bake {
+        nav.bake(scene);
+    }
+}
+
+/// Gather the read-only layer labels, parenting matrix/name, and valid-parent set
+/// for the selected entity (see [`InspectorContext`]).
+fn gather_context(scene: &Scene, selected_id: u32) -> InspectorContext {
+    // The layer dropdown labels (one per registry slot).
     let layer_labels: Vec<String> = (0..LAYER_COUNT)
         .map(|i| scene.layers.label(i as u8))
         .collect();
@@ -123,13 +182,22 @@ fn draw_entity_inspector(
         "None".to_string()
     };
 
-    let candidates: Vec<(u32, String)> = scene
+    InspectorContext {
+        layer_labels,
+        named_layers,
+        parent_mat,
+        selected_parent_name,
+        valid_parents: collect_valid_parents(scene, selected_id),
+    }
+}
+
+/// The entities that may be the selected entity's parent: everything except
+/// itself and its own descendants (which would create a cycle).
+fn collect_valid_parents(scene: &Scene, selected_id: u32) -> Vec<(u32, String)> {
+    scene
         .iter()
         .filter(|e| e.id != selected_id)
         .map(|e| (e.id, e.name.clone()))
-        .collect();
-    let valid_parents: Vec<(u32, String)> = candidates
-        .into_iter()
         .filter(|(id, _)| {
             let mut curr = *id;
             while let Some(ancestor) = scene.get_entity(curr).and_then(|x| x.parent_id) {
@@ -140,96 +208,84 @@ fn draw_entity_inspector(
             }
             true
         })
-        .collect();
+        .collect()
+}
 
-    if let Some(mut entity_guard) = scene.get_entity_mut(selected_id) {
-        let entity: &mut Entity = &mut entity_guard;
-        if entity.camera.is_none() && entity.visual_correction.is_some() {
-            entity.visual_correction = None;
-        }
-
-        // Unity-style object header: name + active/static toggles, on a raised card.
-        let t = editor.theme;
-        egui::Frame::none()
-            .fill(t.bg_tier2)
-            .inner_margin(t.space_sm)
-            .rounding(4.0)
-            .stroke(egui::Stroke::new(1.0, t.border))
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.colored_label(t.text_secondary, icon::CUBE_FOCUS);
-                    ui.add(
-                        egui::TextEdit::singleline(&mut entity.name).desired_width(f32::INFINITY),
-                    );
-                });
-                ui.horizontal(|ui| {
-                    ui.checkbox(&mut entity.active, "Active");
-                    if ui
-                        .checkbox(&mut entity.is_static, "Static")
-                        .on_hover_text("Blocks the navmesh")
-                        .changed()
-                    {
-                        pending_nav_bake = true;
-                    }
-                });
-                ui.horizontal(|ui| {
-                    ui.label("Layer:");
-                    let selected = layer_labels
-                        .get(entity.layer as usize)
-                        .cloned()
-                        .unwrap_or_default();
-                    egui::ComboBox::from_id_source("entity_layer")
-                        .selected_text(selected)
-                        .show_ui(ui, |ui| {
-                            for (i, label) in layer_labels.iter().enumerate() {
-                                if ui
-                                    .selectable_value(&mut entity.layer, i as u8, label)
-                                    .clicked()
-                                {
-                                    layer_changed = true;
-                                }
-                            }
-                        });
-                });
+/// The Unity-style object header card: name + active/static toggles + layer combo.
+fn draw_object_header(
+    ui: &mut egui::Ui,
+    t: crate::editor::theme::Theme,
+    entity: &mut Entity,
+    layer_labels: &[String],
+    pending_nav_bake: &mut bool,
+    layer_changed: &mut bool,
+) {
+    egui::Frame::none()
+        .fill(t.bg_tier2)
+        .inner_margin(t.space_sm)
+        .rounding(4.0)
+        .stroke(egui::Stroke::new(1.0, t.border))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.colored_label(t.text_secondary, icon::CUBE_FOCUS);
+                ui.add(egui::TextEdit::singleline(&mut entity.name).desired_width(f32::INFINITY));
             });
-        ui.add_space(t.space_xs);
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut entity.active, "Active");
+                if ui
+                    .checkbox(&mut entity.is_static, "Static")
+                    .on_hover_text("Blocks the navmesh")
+                    .changed()
+                {
+                    *pending_nav_bake = true;
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Layer:");
+                let selected = layer_labels
+                    .get(entity.layer as usize)
+                    .cloned()
+                    .unwrap_or_default();
+                egui::ComboBox::from_id_source("entity_layer")
+                    .selected_text(selected)
+                    .show_ui(ui, |ui| {
+                        for (i, label) in layer_labels.iter().enumerate() {
+                            if ui
+                                .selectable_value(&mut entity.layer, i as u8, label)
+                                .clicked()
+                            {
+                                *layer_changed = true;
+                            }
+                        }
+                    });
+            });
+        });
+    ui.add_space(t.space_xs);
+}
 
-        inspector_transform::draw(
-            ui,
-            entity,
-            parent_mat,
-            &selected_parent_name,
-            &valid_parents,
-            &mut pending_parent_change,
-            &mut pending_nav_bake,
-            &mut editor.is_dirty,
-        );
+/// The per-component card chain (mesh, material, light, gameplay, camera, …) plus
+/// the Add Component menu, in the canonical inspector order.
+fn draw_components(
+    ui: &mut egui::Ui,
+    entity: &mut Entity,
+    named_layers: &[(u8, String)],
+    is_dirty: &mut bool,
+    pending_nav_bake: &mut bool,
+) {
+    inspector_render::draw_mesh(ui, entity, is_dirty);
+    inspector_render::draw_texture(ui, entity, is_dirty);
+    inspector_render::draw_light(ui, entity, is_dirty);
 
-        inspector_render::draw_mesh(ui, entity, &mut editor.is_dirty);
-        inspector_render::draw_texture(ui, entity, &mut editor.is_dirty);
-        inspector_render::draw_light(ui, entity, &mut editor.is_dirty);
+    inspector_gameplay::draw_script(ui, entity, is_dirty);
+    inspector_gameplay::draw_health(ui, entity, is_dirty);
+    inspector_gameplay::draw_collider(ui, entity, is_dirty, pending_nav_bake);
+    inspector_gameplay::draw_rigidbody(ui, entity, is_dirty);
+    inspector_gameplay::draw_nav_agent(ui, entity, is_dirty);
 
-        inspector_gameplay::draw_script(ui, entity, &mut editor.is_dirty);
-        inspector_gameplay::draw_health(ui, entity, &mut editor.is_dirty);
-        inspector_gameplay::draw_collider(ui, entity, &mut editor.is_dirty, &mut pending_nav_bake);
-        inspector_gameplay::draw_rigidbody(ui, entity, &mut editor.is_dirty);
-        inspector_gameplay::draw_nav_agent(ui, entity, &mut editor.is_dirty);
+    inspector_camera::draw_camera(ui, entity, named_layers, is_dirty);
+    inspector_camera::draw_visual_correction(ui, entity, is_dirty);
 
-        inspector_camera::draw_camera(ui, entity, &named_layers, &mut editor.is_dirty);
-        inspector_camera::draw_visual_correction(ui, entity, &mut editor.is_dirty);
+    inspector_particles::draw(ui, entity, is_dirty);
 
-        inspector_particles::draw(ui, entity, &mut editor.is_dirty);
-
-        inspector_add::draw(ui, entity);
-    }
-
-    if layer_changed {
-        editor.is_dirty = true;
-    }
-    if let Some(new_parent) = pending_parent_change {
-        let _ = scene.set_parent(selected_id, new_parent);
-    }
-    if pending_nav_bake {
-        nav.bake(scene);
-    }
+    inspector_add::draw(ui, entity);
 }
