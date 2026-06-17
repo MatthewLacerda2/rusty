@@ -3,7 +3,6 @@ use std::fs;
 use std::path::Path;
 use std::time::Instant;
 
-#[allow(clippy::too_many_lines)]
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, path: &str) {
     let filename = Path::new(path)
         .file_name()
@@ -13,7 +12,21 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, path: &str) {
     ui.heading(format!("🎵 Audio: {}", filename));
     ui.add_space(5.0);
 
-    // File metadata card
+    draw_metadata_card(ui, path);
+    ui.add_space(10.0);
+    ui.separator();
+    ui.add_space(5.0);
+
+    draw_clip_settings(ui, editor);
+    ui.add_space(15.0);
+    ui.separator();
+    ui.add_space(5.0);
+
+    draw_simulated_playback(ui, editor);
+}
+
+/// File metadata card: path, on-disk size, and asset type.
+fn draw_metadata_card(ui: &mut egui::Ui, path: &str) {
     egui::Frame::none()
         .fill(crate::editor::theme::from_ui(ui).bg_tier2)
         .inner_margin(8.0)
@@ -30,11 +43,10 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, path: &str) {
                 ui.label("Type: Audio Clip");
             });
         });
-    ui.add_space(10.0);
-    ui.separator();
-    ui.add_space(5.0);
+}
 
-    // Audio Import / Source settings
+/// Audio clip source settings: volume, pitch, and looping.
+fn draw_clip_settings(ui: &mut egui::Ui, editor: &mut EditorUi) {
     ui.heading("Audio Clip Settings");
     ui.add_space(5.0);
 
@@ -49,11 +61,11 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, path: &str) {
     });
 
     ui.checkbox(&mut editor.asset_audio_loop, "Loop Playback");
-    ui.add_space(15.0);
-    ui.separator();
-    ui.add_space(5.0);
+}
 
-    // Live Playback Simulation
+/// Mock playback transport: play/pause/stop and a progress bar driven by a
+/// fixed 30-second clip length.
+fn draw_simulated_playback(ui: &mut egui::Ui, editor: &mut EditorUi) {
     ui.heading("Simulated Playback");
     ui.add_space(5.0);
 

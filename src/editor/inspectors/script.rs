@@ -4,7 +4,6 @@ use crate::scripting::ConsoleLogs;
 use std::fs;
 use std::path::Path;
 
-#[allow(clippy::too_many_lines)]
 pub fn draw(
     ui: &mut egui::Ui,
     editor: &mut EditorUi,
@@ -20,7 +19,21 @@ pub fn draw(
     ui.heading(format!("📄 Script: {}", filename));
     ui.add_space(5.0);
 
-    // File metadata card
+    draw_metadata_card(ui, path);
+    ui.add_space(10.0);
+    ui.separator();
+    ui.add_space(5.0);
+
+    draw_code_editor(ui, editor, console, path, filename);
+    ui.add_space(15.0);
+    ui.separator();
+    ui.add_space(5.0);
+
+    draw_attach_to_entity(ui, editor, scene, console, path, filename);
+}
+
+/// File metadata card: path, on-disk size, and asset type.
+fn draw_metadata_card(ui: &mut egui::Ui, path: &str) {
     egui::Frame::none()
         .fill(crate::editor::theme::from_ui(ui).bg_tier2)
         .inner_margin(8.0)
@@ -37,11 +50,17 @@ pub fn draw(
                 ui.label("Type: Lua Script");
             });
         });
-    ui.add_space(10.0);
-    ui.separator();
-    ui.add_space(5.0);
+}
 
-    // Live Script Editor
+/// Live script editor: an editable text area plus a button that writes the
+/// buffer back to disk.
+fn draw_code_editor(
+    ui: &mut egui::Ui,
+    editor: &mut EditorUi,
+    console: &mut ConsoleLogs,
+    path: &str,
+    filename: &str,
+) {
     ui.heading("📝 Script Code Editor");
     ui.add_space(5.0);
 
@@ -72,12 +91,18 @@ pub fn draw(
             }
         }
     }
+}
 
-    ui.add_space(15.0);
-    ui.separator();
-    ui.add_space(5.0);
-
-    // Attach to Scene Entity
+/// Entity picker that appends this script as a new `ScriptComponent` on the
+/// chosen scene entity (#83: many scripts per entity).
+fn draw_attach_to_entity(
+    ui: &mut egui::Ui,
+    editor: &mut EditorUi,
+    scene: &mut Scene,
+    console: &mut ConsoleLogs,
+    path: &str,
+    filename: &str,
+) {
     ui.heading("Attach to Scene Entity");
     ui.add_space(5.0);
 
@@ -86,36 +111,37 @@ pub fn draw(
             egui::Color32::GRAY,
             "No entities in scene to attach script to.",
         );
-    } else {
-        ui.label("Select an entity to attach this script:");
-        let selected_ent_name = "Select Entity...".to_string();
+        return;
+    }
 
-        let mut clicked_entity_id = None;
-        let mut clicked_entity_name = String::new();
-        egui::ComboBox::from_id_source("AttachScriptToEntity")
-            .selected_text(selected_ent_name)
-            .show_ui(ui, |ui| {
-                for entity in scene.iter() {
-                    if ui.selectable_label(false, &entity.name).clicked() {
-                        clicked_entity_id = Some(entity.id);
-                        clicked_entity_name = entity.name.clone();
-                    }
+    ui.label("Select an entity to attach this script:");
+    let selected_ent_name = "Select Entity...".to_string();
+
+    let mut clicked_entity_id = None;
+    let mut clicked_entity_name = String::new();
+    egui::ComboBox::from_id_source("AttachScriptToEntity")
+        .selected_text(selected_ent_name)
+        .show_ui(ui, |ui| {
+            for entity in scene.iter() {
+                if ui.selectable_label(false, &entity.name).clicked() {
+                    clicked_entity_id = Some(entity.id);
+                    clicked_entity_name = entity.name.clone();
                 }
-            });
-
-        if let Some(entity_id) = clicked_entity_id {
-            if let Some(mut ent) = scene.get_entity_mut(entity_id) {
-                // An entity can hold many scripts (#83); append rather than replace.
-                ent.scripts.push(ScriptComponent {
-                    path: path.to_string(),
-                    is_loaded: false,
-                });
-                editor.is_dirty = true;
-                console.info(format!(
-                    "Attached script {} to {}",
-                    filename, clicked_entity_name
-                ));
             }
+        });
+
+    if let Some(entity_id) = clicked_entity_id {
+        if let Some(mut ent) = scene.get_entity_mut(entity_id) {
+            // An entity can hold many scripts (#83); append rather than replace.
+            ent.scripts.push(ScriptComponent {
+                path: path.to_string(),
+                is_loaded: false,
+            });
+            editor.is_dirty = true;
+            console.info(format!(
+                "Attached script {} to {}",
+                filename, clicked_entity_name
+            ));
         }
     }
 }

@@ -3,7 +3,6 @@ use crate::scene::{Scene, TextureComponent};
 use std::fs;
 use std::path::Path;
 
-#[allow(clippy::too_many_lines)]
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     let filename = Path::new(path)
         .file_name()
@@ -13,7 +12,21 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     ui.heading(format!("🖼️ Image: {}", filename));
     ui.add_space(5.0);
 
-    // File metadata card
+    draw_metadata_card(ui, path);
+    ui.add_space(10.0);
+    ui.separator();
+    ui.add_space(5.0);
+
+    draw_import_settings(ui, editor);
+    ui.add_space(15.0);
+    ui.separator();
+    ui.add_space(5.0);
+
+    draw_apply_to_entity(ui, editor, scene, path);
+}
+
+/// File metadata card: path, on-disk size, and asset type.
+fn draw_metadata_card(ui: &mut egui::Ui, path: &str) {
     egui::Frame::none()
         .fill(crate::editor::theme::from_ui(ui).bg_tier2)
         .inner_margin(8.0)
@@ -30,11 +43,10 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
                 ui.label("Type: Texture Asset");
             });
         });
-    ui.add_space(10.0);
-    ui.separator();
-    ui.add_space(5.0);
+}
 
-    // Import settings
+/// Texture import settings: wrap mode, filter mode, and mipmap generation.
+fn draw_import_settings(ui: &mut egui::Ui, editor: &mut EditorUi) {
     ui.heading("Texture Import Settings");
     ui.add_space(5.0);
 
@@ -72,11 +84,10 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     });
 
     ui.checkbox(&mut editor.asset_image_mipmaps, "Generate Mipmaps");
-    ui.add_space(15.0);
-    ui.separator();
-    ui.add_space(5.0);
+}
 
-    // Apply to Scene Entity
+/// Entity picker that applies this texture to the chosen scene entity.
+fn draw_apply_to_entity(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     ui.heading("Apply to Scene Entity");
     ui.add_space(5.0);
 
@@ -85,34 +96,35 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
             egui::Color32::GRAY,
             "No entities in scene to apply texture to.",
         );
-    } else {
-        ui.label("Choose an entity to apply this texture:");
-        let selected_ent_name = "Select Entity...".to_string();
+        return;
+    }
 
-        let mut clicked_entity_id = None;
-        egui::ComboBox::from_id_source("ApplyTextureToEntity")
-            .selected_text(selected_ent_name)
-            .show_ui(ui, |ui| {
-                for entity in scene.iter() {
-                    if ui.selectable_label(false, &entity.name).clicked() {
-                        clicked_entity_id = Some(entity.id);
-                    }
+    ui.label("Choose an entity to apply this texture:");
+    let selected_ent_name = "Select Entity...".to_string();
+
+    let mut clicked_entity_id = None;
+    egui::ComboBox::from_id_source("ApplyTextureToEntity")
+        .selected_text(selected_ent_name)
+        .show_ui(ui, |ui| {
+            for entity in scene.iter() {
+                if ui.selectable_label(false, &entity.name).clicked() {
+                    clicked_entity_id = Some(entity.id);
                 }
-            });
-
-        if let Some(entity_id) = clicked_entity_id {
-            if let Some(mut ent) = scene.get_entity_mut(entity_id) {
-                ent.texture = Some(TextureComponent {
-                    path: path.to_string(),
-                    is_dirty: true,
-                    metallic: 0.0,
-                    roughness: 0.5,
-                    metallic_map: None,
-                    roughness_map: None,
-                    color: [1.0, 1.0, 1.0],
-                });
-                editor.is_dirty = true;
             }
+        });
+
+    if let Some(entity_id) = clicked_entity_id {
+        if let Some(mut ent) = scene.get_entity_mut(entity_id) {
+            ent.texture = Some(TextureComponent {
+                path: path.to_string(),
+                is_dirty: true,
+                metallic: 0.0,
+                roughness: 0.5,
+                metallic_map: None,
+                roughness_map: None,
+                color: [1.0, 1.0, 1.0],
+            });
+            editor.is_dirty = true;
         }
     }
 }
