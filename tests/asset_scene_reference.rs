@@ -47,10 +47,15 @@ fn asset_mesh_reference_rehydrates_on_load() {
     let path = tmp("rusty_asset_ref.scene");
     scene.save_to_file(path.to_str().unwrap()).unwrap();
 
-    // The on-disk document stores the REFERENCE, never the vertices.
+    // The on-disk document stores the REFERENCE, never the vertices. Compare
+    // against the JSON-ENCODED reference: serde escapes backslashes, so a Windows
+    // path's raw string is not a substring of the serialized document (on Linux,
+    // with `/` separators, it happens to be). `to_string` yields the quoted,
+    // escaped form exactly as it appears in the document.
     let json = std::fs::read_to_string(&path).unwrap();
+    let encoded_reference = serde_json::to_string(&reference).unwrap();
     assert!(json.contains("\"primitive_type\": \"Asset\""));
-    assert!(json.contains(&reference));
+    assert!(json.contains(&encoded_reference));
     assert!(!json.contains("\"vertices\""));
 
     // Loading re-imports the file and rebuilds the geometry from the reference.
