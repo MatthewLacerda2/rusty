@@ -105,9 +105,24 @@ impl NavigationGraph {
                 let obstacle_min_z = min.z - pad;
                 let obstacle_max_z = max.z + pad;
 
+                // Only the cells under this collider's padded AABB can flip to
+                // blocked, so iterate just that sub-rectangle instead of the whole
+                // grid. Map the corners through `world_to_grid` (clamped), then
+                // widen by one cell so its rounding can't drop a boundary cell.
+                // The per-cell containment test below keeps the result byte-identical
+                // to a full-grid scan — we only skip cells we know would fail it.
+                let (gx_min, gz_min) =
+                    self.world_to_grid(Vec3::new(obstacle_min_x, 0.0, obstacle_min_z));
+                let (gx_max, gz_max) =
+                    self.world_to_grid(Vec3::new(obstacle_max_x, 0.0, obstacle_max_z));
+                let gx0 = (gx_min - 1).max(0);
+                let gz0 = (gz_min - 1).max(0);
+                let gx1 = (gx_max + 1).min(self.width - 1);
+                let gz1 = (gz_max + 1).min(self.height - 1);
+
                 // Mark grid nodes inside the AABB as blocked
-                for gz in 0..self.height {
-                    for gx in 0..self.width {
+                for gz in gz0..=gz1 {
+                    for gx in gx0..=gx1 {
                         let w_pos = self.grid_to_world(gx, gz);
                         if w_pos.x >= obstacle_min_x
                             && w_pos.x <= obstacle_max_x
@@ -376,5 +391,66 @@ impl NavigationGraph {
                 entity.update_collider(None);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scene::{ColliderComponent, ColliderShape, Scene};
+
+    /// Builds an 11x11 grid (0..=10 on each axis, spacing 1.0) with a single
+    /// static box collider spanning world [3,5]x[3,5]. With the 0.5 pad the
+    /// blocked footprint is exactly the 3x3 block of cells {3,4,5}x{3,4,5}.
+    fn baked_scene() -> NavigationGraph {
+        let mut scene = Scene::new();
+        let id = scene.add_entity("obstacle".to_string());
+        {
+            let mut e = scene.get_entity_mut(id).expect("entity exists");
+            e.is_static = true;
+            e.collider = Some(ColliderComponent {
+                active: true,
+                shape: ColliderShape::Box {
+                    size: Vec3::new(2.0, 1.0, 2.0),
+                },
+                is_trigger: false,
+                aabb_min: Vec3::new(3.0, 0.0, 3.0),
+                aabb_max: Vec3::new(5.0, 0.0, 5.0),
+            });
+        }
+        let mut graph = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
+        graph.bake(&scene);
+        graph
+    }
+
+    #[test]
+    fn bake_blocks_exactly_the_obstacle_footprint() {
+        let graph = baked_scene();
+
+        // Every cell in {3,4,5}x{3,4,5} is blocked; nothing outside is.
+        let blocked: Vec<(i32, i32)> = (0..graph.height)
+            .flat_map(|gz| (0..graph.width).map(move |gx| (gx, gz)))
+            .filter(|&(gx, gz)| !graph.is_walkable(gx, gz))
+            .collect();
+
+        let mut expected: Vec<(i32, i32)> = Vec::new();
+        for gz in 3..=5 {
+            for gx in 3..=5 {
+                expected.push((gx, gz));
+            }
+        }
+        assert_eq!(blocked, expected, "only the padded AABB footprint blocks");
+    }
+
+    #[test]
+    fn bake_leaves_cells_just_outside_the_footprint_walkable() {
+        let graph = baked_scene();
+        // One cell outside the padded AABB on each side stays walkable.
+        assert!(graph.is_walkable(2, 4));
+        assert!(graph.is_walkable(6, 4));
+        assert!(graph.is_walkable(4, 2));
+        assert!(graph.is_walkable(4, 6));
+        // Interior of the obstacle is blocked.
+        assert!(!graph.is_walkable(4, 4));
     }
 }
