@@ -8,7 +8,7 @@ result is written to `.lint/report.txt` so an agent can read exactly what failed
 |---|---|---|
 | Style | rustfmt (`rustfmt.toml`) | `cargo fmt --check` |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (both feature sets) |
-| Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), enforced via `-D clippy::too_many_lines`; legacy functions grandfathered with inline `#[allow]` |
+| Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), enforced crate-wide via `-D clippy::too_many_lines`; no grandfathered functions remain |
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines |
 | Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation` |
@@ -44,15 +44,14 @@ that baseline — it is the gate's first fully-green component.
 
 ## The function-length cap (`too_many_lines`)
 The 50-line per-function cap is a **hard clippy gate** (`-D clippy::too_many_lines`,
-both feature sets). The functions that predate the cap are grandfathered with an
-inline `#[allow(clippy::too_many_lines)]` on each one. That attribute **is** the
-burn-down list — count it with:
+both feature sets) and is now **unconditionally on for the whole crate** — the legacy
+functions that predated it have all been split (#124), so **no
+`#[allow(clippy::too_many_lines)]` remain anywhere in `src/`**. Verify with:
 ```
-rg -c 'allow\(clippy::too_many_lines\)' src
+rg -c 'allow\(clippy::too_many_lines\)' src   # expect no output
 ```
-Same rule as the size baseline: as you split a grandfathered function under 50 lines,
-delete its `#[allow]`; **never add a new one**. When none remain, the cap is
-unconditionally on for the whole crate.
+Keep it that way: if a function grows past 50 lines, split it — **do not** silence the
+lint with a new `#[allow]`.
 
 ## Clippy: CI vs local
 Clippy lints the whole crate (it can't be scoped to changed files). In **CI** it's a

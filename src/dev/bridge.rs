@@ -32,10 +32,16 @@ pub fn register(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     Ok(())
 }
 
-#[allow(clippy::too_many_lines)]
 fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     let t = lua.create_table()?;
+    register_harness_stepping(lua, harness, &t)?;
+    register_harness_reporting(lua, harness, &t)?;
+    register_harness_actions(lua, harness, &t)?;
+    lua.globals().set("Harness", t)
+}
 
+/// Step / StepUntil — advance the headless world by fixed-dt ticks.
+fn register_harness_stepping(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaResult<()> {
     let world = world_of(harness);
     t.set(
         "Step",
@@ -63,8 +69,11 @@ fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
             }
             Ok(false)
         })?,
-    )?;
+    )
+}
 
+/// Snapshot / Log / Expect / Frame — observe and assert against the run.
+fn register_harness_reporting(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaResult<()> {
     // Snapshot is returned as a pretty JSON string — the agent reads it from
     // results.json anyway; in-scenario it is handy for logging a checkpoint.
     let h = Rc::clone(harness);
@@ -98,8 +107,11 @@ fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     t.set(
         "Frame",
         lua.create_function(move |_, ()| Ok(h.borrow().frame()))?,
-    )?;
+    )
+}
 
+/// Screenshot / AttachPlayerBot — side-effecting harness actions.
+fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaResult<()> {
     // Screenshot(path) -> bool. Renders the current scene/camera offscreen to a
     // PNG. Returns false (no error) when no GPU/software adapter is available.
     let h = Rc::clone(harness);
@@ -120,13 +132,18 @@ fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
             let attached = super::botplayer::attach_player_bot(&mut w.scene().borrow_mut(), &path);
             Ok(attached)
         })?,
-    )?;
-
-    lua.globals().set("Harness", t)
+    )
 }
 
-#[allow(clippy::too_many_lines)]
 fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
+    register_scene_lookup(lua, harness)?;
+    register_scene_transform(lua, harness)?;
+    register_scene_health(lua, harness)?;
+    register_scene_animator(lua, harness)
+}
+
+/// Scene.FindEntityByName — name -> entity id.
+fn register_scene_lookup(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     let scene_t = lua.create_table()?;
     let world = world_of(harness);
     scene_t.set(
@@ -135,8 +152,11 @@ fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
             Ok(world.borrow().scene().borrow().find_entity_by_name(&name))
         })?,
     )?;
-    lua.globals().set("Scene", scene_t)?;
+    lua.globals().set("Scene", scene_t)
+}
 
+/// Transform.GetPosition — entity id -> world position tuple.
+fn register_scene_transform(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     let transform_t = lua.create_table()?;
     let world = world_of(harness);
     transform_t.set(
@@ -151,8 +171,11 @@ fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
             Ok((p.x, p.y, p.z))
         })?,
     )?;
-    lua.globals().set("Transform", transform_t)?;
+    lua.globals().set("Transform", transform_t)
+}
 
+/// Health.Get — entity id -> current health.
+fn register_scene_health(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     let health_t = lua.create_table()?;
     let world = world_of(harness);
     health_t.set(
@@ -167,8 +190,11 @@ fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
             Ok(hp)
         })?,
     )?;
-    lua.globals().set("Health", health_t)?;
+    lua.globals().set("Health", health_t)
+}
 
+/// Animator.GetClip — entity id -> current clip name.
+fn register_scene_animator(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     let anim_t = lua.create_table()?;
     let world = world_of(harness);
     anim_t.set(

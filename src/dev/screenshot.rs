@@ -90,7 +90,6 @@ pub fn capture_world(
 /// `copy_texture_to_buffer` requires each row to be padded to a multiple of
 /// `COPY_BYTES_PER_ROW_ALIGNMENT` (256), so we copy into a padded buffer and then
 /// strip the padding back out.
-#[allow(clippy::too_many_lines)]
 fn copy_target_to_cpu(
     renderer: &Renderer,
     target: &wgpu::Texture,
@@ -108,6 +107,32 @@ fn copy_target_to_cpu(
         mapped_at_creation: false,
     });
 
+    copy_texture_into_buffer(
+        renderer,
+        target,
+        &buffer,
+        padded_bytes_per_row,
+        width,
+        height,
+    );
+    read_buffer_pixels(
+        renderer,
+        &buffer,
+        padded_bytes_per_row,
+        unpadded_bytes_per_row,
+        height,
+    )
+}
+
+/// Encode and submit the texture->buffer copy into the padded readback buffer.
+fn copy_texture_into_buffer(
+    renderer: &Renderer,
+    target: &wgpu::Texture,
+    buffer: &wgpu::Buffer,
+    padded_bytes_per_row: u32,
+    width: u32,
+    height: u32,
+) {
     let mut encoder = renderer
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -121,7 +146,7 @@ fn copy_target_to_cpu(
             aspect: wgpu::TextureAspect::All,
         },
         wgpu::ImageCopyBuffer {
-            buffer: &buffer,
+            buffer,
             layout: wgpu::ImageDataLayout {
                 offset: 0,
                 bytes_per_row: Some(padded_bytes_per_row),
@@ -135,7 +160,16 @@ fn copy_target_to_cpu(
         },
     );
     renderer.queue.submit(std::iter::once(encoder.finish()));
+}
 
+/// Map the readback buffer (blocking) and strip the per-row padding back out.
+fn read_buffer_pixels(
+    renderer: &Renderer,
+    buffer: &wgpu::Buffer,
+    padded_bytes_per_row: u32,
+    unpadded_bytes_per_row: u32,
+    height: u32,
+) -> Vec<u8> {
     // Map the buffer and block until the GPU signals completion.
     let slice = buffer.slice(..);
     let (tx, rx) = std::sync::mpsc::channel();

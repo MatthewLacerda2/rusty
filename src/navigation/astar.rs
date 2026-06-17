@@ -27,6 +27,21 @@ impl PartialOrd for NodeState {
     }
 }
 
+/// The mutable A* working set: the open priority queue plus the best-known
+/// g-scores and predecessor links keyed by grid cell.
+#[derive(Default)]
+struct Frontier {
+    open_set: BinaryHeap<NodeState>,
+    g_score: HashMap<(i32, i32), f32>,
+    came_from: HashMap<(i32, i32), (i32, i32)>,
+}
+
+impl Frontier {
+    fn g_of(&self, key: (i32, i32)) -> f32 {
+        *self.g_score.get(&key).unwrap_or(&f32::INFINITY)
+    }
+}
+
 impl NavigationGraph {
     /// Queries the next logical step along the shortest path
     pub fn get_next_path_step(&self, start: Vec3, target: Vec3) -> Vec3 {
@@ -57,7 +72,6 @@ impl NavigationGraph {
     }
 
     /// Core A* algorithm returning list of grid coordinates (x, z)
-    #[allow(clippy::too_many_lines)]
     pub fn find_path(
         &self,
         raw_sx: i32,
@@ -72,87 +86,89 @@ impl NavigationGraph {
             return Some(vec![(sx, sz)]);
         }
 
-        let mut open_set = BinaryHeap::new();
-        let mut g_score = HashMap::new();
-        let mut came_from = HashMap::new();
-
-        let start_key = (sx, sz);
-        g_score.insert(start_key, 0.0);
-
-        open_set.push(NodeState {
+        let mut frontier = Frontier::default();
+        frontier.g_score.insert((sx, sz), 0.0);
+        frontier.open_set.push(NodeState {
             x: sx,
             z: sz,
             g_score: 0.0,
             f_score: self.heuristic(sx, sz, tx, tz),
         });
 
-        while let Some(current) = open_set.pop() {
+        while let Some(current) = frontier.open_set.pop() {
             if current.x == tx && current.z == tz {
-                // Reconstruct path
-                let mut path = vec![(current.x, current.z)];
-                let mut curr_key = (current.x, current.z);
-                while let Some(&prev) = came_from.get(&curr_key) {
-                    path.push(prev);
-                    curr_key = prev;
-                }
-                path.reverse();
-                return Some(path);
+                return Some(reconstruct_path(
+                    &frontier.came_from,
+                    (current.x, current.z),
+                ));
             }
 
-            let curr_key = (current.x, current.z);
-            let current_g = *g_score.get(&curr_key).unwrap_or(&f32::INFINITY);
-
+            let current_g = frontier.g_of((current.x, current.z));
             if current.g_score > current_g {
                 continue; // Old state in heap, skip
             }
 
-            // Neighbors (8-way movement)
-            let dirs = [
-                (1, 0, 1.0),
-                (-1, 0, 1.0),
-                (0, 1, 1.0),
-                (0, -1, 1.0), // Cardinal
-                (1, 1, 1.414),
-                (1, -1, 1.414),
-                (-1, 1, 1.414),
-                (-1, -1, 1.414), // Diagonal
-            ];
-
-            for &(dx, dz, cost) in &dirs {
-                let nx = current.x + dx;
-                let nz = current.z + dz;
-
-                if !self.is_walkable(nx, nz) {
-                    continue;
-                }
-
-                // For diagonal movements, prevent corner-cutting through blocked cardinal obstacles
-                if dx != 0
-                    && dz != 0
-                    && (!self.is_walkable(current.x + dx, current.z)
-                        || !self.is_walkable(current.x, current.z + dz))
-                {
-                    continue;
-                }
-
-                let neighbor_key = (nx, nz);
-                let tentative_g = current_g + cost;
-                let neighbor_g = *g_score.get(&neighbor_key).unwrap_or(&f32::INFINITY);
-
-                if tentative_g < neighbor_g {
-                    came_from.insert(neighbor_key, curr_key);
-                    g_score.insert(neighbor_key, tentative_g);
-                    open_set.push(NodeState {
-                        x: nx,
-                        z: nz,
-                        g_score: tentative_g,
-                        f_score: tentative_g + self.heuristic(nx, nz, tx, tz),
-                    });
-                }
-            }
+            self.expand_neighbors(&current, current_g, (tx, tz), &mut frontier);
         }
 
         None
+    }
+
+    /// Relax the 8-way neighbours of `current`, pushing improved nodes onto the
+    /// open set and recording the predecessor / g-score for each.
+    fn expand_neighbors(
+        &self,
+        current: &NodeState,
+        current_g: f32,
+        target: (i32, i32),
+        frontier: &mut Frontier,
+    ) {
+        let (tx, tz) = target;
+        let curr_key = (current.x, current.z);
+
+        // Neighbors (8-way movement)
+        let dirs = [
+            (1, 0, 1.0),
+            (-1, 0, 1.0),
+            (0, 1, 1.0),
+            (0, -1, 1.0), // Cardinal
+            (1, 1, 1.414),
+            (1, -1, 1.414),
+            (-1, 1, 1.414),
+            (-1, -1, 1.414), // Diagonal
+        ];
+
+        for &(dx, dz, cost) in &dirs {
+            let nx = current.x + dx;
+            let nz = current.z + dz;
+
+            if !self.is_walkable(nx, nz) {
+                continue;
+            }
+
+            // For diagonal movements, prevent corner-cutting through blocked cardinal obstacles
+            if dx != 0
+                && dz != 0
+                && (!self.is_walkable(current.x + dx, current.z)
+                    || !self.is_walkable(current.x, current.z + dz))
+            {
+                continue;
+            }
+
+            let neighbor_key = (nx, nz);
+            let tentative_g = current_g + cost;
+
+            if tentative_g < frontier.g_of(neighbor_key) {
+                frontier.came_from.insert(neighbor_key, curr_key);
+                frontier.g_score.insert(neighbor_key, tentative_g);
+                frontier.open_set.push(NodeState {
+                    x: nx,
+                    z: nz,
+                    g_score: tentative_g,
+                    f_score: tentative_g + self.heuristic(nx, nz, tx, tz),
+                });
+            }
+        }
     }
 
     fn heuristic(&self, ax: i32, az: i32, bx: i32, bz: i32) -> f32 {
@@ -164,4 +180,20 @@ impl NavigationGraph {
         // Cost: 1.0 cardinal, 1.414 diagonal
         dmin * 1.414 + (dmax - dmin) * 1.0
     }
+}
+
+/// Walk the `came_from` chain back from `goal` to the start, returning the path
+/// in start->goal order.
+fn reconstruct_path(
+    came_from: &HashMap<(i32, i32), (i32, i32)>,
+    goal: (i32, i32),
+) -> Vec<(i32, i32)> {
+    let mut path = vec![goal];
+    let mut curr_key = goal;
+    while let Some(&prev) = came_from.get(&curr_key) {
+        path.push(prev);
+        curr_key = prev;
+    }
+    path.reverse();
+    path
 }
