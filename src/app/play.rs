@@ -19,6 +19,9 @@
 //! borrow it too), the engine singletons through `res`, and the scaled per-frame
 //! delta through `res.dt()`.
 
+use glam::Vec3;
+
+use super::game::GameWorld;
 use super::registry::App;
 use super::resources::Resources;
 use super::stage::Stage;
@@ -26,6 +29,54 @@ use super::world::World;
 
 const PLAYER_NAME: &str = "Player";
 const ENEMY_NAME: &str = "Enemy_1";
+
+/// Play-enter helpers, split out of `GameWorld::enter_play` so each phase stays
+/// small and named. These run once when the world transitions into Play.
+impl GameWorld {
+    /// Place the play-mode camera just behind the Player entity (no-op if absent).
+    pub(super) fn snap_camera_to_player(&mut self) {
+        let scene = self.world.scene.borrow();
+        let player = scene
+            .find_entity_by_name(PLAYER_NAME)
+            .and_then(|id| scene.get_entity(id));
+        if let Some(player) = player {
+            let mut cam = self.resources.camera.borrow_mut();
+            cam.position = player.transform.position + Vec3::new(0.0, 1.5, -4.5);
+            cam.yaw = 90.0;
+            cam.pitch = -10.0;
+        }
+    }
+
+    /// Compile + load every entity script, logging per-entity compile errors.
+    pub(super) fn load_entity_scripts(&mut self) {
+        // Each entity can carry many scripts (#83); load each, keyed by its slot.
+        let mut to_load: Vec<(u32, usize, String)> = Vec::new();
+        for e in self.world.scene.borrow().iter() {
+            let rows = e.scripts.iter().enumerate();
+            to_load.extend(rows.map(|(i, s)| (e.id, i, s.path.clone())));
+        }
+        for (id, index, path) in to_load {
+            if let Err(e) = self
+                .resources
+                .script_manager
+                .load_entity_script(id, index, &path)
+            {
+                let msg = format!("Lua compile error (Entity {}): {}", id, e);
+                self.resources.console.borrow_mut().error(msg);
+            }
+        }
+    }
+
+    /// Run the one-shot `Startup` stage now that the Play session is fully set
+    /// up. No built-in module registers Startup systems yet; this is the wired
+    /// hook modules will register into (Unity's `Start`).
+    pub(super) fn run_startup_stage(&mut self) {
+        self.resources.frame_dt = 0.0;
+        let schedule = std::mem::take(&mut self.resources.schedule);
+        schedule.run_startup(&mut self.world, &mut self.resources);
+        self.resources.schedule = schedule;
+    }
+}
 
 /// Rebake cadence in play-mode frames. At the fixed 1/60 timestep this is "once a
 /// second", but the trigger is the frame count, not the wall clock — that is what

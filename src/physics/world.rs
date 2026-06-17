@@ -131,65 +131,51 @@ impl PhysicsWorld {
     }
 
     /// Push current component state into rapier before stepping.
-    #[allow(clippy::too_many_lines)]
     fn sync_to_rapier(&mut self, scene: &Scene, dt: f32) {
         // Snapshot handles to avoid borrowing the map while the body sets below
         // borrow `self.bodies` / `self.colliders` mutably or immutably.
         let entries: Vec<(u32, RigidBodyHandle)> =
             self.id_to_body.iter().map(|(&id, &h)| (id, h)).collect();
         for (id, handle) in entries {
-            let (pos, rot, vel, active, kinematic, is_static) = {
-                let entity = match scene.get_entity(id) {
-                    Some(e) => e,
-                    None => continue,
-                };
-                let kinematic = is_kinematic(entity.is_static, entity.rigidbody.as_ref());
-                let vel = entity
-                    .rigidbody
-                    .as_ref()
-                    .map(|r| r.velocity)
-                    .unwrap_or(Vec3::ZERO);
-                (
-                    entity.transform.position,
-                    entity.transform.rotation,
-                    vel,
-                    entity.active,
-                    kinematic,
-                    entity.is_static,
-                )
+            let Some(snapshot) = read_entity_body_state(scene, id) else {
+                continue;
             };
-
             if self.bodies.get(handle).is_none() {
                 continue;
             }
-            if kinematic {
-                // Route the script/input-set move through the controller so the
-                // body collides-and-slides against walls instead of teleporting.
-                let next = character::corrected_next_pose(
-                    &self.character_controller,
-                    character::RapierRefs {
-                        bodies: &self.bodies,
-                        colliders: &self.colliders,
-                        queries: &self.query_pipeline,
-                    },
-                    handle,
-                    to_iso(pos, rot),
-                    dt,
-                );
-                let body = &mut self.bodies[handle];
-                body.set_enabled(active);
-                body.set_next_kinematic_position(next);
-                continue;
-            }
+            self.apply_body_state(handle, &snapshot, dt);
+        }
+    }
+
+    /// Push one entity's snapshot into its rapier body for this tick.
+    fn apply_body_state(&mut self, handle: RigidBodyHandle, snap: &EntityBodyState, dt: f32) {
+        if snap.kinematic {
+            // Route the script/input-set move through the controller so the
+            // body collides-and-slides against walls instead of teleporting.
+            let next = character::corrected_next_pose(
+                &self.character_controller,
+                character::RapierRefs {
+                    bodies: &self.bodies,
+                    colliders: &self.colliders,
+                    queries: &self.query_pipeline,
+                },
+                handle,
+                to_iso(snap.pos, snap.rot),
+                dt,
+            );
             let body = &mut self.bodies[handle];
-            body.set_enabled(active);
-            if is_static {
-                body.set_position(to_iso(pos, rot), true);
-            } else {
-                // Dynamic: trust rapier for pose, but let scripts inject velocity
-                // (SetVelocity / AddForce mutate the component between ticks).
-                body.set_linvel(to_na_vec(vel), true);
-            }
+            body.set_enabled(snap.active);
+            body.set_next_kinematic_position(next);
+            return;
+        }
+        let body = &mut self.bodies[handle];
+        body.set_enabled(snap.active);
+        if snap.is_static {
+            body.set_position(to_iso(snap.pos, snap.rot), true);
+        } else {
+            // Dynamic: trust rapier for pose, but let scripts inject velocity
+            // (SetVelocity / AddForce mutate the component between ticks).
+            body.set_linvel(to_na_vec(snap.vel), true);
         }
     }
 
@@ -276,4 +262,33 @@ impl PhysicsWorld {
             scene.update_entity_collider(id);
         }
     }
+}
+
+/// The per-entity component state `sync_to_rapier` pushes into a body each tick.
+struct EntityBodyState {
+    pos: Vec3,
+    rot: glam::Quat,
+    vel: Vec3,
+    active: bool,
+    kinematic: bool,
+    is_static: bool,
+}
+
+/// Read an entity's transform/velocity/body-class snapshot, or `None` if absent.
+fn read_entity_body_state(scene: &Scene, id: u32) -> Option<EntityBodyState> {
+    let entity = scene.get_entity(id)?;
+    let kinematic = is_kinematic(entity.is_static, entity.rigidbody.as_ref());
+    let vel = entity
+        .rigidbody
+        .as_ref()
+        .map(|r| r.velocity)
+        .unwrap_or(Vec3::ZERO);
+    Some(EntityBodyState {
+        pos: entity.transform.position,
+        rot: entity.transform.rotation,
+        vel,
+        active: entity.active,
+        kinematic,
+        is_static: entity.is_static,
+    })
 }

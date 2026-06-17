@@ -12,7 +12,7 @@ pre-commit:
       run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- {staged_files}
     clippy:
       # Hard gate, mirroring CI: every warning fails, and the 50-line function cap
-      # (clippy::too_many_lines) is denied. Legacy functions are grandfathered with
-      # an inline `#[allow(clippy::too_many_lines)]` (the burn-down list). Default
-      # features here for speed; CI also runs the dev feature set.
+      # (clippy::too_many_lines) is denied crate-wide. The legacy burn-down is
+      # complete (#124): no `#[allow(clippy::too_many_lines)]` remain — split, don't
+      # silence. Default features here for speed; CI also runs the dev feature set.
       run: cargo clippy --quiet --all-targets --no-deps -- -D warnings -D clippy::too_many_lines

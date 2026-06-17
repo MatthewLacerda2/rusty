@@ -176,24 +176,12 @@ impl GameWorld {
         transition
     }
 
-    #[allow(clippy::too_many_lines)]
     fn enter_play(&mut self) {
         self.resources.play_frame = 0;
         self.resources.time.borrow_mut().reset();
         // Snapshot the edit scene so Stop can restore it, discarding play-mode mutations.
         self.resources.edit_snapshot = Some(SceneSnapshot::capture(&self.world.scene.borrow()));
-        {
-            let scene = self.world.scene.borrow();
-            let player = scene
-                .find_entity_by_name("Player")
-                .and_then(|id| scene.get_entity(id));
-            if let Some(player) = player {
-                let mut cam = self.resources.camera.borrow_mut();
-                cam.position = player.transform.position + Vec3::new(0.0, 1.5, -4.5);
-                cam.yaw = 90.0;
-                cam.pitch = -10.0;
-            }
-        }
+        self.snap_camera_to_player();
         self.resources
             .console
             .borrow_mut()
@@ -210,22 +198,7 @@ impl GameWorld {
                 .error(format!("Lua init error: {}", err));
             return;
         }
-        // Each entity can carry many scripts (#83); load each, keyed by its slot.
-        let mut to_load: Vec<(u32, usize, String)> = Vec::new();
-        for e in self.world.scene.borrow().iter() {
-            let rows = e.scripts.iter().enumerate();
-            to_load.extend(rows.map(|(i, s)| (e.id, i, s.path.clone())));
-        }
-        for (id, index, path) in to_load {
-            if let Err(e) = self
-                .resources
-                .script_manager
-                .load_entity_script(id, index, &path)
-            {
-                let msg = format!("Lua compile error (Entity {}): {}", id, e);
-                self.resources.console.borrow_mut().error(msg);
-            }
-        }
+        self.load_entity_scripts();
         self.resources.script_manager.start_scripts();
 
         // Build the rapier world from the (post-start) scene: bodies + colliders
@@ -234,13 +207,7 @@ impl GameWorld {
         *self.resources.physics.borrow_mut() =
             Some(PhysicsWorld::from_scene(&self.world.scene.borrow()));
 
-        // Run the one-shot `Startup` stage now that the Play session is fully set
-        // up. No built-in module registers Startup systems yet; this is the wired
-        // hook modules will register into (Unity's `Start`).
-        self.resources.frame_dt = 0.0;
-        let schedule = std::mem::take(&mut self.resources.schedule);
-        schedule.run_startup(&mut self.world, &mut self.resources);
-        self.resources.schedule = schedule;
+        self.run_startup_stage();
     }
 
     fn exit_play(&mut self) {

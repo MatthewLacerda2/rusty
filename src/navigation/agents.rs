@@ -86,7 +86,6 @@ impl NavigationGraph {
 
     /// Steers and updates positions of active NavMesh agents in the scene,
     /// constraining them strictly to walkable NavMesh cells using a 2D sliding projection check.
-    #[allow(clippy::too_many_lines)]
     pub fn tick_nav_agents(&self, scene: &mut Scene, delta_time: f32) {
         for id in scene.entity_ids() {
             let mut entity_guard = match scene.get_entity_mut(id) {
@@ -104,49 +103,10 @@ impl NavigationGraph {
                 }
 
                 let current_pos = entity.transform.position;
-                let to_target = agent.target - current_pos;
-                let dist = to_target.length();
+                let dist = (agent.target - current_pos).length();
 
                 if dist > agent.stopping_distance {
-                    // Query the next waypoint from the agent's cached path,
-                    // re-planning with A* only when the cache is invalid (#126).
-                    let next_step = self.cached_next_step(agent, current_pos);
-                    let to_next = next_step - current_pos;
-                    let to_next_dir = to_next.normalize_or_zero();
-
-                    // Accelerate steering velocity
-                    let desired_vel = to_next_dir * agent.speed;
-                    let diff_vel = desired_vel - agent.velocity;
-                    agent.velocity += diff_vel * (agent.acceleration * delta_time).min(1.0);
-
-                    // Proposed step
-                    let proposed_pos_x =
-                        current_pos + Vec3::new(agent.velocity.x * delta_time, 0.0, 0.0);
-                    let mut final_pos = current_pos;
-
-                    // Test X movement slide
-                    let (gx, gz) = self.world_to_grid(proposed_pos_x);
-                    if self.is_walkable(gx, gz) {
-                        final_pos.x = proposed_pos_x.x;
-                    } else {
-                        agent.velocity.x = 0.0;
-                    }
-
-                    // Test Z movement slide
-                    let proposed_pos_z =
-                        final_pos + Vec3::new(0.0, 0.0, agent.velocity.z * delta_time);
-                    let (gx, gz) = self.world_to_grid(proposed_pos_z);
-                    if self.is_walkable(gx, gz) {
-                        final_pos.z = proposed_pos_z.z;
-                    } else {
-                        agent.velocity.z = 0.0;
-                    }
-
-                    // Preserve original Y position
-                    final_pos.y = current_pos.y;
-
-                    // Apply the constrained position to entity transform
-                    entity.transform.position = final_pos;
+                    entity.transform.position = self.steer_agent(agent, current_pos, delta_time);
                 } else {
                     // Decelerate to zero velocity when close
                     agent.velocity -= agent.velocity * (agent.acceleration * delta_time).min(1.0);
@@ -159,6 +119,49 @@ impl NavigationGraph {
                 entity.update_collider(None);
             }
         }
+    }
+
+    /// Accelerate the agent toward its next waypoint and return the new, slide-
+    /// constrained position (Y preserved). Mutates `agent.velocity` in place.
+    fn steer_agent(
+        &self,
+        agent: &mut NavMeshAgentComponent,
+        current_pos: Vec3,
+        delta_time: f32,
+    ) -> Vec3 {
+        // Query the next waypoint from the agent's cached path,
+        // re-planning with A* only when the cache is invalid (#126).
+        let next_step = self.cached_next_step(agent, current_pos);
+        let to_next_dir = (next_step - current_pos).normalize_or_zero();
+
+        // Accelerate steering velocity
+        let desired_vel = to_next_dir * agent.speed;
+        let diff_vel = desired_vel - agent.velocity;
+        agent.velocity += diff_vel * (agent.acceleration * delta_time).min(1.0);
+
+        let mut final_pos = current_pos;
+
+        // Test X movement slide
+        let proposed_pos_x = current_pos + Vec3::new(agent.velocity.x * delta_time, 0.0, 0.0);
+        let (gx, gz) = self.world_to_grid(proposed_pos_x);
+        if self.is_walkable(gx, gz) {
+            final_pos.x = proposed_pos_x.x;
+        } else {
+            agent.velocity.x = 0.0;
+        }
+
+        // Test Z movement slide
+        let proposed_pos_z = final_pos + Vec3::new(0.0, 0.0, agent.velocity.z * delta_time);
+        let (gx, gz) = self.world_to_grid(proposed_pos_z);
+        if self.is_walkable(gx, gz) {
+            final_pos.z = proposed_pos_z.z;
+        } else {
+            agent.velocity.z = 0.0;
+        }
+
+        // Preserve original Y position
+        final_pos.y = current_pos.y;
+        final_pos
     }
 }
 
