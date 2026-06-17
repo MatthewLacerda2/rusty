@@ -1,0 +1,4 @@
+target/
+# Coverage artifacts; the committed corpus/ seeds are kept.
+coverage/
+artifacts/

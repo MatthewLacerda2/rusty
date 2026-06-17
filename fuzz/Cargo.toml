@@ -1,0 +1,29 @@
+# cargo-fuzz target crate (#119). Deliberately its OWN workspace (the empty
+# `[workspace]` table below) so the stable, pinned-1.94.1 root build, the size
+# gate, the determinism guard, and cargo-deny never see it — libFuzzer is
+# nightly-only and must stay out of the shipping gates. Run it on demand:
+#   cargo +nightly fuzz run scene_deserialize
+[package]
+name = "rusty-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+
+[dependencies.rusty]
+path = ".."
+
+[[bin]]
+name = "scene_deserialize"
+path = "fuzz_targets/scene_deserialize.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
