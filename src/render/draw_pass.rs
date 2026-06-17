@@ -171,8 +171,10 @@ impl Renderer {
             render_pass.set_bind_group(3, &self.shadow_bind_group, &[]);
 
             // Render Solid Entities
-            for (id, _ent_buf, _bones_buf, bind_group, tex, num_indices) in solid_render_resources {
-                if let Some(gpu_mesh) = self.gpu_meshes.get(id) {
+            for (_id, mesh_id, _ent_buf, _bones_buf, bind_group, tex, num_indices) in
+                solid_render_resources
+            {
+                if let Some(gpu_mesh) = self.gpu_meshes.get(mesh_id) {
                     render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
                     render_pass.set_index_buffer(
                         gpu_mesh.index_buffer.slice(..),
@@ -188,17 +190,18 @@ impl Renderer {
             if editor_mode {
                 if let Some((
                     selected_id,
+                    outline_mesh_id,
                     _outline_ent_buf,
                     _outline_bones_buf,
                     outline_bind_group,
                     num_indices,
                 )) = outline_resources
                 {
-                    if let Some(gpu_mesh) = self.gpu_meshes.get(selected_id) {
+                    if let Some(gpu_mesh) = self.gpu_meshes.get(outline_mesh_id) {
                         let tex = solid_render_resources
                             .iter()
-                            .find(|(id, _, _, _, _, _)| id == selected_id)
-                            .map(|(_, _, _, _, tex, _)| tex)
+                            .find(|(id, _, _, _, _, _, _)| id == selected_id)
+                            .map(|(_, _, _, _, _, tex, _)| tex)
                             .unwrap_or(&self.default_texture);
 
                         render_pass.set_pipeline(&self.outline_pipeline);
