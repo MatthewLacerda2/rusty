@@ -51,7 +51,6 @@ impl Renderer {
         Some((grid_buf_unif, default_bones_buf, grid_bind_group))
     }
 
-    #[allow(clippy::too_many_lines)]
     pub(super) fn precreate_aabb(
         &self,
         scene: &Scene,
@@ -70,53 +69,7 @@ impl Renderer {
                     continue;
                 }
 
-                let min = col.aabb_min;
-                let max = col.aabb_max;
-
-                // Generate wireframe box lines (12 lines = 24 vertices)
-                let mut line_vertices = Vec::new();
-                let normal = Vec3::Y;
-                let uv = [0.0, 0.0];
-
-                let p000 = Vec3::new(min.x, min.y, min.z);
-                let p100 = Vec3::new(max.x, min.y, min.z);
-                let p010 = Vec3::new(min.x, max.y, min.z);
-                let p110 = Vec3::new(max.x, max.y, min.z);
-                let p001 = Vec3::new(min.x, min.y, max.z);
-                let p101 = Vec3::new(max.x, min.y, max.z);
-                let p011 = Vec3::new(min.x, max.y, max.z);
-                let p111 = Vec3::new(max.x, max.y, max.z);
-
-                // Bottom face
-                line_vertices.push(Vertex::new(p000, normal, uv));
-                line_vertices.push(Vertex::new(p100, normal, uv));
-                line_vertices.push(Vertex::new(p100, normal, uv));
-                line_vertices.push(Vertex::new(p101, normal, uv));
-                line_vertices.push(Vertex::new(p101, normal, uv));
-                line_vertices.push(Vertex::new(p001, normal, uv));
-                line_vertices.push(Vertex::new(p001, normal, uv));
-                line_vertices.push(Vertex::new(p000, normal, uv));
-
-                // Top face
-                line_vertices.push(Vertex::new(p010, normal, uv));
-                line_vertices.push(Vertex::new(p110, normal, uv));
-                line_vertices.push(Vertex::new(p110, normal, uv));
-                line_vertices.push(Vertex::new(p111, normal, uv));
-                line_vertices.push(Vertex::new(p111, normal, uv));
-                line_vertices.push(Vertex::new(p011, normal, uv));
-                line_vertices.push(Vertex::new(p011, normal, uv));
-                line_vertices.push(Vertex::new(p010, normal, uv));
-
-                // Verticals connecting bottom and top
-                line_vertices.push(Vertex::new(p000, normal, uv));
-                line_vertices.push(Vertex::new(p010, normal, uv));
-                line_vertices.push(Vertex::new(p100, normal, uv));
-                line_vertices.push(Vertex::new(p110, normal, uv));
-                line_vertices.push(Vertex::new(p101, normal, uv));
-                line_vertices.push(Vertex::new(p111, normal, uv));
-                line_vertices.push(Vertex::new(p001, normal, uv));
-                line_vertices.push(Vertex::new(p011, normal, uv));
-
+                let line_vertices = aabb_wireframe(col.aabb_min, col.aabb_max);
                 let aabb_wire_buffer =
                     self.device
                         .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -133,43 +86,8 @@ impl Renderer {
                     [0.0, 0.8, 1.0, 0.8]
                 };
 
-                let entity_uniform = EntityUniform {
-                    model_matrix: Mat4::IDENTITY.to_cols_array(), // Vertices are already in world space
-                    color_tint: tint_color,
-                    use_texture: 0,
-                    is_lit: 0,
-                    metallic: 0.0,
-                    roughness: 0.5,
-                };
-
-                let entity_buf =
-                    self.device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: None,
-                            contents: bytemuck::bytes_of(&entity_uniform),
-                            usage: wgpu::BufferUsages::UNIFORM,
-                        });
-                let default_bones_buf =
-                    self.device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: None,
-                            contents: bytemuck::bytes_of(default_bones),
-                            usage: wgpu::BufferUsages::UNIFORM,
-                        });
-                let col_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: None,
-                    layout: &self.entity_bones_layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: entity_buf.as_entire_binding(),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: default_bones_buf.as_entire_binding(),
-                        },
-                    ],
-                });
+                let (entity_buf, default_bones_buf, col_bind_group) =
+                    self.build_aabb_bindings(tint_color, default_bones);
 
                 aabb_resources.push((
                     aabb_wire_buffer,
@@ -181,4 +99,98 @@ impl Renderer {
         }
         aabb_resources
     }
+
+    /// Build an AABB wireframe's uniform + bones buffers and their bind group.
+    fn build_aabb_bindings(
+        &self,
+        tint_color: [f32; 4],
+        default_bones: &BoneUniform,
+    ) -> (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup) {
+        let entity_uniform = EntityUniform {
+            model_matrix: Mat4::IDENTITY.to_cols_array(), // Vertices are already in world space
+            color_tint: tint_color,
+            use_texture: 0,
+            is_lit: 0,
+            metallic: 0.0,
+            roughness: 0.5,
+        };
+
+        let entity_buf = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::bytes_of(&entity_uniform),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+        let default_bones_buf = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::bytes_of(default_bones),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+        let col_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &self.entity_bones_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: entity_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: default_bones_buf.as_entire_binding(),
+                },
+            ],
+        });
+        (entity_buf, default_bones_buf, col_bind_group)
+    }
+}
+
+/// Generate the 24 line vertices (12 edges) of an axis-aligned box's wireframe.
+fn aabb_wireframe(min: Vec3, max: Vec3) -> Vec<Vertex> {
+    let mut line_vertices = Vec::new();
+    let normal = Vec3::Y;
+    let uv = [0.0, 0.0];
+
+    let p000 = Vec3::new(min.x, min.y, min.z);
+    let p100 = Vec3::new(max.x, min.y, min.z);
+    let p010 = Vec3::new(min.x, max.y, min.z);
+    let p110 = Vec3::new(max.x, max.y, min.z);
+    let p001 = Vec3::new(min.x, min.y, max.z);
+    let p101 = Vec3::new(max.x, min.y, max.z);
+    let p011 = Vec3::new(min.x, max.y, max.z);
+    let p111 = Vec3::new(max.x, max.y, max.z);
+
+    // Bottom face
+    line_vertices.push(Vertex::new(p000, normal, uv));
+    line_vertices.push(Vertex::new(p100, normal, uv));
+    line_vertices.push(Vertex::new(p100, normal, uv));
+    line_vertices.push(Vertex::new(p101, normal, uv));
+    line_vertices.push(Vertex::new(p101, normal, uv));
+    line_vertices.push(Vertex::new(p001, normal, uv));
+    line_vertices.push(Vertex::new(p001, normal, uv));
+    line_vertices.push(Vertex::new(p000, normal, uv));
+
+    // Top face
+    line_vertices.push(Vertex::new(p010, normal, uv));
+    line_vertices.push(Vertex::new(p110, normal, uv));
+    line_vertices.push(Vertex::new(p110, normal, uv));
+    line_vertices.push(Vertex::new(p111, normal, uv));
+    line_vertices.push(Vertex::new(p111, normal, uv));
+    line_vertices.push(Vertex::new(p011, normal, uv));
+    line_vertices.push(Vertex::new(p011, normal, uv));
+    line_vertices.push(Vertex::new(p010, normal, uv));
+
+    // Verticals connecting bottom and top
+    line_vertices.push(Vertex::new(p000, normal, uv));
+    line_vertices.push(Vertex::new(p010, normal, uv));
+    line_vertices.push(Vertex::new(p100, normal, uv));
+    line_vertices.push(Vertex::new(p110, normal, uv));
+    line_vertices.push(Vertex::new(p101, normal, uv));
+    line_vertices.push(Vertex::new(p111, normal, uv));
+    line_vertices.push(Vertex::new(p001, normal, uv));
+    line_vertices.push(Vertex::new(p011, normal, uv));
+
+    line_vertices
 }

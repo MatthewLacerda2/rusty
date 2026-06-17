@@ -126,10 +126,7 @@ impl DecalRenderer {
     /// Build the decal pass: a unit-cube mesh, the globals + per-decal + depth
     /// bind-group layouts, and the projector pipeline. Reuses the renderer's
     /// `texture_layout` (group 3) for the decal sprite.
-    #[allow(clippy::too_many_lines)]
     pub fn new(device: &wgpu::Device, texture_layout: &wgpu::BindGroupLayout) -> Self {
-        use wgpu::util::DeviceExt;
-
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Decal Shader"),
             source: wgpu::ShaderSource::Wgsl(
@@ -168,8 +165,23 @@ impl DecalRenderer {
         });
 
         let pipeline = Self::pipeline(device, &shader, &pipeline_layout);
+        let (vertex_buffer, index_buffer) = Self::cube_buffers(device);
 
-        // Unit cube spanning [-0.5, 0.5]³ (8 corners, 36 indices).
+        Self {
+            pipeline,
+            globals_buffer,
+            globals_bind_group,
+            decal_layout,
+            depth_layout,
+            index_buffer,
+            vertex_buffer,
+        }
+    }
+
+    /// Create the unit-cube vertex + index buffers (spanning [-0.5, 0.5]³, 8 corners,
+    /// 36 indices) the projector pass draws.
+    fn cube_buffers(device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Buffer) {
+        use wgpu::util::DeviceExt;
         let (verts, indices) = super::decals_draw::unit_cube();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Decal Cube Vertices"),
@@ -181,16 +193,7 @@ impl DecalRenderer {
             contents: bytemuck::cast_slice(&indices),
             usage: wgpu::BufferUsages::INDEX,
         });
-
-        Self {
-            pipeline,
-            globals_buffer,
-            globals_bind_group,
-            decal_layout,
-            depth_layout,
-            index_buffer,
-            vertex_buffer,
-        }
+        (vertex_buffer, index_buffer)
     }
 
     fn globals_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {

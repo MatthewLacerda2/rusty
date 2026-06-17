@@ -121,119 +121,88 @@ impl Renderer {
     }
 
     /// Pre-generates 3D line-based arrows for X, Y, Z global translation axes
-    #[allow(clippy::too_many_lines)]
     pub(super) fn generate_axis_arrows(&mut self) {
         let axis_length = 2.0;
         let arrow_head_length = 0.35;
-        let arrow_head_width = 0.12;
-        let uv = [0.0, 0.0];
-        let normal = Vec3::Y;
+        let w = 0.12; // arrow head half-width
 
-        // X Axis (Red)
-        let mut x_verts = Vec::new();
+        // X Axis (Red): tip on +X, arrowhead spread on ±Y and ±Z.
         let t_x = Vec3::new(axis_length, 0.0, 0.0);
         let s_x = Vec3::new(axis_length - arrow_head_length, 0.0, 0.0);
-        x_verts.push(Vertex::new(Vec3::ZERO, normal, uv));
-        x_verts.push(Vertex::new(t_x, normal, uv));
-        // Arrowhead
-        let a_x1 = s_x + Vec3::new(0.0, arrow_head_width, 0.0);
-        let a_x2 = s_x - Vec3::new(0.0, arrow_head_width, 0.0);
-        let a_x3 = s_x + Vec3::new(0.0, 0.0, arrow_head_width);
-        let a_x4 = s_x - Vec3::new(0.0, 0.0, arrow_head_width);
-        x_verts.push(Vertex::new(t_x, normal, uv));
-        x_verts.push(Vertex::new(a_x1, normal, uv));
-        x_verts.push(Vertex::new(t_x, normal, uv));
-        x_verts.push(Vertex::new(a_x2, normal, uv));
-        x_verts.push(Vertex::new(t_x, normal, uv));
-        x_verts.push(Vertex::new(a_x3, normal, uv));
-        x_verts.push(Vertex::new(t_x, normal, uv));
-        x_verts.push(Vertex::new(a_x4, normal, uv));
-        x_verts.push(Vertex::new(a_x1, normal, uv));
-        x_verts.push(Vertex::new(a_x3, normal, uv));
-        x_verts.push(Vertex::new(a_x3, normal, uv));
-        x_verts.push(Vertex::new(a_x2, normal, uv));
-        x_verts.push(Vertex::new(a_x2, normal, uv));
-        x_verts.push(Vertex::new(a_x4, normal, uv));
-        x_verts.push(Vertex::new(a_x4, normal, uv));
-        x_verts.push(Vertex::new(a_x1, normal, uv));
+        let x_verts = axis_arrow_verts(
+            t_x,
+            [
+                s_x + Vec3::new(0.0, w, 0.0),
+                s_x - Vec3::new(0.0, w, 0.0),
+                s_x + Vec3::new(0.0, 0.0, w),
+                s_x - Vec3::new(0.0, 0.0, w),
+            ],
+        );
 
-        // Y Axis (Green)
-        let mut y_verts = Vec::new();
+        // Y Axis (Green): tip on +Y, arrowhead spread on ±X and ±Z.
         let t_y = Vec3::new(0.0, axis_length, 0.0);
         let s_y = Vec3::new(0.0, axis_length - arrow_head_length, 0.0);
-        y_verts.push(Vertex::new(Vec3::ZERO, normal, uv));
-        y_verts.push(Vertex::new(t_y, normal, uv));
-        // Arrowhead
-        let a_y1 = s_y + Vec3::new(arrow_head_width, 0.0, 0.0);
-        let a_y2 = s_y - Vec3::new(arrow_head_width, 0.0, 0.0);
-        let a_y3 = s_y + Vec3::new(0.0, 0.0, arrow_head_width);
-        let a_y4 = s_y - Vec3::new(0.0, 0.0, arrow_head_width);
-        y_verts.push(Vertex::new(t_y, normal, uv));
-        y_verts.push(Vertex::new(a_y1, normal, uv));
-        y_verts.push(Vertex::new(t_y, normal, uv));
-        y_verts.push(Vertex::new(a_y2, normal, uv));
-        y_verts.push(Vertex::new(t_y, normal, uv));
-        y_verts.push(Vertex::new(a_y3, normal, uv));
-        y_verts.push(Vertex::new(t_y, normal, uv));
-        y_verts.push(Vertex::new(a_y4, normal, uv));
-        y_verts.push(Vertex::new(a_y1, normal, uv));
-        y_verts.push(Vertex::new(a_y3, normal, uv));
-        y_verts.push(Vertex::new(a_y3, normal, uv));
-        y_verts.push(Vertex::new(a_y2, normal, uv));
-        y_verts.push(Vertex::new(a_y2, normal, uv));
-        y_verts.push(Vertex::new(a_y4, normal, uv));
-        y_verts.push(Vertex::new(a_y4, normal, uv));
-        y_verts.push(Vertex::new(a_y1, normal, uv));
+        let y_verts = axis_arrow_verts(
+            t_y,
+            [
+                s_y + Vec3::new(w, 0.0, 0.0),
+                s_y - Vec3::new(w, 0.0, 0.0),
+                s_y + Vec3::new(0.0, 0.0, w),
+                s_y - Vec3::new(0.0, 0.0, w),
+            ],
+        );
 
-        // Z Axis (Blue)
-        let mut z_verts = Vec::new();
+        // Z Axis (Blue): tip on +Z, arrowhead spread on ±X and ±Y. (Preserves the
+        // original quirk where the third and fourth head points coincide.)
         let t_z = Vec3::new(0.0, 0.0, axis_length);
         let s_z = Vec3::new(0.0, 0.0, axis_length - arrow_head_length);
-        z_verts.push(Vertex::new(Vec3::ZERO, normal, uv));
-        z_verts.push(Vertex::new(t_z, normal, uv));
-        // Arrowhead
-        let a_z1 = s_z + Vec3::new(arrow_head_width, 0.0, 0.0);
-        let a_z2 = s_z - Vec3::new(arrow_head_width, 0.0, 0.0);
-        let a_z3 = s_z + Vec3::new(0.0, arrow_head_width, 0.0);
-        let a_z4 = s_z - Vec3::new(0.0, -arrow_head_width, 0.0);
-        z_verts.push(Vertex::new(t_z, normal, uv));
-        z_verts.push(Vertex::new(a_z1, normal, uv));
-        z_verts.push(Vertex::new(t_z, normal, uv));
-        z_verts.push(Vertex::new(a_z2, normal, uv));
-        z_verts.push(Vertex::new(t_z, normal, uv));
-        z_verts.push(Vertex::new(a_z3, normal, uv));
-        z_verts.push(Vertex::new(t_z, normal, uv));
-        z_verts.push(Vertex::new(a_z4, normal, uv));
-        z_verts.push(Vertex::new(a_z1, normal, uv));
-        z_verts.push(Vertex::new(a_z3, normal, uv));
-        z_verts.push(Vertex::new(a_z3, normal, uv));
-        z_verts.push(Vertex::new(a_z2, normal, uv));
-        z_verts.push(Vertex::new(a_z2, normal, uv));
-        z_verts.push(Vertex::new(a_z4, normal, uv));
-        z_verts.push(Vertex::new(a_z4, normal, uv));
-        z_verts.push(Vertex::new(a_z1, normal, uv));
+        let z_verts = axis_arrow_verts(
+            t_z,
+            [
+                s_z + Vec3::new(w, 0.0, 0.0),
+                s_z - Vec3::new(w, 0.0, 0.0),
+                s_z + Vec3::new(0.0, w, 0.0),
+                s_z - Vec3::new(0.0, -w, 0.0),
+            ],
+        );
 
-        self.axis_x_buffer = Some(self.device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Axis X Buffer"),
-                contents: bytemuck::cast_slice(&x_verts),
-                usage: wgpu::BufferUsages::VERTEX,
-            },
-        ));
-        self.axis_y_buffer = Some(self.device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Axis Y Buffer"),
-                contents: bytemuck::cast_slice(&y_verts),
-                usage: wgpu::BufferUsages::VERTEX,
-            },
-        ));
-        self.axis_z_buffer = Some(self.device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Axis Z Buffer"),
-                contents: bytemuck::cast_slice(&z_verts),
-                usage: wgpu::BufferUsages::VERTEX,
-            },
-        ));
+        self.axis_x_buffer = Some(self.vertex_buffer("Axis X Buffer", &x_verts));
+        self.axis_y_buffer = Some(self.vertex_buffer("Axis Y Buffer", &y_verts));
+        self.axis_z_buffer = Some(self.vertex_buffer("Axis Z Buffer", &z_verts));
         self.axis_count = x_verts.len() as u32;
     }
+
+    /// Create a VERTEX buffer initialised from `verts`.
+    fn vertex_buffer(&self, label: &str, verts: &[Vertex]) -> wgpu::Buffer {
+        self.device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(label),
+                contents: bytemuck::cast_slice(verts),
+                usage: wgpu::BufferUsages::VERTEX,
+            })
+    }
+}
+
+/// Build one axis arrow's line-list vertices: the shaft from the origin to `tip`,
+/// four lines from `tip` to the arrowhead points `[a1, a2, a3, a4]`, then the ring
+/// connecting them (a1-a3, a3-a2, a2-a4, a4-a1).
+fn axis_arrow_verts(tip: Vec3, head: [Vec3; 4]) -> Vec<Vertex> {
+    let uv = [0.0, 0.0];
+    let normal = Vec3::Y;
+    let [a1, a2, a3, a4] = head;
+
+    let mut verts = Vec::new();
+    verts.push(Vertex::new(Vec3::ZERO, normal, uv));
+    verts.push(Vertex::new(tip, normal, uv));
+    // Lines from the tip out to each arrowhead point.
+    for a in [a1, a2, a3, a4] {
+        verts.push(Vertex::new(tip, normal, uv));
+        verts.push(Vertex::new(a, normal, uv));
+    }
+    // Ring connecting the arrowhead points.
+    for (p, q) in [(a1, a3), (a3, a2), (a2, a4), (a4, a1)] {
+        verts.push(Vertex::new(p, normal, uv));
+        verts.push(Vertex::new(q, normal, uv));
+    }
+    verts
 }

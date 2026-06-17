@@ -39,7 +39,6 @@ impl Vertex {
 }
 
 /// Generates a 3D box centered at the origin
-#[allow(clippy::too_many_lines)]
 pub fn generate_box(width: f32, height: f32, depth: f32) -> (Vec<Vertex>, Vec<u32>) {
     let w = width / 2.0;
     let h = height / 2.0;
@@ -48,8 +47,33 @@ pub fn generate_box(width: f32, height: f32, depth: f32) -> (Vec<Vertex>, Vec<u3
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
 
-    // 6 faces of a cube (4 vertices per face)
-    let faces = [
+    let uv_coords = [[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]];
+
+    for (i, &(p0, p1, p2, p3, norm)) in box_faces(w, h, d).iter().enumerate() {
+        let base_idx = (i * 4) as u32;
+        vertices.push(Vertex::new(p0, norm, uv_coords[0]));
+        vertices.push(Vertex::new(p1, norm, uv_coords[1]));
+        vertices.push(Vertex::new(p2, norm, uv_coords[2]));
+        vertices.push(Vertex::new(p3, norm, uv_coords[3]));
+
+        // Triangle 1
+        indices.push(base_idx);
+        indices.push(base_idx + 1);
+        indices.push(base_idx + 2);
+        // Triangle 2
+        indices.push(base_idx);
+        indices.push(base_idx + 2);
+        indices.push(base_idx + 3);
+    }
+
+    (vertices, indices)
+}
+
+/// The 6 faces of a cube of half-extents `(w, h, d)`: each entry is the four corner
+/// positions (CCW) followed by the outward face normal.
+#[allow(clippy::type_complexity)]
+fn box_faces(w: f32, h: f32, d: f32) -> [(Vec3, Vec3, Vec3, Vec3, Vec3); 6] {
+    [
         // Front face (+Z)
         (
             Vec3::new(-w, -h, d),
@@ -98,28 +122,7 @@ pub fn generate_box(width: f32, height: f32, depth: f32) -> (Vec<Vertex>, Vec<u3
             Vec3::new(-w, -h, d),
             Vec3::new(0.0, -1.0, 0.0),
         ),
-    ];
-
-    let uv_coords = [[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]];
-
-    for (i, &(p0, p1, p2, p3, norm)) in faces.iter().enumerate() {
-        let base_idx = (i * 4) as u32;
-        vertices.push(Vertex::new(p0, norm, uv_coords[0]));
-        vertices.push(Vertex::new(p1, norm, uv_coords[1]));
-        vertices.push(Vertex::new(p2, norm, uv_coords[2]));
-        vertices.push(Vertex::new(p3, norm, uv_coords[3]));
-
-        // Triangle 1
-        indices.push(base_idx);
-        indices.push(base_idx + 1);
-        indices.push(base_idx + 2);
-        // Triangle 2
-        indices.push(base_idx);
-        indices.push(base_idx + 2);
-        indices.push(base_idx + 3);
-    }
-
-    (vertices, indices)
+    ]
 }
 
 /// Generates a UV Sphere centered at the origin
@@ -187,7 +190,6 @@ pub fn generate_plane(width: f32, depth: f32) -> (Vec<Vertex>, Vec<u32>) {
 }
 
 /// Generates a cylinder between two arbitrary 3D points
-#[allow(clippy::too_many_lines)]
 pub fn generate_cylinder(
     p1: Vec3,
     p2: Vec3,
@@ -208,86 +210,90 @@ pub fn generate_cylinder(
     };
     let v = dir.cross(u).normalize();
 
-    // 1. Generate cylinder tube vertices
-    for i in 0..=segments {
-        let theta = (i as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
-        let cos_t = theta.cos();
-        let sin_t = theta.sin();
-
-        let radial_dir = u * cos_t + v * sin_t;
-        let p_offset = radial_dir * radius;
-
-        let uv_x = (i as f32) / (segments as f32);
-
-        // Bottom vertex (on P1 plane)
-        vertices.push(Vertex::new(p1 + p_offset, radial_dir, [uv_x, 0.0]));
-        // Top vertex (on P2 plane)
-        vertices.push(Vertex::new(p2 + p_offset, radial_dir, [uv_x, 1.0]));
-    }
-
-    // Connect tube segments
-    for i in 0..segments {
-        let b0 = i * 2;
-        let t0 = i * 2 + 1;
-        let b1 = (i + 1) * 2;
-        let t1 = (i + 1) * 2 + 1;
-
-        // Triangle 1
-        indices.push(b0);
-        indices.push(b1);
-        indices.push(t0);
-
-        // Triangle 2
-        indices.push(t0);
-        indices.push(b1);
-        indices.push(t1);
-    }
-
-    // 2. Generate Bottom Cap (centered at P1, normal pointing -dir)
-    let bot_center_idx = vertices.len() as u32;
-    vertices.push(Vertex::new(p1, -dir, [0.5, 0.5])); // Center of bottom disk
-
-    let bot_ring_start = vertices.len() as u32;
-    for i in 0..=segments {
-        let theta = (i as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
-        let cos_t = theta.cos();
-        let sin_t = theta.sin();
-        let radial_dir = u * cos_t + v * sin_t;
-        let p_offset = radial_dir * radius;
-        let uv_u = 0.5 + 0.5 * cos_t;
-        let uv_v = 0.5 + 0.5 * sin_t;
-
-        vertices.push(Vertex::new(p1 + p_offset, -dir, [uv_u, uv_v]));
-    }
-
-    for i in 0..segments {
-        indices.push(bot_center_idx);
-        indices.push(bot_ring_start + i + 1);
-        indices.push(bot_ring_start + i);
-    }
-
-    // 3. Generate Top Cap (centered at P2, normal pointing +dir)
-    let top_center_idx = vertices.len() as u32;
-    vertices.push(Vertex::new(p2, dir, [0.5, 0.5])); // Center of top disk
-
-    let top_ring_start = vertices.len() as u32;
-    for i in 0..=segments {
-        let theta = (i as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
-        let cos_t = theta.cos();
-        let sin_t = theta.sin();
-        let radial_dir = u * cos_t + v * sin_t;
-        let p_offset = radial_dir * radius;
-        let uv_u = 0.5 + 0.5 * cos_t;
-        let uv_v = 0.5 + 0.5 * sin_t;
-
-        vertices.push(Vertex::new(p2 + p_offset, dir, [uv_u, uv_v]));
-    }
-
-    for i in 0..segments {
-        indices.push(top_center_idx);
-        indices.push(top_ring_start + i);
-        indices.push(top_ring_start + i + 1);
-    }
+    // 1. Tube wall, 2. bottom cap (−dir at p1), 3. top cap (+dir at p2).
+    push_cylinder_tube(
+        &mut vertices,
+        &mut indices,
+        (p1, p2),
+        (u, v),
+        radius,
+        segments,
+    );
+    push_cylinder_cap(
+        &mut vertices,
+        &mut indices,
+        (p1, -dir, true),
+        (u, v),
+        radius,
+        segments,
+    );
+    push_cylinder_cap(
+        &mut vertices,
+        &mut indices,
+        (p2, dir, false),
+        (u, v),
+        radius,
+        segments,
+    );
 
     (vertices, indices)
+}
+
+/// Append the cylinder's side wall: paired bottom/top ring vertices and the
+/// triangles connecting consecutive segments.
+fn push_cylinder_tube(
+    vertices: &mut Vec<Vertex>,
+    indices: &mut Vec<u32>,
+    ends: (Vec3, Vec3),
+    basis: (Vec3, Vec3),
+    radius: f32,
+    segments: u32,
+) {
+    let (p1, p2) = ends;
+    let (u, v) = basis;
+    for i in 0..=segments {
+        let theta = (i as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
+        let radial_dir = u * theta.cos() + v * theta.sin();
+        let p_offset = radial_dir * radius;
+        let uv_x = (i as f32) / (segments as f32);
+        // Bottom vertex (on P1 plane), then top vertex (on P2 plane).
+        vertices.push(Vertex::new(p1 + p_offset, radial_dir, [uv_x, 0.0]));
+        vertices.push(Vertex::new(p2 + p_offset, radial_dir, [uv_x, 1.0]));
+    }
+    for i in 0..segments {
+        let (b0, t0, b1, t1) = (i * 2, i * 2 + 1, (i + 1) * 2, (i + 1) * 2 + 1);
+        indices.extend_from_slice(&[b0, b1, t0, t0, b1, t1]);
+    }
+}
+
+/// Append one disk cap. `cap` is `(center, outward normal, flip_winding)`: the bottom
+/// cap winds (center, i+1, i) so the face points outward, the top cap (center, i, i+1).
+fn push_cylinder_cap(
+    vertices: &mut Vec<Vertex>,
+    indices: &mut Vec<u32>,
+    cap: (Vec3, Vec3, bool),
+    basis: (Vec3, Vec3),
+    radius: f32,
+    segments: u32,
+) {
+    let (center, normal, flip) = cap;
+    let (u, v) = basis;
+    let center_idx = vertices.len() as u32;
+    vertices.push(Vertex::new(center, normal, [0.5, 0.5]));
+    let ring_start = vertices.len() as u32;
+    for i in 0..=segments {
+        let theta = (i as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
+        let (cos_t, sin_t) = (theta.cos(), theta.sin());
+        let radial_dir = u * cos_t + v * sin_t;
+        let p_offset = radial_dir * radius;
+        let uv = [0.5 + 0.5 * cos_t, 0.5 + 0.5 * sin_t];
+        vertices.push(Vertex::new(center + p_offset, normal, uv));
+    }
+    for i in 0..segments {
+        if flip {
+            indices.extend_from_slice(&[center_idx, ring_start + i + 1, ring_start + i]);
+        } else {
+            indices.extend_from_slice(&[center_idx, ring_start + i, ring_start + i + 1]);
+        }
+    }
 }
