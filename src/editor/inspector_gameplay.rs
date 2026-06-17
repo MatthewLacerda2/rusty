@@ -62,7 +62,6 @@ pub fn draw_health(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) 
 }
 
 /// 3EE. Collider Component
-#[allow(clippy::too_many_lines)]
 pub fn draw_collider(
     ui: &mut egui::Ui,
     entity: &mut Entity,
@@ -84,70 +83,79 @@ pub fn draw_collider(
             };
             ui.checkbox(&mut collider.active, "Active");
             ui.checkbox(&mut collider.is_trigger, "Is Trigger");
-
-            let mut shape_type = match &collider.shape {
-                ColliderShape::Box { .. } => "Box",
-                ColliderShape::Sphere { .. } => "Sphere",
-                ColliderShape::Cylinder { .. } => "Cylinder",
-                ColliderShape::Mesh { .. } => "Mesh",
-            };
-            let old_shape_type = shape_type;
-            egui::ComboBox::from_label("Shape")
-                .selected_text(shape_type)
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut shape_type, "Box", "Box");
-                    ui.selectable_value(&mut shape_type, "Sphere", "Sphere");
-                    ui.selectable_value(&mut shape_type, "Cylinder", "Cylinder");
-                });
-            if shape_type != old_shape_type {
-                collider.shape = match shape_type {
-                    "Sphere" => ColliderShape::Sphere { radius: 0.5 },
-                    "Cylinder" => ColliderShape::Cylinder {
-                        radius: 0.5,
-                        height: 1.0,
-                    },
-                    _ => ColliderShape::Box { size: Vec3::ONE },
-                };
-                *pending_nav_bake = true;
-            }
-
-            match &mut collider.shape {
-                ColliderShape::Box { size } => {
-                    ui.horizontal(|ui| {
-                        ui.label("Size:");
-                        drag(ui, &mut size.x);
-                        drag(ui, &mut size.y);
-                        drag(ui, &mut size.z);
-                    });
-                }
-                ColliderShape::Sphere { radius } => {
-                    ui.horizontal(|ui| {
-                        ui.label("Radius:");
-                        drag(ui, radius);
-                    });
-                }
-                ColliderShape::Cylinder { radius, height } => {
-                    ui.horizontal(|ui| {
-                        ui.label("Radius:");
-                        drag(ui, radius);
-                        ui.label("Height:");
-                        drag(ui, height);
-                    });
-                }
-                ColliderShape::Mesh { convex, .. } => {
-                    // Baked from the imported mesh (#77): no editable extents, but
-                    // the hull/trimesh choice can still be flipped here.
-                    ui.label("Baked from imported mesh");
-                    if ui.checkbox(convex, "Convex hull").changed() {
-                        *pending_nav_bake = true;
-                    }
-                }
-            }
+            draw_shape_selector(ui, &mut collider.shape, pending_nav_bake);
+            draw_shape_fields(ui, &mut collider.shape, pending_nav_bake);
         },
     );
     if remove {
         entity.collider = None;
         *is_dirty = true;
+    }
+}
+
+/// The Shape combo box; switching to a new shape resets it to sensible defaults
+/// and requests a nav rebake (the static geometry changed).
+fn draw_shape_selector(ui: &mut egui::Ui, shape: &mut ColliderShape, pending_nav_bake: &mut bool) {
+    let mut shape_type = match shape {
+        ColliderShape::Box { .. } => "Box",
+        ColliderShape::Sphere { .. } => "Sphere",
+        ColliderShape::Cylinder { .. } => "Cylinder",
+        ColliderShape::Mesh { .. } => "Mesh",
+    };
+    let old_shape_type = shape_type;
+    egui::ComboBox::from_label("Shape")
+        .selected_text(shape_type)
+        .show_ui(ui, |ui| {
+            ui.selectable_value(&mut shape_type, "Box", "Box");
+            ui.selectable_value(&mut shape_type, "Sphere", "Sphere");
+            ui.selectable_value(&mut shape_type, "Cylinder", "Cylinder");
+        });
+    if shape_type != old_shape_type {
+        *shape = match shape_type {
+            "Sphere" => ColliderShape::Sphere { radius: 0.5 },
+            "Cylinder" => ColliderShape::Cylinder {
+                radius: 0.5,
+                height: 1.0,
+            },
+            _ => ColliderShape::Box { size: Vec3::ONE },
+        };
+        *pending_nav_bake = true;
+    }
+}
+
+/// The shape-specific extent fields (or the baked-mesh hull toggle).
+fn draw_shape_fields(ui: &mut egui::Ui, shape: &mut ColliderShape, pending_nav_bake: &mut bool) {
+    match shape {
+        ColliderShape::Box { size } => {
+            ui.horizontal(|ui| {
+                ui.label("Size:");
+                drag(ui, &mut size.x);
+                drag(ui, &mut size.y);
+                drag(ui, &mut size.z);
+            });
+        }
+        ColliderShape::Sphere { radius } => {
+            ui.horizontal(|ui| {
+                ui.label("Radius:");
+                drag(ui, radius);
+            });
+        }
+        ColliderShape::Cylinder { radius, height } => {
+            ui.horizontal(|ui| {
+                ui.label("Radius:");
+                drag(ui, radius);
+                ui.label("Height:");
+                drag(ui, height);
+            });
+        }
+        ColliderShape::Mesh { convex, .. } => {
+            // Baked from the imported mesh (#77): no editable extents, but
+            // the hull/trimesh choice can still be flipped here.
+            ui.label("Baked from imported mesh");
+            if ui.checkbox(convex, "Convex hull").changed() {
+                *pending_nav_bake = true;
+            }
+        }
     }
 }
 

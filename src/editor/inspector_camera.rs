@@ -132,7 +132,6 @@ fn draw_stacking(
 }
 
 /// Visual Correction Component panel
-#[allow(clippy::too_many_lines)]
 pub fn draw_visual_correction(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
     if entity.visual_correction.is_none() {
         return;
@@ -148,75 +147,83 @@ pub fn draw_visual_correction(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: 
                 return;
             };
             ui.checkbox(&mut vc.active, "Enable Visual Correction");
-
-            ui.add_space(3.0);
-            ui.label("Bloom");
-            ui.checkbox(&mut vc.bloom_active, "  Bloom Active");
-            if vc.bloom_active {
-                ui.horizontal(|ui| {
-                    ui.label("    Intensity:");
-                    ui.add(egui::Slider::new(&mut vc.bloom_intensity, 0.0..=5.0));
-                });
-                ui.horizontal(|ui| {
-                    ui.label("    Threshold:");
-                    ui.add(egui::Slider::new(&mut vc.bloom_threshold, 0.0..=1.0));
-                });
-            }
-
-            ui.add_space(3.0);
-            ui.label("Color Correction");
-            ui.horizontal(|ui| {
-                ui.label("  Exposure (EV):");
-                ui.add(egui::Slider::new(&mut vc.exposure, -4.0..=4.0));
-            });
-            ui.horizontal(|ui| {
-                ui.label("  Contrast:");
-                ui.add(egui::Slider::new(&mut vc.contrast, 0.0..=2.0));
-            });
-            ui.horizontal(|ui| {
-                ui.label("  Saturation:");
-                ui.add(egui::Slider::new(&mut vc.saturation, 0.0..=2.0));
-            });
-            ui.horizontal(|ui| {
-                ui.label("  Tonemap:");
-                egui::ComboBox::from_id_source("tonemap")
-                    .selected_text(format!("{:?}", vc.tonemap))
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut vc.tonemap, Tonemap::Aces, "ACES");
-                        ui.selectable_value(&mut vc.tonemap, Tonemap::Reinhard, "Reinhard");
-                        ui.selectable_value(&mut vc.tonemap, Tonemap::None, "None");
-                    });
-            });
-            ui.horizontal(|ui| {
-                ui.label("  Gamma:");
-                ui.add(egui::Slider::new(&mut vc.gamma, 1.0..=3.0));
-            });
-
-            ui.add_space(3.0);
-            ui.label("Screen Space Reflections (SSR)");
-            ui.checkbox(&mut vc.ssr_active, "  SSR Active");
-            if vc.ssr_active {
-                ui.horizontal(|ui| {
-                    ui.label("    Quality:");
-                    egui::ComboBox::from_label("")
-                        .selected_text(&vc.ssr_quality)
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut vc.ssr_quality, "Low".to_string(), "Low");
-                            ui.selectable_value(
-                                &mut vc.ssr_quality,
-                                "Medium".to_string(),
-                                "Medium",
-                            );
-                            ui.selectable_value(&mut vc.ssr_quality, "High".to_string(), "High");
-                            ui.selectable_value(&mut vc.ssr_quality, "Ultra".to_string(), "Ultra");
-                        });
-                });
-                ui.checkbox(&mut vc.ssr_temporal_upsampling, "    Temporal Upsampling");
-            }
+            draw_bloom(ui, vc);
+            draw_color_correction(ui, vc);
+            draw_ssr(ui, vc);
         },
     );
     if remove {
         entity.visual_correction = None;
         *is_dirty = true;
+    }
+}
+
+/// The Bloom section of the Visual Correction card.
+fn draw_bloom(ui: &mut egui::Ui, vc: &mut crate::scene::VisualCorrectionComponent) {
+    ui.add_space(3.0);
+    ui.label("Bloom");
+    ui.checkbox(&mut vc.bloom_active, "  Bloom Active");
+    if vc.bloom_active {
+        ui.horizontal(|ui| {
+            ui.label("    Intensity:");
+            ui.add(egui::Slider::new(&mut vc.bloom_intensity, 0.0..=5.0));
+        });
+        ui.horizontal(|ui| {
+            ui.label("    Threshold:");
+            ui.add(egui::Slider::new(&mut vc.bloom_threshold, 0.0..=1.0));
+        });
+    }
+}
+
+/// The Color Correction section (exposure, contrast, saturation, tonemap, gamma).
+fn draw_color_correction(ui: &mut egui::Ui, vc: &mut crate::scene::VisualCorrectionComponent) {
+    ui.add_space(3.0);
+    ui.label("Color Correction");
+    ui.horizontal(|ui| {
+        ui.label("  Exposure (EV):");
+        ui.add(egui::Slider::new(&mut vc.exposure, -4.0..=4.0));
+    });
+    ui.horizontal(|ui| {
+        ui.label("  Contrast:");
+        ui.add(egui::Slider::new(&mut vc.contrast, 0.0..=2.0));
+    });
+    ui.horizontal(|ui| {
+        ui.label("  Saturation:");
+        ui.add(egui::Slider::new(&mut vc.saturation, 0.0..=2.0));
+    });
+    ui.horizontal(|ui| {
+        ui.label("  Tonemap:");
+        egui::ComboBox::from_id_source("tonemap")
+            .selected_text(format!("{:?}", vc.tonemap))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut vc.tonemap, Tonemap::Aces, "ACES");
+                ui.selectable_value(&mut vc.tonemap, Tonemap::Reinhard, "Reinhard");
+                ui.selectable_value(&mut vc.tonemap, Tonemap::None, "None");
+            });
+    });
+    ui.horizontal(|ui| {
+        ui.label("  Gamma:");
+        ui.add(egui::Slider::new(&mut vc.gamma, 1.0..=3.0));
+    });
+}
+
+/// The Screen Space Reflections (SSR) section of the Visual Correction card.
+fn draw_ssr(ui: &mut egui::Ui, vc: &mut crate::scene::VisualCorrectionComponent) {
+    ui.add_space(3.0);
+    ui.label("Screen Space Reflections (SSR)");
+    ui.checkbox(&mut vc.ssr_active, "  SSR Active");
+    if vc.ssr_active {
+        ui.horizontal(|ui| {
+            ui.label("    Quality:");
+            egui::ComboBox::from_label("")
+                .selected_text(&vc.ssr_quality)
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut vc.ssr_quality, "Low".to_string(), "Low");
+                    ui.selectable_value(&mut vc.ssr_quality, "Medium".to_string(), "Medium");
+                    ui.selectable_value(&mut vc.ssr_quality, "High".to_string(), "High");
+                    ui.selectable_value(&mut vc.ssr_quality, "Ultra".to_string(), "Ultra");
+                });
+        });
+        ui.checkbox(&mut vc.ssr_temporal_upsampling, "    Temporal Upsampling");
     }
 }

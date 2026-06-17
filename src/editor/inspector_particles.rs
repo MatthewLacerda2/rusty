@@ -9,10 +9,9 @@
 use egui_phosphor::regular as icon;
 
 use crate::editor::inspector_card::component_card;
-use crate::scene::{CollisionResponse, EmitMode, Entity, ParticleBlend};
+use crate::scene::{CollisionResponse, EmitMode, Entity, ParticleBlend, ParticleEmitterComponent};
 
 /// 3F-particles. Particle System component card.
-#[allow(clippy::too_many_lines)]
 pub fn draw(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
     if entity.particles.is_none() {
         return;
@@ -28,90 +27,20 @@ pub fn draw(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
             let Some(p) = &mut entity.particles else {
                 return;
             };
-
             changed |= ui.checkbox(&mut p.active, "Active").changed();
             ui.label(format!("Live particles: {}", p.live_count()));
             ui.separator();
-
-            // Emission ---------------------------------------------------------
-            changed |= combo(
-                ui,
-                "Emit Mode",
-                &mut p.emit_mode,
-                &[
-                    (EmitMode::Continuous, "Continuous"),
-                    (EmitMode::Burst, "Burst"),
-                ],
-            );
-            changed |= ui.checkbox(&mut p.looping, "Looping").changed();
-            changed |= clamped(ui, "Rate (per sec):", &mut p.rate, 0.0..=1000.0);
-            changed |= drag_u32(ui, "Burst Count:", &mut p.burst_count, 1..=100_000);
-            changed |= drag_u32(ui, "Max Particles:", &mut p.max_particles, 1..=100_000);
+            changed |= draw_emission(ui, p);
             ui.separator();
-
-            // Rendering --------------------------------------------------------
-            changed |= combo(
-                ui,
-                "Blend",
-                &mut p.blend,
-                &[
-                    (ParticleBlend::Alpha, "Alpha"),
-                    (ParticleBlend::Additive, "Additive"),
-                ],
-            );
-            let mut tex = p.texture.clone().unwrap_or_default();
-            ui.horizontal(|ui| {
-                ui.label("Texture:");
-                if ui.text_edit_singleline(&mut tex).changed() {
-                    p.texture = if tex.is_empty() { None } else { Some(tex) };
-                    changed = true;
-                }
-            });
+            changed |= draw_rendering(ui, p);
             ui.separator();
-
-            // Motion -----------------------------------------------------------
-            changed |= clamped(ui, "Lifetime (sec):", &mut p.lifetime, 0.0..=60.0);
-            changed |= clamped(ui, "Speed:", &mut p.speed, 0.0..=100.0);
-            changed |= vec3(ui, "Direction:", &mut p.direction, 0.05);
-            changed |= clamped(ui, "Spread:", &mut p.spread, 0.0..=1.0);
-            changed |= vec3(ui, "Gravity:", &mut p.gravity, 0.1);
+            changed |= draw_motion(ui, p);
             ui.separator();
-
-            // Size + colour ----------------------------------------------------
-            changed |= clamped(ui, "Size Start:", &mut p.size_start, 0.0..=50.0);
-            changed |= clamped(ui, "Size End:", &mut p.size_end, 0.0..=50.0);
-            ui.horizontal(|ui| {
-                ui.label("Color (RGBA):");
-                if ui
-                    .color_edit_button_rgba_unmultiplied(&mut p.color)
-                    .changed()
-                {
-                    changed = true;
-                }
-            });
+            changed |= draw_size_color(ui, p);
             ui.separator();
-
-            // Collision --------------------------------------------------------
-            changed |= combo(
-                ui,
-                "Collision",
-                &mut p.collision,
-                &[
-                    (CollisionResponse::None, "None"),
-                    (CollisionResponse::Die, "Die"),
-                    (CollisionResponse::Bounce, "Bounce"),
-                ],
-            );
-            changed |= clamped(ui, "Bounciness:", &mut p.bounciness, 0.0..=1.0);
+            changed |= draw_collision(ui, p);
             ui.separator();
-
-            // Determinism ------------------------------------------------------
-            ui.horizontal(|ui| {
-                ui.label("Seed:");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut p.seed).speed(1.0))
-                    .changed();
-            });
+            changed |= draw_determinism(ui, p);
         },
     );
     if remove {
@@ -120,6 +49,98 @@ pub fn draw(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
     } else if changed {
         *is_dirty = true;
     }
+}
+
+/// Emission controls: mode, looping, rate, burst count and particle cap.
+fn draw_emission(ui: &mut egui::Ui, p: &mut ParticleEmitterComponent) -> bool {
+    let mut changed = combo(
+        ui,
+        "Emit Mode",
+        &mut p.emit_mode,
+        &[
+            (EmitMode::Continuous, "Continuous"),
+            (EmitMode::Burst, "Burst"),
+        ],
+    );
+    changed |= ui.checkbox(&mut p.looping, "Looping").changed();
+    changed |= clamped(ui, "Rate (per sec):", &mut p.rate, 0.0..=1000.0);
+    changed |= drag_u32(ui, "Burst Count:", &mut p.burst_count, 1..=100_000);
+    changed |= drag_u32(ui, "Max Particles:", &mut p.max_particles, 1..=100_000);
+    changed
+}
+
+/// Rendering controls: blend mode and the optional texture path.
+fn draw_rendering(ui: &mut egui::Ui, p: &mut ParticleEmitterComponent) -> bool {
+    let mut changed = combo(
+        ui,
+        "Blend",
+        &mut p.blend,
+        &[
+            (ParticleBlend::Alpha, "Alpha"),
+            (ParticleBlend::Additive, "Additive"),
+        ],
+    );
+    let mut tex = p.texture.clone().unwrap_or_default();
+    ui.horizontal(|ui| {
+        ui.label("Texture:");
+        if ui.text_edit_singleline(&mut tex).changed() {
+            p.texture = if tex.is_empty() { None } else { Some(tex) };
+            changed = true;
+        }
+    });
+    changed
+}
+
+/// Per-particle motion: lifetime, speed, direction, spread and gravity.
+fn draw_motion(ui: &mut egui::Ui, p: &mut ParticleEmitterComponent) -> bool {
+    let mut changed = clamped(ui, "Lifetime (sec):", &mut p.lifetime, 0.0..=60.0);
+    changed |= clamped(ui, "Speed:", &mut p.speed, 0.0..=100.0);
+    changed |= vec3(ui, "Direction:", &mut p.direction, 0.05);
+    changed |= clamped(ui, "Spread:", &mut p.spread, 0.0..=1.0);
+    changed |= vec3(ui, "Gravity:", &mut p.gravity, 0.1);
+    changed
+}
+
+/// Size-over-life and colour controls.
+fn draw_size_color(ui: &mut egui::Ui, p: &mut ParticleEmitterComponent) -> bool {
+    let mut changed = clamped(ui, "Size Start:", &mut p.size_start, 0.0..=50.0);
+    changed |= clamped(ui, "Size End:", &mut p.size_end, 0.0..=50.0);
+    ui.horizontal(|ui| {
+        ui.label("Color (RGBA):");
+        if ui
+            .color_edit_button_rgba_unmultiplied(&mut p.color)
+            .changed()
+        {
+            changed = true;
+        }
+    });
+    changed
+}
+
+/// Collision response and bounciness controls.
+fn draw_collision(ui: &mut egui::Ui, p: &mut ParticleEmitterComponent) -> bool {
+    let mut changed = combo(
+        ui,
+        "Collision",
+        &mut p.collision,
+        &[
+            (CollisionResponse::None, "None"),
+            (CollisionResponse::Die, "Die"),
+            (CollisionResponse::Bounce, "Bounce"),
+        ],
+    );
+    changed |= clamped(ui, "Bounciness:", &mut p.bounciness, 0.0..=1.0);
+    changed
+}
+
+/// The deterministic seed control.
+fn draw_determinism(ui: &mut egui::Ui, p: &mut ParticleEmitterComponent) -> bool {
+    ui.horizontal(|ui| {
+        ui.label("Seed:");
+        ui.add(egui::DragValue::new(&mut p.seed).speed(1.0))
+            .changed()
+    })
+    .inner
 }
 
 /// A labelled, clamped `f32` drag row. Returns whether the value changed.

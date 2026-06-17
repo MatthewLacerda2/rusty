@@ -27,7 +27,6 @@ pub fn draw_mesh(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
 }
 
 /// 3B2. Material / Texture Component
-#[allow(clippy::too_many_lines)]
 pub fn draw_texture(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
     if entity.texture.is_none() {
         return;
@@ -59,33 +58,8 @@ pub fn draw_texture(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool)
             ui.add(egui::Slider::new(&mut tex.roughness, 0.0..=1.0));
         });
 
-        let mut has_metallic_map = tex.metallic_map.is_some();
-        if ui
-            .checkbox(&mut has_metallic_map, "Use Metallic Map")
-            .changed()
-        {
-            tex.metallic_map = has_metallic_map.then(String::new);
-        }
-        if let Some(map_path) = &mut tex.metallic_map {
-            ui.horizontal(|ui| {
-                ui.label("  Path:");
-                ui.text_edit_singleline(map_path);
-            });
-        }
-
-        let mut has_roughness_map = tex.roughness_map.is_some();
-        if ui
-            .checkbox(&mut has_roughness_map, "Use Roughness Map")
-            .changed()
-        {
-            tex.roughness_map = has_roughness_map.then(String::new);
-        }
-        if let Some(map_path) = &mut tex.roughness_map {
-            ui.horizontal(|ui| {
-                ui.label("  Path:");
-                ui.text_edit_singleline(map_path);
-            });
-        }
+        optional_map(ui, "Use Metallic Map", &mut tex.metallic_map);
+        optional_map(ui, "Use Roughness Map", &mut tex.roughness_map);
     });
     if remove {
         entity.texture = None;
@@ -93,8 +67,22 @@ pub fn draw_texture(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool)
     }
 }
 
+/// A "Use X Map" checkbox that, when ticked, reveals an editable map-path field.
+/// Toggling the checkbox enables (empty path) or clears the optional `map`.
+fn optional_map(ui: &mut egui::Ui, label: &str, map: &mut Option<String>) {
+    let mut enabled = map.is_some();
+    if ui.checkbox(&mut enabled, label).changed() {
+        *map = enabled.then(String::new);
+    }
+    if let Some(map_path) = map {
+        ui.horizontal(|ui| {
+            ui.label("  Path:");
+            ui.text_edit_singleline(map_path);
+        });
+    }
+}
+
 /// 3C. Light configuration
-#[allow(clippy::too_many_lines)]
 pub fn draw_light(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
     if entity.light.is_none() {
         return;
@@ -105,44 +93,7 @@ pub fn draw_light(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
             return;
         };
 
-        ui.horizontal(|ui| {
-            ui.label("Type:");
-            let current_type_name = match light.light_type {
-                LightType::Point => "Point",
-                LightType::Directional => "Directional",
-                LightType::Spotlight => "Spot",
-                LightType::Ambient => "Ambient",
-            };
-            egui::ComboBox::from_id_source("LightTypeSelector")
-                .selected_text(current_type_name)
-                .show_ui(ui, |ui| {
-                    if ui
-                        .selectable_label(light.light_type == LightType::Point, "Point")
-                        .clicked()
-                    {
-                        light.light_type = LightType::Point;
-                        *is_dirty = true;
-                    }
-                    if ui
-                        .selectable_label(light.light_type == LightType::Directional, "Directional")
-                        .clicked()
-                    {
-                        light.light_type = LightType::Directional;
-                        *is_dirty = true;
-                    }
-                    if ui
-                        .selectable_label(light.light_type == LightType::Spotlight, "Spot")
-                        .clicked()
-                    {
-                        light.light_type = LightType::Spotlight;
-                        *is_dirty = true;
-                        if light.inner_cone == 0.0 && light.outer_cone == 0.0 {
-                            light.inner_cone = 30.0;
-                            light.outer_cone = 45.0;
-                        }
-                    }
-                });
-        });
+        draw_light_type(ui, light, is_dirty);
 
         let mut color_arr = [light.color.x, light.color.y, light.color.z];
         ui.horizontal(|ui| {
@@ -176,34 +127,91 @@ pub fn draw_light(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
         }
 
         if light.light_type == LightType::Spotlight {
-            ui.horizontal(|ui| {
-                ui.label("FOV (Outer Cone):");
-                if ui
-                    .add(egui::Slider::new(&mut light.outer_cone, 0.1..=90.0).suffix("°"))
-                    .changed()
-                {
-                    *is_dirty = true;
-                    if light.inner_cone > light.outer_cone {
-                        light.inner_cone = light.outer_cone;
-                    }
-                }
-            });
-            ui.horizontal(|ui| {
-                ui.label("Inner Cone:");
-                if ui
-                    .add(egui::Slider::new(&mut light.inner_cone, 0.0..=90.0).suffix("°"))
-                    .changed()
-                {
-                    *is_dirty = true;
-                    if light.inner_cone > light.outer_cone {
-                        light.outer_cone = light.inner_cone;
-                    }
-                }
-            });
+            draw_spot_cones(ui, light, is_dirty);
         }
     });
     if remove {
         entity.light = None;
         *is_dirty = true;
     }
+}
+
+/// The light-type selector combo box. Switching to Spotlight seeds default cone
+/// angles when they are still zero so the spot is immediately visible.
+fn draw_light_type(
+    ui: &mut egui::Ui,
+    light: &mut crate::scene::LightComponent,
+    is_dirty: &mut bool,
+) {
+    ui.horizontal(|ui| {
+        ui.label("Type:");
+        let current_type_name = match light.light_type {
+            LightType::Point => "Point",
+            LightType::Directional => "Directional",
+            LightType::Spotlight => "Spot",
+            LightType::Ambient => "Ambient",
+        };
+        egui::ComboBox::from_id_source("LightTypeSelector")
+            .selected_text(current_type_name)
+            .show_ui(ui, |ui| {
+                if ui
+                    .selectable_label(light.light_type == LightType::Point, "Point")
+                    .clicked()
+                {
+                    light.light_type = LightType::Point;
+                    *is_dirty = true;
+                }
+                if ui
+                    .selectable_label(light.light_type == LightType::Directional, "Directional")
+                    .clicked()
+                {
+                    light.light_type = LightType::Directional;
+                    *is_dirty = true;
+                }
+                if ui
+                    .selectable_label(light.light_type == LightType::Spotlight, "Spot")
+                    .clicked()
+                {
+                    light.light_type = LightType::Spotlight;
+                    *is_dirty = true;
+                    if light.inner_cone == 0.0 && light.outer_cone == 0.0 {
+                        light.inner_cone = 30.0;
+                        light.outer_cone = 45.0;
+                    }
+                }
+            });
+    });
+}
+
+/// The spotlight cone sliders: outer (FOV) and inner cone, kept ordered so the
+/// inner cone never exceeds the outer one.
+fn draw_spot_cones(
+    ui: &mut egui::Ui,
+    light: &mut crate::scene::LightComponent,
+    is_dirty: &mut bool,
+) {
+    ui.horizontal(|ui| {
+        ui.label("FOV (Outer Cone):");
+        if ui
+            .add(egui::Slider::new(&mut light.outer_cone, 0.1..=90.0).suffix("°"))
+            .changed()
+        {
+            *is_dirty = true;
+            if light.inner_cone > light.outer_cone {
+                light.inner_cone = light.outer_cone;
+            }
+        }
+    });
+    ui.horizontal(|ui| {
+        ui.label("Inner Cone:");
+        if ui
+            .add(egui::Slider::new(&mut light.inner_cone, 0.0..=90.0).suffix("°"))
+            .changed()
+        {
+            *is_dirty = true;
+            if light.inner_cone > light.outer_cone {
+                light.outer_cone = light.inner_cone;
+            }
+        }
+    });
 }

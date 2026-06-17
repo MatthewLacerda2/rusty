@@ -5,7 +5,6 @@ use crate::scene::Scene;
 use crate::scripting::{ConsoleLogs, LogLevel};
 
 /// BOTTOM PANEL: Folder Explorer & Console Logs
-#[allow(clippy::too_many_lines)]
 pub fn draw(
     editor: &mut EditorUi,
     ctx: &egui::Context,
@@ -27,45 +26,7 @@ pub fn draw(
                 .stroke(egui::Stroke::new(1.0, t.border)),
         )
         .show(ctx, |ui| {
-            // Tab Header Bar
-            ui.horizontal(|ui| {
-                if ui
-                    .selectable_label(
-                        editor.active_bottom_tab == "assets",
-                        format!("{}  Content", icon::FOLDERS),
-                    )
-                    .clicked()
-                {
-                    editor.active_bottom_tab = "assets".to_string();
-                }
-                if ui
-                    .selectable_label(
-                        editor.active_bottom_tab == "console",
-                        format!("{}  Console", icon::TERMINAL_WINDOW),
-                    )
-                    .clicked()
-                {
-                    editor.active_bottom_tab = "console".to_string();
-                }
-
-                // Align the collapse caret and dynamic tab utility button on the right
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui
-                        .button(icon::CARET_DOWN)
-                        .on_hover_text("Collapse")
-                        .clicked()
-                    {
-                        editor.bottom_open = false;
-                    }
-                    if editor.active_bottom_tab == "console" {
-                        if ui.button(format!("{}  Clear", icon::TRASH)).clicked() {
-                            console.messages.clear();
-                        }
-                    } else if ui.button(format!("{}  Root", icon::HOUSE)).clicked() {
-                        editor.current_dir = "project".to_string();
-                    }
-                });
-            });
+            draw_tab_header(editor, console, ui);
             ui.separator();
             ui.add_space(3.0);
 
@@ -77,6 +38,49 @@ pub fn draw(
                 draw_repl_input(editor, ui);
             }
         });
+}
+
+/// The tab header bar: the Content/Console selectors plus the right-aligned
+/// collapse caret and the per-tab utility button (Clear logs / jump to Root).
+fn draw_tab_header(editor: &mut EditorUi, console: &mut ConsoleLogs, ui: &mut egui::Ui) {
+    ui.horizontal(|ui| {
+        if ui
+            .selectable_label(
+                editor.active_bottom_tab == "assets",
+                format!("{}  Content", icon::FOLDERS),
+            )
+            .clicked()
+        {
+            editor.active_bottom_tab = "assets".to_string();
+        }
+        if ui
+            .selectable_label(
+                editor.active_bottom_tab == "console",
+                format!("{}  Console", icon::TERMINAL_WINDOW),
+            )
+            .clicked()
+        {
+            editor.active_bottom_tab = "console".to_string();
+        }
+
+        // Align the collapse caret and dynamic tab utility button on the right
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if ui
+                .button(icon::CARET_DOWN)
+                .on_hover_text("Collapse")
+                .clicked()
+            {
+                editor.bottom_open = false;
+            }
+            if editor.active_bottom_tab == "console" {
+                if ui.button(format!("{}  Clear", icon::TRASH)).clicked() {
+                    console.messages.clear();
+                }
+            } else if ui.button(format!("{}  Root", icon::HOUSE)).clicked() {
+                editor.current_dir = "project".to_string();
+            }
+        });
+    });
 }
 
 /// Collapsed state: a short rail with a caret that reopens the bottom panel.

@@ -22,13 +22,20 @@ pub fn draw(ui: &mut egui::Ui, entity: &mut Entity) {
     );
 }
 
-#[allow(clippy::too_many_lines)]
 fn add_menu(ui: &mut egui::Ui, entity: &mut Entity) {
     // Every project `.lua` that exposes a lifecycle table is a MonoBehaviour and
     // is offered here with the moon glyph (the per-type icons for the other
     // built-ins are the burn-down in #82); helper modules without a lifecycle
     // table are not. An entity can hold many scripts (#83), so each pick appends.
     add_script_menu(ui, entity);
+    add_lighting_combat(ui, entity);
+    add_physics_components(ui, entity);
+    add_render_components(ui, entity);
+}
+
+/// Add-menu entries for light, health (+ animator) and collider. Each entry is
+/// offered only when absent.
+fn add_lighting_combat(ui: &mut egui::Ui, entity: &mut Entity) {
     if entity.light.is_none() && ui.button("Light Component").clicked() {
         entity.light = Some(LightComponent {
             light_type: LightType::Point,
@@ -65,6 +72,11 @@ fn add_menu(ui: &mut egui::Ui, entity: &mut Entity) {
         });
         ui.close_menu();
     }
+}
+
+/// Add-menu entries for rigidbody, material/texture and nav-agent. Each entry is
+/// offered only when absent.
+fn add_physics_components(ui: &mut egui::Ui, entity: &mut Entity) {
     if entity.rigidbody.is_none() && ui.button("RigidBody Component").clicked() {
         entity.rigidbody = Some(RigidBodyComponent {
             active: true,
@@ -100,6 +112,11 @@ fn add_menu(ui: &mut egui::Ui, entity: &mut Entity) {
         });
         ui.close_menu();
     }
+}
+
+/// The rendering half of the Add Component menu: camera, particles and the
+/// camera-only visual correction stack. Each entry is offered only when absent.
+fn add_render_components(ui: &mut egui::Ui, entity: &mut Entity) {
     if entity.camera.is_none() && ui.button("Camera Component").clicked() {
         entity.camera = Some(CameraComponent {
             active: true,
