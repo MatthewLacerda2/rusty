@@ -73,9 +73,14 @@ user. Keys are named strings (e.g. `"W"`, `"Space"`).
 
 ## `Navigation`
 
+The navmesh is a height-field surface (#130): each grid cell carries a baked
+surface height, so paths follow ramps, stairs, and multi-level terrain in real `y`
+rather than a flat `y = 0` plane. The returned waypoint's `y` is the surface height
+of the next cell — agents climb and descend instead of sliding through geometry.
+
 | Function | Signature | Returns |
 |---|---|---|
-| `Navigation.GetNextPathStep` | `(cx, cy, cz, tx, ty, tz)` | next waypoint `x, y, z` along the A* path |
+| `Navigation.GetNextPathStep` | `(cx, cy, cz, tx, ty, tz)` | next waypoint `x, y, z` on the baked surface along the A* path |
 
 ## `NavMeshAgent`
 
