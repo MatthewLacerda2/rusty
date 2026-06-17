@@ -95,6 +95,7 @@ fn add_menu(ui: &mut egui::Ui, entity: &mut Entity) {
             acceleration: 5.0,
             stopping_distance: 0.5,
             velocity: Vec3::ZERO,
+            ..Default::default()
         });
         ui.close_menu();
     }
