@@ -91,7 +91,11 @@ fn fs_blur(in: VsOut) -> @location(0) vec4<f32> {
         for (var y = -2; y <= 2; y = y + 1) {
             let off = vec2<f32>(f32(x) * tx, f32(y) * ty);
             let weight = gauss_w(x) * gauss_w(y);
-            result += textureSample(t_color, s_color, in.uv + off).rgb * weight;
+            // textureSampleLevel (explicit LOD 0), not textureSample: a gradient
+            // (implicit-LOD) instruction inside a loop fails to compile on D3D12
+            // (FXC "gradient instruction used in a loop"). These full-screen
+            // targets have no mips, so LOD 0 is identical on every backend.
+            result += textureSampleLevel(t_color, s_color, in.uv + off, 0.0).rgb * weight;
         }
     }
     return vec4<f32>(result, 1.0);
@@ -128,7 +132,9 @@ fn screen_space_reflection(uv: vec2<f32>, world_pos: vec3<f32>, n: vec3<f32>) ->
         if (suv.x < 0.0 || suv.x > 1.0 || suv.y < 0.0 || suv.y > 1.0) { break; }
         let scene_depth = load_depth(suv);
         if (scene_depth < s.z - 0.0005 && s.z - scene_depth < 0.02) {
-            return textureSample(t_color, s_color, suv).rgb;
+            // Explicit-LOD sample: a gradient instruction inside this break-bounded
+            // (varying-iteration) loop fails to compile under D3D12/FXC.
+            return textureSampleLevel(t_color, s_color, suv, 0.0).rgb;
         }
     }
     return cubemap_reflection(r);
@@ -159,7 +165,9 @@ fn motion_blur(uv: vec2<f32>, world_pos: vec3<f32>) -> vec3<f32> {
     for (var i = 0; i < samples; i = i + 1) {
         let t = f32(i) / max(f32(samples - 1), 1.0) - 0.5;
         let suv = clamp(uv + velocity * t, vec2<f32>(0.0), vec2<f32>(1.0));
-        color += textureSample(t_color, s_color, suv).rgb;
+        // Explicit-LOD sample: dynamic sample count makes this a varying-iteration
+        // loop, where a gradient (implicit-LOD) instruction fails under D3D12/FXC.
+        color += textureSampleLevel(t_color, s_color, suv, 0.0).rgb;
         total += 1.0;
     }
     return color / max(total, 1.0);

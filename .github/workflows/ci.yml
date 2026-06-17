@@ -22,6 +22,9 @@ jobs:
             code:
               - '!**/*.md'
 
+  # The Linux build+test. Kept as its own job (not folded into the OS matrix
+  # below) so the `build-test` status-check name — referenced by the branch
+  # ruleset as a required check — is preserved exactly.
   build-test:
     needs: changes
     runs-on: ubuntu-latest
@@ -36,6 +39,39 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: System libs for winit/wgpu builds
         run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev
+      - name: Build (default)
+        run: cargo build --locked
+      - name: Build (dev features)
+        run: cargo build --features dev --locked
+      - name: Test (engine, default)
+        run: cargo test --locked
+      - name: Test (engine, dev features)
+        run: cargo test --features dev --locked
+      - name: Test (lint xtask)
+        run: cargo test --manifest-path tools/lint/Cargo.toml --locked
+
+  # Verify the wgpu cross-platform claim (issue #121): the same build + test on
+  # macOS (Metal) and Windows (D3D12), so the portability premise is checked, not
+  # assumed. Separate from `build-test` to avoid renaming that required check.
+  # `fail-fast: false` so one OS's failure doesn't cancel the other's result.
+  build-test-cross:
+    needs: changes
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+      # macOS/Windows use their native backends and need no extra system libs; the
+      # apt step is Linux-only and lives on the `build-test` job above.
       - name: Build (default)
         run: cargo build --locked
       - name: Build (dev features)
