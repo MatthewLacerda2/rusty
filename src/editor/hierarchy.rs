@@ -169,6 +169,9 @@ fn mesh_component(
         vertices,
         indices,
         bind_palette: Vec::new(),
+        skin: None,
+        clips: Vec::new(),
+        pose_palette: Vec::new(),
         is_dirty: crate::scene::DirtyFlag::new(true),
     }
 }

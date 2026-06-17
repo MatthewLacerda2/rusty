@@ -122,12 +122,13 @@ impl Renderer {
                 usage: wgpu::BufferUsages::UNIFORM,
             });
 
-        // Upload the mesh's bind-pose bone palette (#79). Skinned `"Asset"` meshes
-        // supply a real palette computed from their imported skeleton; primitives and
-        // static meshes leave an empty palette, so the GPU bones stay at identity and
-        // the skinning shader is a no-op for them.
+        // Upload the mesh's active bone palette: the live animated pose when a clip
+        // is playing (#80), else the bind pose (#79). Skinned `"Asset"` meshes supply
+        // a real palette computed from their imported skeleton; primitives and static
+        // meshes leave an empty palette, so the GPU bones stay at identity and the
+        // skinning shader is a no-op for them.
         let mut bones_data = *default_bones;
-        for (i, bone) in mesh.bind_palette.iter().take(64).enumerate() {
+        for (i, bone) in mesh.active_palette().iter().take(64).enumerate() {
             bones_data.bones[i] = bone.to_cols_array();
         }
         let bones_buffer = self

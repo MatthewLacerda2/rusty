@@ -1,7 +1,9 @@
 //! src/api/animator.rs — `Animator` namespace.
 //!
-//! `Play`/`Crossfade`/`Stop` over an entity's optional animator component.
-//! `Crossfade` is simplified to a plain play in our component model.
+//! `Play`/`Crossfade`/`Stop` over an entity's optional animator component. `Play`
+//! hard-cuts to a clip; `Crossfade` blends out of the current clip over a duration
+//! (#80); both drive the component's minimal state machine, which the `animate`
+//! system samples against the mesh's imported clips.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -40,9 +42,7 @@ fn register_play(
             let mut scene = s.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(anim) = &mut e.animator {
-                    anim.current_clip = clip.clone();
-                    anim.is_playing = true;
-                    anim.freeze = false;
+                    anim.play(clip.clone());
                     c.borrow_mut()
                         .info(format!("Entity {} playing animation: {}", e.name, clip));
                 }
@@ -55,14 +55,12 @@ fn register_play(
     put(
         table,
         "Crossfade",
-        lua.create_function(move |_, (id, clip, _duration): (u32, String, f32)| {
-            // Simplify crossfade to standard play in our component
+        lua.create_function(move |_, (id, clip, duration): (u32, String, f32)| {
+            // Blend out of the current clip over `duration` seconds (#80).
             let mut scene = s.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(anim) = &mut e.animator {
-                    anim.current_clip = clip;
-                    anim.is_playing = true;
-                    anim.freeze = false;
+                    anim.crossfade(clip, duration);
                 }
             }
             Ok(())

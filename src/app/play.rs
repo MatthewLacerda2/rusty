@@ -163,19 +163,28 @@ fn tick_nav(world: &mut World, res: &mut Resources) {
     nav.tick_nav_agents(&mut s, res.frame_dt);
 }
 
+/// Advance every active entity's animator and re-pose its skinned mesh from the
+/// imported clips (#80). The sampler is a pure function of (skin, clip, time), so
+/// stepping at the fixed dt is deterministic.
 fn animate(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
     let mut s = world.scene.borrow_mut();
     for id in s.entity_ids() {
-        if let Some(mut entity) = s.get_entity_mut(id) {
-            if !entity.active {
-                continue;
-            }
-            if let Some(anim) = &mut entity.animator {
-                if anim.is_playing && !anim.freeze {
-                    anim.time += dt;
-                }
-            }
+        let Some(mut entity) = s.get_entity_mut(id) else {
+            continue;
+        };
+        if !entity.active {
+            continue;
+        }
+        // Split the borrow: `animator` and `mesh` are distinct fields of `entity`,
+        // so destructure to mutate both without aliasing.
+        let crate::components::Entity { animator, mesh, .. } = &mut *entity;
+        let Some(anim) = animator else {
+            continue;
+        };
+        anim.advance(dt);
+        if let Some(mesh) = mesh {
+            super::animation::repose_mesh(anim, mesh);
         }
     }
 }

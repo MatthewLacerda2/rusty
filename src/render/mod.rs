@@ -224,6 +224,9 @@ mod mesh_id_tests {
             vertices: Vec::new(),
             indices: Vec::new(),
             bind_palette: Vec::new(),
+            skin: None,
+            clips: Vec::new(),
+            pose_palette: Vec::new(),
             is_dirty: DirtyFlag::new(false),
         }
     }

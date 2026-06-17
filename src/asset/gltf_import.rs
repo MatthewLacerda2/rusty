@@ -1,18 +1,18 @@
 //! src/asset/gltf_import.rs — glTF 2.0 import (`.gltf` + `.glb`), meshes,
 //! materials and skin bindings.
 //!
-//! Reads static geometry, base-color material values, and (issue #79) the skin:
-//! per-vertex `JOINTS_0`/`WEIGHTS_0` plus the skeleton (`gltf_skin`). Animation
-//! clips remain out of scope (#80). Pure data — the `gltf` crate + `glam`, never
-//! wgpu/egui/mlua.
+//! Reads static geometry, base-color material values, the skin (issue #79):
+//! per-vertex `JOINTS_0`/`WEIGHTS_0` plus the skeleton (`gltf_skin`), and the
+//! animation clips that drive that skeleton (issue #80, `gltf_anim`). Pure data —
+//! the `gltf` crate + `glam`, never wgpu/egui/mlua.
 //!
 //! Each glTF *mesh* becomes one addressable `SubMesh`; its primitives are merged
 //! (index offsets fixed up) into one vertex/index stream, since a primitive split
 //! is a material boundary, not a separate addressable object.
 
-use super::gltf_skin;
 use super::mesh_data::{ImportedAsset, MaterialData, MeshVertex, SkinData, SubMesh};
 use super::ImportError;
+use super::{gltf_anim, gltf_skin};
 use std::path::Path;
 
 /// Import a `.gltf` or `.glb` file into addressable sub-meshes + materials.
@@ -26,7 +26,14 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
 
     let sub_meshes = document
         .meshes()
-        .map(|mesh| sub_mesh_from_gltf(&mesh, &buffers, skins.get(&mesh.index()).cloned()))
+        .map(|mesh| {
+            sub_mesh_from_gltf(
+                &mesh,
+                &buffers,
+                skins.get(&mesh.index()).cloned(),
+                &document,
+            )
+        })
         .collect();
 
     Ok(ImportedAsset {
@@ -47,6 +54,7 @@ fn sub_mesh_from_gltf(
     mesh: &gltf::Mesh,
     buffers: &[gltf::buffer::Data],
     skin: Option<SkinData>,
+    document: &gltf::Document,
 ) -> SubMesh {
     let id = mesh
         .name()
@@ -64,12 +72,20 @@ fn sub_mesh_from_gltf(
         append_primitive(&primitive, buffers, &mut vertices, &mut indices);
     }
 
+    // Clips are keyed to this skin's joint slots, so only a skinned mesh carries
+    // them (a static mesh has nothing for a channel to pose).
+    let clips = match &skin {
+        Some(s) => gltf_anim::clips_for_skin(document, buffers, &s.joint_nodes),
+        None => Vec::new(),
+    };
+
     SubMesh {
         id,
         vertices,
         indices,
         material,
         skin,
+        clips,
     }
 }
 

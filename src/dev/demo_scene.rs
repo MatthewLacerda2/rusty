@@ -33,6 +33,9 @@ fn mesh(primitive_type: &str, data: (Vec<primitives::Vertex>, Vec<u32>)) -> Mesh
         vertices: data.0,
         indices: data.1,
         bind_palette: Vec::new(),
+        skin: None,
+        clips: Vec::new(),
+        pose_palette: Vec::new(),
         is_dirty: DirtyFlag::new(true),
     }
 }
@@ -150,10 +153,9 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
     });
     enemy.animator = Some(AnimatorComponent {
         current_clip: "Walk".to_string(),
-        time: 0.0,
         speed: 3.0,
         is_playing: true,
-        freeze: false,
+        ..Default::default()
     });
     if !bot_script.is_empty() {
         enemy.scripts.push(ScriptComponent {
