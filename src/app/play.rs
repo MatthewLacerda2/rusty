@@ -50,16 +50,22 @@ impl GameWorld {
     /// Compile + load every entity script, logging per-entity compile errors.
     pub(super) fn load_entity_scripts(&mut self) {
         // Each entity can carry many scripts (#83); load each, keyed by its slot.
-        let mut to_load: Vec<(u32, usize, String)> = Vec::new();
+        type ScriptRow = (
+            u32,
+            usize,
+            String,
+            std::collections::BTreeMap<String, crate::components::ScriptFieldValue>,
+        );
+        let mut to_load: Vec<ScriptRow> = Vec::new();
         for e in self.world.scene.borrow().iter() {
             let rows = e.scripts.iter().enumerate();
-            to_load.extend(rows.map(|(i, s)| (e.id, i, s.path.clone())));
+            to_load.extend(rows.map(|(i, s)| (e.id, i, s.path.clone(), s.values.clone())));
         }
-        for (id, index, path) in to_load {
+        for (id, index, path, values) in to_load {
             if let Err(e) = self
                 .resources
                 .script_manager
-                .load_entity_script(id, index, &path)
+                .load_entity_script(id, index, &path, &values)
             {
                 let msg = format!("Lua compile error (Entity {}): {}", id, e);
                 self.resources.console.borrow_mut().error(msg);

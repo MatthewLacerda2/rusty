@@ -31,6 +31,7 @@ pub fn attach_player_bot(scene: &mut Scene, script_path: &str) -> bool {
         player.scripts = vec![ScriptComponent {
             path: script_path.to_string(),
             is_loaded: false,
+            ..Default::default()
         }];
         return true;
     }

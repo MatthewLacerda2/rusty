@@ -136,6 +136,7 @@ impl ScriptManager {
         entity_id: u32,
         script_index: usize,
         script_path: &str,
+        field_values: &std::collections::BTreeMap<String, crate::components::ScriptFieldValue>,
     ) -> Result<(), String> {
         let lua = self.lua.as_ref().ok_or("Lua runtime not initialized")?;
 
@@ -151,6 +152,12 @@ impl ScriptManager {
         let table: Table = chunk
             .eval()
             .map_err(|e| format!("Syntax error compiling {}: {}", script_path, e))?;
+
+        // Merge the inspector-set field values (#84) over the schema defaults onto
+        // the lifecycle table, so `self.<field>` inside the script reads the
+        // configured value. Pure data assignment — determinism-clean.
+        super::schema::apply_field_values(&table, &script_code, field_values)
+            .map_err(|e| format!("Failed to apply script fields for {}: {}", script_path, e))?;
 
         // Cache the returned lifecycle table in the Lua registry
         let reg_key = lua

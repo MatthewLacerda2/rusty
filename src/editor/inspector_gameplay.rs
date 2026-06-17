@@ -23,6 +23,9 @@ pub fn draw_script(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) 
             } else {
                 ui.colored_label(t.danger, "❌ File not found!");
             }
+            // Schema-driven field controls (#84): one typed control per field the
+            // script's optional `fields` table declares. No-op for plain scripts.
+            super::inspector_script_fields::draw_script_fields(ui, script, is_dirty);
         });
         if remove {
             remove_index = Some(i);

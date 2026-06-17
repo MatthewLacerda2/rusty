@@ -180,6 +180,7 @@ fn add_script_menu(ui: &mut egui::Ui, entity: &mut Entity) {
             entity.scripts.push(ScriptComponent {
                 path,
                 is_loaded: false,
+                ..Default::default()
             });
             ui.close_menu();
         }

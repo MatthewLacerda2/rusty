@@ -35,7 +35,7 @@ pub use particle::{
     CollisionResponse, EmitMode, Particle, ParticleBlend, ParticleEmitterComponent,
 };
 pub use rigidbody::RigidBodyComponent;
-pub use script::ScriptComponent;
+pub use script::{ScriptComponent, ScriptFieldValue};
 pub use texture::TextureComponent;
 pub use transform::TransformComponent;
 pub use visual_correction::{Tonemap, VisualCorrectionComponent};
