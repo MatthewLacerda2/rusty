@@ -6,6 +6,7 @@ use super::{PfxTarget, PostFx, PostParams, HDR_FORMAT};
 impl PostFx {
     /// Build the whole post-FX resource set sized for `width` x `height`, writing
     /// its final composite into `output_format` (the swapchain / screenshot format).
+    #[allow(clippy::too_many_lines)] // legacy; burn down in #124
     pub fn new(
         device: &wgpu::Device,
         width: u32,

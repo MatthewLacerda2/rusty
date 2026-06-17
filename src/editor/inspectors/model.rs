@@ -3,6 +3,7 @@ use crate::scene::Scene;
 use std::fs;
 use std::path::Path;
 
+#[allow(clippy::too_many_lines)] // legacy; burn down in #124
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     let filename = Path::new(path)
         .file_name()

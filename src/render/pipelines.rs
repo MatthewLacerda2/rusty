@@ -142,6 +142,7 @@ pub(super) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayo
 // (device, shader, format, four bind-group layouts); bundling them into a struct
 // would only add an indirection without clarifying intent.
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_lines)] // legacy; burn down in #124
 pub(super) fn create_pipelines(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,

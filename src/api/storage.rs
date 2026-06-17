@@ -16,6 +16,7 @@ use super::{put, Reg};
 use crate::core::storage::Storage;
 
 /// Register the `Storage` namespace onto `lua`.
+#[allow(clippy::too_many_lines)] // legacy; burn down in #124
 pub fn register(lua: &Lua, storage: &Rc<RefCell<Storage>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 

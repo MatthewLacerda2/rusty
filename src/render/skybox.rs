@@ -10,6 +10,7 @@ pub struct SkyboxRenderer {
 }
 
 impl SkyboxRenderer {
+    #[allow(clippy::too_many_lines)] // legacy; burn down in #124
     pub fn new(
         device: &wgpu::Device,
         texture_layout: &wgpu::BindGroupLayout,

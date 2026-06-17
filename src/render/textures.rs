@@ -6,6 +6,7 @@ use super::{GpuTexture, Renderer};
 
 impl Renderer {
     /// Generates a standard checkerboard texture for meshes that don't have texture files assigned
+    #[allow(clippy::too_many_lines)] // legacy; burn down in #124
     pub(super) fn create_default_checkerboard_texture(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -97,6 +98,7 @@ impl Renderer {
     }
 
     /// Loads and registers a new texture from a filepath. Caches results dynamically.
+    #[allow(clippy::too_many_lines)] // legacy; burn down in #124
     pub fn load_texture(&mut self, path_str: &str) -> Rc<GpuTexture> {
         if let Some(tex) = self.gpu_textures.get(path_str) {
             return Rc::clone(tex);

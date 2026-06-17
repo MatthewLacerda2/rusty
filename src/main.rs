@@ -40,6 +40,7 @@ fn physical_key_name(key: KeyCode) -> Option<&'static str> {
     })
 }
 
+#[allow(clippy::too_many_lines)] // legacy; burn down in #124
 fn main() {
     env_logger::init();
     println!("[Engine] Starting rusty 3D engine...");

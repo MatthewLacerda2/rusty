@@ -32,6 +32,7 @@ pub fn register(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)] // legacy; burn down in #124
 fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     let t = lua.create_table()?;
 
@@ -124,6 +125,7 @@ fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     lua.globals().set("Harness", t)
 }
 
+#[allow(clippy::too_many_lines)] // legacy; burn down in #124
 fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     let scene_t = lua.create_table()?;
     let world = world_of(harness);

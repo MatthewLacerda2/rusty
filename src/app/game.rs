@@ -176,6 +176,7 @@ impl GameWorld {
         transition
     }
 
+    #[allow(clippy::too_many_lines)] // legacy; burn down in #124
     fn enter_play(&mut self) {
         self.resources.play_frame = 0;
         self.resources.time.borrow_mut().reset();
@@ -233,7 +234,6 @@ impl GameWorld {
         // Shared with the script runtime's Physics.Raycast/Shoot bindings.
         *self.resources.physics.borrow_mut() =
             Some(PhysicsWorld::from_scene(&self.world.scene.borrow()));
-
         // Run the one-shot `Startup` stage now that the Play session is fully set
         // up. No built-in module registers Startup systems yet; this is the wired
         // hook modules will register into (Unity's `Start`).

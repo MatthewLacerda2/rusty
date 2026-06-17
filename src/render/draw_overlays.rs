@@ -51,6 +51,7 @@ impl Renderer {
         Some((grid_buf_unif, default_bones_buf, grid_bind_group))
     }
 
+    #[allow(clippy::too_many_lines)] // legacy; burn down in #124
     pub(super) fn precreate_aabb(
         &self,
         scene: &Scene,

@@ -12,6 +12,7 @@ use crate::editor::inspector_card::component_card;
 use crate::scene::{CollisionResponse, EmitMode, Entity, ParticleBlend};
 
 /// 3F-particles. Particle System component card.
+#[allow(clippy::too_many_lines)] // legacy; burn down in #124
 pub fn draw(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
     if entity.particles.is_none() {
         return;

@@ -11,6 +11,9 @@ pre-commit:
       glob: "*.rs"
       run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- {staged_files}
     clippy:
-      # Report-only until the legacy modules are migrated. To make it a hard gate,
-      # drop the trailing `|| true` and append `-- -D warnings -W clippy::too_many_lines`.
-      run: cargo clippy --quiet --no-deps 2>&1 | tee .lint/clippy.txt || true
+      # Report-only locally (CI is the hard gate). CI runs:
+      #   cargo clippy --all-targets -- -D warnings -D clippy::too_many_lines
+      # for both feature sets, so the 50-line function cap is enforced there. The
+      # `-W clippy::too_many_lines` below surfaces over-cap functions locally too;
+      # the trailing `|| true` keeps the commit unblocked.
+      run: cargo clippy --quiet --no-deps -- -W clippy::too_many_lines 2>&1 | tee .lint/clippy.txt || true

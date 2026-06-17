@@ -43,6 +43,7 @@ fn register_navigation(lua: &Lua, nav: &Rc<RefCell<NavigationGraph>>) -> Reg {
 }
 
 /// `NavMeshAgent.*` target / speed / radius accessors over the nav-agent component.
+#[allow(clippy::too_many_lines)] // legacy; burn down in #124
 fn register_agent(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 

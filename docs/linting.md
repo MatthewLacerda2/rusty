@@ -8,7 +8,7 @@ result is written to `.lint/report.txt` so an agent can read exactly what failed
 |---|---|---|
 | Style | rustfmt (`rustfmt.toml`) | `cargo fmt --check` |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (both feature sets) |
-| Function ("endpoint") length | clippy `too_many_lines` | `too-many-lines-threshold = 50` — configured in `clippy.toml`, not wired into CI |
+| Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `-D clippy::too_many_lines`, threshold `50` in `clippy.toml` (both feature sets); legacy fns grandfathered (see below) |
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines |
 | Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation` |
@@ -29,6 +29,16 @@ cargo clippy --no-deps                                   # smells
 `tools/lint/baseline.txt` grandfathers the files that already exceed the cap. It is a
 **TODO list, not a pardon**: as a file is split, remove its entry. Never add new
 entries. When the file is empty, the size gate is fully on.
+
+## The function-length cap (burn-down via allow-list)
+The 50-line function cap is enforced in CI with `-D clippy::too_many_lines` on both
+feature sets, so **any new or changed function over 50 lines fails the build**. The
+~56 functions that already exceeded the cap are grandfathered with a per-function
+`#[allow(clippy::too_many_lines)]` carrying a `// legacy; burn down in #124` marker.
+That allow-list **is** the burn-down list — `grep -rn "burn down in #124" src` shows
+what's left. As each legacy function is split below the cap, remove its `#[allow]`;
+when none remain, #124 drops the escape hatch and the cap is unconditional. Same
+rule as the size baseline: never add a new entry — split instead.
 
 ## Component completeness (`--components`)
 A built-in component is only "done" when it appears on all four axes that

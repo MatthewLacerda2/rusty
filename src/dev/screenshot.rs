@@ -90,6 +90,7 @@ pub fn capture_world(
 /// `copy_texture_to_buffer` requires each row to be padded to a multiple of
 /// `COPY_BYTES_PER_ROW_ALIGNMENT` (256), so we copy into a padded buffer and then
 /// strip the padding back out.
+#[allow(clippy::too_many_lines)] // legacy; burn down in #124
 fn copy_target_to_cpu(
     renderer: &Renderer,
     target: &wgpu::Texture,

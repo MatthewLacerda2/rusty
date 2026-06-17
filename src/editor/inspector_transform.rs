@@ -32,6 +32,7 @@ pub fn draw(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_lines)] // legacy; burn down in #124
 fn draw_body(
     ui: &mut egui::Ui,
     entity: &mut Entity,

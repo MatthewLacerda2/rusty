@@ -22,6 +22,7 @@ pub fn draw(ui: &mut egui::Ui, entity: &mut Entity) {
     );
 }
 
+#[allow(clippy::too_many_lines)] // legacy; burn down in #124
 fn add_menu(ui: &mut egui::Ui, entity: &mut Entity) {
     // Every project `.lua` that exposes a lifecycle table is a MonoBehaviour and
     // is offered here with the moon glyph (the per-type icons for the other

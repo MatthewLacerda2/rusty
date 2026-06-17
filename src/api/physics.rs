@@ -20,6 +20,7 @@ use crate::scripting::ConsoleLogs;
 
 /// Register the rigidbody half of `Physics` (velocity/force/kinematic) onto
 /// `lua`, creating the `Physics` global table.
+#[allow(clippy::too_many_lines)] // legacy; burn down in #124
 pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -96,6 +97,7 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 /// pipeline the engine hitscan uses — so a script's cast and the engine's cast
 /// return identical hits for the same ray. `Shoot` is the hitscan that used to be
 /// inline in `app/play.rs`.
+#[allow(clippy::too_many_lines)] // legacy; burn down in #124
 pub fn register_hitscan(
     lua: &Lua,
     scene: &Rc<RefCell<Scene>>,

@@ -62,6 +62,7 @@ pub fn draw_health(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) 
 }
 
 /// 3EE. Collider Component
+#[allow(clippy::too_many_lines)] // legacy; burn down in #124
 pub fn draw_collider(
     ui: &mut egui::Ui,
     entity: &mut Entity,
