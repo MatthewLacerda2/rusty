@@ -4,7 +4,6 @@ use crate::scripting::ConsoleLogs;
 use std::fs;
 use std::path::Path;
 
-#[allow(clippy::too_many_lines)]
 pub fn draw(
     ui: &mut egui::Ui,
     editor: &mut EditorUi,
@@ -20,7 +19,17 @@ pub fn draw(
     ui.heading(format!("🎬 Scene: {}", filename));
     ui.add_space(5.0);
 
-    // File metadata card
+    draw_metadata_card(ui, path);
+    ui.add_space(10.0);
+    ui.separator();
+    ui.add_space(5.0);
+
+    draw_scene_operations(ui, editor, scene, console, path, filename);
+}
+
+/// File metadata card: path, on-disk size, plus the entity count and skybox
+/// peeked out of the scene's JSON without fully loading it.
+fn draw_metadata_card(ui: &mut egui::Ui, path: &str) {
     let size_str = if let Ok(meta) = fs::metadata(path) {
         format_size(meta.len())
     } else {
@@ -53,11 +62,18 @@ pub fn draw(
                 ui.label(format!("Skybox: {}", skybox_str));
             });
         });
-    ui.add_space(10.0);
-    ui.separator();
-    ui.add_space(5.0);
+}
 
-    // Actions
+/// Scene operations: load the scene file into the world, or overwrite it with
+/// the current world state, logging results to the console.
+fn draw_scene_operations(
+    ui: &mut egui::Ui,
+    editor: &mut EditorUi,
+    scene: &mut Scene,
+    console: &mut ConsoleLogs,
+    path: &str,
+    filename: &str,
+) {
     ui.heading("Scene Operations");
     ui.add_space(8.0);
 

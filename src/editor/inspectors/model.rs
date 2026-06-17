@@ -3,22 +3,48 @@ use crate::scene::Scene;
 use std::fs;
 use std::path::Path;
 
-#[allow(clippy::too_many_lines)]
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     let filename = Path::new(path)
         .file_name()
         .and_then(|f| f.to_str())
         .unwrap_or(path);
+
+    ui.heading(format!("📐 Model: {}", filename));
+    ui.add_space(5.0);
+
+    draw_metadata_card(ui, path);
+    ui.add_space(10.0);
+    ui.separator();
+    ui.add_space(5.0);
+
+    draw_sub_objects(ui, path);
+
+    draw_import_settings(ui, editor);
+
+    ui.add_space(15.0);
+    ui.separator();
+    ui.add_space(5.0);
+
+    // Actions
+    ui.heading("Instantiation");
+    ui.add_space(5.0);
+
+    if ui
+        .add(egui::Button::new("➕ Instantiate into Scene").min_size(egui::Vec2::new(140.0, 30.0)))
+        .clicked()
+    {
+        instantiate(editor, scene, path);
+    }
+}
+
+/// File metadata card: path, on-disk size, and the asset type derived from the
+/// file extension.
+fn draw_metadata_card(ui: &mut egui::Ui, path: &str) {
     let ext = Path::new(path)
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_uppercase();
-
-    ui.heading(format!("📐 Model: {}", filename));
-    ui.add_space(5.0);
-
-    // File metadata card
     egui::Frame::none()
         .fill(crate::editor::theme::from_ui(ui).bg_tier2)
         .inner_margin(8.0)
@@ -35,13 +61,11 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
                 ui.label(format!("Type: {} Model Asset", ext));
             });
         });
-    ui.add_space(10.0);
-    ui.separator();
-    ui.add_space(5.0);
+}
 
-    draw_sub_objects(ui, path);
-
-    // Model settings
+/// Model import settings: scale factor, normal/tangent import, and mesh
+/// compression level.
+fn draw_import_settings(ui: &mut egui::Ui, editor: &mut EditorUi) {
     ui.heading("Model Import Settings");
     ui.add_space(5.0);
 
@@ -71,21 +95,6 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
                 ui.selectable_value(&mut compression, "High", "High");
             });
     });
-
-    ui.add_space(15.0);
-    ui.separator();
-    ui.add_space(5.0);
-
-    // Actions
-    ui.heading("Instantiation");
-    ui.add_space(5.0);
-
-    if ui
-        .add(egui::Button::new("➕ Instantiate into Scene").min_size(egui::Vec2::new(140.0, 30.0)))
-        .clicked()
-    {
-        instantiate(editor, scene, path);
-    }
 }
 
 /// List the addressable sub-objects the source file exposes (`path::<id>`) and,
