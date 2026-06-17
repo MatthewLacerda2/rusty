@@ -2,6 +2,10 @@
 name = "rusty"
 version = "0.1.0"
 edition = "2021"
+# This is the engine application itself, not a library we publish to crates.io.
+# `publish = false` also lets the cargo-deny license gate skip our own crate
+# (via `[licenses] private.ignore`) while still gating every dependency.
+publish = false
 
 [lib]
 name = "rusty"
