@@ -3,8 +3,8 @@
 //! The single stable API surface shared by Lua scripts, the console REPL and
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
 //! `Scene`, `Health`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
-//! `Particles`, `Layers`, `Graphics`, `Storage`, plus the dev-only `Debug`) is registered from this tree
-//! onto the live Lua runtime.
+//! `Particles`, `Layers`, `Graphics`, `Video`, `Storage`, plus the dev-only `Debug`)
+//! is registered from this tree onto the live Lua runtime.
 //! `scripting`
 //! owns the runtime and lifecycle; `api` owns the surface. One surface, three
 //! callers — they never drift apart.
@@ -29,6 +29,7 @@ pub mod scene;
 pub mod storage;
 pub mod time;
 pub mod transform;
+pub mod video;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -37,6 +38,7 @@ use mlua::{Function, Lua, Table};
 
 use crate::core::input::InputState;
 use crate::core::storage::Storage;
+use crate::core::video::VideoSettings;
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
 use crate::render::postfx::QualityPreset;
@@ -64,6 +66,9 @@ pub struct ApiCtx {
     /// Global post-FX scalability tier, shared with the platform layer so a
     /// `Graphics.SetQuality` write reaches `renderer.set_quality`.
     pub quality: Rc<RefCell<QualityPreset>>,
+    /// Runtime video settings (resolution / vsync / fullscreen), shared with the
+    /// platform layer so a `Video.*` write reaches the surface + window.
+    pub video: Rc<RefCell<VideoSettings>>,
 }
 
 /// Register every namespace onto `lua`. This is the one place the whole script
@@ -86,6 +91,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     decals::register(lua, &ctx.scene)?;
     layers::register(lua, &ctx.scene)?;
     graphics::register(lua, &ctx.scene, &ctx.quality)?;
+    video::register(lua, &ctx.video)?;
     storage::register(lua, &ctx.storage)?;
     input::register_writable(lua, &ctx.input)?;
     #[cfg(feature = "dev")]

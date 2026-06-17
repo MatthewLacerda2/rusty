@@ -49,6 +49,40 @@ impl Renderer {
         (texture, view)
     }
 
+    /// Whether the surface can turn vsync OFF — i.e. advertises `Immediate`. `Fifo`
+    /// (vsync on) is mandated by wgpu on every backend, so vsync can always be
+    /// turned back on; only the off direction is gated.
+    pub fn supports_no_vsync(&self) -> bool {
+        self.present_modes.contains(&wgpu::PresentMode::Immediate)
+    }
+
+    /// Toggle vsync by reconfiguring the surface's present mode: `Fifo` (vsync on,
+    /// no tearing, always supported) vs `Immediate` (vsync off, lowest latency, may
+    /// tear). Returns the vsync state actually in effect — a request to turn vsync
+    /// off is refused (and `Fifo` kept) when the surface lacks `Immediate`, so this
+    /// never feeds wgpu an unsupported mode. Cheap no-op when unchanged. Headless
+    /// (no surface) just keeps the config field in sync.
+    pub fn set_vsync(&mut self, vsync: bool) -> bool {
+        let want_off = !vsync && self.supports_no_vsync();
+        let mode = if want_off {
+            wgpu::PresentMode::Immediate
+        } else {
+            wgpu::PresentMode::Fifo
+        };
+        if self.config.present_mode != mode {
+            self.config.present_mode = mode;
+            if let Some(surface) = &self.surface {
+                surface.configure(&self.device, &self.config);
+            }
+        }
+        self.vsync()
+    }
+
+    /// Whether vsync is currently on (`Fifo` present mode).
+    pub fn vsync(&self) -> bool {
+        self.config.present_mode == wgpu::PresentMode::Fifo
+    }
+
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             self.size = new_size;

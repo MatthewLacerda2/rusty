@@ -18,6 +18,8 @@ use rusty::render::Renderer;
 use rusty::scene::Scene;
 use rusty::scripting::ConsoleLogs;
 
+mod settings;
+
 /// The stable physical-key name (uppercase) the engine speaks for a winit
 /// `KeyCode`, or `None` for keys the sim has no logical name for. This is the
 /// hardware-side identity name; the [`Keymap`] then remaps it to a logical key
@@ -52,6 +54,9 @@ struct Frontend {
     frame_count: u32,
     fps: f32,
     last_fps_update: Instant,
+    /// Video settings currently in effect on the surface/window, so the per-frame
+    /// apply (`settings::apply_pending`) reconfigures only what a script changed.
+    applied_video: rusty::core::video::VideoSettings,
 }
 
 fn main() {
@@ -66,6 +71,9 @@ fn main() {
     let mut game = init_game(boot_scene_path.clone());
     frontend.editor_ui.current_scene_path = Some(boot_scene_path);
     let keymap = load_keymap(&game);
+    // Boundary read: apply the persisted video + quality settings to the
+    // surface/window and seed the shared script cells before the first frame.
+    settings::load(&mut frontend, &window, &game);
 
     let _ = event_loop.run(move |event, elwt| {
         elwt.set_control_flow(ControlFlow::Poll);
@@ -84,6 +92,7 @@ fn main() {
             // Quit boundary: persist the store however the loop is exiting (window
             // close, menu quit, surface OOM). A no-op when the store is pathless.
             Event::LoopExiting => {
+                settings::persist(&frontend, &game);
                 game.resources.flush_storage();
             }
             _ => {}
@@ -148,6 +157,7 @@ fn init_frontend(window: &Arc<winit::window::Window>) -> (Frontend, String) {
         frame_count: 0,
         fps: 60.0,
         last_fps_update: Instant::now(),
+        applied_video: rusty::core::video::VideoSettings::default(),
     };
     (frontend, rusty::scene::seed_default_scene())
 }
@@ -283,6 +293,10 @@ fn render_frame(
     // Advance the simulation (decoupled from window + GPU).
     let transition = game.tick(delta_time);
     apply_play_transition(transition, window);
+
+    // Apply any video setting (resolution / vsync / fullscreen) a script wrote
+    // this tick to the surface + window before drawing.
+    settings::apply_pending(frontend, window, game);
 
     // --- GPU RENDER TICK ---
     let frame = match acquire_frame(elwt, &mut frontend.renderer) {

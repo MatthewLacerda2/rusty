@@ -61,20 +61,30 @@ impl Renderer {
             .await
             .ok()?;
 
-        // A surface-shaped config so depth/pipeline creation matches the windowed
-        // path; there is no real swapchain to configure.
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: OFFSCREEN_FORMAT,
-            width,
-            height,
-            present_mode: wgpu::PresentMode::Fifo,
-            alpha_mode: wgpu::CompositeAlphaMode::Auto,
-            view_formats: vec![],
-            desired_maximum_frame_latency: 2,
-        };
-
         let size = winit::dpi::PhysicalSize::new(width, height);
-        Some(Self::from_parts(device, queue, None, config, size))
+        // No real swapchain offscreen: only the always-available `Fifo` mode.
+        Some(Self::from_parts(
+            device,
+            queue,
+            None,
+            offscreen_config(width, height),
+            size,
+            vec![wgpu::PresentMode::Fifo],
+        ))
+    }
+}
+
+/// A surface-shaped config so depth/pipeline creation matches the windowed path;
+/// there is no real swapchain to configure offscreen.
+fn offscreen_config(width: u32, height: u32) -> wgpu::SurfaceConfiguration {
+    wgpu::SurfaceConfiguration {
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        format: OFFSCREEN_FORMAT,
+        width,
+        height,
+        present_mode: wgpu::PresentMode::Fifo,
+        alpha_mode: wgpu::CompositeAlphaMode::Auto,
+        view_formats: vec![],
+        desired_maximum_frame_latency: 2,
     }
 }
