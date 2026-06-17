@@ -2,6 +2,9 @@
 name = "rusty"
 version = "0.1.0"
 edition = "2021"
+# Private, unpublished game engine — never goes to crates.io, so it carries no
+# license field. `cargo-deny` skips it via `licenses.private.ignore` (deny.toml).
+publish = false
 
 [lib]
 name = "rusty"

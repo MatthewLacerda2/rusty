@@ -108,12 +108,15 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
-    continue-on-error: true # report-only supply-chain audit
+    # Hard gate (#120): a new RUSTSEC advisory on any transitive dep, a banned
+    # crate, an untrusted source, or a license outside deny.toml's allow-list now
+    # blocks the merge instead of being a report nobody reads.
     steps:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           # v2 ships a newer cargo-deny whose parser supports CVSS 4.0 advisories
-          # (v1 errors on RUSTSEC entries using CVSS 4.0). Scope to advisories/bans/
-          # sources; licenses stay un-gated for now to avoid allow-list churn.
-          command: check advisories bans sources
+          # (v1 errors on RUSTSEC entries using CVSS 4.0). Licenses are gated against
+          # the explicit allow-list in deny.toml so license drift is a deliberate,
+          # reviewed decision.
+          command: check advisories bans sources licenses

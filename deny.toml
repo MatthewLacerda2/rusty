@@ -3,7 +3,8 @@ yanked = "warn"
 ignore = [
   # `paste` is unmaintained (archived upstream) but only reaches us transitively
   # via wgpu → wgpu-hal → metal; there is no safe upgrade and it is NOT a
-  # vulnerability. Real vulnerabilities still fail the (report-only) deny job.
+  # vulnerability. The deny job is now a hard gate (#120), so any *other* RUSTSEC
+  # advisory blocks CI — this single explicit ignore is the one reviewed exception.
   "RUSTSEC-2024-0436",
 ]
 
@@ -11,10 +12,28 @@ ignore = [
 multiple-versions = "warn"
 wildcards = "allow"
 
+# Gated in CI (#120): every dependency's license must be on this explicit
+# allow-list, so a copyleft/unknown-licensed crate is a deliberate, reviewed
+# decision rather than silent drift. Add a license here only after confirming
+# it's acceptable for the project.
 [licenses]
 allow = [
   "MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception",
   "BSD-2-Clause", "BSD-3-Clause", "ISC", "Zlib",
   "Unicode-DFS-2016", "Unicode-3.0", "MPL-2.0", "CC0-1.0",
+  # Boost Software License (permissive) — reaches us via arboard's clipboard
+  # backends (clipboard-win, error-code).
+  "BSL-1.0",
 ]
 confidence-threshold = 0.8
+# `rusty` itself is private (`publish = false`) and carries no license field;
+# skip the license check on it rather than declaring a license we don't need.
+private = { ignore = true }
+
+# epaint bundles its default fonts — Ubuntu-Light (Ubuntu Font License) and
+# Hack/Noto (SIL Open Font License). The crate's *code* is MIT/Apache; these
+# font licenses apply only to the embedded font data, so scope the allowance to
+# epaint rather than permitting OFL/UFL crate-wide.
+[[licenses.exceptions]]
+crate = "epaint"
+allow = ["OFL-1.1", "LicenseRef-UFL-1.0"]
