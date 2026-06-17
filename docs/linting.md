@@ -37,10 +37,31 @@ entry (`inspector_add.rs`), an inspector card (some `inspector_*.rs`), and an AP
 namespace (`src/api/<x>.rs` registered in `api/mod.rs` and documented in
 `scripting-api.md`). The gate discovers components from `Entity`'s
 `Option<…Component>` fields — so a new one can't slip through — and fails on any
-missing axis. `tools/lint/components_baseline.txt` grandfathers today's incomplete
-components as `<component> <axis>` lines (the same burn-down rule as above; #82
-removes them one axis at a time). The particle system is intentionally absent from
-that baseline — it is the gate's first fully-green component.
+missing axis. `tools/lint/components_baseline.txt` grandfathers incomplete
+components as `<component> <axis>` lines (the same burn-down rule as above). As of
+#82 that file is **empty** — every grandfathered gap was either closed or waived.
+
+### Closed vs waived (#82)
+An axis can be satisfied in two ways:
+
+- **Closed** — the artifact exists (the field, Add Component entry, inspector card,
+  or `src/api/<x>.rs` namespace + doc). #82 closed `animator add_menu` (Animator got
+  its own Add Component entry, decoupled from Health) and `light api` (the new
+  `src/api/light.rs` `Light` namespace).
+- **Waived** — a documented decision *not* to add a per-component artifact, because
+  the axis is already served by a shared namespace or a content-driven workflow, and
+  doing it standalone would fragment the one stable API surface. Waivers live in the
+  `WAIVERS` table in `tools/lint/src/components.rs` as `(component, axis, rationale)`
+  rows: `mesh add_menu`/`mesh api` (mesh is content-grid/glTF-driven),
+  `texture api` (→ `Material`), `collider api` + `rigidbody api` (→ `Physics`),
+  `nav_agent api` (→ `NavMeshAgent`), `visual_correction api` (→ `Graphics`).
+
+The difference is intent: the **baseline** is a burn-down list of axes we still mean
+to implement; **`WAIVERS`** is for axes we have decided not to implement standalone.
+A waiver is never a silent skip — its rationale lives in code and is reviewable in
+`git`. To add one, add a row to `WAIVERS` with a clear justification; to revisit one,
+delete the row and the gate will demand the artifact again. The particle system is on
+neither list — it is the gate's first fully-green component, satisfied on all axes.
 
 ## The function-length cap (`too_many_lines`)
 The 50-line per-function cap is a **hard clippy gate** (`-D clippy::too_many_lines`,

@@ -18,6 +18,18 @@
 //! Std-only, like the size gate and the determinism guard. The scan is coarse
 //! (substring matches on source), matching the existing lint philosophy.
 //!
+//! ## Waivers (#82)
+//! A few axes are *intentionally* unmet because closing them mechanically would
+//! fragment the engine's one stable API surface
+//! (`Transform`/`Input`/`Time`/`Physics`/`Scene`/`Animator`/`Nav`/`Health`/
+//! `Camera`/`Material`/…). Those live in [`WAIVERS`] — an auditable, in-code list
+//! of `(component, axis, rationale)` rows. A waived axis counts as satisfied, but
+//! unlike the burn-down baseline each waiver carries its written justification
+//! right here in the gate, so the decision is reviewable in `git` and can never
+//! be a silent skip. The baseline file is the burn-down list for axes we still
+//! intend to close; [`WAIVERS`] is for axes deliberately served by a shared
+//! namespace that we will not re-implement standalone.
+//!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --components`
 
 use std::fs;
@@ -35,6 +47,61 @@ const REPORT: &str = ".lint/report.txt";
 
 /// The checkable axes (axis 1, the `Entity` field, is the discovery source).
 const AXES: &[&str] = &["add_menu", "inspector", "api"];
+
+/// Deliberately-waived axes: `(component_field, axis, rationale)`. A waived axis
+/// is treated as satisfied. Each row is a documented decision (#82) NOT to add a
+/// per-component artifact, because the axis is already served another way and
+/// doing so standalone would fragment the one stable API surface or duplicate a
+/// content-driven workflow. Reviewable here, never a silent skip.
+const WAIVERS: &[(&str, &str, &str)] = &[
+    (
+        "mesh",
+        "add_menu",
+        "Mesh is assigned by dragging an asset from the content grid / the render \
+         inspector, not picked from the Add Component menu — a blank mesh slot is \
+         meaningless. Authoring stays content-driven (CLAUDE.md: glTF/OBJ sources).",
+    ),
+    (
+        "mesh",
+        "api",
+        "Mesh geometry is content (glTF/OBJ), not a scriptable scalar surface; \
+         swapping meshes at runtime is out of the script API's scope. Material \
+         look is driven via the `Material` namespace instead.",
+    ),
+    (
+        "texture",
+        "api",
+        "Served by the `Material` namespace (SetTexture/SetMetallic/SetRoughness \
+         and their map variants) — a dedicated `Texture` namespace would fragment \
+         the surface for the same component.",
+    ),
+    (
+        "collider",
+        "api",
+        "Served by the `Physics` namespace (the collider is queried via \
+         Physics.Raycast/Shoot, the same rapier world the engine casts against). \
+         A separate `Collider` namespace would split physics across two surfaces.",
+    ),
+    (
+        "rigidbody",
+        "api",
+        "Served by the `Physics` namespace \
+         (GetVelocity/SetVelocity/AddForce/SetKinematic act on the rigidbody).",
+    ),
+    (
+        "nav_agent",
+        "api",
+        "Served by the `NavMeshAgent`/`Navigation` namespace in src/api/nav.rs \
+         (the field is `nav_agent`, the namespace is the Unity name `NavMeshAgent`).",
+    ),
+    (
+        "visual_correction",
+        "api",
+        "Served by the `Graphics` namespace, which drives the active \
+         VisualCorrectionComponent's bloom/SSR/tonemap/exposure knobs (render-only \
+         state). A per-component namespace would duplicate that surface.",
+    ),
+];
 
 /// Entry point: discover every component and fail on any unbaselined missing axis.
 pub fn run() {
@@ -55,7 +122,7 @@ pub fn run() {
                 "api" => has_api(field, &api_stems, &api_mod, &docs),
                 _ => true,
             };
-            if !ok && !baselined(field, axis, &baseline) {
+            if !ok && !waived(field, axis) && !baselined(field, axis, &baseline) {
                 violations.push(format!(
                     "INCOMPLETE_COMPONENT `{field}` missing `{axis}` axis"
                 ));
@@ -200,6 +267,12 @@ fn baselined(field: &str, axis: &str, baseline: &[(String, String)]) -> bool {
     baseline.iter().any(|(c, a)| c == field && a == axis)
 }
 
+/// True when `(field, axis)` is a documented [`WAIVERS`] decision — served by a
+/// shared namespace or a content-driven workflow, not to be implemented standalone.
+fn waived(field: &str, axis: &str) -> bool {
+    WAIVERS.iter().any(|(c, a, _)| *c == field && *a == axis)
+}
+
 fn report(violations: &[String]) {
     let mut body = if violations.is_empty() {
         String::from("components: ok\n")
@@ -253,5 +326,26 @@ mod tests {
         // a component — neither is discovered.
         assert!(!fields.iter().any(|f| f == "parent_id"));
         assert!(!fields.iter().any(|f| f == "transform"));
+    }
+
+    #[test]
+    fn waivers_are_recognized_and_scoped() {
+        // Every waiver row is recognized for its own (component, axis)…
+        for (c, a, rationale) in WAIVERS {
+            assert!(waived(c, a), "{c}/{a} should be waived");
+            assert!(!rationale.is_empty(), "{c}/{a} needs a rationale");
+        }
+        // …and a waiver does not leak to a different axis of the same component.
+        assert!(waived("collider", "api"));
+        assert!(!waived("collider", "inspector"));
+        // A component with no waiver (e.g. particles) is never waived.
+        assert!(!waived("particles", "api"));
+    }
+
+    #[test]
+    fn light_api_is_not_waived_it_is_implemented() {
+        // `light` gets a real `src/api/light.rs` namespace (#82), so it must NOT be
+        // on the waiver list — removing the namespace must make the gate fail.
+        assert!(!waived("light", "api"));
     }
 }
