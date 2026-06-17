@@ -1,11 +1,8 @@
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::Arc;
 
-use super::pipelines;
-use super::postfx::{PostFx, QualityPreset, HDR_FORMAT};
-use super::{shadows, skybox};
-use super::{CameraUniform, LightingUniform, Renderer};
+use super::setup_build::RendererParts;
+use super::Renderer;
 
 impl Renderer {
     /// Build the windowed renderer. Returns `Err` with a human-readable message
@@ -78,7 +75,6 @@ impl Renderer {
     /// groups from an already-created device/queue. Both the windowed (`new`) and
     /// the headless offscreen (`new_headless`) paths funnel through here, so they
     /// produce a byte-identical renderer apart from the optional window surface.
-    #[allow(clippy::too_many_lines)]
     pub(super) fn from_parts(
         device: wgpu::Device,
         queue: wgpu::Queue,
@@ -86,133 +82,10 @@ impl Renderer {
         config: wgpu::SurfaceConfiguration,
         size: winit::dpi::PhysicalSize<u32>,
     ) -> Self {
-        // 5. Create Depth Texture
-        let (depth_texture, depth_view) = Self::create_depth_resources(&device, &config);
-
-        // 6. Create Bind Group Layouts
-        let camera_lighting_layout = pipelines::create_camera_lighting_layout(&device);
-        let entity_bones_layout = pipelines::create_entity_bones_layout(&device);
-        let texture_layout = pipelines::create_texture_layout(&device);
-
-        // 10. Generate default grid checker texture (moved up to bind statically to global layouts)
-        let default_texture = Rc::new(Self::create_default_checkerboard_texture(
-            &device,
-            &queue,
-            &texture_layout,
-        ));
-
-        // 7. Create Global Uniform Buffers
-        let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Camera Uniform Buffer"),
-            size: std::mem::size_of::<CameraUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
-        let lighting_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Lighting Uniform Buffer"),
-            size: std::mem::size_of::<LightingUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
-        let global_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Global Bind Group"),
-            layout: &camera_lighting_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: camera_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: lighting_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&default_texture.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::Sampler(&default_texture.sampler),
-                },
-            ],
-        });
-
-        // 8. Compile WGSL Shader
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Forward Lit Shader"),
-            source: wgpu::ShaderSource::Wgsl(
-                include_str!("../../assets/shaders/shader.wgsl").into(),
-            ),
-        });
-
-        // Initialize Shadow map system
-        let shadow_renderer = shadows::ShadowRenderer::new(&device);
-
-        let shadow_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Shadow Uniform Buffer"),
-            size: 64, // Mat4 size
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
-        let shadow_layout = pipelines::create_shadow_layout(&device);
-
-        let shadow_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Main Shadow Bind Group"),
-            layout: &shadow_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: shadow_uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&shadow_renderer.active_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&shadow_renderer.sampler),
-                },
-            ],
-        });
-
-        // Initialize Skybox Renderer (draws into the HDR scene target).
-        let skybox_renderer = skybox::SkyboxRenderer::new(
-            &device,
-            &texture_layout,
-            &camera_lighting_layout,
-            HDR_FORMAT,
-        );
-
-        // 9. Create Render Pipelines — the scene draws into the HDR offscreen
-        // target now; the post-FX composite is what writes `config.format`.
-        let (render_pipeline, line_pipeline, outline_pipeline) = pipelines::create_pipelines(
-            &device,
-            &shader,
-            HDR_FORMAT,
-            &camera_lighting_layout,
-            &entity_bones_layout,
-            &texture_layout,
-            &shadow_layout,
-        );
-
-        // Post-process chain + default scalability tier.
-        let quality = QualityPreset::default();
-        let post_fx = PostFx::new(
-            &device,
-            config.width,
-            config.height,
-            config.format,
-            quality.bloom_divisor(),
-        );
-
-        // Billboard particle pass — reuses the texture layout for sprites.
-        let particle_renderer = super::particles::ParticleRenderer::new(&device, &texture_layout);
-
-        // Box-projector decal pass — reuses the texture layout for decal sprites.
-        let decal_renderer = super::decals::DecalRenderer::new(&device, &texture_layout);
+        // All GPU resources (depth, layouts, buffers, bind groups, pipelines and
+        // the auxiliary passes) are built up-front in `build_parts`; here we only
+        // move them into the flat `Renderer` and seed the editor gizmo meshes.
+        let p = RendererParts::build(&device, &queue, &config);
 
         let mut renderer = Self {
             device,
@@ -220,37 +93,37 @@ impl Renderer {
             surface,
             config,
             size,
-            render_pipeline,
-            line_pipeline,
-            outline_pipeline,
-            camera_lighting_layout,
-            entity_bones_layout,
-            texture_layout,
-            camera_buffer,
-            lighting_buffer,
-            global_bind_group,
-            depth_texture,
-            depth_view,
+            render_pipeline: p.render_pipeline,
+            line_pipeline: p.line_pipeline,
+            outline_pipeline: p.outline_pipeline,
+            camera_lighting_layout: p.camera_lighting_layout,
+            entity_bones_layout: p.entity_bones_layout,
+            texture_layout: p.texture_layout,
+            camera_buffer: p.camera_buffer,
+            lighting_buffer: p.lighting_buffer,
+            global_bind_group: p.global_bind_group,
+            depth_texture: p.depth_texture,
+            depth_view: p.depth_view,
             gpu_meshes: HashMap::new(),
             gpu_textures: HashMap::new(),
-            default_texture,
+            default_texture: p.default_texture,
             grid_vertex_buffer: None,
             grid_count: 0,
             axis_x_buffer: None,
             axis_y_buffer: None,
             axis_z_buffer: None,
             axis_count: 0,
-            skybox_renderer,
-            shadow_renderer,
+            skybox_renderer: p.skybox_renderer,
+            shadow_renderer: p.shadow_renderer,
             skybox_texture: None,
             skybox_path: "".to_string(),
-            shadow_layout,
-            shadow_uniform_buffer,
-            shadow_bind_group,
-            post_fx,
-            quality,
-            particle_renderer,
-            decal_renderer,
+            shadow_layout: p.shadow_layout,
+            shadow_uniform_buffer: p.shadow_uniform_buffer,
+            shadow_bind_group: p.shadow_bind_group,
+            post_fx: p.post_fx,
+            quality: p.quality,
+            particle_renderer: p.particle_renderer,
+            decal_renderer: p.decal_renderer,
         };
 
         renderer.generate_grid_mesh();

@@ -10,13 +10,35 @@ pub struct SkyboxRenderer {
 }
 
 impl SkyboxRenderer {
-    #[allow(clippy::too_many_lines)]
     pub fn new(
         device: &wgpu::Device,
         texture_layout: &wgpu::BindGroupLayout,
         camera_lighting_layout: &wgpu::BindGroupLayout,
         texture_format: wgpu::TextureFormat,
     ) -> Self {
+        let pipeline = Self::create_pipeline(
+            device,
+            texture_layout,
+            camera_lighting_layout,
+            texture_format,
+        );
+        let (vertex_buffer, index_buffer, num_indices) = Self::create_box_buffers(device);
+
+        Self {
+            pipeline,
+            vertex_buffer,
+            index_buffer,
+            num_indices,
+        }
+    }
+
+    /// Build the interior-facing, depth-test-only skybox pipeline.
+    fn create_pipeline(
+        device: &wgpu::Device,
+        texture_layout: &wgpu::BindGroupLayout,
+        camera_lighting_layout: &wgpu::BindGroupLayout,
+        texture_format: wgpu::TextureFormat,
+    ) -> wgpu::RenderPipeline {
         // Compile skybox shader
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Skybox Shader"),
@@ -31,7 +53,7 @@ impl SkyboxRenderer {
             push_constant_ranges: &[],
         });
 
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Skybox Pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
@@ -63,9 +85,11 @@ impl SkyboxRenderer {
             }),
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
-        });
+        })
+    }
 
-        // Generate box vertex/index buffers
+    /// Generate the unit box vertex/index buffers the skybox is drawn with.
+    fn create_box_buffers(device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Buffer, u32) {
         let (vertices, indices) = crate::render::mesh::generate_box(2.0, 2.0, 2.0);
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Skybox Vertex Buffer"),
@@ -77,13 +101,7 @@ impl SkyboxRenderer {
             contents: bytemuck::cast_slice(&indices),
             usage: wgpu::BufferUsages::INDEX,
         });
-
-        Self {
-            pipeline,
-            vertex_buffer,
-            index_buffer,
-            num_indices: indices.len() as u32,
-        }
+        (vertex_buffer, index_buffer, indices.len() as u32)
     }
 
     pub fn draw<'a>(
