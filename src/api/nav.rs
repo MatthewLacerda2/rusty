@@ -43,13 +43,24 @@ fn register_navigation(lua: &Lua, nav: &Rc<RefCell<NavigationGraph>>) -> Reg {
 }
 
 /// `NavMeshAgent.*` target / speed / radius accessors over the nav-agent component.
-#[allow(clippy::too_many_lines)]
 fn register_agent(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
+    register_agent_target(lua, &table, scene)?;
+    register_agent_motion(lua, &table, scene)?;
+    register_agent_size(lua, &table, scene)?;
+    register_agent_queries(lua, &table, scene)?;
+
+    lua.globals()
+        .set("NavMeshAgent", table)
+        .map_err(|e| e.to_string())
+}
+
+/// `SetTarget` / `GetTarget` over the agent's destination.
+fn register_agent_target(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetTarget",
         lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
             let mut scene = s.borrow_mut();
@@ -64,7 +75,7 @@ fn register_agent(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "GetTarget",
         lua.create_function(move |_, id: u32| {
             let scene = s.borrow();
@@ -76,11 +87,14 @@ fn register_agent(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
             }
             Ok((0.0, 0.0, 0.0))
         }),
-    )?;
+    )
+}
 
+/// Motion tuning: `SetSpeed` / `SetAcceleration`.
+fn register_agent_motion(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetSpeed",
         lua.create_function(move |_, (id, speed): (u32, f32)| {
             let mut scene = s.borrow_mut();
@@ -95,7 +109,7 @@ fn register_agent(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetAcceleration",
         lua.create_function(move |_, (id, acc): (u32, f32)| {
             let mut scene = s.borrow_mut();
@@ -106,11 +120,14 @@ fn register_agent(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
             }
             Ok(())
         }),
-    )?;
+    )
+}
 
+/// Footprint tuning: `SetStoppingDistance` / `SetRadius`.
+fn register_agent_size(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetStoppingDistance",
         lua.create_function(move |_, (id, dist): (u32, f32)| {
             let mut scene = s.borrow_mut();
@@ -125,7 +142,7 @@ fn register_agent(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetRadius",
         lua.create_function(move |_, (id, r): (u32, f32)| {
             let mut scene = s.borrow_mut();
@@ -136,11 +153,14 @@ fn register_agent(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
             }
             Ok(())
         }),
-    )?;
+    )
+}
 
+/// Runtime queries / toggle: `IsAtTarget`, `GetVelocity`, and `SetActive`.
+fn register_agent_queries(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "IsAtTarget",
         lua.create_function(move |_, id: u32| {
             let scene = s.borrow();
@@ -157,7 +177,7 @@ fn register_agent(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "GetVelocity",
         lua.create_function(move |_, id: u32| {
             let scene = s.borrow();
@@ -173,7 +193,7 @@ fn register_agent(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetActive",
         lua.create_function(move |_, (id, active): (u32, bool)| {
             let mut scene = s.borrow_mut();
@@ -184,9 +204,5 @@ fn register_agent(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
             }
             Ok(())
         }),
-    )?;
-
-    lua.globals()
-        .set("NavMeshAgent", table)
-        .map_err(|e| e.to_string())
+    )
 }

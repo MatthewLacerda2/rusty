@@ -41,7 +41,9 @@ pub fn register(
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     register_bloom(lua, &table, scene)?;
-    register_color(lua, &table, scene)?;
+    register_exposure_contrast(lua, &table, scene)?;
+    register_saturation_gamma(lua, &table, scene)?;
+    register_tonemap(lua, &table, scene)?;
     register_ssr(lua, &table, scene)?;
     register_motion_blur(lua, &table, scene)?;
     register_quality(lua, &table, quality)?;
@@ -102,9 +104,8 @@ fn register_bloom(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) ->
     )
 }
 
-/// Color grading: exposure / contrast / saturation / gamma + tonemap operator.
-#[allow(clippy::too_many_lines)]
-fn register_color(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
+/// Color grading: `Set`/`Get` for exposure and contrast.
+fn register_exposure_contrast(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
         table,
@@ -135,8 +136,11 @@ fn register_color(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) ->
         table,
         "GetContrast",
         lua.create_function(move |_, ()| Ok(with_vc(&s, |vc| vc.contrast).unwrap_or(1.0))),
-    )?;
+    )
+}
 
+/// Color grading: `Set`/`Get` for saturation and gamma.
+fn register_saturation_gamma(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
         table,
@@ -167,8 +171,11 @@ fn register_color(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) ->
         table,
         "GetGamma",
         lua.create_function(move |_, ()| Ok(with_vc(&s, |vc| vc.gamma).unwrap_or(2.2))),
-    )?;
+    )
+}
 
+/// Tonemap operator: `SetTonemap` / `GetTonemap` (defaulting to Aces).
+fn register_tonemap(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
         table,

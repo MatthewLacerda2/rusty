@@ -12,13 +12,22 @@ use super::{put, Reg};
 use crate::scene::Scene;
 
 /// Register the `Material` namespace onto `lua`.
-#[allow(clippy::too_many_lines)]
 pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
+    register_scalars(lua, &table, scene)?;
+    register_maps(lua, &table, scene)?;
+
+    lua.globals()
+        .set("Material", table)
+        .map_err(|e| e.to_string())
+}
+
+/// Scalar PBR knobs: `SetMetallic` / `SetRoughness`.
+fn register_scalars(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetMetallic",
         lua.create_function(move |_, (id, val): (u32, f32)| {
             let mut scene = s.borrow_mut();
@@ -33,7 +42,7 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetRoughness",
         lua.create_function(move |_, (id, val): (u32, f32)| {
             let mut scene = s.borrow_mut();
@@ -44,11 +53,14 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
             }
             Ok(())
         }),
-    )?;
+    )
+}
 
+/// Texture-map paths: `SetMetallicMap` / `SetRoughnessMap` / `SetTexture`.
+fn register_maps(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetMetallicMap",
         lua.create_function(move |_, (id, path): (u32, String)| {
             let mut scene = s.borrow_mut();
@@ -63,7 +75,7 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetRoughnessMap",
         lua.create_function(move |_, (id, path): (u32, String)| {
             let mut scene = s.borrow_mut();
@@ -78,7 +90,7 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetTexture",
         lua.create_function(move |_, (id, path): (u32, String)| {
             let mut scene = s.borrow_mut();
@@ -89,9 +101,5 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
             }
             Ok(())
         }),
-    )?;
-
-    lua.globals()
-        .set("Material", table)
-        .map_err(|e| e.to_string())
+    )
 }

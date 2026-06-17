@@ -13,14 +13,28 @@ use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the `Animator` namespace onto `lua`.
-#[allow(clippy::too_many_lines)]
 pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<ConsoleLogs>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
+    register_play(lua, &table, scene, console)?;
+    register_stop(lua, &table, scene)?;
+
+    lua.globals()
+        .set("Animator", table)
+        .map_err(|e| e.to_string())
+}
+
+/// `Play` / `Crossfade` — start a clip (crossfade simplifies to a plain play).
+fn register_play(
+    lua: &Lua,
+    table: &mlua::Table,
+    scene: &Rc<RefCell<Scene>>,
+    console: &Rc<RefCell<ConsoleLogs>>,
+) -> Reg {
     let s = Rc::clone(scene);
     let c = Rc::clone(console);
     put(
-        &table,
+        table,
         "Play",
         lua.create_function(move |_, (id, clip): (u32, String)| {
             let mut scene = s.borrow_mut();
@@ -39,7 +53,7 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<Cons
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "Crossfade",
         lua.create_function(move |_, (id, clip, _duration): (u32, String, f32)| {
             // Simplify crossfade to standard play in our component
@@ -53,11 +67,14 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<Cons
             }
             Ok(())
         }),
-    )?;
+    )
+}
 
+/// `Stop` — halt playback on the entity's animator.
+fn register_stop(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "Stop",
         lua.create_function(move |_, id: u32| {
             let mut scene = s.borrow_mut();
@@ -68,9 +85,5 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<Cons
             }
             Ok(())
         }),
-    )?;
-
-    lua.globals()
-        .set("Animator", table)
-        .map_err(|e| e.to_string())
+    )
 }
