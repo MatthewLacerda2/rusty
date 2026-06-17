@@ -78,7 +78,6 @@ impl Renderer {
         }
     }
 
-    #[allow(clippy::too_many_lines)]
     pub(super) fn precreate_solid_resources(
         &self,
         scene: &Scene,
@@ -94,119 +93,75 @@ impl Renderer {
             if !crate::scene::layer_in_mask(entity.layer, culling_mask) {
                 continue;
             }
-
-            if let Some(mesh) = &entity.mesh {
-                let mesh_id = MeshId::from_mesh(mesh);
-                if let Some(gpu_mesh) = self.gpu_meshes.get(&mesh_id) {
-                    // Prepare entity uniform buffer
-                    let is_lit = if entity.light.is_some() { 0u32 } else { 1u32 };
-                    let model_matrix = scene.compute_world_matrix(entity.id);
-
-                    // Tint is driven by components only — never by entity name. A
-                    // game colours its entities via the `texture` component's
-                    // `color`; the engine carries no per-name colour assumptions.
-                    let color_tint = if let Some(t_comp) = &entity.texture {
-                        [t_comp.color[0], t_comp.color[1], t_comp.color[2], 1.0]
-                    } else if let Some(health) = &entity.health {
-                        if health.is_dead {
-                            [0.2, 0.2, 0.2, 1.0]
-                        } else {
-                            [1.0, 1.0, 1.0, 1.0]
-                        }
-                    } else {
-                        [1.0, 1.0, 1.0, 1.0]
-                    };
-
-                    let (metallic, roughness) = if let Some(t_comp) = &entity.texture {
-                        (t_comp.metallic, t_comp.roughness)
-                    } else {
-                        (0.0, 0.5)
-                    };
-
-                    let entity_uniform = EntityUniform {
-                        model_matrix: model_matrix.to_cols_array(),
-                        color_tint,
-                        use_texture: if entity.texture.is_some()
-                            && !entity.texture.as_ref().unwrap().path.is_empty()
-                        {
-                            1
-                        } else {
-                            0
-                        },
-                        is_lit,
-                        metallic,
-                        roughness,
-                    };
-
-                    let entity_buffer =
-                        self.device
-                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some("Entity Uniform"),
-                                contents: bytemuck::bytes_of(&entity_uniform),
-                                usage: wgpu::BufferUsages::UNIFORM,
-                            });
-
-                    // Upload the mesh's bind-pose bone palette (#79). Skinned
-                    // `"Asset"` meshes supply a real palette computed from their
-                    // imported skeleton; primitives and static meshes leave an
-                    // empty palette, so the GPU bones stay at identity and the
-                    // skinning shader is a no-op for them.
-                    let mut bones_data = *default_bones;
-                    for (i, bone) in mesh.bind_palette.iter().take(64).enumerate() {
-                        bones_data.bones[i] = bone.to_cols_array();
-                    }
-
-                    let bones_buffer =
-                        self.device
-                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some("Bones Uniform"),
-                                contents: bytemuck::bytes_of(&bones_data),
-                                usage: wgpu::BufferUsages::UNIFORM,
-                            });
-
-                    // Bind Group 1
-                    let entity_bind_group =
-                        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                            label: Some("Entity Bind Group"),
-                            layout: &self.entity_bones_layout,
-                            entries: &[
-                                wgpu::BindGroupEntry {
-                                    binding: 0,
-                                    resource: entity_buffer.as_entire_binding(),
-                                },
-                                wgpu::BindGroupEntry {
-                                    binding: 1,
-                                    resource: bones_buffer.as_entire_binding(),
-                                },
-                            ],
-                        });
-
-                    // Bind Group 2 (Texture)
-                    let tex = if let Some(t_comp) = &entity.texture {
-                        self.gpu_textures
-                            .get(&t_comp.path)
-                            .cloned()
-                            .unwrap_or_else(|| Rc::clone(&self.default_texture))
-                    } else {
-                        Rc::clone(&self.default_texture)
-                    };
-
-                    solid_render_resources.push((
-                        entity.id,
-                        mesh_id,
-                        entity_buffer,
-                        bones_buffer,
-                        entity_bind_group,
-                        tex,
-                        gpu_mesh.num_indices,
-                    ));
-                }
+            if let Some(res) = self.build_solid_resource(scene, &entity, default_bones) {
+                solid_render_resources.push(res);
             }
         }
         solid_render_resources
     }
 
-    #[allow(clippy::too_many_lines)]
+    /// Build the GPU resources for one solid entity, or `None` if its mesh is not
+    /// resident on the GPU yet.
+    fn build_solid_resource(
+        &self,
+        scene: &Scene,
+        entity: &crate::components::Entity,
+        default_bones: &BoneUniform,
+    ) -> Option<SolidResource> {
+        let mesh = entity.mesh.as_ref()?;
+        let mesh_id = MeshId::from_mesh(mesh);
+        let gpu_mesh = self.gpu_meshes.get(&mesh_id)?;
+
+        let model_matrix = scene.compute_world_matrix(entity.id);
+        let entity_uniform = solid_entity_uniform(entity, model_matrix);
+        let entity_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Entity Uniform"),
+                contents: bytemuck::bytes_of(&entity_uniform),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+
+        // Upload the mesh's bind-pose bone palette (#79). Skinned `"Asset"` meshes
+        // supply a real palette computed from their imported skeleton; primitives and
+        // static meshes leave an empty palette, so the GPU bones stay at identity and
+        // the skinning shader is a no-op for them.
+        let mut bones_data = *default_bones;
+        for (i, bone) in mesh.bind_palette.iter().take(64).enumerate() {
+            bones_data.bones[i] = bone.to_cols_array();
+        }
+        let bones_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Bones Uniform"),
+                contents: bytemuck::bytes_of(&bones_data),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+
+        let entity_bind_group =
+            self.entity_bind_group("Entity Bind Group", &entity_buffer, &bones_buffer);
+
+        // Bind Group 2 (Texture)
+        let tex = if let Some(t_comp) = &entity.texture {
+            self.gpu_textures
+                .get(&t_comp.path)
+                .cloned()
+                .unwrap_or_else(|| Rc::clone(&self.default_texture))
+        } else {
+            Rc::clone(&self.default_texture)
+        };
+
+        Some((
+            entity.id,
+            mesh_id,
+            entity_buffer,
+            bones_buffer,
+            entity_bind_group,
+            tex,
+            gpu_mesh.num_indices,
+        ))
+    }
+
     pub(super) fn precreate_outline(
         &self,
         scene: &Scene,
@@ -251,20 +206,8 @@ impl Renderer {
                 contents: bytemuck::bytes_of(default_bones),
                 usage: wgpu::BufferUsages::UNIFORM,
             });
-        let outline_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Outline Bind Group"),
-            layout: &self.entity_bones_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: outline_ent_buf.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: outline_bones_buf.as_entire_binding(),
-                },
-            ],
-        });
+        let outline_bind_group =
+            self.entity_bind_group("Outline Bind Group", &outline_ent_buf, &outline_bones_buf);
 
         Some((
             selected_id,
@@ -274,5 +217,67 @@ impl Renderer {
             outline_bind_group,
             gpu_mesh.num_indices,
         ))
+    }
+
+    /// Create a group-1 bind group pairing an entity uniform buffer with a bones
+    /// buffer against the shared `entity_bones_layout`.
+    fn entity_bind_group(
+        &self,
+        label: &str,
+        entity_buf: &wgpu::Buffer,
+        bones_buf: &wgpu::Buffer,
+    ) -> wgpu::BindGroup {
+        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(label),
+            layout: &self.entity_bones_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: entity_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: bones_buf.as_entire_binding(),
+                },
+            ],
+        })
+    }
+}
+
+/// Compute the per-entity uniform (tint, lit flag, PBR params) for a solid mesh.
+/// Tint is driven by components only — never by entity name. A game colours its
+/// entities via the `texture` component's `color`; the engine carries no per-name
+/// colour assumptions.
+fn solid_entity_uniform(entity: &crate::components::Entity, model_matrix: Mat4) -> EntityUniform {
+    let is_lit = if entity.light.is_some() { 0u32 } else { 1u32 };
+
+    let color_tint = if let Some(t_comp) = &entity.texture {
+        [t_comp.color[0], t_comp.color[1], t_comp.color[2], 1.0]
+    } else if let Some(health) = &entity.health {
+        if health.is_dead {
+            [0.2, 0.2, 0.2, 1.0]
+        } else {
+            [1.0, 1.0, 1.0, 1.0]
+        }
+    } else {
+        [1.0, 1.0, 1.0, 1.0]
+    };
+
+    let (metallic, roughness) = if let Some(t_comp) = &entity.texture {
+        (t_comp.metallic, t_comp.roughness)
+    } else {
+        (0.0, 0.5)
+    };
+
+    let use_texture =
+        u32::from(entity.texture.is_some() && !entity.texture.as_ref().unwrap().path.is_empty());
+
+    EntityUniform {
+        model_matrix: model_matrix.to_cols_array(),
+        color_tint,
+        use_texture,
+        is_lit,
+        metallic,
+        roughness,
     }
 }

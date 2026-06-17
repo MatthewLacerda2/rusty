@@ -10,74 +10,90 @@ use super::{BoneUniform, EntityUniform, Renderer};
 use crate::scene::Scene;
 
 impl Renderer {
-    #[allow(clippy::too_many_lines)]
     pub(super) fn precreate_axis_arrows(
         &self,
         scene: &Scene,
         default_bones: &BoneUniform,
     ) -> Vec<AxisResource> {
         let mut axis_arrow_resources = Vec::new();
-        if let Some(selected_id) = scene.selected_entity_id {
-            if scene.get_entity(selected_id).is_some() {
-                let world_matrix = scene.compute_world_matrix(selected_id);
-                let world_pos = world_matrix.col(3).truncate();
-                let arrow_model_matrix = Mat4::from_translation(world_pos);
+        let Some(selected_id) = scene.selected_entity_id else {
+            return axis_arrow_resources;
+        };
+        if scene.get_entity(selected_id).is_none() {
+            return axis_arrow_resources;
+        }
+        let world_matrix = scene.compute_world_matrix(selected_id);
+        let world_pos = world_matrix.col(3).truncate();
+        let arrow_model_matrix = Mat4::from_translation(world_pos);
 
-                let colors = [
-                    [1.0, 0.1, 0.1, 1.0], // X: Red
-                    [0.1, 0.9, 0.1, 1.0], // Y: Green
-                    [0.1, 0.4, 1.0, 1.0], // Z: Blue
-                ];
+        let colors = [
+            [1.0, 0.1, 0.1, 1.0], // X: Red
+            [0.1, 0.9, 0.1, 1.0], // Y: Green
+            [0.1, 0.4, 1.0, 1.0], // Z: Blue
+        ];
 
-                for (i, color) in colors.iter().enumerate() {
-                    let entity_uniform = EntityUniform {
-                        model_matrix: arrow_model_matrix.to_cols_array(),
-                        color_tint: *color,
-                        use_texture: 0,
-                        is_lit: 0,
-                        metallic: 0.0,
-                        roughness: 0.5,
-                    };
-
-                    let entity_buf =
-                        self.device
-                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some("Axis Arrow Uniform"),
-                                contents: bytemuck::bytes_of(&entity_uniform),
-                                usage: wgpu::BufferUsages::UNIFORM,
-                            });
-
-                    let default_bones_buf =
-                        self.device
-                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some("Axis Arrow Bones"),
-                                contents: bytemuck::bytes_of(default_bones),
-                                usage: wgpu::BufferUsages::UNIFORM,
-                            });
-
-                    let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("Axis Arrow Bind Group"),
-                        layout: &self.entity_bones_layout,
-                        entries: &[
-                            wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: entity_buf.as_entire_binding(),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 1,
-                                resource: default_bones_buf.as_entire_binding(),
-                            },
-                        ],
-                    });
-
-                    axis_arrow_resources.push((i, entity_buf, default_bones_buf, bind_group));
-                }
-            }
+        for (i, color) in colors.iter().enumerate() {
+            axis_arrow_resources.push(self.build_axis_arrow(
+                i,
+                arrow_model_matrix,
+                *color,
+                default_bones,
+            ));
         }
         axis_arrow_resources
     }
 
-    #[allow(clippy::too_many_lines)]
+    /// Build one axis-arrow's uniform + bones buffers and their bind group.
+    fn build_axis_arrow(
+        &self,
+        i: usize,
+        arrow_model_matrix: Mat4,
+        color: [f32; 4],
+        default_bones: &BoneUniform,
+    ) -> AxisResource {
+        let entity_uniform = EntityUniform {
+            model_matrix: arrow_model_matrix.to_cols_array(),
+            color_tint: color,
+            use_texture: 0,
+            is_lit: 0,
+            metallic: 0.0,
+            roughness: 0.5,
+        };
+
+        let entity_buf = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Axis Arrow Uniform"),
+                contents: bytemuck::bytes_of(&entity_uniform),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+
+        let default_bones_buf = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Axis Arrow Bones"),
+                contents: bytemuck::bytes_of(default_bones),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Axis Arrow Bind Group"),
+            layout: &self.entity_bones_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: entity_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: default_bones_buf.as_entire_binding(),
+                },
+            ],
+        });
+
+        (i, entity_buf, default_bones_buf, bind_group)
+    }
+
     pub(super) fn precreate_path(
         &self,
         pathfinding_points: &[Vec3],
@@ -107,6 +123,23 @@ impl Renderer {
                 usage: wgpu::BufferUsages::VERTEX,
             });
 
+        let (entity_buf, default_bones_buf, path_bind_group) =
+            self.build_path_bindings(default_bones);
+
+        Some((
+            path_buffer,
+            entity_buf,
+            default_bones_buf,
+            path_bind_group,
+            path_vertices.len() as u32,
+        ))
+    }
+
+    /// Build the path line's uniform + bones buffers and their bind group.
+    fn build_path_bindings(
+        &self,
+        default_bones: &BoneUniform,
+    ) -> (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup) {
         let entity_uniform = EntityUniform {
             model_matrix: Mat4::IDENTITY.to_cols_array(),
             color_tint: [0.0, 1.0, 0.3, 1.0], // Neon green pathline
@@ -144,13 +177,6 @@ impl Renderer {
                 },
             ],
         });
-
-        Some((
-            path_buffer,
-            entity_buf,
-            default_bones_buf,
-            path_bind_group,
-            path_vertices.len() as u32,
-        ))
+        (entity_buf, default_bones_buf, path_bind_group)
     }
 }
