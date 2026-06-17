@@ -118,3 +118,47 @@ jobs:
           # whose parser supports CVSS 4.0 advisories (v1 errors on those).
           # `bans`/`sources` stay as-is (warn). Policy lives in deny.toml.
           command: check advisories bans sources licenses
+
+  mutants:
+    needs: changes
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
+    # Report-only to start (#122): mutation testing audits whether the tests
+    # actually catch bugs — the headline guardrail against green-but-vacuous
+    # agent-written tests. Scoped to the deterministic sim (app/scripting/physics/
+    # navigation), the pure-logic part where a silent bug hurts most; surviving
+    # mutants are published as an artifact. Ratchet to a hard gate once the
+    # survivor list is burned down. `continue-on-error` keeps it from blocking
+    # merges meanwhile.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+      - name: System libs for winit/wgpu builds
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev
+      - name: Install cargo-mutants
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+      - name: Mutation test (deterministic sim, report-only)
+        # Build/test with the dev feature so the headless-harness sim tests run
+        # too. Scoped by --file to the sim modules; the timeout multiplier guards
+        # against mutants that induce infinite loops.
+        run: |
+          cargo mutants --no-shuffle --timeout-multiplier 3 \
+            --file 'src/app/**/*.rs' \
+            --file 'src/scripting/**/*.rs' \
+            --file 'src/physics/**/*.rs' \
+            --file 'src/navigation/**/*.rs' \
+            -- --features dev
+      - name: Upload surviving-mutant report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutants-report
+          path: mutants.out/
