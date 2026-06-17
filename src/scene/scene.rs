@@ -21,8 +21,8 @@ pub use crate::components::{
     AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape,
     CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent, LightType,
     MeshComponent, NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent,
-    RigidBodyComponent, ScriptComponent, TextureComponent, Tonemap, TransformComponent,
-    VisualCorrectionComponent,
+    RigidBodyComponent, ScriptComponent, ScriptFieldValue, TextureComponent, Tonemap,
+    TransformComponent, VisualCorrectionComponent,
 };
 
 fn default_skybox_path() -> String {

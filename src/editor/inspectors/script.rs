@@ -136,6 +136,7 @@ fn draw_attach_to_entity(
             ent.scripts.push(ScriptComponent {
                 path: path.to_string(),
                 is_loaded: false,
+                ..Default::default()
             });
             editor.is_dirty = true;
             console.info(format!(

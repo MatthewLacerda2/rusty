@@ -108,6 +108,7 @@ fn add_player(scene: &mut Scene) {
     player.scripts.push(ScriptComponent {
         path: PLAYER_CONTROLLER_SCRIPT.to_string(),
         is_loaded: false,
+        ..Default::default()
     });
 }
 
@@ -158,6 +159,7 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
         enemy.scripts.push(ScriptComponent {
             path: bot_script.to_string(),
             is_loaded: false,
+            ..Default::default()
         });
     }
 }

@@ -100,6 +100,7 @@ fn legacy_single_script_scene_loads_into_scripts_vec() {
         .push(rusty::scene::ScriptComponent {
             path: "project/assets/scripts/bot.lua".to_string(),
             is_loaded: false,
+            ..Default::default()
         });
     let path = tmp("rusty_legacy_script.scene");
     scene.save_to_file(&path).unwrap();

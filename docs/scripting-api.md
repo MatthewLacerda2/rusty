@@ -287,3 +287,65 @@ because the namespace is absent.
 | `Debug.Log` | `(message)` |
 | `Debug.Warn` | `(message)` |
 | `Debug.Error` | `(message)` |
+
+---
+
+## Script field schema (inspector decorators)
+
+The engine's equivalent of Unity's `[SerializeField]` + `[Range]` / `[Tooltip]` /
+`[Header]` attributes. A script may `return` an optional `fields` table describing
+its inspector-editable serialized fields. The generic Lua Script inspector then
+renders a typed control per field — no hand-written egui card needed — and the
+values you set persist with the scene.
+
+```lua
+return {
+  fields = {
+    speed   = { type = "number", range = {0, 10}, default = 3.0, tooltip = "units/sec", header = "Movement" },
+    jumps   = { type = "number", default = 2 },
+    canFly  = { type = "boolean", default = false },
+    label   = { type = "string", default = "Rusty" },
+    -- A bare value is shorthand: its type is inferred and it becomes the default.
+    health  = 100,
+  },
+  Start  = function(id) end,
+  Update = function(id, dt) end,
+}
+```
+
+At Play — before `Start` runs — each field is written as a key on the table the
+script returns (the inspector override, or the schema `default`). So write the
+script in the `local M = {} … return M` form and read the configured value off
+that captured table:
+
+```lua
+local M = {}
+M.speed = 0  -- overwritten by the inspector value at load
+function M.Update(id, dt)
+  local x = Transform.GetPosition(id)
+  Transform.SetPosition(id, x + M.speed * dt, 0, 0)
+end
+return M
+```
+
+**Supported `type` values** (omit `type` and it's inferred from `default`):
+
+| `type` | Inspector control | Stored as |
+|---|---|---|
+| `"number"` | drag value, or a **slider** when `range` is given | `f64` |
+| `"boolean"` (`"bool"`) | checkbox | `bool` |
+| `"string"` (`"text"`) | single-line text edit | `String` |
+
+**Decorators** (all optional):
+
+| Key | Effect |
+|---|---|
+| `range = {min, max}` | Renders a slider clamped to `[min, max]` (numbers only). |
+| `default = <value>` | Initial value before the inspector overrides it; also fixes the inferred type. |
+| `tooltip = "..."` | Hover text on the control. |
+| `header = "..."` | A bold section label drawn above the field. |
+
+Fields with no metadata fall back to a default control inferred from their value.
+Fields are listed in the inspector sorted by name (Lua table order is
+unspecified). Edited values are stored per script instance in the scene file, so
+two entities running the same script can carry different field values.

@@ -10,10 +10,12 @@ mod console;
 mod discovery;
 mod lifecycle;
 mod manager;
+mod schema;
 
 pub use console::{ConsoleLogs, LogLevel};
 pub use discovery::{monobehaviour_scripts, script_label};
 pub use manager::ScriptManager;
+pub use schema::{parse_fields, FieldKind, ScriptField};
 
 #[cfg(test)]
 mod tests;
