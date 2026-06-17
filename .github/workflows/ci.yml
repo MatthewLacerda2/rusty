@@ -47,6 +47,61 @@ jobs:
       - name: Test (lint xtask)
         run: cargo test --manifest-path tools/lint/Cargo.toml --locked
 
+  coverage:
+    needs: changes
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
+    # Informational to start (issue #117): publish what the suite exercises so the
+    # mutation/property work can be aimed. No hard floor yet — we ratchet to a
+    # regression gate once a baseline is recorded. The ~85% target on the
+    # deterministic sim modules (app/scripting/physics/navigation) and the
+    # platform-layer exemption (main.rs, render, dev) are documented in
+    # docs/testing.md. `continue-on-error` keeps this from blocking merges.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show
+      - name: Add llvm-tools-preview (required by cargo-llvm-cov)
+        run: rustup component add llvm-tools-preview
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+      - name: System libs for winit/wgpu builds
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - name: Measure coverage (both feature sets, accumulated)
+        run: |
+          cargo llvm-cov clean --workspace
+          cargo llvm-cov --no-report --locked
+          cargo llvm-cov --no-report --features dev --locked
+      - name: Whole-crate summary
+        run: |
+          {
+            echo '### Coverage summary (whole crate)'
+            echo ''
+            echo '```'
+            cargo llvm-cov report --summary-only
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Deterministic sim-module coverage (target ~85%, informational)
+        run: |
+          # Restrict the report to the sim modules by ignoring everything else.
+          # The `regex` crate (used by llvm-cov) has no look-around, so we list the
+          # non-sim paths explicitly rather than negative-matching the sim ones.
+          {
+            echo '### Sim-module coverage — app, scripting, physics, navigation (target ~85%)'
+            echo ''
+            echo '```'
+            cargo llvm-cov report --summary-only \
+              --ignore-filename-regex 'src/(render|dev|api|components|core|ecs|scene|time)/|src/(main|lib)\.rs|src/bin/|tools/'
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
   deny:
     needs: changes
     runs-on: ubuntu-latest
