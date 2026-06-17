@@ -13,13 +13,24 @@ use super::{put, Reg};
 use crate::scene::Scene;
 
 /// Register the `Transform` namespace onto `lua`.
-#[allow(clippy::too_many_lines)]
 pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
+    register_position(lua, &table, scene)?;
+    register_rotation(lua, &table, scene)?;
+    register_scale(lua, &table, scene)?;
+    register_move_towards(lua, &table, scene)?;
+
+    lua.globals()
+        .set("Transform", table)
+        .map_err(|e| e.to_string())
+}
+
+/// `GetPosition` / `SetPosition` (set re-syncs the entity's collider).
+fn register_position(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "GetPosition",
         lua.create_function(move |_, id: u32| {
             let scene = s.borrow();
@@ -33,7 +44,7 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetPosition",
         lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
             let mut scene = s.borrow_mut();
@@ -43,11 +54,14 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
             scene.update_entity_collider(id);
             Ok(())
         }),
-    )?;
+    )
+}
 
+/// `GetRotation` / `SetRotation` over euler angles (set re-syncs the collider).
+fn register_rotation(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "GetRotation",
         lua.create_function(move |_, id: u32| {
             let scene = s.borrow();
@@ -61,7 +75,7 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetRotation",
         lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
             let mut scene = s.borrow_mut();
@@ -71,11 +85,14 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
             scene.update_entity_collider(id);
             Ok(())
         }),
-    )?;
+    )
+}
 
+/// `GetScale` / `SetScale` (set re-syncs the entity's collider).
+fn register_scale(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "GetScale",
         lua.create_function(move |_, id: u32| {
             let scene = s.borrow();
@@ -89,7 +106,7 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetScale",
         lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
             let mut scene = s.borrow_mut();
@@ -99,11 +116,14 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
             scene.update_entity_collider(id);
             Ok(())
         }),
-    )?;
+    )
+}
 
+/// `MoveTowards` — step toward a target, snapping when within `step` (or ~0).
+fn register_move_towards(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "MoveTowards",
         lua.create_function(
             move |_, (id, tx, ty, tz, step): (u32, f32, f32, f32, f32)| {
@@ -123,9 +143,5 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
                 Ok(())
             },
         ),
-    )?;
-
-    lua.globals()
-        .set("Transform", table)
-        .map_err(|e| e.to_string())
+    )
 }

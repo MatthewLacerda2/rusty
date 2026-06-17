@@ -13,13 +13,22 @@ use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the `Health` namespace onto `lua`.
-#[allow(clippy::too_many_lines)]
 pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<ConsoleLogs>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
+    register_get_set(lua, &table, scene)?;
+    register_heal_damage(lua, &table, scene, console)?;
+
+    lua.globals()
+        .set("Health", table)
+        .map_err(|e| e.to_string())
+}
+
+/// `Get` / `Set` — read the (current, max) pair and clamp-set current health.
+fn register_get_set(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "Get",
         lua.create_function(move |_, id: u32| {
             let scene = s.borrow();
@@ -32,7 +41,7 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<Cons
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "Set",
         lua.create_function(move |_, (id, value): (u32, f32)| {
             let mut scene = s.borrow_mut();
@@ -44,11 +53,19 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<Cons
             }
             Ok(())
         }),
-    )?;
+    )
+}
 
+/// `Heal` / `Damage` — add health (capped at max) or route through `apply_damage`.
+fn register_heal_damage(
+    lua: &Lua,
+    table: &mlua::Table,
+    scene: &Rc<RefCell<Scene>>,
+    console: &Rc<RefCell<ConsoleLogs>>,
+) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "Heal",
         lua.create_function(move |_, (id, amount): (u32, f32)| {
             let mut scene = s.borrow_mut();
@@ -67,17 +84,13 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<Cons
     let s = Rc::clone(scene);
     let c = Rc::clone(console);
     put(
-        &table,
+        table,
         "Damage",
         lua.create_function(move |_, (id, amount): (u32, f32)| {
             apply_damage(&s, &c, id, amount);
             Ok(())
         }),
-    )?;
-
-    lua.globals()
-        .set("Health", table)
-        .map_err(|e| e.to_string())
+    )
 }
 
 /// Reduce an entity's health, flag death + freeze its death clip, and log it.

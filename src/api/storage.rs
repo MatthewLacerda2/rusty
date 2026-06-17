@@ -16,13 +16,22 @@ use super::{put, Reg};
 use crate::core::storage::Storage;
 
 /// Register the `Storage` namespace onto `lua`.
-#[allow(clippy::too_many_lines)]
 pub fn register(lua: &Lua, storage: &Rc<RefCell<Storage>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
+    register_scalars(lua, &table, storage)?;
+    register_namespaces(lua, &table, storage)?;
+
+    lua.globals()
+        .set("Storage", table)
+        .map_err(|e| e.to_string())
+}
+
+/// Per-key accessors: `Set` / `Get` / `Has` / `Delete`.
+fn register_scalars(lua: &Lua, table: &Table, storage: &Rc<RefCell<Storage>>) -> Reg {
     let s = Rc::clone(storage);
     put(
-        &table,
+        table,
         "Set",
         lua.create_function(move |_, (ns, key, value): (String, String, LuaValue)| {
             let json = lua_to_json(&value).map_err(mlua::Error::RuntimeError)?;
@@ -33,7 +42,7 @@ pub fn register(lua: &Lua, storage: &Rc<RefCell<Storage>>) -> Reg {
 
     let s = Rc::clone(storage);
     put(
-        &table,
+        table,
         "Get",
         lua.create_function(move |lua, (ns, key): (String, String)| {
             match s.borrow().get(&ns, &key) {
@@ -45,24 +54,26 @@ pub fn register(lua: &Lua, storage: &Rc<RefCell<Storage>>) -> Reg {
 
     let s = Rc::clone(storage);
     put(
-        &table,
+        table,
         "Has",
         lua.create_function(move |_, (ns, key): (String, String)| Ok(s.borrow().has(&ns, &key))),
     )?;
 
     let s = Rc::clone(storage);
     put(
-        &table,
+        table,
         "Delete",
         lua.create_function(move |_, (ns, key): (String, String)| {
             Ok(s.borrow_mut().delete(&ns, &key))
         }),
-    )?;
+    )
+}
 
-    // Whole-namespace blob accessors — store/read a structured table at once.
+/// Whole-namespace blob accessors — store/read a structured table at once.
+fn register_namespaces(lua: &Lua, table: &Table, storage: &Rc<RefCell<Storage>>) -> Reg {
     let s = Rc::clone(storage);
     put(
-        &table,
+        table,
         "GetTable",
         lua.create_function(move |lua, ns: String| match s.borrow().get_namespace(&ns) {
             Some(json) => json_to_lua(lua, &json),
@@ -72,18 +83,14 @@ pub fn register(lua: &Lua, storage: &Rc<RefCell<Storage>>) -> Reg {
 
     let s = Rc::clone(storage);
     put(
-        &table,
+        table,
         "SetTable",
         lua.create_function(move |_, (ns, value): (String, Table)| {
             let json = lua_to_json(&LuaValue::Table(value)).map_err(mlua::Error::RuntimeError)?;
             s.borrow_mut().set_namespace(&ns, json);
             Ok(())
         }),
-    )?;
-
-    lua.globals()
-        .set("Storage", table)
-        .map_err(|e| e.to_string())
+    )
 }
 
 /// Convert an mlua value into JSON for storage. Functions/userdata are rejected.

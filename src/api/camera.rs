@@ -14,13 +14,23 @@ use super::{put, Reg};
 use crate::render::Camera;
 
 /// Register the `Camera` namespace onto `lua`.
-#[allow(clippy::too_many_lines)]
 pub fn register(lua: &Lua, camera: &Rc<RefCell<Camera>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
+    register_position(lua, &table, camera)?;
+    register_orientation(lua, &table, camera)?;
+    register_fov(lua, &table, camera)?;
+
+    lua.globals()
+        .set("Camera", table)
+        .map_err(|e| e.to_string())
+}
+
+/// `GetPosition` / `SetPosition` plus the `GetForward` / `GetRight` basis vectors.
+fn register_position(lua: &Lua, table: &mlua::Table, camera: &Rc<RefCell<Camera>>) -> Reg {
     let c = Rc::clone(camera);
     put(
-        &table,
+        table,
         "GetPosition",
         lua.create_function(move |_, ()| {
             let cam = c.borrow();
@@ -30,7 +40,7 @@ pub fn register(lua: &Lua, camera: &Rc<RefCell<Camera>>) -> Reg {
 
     let c = Rc::clone(camera);
     put(
-        &table,
+        table,
         "SetPosition",
         lua.create_function(move |_, (x, y, z): (f32, f32, f32)| {
             c.borrow_mut().position = Vec3::new(x, y, z);
@@ -43,7 +53,7 @@ pub fn register(lua: &Lua, camera: &Rc<RefCell<Camera>>) -> Reg {
     // relative to where the camera looks, instead of re-deriving the trig in Lua.
     let c = Rc::clone(camera);
     put(
-        &table,
+        table,
         "GetForward",
         lua.create_function(move |_, ()| {
             let f = c.borrow().forward();
@@ -53,23 +63,26 @@ pub fn register(lua: &Lua, camera: &Rc<RefCell<Camera>>) -> Reg {
 
     let c = Rc::clone(camera);
     put(
-        &table,
+        table,
         "GetRight",
         lua.create_function(move |_, ()| {
             let r = c.borrow().right();
             Ok((r.x, r.y, r.z))
         }),
-    )?;
+    )
+}
 
+/// `GetYaw` / `SetYaw` and `GetPitch` / `SetPitch` (pitch clamped to ±89°).
+fn register_orientation(lua: &Lua, table: &mlua::Table, camera: &Rc<RefCell<Camera>>) -> Reg {
     let c = Rc::clone(camera);
     put(
-        &table,
+        table,
         "GetYaw",
         lua.create_function(move |_, ()| Ok(c.borrow().yaw)),
     )?;
     let c = Rc::clone(camera);
     put(
-        &table,
+        table,
         "SetYaw",
         lua.create_function(move |_, yaw: f32| {
             c.borrow_mut().yaw = yaw;
@@ -79,37 +92,36 @@ pub fn register(lua: &Lua, camera: &Rc<RefCell<Camera>>) -> Reg {
 
     let c = Rc::clone(camera);
     put(
-        &table,
+        table,
         "GetPitch",
         lua.create_function(move |_, ()| Ok(c.borrow().pitch)),
     )?;
     let c = Rc::clone(camera);
     put(
-        &table,
+        table,
         "SetPitch",
         lua.create_function(move |_, pitch: f32| {
             c.borrow_mut().pitch = pitch.clamp(-89.0, 89.0);
             Ok(())
         }),
-    )?;
+    )
+}
 
+/// `GetFov` / `SetFov` (fov clamped to 1..179°).
+fn register_fov(lua: &Lua, table: &mlua::Table, camera: &Rc<RefCell<Camera>>) -> Reg {
     let c = Rc::clone(camera);
     put(
-        &table,
+        table,
         "GetFov",
         lua.create_function(move |_, ()| Ok(c.borrow().fov)),
     )?;
     let c = Rc::clone(camera);
     put(
-        &table,
+        table,
         "SetFov",
         lua.create_function(move |_, fov: f32| {
             c.borrow_mut().fov = fov.clamp(1.0, 179.0);
             Ok(())
         }),
-    )?;
-
-    lua.globals()
-        .set("Camera", table)
-        .map_err(|e| e.to_string())
+    )
 }

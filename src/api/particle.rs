@@ -15,15 +15,25 @@ use super::{put, Reg};
 use crate::scene::Scene;
 
 /// Register the `Particles` namespace onto `lua`.
-#[allow(clippy::too_many_lines)]
 pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
+    register_emission(lua, &table, scene)?;
+    register_tuning(lua, &table, scene)?;
+    register_state(lua, &table, scene)?;
+
+    lua.globals()
+        .set("Particles", table)
+        .map_err(|e| e.to_string())
+}
+
+/// One-off emissions: `Emit` (count) and `Burst` (the configured burst count).
+fn register_emission(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     // Emit `count` particles at the entity's position, right now. Returns the
     // number actually spawned (the max-particle cap may swallow some).
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "Emit",
         lua.create_function(move |_, (id, count): (u32, u32)| {
             let mut scene = s.borrow_mut();
@@ -39,7 +49,7 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
     // the emit mode or the auto-burst bookkeeping. Returns the number spawned.
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "Burst",
         lua.create_function(move |_, id: u32| {
             let mut scene = s.borrow_mut();
@@ -51,11 +61,14 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
             });
             Ok(spawned.unwrap_or(0))
         }),
-    )?;
+    )
+}
 
+/// Emitter tuning: `SetActive` (gate) and `SetRate` (continuous rate).
+fn register_tuning(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetActive",
         lua.create_function(move |_, (id, active): (u32, bool)| {
             with_emitter(&s, id, |p| p.active = active);
@@ -65,17 +78,20 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetRate",
         lua.create_function(move |_, (id, rate): (u32, f32)| {
             with_emitter(&s, id, |p| p.rate = rate.max(0.0));
             Ok(())
         }),
-    )?;
+    )
+}
 
+/// Live state: `IsActive`, `GetCount`, and `Clear`.
+fn register_state(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "IsActive",
         lua.create_function(move |_, id: u32| {
             let scene = s.borrow();
@@ -88,7 +104,7 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "GetCount",
         lua.create_function(move |_, id: u32| {
             let scene = s.borrow();
@@ -101,17 +117,13 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "Clear",
         lua.create_function(move |_, id: u32| {
             with_emitter(&s, id, |p| p.runtime.particles.clear());
             Ok(())
         }),
-    )?;
-
-    lua.globals()
-        .set("Particles", table)
-        .map_err(|e| e.to_string())
+    )
 }
 
 /// Mutate the emitter on entity `id` if it has one (no-op otherwise).

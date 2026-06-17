@@ -20,13 +20,22 @@ use crate::scripting::ConsoleLogs;
 
 /// Register the rigidbody half of `Physics` (velocity/force/kinematic) onto
 /// `lua`, creating the `Physics` global table.
-#[allow(clippy::too_many_lines)]
 pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
+    register_velocity(lua, &table, scene)?;
+    register_force(lua, &table, scene)?;
+
+    lua.globals()
+        .set("Physics", table)
+        .map_err(|e| e.to_string())
+}
+
+/// `GetVelocity` / `SetVelocity` over the entity's rigidbody.
+fn register_velocity(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "GetVelocity",
         lua.create_function(move |_, id: u32| {
             let scene = s.borrow();
@@ -41,7 +50,7 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetVelocity",
         lua.create_function(move |_, (id, vx, vy, vz): (u32, f32, f32, f32)| {
             let mut scene = s.borrow_mut();
@@ -52,11 +61,14 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
             }
             Ok(())
         }),
-    )?;
+    )
+}
 
+/// `AddForce` (impulse via F/m) / `SetKinematic` over the entity's rigidbody.
+fn register_force(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "AddForce",
         lua.create_function(move |_, (id, fx, fy, fz): (u32, f32, f32, f32)| {
             let mut scene = s.borrow_mut();
@@ -74,7 +86,7 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 
     let s = Rc::clone(scene);
     put(
-        &table,
+        table,
         "SetKinematic",
         lua.create_function(move |_, (id, is_kinematic): (u32, bool)| {
             let mut scene = s.borrow_mut();
@@ -85,11 +97,7 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
             }
             Ok(())
         }),
-    )?;
-
-    lua.globals()
-        .set("Physics", table)
-        .map_err(|e| e.to_string())
+    )
 }
 
 /// Extend `Physics` with `Raycast` (query) and `Shoot` (raycast + apply damage).
@@ -97,7 +105,6 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 /// pipeline the engine hitscan uses — so a script's cast and the engine's cast
 /// return identical hits for the same ray. `Shoot` is the hitscan that used to be
 /// inline in `app/play.rs`.
-#[allow(clippy::too_many_lines)]
 pub fn register_hitscan(
     lua: &Lua,
     scene: &Rc<RefCell<Scene>>,
@@ -106,10 +113,23 @@ pub fn register_hitscan(
 ) -> Reg {
     let table = global_table(lua, "Physics")?;
 
+    register_raycast(lua, &table, scene, physics)?;
+    register_shoot(lua, &table, scene, physics, console)?;
+
+    Ok(())
+}
+
+/// `Raycast` — query-only cast returning `(hit, entity_id, distance)`.
+fn register_raycast(
+    lua: &Lua,
+    table: &mlua::Table,
+    scene: &Rc<RefCell<Scene>>,
+    physics: &Rc<RefCell<Option<PhysicsWorld>>>,
+) -> Reg {
     let s = Rc::clone(scene);
     let p = Rc::clone(physics);
     put(
-        &table,
+        table,
         "Raycast",
         lua.create_function(
             move |_,
@@ -139,13 +159,22 @@ pub fn register_hitscan(
                 }
             },
         ),
-    )?;
+    )
+}
 
+/// `Shoot` — raycast plus apply damage to the hit entity (the engine hitscan).
+fn register_shoot(
+    lua: &Lua,
+    table: &mlua::Table,
+    scene: &Rc<RefCell<Scene>>,
+    physics: &Rc<RefCell<Option<PhysicsWorld>>>,
+    console: &Rc<RefCell<ConsoleLogs>>,
+) -> Reg {
     let s = Rc::clone(scene);
     let p = Rc::clone(physics);
     let c = Rc::clone(console);
     put(
-        &table,
+        table,
         "Shoot",
         lua.create_function(
             move |_,
@@ -176,9 +205,7 @@ pub fn register_hitscan(
                 }
             },
         ),
-    )?;
-
-    Ok(())
+    )
 }
 
 /// Cast `origin`→`dir` through the live rapier world under the shared hitscan
