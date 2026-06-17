@@ -13,6 +13,7 @@ use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Render the tile grid for the current folder and apply any click action.
+#[allow(clippy::too_many_lines)]
 pub fn draw(
     editor: &mut EditorUi,
     scene: &mut Scene,

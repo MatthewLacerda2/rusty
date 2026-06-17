@@ -131,6 +131,7 @@ impl PhysicsWorld {
     }
 
     /// Push current component state into rapier before stepping.
+    #[allow(clippy::too_many_lines)]
     fn sync_to_rapier(&mut self, scene: &Scene, dt: f32) {
         // Snapshot handles to avoid borrowing the map while the body sets below
         // borrow `self.bodies` / `self.colliders` mutably or immutably.

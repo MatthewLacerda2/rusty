@@ -126,6 +126,7 @@ impl DecalRenderer {
     /// Build the decal pass: a unit-cube mesh, the globals + per-decal + depth
     /// bind-group layouts, and the projector pipeline. Reuses the renderer's
     /// `texture_layout` (group 3) for the decal sprite.
+    #[allow(clippy::too_many_lines)]
     pub fn new(device: &wgpu::Device, texture_layout: &wgpu::BindGroupLayout) -> Self {
         use wgpu::util::DeviceExt;
 

@@ -26,6 +26,7 @@ pub struct ShadowRenderer {
 impl ShadowRenderer {
     pub const SHADOW_SIZE: u32 = 2048;
 
+    #[allow(clippy::too_many_lines)]
     pub fn new(device: &wgpu::Device) -> Self {
         // Create depth textures
         let size = wgpu::Extent3d {
@@ -228,6 +229,7 @@ impl ShadowRenderer {
         );
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn render_static(
         &mut self,
         device: &wgpu::Device,
@@ -299,6 +301,7 @@ impl ShadowRenderer {
         self.is_static_cached = true;
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn render_dynamic(
         &mut self,
         device: &wgpu::Device,

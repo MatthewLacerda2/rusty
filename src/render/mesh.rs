@@ -39,6 +39,7 @@ impl Vertex {
 }
 
 /// Generates a 3D box centered at the origin
+#[allow(clippy::too_many_lines)]
 pub fn generate_box(width: f32, height: f32, depth: f32) -> (Vec<Vertex>, Vec<u32>) {
     let w = width / 2.0;
     let h = height / 2.0;
@@ -186,6 +187,7 @@ pub fn generate_plane(width: f32, depth: f32) -> (Vec<Vertex>, Vec<u32>) {
 }
 
 /// Generates a cylinder between two arbitrary 3D points
+#[allow(clippy::too_many_lines)]
 pub fn generate_cylinder(
     p1: Vec3,
     p2: Vec3,

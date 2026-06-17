@@ -50,6 +50,7 @@ pub(super) struct ScenePassFrame {
 }
 
 impl Renderer {
+    #[allow(clippy::too_many_lines)]
     pub(super) fn execute_scene_pass(
         &mut self,
         scene: &Scene,

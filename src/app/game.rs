@@ -176,11 +176,11 @@ impl GameWorld {
         transition
     }
 
+    #[allow(clippy::too_many_lines)]
     fn enter_play(&mut self) {
         self.resources.play_frame = 0;
         self.resources.time.borrow_mut().reset();
-        // Snapshot the authoritative edit scene so Stop can restore it, discarding
-        // every play-mode mutation (script/physics moves, health, spawns/despawns).
+        // Snapshot the edit scene so Stop can restore it, discarding play-mode mutations.
         self.resources.edit_snapshot = Some(SceneSnapshot::capture(&self.world.scene.borrow()));
         {
             let scene = self.world.scene.borrow();

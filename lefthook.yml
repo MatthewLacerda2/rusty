@@ -11,6 +11,8 @@ pre-commit:
       glob: "*.rs"
       run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- {staged_files}
     clippy:
-      # Report-only until the legacy modules are migrated. To make it a hard gate,
-      # drop the trailing `|| true` and append `-- -D warnings -W clippy::too_many_lines`.
-      run: cargo clippy --quiet --no-deps 2>&1 | tee .lint/clippy.txt || true
+      # Hard gate, mirroring CI: every warning fails, and the 50-line function cap
+      # (clippy::too_many_lines) is denied. Legacy functions are grandfathered with
+      # an inline `#[allow(clippy::too_many_lines)]` (the burn-down list). Default
+      # features here for speed; CI also runs the dev feature set.
+      run: cargo clippy --quiet --all-targets --no-deps -- -D warnings -D clippy::too_many_lines

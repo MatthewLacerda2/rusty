@@ -4,6 +4,7 @@ use crate::scripting::ConsoleLogs;
 use std::fs;
 use std::path::Path;
 
+#[allow(clippy::too_many_lines)]
 pub fn draw(
     ui: &mut egui::Ui,
     editor: &mut EditorUi,
