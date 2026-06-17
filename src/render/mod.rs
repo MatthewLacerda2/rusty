@@ -17,6 +17,7 @@ mod particles_draw;
 mod pipelines;
 mod postfx_params;
 mod setup;
+mod setup_build;
 mod setup_headless;
 mod setup_resize;
 mod textures;

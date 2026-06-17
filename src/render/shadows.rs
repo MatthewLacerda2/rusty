@@ -26,9 +26,49 @@ pub struct ShadowRenderer {
 impl ShadowRenderer {
     pub const SHADOW_SIZE: u32 = 2048;
 
-    #[allow(clippy::too_many_lines)]
     pub fn new(device: &wgpu::Device) -> Self {
-        // Create depth textures
+        let (static_texture, static_view, active_texture, active_view) =
+            Self::create_depth_textures(device);
+        let (sampler, bind_group_layout, bind_group) =
+            Self::create_sampler_and_bind_group(device, &active_view);
+
+        let light_space_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Shadow Light Space Buffer"),
+            size: 64, // Mat4 size
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let (global_layout, global_bind_group, entity_layout) =
+            Self::create_pass_layouts(device, &light_space_buffer);
+        let pipeline = Self::create_pipeline(device, &global_layout, &entity_layout);
+
+        Self {
+            static_texture,
+            static_view,
+            active_texture,
+            active_view,
+            sampler,
+            bind_group_layout,
+            bind_group,
+            pipeline,
+            light_space_buffer,
+            light_space_matrix: Mat4::IDENTITY,
+            is_static_cached: false,
+            global_bind_group,
+            entity_layout,
+        }
+    }
+
+    /// Allocate the static + active depth textures (and their default views).
+    fn create_depth_textures(
+        device: &wgpu::Device,
+    ) -> (
+        wgpu::Texture,
+        wgpu::TextureView,
+        wgpu::Texture,
+        wgpu::TextureView,
+    ) {
         let size = wgpu::Extent3d {
             width: Self::SHADOW_SIZE,
             height: Self::SHADOW_SIZE,
@@ -55,6 +95,15 @@ impl ShadowRenderer {
         let active_texture = device.create_texture(&desc);
         let active_view = active_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
+        (static_texture, static_view, active_texture, active_view)
+    }
+
+    /// Comparison sampler plus the layout/group that expose the depth map to the
+    /// main shader.
+    fn create_sampler_and_bind_group(
+        device: &wgpu::Device,
+        active_view: &wgpu::TextureView,
+    ) -> (wgpu::Sampler, wgpu::BindGroupLayout, wgpu::BindGroup) {
         // Sampler with comparison for hardware PCF shadows
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Shadow Sampler"),
@@ -97,7 +146,7 @@ impl ShadowRenderer {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&active_view),
+                    resource: wgpu::BindingResource::TextureView(active_view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
@@ -106,21 +155,18 @@ impl ShadowRenderer {
             ],
         });
 
-        // Compile shadow map shader
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Shadow Shader"),
-            source: wgpu::ShaderSource::Wgsl(
-                include_str!("../../assets/shaders/shadow.wgsl").into(),
-            ),
-        });
+        (sampler, bind_group_layout, bind_group)
+    }
 
-        let light_space_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Shadow Light Space Buffer"),
-            size: 64, // Mat4 size
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
+    /// Global (light-space) and per-entity layouts used by the depth-only pass.
+    fn create_pass_layouts(
+        device: &wgpu::Device,
+        light_space_buffer: &wgpu::Buffer,
+    ) -> (
+        wgpu::BindGroupLayout,
+        wgpu::BindGroup,
+        wgpu::BindGroupLayout,
+    ) {
         let global_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Shadow Global Layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
@@ -158,13 +204,30 @@ impl ShadowRenderer {
             }],
         });
 
+        (global_layout, global_bind_group, entity_layout)
+    }
+
+    /// Depth-only render pipeline (sloped bias to fight shadow acne).
+    fn create_pipeline(
+        device: &wgpu::Device,
+        global_layout: &wgpu::BindGroupLayout,
+        entity_layout: &wgpu::BindGroupLayout,
+    ) -> wgpu::RenderPipeline {
+        // Compile shadow map shader
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Shadow Shader"),
+            source: wgpu::ShaderSource::Wgsl(
+                include_str!("../../assets/shaders/shadow.wgsl").into(),
+            ),
+        });
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Shadow Pipeline Layout"),
-            bind_group_layouts: &[&global_layout, &entity_layout],
+            bind_group_layouts: &[global_layout, entity_layout],
             push_constant_ranges: &[],
         });
 
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Shadow Render Pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
@@ -192,23 +255,7 @@ impl ShadowRenderer {
             }),
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
-        });
-
-        Self {
-            static_texture,
-            static_view,
-            active_texture,
-            active_view,
-            sampler,
-            bind_group_layout,
-            bind_group,
-            pipeline,
-            light_space_buffer,
-            light_space_matrix: Mat4::IDENTITY,
-            is_static_cached: false,
-            global_bind_group,
-            entity_layout,
-        }
+        })
     }
 
     pub fn update_light_space(&mut self, queue: &wgpu::Queue, light_dir: Vec3) {
@@ -229,7 +276,6 @@ impl ShadowRenderer {
         );
     }
 
-    #[allow(clippy::too_many_lines)]
     pub fn render_static(
         &mut self,
         device: &wgpu::Device,
@@ -237,35 +283,7 @@ impl ShadowRenderer {
         scene: &Scene,
         gpu_meshes: &HashMap<crate::render::MeshId, crate::render::GpuMesh>,
     ) {
-        let mut render_resources = Vec::new();
-        for entity in scene.iter() {
-            if !entity.active || !entity.is_static {
-                continue;
-            }
-            if let Some(mesh) = &entity.mesh {
-                let mesh_id = crate::render::MeshId::from_mesh(mesh);
-                if let Some(gpu_mesh) = gpu_meshes.get(&mesh_id) {
-                    let model_matrix = scene.compute_world_matrix(entity.id);
-                    let model_arr = model_matrix.to_cols_array();
-                    let entity_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("Shadow Static Entity Uniform"),
-                        contents: bytemuck::bytes_of(&model_arr),
-                        usage: wgpu::BufferUsages::UNIFORM,
-                    });
-
-                    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("Shadow Static Entity Bind Group"),
-                        layout: &self.entity_layout,
-                        entries: &[wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: entity_buf.as_entire_binding(),
-                        }],
-                    });
-
-                    render_resources.push((mesh_id, bind_group, gpu_mesh.num_indices));
-                }
-            }
-        }
+        let render_resources = self.collect_entity_resources(device, scene, gpu_meshes, true);
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -283,26 +301,12 @@ impl ShadowRenderer {
                 occlusion_query_set: None,
             });
 
-            render_pass.set_pipeline(&self.pipeline);
-            render_pass.set_bind_group(0, &self.global_bind_group, &[]);
-
-            for (id, bind_group, num_indices) in &render_resources {
-                if let Some(gpu_mesh) = gpu_meshes.get(id) {
-                    render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
-                    render_pass.set_index_buffer(
-                        gpu_mesh.index_buffer.slice(..),
-                        wgpu::IndexFormat::Uint32,
-                    );
-                    render_pass.set_bind_group(1, bind_group, &[]);
-                    render_pass.draw_indexed(0..*num_indices, 0, 0..1);
-                }
-            }
+            self.draw_resources(&mut render_pass, gpu_meshes, &render_resources);
         }
 
         self.is_static_cached = true;
     }
 
-    #[allow(clippy::too_many_lines)]
     pub fn render_dynamic(
         &mut self,
         device: &wgpu::Device,
@@ -332,35 +336,7 @@ impl ShadowRenderer {
             size,
         );
 
-        let mut render_resources = Vec::new();
-        for entity in scene.iter() {
-            if !entity.active || entity.is_static {
-                continue;
-            }
-            if let Some(mesh) = &entity.mesh {
-                let mesh_id = crate::render::MeshId::from_mesh(mesh);
-                if let Some(gpu_mesh) = gpu_meshes.get(&mesh_id) {
-                    let model_matrix = scene.compute_world_matrix(entity.id);
-                    let model_arr = model_matrix.to_cols_array();
-                    let entity_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("Shadow Dynamic Entity Uniform"),
-                        contents: bytemuck::bytes_of(&model_arr),
-                        usage: wgpu::BufferUsages::UNIFORM,
-                    });
-
-                    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("Shadow Dynamic Entity Bind Group"),
-                        layout: &self.entity_layout,
-                        entries: &[wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: entity_buf.as_entire_binding(),
-                        }],
-                    });
-
-                    render_resources.push((mesh_id, bind_group, gpu_mesh.num_indices));
-                }
-            }
-        }
+        let render_resources = self.collect_entity_resources(device, scene, gpu_meshes, false);
 
         if !render_resources.is_empty() {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -378,19 +354,79 @@ impl ShadowRenderer {
                 occlusion_query_set: None,
             });
 
-            render_pass.set_pipeline(&self.pipeline);
-            render_pass.set_bind_group(0, &self.global_bind_group, &[]);
+            self.draw_resources(&mut render_pass, gpu_meshes, &render_resources);
+        }
+    }
 
-            for (id, bind_group, num_indices) in &render_resources {
-                if let Some(gpu_mesh) = gpu_meshes.get(id) {
-                    render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
-                    render_pass.set_index_buffer(
-                        gpu_mesh.index_buffer.slice(..),
-                        wgpu::IndexFormat::Uint32,
-                    );
-                    render_pass.set_bind_group(1, bind_group, &[]);
-                    render_pass.draw_indexed(0..*num_indices, 0, 0..1);
+    /// Build a per-entity model-matrix uniform + bind group for every active
+    /// entity whose `is_static` flag matches `want_static`.
+    fn collect_entity_resources(
+        &self,
+        device: &wgpu::Device,
+        scene: &Scene,
+        gpu_meshes: &HashMap<crate::render::MeshId, crate::render::GpuMesh>,
+        want_static: bool,
+    ) -> Vec<(crate::render::MeshId, wgpu::BindGroup, u32)> {
+        let (buffer_label, bind_group_label) = if want_static {
+            (
+                "Shadow Static Entity Uniform",
+                "Shadow Static Entity Bind Group",
+            )
+        } else {
+            (
+                "Shadow Dynamic Entity Uniform",
+                "Shadow Dynamic Entity Bind Group",
+            )
+        };
+        let mut render_resources = Vec::new();
+        for entity in scene.iter() {
+            if !entity.active || entity.is_static != want_static {
+                continue;
+            }
+            if let Some(mesh) = &entity.mesh {
+                let mesh_id = crate::render::MeshId::from_mesh(mesh);
+                if let Some(gpu_mesh) = gpu_meshes.get(&mesh_id) {
+                    let model_matrix = scene.compute_world_matrix(entity.id);
+                    let model_arr = model_matrix.to_cols_array();
+                    let entity_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some(buffer_label),
+                        contents: bytemuck::bytes_of(&model_arr),
+                        usage: wgpu::BufferUsages::UNIFORM,
+                    });
+
+                    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some(bind_group_label),
+                        layout: &self.entity_layout,
+                        entries: &[wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: entity_buf.as_entire_binding(),
+                        }],
+                    });
+
+                    render_resources.push((mesh_id, bind_group, gpu_mesh.num_indices));
                 }
+            }
+        }
+        render_resources
+    }
+
+    /// Issue the depth-only draw calls for collected entity resources.
+    fn draw_resources<'a>(
+        &'a self,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        gpu_meshes: &'a HashMap<crate::render::MeshId, crate::render::GpuMesh>,
+        render_resources: &'a [(crate::render::MeshId, wgpu::BindGroup, u32)],
+    ) {
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &self.global_bind_group, &[]);
+
+        for (id, bind_group, num_indices) in render_resources {
+            if let Some(gpu_mesh) = gpu_meshes.get(id) {
+                render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
+                render_pass
+                    .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                render_pass.set_bind_group(1, bind_group, &[]);
+                render_pass.draw_indexed(0..*num_indices, 0, 0..1);
             }
         }
     }

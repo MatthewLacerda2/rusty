@@ -6,7 +6,6 @@ use super::{PfxTarget, PostFx, PostParams, HDR_FORMAT};
 impl PostFx {
     /// Build the whole post-FX resource set sized for `width` x `height`, writing
     /// its final composite into `output_format` (the swapchain / screenshot format).
-    #[allow(clippy::too_many_lines)]
     pub fn new(
         device: &wgpu::Device,
         width: u32,
@@ -14,48 +13,10 @@ impl PostFx {
         output_format: wgpu::TextureFormat,
         bloom_divisor: u32,
     ) -> Self {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("PostFX Shader"),
-            source: wgpu::ShaderSource::Wgsl(
-                include_str!("../../../assets/shaders/postfx.wgsl").into(),
-            ),
-        });
-
         let io_layout = Self::create_io_layout(device);
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("PostFX Pipeline Layout"),
-            bind_group_layouts: &[&io_layout],
-            push_constant_ranges: &[],
-        });
-
-        let bright_pipeline =
-            Self::pipeline(device, &shader, &pipeline_layout, "fs_bright", HDR_FORMAT);
-        let blur_pipeline =
-            Self::pipeline(device, &shader, &pipeline_layout, "fs_blur", HDR_FORMAT);
-        let composite_pipeline = Self::pipeline(
-            device,
-            &shader,
-            &pipeline_layout,
-            "fs_composite",
-            output_format,
-        );
-
-        let params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("PostFX Params"),
-            size: std::mem::size_of::<PostParams>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("PostFX Sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            ..Default::default()
-        });
+        let (bright_pipeline, blur_pipeline, composite_pipeline) =
+            Self::create_pipelines(device, &io_layout, output_format);
+        let (params_buffer, sampler) = Self::create_params_and_sampler(device);
 
         let (full_size, bloom_size, scene_hdr, bloom_a, bloom_b) =
             Self::create_targets(device, width, height, bloom_divisor);
@@ -74,6 +35,66 @@ impl PostFx {
             full_size,
             prev_view_proj: glam::Mat4::IDENTITY,
         }
+    }
+
+    /// Build the three fullscreen passes (bright extract, blur, final composite).
+    fn create_pipelines(
+        device: &wgpu::Device,
+        io_layout: &wgpu::BindGroupLayout,
+        output_format: wgpu::TextureFormat,
+    ) -> (
+        wgpu::RenderPipeline,
+        wgpu::RenderPipeline,
+        wgpu::RenderPipeline,
+    ) {
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("PostFX Shader"),
+            source: wgpu::ShaderSource::Wgsl(
+                include_str!("../../../assets/shaders/postfx.wgsl").into(),
+            ),
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("PostFX Pipeline Layout"),
+            bind_group_layouts: &[io_layout],
+            push_constant_ranges: &[],
+        });
+
+        let bright_pipeline =
+            Self::pipeline(device, &shader, &pipeline_layout, "fs_bright", HDR_FORMAT);
+        let blur_pipeline =
+            Self::pipeline(device, &shader, &pipeline_layout, "fs_blur", HDR_FORMAT);
+        let composite_pipeline = Self::pipeline(
+            device,
+            &shader,
+            &pipeline_layout,
+            "fs_composite",
+            output_format,
+        );
+
+        (bright_pipeline, blur_pipeline, composite_pipeline)
+    }
+
+    /// Create the params uniform buffer and the linear-clamp sampler.
+    fn create_params_and_sampler(device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Sampler) {
+        let params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("PostFX Params"),
+            size: std::mem::size_of::<PostParams>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("PostFX Sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+
+        (params_buffer, sampler)
     }
 
     /// (Re)allocate the HDR + bloom targets for a new framebuffer size.
