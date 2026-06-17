@@ -27,6 +27,7 @@ pub fn draw_mesh(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
 }
 
 /// 3B2. Material / Texture Component
+#[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
 pub fn draw_texture(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
     if entity.texture.is_none() {
         return;
@@ -93,6 +94,7 @@ pub fn draw_texture(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool)
 }
 
 /// 3C. Light configuration
+#[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
 pub fn draw_light(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
     if entity.light.is_none() {
         return;

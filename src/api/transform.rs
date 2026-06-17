@@ -13,6 +13,7 @@ use super::{put, Reg};
 use crate::scene::Scene;
 
 /// Register the `Transform` namespace onto `lua`.
+#[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
 pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 

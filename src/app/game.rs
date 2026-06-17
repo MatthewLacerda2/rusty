@@ -176,6 +176,7 @@ impl GameWorld {
         transition
     }
 
+    #[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
     fn enter_play(&mut self) {
         self.resources.play_frame = 0;
         self.resources.time.borrow_mut().reset();
@@ -194,8 +195,8 @@ impl GameWorld {
                 cam.pitch = -10.0;
             }
         }
-        self.resources
-            .console
+        let console = self.resources.console.clone();
+        console
             .borrow_mut()
             .info("Capturing cursor, entering PlayMode!".to_string());
 
@@ -204,8 +205,7 @@ impl GameWorld {
             .script_manager
             .init_runtime(&self.resources.physics)
         {
-            self.resources
-                .console
+            console
                 .borrow_mut()
                 .error(format!("Lua init error: {}", err));
             return;

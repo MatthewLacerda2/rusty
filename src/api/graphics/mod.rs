@@ -103,6 +103,7 @@ fn register_bloom(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) ->
 }
 
 /// Color grading: exposure / contrast / saturation / gamma + tonemap operator.
+#[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
 fn register_color(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
     let s = Rc::clone(scene);
     put(

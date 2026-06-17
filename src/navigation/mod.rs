@@ -232,6 +232,7 @@ impl NavigationGraph {
     }
 
     /// Core A* algorithm returning list of grid coordinates (x, z)
+    #[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
     pub fn find_path(
         &self,
         raw_sx: i32,
@@ -411,6 +412,7 @@ impl NavigationGraph {
 
     /// Steers and updates positions of active NavMesh agents in the scene,
     /// constraining them strictly to walkable NavMesh cells using a 2D sliding projection check.
+    #[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
     pub fn tick_nav_agents(&self, scene: &mut Scene, delta_time: f32) {
         for id in scene.entity_ids() {
             let mut entity_guard = match scene.get_entity_mut(id) {

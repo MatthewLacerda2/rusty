@@ -86,6 +86,7 @@ fn draw_collapsed(ctx: &egui::Context, t: crate::editor::theme::Theme, open: &mu
         });
 }
 
+#[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
 fn draw_entity_inspector(
     editor: &mut EditorUi,
     ui: &mut egui::Ui,

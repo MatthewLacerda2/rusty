@@ -14,6 +14,7 @@ use super::{put, Reg};
 use crate::render::Camera;
 
 /// Register the `Camera` namespace onto `lua`.
+#[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
 pub fn register(lua: &Lua, camera: &Rc<RefCell<Camera>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 

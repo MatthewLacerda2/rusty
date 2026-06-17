@@ -67,6 +67,7 @@ impl Renderer {
         }
     }
 
+    #[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
     pub(super) fn precreate_solid_resources(
         &self,
         scene: &Scene,
@@ -192,6 +193,7 @@ impl Renderer {
         solid_render_resources
     }
 
+    #[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
     pub(super) fn precreate_outline(
         &self,
         scene: &Scene,

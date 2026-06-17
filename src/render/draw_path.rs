@@ -10,6 +10,7 @@ use super::{BoneUniform, EntityUniform, Renderer};
 use crate::scene::Scene;
 
 impl Renderer {
+    #[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
     pub(super) fn precreate_axis_arrows(
         &self,
         scene: &Scene,
@@ -76,6 +77,7 @@ impl Renderer {
         axis_arrow_resources
     }
 
+    #[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
     pub(super) fn precreate_path(
         &self,
         pathfinding_points: &[Vec3],

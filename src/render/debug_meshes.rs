@@ -71,6 +71,7 @@ impl Renderer {
     }
 
     /// Pre-generates 3D line-based arrows for X, Y, Z global translation axes
+    #[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
     pub(super) fn generate_axis_arrows(&mut self) {
         let axis_length = 2.0;
         let arrow_head_length = 0.35;

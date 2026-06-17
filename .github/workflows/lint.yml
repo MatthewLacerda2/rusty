@@ -45,13 +45,15 @@ jobs:
         run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- --determinism
       - name: Component completeness gate (4 axes per built-in component)
         run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- --components
-      # Clippy is now a HARD gate: every warning fails CI, for both feature sets.
+      # Clippy is a HARD gate: every warning fails CI, for both feature sets.
       # The 50-line function cap (clippy::too_many_lines, configured in clippy.toml)
-      # is NOT yet wired in here — it flags ~45 legacy functions and is tracked as a
-      # burn-down follow-up. Everything else is clean and enforced.
+      # is enforced here too: `-W clippy::too_many_lines` turns the lint on and the
+      # trailing `-D warnings` promotes it (and everything else) to an error. The ~45
+      # legacy offenders carry a `#[allow(clippy::too_many_lines)]` grandfather marker
+      # and are burned down in #124; all new/changed code must stay under the cap.
       - name: System libs for winit/wgpu builds
         run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev
       - name: Clippy (hard gate, default features)
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets -- -W clippy::too_many_lines -D warnings
       - name: Clippy (hard gate, dev features)
-        run: cargo clippy --all-targets --features dev -- -D warnings
+        run: cargo clippy --all-targets --features dev -- -W clippy::too_many_lines -D warnings

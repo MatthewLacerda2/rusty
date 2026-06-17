@@ -13,6 +13,7 @@ use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the `Health` namespace onto `lua`.
+#[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
 pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<ConsoleLogs>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 

@@ -78,6 +78,7 @@ impl Renderer {
     /// groups from an already-created device/queue. Both the windowed (`new`) and
     /// the headless offscreen (`new_headless`) paths funnel through here, so they
     /// produce a byte-identical renderer apart from the optional window surface.
+    #[allow(clippy::too_many_lines)] // grandfathered: burn down in #124
     pub(super) fn from_parts(
         device: wgpu::Device,
         queue: wgpu::Queue,
