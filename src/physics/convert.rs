@@ -44,3 +44,22 @@ pub fn from_iso(iso: &Isometry3<f32>) -> (Vec3, Quat) {
         from_na_quat(&iso.rotation),
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::f32::consts::FRAC_PI_2;
+
+    #[test]
+    fn quat_round_trips_through_nalgebra() {
+        // A non-identity rotation so `from_na_quat` returning identity (or any fixed
+        // default) is caught: a 90° yaw must survive the glam->na->glam round trip.
+        let q = Quat::from_rotation_y(FRAC_PI_2);
+        let back = from_na_quat(&to_na_quat(q));
+        // Quaternion double cover: q and -q are the same rotation.
+        assert!(
+            back.abs_diff_eq(q, 1e-5) || back.abs_diff_eq(-q, 1e-5),
+            "round-tripped quat {back:?} should match {q:?}"
+        );
+    }
+}
