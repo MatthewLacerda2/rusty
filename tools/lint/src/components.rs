@@ -1,6 +1,6 @@
 //! Component-completeness gate (#81).
 //!
-//! Every built-in component must satisfy four axes that deliberately live in layers
+//! Every first-class component must satisfy four axes that deliberately live in layers
 //! which don't depend on each other:
 //!   1. a field on `Entity` (`src/components/entity.rs`) — the discovery source,
 //!   2. an Add Component entry (`src/editor/inspector_add.rs`),

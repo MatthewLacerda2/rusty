@@ -36,7 +36,7 @@ fn main() {
     }
 
     // `--components` runs the 4-axis component-completeness gate (#81): every
-    // built-in component must have an Entity field, an Add Component entry, an
+    // first-class component must have an Entity field, an Add Component entry, an
     // inspector card, and an API namespace, or be grandfathered in the baseline.
     if args.iter().any(|a| a == "--components") {
         components::run();

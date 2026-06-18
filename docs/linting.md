@@ -12,7 +12,7 @@ result is written to `.lint/report.txt` so an agent can read exactly what failed
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines |
 | Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation` |
-| Component completeness | `tools/lint -- --components` | every built-in component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
+| Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
 
 ## Run it
 ```
@@ -31,7 +31,7 @@ cargo clippy --no-deps                                   # smells
 entries. When the file is empty, the size gate is fully on.
 
 ## Component completeness (`--components`)
-A built-in component is only "done" when it appears on all four axes that
+A first-class component is only "done" when it appears on all four axes that
 deliberately live in non-dependent layers: a field on `Entity`, an Add Component
 entry (`inspector_add.rs`), an inspector card (some `inspector_*.rs`), and an API
 namespace (`src/api/<x>.rs` registered in `api/mod.rs` and documented in

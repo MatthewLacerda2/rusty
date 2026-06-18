@@ -1,4 +1,4 @@
-//! src/components/mod.rs — Built-in component registry
+//! src/components/mod.rs — First-class component registry
 //!
 //! First-class engine components: the engine expects these and its systems
 //! interface with them (e.g. NavMeshAgent <-> baked navmesh), exactly like
