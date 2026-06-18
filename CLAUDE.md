@@ -69,9 +69,11 @@ five kinds of moving part (Unity analogs in parentheses):
    Global state the systems read and write.
 2. **Components** — per-entity data, the Unity-style "classes" (`Transform`, `Mesh`,
    `Camera`, `Light`, `Collider`, `Rigidbody`, `NavMeshAgent`, `Health`, `Animator`,
-   …). First-class and engine-provided; systems expect them. Every entity has exactly
-   one `Transform` (mandatory, cannot be removed); all others are optional. Custom
-   behaviour goes in *scripts*, never in new built-in components.
+   …). These are the engine's **first-class components** — engine-provided, systems
+   expect them, and each must satisfy the four axes the completeness gate enforces
+   (see `docs/linting.md`). Every entity has exactly one `Transform` (mandatory, cannot
+   be removed); all others are optional. Custom behaviour goes in *script components*
+   (Lua MonoBehaviours), never in new first-class components.
 3. **Systems** — per-frame logic, a plain `fn(&mut World, &mut Resources)`, grouped
    into ordered stages (`Startup` once, then each frame
    `FixedUpdate → Update → LateUpdate → Render`). Order within a stage is the order

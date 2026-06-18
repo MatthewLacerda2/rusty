@@ -43,7 +43,7 @@ jobs:
         run: cargo run --quiet --manifest-path tools/lint/Cargo.toml
       - name: Determinism guard (no wall-clock / unseeded RNG in sim modules)
         run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- --determinism
-      - name: Component completeness gate (4 axes per built-in component)
+      - name: Component completeness gate (4 axes per first-class component)
         run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- --components
       # Clippy is a HARD gate: every warning fails CI, for both feature sets.
       # The 50-line function cap (clippy::too_many_lines, threshold in clippy.toml)
