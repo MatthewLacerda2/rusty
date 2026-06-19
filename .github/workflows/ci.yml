@@ -7,13 +7,20 @@ on:
   # it lands. The gating jobs below opt in via their `if`; the report-only
   # coverage/mutants jobs deliberately do not, to keep the queue lean.
   merge_group:
-  # The report-only coverage/mutants jobs run here — post-merge on `main` — and
-  # NOT on `pull_request`. They take ~15 min and, being non-blocking, only ever
-  # sat on a PR as a phantom "still running" long after the gating checks were
-  # already green, which repeatedly read as a stuck PR. On `main` they still
-  # produce the ratchet/baseline data, without stalling any PR or the queue.
+  # `coverage` runs here — post-merge on `main`, never on `pull_request`: it takes
+  # ~15 min and, being non-blocking, only ever sat on a PR as a phantom "still
+  # running" long after the gating checks were green, which read as a stuck PR. On
+  # `main` it still produces the ratchet/baseline data without stalling any PR or
+  # the queue. Mutation testing is split differently (see the two `mutants*` jobs):
+  # a fast, diff-scoped, informational run *does* run per-PR so the coding agent
+  # gets a fresh-context catch, while the full-sim sweep moved to the nightly
+  # `schedule` below — the report-only backstop.
   push:
     branches: [main]
+  # Nightly full-sim mutation sweep (the `mutants` job): re-examines untouched code
+  # the per-PR diff run never mutates and tracks/ratchets the survivor backlog.
+  schedule:
+    - cron: '0 3 * * *'
   workflow_dispatch:
 
 jobs:
@@ -191,24 +198,109 @@ jobs:
           # `bans`/`sources` stay as-is (warn). Policy lives in deny.toml.
           command: check advisories bans sources licenses
 
-  mutants:
+  # Per-PR mutation run — fast, diff-scoped, informational. Mutates only the lines
+  # this PR changed within the deterministic sim modules (--in-diff ∩ --file), so
+  # the cost scales with the change, not the whole codebase. Survivors are surfaced
+  # in the PR's own context — a job-summary block plus a sticky PR comment — so the
+  # coding agent fixes them in-PR; that routing is what makes "informational" bite
+  # without a hard gate. `continue-on-error` keeps it from ever blocking a merge,
+  # and the cheap `sim` paths-filter short-circuits PRs that touch no sim code.
+  mutants-pr:
     needs: changes
     runs-on: ubuntu-latest
-    # Post-merge on main (or manual), not per-PR — see the `push` trigger note.
-    # Runs only when the merge touched sim source / their tests / dep pins (the
-    # `sim` filter above): a full mutation sweep over the four sim modules takes
-    # ~15 min and cannot reveal anything new on a merge that changed none of them.
-    # `workflow_dispatch` always runs the full sweep on demand.
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && needs.changes.outputs.sim != 'false')
-    # Report-only to start (#122): mutation testing audits whether the tests
-    # actually catch bugs — the headline guardrail against green-but-vacuous
-    # agent-written tests. Scoped to the deterministic sim (app/scripting/physics/
-    # navigation), the pure-logic part where a silent bug hurts most; surviving
-    # mutants are published as an artifact. Ratchet to a hard gate once the
-    # survivor list is burned down. `continue-on-error` keeps it from blocking
-    # merges meanwhile.
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.draft == false &&
+      needs.changes.outputs.sim != 'false'
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so we can diff against the PR base to build the --in-diff patch.
+          fetch-depth: 0
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+      - name: System libs for winit/wgpu builds
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev
+      - name: Install cargo-mutants
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+      - name: Build the PR diff (changed lines vs. merge-base)
+        run: git diff ${{ github.event.pull_request.base.sha }}...HEAD > pr.diff
+      - name: Mutation test (changed sim lines only, informational)
+        # --in-diff restricts mutants to the lines this PR changed; the --file sim
+        # globs keep it from mutating anything outside the deterministic sim even
+        # if the diff strays. Same dev-feature build + timeout guard as the sweep.
+        run: |
+          cargo mutants --no-shuffle --timeout-multiplier 3 --in-diff pr.diff \
+            --file 'src/app/**/*.rs' \
+            --file 'src/scripting/**/*.rs' \
+            --file 'src/physics/**/*.rs' \
+            --file 'src/navigation/**/*.rs' \
+            -- --features dev
+      - name: Summarize survivors (job summary + comment body)
+        id: prep
+        if: always()
+        # cargo-mutants exits non-zero when mutants survive, so this and the steps
+        # below run with `if: always()`. Build the same block for the run summary
+        # and the sticky comment; flag whether there were any survivors.
+        run: |
+          MISSED=mutants.out/missed.txt
+          {
+            echo '### Mutation testing — diff-scoped (informational, non-blocking)'
+            echo ''
+            if [ -s "$MISSED" ]; then
+              echo 'These **changed** sim lines were mutated and no test caught it. Strengthen the tests covering them:'
+              echo ''
+              echo '```'
+              cat "$MISSED"
+              echo '```'
+            else
+              echo 'No surviving mutants in the changed sim lines. ✅'
+            fi
+          } | tee comment.md >> "$GITHUB_STEP_SUMMARY"
+          if [ -s "$MISSED" ]; then
+            echo 'has_survivors=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'has_survivors=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Post surviving-mutant comment
+        if: always() && steps.prep.outputs.has_survivors == 'true'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: mutants-diff
+          path: comment.md
+      - name: Clear stale survivor comment
+        # Idempotent: when a re-push fixes the survivors, drop the old comment so the
+        # PR doesn't carry a stale list.
+        if: always() && steps.prep.outputs.has_survivors != 'true'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: mutants-diff
+          delete: true
+      - name: Upload surviving-mutant report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutants-pr-report
+          path: mutants.out/
+
+  # Nightly full-sim mutation sweep — the report-only backstop. Unlike the per-PR
+  # diff run, this re-mutates the *entire* deterministic sim (app/scripting/physics/
+  # navigation), re-examining untouched code the diff run never touches and
+  # tracking/ratcheting the survivor backlog (#158–#161). Runs on the nightly
+  # `schedule` or on demand; never on a PR, never blocking. No `needs: changes`:
+  # there is no PR/push diff to filter on a scheduled/manual run, so it always
+  # sweeps the full set.
+  mutants:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -222,7 +314,7 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-mutants
-      - name: Mutation test (deterministic sim, report-only)
+      - name: Mutation test (full deterministic sim, report-only)
         # Build/test with the dev feature so the headless-harness sim tests run
         # too. Scoped by --file to the sim modules; the timeout multiplier guards
         # against mutants that induce infinite loops.

@@ -40,11 +40,41 @@ locally with `cargo llvm-cov --summary-only` (add `--features dev` for the
 dev-only surface).
 
 **When it runs:** post-merge on `main` (and on `workflow_dispatch`), **not** on
-every pull request. The same applies to the report-only `mutants` sweep. Both
-are non-blocking and take ~15 min, so on a PR they only ever sat "in progress"
-long after the gating checks were green — a phantom stuck-PR. Running them on
-`main` keeps the ratchet/baseline signal where it's actionable without stalling
-PRs; a merge that touches no sim/code paths skips them via the `changes` filter.
+every pull request. It is non-blocking and takes ~15 min, so on a PR it only ever
+sat "in progress" long after the gating checks were green — a phantom stuck-PR.
+Running it on `main` keeps the ratchet/baseline signal where it's actionable
+without stalling PRs; a merge that touches no sim/code paths skips it via the
+`changes` filter. (Mutation testing — below — does run per-PR, but only because
+it is diff-scoped down to seconds, not the full ~15-min sweep.)
+
+## Mutation testing
+[`cargo-mutants`](https://github.com/sourcefrog/cargo-mutants) audits whether the
+suite actually *catches* bugs — the headline guardrail against green-but-vacuous
+agent-written tests. It mutates the deterministic sim (`app`, `scripting`,
+`physics`, `navigation`), the pure-logic part where a silent bug hurts most, and
+reports the **surviving** mutants (a change no test failed on). It runs in two
+tiers, both **non-blocking** — mutation never gates a merge:
+
+| Run | Trigger | Scope | Where it lands |
+|---|---|---|---|
+| **PR run** (`mutants-pr`) | `pull_request`, `sim` filter | `--in-diff` — only lines the PR changed (∩ the `--file` sim globs) | job summary **and** a sticky PR comment, so the coding agent fixes survivors in-PR |
+| **Full sweep** (`mutants`) | nightly `schedule` + `workflow_dispatch` | full `--file` sim scope | uploaded survivor artifact (`mutants-report`) |
+
+Why split it: diff-scoping makes the per-PR run fast and every survivor
+attributable to a line the PR just wrote (the *fresh-context catch*), while the
+nightly sweep re-examines untouched code the diff run never mutates and
+tracks/ratchets the survivor backlog. Keeping both **informational** — surfaced
+where the agent acts on them rather than failing the build — is deliberate:
+`--in-diff` line-matching can drift after a rebase and timeouts can produce
+spurious "survivors," neither of which should redden CI. The per-PR sticky
+comment is cleared automatically once a re-push fixes the survivors.
+
+Run it locally (the diff-scoped form mirrors the PR run):
+```
+git diff origin/main > pr.diff
+cargo mutants --in-diff pr.diff --file 'src/app/**/*.rs' -- --features dev   # ...plus the other sim modules
+cargo mutants --no-shuffle --timeout-multiplier 3 -- --features dev          # full sweep
+```
 
 ## Fuzzing (local-first)
 The scene-load path is a parser eating untrusted input (hand-edited or corrupt
