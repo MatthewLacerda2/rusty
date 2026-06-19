@@ -39,8 +39,16 @@ auxmd.md
 # Lint reports
 .lint/
 
+# cargo-mutants output (transient local mutation-testing run; CI uploads it as an artifact)
+mutants.out/
+mutants.out*.tmp/
+
 # Background-agent git worktrees (transient; auto-cleaned)
 .claude/worktrees/
 
 # Harness run artifacts
 out/
+
+# cargo-mutants run output
+/mutants.out/
+/mutants.out.old/

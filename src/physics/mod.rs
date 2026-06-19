@@ -8,6 +8,8 @@
 //! (`cast_ray_in_scene`) has been retired.
 
 mod build;
+#[cfg(test)]
+mod build_tests;
 mod character;
 mod convert;
 mod query;
@@ -28,4 +30,28 @@ pub fn is_hittable(scene: &Scene, id: u32) -> bool {
     scene
         .get_entity(id)
         .is_some_and(|e| e.health.as_ref().is_none_or(|h| !h.is_dead))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::components::HealthComponent;
+
+    #[test]
+    fn dead_and_missing_entities_are_not_hittable() {
+        let mut scene = Scene::new();
+        let alive = scene.add_entity("Alive".to_string());
+        let dead = scene.add_entity("Dead".to_string());
+        scene.get_entity_mut(dead).unwrap().health = Some(HealthComponent {
+            current_health: 0.0,
+            max_health: 100.0,
+            is_dead: true,
+        });
+        assert!(is_hittable(&scene, alive), "a live entity is hittable");
+        assert!(!is_hittable(&scene, dead), "a dead entity is not hittable");
+        assert!(
+            !is_hittable(&scene, 9999),
+            "a missing entity is not hittable"
+        );
+    }
 }

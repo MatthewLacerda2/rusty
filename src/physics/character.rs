@@ -19,9 +19,12 @@ use rapier3d::prelude::*;
 /// horizontally-driven body keeps exactly the vertical motion the script asked for
 /// (the existing kinematic bodies opt out of gravity).
 pub(super) fn controller() -> KinematicCharacterController {
+    // Only `snap_to_ground` departs from rapier's defaults: disabling it keeps a
+    // horizontally-driven body's vertical motion exactly as the script asked (the
+    // kinematic bodies opt out of gravity). rapier's defaults already give us
+    // `slide: true` (collide-and-slide) and `autostep: None`, so we don't restate
+    // them — restating a value identical to the default would be a silent no-op.
     KinematicCharacterController {
-        slide: true,
-        autostep: None,
         snap_to_ground: None,
         ..KinematicCharacterController::default()
     }
@@ -81,4 +84,23 @@ pub(super) fn corrected_next_pose(
         (current.translation.vector + translation).into(),
         target.rotation,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn controller_disables_snap_to_ground() {
+        let c = controller();
+        // The one departure from rapier's defaults: kinematic bodies keep the exact
+        // vertical motion scripts drive, so ground-snapping must be off.
+        assert!(
+            c.snap_to_ground.is_none(),
+            "snap_to_ground must be disabled"
+        );
+        // The resulting config we rely on (these happen to match rapier defaults).
+        assert!(c.slide, "collide-and-slide stays on");
+        assert!(c.autostep.is_none(), "autostep stays off");
+    }
 }

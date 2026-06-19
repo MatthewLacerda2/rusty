@@ -33,7 +33,7 @@ pub struct Entity {
     pub texture: Option<TextureComponent>,
     /// An entity can carry MANY scripts, each its own MonoBehaviour-equivalent
     /// Lua lifecycle table (#83). `#[serde(default)]` plus the legacy `script`
-    /// field in [`EntityRepr`] keep pre-#83 single-`script` scenes loadable.
+    /// field in `EntityRepr` keep pre-#83 single-`script` scenes loadable.
     #[serde(default)]
     pub scripts: Vec<ScriptComponent>,
     pub animator: Option<AnimatorComponent>,

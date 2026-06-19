@@ -2,6 +2,11 @@ name: ci
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
+  # GitHub fires `merge_group` when a PR is queued via the merge queue; CI must
+  # run on it so the required checks validate the speculative merged state before
+  # it lands. The gating jobs below opt in via their `if`; the report-only
+  # coverage/mutants jobs deliberately do not, to keep the queue lean.
+  merge_group:
   workflow_dispatch:
 
 jobs:
@@ -9,10 +14,17 @@ jobs:
   # skip the heavy Rust jobs below (see the merging note in CLAUDE.md). We gate via
   # job-level `if` (a skipped job still satisfies a required check) rather than
   # workflow `paths-ignore` (which would leave a required check stuck pending).
+  #
+  # `sim` narrows further: it's true only when the PR touches code that can change
+  # mutation-test outcomes on the four deterministic sim modules — their source, the
+  # integration tests that exercise them, or the dependency/toolchain pins. The slow
+  # `mutants` sweep is gated on it so a docs/CI/tooling/non-sim-src PR no longer pays
+  # for a full ~15-min mutation run that could not have changed anything it measures.
   changes:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.filter.outputs.code || 'true' }}
+      sim: ${{ steps.filter.outputs.sim || 'true' }}
     steps:
       - uses: dorny/paths-filter@v3
         id: filter
@@ -21,6 +33,15 @@ jobs:
           filters: |
             code:
               - '!**/*.md'
+            sim:
+              - 'src/app/**'
+              - 'src/scripting/**'
+              - 'src/physics/**'
+              - 'src/navigation/**'
+              - 'tests/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain.toml'
 
   # The Linux build+test. Kept as its own job (not folded into the OS matrix
   # below) so the `build-test` status-check name — referenced by the branch
@@ -30,6 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'merge_group' ||
       (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
     steps:
       - uses: actions/checkout@v4
@@ -63,6 +85,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'merge_group' ||
       (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
     steps:
       - uses: actions/checkout@v4
@@ -134,7 +157,7 @@ jobs:
             echo ''
             echo '```'
             cargo llvm-cov report --summary-only \
-              --ignore-filename-regex 'src/(render|dev|api|components|core|ecs|scene|time)/|src/(main|lib)\.rs|src/bin/|tools/'
+              --ignore-filename-regex 'src/(render|dev|api|asset|editor|components|core|ecs|scene|time)/|src/(main|lib)\.rs|src/bin/|tools/'
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
@@ -143,6 +166,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'merge_group' ||
       (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
     steps:
       - uses: actions/checkout@v4
@@ -158,9 +182,13 @@ jobs:
   mutants:
     needs: changes
     runs-on: ubuntu-latest
+    # Only run when the PR touches sim source / their tests / dep pins (the `sim`
+    # filter above): a full mutation sweep over the four sim modules takes ~15 min
+    # and cannot reveal anything new on a PR that changes none of them, so non-sim
+    # PRs skip it. `workflow_dispatch` always runs the full sweep on demand.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
+      (github.event.pull_request.draft == false && needs.changes.outputs.sim != 'false')
     # Report-only to start (#122): mutation testing audits whether the tests
     # actually catch bugs — the headline guardrail against green-but-vacuous
     # agent-written tests. Scoped to the deterministic sim (app/scripting/physics/
