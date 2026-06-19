@@ -218,6 +218,9 @@ mod tests {
         g.walkability[idx] = false;
         let (nx, nz) = g.closest_walkable(5, 5);
         let dist_sq = (nx - 5) * (nx - 5) + (nz - 5) * (nz - 5);
-        assert_eq!(dist_sq, 1, "cardinal ring (dist²=1) chosen over diagonal (dist²=2)");
+        assert_eq!(
+            dist_sq, 1,
+            "cardinal ring (dist²=1) chosen over diagonal (dist²=2)"
+        );
     }
 }

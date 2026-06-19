@@ -181,8 +181,18 @@ mod tests {
     #[test]
     fn raise_surface_takes_max_of_overlapping_colliders() {
         let mut scene = Scene::new();
-        add_box(&mut scene, "lo", Vec3::new(3.0, 0.0, 3.0), Vec3::new(5.0, 1.0, 5.0));
-        add_box(&mut scene, "hi", Vec3::new(3.0, 0.0, 3.0), Vec3::new(5.0, 3.0, 5.0));
+        add_box(
+            &mut scene,
+            "lo",
+            Vec3::new(3.0, 0.0, 3.0),
+            Vec3::new(5.0, 1.0, 5.0),
+        );
+        add_box(
+            &mut scene,
+            "hi",
+            Vec3::new(3.0, 0.0, 3.0),
+            Vec3::new(5.0, 3.0, 5.0),
+        );
         let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
         g.bake(&scene);
         assert_eq!(g.height_at(4, 4), 3.0, "max(1.0, 3.0) = 3.0");

@@ -19,7 +19,9 @@ fn manager_with_entity() -> (ScriptManager, u32) {
     let m = ScriptManager::new(
         Rc::new(RefCell::new(scene)),
         Rc::new(RefCell::new(InputState::new())),
-        Rc::new(RefCell::new(NavigationGraph::new(-5.0, 5.0, -5.0, 5.0, 1.0))),
+        Rc::new(RefCell::new(NavigationGraph::new(
+            -5.0, 5.0, -5.0, 5.0, 1.0,
+        ))),
         Rc::new(RefCell::new(ConsoleLogs::new())),
         Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0))),
         Rc::new(RefCell::new(Time::new())),
@@ -72,10 +74,12 @@ fn eval_lua_error_propagates_as_err() {
 fn start_scripts_invokes_start_for_each_entity() {
     let (mut m, id) = manager_with_entity();
     m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
-    let path = write_script("start", &format!(
-        "_G.__start_id = 0\nreturn {{ Start = function(id) _G.__start_id = id end }}"
-    ));
-    m.load_entity_script(id, 0, &path, &BTreeMap::new()).unwrap();
+    let path = write_script(
+        "start",
+        "_G.__start_id = 0\nreturn { Start = function(id) _G.__start_id = id end }",
+    );
+    m.load_entity_script(id, 0, &path, &BTreeMap::new())
+        .unwrap();
     m.start_scripts();
     assert_eq!(m.eval("__start_id").unwrap(), id.to_string());
 }
@@ -84,10 +88,12 @@ fn start_scripts_invokes_start_for_each_entity() {
 fn update_scripts_passes_delta_time_to_update() {
     let (mut m, id) = manager_with_entity();
     m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
-    let path = write_script("update", &format!(
-        "_G.__update_dt = 0\nreturn {{ Update = function(id, dt) _G.__update_dt = dt end }}"
-    ));
-    m.load_entity_script(id, 0, &path, &BTreeMap::new()).unwrap();
+    let path = write_script(
+        "update",
+        "_G.__update_dt = 0\nreturn { Update = function(id, dt) _G.__update_dt = dt end }",
+    );
+    m.load_entity_script(id, 0, &path, &BTreeMap::new())
+        .unwrap();
     m.update_scripts(0.25);
     let got: f64 = m.eval("__update_dt").unwrap().parse().unwrap();
     assert!((got - 0.25).abs() < 1e-6, "dt should be 0.25, got {got}");
@@ -97,10 +103,12 @@ fn update_scripts_passes_delta_time_to_update() {
 fn dispatch_trigger_events_calls_on_trigger() {
     let (mut m, id) = manager_with_entity();
     m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
-    let path = write_script("trigger", &format!(
-        "_G.__other = 0\nreturn {{ OnTrigger = function(id, other) _G.__other = other end }}"
-    ));
-    m.load_entity_script(id, 0, &path, &BTreeMap::new()).unwrap();
+    let path = write_script(
+        "trigger",
+        "_G.__other = 0\nreturn { OnTrigger = function(id, other) _G.__other = other end }",
+    );
+    m.load_entity_script(id, 0, &path, &BTreeMap::new())
+        .unwrap();
     m.dispatch_trigger_events(vec![(id, 99)]);
     assert_eq!(m.eval("__other").unwrap(), "99");
 }

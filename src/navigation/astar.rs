@@ -249,7 +249,10 @@ mod tests {
     #[test]
     fn find_path_exact_cardinal_sequence() {
         let g = open(5.0);
-        assert_eq!(g.find_path(0, 0, 3, 0).unwrap(), vec![(0, 0), (1, 0), (2, 0), (3, 0)]);
+        assert_eq!(
+            g.find_path(0, 0, 3, 0).unwrap(),
+            vec![(0, 0), (1, 0), (2, 0), (3, 0)]
+        );
     }
 
     /// Kill cost `+dh → *dh` and heuristic `*1.414 → +1.414`: diagonal step
@@ -283,7 +286,10 @@ mod tests {
         g.heightfield[idx] = 0.5; // = max_slope * run (1.0); both limits met
         assert!(g.step_connected(0, 0, 1, 0), "at slope limit: connected");
         g.heightfield[idx] = 0.6; // above slope limit but within max_step = 2.0
-        assert!(!g.step_connected(0, 0, 1, 0), "slope violated: disconnected");
+        assert!(
+            !g.step_connected(0, 0, 1, 0),
+            "slope violated: disconnected"
+        );
     }
 
     /// Kill lazy-deletion `> → <` and path reconstruction mutations: the optimal

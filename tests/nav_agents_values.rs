@@ -95,8 +95,16 @@ fn deceleration_reduces_not_amplifies_velocity() {
         .as_ref()
         .unwrap()
         .velocity;
-    assert!(vel.x > 0.0, "velocity must stay positive (not reverse): vx={:.3}", vel.x);
-    assert!(vel.x < 2.0, "velocity must decrease toward zero: vx={:.3}", vel.x);
+    assert!(
+        vel.x > 0.0,
+        "velocity must stay positive (not reverse): vx={:.3}",
+        vel.x
+    );
+    assert!(
+        vel.x < 2.0,
+        "velocity must decrease toward zero: vx={:.3}",
+        vel.x
+    );
 }
 
 /// Kill "replace sqrt() distance comparison" in waypoint-reached check (line 75).
@@ -130,5 +138,9 @@ fn waypoint_behind_agent_is_advanced_past() {
     let pos = scene.get_entity(id).unwrap().transform.position;
     // If cursor advanced correctly: steering toward (10, 5) → x increases.
     // If cursor stalled: steering toward (4.8, 5) → x decreases.
-    assert!(pos.x > 5.0, "agent steered forward past the behind-waypoint: x={:.4}", pos.x);
+    assert!(
+        pos.x > 5.0,
+        "agent steered forward past the behind-waypoint: x={:.4}",
+        pos.x
+    );
 }

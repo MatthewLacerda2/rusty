@@ -20,7 +20,9 @@ fn make_manager() -> ScriptManager {
     ScriptManager::new(
         Rc::new(RefCell::new(Scene::new())),
         Rc::new(RefCell::new(InputState::new())),
-        Rc::new(RefCell::new(NavigationGraph::new(-5.0, 5.0, -5.0, 5.0, 1.0))),
+        Rc::new(RefCell::new(NavigationGraph::new(
+            -5.0, 5.0, -5.0, 5.0, 1.0,
+        ))),
         Rc::new(RefCell::new(ConsoleLogs::new())),
         Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0))),
         Rc::new(RefCell::new(Time::new())),
@@ -46,7 +48,10 @@ fn shutdown_clears_runtime_and_scripts() {
     let mut m = live_manager();
     m.shutdown();
     assert!(!m.is_live(), "lua cleared by shutdown");
-    assert!(m.entity_scripts.is_empty(), "entity_scripts cleared by shutdown");
+    assert!(
+        m.entity_scripts.is_empty(),
+        "entity_scripts cleared by shutdown"
+    );
 }
 
 #[test]
