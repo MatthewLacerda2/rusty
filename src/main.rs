@@ -472,6 +472,16 @@ fn draw_editor_dashboard(
     frontend
         .renderer
         .set_quality(frontend.editor_ui.quality_preset);
+
+    // Keep the script-side `Scene.Save()` write-back target in lockstep with the
+    // editor's current scene file. A scripted Save-with-path updates the cell
+    // (Save As); reflect that back into the editor so both agree on the file.
+    let path_cell = game.script_manager().scene_path_cell();
+    let scripted_path = path_cell.borrow().clone();
+    if scripted_path.is_some() && scripted_path != frontend.editor_ui.current_scene_path {
+        frontend.editor_ui.current_scene_path = scripted_path;
+    }
+    *path_cell.borrow_mut() = frontend.editor_ui.current_scene_path.clone();
 }
 
 /// Drain a submitted REPL line through the single live evaluator. Dev builds

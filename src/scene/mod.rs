@@ -17,6 +17,8 @@
 //!   io        — save/load, path + extension, default-scene seeding
 //!   snapshot  — edit-mode snapshot/restore around Play
 
+pub mod authoring;
+pub mod authoring_defaults;
 pub mod collision_matrix;
 pub mod io;
 pub mod layers;
