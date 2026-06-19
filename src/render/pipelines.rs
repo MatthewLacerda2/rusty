@@ -1,141 +1,7 @@
-//! Bind-group-layout and render-pipeline construction for the main forward renderer.
-//! Pure builders extracted from `Renderer::new` (behavior unchanged).
+//! Render-pipeline construction for the main forward renderer. The bind-group
+//! layouts these pipelines reference live in `bind_layouts` (behavior unchanged).
 
 use super::mesh::Vertex;
-
-/// Group 0: Camera (0), Lighting (1), Skybox Texture (2), Skybox Sampler (3)
-pub(super) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("Camera, Lighting & Skybox Layout"),
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 2,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    multisampled: false,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 3,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                count: None,
-            },
-        ],
-    })
-}
-
-/// Group 1: Entity model matrix + color tint (0) & Bone Matrices (1)
-pub(super) fn create_entity_bones_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("Entity & Bones Layout"),
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-        ],
-    })
-}
-
-/// Group 2: Texture (0) & Sampler (1)
-pub(super) fn create_texture_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("Texture Layout"),
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    multisampled: false,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                count: None,
-            },
-        ],
-    })
-}
-
-/// Main shadow bind group layout (uniform + depth texture + comparison sampler)
-pub(super) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("Main Shadow Bind Group Layout"),
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Depth,
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    multisampled: false,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 2,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
-                count: None,
-            },
-        ],
-    })
-}
 
 /// Fixed-function knobs that distinguish the three forward-pass pipelines.
 struct PipelineSpec {
@@ -158,7 +24,7 @@ pub(super) fn create_pipelines(
     format: wgpu::TextureFormat,
     camera_lighting_layout: &wgpu::BindGroupLayout,
     entity_bones_layout: &wgpu::BindGroupLayout,
-    texture_layout: &wgpu::BindGroupLayout,
+    material_layout: &wgpu::BindGroupLayout,
     shadow_layout: &wgpu::BindGroupLayout,
 ) -> (
     wgpu::RenderPipeline,
@@ -169,7 +35,7 @@ pub(super) fn create_pipelines(
         device,
         camera_lighting_layout,
         entity_bones_layout,
-        texture_layout,
+        material_layout,
         shadow_layout,
     );
 
@@ -230,13 +96,13 @@ fn create_pipeline_layouts(
     device: &wgpu::Device,
     camera_lighting_layout: &wgpu::BindGroupLayout,
     entity_bones_layout: &wgpu::BindGroupLayout,
-    texture_layout: &wgpu::BindGroupLayout,
+    material_layout: &wgpu::BindGroupLayout,
     shadow_layout: &wgpu::BindGroupLayout,
 ) -> (wgpu::PipelineLayout, wgpu::PipelineLayout) {
     let layouts = [
         camera_lighting_layout,
         entity_bones_layout,
-        texture_layout,
+        material_layout,
         shadow_layout,
     ];
     let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {

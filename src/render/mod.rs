@@ -4,11 +4,13 @@ pub mod shaders;
 pub mod shadows;
 pub mod skybox;
 
+mod bind_layouts;
 mod camera;
 mod debug_meshes;
 pub mod decals;
 mod decals_draw;
 mod draw;
+mod draw_lighting;
 mod draw_overlays;
 mod draw_pass;
 mod draw_path;
@@ -21,6 +23,7 @@ mod setup;
 mod setup_build;
 mod setup_headless;
 mod setup_resize;
+mod setup_textures;
 mod textures;
 
 use std::collections::HashMap;
@@ -103,6 +106,14 @@ struct EntityUniform {
     is_lit: u32,
     metallic: f32,
     roughness: f32,
+    // Flags + padding for the metallic/roughness maps (#202). When set, the shader
+    // multiplies the scalar by the sampled map channel. Two `u32` pads keep the
+    // struct 16-byte aligned (96 -> 112 bytes); `EntityUniforms` in shader.wgsl
+    // mirrors this field order byte-for-byte.
+    use_metallic_map: u32,
+    use_roughness_map: u32,
+    _pad0: u32,
+    _pad1: u32,
 }
 
 #[repr(C)]
@@ -164,6 +175,9 @@ pub struct Renderer {
     pub camera_lighting_layout: wgpu::BindGroupLayout,
     pub entity_bones_layout: wgpu::BindGroupLayout,
     pub texture_layout: wgpu::BindGroupLayout,
+    /// Expanded group(2) layout (albedo + sampler + metallic + roughness maps) the
+    /// forward pass binds a per-entity material bind group against (#202).
+    pub material_layout: wgpu::BindGroupLayout,
 
     // Buffers and Bind Groups (Global)
     camera_buffer: wgpu::Buffer,
@@ -179,6 +193,11 @@ pub struct Renderer {
     pub gpu_meshes: HashMap<MeshId, GpuMesh>,
     pub gpu_textures: HashMap<String, Rc<GpuTexture>>,
     pub default_texture: Rc<GpuTexture>,
+    /// A group(2) material bind group whose three texture slots all point at
+    /// `default_texture` — used by the outline and editor-grid passes, which never
+    /// sample the maps (they render unlit / use the default checker) but still must
+    /// supply a bind group matching the expanded `material_layout` (#202).
+    pub default_material_bind_group: wgpu::BindGroup,
 
     grid_vertex_buffer: Option<wgpu::Buffer>,
     grid_count: u32,

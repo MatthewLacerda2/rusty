@@ -58,6 +58,10 @@ impl Renderer {
             is_lit: 0,
             metallic: 0.0,
             roughness: 0.5,
+            use_metallic_map: 0,
+            use_roughness_map: 0,
+            _pad0: 0,
+            _pad1: 0,
         };
 
         let entity_buf = self
@@ -147,6 +151,10 @@ impl Renderer {
             is_lit: 0,
             metallic: 0.0,
             roughness: 0.5,
+            use_metallic_map: 0,
+            use_roughness_map: 0,
+            _pad0: 0,
+            _pad1: 0,
         };
 
         let entity_buf = self
