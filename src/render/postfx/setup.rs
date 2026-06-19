@@ -1,6 +1,8 @@
 //! Resource construction for the post-process chain: bind-group layout, the three
 //! fullscreen pipelines, the params buffer, sampler, and the render targets.
 
+use crate::render::shaders::ShaderRegistry;
+
 use super::{PfxTarget, PostFx, PostParams, HDR_FORMAT};
 
 impl PostFx {
@@ -12,10 +14,11 @@ impl PostFx {
         height: u32,
         output_format: wgpu::TextureFormat,
         bloom_divisor: u32,
+        registry: &mut ShaderRegistry,
     ) -> Self {
         let io_layout = Self::create_io_layout(device);
         let (bright_pipeline, blur_pipeline, composite_pipeline) =
-            Self::create_pipelines(device, &io_layout, output_format);
+            Self::create_pipelines(device, &io_layout, output_format, registry);
         let (params_buffer, sampler) = Self::create_params_and_sampler(device);
 
         let (full_size, bloom_size, scene_hdr, bloom_a, bloom_b) =
@@ -42,17 +45,13 @@ impl PostFx {
         device: &wgpu::Device,
         io_layout: &wgpu::BindGroupLayout,
         output_format: wgpu::TextureFormat,
+        registry: &mut ShaderRegistry,
     ) -> (
         wgpu::RenderPipeline,
         wgpu::RenderPipeline,
         wgpu::RenderPipeline,
     ) {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("PostFX Shader"),
-            source: wgpu::ShaderSource::Wgsl(
-                include_str!("../../../assets/shaders/postfx.wgsl").into(),
-            ),
-        });
+        let shader = registry.load(device, "postfx.wgsl", "PostFX Shader");
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("PostFX Pipeline Layout"),

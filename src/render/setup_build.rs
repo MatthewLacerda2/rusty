@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use super::pipelines;
 use super::postfx::{PostFx, QualityPreset, HDR_FORMAT};
+use super::shaders::ShaderRegistry;
 use super::{shadows, skybox};
 use super::{CameraUniform, GpuTexture, LightingUniform, Renderer};
 
@@ -42,6 +43,8 @@ impl RendererParts {
         queue: &wgpu::Queue,
         config: &wgpu::SurfaceConfiguration,
     ) -> Self {
+        let mut registry = ShaderRegistry::new("assets/shaders");
+
         let (depth_texture, depth_view) = Renderer::create_depth_resources(device, config);
 
         let camera_lighting_layout = pipelines::create_camera_lighting_layout(device);
@@ -60,7 +63,7 @@ impl RendererParts {
 
         let shadow_layout = pipelines::create_shadow_layout(device);
         let (shadow_renderer, shadow_uniform_buffer, shadow_bind_group) =
-            create_shadow_system(device, &shadow_layout);
+            create_shadow_system(device, &shadow_layout, &mut registry);
 
         let (render_pipeline, line_pipeline, outline_pipeline, skybox_renderer) =
             create_forward_passes(
@@ -69,18 +72,20 @@ impl RendererParts {
                 &entity_bones_layout,
                 &texture_layout,
                 &shadow_layout,
+                &mut registry,
             );
 
-        let (post_fx, quality) = create_post_chain(device, config);
+        let (post_fx, quality) = create_post_chain(device, config, &mut registry);
+        let (particle_renderer, decal_renderer) =
+            create_billboard_passes(device, &texture_layout, &mut registry);
 
         Self {
             depth_texture,
             depth_view,
             camera_lighting_layout,
             entity_bones_layout,
-            // Billboard particle + box-projector decal passes reuse the layout.
-            particle_renderer: super::particles::ParticleRenderer::new(device, &texture_layout),
-            decal_renderer: super::decals::DecalRenderer::new(device, &texture_layout),
+            particle_renderer,
+            decal_renderer,
             texture_layout,
             default_texture,
             camera_buffer,
@@ -100,10 +105,27 @@ impl RendererParts {
     }
 }
 
+/// Billboard particle + box-projector decal passes; both reuse the renderer's
+/// `texture_layout` (group 1 / group 3 respectively).
+fn create_billboard_passes(
+    device: &wgpu::Device,
+    texture_layout: &wgpu::BindGroupLayout,
+    registry: &mut ShaderRegistry,
+) -> (
+    super::particles::ParticleRenderer,
+    super::decals::DecalRenderer,
+) {
+    let particle_renderer =
+        super::particles::ParticleRenderer::new(device, texture_layout, registry);
+    let decal_renderer = super::decals::DecalRenderer::new(device, texture_layout, registry);
+    (particle_renderer, decal_renderer)
+}
+
 /// Post-process chain sized to the framebuffer, plus the default quality tier.
 fn create_post_chain(
     device: &wgpu::Device,
     config: &wgpu::SurfaceConfiguration,
+    registry: &mut ShaderRegistry,
 ) -> (PostFx, QualityPreset) {
     let quality = QualityPreset::default();
     let post_fx = PostFx::new(
@@ -112,6 +134,7 @@ fn create_post_chain(
         config.height,
         config.format,
         quality.bloom_divisor(),
+        registry,
     );
     (post_fx, quality)
 }
@@ -168,8 +191,9 @@ fn create_global_bindings(
 fn create_shadow_system(
     device: &wgpu::Device,
     shadow_layout: &wgpu::BindGroupLayout,
+    registry: &mut ShaderRegistry,
 ) -> (shadows::ShadowRenderer, wgpu::Buffer, wgpu::BindGroup) {
-    let shadow_renderer = shadows::ShadowRenderer::new(device);
+    let shadow_renderer = shadows::ShadowRenderer::new(device, registry);
 
     let shadow_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Shadow Uniform Buffer"),
@@ -208,19 +232,22 @@ fn create_forward_passes(
     entity_bones_layout: &wgpu::BindGroupLayout,
     texture_layout: &wgpu::BindGroupLayout,
     shadow_layout: &wgpu::BindGroupLayout,
+    registry: &mut ShaderRegistry,
 ) -> (
     wgpu::RenderPipeline,
     wgpu::RenderPipeline,
     wgpu::RenderPipeline,
     skybox::SkyboxRenderer,
 ) {
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("Forward Lit Shader"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("../../assets/shaders/shader.wgsl").into()),
-    });
+    let shader = registry.load(device, "shader.wgsl", "Forward Lit Shader");
 
-    let skybox_renderer =
-        skybox::SkyboxRenderer::new(device, texture_layout, camera_lighting_layout, HDR_FORMAT);
+    let skybox_renderer = skybox::SkyboxRenderer::new(
+        device,
+        texture_layout,
+        camera_lighting_layout,
+        HDR_FORMAT,
+        registry,
+    );
 
     let (render_pipeline, line_pipeline, outline_pipeline) = pipelines::create_pipelines(
         device,

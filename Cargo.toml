@@ -35,7 +35,8 @@ dev = []
 
 [dependencies]
 winit = { version = "0.29.10" }
-wgpu = { version = "0.19.4" }
+wgpu = { version = "0.19.4", features = ["naga-ir"] }
+naga_oil = { version = "0.13" }
 egui = { version = "0.27.2" }
 egui-wgpu = { version = "0.27.2" }
 egui-winit = { version = "0.27.2", default-features = false, features = ["clipboard", "links"] }

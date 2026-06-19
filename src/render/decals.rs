@@ -13,6 +13,7 @@
 use glam::{Mat4, Quat, Vec3};
 
 use super::postfx::HDR_FORMAT;
+use super::shaders::ShaderRegistry;
 
 /// Maximum decals drawn per frame. Bullet holes/scorch accumulate, but old ones
 /// are evicted (FIFO) so the pass stays bounded; matches a typical FPS budget.
@@ -126,13 +127,12 @@ impl DecalRenderer {
     /// Build the decal pass: a unit-cube mesh, the globals + per-decal + depth
     /// bind-group layouts, and the projector pipeline. Reuses the renderer's
     /// `texture_layout` (group 3) for the decal sprite.
-    pub fn new(device: &wgpu::Device, texture_layout: &wgpu::BindGroupLayout) -> Self {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Decal Shader"),
-            source: wgpu::ShaderSource::Wgsl(
-                include_str!("../../assets/shaders/decals.wgsl").into(),
-            ),
-        });
+    pub fn new(
+        device: &wgpu::Device,
+        texture_layout: &wgpu::BindGroupLayout,
+        registry: &mut ShaderRegistry,
+    ) -> Self {
+        let shader = registry.load(device, "decals.wgsl", "Decal Shader");
 
         let globals_layout = Self::globals_layout(device);
         let decal_layout = Self::decal_layout(device);
