@@ -14,6 +14,12 @@ return a sensible default (zeros, or `(1,1,1)` for scale) instead of erroring.
 > that emits it from self-describing bindings (with a CI drift check) is a tracked
 > follow-up — see the PR for issue #28.
 
+> **Faithfulness:** every setter here is expected to be *observed* by a downstream
+> system — a renderer/sim read or a `SceneData` round-trip. When you add a setter,
+> name its read-site (or add a round-trip test) in the same change and record it in
+> [`api-faithfulness.md`](api-faithfulness.md), so the surface never grows a
+> write-only no-op that silently fails headless authoring (issue #178).
+
 ---
 
 ## `Transform`
@@ -39,8 +45,8 @@ PBR material params and texture maps on an entity's renderer.
 |---|---|
 | `Material.SetMetallic` | `(id, value)` |
 | `Material.SetRoughness` | `(id, value)` |
-| `Material.SetMetallicMap` | `(id, path)` |
-| `Material.SetRoughnessMap` | `(id, path)` |
+| `Material.SetMetallicMap` | `(id, path)` — ⚠️ stored/serialized but **not yet sampled** by the renderer (#184) |
+| `Material.SetRoughnessMap` | `(id, path)` — ⚠️ stored/serialized but **not yet sampled** by the renderer (#184) |
 | `Material.SetTexture` | `(id, path)` |
 
 ## `Animator`
