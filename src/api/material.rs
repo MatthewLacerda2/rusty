@@ -4,7 +4,6 @@
 //! entity's optional texture component.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use mlua::Lua;
 
@@ -12,11 +11,15 @@ use super::{put, Reg};
 use crate::scene::Scene;
 
 /// Register the `Material` namespace onto `lua`.
-pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
+pub fn register<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_scalars(lua, &table, scene)?;
-    register_maps(lua, &table, scene)?;
+    register_scalars(scope, &table, scene)?;
+    register_maps(scope, &table, scene)?;
 
     lua.globals()
         .set("Material", table)
@@ -24,13 +27,16 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 }
 
 /// Scalar PBR knobs: `SetMetallic` / `SetRoughness`.
-fn register_scalars(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_scalars<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "SetMetallic",
-        lua.create_function(move |_, (id, val): (u32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, val): (u32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(tex) = &mut e.texture {
                     tex.metallic = val;
@@ -40,12 +46,11 @@ fn register_scalars(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) 
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetRoughness",
-        lua.create_function(move |_, (id, val): (u32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, val): (u32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(tex) = &mut e.texture {
                     tex.roughness = val;
@@ -57,13 +62,16 @@ fn register_scalars(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) 
 }
 
 /// Texture-map paths: `SetMetallicMap` / `SetRoughnessMap` / `SetTexture`.
-fn register_maps(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_maps<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "SetMetallicMap",
-        lua.create_function(move |_, (id, path): (u32, String)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, path): (u32, String)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(tex) = &mut e.texture {
                     tex.metallic_map = Some(path);
@@ -73,12 +81,11 @@ fn register_maps(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> 
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetRoughnessMap",
-        lua.create_function(move |_, (id, path): (u32, String)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, path): (u32, String)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(tex) = &mut e.texture {
                     tex.roughness_map = Some(path);
@@ -88,12 +95,11 @@ fn register_maps(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> 
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetTexture",
-        lua.create_function(move |_, (id, path): (u32, String)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, path): (u32, String)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(tex) = &mut e.texture {
                     tex.path = path;

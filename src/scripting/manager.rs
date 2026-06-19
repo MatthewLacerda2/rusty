@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::rc::Rc;
 
-use crate::api::{self, ApiCtx};
+use crate::api::ApiScopedCtx;
 use crate::core::input::InputState;
 use crate::core::storage::Storage;
 use crate::core::video::VideoSettings;
@@ -42,6 +42,9 @@ pub struct ScriptManager {
     /// surface + window; defaults to the windowed boot settings (harness needs no
     /// window).
     pub(super) video: Rc<RefCell<VideoSettings>>,
+    /// Live rapier physics world shared with `GameWorld` — used by
+    /// `Physics.Raycast`/`Shoot`. `None` until Play builds the world.
+    pub(super) physics: Rc<RefCell<Option<crate::physics::PhysicsWorld>>>,
 }
 
 impl ScriptManager {
@@ -65,6 +68,7 @@ impl ScriptManager {
             storage: Rc::new(RefCell::new(Storage::new())),
             quality: Rc::new(RefCell::new(QualityPreset::default())),
             video: Rc::new(RefCell::new(VideoSettings::default())),
+            physics: Rc::new(RefCell::new(None)),
         }
     }
 
@@ -100,17 +104,24 @@ impl ScriptManager {
         Rc::clone(&self.video)
     }
 
-    /// Initializes a fresh Lua environment and registers all required namespaces.
-    /// `physics` is the live rapier world shared with `GameWorld`; the
-    /// `Physics.Raycast`/`Shoot` bindings cast against it so scripts and the
-    /// engine hitscan agree. It is `None` until Play builds the world.
+    /// Initializes a fresh Lua environment. API namespaces are NOT registered
+    /// here; they are registered per-evaluation inside `lua.scope(...)` in
+    /// `lifecycle.rs`, so closures capture `&RefCell<T>` references (no
+    /// `Rc::clone` in the `api/` tree).
+    ///
+    /// `physics` is the live rapier world shared with `GameWorld`; stored here
+    /// so `lifecycle.rs` can dereference it when building `ApiScopedCtx`.
     pub fn init_runtime(
         &mut self,
         physics: &Rc<RefCell<Option<crate::physics::PhysicsWorld>>>,
     ) -> Result<(), String> {
+        self.physics = Rc::clone(physics);
+
         let lua = Lua::new();
 
-        // 1. Override print to write to our console panel
+        // Override print to write to our console panel. This stays as a
+        // `lua.create_function` (static closure) because `print` is in the
+        // scripting layer, not the api/ tree — the Rc borrow here is fine.
         let console_clone = Rc::clone(&self.console);
         let print_fn = lua
             .create_function(move |_, msg: String| {
@@ -122,31 +133,30 @@ impl ScriptManager {
             .set("print", print_fn)
             .map_err(|e| e.to_string())?;
 
-        // 2. Register the whole stable API surface. Every namespace
-        //    (`Transform`, `Material`, `Animator`, `Input`, `Scene`, `Navigation`,
-        //    `NavMeshAgent`, `Physics`, `Health`, `Time`, `Camera`, and the
-        //    dev-only `Debug`) is owned by the `api/` tree — the single surface
-        //    shared by gameplay scripts, the console REPL and bot-players. The
-        //    live `physics` handle rides along so `Physics.Raycast`/`Shoot` reach
-        //    the same rapier world the engine hitscan uses (#31).
-        let ctx = ApiCtx {
-            scene: Rc::clone(&self.scene),
-            input: Rc::clone(&self.input),
-            nav: Rc::clone(&self.nav),
-            camera: Rc::clone(&self.camera),
-            time: Rc::clone(&self.time),
-            physics: Rc::clone(physics),
-            console: Rc::clone(&self.console),
-            storage: Rc::clone(&self.storage),
-            quality: Rc::clone(&self.quality),
-            video: Rc::clone(&self.video),
-        };
-        api::register(&lua, &ctx)?;
-
         self.lua = Some(lua);
         self.entity_scripts.clear();
 
         Ok(())
+    }
+
+    /// Build the scoped context from this manager's resource cells.
+    ///
+    /// The returned struct borrows through the `Rc` smart pointers, tying
+    /// references to the caller's lifetime. Used inside `lua.scope(...)` blocks in
+    /// `lifecycle.rs` so the borrow can't outlive the scope.
+    pub(super) fn make_ctx(&self) -> ApiScopedCtx<'_> {
+        ApiScopedCtx {
+            scene: &self.scene,
+            input: &self.input,
+            nav: &self.nav,
+            camera: &self.camera,
+            time: &self.time,
+            physics: &self.physics,
+            console: &self.console,
+            storage: &self.storage,
+            quality: &self.quality,
+            video: &self.video,
+        }
     }
 
     /// Loads and runs one of an entity's scripts, then registers its lifecycle
@@ -202,8 +212,14 @@ impl ScriptManager {
     /// the lifecycle callbacks instead.
     #[cfg(test)]
     pub(super) fn exec(&self, code: &str) -> Result<(), String> {
+        use crate::api;
         let lua = self.lua.as_ref().ok_or("runtime not initialized")?;
-        lua.load(code).exec().map_err(|e| e.to_string())
+        let ctx = self.make_ctx();
+        lua.scope(|scope| {
+            api::register(lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
+            lua.load(code).exec()
+        })
+        .map_err(|e| e.to_string())
     }
 
     /// Whether the live runtime exists yet (only during play / a loaded scenario).

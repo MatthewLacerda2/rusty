@@ -18,7 +18,6 @@
 //! evolves.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 mod state;
 
@@ -33,20 +32,21 @@ use crate::render::postfx::QualityPreset;
 use crate::scene::Scene;
 
 /// Register the `Graphics` namespace onto `lua`.
-pub fn register(
-    lua: &Lua,
-    scene: &Rc<RefCell<Scene>>,
-    quality: &Rc<RefCell<QualityPreset>>,
+pub fn register<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    scene: &'scope RefCell<Scene>,
+    quality: &'scope RefCell<QualityPreset>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_bloom(lua, &table, scene)?;
-    register_exposure_contrast(lua, &table, scene)?;
-    register_saturation_gamma(lua, &table, scene)?;
-    register_tonemap(lua, &table, scene)?;
-    register_ssr(lua, &table, scene)?;
-    register_motion_blur(lua, &table, scene)?;
-    register_quality(lua, &table, quality)?;
+    register_bloom(scope, &table, scene)?;
+    register_exposure_contrast(scope, &table, scene)?;
+    register_saturation_gamma(scope, &table, scene)?;
+    register_tonemap(scope, &table, scene)?;
+    register_ssr(scope, &table, scene)?;
+    register_motion_blur(scope, &table, scene)?;
+    register_quality(scope, &table, quality)?;
 
     lua.globals()
         .set("Graphics", table)
@@ -54,239 +54,241 @@ pub fn register(
 }
 
 /// Bloom: active / intensity / threshold over the active visual-correction volume.
-fn register_bloom(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_bloom<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "SetBloomActive",
-        lua.create_function(move |_, active: bool| {
-            with_vc_mut(&s, |vc| vc.bloom_active = active);
+        scope.create_function(|_, active: bool| {
+            with_vc_mut(scene, |vc| vc.bloom_active = active);
             Ok(())
         }),
     )?;
-    let s = Rc::clone(scene);
     put(
         table,
         "GetBloomActive",
-        lua.create_function(move |_, ()| Ok(with_vc(&s, |vc| vc.bloom_active).unwrap_or(false))),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.bloom_active).unwrap_or(false))),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetBloomIntensity",
-        lua.create_function(move |_, v: f32| {
-            with_vc_mut(&s, |vc| vc.bloom_intensity = v.max(0.0));
+        scope.create_function(|_, v: f32| {
+            with_vc_mut(scene, |vc| vc.bloom_intensity = v.max(0.0));
             Ok(())
         }),
     )?;
-    let s = Rc::clone(scene);
     put(
         table,
         "GetBloomIntensity",
-        lua.create_function(move |_, ()| Ok(with_vc(&s, |vc| vc.bloom_intensity).unwrap_or(0.0))),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.bloom_intensity).unwrap_or(0.0))),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetBloomThreshold",
-        lua.create_function(move |_, v: f32| {
-            with_vc_mut(&s, |vc| vc.bloom_threshold = v.max(0.0));
+        scope.create_function(|_, v: f32| {
+            with_vc_mut(scene, |vc| vc.bloom_threshold = v.max(0.0));
             Ok(())
         }),
     )?;
-    let s = Rc::clone(scene);
     put(
         table,
         "GetBloomThreshold",
-        lua.create_function(move |_, ()| Ok(with_vc(&s, |vc| vc.bloom_threshold).unwrap_or(0.0))),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.bloom_threshold).unwrap_or(0.0))),
     )
 }
 
 /// Color grading: `Set`/`Get` for exposure and contrast.
-fn register_exposure_contrast(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_exposure_contrast<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "SetExposure",
-        lua.create_function(move |_, v: f32| {
-            with_vc_mut(&s, |vc| vc.exposure = v);
+        scope.create_function(|_, v: f32| {
+            with_vc_mut(scene, |vc| vc.exposure = v);
             Ok(())
         }),
     )?;
-    let s = Rc::clone(scene);
     put(
         table,
         "GetExposure",
-        lua.create_function(move |_, ()| Ok(with_vc(&s, |vc| vc.exposure).unwrap_or(0.0))),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.exposure).unwrap_or(0.0))),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetContrast",
-        lua.create_function(move |_, v: f32| {
-            with_vc_mut(&s, |vc| vc.contrast = v);
+        scope.create_function(|_, v: f32| {
+            with_vc_mut(scene, |vc| vc.contrast = v);
             Ok(())
         }),
     )?;
-    let s = Rc::clone(scene);
     put(
         table,
         "GetContrast",
-        lua.create_function(move |_, ()| Ok(with_vc(&s, |vc| vc.contrast).unwrap_or(1.0))),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.contrast).unwrap_or(1.0))),
     )
 }
 
 /// Color grading: `Set`/`Get` for saturation and gamma.
-fn register_saturation_gamma(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_saturation_gamma<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "SetSaturation",
-        lua.create_function(move |_, v: f32| {
-            with_vc_mut(&s, |vc| vc.saturation = v);
+        scope.create_function(|_, v: f32| {
+            with_vc_mut(scene, |vc| vc.saturation = v);
             Ok(())
         }),
     )?;
-    let s = Rc::clone(scene);
     put(
         table,
         "GetSaturation",
-        lua.create_function(move |_, ()| Ok(with_vc(&s, |vc| vc.saturation).unwrap_or(1.0))),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.saturation).unwrap_or(1.0))),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetGamma",
-        lua.create_function(move |_, v: f32| {
-            with_vc_mut(&s, |vc| vc.gamma = v.max(0.01));
+        scope.create_function(|_, v: f32| {
+            with_vc_mut(scene, |vc| vc.gamma = v.max(0.01));
             Ok(())
         }),
     )?;
-    let s = Rc::clone(scene);
     put(
         table,
         "GetGamma",
-        lua.create_function(move |_, ()| Ok(with_vc(&s, |vc| vc.gamma).unwrap_or(2.2))),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.gamma).unwrap_or(2.2))),
     )
 }
 
 /// Tonemap operator: `SetTonemap` / `GetTonemap` (defaulting to Aces).
-fn register_tonemap(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_tonemap<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "SetTonemap",
-        lua.create_function(move |_, name: String| {
+        scope.create_function(|_, name: String| {
             if let Some(tm) = parse_tonemap(&name) {
-                with_vc_mut(&s, |vc| vc.tonemap = tm);
+                with_vc_mut(scene, |vc| vc.tonemap = tm);
             }
             Ok(())
         }),
     )?;
-    let s = Rc::clone(scene);
     put(
         table,
         "GetTonemap",
-        lua.create_function(move |_, ()| {
-            Ok(with_vc(&s, |vc| tonemap_name(vc.tonemap).to_string())
+        scope.create_function(|_, ()| {
+            Ok(with_vc(scene, |vc| tonemap_name(vc.tonemap).to_string())
                 .unwrap_or_else(|| "Aces".to_string()))
         }),
     )
 }
 
 /// Screen-space reflections: active + quality string (gated by the High preset).
-fn register_ssr(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_ssr<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "SetSsrActive",
-        lua.create_function(move |_, active: bool| {
-            with_vc_mut(&s, |vc| vc.ssr_active = active);
+        scope.create_function(|_, active: bool| {
+            with_vc_mut(scene, |vc| vc.ssr_active = active);
             Ok(())
         }),
     )?;
-    let s = Rc::clone(scene);
     put(
         table,
         "GetSsrActive",
-        lua.create_function(move |_, ()| Ok(with_vc(&s, |vc| vc.ssr_active).unwrap_or(false))),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.ssr_active).unwrap_or(false))),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetSsrQuality",
-        lua.create_function(move |_, q: String| {
-            with_vc_mut(&s, |vc| vc.ssr_quality = q.clone());
+        scope.create_function(|_, q: String| {
+            with_vc_mut(scene, |vc| vc.ssr_quality = q.clone());
             Ok(())
         }),
     )?;
-    let s = Rc::clone(scene);
     put(
         table,
         "GetSsrQuality",
-        lua.create_function(move |_, ()| {
-            Ok(with_vc(&s, |vc| vc.ssr_quality.clone()).unwrap_or_default())
+        scope.create_function(|_, ()| {
+            Ok(with_vc(scene, |vc| vc.ssr_quality.clone()).unwrap_or_default())
         }),
     )
 }
 
 /// Camera motion blur: active + sample count over the active camera component.
-fn register_motion_blur(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_motion_blur<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "SetMotionBlurActive",
-        lua.create_function(move |_, active: bool| {
-            with_cam_mut(&s, |c| c.motion_blur_active = active);
+        scope.create_function(|_, active: bool| {
+            with_cam_mut(scene, |c| c.motion_blur_active = active);
             Ok(())
         }),
     )?;
-    let s = Rc::clone(scene);
     put(
         table,
         "GetMotionBlurActive",
-        lua.create_function(move |_, ()| {
-            Ok(with_cam(&s, |c| c.motion_blur_active).unwrap_or(false))
+        scope.create_function(|_, ()| {
+            Ok(with_cam(scene, |c| c.motion_blur_active).unwrap_or(false))
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetMotionBlurSamples",
-        lua.create_function(move |_, n: u32| {
-            with_cam_mut(&s, |c| c.motion_blur_samples = n.clamp(2, 32));
+        scope.create_function(|_, n: u32| {
+            with_cam_mut(scene, |c| c.motion_blur_samples = n.clamp(2, 32));
             Ok(())
         }),
     )?;
-    let s = Rc::clone(scene);
     put(
         table,
         "GetMotionBlurSamples",
-        lua.create_function(move |_, ()| Ok(with_cam(&s, |c| c.motion_blur_samples).unwrap_or(0))),
+        scope.create_function(|_, ()| Ok(with_cam(scene, |c| c.motion_blur_samples).unwrap_or(0))),
     )
 }
 
 /// Global quality preset value get/set over the shared resource cell.
-fn register_quality(lua: &Lua, table: &mlua::Table, quality: &Rc<RefCell<QualityPreset>>) -> Reg {
-    let q = Rc::clone(quality);
+fn register_quality<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    quality: &'scope RefCell<QualityPreset>,
+) -> Reg {
     put(
         table,
         "GetQuality",
-        lua.create_function(move |_, ()| Ok(quality_name(*q.borrow()).to_string())),
+        scope.create_function(|_, ()| Ok(quality_name(*quality.borrow()).to_string())),
     )?;
-    let q = Rc::clone(quality);
     put(
         table,
         "SetQuality",
-        lua.create_function(move |_, name: String| {
+        scope.create_function(|_, name: String| {
             if let Some(p) = parse_quality(&name) {
-                *q.borrow_mut() = p;
+                *quality.borrow_mut() = p;
             }
             Ok(())
         }),
