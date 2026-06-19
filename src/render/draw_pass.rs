@@ -124,7 +124,7 @@ impl Renderer {
         // Solid entities, then the editor selection outline.
         self.draw_solids(&mut render_pass, solid_render_resources);
         if editor_mode {
-            self.draw_outline(&mut render_pass, &overlays.outline, solid_render_resources);
+            self.draw_outline(&mut render_pass, &overlays.outline);
         }
 
         // Render Skybox last (optimization). Only a Skybox camera paints it — a
@@ -213,7 +213,7 @@ impl Renderer {
         render_pass: &mut wgpu::RenderPass<'a>,
         solid_render_resources: &'a [SolidResource],
     ) {
-        for (_id, mesh_id, _ent_buf, _bones_buf, bind_group, tex, num_indices) in
+        for (_id, mesh_id, _ent_buf, _bones_buf, bind_group, material_bind_group, num_indices) in
             solid_render_resources
         {
             if let Some(gpu_mesh) = self.gpu_meshes.get(mesh_id) {
@@ -221,7 +221,7 @@ impl Renderer {
                 render_pass
                     .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
                 render_pass.set_bind_group(1, bind_group, &[]);
-                render_pass.set_bind_group(2, &tex.bind_group, &[]);
+                render_pass.set_bind_group(2, material_bind_group, &[]);
                 render_pass.draw_indexed(0..*num_indices, 0, 0..1);
             }
         }
@@ -231,10 +231,9 @@ impl Renderer {
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         outline_resources: &'a Option<OutlineResource>,
-        solid_render_resources: &'a [SolidResource],
     ) {
         let Some((
-            selected_id,
+            _selected_id,
             outline_mesh_id,
             _outline_ent_buf,
             _outline_bones_buf,
@@ -247,16 +246,13 @@ impl Renderer {
         let Some(gpu_mesh) = self.gpu_meshes.get(outline_mesh_id) else {
             return;
         };
-        let tex = solid_render_resources
-            .iter()
-            .find(|(id, _, _, _, _, _, _)| id == selected_id)
-            .map(|(_, _, _, _, _, tex, _)| tex)
-            .unwrap_or(&self.default_texture);
+        // The outline is a flat unlit silhouette (`use_texture = 0`), so group(2) is
+        // never sampled — bind the default material group to satisfy the layout.
         render_pass.set_pipeline(&self.outline_pipeline);
         render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
         render_pass.set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         render_pass.set_bind_group(1, outline_bind_group, &[]);
-        render_pass.set_bind_group(2, &tex.bind_group, &[]);
+        render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
         render_pass.draw_indexed(0..*num_indices, 0, 0..1);
     }
 
@@ -272,7 +268,7 @@ impl Renderer {
             if let Some(grid_buf) = &self.grid_vertex_buffer {
                 render_pass.set_vertex_buffer(0, grid_buf.slice(..));
                 render_pass.set_bind_group(1, grid_bind_group, &[]);
-                render_pass.set_bind_group(2, &self.default_texture.bind_group, &[]);
+                render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
                 render_pass.draw(0..self.grid_count, 0..1);
             }
         }

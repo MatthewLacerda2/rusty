@@ -89,9 +89,13 @@ map; an empty path clears it.
 |---|---|
 | `Material.SetMetallic` | `(id, value)` |
 | `Material.SetRoughness` | `(id, value)` |
-| `Material.SetMetallicMap` | `(id, path)` — ⚠️ stored/serialized but **not yet sampled** by the renderer (#202) |
-| `Material.SetRoughnessMap` | `(id, path)` — ⚠️ stored/serialized but **not yet sampled** by the renderer (#202) |
+| `Material.SetMetallicMap` | `(id, path)` — sampled by the renderer; the map's blue channel scales the metallic value (glTF metallic-roughness convention) |
+| `Material.SetRoughnessMap` | `(id, path)` — sampled by the renderer; the map's green channel scales the roughness value |
 | `Material.SetTexture` | `(id, path)` — the albedo map (sampled today) |
+
+> Normal and emissive maps round-trip through save/load and the inspector but are
+> not sampled by the renderer yet (deferred follow-ups: normal maps need vertex
+> tangents; emissive needs extra uniform plumbing).
 
 ## `Animator`
 

@@ -53,8 +53,8 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `SetMetallic` | ✅ | renderer — `draw_resources::solid_entity_uniform` packs `metallic` into `EntityUniform`; `shader.wgsl` PBR uses it |
 | `SetRoughness` | ✅ | renderer — same path, `roughness` uniform |
 | `SetTexture` | ✅ | renderer — `draw::upload_scene_assets` calls `load_texture(path)` for every active entity **each frame**, and `draw_resources::build_solid_resource` binds `gpu_textures[path]`. A runtime path change loads + binds next frame. (This is the issue's "canonical no-op"; it is **wired** in the current renderer.) Round-trips. |
-| `SetMetallicMap` | ❌ | **none** — written + serialized + shown in inspector, but no renderer/shader read. Deep hole → **#184** |
-| `SetRoughnessMap` | ❌ | **none** — same as above → **#184** |
+| `SetMetallicMap` | ✅ | renderer — `draw::upload_scene_assets` loads the map, `draw_resources::build_solid_resource` assembles the per-entity group(2) material bind group, and `shader.wgsl` samples `t_metallic` (`.b` channel) × the metallic scalar (#202, closed #184) |
+| `SetRoughnessMap` | ✅ | renderer — same path; `shader.wgsl` samples `t_roughness` (`.g` channel) × the roughness scalar (#202, closed #184) |
 
 ### `Animator` — over `Entity.animator`
 
@@ -186,12 +186,15 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 49 |
+| ✅ faithful | 51 |
 | ⚠️ partial | 0 |
-| ❌ no-op | 2 |
+| ❌ no-op | 0 |
 
-The only no-ops are `Material.SetMetallicMap` / `SetRoughnessMap` — a renderer
-feature gap, spun out as **#184** (they need GPU bindings + shader sampling, not a
-one-field wire). The issue's "canonical no-op" — `Material.SetTexture` — is in fact
-**faithful** against the current renderer (`upload_scene_assets` lazily loads any
-texture path each frame), so no fix was needed there.
+`Material.SetMetallicMap` / `SetRoughnessMap` are now **faithful**: #202 wired them
+through the renderer (per-entity group(2) material bind group + `shader.wgsl`
+sampling of `t_metallic`/`t_roughness`), closing the **#184** feature gap. The
+issue's "canonical no-op" — `Material.SetTexture` — was already **faithful** against
+the current renderer (`upload_scene_assets` lazily loads any texture path each
+frame), so no fix was needed there. `Material.SetNormalMap` / `SetEmissiveMap`
+round-trip but are not yet sampled (deferred follow-ups: normal maps need vertex
+tangents; emissive needs extra uniform plumbing).

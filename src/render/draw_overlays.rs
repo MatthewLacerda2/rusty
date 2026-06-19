@@ -1,12 +1,13 @@
-//! Pre-creation of editor overlay resources: floor grid and per-collider AABB
-//! wireframes. Extracted verbatim from `Renderer::render` (behavior unchanged).
+//! Pre-creation of editor overlay resources: the selection outline, floor grid, and
+//! per-collider AABB wireframes. Extracted from `Renderer::render` (behavior
+//! unchanged).
 
 use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
-use super::draw_resources::{AabbResource, GridResource};
+use super::draw_resources::{AabbResource, GridResource, OutlineResource};
 use super::mesh::Vertex;
-use super::{BoneUniform, EntityUniform, Renderer};
+use super::{BoneUniform, EntityUniform, MeshId, Renderer};
 use crate::scene::Scene;
 
 impl Renderer {
@@ -19,6 +20,10 @@ impl Renderer {
             is_lit: 0,
             metallic: 0.0,
             roughness: 0.5,
+            use_metallic_map: 0,
+            use_roughness_map: 0,
+            _pad0: 0,
+            _pad1: 0,
         };
         let grid_buf_unif = self
             .device
@@ -113,6 +118,10 @@ impl Renderer {
             is_lit: 0,
             metallic: 0.0,
             roughness: 0.5,
+            use_metallic_map: 0,
+            use_roughness_map: 0,
+            _pad0: 0,
+            _pad1: 0,
         };
 
         let entity_buf = self
@@ -144,6 +153,67 @@ impl Renderer {
             ],
         });
         (entity_buf, default_bones_buf, col_bind_group)
+    }
+
+    pub(super) fn precreate_outline(
+        &self,
+        scene: &Scene,
+        default_bones: &BoneUniform,
+    ) -> Option<OutlineResource> {
+        let selected_id = scene.selected_entity_id?;
+        let entity = scene.get_entity(selected_id)?;
+        let mesh_id = MeshId::from_mesh(entity.mesh.as_ref()?);
+        if !entity.active {
+            return None;
+        }
+        let gpu_mesh = self.gpu_meshes.get(&mesh_id)?;
+
+        // Scale up the model matrix slightly for the outline hull
+        let outline_scale = 1.05;
+        let scaled_transform = Mat4::from_scale_rotation_translation(
+            entity.transform.scale * outline_scale,
+            entity.transform.rotation,
+            entity.transform.position,
+        );
+
+        let outline_uniform = EntityUniform {
+            model_matrix: scaled_transform.to_cols_array(),
+            color_tint: [1.0, 0.5, 0.0, 1.0], // Vibrant glowing orange outline
+            use_texture: 0,
+            is_lit: 0,
+            metallic: 0.0,
+            roughness: 0.5,
+            use_metallic_map: 0,
+            use_roughness_map: 0,
+            _pad0: 0,
+            _pad1: 0,
+        };
+
+        let outline_ent_buf = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Outline Entity Uniform"),
+                contents: bytemuck::bytes_of(&outline_uniform),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+        let outline_bones_buf = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Outline Bones Uniform"),
+                contents: bytemuck::bytes_of(default_bones),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+        let outline_bind_group =
+            self.entity_bind_group("Outline Bind Group", &outline_ent_buf, &outline_bones_buf);
+
+        Some((
+            selected_id,
+            mesh_id,
+            outline_ent_buf,
+            outline_bones_buf,
+            outline_bind_group,
+            gpu_mesh.num_indices,
+        ))
     }
 }
 
