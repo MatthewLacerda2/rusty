@@ -12,6 +12,7 @@ result is written to `.lint/report.txt` so an agent can read exactly what failed
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines |
 | Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation` |
+| Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
 
 ## Run it
@@ -73,6 +74,30 @@ rg -c 'allow\(clippy::too_many_lines\)' src   # expect no output
 ```
 Keep it that way: if a function grows past 50 lines, split it — **do not** silence the
 lint with a new `#[allow]`.
+
+## Panic-free sim core (`unwrap_used`)
+The four deterministic sim modules (`app`, `scripting`, `physics`, `navigation`)
+carry a module-level `#![deny(clippy::unwrap_used)]`, so a bare `.unwrap()` in
+their **production** code is a hard clippy error (caught by the same `-D warnings`
+gate, both feature sets, CI + the local hook). This is the **survivability**
+sibling of the determinism guard's **reproducibility**: a `.unwrap()` that panics
+mid-frame kills an unattended/overnight play-test just as surely as a wall-clock
+read breaks replay — same protected boundary (#195), same rationale.
+
+The rule is deliberately narrow:
+- **`unwrap`, not `expect`.** `.expect("clear invariant")` is the sanctioned escape
+  hatch — it documents *why* the value must be present at the call site. Use `?`
+  where a `Result` should propagate, `.expect(...)` where the invariant is real and
+  local; reach for the bare `.unwrap()` nowhere in the sim core.
+- **Sim modules only.** The platform layer (`main.rs`, `render`, `dev`) is exempt —
+  e.g. `render/shaders.rs` panicking at boot on a bad shader is fail-fast-at-startup,
+  not a mid-sim hazard. This is the exact boundary the determinism guard uses.
+- **Tests exempt.** `clippy.toml`'s `allow-unwrap-in-tests = true` lets test code
+  unwrap freely, so no per-test `#[allow]` noise.
+
+There is no baseline/burn-down: the sim core landed already clean (its few unwraps
+were all in `#[cfg(test)]`), so the lint went straight to `deny` with no grandfathered
+sites. Keep it that way — fix the call site, don't add an `#[allow]`.
 
 ## Clippy: CI vs local
 Clippy lints the whole crate (it can't be scoped to changed files). In **CI** it's a

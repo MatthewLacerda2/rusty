@@ -18,6 +18,10 @@
 //! no longer reach through one opaque blob; the borrow checker now separates world
 //! from resources at the call boundary.
 
+// Panic-free sim core (#195): bare `.unwrap()` is denied here (use `?` or a
+// documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
+#![deny(clippy::unwrap_used)]
+
 pub mod animation;
 mod camera_sync;
 pub mod game;

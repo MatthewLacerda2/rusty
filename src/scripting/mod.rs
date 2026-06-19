@@ -6,6 +6,10 @@
 //! start/update/trigger/eval callbacks + REPL value rendering) — and re-exported
 //! here so the public surface stays a flat `crate::scripting::*`.
 
+// Panic-free sim core (#195): bare `.unwrap()` is denied here (use `?` or a
+// documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
+#![deny(clippy::unwrap_used)]
+
 mod console;
 mod discovery;
 mod lifecycle;
