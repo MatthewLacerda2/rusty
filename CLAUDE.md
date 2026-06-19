@@ -24,16 +24,17 @@ agent can drive, observe, and play-test it headlessly.
 - **Flow:** discuss the idea (if needed) → write a GitHub issue for it → mark its
   dependencies → implement it in a pull request → merge. New work normally starts as an
   issue, not a surprise diff, and that PR references the issue it closes. **Issue-less PRs
-  are allowed** for small, self-contained changes — docs, CI/tooling tweaks, trivial
-  fixes — where writing a separate issue would add nothing; the PR description still has
-  to clear the three gates above.
-- **Infrastructure-first (NOT "make it up as we go").** We do **not** improvise or pile
-  on features ad hoc. Whenever we find a problem — something that already bites or will
-  bite more than once, a pattern worth adopting, or a gold-standard practice we should
-  have had — we **document it and implement it right away**, before continuing. We do
-  **not** have the right to add more features/shenanigans until the
-  infrastructure/architecture itself is improved first. Fix the foundation, then build
-  on it. Each such fix gets its own issue when it carries its own responsibility.
+  are allowed only** for documentation updates or bug fixes; everything else starts as an
+  issue. The PR description still has to clear the three gates above.
+- **Architecture- then infrastructure-first (NOT "make it up as we go").** We do **not**
+  improvise or pile on features ad hoc. Whenever we find a problem — something that
+  already bites or will bite more than once, a pattern worth adopting, or a gold-standard
+  practice we should have had — we **document it and implement it right away**, before
+  continuing. We do **not** have the right to add more features/shenanigans until the
+  architecture/infrastructure itself is improved first. Architecture (how things are
+  organized) outranks infrastructure (the tools to build them), and both outrank features
+  — see *Issues, labels & priority* for the full order. Fix the foundation, then build on
+  it. Each such fix gets its own issue when it carries its own responsibility.
 - **Dependencies (not batches).** Once an issue is written, record how it relates to the
   others using GitHub's native issue **relationships** — set `Blocked by` / `Blocks`
   directly on the issue, and use GitHub **sub-issues** when one issue is literal
@@ -47,6 +48,15 @@ agent can drive, observe, and play-test it headlessly.
   **ready for review** unless you need help, in which case leave it a **draft and say
   why** (blocked on another issue, needs a brand-new PR, software/hardware constraints,
   human intervention, etc.).
+- **A PR per branch, as soon as it has a commit.** The moment a branch/worktree has a
+  commit, open a PR for it — kept a **draft** until the work is done. This prevents
+  stray branches with no documented purpose and branches that go stale unnoticed: the
+  PR description, the commit history, and the PR↔issue relationship (when it addresses
+  one) are how we see what a branch adds in value and whether it still earns its place
+  in the current context.
+- **Branch naming.** A PR that closes an issue uses `{issue_number}-short-slug` (e.g.
+  `163-fix-coverage-scope`). An issue-less PR uses a readable short slug of its subject
+  (e.g. `document-ai-parity`). Lowercase-hyphenated, brief.
 - **Merging — serialized, one at a time.** When a PR is ready, CI/CD runs; once it's
   green you may merge to `main` right away. If it conflicts or fails, fix it until it
   passes; if it's taking too many iterations (≈3 fix attempts at the same failure, or a
@@ -57,6 +67,39 @@ agent can drive, observe, and play-test it headlessly.
   CI green on that rebased state → merge → repeat, one PR at a time. The only exception
   is a PR that touches **only** Markdown — CI is skipped for Markdown-only PRs, so they
   needn't be serialized and can merge freely.
+
+## Issues, labels & priority
+- **Issues come before PRs.** The unit of work is a well-specified issue — a clear
+  statement of *what* to set up and *what* to do (the roadmap, not the implementation
+  intrinsics). That's what lets Claude Code pick an issue up and run it unattended, even
+  overnight. So defining issues well outranks opening PRs: get the roadmap right and the
+  doing is the easy part.
+- **Never file an issue and start it in the same breath** — unless the work is a *direct
+  consequence* of another, already-decided issue. Filing-then-immediately-implementing
+  defeats planning: an idea still being shaped has to settle before anyone codes it.
+- **Issue-less PRs are allowed only** for documentation updates or bug fixes; everything
+  else starts as an issue.
+- **Priority by label.** When choosing what to do next, the order is
+  **architecture → infrastructure → bug → feature.** Architecture comes first because it
+  defines how things are organized and so reshapes — or eases — everything downstream;
+  infrastructure (the tools to do the work) is next; then bugs; then features.
+  **documentation** can be done at any time and never waits its turn.
+
+### Labels
+- **architecture** — How we define stuff.
+- **bug** — Something isn't working.
+- **burn-down** — *(no description yet)*
+- **documentation** — Improvements or additions to documentation.
+- **feature** — Feature or improvement.
+- **foundation** — *(no description yet)*
+- **human** — AI can't do this end-to-end.
+- **infrastructure** — Laying groundworks.
+- **plan** — *not yet defined.*
+
+Issues tagged **plan** are still being discussed with the user. They must **NOT** be
+started by any means. If a planning issue would implement something that affects another
+issue — changing how it gets implemented, or even how it's thought of — that other issue
+must be marked **blocked by** the planning issue.
 
 ## Architecture — the conceptual model
 A high-level map of how the engine is shaped. It deliberately doesn't enumerate every
@@ -93,6 +136,14 @@ five kinds of moving part (Unity analogs in parentheses):
    One surface, three callers — they never drift apart.
 
 ## Conventions that matter
+- **AI-driven, editor↔API parity.** rusty is built for an agent-driven workflow in the
+  *Claude Code + Blender-MCP* style: the agent can do anything a user can do in the
+  editor — create entities, place and configure components, instantiate assets, save
+  scenes — **except pure UI chrome** (collapsing a card, resizing a panel). Every
+  user-facing editor capability has an API equivalent.
+- **Keep the API doc in lockstep.** When you add or change an API function, update
+  `docs/scripting-api.md` in the *same* change. That doc is the API reference the agent
+  reads to drive the engine, so it must never lag the bindings.
 - **ECS via `hecs`.** `Transform` is the one mandatory component; all others optional.
 - **No event bus, no plugin trait.** Modules self-register via `register(&mut app)`;
   cross-system signals are direct typed returns.
@@ -120,3 +171,10 @@ Commits are blocked unless the checks pass; failures are written to
   `scripting`, `physics`, `navigation`); it protects the harness's reproducibility.
 - `tools/lint/baseline.txt` grandfathers the files that currently exceed the size
   cap. It's a **burn-down list** — remove entries as you split them, never add to it.
+
+## Overrides
+Any rule in this file may be overridden by the user's explicit say-so — in the current
+prompt or a previous one. The **one exception**: an issue tagged **plan** must never be
+started while that tag is on it. The user may tell you to **remove the `plan` label and
+then do it** — but never to do it with the label still on. (The user *may* greenlight an
+issue that is **blocked by** another; doing so automatically lifts that block.)
