@@ -286,3 +286,11 @@ impl GameWorld {
         cam.pitch = cam.pitch.clamp(-80.0, 80.0);
     }
 }
+
+#[cfg(test)]
+#[path = "game_tests.rs"]
+mod game_tests;
+
+#[cfg(test)]
+#[path = "game_play_tests.rs"]
+mod game_play_tests;

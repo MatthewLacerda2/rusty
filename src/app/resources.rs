@@ -138,3 +138,7 @@ impl Resources {
         &self.pathfinding_points
     }
 }
+
+#[cfg(test)]
+#[path = "resources_tests.rs"]
+mod resources_tests;
