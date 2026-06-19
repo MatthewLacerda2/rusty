@@ -37,3 +37,6 @@ pub use schedule::Schedule;
 pub use stage::Stage;
 pub use system::System;
 pub use world::World;
+
+#[cfg(test)]
+mod schedule_tests;
