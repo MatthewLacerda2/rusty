@@ -10,8 +10,8 @@ use glam::Vec3;
 
 use crate::scene::{
     AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape,
-    HealthComponent, LightComponent, LightType, NavMeshAgentComponent, RigidBodyComponent,
-    TextureComponent, Tonemap, VisualCorrectionComponent,
+    HealthComponent, LightComponent, LightType, MaterialAsset, MaterialComponent,
+    NavMeshAgentComponent, RigidBodyComponent, Scene, Tonemap, VisualCorrectionComponent,
 };
 
 /// Construct a `LightComponent` with the standard cone defaults. Shared by the
@@ -78,17 +78,29 @@ pub fn default_rigidbody() -> RigidBodyComponent {
     }
 }
 
-/// Default `TextureComponent` (the Add-Component menu's values).
-pub fn default_texture() -> TextureComponent {
-    TextureComponent {
-        path: String::new(),
-        is_dirty: true,
-        metallic: 0.0,
-        roughness: 0.5,
-        metallic_map: None,
-        roughness_map: None,
-        color: [1.0, 1.0, 1.0],
+/// Default `MaterialAsset` (the data a fresh library material starts from — the
+/// Add-Component / "Material" menu's values: white base color, dielectric, mid
+/// roughness, no maps).
+pub fn default_material() -> MaterialAsset {
+    MaterialAsset::default()
+}
+
+/// Attach a `MaterialComponent` to entity `id` referencing a freshly-created default
+/// library material (keyed `entity_{id}_material`), inserting it into the scene's
+/// library. Returns `false` if the entity does not exist. Material is the one
+/// "Add Component" verb that creates a shared library asset, not just entity data.
+pub fn attach_default_material(scene: &mut Scene, id: u32) -> bool {
+    let key = format!("entity_{id}_material");
+    {
+        let Some(mut entity) = scene.get_entity_mut(id) else {
+            return false;
+        };
+        entity.material = Some(MaterialComponent {
+            material: key.clone(),
+        });
     }
+    scene.materials.insert(key, default_material());
+    true
 }
 
 /// Default `NavMeshAgentComponent` (the Add-Component menu's values).

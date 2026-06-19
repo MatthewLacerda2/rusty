@@ -6,8 +6,9 @@ use crate::editor::{
 };
 use crate::editor::{inspectors, EditorUi, InspectorTarget};
 use crate::navigation::NavigationGraph;
-use crate::scene::{Entity, Scene, LAYER_COUNT};
+use crate::scene::{Entity, MaterialAsset, Scene, LAYER_COUNT};
 use crate::scripting::ConsoleLogs;
+use std::collections::BTreeMap;
 
 /// RIGHT PANEL: Properties Inspector
 pub fn draw(
@@ -110,7 +111,11 @@ fn draw_entity_inspector(
 
     let cx = gather_context(scene, selected_id);
 
-    if let Some(mut entity_guard) = scene.get_entity_mut(selected_id) {
+    // Borrow the entity (`scene.world`) and the material library (`scene.materials`)
+    // as DISJOINT fields of `Scene`, so the material card can edit the shared library
+    // asset while the entity guard is live (they never alias).
+    let materials = &mut scene.materials;
+    if let Some(mut entity_guard) = scene.world.get_mut(selected_id) {
         let entity: &mut Entity = &mut entity_guard;
         if entity.camera.is_none() && entity.visual_correction.is_some() {
             entity.visual_correction = None;
@@ -139,6 +144,7 @@ fn draw_entity_inspector(
         draw_components(
             ui,
             entity,
+            materials,
             &cx.named_layers,
             &mut editor.is_dirty,
             &mut pending_nav_bake,
@@ -268,12 +274,13 @@ fn draw_object_header(
 fn draw_components(
     ui: &mut egui::Ui,
     entity: &mut Entity,
+    materials: &mut BTreeMap<String, MaterialAsset>,
     named_layers: &[(u8, String)],
     is_dirty: &mut bool,
     pending_nav_bake: &mut bool,
 ) {
     inspector_render::draw_mesh(ui, entity, is_dirty);
-    inspector_render::draw_texture(ui, entity, is_dirty);
+    inspector_render::draw_material_card(ui, entity, materials, is_dirty);
     inspector_render::draw_light(ui, entity, is_dirty);
 
     inspector_gameplay::draw_script(ui, entity, is_dirty);

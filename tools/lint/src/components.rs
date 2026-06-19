@@ -69,11 +69,12 @@ const WAIVERS: &[(&str, &str, &str)] = &[
          look is driven via the `Material` namespace instead.",
     ),
     (
-        "texture",
+        "material",
         "api",
         "Served by the `Material` namespace (SetTexture/SetMetallic/SetRoughness \
-         and their map variants) — a dedicated `Texture` namespace would fragment \
-         the surface for the same component.",
+         and their map variants) — the `material` field is a reference to a shared \
+         library material, and a dedicated `Material`-field namespace would just \
+         restate the same surface.",
     ),
     (
         "collider",

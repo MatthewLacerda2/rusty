@@ -11,8 +11,9 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     AnimatorComponent, CameraComponent, ColliderComponent, HealthComponent, LightComponent,
-    MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent, RigidBodyComponent,
-    ScriptComponent, TextureComponent, TransformComponent, VisualCorrectionComponent,
+    MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent,
+    ParticleEmitterComponent, RigidBodyComponent, ScriptComponent, TextureComponent,
+    TransformComponent, VisualCorrectionComponent,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -30,7 +31,15 @@ pub struct Entity {
     pub layer: u8,
     pub transform: TransformComponent,
     pub mesh: Option<MeshComponent>,
-    pub texture: Option<TextureComponent>,
+    /// Reference to a library material by name (the first-class component). The
+    /// material DATA is a shared asset in `Scene.materials`; this only points at it.
+    pub material: Option<MaterialComponent>,
+    /// Transient migration carrier: a legacy inline material lifted out of an old
+    /// scene by `From<EntityRepr>`, to be inserted into the scene's material library
+    /// by `apply_scene_data` (which is where the library is reachable). Never
+    /// serialized; always `None` on a freshly-built/loaded runtime entity.
+    #[serde(skip)]
+    pub pending_material: Option<MaterialAsset>,
     /// An entity can carry MANY scripts, each its own MonoBehaviour-equivalent
     /// Lua lifecycle table (#83). `#[serde(default)]` plus the legacy `script`
     /// field in `EntityRepr` keep pre-#83 single-`script` scenes loadable.
@@ -65,7 +74,12 @@ struct EntityRepr {
     layer: u8,
     transform: TransformComponent,
     mesh: Option<MeshComponent>,
+    /// Legacy pre-#201 inline material, migrated into a library material by `From`.
+    #[serde(default)]
     texture: Option<TextureComponent>,
+    /// New reference-to-library material (post-#201 scenes carry this directly).
+    #[serde(default)]
+    material: Option<MaterialComponent>,
     #[serde(default)]
     scripts: Vec<ScriptComponent>,
     /// Legacy singular field (pre-#83), migrated into `scripts` by `From`.
@@ -93,6 +107,19 @@ impl From<EntityRepr> for Entity {
         if let Some(legacy) = r.script {
             scripts.insert(0, legacy);
         }
+        // Material migration: a new-format `material` reference is taken verbatim; a
+        // legacy inline `texture` becomes a per-entity library material whose data is
+        // carried in `pending_material` for `apply_scene_data` to insert by name.
+        let (material, pending_material) = match (r.material, r.texture) {
+            (Some(m), _) => (Some(m), None),
+            (None, Some(t)) => (
+                Some(MaterialComponent {
+                    material: format!("entity_{}_material", r.id),
+                }),
+                Some(MaterialAsset::from_legacy(&t)),
+            ),
+            (None, None) => (None, None),
+        };
         Self {
             id: r.id,
             name: r.name,
@@ -101,7 +128,8 @@ impl From<EntityRepr> for Entity {
             layer: r.layer,
             transform: r.transform,
             mesh: r.mesh,
-            texture: r.texture,
+            material,
+            pending_material,
             scripts,
             animator: r.animator,
             light: r.light,
@@ -128,7 +156,8 @@ impl Entity {
             layer: 0,
             transform: TransformComponent::default(),
             mesh: None,
-            texture: None,
+            material: None,
+            pending_material: None,
             scripts: Vec::new(),
             animator: None,
             light: None,

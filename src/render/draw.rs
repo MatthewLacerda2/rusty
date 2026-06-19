@@ -88,19 +88,18 @@ impl Renderer {
     /// Upload/refresh per-frame GPU assets (meshes, textures, skybox) shared by every
     /// camera in the stack. Borrow-splits cleanly before the render passes begin.
     fn upload_scene_assets(&mut self, scene: &Scene) {
-        // Mesh upload + dedup-by-asset-identity lives next to `update_gpu_mesh`.
         self.upload_scene_meshes(scene);
 
-        let mut tex_paths = Vec::new();
-        for entity in scene.iter() {
-            if !entity.active {
-                continue;
-            }
-            if let Some(t_comp) = &entity.texture {
-                tex_paths.push(t_comp.path.clone());
-            }
-        }
-        for path in tex_paths {
+        // Each active entity's resolved albedo (`base_color_map`) — the only material
+        // map the shader samples today (#201). Collected first to end the scene borrow.
+        let albedos: Vec<String> = scene
+            .entity_ids()
+            .iter()
+            .filter_map(|&id| scene.get_entity(id))
+            .filter(|e| e.active)
+            .filter_map(|e| scene.material_of(&e).and_then(|m| m.base_color_map.clone()))
+            .collect();
+        for path in albedos {
             self.load_texture(&path);
         }
 

@@ -1,7 +1,10 @@
-//! src/components/texture.rs — Texture/material component
+//! src/components/texture.rs — LEGACY inline material component.
 //!
-//! albedo/metallic/roughness/color. Moved verbatim from the legacy
-//! `core/scene.rs`.
+//! Pre-#201 the material lived inline on each entity as this `TextureComponent`
+//! (albedo/metallic/roughness/color). It is now retained ONLY for back-compat
+//! deserialization of old scenes: `MaterialAsset::from_legacy` migrates one into
+//! the per-World material library, and entities reference materials by name via
+//! `MaterialComponent`. Do not add new uses.
 
 use serde::{Deserialize, Serialize};
 

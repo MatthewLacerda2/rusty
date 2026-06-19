@@ -9,6 +9,7 @@ use std::rc::Rc;
 use wgpu::util::DeviceExt;
 
 use super::{BoneUniform, EntityUniform, GpuTexture, MeshId, Renderer};
+use crate::components::MaterialAsset;
 use crate::scene::Scene;
 
 // The leading `u32` is the entity id (identity — e.g. matching the selected
@@ -112,8 +113,9 @@ impl Renderer {
         let mesh_id = MeshId::from_mesh(mesh);
         let gpu_mesh = self.gpu_meshes.get(&mesh_id)?;
 
+        let material = scene.material_of(entity);
         let model_matrix = scene.compute_world_matrix(entity.id);
-        let entity_uniform = solid_entity_uniform(entity, model_matrix);
+        let entity_uniform = solid_entity_uniform(entity, material, model_matrix);
         let entity_buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -142,14 +144,15 @@ impl Renderer {
         let entity_bind_group =
             self.entity_bind_group("Entity Bind Group", &entity_buffer, &bones_buffer);
 
-        // Bind Group 2 (Texture)
-        let tex = if let Some(t_comp) = &entity.texture {
-            self.gpu_textures
-                .get(&t_comp.path)
+        // Bind Group 2 (Texture): the material's albedo (`base_color_map`), or the
+        // default texture when the material has none / no material is referenced.
+        let tex = match material.and_then(|m| m.base_color_map.as_ref()) {
+            Some(path) => self
+                .gpu_textures
+                .get(path)
                 .cloned()
-                .unwrap_or_else(|| Rc::clone(&self.default_texture))
-        } else {
-            Rc::clone(&self.default_texture)
+                .unwrap_or_else(|| Rc::clone(&self.default_texture)),
+            None => Rc::clone(&self.default_texture),
         };
 
         Some((
@@ -247,13 +250,18 @@ impl Renderer {
 
 /// Compute the per-entity uniform (tint, lit flag, PBR params) for a solid mesh.
 /// Tint is driven by components only — never by entity name. A game colours its
-/// entities via the `texture` component's `color`; the engine carries no per-name
-/// colour assumptions.
-fn solid_entity_uniform(entity: &crate::components::Entity, model_matrix: Mat4) -> EntityUniform {
+/// entities via its referenced material's `base_color`; the engine carries no
+/// per-name colour assumptions. `material` is the entity's resolved library
+/// material (`None` when it references none).
+fn solid_entity_uniform(
+    entity: &crate::components::Entity,
+    material: Option<&MaterialAsset>,
+    model_matrix: Mat4,
+) -> EntityUniform {
     let is_lit = if entity.light.is_some() { 0u32 } else { 1u32 };
 
-    let color_tint = if let Some(t_comp) = &entity.texture {
-        [t_comp.color[0], t_comp.color[1], t_comp.color[2], 1.0]
+    let color_tint = if let Some(mat) = material {
+        [mat.base_color[0], mat.base_color[1], mat.base_color[2], 1.0]
     } else if let Some(health) = &entity.health {
         if health.is_dead {
             [0.2, 0.2, 0.2, 1.0]
@@ -264,14 +272,12 @@ fn solid_entity_uniform(entity: &crate::components::Entity, model_matrix: Mat4) 
         [1.0, 1.0, 1.0, 1.0]
     };
 
-    let (metallic, roughness) = if let Some(t_comp) = &entity.texture {
-        (t_comp.metallic, t_comp.roughness)
-    } else {
-        (0.0, 0.5)
+    let (metallic, roughness) = match material {
+        Some(mat) => (mat.metallic, mat.roughness),
+        None => (0.0, 0.5),
     };
 
-    let use_texture =
-        u32::from(entity.texture.is_some() && !entity.texture.as_ref().unwrap().path.is_empty());
+    let use_texture = u32::from(material.is_some_and(|m| m.base_color_map.is_some()));
 
     EntityUniform {
         model_matrix: model_matrix.to_cols_array(),
