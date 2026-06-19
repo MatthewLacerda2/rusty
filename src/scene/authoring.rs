@@ -27,7 +27,7 @@ use crate::scene::{LightComponent, LightType, MeshComponent, ParticleEmitterComp
 pub use crate::scene::authoring_defaults::{
     attach_default_material, default_animator, default_camera, default_collider, default_health,
     default_light, default_material, default_nav_agent, default_rigidbody,
-    default_visual_correction,
+    default_visual_correction, material_asset_from_import,
 };
 
 /// The primitive set the hierarchy toolbar's "Create" dropdown offers — meshes

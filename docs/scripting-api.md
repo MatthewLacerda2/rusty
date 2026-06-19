@@ -97,6 +97,17 @@ map; an empty path clears it.
 > not sampled by the renderer yet (deferred follow-ups: normal maps need vertex
 > tangents; emissive needs extra uniform plumbing).
 
+> **Imported materials.** Instantiating a glTF model populates the material library
+> from the file's authored metallic-roughness materials and points each sub-object's
+> entity at the matching library entry via its `MaterialComponent`. The library key
+> is deterministic — `"<path>::<material-name>"` (or `"<path>::material_<index>"`
+> when the material is unnamed) — so sub-objects that share one glTF material share a
+> single library entry. glTF packs metallic + roughness in one texture; on import it
+> is mapped to *both* the engine's `metallic_map` and `roughness_map` (the shader
+> reads the blue/green channel from each). External texture URIs resolve to paths
+> relative to the glTF file; embedded images are not yet extracted (a follow-up). OBJ
+> imports only `Kd` (base color) and `map_Kd` (albedo) — it is static-mesh only.
+
 ## `Animator`
 
 Drive an entity's animation clips. Clips are imported from the entity's skinned

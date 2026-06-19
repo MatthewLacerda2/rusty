@@ -85,6 +85,30 @@ pub fn default_material() -> MaterialAsset {
     MaterialAsset::default()
 }
 
+/// Convert an imported [`crate::asset::MaterialData`] (the asset-layer DTO) into a
+/// renderable [`MaterialAsset`] for the scene's material library. This is the bridge
+/// between the pure-data asset layer and the components layer; it lives in `scene`
+/// because only this layer may see both.
+///
+/// glTF packs metallic + roughness into ONE `metallicRoughnessTexture` (metallic in
+/// B, roughness in G), so the single `data.metallic_roughness_map` is mapped to BOTH
+/// `metallic_map` AND `roughness_map`; the shader samples `.b` / `.g` from each, so
+/// pointing both at the same image reads the correct channel. The base-color alpha is
+/// dropped (the renderer's base color is RGB).
+pub fn material_asset_from_import(data: &crate::asset::MaterialData) -> MaterialAsset {
+    MaterialAsset {
+        base_color: [data.base_color[0], data.base_color[1], data.base_color[2]],
+        base_color_map: data.base_color_map.clone(),
+        metallic: data.metallic,
+        metallic_map: data.metallic_roughness_map.clone(),
+        roughness: data.roughness,
+        roughness_map: data.metallic_roughness_map.clone(),
+        normal_map: data.normal_map.clone(),
+        emissive: data.emissive,
+        emissive_map: data.emissive_map.clone(),
+    }
+}
+
 /// Attach a `MaterialComponent` to entity `id` referencing a freshly-created default
 /// library material (keyed `entity_{id}_material`), inserting it into the scene's
 /// library. Returns `false` if the entity does not exist. Material is the one
@@ -150,5 +174,39 @@ pub fn default_visual_correction() -> VisualCorrectionComponent {
         ssr_temporal_upsampling: true,
         tonemap: Tonemap::Aces,
         gamma: 2.2,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::material_asset_from_import;
+    use crate::asset::MaterialData;
+
+    #[test]
+    fn import_conversion_fans_mr_map_to_both_channels() {
+        let data = MaterialData {
+            name: "Bricks".to_string(),
+            base_color: [0.8, 0.4, 0.2, 0.5],
+            metallic: 0.25,
+            roughness: 0.75,
+            base_color_map: Some("albedo.png".to_string()),
+            metallic_roughness_map: Some("mr.png".to_string()),
+            normal_map: Some("n.png".to_string()),
+            emissive_map: Some("e.png".to_string()),
+            emissive: [0.1, 0.2, 0.3],
+        };
+        let mat = material_asset_from_import(&data);
+
+        // Base-color alpha is dropped; rgb carried through.
+        assert_eq!(mat.base_color, [0.8, 0.4, 0.2]);
+        assert_eq!(mat.metallic, 0.25);
+        assert_eq!(mat.roughness, 0.75);
+        assert_eq!(mat.base_color_map.as_deref(), Some("albedo.png"));
+        // The single glTF MR texture fans out to BOTH engine maps (#203).
+        assert_eq!(mat.metallic_map.as_deref(), Some("mr.png"));
+        assert_eq!(mat.roughness_map.as_deref(), Some("mr.png"));
+        assert_eq!(mat.normal_map.as_deref(), Some("n.png"));
+        assert_eq!(mat.emissive, [0.1, 0.2, 0.3]);
+        assert_eq!(mat.emissive_map.as_deref(), Some("e.png"));
     }
 }

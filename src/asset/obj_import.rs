@@ -22,13 +22,22 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
     // unusable — treat that as an empty material table rather than a hard error.
     let materials = materials.unwrap_or_default();
 
+    // OBJ is static-mesh only (per CLAUDE.md): we read just the trivially-available
+    // values — `Kd` (base color) and `map_Kd` (base-color texture). All glTF-specific
+    // fields (metallic/roughness, MR/normal/emissive maps) take their `Default`.
+    let base_dir = path.parent().unwrap_or_else(|| Path::new(""));
     let materials: Vec<MaterialData> = materials
         .into_iter()
         .map(|m| {
             let base = m.diffuse.unwrap_or([1.0, 1.0, 1.0]);
+            let base_color_map = m
+                .diffuse_texture
+                .map(|t| base_dir.join(t).to_string_lossy().into_owned());
             MaterialData {
                 name: m.name,
                 base_color: [base[0], base[1], base[2], 1.0],
+                base_color_map,
+                ..Default::default()
             }
         })
         .collect();
