@@ -4,7 +4,6 @@
 //! reads and writes an entity's optional nav-agent component.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
@@ -14,22 +13,30 @@ use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 
 /// Register the `Navigation` and `NavMeshAgent` namespaces onto `lua`.
-pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, nav: &Rc<RefCell<NavigationGraph>>) -> Reg {
-    register_navigation(lua, nav)?;
-    register_agent(lua, scene)
+pub fn register<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    scene: &'scope RefCell<Scene>,
+    nav: &'scope RefCell<NavigationGraph>,
+) -> Reg {
+    register_navigation(lua, scope, nav)?;
+    register_agent(lua, scope, scene)
 }
 
 /// `Navigation.GetNextPathStep` over the shared nav graph.
-fn register_navigation(lua: &Lua, nav: &Rc<RefCell<NavigationGraph>>) -> Reg {
+fn register_navigation<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    nav: &'scope RefCell<NavigationGraph>,
+) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    let n = Rc::clone(nav);
     put(
         &table,
         "GetNextPathStep",
-        lua.create_function(
-            move |_, (cx, cy, cz, tx, ty, tz): (f32, f32, f32, f32, f32, f32)| {
-                let step = n
+        scope.create_function(
+            |_, (cx, cy, cz, tx, ty, tz): (f32, f32, f32, f32, f32, f32)| {
+                let step = nav
                     .borrow()
                     .get_next_path_step(Vec3::new(cx, cy, cz), Vec3::new(tx, ty, tz));
                 Ok((step.x, step.y, step.z))
@@ -43,13 +50,17 @@ fn register_navigation(lua: &Lua, nav: &Rc<RefCell<NavigationGraph>>) -> Reg {
 }
 
 /// `NavMeshAgent.*` target / speed / radius accessors over the nav-agent component.
-fn register_agent(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
+fn register_agent<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_agent_target(lua, &table, scene)?;
-    register_agent_motion(lua, &table, scene)?;
-    register_agent_size(lua, &table, scene)?;
-    register_agent_queries(lua, &table, scene)?;
+    register_agent_target(scope, &table, scene)?;
+    register_agent_motion(scope, &table, scene)?;
+    register_agent_size(scope, &table, scene)?;
+    register_agent_queries(scope, &table, scene)?;
 
     lua.globals()
         .set("NavMeshAgent", table)
@@ -57,13 +68,16 @@ fn register_agent(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 }
 
 /// `SetTarget` / `GetTarget` over the agent's destination.
-fn register_agent_target(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_agent_target<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "SetTarget",
-        lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(agent) = &mut e.nav_agent {
                     agent.target = Vec3::new(x, y, z);
@@ -73,12 +87,11 @@ fn register_agent_target(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scen
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "GetTarget",
-        lua.create_function(move |_, id: u32| {
-            let scene = s.borrow();
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
             if let Some(e) = scene.get_entity(id) {
                 if let Some(agent) = &e.nav_agent {
                     let t = agent.target;
@@ -91,13 +104,16 @@ fn register_agent_target(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scen
 }
 
 /// Motion tuning: `SetSpeed` / `SetAcceleration`.
-fn register_agent_motion(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_agent_motion<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "SetSpeed",
-        lua.create_function(move |_, (id, speed): (u32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, speed): (u32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(agent) = &mut e.nav_agent {
                     agent.speed = speed;
@@ -107,12 +123,11 @@ fn register_agent_motion(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scen
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetAcceleration",
-        lua.create_function(move |_, (id, acc): (u32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, acc): (u32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(agent) = &mut e.nav_agent {
                     agent.acceleration = acc;
@@ -124,13 +139,16 @@ fn register_agent_motion(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scen
 }
 
 /// Footprint tuning: `SetStoppingDistance` / `SetRadius`.
-fn register_agent_size(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_agent_size<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "SetStoppingDistance",
-        lua.create_function(move |_, (id, dist): (u32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, dist): (u32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(agent) = &mut e.nav_agent {
                     agent.stopping_distance = dist;
@@ -140,12 +158,11 @@ fn register_agent_size(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetRadius",
-        lua.create_function(move |_, (id, r): (u32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, r): (u32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(agent) = &mut e.nav_agent {
                     agent.radius = r;
@@ -157,13 +174,16 @@ fn register_agent_size(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>
 }
 
 /// Runtime queries / toggle: `IsAtTarget`, `GetVelocity`, and `SetActive`.
-fn register_agent_queries(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_agent_queries<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "IsAtTarget",
-        lua.create_function(move |_, id: u32| {
-            let scene = s.borrow();
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
             if let Some(e) = scene.get_entity(id) {
                 if let Some(agent) = &e.nav_agent {
                     let current_pos = e.transform.position;
@@ -175,12 +195,11 @@ fn register_agent_queries(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Sce
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "GetVelocity",
-        lua.create_function(move |_, id: u32| {
-            let scene = s.borrow();
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
             if let Some(e) = scene.get_entity(id) {
                 if let Some(agent) = &e.nav_agent {
                     let v = agent.velocity;
@@ -191,12 +210,11 @@ fn register_agent_queries(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Sce
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetActive",
-        lua.create_function(move |_, (id, active): (u32, bool)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, active): (u32, bool)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(agent) = &mut e.nav_agent {
                     agent.active = active;

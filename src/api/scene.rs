@@ -4,7 +4,6 @@
 //! deferred destroy). Unity: `SceneManager` / `Object.Destroy`.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use mlua::Lua;
 
@@ -13,26 +12,29 @@ use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the `Scene` namespace onto `lua`.
-pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<ConsoleLogs>>) -> Reg {
+pub fn register<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    scene: &'scope RefCell<Scene>,
+    console: &'scope RefCell<ConsoleLogs>,
+) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    let s = Rc::clone(scene);
     put(
         &table,
         "FindEntityByName",
-        lua.create_function(move |_, name: String| Ok(s.borrow().find_entity_by_name(&name))),
+        scope.create_function(|_, name: String| Ok(scene.borrow().find_entity_by_name(&name))),
     )?;
 
-    let s = Rc::clone(scene);
-    let c = Rc::clone(console);
     put(
         &table,
         "DestroyEntity",
-        lua.create_function(move |_, id: u32| {
-            let mut scene = s.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
+        scope.create_function(|_, id: u32| {
+            let mut s = scene.borrow_mut();
+            if let Some(mut e) = s.get_entity_mut(id) {
                 e.active = false;
-                c.borrow_mut()
+                console
+                    .borrow_mut()
                     .info(format!("Entity {} destroyed (deactivated)", e.name));
             }
             Ok(())

@@ -5,7 +5,6 @@
 //! These are the only places `Graphics.*` reaches into render-only component state.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use crate::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
 use crate::render::postfx::QualityPreset;
@@ -13,7 +12,7 @@ use crate::scene::Scene;
 
 /// Run `f` on the first active visual-correction volume, returning its result.
 pub(super) fn with_vc<R>(
-    scene: &Rc<RefCell<Scene>>,
+    scene: &RefCell<Scene>,
     f: impl FnOnce(&VisualCorrectionComponent) -> R,
 ) -> Option<R> {
     let scene = scene.borrow();
@@ -26,10 +25,7 @@ pub(super) fn with_vc<R>(
 }
 
 /// Mutate the first active visual-correction volume (no-op when there is none).
-pub(super) fn with_vc_mut(
-    scene: &Rc<RefCell<Scene>>,
-    f: impl FnOnce(&mut VisualCorrectionComponent),
-) {
+pub(super) fn with_vc_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut VisualCorrectionComponent)) {
     let mut scene = scene.borrow_mut();
     let target = scene
         .iter()
@@ -46,7 +42,7 @@ pub(super) fn with_vc_mut(
 
 /// Run `f` on the first active camera component, returning its result.
 pub(super) fn with_cam<R>(
-    scene: &Rc<RefCell<Scene>>,
+    scene: &RefCell<Scene>,
     f: impl FnOnce(&CameraComponent) -> R,
 ) -> Option<R> {
     let scene = scene.borrow();
@@ -59,7 +55,7 @@ pub(super) fn with_cam<R>(
 }
 
 /// Mutate the first active camera component (no-op when there is none).
-pub(super) fn with_cam_mut(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&mut CameraComponent)) {
+pub(super) fn with_cam_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut CameraComponent)) {
     let mut scene = scene.borrow_mut();
     let target = scene
         .iter()
