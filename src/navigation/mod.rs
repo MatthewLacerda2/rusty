@@ -8,6 +8,10 @@
 //! re-exported [`NavigationGraph`] type. Agents follow the real baked `y` of the
 //! surface (ramps, stairs, multi-level terrain), not a preserved-constant height.
 
+// Panic-free sim core (#195): bare `.unwrap()` is denied here (use `?` or a
+// documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
+#![deny(clippy::unwrap_used)]
+
 mod agents;
 mod astar;
 #[cfg(test)]

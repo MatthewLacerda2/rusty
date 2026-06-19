@@ -7,6 +7,10 @@
 //! engine's cast agree for the same ray. The old AABB approximation
 //! (`cast_ray_in_scene`) has been retired.
 
+// Panic-free sim core (#195): bare `.unwrap()` is denied here (use `?` or a
+// documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
+#![deny(clippy::unwrap_used)]
+
 mod build;
 #[cfg(test)]
 mod build_tests;
