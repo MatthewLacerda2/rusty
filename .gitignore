@@ -48,3 +48,7 @@ mutants.out*.tmp/
 
 # Harness run artifacts
 out/
+
+# cargo-mutants run output
+/mutants.out/
+/mutants.out.old/
