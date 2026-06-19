@@ -67,6 +67,20 @@ agent can drive, observe, and play-test it headlessly.
   CI green on that rebased state → merge → repeat, one PR at a time. The only exception
   is a PR that touches **only** Markdown — CI is skipped for Markdown-only PRs, so they
   needn't be serialized and can merge freely.
+- **Gates vs. signals — block on correctness, inform on quality.** Keep the bar high
+  *without* stalling the agents. A check that proves **correctness** — build, test, clippy,
+  the determinism guard, the size gate — is a **hard gate**: green-to-merge, no exceptions. A
+  check that *audits quality* — mutation testing, coverage — is an **informational signal**:
+  scoped to the diff per-PR for a fresh-context catch and run as a periodic full sweep on
+  `main` for the backstop, but it **never blocks a merge**. Nothing may silently slide, so an
+  informational signal only earns its keep when it's **surfaced where the agent acts on it** (a
+  job summary or PR comment read in-context), not buried in an artifact nobody opens. Don't
+  reach for a hard gate where an informational signal does the job.
+- **Agent velocity is first-class.** This workflow is agents driving the engine and each
+  other, often unattended — throughput counts. Write code that is **readable by design and
+  lean**: not for style points but because clear, well-shaped code is cheaper to reason about
+  (fewer tokens, fewer wrong turns) and faster for the next agent to extend. Strip avoidable
+  blockages and keep CI fast. This is part of **Craft**, not a trade-off against it.
 
 ## Issues, labels & priority
 - **Issues come before PRs.** The unit of work is a well-specified issue — a clear
