@@ -5,13 +5,11 @@
 //! detach a first-class component with the inspector's "Add Component" defaults,
 //! and the primitive-mesh geometry shared with serialization's rehydrate path.
 //!
-//! BOTH callers route through here so editor and API can never drift:
-//!   - the editor (`hierarchy.rs` create, `inspector_add.rs` add-menu),
-//!   - the API surface (`api::scene`), which the console REPL and headless
-//!     session drive against the live edit world.
-//!
-//! Parenting, destroy and save already have single canonical entry points on
-//! `Scene` (`set_parent` / `destroy_entity` / `save_to_file`); the structural API
+//! BOTH callers route through here so editor and API can never drift: the editor
+//! (`hierarchy.rs` create, `inspector_add.rs` add-menu) and the API surface
+//! (`api::scene`), which the console REPL and headless session drive against the
+//! live edit world. Parenting/destroy/save have their own canonical `Scene` entry
+//! points (`set_parent` / `destroy_entity` / `save_to_file`); the structural API
 //! verbs call straight into those, so they are not duplicated here.
 //!
 //! Allowed deps: components, render::mesh (primitive geometry), scene.
@@ -23,12 +21,13 @@ use crate::render::mesh::Vertex;
 use crate::scene::authoring_defaults::light;
 use crate::scene::{LightComponent, LightType, MeshComponent, ParticleEmitterComponent, Scene};
 
-// Re-export the per-component defaults so callers (the editor's add-menu, the
-// `Scene.AddComponent` API) reach them through the one `scene::authoring` entry
-// point. They live in `authoring_defaults` only to keep this module under the cap.
+// Re-export the per-component defaults so callers (editor add-menu, `Scene.AddComponent`
+// API) reach them through this one entry point; they live in `authoring_defaults`
+// only to keep this module under the size cap.
 pub use crate::scene::authoring_defaults::{
-    default_animator, default_camera, default_collider, default_health, default_light,
-    default_nav_agent, default_rigidbody, default_texture, default_visual_correction,
+    attach_default_material, default_animator, default_camera, default_collider, default_health,
+    default_light, default_material, default_nav_agent, default_rigidbody,
+    default_visual_correction,
 };
 
 /// The primitive set the hierarchy toolbar's "Create" dropdown offers — meshes
@@ -184,11 +183,15 @@ impl ComponentKind {
 }
 
 /// Attach a first-class component of `kind` to entity `id` with the inspector's
-/// default values, replacing any existing one of that kind (the editor only
-/// offers the entry when absent; the API is idempotent-by-replace). Returns
-/// `false` if the entity does not exist. The editor's inspector add-menu and the
-/// `Scene.AddComponent` API both route here.
+/// default values, replacing any existing one (editor offers it only when absent;
+/// the API is idempotent-by-replace). Returns `false` if the entity is missing. The
+/// inspector add-menu and the `Scene.AddComponent` API both route here.
 pub fn add_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool {
+    // Material attaches a reference AND creates a shared library asset (it touches
+    // `scene.materials`, not just the entity guard), so it routes off on its own.
+    if kind == ComponentKind::Texture {
+        return attach_default_material(scene, id);
+    }
     let Some(mut entity) = scene.get_entity_mut(id) else {
         return false;
     };
@@ -198,7 +201,7 @@ pub fn add_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::Animator => entity.animator = Some(default_animator()),
         ComponentKind::Collider => entity.collider = Some(default_collider()),
         ComponentKind::RigidBody => entity.rigidbody = Some(default_rigidbody()),
-        ComponentKind::Texture => entity.texture = Some(default_texture()),
+        ComponentKind::Texture => unreachable!("handled above"),
         ComponentKind::NavMeshAgent => entity.nav_agent = Some(default_nav_agent()),
         ComponentKind::Camera => entity.camera = Some(default_camera()),
         ComponentKind::Particles => entity.particles = Some(ParticleEmitterComponent::default()),
@@ -227,7 +230,8 @@ pub fn remove_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool
         ComponentKind::Animator => entity.animator = None,
         ComponentKind::Collider => entity.collider = None,
         ComponentKind::RigidBody => entity.rigidbody = None,
-        ComponentKind::Texture => entity.texture = None,
+        // Drop only the reference; the shared library material may still be in use.
+        ComponentKind::Texture => entity.material = None,
         ComponentKind::NavMeshAgent => entity.nav_agent = None,
         ComponentKind::Camera => {
             entity.camera = None;
@@ -288,10 +292,8 @@ mod tests {
     #[test]
     fn parse_names_are_case_insensitive() {
         assert_eq!(Primitive::parse("BOX"), Some(Primitive::Box));
-        assert_eq!(
-            ComponentKind::parse("material"),
-            Some(ComponentKind::Texture)
-        );
+        let mat = ComponentKind::parse("material");
+        assert_eq!(mat, Some(ComponentKind::Texture));
         assert_eq!(ComponentKind::parse("nope"), None);
     }
 }

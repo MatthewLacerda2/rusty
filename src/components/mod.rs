@@ -14,6 +14,7 @@ pub mod collider;
 pub mod entity;
 pub mod health;
 pub mod light;
+pub mod material;
 pub mod mesh;
 pub mod nav_agent;
 pub mod particle;
@@ -29,6 +30,7 @@ pub use collider::{ColliderComponent, ColliderShape};
 pub use entity::Entity;
 pub use health::HealthComponent;
 pub use light::{LightComponent, LightType};
+pub use material::{MaterialAsset, MaterialComponent};
 pub use mesh::{DirtyFlag, MeshComponent};
 pub use nav_agent::NavMeshAgentComponent;
 pub use particle::{

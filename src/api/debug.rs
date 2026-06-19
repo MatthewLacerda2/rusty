@@ -88,7 +88,10 @@ fn register_snapshot<'lua, 'scope>(
             let scene = scene.borrow();
             let world_matrix = scene.compute_world_matrix(id);
             let value = match scene.get_entity(id) {
-                Some(entity) => snapshot::entity_value(&entity, world_matrix),
+                Some(entity) => {
+                    let material = scene.material_of(&entity);
+                    snapshot::entity_value(&entity, material, world_matrix)
+                }
                 None => serde_json::Value::Null,
             };
             Ok(serde_json::to_string_pretty(&value).unwrap_or_default())

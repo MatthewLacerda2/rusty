@@ -13,11 +13,13 @@
 //! Allowed deps: ecs, components, asset (for re-importing `"Asset"` meshes),
 //! render::mesh (the `Vertex` type rehydration targets).
 
+use std::collections::BTreeMap;
+
 use glam::{Mat4, Vec3};
 use serde::{Deserialize, Serialize};
 
 use crate::asset::{self, MeshVertex, SubMesh};
-use crate::components::Entity;
+use crate::components::{Entity, MaterialAsset};
 use crate::render::mesh::Vertex;
 use crate::scene::authoring::{primitive_geometry, Primitive};
 use crate::scene::collision_matrix::CollisionMatrix;
@@ -59,6 +61,12 @@ pub struct SceneData {
     /// all-pairs-collide default (preserving their behaviour).
     #[serde(default)]
     pub collision_matrix: CollisionMatrix,
+    /// The material library: reusable materials keyed by name (#201). Entities
+    /// reference one by name. `#[serde(default)]` so pre-#201 scenes (which stored
+    /// the material inline per entity) load with an empty library; their inline
+    /// materials are migrated in [`apply_scene_data`].
+    #[serde(default)]
+    pub materials: BTreeMap<String, MaterialAsset>,
 }
 
 /// Read the live World's component values out into a serializable document.
@@ -72,6 +80,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         ambient_intensity: scene.ambient_intensity,
         layers: scene.layers.clone(),
         collision_matrix: scene.collision_matrix.clone(),
+        materials: scene.materials.clone(),
     }
 }
 
@@ -197,6 +206,18 @@ pub fn asset_mesh_component(reference: &str) -> crate::scene::MeshComponent {
 /// rehydrating meshes and recomputing collider AABBs. Preserves entity order/ids.
 pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     rehydrate_meshes(&mut data);
+
+    // Start from the document's library (new-format scenes), then fold in any legacy
+    // inline materials migration carriers lifted out of pre-#201 entities by
+    // `From<EntityRepr>`. Done before spawning so each entity's reference resolves.
+    scene.materials = data.materials;
+    for entity in &mut data.entities {
+        if let Some(pending) = entity.pending_material.take() {
+            if let Some(reference) = &entity.material {
+                scene.materials.insert(reference.material.clone(), pending);
+            }
+        }
+    }
 
     scene.world.clear();
     for entity in data.entities {

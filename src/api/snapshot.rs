@@ -17,8 +17,8 @@ use serde_json::{json, Value};
 
 use crate::components::{
     AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, Entity, HealthComponent,
-    LightComponent, LightType, MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent,
-    RigidBodyComponent, TextureComponent, TransformComponent,
+    LightComponent, LightType, MaterialAsset, MeshComponent, NavMeshAgentComponent,
+    ParticleEmitterComponent, RigidBodyComponent, TransformComponent,
 };
 use crate::render::Camera;
 use crate::scene::Scene;
@@ -37,7 +37,10 @@ pub fn world_value(scene: &Scene, camera: &Camera, frame: u64, playing: bool) ->
         .iter()
         .filter_map(|&id| {
             let world_matrix = scene.compute_world_matrix(id);
-            scene.get_entity(id).map(|e| entity_value(&e, world_matrix))
+            scene.get_entity(id).map(|e| {
+                let material = scene.material_of(&e);
+                entity_value(&e, material, world_matrix)
+            })
         })
         .collect();
     json!({
@@ -59,8 +62,9 @@ fn camera_value(cam: &Camera) -> Value {
 }
 
 /// One entity in the stable authoring shape. `world_matrix` is the entity's
-/// parent-aware world transform, used for the world-space bounds.
-pub fn entity_value(e: &Entity, world_matrix: Mat4) -> Value {
+/// parent-aware world transform, used for the world-space bounds; `material` is the
+/// entity's resolved library material (`None` when it references none).
+pub fn entity_value(e: &Entity, material: Option<&MaterialAsset>, world_matrix: Mat4) -> Value {
     json!({
         "id": e.id,
         "name": e.name,
@@ -74,7 +78,7 @@ pub fn entity_value(e: &Entity, world_matrix: Mat4) -> Value {
         "bounds": bounds_value(e, world_matrix),
         "scripts": e.scripts.iter().map(|s| s.path.clone()).collect::<Vec<_>>(),
         "mesh": e.mesh.as_ref().map(mesh_value),
-        "material": e.texture.as_ref().map(material_value),
+        "material": material.map(material_value),
         "light": e.light.as_ref().map(light_value),
         "collider": e.collider.as_ref().map(collider_value),
         "rigidbody": e.rigidbody.as_ref().map(rigidbody_value),
@@ -93,7 +97,7 @@ fn inventory(e: &Entity) -> Vec<&'static str> {
     if e.mesh.is_some() {
         names.push("Mesh");
     }
-    if e.texture.is_some() {
+    if e.material.is_some() {
         names.push("Material");
     }
     if e.light.is_some() {
@@ -158,15 +162,19 @@ fn mesh_value(m: &MeshComponent) -> Value {
     })
 }
 
-/// Material (PBR) params + texture references.
-fn material_value(t: &TextureComponent) -> Value {
+/// Material (PBR) params + texture references, read from the resolved library
+/// `MaterialAsset`. The albedo map is surfaced under the legacy `"texture"` key
+/// (empty string when unset, preserving the prior shape).
+fn material_value(m: &MaterialAsset) -> Value {
     json!({
-        "color": t.color,
-        "metallic": t.metallic,
-        "roughness": t.roughness,
-        "texture": t.path,
-        "metallic_map": t.metallic_map,
-        "roughness_map": t.roughness_map,
+        "color": m.base_color,
+        "metallic": m.metallic,
+        "roughness": m.roughness,
+        "texture": m.base_color_map.clone().unwrap_or_default(),
+        "metallic_map": m.metallic_map,
+        "roughness_map": m.roughness_map,
+        "normal_map": m.normal_map,
+        "emissive": m.emissive,
     })
 }
 

@@ -8,8 +8,8 @@ use glam::Vec3;
 
 use crate::render::mesh as primitives;
 use crate::scene::{
-    AnimatorComponent, ColliderComponent, ColliderShape, DirtyFlag, HealthComponent, MeshComponent,
-    RigidBodyComponent, Scene, ScriptComponent, TextureComponent,
+    AnimatorComponent, ColliderComponent, ColliderShape, DirtyFlag, HealthComponent, MaterialAsset,
+    MaterialComponent, MeshComponent, RigidBodyComponent, Scene, ScriptComponent,
 };
 
 /// Bundled default player brain (movement + camera + weapon), seeded next to
@@ -40,16 +40,19 @@ fn mesh(primitive_type: &str, data: (Vec<primitives::Vertex>, Vec<u32>)) -> Mesh
     }
 }
 
-/// Colour-only texture component (empty path => no albedo map, just a tint).
-fn tint(color: [f32; 3]) -> TextureComponent {
-    TextureComponent {
-        path: String::new(),
-        is_dirty: false,
-        metallic: 0.0,
-        roughness: 0.5,
-        metallic_map: None,
-        roughness_map: None,
-        color,
+/// Create a colour-only library material (no albedo map, just a tint) under `key`
+/// and return the reference an entity carries to it. The data lives in the scene's
+/// material library; the entity holds only the name.
+fn tint(scene: &mut Scene, key: &str, color: [f32; 3]) -> MaterialComponent {
+    scene.materials.insert(
+        key.to_string(),
+        MaterialAsset {
+            base_color: color,
+            ..MaterialAsset::default()
+        },
+    );
+    MaterialComponent {
+        material: key.to_string(),
     }
 }
 
@@ -89,6 +92,9 @@ fn add_floor(scene: &mut Scene) {
 /// 2 — Player (id 2)
 fn add_player(scene: &mut Scene) {
     let player_id = scene.add_entity("Player".to_string());
+    // Blue tint via a library material (empty albedo => colour-only). The renderer
+    // reads colour from the referenced material, never from the entity name.
+    let material = tint(scene, "player_material", [0.3, 0.6, 1.0]);
     let mut player = scene.get_entity_mut(player_id).unwrap();
     player.transform.position = Vec3::new(0.0, 1.5, -6.0);
     player.mesh = Some(mesh(
@@ -103,9 +109,7 @@ fn add_player(scene: &mut Scene) {
         ..box_collider(Vec3::ONE)
     });
     player.rigidbody = Some(kinematic_body());
-    // Blue tint via the texture component (empty path => colour-only). The
-    // renderer reads colour from components, never from the entity name.
-    player.texture = Some(tint([0.3, 0.6, 1.0]));
+    player.material = Some(material);
     // The Player's movement + camera + weapon are NOT engine code: they live in
     // the bundled default player_controller.lua, attached here like any script.
     player.scripts.push(ScriptComponent {

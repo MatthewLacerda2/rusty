@@ -76,15 +76,22 @@ entity's collider.
 
 ## `Material`
 
-PBR material params and texture maps on an entity's renderer.
+A *material* is a reusable **asset** — glTF 2.0 metallic-roughness data — stored
+once in the scene's per-World **material library**; an entity carries only a thin
+**reference** to one by name (its `MaterialComponent`). Many entities can share a
+single material, so editing it once updates all of them. These functions resolve
+the entity's referenced material in the library and mutate that shared asset;
+calling one on an entity that has no material yet **creates** a default library
+material and attaches the reference. `SetTexture` sets the albedo (`base_color`)
+map; an empty path clears it.
 
 | Function | Signature |
 |---|---|
 | `Material.SetMetallic` | `(id, value)` |
 | `Material.SetRoughness` | `(id, value)` |
-| `Material.SetMetallicMap` | `(id, path)` — ⚠️ stored/serialized but **not yet sampled** by the renderer (#184) |
-| `Material.SetRoughnessMap` | `(id, path)` — ⚠️ stored/serialized but **not yet sampled** by the renderer (#184) |
-| `Material.SetTexture` | `(id, path)` |
+| `Material.SetMetallicMap` | `(id, path)` — ⚠️ stored/serialized but **not yet sampled** by the renderer (#202) |
+| `Material.SetRoughnessMap` | `(id, path)` — ⚠️ stored/serialized but **not yet sampled** by the renderer (#202) |
+| `Material.SetTexture` | `(id, path)` — the albedo map (sampled today) |
 
 ## `Animator`
 

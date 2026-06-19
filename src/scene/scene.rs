@@ -8,6 +8,8 @@
 //! (whose deps are restricted to hecs + components). This wrapper lives in the
 //! `scene` layer, which is allowed to depend on `crate::scene` and rendering.
 
+use std::collections::BTreeMap;
+
 use glam::{Mat4, Vec3};
 
 use crate::ecs::world::{Ref, RefMut};
@@ -20,9 +22,9 @@ use crate::scene::layers::LayerRegistry;
 pub use crate::components::{
     AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape,
     CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent, LightType,
-    MeshComponent, NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent,
-    RigidBodyComponent, ScriptComponent, ScriptFieldValue, TextureComponent, Tonemap,
-    TransformComponent, VisualCorrectionComponent,
+    MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent, Particle,
+    ParticleBlend, ParticleEmitterComponent, RigidBodyComponent, ScriptComponent, ScriptFieldValue,
+    TextureComponent, Tonemap, TransformComponent, VisualCorrectionComponent,
 };
 
 fn default_skybox_path() -> String {
@@ -47,6 +49,11 @@ pub struct Scene {
     /// Unity's Layer Collision Matrix: which layer collides with which. Drives
     /// rapier `InteractionGroups` on collider build (#91); serialized with the scene.
     pub collision_matrix: CollisionMatrix,
+    /// The per-World material library: reusable `MaterialAsset`s keyed by name.
+    /// Entities reference a material by name via their `MaterialComponent`; many
+    /// entities can share one entry. A `BTreeMap` (not `HashMap`) so serialization
+    /// order is deterministic (the repo has a determinism guard).
+    pub materials: BTreeMap<String, MaterialAsset>,
     /// Runtime box-projector decals (bullet holes, scorch, blood splats). These are
     /// ephemeral *visual* state spawned from raycast hits, NOT serialized scene
     /// data — the decal renderer reads them each frame and projects them onto the
@@ -64,6 +71,7 @@ impl Default for Scene {
             ambient_intensity: default_ambient_intensity(),
             layers: LayerRegistry::default(),
             collision_matrix: CollisionMatrix::default(),
+            materials: BTreeMap::new(),
             decals: Vec::new(),
         }
     }
@@ -133,6 +141,16 @@ impl Scene {
 
     pub fn find_entity_by_name(&self, name: &str) -> Option<u32> {
         self.world.find_by_name(name)
+    }
+
+    /// Resolve an entity's referenced material from the library, if any. Returns
+    /// `None` when the entity has no `MaterialComponent` or it points at a missing
+    /// library key.
+    pub fn material_of(&self, entity: &Entity) -> Option<&MaterialAsset> {
+        entity
+            .material
+            .as_ref()
+            .and_then(|m| self.materials.get(&m.material))
     }
 
     /// Iterate entities in insertion order (immutably). Replaces the legacy

@@ -1,7 +1,9 @@
 use egui_phosphor::regular as icon;
 
 use crate::scene::authoring;
-use crate::scene::{Entity, ParticleEmitterComponent, ScriptComponent, DEFAULT_SCRIPTS_DEST_DIR};
+use crate::scene::{
+    Entity, MaterialComponent, ParticleEmitterComponent, ScriptComponent, DEFAULT_SCRIPTS_DEST_DIR,
+};
 
 /// 3F. Add Component — Unity-style full-width pill that opens the component menu.
 pub fn draw(ui: &mut egui::Ui, entity: &mut Entity) {
@@ -58,14 +60,24 @@ fn add_physics_components(ui: &mut egui::Ui, entity: &mut Entity) {
         entity.rigidbody = Some(authoring::default_rigidbody());
         ui.close_menu();
     }
-    if entity.texture.is_none() && ui.button("Material / Texture Component").clicked() {
-        entity.texture = Some(authoring::default_texture());
+    if entity.material.is_none() && ui.button("Material / Texture Component").clicked() {
+        attach_default_material(entity);
         ui.close_menu();
     }
     if entity.nav_agent.is_none() && ui.button("NavMesh Agent Component").clicked() {
         entity.nav_agent = Some(authoring::default_nav_agent());
         ui.close_menu();
     }
+}
+
+/// Attach a `MaterialComponent` referencing a fresh per-entity library material.
+/// The Add menu has only the entity (not the scene), so the default `MaterialAsset`
+/// rides along in `pending_material`; the inspector folds it into `scene.materials`
+/// once the entity guard drops (where the library is reachable).
+fn attach_default_material(entity: &mut Entity) {
+    let key = format!("entity_{}_material", entity.id);
+    entity.material = Some(MaterialComponent { material: key });
+    entity.pending_material = Some(authoring::default_material());
 }
 
 /// The rendering half of the Add Component menu: camera, particles and the

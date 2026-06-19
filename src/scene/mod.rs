@@ -36,9 +36,9 @@ pub use layers::{layer_in_mask, LayerRegistry, LAYER_COUNT};
 pub use scene::{
     AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape,
     CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent, LightType,
-    MeshComponent, NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent,
-    RigidBodyComponent, Scene, ScriptComponent, ScriptFieldValue, TextureComponent, Tonemap,
-    TransformComponent, VisualCorrectionComponent,
+    MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent, Particle,
+    ParticleBlend, ParticleEmitterComponent, RigidBodyComponent, Scene, ScriptComponent,
+    ScriptFieldValue, TextureComponent, Tonemap, TransformComponent, VisualCorrectionComponent,
 };
 pub use serialize::{apply_scene_data, asset_mesh_component, to_scene_data, SceneData};
 pub use snapshot::SceneSnapshot;

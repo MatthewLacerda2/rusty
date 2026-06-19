@@ -53,11 +53,18 @@ fn mesh_and_material_reflect_authored_values() {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "Box", Some(Primitive::Box));
     add_component(&mut scene, id, ComponentKind::Texture);
-    if let Some(mut e) = scene.get_entity_mut(id) {
-        if let Some(tex) = e.texture.as_mut() {
-            tex.color = [0.5, 0.25, 0.125];
-            tex.path = "project/textures/wood.png".to_string();
-        }
+    // Edit the entity's referenced library material (the data is shared, not inline).
+    let key = scene
+        .get_entity(id)
+        .unwrap()
+        .material
+        .as_ref()
+        .unwrap()
+        .material
+        .clone();
+    if let Some(mat) = scene.materials.get_mut(&key) {
+        mat.base_color = [0.5, 0.25, 0.125];
+        mat.base_color_map = Some("project/textures/wood.png".to_string());
     }
 
     let ent = &world_value(&scene, &cam(), 0, false)["entities"][0];
@@ -88,7 +95,8 @@ fn entity_value_matches_world_entry() {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "Solo", None);
     let wm = scene.compute_world_matrix(id);
-    let direct = entity_value(&scene.get_entity(id).unwrap(), wm);
+    let e = scene.get_entity(id).unwrap();
+    let direct = entity_value(&e, scene.material_of(&e), wm);
     assert_eq!(direct["name"].as_str(), Some("Solo"));
     // A transform-only entity has no mesh/collider, so no bounds.
     assert!(direct["bounds"].is_null());

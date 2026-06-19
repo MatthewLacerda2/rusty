@@ -1,5 +1,5 @@
 use crate::editor::EditorUi;
-use crate::scene::{Scene, TextureComponent};
+use crate::scene::{MaterialComponent, Scene};
 use std::fs;
 use std::path::Path;
 
@@ -114,19 +114,28 @@ fn draw_apply_to_entity(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Sc
         });
 
     if let Some(entity_id) = clicked_entity_id {
-        if let Some(mut ent) = scene.get_entity_mut(entity_id) {
-            ent.texture = Some(TextureComponent {
-                path: path.to_string(),
-                is_dirty: true,
-                metallic: 0.0,
-                roughness: 0.5,
-                metallic_map: None,
-                roughness_map: None,
-                color: [1.0, 1.0, 1.0],
-            });
-            editor.is_dirty = true;
-        }
+        apply_albedo_to_entity(scene, entity_id, path);
+        editor.is_dirty = true;
     }
+}
+
+/// Attach (or update) a material on `entity_id` whose albedo is `path`, creating a
+/// library material under a per-entity key if the entity has none yet. Reuses the
+/// entity's existing referenced material when present so its other params survive.
+fn apply_albedo_to_entity(scene: &mut Scene, entity_id: u32, path: &str) {
+    let key = {
+        let Some(mut ent) = scene.get_entity_mut(entity_id) else {
+            return;
+        };
+        if ent.material.is_none() {
+            ent.material = Some(MaterialComponent {
+                material: format!("entity_{entity_id}_material"),
+            });
+        }
+        ent.material.as_ref().unwrap().material.clone()
+    };
+    let mat = scene.materials.entry(key).or_default();
+    mat.base_color_map = Some(path.to_string());
 }
 
 fn format_size(bytes: u64) -> String {
