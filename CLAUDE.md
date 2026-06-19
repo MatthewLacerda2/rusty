@@ -4,6 +4,13 @@
 components, scripts with `Update()`), built with **agentic coding in mind** — an AI
 agent can drive, observe, and play-test it headlessly.
 
+## North star
+The bar rusty aims for is a game on par with **F.E.A.R.** (2005) or **Trepang2** —
+visceral first-person combat carried by reactive enemy AI. That is the quality target
+every decision serves: the engine is "good enough" when an agent could build a shooter
+of that caliber on it. Keep this goal in mind when weighing features, architecture, and
+craft — it is the reason the gates below are strict.
+
 ## Start here
 - **README.md** — what the engine is and what you can do with it.
 - **docs/** — `linting.md` (the gate), `testing.md`, `scripting-api.md` (the Lua API

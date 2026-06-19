@@ -9,6 +9,10 @@ difference is *why* it exists: rusty is made to be **driven by a coding agent**,
 you build the game from your IDE (Claude Code, ideally) instead of clicking around an
 editor — and a lot faster.
 
+The north star is a game on par with **F.E.A.R.** (2005) or **Trepang2** — visceral
+first-person combat carried by reactive enemy AI. The engine is "done enough" when an
+agent could build a shooter of that caliber on it.
+
 ## What it is
 
 - **Unity-shaped.** Entities each have a `Transform` plus optional components (`Mesh`,
