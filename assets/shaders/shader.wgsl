@@ -1,8 +1,4 @@
-struct CameraUniforms {
-    view_proj: mat4x4<f32>,
-    camera_pos: vec3<f32>,
-    _pad: f32,
-};
+#import "common"
 
 struct AmbientLight {
     color: vec3<f32>,
@@ -86,14 +82,6 @@ var t_shadow: texture_depth_2d;
 @group(3) @binding(2)
 var s_shadow: sampler_comparison;
 
-
-struct VertexInput {
-    @location(0) position: vec3<f32>,
-    @location(1) normal: vec3<f32>,
-    @location(2) tex_coords: vec2<f32>,
-    @location(3) joint_indices: vec4<u32>,
-    @location(4) joint_weights: vec4<f32>,
-};
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,

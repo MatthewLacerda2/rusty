@@ -1,4 +1,5 @@
 use crate::render::mesh::Vertex;
+use crate::render::shaders::ShaderRegistry;
 use crate::render::GpuTexture;
 use wgpu::util::DeviceExt;
 
@@ -15,12 +16,14 @@ impl SkyboxRenderer {
         texture_layout: &wgpu::BindGroupLayout,
         camera_lighting_layout: &wgpu::BindGroupLayout,
         texture_format: wgpu::TextureFormat,
+        registry: &mut ShaderRegistry,
     ) -> Self {
         let pipeline = Self::create_pipeline(
             device,
             texture_layout,
             camera_lighting_layout,
             texture_format,
+            registry,
         );
         let (vertex_buffer, index_buffer, num_indices) = Self::create_box_buffers(device);
 
@@ -38,14 +41,9 @@ impl SkyboxRenderer {
         texture_layout: &wgpu::BindGroupLayout,
         camera_lighting_layout: &wgpu::BindGroupLayout,
         texture_format: wgpu::TextureFormat,
+        registry: &mut ShaderRegistry,
     ) -> wgpu::RenderPipeline {
-        // Compile skybox shader
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Skybox Shader"),
-            source: wgpu::ShaderSource::Wgsl(
-                include_str!("../../assets/shaders/skybox.wgsl").into(),
-            ),
-        });
+        let shader = registry.load(device, "skybox.wgsl", "Skybox Shader");
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Skybox Pipeline Layout"),

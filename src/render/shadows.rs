@@ -1,4 +1,5 @@
 use crate::render::mesh::Vertex;
+use crate::render::shaders::ShaderRegistry;
 use crate::scene::Scene;
 use glam::{Mat4, Vec3};
 use std::collections::HashMap;
@@ -26,7 +27,7 @@ pub struct ShadowRenderer {
 impl ShadowRenderer {
     pub const SHADOW_SIZE: u32 = 2048;
 
-    pub fn new(device: &wgpu::Device) -> Self {
+    pub fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
         let (static_texture, static_view, active_texture, active_view) =
             Self::create_depth_textures(device);
         let (sampler, bind_group_layout, bind_group) =
@@ -41,7 +42,7 @@ impl ShadowRenderer {
 
         let (global_layout, global_bind_group, entity_layout) =
             Self::create_pass_layouts(device, &light_space_buffer);
-        let pipeline = Self::create_pipeline(device, &global_layout, &entity_layout);
+        let pipeline = Self::create_pipeline(device, &global_layout, &entity_layout, registry);
 
         Self {
             static_texture,
@@ -212,14 +213,9 @@ impl ShadowRenderer {
         device: &wgpu::Device,
         global_layout: &wgpu::BindGroupLayout,
         entity_layout: &wgpu::BindGroupLayout,
+        registry: &mut ShaderRegistry,
     ) -> wgpu::RenderPipeline {
-        // Compile shadow map shader
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Shadow Shader"),
-            source: wgpu::ShaderSource::Wgsl(
-                include_str!("../../assets/shaders/shadow.wgsl").into(),
-            ),
-        });
+        let shader = registry.load(device, "shadow.wgsl", "Shadow Shader");
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Shadow Pipeline Layout"),

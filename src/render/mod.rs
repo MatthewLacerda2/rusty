@@ -1,5 +1,6 @@
 pub mod mesh;
 pub mod postfx;
+pub mod shaders;
 pub mod shadows;
 pub mod skybox;
 

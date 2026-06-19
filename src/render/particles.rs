@@ -12,6 +12,7 @@
 use wgpu::util::DeviceExt;
 
 use super::postfx::HDR_FORMAT;
+use super::shaders::ShaderRegistry;
 use crate::components::particle::ParticleBlend;
 
 /// Per-particle instance data uploaded to the GPU (matches `InstanceInput`).
@@ -60,13 +61,8 @@ pub struct ParticleRenderer {
 impl ParticleRenderer {
     /// Build the pass: a globals bind group + two blend-variant pipelines that
     /// reuse the renderer's `texture_layout` for the sprite (group 1).
-    pub fn new(device: &wgpu::Device, texture_layout: &wgpu::BindGroupLayout) -> Self {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Particle Shader"),
-            source: wgpu::ShaderSource::Wgsl(
-                include_str!("../../assets/shaders/particles.wgsl").into(),
-            ),
-        });
+    pub fn new(device: &wgpu::Device, texture_layout: &wgpu::BindGroupLayout, registry: &mut ShaderRegistry) -> Self {
+        let shader = registry.load(device, "particles.wgsl", "Particle Shader");
 
         let globals_layout = Self::globals_layout(device);
         let globals_buffer = device.create_buffer(&wgpu::BufferDescriptor {
