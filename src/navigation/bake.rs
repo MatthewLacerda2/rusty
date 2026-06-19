@@ -175,4 +175,39 @@ mod tests {
         assert_eq!(a.walkability, b.walkability, "walkability must be stable");
         assert_eq!(a.bake_generation, b.bake_generation);
     }
+
+    /// Kill "replace > with <" in raise_surface max-fold: overlapping boxes must
+    /// leave the cell at the MAXIMUM top, not the minimum or the first seen.
+    #[test]
+    fn raise_surface_takes_max_of_overlapping_colliders() {
+        let mut scene = Scene::new();
+        add_box(
+            &mut scene,
+            "lo",
+            Vec3::new(3.0, 0.0, 3.0),
+            Vec3::new(5.0, 1.0, 5.0),
+        );
+        add_box(
+            &mut scene,
+            "hi",
+            Vec3::new(3.0, 0.0, 3.0),
+            Vec3::new(5.0, 3.0, 5.0),
+        );
+        let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
+        g.bake(&scene);
+        assert_eq!(g.height_at(4, 4), 3.0, "max(1.0, 3.0) = 3.0");
+        assert_eq!(g.height_at(3, 3), 3.0, "corner cell also takes max");
+    }
+
+    /// Kill cell_reachable `<= → <`: a cell exactly max_step above a neighbour
+    /// must be reachable; max_step + epsilon must not.
+    #[test]
+    fn cell_reachable_boundary_at_max_step() {
+        let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
+        let idx = g.index(5, 5);
+        g.heightfield[idx] = g.max_step;
+        assert!(g.cell_reachable(5, 5), "exactly max_step: reachable");
+        g.heightfield[idx] += 0.001;
+        assert!(!g.cell_reachable(5, 5), "above max_step: unreachable");
+    }
 }

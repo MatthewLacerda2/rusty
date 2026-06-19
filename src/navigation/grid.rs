@@ -184,4 +184,43 @@ mod tests {
             "nearest ring is distance 1"
         );
     }
+
+    /// Kill `- min_x → + min_x`, `/ spacing → * spacing`, and `round → floor`
+    /// mutations in world_to_grid by asserting exact cell for several inputs.
+    #[test]
+    fn world_to_grid_rounds_to_nearest_cell() {
+        let g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
+        assert_eq!(g.world_to_grid(Vec3::new(3.0, 0.0, 5.0)), (3, 5));
+        assert_eq!(g.world_to_grid(Vec3::new(3.6, 0.0, 5.4)), (4, 5));
+        assert_eq!(g.world_to_grid(Vec3::new(3.4, 0.0, 4.6)), (3, 5));
+        // Non-zero origin: offset must be subtracted before dividing.
+        let g2 = NavigationGraph::new(2.0, 12.0, 2.0, 12.0, 1.0);
+        assert_eq!(g2.world_to_grid(Vec3::new(5.0, 0.0, 7.0)), (3, 5));
+    }
+
+    /// Kill `* width → / width` or `+ gx → - gx` in index(): the formula
+    /// gz*width+gx must map (gx,gz) to the correct flat offset.
+    #[test]
+    fn index_is_row_major() {
+        let g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0); // width = 11
+        assert_eq!(g.index(0, 0), 0);
+        assert_eq!(g.index(1, 0), 1);
+        assert_eq!(g.index(0, 1), 11); // 1*11 + 0
+        assert_eq!(g.index(3, 2), 25); // 2*11 + 3
+    }
+
+    /// Kill `< → <=` or `< → >` in closest_walkable distance comparison: a
+    /// diagonal candidate (dist²=2) must NOT beat a cardinal one (dist²=1).
+    #[test]
+    fn closest_walkable_prefers_cardinal_over_diagonal() {
+        let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
+        let idx = g.index(5, 5);
+        g.walkability[idx] = false;
+        let (nx, nz) = g.closest_walkable(5, 5);
+        let dist_sq = (nx - 5) * (nx - 5) + (nz - 5) * (nz - 5);
+        assert_eq!(
+            dist_sq, 1,
+            "cardinal ring (dist²=1) chosen over diagonal (dist²=2)"
+        );
+    }
 }

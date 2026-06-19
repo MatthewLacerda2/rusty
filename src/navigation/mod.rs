@@ -10,6 +10,8 @@
 
 mod agents;
 mod astar;
+#[cfg(test)]
+mod astar_tests;
 mod bake;
 mod grid;
 
