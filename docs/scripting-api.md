@@ -458,11 +458,66 @@ Mirrors Unity's `[Conditional]` `Debug`. Registered only under the `dev` Cargo
 feature and stripped from ship builds; calling it from a ship build is a no-op
 because the namespace is absent.
 
-| Function | Signature |
-|---|---|
-| `Debug.Log` | `(message)` |
-| `Debug.Warn` | `(message)` |
-| `Debug.Error` | `(message)` |
+| Function | Signature | Returns |
+|---|---|---|
+| `Debug.Log` | `(message)` | — |
+| `Debug.Warn` | `(message)` | — |
+| `Debug.Error` | `(message)` | — |
+| `Debug.Snapshot` | `()` | a pretty **JSON string**: the whole live world (below) |
+| `Debug.SnapshotEntity` | `(id)` | a pretty **JSON string**: one entity (below), or `null` if absent |
+
+### The snapshot — the structured scene-read (#180)
+
+`Debug.Snapshot()` is the **read half of editor↔API parity**: it returns the live
+world as a stable, diffable JSON document rich enough to *author* against — the
+agent's "look at the scene" verb in a headless session. It reads the **live world**
+(the source of truth), never the scene file, and never dumps GPU buffers — only
+references and values, mirroring the saved `SceneData`.
+
+Top level:
+
+```json
+{
+  "frame": 0,
+  "play_state": "editor",            // or "playing"
+  "camera": { "pos": [x,y,z], "yaw": .., "pitch": .., "fov": .. },
+  "entities": [ <entity>, ... ]
+}
+```
+
+Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
+
+```json
+{
+  "id": 1, "name": "Crate", "active": true, "static": false, "layer": 0,
+  "parent": null, "children": [],
+  "components": ["Mesh", "Material", "Collider"],   // optional-component inventory
+  "transform": { "pos": [x,y,z], "rot": [x,y,z], "scale": [x,y,z] },  // rot = Euler°
+  "bounds": { "min": [x,y,z], "max": [x,y,z] },     // world-space AABB, or null
+  "scripts": ["project/scripts/foo.lua"],
+  "mesh":      { "primitive_type": "Box", "asset_ref": "models/crates.glb::Barrel" },
+  "material":  { "color": [r,g,b], "metallic": .., "roughness": .., "texture": "..",
+                 "metallic_map": null, "roughness_map": null },
+  "light":     { "type": "Point", "color": [r,g,b], "intensity": .., "range": ..,
+                 "inner_cone": .., "outer_cone": .. },
+  "collider":  { "active": true, "is_trigger": false,
+                 "shape": { "kind": "Box", "size": [x,y,z] } },
+  "rigidbody": { "active": true, "is_kinematic": false, "mass": .., "velocity": [x,y,z],
+                 "use_gravity": true },
+  "camera":    { "active": true, "fov": .., "near": .., "far": .., "culling_mask": ..,
+                 "render_order": 0 },
+  "nav_agent": { "active": true, "radius": .., "target": [x,y,z], "speed": .., .. },
+  "particles": { "active": true, "texture": null, "rate": .., "lifetime": .., .. },
+  "animator":  { "clip": "Idle", "time": .., "speed": .., "playing": true },
+  "health":    { "current": .., "max": .., "dead": false }
+}
+```
+
+Every per-component key is present only when the entity carries that component
+(absent ones serialize as `null`); `bounds` comes from the mesh when geometry is
+present, else the collider, else `null`. The shape is shared with the harness's
+`Harness.Snapshot` (the play-testing path), so the read is identical wherever it's
+taken.
 
 ---
 

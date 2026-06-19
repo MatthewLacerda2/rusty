@@ -200,4 +200,33 @@ mod tests {
         assert!(lines[0].contains("\"ok\":true") && lines[0].contains("\"result\":\"2\""));
         assert!(lines[1].contains("\"ok\":false") && lines[1].contains("\"error\""));
     }
+
+    #[test]
+    fn debug_snapshot_round_trips_authored_state() {
+        let s = session();
+        // Author + configure an entity purely through the command channel, then read
+        // it back via the rich snapshot on the same channel (#180 acceptance).
+        let id = s.eval("Scene.CreateEntity(\"Widget\", \"Box\")").unwrap();
+        s.eval(&format!("Transform.SetPosition({}, 4, 5, 6)", id))
+            .unwrap();
+
+        let snap = s.eval("Debug.Snapshot()").unwrap();
+        let world: serde_json::Value = serde_json::from_str(&snap).unwrap();
+        assert_eq!(world["play_state"], "editor", "session is edit-mode");
+
+        let entities = world["entities"].as_array().unwrap();
+        let widget = entities
+            .iter()
+            .find(|e| e["name"] == "Widget")
+            .expect("authored entity appears in the snapshot");
+        assert_eq!(widget["transform"]["pos"][0].as_f64(), Some(4.0));
+        assert!(
+            widget["components"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|c| c == "Mesh"),
+            "the Box primitive's mesh shows in the inventory"
+        );
+    }
 }

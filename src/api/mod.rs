@@ -29,6 +29,7 @@ pub mod nav;
 pub mod particle;
 pub mod physics;
 pub mod scene;
+pub mod snapshot;
 pub mod storage;
 pub mod time;
 pub mod transform;
@@ -76,6 +77,10 @@ pub struct ApiScopedCtx<'scope> {
     /// The current scene file — `Scene.Save()`'s no-path write-back target. Shared
     /// with the platform layer (synced from `EditorUi.current_scene_path`).
     pub scene_path: &'scope RefCell<Option<String>>,
+    /// Whether the world is in play mode — mirrored from `GameWorld` so the
+    /// dev-only `Debug.Snapshot` can report play-state without reaching into the
+    /// `Resources` the evaluator deliberately doesn't hold.
+    pub is_playing: &'scope RefCell<bool>,
 }
 
 /// Register every namespace onto `lua` using `scope`-tied closures that borrow
@@ -110,7 +115,7 @@ pub fn register<'lua, 'scope>(
     storage::register(lua, scope, ctx.storage)?;
     input::register_writable(lua, scope, ctx.input)?;
     #[cfg(feature = "dev")]
-    debug::register(lua, scope, ctx.console)?;
+    debug::register(lua, scope, ctx)?;
     Ok(())
 }
 
