@@ -3,15 +3,18 @@
 //! The single stable API surface shared by Lua scripts, the console REPL and
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
 //! `Scene`, `Health`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
-//! `Particles`, `Layers`, `Graphics`, `Video`, `Storage`, plus the dev-only `Debug`)
+//! `Assets`, `Particles`, `Layers`, `Graphics`, `Video`, `Storage`, plus the
+//! dev-only `Debug`)
 //! is registered from this tree onto the live Lua runtime.
 //! `scripting`
 //! owns the runtime and lifecycle; `api` owns the surface. One surface, three
 //! callers — they never drift apart.
 //!
-//! Allowed deps: core, components, physics, navigation, render, time, scripting.
+//! Allowed deps: core, components, physics, navigation, render, time, scripting,
+//! asset (for the `Assets` manifest).
 
 pub mod animator;
+pub mod assets;
 pub mod camera;
 #[cfg(feature = "dev")]
 pub mod debug;
@@ -76,6 +79,7 @@ pub struct ApiCtx {
 /// bot-players.
 pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     transform::register(lua, &ctx.scene)?;
+    assets::register(lua)?;
     material::register(lua, &ctx.scene)?;
     animator::register(lua, &ctx.scene, &ctx.console)?;
     input::register_readable(lua, &ctx.input)?;
