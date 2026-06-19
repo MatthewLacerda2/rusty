@@ -96,4 +96,36 @@ mod tests {
         assert_eq!(script_label("project/assets/scripts/bot.lua"), "bot");
         assert_eq!(script_label("player_controller.lua"), "player_controller");
     }
+
+    #[test]
+    fn nonexistent_dir_returns_empty() {
+        assert!(monobehaviour_scripts("/nonexistent/dir/xyz").is_empty());
+    }
+
+    #[test]
+    fn monobehaviour_scripts_finds_lifecycle_scripts_and_skips_helpers() {
+        let dir = "/tmp/rusty_discovery_test";
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(format!("{dir}/a.lua"), "return { Start = function() end }").unwrap();
+        std::fs::write(format!("{dir}/b.lua"), "return { helper = function() end }").unwrap();
+        std::fs::write(format!("{dir}/c.lua"), "return { Update = function() end }").unwrap();
+        let found = monobehaviour_scripts(dir);
+        assert_eq!(found.len(), 2, "only lifecycle scripts returned");
+        assert!(found.iter().any(|p| p.contains("/a.lua")));
+        assert!(found.iter().any(|p| p.contains("/c.lua")));
+        assert!(!found.iter().any(|p| p.contains("/b.lua")));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn monobehaviour_scripts_results_are_sorted() {
+        let dir = "/tmp/rusty_discovery_sorted";
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(format!("{dir}/z.lua"), "return { Update = function() end }").unwrap();
+        std::fs::write(format!("{dir}/a.lua"), "return { Start = function() end }").unwrap();
+        let found = monobehaviour_scripts(dir);
+        assert_eq!(found.len(), 2);
+        assert!(found[0] < found[1], "results must be sorted");
+        let _ = std::fs::remove_dir_all(dir);
+    }
 }

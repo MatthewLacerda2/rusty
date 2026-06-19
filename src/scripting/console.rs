@@ -38,7 +38,7 @@ impl ConsoleLogs {
     }
 
     fn add_log(&mut self, msg: String, level: LogLevel) {
-        if self.messages.len() > 100 {
+        if self.messages.len() >= 100 {
             self.messages.remove(0);
         }
         self.messages.push((msg, level));

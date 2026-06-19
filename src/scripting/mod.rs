@@ -20,4 +20,10 @@ pub use schema::{parse_fields, FieldKind, ScriptField};
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_console;
+#[cfg(test)]
+mod tests_lifecycle;
+#[cfg(test)]
+mod tests_manager;
+#[cfg(test)]
 mod tests_physics;
