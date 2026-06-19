@@ -10,7 +10,6 @@
 //! separate GPU particle system (`Particles`), triggered on the same hit.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::{Lua, Variadic};
@@ -23,7 +22,11 @@ const DEFAULT_SIZE: f32 = 0.5;
 const DEFAULT_DEPTH: f32 = 0.5;
 
 /// Register the `Decals` namespace onto `lua`.
-pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
+pub fn register<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     // Decals.Spawn(x,y,z, nx,ny,nz, [size], [texture], [rotation_deg], [r,g,b,a])
@@ -33,13 +36,12 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
     // default 0.5), `texture` (sprite path, default checker), `rotation_deg` (spin
     // around the projection axis), and an r,g,b,a tint (default opaque white). The
     // box depth tracks `size` so the projector reaches through typical geometry.
-    let s = Rc::clone(scene);
     put(
         &table,
         "Spawn",
-        lua.create_function(move |_, args: Variadic<mlua::Value>| {
+        scope.create_function(|_, args: Variadic<mlua::Value>| {
             let p = spawn_params_from(&args)?;
-            s.borrow_mut().spawn_decal(
+            scene.borrow_mut().spawn_decal(
                 p.point,
                 p.normal,
                 p.size,
@@ -53,20 +55,18 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
     )?;
 
     // Decals.Count() — number of live decals (after FIFO eviction).
-    let s = Rc::clone(scene);
     put(
         &table,
         "Count",
-        lua.create_function(move |_, ()| Ok(s.borrow().decals.len() as u32)),
+        scope.create_function(|_, ()| Ok(scene.borrow().decals.len() as u32)),
     )?;
 
     // Decals.Clear() — drop every live decal (e.g. on level reset).
-    let s = Rc::clone(scene);
     put(
         &table,
         "Clear",
-        lua.create_function(move |_, ()| {
-            s.borrow_mut().clear_decals();
+        scope.create_function(|_, ()| {
+            scene.borrow_mut().clear_decals();
             Ok(())
         }),
     )?;

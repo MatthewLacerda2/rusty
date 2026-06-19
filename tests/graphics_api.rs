@@ -45,66 +45,82 @@ fn scene_with_volume() -> Rc<RefCell<Scene>> {
     Rc::new(RefCell::new(scene))
 }
 
-fn setup() -> (Lua, Rc<RefCell<Scene>>, Rc<RefCell<QualityPreset>>) {
+#[test]
+fn bloom_and_color_round_trip() {
     let lua = Lua::new();
     let scene = scene_with_volume();
     let quality = Rc::new(RefCell::new(QualityPreset::Medium));
-    rusty::api::graphics::register(&lua, &scene, &quality).unwrap();
-    (lua, scene, quality)
-}
 
-#[test]
-fn bloom_and_color_round_trip() {
-    let (lua, scene, _q) = setup();
-    lua.load(
-        r#"
-        Graphics.SetBloomActive(true)
-        Graphics.SetBloomIntensity(3.5)
-        Graphics.SetExposure(1.25)
-        Graphics.SetGamma(2.0)
-        Graphics.SetTonemap("Reinhard")
-    "#,
-    )
-    .exec()
+    lua.scope(|scope| {
+        rusty::api::graphics::register(&lua, scope, &scene, &quality).unwrap();
+        lua.load(
+            r#"
+            Graphics.SetBloomActive(true)
+            Graphics.SetBloomIntensity(3.5)
+            Graphics.SetExposure(1.25)
+            Graphics.SetGamma(2.0)
+            Graphics.SetTonemap("Reinhard")
+        "#,
+        )
+        .exec()
+        .unwrap();
+
+        let s = scene.borrow();
+        let vc = s.iter().next().unwrap().visual_correction.clone().unwrap();
+        assert!(vc.bloom_active);
+        assert_eq!(vc.bloom_intensity, 3.5);
+        assert_eq!(vc.exposure, 1.25);
+        assert_eq!(vc.gamma, 2.0);
+        assert_eq!(vc.tonemap, Tonemap::Reinhard);
+
+        let read: bool = lua.load("return Graphics.GetBloomActive()").eval().unwrap();
+        assert!(read);
+        let tm: String = lua.load("return Graphics.GetTonemap()").eval().unwrap();
+        assert_eq!(tm, "Reinhard");
+        Ok(())
+    })
     .unwrap();
-
-    let s = scene.borrow();
-    let vc = s.iter().next().unwrap().visual_correction.clone().unwrap();
-    assert!(vc.bloom_active);
-    assert_eq!(vc.bloom_intensity, 3.5);
-    assert_eq!(vc.exposure, 1.25);
-    assert_eq!(vc.gamma, 2.0);
-    assert_eq!(vc.tonemap, Tonemap::Reinhard);
-
-    let read: bool = lua.load("return Graphics.GetBloomActive()").eval().unwrap();
-    assert!(read);
-    let tm: String = lua.load("return Graphics.GetTonemap()").eval().unwrap();
-    assert_eq!(tm, "Reinhard");
 }
 
 #[test]
 fn motion_blur_samples_are_clamped() {
-    let (lua, scene, _q) = setup();
-    lua.load("Graphics.SetMotionBlurActive(true); Graphics.SetMotionBlurSamples(99)")
-        .exec()
-        .unwrap();
-    let s = scene.borrow();
-    let cam = s.iter().next().unwrap().camera.clone().unwrap();
-    assert!(cam.motion_blur_active);
-    assert_eq!(cam.motion_blur_samples, 32, "clamped into 2..=32");
+    let lua = Lua::new();
+    let scene = scene_with_volume();
+    let quality = Rc::new(RefCell::new(QualityPreset::Medium));
+
+    lua.scope(|scope| {
+        rusty::api::graphics::register(&lua, scope, &scene, &quality).unwrap();
+        lua.load("Graphics.SetMotionBlurActive(true); Graphics.SetMotionBlurSamples(99)")
+            .exec()
+            .unwrap();
+        let s = scene.borrow();
+        let cam = s.iter().next().unwrap().camera.clone().unwrap();
+        assert!(cam.motion_blur_active);
+        assert_eq!(cam.motion_blur_samples, 32, "clamped into 2..=32");
+        Ok(())
+    })
+    .unwrap();
 }
 
 #[test]
 fn quality_preset_round_trips_through_cell() {
-    let (lua, _scene, quality) = setup();
-    lua.load("Graphics.SetQuality(\"High\")").exec().unwrap();
-    assert_eq!(*quality.borrow(), QualityPreset::High);
-    let name: String = lua.load("return Graphics.GetQuality()").eval().unwrap();
-    assert_eq!(name, "High");
+    let lua = Lua::new();
+    let scene = scene_with_volume();
+    let quality = Rc::new(RefCell::new(QualityPreset::Medium));
 
-    // An unknown tier name is ignored — the current value is kept.
-    lua.load("Graphics.SetQuality(\"Ultra\")").exec().unwrap();
-    assert_eq!(*quality.borrow(), QualityPreset::High);
+    lua.scope(|scope| {
+        rusty::api::graphics::register(&lua, scope, &scene, &quality).unwrap();
+        lua.load("Graphics.SetQuality(\"High\")").exec().unwrap();
+        assert_eq!(*quality.borrow(), QualityPreset::High);
+        let name: String = lua.load("return Graphics.GetQuality()").eval().unwrap();
+        assert_eq!(name, "High");
+
+        // An unknown tier name is ignored — the current value is kept.
+        lua.load("Graphics.SetQuality(\"Ultra\")").exec().unwrap();
+        assert_eq!(*quality.borrow(), QualityPreset::High);
+        Ok(())
+    })
+    .unwrap();
 }
 
 #[test]
@@ -112,10 +128,14 @@ fn getters_return_defaults_with_no_active_volume() {
     let lua = Lua::new();
     let scene = Rc::new(RefCell::new(Scene::new()));
     let quality = Rc::new(RefCell::new(QualityPreset::Low));
-    rusty::api::graphics::register(&lua, &scene, &quality).unwrap();
 
-    let bloom: bool = lua.load("return Graphics.GetBloomActive()").eval().unwrap();
-    assert!(!bloom);
-    let gamma: f32 = lua.load("return Graphics.GetGamma()").eval().unwrap();
-    assert_eq!(gamma, 2.2);
+    lua.scope(|scope| {
+        rusty::api::graphics::register(&lua, scope, &scene, &quality).unwrap();
+        let bloom: bool = lua.load("return Graphics.GetBloomActive()").eval().unwrap();
+        assert!(!bloom);
+        let gamma: f32 = lua.load("return Graphics.GetGamma()").eval().unwrap();
+        assert_eq!(gamma, 2.2);
+        Ok(())
+    })
+    .unwrap();
 }

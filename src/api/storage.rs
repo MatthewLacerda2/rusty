@@ -7,7 +7,6 @@
 //! keeps the sim a pure function of its inputs.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use mlua::{Lua, Table, Value as LuaValue};
 use serde_json::Value as JsonValue;
@@ -16,11 +15,15 @@ use super::{put, Reg};
 use crate::core::storage::Storage;
 
 /// Register the `Storage` namespace onto `lua`.
-pub fn register(lua: &Lua, storage: &Rc<RefCell<Storage>>) -> Reg {
+pub fn register<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    storage: &'scope RefCell<Storage>,
+) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_scalars(lua, &table, storage)?;
-    register_namespaces(lua, &table, storage)?;
+    register_scalars(scope, &table, storage)?;
+    register_namespaces(scope, &table, storage)?;
 
     lua.globals()
         .set("Storage", table)
@@ -28,66 +31,70 @@ pub fn register(lua: &Lua, storage: &Rc<RefCell<Storage>>) -> Reg {
 }
 
 /// Per-key accessors: `Set` / `Get` / `Has` / `Delete`.
-fn register_scalars(lua: &Lua, table: &Table, storage: &Rc<RefCell<Storage>>) -> Reg {
-    let s = Rc::clone(storage);
+fn register_scalars<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &Table,
+    storage: &'scope RefCell<Storage>,
+) -> Reg {
     put(
         table,
         "Set",
-        lua.create_function(move |_, (ns, key, value): (String, String, LuaValue)| {
+        scope.create_function(|_, (ns, key, value): (String, String, LuaValue)| {
             let json = lua_to_json(&value).map_err(mlua::Error::RuntimeError)?;
-            s.borrow_mut().set(&ns, &key, json);
+            storage.borrow_mut().set(&ns, &key, json);
             Ok(())
         }),
     )?;
 
-    let s = Rc::clone(storage);
     put(
         table,
         "Get",
-        lua.create_function(move |lua, (ns, key): (String, String)| {
-            match s.borrow().get(&ns, &key) {
+        scope.create_function(|lua, (ns, key): (String, String)| {
+            match storage.borrow().get(&ns, &key) {
                 Some(json) => json_to_lua(lua, &json),
                 None => Ok(LuaValue::Nil),
             }
         }),
     )?;
 
-    let s = Rc::clone(storage);
     put(
         table,
         "Has",
-        lua.create_function(move |_, (ns, key): (String, String)| Ok(s.borrow().has(&ns, &key))),
+        scope.create_function(|_, (ns, key): (String, String)| {
+            Ok(storage.borrow().has(&ns, &key))
+        }),
     )?;
 
-    let s = Rc::clone(storage);
     put(
         table,
         "Delete",
-        lua.create_function(move |_, (ns, key): (String, String)| {
-            Ok(s.borrow_mut().delete(&ns, &key))
+        scope.create_function(|_, (ns, key): (String, String)| {
+            Ok(storage.borrow_mut().delete(&ns, &key))
         }),
     )
 }
 
 /// Whole-namespace blob accessors — store/read a structured table at once.
-fn register_namespaces(lua: &Lua, table: &Table, storage: &Rc<RefCell<Storage>>) -> Reg {
-    let s = Rc::clone(storage);
+fn register_namespaces<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &Table,
+    storage: &'scope RefCell<Storage>,
+) -> Reg {
     put(
         table,
         "GetTable",
-        lua.create_function(move |lua, ns: String| match s.borrow().get_namespace(&ns) {
+        scope.create_function(|lua, ns: String| match storage.borrow().get_namespace(&ns) {
             Some(json) => json_to_lua(lua, &json),
             None => Ok(LuaValue::Nil),
         }),
     )?;
 
-    let s = Rc::clone(storage);
     put(
         table,
         "SetTable",
-        lua.create_function(move |_, (ns, value): (String, Table)| {
+        scope.create_function(|_, (ns, value): (String, Table)| {
             let json = lua_to_json(&LuaValue::Table(value)).map_err(mlua::Error::RuntimeError)?;
-            s.borrow_mut().set_namespace(&ns, json);
+            storage.borrow_mut().set_namespace(&ns, json);
             Ok(())
         }),
     )

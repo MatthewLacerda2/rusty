@@ -4,7 +4,6 @@
 //! through `Scene::update_entity_collider` so a moved entity's collider tracks it.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
@@ -13,13 +12,17 @@ use super::{put, Reg};
 use crate::scene::Scene;
 
 /// Register the `Transform` namespace onto `lua`.
-pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
+pub fn register<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_position(lua, &table, scene)?;
-    register_rotation(lua, &table, scene)?;
-    register_scale(lua, &table, scene)?;
-    register_move_towards(lua, &table, scene)?;
+    register_position(scope, &table, scene)?;
+    register_rotation(scope, &table, scene)?;
+    register_scale(scope, &table, scene)?;
+    register_move_towards(scope, &table, scene)?;
 
     lua.globals()
         .set("Transform", table)
@@ -27,13 +30,16 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 }
 
 /// `GetPosition` / `SetPosition` (set re-syncs the entity's collider).
-fn register_position(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_position<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "GetPosition",
-        lua.create_function(move |_, id: u32| {
-            let scene = s.borrow();
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
             let pos = scene.get_entity(id).map(|e| e.transform.position);
             match pos {
                 Some(pos) => Ok((pos.x, pos.y, pos.z)),
@@ -42,12 +48,11 @@ fn register_position(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>)
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetPosition",
-        lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 e.transform.position = Vec3::new(x, y, z);
             }
@@ -58,13 +63,16 @@ fn register_position(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>)
 }
 
 /// `GetRotation` / `SetRotation` over euler angles (set re-syncs the collider).
-fn register_rotation(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_rotation<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "GetRotation",
-        lua.create_function(move |_, id: u32| {
-            let scene = s.borrow();
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
             let rot = scene.get_entity(id).map(|e| e.transform.euler_angles());
             match rot {
                 Some(rot) => Ok((rot.x, rot.y, rot.z)),
@@ -73,12 +81,11 @@ fn register_rotation(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>)
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetRotation",
-        lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 e.transform.set_euler_angles(Vec3::new(x, y, z));
             }
@@ -89,13 +96,16 @@ fn register_rotation(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>)
 }
 
 /// `GetScale` / `SetScale` (set re-syncs the entity's collider).
-fn register_scale(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_scale<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "GetScale",
-        lua.create_function(move |_, id: u32| {
-            let scene = s.borrow();
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
             let scl = scene.get_entity(id).map(|e| e.transform.scale);
             match scl {
                 Some(scl) => Ok((scl.x, scl.y, scl.z)),
@@ -104,12 +114,11 @@ fn register_scale(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) ->
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetScale",
-        lua.create_function(move |_, (id, x, y, z): (u32, f32, f32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 e.transform.scale = Vec3::new(x, y, z);
             }
@@ -120,14 +129,17 @@ fn register_scale(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) ->
 }
 
 /// `MoveTowards` — step toward a target, snapping when within `step` (or ~0).
-fn register_move_towards(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_move_towards<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "MoveTowards",
-        lua.create_function(
-            move |_, (id, tx, ty, tz, step): (u32, f32, f32, f32, f32)| {
-                let mut scene = s.borrow_mut();
+        scope.create_function(
+            |_, (id, tx, ty, tz, step): (u32, f32, f32, f32, f32)| {
+                let mut scene = scene.borrow_mut();
                 if let Some(mut e) = scene.get_entity_mut(id) {
                     let pos = e.transform.position;
                     let target = Vec3::new(tx, ty, tz);

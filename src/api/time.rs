@@ -5,7 +5,6 @@
 //! `time::Time` resource the `GameWorld` advances once per tick.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use mlua::Lua;
 
@@ -13,52 +12,50 @@ use super::{put, Reg};
 use crate::time::Time;
 
 /// Register the `Time` namespace onto `lua`.
-pub fn register(lua: &Lua, time: &Rc<RefCell<Time>>) -> Reg {
+pub fn register<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    time: &'scope RefCell<Time>,
+) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    let t = Rc::clone(time);
     put(
         &table,
         "deltaTime",
-        lua.create_function(move |_, ()| Ok(t.borrow().delta_time)),
+        scope.create_function(|_, ()| Ok(time.borrow().delta_time)),
     )?;
 
-    let t = Rc::clone(time);
     put(
         &table,
         "unscaledDeltaTime",
-        lua.create_function(move |_, ()| Ok(t.borrow().unscaled_delta_time)),
+        scope.create_function(|_, ()| Ok(time.borrow().unscaled_delta_time)),
     )?;
 
-    let t = Rc::clone(time);
     put(
         &table,
         "fixedDeltaTime",
-        lua.create_function(move |_, ()| Ok(t.borrow().fixed_delta_time)),
+        scope.create_function(|_, ()| Ok(time.borrow().fixed_delta_time)),
     )?;
 
-    let t = Rc::clone(time);
     put(
         &table,
         "frameCount",
-        lua.create_function(move |_, ()| Ok(t.borrow().frame_count)),
+        scope.create_function(|_, ()| Ok(time.borrow().frame_count)),
     )?;
 
-    let t = Rc::clone(time);
     put(
         &table,
         "SetTimeScale",
-        lua.create_function(move |_, scale: f32| {
-            t.borrow_mut().set_time_scale(scale);
+        scope.create_function(|_, scale: f32| {
+            time.borrow_mut().set_time_scale(scale);
             Ok(())
         }),
     )?;
 
-    let t = Rc::clone(time);
     put(
         &table,
         "GetTimeScale",
-        lua.create_function(move |_, ()| Ok(t.borrow().time_scale)),
+        scope.create_function(|_, ()| Ok(time.borrow().time_scale)),
     )?;
 
     lua.globals().set("Time", table).map_err(|e| e.to_string())

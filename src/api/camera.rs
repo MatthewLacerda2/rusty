@@ -5,7 +5,6 @@
 //! script can move and aim relative to where the camera looks.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
@@ -14,12 +13,16 @@ use super::{put, Reg};
 use crate::render::Camera;
 
 /// Register the `Camera` namespace onto `lua`.
-pub fn register(lua: &Lua, camera: &Rc<RefCell<Camera>>) -> Reg {
+pub fn register<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    camera: &'scope RefCell<Camera>,
+) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_position(lua, &table, camera)?;
-    register_orientation(lua, &table, camera)?;
-    register_fov(lua, &table, camera)?;
+    register_position(scope, &table, camera)?;
+    register_orientation(scope, &table, camera)?;
+    register_fov(scope, &table, camera)?;
 
     lua.globals()
         .set("Camera", table)
@@ -27,23 +30,25 @@ pub fn register(lua: &Lua, camera: &Rc<RefCell<Camera>>) -> Reg {
 }
 
 /// `GetPosition` / `SetPosition` plus the `GetForward` / `GetRight` basis vectors.
-fn register_position(lua: &Lua, table: &mlua::Table, camera: &Rc<RefCell<Camera>>) -> Reg {
-    let c = Rc::clone(camera);
+fn register_position<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    camera: &'scope RefCell<Camera>,
+) -> Reg {
     put(
         table,
         "GetPosition",
-        lua.create_function(move |_, ()| {
-            let cam = c.borrow();
+        scope.create_function(|_, ()| {
+            let cam = camera.borrow();
             Ok((cam.position.x, cam.position.y, cam.position.z))
         }),
     )?;
 
-    let c = Rc::clone(camera);
     put(
         table,
         "SetPosition",
-        lua.create_function(move |_, (x, y, z): (f32, f32, f32)| {
-            c.borrow_mut().position = Vec3::new(x, y, z);
+        scope.create_function(|_, (x, y, z): (f32, f32, f32)| {
+            camera.borrow_mut().position = Vec3::new(x, y, z);
             Ok(())
         }),
     )?;
@@ -51,76 +56,76 @@ fn register_position(lua: &Lua, table: &mlua::Table, camera: &Rc<RefCell<Camera>
     // Forward / right basis vectors derived from yaw+pitch. Pure engine math
     // (`Camera::forward`/`right`) exposed so a controller script can move and aim
     // relative to where the camera looks, instead of re-deriving the trig in Lua.
-    let c = Rc::clone(camera);
     put(
         table,
         "GetForward",
-        lua.create_function(move |_, ()| {
-            let f = c.borrow().forward();
+        scope.create_function(|_, ()| {
+            let f = camera.borrow().forward();
             Ok((f.x, f.y, f.z))
         }),
     )?;
 
-    let c = Rc::clone(camera);
     put(
         table,
         "GetRight",
-        lua.create_function(move |_, ()| {
-            let r = c.borrow().right();
+        scope.create_function(|_, ()| {
+            let r = camera.borrow().right();
             Ok((r.x, r.y, r.z))
         }),
     )
 }
 
 /// `GetYaw` / `SetYaw` and `GetPitch` / `SetPitch` (pitch clamped to ±89°).
-fn register_orientation(lua: &Lua, table: &mlua::Table, camera: &Rc<RefCell<Camera>>) -> Reg {
-    let c = Rc::clone(camera);
+fn register_orientation<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    camera: &'scope RefCell<Camera>,
+) -> Reg {
     put(
         table,
         "GetYaw",
-        lua.create_function(move |_, ()| Ok(c.borrow().yaw)),
+        scope.create_function(|_, ()| Ok(camera.borrow().yaw)),
     )?;
-    let c = Rc::clone(camera);
     put(
         table,
         "SetYaw",
-        lua.create_function(move |_, yaw: f32| {
-            c.borrow_mut().yaw = yaw;
+        scope.create_function(|_, yaw: f32| {
+            camera.borrow_mut().yaw = yaw;
             Ok(())
         }),
     )?;
 
-    let c = Rc::clone(camera);
     put(
         table,
         "GetPitch",
-        lua.create_function(move |_, ()| Ok(c.borrow().pitch)),
+        scope.create_function(|_, ()| Ok(camera.borrow().pitch)),
     )?;
-    let c = Rc::clone(camera);
     put(
         table,
         "SetPitch",
-        lua.create_function(move |_, pitch: f32| {
-            c.borrow_mut().pitch = pitch.clamp(-89.0, 89.0);
+        scope.create_function(|_, pitch: f32| {
+            camera.borrow_mut().pitch = pitch.clamp(-89.0, 89.0);
             Ok(())
         }),
     )
 }
 
 /// `GetFov` / `SetFov` (fov clamped to 1..179°).
-fn register_fov(lua: &Lua, table: &mlua::Table, camera: &Rc<RefCell<Camera>>) -> Reg {
-    let c = Rc::clone(camera);
+fn register_fov<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    camera: &'scope RefCell<Camera>,
+) -> Reg {
     put(
         table,
         "GetFov",
-        lua.create_function(move |_, ()| Ok(c.borrow().fov)),
+        scope.create_function(|_, ()| Ok(camera.borrow().fov)),
     )?;
-    let c = Rc::clone(camera);
     put(
         table,
         "SetFov",
-        lua.create_function(move |_, fov: f32| {
-            c.borrow_mut().fov = fov.clamp(1.0, 179.0);
+        scope.create_function(|_, fov: f32| {
+            camera.borrow_mut().fov = fov.clamp(1.0, 179.0);
             Ok(())
         }),
     )

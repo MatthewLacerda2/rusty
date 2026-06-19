@@ -7,7 +7,6 @@
 //! the live physics handle is available.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
@@ -20,11 +19,15 @@ use crate::scripting::ConsoleLogs;
 
 /// Register the rigidbody half of `Physics` (velocity/force/kinematic) onto
 /// `lua`, creating the `Physics` global table.
-pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
+pub fn register<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_velocity(lua, &table, scene)?;
-    register_force(lua, &table, scene)?;
+    register_velocity(scope, &table, scene)?;
+    register_force(scope, &table, scene)?;
 
     lua.globals()
         .set("Physics", table)
@@ -32,13 +35,16 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 }
 
 /// `GetVelocity` / `SetVelocity` over the entity's rigidbody.
-fn register_velocity(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_velocity<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "GetVelocity",
-        lua.create_function(move |_, id: u32| {
-            let scene = s.borrow();
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
             if let Some(e) = scene.get_entity(id) {
                 if let Some(rb) = &e.rigidbody {
                     return Ok((rb.velocity.x, rb.velocity.y, rb.velocity.z));
@@ -48,12 +54,11 @@ fn register_velocity(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>)
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetVelocity",
-        lua.create_function(move |_, (id, vx, vy, vz): (u32, f32, f32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, vx, vy, vz): (u32, f32, f32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(rb) = &mut e.rigidbody {
                     rb.velocity = Vec3::new(vx, vy, vz);
@@ -65,13 +70,16 @@ fn register_velocity(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>)
 }
 
 /// `AddForce` (impulse via F/m) / `SetKinematic` over the entity's rigidbody.
-fn register_force(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_force<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "AddForce",
-        lua.create_function(move |_, (id, fx, fy, fz): (u32, f32, f32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, fx, fy, fz): (u32, f32, f32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(rb) = &mut e.rigidbody {
                     if !rb.is_kinematic {
@@ -84,12 +92,11 @@ fn register_force(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) ->
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetKinematic",
-        lua.create_function(move |_, (id, is_kinematic): (u32, bool)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, is_kinematic): (u32, bool)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(rb) = &mut e.rigidbody {
                     rb.is_kinematic = is_kinematic;
@@ -105,35 +112,34 @@ fn register_force(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) ->
 /// pipeline the engine hitscan uses — so a script's cast and the engine's cast
 /// return identical hits for the same ray. `Shoot` is the hitscan that used to be
 /// inline in `app/play.rs`.
-pub fn register_hitscan(
-    lua: &Lua,
-    scene: &Rc<RefCell<Scene>>,
-    physics: &Rc<RefCell<Option<PhysicsWorld>>>,
-    console: &Rc<RefCell<ConsoleLogs>>,
+pub fn register_hitscan<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    scene: &'scope RefCell<Scene>,
+    physics: &'scope RefCell<Option<PhysicsWorld>>,
+    console: &'scope RefCell<ConsoleLogs>,
 ) -> Reg {
     let table = global_table(lua, "Physics")?;
 
-    register_raycast(lua, &table, scene, physics)?;
-    register_shoot(lua, &table, scene, physics, console)?;
+    register_raycast(scope, &table, scene, physics)?;
+    register_shoot(scope, &table, scene, physics, console)?;
 
     Ok(())
 }
 
 /// `Raycast` — query-only cast returning `(hit, entity_id, distance)`.
-fn register_raycast(
-    lua: &Lua,
+fn register_raycast<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,
-    scene: &Rc<RefCell<Scene>>,
-    physics: &Rc<RefCell<Option<PhysicsWorld>>>,
+    scene: &'scope RefCell<Scene>,
+    physics: &'scope RefCell<Option<PhysicsWorld>>,
 ) -> Reg {
-    let s = Rc::clone(scene);
-    let p = Rc::clone(physics);
     put(
         table,
         "Raycast",
-        lua.create_function(
-            move |_,
-                  (ox, oy, oz, dx, dy, dz, ignore, mask): (
+        scope.create_function(
+            |_,
+             (ox, oy, oz, dx, dy, dz, ignore, mask): (
                 f32,
                 f32,
                 f32,
@@ -147,8 +153,8 @@ fn register_raycast(
                 // optional trailing `ignore` id is skipped (e.g. the shooter); the
                 // optional `mask` limits hits to entities on those layers (#91).
                 match cast(
-                    &p,
-                    &s,
+                    physics,
+                    scene,
                     Vec3::new(ox, oy, oz),
                     Vec3::new(dx, dy, dz),
                     ignore,
@@ -163,22 +169,19 @@ fn register_raycast(
 }
 
 /// `Shoot` — raycast plus apply damage to the hit entity (the engine hitscan).
-fn register_shoot(
-    lua: &Lua,
+fn register_shoot<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,
-    scene: &Rc<RefCell<Scene>>,
-    physics: &Rc<RefCell<Option<PhysicsWorld>>>,
-    console: &Rc<RefCell<ConsoleLogs>>,
+    scene: &'scope RefCell<Scene>,
+    physics: &'scope RefCell<Option<PhysicsWorld>>,
+    console: &'scope RefCell<ConsoleLogs>,
 ) -> Reg {
-    let s = Rc::clone(scene);
-    let p = Rc::clone(physics);
-    let c = Rc::clone(console);
     put(
         table,
         "Shoot",
-        lua.create_function(
-            move |_,
-                  (ox, oy, oz, dx, dy, dz, damage, ignore, mask): (
+        scope.create_function(
+            |_,
+             (ox, oy, oz, dx, dy, dz, damage, ignore, mask): (
                 f32,
                 f32,
                 f32,
@@ -190,15 +193,15 @@ fn register_shoot(
                 Option<u32>,
             )| {
                 match cast(
-                    &p,
-                    &s,
+                    physics,
+                    scene,
                     Vec3::new(ox, oy, oz),
                     Vec3::new(dx, dy, dz),
                     ignore,
                     mask,
                 ) {
                     Some((id, t)) => {
-                        apply_damage(&s, &c, id, damage);
+                        apply_damage(scene, console, id, damage);
                         Ok((true, id, t))
                     }
                     None => Ok((false, 0u32, 0.0f32)),
@@ -213,8 +216,8 @@ fn register_shoot(
 /// entity, so a shot can't hit its source). Returns `None` when no physics world
 /// exists yet (edit mode / no Play has built one) or on a miss.
 fn cast(
-    physics: &Rc<RefCell<Option<PhysicsWorld>>>,
-    scene: &Rc<RefCell<Scene>>,
+    physics: &RefCell<Option<PhysicsWorld>>,
+    scene: &RefCell<Scene>,
     origin: Vec3,
     dir: Vec3,
     ignore: Option<u32>,
