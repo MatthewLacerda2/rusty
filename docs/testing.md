@@ -20,32 +20,39 @@ See `tools/lint/src/main.rs` — a `#[cfg(test)] mod tests` block testing the
 size-cap selection and path normalization.
 
 ## Coverage
-The `coverage` job in `ci.yml` measures what the suite exercises with
-[`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov), accumulated over
-**both feature sets** (default + `dev`) so it matches what CI actually runs. It
-publishes two summaries to the run's job summary: the whole crate, and the
-**deterministic sim modules** (`app`, `scripting`, `physics`, `navigation`).
+Coverage is measured with [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov),
+accumulated over **both feature sets** (default + `dev`) so it matches what CI
+actually runs. It is an **informational signal, never a merge blocker** (CLAUDE.md's
+gates-vs-signals rule), surfaced where the agent acts on it.
 
 Targets are deliberately differentiated:
 
-- **~85% floor on the sim modules** — pure logic, no GPU, the part that must be
-  right and where mutation/property testing is aimed.
+- **A per-module floor on the sim modules** (`app`, `scripting`, `physics`,
+  `navigation`) — pure logic, no GPU, the part that must be right and where
+  mutation/property testing is aimed. The floors live in `coverage-baseline.txt`
+  at the repo root (one `module floor` line each) and **ratchet**: raise them as
+  coverage improves, never lower them silently.
 - **No floor on the platform layer** (`main.rs`, `render`, `dev`) — headless
   coverage there is low-value.
 
-The job is **informational** (`continue-on-error`) for now: it reports but does
-not gate. The plan is to record a baseline and then **ratchet** — fail only on a
-regression below it — rather than gate on a brittle absolute percentage. Run it
-locally with `cargo llvm-cov --summary-only` (add `--features dev` for the
-dev-only surface).
+It runs in two tiers, both non-blocking (mirroring mutation testing, below):
 
-**When it runs:** post-merge on `main` (and on `workflow_dispatch`), **not** on
-every pull request. It is non-blocking and takes ~15 min, so on a PR it only ever
-sat "in progress" long after the gating checks were green — a phantom stuck-PR.
-Running it on `main` keeps the ratchet/baseline signal where it's actionable
-without stalling PRs; a merge that touches no sim/code paths skips it via the
-`changes` filter. (Mutation testing — below — does run per-PR, but only because
-it is diff-scoped down to seconds, not the full ~15-min sweep.)
+| Run | Trigger | Scope | Where it lands |
+|---|---|---|---|
+| **PR run** (`coverage-pr`) | `pull_request`, `sim` filter | changed sim **lines** (`diff-cover`) | job summary **and** a sticky PR comment when changed lines are left uncovered |
+| **Ratchet** (`coverage`) | post-merge on `main` + `workflow_dispatch` | per-sim-module total vs `coverage-baseline.txt` | a job-summary table flagging any module below its floor |
+
+Why split it: the per-PR run scores only the lines the PR changed, so the agent
+gets a *fresh-context catch* — did the new sim code get tested? — and fixes it
+in-PR; the main run re-measures each whole module and ratchets it against the
+committed floor as the backstop. Unlike mutation, diff-scoping does **not** make
+the per-PR run cheap (the instrumented suite still runs in full), but it stays
+informational and is not a required check, so it never gates a merge and may even
+finish after one without stalling anything.
+
+Run it locally: `cargo llvm-cov --summary-only` (add `--features dev` for the
+dev-only surface); for the per-PR view, `cargo llvm-cov report --cobertura
+--output-path cov.xml` then `diff-cover cov.xml --compare-branch origin/main`.
 
 ## Mutation testing
 [`cargo-mutants`](https://github.com/sourcefrog/cargo-mutants) audits whether the

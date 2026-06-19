@@ -123,20 +123,106 @@ jobs:
       - name: Test (lint xtask)
         run: cargo test --manifest-path tools/lint/Cargo.toml --locked
 
+  # Per-PR coverage signal — diff-scoped, informational (the coverage analog of
+  # mutants-pr, #194/#157). Unlike mutation, cargo-llvm-cov can't cheaply scope the
+  # *measurement* to a diff — the instrumented suite still runs in full — but the
+  # *report* is scoped to the lines this PR changed via `diff-cover`, so the agent
+  # sees exactly whether its new sim code is tested (the fresh-context catch).
+  # Non-blocking and not a required check, so it never gates a merge and may even
+  # finish after one without stalling anything. Gated by the cheap `sim` filter.
+  coverage-pr:
+    needs: changes
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.draft == false &&
+      needs.changes.outputs.sim != 'false'
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so diff-cover can diff the changed lines against the base.
+          fetch-depth: 0
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show
+      - name: Add llvm-tools-preview (required by cargo-llvm-cov)
+        run: rustup component add llvm-tools-preview
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+      - name: System libs for winit/wgpu builds
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - name: Install diff-cover
+        run: pipx install diff-cover
+      - name: Measure coverage (both feature sets, accumulated)
+        run: |
+          cargo llvm-cov clean --workspace
+          cargo llvm-cov --no-report --locked
+          cargo llvm-cov --no-report --features dev --locked
+      - name: Cobertura report (sim modules only)
+        # Same ignore-regex as the main job: restrict to app/scripting/physics/
+        # navigation so diff-cover only ever scores changed *sim* lines. The
+        # `src/[^/]+\.rs` term drops every top-level src file (main/lib/settings/…)
+        # — none are sim, all sim code lives in subdirectories — so a new top-level
+        # file can't silently pollute the number (the #163 class of bug).
+        run: |
+          cargo llvm-cov report --cobertura --output-path cobertura-sim.xml \
+            --ignore-filename-regex 'src/(render|dev|api|asset|editor|components|core|ecs|scene|time)/|src/[^/]+\.rs|src/bin/|tools/'
+      - name: Diff coverage of changed sim lines
+        id: diffcov
+        # --fail-under 100 makes diff-cover exit non-zero when any changed sim line
+        # is uncovered; we capture that as the "gaps" signal, not as a build failure.
+        run: |
+          BASE='origin/${{ github.event.pull_request.base.ref }}'
+          if diff-cover cobertura-sim.xml --compare-branch "$BASE" \
+               --markdown-report coverage-diff.md --fail-under 100; then
+            echo 'has_gaps=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'has_gaps=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Summarize diff coverage (job summary + comment body)
+        if: always()
+        run: |
+          {
+            echo '### Diff coverage — changed sim lines (informational, non-blocking)'
+            echo ''
+            cat coverage-diff.md 2>/dev/null || echo 'No coverage information for the changed lines.'
+          } | tee comment.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Post diff-coverage comment
+        if: always() && steps.diffcov.outputs.has_gaps == 'true'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: coverage-diff
+          path: comment.md
+      - name: Clear stale diff-coverage comment
+        # Idempotent: once a re-push covers the changed lines, drop the comment.
+        if: always() && steps.diffcov.outputs.has_gaps != 'true'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: coverage-diff
+          delete: true
+
   coverage:
     needs: changes
     runs-on: ubuntu-latest
-    # Post-merge on main (or manual), not per-PR — see the `push` trigger note.
+    # Post-merge on main (or manual), not per-PR — see the `push` trigger note; the
+    # per-PR fresh-context signal is the diff-scoped `coverage-pr` job above.
     # Skips docs-only merges via the `code` filter.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && needs.changes.outputs.code != 'false')
-    # Informational to start (issue #117): publish what the suite exercises so the
-    # mutation/property work can be aimed. No hard floor yet — we ratchet to a
-    # regression gate once a baseline is recorded. The ~85% target on the
-    # deterministic sim modules (app/scripting/physics/navigation) and the
-    # platform-layer exemption (main.rs, render, dev) are documented in
-    # docs/testing.md. `continue-on-error` keeps this from blocking merges.
+    # Informational signal, never a merge blocker (CLAUDE.md gates-vs-signals).
+    # On `main` it ratchets the deterministic sim modules (app/scripting/physics/
+    # navigation) against the committed floors in `coverage-baseline.txt`: a drop
+    # below a floor is surfaced here but does not fail the build. The platform layer
+    # (main.rs, render, dev) is exempt — see docs/testing.md. `continue-on-error`
+    # keeps even a regression non-blocking.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
@@ -166,18 +252,40 @@ jobs:
             cargo llvm-cov report --summary-only
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Deterministic sim-module coverage (target ~85%, informational)
+      - name: Ratchet sim coverage against the committed baseline
+        # Per-module line coverage vs the floors in coverage-baseline.txt. The
+        # `regex` crate llvm-cov uses has no look-around, so each module is isolated
+        # by ignoring the other three plus all non-sim paths; `src/[^/]+\.rs` drops
+        # every top-level src file (main/lib/settings/…) so none can pollute the
+        # number (the #163 class of bug). Informational: a drop below a floor is
+        # flagged but the step never exits non-zero (and the job is continue-on-error
+        # regardless), honouring "inform on quality, never block".
         run: |
-          # Restrict the report to the sim modules by ignoring everything else.
-          # The `regex` crate (used by llvm-cov) has no look-around, so we list the
-          # non-sim paths explicitly rather than negative-matching the sim ones.
+          NONSIM='render|dev|api|asset|editor|components|core|ecs|scene|time'
           {
-            echo '### Sim-module coverage — app, scripting, physics, navigation (target ~85%)'
+            echo '### Sim-module coverage ratchet (informational, non-blocking)'
             echo ''
-            echo '```'
-            cargo llvm-cov report --summary-only \
-              --ignore-filename-regex 'src/(render|dev|api|asset|editor|components|core|ecs|scene|time)/|src/(main|lib)\.rs|src/bin/|tools/'
-            echo '```'
+            echo '| Module | Floor | Current | Status |'
+            echo '|---|---|---|---|'
+            regressed=0
+            while read -r module floor; do
+              case "$module" in ''|\#*) continue ;; esac
+              others=$(echo "app scripting physics navigation" \
+                | tr ' ' '\n' | grep -v "^${module}$" | paste -sd'|')
+              cur=$(cargo llvm-cov report --json --summary-only \
+                --ignore-filename-regex "src/(${others}|${NONSIM})/|src/[^/]+\.rs|src/bin/|tools/" \
+                | jq '.data[0].totals.lines.percent')
+              status='✅'
+              if awk "BEGIN{exit !(${cur} < ${floor})}"; then status='❌ regression'; regressed=1; fi
+              printf '| %s | %.2f | %.2f | %s |\n' "$module" "$floor" "$cur" "$status"
+            done < coverage-baseline.txt
+            echo ''
+            if [ "$regressed" = 1 ]; then
+              echo '> A sim module dropped below its committed floor. Informational — add'
+              echo '> tests, or, if the drop is intended, lower it in `coverage-baseline.txt`.'
+            else
+              echo '> All sim modules at or above their committed floor.'
+            fi
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
   deny:
