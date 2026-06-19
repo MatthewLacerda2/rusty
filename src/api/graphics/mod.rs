@@ -98,9 +98,7 @@ fn register_bloom<'lua, 'scope>(
     put(
         table,
         "GetBloomThreshold",
-        scope.create_function(
-            |_, ()| Ok(with_vc(scene, |vc| vc.bloom_threshold).unwrap_or(0.0)),
-        ),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.bloom_threshold).unwrap_or(0.0))),
     )
 }
 

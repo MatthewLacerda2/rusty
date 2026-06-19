@@ -60,9 +60,7 @@ fn register_scalars<'lua, 'scope>(
     put(
         table,
         "Has",
-        scope.create_function(|_, (ns, key): (String, String)| {
-            Ok(storage.borrow().has(&ns, &key))
-        }),
+        scope.create_function(|_, (ns, key): (String, String)| Ok(storage.borrow().has(&ns, &key))),
     )?;
 
     put(
@@ -83,10 +81,12 @@ fn register_namespaces<'lua, 'scope>(
     put(
         table,
         "GetTable",
-        scope.create_function(|lua, ns: String| match storage.borrow().get_namespace(&ns) {
-            Some(json) => json_to_lua(lua, &json),
-            None => Ok(LuaValue::Nil),
-        }),
+        scope.create_function(
+            |lua, ns: String| match storage.borrow().get_namespace(&ns) {
+                Some(json) => json_to_lua(lua, &json),
+                None => Ok(LuaValue::Nil),
+            },
+        ),
     )?;
 
     put(

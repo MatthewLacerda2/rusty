@@ -87,10 +87,9 @@ impl ScriptManager {
                     continue;
                 };
                 if let Err(e) = update_fn.call::<_, ()>((id, delta_time)) {
-                    self.console.borrow_mut().error(format!(
-                        "[Lua Error] Update on entity {} failed: {}",
-                        id, e
-                    ));
+                    self.console
+                        .borrow_mut()
+                        .error(format!("[Lua Error] Update on entity {} failed: {}", id, e));
                 }
             }
             Ok(())
@@ -171,9 +170,7 @@ impl ScriptManager {
                 .eval::<mlua::MultiValue>()
             {
                 Ok(v) => v,
-                Err(_) => lua
-                    .load(trimmed)
-                    .eval::<mlua::MultiValue>()?,
+                Err(_) => lua.load(trimmed).eval::<mlua::MultiValue>()?,
             };
 
             let rendered = values

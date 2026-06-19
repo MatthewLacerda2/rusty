@@ -25,10 +25,7 @@ pub(super) fn with_vc<R>(
 }
 
 /// Mutate the first active visual-correction volume (no-op when there is none).
-pub(super) fn with_vc_mut(
-    scene: &RefCell<Scene>,
-    f: impl FnOnce(&mut VisualCorrectionComponent),
-) {
+pub(super) fn with_vc_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut VisualCorrectionComponent)) {
     let mut scene = scene.borrow_mut();
     let target = scene
         .iter()

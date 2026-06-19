@@ -137,23 +137,21 @@ fn register_move_towards<'lua, 'scope>(
     put(
         table,
         "MoveTowards",
-        scope.create_function(
-            |_, (id, tx, ty, tz, step): (u32, f32, f32, f32, f32)| {
-                let mut scene = scene.borrow_mut();
-                if let Some(mut e) = scene.get_entity_mut(id) {
-                    let pos = e.transform.position;
-                    let target = Vec3::new(tx, ty, tz);
-                    let dir = target - pos;
-                    let len = dir.length();
-                    if len <= step || len < 0.001 {
-                        e.transform.position = target;
-                    } else {
-                        e.transform.position += dir.normalize() * step;
-                    }
+        scope.create_function(|_, (id, tx, ty, tz, step): (u32, f32, f32, f32, f32)| {
+            let mut scene = scene.borrow_mut();
+            if let Some(mut e) = scene.get_entity_mut(id) {
+                let pos = e.transform.position;
+                let target = Vec3::new(tx, ty, tz);
+                let dir = target - pos;
+                let len = dir.length();
+                if len <= step || len < 0.001 {
+                    e.transform.position = target;
+                } else {
+                    e.transform.position += dir.normalize() * step;
                 }
-                scene.update_entity_collider(id);
-                Ok(())
-            },
-        ),
+            }
+            scene.update_entity_collider(id);
+            Ok(())
+        }),
     )
 }
