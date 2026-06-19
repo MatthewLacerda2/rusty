@@ -113,15 +113,39 @@ impl JointTransform {
     }
 }
 
-/// A material's scalar values, as read from the source file. Texture images are
-/// not loaded here (a later issue); this carries only the values needed to tint a
-/// mesh and to round-trip the material's identity/name.
+/// A material's values, as read from the source file — the asset-layer DTO for the
+/// full glTF 2.0 metallic-roughness model. Pure data (no GPU buffers): the scalar
+/// factors plus the *resolved file paths* to the texture images. The scene layer
+/// converts this into a renderable `MaterialAsset` (see `material_asset_from_import`).
+///
+/// glTF packs metallic + roughness into ONE `metallicRoughnessTexture` (metallic in
+/// B, roughness in G), so [`MaterialData::metallic_roughness_map`] is a single path;
+/// the conversion fans it out to the engine's separate metallic/roughness maps.
+///
+/// Only EXTERNAL texture URIs are resolved to paths here; embedded images
+/// (`Source::View`, a data URI / buffer view) are left `None` (a documented
+/// follow-up — extracting embedded pixels to disk is out of scope for #203).
 #[derive(Clone, Debug, PartialEq)]
 pub struct MaterialData {
     pub name: String,
     /// Linear RGBA base color factor (glTF `pbrMetallicRoughness.baseColorFactor`
     /// or OBJ `Kd` with alpha 1.0). Defaults to opaque white.
     pub base_color: [f32; 4],
+    /// glTF `metallicFactor` (default 1.0 per the glTF spec).
+    pub metallic: f32,
+    /// glTF `roughnessFactor` (default 1.0 per the glTF spec).
+    pub roughness: f32,
+    /// Resolved path to the base-color (albedo) texture, or `None`.
+    pub base_color_map: Option<String>,
+    /// Resolved path to the packed metallic-roughness texture (metallic=B,
+    /// roughness=G), or `None`.
+    pub metallic_roughness_map: Option<String>,
+    /// Resolved path to the normal map, or `None`.
+    pub normal_map: Option<String>,
+    /// Resolved path to the emissive texture, or `None`.
+    pub emissive_map: Option<String>,
+    /// glTF `emissiveFactor` (linear RGB, default [0,0,0]).
+    pub emissive: [f32; 3],
 }
 
 impl Default for MaterialData {
@@ -129,6 +153,14 @@ impl Default for MaterialData {
         Self {
             name: String::new(),
             base_color: [1.0, 1.0, 1.0, 1.0],
+            // glTF spec defaults: a material with no factors is fully metallic/rough.
+            metallic: 1.0,
+            roughness: 1.0,
+            base_color_map: None,
+            metallic_roughness_map: None,
+            normal_map: None,
+            emissive_map: None,
+            emissive: [0.0, 0.0, 0.0],
         }
     }
 }

@@ -19,6 +19,18 @@ f 1/1/1 2/2/1 3/3/1
 f 1/1/1 3/3/1 4/4/1
 ";
 
+/// A 1x1 opaque-white PNG — the smallest valid image to satisfy `gltf::import`'s
+/// eager image decode for a fixture that references an EXTERNAL texture URI (#203).
+/// (8-byte signature, IHDR, a single-pixel IDAT, IEND.)
+#[rustfmt::skip]
+pub const ONE_PX_PNG: &[u8] = &[
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+    0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0xF8, 0xFF, 0xFF, 0x3F,
+    0x00, 0x05, 0xFE, 0x02, 0xFE, 0x0D, 0xEF, 0x46, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
+    0x44, 0xAE, 0x42, 0x60, 0x82,
+];
+
 /// A minimal embedded-buffer glTF 2.0 file: one mesh named `Triangle`, one
 /// POSITION-only primitive (a single triangle), one base-color material.
 pub const TRIANGLE_GLTF: &str = r#"{
@@ -40,6 +52,61 @@ pub const TRIANGLE_GLTF: &str = r#"{
       "pbrMetallicRoughness": { "baseColorFactor": [1.0, 0.0, 0.0, 1.0] }
     }
   ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 3,
+      "type": "VEC3",
+      "min": [0.0, 0.0, 0.0],
+      "max": [1.0, 1.0, 0.0]
+    }
+  ],
+  "bufferViews": [
+    { "buffer": 0, "byteOffset": 0, "byteLength": 36 }
+  ],
+  "buffers": [
+    {
+      "byteLength": 36,
+      "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAA"
+    }
+  ]
+}
+"#;
+
+/// A minimal glTF 2.0 file with a full metallic-roughness material (#203): explicit
+/// metallic/roughness factors, an emissive factor, and an EXTERNAL base-color texture
+/// URI (`brick.png`, percent-encoded space proves trivial decode). Geometry reuses the
+/// embedded-buffer single triangle. No `model.bin` needed — the texture file itself is
+/// never read by the importer (only its path is resolved), so the test writes only the
+/// `.gltf`.
+pub const TEXTURED_GLTF: &str = r#"{
+  "asset": { "version": "2.0" },
+  "scene": 0,
+  "scenes": [ { "nodes": [ 0 ] } ],
+  "nodes": [ { "mesh": 0 } ],
+  "meshes": [
+    {
+      "name": "Brick",
+      "primitives": [
+        { "attributes": { "POSITION": 0 }, "material": 0 }
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "name": "Bricks",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [0.8, 0.4, 0.2, 1.0],
+        "metallicFactor": 0.25,
+        "roughnessFactor": 0.75,
+        "baseColorTexture": { "index": 0 }
+      },
+      "emissiveFactor": [0.1, 0.2, 0.3]
+    }
+  ],
+  "textures": [ { "source": 0 } ],
+  "images": [ { "uri": "tex/brick%20wall.png" } ],
   "accessors": [
     {
       "bufferView": 0,

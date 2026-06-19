@@ -191,9 +191,18 @@ fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     let mut added_collider = false;
     for id in asset.sub_mesh_ids() {
         let reference = format!("{}{}{}", path, crate::asset::REF_SEPARATOR, id);
+        // Resolve the sub-mesh's imported material into a deterministic library key
+        // (shared across sub-objects that reference the same glTF material — dedup).
+        let material_key = asset
+            .sub_mesh(&id)
+            .and_then(|s| s.material)
+            .and_then(|idx| import_material(scene, path, &asset, idx));
         let ent_id = scene.add_entity(id.clone());
         if let Some(mut ent) = scene.get_entity_mut(ent_id) {
             ent.mesh = Some(crate::scene::asset_mesh_component(&reference));
+            if let Some(key) = material_key {
+                ent.material = Some(crate::components::MaterialComponent { material: key });
+            }
             if let Some(kind) = settings.colliders.get(&id) {
                 if let Some((min, max)) = asset.sub_mesh(&id).and_then(|s| s.bounds()) {
                     ent.collider = Some(crate::components::ColliderComponent::from_mesh_bounds(
@@ -218,6 +227,28 @@ fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     }
 }
 
+/// Convert sub-mesh material `idx` into a `MaterialAsset`, insert it into the scene's
+/// shared library under a DETERMINISTIC key, and return that key. The key is
+/// `"{path}::{material_name}"` when the glTF material is named, else
+/// `"{path}::material_{idx}"` — so sub-objects that share one glTF material share one
+/// library entry (dedup). Returns `None` if the index is out of range.
+fn import_material(
+    scene: &mut crate::scene::Scene,
+    path: &str,
+    asset: &crate::asset::ImportedAsset,
+    idx: usize,
+) -> Option<String> {
+    let data = asset.materials.get(idx)?;
+    let key = if data.name.is_empty() {
+        format!("{path}::material_{idx}")
+    } else {
+        format!("{path}::{}", data.name)
+    };
+    let material = crate::scene::authoring::material_asset_from_import(data);
+    scene.materials.insert(key.clone(), material);
+    Some(key)
+}
+
 fn format_size(bytes: u64) -> String {
     if bytes < 1024 {
         format!("{} B", bytes)
@@ -227,3 +258,7 @@ fn format_size(bytes: u64) -> String {
         format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
     }
 }
+
+#[cfg(test)]
+#[path = "model_material_tests.rs"]
+mod model_material_tests;

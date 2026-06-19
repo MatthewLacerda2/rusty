@@ -1,6 +1,6 @@
 //! src/asset/tests.rs — importer unit tests over tiny embedded fixtures.
 
-use super::fixtures::{SKINNED_GLTF, TRIANGLE_GLTF, TRIANGLE_OBJ};
+use super::fixtures::{ONE_PX_PNG, SKINNED_GLTF, TEXTURED_GLTF, TRIANGLE_GLTF, TRIANGLE_OBJ};
 use super::*;
 use std::path::PathBuf;
 
@@ -42,6 +42,49 @@ fn gltf_imports_mesh_and_material() {
     assert_eq!(tri.material, Some(0));
     assert_eq!(asset.materials[0].name, "Red");
     assert_eq!(asset.materials[0].base_color, [1.0, 0.0, 0.0, 1.0]);
+}
+
+#[test]
+fn gltf_reads_full_metallic_roughness_material() {
+    // The fixture lives in its own dir so the resolved texture path is predictable.
+    // `gltf::import` eagerly decodes external images, so the referenced PNG must exist
+    // on disk — write a 1x1 PNG at the URI the fixture points at.
+    let dir = std::env::temp_dir().join("rusty_textured_fixture");
+    std::fs::create_dir_all(dir.join("tex")).unwrap();
+    std::fs::write(dir.join("tex/brick wall.png"), ONE_PX_PNG).unwrap();
+    let gltf_path = dir.join("model.gltf");
+    std::fs::write(&gltf_path, TEXTURED_GLTF).unwrap();
+
+    let asset = import_file(&gltf_path).unwrap();
+    let mat = &asset.materials[0];
+    assert_eq!(mat.name, "Bricks");
+    assert_eq!(mat.base_color, [0.8, 0.4, 0.2, 1.0]);
+    assert_eq!(mat.metallic, 0.25);
+    assert_eq!(mat.roughness, 0.75);
+    assert_eq!(mat.emissive, [0.1, 0.2, 0.3]);
+    // The external base-color URI resolved against the glTF dir, with `%20` decoded.
+    let expected = dir
+        .join("tex/brick wall.png")
+        .to_string_lossy()
+        .into_owned();
+    assert_eq!(mat.base_color_map.as_deref(), Some(expected.as_str()));
+    // The fixture declares no other textures.
+    assert!(mat.metallic_roughness_map.is_none());
+    assert!(mat.normal_map.is_none());
+    assert!(mat.emissive_map.is_none());
+}
+
+#[test]
+fn gltf_embedded_material_uses_spec_defaults() {
+    // TRIANGLE_GLTF gives only a baseColorFactor: metallic/roughness fall to the glTF
+    // spec defaults (1.0), all maps are absent.
+    let path = tmp("defaults.gltf");
+    std::fs::write(&path, TRIANGLE_GLTF).unwrap();
+    let mat = &import_file(&path).unwrap().materials[0];
+    assert_eq!(mat.metallic, 1.0);
+    assert_eq!(mat.roughness, 1.0);
+    assert!(mat.base_color_map.is_none());
+    assert!(mat.metallic_roughness_map.is_none());
 }
 
 #[test]
