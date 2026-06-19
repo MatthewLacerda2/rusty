@@ -70,6 +70,9 @@ pub struct ApiScopedCtx<'scope> {
     /// Runtime video settings (resolution / vsync / fullscreen), shared with the
     /// platform layer so a `Video.*` write reaches the surface + window.
     pub video: &'scope RefCell<VideoSettings>,
+    /// The current scene file — `Scene.Save()`'s no-path write-back target. Shared
+    /// with the platform layer (synced from `EditorUi.current_scene_path`).
+    pub scene_path: &'scope RefCell<Option<String>>,
 }
 
 /// Register every namespace onto `lua` using `scope`-tied closures that borrow
@@ -85,7 +88,7 @@ pub fn register<'lua, 'scope>(
     material::register(lua, scope, ctx.scene)?;
     animator::register(lua, scope, ctx.scene, ctx.console)?;
     input::register_readable(lua, scope, ctx.input)?;
-    scene::register(lua, scope, ctx.scene, ctx.console)?;
+    scene::register(lua, scope, ctx.scene, ctx.scene_path)?;
     nav::register(lua, scope, ctx.scene, ctx.nav)?;
     physics::register(lua, scope, ctx.scene)?;
     health::register(lua, scope, ctx.scene, ctx.console)?;

@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::asset::{self, MeshVertex, SubMesh};
 use crate::components::Entity;
-use crate::render::mesh as primitives;
 use crate::render::mesh::Vertex;
+use crate::scene::authoring::{primitive_geometry, Primitive};
 use crate::scene::collision_matrix::CollisionMatrix;
 use crate::scene::layers::LayerRegistry;
 use crate::scene::Scene;
@@ -145,18 +145,14 @@ fn rehydrate_asset_mesh(asset_ref: &Option<String>) -> RehydratedMesh {
 /// primitive from `primitive_type`, or an imported sub-mesh from `asset_ref` when
 /// the type is `"Asset"`. GPU buffers are never stored on disk, only rebuilt here.
 fn rehydrate_one(primitive_type: &str, asset_ref: &Option<String>) -> RehydratedMesh {
-    match primitive_type {
-        "Box" => RehydratedMesh::primitive(primitives::generate_box(1.0, 1.0, 1.0)),
-        "Sphere" => RehydratedMesh::primitive(primitives::generate_sphere(1.0, 16, 16)),
-        "Plane" => RehydratedMesh::primitive(primitives::generate_plane(15.0, 15.0)),
-        "Cylinder" => RehydratedMesh::primitive(primitives::generate_cylinder(
-            Vec3::new(0.0, -0.5, 0.0),
-            Vec3::new(0.0, 0.5, 0.0),
-            0.5,
-            12,
-        )),
-        "Asset" => rehydrate_asset_mesh(asset_ref),
-        _ => RehydratedMesh::default(),
+    if primitive_type == "Asset" {
+        return rehydrate_asset_mesh(asset_ref);
+    }
+    // Primitive geometry is owned by `scene::authoring` so a created primitive and
+    // a loaded one are byte-identical.
+    match Primitive::parse(primitive_type).and_then(primitive_geometry) {
+        Some(geometry) => RehydratedMesh::primitive(geometry),
+        None => RehydratedMesh::default(),
     }
 }
 

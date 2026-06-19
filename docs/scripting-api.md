@@ -111,10 +111,44 @@ user. Keys are named strings (e.g. `"W"`, `"Space"`).
 
 ## `Scene`
 
+The structural-authoring surface: the API equivalent of the editor's hierarchy
+toolbar (create / destroy / parent) and the inspector's Add Component menu. Every
+verb routes through the shared `scene::authoring` module, so it behaves identically
+to the editor and uses the same default values.
+
 | Function | Signature | Returns |
 |---|---|---|
 | `Scene.FindEntityByName` | `(name)` | `id` (or `0` if none) |
-| `Scene.DestroyEntity` | `(id)` | — |
+| `Scene.CreateEntity` | `(name, [primitive])` | new entity `id` |
+| `Scene.Deactivate` | `(id)` | — |
+| `Scene.DestroyEntity` | `(id)` | `true` if an entity existed at `id` |
+| `Scene.AddComponent` | `(id, kind)` | `true` if the entity exists |
+| `Scene.RemoveComponent` | `(id, kind)` | `true` if the entity exists |
+| `Scene.SetParent` | `(id, parent_id)` | — (errors on a parenting cycle) |
+| `Scene.ClearParent` | `(id)` | — |
+| `Scene.Save` | `([path])` | the written path |
+
+**`primitive`** (optional) is one of the hierarchy toolbar's primitives,
+case-insensitive: `Box`, `Sphere`, `Plane`, `Cylinder` (meshes) or `PointLight`,
+`DirectionalLight`, `SpotLight`. Omit it (or pass an unknown name) to create a bare
+entity carrying only its mandatory `Transform`.
+
+**`kind`** is one of the Add Component menu's first-class components,
+case-insensitive: `Light`, `Health`, `Animator`, `Collider`, `RigidBody`,
+`Texture` (alias `Material`), `NavMeshAgent`, `Camera`, `Particles`,
+`VisualCorrection`. Each is added with the inspector's default values; adding an
+existing kind replaces it. Removing `Health` also removes its `Animator`, and
+removing `Camera` also removes `VisualCorrection`, matching the inspector's
+cascades. (Scripts attach by path, not as a defaulted kind — a separate concern.)
+
+**`Scene.Deactivate`** is Unity's deferred `Object.Destroy`: it sets `active =
+false` but leaves the entity in the scene. **`Scene.DestroyEntity`** is the
+editor's Destroy button: it actually removes the entity.
+
+**`Scene.Save([path])`** persists the live world. With no path it writes back to
+the current scene file (the file the editor/session loaded); an explicit path
+writes there and becomes the new current file (Save As). It errors if no path is
+given and no current scene file is set.
 
 ## `Navigation`
 
