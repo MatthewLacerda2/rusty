@@ -45,6 +45,12 @@ pub struct ScriptManager {
     /// Live rapier physics world shared with `GameWorld` — used by
     /// `Physics.Raycast`/`Shoot`. `None` until Play builds the world.
     pub(super) physics: Rc<RefCell<Option<crate::physics::PhysicsWorld>>>,
+    /// The scene file the editor/session is currently editing — the write-back
+    /// target for `Scene.Save()` (no-path). Shared with the platform layer (the
+    /// editor keeps `EditorUi.current_scene_path` synced into it), so a scripted
+    /// save and an editor save hit the same file. `None` until a scene is loaded
+    /// or the path is set; an argument-less `Scene.Save()` then errors cleanly.
+    pub(super) scene_path: Rc<RefCell<Option<String>>>,
 }
 
 impl ScriptManager {
@@ -69,7 +75,22 @@ impl ScriptManager {
             quality: Rc::new(RefCell::new(QualityPreset::default())),
             video: Rc::new(RefCell::new(VideoSettings::default())),
             physics: Rc::new(RefCell::new(None)),
+            scene_path: Rc::new(RefCell::new(None)),
         }
+    }
+
+    /// Inject the shared scene-path cell — the `Scene.Save()` write-back target.
+    /// The platform layer keeps this in sync with `EditorUi.current_scene_path`,
+    /// and the headless session sets it from the loaded boot scene, so a scripted
+    /// save writes back to the same file the editor would.
+    pub fn set_scene_path_cell(&mut self, scene_path: Rc<RefCell<Option<String>>>) {
+        self.scene_path = scene_path;
+    }
+
+    /// Handle to the shared scene-path cell, so the platform layer can read/sync
+    /// the current scene file with the editor's `current_scene_path`.
+    pub fn scene_path_cell(&self) -> Rc<RefCell<Option<String>>> {
+        Rc::clone(&self.scene_path)
     }
 
     /// Inject the shared persistent store. `Resources` calls this so the script
@@ -156,6 +177,7 @@ impl ScriptManager {
             storage: &self.storage,
             quality: &self.quality,
             video: &self.video,
+            scene_path: &self.scene_path,
         }
     }
 

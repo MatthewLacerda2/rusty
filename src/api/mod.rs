@@ -3,15 +3,18 @@
 //! The single stable API surface shared by Lua scripts, the console REPL and
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
 //! `Scene`, `Health`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
-//! `Particles`, `Layers`, `Graphics`, `Video`, `Storage`, plus the dev-only `Debug`)
+//! `Assets`, `Particles`, `Layers`, `Graphics`, `Video`, `Storage`, plus the
+//! dev-only `Debug`)
 //! is registered from this tree onto the live Lua runtime.
 //! `scripting`
 //! owns the runtime and lifecycle; `api` owns the surface. One surface, three
 //! callers — they never drift apart.
 //!
-//! Allowed deps: core, components, physics, navigation, render, time, scripting.
+//! Allowed deps: core, components, physics, navigation, render, time, scripting,
+//! asset (for the `Assets` manifest).
 
 pub mod animator;
+pub mod assets;
 pub mod camera;
 #[cfg(feature = "dev")]
 pub mod debug;
@@ -70,6 +73,9 @@ pub struct ApiScopedCtx<'scope> {
     /// Runtime video settings (resolution / vsync / fullscreen), shared with the
     /// platform layer so a `Video.*` write reaches the surface + window.
     pub video: &'scope RefCell<VideoSettings>,
+    /// The current scene file — `Scene.Save()`'s no-path write-back target. Shared
+    /// with the platform layer (synced from `EditorUi.current_scene_path`).
+    pub scene_path: &'scope RefCell<Option<String>>,
 }
 
 /// Register every namespace onto `lua` using `scope`-tied closures that borrow
@@ -82,10 +88,13 @@ pub fn register<'lua, 'scope>(
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     transform::register(lua, scope, ctx.scene)?;
+    // `Assets` borrows no engine state (it walks the project asset root on each
+    // call), so it stays a plain static registrar even under the scoped surface.
+    assets::register(lua)?;
     material::register(lua, scope, ctx.scene)?;
     animator::register(lua, scope, ctx.scene, ctx.console)?;
     input::register_readable(lua, scope, ctx.input)?;
-    scene::register(lua, scope, ctx.scene, ctx.console)?;
+    scene::register(lua, scope, ctx.scene, ctx.scene_path)?;
     nav::register(lua, scope, ctx.scene, ctx.nav)?;
     physics::register(lua, scope, ctx.scene)?;
     health::register(lua, scope, ctx.scene, ctx.console)?;

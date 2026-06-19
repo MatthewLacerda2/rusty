@@ -1,12 +1,7 @@
 use egui_phosphor::regular as icon;
-use glam::Vec3;
 
-use crate::scene::{
-    AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape, Entity,
-    HealthComponent, LightComponent, LightType, NavMeshAgentComponent, ParticleEmitterComponent,
-    RigidBodyComponent, ScriptComponent, TextureComponent, Tonemap, VisualCorrectionComponent,
-    DEFAULT_SCRIPTS_DEST_DIR,
-};
+use crate::scene::authoring;
+use crate::scene::{Entity, ParticleEmitterComponent, ScriptComponent, DEFAULT_SCRIPTS_DEST_DIR};
 
 /// 3F. Add Component — Unity-style full-width pill that opens the component menu.
 pub fn draw(ui: &mut egui::Ui, entity: &mut Entity) {
@@ -39,41 +34,19 @@ fn add_menu(ui: &mut egui::Ui, entity: &mut Entity) {
 /// axis of its own.
 fn add_lighting_combat(ui: &mut egui::Ui, entity: &mut Entity) {
     if entity.light.is_none() && ui.button("Light Component").clicked() {
-        entity.light = Some(LightComponent {
-            light_type: LightType::Point,
-            color: Vec3::ONE,
-            intensity: 1.5,
-            range: 10.0,
-            inner_cone: 30.0,
-            outer_cone: 45.0,
-        });
+        entity.light = Some(authoring::default_light());
         ui.close_menu();
     }
     if entity.health.is_none() && ui.button("Health Component (Enemies)").clicked() {
-        entity.health = Some(HealthComponent {
-            current_health: 100.0,
-            max_health: 100.0,
-            is_dead: false,
-        });
+        entity.health = Some(authoring::default_health());
         ui.close_menu();
     }
     if entity.animator.is_none() && ui.button("Animator Component").clicked() {
-        entity.animator = Some(AnimatorComponent {
-            current_clip: "Idle".to_string(),
-            speed: 2.0,
-            is_playing: true,
-            ..Default::default()
-        });
+        entity.animator = Some(authoring::default_animator());
         ui.close_menu();
     }
     if entity.collider.is_none() && ui.button("Collider Component").clicked() {
-        entity.collider = Some(ColliderComponent {
-            active: true,
-            shape: ColliderShape::Box { size: Vec3::ONE },
-            is_trigger: false,
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
-        });
+        entity.collider = Some(authoring::default_collider());
         ui.close_menu();
     }
 }
@@ -82,38 +55,15 @@ fn add_lighting_combat(ui: &mut egui::Ui, entity: &mut Entity) {
 /// offered only when absent.
 fn add_physics_components(ui: &mut egui::Ui, entity: &mut Entity) {
     if entity.rigidbody.is_none() && ui.button("RigidBody Component").clicked() {
-        entity.rigidbody = Some(RigidBodyComponent {
-            active: true,
-            is_kinematic: false,
-            mass: 1.0,
-            velocity: Vec3::ZERO,
-            use_gravity: true,
-        });
+        entity.rigidbody = Some(authoring::default_rigidbody());
         ui.close_menu();
     }
     if entity.texture.is_none() && ui.button("Material / Texture Component").clicked() {
-        entity.texture = Some(TextureComponent {
-            path: "".to_string(),
-            is_dirty: true,
-            metallic: 0.0,
-            roughness: 0.5,
-            metallic_map: None,
-            roughness_map: None,
-            color: [1.0, 1.0, 1.0],
-        });
+        entity.texture = Some(authoring::default_texture());
         ui.close_menu();
     }
     if entity.nav_agent.is_none() && ui.button("NavMesh Agent Component").clicked() {
-        entity.nav_agent = Some(NavMeshAgentComponent {
-            active: true,
-            radius: 0.5,
-            target: Vec3::new(8.0, 1.0, 8.0),
-            speed: 3.0,
-            acceleration: 5.0,
-            stopping_distance: 0.5,
-            velocity: Vec3::ZERO,
-            ..Default::default()
-        });
+        entity.nav_agent = Some(authoring::default_nav_agent());
         ui.close_menu();
     }
 }
@@ -122,17 +72,7 @@ fn add_physics_components(ui: &mut egui::Ui, entity: &mut Entity) {
 /// camera-only visual correction stack. Each entry is offered only when absent.
 fn add_render_components(ui: &mut egui::Ui, entity: &mut Entity) {
     if entity.camera.is_none() && ui.button("Camera Component").clicked() {
-        entity.camera = Some(CameraComponent {
-            active: true,
-            fov: 45.0,
-            near: 0.1,
-            far: 200.0,
-            culling_mask: u32::MAX,
-            render_order: 0,
-            clear_flags: ClearFlags::Skybox,
-            motion_blur_active: true,
-            motion_blur_samples: 64,
-        });
+        entity.camera = Some(authoring::default_camera());
         ui.close_menu();
     }
     if entity.particles.is_none()
@@ -147,20 +87,7 @@ fn add_render_components(ui: &mut egui::Ui, entity: &mut Entity) {
         && entity.visual_correction.is_none()
         && ui.button("Visual Correction Component").clicked()
     {
-        entity.visual_correction = Some(VisualCorrectionComponent {
-            active: true,
-            bloom_active: true,
-            bloom_intensity: 1.0,
-            bloom_threshold: 0.8,
-            exposure: 0.0,
-            contrast: 1.0,
-            saturation: 1.0,
-            ssr_active: true,
-            ssr_quality: "High".to_string(),
-            ssr_temporal_upsampling: true,
-            tonemap: Tonemap::Aces,
-            gamma: 2.2,
-        });
+        entity.visual_correction = Some(authoring::default_visual_correction());
         ui.close_menu();
     }
 }

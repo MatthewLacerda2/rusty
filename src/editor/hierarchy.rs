@@ -1,8 +1,8 @@
 use egui_phosphor::regular as icon;
-use glam::Vec3;
 
 use crate::editor::{hierarchy_tree, EditorUi};
-use crate::scene::{LightComponent, LightType, MeshComponent, Scene};
+use crate::scene::authoring::{self, Primitive};
+use crate::scene::Scene;
 
 /// LEFT PANEL: Scene Hierarchy — a VS Code Explorer-style collapsible tree with a
 /// creation toolbar pinned at the top.
@@ -120,69 +120,11 @@ fn draw_toolbar(editor: &mut EditorUi, scene: &mut Scene, ui: &mut egui::Ui) {
 }
 
 fn create_entity(editor: &mut EditorUi, scene: &mut Scene) {
-    let new_id = scene.add_entity(editor.new_entity_name.clone());
-    let name_lower = editor.new_entity_type.to_lowercase();
-    if let Some(mut ent) = scene.get_entity_mut(new_id) {
-        if name_lower == "box" {
-            let (v, idx) = crate::render::mesh::generate_box(1.0, 1.0, 1.0);
-            ent.mesh = Some(mesh_component("Box", v, idx));
-        } else if name_lower == "sphere" {
-            let (v, idx) = crate::render::mesh::generate_sphere(1.0, 16, 16);
-            ent.mesh = Some(mesh_component("Sphere", v, idx));
-        } else if name_lower == "plane" {
-            let (v, idx) = crate::render::mesh::generate_plane(15.0, 15.0);
-            ent.mesh = Some(mesh_component("Plane", v, idx));
-        } else if name_lower == "cylinder" {
-            let (v, idx) = crate::render::mesh::generate_cylinder(
-                Vec3::new(0.0, -0.5, 0.0),
-                Vec3::new(0.0, 0.5, 0.0),
-                0.5,
-                12,
-            );
-            ent.mesh = Some(mesh_component("Cylinder", v, idx));
-        } else if name_lower == "pointlight" {
-            ent.light = Some(light(LightType::Point, Vec3::ONE, 1.5, 10.0));
-        } else if name_lower == "directionallight" {
-            ent.light = Some(light(
-                LightType::Directional,
-                Vec3::new(1.0, 0.95, 0.8),
-                2.0,
-                0.0,
-            ));
-        } else if name_lower == "spotlight" {
-            ent.light = Some(light(LightType::Spotlight, Vec3::ONE, 2.0, 15.0));
-        }
-        editor.selected_entity_id = Some(new_id);
-        editor.selected_asset_path = None; // clear asset selection
-        editor.is_dirty = true;
-    }
-}
-
-fn mesh_component(
-    kind: &str,
-    vertices: Vec<crate::render::mesh::Vertex>,
-    indices: Vec<u32>,
-) -> MeshComponent {
-    MeshComponent {
-        primitive_type: kind.to_string(),
-        asset_ref: None,
-        vertices,
-        indices,
-        bind_palette: Vec::new(),
-        skin: None,
-        clips: Vec::new(),
-        pose_palette: Vec::new(),
-        is_dirty: crate::scene::DirtyFlag::new(true),
-    }
-}
-
-fn light(light_type: LightType, color: Vec3, intensity: f32, range: f32) -> LightComponent {
-    LightComponent {
-        light_type,
-        color,
-        intensity,
-        range,
-        inner_cone: 30.0,
-        outer_cone: 45.0,
-    }
+    // Both the toolbar and the `Scene.CreateEntity` API route through the shared
+    // `scene::authoring` create path, so editor and API behaviour match exactly.
+    let primitive = Primitive::parse(&editor.new_entity_type);
+    let new_id = authoring::create_entity(scene, &editor.new_entity_name, primitive);
+    editor.selected_entity_id = Some(new_id);
+    editor.selected_asset_path = None; // clear asset selection
+    editor.is_dirty = true;
 }

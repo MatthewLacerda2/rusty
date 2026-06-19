@@ -101,6 +101,15 @@ fn storage_roundtrips_scalars_and_tables() {
 }
 
 #[test]
+fn assets_manifest_returns_a_table() {
+    let (m, _scene, _cam) = manager();
+    // The manifest is always a (possibly empty) array table, and `List` aliases it.
+    m.exec("assert(type(Assets.Manifest()) == 'table')")
+        .unwrap();
+    m.exec("assert(type(Assets.List()) == 'table')").unwrap();
+}
+
+#[test]
 fn raycast_misses_into_empty_space() {
     let (m, _scene, _cam) = manager();
     // Target has no collider, so nothing to hit.

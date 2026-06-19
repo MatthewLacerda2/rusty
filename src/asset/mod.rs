@@ -20,11 +20,13 @@ pub mod anim_data;
 pub mod gltf_anim;
 pub mod gltf_import;
 pub mod gltf_skin;
+pub mod manifest;
 pub mod mesh_data;
 pub mod obj_import;
 pub mod sidecar;
 
 pub use anim_data::{AnimationClip, Interpolation, JointTrack, Track};
+pub use manifest::{build_manifest, AssetEntry, AssetManifest, SubObjectEntry};
 pub use mesh_data::{ImportedAsset, JointTransform, MaterialData, MeshVertex, SkinData, SubMesh};
 pub use sidecar::{import_and_sync_sidecar, ImportSettings, MeshColliderKind};
 
@@ -134,5 +136,7 @@ pub fn import_sub_mesh(reference: &str) -> Result<SubMesh, ImportError> {
 mod fixtures;
 #[cfg(test)]
 mod fixtures_anim;
+#[cfg(test)]
+mod manifest_tests;
 #[cfg(test)]
 mod tests;

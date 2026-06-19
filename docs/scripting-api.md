@@ -111,10 +111,85 @@ user. Keys are named strings (e.g. `"W"`, `"Space"`).
 
 ## `Scene`
 
+The structural-authoring surface: the API equivalent of the editor's hierarchy
+toolbar (create / destroy / parent) and the inspector's Add Component menu. Every
+verb routes through the shared `scene::authoring` module, so it behaves identically
+to the editor and uses the same default values.
+
 | Function | Signature | Returns |
 |---|---|---|
 | `Scene.FindEntityByName` | `(name)` | `id` (or `0` if none) |
-| `Scene.DestroyEntity` | `(id)` | — |
+| `Scene.CreateEntity` | `(name, [primitive])` | new entity `id` |
+| `Scene.Deactivate` | `(id)` | — |
+| `Scene.DestroyEntity` | `(id)` | `true` if an entity existed at `id` |
+| `Scene.AddComponent` | `(id, kind)` | `true` if the entity exists |
+| `Scene.RemoveComponent` | `(id, kind)` | `true` if the entity exists |
+| `Scene.SetParent` | `(id, parent_id)` | — (errors on a parenting cycle) |
+| `Scene.ClearParent` | `(id)` | — |
+| `Scene.Save` | `([path])` | the written path |
+
+**`primitive`** (optional) is one of the hierarchy toolbar's primitives,
+case-insensitive: `Box`, `Sphere`, `Plane`, `Cylinder` (meshes) or `PointLight`,
+`DirectionalLight`, `SpotLight`. Omit it (or pass an unknown name) to create a bare
+entity carrying only its mandatory `Transform`.
+
+**`kind`** is one of the Add Component menu's first-class components,
+case-insensitive: `Light`, `Health`, `Animator`, `Collider`, `RigidBody`,
+`Texture` (alias `Material`), `NavMeshAgent`, `Camera`, `Particles`,
+`VisualCorrection`. Each is added with the inspector's default values; adding an
+existing kind replaces it. Removing `Health` also removes its `Animator`, and
+removing `Camera` also removes `VisualCorrection`, matching the inspector's
+cascades. (Scripts attach by path, not as a defaulted kind — a separate concern.)
+
+**`Scene.Deactivate`** is Unity's deferred `Object.Destroy`: it sets `active =
+false` but leaves the entity in the scene. **`Scene.DestroyEntity`** is the
+editor's Destroy button: it actually removes the entity.
+
+**`Scene.Save([path])`** persists the live world. With no path it writes back to
+the current scene file (the file the editor/session loaded); an explicit path
+writes there and becomes the new current file (Save As). It errors if no path is
+given and no current scene file is set.
+
+## `Assets`
+
+The project's importable assets — the "see what I can place" half of authoring.
+`Assets.Manifest()` (alias `Assets.List()`) walks the `project` asset root, imports
+every model file (`.gltf`/`.glb`/`.obj`), and returns a structured catalogue of the
+addressable sub-objects inside each file plus their footprint (so the agent can lay
+things out without overlap) and material count. Unlike the rest of the surface,
+this returns a Lua **table** (not a scalar triple): the result is nested data.
+
+Each `subObject`'s `reference` is the canonical `path::sub_object` string and
+round-trips with `AssetRef` / `import_sub_mesh`, so it can be handed straight to the
+mesh-instantiation path to place exactly what the manifest names. Files that fail to
+import are skipped; a missing root yields an empty list. Output is deterministic
+(files sorted by path, sub-objects in source order).
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Assets.Manifest` | `()` | array of asset tables (see shape below) |
+| `Assets.List` | `()` | alias for `Assets.Manifest` |
+
+Returned shape (Lua, 1-indexed arrays):
+
+```lua
+{
+  {
+    path = "project/models/crates.glb",
+    materialCount = 2,            -- materials in the file's shared table
+    subObjects = {
+      {
+        id = "Sedan",
+        reference = "project/models/crates.glb::Sedan",  -- round-trips with AssetRef
+        materialCount = 1,         -- 0 or 1 (a sub-mesh uses at most one material)
+        size = { x = 4.2, y = 1.5, z = 1.8 },            -- AABB extent (max - min)
+        min  = { x = -2.1, y = 0.0, z = -0.9 },          -- absent if the mesh is empty
+        max  = { x =  2.1, y = 1.5, z =  0.9 },
+      },
+    },
+  },
+}
+```
 
 ## `Navigation`
 

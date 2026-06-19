@@ -63,6 +63,16 @@ impl Session {
         }
 
         let mut world = GameWorld::new(scene, input, nav, console);
+        // The boot scene is the `Scene.Save()` write-back target, so an
+        // argument-less save from the agent persists back to the loaded file —
+        // just as the editor's Save writes to `current_scene_path`.
+        if !boot_scene.is_empty() {
+            *world
+                .resources
+                .script_manager
+                .scene_path_cell()
+                .borrow_mut() = Some(boot_scene.to_string());
+        }
         world.init_edit_runtime()?;
         Ok(Self { world })
     }
