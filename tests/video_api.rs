@@ -8,49 +8,54 @@
 //! `core::video::VideoSettings::diff`, exercised here through the cell.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use mlua::Lua;
 use rusty::core::storage::Storage;
 use rusty::core::video::{VideoSettings, VIDEO_NAMESPACE};
 
-fn setup() -> (Lua, Rc<RefCell<VideoSettings>>) {
-    let lua = Lua::new();
-    let video = Rc::new(RefCell::new(VideoSettings::default()));
-    rusty::api::video::register(&lua, &video).unwrap();
-    (lua, video)
-}
-
 #[test]
 fn resolution_writes_cell_and_clamps_zero() {
-    let (lua, video) = setup();
-    lua.load("Video.SetResolution(1920, 1080)").exec().unwrap();
-    assert_eq!(video.borrow().resolution(), (1920, 1080));
+    let lua = Lua::new();
+    let video = RefCell::new(VideoSettings::default());
+    lua.scope(|scope| {
+        rusty::api::video::register(&lua, scope, &video).unwrap();
+        lua.load("Video.SetResolution(1920, 1080)").exec().unwrap();
+        assert_eq!(video.borrow().resolution(), (1920, 1080));
 
-    let res: (u32, u32) = lua.load("return Video.GetResolution()").eval().unwrap();
-    assert_eq!(res, (1920, 1080));
+        let res: (u32, u32) = lua.load("return Video.GetResolution()").eval().unwrap();
+        assert_eq!(res, (1920, 1080));
 
-    // A zero axis is clamped to 1 so the platform layer never gets a 0-sized surface.
-    lua.load("Video.SetResolution(0, 0)").exec().unwrap();
-    assert_eq!(video.borrow().resolution(), (1, 1));
+        // A zero axis is clamped to 1 so the platform layer never gets a 0-sized surface.
+        lua.load("Video.SetResolution(0, 0)").exec().unwrap();
+        assert_eq!(video.borrow().resolution(), (1, 1));
+        Ok(())
+    })
+    .unwrap();
 }
 
 #[test]
 fn vsync_and_fullscreen_round_trip_through_cell() {
-    let (lua, video) = setup();
-    assert!(video.borrow().vsync, "default vsync on");
-    assert!(!video.borrow().fullscreen, "default windowed");
+    let lua = Lua::new();
+    let video = RefCell::new(VideoSettings::default());
+    lua.scope(|scope| {
+        rusty::api::video::register(&lua, scope, &video).unwrap();
 
-    lua.load("Video.SetVsync(false); Video.SetFullscreen(true)")
-        .exec()
-        .unwrap();
-    assert!(!video.borrow().vsync);
-    assert!(video.borrow().fullscreen);
+        assert!(video.borrow().vsync, "default vsync on");
+        assert!(!video.borrow().fullscreen, "default windowed");
 
-    let v: bool = lua.load("return Video.GetVsync()").eval().unwrap();
-    let f: bool = lua.load("return Video.GetFullscreen()").eval().unwrap();
-    assert!(!v);
-    assert!(f);
+        lua.load("Video.SetVsync(false); Video.SetFullscreen(true)")
+            .exec()
+            .unwrap();
+        assert!(!video.borrow().vsync);
+        assert!(video.borrow().fullscreen);
+
+        let v: bool = lua.load("return Video.GetVsync()").eval().unwrap();
+        let f: bool = lua.load("return Video.GetFullscreen()").eval().unwrap();
+        assert!(!v);
+        assert!(f);
+        Ok(())
+    })
+    .unwrap();
 }
 
 #[test]

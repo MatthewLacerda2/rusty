@@ -4,7 +4,6 @@
 //! `apply_damage` is shared with `Physics.Shoot`, which is hitscan-plus-damage.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use mlua::Lua;
 
@@ -13,11 +12,16 @@ use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the `Health` namespace onto `lua`.
-pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<ConsoleLogs>>) -> Reg {
+pub fn register<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    scene: &'scope RefCell<Scene>,
+    console: &'scope RefCell<ConsoleLogs>,
+) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_get_set(lua, &table, scene)?;
-    register_heal_damage(lua, &table, scene, console)?;
+    register_get_set(scope, &table, scene)?;
+    register_heal_damage(scope, &table, scene, console)?;
 
     lua.globals()
         .set("Health", table)
@@ -25,13 +29,16 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<Cons
 }
 
 /// `Get` / `Set` — read the (current, max) pair and clamp-set current health.
-fn register_get_set(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_get_set<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "Get",
-        lua.create_function(move |_, id: u32| {
-            let scene = s.borrow();
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
             let hp = scene
                 .get_entity(id)
                 .and_then(|e| e.health.as_ref().map(|h| (h.current_health, h.max_health)));
@@ -39,12 +46,11 @@ fn register_get_set(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) 
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "Set",
-        lua.create_function(move |_, (id, value): (u32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, value): (u32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(h) = &mut e.health {
                     h.current_health = value.clamp(0.0, h.max_health);
@@ -57,18 +63,17 @@ fn register_get_set(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) 
 }
 
 /// `Heal` / `Damage` — add health (capped at max) or route through `apply_damage`.
-fn register_heal_damage(
-    lua: &Lua,
+fn register_heal_damage<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,
-    scene: &Rc<RefCell<Scene>>,
-    console: &Rc<RefCell<ConsoleLogs>>,
+    scene: &'scope RefCell<Scene>,
+    console: &'scope RefCell<ConsoleLogs>,
 ) -> Reg {
-    let s = Rc::clone(scene);
     put(
         table,
         "Heal",
-        lua.create_function(move |_, (id, amount): (u32, f32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, amount): (u32, f32)| {
+            let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(h) = &mut e.health {
                     h.current_health = (h.current_health + amount).min(h.max_health);
@@ -81,13 +86,11 @@ fn register_heal_damage(
         }),
     )?;
 
-    let s = Rc::clone(scene);
-    let c = Rc::clone(console);
     put(
         table,
         "Damage",
-        lua.create_function(move |_, (id, amount): (u32, f32)| {
-            apply_damage(&s, &c, id, amount);
+        scope.create_function(|_, (id, amount): (u32, f32)| {
+            apply_damage(scene, console, id, amount);
             Ok(())
         }),
     )
@@ -96,8 +99,8 @@ fn register_heal_damage(
 /// Reduce an entity's health, flag death + freeze its death clip, and log it.
 /// Shared by `Health.Damage` and `Physics.Shoot`.
 pub(crate) fn apply_damage(
-    scene: &Rc<RefCell<Scene>>,
-    console: &Rc<RefCell<ConsoleLogs>>,
+    scene: &RefCell<Scene>,
+    console: &RefCell<ConsoleLogs>,
     id: u32,
     amount: f32,
 ) {

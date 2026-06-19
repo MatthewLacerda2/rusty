@@ -7,7 +7,6 @@
 //! stays bit-for-bit reproducible alongside the sim's own emission.
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use mlua::Lua;
 
@@ -15,12 +14,16 @@ use super::{put, Reg};
 use crate::scene::Scene;
 
 /// Register the `Particles` namespace onto `lua`.
-pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
+pub fn register<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_emission(lua, &table, scene)?;
-    register_tuning(lua, &table, scene)?;
-    register_state(lua, &table, scene)?;
+    register_emission(scope, &table, scene)?;
+    register_tuning(scope, &table, scene)?;
+    register_state(scope, &table, scene)?;
 
     lua.globals()
         .set("Particles", table)
@@ -28,15 +31,18 @@ pub fn register(lua: &Lua, scene: &Rc<RefCell<Scene>>) -> Reg {
 }
 
 /// One-off emissions: `Emit` (count) and `Burst` (the configured burst count).
-fn register_emission(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
+fn register_emission<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     // Emit `count` particles at the entity's position, right now. Returns the
     // number actually spawned (the max-particle cap may swallow some).
-    let s = Rc::clone(scene);
     put(
         table,
         "Emit",
-        lua.create_function(move |_, (id, count): (u32, u32)| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, (id, count): (u32, u32)| {
+            let mut scene = scene.borrow_mut();
             let spawned = scene.get_entity_mut(id).and_then(|mut e| {
                 let origin = e.transform.position;
                 e.particles.as_mut().map(|p| p.emit_at(origin, count))
@@ -47,12 +53,11 @@ fn register_emission(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>)
 
     // Fire one full configured burst (`burst_count`) immediately, independent of
     // the emit mode or the auto-burst bookkeeping. Returns the number spawned.
-    let s = Rc::clone(scene);
     put(
         table,
         "Burst",
-        lua.create_function(move |_, id: u32| {
-            let mut scene = s.borrow_mut();
+        scope.create_function(|_, id: u32| {
+            let mut scene = scene.borrow_mut();
             let spawned = scene.get_entity_mut(id).and_then(|mut e| {
                 let origin = e.transform.position;
                 e.particles
@@ -65,36 +70,41 @@ fn register_emission(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>)
 }
 
 /// Emitter tuning: `SetActive` (gate) and `SetRate` (continuous rate).
-fn register_tuning(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_tuning<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "SetActive",
-        lua.create_function(move |_, (id, active): (u32, bool)| {
-            with_emitter(&s, id, |p| p.active = active);
+        scope.create_function(|_, (id, active): (u32, bool)| {
+            with_emitter(scene, id, |p| p.active = active);
             Ok(())
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "SetRate",
-        lua.create_function(move |_, (id, rate): (u32, f32)| {
-            with_emitter(&s, id, |p| p.rate = rate.max(0.0));
+        scope.create_function(|_, (id, rate): (u32, f32)| {
+            with_emitter(scene, id, |p| p.rate = rate.max(0.0));
             Ok(())
         }),
     )
 }
 
 /// Live state: `IsActive`, `GetCount`, and `Clear`.
-fn register_state(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) -> Reg {
-    let s = Rc::clone(scene);
+fn register_state<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "IsActive",
-        lua.create_function(move |_, id: u32| {
-            let scene = s.borrow();
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
             let active = scene
                 .get_entity(id)
                 .and_then(|e| e.particles.as_ref().map(|p| p.active));
@@ -102,12 +112,11 @@ fn register_state(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) ->
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "GetCount",
-        lua.create_function(move |_, id: u32| {
-            let scene = s.borrow();
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
             let count = scene
                 .get_entity(id)
                 .and_then(|e| e.particles.as_ref().map(|p| p.live_count() as u32));
@@ -115,12 +124,11 @@ fn register_state(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) ->
         }),
     )?;
 
-    let s = Rc::clone(scene);
     put(
         table,
         "Clear",
-        lua.create_function(move |_, id: u32| {
-            with_emitter(&s, id, |p| p.runtime.particles.clear());
+        scope.create_function(|_, id: u32| {
+            with_emitter(scene, id, |p| p.runtime.particles.clear());
             Ok(())
         }),
     )
@@ -128,7 +136,7 @@ fn register_state(lua: &Lua, table: &mlua::Table, scene: &Rc<RefCell<Scene>>) ->
 
 /// Mutate the emitter on entity `id` if it has one (no-op otherwise).
 fn with_emitter(
-    scene: &Rc<RefCell<Scene>>,
+    scene: &RefCell<Scene>,
     id: u32,
     f: impl FnOnce(&mut crate::scene::ParticleEmitterComponent),
 ) {

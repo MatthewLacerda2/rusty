@@ -35,7 +35,6 @@ pub mod transform;
 pub mod video;
 
 use std::cell::RefCell;
-use std::rc::Rc;
 
 use mlua::{Function, Lua, Table};
 
@@ -53,53 +52,62 @@ use crate::time::Time;
 /// Result alias every namespace registrar returns.
 pub type Reg = Result<(), String>;
 
-/// The shared engine-resource handles every namespace binds against. Bundled
-/// into one struct so each registrar takes a single context. The live `physics`
-/// handle is what lets `Physics.Raycast`/`Shoot` reach the same rapier world the
-/// engine hitscan uses; it is `None` until Play builds the world.
-pub struct ApiCtx {
-    pub scene: Rc<RefCell<Scene>>,
-    pub input: Rc<RefCell<InputState>>,
-    pub nav: Rc<RefCell<NavigationGraph>>,
-    pub camera: Rc<RefCell<Camera>>,
-    pub time: Rc<RefCell<Time>>,
-    pub physics: Rc<RefCell<Option<PhysicsWorld>>>,
-    pub console: Rc<RefCell<ConsoleLogs>>,
-    pub storage: Rc<RefCell<Storage>>,
+/// Scoped engine-resource references bundled for a single script evaluation.
+///
+/// Every field is a plain borrow of the engine's `RefCell<T>` — no `Rc` clone
+/// occurs. The lifetime `'scope` ties these references to the `mlua::Scope`
+/// that created the closures, so the Lua functions cannot outlive the call-frame
+/// that holds the borrows.
+pub struct ApiScopedCtx<'scope> {
+    pub scene: &'scope RefCell<Scene>,
+    pub input: &'scope RefCell<InputState>,
+    pub nav: &'scope RefCell<NavigationGraph>,
+    pub camera: &'scope RefCell<Camera>,
+    pub time: &'scope RefCell<Time>,
+    pub physics: &'scope RefCell<Option<PhysicsWorld>>,
+    pub console: &'scope RefCell<ConsoleLogs>,
+    pub storage: &'scope RefCell<Storage>,
     /// Global post-FX scalability tier, shared with the platform layer so a
     /// `Graphics.SetQuality` write reaches `renderer.set_quality`.
-    pub quality: Rc<RefCell<QualityPreset>>,
+    pub quality: &'scope RefCell<QualityPreset>,
     /// Runtime video settings (resolution / vsync / fullscreen), shared with the
     /// platform layer so a `Video.*` write reaches the surface + window.
-    pub video: Rc<RefCell<VideoSettings>>,
+    pub video: &'scope RefCell<VideoSettings>,
 }
 
-/// Register every namespace onto `lua`. This is the one place the whole script
+/// Register every namespace onto `lua` using `scope`-tied closures that borrow
+/// the engine resources via `ctx`. This is the one place the whole script
 /// surface is wired up, shared by gameplay scripts, the console REPL and
 /// bot-players.
-pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
-    transform::register(lua, &ctx.scene)?;
+pub fn register<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    ctx: &ApiScopedCtx<'scope>,
+) -> Reg {
+    transform::register(lua, scope, ctx.scene)?;
+    // `Assets` borrows no engine state (it walks the project asset root on each
+    // call), so it stays a plain static registrar even under the scoped surface.
     assets::register(lua)?;
-    material::register(lua, &ctx.scene)?;
-    animator::register(lua, &ctx.scene, &ctx.console)?;
-    input::register_readable(lua, &ctx.input)?;
-    scene::register(lua, &ctx.scene, &ctx.console)?;
-    nav::register(lua, &ctx.scene, &ctx.nav)?;
-    physics::register(lua, &ctx.scene)?;
-    health::register(lua, &ctx.scene, &ctx.console)?;
-    physics::register_hitscan(lua, &ctx.scene, &ctx.physics, &ctx.console)?;
-    time::register(lua, &ctx.time)?;
-    camera::register(lua, &ctx.camera)?;
-    light::register(lua, &ctx.scene)?;
-    particle::register(lua, &ctx.scene)?;
-    decals::register(lua, &ctx.scene)?;
-    layers::register(lua, &ctx.scene)?;
-    graphics::register(lua, &ctx.scene, &ctx.quality)?;
-    video::register(lua, &ctx.video)?;
-    storage::register(lua, &ctx.storage)?;
-    input::register_writable(lua, &ctx.input)?;
+    material::register(lua, scope, ctx.scene)?;
+    animator::register(lua, scope, ctx.scene, ctx.console)?;
+    input::register_readable(lua, scope, ctx.input)?;
+    scene::register(lua, scope, ctx.scene, ctx.console)?;
+    nav::register(lua, scope, ctx.scene, ctx.nav)?;
+    physics::register(lua, scope, ctx.scene)?;
+    health::register(lua, scope, ctx.scene, ctx.console)?;
+    physics::register_hitscan(lua, scope, ctx.scene, ctx.physics, ctx.console)?;
+    time::register(lua, scope, ctx.time)?;
+    camera::register(lua, scope, ctx.camera)?;
+    light::register(lua, scope, ctx.scene)?;
+    particle::register(lua, scope, ctx.scene)?;
+    decals::register(lua, scope, ctx.scene)?;
+    layers::register(lua, scope, ctx.scene)?;
+    graphics::register(lua, scope, ctx.scene, ctx.quality)?;
+    video::register(lua, scope, ctx.video)?;
+    storage::register(lua, scope, ctx.storage)?;
+    input::register_writable(lua, scope, ctx.input)?;
     #[cfg(feature = "dev")]
-    debug::register(lua, &ctx.console)?;
+    debug::register(lua, scope, ctx.console)?;
     Ok(())
 }
 

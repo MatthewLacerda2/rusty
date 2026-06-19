@@ -14,6 +14,49 @@ return a sensible default (zeros, or `(1,1,1)` for scale) instead of erroring.
 > that emits it from self-describing bindings (with a CI drift check) is a tracked
 > follow-up — see the PR for issue #28.
 
+> **Faithfulness:** every setter here is expected to be *observed* by a downstream
+> system — a renderer/sim read or a `SceneData` round-trip. When you add a setter,
+> name its read-site (or add a round-trip test) in the same change and record it in
+> [`api-faithfulness.md`](api-faithfulness.md), so the surface never grows a
+> write-only no-op that silently fails headless authoring (issue #178).
+
+---
+
+## Driving a headless session
+
+For agentic use there is a **fourth caller**: a long-lived, headless, **edit-mode**
+engine process you talk to over a command channel. It holds a live world and the
+same evaluator the console uses, so every namespace below resolves through it
+identically — there is no separate, thinner headless surface.
+
+```
+cargo run --bin session --features dev               # boot + seed the default scene
+cargo run --bin session --features dev -- <scene>    # boot a specific scene file
+cargo run --bin session --features dev -- --empty    # start from an empty scene
+```
+
+**Protocol.** One Lua command per line on **stdin**; one JSON response per command
+on **stdout**, in lockstep:
+
+- success: `{"ok":true,"result":"<rendered value, or empty for a statement>"}`
+- failure: `{"ok":false,"error":"<message>"}`
+
+A line is evaluated as an expression first (so it echoes its value), then as a
+statement. **State persists for the life of the process**: globals set on one line
+are visible on the next, and any world mutation (a loaded scene, baked nav, an
+imported mesh, a moved transform) stays put across commands. The session runs in
+**edit mode** — it does *not* force play — and a failed command is reported in its
+response **without** tearing the session down. The channel ends at EOF.
+
+```
+> pid = Scene.FindEntityByName("Player")   ->  {"ok":true,"result":""}
+> Transform.SetPosition(pid, 7, 8, 9)      ->  {"ok":true,"result":""}
+> Transform.GetPosition(pid)               ->  {"ok":true,"result":"7, 8, 9"}
+```
+
+Note: `local` bindings are scoped to their own line; use a **global** (no `local`)
+to carry a value across commands, as with `pid` above.
+
 ---
 
 ## `Transform`
@@ -39,8 +82,8 @@ PBR material params and texture maps on an entity's renderer.
 |---|---|
 | `Material.SetMetallic` | `(id, value)` |
 | `Material.SetRoughness` | `(id, value)` |
-| `Material.SetMetallicMap` | `(id, path)` |
-| `Material.SetRoughnessMap` | `(id, path)` |
+| `Material.SetMetallicMap` | `(id, path)` — ⚠️ stored/serialized but **not yet sampled** by the renderer (#184) |
+| `Material.SetRoughnessMap` | `(id, path)` — ⚠️ stored/serialized but **not yet sampled** by the renderer (#184) |
 | `Material.SetTexture` | `(id, path)` |
 
 ## `Animator`
