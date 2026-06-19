@@ -9,6 +9,7 @@
 //! behaviour).
 //!
 //! Submodules:
+//!   session     — long-lived edit-mode host + command channel (the keystone, #177)
 //!   harness     — headless deterministic runner: Step / StepUntil / results.json
 //!   scenario    — loads and runs a `.lua` scenario, captures observations
 //!   bridge      — Lua bindings for the scenario VM (the control surface)
@@ -27,4 +28,5 @@ pub mod demo_scene;
 pub mod harness;
 pub mod scenario;
 pub mod screenshot;
+pub mod session;
 pub mod snapshot;

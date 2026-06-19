@@ -22,6 +22,13 @@ name = "play"
 path = "src/bin/play.rs"
 required-features = ["dev"]
 
+# Long-lived headless EDIT-mode session + command channel (the keystone, #177).
+# Dev-only: an agent drives the full `api::` surface over stdin against a live world.
+[[bin]]
+name = "session"
+path = "src/bin/session.rs"
+required-features = ["dev"]
+
 [features]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
 dev = []
