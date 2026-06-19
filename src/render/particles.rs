@@ -61,7 +61,11 @@ pub struct ParticleRenderer {
 impl ParticleRenderer {
     /// Build the pass: a globals bind group + two blend-variant pipelines that
     /// reuse the renderer's `texture_layout` for the sprite (group 1).
-    pub fn new(device: &wgpu::Device, texture_layout: &wgpu::BindGroupLayout, registry: &mut ShaderRegistry) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        texture_layout: &wgpu::BindGroupLayout,
+        registry: &mut ShaderRegistry,
+    ) -> Self {
         let shader = registry.load(device, "particles.wgsl", "Particle Shader");
 
         let globals_layout = Self::globals_layout(device);

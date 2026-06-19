@@ -83,8 +83,16 @@ impl RendererParts {
             camera_lighting_layout,
             entity_bones_layout,
             // Billboard particle + box-projector decal passes reuse the layout.
-            particle_renderer: super::particles::ParticleRenderer::new(device, &texture_layout, &mut registry),
-            decal_renderer: super::decals::DecalRenderer::new(device, &texture_layout, &mut registry),
+            particle_renderer: super::particles::ParticleRenderer::new(
+                device,
+                &texture_layout,
+                &mut registry,
+            ),
+            decal_renderer: super::decals::DecalRenderer::new(
+                device,
+                &texture_layout,
+                &mut registry,
+            ),
             texture_layout,
             default_texture,
             camera_buffer,

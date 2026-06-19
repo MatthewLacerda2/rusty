@@ -43,9 +43,7 @@ impl ShaderRegistry {
                 file_path: "common",
                 ..Default::default()
             })
-            .unwrap_or_else(|e| {
-                panic!("ShaderRegistry: common.wgsl failed to compose: {e:?}")
-            });
+            .unwrap_or_else(|e| panic!("ShaderRegistry: common.wgsl failed to compose: {e:?}"));
         Self { composer, base }
     }
 
@@ -55,12 +53,7 @@ impl ShaderRegistry {
     /// # Panics
     /// Panics on missing files or shader errors — both are authoring mistakes
     /// caught during engine startup, not recoverable runtime conditions.
-    pub fn load(
-        &mut self,
-        device: &wgpu::Device,
-        name: &str,
-        label: &str,
-    ) -> wgpu::ShaderModule {
+    pub fn load(&mut self, device: &wgpu::Device, name: &str, label: &str) -> wgpu::ShaderModule {
         let path = format!("{}/{name}", self.base);
         let source = std::fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("ShaderRegistry: cannot read {path}: {e}"));

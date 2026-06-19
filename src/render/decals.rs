@@ -127,7 +127,11 @@ impl DecalRenderer {
     /// Build the decal pass: a unit-cube mesh, the globals + per-decal + depth
     /// bind-group layouts, and the projector pipeline. Reuses the renderer's
     /// `texture_layout` (group 3) for the decal sprite.
-    pub fn new(device: &wgpu::Device, texture_layout: &wgpu::BindGroupLayout, registry: &mut ShaderRegistry) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        texture_layout: &wgpu::BindGroupLayout,
+        registry: &mut ShaderRegistry,
+    ) -> Self {
         let shader = registry.load(device, "decals.wgsl", "Decal Shader");
 
         let globals_layout = Self::globals_layout(device);
