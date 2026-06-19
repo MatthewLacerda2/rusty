@@ -3,15 +3,18 @@
 //! The single stable API surface shared by Lua scripts, the console REPL and
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
 //! `Scene`, `Health`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
-//! `Particles`, `Layers`, `Graphics`, `Video`, `Storage`, plus the dev-only `Debug`)
+//! `Assets`, `Particles`, `Layers`, `Graphics`, `Video`, `Storage`, plus the
+//! dev-only `Debug`)
 //! is registered from this tree onto the live Lua runtime.
 //! `scripting`
 //! owns the runtime and lifecycle; `api` owns the surface. One surface, three
 //! callers — they never drift apart.
 //!
-//! Allowed deps: core, components, physics, navigation, render, time, scripting.
+//! Allowed deps: core, components, physics, navigation, render, time, scripting,
+//! asset (for the `Assets` manifest).
 
 pub mod animator;
+pub mod assets;
 pub mod camera;
 #[cfg(feature = "dev")]
 pub mod debug;
@@ -82,6 +85,9 @@ pub fn register<'lua, 'scope>(
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     transform::register(lua, scope, ctx.scene)?;
+    // `Assets` borrows no engine state (it walks the project asset root on each
+    // call), so it stays a plain static registrar even under the scoped surface.
+    assets::register(lua)?;
     material::register(lua, scope, ctx.scene)?;
     animator::register(lua, scope, ctx.scene, ctx.console)?;
     input::register_readable(lua, scope, ctx.input)?;
