@@ -51,6 +51,10 @@ pub struct ScriptManager {
     /// save and an editor save hit the same file. `None` until a scene is loaded
     /// or the path is set; an argument-less `Scene.Save()` then errors cleanly.
     pub(super) scene_path: Rc<RefCell<Option<String>>>,
+    /// Mirror of `GameWorld`'s play-mode flag, synced by `set_playing`. The
+    /// evaluator doesn't hold `Resources`, so this shared cell is how the dev-only
+    /// `Debug.Snapshot` reports play-state. Defaults to `false` (edit mode).
+    pub(super) is_playing: Rc<RefCell<bool>>,
 }
 
 impl ScriptManager {
@@ -76,7 +80,14 @@ impl ScriptManager {
             video: Rc::new(RefCell::new(VideoSettings::default())),
             physics: Rc::new(RefCell::new(None)),
             scene_path: Rc::new(RefCell::new(None)),
+            is_playing: Rc::new(RefCell::new(false)),
         }
+    }
+
+    /// Handle to the shared play-state cell, so `GameWorld::set_playing` can keep
+    /// it in step with the live play-mode flag for `Debug.Snapshot`.
+    pub fn play_state_cell(&self) -> Rc<RefCell<bool>> {
+        Rc::clone(&self.is_playing)
     }
 
     /// Inject the shared scene-path cell — the `Scene.Save()` write-back target.
@@ -178,6 +189,7 @@ impl ScriptManager {
             quality: &self.quality,
             video: &self.video,
             scene_path: &self.scene_path,
+            is_playing: &self.is_playing,
         }
     }
 

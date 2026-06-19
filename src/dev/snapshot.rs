@@ -1,49 +1,22 @@
 //! src/dev/snapshot.rs — world → JSON snapshot (what the agent "sees").
 //!
-//! One observation == one snapshot. The agent spends a `StepUntil` to skip hundreds
-//! of frames, then reads ONE of these. Fields are intentionally small and stable:
-//! per-entity id/name/pos/rot/health/clip, plus camera and play-state.
+//! One observation == one snapshot. The harness/bot path spends a `StepUntil` to
+//! skip hundreds of frames, then reads ONE of these. The structured shape itself
+//! lives on the API surface in [`crate::api::snapshot`] (the read half of
+//! editor↔API parity, #180), so this play-testing entry point and the dev-only
+//! `Debug.Snapshot` binding return the exact same rich document — no drift.
 
-use serde_json::{json, Value};
+use serde_json::Value;
 
 use crate::app::GameWorld;
 
-fn vec3(v: glam::Vec3) -> Value {
-    json!([v.x, v.y, v.z])
-}
-
-/// Snapshot a single entity into the stable observation shape.
-fn entity_json(e: &crate::scene::Entity) -> Value {
-    let health = e
-        .health
-        .as_ref()
-        .map(|h| json!({ "current": h.current_health, "max": h.max_health, "dead": h.is_dead }));
-    let clip = e.animator.as_ref().map(|a| a.current_clip.clone());
-    json!({
-        "id": e.id,
-        "name": e.name,
-        "active": e.active,
-        "pos": vec3(e.transform.position),
-        "rot": vec3(e.transform.euler_angles()),
-        "health": health,
-        "clip": clip,
-    })
-}
-
-/// Build the full world snapshot.
+/// Build the full world snapshot from the live world (frame + play-state envelope,
+/// camera, and every entity in the authoring-rich shape).
 pub fn snapshot(world: &GameWorld) -> Value {
-    let scene = world.scene().borrow();
-    let entities: Vec<Value> = scene.iter().map(|e| entity_json(&e)).collect();
-    let cam = world.camera().borrow();
-    json!({
-        "frame": world.play_frame(),
-        "play_state": if world.is_playing() { "playing" } else { "editor" },
-        "camera": {
-            "pos": vec3(cam.position),
-            "yaw": cam.yaw,
-            "pitch": cam.pitch,
-            "fov": cam.fov,
-        },
-        "entities": entities,
-    })
+    crate::api::snapshot::world_value(
+        &world.scene().borrow(),
+        &world.camera().borrow(),
+        world.play_frame(),
+        world.is_playing(),
+    )
 }

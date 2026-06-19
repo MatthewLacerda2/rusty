@@ -139,6 +139,9 @@ impl GameWorld {
     /// Enter or leave play mode (the platform layer flips this on a button / ESC).
     pub fn set_playing(&mut self, playing: bool) {
         self.resources.is_playing = playing;
+        // Mirror into the script runtime's shared cell so `Debug.Snapshot` reports
+        // the live play-state (the evaluator doesn't hold `Resources`).
+        *self.resources.script_manager.play_state_cell().borrow_mut() = playing;
     }
 
     /// Advance the simulation by `dt` seconds. Returns any play-state transition so

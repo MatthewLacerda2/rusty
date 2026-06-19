@@ -99,3 +99,26 @@ fn load_entity_script_missing_file_returns_error() {
     assert!(result.is_err(), "missing file must error");
     assert!(result.unwrap_err().contains("Script file not found"));
 }
+
+// `Debug.Snapshot` reports play-state from the shared cell `set_playing` writes,
+// so `play_state_cell()` must alias the live flag the evaluator reads — flipping it
+// must show up in the snapshot (#180).
+#[cfg(feature = "dev")]
+#[test]
+fn play_state_cell_drives_debug_snapshot_play_state() {
+    let m = live_manager();
+    assert!(
+        m.eval("Debug.Snapshot()")
+            .unwrap()
+            .contains("\"play_state\": \"editor\""),
+        "edit mode by default"
+    );
+
+    *m.play_state_cell().borrow_mut() = true;
+    assert!(
+        m.eval("Debug.Snapshot()")
+            .unwrap()
+            .contains("\"play_state\": \"playing\""),
+        "the cell handle must alias the flag the snapshot reads"
+    );
+}
