@@ -7,6 +7,13 @@ on:
   # it lands. The gating jobs below opt in via their `if`; the report-only
   # coverage/mutants jobs deliberately do not, to keep the queue lean.
   merge_group:
+  # The report-only coverage/mutants jobs run here — post-merge on `main` — and
+  # NOT on `pull_request`. They take ~15 min and, being non-blocking, only ever
+  # sat on a PR as a phantom "still running" long after the gating checks were
+  # already green, which repeatedly read as a stuck PR. On `main` they still
+  # produce the ratchet/baseline data, without stalling any PR or the queue.
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -28,7 +35,10 @@ jobs:
     steps:
       - uses: dorny/paths-filter@v3
         id: filter
-        if: github.event_name == 'pull_request'
+        # Runs on PRs (diff vs. base) and on push to main (diff of the merge
+        # commit) so the post-merge coverage/mutants jobs can skip docs-only or
+        # non-sim merges just as they did per-PR.
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         with:
           filters: |
             code:
@@ -109,9 +119,11 @@ jobs:
   coverage:
     needs: changes
     runs-on: ubuntu-latest
+    # Post-merge on main (or manual), not per-PR — see the `push` trigger note.
+    # Skips docs-only merges via the `code` filter.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
+      (github.event_name == 'push' && needs.changes.outputs.code != 'false')
     # Informational to start (issue #117): publish what the suite exercises so the
     # mutation/property work can be aimed. No hard floor yet — we ratchet to a
     # regression gate once a baseline is recorded. The ~85% target on the
@@ -182,13 +194,14 @@ jobs:
   mutants:
     needs: changes
     runs-on: ubuntu-latest
-    # Only run when the PR touches sim source / their tests / dep pins (the `sim`
-    # filter above): a full mutation sweep over the four sim modules takes ~15 min
-    # and cannot reveal anything new on a PR that changes none of them, so non-sim
-    # PRs skip it. `workflow_dispatch` always runs the full sweep on demand.
+    # Post-merge on main (or manual), not per-PR — see the `push` trigger note.
+    # Runs only when the merge touched sim source / their tests / dep pins (the
+    # `sim` filter above): a full mutation sweep over the four sim modules takes
+    # ~15 min and cannot reveal anything new on a merge that changed none of them.
+    # `workflow_dispatch` always runs the full sweep on demand.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.draft == false && needs.changes.outputs.sim != 'false')
+      (github.event_name == 'push' && needs.changes.outputs.sim != 'false')
     # Report-only to start (#122): mutation testing audits whether the tests
     # actually catch bugs — the headline guardrail against green-but-vacuous
     # agent-written tests. Scoped to the deterministic sim (app/scripting/physics/

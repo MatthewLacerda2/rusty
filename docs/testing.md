@@ -39,6 +39,13 @@ regression below it — rather than gate on a brittle absolute percentage. Run i
 locally with `cargo llvm-cov --summary-only` (add `--features dev` for the
 dev-only surface).
 
+**When it runs:** post-merge on `main` (and on `workflow_dispatch`), **not** on
+every pull request. The same applies to the report-only `mutants` sweep. Both
+are non-blocking and take ~15 min, so on a PR they only ever sat "in progress"
+long after the gating checks were green — a phantom stuck-PR. Running them on
+`main` keeps the ratchet/baseline signal where it's actionable without stalling
+PRs; a merge that touches no sim/code paths skips them via the `changes` filter.
+
 ## Fuzzing (local-first)
 The scene-load path is a parser eating untrusted input (hand-edited or corrupt
 save files), so it gets a [`cargo-fuzz`](https://github.com/rust-fuzz/cargo-fuzz)
