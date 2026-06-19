@@ -11,7 +11,7 @@
 //! ## Where it lives in the determinism story
 //! The remap sits in the platform layer (`main.rs`), strictly *before* the sim
 //! reads a key. The headless harness and bot-players inject logical keys directly
-//! via [`InputState::press`]/[`release`](crate::core::input::InputState::release),
+//! via [`InputState::press`](crate::core::input::InputState::press)/[`release`](crate::core::input::InputState::release),
 //! so they bypass the keymap entirely — the sim stays a pure function of
 //! `(seed, inputs, fixed dt)`. `core` is outside the determinism guard's sim dirs.
 //!
