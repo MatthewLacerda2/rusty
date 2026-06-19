@@ -1,7 +1,7 @@
 //! src/asset/gltf_anim.rs — glTF `animation` → [`AnimationClip`] extraction (#80).
 //!
 //! Reads the document's `animations` into named clips whose tracks are keyed by the
-//! *joint slot* of a given skin (the same order #79's [`SkinData`] uses), so the
+//! *joint slot* of a given skin (the same order #79's [`SkinData`](super::SkinData) uses), so the
 //! sampler can pose the skeleton directly. A channel that targets a node outside the
 //! skin's joints is ignored (it can't drive this mesh's palette). Pure data — the
 //! `gltf` crate + `glam`, never wgpu/egui/mlua.

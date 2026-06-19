@@ -9,7 +9,7 @@ impl NavigationGraph {
     /// a cell takes the highest top covering it (so stairs and overlapping terrain
     /// keep the upper surface), else flat ground `y = 0`. Walkability between cells
     /// is not a per-cell flag but a connectivity rule applied at query time
-    /// ([`super::NavigationGraph::step_connected`]): a cell raised far above all its
+    /// (`NavigationGraph::step_connected`): a cell raised far above all its
     /// neighbours (a wall top) is simply unreachable — no neighbour is within
     /// `max_step` — so A\* never routes onto it and steering never slides up it.
     /// This unifies the pathing and steering rules and correctly keeps stair tops
@@ -68,7 +68,7 @@ impl NavigationGraph {
     /// Whether a cell is *reachable* from any cardinal neighbour within `max_step`
     /// (a wall top, isolated by tall drops on every side, is not). Drives the bake's
     /// notion of an effectively-blocked cell in tests; A\* and steering enforce the
-    /// same `max_step` rule per-edge via [`super::NavigationGraph::step_connected`].
+    /// same `max_step` rule per-edge via `NavigationGraph::step_connected`.
     pub fn cell_reachable(&self, gx: i32, gz: i32) -> bool {
         let h = self.height_at(gx, gz);
         [(1, 0), (-1, 0), (0, 1), (0, -1)].iter().any(|&(dx, dz)| {
