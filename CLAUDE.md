@@ -47,6 +47,15 @@ agent can drive, observe, and play-test it headlessly.
   **ready for review** unless you need help, in which case leave it a **draft and say
   why** (blocked on another issue, needs a brand-new PR, software/hardware constraints,
   human intervention, etc.).
+- **A PR per branch, as soon as it has a commit.** The moment a branch/worktree has a
+  commit, open a PR for it — kept a **draft** until the work is done. This prevents
+  stray branches with no documented purpose and branches that go stale unnoticed: the
+  PR description, the commit history, and the PR↔issue relationship (when it addresses
+  one) are how we see what a branch adds in value and whether it still earns its place
+  in the current context.
+- **Branch naming.** A PR that closes an issue uses `{issue_number}-short-slug` (e.g.
+  `163-fix-coverage-scope`). An issue-less PR uses a readable short slug of its subject
+  (e.g. `document-ai-parity`). Lowercase-hyphenated, brief.
 - **Merging — serialized, one at a time.** When a PR is ready, CI/CD runs; once it's
   green you may merge to `main` right away. If it conflicts or fails, fix it until it
   passes; if it's taking too many iterations (≈3 fix attempts at the same failure, or a
@@ -93,6 +102,14 @@ five kinds of moving part (Unity analogs in parentheses):
    One surface, three callers — they never drift apart.
 
 ## Conventions that matter
+- **AI-driven, editor↔API parity.** rusty is built for an agent-driven workflow in the
+  *Claude Code + Blender-MCP* style: the agent can do anything a user can do in the
+  editor — create entities, place and configure components, instantiate assets, save
+  scenes — **except pure UI chrome** (collapsing a card, resizing a panel). Every
+  user-facing editor capability has an API equivalent.
+- **Keep the API doc in lockstep.** When you add or change an API function, update
+  `docs/scripting-api.md` in the *same* change. That doc is the API reference the agent
+  reads to drive the engine, so it must never lag the bindings.
 - **ECS via `hecs`.** `Transform` is the one mandatory component; all others optional.
 - **No event bus, no plugin trait.** Modules self-register via `register(&mut app)`;
   cross-system signals are direct typed returns.
