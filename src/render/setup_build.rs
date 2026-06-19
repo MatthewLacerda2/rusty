@@ -76,23 +76,16 @@ impl RendererParts {
             );
 
         let (post_fx, quality) = create_post_chain(device, config, &mut registry);
+        let (particle_renderer, decal_renderer) =
+            create_billboard_passes(device, &texture_layout, &mut registry);
 
         Self {
             depth_texture,
             depth_view,
             camera_lighting_layout,
             entity_bones_layout,
-            // Billboard particle + box-projector decal passes reuse the layout.
-            particle_renderer: super::particles::ParticleRenderer::new(
-                device,
-                &texture_layout,
-                &mut registry,
-            ),
-            decal_renderer: super::decals::DecalRenderer::new(
-                device,
-                &texture_layout,
-                &mut registry,
-            ),
+            particle_renderer,
+            decal_renderer,
             texture_layout,
             default_texture,
             camera_buffer,
@@ -110,6 +103,22 @@ impl RendererParts {
             quality,
         }
     }
+}
+
+/// Billboard particle + box-projector decal passes; both reuse the renderer's
+/// `texture_layout` (group 1 / group 3 respectively).
+fn create_billboard_passes(
+    device: &wgpu::Device,
+    texture_layout: &wgpu::BindGroupLayout,
+    registry: &mut ShaderRegistry,
+) -> (
+    super::particles::ParticleRenderer,
+    super::decals::DecalRenderer,
+) {
+    let particle_renderer =
+        super::particles::ParticleRenderer::new(device, texture_layout, registry);
+    let decal_renderer = super::decals::DecalRenderer::new(device, texture_layout, registry);
+    (particle_renderer, decal_renderer)
 }
 
 /// Post-process chain sized to the framebuffer, plus the default quality tier.

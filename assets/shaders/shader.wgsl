@@ -1,4 +1,4 @@
-#import "common"
+#import common::{CameraUniforms, VertexInput}
 
 struct AmbientLight {
     color: vec3<f32>,

@@ -1,4 +1,4 @@
-#import "common"
+#import common::{VertexInput}
 
 struct ShadowUniforms {
     light_space: mat4x4<f32>,
