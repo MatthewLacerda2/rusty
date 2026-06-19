@@ -134,7 +134,7 @@ jobs:
             echo ''
             echo '```'
             cargo llvm-cov report --summary-only \
-              --ignore-filename-regex 'src/(render|dev|api|components|core|ecs|scene|time)/|src/(main|lib)\.rs|src/bin/|tools/'
+              --ignore-filename-regex 'src/(render|dev|api|asset|editor|components|core|ecs|scene|time)/|src/(main|lib)\.rs|src/bin/|tools/'
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
