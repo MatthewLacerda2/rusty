@@ -2,6 +2,9 @@ name: lint
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
+  # Run on the merge queue's speculative merge so the lint gate validates the
+  # state that will actually land (see ci.yml for the same rationale).
+  merge_group:
   workflow_dispatch:
 
 jobs:
@@ -26,6 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'merge_group' ||
       (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
     steps:
       - uses: actions/checkout@v4

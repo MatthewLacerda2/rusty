@@ -2,6 +2,11 @@ name: ci
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
+  # GitHub fires `merge_group` when a PR is queued via the merge queue; CI must
+  # run on it so the required checks validate the speculative merged state before
+  # it lands. The gating jobs below opt in via their `if`; the report-only
+  # coverage/mutants jobs deliberately do not, to keep the queue lean.
+  merge_group:
   workflow_dispatch:
 
 jobs:
@@ -46,6 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'merge_group' ||
       (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
     steps:
       - uses: actions/checkout@v4
@@ -79,6 +85,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'merge_group' ||
       (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
     steps:
       - uses: actions/checkout@v4
@@ -159,6 +166,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'merge_group' ||
       (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
     steps:
       - uses: actions/checkout@v4
