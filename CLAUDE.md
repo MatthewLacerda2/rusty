@@ -122,19 +122,23 @@ craft — it is the reason the gates below are strict.
 ### Labels
 - **architecture** — *How we define stuff.* Intrinsic changes to the engine: a new module,
   a significant structural improvement, a convention we adopt, or a guardrail baked into
-  the engine's design that keeps development fast and fully equipped. The engine's shape,
-  not a single feature.
+  the engine's **design** (e.g. the determinism rule, the five-kinds model, the four-axis
+  component gate) — the engine's shape, not a single feature. Contrast **infrastructure**,
+  which guardrails the *development process* rather than the engine's design.
 - **bug** — *Something isn't working.* Broken behaviour to fix.
 - **documentation** — *Edit/add documentation.* Keep it clear and clean how the engine is
   used and what its features are — architecture's *definition*, not its implementation.
 - **feature** — *Feature or improvement.* A new engine capability that makes the eventual
   game's development faster, easier, and/or more complete.
 - **foundation** — *Groundworks for game development.* A new capability that makes the
-  **engine itself** more complete.
+  **engine itself** more complete. Despite the name, this is stage-2 work that sits **on
+  top of** the guardrail layer (architecture/infrastructure), not beneath it — engine
+  completeness, not the dev groundwork.
 - **human** — *AI can't do this end-to-end.* The issue needs a human in the loop to finish.
 - **infrastructure** — *Improves engine or agentic development.* Tools or guardrails for
-  the engine's **development process**, making that development faster, solid, and correctly
-  guardrailed.
+  the engine's **development process** (e.g. the lint/size gate, CI, the headless harness),
+  making that development faster, solid, and correctly guardrailed — distinct from
+  **architecture**, which is a guardrail in the engine's own design.
 - **plan** — *Being discussed or planned.* Still under discussion (see below) — must not be
   started.
 
