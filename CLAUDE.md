@@ -104,21 +104,39 @@ craft — it is the reason the gates below are strict.
 - **Issue-less PRs are allowed only** for documentation updates or bug fixes; everything
   else starts as an issue.
 - **Priority by label.** When choosing what to do next, the order is
-  **architecture → infrastructure → bug → feature.** Architecture comes first because it
-  defines how things are organized and so reshapes — or eases — everything downstream;
-  infrastructure (the tools to do the work) is next; then bugs; then features.
+  **architecture → infrastructure → bug → foundation → feature.** It encodes how the whole
+  project is built, in three stages:
+  1. **Guardrail the development first.** If the *way we build the engine* isn't solid — a
+     missing structural shape or convention (**architecture**), or a missing tool or
+     guardrail for development (**infrastructure**) — we **halt everything and fix that
+     first**. We don't earn the right to build more until the means of building are sound.
+     A **bug** (broken stuff) sits here too: a broken engine is no foundation to build on.
+  2. **Then make the engine as complete as it can be** — **foundation** work, which
+     improves the *engine itself*.
+  3. **Then features** — **feature** work that makes the eventual *game's* development
+     faster, easier, or more complete. The game is built **elsewhere** (another repo, or by
+     whoever uses the engine), so engine-completeness always outranks game-facing
+     convenience here.
   **documentation** can be done at any time and never waits its turn.
 
 ### Labels
-- **architecture** — How we define stuff.
-- **bug** — Something isn't working.
-- **burn-down** — *(no description yet)*
-- **documentation** — Improvements or additions to documentation.
-- **feature** — Feature or improvement.
-- **foundation** — *(no description yet)*
-- **human** — AI can't do this end-to-end.
-- **infrastructure** — Laying groundworks.
-- **plan** — *not yet defined.*
+- **architecture** — *How we define stuff.* Intrinsic changes to the engine: a new module,
+  a significant structural improvement, a convention we adopt, or a guardrail baked into
+  the engine's design that keeps development fast and fully equipped. The engine's shape,
+  not a single feature.
+- **bug** — *Something isn't working.* Broken behaviour to fix.
+- **documentation** — *Edit/add documentation.* Keep it clear and clean how the engine is
+  used and what its features are — architecture's *definition*, not its implementation.
+- **feature** — *Feature or improvement.* A new engine capability that makes the eventual
+  game's development faster, easier, and/or more complete.
+- **foundation** — *Groundworks for game development.* A new capability that makes the
+  **engine itself** more complete.
+- **human** — *AI can't do this end-to-end.* The issue needs a human in the loop to finish.
+- **infrastructure** — *Improves engine or agentic development.* Tools or guardrails for
+  the engine's **development process**, making that development faster, solid, and correctly
+  guardrailed.
+- **plan** — *Being discussed or planned.* Still under discussion (see below) — must not be
+  started.
 
 Issues tagged **plan** are still being discussed with the user. They must **NOT** be
 started by any means. If a planning issue would implement something that affects another
