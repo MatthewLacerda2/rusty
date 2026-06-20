@@ -128,6 +128,14 @@ concrete type — that inventory lives in the rustdoc reference (`cargo doc --no
 and the script surface in `docs/scripting-api.md`. Everything in the engine is one of
 five kinds of moving part (Unity analogs in parentheses):
 
+A **GameObject** is one entity (`Entity` in `components/entity.rs`): a mandatory
+`Transform` plus any mix of the optional first-class components below, and a place in
+the parent/child hierarchy. It can be **empty** — a Transform and nothing else, used as
+a grouping pivot or a spawn marker. Or it can be configured: instantiating a glTF
+yields a GameObject carrying a `Transform`, a `Mesh`, a `Collider` when the asset
+provides one, and the engine's default `Material`. Same object, more components — that
+is the only difference between an empty marker and a fully-dressed enemy.
+
 1. **Resources** — engine singletons, one per World (Unity's engine statics: `Time`,
    `Input`, the nav graph, the console, the active camera, play-state, the renderer).
    Global state the systems read and write.
@@ -157,6 +165,13 @@ five kinds of moving part (Unity analogs in parentheses):
    One surface, three callers — they never drift apart.
 
 ## Conventions that matter
+- **Unity is the reference; rusty is a deliberate subset.** Use Unity Engine as the
+  yardstick for what rusty *must* be capable of. Unity is exhaustive, so we implement
+  only the subset a game actually needs — never feature-for-feature parity. The twist is
+  that our API exists to be driven by **Claude Code**, not hand-written: developers won't
+  write or even read the engine's code. As long as the docs stay current, Claude can tell
+  the developer how anything is done — so keeping documentation truthful is load-bearing,
+  not a nicety.
 - **AI-driven, editor↔API parity.** rusty is built for an agent-driven workflow in the
   *Claude Code + Blender-MCP* style: the agent can do anything a user can do in the
   editor — create entities, place and configure components, instantiate assets, save
