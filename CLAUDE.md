@@ -28,11 +28,38 @@ craft — it is the reason the gates below are strict.
      their own sake.
   3. **Craft.** It follows Rust/Lua good practices and the gold standards of game-engine
      design and architecture. If it doesn't, say so and propose the right shape.
-- **Flow:** discuss the idea (if needed) → write a GitHub issue for it → mark its
-  dependencies → implement it in a pull request → merge. New work normally starts as an
-  issue, not a surprise diff, and that PR references the issue it closes. **Issue-less PRs
-  are allowed only** for documentation updates or bug fixes; everything else starts as an
-  issue. The PR description still has to clear the three gates above.
+- **Flow:** discuss the idea (if needed) → (usually) write a GitHub issue for it → mark
+  its dependencies → implement it on a branch → open its PR → merge. New work normally
+  starts as an issue, not a surprise diff, and the PR references the issue it closes.
+  **Issue-less PRs are allowed only** for documentation updates or bug fixes; everything
+  else starts as an issue. Either way the PR description still has to clear the three
+  gates above.
+- **Pull requests — open early, draft until ready.** The moment a branch has its first
+  commit, **open a PR for it** — you don't wait to be asked; that's the rule, so a branch
+  is never a stray with no documented purpose and never goes stale unnoticed. Then set its
+  state, and flip between the two as the work moves:
+  - **Draft** while the work is still in progress, or whenever you're **blocked or need
+    something from the user** — a decision you can't make, another PR/issue that must land
+    first, or human/hardware intervention. **Say why** in the description.
+  - **Ready for review** once the work is done and you need nothing further from the user.
+    That is the signal it can be reviewed and merged.
+  The description says **what changed and why** — not how you got there (include process
+  only when it's needed to understand the diff) — and carries the PR↔issue link when there
+  is one. That description, the commit history, and that link are how we see what a branch
+  adds in value and whether it still earns its place.
+- **Branch naming.** A PR that closes an issue uses `{issue_number}-short-slug` (e.g.
+  `163-fix-coverage-scope`). An issue-less PR uses a readable short slug of its subject
+  (e.g. `document-ai-parity`). Lowercase-hyphenated, brief.
+- **Merging — serialized, one at a time.** When a PR is ready, CI/CD runs; once it's
+  green you may merge to `main` right away. If it conflicts or fails, fix it until it
+  passes; if it's taking too many iterations (≈3 fix attempts at the same failure, or a
+  failure that needs a decision you can't make), mark it a **draft** and hand it to the
+  user. Because Rust is compiled, two PRs can each be green alone yet break `main`
+  together (a rename, a changed signature, a moved module — no textual conflict catches
+  it). So merging **cannot be parallelized**: rebase each PR onto the latest `main` →
+  CI green on that rebased state → merge → repeat, one PR at a time. The only exception
+  is a PR that touches **only** Markdown — CI is skipped for Markdown-only PRs, so they
+  needn't be serialized and can merge freely.
 - **Architecture- then infrastructure-first (NOT "make it up as we go").** We do **not**
   improvise or pile on features ad hoc. Whenever we find a problem — something that
   already bites or will bite more than once, a pattern worth adopting, or a gold-standard
@@ -50,30 +77,6 @@ craft — it is the reason the gates below are strict.
   concurrently; use your best judgment. There are no rigid batches: the dependency graph
   *is* the plan. Any issue with no open blockers is fair game, and independent issues can
   be worked in parallel — stay flexible and efficient.
-- **Pull requests.** Each PR's description says **what changed and why**, not how you
-  got there — include process only when it's needed to understand the diff. Open it
-  **ready for review** unless you need help, in which case leave it a **draft and say
-  why** (blocked on another issue, needs a brand-new PR, software/hardware constraints,
-  human intervention, etc.).
-- **A PR per branch, as soon as it has a commit.** The moment a branch/worktree has a
-  commit, open a PR for it — kept a **draft** until the work is done. This prevents
-  stray branches with no documented purpose and branches that go stale unnoticed: the
-  PR description, the commit history, and the PR↔issue relationship (when it addresses
-  one) are how we see what a branch adds in value and whether it still earns its place
-  in the current context.
-- **Branch naming.** A PR that closes an issue uses `{issue_number}-short-slug` (e.g.
-  `163-fix-coverage-scope`). An issue-less PR uses a readable short slug of its subject
-  (e.g. `document-ai-parity`). Lowercase-hyphenated, brief.
-- **Merging — serialized, one at a time.** When a PR is ready, CI/CD runs; once it's
-  green you may merge to `main` right away. If it conflicts or fails, fix it until it
-  passes; if it's taking too many iterations (≈3 fix attempts at the same failure, or a
-  failure that needs a decision you can't make), mark it a **draft** and hand it to the
-  user. Because Rust is compiled, two PRs can each be green alone yet break `main`
-  together (a rename, a changed signature, a moved module — no textual conflict catches
-  it). So merging **cannot be parallelized**: rebase each PR onto the latest `main` →
-  CI green on that rebased state → merge → repeat, one PR at a time. The only exception
-  is a PR that touches **only** Markdown — CI is skipped for Markdown-only PRs, so they
-  needn't be serialized and can merge freely.
 - **Gates vs. signals — block on correctness, inform on quality.** Keep the bar high
   *without* stalling the agents. A check that proves **correctness** — build, test, clippy,
   the determinism guard, the size gate — is a **hard gate**: green-to-merge, no exceptions. A
