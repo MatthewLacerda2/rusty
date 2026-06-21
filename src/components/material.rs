@@ -28,7 +28,7 @@ fn default_roughness() -> f32 {
 /// never any GPU buffers.
 ///
 /// NOTE: every field here is sampled by the renderer — `base_color`/`base_color_map`
-/// + `metallic`/`roughness` (#201), the `metallic_map`/`roughness_map` (#202), the flat
+/// plus `metallic`/`roughness` (#201), the `metallic_map`/`roughness_map` (#202), the flat
 /// `emissive` factor (#222), and the `normal_map`/`emissive_map` (#207 — the normal map
 /// via a per-vertex tangent attribute + TBN in `fs_main`). No field is a write-only no-op.
 #[derive(Clone, Debug, Serialize, Deserialize)]
