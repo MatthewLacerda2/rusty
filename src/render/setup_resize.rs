@@ -1,6 +1,7 @@
-//! Depth-resource creation, framebuffer resize, and quality-tier switching.
-//! Split out of `setup.rs` to keep both files under the size cap; behaviour is
-//! the original `resize` plus the new post-FX-aware reallocation.
+//! The renderer's runtime framebuffer concern, distinct from one-time construction
+//! (`setup.rs` / `setup_build.rs`): depth-resource creation, surface resize, vsync
+//! toggling, and quality-tier switching — everything that reacts to the window or
+//! settings changing *after* the renderer exists.
 
 use super::postfx::QualityPreset;
 use super::Renderer;

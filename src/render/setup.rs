@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::setup_build::RendererParts;
+use super::setup_build::GpuResources;
 use super::Renderer;
 
 impl Renderer {
@@ -75,56 +75,87 @@ impl Renderer {
         size: winit::dpi::PhysicalSize<u32>,
         present_modes: Vec<wgpu::PresentMode>,
     ) -> Self {
-        // All GPU resources (depth, layouts, buffers, bind groups, pipelines and
-        // the auxiliary passes) are built up-front in `build_parts`; here we only
-        // move them into the flat `Renderer` and seed the editor gizmo meshes.
-        let p = RendererParts::build(&device, &queue, &config);
+        // Build every GPU resource up-front, grouped by role (textures, global
+        // bindings, shadow system, forward/billboard passes), then assemble the
+        // flat renderer from those groups and seed the editor gizmo meshes.
+        let gpu = GpuResources::build(&device, &queue, &config);
+        let mut renderer = Self::assemble(device, queue, surface, config, size, present_modes, gpu);
+        renderer.generate_grid_mesh();
+        renderer.generate_axis_arrows();
+        renderer
+    }
 
-        let mut renderer = Self {
+    /// Flatten the grouped [`GpuResources`] plus the window-dependent parameters
+    /// into the renderer's single struct. Trivial fields (the asset caches, the
+    /// editor gizmo buffers, the skybox slots) start empty/`None` and are filled in
+    /// by the caller or at runtime.
+    // A flat field-mapping constructor: no logic, just one line per `Renderer`
+    // field, so the line/argument counts are inherent to the struct's width.
+    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_lines)]
+    fn assemble(
+        device: wgpu::Device,
+        queue: wgpu::Queue,
+        surface: Option<wgpu::Surface<'static>>,
+        config: wgpu::SurfaceConfiguration,
+        size: winit::dpi::PhysicalSize<u32>,
+        present_modes: Vec<wgpu::PresentMode>,
+        gpu: GpuResources,
+    ) -> Self {
+        let GpuResources {
+            depth_texture,
+            depth_view,
+            camera_lighting_layout,
+            entity_bones_layout,
+            textures,
+            global,
+            shadows,
+            forward,
+            billboards,
+            post_fx,
+            quality,
+        } = gpu;
+        Self {
             device,
             queue,
             surface,
             config,
             size,
-            render_pipeline: p.render_pipeline,
-            line_pipeline: p.line_pipeline,
-            outline_pipeline: p.outline_pipeline,
-            camera_lighting_layout: p.camera_lighting_layout,
-            entity_bones_layout: p.entity_bones_layout,
-            texture_layout: p.texture_layout,
-            material_layout: p.material_layout,
-            camera_buffer: p.camera_buffer,
-            lighting_buffer: p.lighting_buffer,
-            global_bind_group: p.global_bind_group,
-            depth_texture: p.depth_texture,
-            depth_view: p.depth_view,
+            present_modes,
+            render_pipeline: forward.render_pipeline,
+            line_pipeline: forward.line_pipeline,
+            outline_pipeline: forward.outline_pipeline,
+            skybox_renderer: forward.skybox_renderer,
+            camera_lighting_layout,
+            entity_bones_layout,
+            texture_layout: textures.texture_layout,
+            material_layout: textures.material_layout,
+            default_texture: textures.default_texture,
+            default_material_bind_group: textures.default_material_bind_group,
+            camera_buffer: global.camera_buffer,
+            lighting_buffer: global.lighting_buffer,
+            global_bind_group: global.global_bind_group,
+            depth_texture,
+            depth_view,
+            shadow_layout: shadows.layout,
+            shadow_renderer: shadows.renderer,
+            shadow_uniform_buffer: shadows.uniform_buffer,
+            shadow_bind_group: shadows.bind_group,
+            particle_renderer: billboards.particle_renderer,
+            decal_renderer: billboards.decal_renderer,
+            post_fx,
+            quality,
             gpu_meshes: HashMap::new(),
             gpu_textures: HashMap::new(),
-            default_texture: p.default_texture,
-            default_material_bind_group: p.default_material_bind_group,
             grid_vertex_buffer: None,
             grid_count: 0,
             axis_x_buffer: None,
             axis_y_buffer: None,
             axis_z_buffer: None,
             axis_count: 0,
-            skybox_renderer: p.skybox_renderer,
-            shadow_renderer: p.shadow_renderer,
             skybox_texture: None,
             skybox_path: "".to_string(),
-            shadow_layout: p.shadow_layout,
-            shadow_uniform_buffer: p.shadow_uniform_buffer,
-            shadow_bind_group: p.shadow_bind_group,
-            post_fx: p.post_fx,
-            quality: p.quality,
-            present_modes,
-            particle_renderer: p.particle_renderer,
-            decal_renderer: p.decal_renderer,
-        };
-
-        renderer.generate_grid_mesh();
-        renderer.generate_axis_arrows();
-        renderer
+        }
     }
 }
 

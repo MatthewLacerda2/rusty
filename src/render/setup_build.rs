@@ -1,46 +1,70 @@
-//! GPU-resource construction for [`Renderer`], split out of `setup.rs` so the
-//! flat `from_parts` assembly stays small. Every field of [`RendererParts`]
-//! moves verbatim into the corresponding `Renderer` field; this module only
-//! groups the builders, it changes no behavior.
-
-use std::rc::Rc;
+//! GPU-resource construction for [`Renderer`], split out of `setup.rs`.
+//!
+//! Each builder here returns a small *cohesive* group of related GPU resources —
+//! the global camera/lighting bindings, the shadow system, the forward passes, the
+//! billboard passes — rather than one flat struct that mirrors every `Renderer`
+//! field verbatim. `Renderer::from_parts` (in `setup.rs`) destructures these groups
+//! straight into the assembled renderer, so the seams follow real boundaries (what
+//! depends on what) instead of a pass-through layer (#211). Behavior is unchanged.
 
 use super::bind_layouts;
 use super::pipelines;
 use super::postfx::{PostFx, QualityPreset, HDR_FORMAT};
-use super::setup_textures::create_textures;
+use super::setup_textures::{create_textures, Textures};
 use super::shaders::ShaderRegistry;
 use super::{shadows, skybox};
 use super::{CameraUniform, GpuTexture, LightingUniform, Renderer};
 
-/// All non-trivial GPU resources for a [`Renderer`], built before assembly.
-pub(super) struct RendererParts {
-    pub depth_texture: wgpu::Texture,
-    pub depth_view: wgpu::TextureView,
-    pub camera_lighting_layout: wgpu::BindGroupLayout,
-    pub entity_bones_layout: wgpu::BindGroupLayout,
-    pub texture_layout: wgpu::BindGroupLayout,
-    pub material_layout: wgpu::BindGroupLayout,
-    pub default_texture: Rc<GpuTexture>,
-    pub default_material_bind_group: wgpu::BindGroup,
+/// Camera + lighting uniform buffers and the group(0) bind group.
+pub(super) struct GlobalBindings {
     pub camera_buffer: wgpu::Buffer,
     pub lighting_buffer: wgpu::Buffer,
     pub global_bind_group: wgpu::BindGroup,
+}
+
+/// Shadow renderer, its light-space uniform buffer, and the main-pass bind group
+/// that samples the active shadow map.
+pub(super) struct ShadowSystem {
+    pub layout: wgpu::BindGroupLayout,
+    pub renderer: shadows::ShadowRenderer,
+    pub uniform_buffer: wgpu::Buffer,
+    pub bind_group: wgpu::BindGroup,
+}
+
+/// The forward-lit, line, outline and skybox passes — everything that draws into
+/// the HDR offscreen target.
+pub(super) struct ForwardPasses {
     pub render_pipeline: wgpu::RenderPipeline,
     pub line_pipeline: wgpu::RenderPipeline,
     pub outline_pipeline: wgpu::RenderPipeline,
     pub skybox_renderer: skybox::SkyboxRenderer,
-    pub shadow_renderer: shadows::ShadowRenderer,
-    pub shadow_layout: wgpu::BindGroupLayout,
-    pub shadow_uniform_buffer: wgpu::Buffer,
-    pub shadow_bind_group: wgpu::BindGroup,
-    pub post_fx: PostFx,
-    pub quality: QualityPreset,
+}
+
+/// Billboard particle + box-projector decal passes; both reuse the renderer's
+/// `texture_layout` (group 1 / group 3 respectively).
+pub(super) struct BillboardPasses {
     pub particle_renderer: super::particles::ParticleRenderer,
     pub decal_renderer: super::decals::DecalRenderer,
 }
 
-impl RendererParts {
+/// Every non-trivial GPU resource a [`Renderer`] needs, grouped by role. Built in
+/// dependency order (layouts → textures → bindings → passes) and consumed once by
+/// [`Renderer::from_parts`], which moves each group into the flat renderer.
+pub(super) struct GpuResources {
+    pub depth_texture: wgpu::Texture,
+    pub depth_view: wgpu::TextureView,
+    pub camera_lighting_layout: wgpu::BindGroupLayout,
+    pub entity_bones_layout: wgpu::BindGroupLayout,
+    pub textures: Textures,
+    pub global: GlobalBindings,
+    pub shadows: ShadowSystem,
+    pub forward: ForwardPasses,
+    pub billboards: BillboardPasses,
+    pub post_fx: PostFx,
+    pub quality: QualityPreset,
+}
+
+impl GpuResources {
     /// Build every GPU resource from an already-created device/queue/config.
     pub(super) fn build(
         device: &wgpu::Device,
@@ -51,48 +75,30 @@ impl RendererParts {
         let (depth_texture, depth_view) = Renderer::create_depth_resources(device, config);
         let camera_lighting_layout = bind_layouts::create_camera_lighting_layout(device);
         let entity_bones_layout = bind_layouts::create_entity_bones_layout(device);
-        let tx = create_textures(device, queue);
-        let (camera_buffer, lighting_buffer, global_bind_group) =
-            create_global_bindings(device, &camera_lighting_layout, &tx.default_texture);
-
-        let (shadow_layout, shadow_renderer, shadow_uniform_buffer, shadow_bind_group) =
-            create_shadow_system(device, &mut registry);
-
-        let (render_pipeline, line_pipeline, outline_pipeline, skybox_renderer) =
-            create_forward_passes(
-                device,
-                &camera_lighting_layout,
-                &entity_bones_layout,
-                &tx.texture_layout,
-                &tx.material_layout,
-                &shadow_layout,
-                &mut registry,
-            );
+        let textures = create_textures(device, queue);
+        let global =
+            create_global_bindings(device, &camera_lighting_layout, &textures.default_texture);
+        let shadows = create_shadow_system(device, &mut registry);
+        let forward = create_forward_passes(
+            device,
+            &camera_lighting_layout,
+            &entity_bones_layout,
+            &textures,
+            &shadows.layout,
+            &mut registry,
+        );
         let (post_fx, quality) = create_post_chain(device, config, &mut registry);
-        let (particle_renderer, decal_renderer) =
-            create_billboard_passes(device, &tx.texture_layout, &mut registry);
+        let billboards = create_billboard_passes(device, &textures.texture_layout, &mut registry);
         Self {
             depth_texture,
             depth_view,
             camera_lighting_layout,
             entity_bones_layout,
-            particle_renderer,
-            decal_renderer,
-            texture_layout: tx.texture_layout,
-            material_layout: tx.material_layout,
-            default_texture: tx.default_texture,
-            default_material_bind_group: tx.default_material_bind_group,
-            camera_buffer,
-            lighting_buffer,
-            global_bind_group,
-            render_pipeline,
-            line_pipeline,
-            outline_pipeline,
-            skybox_renderer,
-            shadow_renderer,
-            shadow_layout,
-            shadow_uniform_buffer,
-            shadow_bind_group,
+            textures,
+            global,
+            shadows,
+            forward,
+            billboards,
             post_fx,
             quality,
         }
@@ -105,14 +111,15 @@ fn create_billboard_passes(
     device: &wgpu::Device,
     texture_layout: &wgpu::BindGroupLayout,
     registry: &mut ShaderRegistry,
-) -> (
-    super::particles::ParticleRenderer,
-    super::decals::DecalRenderer,
-) {
-    let particle_renderer =
-        super::particles::ParticleRenderer::new(device, texture_layout, registry);
-    let decal_renderer = super::decals::DecalRenderer::new(device, texture_layout, registry);
-    (particle_renderer, decal_renderer)
+) -> BillboardPasses {
+    BillboardPasses {
+        particle_renderer: super::particles::ParticleRenderer::new(
+            device,
+            texture_layout,
+            registry,
+        ),
+        decal_renderer: super::decals::DecalRenderer::new(device, texture_layout, registry),
+    }
 }
 
 /// Post-process chain sized to the framebuffer, plus the default quality tier.
@@ -139,7 +146,7 @@ fn create_global_bindings(
     device: &wgpu::Device,
     camera_lighting_layout: &wgpu::BindGroupLayout,
     default_texture: &GpuTexture,
-) -> (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup) {
+) -> GlobalBindings {
     let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Camera Uniform Buffer"),
         size: std::mem::size_of::<CameraUniform>() as u64,
@@ -177,84 +184,70 @@ fn create_global_bindings(
         ],
     });
 
-    (camera_buffer, lighting_buffer, global_bind_group)
+    GlobalBindings {
+        camera_buffer,
+        lighting_buffer,
+        global_bind_group,
+    }
 }
 
 /// Shadow renderer, its light-space uniform buffer, and the main-pass bind group
 /// that samples the active shadow map.
-fn create_shadow_system(
-    device: &wgpu::Device,
-    registry: &mut ShaderRegistry,
-) -> (
-    wgpu::BindGroupLayout,
-    shadows::ShadowRenderer,
-    wgpu::Buffer,
-    wgpu::BindGroup,
-) {
-    let shadow_layout = bind_layouts::create_shadow_layout(device);
-    let shadow_renderer = shadows::ShadowRenderer::new(device, registry);
+fn create_shadow_system(device: &wgpu::Device, registry: &mut ShaderRegistry) -> ShadowSystem {
+    let layout = bind_layouts::create_shadow_layout(device);
+    let renderer = shadows::ShadowRenderer::new(device, registry);
 
-    let shadow_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+    let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Shadow Uniform Buffer"),
         size: 64, // Mat4 size
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
 
-    let shadow_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Main Shadow Bind Group"),
-        layout: &shadow_layout,
+        layout: &layout,
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
-                resource: shadow_uniform_buffer.as_entire_binding(),
+                resource: uniform_buffer.as_entire_binding(),
             },
             wgpu::BindGroupEntry {
                 binding: 1,
-                resource: wgpu::BindingResource::TextureView(&shadow_renderer.active_view),
+                resource: wgpu::BindingResource::TextureView(&renderer.active_view),
             },
             wgpu::BindGroupEntry {
                 binding: 2,
-                resource: wgpu::BindingResource::Sampler(&shadow_renderer.sampler),
+                resource: wgpu::BindingResource::Sampler(&renderer.sampler),
             },
         ],
     });
 
-    (
-        shadow_layout,
-        shadow_renderer,
-        shadow_uniform_buffer,
-        shadow_bind_group,
-    )
+    ShadowSystem {
+        layout,
+        renderer,
+        uniform_buffer,
+        bind_group,
+    }
 }
 
 /// Compile the forward shader and build the forward-lit, line, outline and skybox
 /// passes that all draw into the HDR offscreen target.
-// Threads the four bind-group layouts the forward passes need (skybox keeps the
-// single-texture layout, the pipelines take the expanded material layout); a struct
-// wrapper would only add indirection without clarifying intent.
-#[allow(clippy::too_many_arguments)]
 fn create_forward_passes(
     device: &wgpu::Device,
     camera_lighting_layout: &wgpu::BindGroupLayout,
     entity_bones_layout: &wgpu::BindGroupLayout,
-    texture_layout: &wgpu::BindGroupLayout,
-    material_layout: &wgpu::BindGroupLayout,
+    textures: &Textures,
     shadow_layout: &wgpu::BindGroupLayout,
     registry: &mut ShaderRegistry,
-) -> (
-    wgpu::RenderPipeline,
-    wgpu::RenderPipeline,
-    wgpu::RenderPipeline,
-    skybox::SkyboxRenderer,
-) {
+) -> ForwardPasses {
     let shader = registry.load(device, "shader.wgsl", "Forward Lit Shader");
 
     // Skybox binds a single-texture `GpuTexture.bind_group` at its group(1), so it
     // keeps the single `texture_layout`; the forward pipelines use `material_layout`.
     let skybox_renderer = skybox::SkyboxRenderer::new(
         device,
-        texture_layout,
+        &textures.texture_layout,
         camera_lighting_layout,
         HDR_FORMAT,
         registry,
@@ -266,14 +259,14 @@ fn create_forward_passes(
         HDR_FORMAT,
         camera_lighting_layout,
         entity_bones_layout,
-        material_layout,
+        &textures.material_layout,
         shadow_layout,
     );
 
-    (
+    ForwardPasses {
         render_pipeline,
         line_pipeline,
         outline_pipeline,
         skybox_renderer,
-    )
+    }
 }

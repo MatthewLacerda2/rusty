@@ -1,8 +1,12 @@
-//! src/physics/build_tests.rs — unit tests for body/collider construction.
+//! src/physics/build_tests.rs — the single test home for `build.rs`.
 //!
-//! Kept in a sibling module so `build.rs` stays under the size cap. These assert the
-//! *values* `build.rs` computes (baked extents, layer bits, body class) rather than
-//! just that a collider is produced, so arithmetic/comparison mutations are caught.
+//! All unit tests for body/collider construction live here, in one place, rather
+//! than split between an inline `#[cfg(test)] mod tests` in `build.rs` and this
+//! sibling. The lint counts `build.rs` and this sibling as one logical unit (see
+//! `tools/lint`), so there is no size-cap reason to test `build.rs` from two
+//! locations. These assert the *values* `build.rs` computes (baked extents, layer
+//! bits, body class) rather than just that a collider is produced, so
+//! arithmetic/comparison mutations are caught.
 
 use glam::Vec3;
 use rapier3d::prelude::*;
@@ -14,6 +18,42 @@ use crate::components::{ColliderComponent, ColliderShape, Entity, RigidBodyCompo
 fn half_extents(c: &Collider) -> [f32; 3] {
     let aabb = c.shape().compute_local_aabb();
     [aabb.maxs[0], aabb.maxs[1], aabb.maxs[2]]
+}
+
+/// A unit cube (half-extent 0.5) as rest-pose positions + triangle indices.
+fn unit_cube() -> (Vec<[f32; 3]>, Vec<u32>) {
+    let p = vec![
+        [-0.5, -0.5, -0.5],
+        [0.5, -0.5, -0.5],
+        [0.5, 0.5, -0.5],
+        [-0.5, 0.5, -0.5],
+        [-0.5, -0.5, 0.5],
+        [0.5, -0.5, 0.5],
+        [0.5, 0.5, 0.5],
+        [-0.5, 0.5, 0.5],
+    ];
+    #[rustfmt::skip]
+    let i = vec![
+        0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 0, 4, 5,
+        0, 5, 1, 3, 2, 6, 3, 6, 7, 0, 3, 7, 0, 7, 4, 1, 5, 6, 1, 6, 2,
+    ];
+    (p, i)
+}
+
+fn mesh_shape(convex: bool) -> ColliderShape {
+    ColliderShape::Mesh {
+        convex,
+        local_min: Vec3::splat(-0.5),
+        local_max: Vec3::splat(0.5),
+    }
+}
+
+fn assert_cube_extent(collider: &Collider, half: f32) {
+    let aabb = collider.shape().compute_local_aabb();
+    for axis in 0..3 {
+        assert!((aabb.maxs[axis] - half).abs() < 1e-4, "max {:?}", aabb.maxs);
+        assert!((aabb.mins[axis] + half).abs() < 1e-4, "min {:?}", aabb.mins);
+    }
 }
 
 #[test]
@@ -67,6 +107,27 @@ fn cylinder_bakes_radius_x_and_half_height_y() {
 }
 
 #[test]
+fn convex_hull_from_mesh_matches_extents() {
+    let (p, i) = unit_cube();
+    let c = build_shape(&mesh_shape(true), Vec3::ONE, Some((&p, &i))).unwrap();
+    assert_cube_extent(&c, 0.5);
+}
+
+#[test]
+fn trimesh_from_mesh_matches_extents() {
+    let (p, i) = unit_cube();
+    let c = build_shape(&mesh_shape(false), Vec3::ONE, Some((&p, &i))).unwrap();
+    assert_cube_extent(&c, 0.5);
+}
+
+#[test]
+fn scale_is_baked_into_mesh_collider() {
+    let (p, i) = unit_cube();
+    let c = build_shape(&mesh_shape(false), Vec3::splat(2.0), Some((&p, &i))).unwrap();
+    assert_cube_extent(&c, 1.0);
+}
+
+#[test]
 fn mesh_collider_needs_at_least_four_points() {
     // Exactly four non-coplanar points form a valid convex hull (a tetrahedron); the
     // `< 4` guard must admit four, so a `<=`-mutation that rejects them is caught.
@@ -76,12 +137,24 @@ fn mesh_collider_needs_at_least_four_points() {
         [0.0, 1.0, 0.0],
         [0.0, 0.0, 1.0],
     ];
-    let shape = ColliderShape::Mesh {
-        convex: true,
-        local_min: Vec3::ZERO,
-        local_max: Vec3::ONE,
-    };
-    assert!(build_shape(&shape, Vec3::ONE, Some((&tetra, &[]))).is_some());
+    assert!(build_shape(&mesh_shape(true), Vec3::ONE, Some((&tetra, &[]))).is_some());
+}
+
+#[test]
+fn degenerate_mesh_yields_no_collider() {
+    // Too few points for any shape.
+    let sparse = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
+    assert!(build_shape(&mesh_shape(true), Vec3::ONE, Some((&sparse, &[0, 1, 2]))).is_none());
+    // Enough points, but a trimesh needs triangles.
+    let (p, _) = unit_cube();
+    assert!(build_shape(&mesh_shape(false), Vec3::ONE, Some((&p, &[]))).is_none());
+    // No geometry supplied at all.
+    assert!(build_shape(&mesh_shape(true), Vec3::ONE, None).is_none());
+}
+
+#[test]
+fn analytic_shapes_still_build_without_mesh() {
+    assert!(build_shape(&ColliderShape::Sphere { radius: 1.0 }, Vec3::ONE, None).is_some());
 }
 
 #[test]
