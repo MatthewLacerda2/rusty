@@ -19,6 +19,7 @@ use super::backend::{AudioBackend, NullBackend, PlayParams, VoiceId};
 use super::introspection::{
     AudioEvent, AudioEventKind, AudioEventLog, VoiceInfo, DEFAULT_EVENT_CAP,
 };
+use super::spatial::{self, Listener};
 use crate::components::AudioSourceComponent;
 
 /// A live entity voice: the backend handle plus the per-source (pre-master) volume,
@@ -218,9 +219,25 @@ impl AudioMaestro {
     }
 
     /// Build a [`VoiceInfo`] for entity `id`'s source — the per-source roster row the
-    /// agent reads, with the live playing flag folded in. The caller supplies the
-    /// component (the maestro doesn't hold the scene).
-    pub fn voice_info(&self, id: u32, source: &AudioSourceComponent) -> VoiceInfo {
+    /// agent reads, with the live playing flag folded in and the spatial `(gain, pan)`
+    /// resolved against `listener` at the source's world `position` (#213). The caller
+    /// supplies the component, position and listener (the maestro doesn't hold the
+    /// scene or the active camera).
+    pub fn voice_info(
+        &self,
+        id: u32,
+        source: &AudioSourceComponent,
+        position: glam::Vec3,
+        listener: &Listener,
+    ) -> VoiceInfo {
+        let spatial = spatial::resolve(
+            listener,
+            position,
+            source.volume,
+            source.spatial_blend,
+            source.initial_distance,
+            source.final_distance,
+        );
         VoiceInfo {
             entity: id,
             clip: source.clip.clone(),
@@ -228,6 +245,7 @@ impl AudioMaestro {
             looping: source.looping,
             is_time_scaled: source.is_time_scaled,
             playing: self.is_source_playing(id),
+            spatial,
         }
     }
 }
