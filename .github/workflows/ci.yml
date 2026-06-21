@@ -88,7 +88,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: System libs for winit/wgpu builds
         if: needs.changes.outputs.code != 'false'
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       - name: Build (default)
         if: needs.changes.outputs.code != 'false'
         run: cargo build --locked
@@ -169,7 +169,7 @@ jobs:
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@v2
       - name: System libs for winit/wgpu builds
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
@@ -249,7 +249,7 @@ jobs:
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@v2
       - name: System libs for winit/wgpu builds
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
@@ -350,7 +350,7 @@ jobs:
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@v2
       - name: System libs for winit/wgpu builds
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       - name: Install cargo-mutants
         uses: taiki-e/install-action@v2
         with:
@@ -433,7 +433,7 @@ jobs:
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@v2
       - name: System libs for winit/wgpu builds
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       - name: Install cargo-mutants
         uses: taiki-e/install-action@v2
         with:

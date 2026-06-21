@@ -15,16 +15,16 @@
 use glam::{Mat4, Vec3};
 use serde_json::{json, Value};
 
-use crate::components::{
-    AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, Entity, HealthComponent,
-    LightComponent, LightType, MaterialAsset, MeshComponent, NavMeshAgentComponent,
-    ParticleEmitterComponent, RigidBodyComponent, TransformComponent,
+use super::snapshot_components::{
+    animator_value, audio_value, camera_component_value, collider_value, health_value, light_value,
+    material_value, mesh_value, nav_agent_value, particle_value, rigidbody_value,
 };
+use crate::components::{Entity, MaterialAsset, TransformComponent};
 use crate::render::Camera;
 use crate::scene::Scene;
 
-/// A `glam::Vec3` as a `[x, y, z]` JSON array.
-fn vec3(v: Vec3) -> Value {
+/// A `glam::Vec3` as a `[x, y, z]` JSON array. Shared with `snapshot_components`.
+pub(crate) fn vec3(v: Vec3) -> Value {
     json!([v.x, v.y, v.z])
 }
 
@@ -87,6 +87,7 @@ pub fn entity_value(e: &Entity, material: Option<&MaterialAsset>, world_matrix: 
         "particles": e.particles.as_ref().map(particle_value),
         "animator": e.animator.as_ref().map(animator_value),
         "health": e.health.as_ref().map(health_value),
+        "audio": e.audio.as_ref().map(audio_value),
     })
 }
 
@@ -124,6 +125,9 @@ fn inventory(e: &Entity) -> Vec<&'static str> {
     if e.health.is_some() {
         names.push("Health");
     }
+    if e.audio.is_some() {
+        names.push("AudioSource");
+    }
     if !e.scripts.is_empty() {
         names.push("Script");
     }
@@ -151,144 +155,6 @@ fn bounds_value(e: &Entity, world_matrix: Mat4) -> Value {
         Some((min, max)) => json!({ "min": vec3(min), "max": vec3(max) }),
         None => Value::Null,
     }
-}
-
-/// Mesh identity: the primitive kind and, for imported meshes, the
-/// `path::sub_object` asset reference. Never the GPU geometry.
-fn mesh_value(m: &MeshComponent) -> Value {
-    json!({
-        "primitive_type": m.primitive_type,
-        "asset_ref": m.asset_ref,
-    })
-}
-
-/// Material (PBR) params + texture references, read from the resolved library
-/// `MaterialAsset`. The albedo map is surfaced under the legacy `"texture"` key
-/// (empty string when unset, preserving the prior shape).
-fn material_value(m: &MaterialAsset) -> Value {
-    json!({
-        "color": m.base_color,
-        "metallic": m.metallic,
-        "roughness": m.roughness,
-        "texture": m.base_color_map.clone().unwrap_or_default(),
-        "metallic_map": m.metallic_map,
-        "roughness_map": m.roughness_map,
-        "normal_map": m.normal_map,
-        "emissive": m.emissive,
-    })
-}
-
-/// Light kind as a stable string.
-fn light_type_str(kind: &LightType) -> &'static str {
-    match kind {
-        LightType::Ambient => "Ambient",
-        LightType::Directional => "Directional",
-        LightType::Point => "Point",
-        LightType::Spotlight => "Spotlight",
-    }
-}
-
-fn light_value(l: &LightComponent) -> Value {
-    json!({
-        "type": light_type_str(&l.light_type),
-        "color": vec3(l.color),
-        "intensity": l.intensity,
-        "range": l.range,
-        "inner_cone": l.inner_cone,
-        "outer_cone": l.outer_cone,
-    })
-}
-
-/// Collider shape with its defining dimensions.
-fn collider_shape_value(shape: &ColliderShape) -> Value {
-    match shape {
-        ColliderShape::Box { size } => json!({ "kind": "Box", "size": vec3(*size) }),
-        ColliderShape::Sphere { radius } => json!({ "kind": "Sphere", "radius": radius }),
-        ColliderShape::Cylinder { radius, height } => {
-            json!({ "kind": "Cylinder", "radius": radius, "height": height })
-        }
-        ColliderShape::Mesh {
-            convex,
-            local_min,
-            local_max,
-        } => json!({
-            "kind": "Mesh",
-            "convex": convex,
-            "local_min": vec3(*local_min),
-            "local_max": vec3(*local_max),
-        }),
-    }
-}
-
-fn collider_value(c: &ColliderComponent) -> Value {
-    json!({
-        "active": c.active,
-        "is_trigger": c.is_trigger,
-        "shape": collider_shape_value(&c.shape),
-    })
-}
-
-fn rigidbody_value(r: &RigidBodyComponent) -> Value {
-    json!({
-        "active": r.active,
-        "is_kinematic": r.is_kinematic,
-        "mass": r.mass,
-        "velocity": vec3(r.velocity),
-        "use_gravity": r.use_gravity,
-    })
-}
-
-fn camera_component_value(c: &CameraComponent) -> Value {
-    json!({
-        "active": c.active,
-        "fov": c.fov,
-        "near": c.near,
-        "far": c.far,
-        "culling_mask": c.culling_mask,
-        "render_order": c.render_order,
-    })
-}
-
-fn nav_agent_value(n: &NavMeshAgentComponent) -> Value {
-    json!({
-        "active": n.active,
-        "radius": n.radius,
-        "target": vec3(n.target),
-        "speed": n.speed,
-        "acceleration": n.acceleration,
-        "stopping_distance": n.stopping_distance,
-        "velocity": vec3(n.velocity),
-    })
-}
-
-fn particle_value(p: &ParticleEmitterComponent) -> Value {
-    json!({
-        "active": p.active,
-        "texture": p.texture,
-        "rate": p.rate,
-        "max_particles": p.max_particles,
-        "lifetime": p.lifetime,
-        "speed": p.speed,
-        "direction": vec3(p.direction),
-        "color": p.color,
-    })
-}
-
-fn animator_value(a: &AnimatorComponent) -> Value {
-    json!({
-        "clip": a.current_clip,
-        "time": a.time,
-        "speed": a.speed,
-        "playing": a.is_playing,
-    })
-}
-
-fn health_value(h: &HealthComponent) -> Value {
-    json!({
-        "current": h.current_health,
-        "max": h.max_health,
-        "dead": h.is_dead,
-    })
 }
 
 #[cfg(test)]

@@ -21,6 +21,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::audio::AudioMaestro;
 use crate::core::input::InputState;
 use crate::core::storage::Storage;
 use crate::navigation::NavigationGraph;
@@ -42,6 +43,10 @@ pub struct Resources {
     pub console: Rc<RefCell<ConsoleLogs>>,
     pub camera: Rc<RefCell<Camera>>,
     pub time: Rc<RefCell<Time>>,
+    /// The audio engine singleton (#212). Owns the device/mixer (a no-op backend by
+    /// default; the windowed app injects the real one) and the play-event log.
+    /// Shared with the script runtime so the `Audio` namespace drives it.
+    pub audio: Rc<RefCell<AudioMaestro>>,
     pub script_manager: ScriptManager,
     /// rapier3d simulation, rebuilt from the scene on Play and torn down on Stop.
     /// `None` in edit mode. Shared (via `Rc`) with the script runtime so
@@ -94,12 +99,18 @@ impl Resources {
         // platform layer binds it to a file at startup.
         let storage = Rc::new(RefCell::new(Storage::new()));
         script_manager.set_storage(Rc::clone(&storage));
+        // The audio maestro starts with a no-op backend (the harness path); the
+        // windowed app injects the real `RodioBackend` after construction. Shared
+        // with the script runtime so the `Audio` namespace drives the same maestro.
+        let audio = Rc::new(RefCell::new(AudioMaestro::default()));
+        script_manager.set_audio_cell(Rc::clone(&audio));
         Self {
             input,
             nav,
             console,
             camera,
             time,
+            audio,
             script_manager,
             storage,
             physics: Rc::new(RefCell::new(None)),

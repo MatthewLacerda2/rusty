@@ -137,6 +137,22 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `SetRate` | ✅ | sim — continuous spawn cadence |
 | `Clear` | ✅ | renderer — empties the live buffer that's drawn |
 
+### `Audio` — over the `AudioMaestro` resource (+ `Entity.audio`)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `Play` | ✅ | platform (`AudioMaestro::play_source` → backend voice) + introspection log; the `AudioSource` it reads round-trips |
+| `Stop` | ✅ | platform — drops the live voice; logs a Stop event |
+| `SetVolume` | ✅ | platform — re-folds the live voice's gain (master × per-source) |
+| `PlayAt` | ✅ | platform (`play_at` one-shot) + introspection log — the log entry is the one-shot's only trace |
+| `SetMasterVolume` | ✅ | platform — re-folds every live voice; observable via `GetMasterVolume` |
+
+The maestro carries a **no-op backend** on the headless harness, so the *sound* is a
+windowed-only side effect; the **introspection log + playing set** are the
+device-free read-sites a play-test asserts on (deterministic — voice ids are a
+monotone counter, the event tick is `Time.frameCount`). `AudioSource`'s authoring
+fields (incl. the spatial fields stored for #213) round-trip through `SceneData`.
+
 ### `Decals` — over `Scene.decals`
 
 | Setter | Status | Read-site |
