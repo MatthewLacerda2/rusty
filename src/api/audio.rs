@@ -17,7 +17,8 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 use super::{put, Reg};
-use crate::audio::AudioMaestro;
+use crate::audio::{AudioMaestro, Listener};
+use crate::render::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
 
@@ -28,13 +29,21 @@ pub fn register<'lua, 'scope>(
     scene: &'scope RefCell<Scene>,
     audio: &'scope RefCell<AudioMaestro>,
     time: &'scope RefCell<Time>,
+    camera: &'scope RefCell<Camera>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     register_source_control(scope, &table, scene, audio, time)?;
     register_oneshot_and_master(scope, &table, audio, time)?;
+    register_spatial(scope, &table, scene, audio, camera)?;
 
     lua.globals().set("Audio", table).map_err(|e| e.to_string())
+}
+
+/// The listener — the active camera — as the spatial math wants it (position + right).
+fn listener(camera: &RefCell<Camera>) -> Listener {
+    let cam = camera.borrow();
+    Listener::new(cam.position, cam.right())
 }
 
 /// The current play-mode frame, used as the deterministic event `tick`.
@@ -141,6 +150,39 @@ fn register_oneshot_and_master<'lua, 'scope>(
         scope.create_function(|_, v: f32| {
             audio.borrow_mut().set_master_volume(v);
             Ok(())
+        }),
+    )
+}
+
+/// `GetSpatial` — read the resolved spatial state of an entity's `AudioSource` against
+/// the listener (the active camera). Returns `(gain, pan, playing)`: `gain` is the
+/// pre-master volume after distance rolloff + `spatial_blend`, `pan` is `[-1, 1]`
+/// (left→right). This is the agent-facing introspection (#213) for "how a source is
+/// heard right now" — pure math, identical with or without an audio device.
+fn register_spatial<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+    audio: &'scope RefCell<AudioMaestro>,
+    camera: &'scope RefCell<Camera>,
+) -> Reg {
+    put(
+        table,
+        "GetSpatial",
+        scope.create_function(|_, id: u32| {
+            let Some((src, pos)) = ({
+                let scene = scene.borrow();
+                scene.get_entity(id).and_then(|e| {
+                    let s = e.audio.as_ref()?.clone();
+                    let p = e.transform.position;
+                    Some((s, p))
+                })
+            }) else {
+                // No source: report silent + centred + not playing.
+                return Ok((0.0_f32, 0.0_f32, false));
+            };
+            let info = audio.borrow().voice_info(id, &src, pos, &listener(camera));
+            Ok((info.spatial.gain, info.spatial.pan, info.playing))
         }),
     )
 }

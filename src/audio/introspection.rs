@@ -14,6 +14,19 @@
 
 use serde::{Deserialize, Serialize};
 
+/// The resolved spatial state of a source against the listener (#213): the per-source
+/// **gain** (pre-master, after distance rolloff + `spatial_blend`) and **pan** in
+/// `[-1, 1]` (`-1` = full left, `0` = centre, `+1` = full right). Pure data, computed
+/// by [`crate::audio::spatial::resolve`] — no audio device involved, so a headless
+/// play-test can assert the agent hears a left-placed source quieter and panned left.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SpatialResult {
+    /// Pre-master linear gain after distance rolloff and the 2D↔3D blend.
+    pub gain: f32,
+    /// Stereo pan in `[-1, 1]` (left → right), already scaled by `spatial_blend`.
+    pub pan: f32,
+}
+
 /// One live voice owned by an entity's `AudioSource`, as the agent sees it. A
 /// flattened, device-free view rebuilt each query from the live scene + the
 /// maestro's playing set.
@@ -31,6 +44,8 @@ pub struct VoiceInfo {
     pub is_time_scaled: bool,
     /// Whether the maestro currently has this source playing.
     pub playing: bool,
+    /// The resolved spatial state — `(gain, pan)` against the listener (#213).
+    pub spatial: SpatialResult,
 }
 
 /// What kind of play action an [`AudioEvent`] records.

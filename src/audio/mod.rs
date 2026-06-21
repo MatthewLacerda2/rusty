@@ -20,8 +20,10 @@ pub mod decode;
 pub mod introspection;
 pub mod maestro;
 pub mod rodio_backend;
+pub mod spatial;
 
 pub use backend::{AudioBackend, NullBackend, PlayParams, VoiceId};
-pub use introspection::{AudioEvent, AudioEventKind, AudioEventLog, VoiceInfo};
+pub use introspection::{AudioEvent, AudioEventKind, AudioEventLog, SpatialResult, VoiceInfo};
 pub use maestro::AudioMaestro;
 pub use rodio_backend::RodioBackend;
+pub use spatial::Listener;
