@@ -325,6 +325,33 @@ jobs:
           # `bans`/`sources` stay as-is (warn). Policy lives in deny.toml.
           command: check advisories bans sources licenses
 
+  # The single required status check for ci.yml (issue #229). Branch protection
+  # requires THIS job, not build-test / build-test-cross / deny by name. It always
+  # runs and collapses those gating jobs into one result: it passes when each either
+  # succeeded or was legitimately skipped (e.g. build-test-cross on a Markdown-only
+  # PR) and fails only on a real failure or cancellation. That permanently retires the
+  # skipped-required-check deadlock (#218/#228) — a skipped gating job can no longer
+  # leave a required check stuck "Expected" and wedge a docs-only PR. When a gating
+  # job is added or removed, update this `needs:` list; branch protection never needs
+  # touching again. (lint.yml exposes the analogous `lint-gate`.)
+  ci-gate:
+    needs: [build-test, build-test-cross, deny]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate on the correctness jobs (success or skipped passes)
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "gating job results: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error::a required gating job concluded '$r'"; exit 1 ;;
+            esac
+          done
+          echo 'all gating jobs passed (success or skipped)'
+
   # Per-PR mutation run — fast, diff-scoped, informational. Mutates only the lines
   # this PR changed within the deterministic sim modules (--in-diff ∩ --file), so
   # the cost scales with the change, not the whole codebase. Survivors are surfaced
