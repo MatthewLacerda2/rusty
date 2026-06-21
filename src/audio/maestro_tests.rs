@@ -2,6 +2,8 @@
 
 use super::*;
 use crate::audio::introspection::AudioEventKind;
+use crate::audio::spatial::Listener;
+use glam::{Quat, Vec3};
 
 fn source(clip: &str, volume: f32, looping: bool) -> AudioSourceComponent {
     AudioSourceComponent {
@@ -10,6 +12,11 @@ fn source(clip: &str, volume: f32, looping: bool) -> AudioSourceComponent {
         looping,
         ..Default::default()
     }
+}
+
+/// A listener at the origin facing -Z (right axis = +X), the default test camera.
+fn listener() -> Listener {
+    Listener::from_transform(Vec3::ZERO, Quat::IDENTITY)
 }
 
 #[test]
@@ -81,7 +88,7 @@ fn set_source_volume_only_affects_live_voices() {
     m.play_source(3, &source("a.ogg", 1.0, true), [0.0; 3], 0);
     m.set_source_volume(3, 0.25);
     // Still playing; volume change is reflected via the roster's source view.
-    let info = m.voice_info(3, &source("a.ogg", 0.25, true));
+    let info = m.voice_info(3, &source("a.ogg", 0.25, true), Vec3::ZERO, &listener());
     assert!(info.playing);
     assert_eq!(info.volume, 0.25);
 }
@@ -101,7 +108,7 @@ fn voice_info_reflects_source_fields() {
     let mut m = AudioMaestro::default();
     let s = source("music.ogg", 0.7, true);
     m.play_source(8, &s, [0.0; 3], 0);
-    let info = m.voice_info(8, &s);
+    let info = m.voice_info(8, &s, Vec3::ZERO, &listener());
     assert_eq!(info.entity, 8);
     assert_eq!(info.clip, "music.ogg");
     assert!(info.looping);

@@ -48,11 +48,15 @@ struct EntityUniforms {
     metallic: f32,
     roughness: f32,
     // Mirrors `EntityUniform` (src/render/mod.rs) byte-for-byte (#202): when set,
-    // multiply the scalar by the sampled map channel. Two pads keep 16-byte align.
+    // multiply the scalar by the sampled map channel. Two pads keep 16-byte align so
+    // the `vec4` that follows is aligned.
     use_metallic_map: u32,
     use_roughness_map: u32,
     _pad0: u32,
     _pad1: u32,
+    // Flat emissive factor (#222): rgb glow added after lighting in `fs_main`; the
+    // 4th lane is unused. `vec4` to match the Rust `[f32; 4]` byte-for-byte.
+    emissive: vec4<f32>,
 };
 
 struct BoneUniforms {
@@ -334,6 +338,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let reflection_scale = (1.0 - roughness) * (metallic + (1.0 - metallic) * 0.2);
         lighting_color += env_reflection * F_refl * reflection_scale;
     }
+
+    // 6. Emissive factor (#222): self-illumination added on top of the lit colour,
+    // independent of any light. The HDR target + bloom bright-pass turn values >1.0
+    // into a glow (muzzle flashes, glowing screens) with no post-FX work here.
+    lighting_color += entity.emissive.rgb;
 
     return vec4<f32>(lighting_color, base_color.a);
 }

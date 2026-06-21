@@ -106,14 +106,20 @@ struct EntityUniform {
     is_lit: u32,
     metallic: f32,
     roughness: f32,
-    // Flags + padding for the metallic/roughness maps (#202). When set, the shader
-    // multiplies the scalar by the sampled map channel. Two `u32` pads keep the
-    // struct 16-byte aligned (96 -> 112 bytes); `EntityUniforms` in shader.wgsl
-    // mirrors this field order byte-for-byte.
+    // Flags for the metallic/roughness maps (#202). When set, the shader multiplies
+    // the scalar by the sampled map channel. The two `u32` pads fill the run of u32s
+    // up to the next 16-byte boundary so the `vec4` that follows is aligned;
+    // `EntityUniforms` in shader.wgsl mirrors this field order byte-for-byte.
     use_metallic_map: u32,
     use_roughness_map: u32,
     _pad0: u32,
     _pad1: u32,
+    // Flat emissive factor (#222): rgb glow added on top of the lit colour in
+    // `fs_main`. The renderer draws to an HDR target with a bloom bright-pass, so
+    // values >1.0 glow automatically. Stored as a `vec4` (4th lane unused) to dodge
+    // WGSL's `vec3` 16-byte-alignment gotcha and keep the struct a 16-byte multiple
+    // (112 -> 128 bytes).
+    emissive: [f32; 4],
 }
 
 #[repr(C)]

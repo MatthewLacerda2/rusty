@@ -187,9 +187,12 @@ jobs:
         # `src/[^/]+\.rs` term drops every top-level src file (main/lib/settings/…)
         # — none are sim, all sim code lives in subdirectories — so a new top-level
         # file can't silently pollute the number (the #163 class of bug).
+        # src/audio/rodio_backend.rs is the real output-device shim (tests run against
+        # NullBackend, so it's untestable by design); ignore just that file while the
+        # testable maestro/decode/introspection audio logic stays in scope.
         run: |
           cargo llvm-cov report --cobertura --output-path cobertura-sim.xml \
-            --ignore-filename-regex 'src/(render|dev|api|asset|editor|components|core|ecs|scene|time)/|src/[^/]+\.rs|src/bin/|tools/'
+            --ignore-filename-regex 'src/(render|dev|api|asset|editor|components|core|ecs|scene|time)/|src/audio/rodio_backend\.rs|src/[^/]+\.rs|src/bin/|tools/'
       - name: Diff coverage of changed sim lines
         id: diffcov
         # --fail-under 100 makes diff-cover exit non-zero when any changed sim line
