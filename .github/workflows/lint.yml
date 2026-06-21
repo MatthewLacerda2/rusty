@@ -73,3 +73,26 @@ jobs:
       - name: Clippy (hard gate, dev features)
         if: needs.changes.outputs.code != 'false'
         run: cargo clippy --all-targets --features dev -- -D warnings -D clippy::too_many_lines
+
+  # The single required status check for lint.yml (issue #229) — the lint-workflow
+  # analog of ci.yml's `ci-gate`. Branch protection requires this job, not `lint` by
+  # name, so a lint job that is later added or skipped can never re-introduce the
+  # skipped-required-check deadlock (#218). Passes when `lint` succeeded or was
+  # skipped; fails only on a real failure or cancellation.
+  lint-gate:
+    needs: [lint]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate on the lint job (success or skipped passes)
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "lint job result: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error::the lint job concluded '$r'"; exit 1 ;;
+            esac
+          done
+          echo 'lint gate passed (success or skipped)'
