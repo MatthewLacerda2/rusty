@@ -100,18 +100,17 @@ impl Renderer {
     /// Record the decal render pass: load the existing HDR colour (no depth
     /// attachment — depth is bound as a sampled texture), then draw each projector
     /// box. The shader reconstructs the surface and projects the decal onto it.
-    fn encode_decal_pass(&self, draws: &[DecalDraw]) {
+    fn encode_decal_pass(&mut self, draws: &[DecalDraw]) {
+        // Bind the scene depth as a sampled texture for surface reconstruction. The
+        // depth view only changes on resize, so this bind group is cached and reused
+        // across frames/cameras instead of rebuilt every call (#210); `resize`
+        // invalidates it.
+        self.ensure_decal_depth_bind_group();
         let dr = &self.decal_renderer;
-
-        // Bind the scene depth as a sampled texture for surface reconstruction.
-        let depth_bg = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Decal Depth Bind Group"),
-            layout: &dr.depth_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(&self.depth_view),
-            }],
-        });
+        let depth_bg = self
+            .decal_depth_bind_group
+            .as_ref()
+            .expect("decal depth bind group built");
 
         let mut encoder = self
             .device
@@ -136,7 +135,7 @@ impl Renderer {
 
             pass.set_pipeline(&dr.pipeline);
             pass.set_bind_group(0, &dr.globals_bind_group, &[]);
-            pass.set_bind_group(2, &depth_bg, &[]);
+            pass.set_bind_group(2, depth_bg, &[]);
             pass.set_vertex_buffer(0, dr.vertex_buffer.slice(..));
             pass.set_index_buffer(dr.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
@@ -147,6 +146,23 @@ impl Renderer {
             }
         }
         self.queue.submit(std::iter::once(encoder.finish()));
+    }
+
+    /// Build the cached decal-pass depth bind group if absent (first decal frame or
+    /// after a resize invalidated it).
+    fn ensure_decal_depth_bind_group(&mut self) {
+        if self.decal_depth_bind_group.is_some() {
+            return;
+        }
+        self.decal_depth_bind_group =
+            Some(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Decal Depth Bind Group"),
+                layout: &self.decal_renderer.depth_layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&self.depth_view),
+                }],
+            }));
     }
 }
 

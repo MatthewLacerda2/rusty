@@ -115,6 +115,7 @@ impl Renderer {
             post_fx,
             quality,
         } = gpu;
+        let entity_pool = Some(super::entity_pool::EntityPool::new(&device));
         Self {
             device,
             queue,
@@ -135,6 +136,8 @@ impl Renderer {
             camera_buffer: global.camera_buffer,
             lighting_buffer: global.lighting_buffer,
             global_bind_group: global.global_bind_group,
+            global_bind_group_dirty: false,
+            entity_pool,
             depth_texture,
             depth_view,
             shadow_layout: shadows.layout,
@@ -155,6 +158,7 @@ impl Renderer {
             axis_count: 0,
             skybox_texture: None,
             skybox_path: "".to_string(),
+            decal_depth_bind_group: None,
         }
     }
 }

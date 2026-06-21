@@ -22,6 +22,18 @@ pub struct ShadowRenderer {
 
     global_bind_group: wgpu::BindGroup,
     entity_layout: wgpu::BindGroupLayout,
+
+    /// Persistent per-entity model-matrix buffers + bind groups, keyed by entity id.
+    /// The depth pass used to `create_buffer_init` one buffer + bind group per entity
+    /// every frame (static *and* dynamic); these are written in place with
+    /// `queue.write_buffer` and reused instead (#210).
+    entity_slots: HashMap<u32, ShadowSlot>,
+}
+
+/// One entity's reused shadow-pass model-matrix buffer + its bind group.
+struct ShadowSlot {
+    buffer: wgpu::Buffer,
+    bind_group: wgpu::BindGroup,
 }
 
 impl ShadowRenderer {
@@ -58,6 +70,7 @@ impl ShadowRenderer {
             is_static_cached: false,
             global_bind_group,
             entity_layout,
+            entity_slots: HashMap::new(),
         }
     }
 
@@ -254,6 +267,12 @@ impl ShadowRenderer {
         })
     }
 
+    /// Drop shadow slots for entities no longer in `live`, keeping the per-entity
+    /// buffer pool bounded to the active scene (#210).
+    pub fn retain_entities(&mut self, live: &std::collections::HashSet<u32>) {
+        self.entity_slots.retain(|id, _| live.contains(id));
+    }
+
     pub fn update_light_space(&mut self, queue: &wgpu::Queue, light_dir: Vec3) {
         let norm_dir = light_dir.normalize();
         // Position the shadow camera looking at the center of the scene
@@ -275,11 +294,13 @@ impl ShadowRenderer {
     pub fn render_static(
         &mut self,
         device: &wgpu::Device,
+        queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         scene: &Scene,
         gpu_meshes: &HashMap<crate::render::MeshId, crate::render::GpuMesh>,
     ) {
-        let render_resources = self.collect_entity_resources(device, scene, gpu_meshes, true);
+        let render_resources =
+            self.collect_entity_resources(device, queue, scene, gpu_meshes, true);
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -306,6 +327,7 @@ impl ShadowRenderer {
     pub fn render_dynamic(
         &mut self,
         device: &wgpu::Device,
+        queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         scene: &Scene,
         gpu_meshes: &HashMap<crate::render::MeshId, crate::render::GpuMesh>,
@@ -332,7 +354,8 @@ impl ShadowRenderer {
             size,
         );
 
-        let render_resources = self.collect_entity_resources(device, scene, gpu_meshes, false);
+        let render_resources =
+            self.collect_entity_resources(device, queue, scene, gpu_meshes, false);
 
         if !render_resources.is_empty() {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -354,76 +377,86 @@ impl ShadowRenderer {
         }
     }
 
-    /// Build a per-entity model-matrix uniform + bind group for every active
-    /// entity whose `is_static` flag matches `want_static`.
+    /// Sync the persistent model-matrix buffer for every active entity whose
+    /// `is_static` flag matches `want_static`, returning a lightweight draw item per
+    /// entity. The buffer + bind group are reused across frames and only the matrix is
+    /// rewritten with `queue.write_buffer` (#210).
     fn collect_entity_resources(
-        &self,
+        &mut self,
         device: &wgpu::Device,
+        queue: &wgpu::Queue,
         scene: &Scene,
         gpu_meshes: &HashMap<crate::render::MeshId, crate::render::GpuMesh>,
         want_static: bool,
-    ) -> Vec<(crate::render::MeshId, wgpu::BindGroup, u32)> {
-        let (buffer_label, bind_group_label) = if want_static {
-            (
-                "Shadow Static Entity Uniform",
-                "Shadow Static Entity Bind Group",
-            )
-        } else {
-            (
-                "Shadow Dynamic Entity Uniform",
-                "Shadow Dynamic Entity Bind Group",
-            )
-        };
+    ) -> Vec<(crate::render::MeshId, u32, u32)> {
         let mut render_resources = Vec::new();
         for entity in scene.iter() {
             if !entity.active || entity.is_static != want_static {
                 continue;
             }
-            if let Some(mesh) = &entity.mesh {
-                let mesh_id = crate::render::MeshId::from_mesh(mesh);
-                if let Some(gpu_mesh) = gpu_meshes.get(&mesh_id) {
-                    let model_matrix = scene.compute_world_matrix(entity.id);
-                    let model_arr = model_matrix.to_cols_array();
-                    let entity_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some(buffer_label),
-                        contents: bytemuck::bytes_of(&model_arr),
-                        usage: wgpu::BufferUsages::UNIFORM,
-                    });
-
-                    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some(bind_group_label),
-                        layout: &self.entity_layout,
-                        entries: &[wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: entity_buf.as_entire_binding(),
-                        }],
-                    });
-
-                    render_resources.push((mesh_id, bind_group, gpu_mesh.num_indices));
-                }
-            }
+            let Some(mesh) = &entity.mesh else { continue };
+            let mesh_id = crate::render::MeshId::from_mesh(mesh);
+            let Some(gpu_mesh) = gpu_meshes.get(&mesh_id) else {
+                continue;
+            };
+            let model_arr = scene.compute_world_matrix(entity.id).to_cols_array();
+            self.sync_entity_slot(device, queue, entity.id, &model_arr);
+            render_resources.push((mesh_id, entity.id, gpu_mesh.num_indices));
         }
         render_resources
     }
 
-    /// Issue the depth-only draw calls for collected entity resources.
+    /// Get-or-create entity `id`'s shadow slot, writing the model matrix into its
+    /// persistent buffer (allocated once, on first appearance).
+    fn sync_entity_slot(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        id: u32,
+        model_arr: &[f32; 16],
+    ) {
+        if let Some(slot) = self.entity_slots.get(&id) {
+            queue.write_buffer(&slot.buffer, 0, bytemuck::bytes_of(model_arr));
+            return;
+        }
+        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Shadow Entity Uniform"),
+            contents: bytemuck::bytes_of(model_arr),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Shadow Entity Bind Group"),
+            layout: &self.entity_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        });
+        self.entity_slots
+            .insert(id, ShadowSlot { buffer, bind_group });
+    }
+
+    /// Issue the depth-only draw calls for collected entity resources, pulling each
+    /// entity's reused bind group from the slot pool.
     fn draw_resources<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         gpu_meshes: &'a HashMap<crate::render::MeshId, crate::render::GpuMesh>,
-        render_resources: &'a [(crate::render::MeshId, wgpu::BindGroup, u32)],
+        render_resources: &'a [(crate::render::MeshId, u32, u32)],
     ) {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
 
-        for (id, bind_group, num_indices) in render_resources {
-            if let Some(gpu_mesh) = gpu_meshes.get(id) {
-                render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
-                render_pass
-                    .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-                render_pass.set_bind_group(1, bind_group, &[]);
-                render_pass.draw_indexed(0..*num_indices, 0, 0..1);
-            }
+        for (mesh_id, id, num_indices) in render_resources {
+            let (Some(gpu_mesh), Some(slot)) = (gpu_meshes.get(mesh_id), self.entity_slots.get(id))
+            else {
+                continue;
+            };
+            render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
+            render_pass
+                .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            render_pass.set_bind_group(1, &slot.bind_group, &[]);
+            render_pass.draw_indexed(0..*num_indices, 0, 0..1);
         }
     }
 }

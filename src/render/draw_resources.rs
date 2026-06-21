@@ -6,44 +6,24 @@
 
 use glam::Mat4;
 use std::rc::Rc;
-use wgpu::util::DeviceExt;
 
-use super::{BoneUniform, EntityUniform, GpuTexture, MeshId, Renderer};
+use super::{EntityUniform, GpuTexture, MeshId, Renderer};
 use crate::components::MaterialAsset;
 use crate::scene::Scene;
 
-// The leading `u32` is the entity id (identity — e.g. matching the selected entity
-// for its outline); `MeshId` is the geometry key the render pass resolves the shared
-// vertex/index buffers through (#127). The second `BindGroup` is the per-entity
-// group(2) material bind group (albedo + metallic + roughness maps), assembled from
-// the entity's resolved textures against `material_layout` (#202).
-pub(super) type SolidResource = (
-    u32,
-    MeshId,
-    wgpu::Buffer,
-    wgpu::Buffer,
-    wgpu::BindGroup,
-    wgpu::BindGroup,
-    u32,
-);
-pub(super) type OutlineResource = (
-    u32,
-    MeshId,
-    wgpu::Buffer,
-    wgpu::Buffer,
-    wgpu::BindGroup,
-    u32,
-);
-pub(super) type GridResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
-pub(super) type AabbResource = (wgpu::Buffer, wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
-pub(super) type AxisResource = (usize, wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
-pub(super) type PathResource = (
-    wgpu::Buffer,
-    wgpu::Buffer,
-    wgpu::Buffer,
-    wgpu::BindGroup,
-    u32,
-);
+// One solid draw item: the entity id (its persistent entity + material bind groups
+// live in `entity_pool`, keyed by this id — #210), the `MeshId` geometry key the
+// pass resolves the shared vertex/index buffers through (#127), and the index count.
+pub(super) type SolidResource = (u32, MeshId, u32);
+// The overlay resources keep only the buffers they own (the per-overlay entity
+// uniform + any vertex buffer) plus their bind group; the bone palette they bind is
+// the renderer's one shared identity buffer, so no per-overlay palette is allocated
+// (#210).
+pub(super) type OutlineResource = (u32, MeshId, wgpu::Buffer, wgpu::BindGroup, u32);
+pub(super) type GridResource = (wgpu::Buffer, wgpu::BindGroup);
+pub(super) type AabbResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
+pub(super) type AxisResource = (usize, wgpu::Buffer, wgpu::BindGroup);
+pub(super) type PathResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup, u32);
 
 /// The editor-only overlay resources for one scene pass (selection outline, grid,
 /// collider AABBs, axis arrows). Empty outside editor mode. Bundled so the scene pass
@@ -57,34 +37,31 @@ pub(super) struct Overlays {
 }
 
 impl Renderer {
-    pub(super) fn default_bones() -> BoneUniform {
-        BoneUniform {
-            bones: [Mat4::IDENTITY.to_cols_array(); 64],
-        }
+    /// The one shared identity bone palette buffer every overlay/non-skinned draw
+    /// binds, so none of them allocate a per-draw 4 KB palette (#210).
+    pub(super) fn shared_bones_buffer(&self) -> &wgpu::Buffer {
+        self.entity_pool
+            .as_ref()
+            .expect("entity pool present")
+            .default_bones_buffer()
     }
 
     /// Pre-create the editor overlay resources for a pass; all-empty in play mode.
-    pub(super) fn precreate_overlays(
-        &self,
-        scene: &Scene,
-        default_bones: &BoneUniform,
-        editor_mode: bool,
-    ) -> Overlays {
+    pub(super) fn precreate_overlays(&self, scene: &Scene, editor_mode: bool) -> Overlays {
         if !editor_mode {
             return Overlays::default();
         }
         Overlays {
-            outline: self.precreate_outline(scene, default_bones),
-            grid: self.precreate_grid(default_bones),
-            aabb: self.precreate_aabb(scene, default_bones),
-            axis: self.precreate_axis_arrows(scene, default_bones),
+            outline: self.precreate_outline(scene),
+            grid: self.precreate_grid(),
+            aabb: self.precreate_aabb(scene),
+            axis: self.precreate_axis_arrows(scene),
         }
     }
 
     pub(super) fn precreate_solid_resources(
-        &self,
+        &mut self,
         scene: &Scene,
-        default_bones: &BoneUniform,
         culling_mask: u32,
     ) -> Vec<SolidResource> {
         let mut solid_render_resources = Vec::new();
@@ -96,78 +73,57 @@ impl Renderer {
             if !crate::scene::layer_in_mask(entity.layer, culling_mask) {
                 continue;
             }
-            if let Some(res) = self.build_solid_resource(scene, &entity, default_bones) {
+            if let Some(res) = self.sync_solid_resource(scene, &entity) {
                 solid_render_resources.push(res);
             }
         }
         solid_render_resources
     }
 
-    /// Build the GPU resources for one solid entity, or `None` if its mesh is not
-    /// resident on the GPU yet.
-    fn build_solid_resource(
-        &self,
+    /// Sync one solid entity's persistent pool slot (uniform + palette written in
+    /// place, bind groups reused) and return its draw item, or `None` if its mesh is
+    /// not resident on the GPU yet (#210).
+    fn sync_solid_resource(
+        &mut self,
         scene: &Scene,
         entity: &crate::components::Entity,
-        default_bones: &BoneUniform,
     ) -> Option<SolidResource> {
         let mesh = entity.mesh.as_ref()?;
         let mesh_id = MeshId::from_mesh(mesh);
-        let gpu_mesh = self.gpu_meshes.get(&mesh_id)?;
+        let num_indices = self.gpu_meshes.get(&mesh_id)?.num_indices;
 
         let material = scene.material_of(entity);
         let model_matrix = scene.compute_world_matrix(entity.id);
-        let entity_uniform = solid_entity_uniform(entity, material, model_matrix);
-        let entity_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Entity Uniform"),
-                contents: bytemuck::bytes_of(&entity_uniform),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
+        let uniform = solid_entity_uniform(entity, material, model_matrix);
+        // The active bone palette: the live animated pose when a clip plays (#80),
+        // else the bind pose (#79). Primitives/static meshes leave it empty, so the
+        // pool binds the shared identity palette and allocates no per-entity buffer.
+        let palette = mesh.active_palette().to_vec();
 
-        // Upload the mesh's active bone palette: the live animated pose when a clip
-        // is playing (#80), else the bind pose (#79). Skinned `"Asset"` meshes supply
-        // a real palette computed from their imported skeleton; primitives and static
-        // meshes leave an empty palette, so the GPU bones stay at identity and the
-        // skinning shader is a no-op for them.
-        let mut bones_data = *default_bones;
-        for (i, bone) in mesh.active_palette().iter().take(64).enumerate() {
-            bones_data.bones[i] = bone.to_cols_array();
-        }
-        let bones_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Bones Uniform"),
-                contents: bytemuck::bytes_of(&bones_data),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-
-        let entity_bind_group =
-            self.entity_bind_group("Entity Bind Group", &entity_buffer, &bones_buffer);
-
-        // Bind Group 2 (Material): albedo + metallic + roughness + normal + emissive
-        // maps, each resolved from the entity's material by path (default texture when
-        // absent / not yet loaded), assembled against the expanded `material_layout`
-        // (#202, #207). Order matches the layout's texture bindings (0,2,3,4,5).
-        let maps = [
-            self.resolve_map(material.and_then(|m| m.base_color_map.as_ref())),
-            self.resolve_map(material.and_then(|m| m.metallic_map.as_ref())),
-            self.resolve_map(material.and_then(|m| m.roughness_map.as_ref())),
-            self.resolve_map(material.and_then(|m| m.normal_map.as_ref())),
-            self.resolve_map(material.and_then(|m| m.emissive_map.as_ref())),
+        // Five material map paths (albedo, metallic, roughness, normal, emissive).
+        // The signature is the *resolved* key (the path only when resident, else
+        // empty for the default), so the material bind group is rebuilt exactly when
+        // a map's resolved texture changes — including a late-loaded texture (#207).
+        let paths = [
+            material.and_then(|m| m.base_color_map.clone()),
+            material.and_then(|m| m.metallic_map.clone()),
+            material.and_then(|m| m.roughness_map.clone()),
+            material.and_then(|m| m.normal_map.clone()),
+            material.and_then(|m| m.emissive_map.clone()),
         ];
-        let material_bind_group = self.material_bind_group(&maps);
+        let material_sig = std::array::from_fn(|i| self.resolved_key(paths[i].as_ref()));
 
-        Some((
-            entity.id,
-            mesh_id,
-            entity_buffer,
-            bones_buffer,
-            entity_bind_group,
-            material_bind_group,
-            gpu_mesh.num_indices,
-        ))
+        let update = super::entity_pool::SlotUpdate {
+            uniform,
+            palette: &palette,
+            material_sig,
+        };
+        self.sync_entity_slot(entity.id, update, |s| {
+            let maps = std::array::from_fn(|i| s.resolve_map(paths[i].as_ref()));
+            s.material_bind_group(&maps)
+        });
+
+        Some((entity.id, mesh_id, num_indices))
     }
 
     /// Resolve a material map path to a resident GPU texture, falling back to the
@@ -180,6 +136,15 @@ impl Renderer {
                 .cloned()
                 .unwrap_or_else(|| Rc::clone(&self.default_texture)),
             None => Rc::clone(&self.default_texture),
+        }
+    }
+
+    /// The cache key a map path resolves to: the path when its texture is resident,
+    /// else empty (the default texture). Lets the pool detect a late-loaded map.
+    fn resolved_key(&self, path: Option<&String>) -> String {
+        match path {
+            Some(p) if self.gpu_textures.contains_key(p) => p.clone(),
+            _ => String::new(),
         }
     }
 

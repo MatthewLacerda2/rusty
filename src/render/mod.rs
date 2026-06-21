@@ -15,6 +15,7 @@ mod draw_overlays;
 mod draw_pass;
 mod draw_path;
 mod draw_resources;
+mod entity_pool;
 mod particles;
 mod particles_draw;
 mod pipelines;
@@ -192,6 +193,13 @@ pub struct Renderer {
     camera_buffer: wgpu::Buffer,
     lighting_buffer: wgpu::Buffer,
     pub global_bind_group: wgpu::BindGroup,
+    /// Rebuild the group-0 bind group only when the skybox it binds changed, not every
+    /// camera every frame — its camera/lighting buffers are persistent (#210).
+    global_bind_group_dirty: bool,
+    /// Persistent per-entity forward buffers + bind groups, written in place each frame
+    /// instead of reallocated per camera per entity (#210). `Option` so a slot can be
+    /// borrowed out mutably while other renderer fields are read.
+    entity_pool: Option<entity_pool::EntityPool>,
 
     // Depth Stencil
     depth_texture: wgpu::Texture,
@@ -239,6 +247,9 @@ pub struct Renderer {
     /// Box-projector decal pass (draws into the HDR target after solids/skybox,
     /// reconstructing the underlying surface from the scene depth target).
     decal_renderer: decals::DecalRenderer,
+    /// Cached decal-pass depth bind group; the depth view it samples only changes on
+    /// resize, so it is built lazily and invalidated there, not rebuilt per frame (#210).
+    decal_depth_bind_group: Option<wgpu::BindGroup>,
 }
 
 #[cfg(test)]
