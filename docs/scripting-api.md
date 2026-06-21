@@ -89,9 +89,24 @@ map; an empty path clears it.
 |---|---|
 | `Material.SetMetallic` | `(id, value)` |
 | `Material.SetRoughness` | `(id, value)` |
-| `Material.SetMetallicMap` | `(id, path)` — ⚠️ stored/serialized but **not yet sampled** by the renderer (#202) |
-| `Material.SetRoughnessMap` | `(id, path)` — ⚠️ stored/serialized but **not yet sampled** by the renderer (#202) |
+| `Material.SetMetallicMap` | `(id, path)` — sampled by the renderer; the map's blue channel scales the metallic value (glTF metallic-roughness convention) |
+| `Material.SetRoughnessMap` | `(id, path)` — sampled by the renderer; the map's green channel scales the roughness value |
 | `Material.SetTexture` | `(id, path)` — the albedo map (sampled today) |
+
+> Normal and emissive maps round-trip through save/load and the inspector but are
+> not sampled by the renderer yet (deferred follow-ups: normal maps need vertex
+> tangents; emissive needs extra uniform plumbing).
+
+> **Imported materials.** Instantiating a glTF model populates the material library
+> from the file's authored metallic-roughness materials and points each sub-object's
+> entity at the matching library entry via its `MaterialComponent`. The library key
+> is deterministic — `"<path>::<material-name>"` (or `"<path>::material_<index>"`
+> when the material is unnamed) — so sub-objects that share one glTF material share a
+> single library entry. glTF packs metallic + roughness in one texture; on import it
+> is mapped to *both* the engine's `metallic_map` and `roughness_map` (the shader
+> reads the blue/green channel from each). External texture URIs resolve to paths
+> relative to the glTF file; embedded images are not yet extracted (a follow-up). OBJ
+> imports only `Kd` (base color) and `map_Kd` (albedo) — it is static-mesh only.
 
 ## `Animator`
 

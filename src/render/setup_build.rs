@@ -5,8 +5,10 @@
 
 use std::rc::Rc;
 
+use super::bind_layouts;
 use super::pipelines;
 use super::postfx::{PostFx, QualityPreset, HDR_FORMAT};
+use super::setup_textures::create_textures;
 use super::shaders::ShaderRegistry;
 use super::{shadows, skybox};
 use super::{CameraUniform, GpuTexture, LightingUniform, Renderer};
@@ -18,7 +20,9 @@ pub(super) struct RendererParts {
     pub camera_lighting_layout: wgpu::BindGroupLayout,
     pub entity_bones_layout: wgpu::BindGroupLayout,
     pub texture_layout: wgpu::BindGroupLayout,
+    pub material_layout: wgpu::BindGroupLayout,
     pub default_texture: Rc<GpuTexture>,
+    pub default_material_bind_group: wgpu::BindGroup,
     pub camera_buffer: wgpu::Buffer,
     pub lighting_buffer: wgpu::Buffer,
     pub global_bind_group: wgpu::BindGroup,
@@ -44,41 +48,29 @@ impl RendererParts {
         config: &wgpu::SurfaceConfiguration,
     ) -> Self {
         let mut registry = ShaderRegistry::new("assets/shaders");
-
         let (depth_texture, depth_view) = Renderer::create_depth_resources(device, config);
-
-        let camera_lighting_layout = pipelines::create_camera_lighting_layout(device);
-        let entity_bones_layout = pipelines::create_entity_bones_layout(device);
-        let texture_layout = pipelines::create_texture_layout(device);
-
-        // Default grid checker texture (bound statically to the global layout).
-        let default_texture = Rc::new(Renderer::create_default_checkerboard_texture(
-            device,
-            queue,
-            &texture_layout,
-        ));
-
+        let camera_lighting_layout = bind_layouts::create_camera_lighting_layout(device);
+        let entity_bones_layout = bind_layouts::create_entity_bones_layout(device);
+        let tx = create_textures(device, queue);
         let (camera_buffer, lighting_buffer, global_bind_group) =
-            create_global_bindings(device, &camera_lighting_layout, &default_texture);
+            create_global_bindings(device, &camera_lighting_layout, &tx.default_texture);
 
-        let shadow_layout = pipelines::create_shadow_layout(device);
-        let (shadow_renderer, shadow_uniform_buffer, shadow_bind_group) =
-            create_shadow_system(device, &shadow_layout, &mut registry);
+        let (shadow_layout, shadow_renderer, shadow_uniform_buffer, shadow_bind_group) =
+            create_shadow_system(device, &mut registry);
 
         let (render_pipeline, line_pipeline, outline_pipeline, skybox_renderer) =
             create_forward_passes(
                 device,
                 &camera_lighting_layout,
                 &entity_bones_layout,
-                &texture_layout,
+                &tx.texture_layout,
+                &tx.material_layout,
                 &shadow_layout,
                 &mut registry,
             );
-
         let (post_fx, quality) = create_post_chain(device, config, &mut registry);
         let (particle_renderer, decal_renderer) =
-            create_billboard_passes(device, &texture_layout, &mut registry);
-
+            create_billboard_passes(device, &tx.texture_layout, &mut registry);
         Self {
             depth_texture,
             depth_view,
@@ -86,8 +78,10 @@ impl RendererParts {
             entity_bones_layout,
             particle_renderer,
             decal_renderer,
-            texture_layout,
-            default_texture,
+            texture_layout: tx.texture_layout,
+            material_layout: tx.material_layout,
+            default_texture: tx.default_texture,
+            default_material_bind_group: tx.default_material_bind_group,
             camera_buffer,
             lighting_buffer,
             global_bind_group,
@@ -190,9 +184,14 @@ fn create_global_bindings(
 /// that samples the active shadow map.
 fn create_shadow_system(
     device: &wgpu::Device,
-    shadow_layout: &wgpu::BindGroupLayout,
     registry: &mut ShaderRegistry,
-) -> (shadows::ShadowRenderer, wgpu::Buffer, wgpu::BindGroup) {
+) -> (
+    wgpu::BindGroupLayout,
+    shadows::ShadowRenderer,
+    wgpu::Buffer,
+    wgpu::BindGroup,
+) {
+    let shadow_layout = bind_layouts::create_shadow_layout(device);
     let shadow_renderer = shadows::ShadowRenderer::new(device, registry);
 
     let shadow_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -204,7 +203,7 @@ fn create_shadow_system(
 
     let shadow_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Main Shadow Bind Group"),
-        layout: shadow_layout,
+        layout: &shadow_layout,
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
@@ -221,16 +220,26 @@ fn create_shadow_system(
         ],
     });
 
-    (shadow_renderer, shadow_uniform_buffer, shadow_bind_group)
+    (
+        shadow_layout,
+        shadow_renderer,
+        shadow_uniform_buffer,
+        shadow_bind_group,
+    )
 }
 
 /// Compile the forward shader and build the forward-lit, line, outline and skybox
 /// passes that all draw into the HDR offscreen target.
+// Threads the four bind-group layouts the forward passes need (skybox keeps the
+// single-texture layout, the pipelines take the expanded material layout); a struct
+// wrapper would only add indirection without clarifying intent.
+#[allow(clippy::too_many_arguments)]
 fn create_forward_passes(
     device: &wgpu::Device,
     camera_lighting_layout: &wgpu::BindGroupLayout,
     entity_bones_layout: &wgpu::BindGroupLayout,
     texture_layout: &wgpu::BindGroupLayout,
+    material_layout: &wgpu::BindGroupLayout,
     shadow_layout: &wgpu::BindGroupLayout,
     registry: &mut ShaderRegistry,
 ) -> (
@@ -241,6 +250,8 @@ fn create_forward_passes(
 ) {
     let shader = registry.load(device, "shader.wgsl", "Forward Lit Shader");
 
+    // Skybox binds a single-texture `GpuTexture.bind_group` at its group(1), so it
+    // keeps the single `texture_layout`; the forward pipelines use `material_layout`.
     let skybox_renderer = skybox::SkyboxRenderer::new(
         device,
         texture_layout,
@@ -255,7 +266,7 @@ fn create_forward_passes(
         HDR_FORMAT,
         camera_lighting_layout,
         entity_bones_layout,
-        texture_layout,
+        material_layout,
         shadow_layout,
     );
 

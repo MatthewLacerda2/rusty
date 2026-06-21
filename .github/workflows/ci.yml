@@ -24,10 +24,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Detect whether the PR changes anything other than Markdown. Markdown-only PRs
-  # skip the heavy Rust jobs below (see the merging note in CLAUDE.md). We gate via
-  # job-level `if` (a skipped job still satisfies a required check) rather than
-  # workflow `paths-ignore` (which would leave a required check stuck pending).
+  # Detect whether the PR changes anything other than Markdown. On a Markdown-only
+  # PR the heavy Rust *steps* below are skipped, but the required job still RUNS and
+  # reports `success` (a job whose steps all skip still succeeds). This is on
+  # purpose: the branch ruleset treats a *skipped* required check as
+  # "Expected"/unsatisfied — NOT a pass — so skipping the whole job would wedge a
+  # docs-only PR as unmergeable (issue #218). So we keep the cheap-docs-PR path by
+  # guarding the required job's steps on `code`, never by skipping the job itself.
+  # See the merging note in CLAUDE.md.
   #
   # `sim` narrows further: it's true only when the PR touches code that can change
   # mutation-test outcomes on the four deterministic sim modules — their source, the
@@ -62,31 +66,43 @@ jobs:
 
   # The Linux build+test. Kept as its own job (not folded into the OS matrix
   # below) so the `build-test` status-check name — referenced by the branch
-  # ruleset as a required check — is preserved exactly.
+  # ruleset as a required check — is preserved exactly. The job ALWAYS runs on a
+  # non-draft PR / merge_group so the required check reports `success` (never
+  # `skipped`); the build/test steps are guarded on `code`, so a Markdown-only PR
+  # is a fast no-op success (issue #218).
   build-test:
     needs: changes
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'merge_group' ||
-      (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
+      github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
+        if: needs.changes.outputs.code != 'false'
       - name: Toolchain (from rust-toolchain.toml)
+        if: needs.changes.outputs.code != 'false'
         run: rustup show
       - name: Cache cargo registry + target
+        if: needs.changes.outputs.code != 'false'
         uses: Swatinem/rust-cache@v2
       - name: System libs for winit/wgpu builds
+        if: needs.changes.outputs.code != 'false'
         run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev
       - name: Build (default)
+        if: needs.changes.outputs.code != 'false'
         run: cargo build --locked
       - name: Build (dev features)
+        if: needs.changes.outputs.code != 'false'
         run: cargo build --features dev --locked
       - name: Test (engine, default)
+        if: needs.changes.outputs.code != 'false'
         run: cargo test --locked
       - name: Test (engine, dev features)
+        if: needs.changes.outputs.code != 'false'
         run: cargo test --features dev --locked
       - name: Test (lint xtask)
+        if: needs.changes.outputs.code != 'false'
         run: cargo test --manifest-path tools/lint/Cargo.toml --locked
 
   # Verify the wgpu cross-platform claim (issue #121): the same build + test on

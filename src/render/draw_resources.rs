@@ -12,16 +12,18 @@ use super::{BoneUniform, EntityUniform, GpuTexture, MeshId, Renderer};
 use crate::components::MaterialAsset;
 use crate::scene::Scene;
 
-// The leading `u32` is the entity id (identity — e.g. matching the selected
-// entity's texture for its outline); `MeshId` is the geometry key the render pass
-// resolves the shared vertex/index buffers through (#127).
+// The leading `u32` is the entity id (identity — e.g. matching the selected entity
+// for its outline); `MeshId` is the geometry key the render pass resolves the shared
+// vertex/index buffers through (#127). The second `BindGroup` is the per-entity
+// group(2) material bind group (albedo + metallic + roughness maps), assembled from
+// the entity's resolved textures against `material_layout` (#202).
 pub(super) type SolidResource = (
     u32,
     MeshId,
     wgpu::Buffer,
     wgpu::Buffer,
     wgpu::BindGroup,
-    Rc<GpuTexture>,
+    wgpu::BindGroup,
     u32,
 );
 pub(super) type OutlineResource = (
@@ -144,16 +146,13 @@ impl Renderer {
         let entity_bind_group =
             self.entity_bind_group("Entity Bind Group", &entity_buffer, &bones_buffer);
 
-        // Bind Group 2 (Texture): the material's albedo (`base_color_map`), or the
-        // default texture when the material has none / no material is referenced.
-        let tex = match material.and_then(|m| m.base_color_map.as_ref()) {
-            Some(path) => self
-                .gpu_textures
-                .get(path)
-                .cloned()
-                .unwrap_or_else(|| Rc::clone(&self.default_texture)),
-            None => Rc::clone(&self.default_texture),
-        };
+        // Bind Group 2 (Material): albedo + metallic + roughness maps, each resolved
+        // from the entity's material by path (default texture when absent / not yet
+        // loaded), assembled against the expanded `material_layout` (#202).
+        let albedo = self.resolve_map(material.and_then(|m| m.base_color_map.as_ref()));
+        let metallic = self.resolve_map(material.and_then(|m| m.metallic_map.as_ref()));
+        let roughness = self.resolve_map(material.and_then(|m| m.roughness_map.as_ref()));
+        let material_bind_group = self.material_bind_group(&albedo, &metallic, &roughness);
 
         Some((
             entity.id,
@@ -161,71 +160,59 @@ impl Renderer {
             entity_buffer,
             bones_buffer,
             entity_bind_group,
-            tex,
+            material_bind_group,
             gpu_mesh.num_indices,
         ))
     }
 
-    pub(super) fn precreate_outline(
-        &self,
-        scene: &Scene,
-        default_bones: &BoneUniform,
-    ) -> Option<OutlineResource> {
-        let selected_id = scene.selected_entity_id?;
-        let entity = scene.get_entity(selected_id)?;
-        let mesh_id = MeshId::from_mesh(entity.mesh.as_ref()?);
-        if !entity.active {
-            return None;
+    /// Resolve a material map path to a resident GPU texture, falling back to the
+    /// default texture when the path is absent or not yet uploaded.
+    fn resolve_map(&self, path: Option<&String>) -> Rc<GpuTexture> {
+        match path {
+            Some(p) => self
+                .gpu_textures
+                .get(p)
+                .cloned()
+                .unwrap_or_else(|| Rc::clone(&self.default_texture)),
+            None => Rc::clone(&self.default_texture),
         }
-        let gpu_mesh = self.gpu_meshes.get(&mesh_id)?;
+    }
 
-        // Scale up the model matrix slightly for the outline hull
-        let outline_scale = 1.05;
-        let scaled_transform = Mat4::from_scale_rotation_translation(
-            entity.transform.scale * outline_scale,
-            entity.transform.rotation,
-            entity.transform.position,
-        );
-
-        let outline_uniform = EntityUniform {
-            model_matrix: scaled_transform.to_cols_array(),
-            color_tint: [1.0, 0.5, 0.0, 1.0], // Vibrant glowing orange outline
-            use_texture: 0,
-            is_lit: 0,
-            metallic: 0.0,
-            roughness: 0.5,
-        };
-
-        let outline_ent_buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Outline Entity Uniform"),
-                contents: bytemuck::bytes_of(&outline_uniform),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-        let outline_bones_buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Outline Bones Uniform"),
-                contents: bytemuck::bytes_of(default_bones),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-        let outline_bind_group =
-            self.entity_bind_group("Outline Bind Group", &outline_ent_buf, &outline_bones_buf);
-
-        Some((
-            selected_id,
-            mesh_id,
-            outline_ent_buf,
-            outline_bones_buf,
-            outline_bind_group,
-            gpu_mesh.num_indices,
-        ))
+    /// Build a group(2) material bind group from three texture views + one shared
+    /// sampler, against `material_layout` (binding 1 samples all three textures).
+    pub(super) fn material_bind_group(
+        &self,
+        albedo: &GpuTexture,
+        metallic: &GpuTexture,
+        roughness: &GpuTexture,
+    ) -> wgpu::BindGroup {
+        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Material Bind Group"),
+            layout: &self.material_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&albedo.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.default_texture.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&metallic.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(&roughness.view),
+                },
+            ],
+        })
     }
 
     /// Create a group-1 bind group pairing an entity uniform buffer with a bones
     /// buffer against the shared `entity_bones_layout`.
-    fn entity_bind_group(
+    pub(super) fn entity_bind_group(
         &self,
         label: &str,
         entity_buf: &wgpu::Buffer,
@@ -278,6 +265,8 @@ fn solid_entity_uniform(
     };
 
     let use_texture = u32::from(material.is_some_and(|m| m.base_color_map.is_some()));
+    let use_metallic_map = u32::from(material.is_some_and(|m| m.metallic_map.is_some()));
+    let use_roughness_map = u32::from(material.is_some_and(|m| m.roughness_map.is_some()));
 
     EntityUniform {
         model_matrix: model_matrix.to_cols_array(),
@@ -286,5 +275,9 @@ fn solid_entity_uniform(
         is_lit,
         metallic,
         roughness,
+        use_metallic_map,
+        use_roughness_map,
+        _pad0: 0,
+        _pad1: 0,
     }
 }

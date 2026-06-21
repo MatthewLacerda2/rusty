@@ -21,7 +21,12 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
     let (document, buffers, _images) =
         gltf::import(path).map_err(|e| ImportError::Parse(e.to_string()))?;
 
-    let materials = document.materials().map(material_data).collect();
+    // External texture URIs resolve relative to the glTF file's own directory.
+    let base_dir = path.parent().unwrap_or_else(|| Path::new(""));
+    let materials = document
+        .materials()
+        .map(|m| material_data(m, base_dir))
+        .collect();
     let skins = gltf_skin::skins_by_mesh(&document, &buffers);
 
     let sub_meshes = document
@@ -42,11 +47,45 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
     })
 }
 
-fn material_data(material: gltf::Material) -> MaterialData {
-    let base_color = material.pbr_metallic_roughness().base_color_factor();
+/// Read one glTF material into the pure-data [`MaterialData`]: the metallic-roughness
+/// factors plus the resolved file paths of its external textures (`base_dir` anchors
+/// relative URIs). Embedded images yield `None` maps (see [`texture_path`]).
+fn material_data(material: gltf::Material, base_dir: &Path) -> MaterialData {
+    let pbr = material.pbr_metallic_roughness();
     MaterialData {
         name: material.name().unwrap_or("").to_string(),
-        base_color,
+        base_color: pbr.base_color_factor(),
+        metallic: pbr.metallic_factor(),
+        roughness: pbr.roughness_factor(),
+        base_color_map: pbr
+            .base_color_texture()
+            .and_then(|t| texture_path(&t.texture(), base_dir)),
+        metallic_roughness_map: pbr
+            .metallic_roughness_texture()
+            .and_then(|t| texture_path(&t.texture(), base_dir)),
+        normal_map: material
+            .normal_texture()
+            .and_then(|t| texture_path(&t.texture(), base_dir)),
+        emissive_map: material
+            .emissive_texture()
+            .and_then(|t| texture_path(&t.texture(), base_dir)),
+        emissive: material.emissive_factor(),
+    }
+}
+
+/// Resolve a glTF texture's image to a file path, anchored at the glTF file's
+/// directory. Only the EXTERNAL-URI case is handled: an embedded image
+/// (`Source::View`, a buffer view / data URI) returns `None` — extracting its pixels
+/// to disk is a documented follow-up, out of scope for #203. The URI is
+/// percent-decoded for the trivial `%20` (space) case; anything else is used as-is.
+fn texture_path(texture: &gltf::Texture, base_dir: &Path) -> Option<String> {
+    match texture.source().source() {
+        gltf::image::Source::Uri { uri, .. } => {
+            let decoded = uri.replace("%20", " ");
+            Some(base_dir.join(decoded).to_string_lossy().into_owned())
+        }
+        // Embedded image: no on-disk path to reference (follow-up).
+        gltf::image::Source::View { .. } => None,
     }
 }
 

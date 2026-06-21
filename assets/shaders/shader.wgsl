@@ -47,6 +47,12 @@ struct EntityUniforms {
     is_lit: u32,
     metallic: f32,
     roughness: f32,
+    // Mirrors `EntityUniform` (src/render/mod.rs) byte-for-byte (#202): when set,
+    // multiply the scalar by the sampled map channel. Two pads keep 16-byte align.
+    use_metallic_map: u32,
+    use_roughness_map: u32,
+    _pad0: u32,
+    _pad1: u32,
 };
 
 struct BoneUniforms {
@@ -74,6 +80,10 @@ var<uniform> bones: BoneUniforms;
 var t_diffuse: texture_2d<f32>;
 @group(2) @binding(1)
 var s_diffuse: sampler;
+@group(2) @binding(2)
+var t_metallic: texture_2d<f32>;
+@group(2) @binding(3)
+var t_roughness: texture_2d<f32>;
 
 @group(3) @binding(0)
 var<uniform> light_space: mat4x4<f32>;
@@ -261,8 +271,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let V = normalize(camera.camera_pos - in.world_position);
 
     let albedo = base_color.rgb;
-    let metallic = clamp(entity.metallic, 0.0, 1.0);
-    let roughness = clamp(entity.roughness, 0.04, 1.0);
+    // glTF metallic-roughness packs metallic in BLUE, roughness in GREEN. Each scalar
+    // multiplies its map channel when the flag is set, else acts alone (#202).
+    let metallic = clamp(entity.metallic * select(1.0, textureSample(t_metallic, s_diffuse, in.tex_coords).b, entity.use_metallic_map == 1u), 0.0, 1.0);
+    let roughness = clamp(entity.roughness * select(1.0, textureSample(t_roughness, s_diffuse, in.tex_coords).g, entity.use_roughness_map == 1u), 0.04, 1.0);
 
     let F0 = mix(vec3<f32>(0.04), albedo, metallic);
 

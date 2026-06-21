@@ -4,13 +4,11 @@
 
 use glam::Vec3;
 
+use super::draw_lighting::{apply_scene_lights, apply_ssr_settings, default_lighting_uniform};
 use super::draw_pass::{PassClear, ScenePassFrame};
 use super::postfx_params::build_post_params;
-use super::{
-    build_camera_stack, AmbientLightUniform, Camera, CameraUniform, DirectionalLightUniform,
-    LightingUniform, PointLightUniform, Renderer, SpotlightUniform,
-};
-use crate::scene::{LightType, Scene};
+use super::{build_camera_stack, Camera, CameraUniform, LightingUniform, Renderer};
+use crate::scene::Scene;
 
 impl Renderer {
     /// Renders the 3D scene inside a viewport render pass.
@@ -90,16 +88,9 @@ impl Renderer {
     fn upload_scene_assets(&mut self, scene: &Scene) {
         self.upload_scene_meshes(scene);
 
-        // Each active entity's resolved albedo (`base_color_map`) — the only material
-        // map the shader samples today (#201). Collected first to end the scene borrow.
-        let albedos: Vec<String> = scene
-            .entity_ids()
-            .iter()
-            .filter_map(|&id| scene.get_entity(id))
-            .filter(|e| e.active)
-            .filter_map(|e| scene.material_of(&e).and_then(|m| m.base_color_map.clone()))
-            .collect();
-        for path in albedos {
+        // The material maps the shader samples (albedo #201, metallic/roughness #202),
+        // collected paths-only first to end the scene borrow before uploading.
+        for path in active_material_map_paths(scene) {
             self.load_texture(&path);
         }
 
@@ -159,141 +150,17 @@ impl Renderer {
     }
 }
 
-/// The base lighting uniform before scene lights/SSR are scanned in.
-fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
-    LightingUniform {
-        ambient: AmbientLightUniform {
-            color: scene.ambient_color.to_array(),
-            intensity: scene.ambient_intensity,
-        },
-        dir_light: DirectionalLightUniform {
-            direction: [0.0, -1.0, 0.0],
-            _pad1: 0.0,
-            color: [1.0, 1.0, 1.0],
-            intensity: 0.0,
-            _pad2: [0.0; 4],
-        },
-        point_lights: [PointLightUniform {
-            position: [0.0, 0.0, 0.0],
-            _pad1: 0.0,
-            color: [0.0, 0.0, 0.0],
-            intensity: 0.0,
-            range: 0.0,
-            _pad2: [0.0; 3],
-        }; 4],
-        spot_light: SpotlightUniform {
-            position: [0.0, 0.0, 0.0],
-            _pad1: 0.0,
-            direction: [0.0, 0.0, 0.0],
-            _pad2: 0.0,
-            color: [0.0, 0.0, 0.0],
-            intensity: 0.0,
-            range: 0.0,
-            inner_cone: 0.0,
-            outer_cone: 0.0,
-            _pad3: 0.0,
-        },
-        num_point_lights: 0,
-        ssr_active: 0.0,
-        ssr_quality: 0.0,
-        ssr_temporal_upsampling: 0.0,
-    }
-}
-
-/// Populate the dynamic light slots from active light entities (point lights capped
-/// at the 4-slot budget).
-fn apply_scene_lights(lighting_uniform: &mut LightingUniform, scene: &Scene) {
-    let mut pt_idx = 0;
-    for entity in scene.iter() {
-        if !entity.active {
-            continue;
-        }
-        if let Some(light) = &entity.light {
-            match light.light_type {
-                LightType::Ambient => {
-                    lighting_uniform.ambient = AmbientLightUniform {
-                        color: light.color.to_array(),
-                        intensity: light.intensity,
-                    };
-                }
-                LightType::Directional => {
-                    let dir = entity.transform.rotation * Vec3::NEG_Z;
-                    lighting_uniform.dir_light = DirectionalLightUniform {
-                        direction: dir.to_array(),
-                        _pad1: 0.0,
-                        color: light.color.to_array(),
-                        intensity: light.intensity,
-                        _pad2: [0.0; 4],
-                    };
-                }
-                LightType::Point => {
-                    if pt_idx < 4 {
-                        lighting_uniform.point_lights[pt_idx] = PointLightUniform {
-                            position: entity.transform.position.to_array(),
-                            _pad1: 0.0,
-                            color: light.color.to_array(),
-                            intensity: light.intensity,
-                            range: light.range,
-                            _pad2: [0.0; 3],
-                        };
-                        pt_idx += 1;
-                    }
-                }
-                LightType::Spotlight => {
-                    lighting_uniform.spot_light = spotlight_uniform(&entity, light);
-                }
-            }
-        }
-    }
-    lighting_uniform.num_point_lights = pt_idx as u32;
-}
-
-/// Build the spotlight uniform, baking cone half-angles into their cosines.
-fn spotlight_uniform(
-    entity: &crate::components::Entity,
-    light: &crate::components::LightComponent,
-) -> SpotlightUniform {
-    let dir = entity.transform.rotation * Vec3::NEG_Z;
-    SpotlightUniform {
-        position: entity.transform.position.to_array(),
-        _pad1: 0.0,
-        direction: dir.to_array(),
-        _pad2: 0.0,
-        color: light.color.to_array(),
-        intensity: light.intensity,
-        range: light.range,
-        inner_cone: light.inner_cone.to_radians().cos(),
-        outer_cone: light.outer_cone.to_radians().cos(),
-        _pad3: 0.0,
-    }
-}
-
-/// Fold active Visual Correction (SSR) components into the uniform; last one wins.
-fn apply_ssr_settings(lighting_uniform: &mut LightingUniform, scene: &Scene) {
-    let mut ssr_active = 0.0;
-    let mut ssr_quality = 2.0; // High default
-    let mut ssr_temporal = 0.0;
-    for entity in scene.iter() {
-        if !entity.active {
-            continue;
-        }
-        if let Some(vc) = &entity.visual_correction {
-            if vc.ssr_active {
-                ssr_active = 1.0;
-            }
-            ssr_quality = match vc.ssr_quality.as_str() {
-                "Low" => 0.0,
-                "Medium" => 1.0,
-                "High" => 2.0,
-                "Ultra" => 3.0,
-                _ => 2.0,
-            };
-            if vc.ssr_temporal_upsampling {
-                ssr_temporal = 1.0;
-            }
-        }
-    }
-    lighting_uniform.ssr_active = ssr_active;
-    lighting_uniform.ssr_quality = ssr_quality;
-    lighting_uniform.ssr_temporal_upsampling = ssr_temporal;
+/// Every active entity's resolved material map paths (albedo, metallic, roughness)
+/// the forward shader samples — gathered as owned strings so the scene borrow ends
+/// before the textures are uploaded.
+fn active_material_map_paths(scene: &Scene) -> Vec<String> {
+    scene
+        .entity_ids()
+        .iter()
+        .filter_map(|&id| scene.get_entity(id))
+        .filter(|e| e.active)
+        .filter_map(|e| scene.material_of(&e).cloned())
+        .flat_map(|m| [m.base_color_map, m.metallic_map, m.roughness_map])
+        .flatten()
+        .collect()
 }
