@@ -36,7 +36,9 @@ impl Renderer {
             bytemuck::bytes_of(&lighting_uniform),
         );
 
-        let default_bones = Self::default_bones();
+        // Drop pool slots for entities no longer active, so the persistent forward
+        // buffers track the live scene rather than growing without bound (#210).
+        self.prune_entity_pool(scene);
         let aspect = self.size.width as f32 / self.size.height as f32;
 
         // The ordered camera stack (one entry in edit mode / when no scene camera).
@@ -56,11 +58,12 @@ impl Renderer {
             self.queue
                 .write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&camera_uniform));
 
-            // 2. Pre-create per-camera resources (the culling mask differs per camera).
-            let solid_render_resources =
-                self.precreate_solid_resources(scene, &default_bones, cam.culling_mask);
-            let overlays = self.precreate_overlays(scene, &default_bones, editor_mode);
-            let _path_resources = self.precreate_path(pathfinding_points, &default_bones);
+            // 2. Sync per-camera resources (the culling mask differs per camera). The
+            // forward entity buffers/bind groups persist in the pool; this only
+            // rewrites their contents and returns lightweight draw items (#210).
+            let solid_render_resources = self.precreate_solid_resources(scene, cam.culling_mask);
+            let overlays = self.precreate_overlays(scene, editor_mode);
+            let _path_resources = self.precreate_path(pathfinding_points);
 
             let frame = ScenePassFrame {
                 editor_mode,
@@ -94,14 +97,18 @@ impl Renderer {
             self.load_texture(&path);
         }
 
-        // Update skybox texture if path changed.
+        // Update skybox texture if path changed, marking the global bind group dirty
+        // so it is rebuilt once (next frame) rather than every camera every frame —
+        // the only thing in group 0 that changes outside its persistent buffers (#210).
         if !scene.skybox_path.is_empty() && self.skybox_path != scene.skybox_path {
             let path = scene.skybox_path.clone();
             self.skybox_path = path.clone();
             self.skybox_texture = Some(self.load_texture(&path));
-        } else if scene.skybox_path.is_empty() {
+            self.global_bind_group_dirty = true;
+        } else if scene.skybox_path.is_empty() && self.skybox_texture.is_some() {
             self.skybox_path = "".to_string();
             self.skybox_texture = None;
+            self.global_bind_group_dirty = true;
         }
     }
 
@@ -147,6 +154,17 @@ impl Renderer {
         apply_scene_lights(&mut lighting_uniform, scene);
         apply_ssr_settings(&mut lighting_uniform, scene);
         lighting_uniform
+    }
+
+    /// Evict persistent forward-pass slots for entities no longer active in the
+    /// scene, keeping the pool bounded to the live set (#210).
+    fn prune_entity_pool(&mut self, scene: &Scene) {
+        let live: std::collections::HashSet<u32> =
+            scene.iter().filter(|e| e.active).map(|e| e.id).collect();
+        if let Some(pool) = self.entity_pool.as_mut() {
+            pool.retain(&live);
+        }
+        self.shadow_renderer.retain_entities(&live);
     }
 }
 

@@ -6,15 +6,11 @@ use wgpu::util::DeviceExt;
 
 use super::draw_resources::{AxisResource, PathResource};
 use super::mesh::Vertex;
-use super::{BoneUniform, EntityUniform, Renderer};
+use super::{EntityUniform, Renderer};
 use crate::scene::Scene;
 
 impl Renderer {
-    pub(super) fn precreate_axis_arrows(
-        &self,
-        scene: &Scene,
-        default_bones: &BoneUniform,
-    ) -> Vec<AxisResource> {
+    pub(super) fn precreate_axis_arrows(&self, scene: &Scene) -> Vec<AxisResource> {
         let mut axis_arrow_resources = Vec::new();
         let Some(selected_id) = scene.selected_entity_id else {
             return axis_arrow_resources;
@@ -33,23 +29,18 @@ impl Renderer {
         ];
 
         for (i, color) in colors.iter().enumerate() {
-            axis_arrow_resources.push(self.build_axis_arrow(
-                i,
-                arrow_model_matrix,
-                *color,
-                default_bones,
-            ));
+            axis_arrow_resources.push(self.build_axis_arrow(i, arrow_model_matrix, *color));
         }
         axis_arrow_resources
     }
 
-    /// Build one axis-arrow's uniform + bones buffers and their bind group.
+    /// Build one axis-arrow's uniform buffer + bind group (bound against the shared
+    /// identity bone palette).
     fn build_axis_arrow(
         &self,
         i: usize,
         arrow_model_matrix: Mat4,
         color: [f32; 4],
-        default_bones: &BoneUniform,
     ) -> AxisResource {
         let entity_uniform = EntityUniform {
             model_matrix: arrow_model_matrix.to_cols_array(),
@@ -72,38 +63,12 @@ impl Renderer {
                 contents: bytemuck::bytes_of(&entity_uniform),
                 usage: wgpu::BufferUsages::UNIFORM,
             });
-
-        let default_bones_buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Axis Arrow Bones"),
-                contents: bytemuck::bytes_of(default_bones),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-
-        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Axis Arrow Bind Group"),
-            layout: &self.entity_bones_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: entity_buf.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: default_bones_buf.as_entire_binding(),
-                },
-            ],
-        });
-
-        (i, entity_buf, default_bones_buf, bind_group)
+        let bind_group =
+            self.entity_bind_group("Axis Arrow", &entity_buf, self.shared_bones_buffer());
+        (i, entity_buf, bind_group)
     }
 
-    pub(super) fn precreate_path(
-        &self,
-        pathfinding_points: &[Vec3],
-        default_bones: &BoneUniform,
-    ) -> Option<PathResource> {
+    pub(super) fn precreate_path(&self, pathfinding_points: &[Vec3]) -> Option<PathResource> {
         if pathfinding_points.len() < 2 {
             return None;
         }
@@ -128,23 +93,18 @@ impl Renderer {
                 usage: wgpu::BufferUsages::VERTEX,
             });
 
-        let (entity_buf, default_bones_buf, path_bind_group) =
-            self.build_path_bindings(default_bones);
-
+        let (entity_buf, path_bind_group) = self.build_path_bindings();
         Some((
             path_buffer,
             entity_buf,
-            default_bones_buf,
             path_bind_group,
             path_vertices.len() as u32,
         ))
     }
 
-    /// Build the path line's uniform + bones buffers and their bind group.
-    fn build_path_bindings(
-        &self,
-        default_bones: &BoneUniform,
-    ) -> (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup) {
+    /// Build the path line's uniform buffer + bind group (bound against the shared
+    /// identity bone palette).
+    fn build_path_bindings(&self) -> (wgpu::Buffer, wgpu::BindGroup) {
         let entity_uniform = EntityUniform {
             model_matrix: Mat4::IDENTITY.to_cols_array(),
             color_tint: [0.0, 1.0, 0.3, 1.0], // Neon green pathline
@@ -166,27 +126,8 @@ impl Renderer {
                 contents: bytemuck::bytes_of(&entity_uniform),
                 usage: wgpu::BufferUsages::UNIFORM,
             });
-        let default_bones_buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::bytes_of(default_bones),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-        let path_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &self.entity_bones_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: entity_buf.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: default_bones_buf.as_entire_binding(),
-                },
-            ],
-        });
-        (entity_buf, default_bones_buf, path_bind_group)
+        let path_bind_group =
+            self.entity_bind_group("Path", &entity_buf, self.shared_bones_buffer());
+        (entity_buf, path_bind_group)
     }
 }

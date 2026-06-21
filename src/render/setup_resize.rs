@@ -95,6 +95,8 @@ impl Renderer {
             let (depth_tex, depth_view) = Self::create_depth_resources(&self.device, &self.config);
             self.depth_texture = depth_tex;
             self.depth_view = depth_view;
+            // The cached decal depth bind group references the old depth view (#210).
+            self.decal_depth_bind_group = None;
             self.post_fx.resize(
                 &self.device,
                 self.config.width,
