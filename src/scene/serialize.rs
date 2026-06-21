@@ -165,21 +165,28 @@ fn rehydrate_one(primitive_type: &str, asset_ref: &Option<String>) -> Rehydrated
     }
 }
 
+/// Rebuild one entity's mesh (if any) from its on-disk reference. Shared by scene
+/// load and prefab instantiate (#215) so both rehydrate identically; GPU buffers
+/// are never stored on disk, only rebuilt here.
+pub fn rehydrate_entity_mesh(entity: &mut Entity) {
+    if let Some(mesh) = &mut entity.mesh {
+        let rebuilt = rehydrate_one(&mesh.primitive_type, &mesh.asset_ref);
+        mesh.vertices = rebuilt.vertices;
+        mesh.indices = rebuilt.indices;
+        mesh.bind_palette = rebuilt.bind_palette;
+        mesh.skin = rebuilt.skin;
+        mesh.clips = rebuilt.clips;
+        // A freshly rehydrated mesh starts at its rest pose; the animation
+        // system repopulates the posed palette once a clip plays.
+        mesh.pose_palette = Vec::new();
+        mesh.is_dirty.set(true);
+    }
+}
+
 /// Rebuild every mesh in the document from its reference (see [`rehydrate_one`]).
 fn rehydrate_meshes(data: &mut SceneData) {
     for entity in &mut data.entities {
-        if let Some(mesh) = &mut entity.mesh {
-            let rebuilt = rehydrate_one(&mesh.primitive_type, &mesh.asset_ref);
-            mesh.vertices = rebuilt.vertices;
-            mesh.indices = rebuilt.indices;
-            mesh.bind_palette = rebuilt.bind_palette;
-            mesh.skin = rebuilt.skin;
-            mesh.clips = rebuilt.clips;
-            // A freshly rehydrated mesh starts at its rest pose; the animation
-            // system repopulates the posed palette once a clip plays.
-            mesh.pose_palette = Vec::new();
-            mesh.is_dirty.set(true);
-        }
+        rehydrate_entity_mesh(entity);
     }
 }
 

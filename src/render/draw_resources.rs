@@ -268,6 +268,12 @@ fn solid_entity_uniform(
     let use_metallic_map = u32::from(material.is_some_and(|m| m.metallic_map.is_some()));
     let use_roughness_map = u32::from(material.is_some_and(|m| m.roughness_map.is_some()));
 
+    // Flat emissive factor (#222), 4th lane unused. Defaults to black with no material.
+    let emissive = match material {
+        Some(mat) => [mat.emissive[0], mat.emissive[1], mat.emissive[2], 0.0],
+        None => [0.0, 0.0, 0.0, 0.0],
+    };
+
     EntityUniform {
         model_matrix: model_matrix.to_cols_array(),
         color_tint,
@@ -279,5 +285,6 @@ fn solid_entity_uniform(
         use_roughness_map,
         _pad0: 0,
         _pad1: 0,
+        emissive,
     }
 }

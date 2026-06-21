@@ -115,7 +115,7 @@ pub fn register<'lua, 'scope>(
     camera::register(lua, scope, ctx.camera)?;
     light::register(lua, scope, ctx.scene)?;
     particle::register(lua, scope, ctx.scene)?;
-    audio::register(lua, scope, ctx.scene, ctx.audio, ctx.time)?;
+    audio::register(lua, scope, ctx.scene, ctx.audio, ctx.time, ctx.camera)?;
     decals::register(lua, scope, ctx.scene)?;
     layers::register(lua, scope, ctx.scene)?;
     graphics::register(lua, scope, ctx.scene, ctx.quality)?;

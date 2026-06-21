@@ -93,9 +93,11 @@ map; an empty path clears it.
 | `Material.SetRoughnessMap` | `(id, path)` — sampled by the renderer; the map's green channel scales the roughness value |
 | `Material.SetTexture` | `(id, path)` — the albedo map (sampled today) |
 
-> Normal and emissive maps round-trip through save/load and the inspector but are
-> not sampled by the renderer yet (deferred follow-ups: normal maps need vertex
-> tangents; emissive needs extra uniform plumbing).
+> A material's flat **emissive factor** is sampled by the renderer: it self-illuminates
+> the surface and blooms when >1.0 (HDR target) — set it via the material's `emissive`
+> `[r, g, b]` field. Normal and emissive *maps* round-trip through save/load and the
+> inspector but are not sampled by the renderer yet (deferred follow-ups: normal maps
+> need vertex tangents; the emissive map needs a new texture binding).
 
 > **Imported materials.** Instantiating a glTF model populates the material library
 > from the file's authored metallic-roughness materials and points each sub-object's
@@ -161,6 +163,8 @@ to the editor and uses the same default values.
 | `Scene.SetParent` | `(id, parent_id)` | — (errors on a parenting cycle) |
 | `Scene.ClearParent` | `(id)` | — |
 | `Scene.Save` | `([path])` | the written path |
+| `Scene.SavePrefab` | `(rootId, path)` | the written path |
+| `Scene.Instantiate` | `(path, [parentId])` | new root entity `id` |
 
 **`primitive`** (optional) is one of the hierarchy toolbar's primitives,
 case-insensitive: `Box`, `Sphere`, `Plane`, `Cylinder` (meshes) or `PointLight`,
@@ -183,6 +187,32 @@ editor's Destroy button: it actually removes the entity.
 the current scene file (the file the editor/session loaded); an explicit path
 writes there and becomes the new current file (Save As). It errors if no path is
 given and no current scene file is set.
+
+### Prefabs
+
+A **prefab** is a configured GameObject — a root entity plus its whole child
+subtree, every component configured and every asset reference intact — saved to its
+own `.prefab` asset so it can be stamped into any scene. It is the configure-once,
+stamp-many template (Unity's prefab) and the runtime spawn primitive a wave-spawner
+script calls. v1 is **unpacked**: each instance is an independent copy with no live
+link back to the asset.
+
+**`Scene.SavePrefab(rootId, path)`** extracts the subtree rooted at `rootId` and
+writes it to `path` (a `.prefab` JSON document with local 0-based ids, the referenced
+material slice, and no GPU buffers). Returns the written path; errors if no entity
+has that id. This is the same verb the hierarchy's right-click **Save as Prefab**
+runs.
+
+**`Scene.Instantiate(path, [parentId])`** loads a `.prefab` and stamps an independent
+copy into the scene, assigning fresh deterministic ids, merging the prefab's
+materials into the scene library (an identical existing material is reused; a
+name-conflicting one is inserted under a uniquified name and the instance's
+references are rewritten to it), and parenting the new root under `parentId` (or the
+scene root when omitted). Returns the new root's id. The geometry is rehydrated from
+each mesh's reference on instantiate, exactly like scene load. (Instantiating an
+importable model asset by reference is a separate, queued verb; `Scene.Instantiate`
+is the single surface both will share, dispatching on whether the path is a `.prefab`
+or an importable asset.)
 
 ## `Assets`
 
@@ -349,11 +379,10 @@ actually spawned (the `max_particles` cap may swallow some).
 
 Play sound through the engine's `AudioMaestro` (the audio engine singleton). An
 entity carries an `AudioSource` component (`clip`, `volume`, `loop`,
-`play_on_start`, `is_time_scaled`, plus the spatial fields stored for the 3D
-follow-up); these verbs start/stop and retune it, fire one-shots, and set the single
-master volume. Playback is **2D (non-spatialized)** for now — `spatial_blend` and the
-rolloff distances round-trip and are consumed by the 3D follow-up. Decode is
-`.ogg` / `.wav`, path-cached.
+`play_on_start`, `is_time_scaled`, plus the spatial fields `spatial_blend`,
+`initial_distance`, `final_distance`); these verbs start/stop and retune it, fire
+one-shots, set the single master volume, and read a source's resolved 3D spatial
+state. Decode is `.ogg` / `.wav`, path-cached.
 
 `Play`/`Stop`/`PlayAt` return a `bool` that is `true` when the maestro accepted the
 voice; on the **headless harness the audio backend is a no-op**, so playback makes no
@@ -368,12 +397,33 @@ play-test can assert *what* played, *where*, and *by whom* — one-shots include
 | `Audio.PlayAt` | `(path, x, y, z [, vol])` | `bool` — fire-and-forget one-shot at a world position (`vol` defaults to 1.0); leaves no component, logged as a `PlayAt` event |
 | `Audio.GetMasterVolume` | `()` | `number` (linear, `[0, 1]`) |
 | `Audio.SetMasterVolume` | `(v)` | — (clamped to `[0, 1]`; re-folds every live voice) |
+| `Audio.GetSpatial` | `(id)` | `(gain, pan, playing)` — the source's resolved 3D state against the listener (the active camera): `gain` linear pre-master, `pan` `[-1, 1]` (left→right), `playing` bool |
 
 A voice's volume is its per-source `volume` multiplied by the master volume.
 `is_time_scaled` chooses whether the voice follows `Time.timeScale` (gameplay sound)
 or runs at wall-clock rate (music / UI that should play through a pause). The play
 events are also visible in the `Debug.Snapshot` per-entity `audio` block (the
 component's authoring fields).
+
+### 3D spatialization
+
+The **listener is the active camera**. Each `AudioSource` resolves to a per-source
+`(gain, pan)` from the listener and source world transforms (read back via
+`Audio.GetSpatial`):
+
+- **Distance rolloff** — full volume out to `initial_distance`, then a **linear**
+  falloff across `initial_distance → final_distance`, silent at/beyond `final_distance`.
+- **Pan** — the source direction projected onto the listener's right axis: a source to
+  the left pans left (`-1`), to the right pans right (`+1`), dead ahead/behind is
+  centred (`0`).
+- **`spatial_blend`** — linearly lerps 2D ↔ 3D: `0` is pure 2D (full `volume`, centred —
+  the non-spatialized default), `1` is fully spatialized, and intermediate values lerp
+  each of gain and pan toward the spatial value.
+
+The spatial math is pure and device-free (it resolves the same with or without an
+audio device), so a headless play-test can assert that a gunshot to your left reads
+back quieter and panned left. Only the final mix applies `(gain, pan)` in the platform
+layer.
 
 ## `Decals`
 

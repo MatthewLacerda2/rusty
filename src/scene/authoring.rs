@@ -150,6 +150,11 @@ pub fn create_entity(scene: &mut Scene, name: &str, primitive: Option<Primitive>
 // `authoring::{ComponentKind, add_component, remove_component}` paths still resolve.
 pub use crate::scene::authoring_components::{add_component, remove_component, ComponentKind};
 
+// The prefab structural verbs (#215) live in `scene::prefab` (size-cap split, plus
+// the `.prefab` format itself); re-exported here so editor and API reach
+// extract/instantiate through this one shared authoring entry point.
+pub use crate::scene::prefab::{extract_prefab, instantiate_prefab};
+
 #[cfg(test)]
 mod tests {
     use super::*;
