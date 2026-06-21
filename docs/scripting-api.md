@@ -89,15 +89,18 @@ map; an empty path clears it.
 |---|---|
 | `Material.SetMetallic` | `(id, value)` |
 | `Material.SetRoughness` | `(id, value)` |
+| `Material.SetEmissive` | `(id, {r, g, b})` — the flat emissive factor (self-illumination; values >1.0 bloom on the HDR target) |
 | `Material.SetMetallicMap` | `(id, path)` — sampled by the renderer; the map's blue channel scales the metallic value (glTF metallic-roughness convention) |
 | `Material.SetRoughnessMap` | `(id, path)` — sampled by the renderer; the map's green channel scales the roughness value |
+| `Material.SetNormalMap` | `(id, path)` — sampled by the renderer; perturbs the shading normal in tangent space (per-vertex tangents + TBN) |
+| `Material.SetEmissiveMap` | `(id, path)` — sampled by the renderer; modulates the emissive factor (`factor × map.rgb`) |
 | `Material.SetTexture` | `(id, path)` — the albedo map (sampled today) |
 
-> A material's flat **emissive factor** is sampled by the renderer: it self-illuminates
-> the surface and blooms when >1.0 (HDR target) — set it via the material's `emissive`
-> `[r, g, b]` field. Normal and emissive *maps* round-trip through save/load and the
-> inspector but are not sampled by the renderer yet (deferred follow-ups: normal maps
-> need vertex tangents; the emissive map needs a new texture binding).
+> **All glTF-PBR maps are sampled.** The albedo, metallic, roughness, normal, and
+> emissive maps (and the flat emissive factor) all reach the forward shader. Normal
+> mapping uses a per-vertex `tangent` attribute — read from the glTF `TANGENT` accessor
+> when present, else generated from positions + UVs at import — so it works on imported
+> meshes and the engine's procedural primitives alike (#207).
 
 > **Imported materials.** Instantiating a glTF model populates the material library
 > from the file's authored metallic-roughness materials and points each sub-object's

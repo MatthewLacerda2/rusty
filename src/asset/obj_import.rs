@@ -92,6 +92,9 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model) -> SubMesh {
         })
         .collect();
 
+    // `.obj` carries no tangents; generate them so normal maps work (#207).
+    let vertices = with_generated_tangents(vertices, &mesh.indices);
+
     SubMesh {
         id,
         vertices,
@@ -101,4 +104,16 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model) -> SubMesh {
         skin: None,
         clips: Vec::new(),
     }
+}
+
+/// Fill each vertex's tangent from positions + UVs (`.obj` has no tangent data).
+fn with_generated_tangents(mut vertices: Vec<MeshVertex>, indices: &[u32]) -> Vec<MeshVertex> {
+    let positions: Vec<[f32; 3]> = vertices.iter().map(|v| v.position).collect();
+    let normals: Vec<[f32; 3]> = vertices.iter().map(|v| v.normal).collect();
+    let uvs: Vec<[f32; 2]> = vertices.iter().map(|v| v.tex_coords).collect();
+    let tangents = super::tangents::generate_tangents(&positions, &normals, &uvs, indices);
+    for (v, t) in vertices.iter_mut().zip(tangents) {
+        v.tangent = t;
+    }
+    vertices
 }

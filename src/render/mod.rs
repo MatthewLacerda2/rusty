@@ -24,6 +24,7 @@ mod setup_build;
 mod setup_headless;
 mod setup_resize;
 mod setup_textures;
+mod tangents;
 mod textures;
 
 use std::collections::HashMap;
@@ -106,14 +107,16 @@ struct EntityUniform {
     is_lit: u32,
     metallic: f32,
     roughness: f32,
-    // Flags for the metallic/roughness maps (#202). When set, the shader multiplies
-    // the scalar by the sampled map channel. The two `u32` pads fill the run of u32s
-    // up to the next 16-byte boundary so the `vec4` that follows is aligned;
-    // `EntityUniforms` in shader.wgsl mirrors this field order byte-for-byte.
+    // Map flags (#202, #207). When set, the shader samples the matching group(2)
+    // texture: metallic/roughness multiply their scalar by the sampled channel;
+    // `use_normal_map` perturbs the shading normal in tangent space; `use_emissive_map`
+    // modulates the emissive factor. These four `u32`s fill the run up to the next
+    // 16-byte boundary so the `vec4` that follows is aligned; `EntityUniforms` in
+    // shader.wgsl mirrors this field order byte-for-byte.
     use_metallic_map: u32,
     use_roughness_map: u32,
-    _pad0: u32,
-    _pad1: u32,
+    use_normal_map: u32,
+    use_emissive_map: u32,
     // Flat emissive factor (#222): rgb glow added on top of the lit colour in
     // `fs_main`. The renderer draws to an HDR target with a bloom bright-pass, so
     // values >1.0 glow automatically. Stored as a `vec4` (4th lane unused) to dodge

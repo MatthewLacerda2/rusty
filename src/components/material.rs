@@ -27,11 +27,10 @@ fn default_roughness() -> f32 {
 /// scene's material library and referenced by name from entities. Plain serde data,
 /// never any GPU buffers.
 ///
-/// NOTE: `base_color` + `base_color_map` + `metallic`/`roughness` (#201), the
-/// `metallic_map`/`roughness_map` (#202), and the flat `emissive` factor (#222) are
-/// sampled by the renderer. The `normal_map`/`emissive_map` fields round-trip but are
-/// not sampled yet (deferred follow-ups: normal needs vertex tangents; the emissive
-/// *map* needs a new texture binding — the flat factor is already wired).
+/// NOTE: every field here is sampled by the renderer — `base_color`/`base_color_map`
+/// plus `metallic`/`roughness` (#201), the `metallic_map`/`roughness_map` (#202), the flat
+/// `emissive` factor (#222), and the `normal_map`/`emissive_map` (#207 — the normal map
+/// via a per-vertex tangent attribute + TBN in `fs_main`). No field is a write-only no-op.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MaterialAsset {
     #[serde(default = "default_base_color")]

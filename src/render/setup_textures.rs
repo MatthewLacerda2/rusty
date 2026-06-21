@@ -36,34 +36,30 @@ pub(super) fn create_textures(device: &wgpu::Device, queue: &wgpu::Queue) -> Tex
     }
 }
 
-/// A group(2) material bind group with all three texture slots pointing at the
-/// default texture (one shared sampler). Bound by passes that need group(2) but
-/// never sample the maps (outline, editor grid) (#202).
+/// A group(2) material bind group with all five texture slots (albedo, metallic,
+/// roughness, normal, emissive) pointing at the default texture (one shared sampler).
+/// Bound by passes that need group(2) but never sample the maps (outline, editor
+/// grid) (#202, #207).
 fn create_default_material_bind_group(
     device: &wgpu::Device,
     material_layout: &wgpu::BindGroupLayout,
     default_texture: &GpuTexture,
 ) -> wgpu::BindGroup {
+    let view = wgpu::BindingResource::TextureView(&default_texture.view);
+    // Textures at 0,2,3,4,5; sampler at 1.
+    let mut entries = vec![wgpu::BindGroupEntry {
+        binding: 1,
+        resource: wgpu::BindingResource::Sampler(&default_texture.sampler),
+    }];
+    for binding in [0, 2, 3, 4, 5] {
+        entries.push(wgpu::BindGroupEntry {
+            binding,
+            resource: view.clone(),
+        });
+    }
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Default Material Bind Group"),
         layout: material_layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(&default_texture.view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::Sampler(&default_texture.sampler),
-            },
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: wgpu::BindingResource::TextureView(&default_texture.view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 3,
-                resource: wgpu::BindingResource::TextureView(&default_texture.view),
-            },
-        ],
+        entries: &entries,
     })
 }
