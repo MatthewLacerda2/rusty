@@ -24,6 +24,7 @@ impl Renderer {
             use_roughness_map: 0,
             _pad0: 0,
             _pad1: 0,
+            emissive: [0.0; 4],
         };
         let grid_buf_unif = self
             .device
@@ -122,6 +123,7 @@ impl Renderer {
             use_roughness_map: 0,
             _pad0: 0,
             _pad1: 0,
+            emissive: [0.0; 4],
         };
 
         let entity_buf = self
@@ -187,6 +189,7 @@ impl Renderer {
             use_roughness_map: 0,
             _pad0: 0,
             _pad1: 0,
+            emissive: [0.0; 4],
         };
 
         let outline_ent_buf = self

@@ -93,9 +93,11 @@ map; an empty path clears it.
 | `Material.SetRoughnessMap` | `(id, path)` — sampled by the renderer; the map's green channel scales the roughness value |
 | `Material.SetTexture` | `(id, path)` — the albedo map (sampled today) |
 
-> Normal and emissive maps round-trip through save/load and the inspector but are
-> not sampled by the renderer yet (deferred follow-ups: normal maps need vertex
-> tangents; emissive needs extra uniform plumbing).
+> A material's flat **emissive factor** is sampled by the renderer: it self-illuminates
+> the surface and blooms when >1.0 (HDR target) — set it via the material's `emissive`
+> `[r, g, b]` field. Normal and emissive *maps* round-trip through save/load and the
+> inspector but are not sampled by the renderer yet (deferred follow-ups: normal maps
+> need vertex tangents; the emissive map needs a new texture binding).
 
 > **Imported materials.** Instantiating a glTF model populates the material library
 > from the file's authored metallic-roughness materials and points each sub-object's
