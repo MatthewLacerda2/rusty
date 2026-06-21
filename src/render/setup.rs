@@ -89,7 +89,10 @@ impl Renderer {
     /// into the renderer's single struct. Trivial fields (the asset caches, the
     /// editor gizmo buffers, the skybox slots) start empty/`None` and are filled in
     /// by the caller or at runtime.
+    // A flat field-mapping constructor: no logic, just one line per `Renderer`
+    // field, so the line/argument counts are inherent to the struct's width.
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_lines)]
     fn assemble(
         device: wgpu::Device,
         queue: wgpu::Queue,
