@@ -35,6 +35,10 @@ auxmd.md
 !/project/scripts/
 /project/scripts/*
 !/project/scripts/*.lua
+# Ship the starter material library (#173) — glTF-PBR material assets, no textures.
+!/project/materials/
+/project/materials/*
+!/project/materials/*.gltf
 
 # Lint reports
 .lint/
