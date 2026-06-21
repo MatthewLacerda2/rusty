@@ -27,11 +27,12 @@ mod setup_resize;
 mod setup_textures;
 mod tangents;
 mod textures;
+mod viewport;
 
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub use camera::{build_camera_stack, sync_lens_from_scene, Camera};
+pub use camera::{build_camera_stack, game_camera_from_scene, sync_lens_from_scene, Camera};
 pub use setup_headless::OFFSCREEN_FORMAT;
 
 // Represent memory layouts for GPU Uniforms
@@ -205,6 +206,10 @@ pub struct Renderer {
     depth_texture: wgpu::Texture,
     depth_view: wgpu::TextureView,
 
+    /// Offscreen colour target the editor viewport renders into, sized to the panel
+    /// rect and shown as an `egui::Image`; `None` on the headless path (#183).
+    viewport_target: Option<wgpu::Texture>,
+
     // Asset cache keyed by mesh-asset identity (#127): identical geometry shared
     // across entities resolves to one buffer pair, not one per entity.
     pub gpu_meshes: HashMap<MeshId, GpuMesh>,
@@ -253,47 +258,5 @@ pub struct Renderer {
 }
 
 #[cfg(test)]
-mod mesh_id_tests {
-    use super::MeshId;
-    use crate::scene::{DirtyFlag, MeshComponent};
-
-    fn mesh(primitive: &str, asset: Option<&str>) -> MeshComponent {
-        MeshComponent {
-            primitive_type: primitive.to_string(),
-            asset_ref: asset.map(String::from),
-            vertices: Vec::new(),
-            indices: Vec::new(),
-            bind_palette: Vec::new(),
-            skin: None,
-            clips: Vec::new(),
-            pose_palette: Vec::new(),
-            is_dirty: DirtyFlag::new(false),
-        }
-    }
-
-    #[test]
-    fn identical_geometry_shares_one_id() {
-        // The key is the source, not the entity: two box meshes dedup to one
-        // buffer; two references to the same asset sub-object likewise.
-        assert_eq!(
-            MeshId::from_mesh(&mesh("Box", None)),
-            MeshId::from_mesh(&mesh("Box", None))
-        );
-        assert_eq!(
-            MeshId::from_mesh(&mesh("Asset", Some("models/crates.glb::Barrel"))),
-            MeshId::from_mesh(&mesh("Asset", Some("models/crates.glb::Barrel"))),
-        );
-    }
-
-    #[test]
-    fn distinct_geometry_gets_distinct_ids() {
-        assert_ne!(
-            MeshId::from_mesh(&mesh("Box", None)),
-            MeshId::from_mesh(&mesh("Sphere", None))
-        );
-        assert_ne!(
-            MeshId::from_mesh(&mesh("Asset", Some("models/crates.glb::Barrel"))),
-            MeshId::from_mesh(&mesh("Asset", Some("models/crates.glb::Crate"))),
-        );
-    }
-}
+#[path = "mesh_id_tests.rs"]
+mod mesh_id_tests;

@@ -12,7 +12,7 @@ use winit::{
 use rusty::app::{GameWorld, PlayTransition};
 use rusty::core::input::InputState;
 use rusty::core::keymap::{Keymap, KEYBINDINGS_KEY, KEYBINDINGS_NAMESPACE};
-use rusty::editor::EditorUi;
+use rusty::editor::{EditorUi, ViewportInteraction, ViewportTab};
 use rusty::navigation::NavigationGraph;
 use rusty::render::Renderer;
 use rusty::scene::Scene;
@@ -57,6 +57,10 @@ struct Frontend {
     /// Video settings currently in effect on the surface/window, so the per-frame
     /// apply (`settings::apply_pending`) reconfigures only what a script changed.
     applied_video: rusty::core::video::VideoSettings,
+    /// Stable egui texture id for the offscreen scene target shown in the viewport
+    /// panel (#183). Registered lazily on the first frame a target exists, then
+    /// rebound to the resized view each frame so the `egui::Image` reference stays valid.
+    viewport_texture_id: Option<egui::TextureId>,
 }
 
 fn main() {
@@ -159,6 +163,7 @@ fn init_frontend(window: &Arc<winit::window::Window>) -> (Frontend, String) {
         fps: 60.0,
         last_fps_update: Instant::now(),
         applied_video: rusty::core::video::VideoSettings::default(),
+        viewport_texture_id: None,
     };
     (frontend, rusty::scene::seed_default_scene())
 }
@@ -327,19 +332,9 @@ fn render_frame(
         .texture
         .create_view(&wgpu::TextureViewDescriptor::default());
 
-    // Render the 3D scene (Forward unlit/lit + gizmos line drawers)
-    {
-        let s = game.scene().borrow();
-        let cam = game.camera().borrow();
-        frontend.renderer.render(
-            &s,
-            &cam,
-            &view,
-            !game.is_playing(),
-            game.pathfinding_points(),
-        );
-    }
-
+    // The 3D scene now renders into the editor's offscreen viewport target, shown
+    // inside the egui central panel — so the whole frame (UI build → scene render →
+    // paint) is orchestrated by `render_egui_overlay` (#183).
     render_egui_overlay(window, frontend, game, &view, current_frame_duration);
     frame.present();
 }
@@ -410,8 +405,11 @@ fn acquire_frame(
     }
 }
 
-/// Draw the editor dashboard + console overlay and paint it over `view`.
-/// Header always visible; side panels only in editor mode.
+/// Orchestrate one editor frame: build the egui UI (which lays out the viewport
+/// panel), render the 3D scene into the offscreen viewport target sized to that
+/// panel, rebind it to the egui image, apply click-to-select / gizmo drag, then paint
+/// the whole dashboard over the swapchain `view`. Header always visible; side panels
+/// only in editor mode; the Scene/Game viewport in both (#183).
 fn render_egui_overlay(
     window: &Arc<winit::window::Window>,
     frontend: &mut Frontend,
@@ -422,8 +420,14 @@ fn render_egui_overlay(
     let raw_input = frontend.egui_winit.take_egui_input(window);
     frontend.egui_ctx.begin_frame(raw_input);
 
-    draw_editor_dashboard(frontend, game, current_frame_duration);
+    let interaction = draw_editor_dashboard(frontend, game, current_frame_duration);
     drain_repl(frontend, game);
+
+    // Render the scene into the viewport target now (after the panel rect is known,
+    // before egui paints) so the `egui::Image` samples this frame's render.
+    let ppp = window.scale_factor() as f32;
+    render_viewport_scene(frontend, game, &interaction, ppp);
+    handle_viewport_interaction(frontend, game, &interaction, ppp);
 
     let full_output = frontend.egui_ctx.end_frame();
     let paint_jobs = frontend
@@ -454,24 +458,29 @@ fn render_egui_overlay(
     }
 }
 
-/// Run the editor UI for one frame and apply its post-FX quality selection.
+/// Run the editor UI for one frame and apply its post-FX quality selection. Returns
+/// the viewport panel's pointer interaction so the caller can pick/drag (#183).
 fn draw_editor_dashboard(
     frontend: &mut Frontend,
     game: &mut GameWorld,
     current_frame_duration: f32,
-) {
-    let mut s = game.world.scene.borrow_mut();
-    let mut c = game.resources.console.borrow_mut();
-    let mut n = game.resources.nav.borrow_mut();
-    frontend.editor_ui.draw(
-        &frontend.egui_ctx,
-        &mut s,
-        &mut c,
-        &mut n,
-        &mut game.resources.is_playing,
-        frontend.fps,
-        current_frame_duration,
-    );
+) -> ViewportInteraction {
+    let viewport_texture = frontend.viewport_texture_id;
+    let interaction = {
+        let mut s = game.world.scene.borrow_mut();
+        let mut c = game.resources.console.borrow_mut();
+        let mut n = game.resources.nav.borrow_mut();
+        frontend.editor_ui.draw(
+            &frontend.egui_ctx,
+            &mut s,
+            &mut c,
+            &mut n,
+            &mut game.resources.is_playing,
+            frontend.fps,
+            current_frame_duration,
+            viewport_texture,
+        )
+    };
     if frontend.editor_ui.is_dirty {
         frontend.renderer.shadow_renderer.is_static_cached = false;
         frontend.editor_ui.is_dirty = false;
@@ -502,6 +511,135 @@ fn draw_editor_dashboard(
         frontend.editor_ui.current_scene_path = scripted_path;
     }
     *path_cell.borrow_mut() = frontend.editor_ui.current_scene_path.clone();
+    interaction
+}
+
+/// Render the 3D scene into the offscreen viewport target sized to the panel's image
+/// rect, then (re)bind that target to the stable egui texture id (#183). The active
+/// tab selects the camera + mode: **Scene** = the free-fly editor camera with gizmos/
+/// grid (`editor_mode = true`); **Game** = the active camera entity's view, what the
+/// player sees (`editor_mode = false`). A degenerate (zero-area) rect is skipped.
+fn render_viewport_scene(
+    frontend: &mut Frontend,
+    game: &mut GameWorld,
+    interaction: &ViewportInteraction,
+    pixels_per_point: f32,
+) {
+    let px = (interaction.size.x * pixels_per_point).round() as u32;
+    let py = (interaction.size.y * pixels_per_point).round() as u32;
+    if px == 0 || py == 0 {
+        return;
+    }
+    frontend.renderer.resize_viewport(px, py);
+
+    // An owned view of the offscreen target. `wgpu::TextureView` is a refcounted
+    // handle, so this doesn't borrow `self.renderer` and `render(&mut self, ...)` can
+    // take it as the post-FX output. `None` only before the first `resize_viewport`.
+    let Some(target_view) = frontend.renderer.viewport_target_view() else {
+        return;
+    };
+
+    let scene = game.scene().borrow();
+    let scene_tab = interaction.tab == ViewportTab::Scene;
+    // Scene tab: the free-fly editor camera (editor_mode draws grid + gizmos). Game
+    // tab: the active camera entity's view (the play-mode camera stack composite).
+    let camera = if scene_tab {
+        game.camera().borrow().clone()
+    } else {
+        rusty::render::game_camera_from_scene(&game.camera().borrow(), &scene)
+    };
+    frontend.renderer.render(
+        &scene,
+        &camera,
+        &target_view,
+        scene_tab,
+        game.pathfinding_points(),
+    );
+
+    // (Re)bind the freshly-rendered target to the stable egui texture id so the
+    // `egui::Image` samples this frame's render.
+    match frontend.viewport_texture_id {
+        Some(id) => frontend
+            .egui_renderer
+            .update_egui_texture_from_wgpu_texture(
+                &frontend.renderer.device,
+                &target_view,
+                wgpu::FilterMode::Linear,
+                id,
+            ),
+        None => {
+            let id = frontend.egui_renderer.register_native_texture(
+                &frontend.renderer.device,
+                &target_view,
+                wgpu::FilterMode::Linear,
+            );
+            frontend.viewport_texture_id = Some(id);
+        }
+    }
+}
+
+/// Apply the Scene-tab pointer interaction: a drag on an axis handle translates the
+/// selection (same `Transform` path as the inspector); a plain click picks the entity
+/// under the cursor (or deselects on empty space). The Game tab is view-only. Routes
+/// through the editor's existing `selected_entity_id`, so inspector + overlay agree.
+fn handle_viewport_interaction(
+    frontend: &mut Frontend,
+    game: &mut GameWorld,
+    interaction: &ViewportInteraction,
+    pixels_per_point: f32,
+) {
+    use rusty::editor::{viewport_gizmo, viewport_pick};
+
+    if interaction.tab != ViewportTab::Scene {
+        frontend.editor_ui.gizmo_drag = None;
+        return;
+    }
+    let Some(local) = interaction.hover_local else {
+        if !interaction.dragging {
+            frontend.editor_ui.gizmo_drag = None;
+        }
+        return;
+    };
+    let _ = pixels_per_point; // NDC uses points; the image rect is already in points.
+    let size = interaction.size;
+    let Some((ndc_x, ndc_y)) = viewport_pick::local_to_ndc(local.x, local.y, size.x, size.y) else {
+        return;
+    };
+    let aspect = if size.y > 0.0 { size.x / size.y } else { 1.0 };
+    let camera = game.camera().borrow().clone();
+    let ray = viewport_pick::ray_from_ndc(&camera, aspect, ndc_x, ndc_y);
+
+    let mut scene = game.scene().borrow_mut();
+    let selected = frontend.editor_ui.selected_entity_id;
+
+    // 1. Continue or start a gizmo drag on the current selection's axis handles.
+    if interaction.dragging {
+        if let Some(id) = selected {
+            if let Some(origin) = viewport_pick::entity_world_position(&scene, id) {
+                if interaction.drag_started {
+                    // Handle pick radius scales with distance so far handles stay grabbable.
+                    let radius = (origin - camera.position).length() * 0.06 + 0.15;
+                    frontend.editor_ui.gizmo_drag = viewport_gizmo::begin_drag(origin, ray, radius);
+                }
+                if let Some(drag) = frontend.editor_ui.gizmo_drag.as_mut() {
+                    if viewport_gizmo::drag(&mut scene, id, drag, origin, ray) {
+                        frontend.editor_ui.is_dirty = true;
+                    }
+                    return;
+                }
+            }
+        }
+        return;
+    }
+    frontend.editor_ui.gizmo_drag = None;
+
+    // 2. A plain click selects the entity under the cursor, or deselects empty space.
+    if interaction.clicked {
+        let hit = viewport_pick::pick_entity(&scene, ray).map(|(id, _)| id);
+        frontend.editor_ui.selected_entity_id = hit;
+        frontend.editor_ui.selected_asset_path = None;
+        scene.selected_entity_id = hit;
+    }
 }
 
 /// Drain a submitted REPL line through the single live evaluator. Dev builds
