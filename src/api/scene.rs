@@ -208,12 +208,14 @@ fn register_save<'lua, 'scope>(
     )
 }
 
-/// `SavePrefab(rootId, path)` + `Instantiate(path[, parentId])` — the prefab
-/// surface (#215). `Instantiate` is the runtime spawn primitive a wave-spawner
-/// script needs, and is deliberately shaped to be the **one** instantiate verb:
-/// it dispatches on the path kind, so #182's asset `Instantiate(assetRef)` can
-/// later fold its branch in here without a second public name. v1 handles only
-/// `.prefab`; any other path errors (pointing at where #182 will extend it).
+/// `SavePrefab(rootId, path)` + `Instantiate(path, …)` — the prefab + asset spawn
+/// surface (#215, #182). `Instantiate` is the **one** instantiate verb: it
+/// dispatches on the path kind so both callers share a name and never drift.
+///   - `Instantiate(prefabPath[, parentId])` — stamp a `.prefab` subtree (#215).
+///   - `Instantiate(assetRef[, name][, x, y, z])` — spawn one imported sub-object
+///     (`path::sub_object`) at the given position, importer-built and reference-backed
+///     (#182). This is what makes agent-driven level-building real: place buildings /
+///     cars headlessly to compose a street.
 fn register_prefab<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,
@@ -232,14 +234,47 @@ fn register_prefab<'lua, 'scope>(
     put(
         table,
         "Instantiate",
-        scope.create_function(|_, (path, parent): (String, Option<u32>)| {
-            if !crate::scene::is_prefab_path(&path) {
-                return Err(mlua::Error::RuntimeError(format!(
-                    "Scene.Instantiate: '{path}' is not a .prefab (asset instantiate is #182)"
-                )));
+        scope.create_function(|_, (path, rest): (String, mlua::Variadic<mlua::Value>)| {
+            let mut s = scene.borrow_mut();
+            if crate::scene::is_prefab_path(&path) {
+                let parent = prefab_parent(&rest)?;
+                crate::scene::load_and_instantiate(&mut s, &path, parent)
+                    .map_err(mlua::Error::RuntimeError)
+            } else {
+                let (name, position) = asset_args(&rest)?;
+                crate::scene::authoring::instantiate_asset(&mut s, &path, name.as_deref(), position)
+                    .map_err(mlua::Error::RuntimeError)
             }
-            crate::scene::load_and_instantiate(&mut scene.borrow_mut(), &path, parent)
-                .map_err(mlua::Error::RuntimeError)
         }),
     )
+}
+
+/// Parse the optional `parentId` trailing arg of the `.prefab` `Instantiate` form.
+fn prefab_parent(rest: &[mlua::Value]) -> mlua::Result<Option<u32>> {
+    match rest.first() {
+        None | Some(mlua::Value::Nil) => Ok(None),
+        Some(mlua::Value::Integer(i)) => Ok(Some(*i as u32)),
+        Some(mlua::Value::Number(n)) => Ok(Some(*n as u32)),
+        Some(_) => Err(mlua::Error::RuntimeError(
+            "Scene.Instantiate(prefab): parentId must be a number".to_string(),
+        )),
+    }
+}
+
+/// Parse the optional `[name][, x, y, z]` trailing args of the asset `Instantiate`
+/// form. A leading string is the entity name; the next three numbers are the
+/// position (defaulting to the origin when omitted).
+fn asset_args(rest: &[mlua::Value]) -> mlua::Result<(Option<String>, glam::Vec3)> {
+    let (name, coords) = match rest.first() {
+        Some(mlua::Value::String(s)) => (Some(s.to_str()?.to_string()), &rest[1..]),
+        _ => (None, rest),
+    };
+    let f = |i: usize| -> f32 {
+        match coords.get(i) {
+            Some(mlua::Value::Integer(n)) => *n as f32,
+            Some(mlua::Value::Number(n)) => *n as f32,
+            _ => 0.0,
+        }
+    };
+    Ok((name, glam::Vec3::new(f(0), f(1), f(2))))
 }

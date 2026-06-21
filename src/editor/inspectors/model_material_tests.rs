@@ -1,9 +1,11 @@
-//! Tests for the model inspector's material wiring: `import_material` dedup +
-//! `instantiate` populating `scene.materials` and the entity `MaterialComponent`
-//! (#203), a `SceneData` round-trip, and the engine-default fallback for a
-//! material-less glTF (#214).
+//! Tests for the model inspector's material wiring: `instantiate` populating
+//! `scene.materials` and the entity `MaterialComponent` with a shared (deduped)
+//! library entry (#203), a `SceneData` round-trip, and the engine-default fallback
+//! for a material-less glTF (#214). The per-sub-object spawn now routes through the
+//! shared `authoring::instantiate_asset` verb (#182); its unit-level dedup test
+//! lives alongside that verb in `scene::asset_instance`.
 
-use super::{import_material, instantiate};
+use super::instantiate;
 use crate::editor::EditorUi;
 use crate::scene::{apply_scene_data, to_scene_data, Scene};
 
@@ -62,27 +64,6 @@ fn write_gltf(name: &str, body: &str) -> String {
     let path = std::env::temp_dir().join(name);
     std::fs::write(&path, body).unwrap();
     path.to_string_lossy().into_owned()
-}
-
-#[test]
-fn import_material_dedups_shared_gltf_material() {
-    let path = write_fixture("rusty_203_dedup.gltf");
-    let asset = crate::asset::import_file(std::path::Path::new(&path)).unwrap();
-    let mut scene = Scene::new();
-
-    // Both sub-meshes reference material 0 → same deterministic key, one library entry.
-    let key_a = import_material(&mut scene, &path, &asset, 0).unwrap();
-    let key_b = import_material(&mut scene, &path, &asset, 0).unwrap();
-    assert_eq!(key_a, key_b);
-    assert_eq!(key_a, format!("{path}::Shared"));
-    assert_eq!(scene.materials.len(), 1);
-    let mat = &scene.materials[&key_a];
-    assert_eq!(mat.base_color, [0.2, 0.6, 0.9]);
-    assert_eq!(mat.metallic, 0.3);
-    assert_eq!(mat.roughness, 0.4);
-
-    // Out-of-range index yields no key/entry.
-    assert!(import_material(&mut scene, &path, &asset, 9).is_none());
 }
 
 #[test]

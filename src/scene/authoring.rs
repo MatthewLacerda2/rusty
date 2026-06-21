@@ -155,6 +155,11 @@ pub use crate::scene::authoring_components::{add_component, remove_component, Co
 // extract/instantiate through this one shared authoring entry point.
 pub use crate::scene::prefab::{extract_prefab, instantiate_prefab};
 
+// The asset-instantiate verb (#182) lives in `scene::asset_instance` (size-cap
+// split); re-exported here so the editor's model inspector and the `Scene.Instantiate`
+// asset branch both spawn imported sub-objects through this one shared entry point.
+pub use crate::scene::asset_instance::instantiate_asset;
+
 #[cfg(test)]
 mod tests {
     use super::*;

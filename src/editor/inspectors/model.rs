@@ -178,82 +178,32 @@ fn sub_object_row(
 }
 
 /// Import the source file and instantiate each addressable sub-object as its own
-/// entity carrying a path-based `"Asset"` mesh reference (`path::sub_object`). The
-/// geometry is re-imported on every scene load — no GPU buffers are persisted.
+/// entity carrying a path-based `"Asset"` mesh reference (`path::sub_object`).
+/// Routes every sub-object through the shared `authoring::instantiate_asset` verb —
+/// the same path `Scene.Instantiate` drives — so editor and API never drift. The
+/// geometry is re-imported on every scene load; no GPU buffers are persisted.
 fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     let asset = match crate::asset::import_and_sync_sidecar(Path::new(path)) {
         Ok(a) => a,
         Err(_) => return,
     };
-    // The sidecar records which sub-objects get a baked mesh collider (#77).
-    let settings = crate::asset::sidecar::load(Path::new(path)).unwrap_or_default();
     let mut last = None;
-    let mut added_collider = false;
     for id in asset.sub_mesh_ids() {
         let reference = format!("{}{}{}", path, crate::asset::REF_SEPARATOR, id);
-        // Resolve the sub-mesh's imported material into a deterministic library key
-        // (shared across sub-objects that reference the same glTF material — dedup).
-        let material_key = asset
-            .sub_mesh(&id)
-            .and_then(|s| s.material)
-            .and_then(|idx| import_material(scene, path, &asset, idx));
-        let ent_id = scene.add_entity(id.clone());
-        if let Some(mut ent) = scene.get_entity_mut(ent_id) {
-            ent.mesh = Some(crate::scene::asset_mesh_component(&reference));
-            if let Some(key) = material_key.clone() {
-                ent.material = Some(crate::components::MaterialComponent { material: key });
-            }
-            if let Some(kind) = settings.colliders.get(&id) {
-                if let Some((min, max)) = asset.sub_mesh(&id).and_then(|s| s.bounds()) {
-                    ent.collider = Some(crate::components::ColliderComponent::from_mesh_bounds(
-                        kind.is_convex(),
-                        min,
-                        max,
-                    ));
-                    added_collider = true;
-                }
-            }
+        if let Ok(ent_id) = crate::scene::authoring::instantiate_asset(
+            scene,
+            &reference,
+            Some(&id),
+            glam::Vec3::ZERO,
+        ) {
+            last = Some(ent_id);
         }
-        // A GameObject built from a glTF carries a Material by definition (CLAUDE.md).
-        // When the sub-mesh names no glTF material, dress it with the engine default
-        // via the shared authoring verb — the same path the Add-Component menu uses —
-        // so it renders with a resolvable reference instead of none (#214).
-        if material_key.is_none() {
-            crate::scene::authoring::attach_default_material(scene, ent_id);
-        }
-        last = Some(ent_id);
-    }
-    if added_collider {
-        // Compute the new colliders' world AABBs for the editor overlays.
-        scene.update_all_colliders();
     }
     if let Some(ent_id) = last {
         editor.is_dirty = true;
         editor.selected_entity_id = Some(ent_id);
         editor.selected_asset_path = None;
     }
-}
-
-/// Convert sub-mesh material `idx` into a `MaterialAsset`, insert it into the scene's
-/// shared library under a DETERMINISTIC key, and return that key. The key is
-/// `"{path}::{material_name}"` when the glTF material is named, else
-/// `"{path}::material_{idx}"` — so sub-objects that share one glTF material share one
-/// library entry (dedup). Returns `None` if the index is out of range.
-fn import_material(
-    scene: &mut crate::scene::Scene,
-    path: &str,
-    asset: &crate::asset::ImportedAsset,
-    idx: usize,
-) -> Option<String> {
-    let data = asset.materials.get(idx)?;
-    let key = if data.name.is_empty() {
-        format!("{path}::material_{idx}")
-    } else {
-        format!("{path}::{}", data.name)
-    };
-    let material = crate::scene::authoring::material_asset_from_import(data);
-    scene.materials.insert(key.clone(), material);
-    Some(key)
 }
 
 fn format_size(bytes: u64) -> String {
