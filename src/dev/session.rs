@@ -81,8 +81,10 @@ impl Session {
     /// result or the error message. Drives the full `api::` surface through the one
     /// evaluator; never panics on a bad line.
     pub fn eval(&self, line: &str) -> Result<String, String> {
-        let mut c = self.world.console().borrow_mut();
-        console::evaluate_line(self.world.script_manager(), &mut c, line)
+        // Pass the shared console *cell*, not a held borrow: `evaluate_line` borrows
+        // it narrowly only at the log sites, leaving it free during eval so a script
+        // that calls `print` / `Debug.*` doesn't double-borrow it and panic (#208).
+        console::evaluate_line(self.world.script_manager(), self.world.console(), line)
     }
 
     /// The live world, for tests / embedders that want to inspect state directly.
@@ -185,6 +187,31 @@ mod tests {
         assert!(s.eval("this is not lua %%%").is_err());
         // The session is still usable after a bad command.
         assert_eq!(s.eval("1 + 1").unwrap(), "2");
+    }
+
+    #[test]
+    fn logging_through_the_real_shared_cell_does_not_panic() {
+        // Regression for #208: the session's single console cell is the very one
+        // `print` / `Debug.*` write into during eval. The fix evaluates with that
+        // cell free, so logging from a command no longer double-borrows and panics.
+        let s = session();
+        assert_eq!(s.eval("print(\"hello-headless\")").unwrap(), "");
+        assert_eq!(s.eval("Debug.Log(\"debug-headless\")").unwrap(), "");
+        assert!(s.eval("Debug.Warn(\"warn-headless\")").is_ok());
+        assert!(s.eval("Debug.Error(\"err-headless\")").is_ok());
+
+        let log = s.world().console().borrow();
+        for expected in [
+            "hello-headless",
+            "debug-headless",
+            "warn-headless",
+            "err-headless",
+        ] {
+            assert!(
+                log.messages.iter().any(|(m, _)| m == expected),
+                "{expected} must reach the shared console"
+            );
+        }
     }
 
     #[test]

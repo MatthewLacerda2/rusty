@@ -489,8 +489,13 @@ fn draw_editor_dashboard(
 #[cfg(feature = "dev")]
 fn drain_repl(frontend: &mut Frontend, game: &mut GameWorld) {
     if let Some(line) = frontend.editor_ui.pending_repl.take() {
-        let mut c = game.resources.console.borrow_mut();
-        let _ = rusty::dev::console::evaluate_line(game.script_manager(), &mut c, &line);
+        // Hand `evaluate_line` the shared console cell (not a held borrow) so a
+        // typed `print` / `Debug.*` can borrow it mid-eval without panicking (#208).
+        let _ = rusty::dev::console::evaluate_line(
+            game.script_manager(),
+            &game.resources.console,
+            &line,
+        );
     }
 }
 
