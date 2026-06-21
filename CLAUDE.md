@@ -4,6 +4,13 @@
 components, scripts with `Update()`), built with **agentic coding in mind** — an AI
 agent can drive, observe, and play-test it headlessly.
 
+## North star
+The bar rusty aims for is a game on par with **F.E.A.R.** (2005) or **Trepang2** —
+visceral first-person combat carried by reactive enemy AI. That is the quality target
+every decision serves: the engine is "good enough" when an agent could build a shooter
+of that caliber on it. Keep this goal in mind when weighing features, architecture, and
+craft — it is the reason the gates below are strict.
+
 ## Start here
 - **README.md** — what the engine is and what you can do with it.
 - **docs/** — `linting.md` (the gate), `testing.md`, `scripting-api.md` (the Lua API
@@ -21,11 +28,38 @@ agent can drive, observe, and play-test it headlessly.
      their own sake.
   3. **Craft.** It follows Rust/Lua good practices and the gold standards of game-engine
      design and architecture. If it doesn't, say so and propose the right shape.
-- **Flow:** discuss the idea (if needed) → write a GitHub issue for it → mark its
-  dependencies → implement it in a pull request → merge. New work normally starts as an
-  issue, not a surprise diff, and that PR references the issue it closes. **Issue-less PRs
-  are allowed only** for documentation updates or bug fixes; everything else starts as an
-  issue. The PR description still has to clear the three gates above.
+- **Flow:** discuss the idea (if needed) → (usually) write a GitHub issue for it → mark
+  its dependencies → implement it on a branch → open its PR → merge. New work normally
+  starts as an issue, not a surprise diff, and the PR references the issue it closes.
+  **Issue-less PRs are allowed only** for documentation updates or bug fixes; everything
+  else starts as an issue. Either way the PR description still has to clear the three
+  gates above.
+- **Pull requests — open early, draft until ready.** The moment a branch has its first
+  commit, **open a PR for it** — you don't wait to be asked; that's the rule, so a branch
+  is never a stray with no documented purpose and never goes stale unnoticed. Then set its
+  state, and flip between the two as the work moves:
+  - **Draft** while the work is still in progress, or whenever you're **blocked or need
+    something from the user** — a decision you can't make, another PR/issue that must land
+    first, or human/hardware intervention. **Say why** in the description.
+  - **Ready for review** once the work is done and you need nothing further from the user.
+    That is the signal it can be reviewed and merged.
+  The description says **what changed and why** — not how you got there (include process
+  only when it's needed to understand the diff) — and carries the PR↔issue link when there
+  is one. That description, the commit history, and that link are how we see what a branch
+  adds in value and whether it still earns its place.
+- **Branch naming.** A PR that closes an issue uses `{issue_number}-short-slug` (e.g.
+  `163-fix-coverage-scope`). An issue-less PR uses a readable short slug of its subject
+  (e.g. `document-ai-parity`). Lowercase-hyphenated, brief.
+- **Merging — serialized, one at a time.** When a PR is ready, CI/CD runs; once it's
+  green you may merge to `main` right away. If it conflicts or fails, fix it until it
+  passes; if it's taking too many iterations (≈3 fix attempts at the same failure, or a
+  failure that needs a decision you can't make), mark it a **draft** and hand it to the
+  user. Because Rust is compiled, two PRs can each be green alone yet break `main`
+  together (a rename, a changed signature, a moved module — no textual conflict catches
+  it). So merging **cannot be parallelized**: rebase each PR onto the latest `main` →
+  CI green on that rebased state → merge → repeat, one PR at a time. The only exception
+  is a PR that touches **only** Markdown — CI is skipped for Markdown-only PRs, so they
+  needn't be serialized and can merge freely.
 - **Architecture- then infrastructure-first (NOT "make it up as we go").** We do **not**
   improvise or pile on features ad hoc. Whenever we find a problem — something that
   already bites or will bite more than once, a pattern worth adopting, or a gold-standard
@@ -43,30 +77,6 @@ agent can drive, observe, and play-test it headlessly.
   concurrently; use your best judgment. There are no rigid batches: the dependency graph
   *is* the plan. Any issue with no open blockers is fair game, and independent issues can
   be worked in parallel — stay flexible and efficient.
-- **Pull requests.** Each PR's description says **what changed and why**, not how you
-  got there — include process only when it's needed to understand the diff. Open it
-  **ready for review** unless you need help, in which case leave it a **draft and say
-  why** (blocked on another issue, needs a brand-new PR, software/hardware constraints,
-  human intervention, etc.).
-- **A PR per branch, as soon as it has a commit.** The moment a branch/worktree has a
-  commit, open a PR for it — kept a **draft** until the work is done. This prevents
-  stray branches with no documented purpose and branches that go stale unnoticed: the
-  PR description, the commit history, and the PR↔issue relationship (when it addresses
-  one) are how we see what a branch adds in value and whether it still earns its place
-  in the current context.
-- **Branch naming.** A PR that closes an issue uses `{issue_number}-short-slug` (e.g.
-  `163-fix-coverage-scope`). An issue-less PR uses a readable short slug of its subject
-  (e.g. `document-ai-parity`). Lowercase-hyphenated, brief.
-- **Merging — serialized, one at a time.** When a PR is ready, CI/CD runs; once it's
-  green you may merge to `main` right away. If it conflicts or fails, fix it until it
-  passes; if it's taking too many iterations (≈3 fix attempts at the same failure, or a
-  failure that needs a decision you can't make), mark it a **draft** and hand it to the
-  user. Because Rust is compiled, two PRs can each be green alone yet break `main`
-  together (a rename, a changed signature, a moved module — no textual conflict catches
-  it). So merging **cannot be parallelized**: rebase each PR onto the latest `main` →
-  CI green on that rebased state → merge → repeat, one PR at a time. The only exception
-  is a PR that touches **only** Markdown — CI is skipped for Markdown-only PRs, so they
-  needn't be serialized and can merge freely.
 - **Gates vs. signals — block on correctness, inform on quality.** Keep the bar high
   *without* stalling the agents. A check that proves **correctness** — build, test, clippy,
   the determinism guard, the size gate — is a **hard gate**: green-to-merge, no exceptions. A
@@ -94,21 +104,43 @@ agent can drive, observe, and play-test it headlessly.
 - **Issue-less PRs are allowed only** for documentation updates or bug fixes; everything
   else starts as an issue.
 - **Priority by label.** When choosing what to do next, the order is
-  **architecture → infrastructure → bug → feature.** Architecture comes first because it
-  defines how things are organized and so reshapes — or eases — everything downstream;
-  infrastructure (the tools to do the work) is next; then bugs; then features.
+  **architecture → infrastructure → bug → foundation → feature.** It encodes how the whole
+  project is built, in three stages:
+  1. **Guardrail the development first.** If the *way we build the engine* isn't solid — a
+     missing structural shape or convention (**architecture**), or a missing tool or
+     guardrail for development (**infrastructure**) — we **halt everything and fix that
+     first**. We don't earn the right to build more until the means of building are sound.
+     A **bug** (broken stuff) sits here too: a broken engine is no foundation to build on.
+  2. **Then make the engine as complete as it can be** — **foundation** work, which
+     improves the *engine itself*.
+  3. **Then features** — **feature** work that makes the eventual *game's* development
+     faster, easier, or more complete. The game is built **elsewhere** (another repo, or by
+     whoever uses the engine), so engine-completeness always outranks game-facing
+     convenience here.
   **documentation** can be done at any time and never waits its turn.
 
 ### Labels
-- **architecture** — How we define stuff.
-- **bug** — Something isn't working.
-- **burn-down** — *(no description yet)*
-- **documentation** — Improvements or additions to documentation.
-- **feature** — Feature or improvement.
-- **foundation** — *(no description yet)*
-- **human** — AI can't do this end-to-end.
-- **infrastructure** — Laying groundworks.
-- **plan** — *not yet defined.*
+- **architecture** — *How we define stuff.* Intrinsic changes to the engine: a new module,
+  a significant structural improvement, a convention we adopt, or a guardrail baked into
+  the engine's **design** (e.g. the determinism rule, the five-kinds model, the four-axis
+  component gate) — the engine's shape, not a single feature. Contrast **infrastructure**,
+  which guardrails the *development process* rather than the engine's design.
+- **bug** — *Something isn't working.* Broken behaviour to fix.
+- **documentation** — *Edit/add documentation.* Keep it clear and clean how the engine is
+  used and what its features are — architecture's *definition*, not its implementation.
+- **feature** — *Feature or improvement.* A new engine capability that makes the eventual
+  game's development faster, easier, and/or more complete.
+- **foundation** — *Groundworks for game development.* A new capability that makes the
+  **engine itself** more complete. Despite the name, this is stage-2 work that sits **on
+  top of** the guardrail layer (architecture/infrastructure), not beneath it — engine
+  completeness, not the dev groundwork.
+- **human** — *AI can't do this end-to-end.* The issue needs a human in the loop to finish.
+- **infrastructure** — *Improves engine or agentic development.* Tools or guardrails for
+  the engine's **development process** (e.g. the lint/size gate, CI, the headless harness),
+  making that development faster, solid, and correctly guardrailed — distinct from
+  **architecture**, which is a guardrail in the engine's own design.
+- **plan** — *Being discussed or planned.* Still under discussion (see below) — must not be
+  started.
 
 Issues tagged **plan** are still being discussed with the user. They must **NOT** be
 started by any means. If a planning issue would implement something that affects another
@@ -120,6 +152,14 @@ A high-level map of how the engine is shaped. It deliberately doesn't enumerate 
 concrete type — that inventory lives in the rustdoc reference (`cargo doc --no-deps`)
 and the script surface in `docs/scripting-api.md`. Everything in the engine is one of
 five kinds of moving part (Unity analogs in parentheses):
+
+A **GameObject** is one entity (`Entity` in `components/entity.rs`): a mandatory
+`Transform` plus any mix of the optional first-class components below, and a place in
+the parent/child hierarchy. It can be **empty** — a Transform and nothing else, used as
+a grouping pivot or a spawn marker. Or it can be configured: instantiating a glTF
+yields a GameObject carrying a `Transform`, a `Mesh`, a `Collider` when the asset
+provides one, and the engine's default `Material`. Same object, more components — that
+is the only difference between an empty marker and a fully-dressed enemy.
 
 1. **Resources** — engine singletons, one per World (Unity's engine statics: `Time`,
    `Input`, the nav graph, the console, the active camera, play-state, the renderer).
@@ -150,6 +190,13 @@ five kinds of moving part (Unity analogs in parentheses):
    One surface, three callers — they never drift apart.
 
 ## Conventions that matter
+- **Unity is the reference; rusty is a deliberate subset.** Use Unity Engine as the
+  yardstick for what rusty *must* be capable of. Unity is exhaustive, so we implement
+  only the subset a game actually needs — never feature-for-feature parity. The twist is
+  that our API exists to be driven by **Claude Code**, not hand-written: developers won't
+  write or even read the engine's code. As long as the docs stay current, Claude can tell
+  the developer how anything is done — so keeping documentation truthful is load-bearing,
+  not a nicety.
 - **AI-driven, editor↔API parity.** rusty is built for an agent-driven workflow in the
   *Claude Code + Blender-MCP* style: the agent can do anything a user can do in the
   editor — create entities, place and configure components, instantiate assets, save
