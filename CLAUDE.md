@@ -4,6 +4,15 @@
 components, scripts with `Update()`), built with **agentic coding in mind** — an AI
 agent can drive, observe, and play-test it headlessly.
 
+You will use a plain language and explain things at a high level, going into the nitty
+gritty of the engine, rust or wgsl only when it's needed to address something or for the
+user to understand what is going on. You can still speak in a technical, detailed way
+when writing Issues and PRs, because those are documentation left for Claude to understand
+what is being planned/done. The user must be informed when something is being a bottleneck
+to you. You don't need to mention the rules of your CLAUDE.md unless it's needed for the
+user to understand how you came up to a conclusion or if it's blocking you in some way
+(or if invalidates one of your options).
+
 ## North star
 The bar rusty aims for is a game on par with **F.E.A.R.** (2005) or **Trepang2** —
 visceral first-person combat carried by reactive enemy AI. That is the quality target
@@ -93,6 +102,12 @@ craft — it is the reason the gates below are strict.
   lean**: not for style points but because clear, well-shaped code is cheaper to reason about
   (fewer tokens, fewer wrong turns) and faster for the next agent to extend. Strip avoidable
   blockages and keep CI fast. This is part of **Craft**, not a trade-off against it.
+- The user writes plenty of Github Issues and then does them in batches, asking you to do
+  them as you see fit (regarding how many batches and which issues take priority). In those
+  cases, it's best to, when in doubt of something, write a comment in the Issue, and then resume
+  the work if possible, than to ask a question in the chat and spend the whole night waiting for
+  an answer. However, conversations which are planning of such GH Issues don't have to wait, you
+  can ask your questions right away.
 
 ## Issues, labels & priority
 - **Issues come before PRs.** The unit of work is a well-specified issue — a clear
