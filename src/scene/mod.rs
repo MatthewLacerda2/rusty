@@ -17,6 +17,7 @@
 //!   io        — save/load, path + extension, default-scene seeding
 //!   snapshot  — edit-mode snapshot/restore around Play
 
+pub mod asset_instance;
 pub mod authoring;
 pub mod authoring_components;
 pub mod authoring_defaults;
