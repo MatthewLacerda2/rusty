@@ -8,6 +8,7 @@ pub mod hierarchy;
 mod hierarchy_tree;
 pub mod inspector;
 mod inspector_add;
+mod inspector_audio;
 mod inspector_camera;
 mod inspector_card;
 mod inspector_gameplay;

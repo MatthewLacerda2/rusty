@@ -333,6 +333,36 @@ actually spawned (the `max_particles` cap may swallow some).
 | `Particles.GetCount` | `(id)` | live particle count |
 | `Particles.Clear` | `(id)` | — (despawns all live particles) |
 
+## `Audio`
+
+Play sound through the engine's `AudioMaestro` (the audio engine singleton). An
+entity carries an `AudioSource` component (`clip`, `volume`, `loop`,
+`play_on_start`, `is_time_scaled`, plus the spatial fields stored for the 3D
+follow-up); these verbs start/stop and retune it, fire one-shots, and set the single
+master volume. Playback is **2D (non-spatialized)** for now — `spatial_blend` and the
+rolloff distances round-trip and are consumed by the 3D follow-up. Decode is
+`.ogg` / `.wav`, path-cached.
+
+`Play`/`Stop`/`PlayAt` return a `bool` that is `true` when the maestro accepted the
+voice; on the **headless harness the audio backend is a no-op**, so playback makes no
+sound but every action is still recorded in the maestro's introspection log (so a
+play-test can assert *what* played, *where*, and *by whom* — one-shots included).
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Audio.Play` | `(id)` | `bool` — started the entity's `AudioSource` (logs a Play event) |
+| `Audio.Stop` | `(id)` | — (stops the entity's voice, logs a Stop event) |
+| `Audio.SetVolume` | `(id, v)` | — (retunes the live voice's volume, pre-master; no-op if not playing) |
+| `Audio.PlayAt` | `(path, x, y, z [, vol])` | `bool` — fire-and-forget one-shot at a world position (`vol` defaults to 1.0); leaves no component, logged as a `PlayAt` event |
+| `Audio.GetMasterVolume` | `()` | `number` (linear, `[0, 1]`) |
+| `Audio.SetMasterVolume` | `(v)` | — (clamped to `[0, 1]`; re-folds every live voice) |
+
+A voice's volume is its per-source `volume` multiplied by the master volume.
+`is_time_scaled` chooses whether the voice follows `Time.timeScale` (gameplay sound)
+or runs at wall-clock rate (music / UI that should play through a pause). The play
+events are also visible in the `Debug.Snapshot` per-entity `audio` block (the
+component's authoring fields).
+
 ## `Decals`
 
 Stamp **box-projector decals** (bullet holes, scorch, blood splats) onto the
@@ -531,7 +561,10 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
   "nav_agent": { "active": true, "radius": .., "target": [x,y,z], "speed": .., .. },
   "particles": { "active": true, "texture": null, "rate": .., "lifetime": .., .. },
   "animator":  { "clip": "Idle", "time": .., "speed": .., "playing": true },
-  "health":    { "current": .., "max": .., "dead": false }
+  "health":    { "current": .., "max": .., "dead": false },
+  "audio":     { "clip": "music/theme.ogg", "volume": .., "loop": false,
+                 "play_on_start": false, "is_time_scaled": true,
+                 "spatial_blend": 0.0, "initial_distance": .., "final_distance": .. }
 }
 ```
 

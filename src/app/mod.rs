@@ -23,6 +23,7 @@
 #![deny(clippy::unwrap_used)]
 
 pub mod animation;
+mod audio;
 mod camera_sync;
 pub mod game;
 mod particles;

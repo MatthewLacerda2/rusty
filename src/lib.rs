@@ -7,6 +7,7 @@
 pub mod api;
 pub mod app;
 pub mod asset;
+pub mod audio;
 pub mod components;
 pub mod core;
 pub mod ecs;

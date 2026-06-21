@@ -203,6 +203,13 @@ impl GameWorld {
     fn enter_play(&mut self) {
         self.resources.play_frame = 0;
         self.resources.time.borrow_mut().reset();
+        // Start the audio log fresh for this Play session (#212) and silence any
+        // voice that lingered from a prior run.
+        {
+            let mut audio = self.resources.audio.borrow_mut();
+            audio.stop_all();
+            audio.clear_log();
+        }
         // Snapshot the edit scene so Stop can restore it, discarding play-mode mutations.
         self.resources.edit_snapshot = Some(SceneSnapshot::capture(&self.world.scene.borrow()));
         self.snap_camera_to_player();
@@ -242,6 +249,8 @@ impl GameWorld {
         self.resources.pathfinding_points.clear();
         self.resources.play_frame = 0;
         *self.resources.physics.borrow_mut() = None;
+        // Silence every voice on Stop (Unity stops play-mode audio at exit).
+        self.resources.audio.borrow_mut().stop_all();
         // Restore the edit scene captured on Play, discarding play-mode state.
         if let Some(snapshot) = self.resources.edit_snapshot.take() {
             snapshot.restore(&mut self.world.scene.borrow_mut());
@@ -250,43 +259,6 @@ impl GameWorld {
                 .borrow_mut()
                 .bake(&self.world.scene.borrow());
         }
-    }
-
-    /// Editor-mode free-fly camera (no entity simulation).
-    fn editor_fly(&mut self, dt: f32) {
-        let inp = self.resources.input.borrow();
-        let mut cam = self.resources.camera.borrow_mut();
-        let mut move_dir = Vec3::ZERO;
-        if inp.is_key_down("W") {
-            move_dir += cam.forward();
-        }
-        if inp.is_key_down("S") {
-            move_dir -= cam.forward();
-        }
-        if inp.is_key_down("A") {
-            move_dir -= cam.right();
-        }
-        if inp.is_key_down("D") {
-            move_dir += cam.right();
-        }
-        if move_dir.length_squared() > 0.001 {
-            cam.position += move_dir.normalize() * 10.0 * dt;
-        }
-
-        let look = 90.0 * dt;
-        if inp.is_key_down("LEFT") {
-            cam.yaw -= look;
-        }
-        if inp.is_key_down("RIGHT") {
-            cam.yaw += look;
-        }
-        if inp.is_key_down("UP") {
-            cam.pitch += look;
-        }
-        if inp.is_key_down("DOWN") {
-            cam.pitch -= look;
-        }
-        cam.pitch = cam.pitch.clamp(-80.0, 80.0);
     }
 }
 

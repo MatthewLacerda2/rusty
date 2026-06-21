@@ -9,6 +9,7 @@
 //! Allowed deps: components::*, glam, serde, render::mesh (data only).
 
 pub mod animator;
+pub mod audio_source;
 pub mod camera;
 pub mod collider;
 pub mod entity;
@@ -25,6 +26,7 @@ pub mod transform;
 pub mod visual_correction;
 
 pub use animator::AnimatorComponent;
+pub use audio_source::AudioSourceComponent;
 pub use camera::{CameraComponent, ClearFlags};
 pub use collider::{ColliderComponent, ColliderShape};
 pub use entity::Entity;

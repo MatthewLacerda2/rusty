@@ -18,6 +18,7 @@
 //!   snapshot  — edit-mode snapshot/restore around Play
 
 pub mod authoring;
+pub mod authoring_components;
 pub mod authoring_defaults;
 pub mod collision_matrix;
 pub mod io;
@@ -34,9 +35,9 @@ pub use io::{
 };
 pub use layers::{layer_in_mask, LayerRegistry, LAYER_COUNT};
 pub use scene::{
-    AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape,
-    CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent, LightType,
-    MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent, Particle,
+    AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
+    ColliderShape, CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent,
+    LightType, MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent, Particle,
     ParticleBlend, ParticleEmitterComponent, RigidBodyComponent, Scene, ScriptComponent,
     ScriptFieldValue, TextureComponent, Tonemap, TransformComponent, VisualCorrectionComponent,
 };

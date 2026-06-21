@@ -2,7 +2,8 @@ use egui_phosphor::regular as icon;
 
 use crate::scene::authoring;
 use crate::scene::{
-    Entity, MaterialComponent, ParticleEmitterComponent, ScriptComponent, DEFAULT_SCRIPTS_DEST_DIR,
+    AudioSourceComponent, Entity, MaterialComponent, ParticleEmitterComponent, ScriptComponent,
+    DEFAULT_SCRIPTS_DEST_DIR,
 };
 
 /// 3F. Add Component — Unity-style full-width pill that opens the component menu.
@@ -28,6 +29,19 @@ fn add_menu(ui: &mut egui::Ui, entity: &mut Entity) {
     add_lighting_combat(ui, entity);
     add_physics_components(ui, entity);
     add_render_components(ui, entity);
+    add_audio(ui, entity);
+}
+
+/// Add-menu entry for the AudioSource component (#212). Offered only when absent.
+fn add_audio(ui: &mut egui::Ui, entity: &mut Entity) {
+    if entity.audio.is_none()
+        && ui
+            .button(format!("{}  Audio Source", icon::SPEAKER_HIGH))
+            .clicked()
+    {
+        entity.audio = Some(AudioSourceComponent::default());
+        ui.close_menu();
+    }
 }
 
 /// Add-menu entries for light, health, animator and collider. Each entry is

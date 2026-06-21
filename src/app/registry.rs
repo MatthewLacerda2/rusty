@@ -47,5 +47,6 @@ impl App {
 pub fn build() -> App {
     let mut app = App::new();
     super::play::register(&mut app);
+    super::audio::register(&mut app);
     app
 }
