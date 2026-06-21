@@ -211,6 +211,9 @@ through the renderer (per-entity group(2) material bind group + `shader.wgsl`
 sampling of `t_metallic`/`t_roughness`), closing the **#184** feature gap. The
 issue's "canonical no-op" — `Material.SetTexture` — was already **faithful** against
 the current renderer (`upload_scene_assets` lazily loads any texture path each
-frame), so no fix was needed there. `Material.SetNormalMap` / `SetEmissiveMap`
-round-trip but are not yet sampled (deferred follow-ups: normal maps need vertex
-tangents; emissive needs extra uniform plumbing).
+frame), so no fix was needed there. The flat **emissive factor** is now **faithful**
+too: #222 wired `MaterialAsset.emissive` through the reserved `EntityUniform` slot and
+added the term in `fs_main`, so it glows (and blooms when >1.0 via the HDR target).
+`Material.SetNormalMap` / `SetEmissiveMap` round-trip but are not yet sampled (deferred
+follow-ups: normal maps need vertex tangents; the emissive *map* needs a new texture
+binding — the flat factor above is already wired).
