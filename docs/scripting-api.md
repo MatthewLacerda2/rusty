@@ -163,6 +163,8 @@ to the editor and uses the same default values.
 | `Scene.SetParent` | `(id, parent_id)` | — (errors on a parenting cycle) |
 | `Scene.ClearParent` | `(id)` | — |
 | `Scene.Save` | `([path])` | the written path |
+| `Scene.SavePrefab` | `(rootId, path)` | the written path |
+| `Scene.Instantiate` | `(path, [parentId])` | new root entity `id` |
 
 **`primitive`** (optional) is one of the hierarchy toolbar's primitives,
 case-insensitive: `Box`, `Sphere`, `Plane`, `Cylinder` (meshes) or `PointLight`,
@@ -185,6 +187,32 @@ editor's Destroy button: it actually removes the entity.
 the current scene file (the file the editor/session loaded); an explicit path
 writes there and becomes the new current file (Save As). It errors if no path is
 given and no current scene file is set.
+
+### Prefabs
+
+A **prefab** is a configured GameObject — a root entity plus its whole child
+subtree, every component configured and every asset reference intact — saved to its
+own `.prefab` asset so it can be stamped into any scene. It is the configure-once,
+stamp-many template (Unity's prefab) and the runtime spawn primitive a wave-spawner
+script calls. v1 is **unpacked**: each instance is an independent copy with no live
+link back to the asset.
+
+**`Scene.SavePrefab(rootId, path)`** extracts the subtree rooted at `rootId` and
+writes it to `path` (a `.prefab` JSON document with local 0-based ids, the referenced
+material slice, and no GPU buffers). Returns the written path; errors if no entity
+has that id. This is the same verb the hierarchy's right-click **Save as Prefab**
+runs.
+
+**`Scene.Instantiate(path, [parentId])`** loads a `.prefab` and stamps an independent
+copy into the scene, assigning fresh deterministic ids, merging the prefab's
+materials into the scene library (an identical existing material is reused; a
+name-conflicting one is inserted under a uniquified name and the instance's
+references are rewritten to it), and parenting the new root under `parentId` (or the
+scene root when omitted). Returns the new root's id. The geometry is rehydrated from
+each mesh's reference on instantiate, exactly like scene load. (Instantiating an
+importable model asset by reference is a separate, queued verb; `Scene.Instantiate`
+is the single surface both will share, dispatching on whether the path is a `.prefab`
+or an importable asset.)
 
 ## `Assets`
 

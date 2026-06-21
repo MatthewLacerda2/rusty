@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod image;
 pub mod model;
+pub mod prefab;
 pub mod scene;
 pub mod script;
 
@@ -30,6 +31,9 @@ pub fn draw_inspector(
         }
         "scene" => {
             scene::draw(ui, editor, scene, console, path);
+        }
+        "prefab" => {
+            prefab::draw(ui, editor, scene, path);
         }
         "fbx" | "obj" | "gltf" | "glb" => {
             model::draw(ui, editor, scene, path);
