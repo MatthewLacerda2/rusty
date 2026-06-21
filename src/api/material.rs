@@ -1,6 +1,7 @@
 //! src/api/material.rs — `Material` namespace.
 //!
-//! `SetMetallic/Roughness`, their map variants, and `SetTexture`. A *material* is a
+//! `SetMetallic/Roughness/Emissive`, their map variants, and `SetTexture`. A
+//! *material* is a
 //! shared asset in the scene's material library (`Scene.materials`); an entity
 //! references one by name via its `MaterialComponent`. These verbs resolve the
 //! entity's material (creating a default one if it has none yet) and mutate the
@@ -79,10 +80,20 @@ fn register_scalars<'lua, 'scope>(
             with_material(scene, id, |mat| mat.roughness = val);
             Ok(())
         }),
+    )?;
+
+    put(
+        table,
+        "SetEmissive",
+        scope.create_function(|_, (id, rgb): (u32, [f32; 3])| {
+            with_material(scene, id, |mat| mat.emissive = rgb);
+            Ok(())
+        }),
     )
 }
 
-/// Texture-map paths: `SetMetallicMap` / `SetRoughnessMap` / `SetTexture`.
+/// Texture-map paths: `SetMetallicMap` / `SetRoughnessMap` / `SetTexture` /
+/// `SetNormalMap` / `SetEmissiveMap`.
 fn register_maps<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,
@@ -113,6 +124,24 @@ fn register_maps<'lua, 'scope>(
             with_material(scene, id, |mat| {
                 mat.base_color_map = (!path.is_empty()).then_some(path);
             });
+            Ok(())
+        }),
+    )?;
+
+    put(
+        table,
+        "SetNormalMap",
+        scope.create_function(|_, (id, path): (u32, String)| {
+            with_material(scene, id, |mat| mat.normal_map = Some(path));
+            Ok(())
+        }),
+    )?;
+
+    put(
+        table,
+        "SetEmissiveMap",
+        scope.create_function(|_, (id, path): (u32, String)| {
+            with_material(scene, id, |mat| mat.emissive_map = Some(path));
             Ok(())
         }),
     )

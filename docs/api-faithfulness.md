@@ -55,6 +55,9 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `SetTexture` | ✅ | renderer — `draw::upload_scene_assets` calls `load_texture(path)` for every active entity **each frame**, and `draw_resources::build_solid_resource` binds `gpu_textures[path]`. A runtime path change loads + binds next frame. (This is the issue's "canonical no-op"; it is **wired** in the current renderer.) Round-trips. |
 | `SetMetallicMap` | ✅ | renderer — `draw::upload_scene_assets` loads the map, `draw_resources::build_solid_resource` assembles the per-entity group(2) material bind group, and `shader.wgsl` samples `t_metallic` (`.b` channel) × the metallic scalar (#202, closed #184) |
 | `SetRoughnessMap` | ✅ | renderer — same path; `shader.wgsl` samples `t_roughness` (`.g` channel) × the roughness scalar (#202, closed #184) |
+| `SetEmissive` | ✅ | renderer — `draw_resources::solid_entity_uniform` packs `emissive` into `EntityUniform`; `shader.wgsl` adds it after lighting (blooms when >1.0) (#222) |
+| `SetNormalMap` | ✅ | renderer — `draw::upload_scene_assets` loads the map, `build_solid_resource` binds `t_normal` to the group(2) material bind group, and `shader.wgsl` perturbs the shading normal in tangent space (per-vertex tangents + TBN) (#207) |
+| `SetEmissiveMap` | ✅ | renderer — same upload/bind path; `shader.wgsl` samples `t_emissive` and modulates the emissive factor (`factor × map.rgb`) (#207) |
 
 ### `Animator` — over `Entity.animator`
 
@@ -202,18 +205,19 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 51 |
+| ✅ faithful | 54 |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 
-`Material.SetMetallicMap` / `SetRoughnessMap` are now **faithful**: #202 wired them
-through the renderer (per-entity group(2) material bind group + `shader.wgsl`
-sampling of `t_metallic`/`t_roughness`), closing the **#184** feature gap. The
-issue's "canonical no-op" — `Material.SetTexture` — was already **faithful** against
-the current renderer (`upload_scene_assets` lazily loads any texture path each
-frame), so no fix was needed there. The flat **emissive factor** is now **faithful**
-too: #222 wired `MaterialAsset.emissive` through the reserved `EntityUniform` slot and
-added the term in `fs_main`, so it glows (and blooms when >1.0 via the HDR target).
-`Material.SetNormalMap` / `SetEmissiveMap` round-trip but are not yet sampled (deferred
-follow-ups: normal maps need vertex tangents; the emissive *map* needs a new texture
-binding — the flat factor above is already wired).
+The full glTF-PBR map surface is now **faithful**. `Material.SetMetallicMap` /
+`SetRoughnessMap` were wired by #202 (per-entity group(2) material bind group +
+`shader.wgsl` sampling of `t_metallic`/`t_roughness`), closing the **#184** gap; the
+issue's "canonical no-op" — `Material.SetTexture` — was already faithful
+(`upload_scene_assets` lazily loads any texture path each frame). The flat **emissive
+factor** (`SetEmissive`) was wired by #222 through the `EntityUniform` slot and the
+`fs_main` add-after-lighting term (glows, and blooms when >1.0 via the HDR target).
+**#207** closed the last two map no-ops: `SetNormalMap` now perturbs the shading
+normal in tangent space (a `tangent` vertex attribute — read from the glTF `TANGENT`
+accessor or generated from positions + UVs — feeds a TBN basis in `fs_main`), and
+`SetEmissiveMap` modulates the emissive factor by the sampled `t_emissive` rgb. No
+material-map setter is a write-only no-op anymore.

@@ -146,13 +146,18 @@ impl Renderer {
         let entity_bind_group =
             self.entity_bind_group("Entity Bind Group", &entity_buffer, &bones_buffer);
 
-        // Bind Group 2 (Material): albedo + metallic + roughness maps, each resolved
-        // from the entity's material by path (default texture when absent / not yet
-        // loaded), assembled against the expanded `material_layout` (#202).
-        let albedo = self.resolve_map(material.and_then(|m| m.base_color_map.as_ref()));
-        let metallic = self.resolve_map(material.and_then(|m| m.metallic_map.as_ref()));
-        let roughness = self.resolve_map(material.and_then(|m| m.roughness_map.as_ref()));
-        let material_bind_group = self.material_bind_group(&albedo, &metallic, &roughness);
+        // Bind Group 2 (Material): albedo + metallic + roughness + normal + emissive
+        // maps, each resolved from the entity's material by path (default texture when
+        // absent / not yet loaded), assembled against the expanded `material_layout`
+        // (#202, #207). Order matches the layout's texture bindings (0,2,3,4,5).
+        let maps = [
+            self.resolve_map(material.and_then(|m| m.base_color_map.as_ref())),
+            self.resolve_map(material.and_then(|m| m.metallic_map.as_ref())),
+            self.resolve_map(material.and_then(|m| m.roughness_map.as_ref())),
+            self.resolve_map(material.and_then(|m| m.normal_map.as_ref())),
+            self.resolve_map(material.and_then(|m| m.emissive_map.as_ref())),
+        ];
+        let material_bind_group = self.material_bind_group(&maps);
 
         Some((
             entity.id,
@@ -178,35 +183,25 @@ impl Renderer {
         }
     }
 
-    /// Build a group(2) material bind group from three texture views + one shared
-    /// sampler, against `material_layout` (binding 1 samples all three textures).
-    pub(super) fn material_bind_group(
-        &self,
-        albedo: &GpuTexture,
-        metallic: &GpuTexture,
-        roughness: &GpuTexture,
-    ) -> wgpu::BindGroup {
+    /// Build a group(2) material bind group from the five resolved map textures
+    /// (albedo, metallic, roughness, normal, emissive — that order) + one shared
+    /// sampler, against `material_layout`. Textures bind at 0,2,3,4,5; sampler at 1
+    /// (binding 1 samples all five) (#202, #207).
+    pub(super) fn material_bind_group(&self, maps: &[Rc<GpuTexture>; 5]) -> wgpu::BindGroup {
+        let mut entries = vec![wgpu::BindGroupEntry {
+            binding: 1,
+            resource: wgpu::BindingResource::Sampler(&self.default_texture.sampler),
+        }];
+        for (map, binding) in maps.iter().zip([0u32, 2, 3, 4, 5]) {
+            entries.push(wgpu::BindGroupEntry {
+                binding,
+                resource: wgpu::BindingResource::TextureView(&map.view),
+            });
+        }
         self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Material Bind Group"),
             layout: &self.material_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&albedo.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&self.default_texture.sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&metallic.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::TextureView(&roughness.view),
-                },
-            ],
+            entries: &entries,
         })
     }
 
@@ -267,6 +262,8 @@ fn solid_entity_uniform(
     let use_texture = u32::from(material.is_some_and(|m| m.base_color_map.is_some()));
     let use_metallic_map = u32::from(material.is_some_and(|m| m.metallic_map.is_some()));
     let use_roughness_map = u32::from(material.is_some_and(|m| m.roughness_map.is_some()));
+    let use_normal_map = u32::from(material.is_some_and(|m| m.normal_map.is_some()));
+    let use_emissive_map = u32::from(material.is_some_and(|m| m.emissive_map.is_some()));
 
     // Flat emissive factor (#222), 4th lane unused. Defaults to black with no material.
     let emissive = match material {
@@ -283,8 +280,8 @@ fn solid_entity_uniform(
         roughness,
         use_metallic_map,
         use_roughness_map,
-        _pad0: 0,
-        _pad1: 0,
+        use_normal_map,
+        use_emissive_map,
         emissive,
     }
 }

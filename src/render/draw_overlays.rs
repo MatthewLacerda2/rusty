@@ -22,8 +22,8 @@ impl Renderer {
             roughness: 0.5,
             use_metallic_map: 0,
             use_roughness_map: 0,
-            _pad0: 0,
-            _pad1: 0,
+            use_normal_map: 0,
+            use_emissive_map: 0,
             emissive: [0.0; 4],
         };
         let grid_buf_unif = self
@@ -121,8 +121,8 @@ impl Renderer {
             roughness: 0.5,
             use_metallic_map: 0,
             use_roughness_map: 0,
-            _pad0: 0,
-            _pad1: 0,
+            use_normal_map: 0,
+            use_emissive_map: 0,
             emissive: [0.0; 4],
         };
 
@@ -187,8 +187,8 @@ impl Renderer {
             roughness: 0.5,
             use_metallic_map: 0,
             use_roughness_map: 0,
-            _pad0: 0,
-            _pad1: 0,
+            use_normal_map: 0,
+            use_emissive_map: 0,
             emissive: [0.0; 4],
         };
 

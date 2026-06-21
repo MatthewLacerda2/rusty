@@ -150,9 +150,9 @@ impl Renderer {
     }
 }
 
-/// Every active entity's resolved material map paths (albedo, metallic, roughness)
-/// the forward shader samples — gathered as owned strings so the scene borrow ends
-/// before the textures are uploaded.
+/// Every active entity's resolved material map paths (albedo, metallic, roughness,
+/// normal, emissive) the forward shader samples — gathered as owned strings so the
+/// scene borrow ends before the textures are uploaded (#202, #207).
 fn active_material_map_paths(scene: &Scene) -> Vec<String> {
     scene
         .entity_ids()
@@ -160,7 +160,15 @@ fn active_material_map_paths(scene: &Scene) -> Vec<String> {
         .filter_map(|&id| scene.get_entity(id))
         .filter(|e| e.active)
         .filter_map(|e| scene.material_of(&e).cloned())
-        .flat_map(|m| [m.base_color_map, m.metallic_map, m.roughness_map])
+        .flat_map(|m| {
+            [
+                m.base_color_map,
+                m.metallic_map,
+                m.roughness_map,
+                m.normal_map,
+                m.emissive_map,
+            ]
+        })
         .flatten()
         .collect()
 }

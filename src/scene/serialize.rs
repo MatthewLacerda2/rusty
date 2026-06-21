@@ -94,6 +94,7 @@ fn vertex_from_imported(v: &MeshVertex) -> Vertex {
         tex_coords: v.tex_coords,
         joint_indices: v.joint_indices,
         joint_weights: v.joint_weights,
+        tangent: v.tangent,
     }
 }
 

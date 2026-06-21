@@ -163,11 +163,27 @@ fn append_primitive(
         .map(|w| w.into_f32().collect())
         .unwrap_or_default();
 
+    // Local (pre-offset) indices: needed both for the merged stream and to generate
+    // tangents when the glTF declares none.
+    let local: Vec<u32> = match reader.read_indices() {
+        Some(read) => read.into_u32().collect(),
+        None => (0..positions.len() as u32).collect(),
+    };
+    // glTF `TANGENT` accessor when present, else generate from positions + UVs (#207).
+    let tangents: Vec<[f32; 4]> =
+        reader
+            .read_tangents()
+            .map(|t| t.collect())
+            .unwrap_or_else(|| {
+                crate::asset::tangents::generate_tangents(&positions, &normals, &uvs, &local)
+            });
+
     let base = vertices.len() as u32;
     for (i, position) in positions.iter().enumerate() {
         let normal = normals.get(i).copied().unwrap_or([0.0, 1.0, 0.0]);
         let uv = uvs.get(i).copied().unwrap_or([0.0, 0.0]);
         let mut vertex = MeshVertex::new(*position, normal, uv);
+        vertex.tangent = tangents.get(i).copied().unwrap_or([1.0, 0.0, 0.0, 1.0]);
         if let (Some(j), Some(w)) = (joints.get(i), weights.get(i)) {
             let ji = [j[0] as u32, j[1] as u32, j[2] as u32, j[3] as u32];
             vertex = vertex.with_skin(ji, *w);
@@ -175,9 +191,5 @@ fn append_primitive(
         vertices.push(vertex);
     }
 
-    match reader.read_indices() {
-        Some(read) => indices.extend(read.into_u32().map(|i| i + base)),
-        // Non-indexed primitive: emit a trivial 0..n index run.
-        None => indices.extend((0..positions.len() as u32).map(|i| i + base)),
-    }
+    indices.extend(local.into_iter().map(|i| i + base));
 }

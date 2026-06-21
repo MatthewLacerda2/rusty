@@ -117,8 +117,9 @@ fn material_texture_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
 }
 
 /// Group 2 (per-entity material): albedo (0), shared sampler (1), metallic map (2),
-/// roughness map (3). One sampler (binding 1) services all three textures. This is
-/// the layout the forward pass's group(2) is built against (#202).
+/// roughness map (3), normal map (4), emissive map (5). One sampler (binding 1)
+/// services all five textures. This is the layout the forward pass's group(2) is
+/// built against (#202, #207).
 pub(super) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Material Layout"),
@@ -132,6 +133,8 @@ pub(super) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
             },
             material_texture_entry(2),
             material_texture_entry(3),
+            material_texture_entry(4),
+            material_texture_entry(5),
         ],
     })
 }

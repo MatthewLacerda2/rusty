@@ -21,6 +21,10 @@ pub struct MeshVertex {
     pub tex_coords: [f32; 2],
     pub joint_indices: [u32; 4],
     pub joint_weights: [f32; 4],
+    /// Tangent basis for normal mapping: `xyz` unit tangent, `w` handedness (±1).
+    /// From the glTF `TANGENT` accessor when present, else generated from positions +
+    /// UVs at import. Defaults to the `+X` placeholder.
+    pub tangent: [f32; 4],
 }
 
 impl MeshVertex {
@@ -31,6 +35,7 @@ impl MeshVertex {
             tex_coords,
             joint_indices: [0, 0, 0, 0],
             joint_weights: [1.0, 0.0, 0.0, 0.0],
+            tangent: [1.0, 0.0, 0.0, 1.0],
         }
     }
 

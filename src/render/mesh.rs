@@ -1,3 +1,4 @@
+use super::tangents::fill_tangents;
 use glam::Vec3;
 
 #[repr(C)]
@@ -8,15 +9,18 @@ pub struct Vertex {
     pub tex_coords: [f32; 2],
     pub joint_indices: [u32; 4],
     pub joint_weights: [f32; 4],
+    /// Normal-map tangent basis: `xyz` unit tangent, `w` handedness (±1) (#207).
+    pub tangent: [f32; 4],
 }
 
 impl Vertex {
-    const ATTRIBS: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
+    const ATTRIBS: [wgpu::VertexAttribute; 6] = wgpu::vertex_attr_array![
         0 => Float32x3,  // position
         1 => Float32x3,  // normal
         2 => Float32x2,  // tex_coords
         3 => Uint32x4,   // joint_indices
         4 => Float32x4,  // joint_weights
+        5 => Float32x4,  // tangent (xyz + handedness)
     ];
 
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
@@ -34,6 +38,7 @@ impl Vertex {
             tex_coords: uv,
             joint_indices: [0, 0, 0, 0],
             joint_weights: [1.0, 0.0, 0.0, 0.0],
+            tangent: [1.0, 0.0, 0.0, 1.0],
         }
     }
 }
@@ -56,17 +61,12 @@ pub fn generate_box(width: f32, height: f32, depth: f32) -> (Vec<Vertex>, Vec<u3
         vertices.push(Vertex::new(p2, norm, uv_coords[2]));
         vertices.push(Vertex::new(p3, norm, uv_coords[3]));
 
-        // Triangle 1
-        indices.push(base_idx);
-        indices.push(base_idx + 1);
-        indices.push(base_idx + 2);
-        // Triangle 2
-        indices.push(base_idx);
-        indices.push(base_idx + 2);
-        indices.push(base_idx + 3);
+        // Two triangles per quad face.
+        let b = base_idx;
+        indices.extend_from_slice(&[b, b + 1, b + 2, b, b + 2, b + 3]);
     }
 
-    (vertices, indices)
+    fill_tangents(vertices, indices)
 }
 
 /// The 6 faces of a cube of half-extents `(w, h, d)`: each entry is the four corner
@@ -167,7 +167,7 @@ pub fn generate_sphere(radius: f32, rings: u32, sectors: u32) -> (Vec<Vertex>, V
         }
     }
 
-    (vertices, indices)
+    fill_tangents(vertices, indices)
 }
 
 /// Generates a flat quad aligned on the XZ plane
@@ -186,7 +186,7 @@ pub fn generate_plane(width: f32, depth: f32) -> (Vec<Vertex>, Vec<u32>) {
 
     let indices = vec![0, 2, 1, 0, 3, 2];
 
-    (vertices, indices)
+    fill_tangents(vertices, indices)
 }
 
 /// Generates a cylinder between two arbitrary 3D points
@@ -236,7 +236,7 @@ pub fn generate_cylinder(
         segments,
     );
 
-    (vertices, indices)
+    fill_tangents(vertices, indices)
 }
 
 /// Append the cylinder's side wall: paired bottom/top ring vertices and the

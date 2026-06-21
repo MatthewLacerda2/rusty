@@ -82,8 +82,17 @@ fn draw_material(ui: &mut egui::Ui, material: &mut MaterialAsset, is_dirty: &mut
             ui.add(egui::Slider::new(&mut material.roughness, 0.0..=1.0));
         });
 
+        ui.horizontal(|ui| {
+            ui.label("Emissive:");
+            if ui.color_edit_button_rgb(&mut material.emissive).changed() {
+                *is_dirty = true;
+            }
+        });
+
         optional_map(ui, "Use Metallic Map", &mut material.metallic_map);
         optional_map(ui, "Use Roughness Map", &mut material.roughness_map);
+        optional_map(ui, "Use Normal Map", &mut material.normal_map);
+        optional_map(ui, "Use Emissive Map", &mut material.emissive_map);
     });
     if remove {
         *is_dirty = true;

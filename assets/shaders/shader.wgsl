@@ -47,13 +47,14 @@ struct EntityUniforms {
     is_lit: u32,
     metallic: f32,
     roughness: f32,
-    // Mirrors `EntityUniform` (src/render/mod.rs) byte-for-byte (#202): when set,
-    // multiply the scalar by the sampled map channel. Two pads keep 16-byte align so
-    // the `vec4` that follows is aligned.
+    // Mirrors `EntityUniform` (src/render/mod.rs) byte-for-byte (#202, #207): map
+    // flags. metallic/roughness scale their scalar by the sampled channel; normal
+    // perturbs the shading normal; emissive modulates the emissive factor. Four u32s
+    // fill the run so the `vec4` that follows is 16-byte aligned.
     use_metallic_map: u32,
     use_roughness_map: u32,
-    _pad0: u32,
-    _pad1: u32,
+    use_normal_map: u32,
+    use_emissive_map: u32,
     // Flat emissive factor (#222): rgb glow added after lighting in `fs_main`; the
     // 4th lane is unused. `vec4` to match the Rust `[f32; 4]` byte-for-byte.
     emissive: vec4<f32>,
@@ -88,6 +89,10 @@ var s_diffuse: sampler;
 var t_metallic: texture_2d<f32>;
 @group(2) @binding(3)
 var t_roughness: texture_2d<f32>;
+@group(2) @binding(4)
+var t_normal: texture_2d<f32>;
+@group(2) @binding(5)
+var t_emissive: texture_2d<f32>;
 
 @group(3) @binding(0)
 var<uniform> light_space: mat4x4<f32>;
@@ -102,6 +107,9 @@ struct VertexOutput {
     @location(0) world_position: vec3<f32>,
     @location(1) world_normal: vec3<f32>,
     @location(2) tex_coords: vec2<f32>,
+    // World-space tangent for normal mapping; `w` carries the handedness sign so the
+    // fragment shader can reconstruct the bitangent as `w * cross(N, T)`.
+    @location(3) world_tangent: vec4<f32>,
 };
 
 @vertex
@@ -132,9 +140,15 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     let local_normal = bone_transform * vec4<f32>(model.normal, 0.0);
     let world_normal = normalize((entity.model_matrix * local_normal).xyz);
 
+    // Tangent rides the same skin + model transform as the normal; its `w`
+    // (handedness) passes through untouched.
+    let local_tangent = bone_transform * vec4<f32>(model.tangent.xyz, 0.0);
+    let world_tangent = normalize((entity.model_matrix * local_tangent).xyz);
+
     out.world_position = world_pos.xyz;
     out.world_normal = world_normal;
     out.tex_coords = model.tex_coords;
+    out.world_tangent = vec4<f32>(world_tangent, model.tangent.w);
     out.clip_position = camera.view_proj * world_pos;
     return out;
 }
@@ -271,7 +285,16 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         return base_color;
     }
 
-    let N = normalize(in.world_normal);
+    // Geometric normal, optionally perturbed by a tangent-space normal map (#207).
+    // The map's RGB in [0,1] decodes to a [-1,1] vector; the TBN basis rotates it
+    // into world space. `w` (handedness) flips the bitangent for mirrored UVs.
+    var N = normalize(in.world_normal);
+    if (entity.use_normal_map == 1u) {
+        let T = normalize(in.world_tangent.xyz);
+        let B = cross(N, T) * in.world_tangent.w;
+        let sampled = textureSample(t_normal, s_diffuse, in.tex_coords).xyz * 2.0 - 1.0;
+        N = normalize(mat3x3<f32>(T, B, N) * sampled);
+    }
     let V = normalize(camera.camera_pos - in.world_position);
 
     let albedo = base_color.rgb;
@@ -339,10 +362,15 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         lighting_color += env_reflection * F_refl * reflection_scale;
     }
 
-    // 6. Emissive factor (#222): self-illumination added on top of the lit colour,
-    // independent of any light. The HDR target + bloom bright-pass turn values >1.0
-    // into a glow (muzzle flashes, glowing screens) with no post-FX work here.
-    lighting_color += entity.emissive.rgb;
+    // 6. Emissive (#222 factor, #207 map): self-illumination added on top of the lit
+    // colour, independent of any light. The factor is modulated by the emissive map's
+    // rgb when one is bound (`factor * map.rgb`, the glTF convention). The HDR target +
+    // bloom bright-pass turn values >1.0 into a glow with no post-FX work here.
+    var emissive = entity.emissive.rgb;
+    if (entity.use_emissive_map == 1u) {
+        emissive *= textureSample(t_emissive, s_diffuse, in.tex_coords).rgb;
+    }
+    lighting_color += emissive;
 
     return vec4<f32>(lighting_color, base_color.a);
 }

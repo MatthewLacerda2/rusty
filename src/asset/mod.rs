@@ -24,6 +24,7 @@ pub mod manifest;
 pub mod mesh_data;
 pub mod obj_import;
 pub mod sidecar;
+pub mod tangents;
 
 pub use anim_data::{AnimationClip, Interpolation, JointTrack, Track};
 pub use manifest::{build_manifest, AssetEntry, AssetManifest, SubObjectEntry};
