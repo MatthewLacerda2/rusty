@@ -167,7 +167,7 @@ to the editor and uses the same default values.
 | `Scene.ClearParent` | `(id)` | — |
 | `Scene.Save` | `([path])` | the written path |
 | `Scene.SavePrefab` | `(rootId, path)` | the written path |
-| `Scene.Instantiate` | `(path, [parentId])` | new root entity `id` |
+| `Scene.Instantiate` | `(path, …)` — see below | new entity `id` |
 
 **`primitive`** (optional) is one of the hierarchy toolbar's primitives,
 case-insensitive: `Box`, `Sphere`, `Plane`, `Cylinder` (meshes) or `PointLight`,
@@ -206,16 +206,29 @@ material slice, and no GPU buffers). Returns the written path; errors if no enti
 has that id. This is the same verb the hierarchy's right-click **Save as Prefab**
 runs.
 
-**`Scene.Instantiate(path, [parentId])`** loads a `.prefab` and stamps an independent
-copy into the scene, assigning fresh deterministic ids, merging the prefab's
-materials into the scene library (an identical existing material is reused; a
-name-conflicting one is inserted under a uniquified name and the instance's
-references are rewritten to it), and parenting the new root under `parentId` (or the
-scene root when omitted). Returns the new root's id. The geometry is rehydrated from
-each mesh's reference on instantiate, exactly like scene load. (Instantiating an
-importable model asset by reference is a separate, queued verb; `Scene.Instantiate`
-is the single surface both will share, dispatching on whether the path is a `.prefab`
-or an importable asset.)
+**`Scene.Instantiate(path, …)`** is the single spawn verb; it dispatches on whether
+`path` is a `.prefab` or an importable asset reference, so prefabs and assets share
+one name and never drift.
+
+- **`Scene.Instantiate(prefabPath, [parentId])`** — loads a `.prefab` and stamps an
+  independent copy into the scene, assigning fresh deterministic ids, merging the
+  prefab's materials into the scene library (an identical existing material is reused;
+  a name-conflicting one is inserted under a uniquified name and the instance's
+  references are rewritten to it), and parenting the new root under `parentId` (or the
+  scene root when omitted). Returns the new root's id.
+
+- **`Scene.Instantiate(assetRef, [name], [x, y, z])`** — spawns one entity from an
+  importable model sub-object reference (`path::sub_object`, the `reference` field
+  `Assets.Manifest()` hands back), placed at `(x, y, z)` (the origin when omitted) and
+  named `name` (the sub-object id when omitted). This is the API equivalent of dragging
+  a glTF from the content browser into the scene: it runs the importer to build the
+  mesh, applies the sub-object's glTF material (deduped into the shared library, or the
+  engine default when the glTF names none), and syncs a mesh collider when the asset's
+  `.meta` sidecar records one. Returns the new entity's id; errors (without spawning)
+  when the reference is malformed, the file fails to import, or the sub-object is absent.
+
+In both cases the geometry is stored only as a reference and rehydrated on the next
+scene load, exactly like a primitive's `primitive_type` — no GPU buffers are inlined.
 
 ## `Assets`
 
@@ -294,7 +307,7 @@ Rigidbody control plus raycast queries. `Raycast`/`Shoot` return
 |---|---|---|
 | `Physics.GetVelocity` | `(id)` | `x, y, z` |
 | `Physics.SetVelocity` | `(id, vx, vy, vz)` | — |
-| `Physics.AddForce` | `(id, fx, fy, fz)` | — |
+| `Physics.AddForce` | `(id, fx, fy, fz)` | — (continuous force, see below) |
 | `Physics.SetKinematic` | `(id, is_kinematic)` | — |
 | `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` |
 | `Physics.Shoot` | `(ox, oy, oz, dx, dy, dz, damage [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` (applies damage on hit) |
@@ -308,6 +321,18 @@ only hits entities whose layer's bit is set, ignoring all others. Build one from
 layer name with `1 << Layers.NameToIndex("Enemy")`, or OR several together. Omit it
 (or pass `nil`) to hit every layer. This is independent of the **Layer Collision
 Matrix** (Scene Settings), which governs which layers physically collide.
+
+`AddForce` applies a **continuous force** (Unity's `ForceMode.Force`): the velocity
+change for one call is `F / mass · fixedDeltaTime`, so applying the same force each
+`Update` accelerates the body smoothly rather than in dt-independent jumps. It is a
+no-op on kinematic bodies. For an instantaneous velocity change, set the velocity
+directly with `SetVelocity`.
+
+A rigidbody's **`use_gravity`** flag (authored in the inspector / serialized in the
+scene) controls whether a dynamic body is pulled by the world's gravity (Unity:
+`Rigidbody.useGravity`). `false` exempts the body from gravity (rapier
+`gravity_scale = 0`) while still letting it move under velocity and collisions; the
+flag is honoured at body build and each tick, so toggling it at runtime takes effect.
 
 ## `Health`
 

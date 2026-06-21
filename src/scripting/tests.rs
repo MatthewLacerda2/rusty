@@ -116,3 +116,33 @@ fn raycast_misses_into_empty_space() {
     m.exec("local hit = Physics.Raycast(0,0,0, 1,0,0); assert(hit == false)")
         .unwrap();
 }
+
+#[test]
+fn add_force_applies_dt_scaled_velocity() {
+    let (m, scene, _cam) = manager();
+    // Give entity 1 a dynamic rigidbody so AddForce takes effect.
+    {
+        let mut s = scene.borrow_mut();
+        let mut e = s.get_entity_mut(1).unwrap();
+        e.rigidbody = Some(crate::components::RigidBodyComponent {
+            active: true,
+            is_kinematic: false,
+            mass: 2.0,
+            velocity: Vec3::ZERO,
+            use_gravity: true,
+        });
+    }
+    // AddForce is a continuous force (Unity ForceMode.Force): Δv = F/m · dt.
+    // F=(20,0,0), m=2 ⇒ a=10; over one fixed step (1/60s) ⇒ Δvx = 10/60.
+    m.exec("Physics.AddForce(1, 20, 0, 0)").unwrap();
+    let vx = scene
+        .borrow()
+        .get_entity(1)
+        .and_then(|e| e.rigidbody.as_ref().map(|r| r.velocity.x))
+        .unwrap();
+    let expected = 10.0 * crate::time::FIXED_DELTA_TIME;
+    assert!(
+        (vx - expected).abs() < 1e-6,
+        "AddForce should scale by dt: got {vx}, want {expected}"
+    );
+}
