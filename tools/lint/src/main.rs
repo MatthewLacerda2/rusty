@@ -92,13 +92,27 @@ fn is_rust(path: &Path) -> bool {
     path.extension().map_or(false, |e| e == "rs")
 }
 
-/// Test and fixture files get the tighter cap.
+/// The cap a file is measured against.
+///
+/// Standalone test/fixture files (`tests/`, `fixtures/`, `*_test.rs`, `test_*`) get
+/// the tighter [`MAX_TEST_FILE_LINES`] cap, because over-splitting a bundle of
+/// `#[test]`s hurts readability more than it helps.
+///
+/// A `<name>_tests.rs` **sibling** is the exception: it is the dedicated, single
+/// test home for `<name>.rs` next to it, so source + sibling read as one logical
+/// unit. Splitting a source file's tests between an inline `#[cfg(test)] mod tests`
+/// AND such a sibling, purely to fit the tight cap, fragments that unit — so the
+/// sibling carries the source cap ([`MAX_FILE_LINES`]), letting all of one source's
+/// tests live in one place. (See issue #211.)
 fn limit_for(path: &Path) -> usize {
     let p = normalize(path);
     let name = path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
+    if is_tests_sibling(&name) {
+        return MAX_FILE_LINES;
+    }
     let in_test_dir = p.split('/').any(|seg| seg == "tests" || seg == "fixtures");
     let is_test = in_test_dir || name.ends_with("_test.rs") || name.starts_with("test_");
     if is_test {
@@ -106,6 +120,15 @@ fn limit_for(path: &Path) -> usize {
     } else {
         MAX_FILE_LINES
     }
+}
+
+/// Is `name` a `<x>_tests.rs` file — the dedicated test home for a `<x>.rs` source
+/// beside it? Such a sibling is part of that source's logical unit (the source cap),
+/// not an over-split standalone test file. The naming convention (`_tests.rs`, the
+/// plural sibling form, distinct from the standalone `_test.rs`) is the marker, so
+/// the rule holds whether the lint scans `src/` or checks an explicit file list.
+fn is_tests_sibling(name: &str) -> bool {
+    name.ends_with("_tests.rs")
 }
 
 fn check_file(path: &Path) -> Option<String> {
@@ -184,6 +207,19 @@ mod tests {
             limit_for(Path::new("src/fixtures/baz.rs")),
             MAX_TEST_FILE_LINES
         );
+    }
+
+    #[test]
+    fn tests_sibling_gets_the_source_cap_not_the_tight_one() {
+        // A `<x>_tests.rs` sibling is one source's single test home (issue #211), so
+        // it shares `<x>.rs`'s source cap — keeping all of a source's tests in one
+        // place rather than spilling them into an inline block to fit the tight cap.
+        assert_eq!(
+            limit_for(Path::new("src/physics/build_tests.rs")),
+            MAX_FILE_LINES
+        );
+        // The standalone `_test.rs` (singular) form still gets the tight cap.
+        assert_eq!(limit_for(Path::new("src/bar_test.rs")), MAX_TEST_FILE_LINES);
     }
 
     #[test]

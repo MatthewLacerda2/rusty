@@ -1,7 +1,7 @@
 //! The forward renderer's group(2) texture setup: the single-texture + expanded
 //! material bind-group layouts, the default checker texture, and the all-default
-//! material bind group. Split out of `setup_build` to keep each file under the size
-//! cap (behavior unchanged).
+//! material bind group. A cohesive unit ([`Textures`]) that `setup_build` builds and
+//! `Renderer::from_parts` flattens into the renderer.
 
 use std::rc::Rc;
 

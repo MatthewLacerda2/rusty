@@ -10,10 +10,19 @@ result is written to `.lint/report.txt` so an agent can read exactly what failed
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (both feature sets) |
 | Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), enforced crate-wide via `-D clippy::too_many_lines`; no grandfathered functions remain |
 | File length | `tools/lint` | <= 300 lines |
-| Test / fixture file length | `tools/lint` | <= 150 lines |
+| Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
 | Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation` |
 | Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
+
+## The `*_tests.rs` sibling rule
+The tight test cap exists to discourage over-splitting a bundle of `#[test]`s. But a
+`<x>_tests.rs` file sitting next to its `<x>.rs` source is the *opposite* — it is that
+one source's dedicated, single test home. Forcing it under the 150-line cap pushes the
+overflow back into an inline `#[cfg(test)] mod tests`, so the same source ends up tested
+from *two* places. To keep cohesion, a `<x>_tests.rs` **sibling** shares its source's
+300-line cap (source + sibling read as one logical unit); the standalone `*_test.rs`
+(singular), `tests/`, and `fixtures/` forms keep the tight 150-line cap (#211).
 
 ## Run it
 ```
