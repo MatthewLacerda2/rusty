@@ -1,6 +1,7 @@
-//! Tests for the model inspector's material-import wiring (#203): `import_material`
-//! deduplication + `instantiate` populating `scene.materials` and the entity
-//! `MaterialComponent`, plus a `SceneData` round-trip of an imported material.
+//! Tests for the model inspector's material wiring: `import_material` dedup +
+//! `instantiate` populating `scene.materials` and the entity `MaterialComponent`
+//! (#203), a `SceneData` round-trip, and the engine-default fallback for a
+//! material-less glTF (#214).
 
 use super::{import_material, instantiate};
 use crate::editor::EditorUi;
@@ -32,9 +33,34 @@ const SHARED_MATERIAL_GLTF: &str = r#"{
 }
 "#;
 
+/// A glTF whose two meshes name NO material — the case the engine must dress with its
+/// default `Material` (#214). Same shared-position buffer as above, refs dropped.
+const NO_MATERIAL_GLTF: &str = r#"{
+  "asset": { "version": "2.0" },
+  "scene": 0,
+  "scenes": [ { "nodes": [ 0, 1 ] } ],
+  "nodes": [ { "mesh": 0 }, { "mesh": 1 } ],
+  "meshes": [
+    { "name": "Bare0", "primitives": [ { "attributes": { "POSITION": 0 } } ] },
+    { "name": "Bare1", "primitives": [ { "attributes": { "POSITION": 0 } } ] }
+  ],
+  "accessors": [
+    { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3",
+      "min": [0.0, 0.0, 0.0], "max": [1.0, 1.0, 0.0] }
+  ],
+  "bufferViews": [ { "buffer": 0, "byteOffset": 0, "byteLength": 36 } ],
+  "buffers": [ { "byteLength": 36,
+    "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAA" } ]
+}
+"#;
+
 fn write_fixture(name: &str) -> String {
+    write_gltf(name, SHARED_MATERIAL_GLTF)
+}
+
+fn write_gltf(name: &str, body: &str) -> String {
     let path = std::env::temp_dir().join(name);
-    std::fs::write(&path, SHARED_MATERIAL_GLTF).unwrap();
+    std::fs::write(&path, body).unwrap();
     path.to_string_lossy().into_owned()
 }
 
@@ -63,29 +89,26 @@ fn import_material_dedups_shared_gltf_material() {
 fn instantiate_sets_material_component_and_shares_library_entry() {
     let path = write_fixture("rusty_203_instantiate.gltf");
     let mut scene = Scene::new();
-    let mut editor = EditorUi::new();
-    instantiate(&mut editor, &mut scene, &path);
+    instantiate(&mut EditorUi::new(), &mut scene, &path);
 
     // Two entities, each with the mesh's shared material reference; ONE library entry.
     let key = format!("{path}::Shared");
     assert_eq!(scene.materials.len(), 1);
     assert!(scene.materials.contains_key(&key));
-    let refs: Vec<String> = scene
-        .world
-        .collect_entities()
+    let entities = scene.world.collect_entities();
+    let refs: Vec<_> = entities
         .iter()
-        .filter_map(|e| e.material.as_ref().map(|m| m.material.clone()))
+        .filter_map(|e| e.material.as_ref())
         .collect();
     assert_eq!(refs.len(), 2, "both sub-objects carry a MaterialComponent");
-    assert!(refs.iter().all(|r| *r == key), "both share one library key");
+    assert!(refs.iter().all(|m| m.material == key), "both share one key");
 }
 
 #[test]
 fn imported_material_round_trips_through_scene_data() {
     let path = write_fixture("rusty_203_roundtrip.gltf");
     let mut scene = Scene::new();
-    let mut editor = EditorUi::new();
-    instantiate(&mut editor, &mut scene, &path);
+    instantiate(&mut EditorUi::new(), &mut scene, &path);
 
     let data = to_scene_data(&scene);
     let mut restored = Scene::new();
@@ -103,12 +126,24 @@ fn imported_material_round_trips_through_scene_data() {
         .world
         .collect_entities()
         .iter()
-        .filter(|e| {
-            e.material
-                .as_ref()
-                .map(|m| m.material == key)
-                .unwrap_or(false)
-        })
+        .filter(|e| e.material.as_ref().is_some_and(|m| m.material == key))
         .count();
     assert_eq!(count, 2, "both material references round-tripped");
+}
+
+#[test]
+fn instantiate_dresses_material_less_meshes_with_engine_default() {
+    let path = write_gltf("rusty_214_default.gltf", NO_MATERIAL_GLTF);
+    let mut scene = Scene::new();
+    instantiate(&mut EditorUi::new(), &mut scene, &path);
+
+    // Both created mesh entities carry a RESOLVABLE material (key present in the shared
+    // library) even though the glTF named none.
+    let entities = scene.world.collect_entities();
+    let meshed: Vec<_> = entities.iter().filter(|e| e.mesh.is_some()).collect();
+    assert_eq!(meshed.len(), 2, "both sub-objects instantiated");
+    for e in meshed {
+        let m = e.material.as_ref().expect("default material attached");
+        assert!(scene.materials.contains_key(&m.material), "ref resolves");
+    }
 }

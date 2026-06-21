@@ -108,6 +108,18 @@ map; an empty path clears it.
 > relative to the glTF file; embedded images are not yet extracted (a follow-up). OBJ
 > imports only `Kd` (base color) and `map_Kd` (albedo) — it is static-mesh only.
 
+> **Starter materials.** The engine ships a small ready-to-go set so a new scene has
+> sane PBR values to grab instead of starting from raw factors. They live as an
+> ordinary glTF asset at `project/materials/starter.gltf` — **no special-casing**: it
+> is discovered by `Assets.Manifest()` and imported through the same path as any user
+> model. The four materials are `Matte` (rough dielectric), `Metal` (polished
+> conductor), `Plastic` (smooth coloured dielectric), and `Emissive` (a glowing
+> dielectric). Instantiating the file populates the library with keys
+> `project/materials/starter.gltf::Matte` (and so on for `Metal` / `Plastic` /
+> `Emissive`); point any entity's `MaterialComponent` at one of those keys to reuse it,
+> or copy its factors as the starting point for your own. No external textures — the
+> factors stand alone, so the set stays tiny and license-clean.
+
 ## `Animator`
 
 Drive an entity's animation clips. Clips are imported from the entity's skinned
