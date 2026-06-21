@@ -110,6 +110,50 @@ pub fn sync_lens_from_scene(camera: &mut Camera, scene: &Scene, is_playing: bool
     }
 }
 
+/// Build a [`Camera`] positioned at the scene's active `CameraComponent` entity — the
+/// player's-eye view the editor's **Game** tab shows while authoring (#183). Position
+/// and orientation come from the camera entity's world transform (so the Game tab
+/// tracks where the gameplay camera actually sits, not the free-fly cam), and the lens
+/// from its component. Falls back to `base` (the free-fly camera) when no active camera
+/// entity exists, so the tab still renders something sensible.
+pub fn game_camera_from_scene(base: &Camera, scene: &Scene) -> Camera {
+    let mut best_order = i32::MAX;
+    let mut chosen: Option<Camera> = None;
+    for id in scene.entity_ids() {
+        let Some(entity) = scene.get_entity(id) else {
+            continue;
+        };
+        let Some(c) = &entity.camera else { continue };
+        if !entity.active || !c.active || c.render_order > best_order {
+            continue;
+        }
+        best_order = c.render_order;
+        let world = scene.compute_world_matrix(id);
+        let (yaw, pitch) = yaw_pitch_from_matrix(world);
+        let mut cam = base.clone();
+        cam.position = world.col(3).truncate();
+        cam.yaw = yaw;
+        cam.pitch = pitch;
+        cam.fov = c.fov;
+        cam.near = c.near;
+        cam.far = c.far;
+        cam.culling_mask = c.culling_mask;
+        cam.clear_flags = c.clear_flags;
+        chosen = Some(cam);
+    }
+    chosen.unwrap_or_else(|| base.clone())
+}
+
+/// Yaw/pitch (degrees) of a world matrix's forward (-Z) axis, the inverse of
+/// [`Camera::forward`], so a camera entity's orientation maps onto the render camera.
+fn yaw_pitch_from_matrix(world: Mat4) -> (f32, f32) {
+    // glTF/engine convention: an entity looks down its local -Z.
+    let forward = (-world.col(2).truncate()).normalize_or_zero();
+    let yaw = forward.z.atan2(forward.x).to_degrees();
+    let pitch = forward.y.clamp(-1.0, 1.0).asin().to_degrees();
+    (yaw, pitch)
+}
+
 /// Build the ordered camera stack the renderer composites for a frame (#93).
 ///
 /// In play mode the scene's active [`CameraComponent`](crate::scene::CameraComponent)

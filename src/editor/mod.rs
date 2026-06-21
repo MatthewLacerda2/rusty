@@ -19,10 +19,15 @@ mod inspector_settings;
 mod inspector_transform;
 pub mod inspectors;
 pub mod theme;
+pub mod viewport;
+pub mod viewport_gizmo;
+pub mod viewport_pick;
 
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
+
+pub use viewport::{ViewportInteraction, ViewportTab};
 
 /// What the Inspector panel is currently showing. The three modes are mutually
 /// exclusive; the editor derives this from its selection state each frame so the
@@ -82,6 +87,15 @@ pub struct EditorUi {
     /// each frame so Low/Medium/High gate which passes run + buffer sizes.
     pub quality_preset: crate::render::postfx::QualityPreset,
 
+    /// Which viewport tab is showing — Scene (editor cam + gizmos) or Game (the
+    /// active camera's view). Both are reachable in edit and play mode (#183).
+    pub viewport_tab: ViewportTab,
+    /// The scene image's last drawn size in egui points, recorded each frame so the
+    /// front-end can size the offscreen render target to match the displayed rect.
+    pub viewport_image_size: egui::Vec2,
+    /// Live move-gizmo drag, if an axis handle is currently grabbed (#183).
+    pub gizmo_drag: Option<viewport_gizmo::GizmoDrag>,
+
     /// Live Lua REPL input line (dev builds only). The editor only collects the
     /// submitted text here; the front-end (main.rs) drains `pending_repl` and runs
     /// it through the single `dev::console` evaluator against the live runtime.
@@ -131,6 +145,9 @@ impl EditorUi {
             theme: theme::Theme::dark(),
             fonts_installed: false,
             quality_preset: crate::render::postfx::QualityPreset::default(),
+            viewport_tab: ViewportTab::Scene,
+            viewport_image_size: egui::Vec2::ZERO,
+            gizmo_drag: None,
 
             #[cfg(feature = "dev")]
             repl_input: crate::dev::console::ReplInput::new(),
@@ -205,7 +222,8 @@ impl EditorUi {
         is_playing: &mut bool,
         _fps: f32,
         _frame_time: f32,
-    ) {
+        viewport_texture: Option<egui::TextureId>,
+    ) -> ViewportInteraction {
         self.apply_theme(ctx);
         self.scan_assets();
 
@@ -215,23 +233,24 @@ impl EditorUi {
         // 1. TOP HEADER PANEL (Controls engine state) — ALWAYS VISIBLE
         header::draw(self, ctx, scene, console, is_playing);
 
+        // The side/bottom authoring panels are edit-mode only; during play the runtime
+        // is live and the floating dev console takes over. The viewport stays in both
+        // modes so the Scene/Game tabs are always reachable (#183).
         if *is_playing {
-            // The runtime is only live during play, so the REPL belongs here. Show a
-            // floating console (log + input line) so you can call the API while the
-            // game runs. Dev builds only — stripped from ship builds with the rest of
-            // the agentic layer.
             #[cfg(feature = "dev")]
             bottom_panel::draw_play_console(self, ctx, console);
-            return;
+        } else {
+            // 2. LEFT PANEL: Scene Hierarchy
+            hierarchy::draw(self, ctx, scene);
+            // 3. RIGHT PANEL: Properties Inspector
+            inspector::draw(self, ctx, scene, console, nav);
+            // 4. BOTTOM PANEL: Folder Explorer & Console Logs
+            bottom_panel::draw(self, ctx, scene, console);
         }
 
-        // 2. LEFT PANEL: Scene Hierarchy
-        hierarchy::draw(self, ctx, scene);
-
-        // 3. RIGHT PANEL: Properties Inspector
-        inspector::draw(self, ctx, scene, console, nav);
-
-        // 4. BOTTOM PANEL: Folder Explorer & Console Logs
-        bottom_panel::draw(self, ctx, scene, console);
+        // 5. CENTRAL VIEWPORT: the Scene/Game tabbed scene image. Drawn last so it
+        // fills the space the docked panels leave. Returns the pointer interaction the
+        // front-end uses for click-to-select and the move gizmo on the Scene tab.
+        viewport::draw(self, ctx, viewport_texture)
     }
 }

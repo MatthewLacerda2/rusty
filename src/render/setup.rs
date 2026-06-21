@@ -140,6 +140,7 @@ impl Renderer {
             entity_pool,
             depth_texture,
             depth_view,
+            viewport_target: None,
             shadow_layout: shadows.layout,
             shadow_renderer: shadows.renderer,
             shadow_uniform_buffer: shadows.uniform_buffer,
