@@ -31,6 +31,17 @@ pub(super) fn is_kinematic(is_static: bool, rb: Option<&RigidBodyComponent>) -> 
     matches!(classify(is_static, rb), BodyClass::Kinematic)
 }
 
+/// rapier `gravity_scale` for a body's `use_gravity` flag: `1.0` keeps the body
+/// under world gravity, `0.0` exempts it (Unity: `Rigidbody.useGravity`). Only
+/// dynamic bodies integrate gravity, so it's a no-op on static/kinematic ones.
+pub(super) fn gravity_scale(use_gravity: bool) -> f32 {
+    if use_gravity {
+        1.0
+    } else {
+        0.0
+    }
+}
+
 /// The per-entity inputs needed to build one rapier body + collider, captured in a
 /// single borrow of the entity so `world.rs` can release it before touching `self`.
 pub(super) struct ColliderInputs {
@@ -45,6 +56,9 @@ pub(super) struct ColliderInputs {
     pub is_static: bool,
     pub class: BodyClass,
     pub velocity: Vec3,
+    /// Whether a dynamic body is pulled by world gravity (Unity: `useGravity`).
+    /// Maps to rapier's `gravity_scale` (1.0 when true, 0.0 when false).
+    pub use_gravity: bool,
     pub layer: u8,
 }
 
@@ -79,6 +93,7 @@ pub(super) fn collider_inputs(entity: &Entity) -> Option<ColliderInputs> {
             .as_ref()
             .map(|r| r.velocity)
             .unwrap_or(Vec3::ZERO),
+        use_gravity: entity.rigidbody.as_ref().is_none_or(|r| r.use_gravity),
         layer: entity.layer,
     })
 }

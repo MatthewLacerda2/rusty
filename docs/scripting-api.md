@@ -304,7 +304,7 @@ Rigidbody control plus raycast queries. `Raycast`/`Shoot` return
 |---|---|---|
 | `Physics.GetVelocity` | `(id)` | `x, y, z` |
 | `Physics.SetVelocity` | `(id, vx, vy, vz)` | — |
-| `Physics.AddForce` | `(id, fx, fy, fz)` | — |
+| `Physics.AddForce` | `(id, fx, fy, fz)` | — (continuous force, see below) |
 | `Physics.SetKinematic` | `(id, is_kinematic)` | — |
 | `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` |
 | `Physics.Shoot` | `(ox, oy, oz, dx, dy, dz, damage [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` (applies damage on hit) |
@@ -318,6 +318,18 @@ only hits entities whose layer's bit is set, ignoring all others. Build one from
 layer name with `1 << Layers.NameToIndex("Enemy")`, or OR several together. Omit it
 (or pass `nil`) to hit every layer. This is independent of the **Layer Collision
 Matrix** (Scene Settings), which governs which layers physically collide.
+
+`AddForce` applies a **continuous force** (Unity's `ForceMode.Force`): the velocity
+change for one call is `F / mass · fixedDeltaTime`, so applying the same force each
+`Update` accelerates the body smoothly rather than in dt-independent jumps. It is a
+no-op on kinematic bodies. For an instantaneous velocity change, set the velocity
+directly with `SetVelocity`.
+
+A rigidbody's **`use_gravity`** flag (authored in the inspector / serialized in the
+scene) controls whether a dynamic body is pulled by the world's gravity (Unity:
+`Rigidbody.useGravity`). `false` exempts the body from gravity (rapier
+`gravity_scale = 0`) while still letting it move under velocity and collisions; the
+flag is honoured at body build and each tick, so toggling it at runtime takes effect.
 
 ## `Health`
 
