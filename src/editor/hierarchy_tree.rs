@@ -30,10 +30,12 @@ pub fn draw_node(
     let is_selected = *sel_entity == Some(entity_id);
 
     // The clickable row: type glyph + name. Selecting toggles off to None (which
-    // the inspector reads as "show scene settings").
+    // the inspector reads as "show scene settings"). Right-click offers "Save as
+    // Prefab", which extracts this entity's subtree to a `.prefab` asset (#215).
     let mut row = |ui: &mut egui::Ui| {
         ui.colored_label(glyph_color, glyph);
-        if ui.selectable_label(is_selected, &name).clicked() {
+        let label = ui.selectable_label(is_selected, &name);
+        if label.clicked() {
             if is_selected {
                 *sel_entity = None;
             } else {
@@ -41,6 +43,15 @@ pub fn draw_node(
                 *sel_asset = None;
             }
         }
+        label.context_menu(|ui| {
+            if ui
+                .button(format!("{}  Save as Prefab", icon::PACKAGE))
+                .clicked()
+            {
+                save_as_prefab(scene, entity_id, &name);
+                ui.close_menu();
+            }
+        });
     };
 
     if children.is_empty() {
@@ -60,6 +71,21 @@ pub fn draw_node(
                 }
             });
     }
+}
+
+/// Extract `entity_id`'s subtree to `project/prefabs/{name}.prefab` via the shared
+/// `scene::save_prefab` verb (the same path `Scene.SavePrefab` takes). The folder is
+/// created on demand; the entity name is sanitised into a filesystem-safe stem.
+fn save_as_prefab(scene: &Scene, entity_id: u32, name: &str) {
+    let dir = std::path::Path::new(crate::editor::content_browser::ROOT).join("prefabs");
+    std::fs::create_dir_all(&dir).ok();
+    let stem: String = name
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+        .collect();
+    let stem = if stem.is_empty() { "Prefab" } else { &stem };
+    let path = dir.join(format!("{stem}.{}", crate::scene::PREFAB_EXTENSION));
+    let _ = crate::scene::save_prefab(scene, entity_id, &path.to_string_lossy());
 }
 
 /// Monochrome type glyph for an entity, mirroring VS Code's restrained icons.

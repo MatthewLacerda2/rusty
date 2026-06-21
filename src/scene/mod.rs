@@ -23,6 +23,7 @@ pub mod authoring_defaults;
 pub mod collision_matrix;
 pub mod io;
 pub mod layers;
+pub mod prefab;
 #[allow(clippy::module_inception)]
 pub mod scene;
 pub mod serialize;
@@ -34,6 +35,10 @@ pub use io::{
     DEFAULT_SCENE_PATH, DEFAULT_SCENE_SOURCE, DEFAULT_SCRIPTS_DEST_DIR, SCENE_EXTENSION,
 };
 pub use layers::{layer_in_mask, LayerRegistry, LAYER_COUNT};
+pub use prefab::{
+    extract_prefab, instantiate_prefab, is_prefab_path, load_and_instantiate, save_prefab,
+    PrefabData, PREFAB_EXTENSION,
+};
 pub use scene::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
     ColliderShape, CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent,

@@ -41,6 +41,7 @@ pub fn register<'lua, 'scope>(
     register_components(scope, &table, scene)?;
     register_parenting(scope, &table, scene)?;
     register_save(scope, &table, scene, scene_path)?;
+    register_prefab(scope, &table, scene)?;
 
     lua.globals().set("Scene", table).map_err(|e| e.to_string())
 }
@@ -203,6 +204,42 @@ fn register_save<'lua, 'scope>(
                 .map_err(mlua::Error::RuntimeError)?;
             *scene_path.borrow_mut() = Some(target.clone());
             Ok(target)
+        }),
+    )
+}
+
+/// `SavePrefab(rootId, path)` + `Instantiate(path[, parentId])` — the prefab
+/// surface (#215). `Instantiate` is the runtime spawn primitive a wave-spawner
+/// script needs, and is deliberately shaped to be the **one** instantiate verb:
+/// it dispatches on the path kind, so #182's asset `Instantiate(assetRef)` can
+/// later fold its branch in here without a second public name. v1 handles only
+/// `.prefab`; any other path errors (pointing at where #182 will extend it).
+fn register_prefab<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "SavePrefab",
+        scope.create_function(|_, (root_id, path): (u32, String)| {
+            crate::scene::save_prefab(&scene.borrow(), root_id, &path)
+                .map(|()| path)
+                .map_err(mlua::Error::RuntimeError)
+        }),
+    )?;
+
+    put(
+        table,
+        "Instantiate",
+        scope.create_function(|_, (path, parent): (String, Option<u32>)| {
+            if !crate::scene::is_prefab_path(&path) {
+                return Err(mlua::Error::RuntimeError(format!(
+                    "Scene.Instantiate: '{path}' is not a .prefab (asset instantiate is #182)"
+                )));
+            }
+            crate::scene::load_and_instantiate(&mut scene.borrow_mut(), &path, parent)
+                .map_err(mlua::Error::RuntimeError)
         }),
     )
 }
