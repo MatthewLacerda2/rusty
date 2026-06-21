@@ -200,7 +200,7 @@ fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
         let ent_id = scene.add_entity(id.clone());
         if let Some(mut ent) = scene.get_entity_mut(ent_id) {
             ent.mesh = Some(crate::scene::asset_mesh_component(&reference));
-            if let Some(key) = material_key {
+            if let Some(key) = material_key.clone() {
                 ent.material = Some(crate::components::MaterialComponent { material: key });
             }
             if let Some(kind) = settings.colliders.get(&id) {
@@ -213,6 +213,13 @@ fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
                     added_collider = true;
                 }
             }
+        }
+        // A GameObject built from a glTF carries a Material by definition (CLAUDE.md).
+        // When the sub-mesh names no glTF material, dress it with the engine default
+        // via the shared authoring verb — the same path the Add-Component menu uses —
+        // so it renders with a resolvable reference instead of none (#214).
+        if material_key.is_none() {
+            crate::scene::authoring::attach_default_material(scene, ent_id);
         }
         last = Some(ent_id);
     }
