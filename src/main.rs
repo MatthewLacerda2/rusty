@@ -69,6 +69,7 @@ fn main() {
     let window = create_window(&event_loop);
     let (mut frontend, boot_scene_path) = init_frontend(&window);
     let mut game = init_game(boot_scene_path.clone());
+    init_audio(&game);
     frontend.editor_ui.current_scene_path = Some(boot_scene_path);
     let keymap = load_keymap(&game);
     // Boundary read: apply the persisted video + quality settings to the
@@ -203,6 +204,25 @@ fn init_game(boot_scene_path: String) -> GameWorld {
             .error(format!("Failed to load storage: {}", err));
     }
     game
+}
+
+/// Open the real audio device and inject it into the `AudioMaestro` (#212). The
+/// maestro starts with a no-op backend (so `GameWorld::new` is device-free, as the
+/// harness needs); only the windowed app swaps in the live `RodioBackend`. A box
+/// with no audio device (a headless dev machine) keeps the no-op backend, logging a
+/// warning rather than failing — sound is non-essential to the editor.
+fn init_audio(game: &GameWorld) {
+    match rusty::audio::RodioBackend::open() {
+        Some(backend) => game
+            .resources
+            .audio
+            .borrow_mut()
+            .set_backend(Box::new(backend)),
+        None => game
+            .console()
+            .borrow_mut()
+            .info("No audio device available — running silent.".to_string()),
+    }
 }
 
 /// Load the physical→logical key remap (issue #88) from the persistent store.
@@ -489,8 +509,13 @@ fn draw_editor_dashboard(
 #[cfg(feature = "dev")]
 fn drain_repl(frontend: &mut Frontend, game: &mut GameWorld) {
     if let Some(line) = frontend.editor_ui.pending_repl.take() {
-        let mut c = game.resources.console.borrow_mut();
-        let _ = rusty::dev::console::evaluate_line(game.script_manager(), &mut c, &line);
+        // Hand `evaluate_line` the shared console cell (not a held borrow) so a
+        // typed `print` / `Debug.*` can borrow it mid-eval without panicking (#208).
+        let _ = rusty::dev::console::evaluate_line(
+            game.script_manager(),
+            &game.resources.console,
+            &line,
+        );
     }
 }
 

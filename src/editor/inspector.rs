@@ -1,8 +1,8 @@
 use egui_phosphor::regular as icon;
 
 use crate::editor::{
-    inspector_add, inspector_camera, inspector_gameplay, inspector_particles, inspector_render,
-    inspector_settings, inspector_transform,
+    inspector_add, inspector_audio, inspector_camera, inspector_gameplay, inspector_particles,
+    inspector_render, inspector_settings, inspector_transform,
 };
 use crate::editor::{inspectors, EditorUi, InspectorTarget};
 use crate::navigation::NavigationGraph;
@@ -293,6 +293,7 @@ fn draw_components(
     inspector_camera::draw_visual_correction(ui, entity, is_dirty);
 
     inspector_particles::draw(ui, entity, is_dirty);
+    inspector_audio::draw(ui, entity, is_dirty);
 
     inspector_add::draw(ui, entity);
 }

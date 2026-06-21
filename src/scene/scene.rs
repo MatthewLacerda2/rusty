@@ -20,9 +20,9 @@ use crate::scene::layers::LayerRegistry;
 // Re-export the component types so the many existing `scene::…Component` paths
 // resolve. The structs themselves live in `crate::components`.
 pub use crate::components::{
-    AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape,
-    CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent, LightType,
-    MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent, Particle,
+    AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
+    ColliderShape, CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent,
+    LightType, MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent, Particle,
     ParticleBlend, ParticleEmitterComponent, RigidBodyComponent, ScriptComponent, ScriptFieldValue,
     TextureComponent, Tonemap, TransformComponent, VisualCorrectionComponent,
 };

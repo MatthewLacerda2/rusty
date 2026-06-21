@@ -15,6 +15,7 @@
 
 pub mod animator;
 pub mod assets;
+pub mod audio;
 pub mod camera;
 #[cfg(feature = "dev")]
 pub mod debug;
@@ -30,6 +31,7 @@ pub mod particle;
 pub mod physics;
 pub mod scene;
 pub mod snapshot;
+mod snapshot_components;
 pub mod storage;
 pub mod time;
 pub mod transform;
@@ -39,6 +41,7 @@ use std::cell::RefCell;
 
 use mlua::{Function, Lua, Table};
 
+use crate::audio::AudioMaestro;
 use crate::core::input::InputState;
 use crate::core::storage::Storage;
 use crate::core::video::VideoSettings;
@@ -81,6 +84,10 @@ pub struct ApiScopedCtx<'scope> {
     /// dev-only `Debug.Snapshot` can report play-state without reaching into the
     /// `Resources` the evaluator deliberately doesn't hold.
     pub is_playing: &'scope RefCell<bool>,
+    /// The audio engine singleton (#212): the `Audio` namespace drives it
+    /// (Play/Stop/SetVolume/PlayAt + master volume). The same maestro the play-mode
+    /// systems use, so a scripted play and `play_on_start` share one device + log.
+    pub audio: &'scope RefCell<AudioMaestro>,
 }
 
 /// Register every namespace onto `lua` using `scope`-tied closures that borrow
@@ -108,6 +115,7 @@ pub fn register<'lua, 'scope>(
     camera::register(lua, scope, ctx.camera)?;
     light::register(lua, scope, ctx.scene)?;
     particle::register(lua, scope, ctx.scene)?;
+    audio::register(lua, scope, ctx.scene, ctx.audio, ctx.time)?;
     decals::register(lua, scope, ctx.scene)?;
     layers::register(lua, scope, ctx.scene)?;
     graphics::register(lua, scope, ctx.scene, ctx.quality)?;

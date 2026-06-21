@@ -5,6 +5,7 @@ use std::path::Path;
 use std::rc::Rc;
 
 use crate::api::ApiScopedCtx;
+use crate::audio::AudioMaestro;
 use crate::core::input::InputState;
 use crate::core::storage::Storage;
 use crate::core::video::VideoSettings;
@@ -55,6 +56,10 @@ pub struct ScriptManager {
     /// evaluator doesn't hold `Resources`, so this shared cell is how the dev-only
     /// `Debug.Snapshot` reports play-state. Defaults to `false` (edit mode).
     pub(super) is_playing: Rc<RefCell<bool>>,
+    /// The audio engine singleton (#212), shared with `Resources` and the platform
+    /// layer so the `Audio` namespace drives the same maestro the systems do.
+    /// Defaults to a maestro with a no-op backend (harness/tests need no device).
+    pub(super) audio: Rc<RefCell<AudioMaestro>>,
 }
 
 impl ScriptManager {
@@ -81,7 +86,21 @@ impl ScriptManager {
             physics: Rc::new(RefCell::new(None)),
             scene_path: Rc::new(RefCell::new(None)),
             is_playing: Rc::new(RefCell::new(false)),
+            audio: Rc::new(RefCell::new(AudioMaestro::default())),
         }
+    }
+
+    /// Inject the shared audio maestro. `Resources` calls this so the script runtime
+    /// and the app drive the same `AudioMaestro` (the `Audio` namespace + the
+    /// play-mode systems must agree on one device/log).
+    pub fn set_audio_cell(&mut self, audio: Rc<RefCell<AudioMaestro>>) {
+        self.audio = audio;
+    }
+
+    /// Handle to the shared audio maestro, so the platform layer can inject the real
+    /// `RodioBackend` and read the introspection log.
+    pub fn audio_cell(&self) -> Rc<RefCell<AudioMaestro>> {
+        Rc::clone(&self.audio)
     }
 
     /// Handle to the shared play-state cell, so `GameWorld::set_playing` can keep
@@ -190,6 +209,7 @@ impl ScriptManager {
             video: &self.video,
             scene_path: &self.scene_path,
             is_playing: &self.is_playing,
+            audio: &self.audio,
         }
     }
 

@@ -10,8 +10,8 @@ use glam::{Mat4, Vec3};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    AnimatorComponent, CameraComponent, ColliderComponent, HealthComponent, LightComponent,
-    MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent,
+    AnimatorComponent, AudioSourceComponent, CameraComponent, ColliderComponent, HealthComponent,
+    LightComponent, MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent,
     ParticleEmitterComponent, RigidBodyComponent, ScriptComponent, TextureComponent,
     TransformComponent, VisualCorrectionComponent,
 };
@@ -55,6 +55,10 @@ pub struct Entity {
     pub visual_correction: Option<VisualCorrectionComponent>,
     #[serde(default)]
     pub particles: Option<ParticleEmitterComponent>,
+    /// Per-entity 2D audio emitter (#212). `#[serde(default)]` so pre-#212 scenes
+    /// load with no audio source.
+    #[serde(default)]
+    pub audio: Option<AudioSourceComponent>,
     pub parent_id: Option<u32>,
     pub children: Vec<u32>,
 }
@@ -95,6 +99,8 @@ struct EntityRepr {
     visual_correction: Option<VisualCorrectionComponent>,
     #[serde(default)]
     particles: Option<ParticleEmitterComponent>,
+    #[serde(default)]
+    audio: Option<AudioSourceComponent>,
     parent_id: Option<u32>,
     children: Vec<u32>,
 }
@@ -140,6 +146,7 @@ impl From<EntityRepr> for Entity {
             camera: r.camera,
             visual_correction: r.visual_correction,
             particles: r.particles,
+            audio: r.audio,
             parent_id: r.parent_id,
             children: r.children,
         }
@@ -168,6 +175,7 @@ impl Entity {
             camera: None,
             visual_correction: None,
             particles: None,
+            audio: None,
             parent_id: None,
             children: Vec::new(),
         }
