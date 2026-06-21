@@ -29,6 +29,7 @@ pub mod material;
 pub mod nav;
 pub mod particle;
 pub mod physics;
+pub mod probe;
 pub mod scene;
 pub mod snapshot;
 mod snapshot_components;
@@ -114,6 +115,7 @@ pub fn register<'lua, 'scope>(
     time::register(lua, scope, ctx.time)?;
     camera::register(lua, scope, ctx.camera)?;
     light::register(lua, scope, ctx.scene)?;
+    probe::register(lua, scope, ctx.scene)?;
     particle::register(lua, scope, ctx.scene)?;
     audio::register(lua, scope, ctx.scene, ctx.audio, ctx.time, ctx.camera)?;
     decals::register(lua, scope, ctx.scene)?;

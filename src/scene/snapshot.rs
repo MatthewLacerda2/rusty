@@ -18,6 +18,10 @@ use crate::scene::Scene;
 /// A frozen copy of the edit-mode scene, taken when entering Play.
 pub struct SceneSnapshot {
     data: SceneData,
+    /// The full probe volume INCLUDING baked SH. `SceneData` skips probe SH (it
+    /// lives in the sidecar on disk), but an in-memory snapshot must preserve it so
+    /// exiting Play doesn't blank out probe-driven ambient (#240).
+    probes: crate::scene::probe::ProbeVolume,
 }
 
 impl SceneSnapshot {
@@ -26,6 +30,7 @@ impl SceneSnapshot {
     pub fn capture(scene: &Scene) -> Self {
         Self {
             data: to_scene_data(scene),
+            probes: scene.probes.clone(),
         }
     }
 
@@ -33,5 +38,8 @@ impl SceneSnapshot {
     /// Consumes the snapshot since a snapshot is single-use per Play session.
     pub fn restore(self, scene: &mut Scene) {
         apply_scene_data(scene, self.data);
+        // Re-apply the baked SH the document-level apply dropped (it only carries
+        // probe positions). Positions are identical, so this overwrites cleanly.
+        scene.probes = self.probes;
     }
 }

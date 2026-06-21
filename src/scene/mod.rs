@@ -24,10 +24,14 @@ pub mod authoring_defaults;
 pub mod collision_matrix;
 pub mod io;
 pub mod layers;
+pub mod lighting_io;
 pub mod prefab;
+pub mod probe;
+pub mod probe_fill;
 #[allow(clippy::module_inception)]
 pub mod scene;
 pub mod serialize;
+pub mod sh;
 pub mod snapshot;
 
 pub use collision_matrix::CollisionMatrix;
@@ -36,10 +40,16 @@ pub use io::{
     DEFAULT_SCENE_PATH, DEFAULT_SCENE_SOURCE, DEFAULT_SCRIPTS_DEST_DIR, SCENE_EXTENSION,
 };
 pub use layers::{layer_in_mask, LayerRegistry, LAYER_COUNT};
+pub use lighting_io::{
+    apply_lighting, extract_lighting, load_lighting_sidecar, save_lighting_sidecar, sidecar_path,
+    LightingData,
+};
 pub use prefab::{
     extract_prefab, instantiate_prefab, is_prefab_path, load_and_instantiate, save_prefab,
     PrefabData, PREFAB_EXTENSION,
 };
+pub use probe::{Probe, ProbeGrid, ProbeVolume};
+pub use probe_fill::{analytic_fill, AnalyticEnv};
 pub use scene::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
     ColliderShape, CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent,
@@ -48,4 +58,5 @@ pub use scene::{
     ScriptFieldValue, TextureComponent, Tonemap, TransformComponent, VisualCorrectionComponent,
 };
 pub use serialize::{apply_scene_data, asset_mesh_component, to_scene_data, SceneData};
+pub use sh::{Sh9, SH_COEFFS};
 pub use snapshot::SceneSnapshot;
