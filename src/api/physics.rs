@@ -16,6 +16,7 @@ use super::{global_table, put, Reg};
 use crate::physics::{is_hittable, PhysicsWorld};
 use crate::scene::{layer_in_mask, Scene};
 use crate::scripting::ConsoleLogs;
+use crate::time::FIXED_DELTA_TIME;
 
 /// Register the rigidbody half of `Physics` (velocity/force/kinematic) onto
 /// `lua`, creating the `Physics` global table.
@@ -69,7 +70,8 @@ fn register_velocity<'lua, 'scope>(
     )
 }
 
-/// `AddForce` (impulse via F/m) / `SetKinematic` over the entity's rigidbody.
+/// `AddForce` (continuous force, Unity `ForceMode.Force`) / `SetKinematic` over the
+/// entity's rigidbody.
 fn register_force<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,
@@ -83,8 +85,12 @@ fn register_force<'lua, 'scope>(
             if let Some(mut e) = scene.get_entity_mut(id) {
                 if let Some(rb) = &mut e.rigidbody {
                     if !rb.is_kinematic {
-                        let acc = Vec3::new(fx, fy, fz) / rb.mass.max(0.0001);
-                        rb.velocity += acc;
+                        // Continuous force (Unity `ForceMode.Force`): a force F over a
+                        // fixed step dt changes velocity by F/m · dt. Scaling by the
+                        // fixed step makes one call's effect match the physics tick it
+                        // feeds, instead of an unscaled (dt-independent) velocity jump.
+                        let dv = Vec3::new(fx, fy, fz) / rb.mass.max(0.0001) * FIXED_DELTA_TIME;
+                        rb.velocity += dv;
                     }
                 }
             }

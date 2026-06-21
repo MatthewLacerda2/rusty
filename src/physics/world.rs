@@ -8,7 +8,7 @@
 //!      velocities into rapier. Kinematic bodies (player/enemy) are routed through
 //!      the `KinematicCharacterController` (collide-and-slide vs. walls; see
 //!      `character`) and given the corrected next pose; dynamic bodies get their
-//!      pose + linear velocity; static bodies stay put.
+//!      pose, linear velocity, and gravity scale; static bodies stay put.
 //!   2. `step`            — advance the rapier world by `dt` under gravity.
 //!   3. `sync_from_rapier`— write the integrated transforms + velocities back onto
 //!      the entities, and return the trigger/collision pairs scripts expect.
@@ -22,7 +22,8 @@ use rapier3d::control::KinematicCharacterController;
 use rapier3d::prelude::*;
 
 use super::build::{
-    build_shape, collider_inputs, interaction_groups, is_kinematic, order_pair, BodyClass,
+    build_shape, collider_inputs, gravity_scale, interaction_groups, is_kinematic, order_pair,
+    BodyClass,
 };
 use super::character;
 use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
@@ -99,12 +100,13 @@ impl PhysicsWorld {
             let body_builder = match inp.class {
                 BodyClass::Static => RigidBodyBuilder::fixed(),
                 BodyClass::Kinematic => RigidBodyBuilder::kinematic_position_based(),
-                BodyClass::Dynamic => RigidBodyBuilder::dynamic().linvel(to_na_vec(inp.velocity)),
+                BodyClass::Dynamic => RigidBodyBuilder::dynamic()
+                    .linvel(to_na_vec(inp.velocity))
+                    // `use_gravity = false` exempts the body from world gravity (#209).
+                    .gravity_scale(gravity_scale(inp.use_gravity)),
             }
             .position(to_iso(inp.pos, inp.rot));
-
             let body_handle = self.bodies.insert(body_builder.build());
-
             collider.set_sensor(inp.is_trigger);
             collider.set_active_events(ActiveEvents::COLLISION_EVENTS);
             // The demo's bodies are kinematic/static, so the default
@@ -122,7 +124,6 @@ impl PhysicsWorld {
             let collider_handle =
                 self.colliders
                     .insert_with_parent(collider, body_handle, &mut self.bodies);
-
             self.id_to_body.insert(id, body_handle);
             self.collider_to_id.insert(collider_handle, id);
             self.id_is_trigger
@@ -174,8 +175,10 @@ impl PhysicsWorld {
             body.set_position(to_iso(snap.pos, snap.rot), true);
         } else {
             // Dynamic: trust rapier for pose, but let scripts inject velocity
-            // (SetVelocity / AddForce mutate the component between ticks).
+            // (SetVelocity / AddForce mutate the component between ticks) and
+            // re-apply `use_gravity` so toggling it at runtime takes effect.
             body.set_linvel(to_na_vec(snap.vel), true);
+            body.set_gravity_scale(gravity_scale(snap.use_gravity), true);
         }
     }
 
@@ -272,6 +275,7 @@ struct EntityBodyState {
     active: bool,
     kinematic: bool,
     is_static: bool,
+    use_gravity: bool,
 }
 
 /// Read an entity's transform/velocity/body-class snapshot, or `None` if absent.
@@ -283,6 +287,7 @@ fn read_entity_body_state(scene: &Scene, id: u32) -> Option<EntityBodyState> {
         .as_ref()
         .map(|r| r.velocity)
         .unwrap_or(Vec3::ZERO);
+    let use_gravity = entity.rigidbody.as_ref().is_none_or(|r| r.use_gravity);
     Some(EntityBodyState {
         pos: entity.transform.position,
         rot: entity.transform.rotation,
@@ -290,5 +295,6 @@ fn read_entity_body_state(scene: &Scene, id: u32) -> Option<EntityBodyState> {
         active: entity.active,
         kinematic,
         is_static: entity.is_static,
+        use_gravity,
     })
 }
