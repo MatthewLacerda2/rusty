@@ -43,10 +43,12 @@ craft — it is the reason the gates below are strict.
     first, or human/hardware intervention. **Say why** in the description.
   - **Ready for review** once the work is done and you need nothing further from the user.
     That is the signal it can be reviewed and merged.
-  The description says **what changed and why** — not how you got there (include process
-  only when it's needed to understand the diff) — and carries the PR↔issue link when there
-  is one. That description, the commit history, and that link are how we see what a branch
-  adds in value and whether it still earns its place.
+  The description says **what changed, why we want it in the project, and the effect** —
+  the *why* is the project-level justification (the same value the label classifies, i.e.
+  why this belongs in rusty at all), **not** how you got there (include process only when
+  it's needed to understand the diff) — and carries the PR↔issue link when there is one.
+  That description, the commit history, and that link are how we see what a branch adds in
+  value and whether it still earns its place.
 - **Branch naming.** A PR that closes an issue uses `{issue_number}-short-slug` (e.g.
   `163-fix-coverage-scope`). An issue-less PR uses a readable short slug of its subject
   (e.g. `document-ai-parity`). Lowercase-hyphenated, brief.
@@ -94,10 +96,18 @@ craft — it is the reason the gates below are strict.
 
 ## Issues, labels & priority
 - **Issues come before PRs.** The unit of work is a well-specified issue — a clear
-  statement of *what* to set up and *what* to do (the roadmap, not the implementation
-  intrinsics). That's what lets Claude Code pick an issue up and run it unattended, even
+  statement of **what** to set up or change, **why we want it in the project** (the
+  project-level justification the label then classifies), and the **roadmap, not the
+  implementation intrinsics**. A good issue description is **documentation of what was
+  thought of**: it captures the reasoning so a future Claude can read it cold — no prior
+  context, no deep digging — and say *"I understand the assignment and have a good idea
+  what to do."* That's what lets Claude Code pick an issue up and run it unattended, even
   overnight. So defining issues well outranks opening PRs: get the roadmap right and the
   doing is the easy part.
+- **Assign yourself when you start.** The moment Claude begins actively working an issue,
+  **assign the user to that issue** so it's visibly taken — everyone can see it's being
+  worked on right now, not just sitting in the backlog. An unassigned issue is fair game;
+  an assigned one is in progress.
 - **Never file an issue and start it in the same breath** — unless the work is a *direct
   consequence* of another, already-decided issue. Filing-then-immediately-implementing
   defeats planning: an idea still being shaped has to settle before anyone codes it.
