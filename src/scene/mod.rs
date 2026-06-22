@@ -25,6 +25,7 @@ pub mod collision_matrix;
 pub mod io;
 pub mod layers;
 pub mod lighting_io;
+pub mod lighting_placement;
 pub mod prefab;
 pub mod probe;
 pub mod probe_fill;

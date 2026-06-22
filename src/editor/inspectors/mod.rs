@@ -6,6 +6,7 @@ pub mod scene;
 pub mod script;
 
 use crate::editor::EditorUi;
+use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
@@ -14,6 +15,7 @@ pub fn draw_inspector(
     editor: &mut EditorUi,
     scene: &mut Scene,
     console: &mut ConsoleLogs,
+    nav: &mut NavigationGraph,
     path: &str,
 ) {
     let extension = std::path::Path::new(path)
@@ -30,7 +32,7 @@ pub fn draw_inspector(
             audio::draw(ui, editor, path);
         }
         "scene" => {
-            scene::draw(ui, editor, scene, console, path);
+            scene::draw(ui, editor, scene, console, nav, path);
         }
         "prefab" => {
             prefab::draw(ui, editor, scene, path);

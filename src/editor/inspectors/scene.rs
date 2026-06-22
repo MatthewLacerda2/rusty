@@ -1,4 +1,5 @@
 use crate::editor::EditorUi;
+use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 use std::fs;
@@ -9,6 +10,7 @@ pub fn draw(
     editor: &mut EditorUi,
     scene: &mut Scene,
     console: &mut ConsoleLogs,
+    nav: &mut NavigationGraph,
     path: &str,
 ) {
     let filename = Path::new(path)
@@ -25,6 +27,49 @@ pub fn draw(
     ui.add_space(5.0);
 
     draw_scene_operations(ui, editor, scene, console, path, filename);
+    draw_bake_lighting(ui, scene, console, nav, path);
+}
+
+/// The "Bake Lighting" button (#246): auto-place + bake both probe sets through the
+/// SAME orchestration the `Lighting.Bake()` script verb uses (editor↔API parity, no
+/// second path). Dev-only — the bake drives a headless GPU and writes authoring
+/// artifacts (the SH sidecar + KTX2 cubemaps), so it is absent from ship builds, just
+/// like the `Lighting.Bake` binding.
+#[cfg(feature = "dev")]
+fn draw_bake_lighting(
+    ui: &mut egui::Ui,
+    scene: &mut Scene,
+    console: &mut ConsoleLogs,
+    nav: &NavigationGraph,
+    path: &str,
+) {
+    ui.add_space(8.0);
+    if !ui
+        .add(egui::Button::new("💡 Bake Lighting").min_size(egui::Vec2::new(120.0, 30.0)))
+        .on_hover_text("Auto-place + bake light & reflection probes")
+        .clicked()
+    {
+        return;
+    }
+    let params = crate::dev::lighting_bake::LightingBakeParams::default();
+    match crate::dev::lighting_bake::bake_lighting(scene, Some(path), Some(nav), params) {
+        Ok(r) => console.info(format!(
+            "Baked lighting: {} light probe(s), {} reflection probe(s)",
+            r.light_probes, r.reflection_probes
+        )),
+        Err(e) => console.error(format!("Bake Lighting failed: {}", e)),
+    }
+}
+
+/// No-op `Bake Lighting` button in a ship build (the bake is a dev-only action).
+#[cfg(not(feature = "dev"))]
+fn draw_bake_lighting(
+    _ui: &mut egui::Ui,
+    _scene: &mut Scene,
+    _console: &mut ConsoleLogs,
+    _nav: &NavigationGraph,
+    _path: &str,
+) {
 }
 
 /// File metadata card: path, on-disk size, plus the entity count and skybox

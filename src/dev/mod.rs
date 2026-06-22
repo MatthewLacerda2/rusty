@@ -26,6 +26,7 @@ pub mod bridge;
 pub mod console;
 pub mod demo_scene;
 pub mod harness;
+pub mod lighting_bake;
 pub mod probe_bake;
 pub mod reflection_bake;
 pub mod scenario;
