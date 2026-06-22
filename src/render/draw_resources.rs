@@ -4,10 +4,9 @@
 //! `Renderer::render` so each block returns owned resources that outlive the
 //! render pass. Behavior unchanged.
 
-use glam::Mat4;
 use std::rc::Rc;
 
-use super::{EntityUniform, GpuTexture, MeshId, Renderer};
+use super::{GpuTexture, MeshId, Renderer};
 use crate::components::MaterialAsset;
 use crate::scene::Scene;
 
@@ -15,6 +14,20 @@ use crate::scene::Scene;
 // live in `entity_pool`, keyed by this id — #210), the `MeshId` geometry key the
 // pass resolves the shared vertex/index buffers through (#127), and the index count.
 pub(super) type SolidResource = (u32, MeshId, u32);
+// A transparent draw item: the same draw tuple plus its view-space depth (distance
+// along the camera forward to the entity origin). The transparent pass sorts on this
+// key back-to-front so `ALPHA_BLENDING` composites correctly (#242).
+pub(super) type TransparentResource = (SolidResource, f32);
+
+/// The solids split into the two passes a frame draws (#242). `opaque` (Opaque +
+/// Cutout) rides the existing `draw_solids` path (REPLACE, depth write on); each
+/// `transparent` item is deferred to the sorted alpha-blended pass after opaque.
+/// Both share the same per-entity pool bind groups synced in `precreate_solid_resources`.
+#[derive(Default)]
+pub(super) struct SolidResources {
+    pub opaque: Vec<SolidResource>,
+    pub transparent: Vec<TransparentResource>,
+}
 // The overlay resources keep only the buffers they own (the per-overlay entity
 // uniform + any vertex buffer) plus their bind group; the bone palette they bind is
 // the renderer's one shared identity buffer, so no per-overlay palette is allocated
@@ -62,9 +75,10 @@ impl Renderer {
     pub(super) fn precreate_solid_resources(
         &mut self,
         scene: &Scene,
-        culling_mask: u32,
-    ) -> Vec<SolidResource> {
-        let mut solid_render_resources = Vec::new();
+        cam: &super::Camera,
+    ) -> SolidResources {
+        let (cam_pos, cam_fwd) = (cam.position, cam.forward());
+        let mut out = SolidResources::default();
         for entity in scene.iter() {
             if !entity.active {
                 continue;
@@ -76,31 +90,45 @@ impl Renderer {
                 continue;
             }
             // Skip meshes the active camera's culling mask excludes (#92).
-            if !crate::scene::layer_in_mask(entity.layer, culling_mask) {
+            if !crate::scene::layer_in_mask(entity.layer, cam.culling_mask) {
                 continue;
             }
-            if let Some(res) = self.sync_solid_resource(scene, &entity) {
-                solid_render_resources.push(res);
+            let Some((res, world_pos, transparent)) = self.sync_solid_resource(scene, &entity)
+            else {
+                continue;
+            };
+            if transparent {
+                let depth = (world_pos - cam_pos).dot(cam_fwd);
+                out.transparent.push((res, depth));
+            } else {
+                out.opaque.push(res);
             }
         }
-        solid_render_resources
+        // Back-to-front: farthest (largest view-space depth) drawn first so nearer
+        // translucent surfaces blend over what is behind them, draw order regardless.
+        out.transparent.sort_by(|a, b| b.1.total_cmp(&a.1));
+        out
     }
 
     /// Sync one solid entity's persistent pool slot (uniform + palette written in
-    /// place, bind groups reused) and return its draw item, or `None` if its mesh is
-    /// not resident on the GPU yet (#210).
+    /// place, bind groups reused) and return its draw item, the entity's world-space
+    /// origin (the transparent sort key's anchor), and whether its material is
+    /// Transparent. `None` if its mesh is not resident on the GPU yet (#210).
     fn sync_solid_resource(
         &mut self,
         scene: &Scene,
         entity: &crate::components::Entity,
-    ) -> Option<SolidResource> {
+    ) -> Option<(SolidResource, glam::Vec3, bool)> {
         let mesh = entity.mesh.as_ref()?;
         let mesh_id = MeshId::from_mesh(mesh);
         let num_indices = self.gpu_meshes.get(&mesh_id)?.num_indices;
 
         let material = scene.material_of(entity);
+        let transparent = material.is_some_and(MaterialAsset::is_transparent);
         let model_matrix = scene.compute_world_matrix(entity.id);
-        let uniform = solid_entity_uniform(scene, entity, material, model_matrix);
+        let world_pos = model_matrix.w_axis.truncate();
+        let uniform =
+            super::draw_uniforms::solid_entity_uniform(scene, entity, material, model_matrix);
         // The active bone palette: the live animated pose when a clip plays (#80),
         // else the bind pose (#79). Primitives/static meshes leave it empty, so the
         // pool binds the shared identity palette and allocates no per-entity buffer.
@@ -129,7 +157,7 @@ impl Renderer {
             s.material_bind_group(&maps)
         });
 
-        Some((entity.id, mesh_id, num_indices))
+        Some(((entity.id, mesh_id, num_indices), world_pos, transparent))
     }
 
     /// Resolve a material map path to a resident GPU texture, falling back to the
@@ -198,92 +226,5 @@ impl Renderer {
                 },
             ],
         })
-    }
-}
-
-/// Compute the per-entity uniform (tint, lit flag, PBR params) for a solid mesh.
-/// Tint is driven by components only — never by entity name. A game colours its
-/// entities via its referenced material's `base_color`; the engine carries no
-/// per-name colour assumptions. `material` is the entity's resolved library
-/// material (`None` when it references none).
-fn solid_entity_uniform(
-    scene: &Scene,
-    entity: &crate::components::Entity,
-    material: Option<&MaterialAsset>,
-    model_matrix: Mat4,
-) -> EntityUniform {
-    let is_lit = if entity.light.is_some() { 0u32 } else { 1u32 };
-    let (use_sh, sh) = entity_probe_sh(scene, entity, model_matrix);
-
-    let color_tint = if let Some(mat) = material {
-        [mat.base_color[0], mat.base_color[1], mat.base_color[2], 1.0]
-    } else if let Some(health) = &entity.health {
-        if health.is_dead {
-            [0.2, 0.2, 0.2, 1.0]
-        } else {
-            [1.0, 1.0, 1.0, 1.0]
-        }
-    } else {
-        [1.0, 1.0, 1.0, 1.0]
-    };
-
-    let (metallic, roughness) = match material {
-        Some(mat) => (mat.metallic, mat.roughness),
-        None => (0.0, 0.5),
-    };
-
-    let use_texture = u32::from(material.is_some_and(|m| m.base_color_map.is_some()));
-    let use_metallic_map = u32::from(material.is_some_and(|m| m.metallic_map.is_some()));
-    let use_roughness_map = u32::from(material.is_some_and(|m| m.roughness_map.is_some()));
-    let use_normal_map = u32::from(material.is_some_and(|m| m.normal_map.is_some()));
-    let use_emissive_map = u32::from(material.is_some_and(|m| m.emissive_map.is_some()));
-
-    // Flat emissive factor (#222), 4th lane unused. Defaults to black with no material.
-    let emissive = match material {
-        Some(mat) => [mat.emissive[0], mat.emissive[1], mat.emissive[2], 0.0],
-        None => [0.0, 0.0, 0.0, 0.0],
-    };
-
-    EntityUniform {
-        model_matrix: model_matrix.to_cols_array(),
-        color_tint,
-        use_texture,
-        is_lit,
-        metallic,
-        roughness,
-        use_metallic_map,
-        use_roughness_map,
-        use_normal_map,
-        use_emissive_map,
-        emissive,
-        use_sh,
-        _sh_pad: [0; 3],
-        sh,
-    }
-}
-
-/// Resolve the light-probe SH for one entity (#240): the scene's probe field sampled
-/// (trilinear) at the entity's world position, flattened to the `vec4`-padded GPU
-/// layout. Only NON-STATIC objects opt in — static geometry keeps the flat ambient
-/// term (and is the bake's target, not its consumer). Returns `(use_sh, coeffs)`;
-/// `use_sh == 0` with zeroed coeffs when the entity is static or no probe covers it.
-fn entity_probe_sh(
-    scene: &Scene,
-    entity: &crate::components::Entity,
-    model_matrix: Mat4,
-) -> (u32, [[f32; 4]; 9]) {
-    if entity.is_static {
-        return (0, [[0.0; 4]; 9]);
-    }
-    let position = model_matrix.w_axis.truncate();
-    match scene.probes.sample(position) {
-        Some(probe) => {
-            let mut sh = [[0.0f32; 4]; 9];
-            for (i, c) in probe.coeffs.iter().enumerate() {
-                sh[i] = [c[0], c[1], c[2], 0.0];
-            }
-            (1, sh)
-        }
-        None => (0, [[0.0; 4]; 9]),
     }
 }

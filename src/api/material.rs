@@ -12,7 +12,7 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 use super::{put, Reg};
-use crate::components::{MaterialAsset, MaterialComponent};
+use crate::components::{MaterialAsset, MaterialComponent, RenderMode};
 use crate::scene::Scene;
 
 /// Register the `Material` namespace onto `lua`.
@@ -25,10 +25,21 @@ pub fn register<'lua, 'scope>(
 
     register_scalars(scope, &table, scene)?;
     register_maps(scope, &table, scene)?;
+    register_transparency(scope, &table, scene)?;
 
     lua.globals()
         .set("Material", table)
         .map_err(|e| e.to_string())
+}
+
+/// Parse a render-mode name (case-insensitive) into a [`RenderMode`]; unknown names
+/// fall back to `Opaque` so a typo degrades to the safe default rather than erroring.
+fn parse_render_mode(name: &str) -> RenderMode {
+    match name.to_ascii_lowercase().as_str() {
+        "cutout" => RenderMode::Cutout,
+        "transparent" => RenderMode::Transparent,
+        _ => RenderMode::Opaque,
+    }
 }
 
 /// Resolve the library key for entity `id`'s material, creating a default material
@@ -142,6 +153,42 @@ fn register_maps<'lua, 'scope>(
         "SetEmissiveMap",
         scope.create_function(|_, (id, path): (u32, String)| {
             with_material(scene, id, |mat| mat.emissive_map = Some(path));
+            Ok(())
+        }),
+    )
+}
+
+/// Transparency controls (#242): `SetRenderMode` / `SetAlpha` / `SetAlphaCutoff`.
+/// Mode is a string — "Opaque" (default), "Cutout", or "Transparent" (case-
+/// insensitive); `alpha`/`cutoff` are clamped to `[0, 1]`.
+fn register_transparency<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "SetRenderMode",
+        scope.create_function(|_, (id, mode): (u32, String)| {
+            with_material(scene, id, |mat| mat.render_mode = parse_render_mode(&mode));
+            Ok(())
+        }),
+    )?;
+
+    put(
+        table,
+        "SetAlpha",
+        scope.create_function(|_, (id, val): (u32, f32)| {
+            with_material(scene, id, |mat| mat.alpha = val.clamp(0.0, 1.0));
+            Ok(())
+        }),
+    )?;
+
+    put(
+        table,
+        "SetAlphaCutoff",
+        scope.create_function(|_, (id, val): (u32, f32)| {
+            with_material(scene, id, |mat| mat.alpha_cutoff = val.clamp(0.0, 1.0));
             Ok(())
         }),
     )

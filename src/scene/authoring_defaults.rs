@@ -106,6 +106,10 @@ pub fn material_asset_from_import(data: &crate::asset::MaterialData) -> Material
         normal_map: data.normal_map.clone(),
         emissive: data.emissive,
         emissive_map: data.emissive_map.clone(),
+        // Imported glTF/OBJ materials default to Opaque (#242): the importer does not
+        // yet read glTF `alphaMode`/`alphaCutoff`, so transparency is authored after
+        // import via the inspector or the `Material` API.
+        ..MaterialAsset::default()
     }
 }
 

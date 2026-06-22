@@ -13,7 +13,19 @@ struct PipelineSpec {
     depth_compare: wgpu::CompareFunction,
 }
 
-/// Builds the forward-lit, line debug, and outline pipelines.
+/// The four forward-target pipelines, all sharing one shader + vertex layout.
+pub(super) struct ForwardPipelines {
+    /// Opaque/cutout solids: REPLACE, depth write on.
+    pub forward: wgpu::RenderPipeline,
+    /// Alpha-blended translucent solids (#242): ALPHA_BLENDING, depth write off.
+    pub transparent: wgpu::RenderPipeline,
+    /// Line debug overlays.
+    pub line: wgpu::RenderPipeline,
+    /// Selection-silhouette inverted hull.
+    pub outline: wgpu::RenderPipeline,
+}
+
+/// Builds the forward-lit, transparent, line debug, and outline pipelines.
 // wgpu pipeline construction legitimately threads several distinct GPU resources
 // (device, shader, format, four bind-group layouts); bundling them into a struct
 // would only add an indirection without clarifying intent.
@@ -26,68 +38,74 @@ pub(super) fn create_pipelines(
     entity_bones_layout: &wgpu::BindGroupLayout,
     material_layout: &wgpu::BindGroupLayout,
     shadow_layout: &wgpu::BindGroupLayout,
-) -> (
-    wgpu::RenderPipeline,
-    wgpu::RenderPipeline,
-    wgpu::RenderPipeline,
-) {
-    let (render_pipeline_layout, line_pipeline_layout) = create_pipeline_layouts(
+) -> ForwardPipelines {
+    let (render_layout, line_layout) = create_pipeline_layouts(
         device,
         camera_lighting_layout,
         entity_bones_layout,
         material_layout,
         shadow_layout,
     );
+    let p = |layout: &wgpu::PipelineLayout, spec: &PipelineSpec| {
+        make_pipeline(device, shader, format, layout, spec)
+    };
+    ForwardPipelines {
+        forward: p(&render_layout, &forward_spec()),
+        transparent: p(&render_layout, &transparent_spec()),
+        line: p(&line_layout, &line_spec()),
+        outline: p(&render_layout, &outline_spec()),
+    }
+}
 
-    let render_pipeline = make_pipeline(
-        device,
-        shader,
-        format,
-        &render_pipeline_layout,
-        &PipelineSpec {
-            label: "Forward Lit Pipeline",
-            topology: wgpu::PrimitiveTopology::TriangleList,
-            cull_mode: None, // No culling to easily render primitives inside-out if needed
-            blend: wgpu::BlendState::REPLACE,
-            depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::Less,
-        },
-    );
+/// Opaque/cutout forward pass: REPLACE, depth write on. No culling so primitives can
+/// render inside-out if needed.
+fn forward_spec() -> PipelineSpec {
+    PipelineSpec {
+        label: "Forward Lit Pipeline",
+        topology: wgpu::PrimitiveTopology::TriangleList,
+        cull_mode: None,
+        blend: wgpu::BlendState::REPLACE,
+        depth_write_enabled: true,
+        depth_compare: wgpu::CompareFunction::Less,
+    }
+}
 
-    let line_pipeline = make_pipeline(
-        device,
-        shader,
-        format,
-        &line_pipeline_layout,
-        &PipelineSpec {
-            label: "Line Debug Pipeline",
-            topology: wgpu::PrimitiveTopology::LineList,
-            cull_mode: None,
-            blend: wgpu::BlendState::ALPHA_BLENDING,
-            // Don't write depth for line overlays so they display over the grid.
-            depth_write_enabled: false,
-            depth_compare: wgpu::CompareFunction::LessEqual,
-        },
-    );
+/// Transparent pass (#242): same shader/layout as the forward pass but alpha-blended
+/// and depth-WRITE-off (still depth-TESTED against opaque) so overlapping translucent
+/// surfaces all blend rather than z-cull each other. Drawn back-to-front after opaque.
+fn transparent_spec() -> PipelineSpec {
+    PipelineSpec {
+        label: "Transparent Pipeline",
+        topology: wgpu::PrimitiveTopology::TriangleList,
+        cull_mode: None,
+        blend: wgpu::BlendState::ALPHA_BLENDING,
+        depth_write_enabled: false,
+        depth_compare: wgpu::CompareFunction::Less,
+    }
+}
 
-    // Outline pipeline for selection silhouette (inverted hull technique).
-    let outline_pipeline = make_pipeline(
-        device,
-        shader,
-        format,
-        &render_pipeline_layout,
-        &PipelineSpec {
-            label: "Outline Pipeline",
-            topology: wgpu::PrimitiveTopology::TriangleList,
-            // Cull front faces so only back faces (the outline) show.
-            cull_mode: Some(wgpu::Face::Front),
-            blend: wgpu::BlendState::REPLACE,
-            depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::LessEqual,
-        },
-    );
+/// Line debug overlays: don't write depth so they display over the grid.
+fn line_spec() -> PipelineSpec {
+    PipelineSpec {
+        label: "Line Debug Pipeline",
+        topology: wgpu::PrimitiveTopology::LineList,
+        cull_mode: None,
+        blend: wgpu::BlendState::ALPHA_BLENDING,
+        depth_write_enabled: false,
+        depth_compare: wgpu::CompareFunction::LessEqual,
+    }
+}
 
-    (render_pipeline, line_pipeline, outline_pipeline)
+/// Selection silhouette (inverted hull): cull front faces so only back faces show.
+fn outline_spec() -> PipelineSpec {
+    PipelineSpec {
+        label: "Outline Pipeline",
+        topology: wgpu::PrimitiveTopology::TriangleList,
+        cull_mode: Some(wgpu::Face::Front),
+        blend: wgpu::BlendState::REPLACE,
+        depth_write_enabled: true,
+        depth_compare: wgpu::CompareFunction::LessEqual,
+    }
 }
 
 /// The forward/outline and line pipelines share the same four bind-group layouts

@@ -32,7 +32,7 @@ pub use collider::{ColliderComponent, ColliderShape};
 pub use entity::Entity;
 pub use health::HealthComponent;
 pub use light::{LightComponent, LightType};
-pub use material::{MaterialAsset, MaterialComponent};
+pub use material::{MaterialAsset, MaterialComponent, RenderMode};
 pub use mesh::{DirtyFlag, MeshComponent};
 pub use nav_agent::NavMeshAgentComponent;
 pub use particle::{

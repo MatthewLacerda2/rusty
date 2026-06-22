@@ -95,6 +95,26 @@ map; an empty path clears it.
 | `Material.SetNormalMap` | `(id, path)` — sampled by the renderer; perturbs the shading normal in tangent space (per-vertex tangents + TBN) |
 | `Material.SetEmissiveMap` | `(id, path)` — sampled by the renderer; modulates the emissive factor (`factor × map.rgb`) |
 | `Material.SetTexture` | `(id, path)` — the albedo map (sampled today) |
+| `Material.SetRenderMode` | `(id, mode)` — `"Opaque"` (default), `"Cutout"`, or `"Transparent"` (case-insensitive; an unknown name falls back to Opaque) |
+| `Material.SetAlpha` | `(id, a)` — base-color alpha in `[0,1]`; the blend factor for a `Transparent` material (ignored by Opaque/Cutout) |
+| `Material.SetAlphaCutoff` | `(id, c)` — alpha-test threshold in `[0,1]` for `Cutout`: fragments below it are discarded (default 0.5) |
+
+> **Rendering modes (transparency).** A material's `render_mode` controls how its
+> surface composites (#242), mirroring Unity's rendering modes:
+> - **Opaque** *(default)* — fully solid, the fast path. `alpha`/`alpha_cutoff` are
+>   inert.
+> - **Cutout** — alpha-tested hard edges (foliage, chain-link, grates): a fragment
+>   whose sampled alpha is below `alpha_cutoff` is discarded, the rest is opaque. Still
+>   writes depth and needs no sorting.
+> - **Transparent** — alpha-blended (glass, holograms, fades): the surface blends over
+>   what is behind it using `alpha` (× the texture's alpha) as the opacity. Drawn in a
+>   separate pass after the opaque geometry, sorted back-to-front per object, with depth
+>   testing on but depth writes off — so overlapping translucent surfaces all blend
+>   correctly regardless of draw order. (Per-object sort only; intersecting translucent
+>   surfaces within one mesh are a known limitation, as in Unity's default.)
+>
+> The current `render_mode`/`alpha`/`alpha_cutoff` are readable back via the scene
+> snapshot's per-entity `material` block.
 
 > **All glTF-PBR maps are sampled.** The albedo, metallic, roughness, normal, and
 > emissive maps (and the flat emissive factor) all reach the forward shader. Normal

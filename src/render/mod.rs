@@ -18,6 +18,7 @@ mod draw_overlays;
 mod draw_pass;
 mod draw_path;
 mod draw_resources;
+mod draw_uniforms;
 mod entity_pool;
 mod ktx2_encode;
 mod particles;
@@ -34,6 +35,7 @@ mod setup_resize;
 mod setup_textures;
 mod tangents;
 mod textures;
+mod transparent;
 mod uniforms;
 mod viewport;
 
@@ -99,6 +101,9 @@ pub struct Renderer {
 
     // Pipelines
     render_pipeline: wgpu::RenderPipeline,
+    /// Alpha-blended translucent solids (#242); depth write off, drawn back-to-front
+    /// in the transparent pass after opaque.
+    transparent_pipeline: wgpu::RenderPipeline,
     line_pipeline: wgpu::RenderPipeline,
     outline_pipeline: wgpu::RenderPipeline,
 
