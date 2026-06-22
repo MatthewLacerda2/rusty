@@ -30,6 +30,10 @@ impl Renderer {
     ) {
         self.upload_scene_assets(scene);
 
+        // Load the active reflection probe's baked cubemap for the primary camera (#245),
+        // so the forward pass reflects that prefiltered cube instead of the skybox.
+        self.update_reflection_cube(scene, camera.position);
+
         // Build + write the camera-independent lighting uniform once. The reflection
         // probe is picked relative to the primary camera (#244).
         let lighting_uniform = self.build_lighting_uniform(scene, camera.position);
@@ -152,12 +156,41 @@ impl Renderer {
     }
 
     /// Builds the per-frame lighting uniform from the scene's lights and SSR settings.
+    /// `refl_has_cubemap` is set only when a baked cube is actually loaded for the active
+    /// probe (`self.reflection_cube`), so the shader never samples the black fallback cube.
     fn build_lighting_uniform(&self, scene: &Scene, camera_pos: Vec3) -> LightingUniform {
         let mut lighting_uniform = default_lighting_uniform(scene);
         apply_scene_lights(&mut lighting_uniform, scene);
         apply_ssr_settings(&mut lighting_uniform, scene);
         apply_reflection_probe(&mut lighting_uniform, scene, camera_pos);
+        if self.reflection_cube.is_some() {
+            lighting_uniform.refl_has_cubemap = 1.0;
+        }
         lighting_uniform
+    }
+
+    /// Load (or clear) the active reflection probe's baked cubemap for `camera_pos` (#245):
+    /// the nearest probe whose box covers the camera and that carries a baked `cubemap_path`
+    /// wins. The KTX2 is loaded only when the active path changes (cached by
+    /// `reflection_cube_path`), and the group-0 bind group is marked dirty so the cube swaps
+    /// in. A missing/unreadable file (or no probe) clears the cube and falls back to skybox.
+    fn update_reflection_cube(&mut self, scene: &Scene, camera_pos: Vec3) {
+        let path = scene
+            .reflection_probes
+            .select(camera_pos)
+            .map(|p| p.cubemap_path.clone())
+            .filter(|p| !p.is_empty())
+            .unwrap_or_default();
+        if path == self.reflection_cube_path {
+            return;
+        }
+        self.reflection_cube_path = path.clone();
+        self.reflection_cube = if path.is_empty() {
+            None
+        } else {
+            self.load_cubemap_mips(&path)
+        };
+        self.global_bind_group_dirty = true;
     }
 
     /// Evict persistent forward-pass slots for entities no longer active in the

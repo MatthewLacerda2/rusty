@@ -43,7 +43,10 @@ struct LightingUniforms {
     // instead of sampled as an infinitely-distant skybox. Mirrors the Rust
     // `LightingUniform` byte-for-byte; the `.w` lanes are padding.
     refl_active: f32,
-    _refl_pad0: f32,
+    // 1.0 when the active probe has a baked, prefiltered cubemap bound at binding 4 (#245):
+    // the env reflection samples THAT cube (roughness -> mip) with parallax correction
+    // instead of the 2D skybox. 0.0 falls back to the skybox. Mirrors the Rust uniform.
+    refl_has_cubemap: f32,
     _refl_pad1: f32,
     _refl_pad2: f32,
     refl_center: vec4<f32>,
@@ -95,6 +98,14 @@ var<uniform> lighting: LightingUniforms;
 var t_skybox: texture_2d<f32>;
 @group(0) @binding(3)
 var s_skybox: sampler;
+
+// Active reflection probe's prefiltered cubemap (#245). Sampled with `textureSampleLevel`
+// (roughness -> mip) and box-projected parallax when `refl_has_cubemap > 0.5`; otherwise a
+// 1x1 black fallback is bound and ignored (the skybox is sampled instead).
+@group(0) @binding(4)
+var t_refl_cube: texture_cube<f32>;
+@group(0) @binding(5)
+var s_refl_cube: sampler;
 
 @group(1) @binding(0)
 var<uniform> entity: EntityUniforms;
@@ -439,11 +450,21 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         if (lighting.refl_active > 0.5) {
             R = parallax_correct(in.world_position, normalize(R));
         }
-        let phi = atan2(R.z, R.x);
-        let theta = acos(clamp(R.y, -1.0, 1.0));
-        let u = (phi + PI) / (2.0 * PI);
-        let v = theta / PI;
-        let env_reflection = textureSample(t_skybox, s_skybox, vec2<f32>(u, v)).rgb;
+        var env_reflection: vec3<f32>;
+        if (lighting.refl_has_cubemap > 0.5) {
+            // The probe's baked, prefiltered cube: roughness selects the mip, so a mirror
+            // reads the sharp base level and a rough surface a blurrier one. `R` is already
+            // parallax-corrected against the probe box above.
+            let max_mip = f32(textureNumLevels(t_refl_cube) - 1u);
+            env_reflection = textureSampleLevel(t_refl_cube, s_refl_cube, R, roughness * max_mip).rgb;
+        } else {
+            // No baked cube: fall back to the equirectangular skybox (the #244 behaviour).
+            let phi = atan2(R.z, R.x);
+            let theta = acos(clamp(R.y, -1.0, 1.0));
+            let u = (phi + PI) / (2.0 * PI);
+            let v = theta / PI;
+            env_reflection = textureSample(t_skybox, s_skybox, vec2<f32>(u, v)).rgb;
+        }
 
         let F_refl = FresnelSchlick(max(dot(N, V), 0.0), F0);
         let reflection_scale = (1.0 - roughness) * (metallic + (1.0 - metallic) * 0.2);

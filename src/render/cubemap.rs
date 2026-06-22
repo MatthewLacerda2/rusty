@@ -26,6 +26,15 @@ pub struct CubemapData {
     pub faces_rgba8: Vec<u8>,
 }
 
+/// A decoded LDR cubemap WITH its roughness mip chain (#245). `mips[0]` is the base level
+/// (`size`); each later mip halves the edge length. Every level is the six faces packed
+/// back-to-back, the same layout `CubemapData::faces_rgba8` uses. This is what the forward
+/// pass uploads so `textureSampleLevel` can pick a mip from a surface's roughness.
+pub struct CubemapMips {
+    pub size: u32,
+    pub mips: Vec<Vec<u8>>,
+}
+
 /// Parse a KTX2 byte blob into an LDR RGBA8 cubemap, or `None` when the bytes are not a
 /// usable LDR cubemap (bad/garbage data, non-cube, non-RGBA8, or a size mismatch). Pure
 /// and GPU-free so the loading path is testable headlessly.
@@ -60,6 +69,37 @@ pub fn parse_ktx2_cubemap(bytes: &[u8]) -> Option<CubemapData> {
     })
 }
 
+/// Parse a KTX2 blob into an LDR RGBA8 cubemap WITH its full roughness mip chain (#245),
+/// or `None` when it is not a usable LDR cubemap. Level 0 is the base; each later level is
+/// expected to halve the edge length (the prefilter's layout). A level whose byte length
+/// is short for its expected size truncates the chain there rather than failing — the
+/// loader stays tolerant, matching `parse_ktx2_cubemap`'s graceful-absence contract.
+pub fn parse_ktx2_cubemap_mips(bytes: &[u8]) -> Option<CubemapMips> {
+    let reader = ktx2::Reader::new(bytes).ok()?;
+    let header = reader.header();
+    if header.face_count != 6 || header.layer_count > 1 || !is_rgba8(header.format?) {
+        return None;
+    }
+    let size = header.pixel_width;
+    if size == 0 || header.pixel_height != size {
+        return None;
+    }
+
+    let mut mips = Vec::new();
+    for (level, data) in reader.levels().enumerate() {
+        let level_size = (size >> level).max(1);
+        let expected = (level_size as usize) * (level_size as usize) * 4 * 6;
+        if data.len() < expected {
+            break;
+        }
+        mips.push(data[..expected].to_vec());
+    }
+    if mips.is_empty() {
+        return None;
+    }
+    Some(CubemapMips { size, mips })
+}
+
 /// True for the LDR RGBA8 formats a reflection bake emits (UNORM or SRGB).
 fn is_rgba8(format: Format) -> bool {
     matches!(format, Format::R8G8B8A8_UNORM | Format::R8G8B8A8_SRGB)
@@ -86,38 +126,70 @@ impl Renderer {
         Some(self.upload_cubemap(path, &data))
     }
 
-    /// Upload a decoded cubemap into a 6-layer cube texture with a cube view + sampler.
-    fn upload_cubemap(&self, label: &str, data: &CubemapData) -> CubemapTexture {
-        let size = wgpu::Extent3d {
-            width: data.size,
-            height: data.size,
-            depth_or_array_layers: 6,
-        };
+    /// Load a reflection-probe cubemap WITH its roughness mip chain from `path` (#245),
+    /// into a mipped cube texture the forward pass samples with `textureSampleLevel`.
+    /// Returns `None` (caller falls back to the skybox) when the file is missing or is not
+    /// a usable LDR RGBA8 cubemap — the graceful-absence contract of `load_cubemap`.
+    pub fn load_cubemap_mips(&self, path: &str) -> Option<CubemapTexture> {
+        let bytes = std::fs::read(path).ok()?;
+        let data = parse_ktx2_cubemap_mips(&bytes)?;
+        Some(self.upload_cubemap_mips(path, &data))
+    }
+
+    /// Upload a decoded mipped cubemap into a mipped 6-layer cube texture with a cube view
+    /// + trilinear sampler. Each mip's six faces upload at their own level/size.
+    fn upload_cubemap_mips(&self, label: &str, data: &CubemapMips) -> CubemapTexture {
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some(label),
-            size,
-            mip_level_count: 1,
+            size: wgpu::Extent3d {
+                width: data.size,
+                height: data.size,
+                depth_or_array_layers: 6,
+            },
+            mip_level_count: data.mips.len() as u32,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Rgba8UnormSrgb,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
+        for (level, bytes) in data.mips.iter().enumerate() {
+            let level_size = (data.size >> level).max(1);
+            self.write_cube_level(&texture, level as u32, level_size, bytes);
+        }
+        self.finish_cube_texture(label, texture, data.size)
+    }
+
+    /// Write one mip level's six faces into a cube texture.
+    fn write_cube_level(&self, texture: &wgpu::Texture, level: u32, size: u32, bytes: &[u8]) {
         self.queue.write_texture(
             wgpu::ImageCopyTexture {
-                texture: &texture,
-                mip_level: 0,
+                texture,
+                mip_level: level,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            &data.faces_rgba8,
+            bytes,
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * data.size),
-                rows_per_image: Some(data.size),
+                bytes_per_row: Some(4 * size),
+                rows_per_image: Some(size),
             },
-            size,
+            wgpu::Extent3d {
+                width: size,
+                height: size,
+                depth_or_array_layers: 6,
+            },
         );
+    }
+
+    /// Build the cube view + trilinear sampler wrapping an uploaded cube texture.
+    fn finish_cube_texture(
+        &self,
+        label: &str,
+        texture: wgpu::Texture,
+        size: u32,
+    ) -> CubemapTexture {
         let view = texture.create_view(&wgpu::TextureViewDescriptor {
             label: Some(label),
             dimension: Some(wgpu::TextureViewDimension::Cube),
@@ -136,8 +208,62 @@ impl Renderer {
             texture,
             view,
             sampler,
-            size: data.size,
+            size,
         }
+    }
+
+    /// Upload a decoded single-level cubemap into a 6-layer cube texture with a cube view
+    /// + sampler.
+    fn upload_cubemap(&self, label: &str, data: &CubemapData) -> CubemapTexture {
+        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some(label),
+            size: wgpu::Extent3d {
+                width: data.size,
+                height: data.size,
+                depth_or_array_layers: 6,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        self.write_cube_level(&texture, 0, data.size, &data.faces_rgba8);
+        self.finish_cube_texture(label, texture, data.size)
+    }
+}
+
+/// A 1×1×6 black fallback cube, always available so the group-0 bind group satisfies the
+/// cube-texture binding even when no reflection probe is active (#245). The shader ignores
+/// it via the `refl_has_cubemap` flag and samples the 2D skybox instead. Built from a raw
+/// device so it can be constructed during renderer assembly before `self` exists.
+pub fn fallback_cube(device: &wgpu::Device) -> CubemapTexture {
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("Fallback Reflection Cube"),
+        size: wgpu::Extent3d {
+            width: 1,
+            height: 1,
+            depth_or_array_layers: 6,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8UnormSrgb,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    let view = texture.create_view(&wgpu::TextureViewDescriptor {
+        label: Some("Fallback Reflection Cube"),
+        dimension: Some(wgpu::TextureViewDimension::Cube),
+        ..Default::default()
+    });
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
+    CubemapTexture {
+        texture,
+        view,
+        sampler,
+        size: 1,
     }
 }
 

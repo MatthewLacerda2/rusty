@@ -188,16 +188,13 @@ impl Renderer {
             return;
         }
         self.global_bind_group_dirty = false;
-        let skybox_view = self
-            .skybox_texture
-            .as_ref()
-            .map(|tex| &tex.view)
-            .unwrap_or(&self.default_texture.view);
-        let skybox_sampler = self
-            .skybox_texture
-            .as_ref()
-            .map(|tex| &tex.sampler)
-            .unwrap_or(&self.default_texture.sampler);
+        let skybox = self.skybox_texture.as_deref();
+        let skybox_view = skybox.map_or(&self.default_texture.view, |t| &t.view);
+        let skybox_sampler = skybox.map_or(&self.default_texture.sampler, |t| &t.sampler);
+        // The active reflection probe's cube at binding 4, else the black fallback cube —
+        // the shader picks skybox vs cube via the `refl_has_cubemap` flag, so a fallback
+        // here is never sampled but keeps the bind group valid against the layout.
+        let cube = self.reflection_cube.as_ref().unwrap_or(&self.default_cube);
         self.global_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Global Bind Group with Reflections"),
             layout: &self.camera_lighting_layout,
@@ -217,6 +214,14 @@ impl Renderer {
                 wgpu::BindGroupEntry {
                     binding: 3,
                     resource: wgpu::BindingResource::Sampler(skybox_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::TextureView(&cube.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: wgpu::BindingResource::Sampler(&cube.sampler),
                 },
             ],
         });

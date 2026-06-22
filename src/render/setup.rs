@@ -116,6 +116,7 @@ impl Renderer {
             quality,
         } = gpu;
         let entity_pool = Some(super::entity_pool::EntityPool::new(&device));
+        let default_cube = super::cubemap::fallback_cube(&device);
         Self {
             device,
             queue,
@@ -159,6 +160,9 @@ impl Renderer {
             axis_count: 0,
             skybox_texture: None,
             skybox_path: "".to_string(),
+            reflection_cube: None,
+            reflection_cube_path: String::new(),
+            default_cube,
             decal_depth_bind_group: None,
             static_capture: false,
         }
