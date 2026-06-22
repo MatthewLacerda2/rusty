@@ -6,6 +6,7 @@ pub mod skybox;
 
 mod bind_layouts;
 mod camera;
+mod cubemap_capture;
 mod debug_meshes;
 pub mod decals;
 mod decals_draw;
@@ -33,6 +34,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub use camera::{build_camera_stack, game_camera_from_scene, sync_lens_from_scene, Camera};
+pub use cubemap_capture::{CubemapCapture, CubemapFace};
 pub use setup_headless::OFFSCREEN_FORMAT;
 
 // Represent memory layouts for GPU Uniforms
@@ -264,6 +266,12 @@ pub struct Renderer {
     /// Cached decal-pass depth bind group; the depth view it samples only changes on
     /// resize, so it is built lazily and invalidated there, not rebuilt per frame (#210).
     decal_depth_bind_group: Option<wgpu::BindGroup>,
+
+    /// When set, the forward pass gathers only `is_static` entities (#243). The
+    /// static-cubemap capture toggles this on for its 6 faces and restores it after,
+    /// so probe/reflection bakes see the distant environment (static walls + skybox)
+    /// without the dynamic actors that would otherwise bake into the captured lighting.
+    static_capture: bool,
 }
 
 #[cfg(test)]

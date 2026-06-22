@@ -69,6 +69,12 @@ impl Renderer {
             if !entity.active {
                 continue;
             }
+            // During a static-cubemap capture, gather only static geometry — dynamic
+            // actors must not bake into a probe/reflection (#243), mirroring the
+            // shadow pass's `want_static` filter.
+            if self.static_capture && !entity.is_static {
+                continue;
+            }
             // Skip meshes the active camera's culling mask excludes (#92).
             if !crate::scene::layer_in_mask(entity.layer, culling_mask) {
                 continue;

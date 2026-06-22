@@ -160,6 +160,7 @@ impl Renderer {
             skybox_texture: None,
             skybox_path: "".to_string(),
             decal_depth_bind_group: None,
+            static_capture: false,
         }
     }
 }
