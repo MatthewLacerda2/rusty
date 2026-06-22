@@ -67,8 +67,10 @@ impl Renderer {
 
             // 2. Sync per-camera resources (the culling mask differs per camera). The
             // forward entity buffers/bind groups persist in the pool; this only
-            // rewrites their contents and returns lightweight draw items (#210).
-            let solid_render_resources = self.precreate_solid_resources(scene, cam.culling_mask);
+            // rewrites their contents and returns lightweight draw items (#210). The
+            // split separates opaque/cutout (the solids pass) from transparent (the
+            // sorted alpha-blended pass below) (#242).
+            let solids = self.precreate_solid_resources(scene, cam);
             let overlays = self.precreate_overlays(scene, editor_mode);
             let _path_resources = self.precreate_path(pathfinding_points);
 
@@ -76,12 +78,17 @@ impl Renderer {
                 editor_mode,
                 clear: PassClear::for_pass(idx == 0, cam.clear_flags),
             };
-            self.execute_scene_pass(scene, frame, &solid_render_resources, &overlays);
+            self.execute_scene_pass(scene, frame, &solids.opaque, &overlays);
 
             // Project box-decals over this camera's lit surfaces (reads the scene
             // depth to reconstruct geometry), after solids/skybox and before the
             // additive particles so decals sit on the surface, not over the sparks.
             self.draw_decals(scene, cam);
+
+            // Translucent solids (#242): alpha-blended, depth-tested against opaque,
+            // drawn back-to-front (already sorted) after opaque + decals so glass
+            // composites over the world behind it.
+            self.draw_transparent(&solids.transparent);
 
             // Billboard particles for this camera (after solids, before the next pass).
             self.draw_particles(scene, cam);

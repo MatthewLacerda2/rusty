@@ -24,7 +24,9 @@ pub(crate) fn mesh_value(m: &MeshComponent) -> Value {
 
 /// Material (PBR) params + texture references, read from the resolved library
 /// `MaterialAsset`. The albedo map is surfaced under the legacy `"texture"` key
-/// (empty string when unset, preserving the prior shape).
+/// (empty string when unset, preserving the prior shape). `render_mode`/`alpha`/
+/// `alpha_cutoff` expose the transparency story (#242) so a script can read back what
+/// `Material.SetRenderMode`/`SetAlpha`/`SetAlphaCutoff` wrote.
 pub(crate) fn material_value(m: &MaterialAsset) -> Value {
     json!({
         "color": m.base_color,
@@ -35,6 +37,9 @@ pub(crate) fn material_value(m: &MaterialAsset) -> Value {
         "roughness_map": m.roughness_map,
         "normal_map": m.normal_map,
         "emissive": m.emissive,
+        "render_mode": format!("{:?}", m.render_mode),
+        "alpha": m.alpha,
+        "alpha_cutoff": m.alpha_cutoff,
     })
 }
 

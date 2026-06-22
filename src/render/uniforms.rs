@@ -108,10 +108,15 @@ pub(super) struct EntityUniform {
     // interpolated at this entity's position on the CPU — instead of the flat
     // hemispherical ambient term; non-static lit objects opt in. Each coefficient is
     // an RGB triple in `xyz` (4th lane unused) so the array stays `vec4`-aligned.
-    // `_sh_pad` fills the run after the `u32` flag to the next 16-byte boundary.
-    // `EntityUniforms` in shader.wgsl mirrors this field order byte-for-byte.
     pub use_sh: u32,
-    pub _sh_pad: [u32; 3],
+    // Cutout alpha-test (#242). `use_cutout == 1` makes `fs_main` discard fragments
+    // whose final alpha is below `alpha_cutoff` (Cutout materials). These two scalars
+    // plus `_sh_pad` complete the 16-byte run after `use_sh`, so the `sh` array that
+    // follows stays `vec4`-aligned; `EntityUniforms` in shader.wgsl mirrors this field
+    // order byte-for-byte.
+    pub use_cutout: u32,
+    pub alpha_cutoff: f32,
+    pub _sh_pad: u32,
     pub sh: [[f32; 4]; 9],
 }
 

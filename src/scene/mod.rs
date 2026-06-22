@@ -64,9 +64,9 @@ pub use scene::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
     ColliderShape, CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent,
     LightType, MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent, Particle,
-    ParticleBlend, ParticleEmitterComponent, RigidBodyComponent, Scene, ScriptComponent,
-    ScriptFieldValue, TextureComponent, Tonemap, TransformComponent, VisualCorrectionComponent,
-    DEFAULT_AMBIENT_COLOR, DEFAULT_AMBIENT_INTENSITY,
+    ParticleBlend, ParticleEmitterComponent, RenderMode, RigidBodyComponent, Scene,
+    ScriptComponent, ScriptFieldValue, TextureComponent, Tonemap, TransformComponent,
+    VisualCorrectionComponent, DEFAULT_AMBIENT_COLOR, DEFAULT_AMBIENT_INTENSITY,
 };
 pub use serialize::{apply_scene_data, asset_mesh_component, to_scene_data, SceneData};
 pub use sh::{Sh9, SH_COEFFS};

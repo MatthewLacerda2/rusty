@@ -74,13 +74,16 @@ struct EntityUniforms {
     emissive: vec4<f32>,
     // Light-probe SH (#240). When `use_sh == 1` the ambient term is reconstructed
     // from the 9 L2 SH coefficients below (xyz = RGB radiance, w unused) instead of
-    // the flat hemispherical gradient. The three scalar pads mirror the Rust
-    // struct's `[u32; 3]` byte-for-byte — a `vec3<u32>` here would be 16-aligned and
-    // open a 12-byte hole, desyncing the layouts (288 vs 304 bytes).
+    // the flat hemispherical gradient.
     use_sh: u32,
-    _sh_pad0: u32,
-    _sh_pad1: u32,
-    _sh_pad2: u32,
+    // Cutout alpha-test (#242): `use_cutout == 1` discards fragments whose final
+    // alpha is below `alpha_cutoff`. These two scalars plus `_sh_pad` complete the
+    // 16-byte run after `use_sh`, so `sh` stays vec4-aligned; mirrors `EntityUniform`
+    // (src/render/uniforms.rs) byte-for-byte. A `vec3<u32>` here would 16-align and
+    // open a 12-byte hole, desyncing the layouts.
+    use_cutout: u32,
+    alpha_cutoff: f32,
+    _sh_pad: u32,
     sh: array<vec4<f32>, 9>,
 };
 
@@ -360,6 +363,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         base_color = textureSample(t_diffuse, s_diffuse, in.tex_coords) * entity.color_tint;
     } else {
         base_color = entity.color_tint;
+    }
+
+    // Cutout alpha-test (#242): for a Cutout material, drop sub-threshold fragments
+    // before any shading so the surface reads as hard-edged (foliage, grates). Opaque
+    // and Transparent materials leave `use_cutout == 0` and skip this. Done before the
+    // unlit early-out so an unlit cutout (a flat alpha-tested billboard) also clips.
+    if (entity.use_cutout == 1u && base_color.a < entity.alpha_cutoff) {
+        discard;
     }
 
     // Unlit rendering (e.g. grids, path highlights, light gizmos)

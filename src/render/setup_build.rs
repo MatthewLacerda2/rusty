@@ -35,6 +35,7 @@ pub(super) struct ShadowSystem {
 /// the HDR offscreen target.
 pub(super) struct ForwardPasses {
     pub render_pipeline: wgpu::RenderPipeline,
+    pub transparent_pipeline: wgpu::RenderPipeline,
     pub line_pipeline: wgpu::RenderPipeline,
     pub outline_pipeline: wgpu::RenderPipeline,
     pub skybox_renderer: skybox::SkyboxRenderer,
@@ -265,7 +266,7 @@ fn create_forward_passes(
         registry,
     );
 
-    let (render_pipeline, line_pipeline, outline_pipeline) = pipelines::create_pipelines(
+    let pl = pipelines::create_pipelines(
         device,
         &shader,
         HDR_FORMAT,
@@ -276,9 +277,10 @@ fn create_forward_passes(
     );
 
     ForwardPasses {
-        render_pipeline,
-        line_pipeline,
-        outline_pipeline,
+        render_pipeline: pl.forward,
+        transparent_pipeline: pl.transparent,
+        line_pipeline: pl.line,
+        outline_pipeline: pl.outline,
         skybox_renderer,
     }
 }

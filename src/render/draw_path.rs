@@ -55,7 +55,9 @@ impl Renderer {
             use_emissive_map: 0,
             emissive: [0.0; 4],
             use_sh: 0,
-            _sh_pad: [0; 3],
+            use_cutout: 0,
+            alpha_cutoff: 0.0,
+            _sh_pad: 0,
             sh: [[0.0; 4]; 9],
         };
 
@@ -121,7 +123,9 @@ impl Renderer {
             use_emissive_map: 0,
             emissive: [0.0; 4],
             use_sh: 0,
-            _sh_pad: [0; 3],
+            use_cutout: 0,
+            alpha_cutoff: 0.0,
+            _sh_pad: 0,
             sh: [[0.0; 4]; 9],
         };
 
