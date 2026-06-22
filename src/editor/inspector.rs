@@ -55,7 +55,7 @@ pub fn draw(
                         draw_entity_inspector(editor, ui, scene, nav, selected_id);
                     }
                     InspectorTarget::Asset(asset_path) => {
-                        inspectors::draw_inspector(ui, editor, scene, console, &asset_path);
+                        inspectors::draw_inspector(ui, editor, scene, console, nav, &asset_path);
                     }
                     InspectorTarget::SceneSettings => {
                         inspector_settings::draw(editor, ui, scene);

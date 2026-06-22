@@ -25,6 +25,7 @@ pub mod health;
 pub mod input;
 pub mod layers;
 pub mod light;
+pub mod lighting;
 pub mod material;
 pub mod nav;
 pub mod particle;
@@ -118,6 +119,7 @@ pub fn register<'lua, 'scope>(
     light::register(lua, scope, ctx.scene)?;
     probe::register(lua, scope, ctx.scene)?;
     reflection::register(lua, scope, ctx.scene, ctx.scene_path)?;
+    lighting::register(lua, scope, ctx.scene, ctx.scene_path, ctx.nav)?;
     particle::register(lua, scope, ctx.scene)?;
     audio::register(lua, scope, ctx.scene, ctx.audio, ctx.time, ctx.camera)?;
     decals::register(lua, scope, ctx.scene)?;
