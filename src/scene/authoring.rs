@@ -150,10 +150,16 @@ pub fn create_entity(scene: &mut Scene, name: &str, primitive: Option<Primitive>
 // `authoring::{ComponentKind, add_component, remove_component}` paths still resolve.
 pub use crate::scene::authoring_components::{add_component, remove_component, ComponentKind};
 
-// The prefab structural verbs (#215) live in `scene::prefab` (size-cap split, plus
-// the `.prefab` format itself); re-exported here so editor and API reach
-// extract/instantiate through this one shared authoring entry point.
-pub use crate::scene::prefab::{extract_prefab, instantiate_prefab};
+// The prefab structural verbs live in `scene::prefab` (#215) and `scene::prefab_link`
+// (#216 linked instances + apply/revert), size-cap splits plus the `.prefab` format
+// itself; re-exported here so editor and API reach extract / instantiate (unpacked
+// and linked) and the apply/revert/list verbs through this one shared authoring entry
+// point.
+pub use crate::scene::prefab::{extract_prefab, instantiate_prefab, instantiate_prefab_linked};
+pub use crate::scene::prefab_link::{
+    list_instance_overrides, record_instance_overrides, reimport_instance,
+    revert_instance_overrides,
+};
 
 // The asset-instantiate verb (#182) lives in `scene::asset_instance` (size-cap
 // split); re-exported here so the editor's model inspector and the `Scene.Instantiate`

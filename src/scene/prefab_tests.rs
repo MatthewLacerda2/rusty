@@ -160,3 +160,22 @@ fn is_prefab_path_recognises_extension() {
     assert!(is_prefab_path("X.PREFAB"));
     assert!(!is_prefab_path("foo.scene"));
 }
+
+#[test]
+fn unpacked_instantiate_leaves_no_link_linked_stamps_one() {
+    let (scene, root) = fixture();
+    let prefab = extract_prefab(&scene, root).unwrap();
+
+    // v1 unpacked copy: no live link back to the asset.
+    let mut a = Scene::new();
+    let ra = instantiate_prefab(&mut a, &prefab, None);
+    assert!(a.get_entity(ra).unwrap().prefab_link.is_none());
+
+    // Linked instance (#216): every entity carries a link to the given source path.
+    let mut b = Scene::new();
+    let rb = instantiate_prefab_linked(&mut b, &prefab, None, "Enemy.prefab");
+    let link = b.get_entity(rb).unwrap().prefab_link.clone().unwrap();
+    assert_eq!(link.source, "Enemy.prefab");
+    assert_eq!(link.local_id, 0);
+    assert!(link.overrides.is_empty(), "a fresh instance has no overrides");
+}
