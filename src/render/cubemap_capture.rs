@@ -144,6 +144,33 @@ fn read_face(renderer: &Renderer, target: &wgpu::Texture, resolution: u32) -> Ve
     let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
     let padded_bytes_per_row = unpadded_bytes_per_row.div_ceil(align) * align;
 
+    let buffer = copy_face_to_buffer(renderer, target, resolution, padded_bytes_per_row);
+
+    let slice = buffer.slice(..);
+    let (tx, rx) = std::sync::mpsc::channel();
+    slice.map_async(wgpu::MapMode::Read, move |res| {
+        let _ = tx.send(res);
+    });
+    renderer.device.poll(wgpu::Maintain::Wait);
+    let _ = rx.recv();
+
+    let mapped = slice.get_mapped_range();
+    let mut pixels = Vec::with_capacity((unpadded_bytes_per_row * resolution) as usize);
+    for row in mapped.chunks(padded_bytes_per_row as usize) {
+        pixels.extend_from_slice(&row[..unpadded_bytes_per_row as usize]);
+    }
+    drop(mapped);
+    buffer.unmap();
+    pixels
+}
+
+/// Allocate a padded readback buffer and copy the rendered face texture into it.
+fn copy_face_to_buffer(
+    renderer: &Renderer,
+    target: &wgpu::Texture,
+    resolution: u32,
+    padded_bytes_per_row: u32,
+) -> wgpu::Buffer {
     let buffer = renderer.device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Cubemap Face Readback Buffer"),
         size: (padded_bytes_per_row * resolution) as u64,
@@ -178,23 +205,7 @@ fn read_face(renderer: &Renderer, target: &wgpu::Texture, resolution: u32) -> Ve
         },
     );
     renderer.queue.submit(std::iter::once(encoder.finish()));
-
-    let slice = buffer.slice(..);
-    let (tx, rx) = std::sync::mpsc::channel();
-    slice.map_async(wgpu::MapMode::Read, move |res| {
-        let _ = tx.send(res);
-    });
-    renderer.device.poll(wgpu::Maintain::Wait);
-    let _ = rx.recv();
-
-    let mapped = slice.get_mapped_range();
-    let mut pixels = Vec::with_capacity((unpadded_bytes_per_row * resolution) as usize);
-    for row in mapped.chunks(padded_bytes_per_row as usize) {
-        pixels.extend_from_slice(&row[..unpadded_bytes_per_row as usize]);
-    }
-    drop(mapped);
-    buffer.unmap();
-    pixels
+    buffer
 }
 
 #[cfg(test)]
