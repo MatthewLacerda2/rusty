@@ -52,6 +52,9 @@ pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
     let json = serde_json::to_string_pretty(&data)
         .map_err(|e| format!("Failed to serialize scene: {}", e))?;
     std::fs::write(path, json).map_err(|e| format!("Failed to write scene file: {}", e))?;
+    // Heavy baked SH lives beside the scene in `<scene>.lighting.json`, not inline in
+    // the human-diffable scene doc (#240). Written only when probes are baked.
+    crate::scene::lighting_io::save_lighting_sidecar(scene, path)?;
     Ok(())
 }
 
@@ -63,6 +66,9 @@ pub fn load_from_file(scene: &mut Scene, path: &str) -> Result<(), String> {
     let data: SceneData =
         serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize scene: {}", e))?;
     apply_scene_data(scene, data);
+    // Merge the baked SH back onto the just-loaded probe positions (#240). A missing
+    // sidecar is fine — probes load with zero SH (positions placed, never baked).
+    crate::scene::lighting_io::load_lighting_sidecar(scene, path)?;
     Ok(())
 }
 

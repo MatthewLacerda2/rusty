@@ -58,6 +58,16 @@ struct EntityUniforms {
     // Flat emissive factor (#222): rgb glow added after lighting in `fs_main`; the
     // 4th lane is unused. `vec4` to match the Rust `[f32; 4]` byte-for-byte.
     emissive: vec4<f32>,
+    // Light-probe SH (#240). When `use_sh == 1` the ambient term is reconstructed
+    // from the 9 L2 SH coefficients below (xyz = RGB radiance, w unused) instead of
+    // the flat hemispherical gradient. The three scalar pads mirror the Rust
+    // struct's `[u32; 3]` byte-for-byte — a `vec3<u32>` here would be 16-aligned and
+    // open a 12-byte hole, desyncing the layouts (288 vs 304 bytes).
+    use_sh: u32,
+    _sh_pad0: u32,
+    _sh_pad1: u32,
+    _sh_pad2: u32,
+    sh: array<vec4<f32>, 9>,
 };
 
 struct BoneUniforms {
@@ -271,6 +281,38 @@ fn calculate_shadow(world_pos: vec3<f32>, N: vec3<f32>) -> f32 {
     return shadow;
 }
 
+// Reconstruct diffuse irradiance from the entity's L2 SH probe for a surface normal
+// (#240). Mirrors `Sh9::eval` in src/scene/sh.rs byte-for-byte: the same 9 real-SH
+// basis polynomials and the same cosine-lobe band factors (pi, 2pi/3, pi/4), so the
+// headless analytic path and the GPU agree. Result clamped to non-negative.
+fn eval_sh(N: vec3<f32>) -> vec3<f32> {
+    let x = N.x;
+    let y = N.y;
+    let z = N.z;
+    var b: array<f32, 9>;
+    b[0] = 0.2820948;
+    b[1] = -0.4886025 * y;
+    b[2] = 0.4886025 * z;
+    b[3] = -0.4886025 * x;
+    b[4] = 1.0925484 * x * y;
+    b[5] = -1.0925484 * y * z;
+    b[6] = 0.31539157 * (3.0 * z * z - 1.0);
+    b[7] = -1.0925484 * x * z;
+    b[8] = 0.5462742 * (x * x - y * y);
+    let a0 = 3.1415927;
+    let a1 = 2.0943952; // 2*pi/3
+    let a2 = 0.7853982; // pi/4
+    var lobe: array<f32, 9>;
+    lobe[0] = a0;
+    lobe[1] = a1; lobe[2] = a1; lobe[3] = a1;
+    lobe[4] = a2; lobe[5] = a2; lobe[6] = a2; lobe[7] = a2; lobe[8] = a2;
+    var out = vec3<f32>(0.0);
+    for (var i = 0u; i < 9u; i = i + 1u) {
+        out += entity.sh[i].xyz * b[i] * lobe[i];
+    }
+    return max(out, vec3<f32>(0.0));
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var base_color: vec4<f32>;
@@ -305,11 +347,20 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let F0 = mix(vec3<f32>(0.04), albedo, metallic);
 
-    // 1. Ambient lighting term (Hemispherical Sky-Ground Ambient)
-    let sky_color = lighting.ambient.color;
-    let ground_color = sky_color * 0.25; // ground is darker and cooler/desaturated
-    let ambient_grad = mix(ground_color, sky_color, N.y * 0.5 + 0.5);
-    var lighting_color = ambient_grad * lighting.ambient.intensity * albedo * (1.0 - metallic);
+    // 1. Ambient lighting term. Non-static objects that a light probe covers
+    // (`use_sh == 1`, #240) reconstruct DIRECTIONAL irradiance from their interpolated
+    // SH probe; everything else falls back to the flat Hemispherical Sky-Ground
+    // gradient. Both feed the same albedo * (1 - metallic) diffuse response.
+    var ambient_irradiance: vec3<f32>;
+    if (entity.use_sh == 1u) {
+        ambient_irradiance = eval_sh(N);
+    } else {
+        let sky_color = lighting.ambient.color;
+        let ground_color = sky_color * 0.25; // ground is darker and cooler/desaturated
+        let ambient_grad = mix(ground_color, sky_color, N.y * 0.5 + 0.5);
+        ambient_irradiance = ambient_grad * lighting.ambient.intensity;
+    }
+    var lighting_color = ambient_irradiance * albedo * (1.0 - metallic);
 
     // 2. Directional Light
     let L_dir = normalize(-lighting.dir_light.direction);

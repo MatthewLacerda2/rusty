@@ -59,6 +59,11 @@ pub struct Scene {
     /// data — the decal renderer reads them each frame and projects them onto the
     /// surfaces they overlap. Bounded FIFO (oldest evicted past `MAX_DECALS`).
     pub decals: Vec<crate::render::decals::Decal>,
+    /// Scene-level light-probe dataset (#240): probe POSITIONS + grid layout live in
+    /// the scene document; their baked L2 SH irradiance lives in the
+    /// `<scene>.lighting.json` sidecar. Dynamic (non-static) objects sample the
+    /// interpolated probe field instead of the flat hemispherical ambient term.
+    pub probes: crate::scene::probe::ProbeVolume,
 }
 
 impl Default for Scene {
@@ -73,6 +78,7 @@ impl Default for Scene {
             collision_matrix: CollisionMatrix::default(),
             materials: BTreeMap::new(),
             decals: Vec::new(),
+            probes: crate::scene::probe::ProbeVolume::new(),
         }
     }
 }

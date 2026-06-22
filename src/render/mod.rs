@@ -122,9 +122,18 @@ struct EntityUniform {
     // Flat emissive factor (#222): rgb glow added on top of the lit colour in
     // `fs_main`. The renderer draws to an HDR target with a bloom bright-pass, so
     // values >1.0 glow automatically. Stored as a `vec4` (4th lane unused) to dodge
-    // WGSL's `vec3` 16-byte-alignment gotcha and keep the struct a 16-byte multiple
-    // (112 -> 128 bytes).
+    // WGSL's `vec3` 16-byte-alignment gotcha and keep the struct a 16-byte multiple.
     emissive: [f32; 4],
+    // Light-probe SH (#240). When `use_sh == 1`, the shader reconstructs ambient
+    // irradiance from these 9 L2 SH coefficients — the scene's probe field
+    // interpolated at this entity's position on the CPU — instead of the flat
+    // hemispherical ambient term; non-static lit objects opt in. Each coefficient is
+    // an RGB triple in `xyz` (4th lane unused) so the array stays `vec4`-aligned.
+    // `_sh_pad` fills the run after the `u32` flag to the next 16-byte boundary.
+    // `EntityUniforms` in shader.wgsl mirrors this field order byte-for-byte.
+    use_sh: u32,
+    _sh_pad: [u32; 3],
+    sh: [[f32; 4]; 9],
 }
 
 #[repr(C)]

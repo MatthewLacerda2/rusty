@@ -67,6 +67,13 @@ pub struct SceneData {
     /// materials are migrated in [`apply_scene_data`].
     #[serde(default)]
     pub materials: BTreeMap<String, MaterialAsset>,
+    /// Light-probe POSITIONS + grid layout (#240). The probes' baked SH is
+    /// `#[serde(skip)]` on `Probe`, so this document carries only positions/layout
+    /// (references + values, no GPU/heavy data); the SH lives in the
+    /// `<scene>.lighting.json` sidecar. `#[serde(default)]` so pre-#240 scenes load
+    /// with no probes.
+    #[serde(default)]
+    pub probes: crate::scene::probe::ProbeVolume,
 }
 
 /// Read the live World's component values out into a serializable document.
@@ -81,6 +88,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         layers: scene.layers.clone(),
         collision_matrix: scene.collision_matrix.clone(),
         materials: scene.materials.clone(),
+        probes: scene.probes.clone(),
     }
 }
 
@@ -239,6 +247,9 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     data.layers.normalize();
     scene.layers = data.layers;
     scene.collision_matrix = data.collision_matrix;
+    // Probe positions + grid come from the scene doc; their SH stays zero here and is
+    // merged in from the `<scene>.lighting.json` sidecar by `load_from_file` (#240).
+    scene.probes = data.probes;
 
     scene.update_all_colliders();
 }

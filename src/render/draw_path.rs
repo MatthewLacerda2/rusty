@@ -54,6 +54,9 @@ impl Renderer {
             use_normal_map: 0,
             use_emissive_map: 0,
             emissive: [0.0; 4],
+            use_sh: 0,
+            _sh_pad: [0; 3],
+            sh: [[0.0; 4]; 9],
         };
 
         let entity_buf = self
@@ -117,6 +120,9 @@ impl Renderer {
             use_normal_map: 0,
             use_emissive_map: 0,
             emissive: [0.0; 4],
+            use_sh: 0,
+            _sh_pad: [0; 3],
+            sh: [[0.0; 4]; 9],
         };
 
         let entity_buf = self

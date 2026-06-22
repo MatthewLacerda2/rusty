@@ -94,7 +94,7 @@ impl Renderer {
 
         let material = scene.material_of(entity);
         let model_matrix = scene.compute_world_matrix(entity.id);
-        let uniform = solid_entity_uniform(entity, material, model_matrix);
+        let uniform = solid_entity_uniform(scene, entity, material, model_matrix);
         // The active bone palette: the live animated pose when a clip plays (#80),
         // else the bind pose (#79). Primitives/static meshes leave it empty, so the
         // pool binds the shared identity palette and allocates no per-entity buffer.
@@ -201,11 +201,13 @@ impl Renderer {
 /// per-name colour assumptions. `material` is the entity's resolved library
 /// material (`None` when it references none).
 fn solid_entity_uniform(
+    scene: &Scene,
     entity: &crate::components::Entity,
     material: Option<&MaterialAsset>,
     model_matrix: Mat4,
 ) -> EntityUniform {
     let is_lit = if entity.light.is_some() { 0u32 } else { 1u32 };
+    let (use_sh, sh) = entity_probe_sh(scene, entity, model_matrix);
 
     let color_tint = if let Some(mat) = material {
         [mat.base_color[0], mat.base_color[1], mat.base_color[2], 1.0]
@@ -248,5 +250,34 @@ fn solid_entity_uniform(
         use_normal_map,
         use_emissive_map,
         emissive,
+        use_sh,
+        _sh_pad: [0; 3],
+        sh,
+    }
+}
+
+/// Resolve the light-probe SH for one entity (#240): the scene's probe field sampled
+/// (trilinear) at the entity's world position, flattened to the `vec4`-padded GPU
+/// layout. Only NON-STATIC objects opt in — static geometry keeps the flat ambient
+/// term (and is the bake's target, not its consumer). Returns `(use_sh, coeffs)`;
+/// `use_sh == 0` with zeroed coeffs when the entity is static or no probe covers it.
+fn entity_probe_sh(
+    scene: &Scene,
+    entity: &crate::components::Entity,
+    model_matrix: Mat4,
+) -> (u32, [[f32; 4]; 9]) {
+    if entity.is_static {
+        return (0, [[0.0; 4]; 9]);
+    }
+    let position = model_matrix.w_axis.truncate();
+    match scene.probes.sample(position) {
+        Some(probe) => {
+            let mut sh = [[0.0f32; 4]; 9];
+            for (i, c) in probe.coeffs.iter().enumerate() {
+                sh[i] = [c[0], c[1], c[2], 0.0];
+            }
+            (1, sh)
+        }
+        None => (0, [[0.0; 4]; 9]),
     }
 }

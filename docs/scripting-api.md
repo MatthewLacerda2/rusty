@@ -386,6 +386,37 @@ no light.
 `SetType` is case-insensitive; an unrecognized name is ignored (the current type
 is kept).
 
+## `Probe`
+
+Place and query **light probes** — a scene-level dataset (not a component) that
+captures the bounced/ambient light arriving at a point as an L2 spherical-harmonics
+(SH) irradiance signal. Dynamic (non-`is_static`) objects sample the interpolated
+probe field in the shader instead of the flat hemispherical ambient term, so they
+pick up directional bounced light. Probe POSITIONS save into the `.scene` document;
+their baked SH saves into a `<scene>.lighting.json` sidecar (heavy, regenerable data
+kept out of the diffable scene file).
+
+Probes are addressed by **index** (0-based, in placement order), not by entity id.
+`Move`/`Remove` on an out-of-range index are no-ops. `Remove` drops the grid layout
+(indices shift), so re-`FillGrid` after manual edits if you need trilinear sampling.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Probe.Add` | `(x, y, z)` | the new probe's `index` |
+| `Probe.Move` | `(index, x, y, z)` | — |
+| `Probe.Remove` | `(index)` | — (drops the grid layout) |
+| `Probe.Clear` | `()` | — (removes every probe) |
+| `Probe.Count` | `()` | probe count |
+| `Probe.FillGrid` | `(minX, minY, minZ, maxX, maxY, maxZ, spacing)` | — (regular grid; replaces existing probes) |
+| `Probe.BakeAnalytic` | `()` | — (deterministic stand-in fill: projects the scene's ambient sky + first directional light to SH) |
+| `Probe.SampleIrradiance` | `(x, y, z, nx, ny, nz)` | `r, g, b` — interpolated probe irradiance for a surface normal at a world position (linear RGB; black when there are no probes) |
+
+`BakeAnalytic` is the headless, render-free stand-in until the real GPU bake lands;
+it ignores occlusion and bounce (every probe sees the same analytic sky+sun, with a
+gentle height gradient so the field varies in space). Sampling is **trilinear** over
+a grid, falling back to the nearest probe for free-placed probes or points outside
+the grid.
+
 ## `Particles`
 
 Drive an entity's particle emitter (`ParticleEmitterComponent`). `Emit`/`Burst`
