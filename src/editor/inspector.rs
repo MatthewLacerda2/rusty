@@ -1,12 +1,14 @@
 use egui_phosphor::regular as icon;
 
+use crate::editor::inspector_context::gather_context;
 use crate::editor::{
     inspector_add, inspector_audio, inspector_camera, inspector_gameplay, inspector_material,
-    inspector_particles, inspector_render, inspector_settings, inspector_transform,
+    inspector_particles, inspector_prefab, inspector_render, inspector_settings,
+    inspector_transform,
 };
 use crate::editor::{inspectors, EditorUi, InspectorTarget};
 use crate::navigation::NavigationGraph;
-use crate::scene::{Entity, MaterialAsset, Scene, LAYER_COUNT};
+use crate::scene::{Entity, MaterialAsset, Scene};
 use crate::scripting::ConsoleLogs;
 use std::collections::BTreeMap;
 
@@ -87,15 +89,36 @@ fn draw_collapsed(ctx: &egui::Context, t: crate::editor::theme::Theme, open: &mu
         });
 }
 
-/// Read-only context the inspector needs that borrows the whole `Scene`, gathered
-/// up front because the entity guard below borrows it mutably for the rest of the
-/// frame.
-struct InspectorContext {
-    layer_labels: Vec<String>,
-    named_layers: Vec<(u8, String)>,
-    parent_mat: Option<glam::Mat4>,
-    selected_parent_name: String,
-    valid_parents: Vec<(u32, String)>,
+/// Edits the per-frame card draw defers until the mutable entity guard has dropped,
+/// because each needs `&mut Scene` (or `&mut NavigationGraph`) that the guard's borrow
+/// would otherwise block. Collected during the draw, then applied by [`Self::apply`].
+#[derive(Default)]
+struct PendingEdits {
+    parent_change: Option<Option<u32>>,
+    nav_bake: bool,
+    layer_changed: bool,
+    prefab_action: Option<inspector_prefab::PrefabAction>,
+}
+
+impl PendingEdits {
+    /// Apply the deferred edits once the entity guard has dropped: re-parent, run a
+    /// prefab verb, mark dirty, and re-bake the navmesh as requested.
+    fn apply(self, editor: &mut EditorUi, scene: &mut Scene, nav: &mut NavigationGraph, id: u32) {
+        if self.layer_changed {
+            editor.is_dirty = true;
+        }
+        if let Some(action) = self.prefab_action {
+            if inspector_prefab::dispatch(scene, action) {
+                editor.is_dirty = true;
+            }
+        }
+        if let Some(new_parent) = self.parent_change {
+            let _ = scene.set_parent(id, new_parent);
+        }
+        if self.nav_bake {
+            nav.bake(scene);
+        }
+    }
 }
 
 fn draw_entity_inspector(
@@ -105,10 +128,7 @@ fn draw_entity_inspector(
     nav: &mut NavigationGraph,
     selected_id: u32,
 ) {
-    let mut pending_parent_change = None;
-    let mut pending_nav_bake = false;
-    let mut layer_changed = false;
-
+    let mut pending = PendingEdits::default();
     let cx = gather_context(scene, selected_id);
 
     // Borrow the entity (`scene.world`) and the material library (`scene.materials`)
@@ -126,9 +146,13 @@ fn draw_entity_inspector(
             editor.theme,
             entity,
             &cx.layer_labels,
-            &mut pending_nav_bake,
-            &mut layer_changed,
+            &mut pending.nav_bake,
+            &mut pending.layer_changed,
         );
+
+        // Linked-prefab override affordance, just under the header (a no-op for a plain
+        // entity). Emits a deferred action so the prefab verbs run after the guard drops.
+        pending.prefab_action = inspector_prefab::draw(ui, entity, cx.prefab_root);
 
         inspector_transform::draw(
             ui,
@@ -136,8 +160,8 @@ fn draw_entity_inspector(
             cx.parent_mat,
             &cx.selected_parent_name,
             &cx.valid_parents,
-            &mut pending_parent_change,
-            &mut pending_nav_bake,
+            &mut pending.parent_change,
+            &mut pending.nav_bake,
             &mut editor.is_dirty,
         );
 
@@ -147,74 +171,11 @@ fn draw_entity_inspector(
             materials,
             &cx.named_layers,
             &mut editor.is_dirty,
-            &mut pending_nav_bake,
+            &mut pending.nav_bake,
         );
     }
 
-    if layer_changed {
-        editor.is_dirty = true;
-    }
-    if let Some(new_parent) = pending_parent_change {
-        let _ = scene.set_parent(selected_id, new_parent);
-    }
-    if pending_nav_bake {
-        nav.bake(scene);
-    }
-}
-
-/// Gather the read-only layer labels, parenting matrix/name, and valid-parent set
-/// for the selected entity (see [`InspectorContext`]).
-fn gather_context(scene: &Scene, selected_id: u32) -> InspectorContext {
-    // The layer dropdown labels (one per registry slot).
-    let layer_labels: Vec<String> = (0..LAYER_COUNT)
-        .map(|i| scene.layers.label(i as u8))
-        .collect();
-
-    // Layers offered in the camera culling-mask checklist: layer 0 plus any named
-    // user slots (unnamed slots are noise, mirroring Unity's mask dropdown).
-    let named_layers: Vec<(u8, String)> = (0..LAYER_COUNT as u8)
-        .filter(|&i| i == 0 || !scene.layers.name(i).is_empty())
-        .map(|i| (i, scene.layers.label(i)))
-        .collect();
-
-    let current_parent_id = scene.get_entity(selected_id).and_then(|e| e.parent_id);
-    let parent_mat = current_parent_id.map(|p| scene.compute_world_matrix(p));
-    let selected_parent_name = if let Some(p_id) = current_parent_id {
-        scene
-            .get_entity(p_id)
-            .map(|e| e.name.clone())
-            .unwrap_or("None".to_string())
-    } else {
-        "None".to_string()
-    };
-
-    InspectorContext {
-        layer_labels,
-        named_layers,
-        parent_mat,
-        selected_parent_name,
-        valid_parents: collect_valid_parents(scene, selected_id),
-    }
-}
-
-/// The entities that may be the selected entity's parent: everything except
-/// itself and its own descendants (which would create a cycle).
-fn collect_valid_parents(scene: &Scene, selected_id: u32) -> Vec<(u32, String)> {
-    scene
-        .iter()
-        .filter(|e| e.id != selected_id)
-        .map(|e| (e.id, e.name.clone()))
-        .filter(|(id, _)| {
-            let mut curr = *id;
-            while let Some(ancestor) = scene.get_entity(curr).and_then(|x| x.parent_id) {
-                if ancestor == selected_id {
-                    return false;
-                }
-                curr = ancestor;
-            }
-            true
-        })
-        .collect()
+    pending.apply(editor, scene, nav, selected_id);
 }
 
 /// The Unity-style object header card: name + active/static toggles + layer combo.
