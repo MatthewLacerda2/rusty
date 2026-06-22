@@ -105,3 +105,25 @@ with the default scene plus a couple of minimal documents; new interesting input
 accrete there. There is no CI gate — fuzzing is run for as long as the operator
 wants; a short time-boxed CI smoke batch could be added later as a separate
 nightly workflow if regression pressure is wanted.
+
+## Parallel agent builds & disk
+
+The agentic workflow runs issues concurrently in isolated git **worktrees**
+(`.claude/worktrees/`), and each worktree gets its **own** Cargo `target/` —
+~12–16 GB once built. The session volume is ~38 GB usable, so fanning out N
+parallel builds needs N × ~15 GB and hits `No space left on device` — failing at
+the **link** step, not compile, which is the tell-tale ENOSPC.
+
+Policy when driving parallel sub-agents:
+
+- **Cap concurrent heavy builds** — at most ~2 worktree builds at once on a
+  ~38 GB volume; serialize the rest. (A PR that shares files with another
+  in-flight PR must wait anyway — see the serialized-merge rule in `CLAUDE.md`.)
+- **Reclaim finished targets** — once a worktree's branch is pushed/merged,
+  `rm -rf .claude/worktrees/<agent-dir>/target` frees ~12–16 GB.
+- **Check headroom first** — if `df -h` shows < ~16 GB free before launching a
+  build, clean finished worktree targets first.
+
+This is an orchestration policy, not a hard gate: the disk ceiling is fixed at
+environment creation, so raising the session volume is the other lever. CI is
+unaffected (each job runs on its own runner).
