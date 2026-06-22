@@ -28,6 +28,7 @@ pub mod lighting_io;
 pub mod prefab;
 pub mod probe;
 pub mod probe_fill;
+pub mod reflection_probe;
 #[allow(clippy::module_inception)]
 pub mod scene;
 pub mod serialize;
@@ -50,6 +51,7 @@ pub use prefab::{
 };
 pub use probe::{Probe, ProbeGrid, ProbeVolume};
 pub use probe_fill::{analytic_fill, AnalyticEnv};
+pub use reflection_probe::{ReflectionProbe, ReflectionProbeSet};
 pub use scene::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
     ColliderShape, CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent,

@@ -49,6 +49,28 @@ pub(super) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
         ssr_active: 0.0,
         ssr_quality: 0.0,
         ssr_temporal_upsampling: 0.0,
+        refl_active: 0.0,
+        _refl_pad: [0.0; 3],
+        refl_center: [0.0; 4],
+        refl_box_min: [0.0; 4],
+        refl_box_max: [0.0; 4],
+    }
+}
+
+/// Select the active reflection probe for this frame and write its box + centre into
+/// the lighting uniform (#244). The probe whose box contains the camera and is nearest
+/// to it wins; with none, `refl_active` stays 0 and the shader keeps the plain skybox
+/// reflection. The selection mirrors `ReflectionProbeSet::select` (unit-tested there).
+pub(super) fn apply_reflection_probe(
+    lighting_uniform: &mut LightingUniform,
+    scene: &Scene,
+    camera_pos: Vec3,
+) {
+    if let Some(probe) = scene.reflection_probes.select(camera_pos) {
+        lighting_uniform.refl_active = 1.0;
+        lighting_uniform.refl_center = probe.position.extend(0.0).to_array();
+        lighting_uniform.refl_box_min = probe.box_min.extend(0.0).to_array();
+        lighting_uniform.refl_box_max = probe.box_max.extend(0.0).to_array();
     }
 }
 

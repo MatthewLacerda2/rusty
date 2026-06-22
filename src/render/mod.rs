@@ -6,6 +6,7 @@ pub mod skybox;
 
 mod bind_layouts;
 mod camera;
+pub mod cubemap;
 mod cubemap_capture;
 mod debug_meshes;
 pub mod decals;
@@ -102,6 +103,16 @@ struct LightingUniform {
     ssr_active: f32,
     ssr_quality: f32,
     ssr_temporal_upsampling: f32,
+    // Active reflection probe (#244). `refl_active` is 1.0 when a probe's box covers
+    // the camera (the nearest such probe is chosen on the CPU each frame); the shader
+    // then box-projects the reflection against `[refl_box_min, refl_box_max]` around
+    // `refl_center` instead of treating the environment as infinitely distant. The
+    // padding keeps each `vec3` on a 16-byte boundary, matching the WGSL layout.
+    refl_active: f32,
+    _refl_pad: [f32; 3],
+    refl_center: [f32; 4],
+    refl_box_min: [f32; 4],
+    refl_box_max: [f32; 4],
 }
 
 #[repr(C)]

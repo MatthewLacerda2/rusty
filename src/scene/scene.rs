@@ -64,6 +64,12 @@ pub struct Scene {
     /// `<scene>.lighting.json` sidecar. Dynamic (non-static) objects sample the
     /// interpolated probe field instead of the flat hemispherical ambient term.
     pub probes: crate::scene::probe::ProbeVolume,
+    /// Scene-level reflection-probe dataset (#244): each probe is a capture position, a
+    /// box volume for parallax correction, and a PATH to its baked cubemap (a KTX2
+    /// sidecar — never inlined, like `skybox_path`). Lit objects reflect the nearest
+    /// applicable probe with box-projected parallax correction instead of the global
+    /// skybox. The cubemaps themselves are baked by a later issue (#245).
+    pub reflection_probes: crate::scene::reflection_probe::ReflectionProbeSet,
 }
 
 impl Default for Scene {
@@ -79,6 +85,7 @@ impl Default for Scene {
             materials: BTreeMap::new(),
             decals: Vec::new(),
             probes: crate::scene::probe::ProbeVolume::new(),
+            reflection_probes: crate::scene::reflection_probe::ReflectionProbeSet::new(),
         }
     }
 }

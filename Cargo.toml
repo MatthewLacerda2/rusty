@@ -46,6 +46,7 @@ glam = { version = "0.25.0", features = ["bytemuck", "serde"] }
 hecs = { version = "0.10.5" }
 rapier3d = { version = "0.19.0" }
 image = { version = "0.24.9", default-features = false, features = ["png", "tga"] }
+ktx2 = { version = "0.3.0" }
 tobj = { version = "4.0.2" }
 gltf = { version = "1.4.1", default-features = false, features = ["import", "utils", "names"] }
 bytemuck = { version = "1.16.1", features = ["derive"] }
