@@ -43,54 +43,12 @@ fn draw_menu_bar(
     console: &mut ConsoleLogs,
 ) {
     egui::menu::bar(ui, |ui| {
-        ui.menu_button(format!("{}  File", icon::FILE), |ui| {
-            if ui.button(format!("{}  New Scene", icon::FILE)).clicked() {
-                new_scene(editor, scene, console);
-                ui.close_menu();
-            }
-            if ui
-                .button(format!("{}  Reset Scene", icon::ARROW_COUNTER_CLOCKWISE))
-                .clicked()
-            {
-                reset_scene(editor, scene, console);
-                ui.close_menu();
-            }
-            if ui
-                .button(format!("{}  Load Scene", icon::FOLDER_OPEN))
-                .clicked()
-            {
-                load_scene(editor, scene, console);
-                ui.close_menu();
-            }
-            if ui
-                .button(format!("{}  Save Scene", icon::FLOPPY_DISK))
-                .clicked()
-            {
-                save_scene(editor, scene, console);
-                ui.close_menu();
-            }
-        });
+        file_menu(editor, ui, scene, console);
 
         // The GameObject menu — the Unity-style home for creating objects (#255).
         menu_create::game_object_menu(editor, ui, scene);
 
-        ui.menu_button(format!("{}  Config", icon::GEAR), |ui| {
-            ui.label("Video / Quality");
-            ui.selectable_value(&mut editor.quality_preset, QualityPreset::Low, "Low");
-            ui.selectable_value(&mut editor.quality_preset, QualityPreset::Medium, "Medium");
-            ui.selectable_value(&mut editor.quality_preset, QualityPreset::High, "High");
-            ui.separator();
-            if ui
-                .button(format!("{}  Scene Settings", icon::GLOBE))
-                .clicked()
-            {
-                // Focus the inspector on the active scene: clearing both selections
-                // makes the inspector fall through to its scene-settings view.
-                editor.selected_entity_id = None;
-                editor.selected_asset_path = None;
-                ui.close_menu();
-            }
-        });
+        config_menu(editor, ui);
 
         ui.menu_button(format!("{}  About", icon::INFO), |ui| {
             if ui.button("About rusty").clicked() {
@@ -98,6 +56,63 @@ fn draw_menu_bar(
                 ui.close_menu();
             }
         });
+    });
+}
+
+/// The File menu — scene lifecycle (new / reset / load / save).
+fn file_menu(
+    editor: &mut EditorUi,
+    ui: &mut egui::Ui,
+    scene: &mut Scene,
+    console: &mut ConsoleLogs,
+) {
+    ui.menu_button(format!("{}  File", icon::FILE), |ui| {
+        if ui.button(format!("{}  New Scene", icon::FILE)).clicked() {
+            new_scene(editor, scene, console);
+            ui.close_menu();
+        }
+        if ui
+            .button(format!("{}  Reset Scene", icon::ARROW_COUNTER_CLOCKWISE))
+            .clicked()
+        {
+            reset_scene(editor, scene, console);
+            ui.close_menu();
+        }
+        if ui
+            .button(format!("{}  Load Scene", icon::FOLDER_OPEN))
+            .clicked()
+        {
+            load_scene(editor, scene, console);
+            ui.close_menu();
+        }
+        if ui
+            .button(format!("{}  Save Scene", icon::FLOPPY_DISK))
+            .clicked()
+        {
+            save_scene(editor, scene, console);
+            ui.close_menu();
+        }
+    });
+}
+
+/// The Config menu — video/quality presets and Scene Settings.
+fn config_menu(editor: &mut EditorUi, ui: &mut egui::Ui) {
+    ui.menu_button(format!("{}  Config", icon::GEAR), |ui| {
+        ui.label("Video / Quality");
+        ui.selectable_value(&mut editor.quality_preset, QualityPreset::Low, "Low");
+        ui.selectable_value(&mut editor.quality_preset, QualityPreset::Medium, "Medium");
+        ui.selectable_value(&mut editor.quality_preset, QualityPreset::High, "High");
+        ui.separator();
+        if ui
+            .button(format!("{}  Scene Settings", icon::GLOBE))
+            .clicked()
+        {
+            // Focus the inspector on the active scene: clearing both selections
+            // makes the inspector fall through to its scene-settings view.
+            editor.selected_entity_id = None;
+            editor.selected_asset_path = None;
+            ui.close_menu();
+        }
     });
 }
 
