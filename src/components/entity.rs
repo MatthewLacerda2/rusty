@@ -16,6 +16,35 @@ use super::{
     TransformComponent, VisualCorrectionComponent,
 };
 
+/// The live link from an instance entity back to the `.prefab` it was stamped from
+/// (#216). Set on EVERY entity of a linked instance — not just the root — so that
+/// reordering the source's entities can never scramble which source entity an
+/// instance entity corresponds to: the correlation is the explicit `local_id` (the
+/// source's own 0-based local id), independent of order. The root anchors the
+/// `source` path; non-root entities carry the same path so each can be matched on
+/// its own. Absent (`None`) on a plain entity or a v1 *unpacked* copy, which has no
+/// link back to the asset.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct PrefabLink {
+    /// Path to the source `.prefab` asset (the same string for every entity of one
+    /// instance).
+    pub source: String,
+    /// The corresponding source entity's LOCAL id (0-based; root = 0). This is the
+    /// stable correlation key against `PrefabData::entities`, order-independent.
+    pub local_id: u32,
+    /// This entity's recorded per-instance overrides: a generic field diff against a
+    /// fresh copy of the source entity, as `json-pointer-path -> value` (e.g.
+    /// `"/transform/position/0" -> 5.0`). It auto-covers every present/future
+    /// first-class component with no per-component code, and covers component
+    /// add/remove too (a `None`↔`Some` is just a diff at that component's path).
+    /// Propagation rebuilds the entity from the fresh source baseline, then re-applies
+    /// these paths on top, so non-overridden fields track the source while overridden
+    /// ones are preserved. `#[serde(default)]` so a link saved before overrides
+    /// existed loads with none.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub overrides: std::collections::BTreeMap<String, serde_json::Value>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(from = "EntityRepr")]
 pub struct Entity {
@@ -59,6 +88,11 @@ pub struct Entity {
     /// load with no audio source.
     #[serde(default)]
     pub audio: Option<AudioSourceComponent>,
+    /// Live link back to the source `.prefab` for a *linked* prefab instance (#216).
+    /// `None` on a plain entity or a v1 unpacked copy. Carried on every entity of an
+    /// instance. `#[serde(default)]` so pre-#216 scenes load with no link.
+    #[serde(default)]
+    pub prefab_link: Option<PrefabLink>,
     pub parent_id: Option<u32>,
     pub children: Vec<u32>,
 }
@@ -101,6 +135,8 @@ struct EntityRepr {
     particles: Option<ParticleEmitterComponent>,
     #[serde(default)]
     audio: Option<AudioSourceComponent>,
+    #[serde(default)]
+    prefab_link: Option<PrefabLink>,
     parent_id: Option<u32>,
     children: Vec<u32>,
 }
@@ -147,6 +183,7 @@ impl From<EntityRepr> for Entity {
             visual_correction: r.visual_correction,
             particles: r.particles,
             audio: r.audio,
+            prefab_link: r.prefab_link,
             parent_id: r.parent_id,
             children: r.children,
         }
@@ -176,6 +213,7 @@ impl Entity {
             visual_correction: None,
             particles: None,
             audio: None,
+            prefab_link: None,
             parent_id: None,
             children: Vec::new(),
         }

@@ -265,4 +265,10 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     scene.reflection_probes = data.reflection_probes;
 
     scene.update_all_colliders();
+
+    // Propagate every linked prefab instance against its source on load (#216):
+    // re-baseline from the current `.prefab`, then re-apply each instance's recorded
+    // overrides on top. A missing/renamed source is skipped per instance (the
+    // instance keeps its last-saved values), so this never aborts the load.
+    crate::scene::prefab_link::reimport_all_linked_instances(scene);
 }

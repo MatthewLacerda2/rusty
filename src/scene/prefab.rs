@@ -111,9 +111,13 @@ fn collect_subtree(scene: &Scene, root_id: u32) -> Vec<u32> {
 /// Rewrite one entity's identity into the local id space: its own `id`, its
 /// `children`, and its `parent_id` (cleared for the root, which detaches from the
 /// scene it was extracted from). The `pending_material` migration carrier is never
-/// part of a freshly cloned runtime entity, so nothing to scrub there.
+/// part of a freshly cloned runtime entity, so nothing to scrub there. Any
+/// `prefab_link` is **dropped**: extracting an already-linked instance bakes it down
+/// into a fresh flat prefab — the new `.prefab` is a plain subtree with no nested
+/// links back to whatever the instance came from (#216 scope).
 fn remap_entity(entity: &mut Entity, local: &BTreeMap<u32, u32>, is_root: bool) {
     entity.id = local[&entity.id];
+    entity.prefab_link = None;
     entity.children = entity
         .children
         .iter()
@@ -126,33 +130,60 @@ fn remap_entity(entity: &mut Entity, local: &BTreeMap<u32, u32>, is_root: bool) 
     };
 }
 
-/// Clone a prefab into `scene` as an independent copy with **fresh, deterministic**
-/// ids (sequential from the world's `next_id` — no wall-clock/RNG), merge its
-/// materials into the scene library (collision policy below), parent the new root
-/// under `parent` (or the scene root when `None`), and return the new root's id.
+/// Clone a prefab into `scene` as an independent **unpacked** copy (v1 behaviour, no
+/// live link): fresh deterministic ids, materials merged into the library, the new
+/// root parented under `parent` (or the scene root when `None`). Returns the new
+/// root's id.
 ///
 /// Material name collision: an identical existing entry is reused; otherwise the
 /// material is inserted under a uniquified name and the instance's references are
 /// rewritten to it — so an instance never silently adopts a different scene material.
 pub fn instantiate_prefab(scene: &mut Scene, prefab: &PrefabData, parent: Option<u32>) -> u32 {
-    let renames = merge_materials(scene, &prefab.materials);
+    stamp_prefab(scene, prefab, parent, None)
+}
 
-    // Fresh sequential ids from the allocator: local id `l` -> `base + l`. Inserting
-    // honours each entity's id and bumps `next_id` past the max, leaving the
-    // allocator consistent and the whole operation deterministic.
+/// Clone a prefab into `scene` as a **linked** instance (#216): identical to
+/// [`instantiate_prefab`], but every entity is stamped with a [`PrefabLink`] back to
+/// `source` (the `.prefab` path) carrying its source `local_id` and an empty override
+/// set. The link is what lets a later scene-load / reimport re-baseline the instance
+/// against the source and re-apply the instance's recorded overrides on top.
+pub fn instantiate_prefab_linked(
+    scene: &mut Scene,
+    prefab: &PrefabData,
+    parent: Option<u32>,
+    source: &str,
+) -> u32 {
+    stamp_prefab(scene, prefab, parent, Some(source))
+}
+
+/// Stamp one fresh copy of `prefab` into `scene`. `link_source = Some(path)` makes it
+/// a linked instance (every entity gets a `PrefabLink`); `None` is the unpacked v1
+/// copy. Fresh sequential ids come from the allocator (local id `l` -> `base + l`),
+/// so the operation is deterministic (no wall-clock/RNG).
+fn stamp_prefab(
+    scene: &mut Scene,
+    prefab: &PrefabData,
+    parent: Option<u32>,
+    link_source: Option<&str>,
+) -> u32 {
+    let renames = merge_materials(scene, &prefab.materials);
     let base = scene.world.next_id();
     let mut new_root = base + prefab.root;
     for entity in &prefab.entities {
+        let local_id = entity.id;
         let mut entity = entity.clone();
         entity.id += base;
         entity.parent_id = entity.parent_id.map(|p| base + p);
         entity.children = entity.children.iter().map(|c| base + c).collect();
-        if let Some(mat) = &mut entity.material {
-            if let Some(renamed) = renames.get(&mat.material) {
-                mat.material = renamed.clone();
-            }
-        }
+        rename_entity_material(&mut entity, &renames);
         rehydrate_entity_mesh(&mut entity);
+        if let Some(source) = link_source {
+            entity.prefab_link = Some(crate::components::PrefabLink {
+                source: source.to_string(),
+                local_id,
+                overrides: std::collections::BTreeMap::new(),
+            });
+        }
         if entity.parent_id.is_none() {
             new_root = entity.id;
         }
@@ -165,6 +196,17 @@ pub fn instantiate_prefab(scene: &mut Scene, prefab: &PrefabData, parent: Option
     }
     scene.update_all_colliders();
     new_root
+}
+
+/// Rewrite an entity's material reference through the merge rename map (a no-op when
+/// the key wasn't uniquified). Shared by stamping and baseline-building so an
+/// instance and its propagation baseline resolve the same library key.
+fn rename_entity_material(entity: &mut Entity, renames: &BTreeMap<String, String>) {
+    if let Some(mat) = &mut entity.material {
+        if let Some(renamed) = renames.get(&mat.material) {
+            mat.material = renamed.clone();
+        }
+    }
 }
 
 /// Merge a prefab's material slice into the scene library, returning the rename map
@@ -216,18 +258,35 @@ pub fn save_prefab(scene: &Scene, root_id: u32, path: &str) -> Result<(), String
     std::fs::write(path, json).map_err(|e| format!("Failed to write prefab file: {e}"))
 }
 
+/// Read and deserialize a `.prefab` document from `path`. Shared by every loader so
+/// the read/parse error wording stays in one place.
+pub fn read_prefab_file(path: &str) -> Result<PrefabData, String> {
+    let json =
+        std::fs::read_to_string(path).map_err(|e| format!("Failed to read prefab file: {e}"))?;
+    serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize prefab: {e}"))
+}
+
 /// Load a `.prefab` from `path` and instantiate it into `scene` under `parent` (or
-/// the scene root when `None`). Returns the new root id.
+/// the scene root when `None`) as an **unpacked** copy (v1). Returns the new root id.
 pub fn load_and_instantiate(
     scene: &mut Scene,
     path: &str,
     parent: Option<u32>,
 ) -> Result<u32, String> {
-    let json =
-        std::fs::read_to_string(path).map_err(|e| format!("Failed to read prefab file: {e}"))?;
-    let prefab: PrefabData =
-        serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize prefab: {e}"))?;
+    let prefab = read_prefab_file(path)?;
     Ok(instantiate_prefab(scene, &prefab, parent))
+}
+
+/// Load a `.prefab` from `path` and instantiate it into `scene` under `parent` as a
+/// **linked** instance (#216): the new entities carry a `PrefabLink` back to `path`,
+/// so the instance tracks the source on later loads/reimports. Returns the new root.
+pub fn load_and_instantiate_linked(
+    scene: &mut Scene,
+    path: &str,
+    parent: Option<u32>,
+) -> Result<u32, String> {
+    let prefab = read_prefab_file(path)?;
+    Ok(instantiate_prefab_linked(scene, &prefab, parent, path))
 }
 
 #[cfg(test)]

@@ -29,7 +29,7 @@ pub use animator::AnimatorComponent;
 pub use audio_source::AudioSourceComponent;
 pub use camera::{CameraComponent, ClearFlags};
 pub use collider::{ColliderComponent, ColliderShape};
-pub use entity::Entity;
+pub use entity::{Entity, PrefabLink};
 pub use health::HealthComponent;
 pub use light::{LightComponent, LightType};
 pub use material::{MaterialAsset, MaterialComponent};

@@ -168,6 +168,11 @@ to the editor and uses the same default values.
 | `Scene.Save` | `([path])` | the written path |
 | `Scene.SavePrefab` | `(rootId, path)` | the written path |
 | `Scene.Instantiate` | `(path, …)` — see below | new entity `id` |
+| `Scene.InstantiateUnpacked` | `(prefabPath, [parentId])` | new entity `id` (an unlinked copy) |
+| `Scene.ApplyPrefabChanges` | `(instanceRootId)` | count of entities whose overrides were recorded |
+| `Scene.RevertPrefabOverrides` | `(instanceRootId)` | — (drops overrides, restores the source) |
+| `Scene.ReimportPrefab` | `(instanceRootId)` | — (re-baseline from source, re-apply overrides) |
+| `Scene.ListPrefabOverrides` | `(instanceRootId)` | array of `"localId:json-pointer"` strings |
 
 **`primitive`** (optional) is one of the hierarchy toolbar's primitives,
 case-insensitive: `Box`, `Sphere`, `Plane`, `Cylinder` (meshes) or `PointLight`,
@@ -197,8 +202,16 @@ A **prefab** is a configured GameObject — a root entity plus its whole child
 subtree, every component configured and every asset reference intact — saved to its
 own `.prefab` asset so it can be stamped into any scene. It is the configure-once,
 stamp-many template (Unity's prefab) and the runtime spawn primitive a wave-spawner
-script calls. v1 is **unpacked**: each instance is an independent copy with no live
-link back to the asset.
+script calls.
+
+Two flavours of instance, matching Unity:
+
+- **Linked** (the default) — the instance keeps a live link back to the `.prefab`. On
+  every scene load and on an explicit re-import, the instance is re-baselined from the
+  current source so a later edit to the prefab propagates into all its instances. Per-
+  instance edits are recorded as **overrides** that survive that propagation.
+- **Unpacked** (the v1 copy) — an independent snapshot with no link back to the asset;
+  editing the source never touches it.
 
 **`Scene.SavePrefab(rootId, path)`** extracts the subtree rooted at `rootId` and
 writes it to `path` (a `.prefab` JSON document with local 0-based ids, the referenced
@@ -210,12 +223,17 @@ runs.
 `path` is a `.prefab` or an importable asset reference, so prefabs and assets share
 one name and never drift.
 
-- **`Scene.Instantiate(prefabPath, [parentId])`** — loads a `.prefab` and stamps an
-  independent copy into the scene, assigning fresh deterministic ids, merging the
-  prefab's materials into the scene library (an identical existing material is reused;
-  a name-conflicting one is inserted under a uniquified name and the instance's
-  references are rewritten to it), and parenting the new root under `parentId` (or the
-  scene root when omitted). Returns the new root's id.
+- **`Scene.Instantiate(prefabPath, [parentId])`** — loads a `.prefab` and stamps a
+  **linked** instance (the default): fresh deterministic ids, the prefab's materials
+  merged into the scene library (an identical existing material is reused; a name-
+  conflicting one is inserted under a uniquified name and the instance's references are
+  rewritten to it), the new root parented under `parentId` (or the scene root when
+  omitted), and a live link to `prefabPath` stamped on **every** entity of the instance.
+  Returns the new root's id.
+
+- **`Scene.InstantiateUnpacked(prefabPath, [parentId])`** — the same stamp **without**
+  the link: the v1 independent copy. Use it when you want a one-off that must not track
+  later source edits.
 
 - **`Scene.Instantiate(assetRef, [name], [x, y, z])`** — spawns one entity from an
   importable model sub-object reference (`path::sub_object`, the `reference` field
@@ -227,8 +245,39 @@ one name and never drift.
   `.meta` sidecar records one. Returns the new entity's id; errors (without spawning)
   when the reference is malformed, the file fails to import, or the sub-object is absent.
 
-In both cases the geometry is stored only as a reference and rehydrated on the next
+In every case the geometry is stored only as a reference and rehydrated on the next
 scene load, exactly like a primitive's `primitive_type` — no GPU buffers are inlined.
+
+#### Linked-instance overrides (apply / revert / reimport)
+
+A linked instance records its divergence from the source as a **generic field diff** —
+a map of `json-pointer-path → value` for each field where the instance differs from a
+fresh copy of the source. This auto-covers every present and future component (and
+component add/remove — a `None`↔`Some` is just a diff at that path) with no per-
+component code. The override set is carried on each instance entity's link, so it
+saves and loads with the scene.
+
+- **`Scene.ApplyPrefabChanges(instanceRootId)`** — record the instance's current edits
+  as overrides (re-diffs every instance entity against a fresh source baseline and
+  stores the result). Call it after editing an instance, while the source is unchanged,
+  so the edits are preserved through later propagation. Returns the number of entities
+  recorded. *(Apply-to-source — pushing an instance's edits back into the `.prefab`
+  file — is a follow-up; this records them on the instance.)*
+- **`Scene.RevertPrefabOverrides(instanceRootId)`** — drop every override and rebuild
+  the instance straight from the current source (it becomes a pristine copy).
+- **`Scene.ReimportPrefab(instanceRootId)`** — re-baseline from the source and re-apply
+  the recorded overrides on top: non-overridden fields pick up the latest source,
+  overridden ones win. This is the same propagation that runs automatically on scene
+  load.
+- **`Scene.ListPrefabOverrides(instanceRootId)`** — the read verb: the instance's
+  recorded override paths as `"localId:json-pointer"` strings (e.g.
+  `"0:/transform/position/0"`).
+
+All four error if `instanceRootId` is not a **linked** instance root. **Scope (#216):**
+a flat instance of a flat prefab — added/removed/reparented child entities and nested
+prefabs are out of scope (propagation matches entities by the link's source `local_id`,
+adding/removing nothing structurally). Saving an already-linked instance back out with
+`SavePrefab` bakes it down into a fresh flat prefab (no nested links).
 
 ## `Assets`
 

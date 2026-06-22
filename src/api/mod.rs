@@ -33,6 +33,7 @@ pub mod physics;
 pub mod probe;
 pub mod reflection;
 pub mod scene;
+pub mod scene_prefab;
 pub mod snapshot;
 mod snapshot_components;
 pub mod storage;
