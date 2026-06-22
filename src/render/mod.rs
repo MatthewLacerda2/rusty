@@ -6,6 +6,7 @@ pub mod skybox;
 
 mod bind_layouts;
 mod camera;
+mod cube_sample;
 pub mod cubemap;
 mod cubemap_capture;
 mod debug_meshes;
@@ -18,11 +19,14 @@ mod draw_pass;
 mod draw_path;
 mod draw_resources;
 mod entity_pool;
+mod ktx2_encode;
 mod particles;
 mod particles_draw;
 mod pipelines;
 mod postfx_params;
 mod probe_bake;
+mod reflection_bake;
+mod reflection_prefilter;
 mod setup;
 mod setup_build;
 mod setup_headless;
@@ -30,6 +34,7 @@ mod setup_resize;
 mod setup_textures;
 mod tangents;
 mod textures;
+mod uniforms;
 mod viewport;
 
 use std::collections::HashMap;
@@ -38,124 +43,15 @@ use std::rc::Rc;
 pub use camera::{build_camera_stack, game_camera_from_scene, sync_lens_from_scene, Camera};
 pub use cubemap_capture::{CubemapCapture, CubemapFace};
 pub use probe_bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
+pub use reflection_bake::DEFAULT_REFLECTION_RESOLUTION;
 pub use setup_headless::OFFSCREEN_FORMAT;
 
-// Represent memory layouts for GPU Uniforms
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct CameraUniform {
-    view_proj: [f32; 16],
-    camera_pos: [f32; 3],
-    _pad: f32,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct AmbientLightUniform {
-    color: [f32; 3],
-    intensity: f32,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct DirectionalLightUniform {
-    direction: [f32; 3],
-    _pad1: f32,
-    color: [f32; 3],
-    intensity: f32,
-    _pad2: [f32; 4],
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct PointLightUniform {
-    position: [f32; 3],
-    _pad1: f32,
-    color: [f32; 3],
-    intensity: f32,
-    range: f32,
-    _pad2: [f32; 3],
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct SpotlightUniform {
-    position: [f32; 3],
-    _pad1: f32,
-    direction: [f32; 3],
-    _pad2: f32,
-    color: [f32; 3],
-    intensity: f32,
-    range: f32,
-    inner_cone: f32,
-    outer_cone: f32,
-    _pad3: f32,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct LightingUniform {
-    ambient: AmbientLightUniform,
-    dir_light: DirectionalLightUniform,
-    point_lights: [PointLightUniform; 4],
-    spot_light: SpotlightUniform,
-    num_point_lights: u32,
-    ssr_active: f32,
-    ssr_quality: f32,
-    ssr_temporal_upsampling: f32,
-    // Active reflection probe (#244). `refl_active` is 1.0 when a probe's box covers
-    // the camera (the nearest such probe is chosen on the CPU each frame); the shader
-    // then box-projects the reflection against `[refl_box_min, refl_box_max]` around
-    // `refl_center` instead of treating the environment as infinitely distant. The
-    // padding keeps each `vec3` on a 16-byte boundary, matching the WGSL layout.
-    refl_active: f32,
-    _refl_pad: [f32; 3],
-    refl_center: [f32; 4],
-    refl_box_min: [f32; 4],
-    refl_box_max: [f32; 4],
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct EntityUniform {
-    model_matrix: [f32; 16],
-    color_tint: [f32; 4],
-    use_texture: u32,
-    is_lit: u32,
-    metallic: f32,
-    roughness: f32,
-    // Map flags (#202, #207). When set, the shader samples the matching group(2)
-    // texture: metallic/roughness multiply their scalar by the sampled channel;
-    // `use_normal_map` perturbs the shading normal in tangent space; `use_emissive_map`
-    // modulates the emissive factor. These four `u32`s fill the run up to the next
-    // 16-byte boundary so the `vec4` that follows is aligned; `EntityUniforms` in
-    // shader.wgsl mirrors this field order byte-for-byte.
-    use_metallic_map: u32,
-    use_roughness_map: u32,
-    use_normal_map: u32,
-    use_emissive_map: u32,
-    // Flat emissive factor (#222): rgb glow added on top of the lit colour in
-    // `fs_main`. The renderer draws to an HDR target with a bloom bright-pass, so
-    // values >1.0 glow automatically. Stored as a `vec4` (4th lane unused) to dodge
-    // WGSL's `vec3` 16-byte-alignment gotcha and keep the struct a 16-byte multiple.
-    emissive: [f32; 4],
-    // Light-probe SH (#240). When `use_sh == 1`, the shader reconstructs ambient
-    // irradiance from these 9 L2 SH coefficients — the scene's probe field
-    // interpolated at this entity's position on the CPU — instead of the flat
-    // hemispherical ambient term; non-static lit objects opt in. Each coefficient is
-    // an RGB triple in `xyz` (4th lane unused) so the array stays `vec4`-aligned.
-    // `_sh_pad` fills the run after the `u32` flag to the next 16-byte boundary.
-    // `EntityUniforms` in shader.wgsl mirrors this field order byte-for-byte.
-    use_sh: u32,
-    _sh_pad: [u32; 3],
-    sh: [[f32; 4]; 9],
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct BoneUniform {
-    bones: [[f32; 16]; 64],
-}
+// GPU uniform memory layouts live in `uniforms.rs` (split out to keep this file under
+// the size cap); re-imported here so the render submodules still name them via `super::`.
+use uniforms::{
+    AmbientLightUniform, BoneUniform, CameraUniform, DirectionalLightUniform, EntityUniform,
+    LightingUniform, PointLightUniform, SpotlightUniform,
+};
 
 // Stores GPU Buffer handlers for meshes
 pub struct GpuMesh {
@@ -257,6 +153,14 @@ pub struct Renderer {
     pub shadow_renderer: shadows::ShadowRenderer,
     pub skybox_texture: Option<Rc<GpuTexture>>,
     pub skybox_path: String,
+    /// The active reflection probe's loaded, prefiltered cubemap (#245) at group-0 binding
+    /// 4; `None` until a baked probe covers the camera, then the shader uses the skybox.
+    /// Reloaded only when `reflection_cube_path` (its cache key) changes, not every frame.
+    reflection_cube: Option<cubemap::CubemapTexture>,
+    reflection_cube_path: String,
+    /// A 1×1×6 black cube bound at binding 4 when no probe cube is active, so the bind
+    /// group always satisfies the layout (the shader ignores it via `refl_has_cubemap`).
+    default_cube: cubemap::CubemapTexture,
     pub shadow_layout: wgpu::BindGroupLayout,
     pub shadow_uniform_buffer: wgpu::Buffer,
     pub shadow_bind_group: wgpu::BindGroup,

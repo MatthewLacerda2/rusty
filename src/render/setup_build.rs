@@ -161,6 +161,10 @@ fn create_global_bindings(
         mapped_at_creation: false,
     });
 
+    // A throwaway fallback cube satisfies binding 4 until the per-frame rebuild swaps in
+    // the active reflection probe's cubemap (or the renderer's own fallback). The shader
+    // ignores it (the `refl_has_cubemap` flag stays 0) and samples the 2D skybox instead.
+    let cube = super::cubemap::fallback_cube(device);
     let global_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Global Bind Group"),
         layout: camera_lighting_layout,
@@ -180,6 +184,14 @@ fn create_global_bindings(
             wgpu::BindGroupEntry {
                 binding: 3,
                 resource: wgpu::BindingResource::Sampler(&default_texture.sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 4,
+                resource: wgpu::BindingResource::TextureView(&cube.view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 5,
+                resource: wgpu::BindingResource::Sampler(&cube.sampler),
             },
         ],
     });

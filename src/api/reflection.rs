@@ -22,20 +22,59 @@ use mlua::Lua;
 use super::{put, Reg};
 use crate::scene::Scene;
 
-/// Register the `Reflection` namespace onto `lua`.
+/// Register the `Reflection` namespace onto `lua`. `scene_path` is the saved scene file
+/// (if any) — the dev-only `Reflection.Bake()` writes its cubemaps next to it.
 pub fn register<'lua, 'scope>(
     lua: &'lua Lua,
     scope: &mlua::Scope<'lua, 'scope>,
     scene: &'scope RefCell<Scene>,
+    scene_path: &'scope RefCell<Option<String>>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     register_placement(scope, &table, scene)?;
     register_config(scope, &table, scene)?;
+    register_bake(scope, &table, scene, scene_path)?;
 
     lua.globals()
         .set("Reflection", table)
         .map_err(|e| e.to_string())
+}
+
+/// The reflection-probe bake (`Reflection.Bake()`, #245): for each probe capture the
+/// static surroundings to a cubemap, GGX-prefilter it into a roughness mip chain, write
+/// the KTX2 next to the scene and point the probe at it. Dev-only — it drives the GPU via
+/// a headless renderer — returning `true` when the bake ran, `false` when no adapter was
+/// available (skipped gracefully). Errors when the scene is unsaved (nowhere to write).
+#[cfg(feature = "dev")]
+fn register_bake<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+    scene_path: &'scope RefCell<Option<String>>,
+) -> Reg {
+    put(
+        table,
+        "Bake",
+        scope.create_function(|_, ()| {
+            let mut scene = scene.borrow_mut();
+            let path = scene_path.borrow();
+            crate::dev::reflection_bake::bake_scene_reflections(&mut scene, path.as_deref())
+                .map_err(mlua::Error::external)
+        }),
+    )
+}
+
+/// No-op `register_bake` with the `dev` feature off — `Reflection.Bake` is a dev action
+/// and isn't registered in a ship build.
+#[cfg(not(feature = "dev"))]
+fn register_bake<'lua, 'scope>(
+    _scope: &mlua::Scope<'lua, 'scope>,
+    _table: &mlua::Table,
+    _scene: &'scope RefCell<Scene>,
+    _scene_path: &'scope RefCell<Option<String>>,
+) -> Reg {
+    Ok(())
 }
 
 /// `Add` / `Move` / `Remove` / `Clear` / `Count` over single probes.
@@ -139,12 +178,17 @@ mod tests {
         RefCell::new(Scene::default())
     }
 
+    fn no_path() -> RefCell<Option<String>> {
+        RefCell::new(None)
+    }
+
     #[test]
     fn add_count_remove() {
         let scene = empty_scene();
+        let path = no_path();
         let lua = Lua::new();
         lua.scope(|scope| {
-            register(&lua, scope, &scene).unwrap();
+            register(&lua, scope, &scene, &path).unwrap();
             lua.load("Reflection.Add(0,0,0, 5,5,5)").exec().unwrap();
             lua.load("Reflection.Add(10,0,0, 5,5,5)").exec().unwrap();
             let n: u32 = lua.load("return Reflection.Count()").eval().unwrap();
@@ -160,9 +204,10 @@ mod tests {
     #[test]
     fn set_box_and_cubemap() {
         let scene = empty_scene();
+        let path = no_path();
         let lua = Lua::new();
         lua.scope(|scope| {
-            register(&lua, scope, &scene).unwrap();
+            register(&lua, scope, &scene, &path).unwrap();
             lua.load("Reflection.Add(0,0,0, 1,1,1)").exec().unwrap();
             lua.load("Reflection.SetBox(0, -3,-3,-3, 3,3,3)")
                 .exec()
@@ -178,5 +223,24 @@ mod tests {
         assert_eq!(p.box_min, Vec3::splat(-3.0));
         assert_eq!(p.box_max, Vec3::splat(3.0));
         assert_eq!(p.cubemap_path, "room.ktx2");
+    }
+
+    /// `Reflection.Bake()` is registered (dev-only) and a no-op with no probes returns
+    /// `true`. The real GPU bake + file round-trip is covered in
+    /// `render::reflection_bake_tests`, which owns the renderer; here we only assert the
+    /// binding exists and threads through to the dev bridge.
+    #[cfg(feature = "dev")]
+    #[test]
+    fn bake_no_probes_is_ok() {
+        let scene = empty_scene();
+        let path = RefCell::new(Some("scene.scene".to_string()));
+        let lua = Lua::new();
+        lua.scope(|scope| {
+            register(&lua, scope, &scene, &path).unwrap();
+            let ran: bool = lua.load("return Reflection.Bake()").eval().unwrap();
+            assert!(ran, "no-probe bake should succeed");
+            Ok(())
+        })
+        .unwrap();
     }
 }
