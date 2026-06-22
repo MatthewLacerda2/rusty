@@ -154,3 +154,17 @@ fn override_verbs_reject_a_non_instance() {
     assert!(reimport_instance(&mut scene, plain).is_err());
     assert!(list_instance_overrides(&scene, plain).is_err());
 }
+
+#[test]
+fn extracting_a_linked_instance_bakes_it_down() {
+    // Stamp a linked instance, then re-extract it: the produced prefab must be a flat
+    // subtree with NO nested links (#216 scope).
+    let path = write_prefab("bake_down");
+    let mut scene = Scene::new();
+    let root = load_and_instantiate_linked(&mut scene, &path, None).unwrap();
+    let baked = crate::scene::extract_prefab(&scene, root).unwrap();
+    assert!(
+        baked.entities.iter().all(|e| e.prefab_link.is_none()),
+        "extract bakes a linked instance into a link-free prefab"
+    );
+}

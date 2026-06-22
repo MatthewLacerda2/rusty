@@ -111,9 +111,13 @@ fn collect_subtree(scene: &Scene, root_id: u32) -> Vec<u32> {
 /// Rewrite one entity's identity into the local id space: its own `id`, its
 /// `children`, and its `parent_id` (cleared for the root, which detaches from the
 /// scene it was extracted from). The `pending_material` migration carrier is never
-/// part of a freshly cloned runtime entity, so nothing to scrub there.
+/// part of a freshly cloned runtime entity, so nothing to scrub there. Any
+/// `prefab_link` is **dropped**: extracting an already-linked instance bakes it down
+/// into a fresh flat prefab — the new `.prefab` is a plain subtree with no nested
+/// links back to whatever the instance came from (#216 scope).
 fn remap_entity(entity: &mut Entity, local: &BTreeMap<u32, u32>, is_root: bool) {
     entity.id = local[&entity.id];
+    entity.prefab_link = None;
     entity.children = entity
         .children
         .iter()
