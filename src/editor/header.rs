@@ -1,13 +1,14 @@
 use egui_phosphor::regular as icon;
 
+use crate::editor::menu_create;
 use crate::editor::EditorUi;
 use crate::render::postfx::QualityPreset;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
-/// TOP BAR — a classic menu bar (File / About / Config) over a minimal transport
-/// row (Play / Stop). Always visible. Scene I/O and quality live in the menus;
-/// the transport row is just play-state.
+/// TOP BAR — a classic menu bar (File / GameObject / Config / About) over a
+/// minimal transport row (Play / Stop). Always visible. Scene I/O, object
+/// creation and quality live in the menus; the transport row is just play-state.
 pub fn draw(
     editor: &mut EditorUi,
     ctx: &egui::Context,
@@ -34,7 +35,7 @@ pub fn draw(
     draw_about_window(editor, ctx);
 }
 
-/// File / About / Config menus.
+/// File / GameObject / Config / About menus.
 fn draw_menu_bar(
     editor: &mut EditorUi,
     ui: &mut egui::Ui,
@@ -43,6 +44,10 @@ fn draw_menu_bar(
 ) {
     egui::menu::bar(ui, |ui| {
         ui.menu_button(format!("{}  File", icon::FILE), |ui| {
+            if ui.button(format!("{}  New Scene", icon::FILE)).clicked() {
+                new_scene(editor, scene, console);
+                ui.close_menu();
+            }
             if ui
                 .button(format!("{}  Reset Scene", icon::ARROW_COUNTER_CLOCKWISE))
                 .clicked()
@@ -65,6 +70,9 @@ fn draw_menu_bar(
                 ui.close_menu();
             }
         });
+
+        // The GameObject menu — the Unity-style home for creating objects (#255).
+        menu_create::game_object_menu(editor, ui, scene);
 
         ui.menu_button(format!("{}  Config", icon::GEAR), |ui| {
             ui.label("Video / Quality");
@@ -194,6 +202,19 @@ fn load_scene(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLog
         }
         Err(err) => console.error(format!("Failed to load scene: {}", err)),
     }
+}
+
+/// Start a fresh, empty scene — a blank slate (no entities, default ambient/sky/
+/// layers), discarding the in-memory scene. Distinct from Reset Scene, which
+/// reverts to the *seeded default* (its ground, lights, etc.). The new scene is
+/// unsaved, so its path is cleared until the next Save.
+fn new_scene(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
+    *scene = Scene::new();
+    editor.current_scene_path = None;
+    editor.selected_entity_id = None;
+    editor.selected_asset_path = None;
+    editor.is_dirty = true;
+    console.info("New empty scene".to_string());
 }
 
 /// Revert to the seeded default scene (discards the in-memory scene).

@@ -1,11 +1,11 @@
 use egui_phosphor::regular as icon;
 
 use crate::editor::{hierarchy_tree, EditorUi};
-use crate::scene::authoring::{self, Primitive};
 use crate::scene::Scene;
 
-/// LEFT PANEL: Scene Hierarchy — a VS Code Explorer-style collapsible tree with a
-/// creation toolbar pinned at the top.
+/// LEFT PANEL: Scene Hierarchy — a VS Code Explorer-style collapsible tree. Object
+/// creation lives in the menu bar's GameObject menu (#255); the panel keeps only a
+/// Destroy affordance for the current selection above the tree.
 pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
     let t = editor.theme;
     if !editor.hierarchy_open {
@@ -34,7 +34,7 @@ pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
                     }
                 });
             });
-            draw_toolbar(editor, scene, ui);
+            draw_actions(editor, scene, ui);
             ui.separator();
             ui.add_space(t.space_xs);
 
@@ -80,51 +80,15 @@ fn draw_collapsed(ctx: &egui::Context, t: crate::editor::theme::Theme, open: &mu
         });
 }
 
-/// Creation toolbar: name + primitive type + Create, and Destroy for the selection.
-/// Lives above the tree so the tree owns the whole scroll area.
-fn draw_toolbar(editor: &mut EditorUi, scene: &mut Scene, ui: &mut egui::Ui) {
-    ui.horizontal(|ui| {
-        ui.add(
-            egui::TextEdit::singleline(&mut editor.new_entity_name)
-                .desired_width(110.0)
-                .hint_text("Name"),
-        );
-        egui::ComboBox::from_id_source("new_entity_type")
-            .selected_text(&editor.new_entity_type)
-            .width(86.0)
-            .show_ui(ui, |ui| {
-                for (val, label) in [
-                    ("Box", "Box Mesh"),
-                    ("Sphere", "Sphere Mesh"),
-                    ("Plane", "Plane Mesh"),
-                    ("Cylinder", "Cylinder Mesh"),
-                    ("PointLight", "Point Light"),
-                    ("DirectionalLight", "Dir Light"),
-                    ("SpotLight", "Spot Light"),
-                ] {
-                    ui.selectable_value(&mut editor.new_entity_type, val.to_string(), label);
-                }
-            });
-    });
-    ui.horizontal(|ui| {
-        if ui.button(format!("{}  Create", icon::PLUS)).clicked() {
-            create_entity(editor, scene);
+/// Selection action bar: a Destroy affordance for the current selection (creation
+/// now lives in the menu bar's GameObject menu). Lives above the tree so the tree
+/// owns the whole scroll area. Destroy only shows when something is selected.
+fn draw_actions(editor: &mut EditorUi, scene: &mut Scene, ui: &mut egui::Ui) {
+    if let Some(selected_id) = editor.selected_entity_id {
+        if ui.button(format!("{}  Destroy", icon::TRASH)).clicked() {
+            scene.destroy_entity(selected_id);
+            editor.selected_entity_id = None;
+            editor.is_dirty = true;
         }
-        if let Some(selected_id) = editor.selected_entity_id {
-            if ui.button(format!("{}  Destroy", icon::TRASH)).clicked() {
-                scene.destroy_entity(selected_id);
-                editor.selected_entity_id = None;
-            }
-        }
-    });
-}
-
-fn create_entity(editor: &mut EditorUi, scene: &mut Scene) {
-    // Both the toolbar and the `Scene.CreateEntity` API route through the shared
-    // `scene::authoring` create path, so editor and API behaviour match exactly.
-    let primitive = Primitive::parse(&editor.new_entity_type);
-    let new_id = authoring::create_entity(scene, &editor.new_entity_name, primitive);
-    editor.selected_entity_id = Some(new_id);
-    editor.selected_asset_path = None; // clear asset selection
-    editor.is_dirty = true;
+    }
 }
