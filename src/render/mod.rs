@@ -21,6 +21,7 @@ mod particles;
 mod particles_draw;
 mod pipelines;
 mod postfx_params;
+mod probe_bake;
 mod setup;
 mod setup_build;
 mod setup_headless;
@@ -35,6 +36,7 @@ use std::rc::Rc;
 
 pub use camera::{build_camera_stack, game_camera_from_scene, sync_lens_from_scene, Camera};
 pub use cubemap_capture::{CubemapCapture, CubemapFace};
+pub use probe_bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
 pub use setup_headless::OFFSCREEN_FORMAT;
 
 // Represent memory layouts for GPU Uniforms
