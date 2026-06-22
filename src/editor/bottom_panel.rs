@@ -111,10 +111,17 @@ fn draw_collapsed(ctx: &egui::Context, t: crate::editor::theme::Theme, open: &mu
 /// live Lua REPL input line, so you can call the API while the game runs.
 #[cfg(feature = "dev")]
 pub fn draw_play_console(editor: &mut EditorUi, ctx: &egui::Context, console: &mut ConsoleLogs) {
+    // Open bottom-left on first frame, then let the user move/resize it freely:
+    // `default_pos` (one-time) replaces an every-frame `anchor` that snapped drags
+    // back, and `resizable` + a min size give it handles without letting it collapse.
+    let bottom_left = egui::pos2(8.0, ctx.screen_rect().bottom() - 228.0);
     egui::Window::new(format!("{}  Developer Console", icon::TERMINAL_WINDOW))
-        .default_height(220.0)
+        .resizable(true)
+        .min_width(320.0)
+        .min_height(140.0)
         .default_width(520.0)
-        .anchor(egui::Align2::LEFT_BOTTOM, egui::vec2(8.0, -8.0))
+        .default_height(220.0)
+        .default_pos(bottom_left)
         .show(ctx, |ui| {
             draw_console(console, ui);
             draw_repl_input(editor, ui);
