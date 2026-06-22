@@ -74,6 +74,12 @@ pub struct SceneData {
     /// with no probes.
     #[serde(default)]
     pub probes: crate::scene::probe::ProbeVolume,
+    /// Reflection-probe positions, parallax boxes, and cubemap PATHS (#244). The
+    /// baked cubemaps are referenced files (KTX2), never inlined — exactly like
+    /// `skybox_path`. `#[serde(default)]` so pre-#244 scenes load with no reflection
+    /// probes.
+    #[serde(default)]
+    pub reflection_probes: crate::scene::reflection_probe::ReflectionProbeSet,
 }
 
 /// Read the live World's component values out into a serializable document.
@@ -89,6 +95,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         collision_matrix: scene.collision_matrix.clone(),
         materials: scene.materials.clone(),
         probes: scene.probes.clone(),
+        reflection_probes: scene.reflection_probes.clone(),
     }
 }
 
@@ -250,6 +257,9 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     // Probe positions + grid come from the scene doc; their SH stays zero here and is
     // merged in from the `<scene>.lighting.json` sidecar by `load_from_file` (#240).
     scene.probes = data.probes;
+    // Reflection probes (positions + boxes + cubemap paths) come straight from the
+    // scene doc; the cubemaps themselves are loaded lazily by the renderer (#244).
+    scene.reflection_probes = data.reflection_probes;
 
     scene.update_all_colliders();
 }

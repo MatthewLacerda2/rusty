@@ -38,6 +38,17 @@ struct LightingUniforms {
     ssr_active: f32,
     ssr_quality: f32,
     ssr_temporal_upsampling: f32,
+    // Active reflection probe (#244): when `refl_active > 0.5` the env reflection is
+    // box-projected (Lagarde parallax) against this probe's box around `refl_center`
+    // instead of sampled as an infinitely-distant skybox. Mirrors the Rust
+    // `LightingUniform` byte-for-byte; the `.w` lanes are padding.
+    refl_active: f32,
+    _refl_pad0: f32,
+    _refl_pad1: f32,
+    _refl_pad2: f32,
+    refl_center: vec4<f32>,
+    refl_box_min: vec4<f32>,
+    refl_box_max: vec4<f32>,
 };
 
 struct EntityUniforms {
@@ -313,6 +324,24 @@ fn eval_sh(N: vec3<f32>) -> vec3<f32> {
     return max(out, vec3<f32>(0.0));
 }
 
+// Box-projected parallax correction (#244), the standard Lagarde technique. Given a
+// fragment world position and a raw reflection direction, intersect the ray against the
+// active probe's box and return the direction from the probe centre to that hit point —
+// so the reflection tracks the room as the camera moves. Mirrors the Rust
+// `ReflectionProbe::parallax_correct` byte-for-byte (unit-tested there without a GPU).
+fn parallax_correct(world_pos: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
+    let inv = vec3<f32>(1.0) / dir;
+    let first = (lighting.refl_box_max.xyz - world_pos) * inv;
+    let second = (lighting.refl_box_min.xyz - world_pos) * inv;
+    let furthest = max(first, second);
+    let t = min(min(furthest.x, furthest.y), furthest.z);
+    if (t <= 0.0) {
+        return dir;
+    }
+    let hit = world_pos + dir * t;
+    return normalize(hit - lighting.refl_center.xyz);
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var base_color: vec4<f32>;
@@ -399,9 +428,17 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
     }
 
-    // 5. Environment Map Reflections (PBR SSR)
+    // 5. Environment reflections (#244). The raw mirror direction is parallax-corrected
+    // against the active reflection probe's box when one covers the fragment, so the
+    // reflected environment tracks the room as the camera moves rather than behaving
+    // like an infinitely-distant skybox. With no probe (or no SSR) it samples the global
+    // skybox directly, the prior behaviour. (Roughness will select a prefiltered cubemap
+    // mip once #245 bakes the chain; today the LDR skybox is the env source.)
     if (lighting.ssr_active > 0.5) {
-        let R = reflect(-V, N);
+        var R = reflect(-V, N);
+        if (lighting.refl_active > 0.5) {
+            R = parallax_correct(in.world_position, normalize(R));
+        }
         let phi = atan2(R.z, R.x);
         let theta = acos(clamp(R.y, -1.0, 1.0));
         let u = (phi + PI) / (2.0 * PI);

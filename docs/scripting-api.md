@@ -429,6 +429,34 @@ it for quick, reproducible fills; use `Bake` for the real lighting. Sampling is
 **trilinear** over a grid, falling back to the nearest probe for free-placed probes or
 points outside the grid.
 
+## `Reflection`
+
+Place **reflection probes** — the *specular* sibling of light probes. Each probe is a
+capture position, a **box volume** for parallax correction, and a path to its baked
+**cubemap** (a KTX2 file). Lit, glossy surfaces reflect the **nearest** probe whose box
+contains them, with box-projected parallax correction (the standard Lagarde technique),
+so the reflected environment tracks the actual room as the camera moves instead of
+behaving like an infinitely-distant skybox. When no probe covers a point, the global
+skybox is used as before.
+
+Like light probes, reflection probes are a scene-level dataset (not a component),
+addressed by **index** (0-based, in placement order); the whole set — positions, boxes,
+and cubemap PATHS — saves into the `.scene` document (the cubemap itself is a referenced
+file, never inlined, exactly like the skybox). The cubemaps are produced by the bake in
+a later change; until then a probe may point at a not-yet-baked path and the runtime
+falls back to the skybox. `Move`/`SetBox`/`SetCubemap`/`Remove` on an out-of-range index
+are no-ops.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Reflection.Add` | `(x, y, z, halfX, halfY, halfZ)` | the new probe's `index` (box is centred on the position with the given half-extents) |
+| `Reflection.Move` | `(index, x, y, z)` | — (box stays centred on the new position) |
+| `Reflection.SetBox` | `(index, minX, minY, minZ, maxX, maxY, maxZ)` | — (explicit parallax box corners; normalized so min ≤ max) |
+| `Reflection.SetCubemap` | `(index, path)` | — (point the probe at a baked cubemap KTX2 file) |
+| `Reflection.Remove` | `(index)` | — |
+| `Reflection.Clear` | `()` | — (removes every probe) |
+| `Reflection.Count` | `()` | probe count |
+
 ## `Particles`
 
 Drive an entity's particle emitter (`ParticleEmitterComponent`). `Emit`/`Burst`

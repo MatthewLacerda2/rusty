@@ -4,7 +4,9 @@
 
 use glam::Vec3;
 
-use super::draw_lighting::{apply_scene_lights, apply_ssr_settings, default_lighting_uniform};
+use super::draw_lighting::{
+    apply_reflection_probe, apply_scene_lights, apply_ssr_settings, default_lighting_uniform,
+};
 use super::draw_pass::{PassClear, ScenePassFrame};
 use super::postfx_params::build_post_params;
 use super::{build_camera_stack, Camera, CameraUniform, LightingUniform, Renderer};
@@ -28,8 +30,9 @@ impl Renderer {
     ) {
         self.upload_scene_assets(scene);
 
-        // Build + write the camera-independent lighting uniform once.
-        let lighting_uniform = self.build_lighting_uniform(scene);
+        // Build + write the camera-independent lighting uniform once. The reflection
+        // probe is picked relative to the primary camera (#244).
+        let lighting_uniform = self.build_lighting_uniform(scene, camera.position);
         self.queue.write_buffer(
             &self.lighting_buffer,
             0,
@@ -149,10 +152,11 @@ impl Renderer {
     }
 
     /// Builds the per-frame lighting uniform from the scene's lights and SSR settings.
-    fn build_lighting_uniform(&self, scene: &Scene) -> LightingUniform {
+    fn build_lighting_uniform(&self, scene: &Scene, camera_pos: Vec3) -> LightingUniform {
         let mut lighting_uniform = default_lighting_uniform(scene);
         apply_scene_lights(&mut lighting_uniform, scene);
         apply_ssr_settings(&mut lighting_uniform, scene);
+        apply_reflection_probe(&mut lighting_uniform, scene, camera_pos);
         lighting_uniform
     }
 
