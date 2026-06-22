@@ -29,11 +29,14 @@ use crate::scene::Scene;
 fn default_skybox_path() -> String {
     String::new()
 }
+// The ambient serde defaults mirror `Scene::default` via the engine's single source
+// of truth (`scene::DEFAULT_AMBIENT_*`), so a pre-#256 scene that omits these fields
+// loads with the SAME brightened hemisphere ambient a freshly created scene gets.
 fn default_ambient_color() -> Vec3 {
-    Vec3::new(0.03, 0.03, 0.045)
+    crate::scene::DEFAULT_AMBIENT_COLOR
 }
 fn default_ambient_intensity() -> f32 {
-    0.24
+    crate::scene::DEFAULT_AMBIENT_INTENSITY
 }
 
 /// The on-disk scene document: entity component VALUES plus scene-level settings.
