@@ -150,10 +150,10 @@ user. Keys are named strings (e.g. `"W"`, `"Space"`).
 
 ## `Scene`
 
-The structural-authoring surface: the API equivalent of the editor's hierarchy
-toolbar (create / destroy / parent) and the inspector's Add Component menu. Every
-verb routes through the shared `scene::authoring` module, so it behaves identically
-to the editor and uses the same default values.
+The structural-authoring surface: the API equivalent of the editor's GameObject
+menu (create), the Hierarchy's Destroy and the inspector's parenting + Add
+Component menu. Every verb routes through the shared `scene::authoring` module, so
+it behaves identically to the editor and uses the same default values.
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -169,10 +169,10 @@ to the editor and uses the same default values.
 | `Scene.SavePrefab` | `(rootId, path)` | the written path |
 | `Scene.Instantiate` | `(path, …)` — see below | new entity `id` |
 
-**`primitive`** (optional) is one of the hierarchy toolbar's primitives,
+**`primitive`** (optional) is one of the GameObject menu's primitives,
 case-insensitive: `Box`, `Sphere`, `Plane`, `Cylinder` (meshes) or `PointLight`,
 `DirectionalLight`, `SpotLight`. Omit it (or pass an unknown name) to create a bare
-entity carrying only its mandatory `Transform`.
+entity carrying only its mandatory `Transform` — the menu's **Create Empty**.
 
 **`kind`** is one of the Add Component menu's first-class components,
 case-insensitive: `Light`, `Health`, `Animator`, `Collider`, `RigidBody`,
