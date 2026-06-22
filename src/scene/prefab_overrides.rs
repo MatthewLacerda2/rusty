@@ -8,11 +8,10 @@
 //! component with **no per-component code**, and covers component add/remove too — a
 //! `None`↔`Some` at a component path is just another diff leaf.
 //!
-//! The two verbs are symmetric:
-//!   - [`diff_entity`] (instance vs. baseline) -> the override map.
-//!   - [`apply_overrides`] (baseline + override map) -> the instance.
-//! so `apply_overrides(baseline, diff_entity(instance, baseline))` reproduces the
-//! instance, and propagation is "rebuild from a fresh baseline, then re-apply the
+//! The two verbs are symmetric: [`diff_entity`] (instance vs. baseline) yields the
+//! override map, and [`apply_overrides`] (baseline + override map) reproduces the
+//! instance. So `apply_overrides(baseline, diff_entity(instance, baseline))` round-
+//! trips, and propagation is "rebuild from a fresh baseline, then re-apply the
 //! recorded map on top".
 //!
 //! Leaves are compared on the entity's serde JSON form with the volatile/identity
@@ -173,15 +172,25 @@ fn set_pointer(value: &mut Value, pointer: &str, leaf: Value) {
 }
 
 /// Step one token into a container, materializing a missing object key as an empty
-/// object so a deep override path can be created. Returns `None` for an out-of-range
-/// array index (we never grow arrays).
+/// object so a deep override path can be created. A child slot that is currently
+/// `null` (an absent component being *added* by the override) is promoted to an empty
+/// object first, so paths like `/health/current_health` can be built over a `None`
+/// baseline. Returns `None` for an out-of-range array index (we never grow arrays).
 fn descend<'a>(cursor: &'a mut Value, token: &str) -> Option<&'a mut Value> {
     match cursor {
-        Value::Object(map) => Some(
-            map.entry(token.to_string())
-                .or_insert(Value::Object(serde_json::Map::new())),
-        ),
-        Value::Array(items) => token.parse::<usize>().ok().and_then(move |i| items.get_mut(i)),
+        Value::Object(map) => {
+            let slot = map
+                .entry(token.to_string())
+                .or_insert_with(|| Value::Object(serde_json::Map::new()));
+            if slot.is_null() {
+                *slot = Value::Object(serde_json::Map::new());
+            }
+            Some(slot)
+        }
+        Value::Array(items) => token
+            .parse::<usize>()
+            .ok()
+            .and_then(move |i| items.get_mut(i)),
         _ => None,
     }
 }

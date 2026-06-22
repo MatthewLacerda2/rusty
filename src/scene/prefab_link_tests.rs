@@ -4,7 +4,7 @@ use super::*;
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::{
     apply_scene_data, load_and_instantiate_linked, save_prefab, to_scene_data, MaterialAsset,
-    MaterialComponent,
+    MaterialComponent, SceneData,
 };
 
 /// Author a 2-entity prefab (Box root + Sphere child, root carrying a "Stone"
@@ -140,7 +140,8 @@ fn revert_drops_overrides_and_restores_source() {
     revert_instance_overrides(&mut scene, root).unwrap();
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
     assert_eq!(
-        scene.get_entity(root).unwrap().transform.position.x, 0.0,
+        scene.get_entity(root).unwrap().transform.position.x,
+        0.0,
         "reverted to the source's value"
     );
 }

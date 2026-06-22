@@ -54,8 +54,8 @@ pub use prefab::{
     PREFAB_EXTENSION,
 };
 pub use prefab_link::{
-    list_instance_overrides, reimport_all_linked_instances, reimport_instance,
-    record_instance_overrides, revert_instance_overrides,
+    list_instance_overrides, record_instance_overrides, reimport_all_linked_instances,
+    reimport_instance, revert_instance_overrides,
 };
 pub use probe::{Probe, ProbeGrid, ProbeVolume};
 pub use probe_fill::{analytic_fill, AnalyticEnv};

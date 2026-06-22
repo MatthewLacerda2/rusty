@@ -29,7 +29,12 @@ use crate::scene::{instantiate_prefab, PrefabData, Scene};
 /// descendant that shares the root's `prefab_link.source`. Returns `None` if `root_id`
 /// is not a linked instance root.
 fn instance_entity_ids(scene: &Scene, root_id: u32) -> Option<Vec<u32>> {
-    let source = scene.get_entity(root_id)?.prefab_link.as_ref()?.source.clone();
+    let source = scene
+        .get_entity(root_id)?
+        .prefab_link
+        .as_ref()?
+        .source
+        .clone();
     let mut ids = Vec::new();
     let mut stack = vec![root_id];
     while let Some(id) = stack.pop() {
@@ -60,9 +65,6 @@ fn fresh_baselines(scene: &mut Scene, prefab: &PrefabData) -> BTreeMap<u32, Enti
     scratch.materials = scene.materials.clone();
     let root = instantiate_prefab(&mut scratch, prefab, None);
 
-    // Carry back any materials the merge added (a brand-new key, or a uniquified one).
-    scene.materials = scratch.materials;
-
     // Map each scratch entity back to its source local id via subtree order: the
     // instantiate assigned local `l` -> `base + l`, so subtracting the base recovers
     // `l`. The base is the scratch root's id minus the prefab root's local id.
@@ -73,6 +75,9 @@ fn fresh_baselines(scene: &mut Scene, prefab: &PrefabData) -> BTreeMap<u32, Enti
             out.insert(id.wrapping_sub(base), (*entity).clone());
         }
     }
+
+    // Carry back any materials the merge added (a brand-new key, or a uniquified one).
+    scene.materials = scratch.materials;
     out
 }
 
@@ -214,7 +219,11 @@ fn require_instance(scene: &Scene, root_id: u32) -> Result<Vec<u32>, String> {
 
 /// The source `local_id` recorded on entity `id`, if it is linked.
 fn local_id_of(scene: &Scene, id: u32) -> Option<u32> {
-    scene.get_entity(id)?.prefab_link.as_ref().map(|l| l.local_id)
+    scene
+        .get_entity(id)?
+        .prefab_link
+        .as_ref()
+        .map(|l| l.local_id)
 }
 
 /// Read the `.prefab` file an instance's root links to.
@@ -227,7 +236,11 @@ fn load_instance_source(scene: &Scene, root_id: u32) -> Result<PrefabData, Strin
 fn link_source(scene: &Scene, root_id: u32) -> Result<String, String> {
     scene
         .get_entity(root_id)
-        .and_then(|e| e.prefab_link.as_ref().map(|l: &PrefabLink| l.source.clone()))
+        .and_then(|e| {
+            e.prefab_link
+                .as_ref()
+                .map(|l: &PrefabLink| l.source.clone())
+        })
         .ok_or_else(|| format!("entity {root_id} is not a linked prefab instance"))
 }
 

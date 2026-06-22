@@ -177,5 +177,8 @@ fn unpacked_instantiate_leaves_no_link_linked_stamps_one() {
     let link = b.get_entity(rb).unwrap().prefab_link.clone().unwrap();
     assert_eq!(link.source, "Enemy.prefab");
     assert_eq!(link.local_id, 0);
-    assert!(link.overrides.is_empty(), "a fresh instance has no overrides");
+    assert!(
+        link.overrides.is_empty(),
+        "a fresh instance has no overrides"
+    );
 }

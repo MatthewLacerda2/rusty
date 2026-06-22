@@ -207,4 +207,3 @@ fn register_save<'lua, 'scope>(
         }),
     )
 }
-

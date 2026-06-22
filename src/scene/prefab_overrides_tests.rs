@@ -10,6 +10,15 @@ fn base() -> Entity {
     e
 }
 
+/// A health component with distinctive values (no `Default` on the type).
+fn health() -> HealthComponent {
+    HealthComponent {
+        current_health: 75.0,
+        max_health: 100.0,
+        is_dead: false,
+    }
+}
+
 #[test]
 fn identical_entities_have_no_overrides() {
     let baseline = base();
@@ -24,14 +33,17 @@ fn a_changed_scalar_is_a_single_pointer_override() {
     instance.transform.position.x = 9.0;
     let diff = diff_entity(&instance, &baseline);
     assert_eq!(diff.len(), 1, "only the one leaf differs: {diff:?}");
-    assert_eq!(diff.get("/transform/position/0"), Some(&serde_json::json!(9.0)));
+    assert_eq!(
+        diff.get("/transform/position/0"),
+        Some(&serde_json::json!(9.0))
+    );
 }
 
 #[test]
 fn adding_a_component_is_an_override_at_its_path() {
     let baseline = base();
     let mut instance = baseline.clone();
-    instance.health = Some(HealthComponent::default());
+    instance.health = Some(health());
     let diff = diff_entity(&instance, &baseline);
     // The added component surfaces as one-or-more leaves under `/health`.
     assert!(
@@ -43,7 +55,7 @@ fn adding_a_component_is_an_override_at_its_path() {
 #[test]
 fn removing_a_component_overrides_it_to_null() {
     let mut baseline = base();
-    baseline.health = Some(HealthComponent::default());
+    baseline.health = Some(health());
     let mut instance = baseline.clone();
     instance.health = None;
     let diff = diff_entity(&instance, &baseline);
@@ -77,9 +89,10 @@ fn apply_round_trips_a_diff() {
 #[test]
 fn identity_and_geometry_are_never_overrides() {
     let mut baseline = base();
-    baseline.mesh = Some(crate::scene::authoring::primitive_mesh_component(
-        crate::scene::authoring::Primitive::Box,
-    ).unwrap());
+    baseline.mesh = Some(
+        crate::scene::authoring::primitive_mesh_component(crate::scene::authoring::Primitive::Box)
+            .unwrap(),
+    );
     let mut instance = baseline.clone();
     // Different id / parent / a fatter (rehydrated) mesh must NOT be diffed.
     instance.id = 999;
@@ -99,4 +112,36 @@ fn applying_an_empty_diff_is_a_noop() {
     let mut rebuilt = baseline.clone();
     apply_overrides(&mut rebuilt, &Default::default());
     assert!(diff_entity(&rebuilt, &baseline).is_empty());
+}
+
+#[test]
+fn apply_can_add_a_component_over_a_none_baseline() {
+    // The baseline has NO health; the instance ADDS one. Round-tripping the diff must
+    // rebuild the whole component (the override paths are created over a `null` slot).
+    let baseline = base();
+    let mut instance = baseline.clone();
+    instance.health = Some(health());
+    let diff = diff_entity(&instance, &baseline);
+
+    let mut rebuilt = baseline.clone();
+    apply_overrides(&mut rebuilt, &diff);
+    let h = rebuilt.health.as_ref().expect("added component rebuilt");
+    assert_eq!(h.current_health, 75.0);
+    assert_eq!(h.max_health, 100.0);
+}
+
+#[test]
+fn apply_can_remove_a_component_via_null() {
+    // The baseline HAS health; a `/health -> null` override drops it.
+    let mut baseline = base();
+    baseline.health = Some(health());
+    let mut overrides = std::collections::BTreeMap::new();
+    overrides.insert("/health".to_string(), serde_json::Value::Null);
+
+    let mut rebuilt = baseline.clone();
+    apply_overrides(&mut rebuilt, &overrides);
+    assert!(
+        rebuilt.health.is_none(),
+        "null override removes the component"
+    );
 }
