@@ -26,6 +26,7 @@ pub mod bridge;
 pub mod console;
 pub mod demo_scene;
 pub mod harness;
+pub mod probe_bake;
 pub mod scenario;
 pub mod screenshot;
 pub mod session;

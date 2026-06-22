@@ -83,7 +83,8 @@ fn register_placement<'lua, 'scope>(
     )
 }
 
-/// `FillGrid` (bounds + spacing) and `BakeAnalytic` (the deterministic stand-in fill).
+/// `FillGrid` (bounds + spacing), `BakeAnalytic` (the deterministic stand-in fill),
+/// and the dev-only `Bake` (the real rendered-capture → SH bake, #241).
 fn register_fill<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,
@@ -114,7 +115,41 @@ fn register_fill<'lua, 'scope>(
             crate::scene::probe_fill::analytic_fill(&mut scene);
             Ok(())
         }),
+    )?;
+
+    register_bake(scope, table, scene)
+}
+
+/// The real bake (`Probe.Bake()`): capture each probe's static surroundings to a
+/// cubemap and project the bounce into SH (#241). Dev-only — it drives the GPU via a
+/// headless renderer — returning `true` when the bake ran, `false` when no adapter was
+/// available (skipped gracefully). With the `dev` feature off the entry is simply
+/// absent, matching the stripped agentic layer.
+#[cfg(feature = "dev")]
+fn register_bake<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "Bake",
+        scope.create_function(|_, ()| {
+            let mut scene = scene.borrow_mut();
+            crate::dev::probe_bake::bake_scene_probes(&mut scene).map_err(mlua::Error::external)
+        }),
     )
+}
+
+/// No-op `register_bake` when the `dev` feature is off — `Probe.Bake` is a dev action
+/// and isn't registered in a ship build.
+#[cfg(not(feature = "dev"))]
+fn register_bake<'lua, 'scope>(
+    _scope: &mlua::Scope<'lua, 'scope>,
+    _table: &mlua::Table,
+    _scene: &'scope RefCell<Scene>,
+) -> Reg {
+    Ok(())
 }
 
 /// `SampleIrradiance(x,y,z, nx,ny,nz)` — the interpolated probe irradiance for a
@@ -187,6 +222,27 @@ mod tests {
                 .eval()
                 .unwrap();
             assert!(r > 0.0, "expected non-zero baked irradiance, got {r}");
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    /// `Probe.Bake()` returns a boolean (`true` when the GPU bake ran, `false` when no
+    /// adapter is available) and never errors — adapter-independent, so it passes on a
+    /// GPU-less CI host as well as one with lavapipe. The deeper "produces a directional
+    /// coloured bounce" assertion lives in `render::probe_bake_tests`, which owns the
+    /// scene + geometry; here we only verify the namespace wiring and the skip contract.
+    #[cfg(feature = "dev")]
+    #[test]
+    fn bake_returns_bool_and_skips_gracefully() {
+        let scene = empty_scene();
+        let lua = Lua::new();
+        lua.scope(|scope| {
+            register(&lua, scope, &scene).unwrap();
+            lua.load("Probe.FillGrid(0,0,0, 1,1,1, 1)").exec().unwrap();
+            let ran: bool = lua.load("return Probe.Bake()").eval().unwrap();
+            // A `bool` came back without an error — that's the wiring + skip contract.
+            let _ = ran;
             Ok(())
         })
         .unwrap();
