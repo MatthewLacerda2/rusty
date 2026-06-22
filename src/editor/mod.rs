@@ -18,6 +18,7 @@ mod inspector_script_fields;
 mod inspector_settings;
 mod inspector_transform;
 pub mod inspectors;
+mod menu_create;
 pub mod theme;
 pub mod viewport;
 pub mod viewport_gizmo;
@@ -46,8 +47,6 @@ pub struct EditorUi {
     pub current_scene_path: Option<String>,
     pub current_dir: String,
     pub is_dirty: bool,
-    new_entity_name: String,
-    new_entity_type: String,
     assets_scripts: Vec<String>,
     assets_textures: Vec<String>,
 
@@ -120,8 +119,6 @@ impl EditorUi {
             current_scene_path: None,
             current_dir: "project".to_string(),
             is_dirty: true,
-            new_entity_name: "New Primitive".to_string(),
-            new_entity_type: "Box".to_string(),
             assets_scripts: Vec::new(),
             assets_textures: Vec::new(),
 

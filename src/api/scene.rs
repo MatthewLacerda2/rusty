@@ -1,11 +1,11 @@
 //! src/api/scene.rs — `Scene` namespace.
 //!
-//! The structural-authoring surface, mirroring the editor's hierarchy toolbar and
+//! The structural-authoring surface, mirroring the editor's GameObject menu and
 //! the inspector's Add Component menu (issue #181). Every verb routes through the
 //! shared `scene::authoring` module so the API and the editor can never drift:
 //!
 //!   - `FindEntityByName(name)` — lookup, `0` if absent.
-//!   - `CreateEntity(name, [primitive])` — the toolbar's primitive set.
+//!   - `CreateEntity(name, [primitive])` — the GameObject menu's primitive set.
 //!   - `Deactivate(id)` — Unity's deferred `Object.Destroy` (sets `active = false`).
 //!   - `DestroyEntity(id)` — **really** removes the entity (the editor's Destroy).
 //!   - `AddComponent(id, kind)` / `RemoveComponent(id, kind)` — the Add Component
@@ -59,8 +59,8 @@ fn register_lookup_create<'lua, 'scope>(
     )?;
 
     // `CreateEntity(name, [primitive])`: an absent/empty/unknown primitive name
-    // creates a bare transform-only entity, matching the toolbar. Returns the new
-    // entity's stable id.
+    // creates a bare transform-only entity, matching the GameObject menu's Create
+    // Empty. Returns the new entity's stable id.
     put(
         table,
         "CreateEntity",
