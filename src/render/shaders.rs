@@ -103,6 +103,7 @@ mod tests {
             "shader.wgsl",
             "shadow.wgsl",
             "skybox.wgsl",
+            "sky_gradient.wgsl",
             "particles.wgsl",
             "decals.wgsl",
             "postfx.wgsl",

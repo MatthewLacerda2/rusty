@@ -403,9 +403,9 @@
   "selected_entity_id": null,
   "skybox_path": "",
   "ambient_color": [
-    0.16,
-    0.1,
-    0.22
+    0.45,
+    0.55,
+    0.7
   ],
-  "ambient_intensity": 0.35
+  "ambient_intensity": 0.55
 }

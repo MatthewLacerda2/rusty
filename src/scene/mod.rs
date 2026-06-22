@@ -59,6 +59,7 @@ pub use scene::{
     LightType, MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent, Particle,
     ParticleBlend, ParticleEmitterComponent, RigidBodyComponent, Scene, ScriptComponent,
     ScriptFieldValue, TextureComponent, Tonemap, TransformComponent, VisualCorrectionComponent,
+    DEFAULT_AMBIENT_COLOR, DEFAULT_AMBIENT_INTENSITY,
 };
 pub use serialize::{apply_scene_data, asset_mesh_component, to_scene_data, SceneData};
 pub use sh::{Sh9, SH_COEFFS};

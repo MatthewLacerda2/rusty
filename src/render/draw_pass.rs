@@ -126,11 +126,20 @@ impl Renderer {
         }
 
         // Render Skybox last (optimization). Only a Skybox camera paints it — a
-        // DepthOnly/SolidColor overlay must not overwrite the world below it.
+        // DepthOnly/SolidColor overlay must not overwrite the world below it. With a
+        // panorama bound we draw it; with none, a Skybox camera falls back to the
+        // procedural sky->horizon->ground gradient (#256) instead of the flat
+        // backdrop, so an empty scene reads as a lit environment (Unity's default-
+        // skybox fallback). Both paint only the far-plane pixels no geometry covered.
         if clear.flags == ClearFlags::Skybox {
-            if let Some(skybox_tex) = &self.skybox_texture {
-                self.skybox_renderer
-                    .draw(&mut render_pass, &self.global_bind_group, skybox_tex);
+            match &self.skybox_texture {
+                Some(skybox_tex) => {
+                    self.skybox_renderer
+                        .draw(&mut render_pass, &self.global_bind_group, skybox_tex)
+                }
+                None => self
+                    .skybox_renderer
+                    .draw_gradient(&mut render_pass, &self.global_bind_group),
             }
         }
 

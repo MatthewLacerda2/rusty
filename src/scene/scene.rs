@@ -30,11 +30,24 @@ pub use crate::components::{
 fn default_skybox_path() -> String {
     "".to_string()
 }
+
+/// The default hemisphere-ambient SKY colour (the up-facing tint) — a soft daylight
+/// blue. This is the engine's single source of truth for the default ambient: the
+/// serde defaults in `serialize.rs` re-export it, and the procedural gradient sky
+/// (#256) derives its dome from the same `lighting.ambient` uniform the surface
+/// shader reads, so background and lighting always agree. The ground term is this
+/// colour scaled down in the shader. Bright/coloured enough that two differently
+/// oriented faces visibly differ with NO baked probes and without a direct light on
+/// every face.
+pub const DEFAULT_AMBIENT_COLOR: Vec3 = Vec3::new(0.45, 0.55, 0.70);
+/// The default hemisphere-ambient intensity (scales [`DEFAULT_AMBIENT_COLOR`]).
+pub const DEFAULT_AMBIENT_INTENSITY: f32 = 0.55;
+
 fn default_ambient_color() -> Vec3 {
-    Vec3::new(0.03, 0.03, 0.045)
+    DEFAULT_AMBIENT_COLOR
 }
 fn default_ambient_intensity() -> f32 {
-    0.24
+    DEFAULT_AMBIENT_INTENSITY
 }
 
 pub struct Scene {
