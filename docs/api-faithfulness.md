@@ -80,8 +80,9 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 |---|---|---|
 | `DestroyEntity` | ✅ | sim + renderer — sets `active=false`; both `draw_resources` and the sim skip inactive entities; round-trips |
 | `Instantiate` (linked prefab) | ✅ | stamps `Entity.prefab_link` on every instance entity; read by `apply_scene_data`'s load-time propagation + `ReimportPrefab`; the link + its overrides round-trip through `SceneData` (#216) |
-| `ApplyPrefabChanges` | ✅ | round-trip — records the instance↔source diff into `prefab_link.overrides`; observable via `ListPrefabOverrides` and re-applied by propagation |
+| `RecordPrefabOverrides` | ✅ | round-trip — records the instance↔source diff into `prefab_link.overrides`; observable via `ListPrefabOverrides` and re-applied by propagation |
 | `RevertPrefabOverrides` / `ReimportPrefab` | ✅ | rebuild each instance entity from a fresh source baseline (re-applying overrides on reimport); the resulting component values feed the same renderer/sim read-sites as any edited entity |
+| `ApplyPrefabToSource` / `ApplyPrefabFieldToSource` | ✅ | write the instance's overrides into the source `.prefab` on disk (reusing the override setter + the one `.prefab` writer), then clear them — other instances pick the edit up on reload/reimport (#268) |
 
 ### `NavMeshAgent` — over `Entity.nav_agent`
 

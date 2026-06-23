@@ -1,10 +1,12 @@
 //! src/editor/inspector_prefab.rs — the linked-prefab-instance override card (#263).
 //!
-//! The editor half of prefab instances (#216 / #260): for an entity that carries a
-//! [`crate::scene::PrefabLink`], it surfaces — Unity-style — which fields diverge from
-//! the linked source and lets the author Apply / Revert them. Every button maps onto
-//! the SAME verbs the `Scene.*` API and console drive (`record_instance_overrides` /
-//! `revert_instance_overrides` / `reimport_instance`), so there is no second code path.
+//! The editor half of prefab instances (#216 / #260 / #268): for an entity that carries
+//! a [`crate::scene::PrefabLink`], it surfaces — Unity-style — which fields diverge from
+//! the linked source and lets the author Record / Revert them on the instance, or Apply
+//! them back into the source `.prefab`. Every button maps onto the SAME verbs the
+//! `Scene.*` API and console drive (`record_instance_overrides` /
+//! `revert_instance_overrides` / `reimport_instance` / `apply_instance_to_source` /
+//! `apply_instance_field_to_source`), so there is no second code path.
 //!
 //! The card is the deferred-action sort the rest of the inspector uses: it only reads
 //! the live entity (the override map lives on its `prefab_link`) and emits a
@@ -18,16 +20,19 @@ use crate::editor::theme;
 use crate::scene::{authoring, Entity, Scene};
 
 /// A prefab-override edit the card requested this frame, dispatched by the caller once
-/// the entity guard has dropped (the verbs need `&mut Scene`). All whole-object verbs
-/// take the instance ROOT id; a per-field revert also carries the entity + json-pointer
-/// path so exactly that one leaf drops back to the source.
+/// the entity guard has dropped (the verbs need `&mut Scene`). Whole-object verbs take
+/// the instance ROOT id; the per-field verbs also carry the entity + json-pointer path
+/// so exactly that one leaf is reverted / pushed to source.
 pub enum PrefabAction {
-    /// Record the instance's current edits as overrides (`Scene.ApplyPrefabChanges`).
-    Apply(u32),
+    /// Record the instance's current edits as overrides (`Scene.RecordPrefabOverrides`).
+    Record(u32),
     /// Drop every override and rebuild from the source (`Scene.RevertPrefabOverrides`).
     Revert(u32),
     /// Re-baseline from the source, re-applying overrides (`Scene.ReimportPrefab`).
     Reimport(u32),
+    /// Write every override back into the source `.prefab`, then clear them on the
+    /// instance (`Scene.ApplyPrefabToSource`).
+    ApplyToSource(u32),
     /// Revert one overridden field: drop `path` from `entity`'s override map, then
     /// reimport the instance rooted at `root` so that leaf tracks the source again.
     RevertField {
@@ -35,6 +40,10 @@ pub enum PrefabAction {
         entity: u32,
         path: String,
     },
+    /// Write one overridden field back into the source `.prefab`, then clear it on the
+    /// instance (`Scene.ApplyPrefabFieldToSource`). The verb resolves the instance root
+    /// from `entity` and reimports it afterwards, so no separate `root` is needed.
+    ApplyFieldToSource { entity: u32, path: String },
 }
 
 /// Draw the prefab-instance card for `entity`, if it is a linked instance. `root` is
@@ -54,34 +63,34 @@ pub fn draw(ui: &mut egui::Ui, entity: &Entity, root: u32) -> Option<PrefabActio
     action
 }
 
-/// The whole-object Apply / Revert / Reimport row. Apply records the instance's edits;
-/// Revert drops every override; Reimport re-pulls the source under the overrides.
+/// The whole-object button block. Top row is instance-side (Record edits as overrides,
+/// Revert all, Reimport from source); the bottom row is the apply-to-source direction
+/// (write every override back into the `.prefab`, then clear them on the instance).
 fn draw_object_buttons(ui: &mut egui::Ui, root: u32) -> Option<PrefabAction> {
     let mut action = None;
     ui.horizontal(|ui| {
-        if ui
-            .button(format!("{}  Apply All", icon::ARROW_SQUARE_UP))
-            .on_hover_text("Record this instance's edits as overrides (Scene.ApplyPrefabChanges)")
-            .clicked()
-        {
-            action = Some(PrefabAction::Apply(root));
+        if labeled(ui, icon::FLOPPY_DISK, "Record", "Record this instance's edits as overrides (Scene.RecordPrefabOverrides)") {
+            action = Some(PrefabAction::Record(root));
         }
-        if ui
-            .button(format!("{}  Revert All", icon::ARROW_COUNTER_CLOCKWISE))
-            .on_hover_text("Drop every override and rebuild from the source")
-            .clicked()
-        {
+        if labeled(ui, icon::ARROW_COUNTER_CLOCKWISE, "Revert All", "Drop every override and rebuild from the source") {
             action = Some(PrefabAction::Revert(root));
         }
-        if ui
-            .button(format!("{}  Reimport", icon::ARROWS_CLOCKWISE))
-            .on_hover_text("Re-pull the source, keeping overrides")
-            .clicked()
-        {
+        if labeled(ui, icon::ARROWS_CLOCKWISE, "Reimport", "Re-pull the source, keeping overrides") {
             action = Some(PrefabAction::Reimport(root));
         }
     });
+    if labeled(ui, icon::ARROW_SQUARE_UP, "Apply All to Source", "Write every override back into the source .prefab, then clear them (Scene.ApplyPrefabToSource)") {
+        action = Some(PrefabAction::ApplyToSource(root));
+    }
     action
+}
+
+/// A labelled button with an icon and a hover tooltip; returns whether it was clicked.
+/// Factored out so the object-button rows stay short and uniform.
+fn labeled(ui: &mut egui::Ui, glyph: &str, label: &str, hover: &str) -> bool {
+    ui.button(format!("{glyph}  {label}"))
+        .on_hover_text(hover)
+        .clicked()
 }
 
 /// The per-field override list: one row per overridden leaf on `entity`, each with the
@@ -110,7 +119,8 @@ fn draw_overrides_list(
     }
 }
 
-/// One override row: the blue dot, the field label, and a per-field Revert button.
+/// One override row: the blue dot, the field label, a per-field "apply to source"
+/// button, and a per-field Revert button.
 fn draw_override_row(
     ui: &mut egui::Ui,
     blue: egui::Color32,
@@ -122,6 +132,16 @@ fn draw_override_row(
     ui.horizontal(|ui| {
         ui.colored_label(blue, icon::CIRCLE);
         ui.label(field_label(path));
+        if ui
+            .small_button(icon::ARROW_SQUARE_UP)
+            .on_hover_text("Apply this field to the source .prefab")
+            .clicked()
+        {
+            *action = Some(PrefabAction::ApplyFieldToSource {
+                entity,
+                path: path.to_string(),
+            });
+        }
         if ui
             .small_button(icon::ARROW_COUNTER_CLOCKWISE)
             .on_hover_text("Revert this field to the source")
@@ -179,11 +199,17 @@ pub fn instance_root(scene: &Scene, selected_id: u32) -> u32 {
 /// scene changed (so the caller can mark the editor dirty).
 pub fn dispatch(scene: &mut Scene, action: PrefabAction) -> bool {
     match action {
-        PrefabAction::Apply(root) => authoring::record_instance_overrides(scene, root).is_ok(),
+        PrefabAction::Record(root) => authoring::record_instance_overrides(scene, root).is_ok(),
         PrefabAction::Revert(root) => authoring::revert_instance_overrides(scene, root).is_ok(),
         PrefabAction::Reimport(root) => authoring::reimport_instance(scene, root).is_ok(),
+        PrefabAction::ApplyToSource(root) => {
+            authoring::apply_instance_to_source(scene, root).is_ok()
+        }
         PrefabAction::RevertField { root, entity, path } => {
             revert_field(scene, root, entity, &path)
+        }
+        PrefabAction::ApplyFieldToSource { entity, path } => {
+            authoring::apply_instance_field_to_source(scene, entity, &path).is_ok()
         }
     }
 }

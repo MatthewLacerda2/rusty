@@ -27,6 +27,7 @@ pub mod layers;
 pub mod lighting_io;
 pub mod lighting_placement;
 pub mod prefab;
+pub mod prefab_apply;
 pub mod prefab_link;
 pub mod prefab_overrides;
 pub mod probe;
@@ -50,9 +51,10 @@ pub use lighting_io::{
 };
 pub use prefab::{
     extract_prefab, instantiate_prefab, instantiate_prefab_linked, is_prefab_path,
-    load_and_instantiate, load_and_instantiate_linked, read_prefab_file, save_prefab, PrefabData,
-    PREFAB_EXTENSION,
+    load_and_instantiate, load_and_instantiate_linked, read_prefab_file, save_prefab,
+    write_prefab_file, PrefabData, PREFAB_EXTENSION,
 };
+pub use prefab_apply::{apply_instance_field_to_source, apply_instance_to_source};
 pub use prefab_link::{
     list_instance_overrides, record_instance_overrides, reimport_all_linked_instances,
     reimport_instance, revert_instance_overrides,

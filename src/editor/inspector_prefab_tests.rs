@@ -56,14 +56,50 @@ fn instance_root_of_a_plain_entity_is_itself() {
 }
 
 #[test]
-fn apply_action_records_overrides_like_the_api() {
-    let (mut scene, root) = linked("apply");
+fn record_action_records_overrides_like_the_api() {
+    let (mut scene, root) = linked("record");
     scene.get_entity_mut(root).unwrap().transform.position.x = 5.0;
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
 
-    assert!(dispatch(&mut scene, PrefabAction::Apply(root)));
-    // Same effect as Scene.ApplyPrefabChanges: the divergence is now recorded.
+    assert!(dispatch(&mut scene, PrefabAction::Record(root)));
+    // Same effect as Scene.RecordPrefabOverrides: the divergence is now recorded.
     assert!(!list_instance_overrides(&scene, root).unwrap().is_empty());
+}
+
+#[test]
+fn apply_to_source_action_writes_prefab_and_clears_overrides() {
+    let (mut scene, root) = linked("apply_to_source");
+    scene.get_entity_mut(root).unwrap().transform.position.x = 6.0;
+    record_instance_overrides(&mut scene, root).unwrap();
+
+    // Apply-to-source clears the instance overrides (it now matches the source) and the
+    // value persists, baked into the .prefab. Same effect as Scene.ApplyPrefabToSource.
+    assert!(dispatch(&mut scene, PrefabAction::ApplyToSource(root)));
+    assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
+    assert_eq!(scene.get_entity(root).unwrap().transform.position.x, 6.0);
+}
+
+#[test]
+fn apply_field_to_source_action_clears_only_that_field() {
+    let (mut scene, root) = linked("apply_field");
+    {
+        let mut e = scene.get_entity_mut(root).unwrap();
+        e.transform.position.x = 2.0;
+        e.transform.position.y = 3.0;
+    }
+    record_instance_overrides(&mut scene, root).unwrap();
+
+    let action = PrefabAction::ApplyFieldToSource {
+        entity: root,
+        path: "/transform/position/0".to_string(),
+    };
+    assert!(dispatch(&mut scene, action));
+    // X is now in the source (override cleared); Y stays an override.
+    let remaining = list_instance_overrides(&scene, root).unwrap();
+    assert_eq!(remaining, vec!["0:/transform/position/1".to_string()]);
+    let e = scene.get_entity(root).unwrap();
+    assert_eq!(e.transform.position.x, 2.0);
+    assert_eq!(e.transform.position.y, 3.0);
 }
 
 #[test]
@@ -133,9 +169,10 @@ fn actions_on_a_plain_entity_report_no_change() {
     let mut scene = Scene::new();
     let plain = create_entity(&mut scene, "Plain", None);
     // The verbs error on a non-instance, so dispatch reports "no change" (false).
-    assert!(!dispatch(&mut scene, PrefabAction::Apply(plain)));
+    assert!(!dispatch(&mut scene, PrefabAction::Record(plain)));
     assert!(!dispatch(&mut scene, PrefabAction::Revert(plain)));
     assert!(!dispatch(&mut scene, PrefabAction::Reimport(plain)));
+    assert!(!dispatch(&mut scene, PrefabAction::ApplyToSource(plain)));
 }
 
 #[test]
