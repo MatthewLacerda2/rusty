@@ -253,7 +253,13 @@ fn materials_equal(a: &MaterialAsset, b: &MaterialAsset) -> bool {
 pub fn save_prefab(scene: &Scene, root_id: u32, path: &str) -> Result<(), String> {
     let prefab = extract_prefab(scene, root_id)
         .ok_or_else(|| format!("SavePrefab: no entity with id {root_id}"))?;
-    let json = serde_json::to_string_pretty(&prefab)
+    write_prefab_file(&prefab, path)
+}
+
+/// Serialize `prefab` and write it to `path` as pretty JSON. The single writer for the
+/// `.prefab` format, shared by `save_prefab` and the apply-to-source verbs (#268).
+pub fn write_prefab_file(prefab: &PrefabData, path: &str) -> Result<(), String> {
+    let json = serde_json::to_string_pretty(prefab)
         .map_err(|e| format!("Failed to serialize prefab: {e}"))?;
     std::fs::write(path, json).map_err(|e| format!("Failed to write prefab file: {e}"))
 }

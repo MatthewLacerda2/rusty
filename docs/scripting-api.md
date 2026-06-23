@@ -189,9 +189,11 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.SavePrefab` | `(rootId, path)` | the written path |
 | `Scene.Instantiate` | `(path, …)` — see below | new entity `id` |
 | `Scene.InstantiateUnpacked` | `(prefabPath, [parentId])` | new entity `id` (an unlinked copy) |
-| `Scene.ApplyPrefabChanges` | `(instanceRootId)` | count of entities whose overrides were recorded |
+| `Scene.RecordPrefabOverrides` | `(instanceRootId)` | count of entities whose overrides were recorded |
 | `Scene.RevertPrefabOverrides` | `(instanceRootId)` | — (drops overrides, restores the source) |
 | `Scene.ReimportPrefab` | `(instanceRootId)` | — (re-baseline from source, re-apply overrides) |
+| `Scene.ApplyPrefabToSource` | `(instanceRootId)` | count of entities written back into the `.prefab` |
+| `Scene.ApplyPrefabFieldToSource` | `(entityId, jsonPointer)` | — (writes one leaf to the `.prefab`) |
 | `Scene.ListPrefabOverrides` | `(instanceRootId)` | array of `"localId:json-pointer"` strings |
 
 **`primitive`** (optional) is one of the GameObject menu's primitives,
@@ -268,7 +270,7 @@ one name and never drift.
 In every case the geometry is stored only as a reference and rehydrated on the next
 scene load, exactly like a primitive's `primitive_type` — no GPU buffers are inlined.
 
-#### Linked-instance overrides (apply / revert / reimport)
+#### Linked-instance overrides (record / revert / reimport / apply-to-source)
 
 A linked instance records its divergence from the source as a **generic field diff** —
 a map of `json-pointer-path → value` for each field where the instance differs from a
@@ -277,12 +279,18 @@ component add/remove — a `None`↔`Some` is just a diff at that path) with no 
 component code. The override set is carried on each instance entity's link, so it
 saves and loads with the scene.
 
-- **`Scene.ApplyPrefabChanges(instanceRootId)`** — record the instance's current edits
+Edits flow in two directions. **On-instance** verbs keep edits local to this instance;
+the **apply-to-source** verbs push them up into the shared `.prefab` so *other* instances
+get them. (Naming note (#268): the on-instance recorder is `RecordPrefabOverrides` —
+formerly `ApplyPrefabChanges`, renamed so "apply" unambiguously means apply-to-source.)
+
+On-instance:
+
+- **`Scene.RecordPrefabOverrides(instanceRootId)`** — record the instance's current edits
   as overrides (re-diffs every instance entity against a fresh source baseline and
   stores the result). Call it after editing an instance, while the source is unchanged,
   so the edits are preserved through later propagation. Returns the number of entities
-  recorded. *(Apply-to-source — pushing an instance's edits back into the `.prefab`
-  file — is a follow-up; this records them on the instance.)*
+  recorded.
 - **`Scene.RevertPrefabOverrides(instanceRootId)`** — drop every override and rebuild
   the instance straight from the current source (it becomes a pristine copy).
 - **`Scene.ReimportPrefab(instanceRootId)`** — re-baseline from the source and re-apply
@@ -293,11 +301,24 @@ saves and loads with the scene.
   recorded override paths as `"localId:json-pointer"` strings (e.g.
   `"0:/transform/position/0"`).
 
-All four error if `instanceRootId` is not a **linked** instance root. **Scope (#216):**
-a flat instance of a flat prefab — added/removed/reparented child entities and nested
-prefabs are out of scope (propagation matches entities by the link's source `local_id`,
-adding/removing nothing structurally). Saving an already-linked instance back out with
-`SavePrefab` bakes it down into a fresh flat prefab (no nested links).
+Apply-to-source (the Unity "Apply → Prefab" direction):
+
+- **`Scene.ApplyPrefabToSource(instanceRootId)`** — write *every* recorded override back
+  into the source `.prefab` document on disk, then clear them on the instance (it now
+  matches the source). Other instances of that prefab pick the change up on their next
+  scene load or `ReimportPrefab`. Returns the number of entities written.
+- **`Scene.ApplyPrefabFieldToSource(entityId, jsonPointer)`** — write *one* overridden
+  leaf back into the source, then drop just that override and reimport so the leaf
+  re-tracks the source (the instance's other overrides are untouched). `entityId` may be
+  any instance entity — root or child; the verb resolves the instance root itself. Errors
+  if the entity carries no override at `jsonPointer`.
+
+The verbs error if `instanceRootId` (or, for the field form, `entityId`) is not a
+**linked** instance entity. **Scope (#216):** a flat instance of a flat prefab —
+added/removed/reparented child entities and nested prefabs are out of scope (propagation
+matches entities by the link's source `local_id`, adding/removing nothing structurally).
+Saving an already-linked instance back out with `SavePrefab` bakes it down into a fresh
+flat prefab (no nested links).
 
 ## `Assets`
 

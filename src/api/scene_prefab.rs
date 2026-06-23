@@ -23,7 +23,8 @@ pub fn register<'lua, 'scope>(
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     register_save_and_spawn(scope, table, scene)?;
-    register_overrides(scope, table, scene)
+    register_overrides(scope, table, scene)?;
+    register_apply_to_source(scope, table, scene)
 }
 
 /// `SavePrefab` + the two spawn verbs (`Instantiate` linked, `InstantiateUnpacked`).
@@ -84,8 +85,10 @@ fn instantiate(
     }
 }
 
-/// The linked-instance verbs (#216): apply (record overrides), revert, reimport, and
-/// the list-overrides read verb. All take the instance ROOT id.
+/// The on-instance linked-instance verbs (#216): record the divergence as overrides,
+/// revert, reimport, and the list-overrides read verb. All take the instance ROOT id.
+/// `RecordPrefabOverrides` is the renamed-for-clarity former `ApplyPrefabChanges` —
+/// "record on the instance" vs. the true apply-to-source verbs below (#268).
 fn register_overrides<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,
@@ -93,7 +96,7 @@ fn register_overrides<'lua, 'scope>(
 ) -> Reg {
     put(
         table,
-        "ApplyPrefabChanges",
+        "RecordPrefabOverrides",
         scope.create_function(|_, root_id: u32| {
             authoring::record_instance_overrides(&mut scene.borrow_mut(), root_id)
                 .map_err(mlua::Error::RuntimeError)
@@ -123,6 +126,34 @@ fn register_overrides<'lua, 'scope>(
         "ListPrefabOverrides",
         scope.create_function(|_, root_id: u32| {
             authoring::list_instance_overrides(&scene.borrow(), root_id)
+                .map_err(mlua::Error::RuntimeError)
+        }),
+    )
+}
+
+/// The apply-to-source verbs (#268): write an instance's overrides BACK into the source
+/// `.prefab` on disk (so other instances pick the change up on reload/reimport), then
+/// clear them on the instance. Whole-object (`ApplyPrefabToSource(rootId)`) and per-
+/// field (`ApplyPrefabFieldToSource(entityId, jsonPointer)`) forms.
+fn register_apply_to_source<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "ApplyPrefabToSource",
+        scope.create_function(|_, root_id: u32| {
+            authoring::apply_instance_to_source(&mut scene.borrow_mut(), root_id)
+                .map_err(mlua::Error::RuntimeError)
+        }),
+    )?;
+
+    put(
+        table,
+        "ApplyPrefabFieldToSource",
+        scope.create_function(|_, (entity_id, path): (u32, String)| {
+            authoring::apply_instance_field_to_source(&mut scene.borrow_mut(), entity_id, &path)
                 .map_err(mlua::Error::RuntimeError)
         }),
     )
