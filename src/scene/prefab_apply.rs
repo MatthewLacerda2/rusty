@@ -105,7 +105,11 @@ fn instance_ids(scene: &Scene, root_id: u32) -> Result<Vec<u32>, String> {
         let Some(entity) = scene.get_entity(id) else {
             continue;
         };
-        if entity.prefab_link.as_ref().is_some_and(|l| l.source == source) {
+        if entity
+            .prefab_link
+            .as_ref()
+            .is_some_and(|l| l.source == source)
+        {
             ids.push(id);
             stack.extend(entity.children.iter().copied());
         }
@@ -141,7 +145,11 @@ fn link_source(scene: &Scene, id: u32) -> Result<String, String> {
 
 /// The source `local_id` recorded on entity `id`, if it is linked.
 fn local_id_of(scene: &Scene, id: u32) -> Option<u32> {
-    scene.get_entity(id)?.prefab_link.as_ref().map(|l| l.local_id)
+    scene
+        .get_entity(id)?
+        .prefab_link
+        .as_ref()
+        .map(|l| l.local_id)
 }
 
 /// Entity `id`'s recorded override map (empty if it has none / is unlinked).

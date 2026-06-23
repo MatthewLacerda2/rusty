@@ -69,13 +69,28 @@ pub fn draw(ui: &mut egui::Ui, entity: &Entity, root: u32) -> Option<PrefabActio
 fn draw_object_buttons(ui: &mut egui::Ui, root: u32) -> Option<PrefabAction> {
     let mut action = None;
     ui.horizontal(|ui| {
-        if labeled(ui, icon::FLOPPY_DISK, "Record", "Record this instance's edits as overrides (Scene.RecordPrefabOverrides)") {
+        if labeled(
+            ui,
+            icon::FLOPPY_DISK,
+            "Record",
+            "Record this instance's edits as overrides (Scene.RecordPrefabOverrides)",
+        ) {
             action = Some(PrefabAction::Record(root));
         }
-        if labeled(ui, icon::ARROW_COUNTER_CLOCKWISE, "Revert All", "Drop every override and rebuild from the source") {
+        if labeled(
+            ui,
+            icon::ARROW_COUNTER_CLOCKWISE,
+            "Revert All",
+            "Drop every override and rebuild from the source",
+        ) {
             action = Some(PrefabAction::Revert(root));
         }
-        if labeled(ui, icon::ARROWS_CLOCKWISE, "Reimport", "Re-pull the source, keeping overrides") {
+        if labeled(
+            ui,
+            icon::ARROWS_CLOCKWISE,
+            "Reimport",
+            "Re-pull the source, keeping overrides",
+        ) {
             action = Some(PrefabAction::Reimport(root));
         }
     });
