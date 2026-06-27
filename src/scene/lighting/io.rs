@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::scene::sh::Sh9;
+use crate::scene::lighting::sh::Sh9;
 use crate::scene::Scene;
 
 /// Suffix appended to a scene path to locate its lighting sidecar.

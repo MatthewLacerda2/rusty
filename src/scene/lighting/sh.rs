@@ -146,6 +146,6 @@ mod tests {
     }
 
     fn sphere_dirs() -> Vec<Vec3> {
-        crate::scene::probe_fill::fibonacci_sphere(512)
+        crate::scene::lighting::probe_fill::fibonacci_sphere(512)
     }
 }

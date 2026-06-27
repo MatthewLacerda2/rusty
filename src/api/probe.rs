@@ -112,7 +112,7 @@ fn register_fill<'lua, 'scope>(
         "BakeAnalytic",
         scope.create_function(|_, ()| {
             let mut scene = scene.borrow_mut();
-            crate::scene::probe_fill::analytic_fill(&mut scene);
+            crate::scene::lighting::probe_fill::analytic_fill(&mut scene);
             Ok(())
         }),
     )?;

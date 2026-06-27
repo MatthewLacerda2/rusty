@@ -17,7 +17,7 @@ use glam::{Mat4, Vec3, Vec4, Vec4Swizzles};
 
 use crate::render::ibl::cubemap_capture::face_camera;
 use crate::render::{CubemapCapture, CubemapFace, Renderer};
-use crate::scene::sh::Sh9;
+use crate::scene::lighting::sh::Sh9;
 use crate::scene::Scene;
 
 /// Default per-face capture resolution for a probe bake. Small is plenty: an L2 SH

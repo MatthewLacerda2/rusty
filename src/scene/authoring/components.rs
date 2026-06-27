@@ -9,7 +9,7 @@
 //!
 //! Allowed deps: components, scene.
 
-use crate::scene::authoring_defaults::{
+use crate::scene::authoring::defaults::{
     attach_default_material, default_animator, default_camera, default_collider, default_health,
     default_light, default_nav_agent, default_rigidbody, default_visual_correction,
 };

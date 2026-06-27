@@ -22,7 +22,7 @@
 //! Allowed deps: render (via the two bakes), scene (placement + data), navigation (read).
 
 use crate::navigation::NavigationGraph;
-use crate::scene::lighting_placement;
+use crate::scene::lighting::placement;
 use crate::scene::Scene;
 
 /// Tunables for the one-button bake. Defaults give a sensible mid-size-level layout;
@@ -95,7 +95,7 @@ fn auto_place_light(scene: &mut Scene, nav: Option<&NavigationGraph>, spacing: f
     if !scene.probes.is_empty() {
         return false;
     }
-    match lighting_placement::plan_light_probes(scene, nav, spacing) {
+    match placement::plan_light_probes(scene, nav, spacing) {
         Some(plan) => {
             scene.probes.fill_grid(plan.min, plan.max, plan.spacing);
             true
@@ -110,7 +110,7 @@ fn auto_place_reflection(scene: &mut Scene, params: &LightingBakeParams) -> bool
     if !scene.reflection_probes.is_empty() {
         return false;
     }
-    let plans = lighting_placement::plan_reflection_probes(
+    let plans = placement::plan_reflection_probes(
         scene,
         params.reflection_region,
         params.reflection_cap,

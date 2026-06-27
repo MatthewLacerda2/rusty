@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 use serde_json::Value;
 
 use crate::scene::prefab::{read_prefab_file, write_prefab_file};
-use crate::scene::prefab_overrides::apply_overrides;
+use crate::scene::prefab::overrides::apply_overrides;
 use crate::scene::{reimport_instance, revert_instance_overrides, PrefabData, Scene};
 
 /// Apply every recorded override on the instance rooted at `root_id` back into its

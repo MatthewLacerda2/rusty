@@ -112,7 +112,7 @@ fn bake_probes_fills_all_in_place() {
         .probes
         .probes
         .iter()
-        .all(|p| p.sh != crate::scene::sh::Sh9::zero()));
+        .all(|p| p.sh != crate::scene::lighting::sh::Sh9::zero()));
 }
 
 /// A synthetic cubemap with a single red face projects to a red, directional SH —

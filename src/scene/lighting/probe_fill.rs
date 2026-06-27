@@ -13,7 +13,7 @@
 
 use glam::Vec3;
 
-use crate::scene::sh::Sh9;
+use crate::scene::lighting::sh::Sh9;
 use crate::scene::{LightType, Scene};
 
 /// The environment the analytic fill projects: a uniform ambient sky radiance plus

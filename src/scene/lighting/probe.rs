@@ -22,7 +22,7 @@
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
-use crate::scene::sh::Sh9;
+use crate::scene::lighting::sh::Sh9;
 
 /// A single light probe: a world position plus the baked SH it carries. The SH is
 /// the heavy part; on disk the position lives in the scene and the SH in the

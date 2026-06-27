@@ -25,7 +25,7 @@ use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 
 /// A light-probe grid request: the inclusive `[min, max]` corners and the cell spacing,
-/// ready to hand to [`crate::scene::probe::ProbeVolume::fill_grid`].
+/// ready to hand to [`crate::scene::lighting::probe::ProbeVolume::fill_grid`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ProbeGridPlan {
     pub min: Vec3,

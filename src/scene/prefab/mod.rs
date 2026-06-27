@@ -1,23 +1,22 @@
-//! src/scene/prefab.rs — Prefabs v1 (unpacked instantiate).
+//! Prefabs v1 (unpacked instantiate).
 //!
-//! A *prefab* is a saved **GameObject subtree** — a root entity plus its whole
-//! child hierarchy, every component configured, every asset reference intact — kept
-//! in its own `.prefab` asset so it can be stamped into any scene as an independent
-//! copy. v1 is **unpacked**: each instance is a plain copy with no live link back to
-//! the asset (linked instances + overrides are the deferred follow-up #216).
-//!
-//! Like `SceneData`, a `PrefabData` is a references-only document: it stores entity
-//! component VALUES and the material-library slice the subtree references, never GPU
-//! buffers — meshes are rehydrated from their `primitive_type`/`asset_ref` on
-//! instantiate via the shared `serialize::rehydrate_entity_mesh`.
+//! A *prefab* is a saved **GameObject subtree** — a root entity plus its whole child
+//! hierarchy, every component configured, every asset reference intact — kept in its
+//! own `.prefab` asset so it can be stamped into any scene as an independent copy. v1
+//! is **unpacked**: each instance is a plain copy with no live link back to the asset
+//! (linked instances + overrides are the deferred follow-up #216). Like `SceneData`,
+//! a `PrefabData` is references-only: component VALUES + the material-library slice,
+//! never GPU buffers — meshes rehydrate from `primitive_type`/`asset_ref`.
 //!
 //! Ids are **local** (0-based, root = 0) so the file is self-contained and id-stable
-//! on disk regardless of the scene it came from. On instantiate they are remapped to
-//! fresh, sequential, deterministic scene ids (no wall-clock / RNG).
-//!
-//! The two canonical verbs (`extract_prefab` / `instantiate_prefab`) are re-exported
-//! through `scene::authoring`, the one shared structural-authoring module, so the
-//! editor and the API can never drift.
+//! on disk; on instantiate they are remapped to fresh, sequential, deterministic
+//! scene ids (no wall-clock / RNG). The canonical verbs (`extract_prefab` /
+//! `instantiate_prefab`) are re-exported through `scene::authoring` so editor and API
+//! can never drift. Apply/link/overrides for linked instances live in submodules.
+
+pub mod apply;
+pub mod link;
+pub mod overrides;
 
 use std::collections::BTreeMap;
 use std::path::Path;

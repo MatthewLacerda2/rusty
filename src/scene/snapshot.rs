@@ -21,7 +21,7 @@ pub struct SceneSnapshot {
     /// The full probe volume INCLUDING baked SH. `SceneData` skips probe SH (it
     /// lives in the sidecar on disk), but an in-memory snapshot must preserve it so
     /// exiting Play doesn't blank out probe-driven ambient (#240).
-    probes: crate::scene::probe::ProbeVolume,
+    probes: crate::scene::lighting::probe::ProbeVolume,
 }
 
 impl SceneSnapshot {

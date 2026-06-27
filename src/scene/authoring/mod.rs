@@ -14,17 +14,20 @@
 //!
 //! Allowed deps: components, render::mesh (primitive geometry), scene.
 
+pub mod components;
+pub mod defaults;
+
 use glam::Vec3;
 
 use crate::render::gpu::mesh as primitives;
 use crate::render::gpu::mesh::Vertex;
-use crate::scene::authoring_defaults::light;
+use crate::scene::authoring::defaults::light;
 use crate::scene::{LightComponent, LightType, MeshComponent, Scene};
 
 // Re-export the per-component defaults so callers (editor add-menu, `Scene.AddComponent`
 // API) reach them through this one entry point; they live in `authoring_defaults`
 // only to keep this module under the size cap.
-pub use crate::scene::authoring_defaults::{
+pub use crate::scene::authoring::defaults::{
     attach_default_material, default_animator, default_camera, default_collider, default_health,
     default_light, default_material, default_nav_agent, default_rigidbody,
     default_visual_correction, material_asset_from_import,
@@ -148,7 +151,7 @@ pub fn create_entity(scene: &mut Scene, name: &str, primitive: Option<Primitive>
 // The Add/Remove-Component verbs + their `ComponentKind` enum live in
 // `authoring_components` (size-cap split); re-exported so existing
 // `authoring::{ComponentKind, add_component, remove_component}` paths still resolve.
-pub use crate::scene::authoring_components::{add_component, remove_component, ComponentKind};
+pub use crate::scene::authoring::components::{add_component, remove_component, ComponentKind};
 
 // The prefab structural verbs live in `scene::prefab` (#215) and `scene::prefab_link`
 // (#216 linked instances + apply/revert), size-cap splits plus the `.prefab` format
@@ -156,8 +159,8 @@ pub use crate::scene::authoring_components::{add_component, remove_component, Co
 // and linked) and the apply/revert/list verbs through this one shared authoring entry
 // point.
 pub use crate::scene::prefab::{extract_prefab, instantiate_prefab, instantiate_prefab_linked};
-pub use crate::scene::prefab_apply::{apply_instance_field_to_source, apply_instance_to_source};
-pub use crate::scene::prefab_link::{
+pub use crate::scene::prefab::apply::{apply_instance_field_to_source, apply_instance_to_source};
+pub use crate::scene::prefab::link::{
     list_instance_overrides, record_instance_overrides, reimport_instance,
     revert_instance_overrides,
 };

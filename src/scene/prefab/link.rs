@@ -21,7 +21,7 @@ use std::collections::BTreeMap;
 
 use crate::components::{Entity, PrefabLink};
 use crate::scene::prefab::read_prefab_file;
-use crate::scene::prefab_overrides::{apply_overrides, diff_entity};
+use crate::scene::prefab::overrides::{apply_overrides, diff_entity};
 use crate::scene::serialize::rehydrate_entity_mesh;
 use crate::scene::{instantiate_prefab, PrefabData, Scene};
 
