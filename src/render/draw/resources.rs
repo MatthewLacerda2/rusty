@@ -6,25 +6,25 @@
 
 use std::rc::Rc;
 
-use super::{GpuTexture, MeshId, Renderer};
+use crate::render::{GpuTexture, MeshId, Renderer};
 use crate::components::MaterialAsset;
 use crate::scene::Scene;
 
 // One solid draw item: the entity id (its persistent entity + material bind groups
 // live in `entity_pool`, keyed by this id — #210), the `MeshId` geometry key the
 // pass resolves the shared vertex/index buffers through (#127), and the index count.
-pub(super) type SolidResource = (u32, MeshId, u32);
+pub(crate) type SolidResource = (u32, MeshId, u32);
 // A transparent draw item: the same draw tuple plus its view-space depth (distance
 // along the camera forward to the entity origin). The transparent pass sorts on this
 // key back-to-front so `ALPHA_BLENDING` composites correctly (#242).
-pub(super) type TransparentResource = (SolidResource, f32);
+pub(crate) type TransparentResource = (SolidResource, f32);
 
 /// The solids split into the two passes a frame draws (#242). `opaque` (Opaque +
 /// Cutout) rides the existing `draw_solids` path (REPLACE, depth write on); each
 /// `transparent` item is deferred to the sorted alpha-blended pass after opaque.
 /// Both share the same per-entity pool bind groups synced in `precreate_solid_resources`.
 #[derive(Default)]
-pub(super) struct SolidResources {
+pub(crate) struct SolidResources {
     pub opaque: Vec<SolidResource>,
     pub transparent: Vec<TransparentResource>,
 }
@@ -32,17 +32,17 @@ pub(super) struct SolidResources {
 // uniform + any vertex buffer) plus their bind group; the bone palette they bind is
 // the renderer's one shared identity buffer, so no per-overlay palette is allocated
 // (#210).
-pub(super) type OutlineResource = (u32, MeshId, wgpu::Buffer, wgpu::BindGroup, u32);
-pub(super) type GridResource = (wgpu::Buffer, wgpu::BindGroup);
-pub(super) type AabbResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
-pub(super) type AxisResource = (usize, wgpu::Buffer, wgpu::BindGroup);
-pub(super) type PathResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup, u32);
+pub(crate) type OutlineResource = (u32, MeshId, wgpu::Buffer, wgpu::BindGroup, u32);
+pub(crate) type GridResource = (wgpu::Buffer, wgpu::BindGroup);
+pub(crate) type AabbResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
+pub(crate) type AxisResource = (usize, wgpu::Buffer, wgpu::BindGroup);
+pub(crate) type PathResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup, u32);
 
 /// The editor-only overlay resources for one scene pass (selection outline, grid,
 /// collider AABBs, axis arrows). Empty outside editor mode. Bundled so the scene pass
 /// and the per-camera loop pass a single value instead of four (#93).
 #[derive(Default)]
-pub(super) struct Overlays {
+pub(crate) struct Overlays {
     pub outline: Option<OutlineResource>,
     pub grid: Option<GridResource>,
     pub aabb: Vec<AabbResource>,
@@ -52,7 +52,7 @@ pub(super) struct Overlays {
 impl Renderer {
     /// The one shared identity bone palette buffer every overlay/non-skinned draw
     /// binds, so none of them allocate a per-draw 4 KB palette (#210).
-    pub(super) fn shared_bones_buffer(&self) -> &wgpu::Buffer {
+    pub(crate) fn shared_bones_buffer(&self) -> &wgpu::Buffer {
         self.entity_pool
             .as_ref()
             .expect("entity pool present")
@@ -60,7 +60,7 @@ impl Renderer {
     }
 
     /// Pre-create the editor overlay resources for a pass; all-empty in play mode.
-    pub(super) fn precreate_overlays(&self, scene: &Scene, editor_mode: bool) -> Overlays {
+    pub(crate) fn precreate_overlays(&self, scene: &Scene, editor_mode: bool) -> Overlays {
         if !editor_mode {
             return Overlays::default();
         }
@@ -72,10 +72,10 @@ impl Renderer {
         }
     }
 
-    pub(super) fn precreate_solid_resources(
+    pub(crate) fn precreate_solid_resources(
         &mut self,
         scene: &Scene,
-        cam: &super::Camera,
+        cam: &crate::render::Camera,
     ) -> SolidResources {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
         let mut out = SolidResources::default();
@@ -128,7 +128,7 @@ impl Renderer {
         let model_matrix = scene.compute_world_matrix(entity.id);
         let world_pos = model_matrix.w_axis.truncate();
         let uniform =
-            super::draw_uniforms::solid_entity_uniform(scene, entity, material, model_matrix);
+            crate::render::draw::uniforms::solid_entity_uniform(scene, entity, material, model_matrix);
         // The active bone palette: the live animated pose when a clip plays (#80),
         // else the bind pose (#79). Primitives/static meshes leave it empty, so the
         // pool binds the shared identity palette and allocates no per-entity buffer.
@@ -147,7 +147,7 @@ impl Renderer {
         ];
         let material_sig = std::array::from_fn(|i| self.resolved_key(paths[i].as_ref()));
 
-        let update = super::entity_pool::SlotUpdate {
+        let update = crate::render::gpu::entity_pool::SlotUpdate {
             uniform,
             palette: &palette,
             material_sig,
@@ -186,7 +186,7 @@ impl Renderer {
     /// (albedo, metallic, roughness, normal, emissive — that order) + one shared
     /// sampler, against `material_layout`. Textures bind at 0,2,3,4,5; sampler at 1
     /// (binding 1 samples all five) (#202, #207).
-    pub(super) fn material_bind_group(&self, maps: &[Rc<GpuTexture>; 5]) -> wgpu::BindGroup {
+    pub(crate) fn material_bind_group(&self, maps: &[Rc<GpuTexture>; 5]) -> wgpu::BindGroup {
         let mut entries = vec![wgpu::BindGroupEntry {
             binding: 1,
             resource: wgpu::BindingResource::Sampler(&self.default_texture.sampler),
@@ -206,7 +206,7 @@ impl Renderer {
 
     /// Create a group-1 bind group pairing an entity uniform buffer with a bones
     /// buffer against the shared `entity_bones_layout`.
-    pub(super) fn entity_bind_group(
+    pub(crate) fn entity_bind_group(
         &self,
         label: &str,
         entity_buf: &wgpu::Buffer,

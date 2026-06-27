@@ -45,7 +45,7 @@ fn sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
 /// Probe Cube (4), Reflection Probe Sampler (5). The cube is the active probe's baked,
 /// prefiltered cubemap (#245); the shader samples it (parallax-corrected, roughness->mip)
 /// when a probe applies and falls back to the 2D skybox otherwise.
-pub(super) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     use wgpu::TextureViewDimension::{Cube, D2};
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Camera, Lighting, Skybox & Reflection Layout"),
@@ -61,7 +61,7 @@ pub(super) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::Bind
 }
 
 /// Group 1: Entity model matrix + color tint (0) & Bone Matrices (1)
-pub(super) fn create_entity_bones_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+pub(crate) fn create_entity_bones_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Entity & Bones Layout"),
         entries: &[
@@ -91,7 +91,7 @@ pub(super) fn create_entity_bones_layout(device: &wgpu::Device) -> wgpu::BindGro
 
 /// Group 2 (single-texture): Texture (0) & Sampler (1). Kept for `GpuTexture`'s own
 /// bind group, used by the particle/decal/skybox passes that bind one texture each.
-pub(super) fn create_texture_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+pub(crate) fn create_texture_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Texture Layout"),
         entries: &[
@@ -133,7 +133,7 @@ fn material_texture_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
 /// roughness map (3), normal map (4), emissive map (5). One sampler (binding 1)
 /// services all five textures. This is the layout the forward pass's group(2) is
 /// built against (#202, #207).
-pub(super) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Material Layout"),
         entries: &[
@@ -153,7 +153,7 @@ pub(super) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
 }
 
 /// Main shadow bind group layout (uniform + depth texture + comparison sampler)
-pub(super) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+pub(crate) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Main Shadow Bind Group Layout"),
         entries: &[

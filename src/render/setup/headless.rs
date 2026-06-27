@@ -8,7 +8,7 @@
 //! acquisition return `None` (never panic) when no GPU or software adapter (e.g.
 //! lavapipe) is present — the caller logs and skips gracefully.
 
-use super::Renderer;
+use crate::render::Renderer;
 
 /// The colour format the offscreen target renders into. Non-sRGB so the copied-back
 /// bytes map 1:1 to PNG channel values without a gamma surprise.

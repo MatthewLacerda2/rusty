@@ -11,8 +11,8 @@ use std::rc::Rc;
 
 use wgpu::util::DeviceExt;
 
-use super::decals::{Decal, DecalGlobals, DecalUniform};
-use super::{Camera, GpuTexture, Renderer};
+use crate::render::passes::decals::{Decal, DecalGlobals, DecalUniform};
+use crate::render::{Camera, GpuTexture, Renderer};
 use crate::scene::Scene;
 
 /// One decal resolved for drawing: its uniform bind group + sprite texture.
@@ -27,7 +27,7 @@ impl Renderer {
     /// Draw the scene's decals into the HDR target. Called from the scene pass
     /// after solids/skybox so decals overlay the lit surfaces, and before the
     /// particle pass + post-FX chain.
-    pub(super) fn draw_decals(&mut self, scene: &Scene, camera: &Camera) {
+    pub(crate) fn draw_decals(&mut self, scene: &Scene, camera: &Camera) {
         if scene.decals.is_empty() {
             return;
         }
@@ -167,7 +167,7 @@ impl Renderer {
 }
 
 /// Vertex layout for the decal cube: just a local-space position.
-pub(super) fn decal_vertex_layout() -> wgpu::VertexBufferLayout<'static> {
+pub(crate) fn decal_vertex_layout() -> wgpu::VertexBufferLayout<'static> {
     const ATTRIBS: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![0 => Float32x3];
     wgpu::VertexBufferLayout {
         array_stride: (3 * std::mem::size_of::<f32>()) as wgpu::BufferAddress,
@@ -177,7 +177,7 @@ pub(super) fn decal_vertex_layout() -> wgpu::VertexBufferLayout<'static> {
 }
 
 /// Unit cube spanning `[-0.5, 0.5]³` as 8 corners + 36 CCW indices.
-pub(super) fn unit_cube() -> ([[f32; 3]; 8], [u16; 36]) {
+pub(crate) fn unit_cube() -> ([[f32; 3]; 8], [u16; 36]) {
     let verts = [
         [-0.5, -0.5, -0.5],
         [0.5, -0.5, -0.5],

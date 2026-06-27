@@ -15,7 +15,7 @@
 use std::collections::{HashMap, HashSet};
 use wgpu::util::DeviceExt;
 
-use super::{BoneUniform, EntityUniform};
+use crate::render::{BoneUniform, EntityUniform};
 
 /// One entity's reused GPU resources. The material bind group is rebuilt only when
 /// the resolved map paths change (`material_sig`); the bones buffer exists only for
@@ -30,13 +30,13 @@ struct EntitySlot {
 
 /// Persistent forward-pass GPU resources keyed by entity id, plus the one shared
 /// identity bone palette every non-skinned mesh binds.
-pub(super) struct EntityPool {
+pub(crate) struct EntityPool {
     slots: HashMap<u32, EntitySlot>,
     default_bones_buffer: wgpu::Buffer,
 }
 
 impl EntityPool {
-    pub(super) fn new(device: &wgpu::Device) -> Self {
+    pub(crate) fn new(device: &wgpu::Device) -> Self {
         let default_bones = BoneUniform {
             bones: [glam::Mat4::IDENTITY.to_cols_array(); 64],
         };
@@ -53,30 +53,30 @@ impl EntityPool {
 
     /// The shared identity bone palette buffer, bound by every overlay/non-skinned
     /// draw so no per-entity 4 KB palette is allocated for them.
-    pub(super) fn default_bones_buffer(&self) -> &wgpu::Buffer {
+    pub(crate) fn default_bones_buffer(&self) -> &wgpu::Buffer {
         &self.default_bones_buffer
     }
 
     /// The reused entity (group 1) bind group for `id`, if a slot exists.
-    pub(super) fn entity_bind_group(&self, id: u32) -> Option<&wgpu::BindGroup> {
+    pub(crate) fn entity_bind_group(&self, id: u32) -> Option<&wgpu::BindGroup> {
         self.slots.get(&id).map(|s| &s.entity_bind_group)
     }
 
     /// The reused material (group 2) bind group for `id`, if a slot exists.
-    pub(super) fn material_bind_group(&self, id: u32) -> Option<&wgpu::BindGroup> {
+    pub(crate) fn material_bind_group(&self, id: u32) -> Option<&wgpu::BindGroup> {
         self.slots.get(&id).map(|s| &s.material_bind_group)
     }
 
     /// Drop slots for entities not touched this frame (despawned / deactivated), so
     /// the pool tracks the live scene instead of growing without bound.
-    pub(super) fn retain(&mut self, live: &HashSet<u32>) {
+    pub(crate) fn retain(&mut self, live: &HashSet<u32>) {
         self.slots.retain(|id, _| live.contains(id));
     }
 
     /// Number of live per-entity slots — used by tests to prove the pool reuses
     /// slots across frames rather than allocating per frame (#210).
     #[cfg(test)]
-    pub(super) fn slot_count(&self) -> usize {
+    pub(crate) fn slot_count(&self) -> usize {
         self.slots.len()
     }
 }
@@ -84,18 +84,18 @@ impl EntityPool {
 /// Inputs for an entity's persistent slot for one frame: the new uniform value, the
 /// active bone palette (empty for non-skinned meshes), and the resolved material map
 /// signature deciding whether the material bind group must be rebuilt.
-pub(super) struct SlotUpdate<'a> {
+pub(crate) struct SlotUpdate<'a> {
     pub uniform: EntityUniform,
     pub palette: &'a [glam::Mat4],
     pub material_sig: [String; 5],
 }
 
-impl super::Renderer {
+impl crate::render::Renderer {
     /// Ensure `id`'s pool slot is current: rewrite its uniform, refresh the bone
     /// palette (allocating a per-entity buffer only for skinned meshes), and rebuild
     /// bind groups only when their inputs changed. `build_material` resolves the
     /// material textures and is only invoked on the first frame or a map change.
-    pub(super) fn sync_entity_slot(
+    pub(crate) fn sync_entity_slot(
         &mut self,
         id: u32,
         update: SlotUpdate,
@@ -186,21 +186,21 @@ fn write_palette(queue: &wgpu::Queue, buffer: Option<&wgpu::Buffer>, palette: &[
     queue.write_buffer(buffer, 0, bytemuck::bytes_of(&bones));
 }
 
-impl super::Renderer {
+impl crate::render::Renderer {
     /// Live per-entity forward-pass slot count, for the persistence test.
     #[cfg(test)]
-    pub(super) fn entity_slot_count(&self) -> usize {
+    pub(crate) fn entity_slot_count(&self) -> usize {
         self.entity_pool.as_ref().map_or(0, EntityPool::slot_count)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::super::{Camera, Renderer, OFFSCREEN_FORMAT};
+    use crate::render::{Camera, Renderer, OFFSCREEN_FORMAT};
     use crate::scene::{MeshComponent, Scene};
 
     fn box_mesh() -> MeshComponent {
-        let (vertices, indices) = crate::render::mesh::generate_box(1.0, 1.0, 1.0);
+        let (vertices, indices) = crate::render::gpu::mesh::generate_box(1.0, 1.0, 1.0);
         MeshComponent {
             primitive_type: "Box".to_string(),
             asset_ref: None,

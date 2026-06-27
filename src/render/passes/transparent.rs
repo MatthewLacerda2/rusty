@@ -12,14 +12,14 @@
 //! is occluded by opaque depth without writing depth itself (overlapping translucent
 //! surfaces all blend rather than z-cull each other).
 
-use super::draw_resources::TransparentResource;
-use super::Renderer;
+use crate::render::draw::resources::TransparentResource;
+use crate::render::Renderer;
 
 impl Renderer {
     /// Draw the camera's translucent solids into the HDR target. `items` is already
     /// sorted back-to-front (farthest first). No-op when there is nothing translucent,
     /// so opaque-only scenes pay nothing (#242).
-    pub(super) fn draw_transparent(&self, items: &[TransparentResource]) {
+    pub(crate) fn draw_transparent(&self, items: &[TransparentResource]) {
         if items.is_empty() {
             return;
         }

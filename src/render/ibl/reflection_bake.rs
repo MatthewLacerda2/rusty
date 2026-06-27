@@ -13,9 +13,9 @@
 
 use std::path::Path;
 
-use super::ktx2_encode::encode_cubemap;
-use super::reflection_prefilter::prefilter;
-use super::Renderer;
+use crate::render::ibl::ktx2_encode::encode_cubemap;
+use crate::render::ibl::reflection_prefilter::prefilter;
+use crate::render::Renderer;
 use crate::scene::Scene;
 
 /// Default per-face capture resolution for a reflection bake. Higher than the light-probe
@@ -41,7 +41,7 @@ impl Renderer {
         log::debug!(
             "[ReflectionBake] {} mips, roughest at mip {:.1}",
             prefiltered.level_count(),
-            super::reflection_prefilter::roughness_to_mip(1.0, prefiltered.level_count() as u32)
+            crate::render::ibl::reflection_prefilter::roughness_to_mip(1.0, prefiltered.level_count() as u32)
         );
         encode_cubemap(&prefiltered)
     }

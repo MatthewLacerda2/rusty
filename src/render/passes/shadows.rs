@@ -1,5 +1,5 @@
-use crate::render::mesh::Vertex;
-use crate::render::shaders::ShaderRegistry;
+use crate::render::gpu::mesh::Vertex;
+use crate::render::gpu::shaders::ShaderRegistry;
 use crate::scene::Scene;
 use glam::{Mat4, Vec3};
 use std::collections::HashMap;

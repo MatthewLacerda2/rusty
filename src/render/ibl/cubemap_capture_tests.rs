@@ -6,7 +6,7 @@
 
 use glam::{Quat, Vec3};
 
-use super::{CubemapFace, Renderer};
+use crate::render::{CubemapFace, Renderer};
 use crate::components::MaterialAsset;
 use crate::scene::{MeshComponent, Scene};
 
@@ -14,7 +14,7 @@ const RES: u32 = 32;
 
 /// A unit box mesh (the wall/actor geometry).
 fn box_mesh() -> MeshComponent {
-    let (vertices, indices) = crate::render::mesh::generate_box(1.0, 1.0, 1.0);
+    let (vertices, indices) = crate::render::gpu::mesh::generate_box(1.0, 1.0, 1.0);
     MeshComponent {
         primitive_type: "Box".to_string(),
         asset_ref: None,
@@ -131,7 +131,7 @@ enum Channel {
     Gb,
 }
 
-fn assert_dominant(cap: &super::CubemapCapture, face: CubemapFace, ch: Channel) {
+fn assert_dominant(cap: &crate::render::CubemapCapture, face: CubemapFace, ch: Channel) {
     let (r, g, b) = center_rgb(cap.face(face), cap.resolution);
     match ch {
         Channel::R => assert!(r > g && r > b, "{face:?}: expected red, got {r},{g},{b}"),

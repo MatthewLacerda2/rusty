@@ -5,13 +5,13 @@
 use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
-use super::draw_resources::{AabbResource, AxisResource, GridResource, OutlineResource};
-use super::mesh::Vertex;
-use super::{EntityUniform, MeshId, Renderer};
+use crate::render::draw::resources::{AabbResource, AxisResource, GridResource, OutlineResource};
+use crate::render::gpu::mesh::Vertex;
+use crate::render::{EntityUniform, MeshId, Renderer};
 use crate::scene::Scene;
 
 impl Renderer {
-    pub(super) fn precreate_grid(&self) -> Option<GridResource> {
+    pub(crate) fn precreate_grid(&self) -> Option<GridResource> {
         let _grid_buf = self.grid_vertex_buffer.as_ref()?;
         let grid_uniform = EntityUniform {
             model_matrix: Mat4::IDENTITY.to_cols_array(),
@@ -43,7 +43,7 @@ impl Renderer {
         Some((grid_buf_unif, grid_bind_group))
     }
 
-    pub(super) fn precreate_aabb(&self, scene: &Scene) -> Vec<AabbResource> {
+    pub(crate) fn precreate_aabb(&self, scene: &Scene) -> Vec<AabbResource> {
         let mut aabb_resources = Vec::new();
         for entity in scene.iter() {
             if !entity.active {
@@ -115,7 +115,7 @@ impl Renderer {
         (entity_buf, col_bind_group)
     }
 
-    pub(super) fn precreate_outline(&self, scene: &Scene) -> Option<OutlineResource> {
+    pub(crate) fn precreate_outline(&self, scene: &Scene) -> Option<OutlineResource> {
         let selected_id = scene.selected_entity_id?;
         let entity = scene.get_entity(selected_id)?;
         let mesh_id = MeshId::from_mesh(entity.mesh.as_ref()?);
@@ -175,7 +175,7 @@ impl Renderer {
 
     /// Draw the editor overlays (floor grid, collider AABBs, selected-entity axis
     /// arrows) into the scene pass. Editor-mode only; called from `record_scene_pass`.
-    pub(super) fn draw_editor_overlays<'a>(
+    pub(crate) fn draw_editor_overlays<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         grid_resources: &'a Option<GridResource>,

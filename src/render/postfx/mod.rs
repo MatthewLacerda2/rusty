@@ -9,6 +9,7 @@
 //! `QualityPreset` gates which passes run and how big the bloom buffers are so an
 //! integrated GPU can hold ~30fps (Low: no SSR/motion-blur, half-size bloom).
 
+pub(crate) mod params;
 mod run;
 mod setup;
 

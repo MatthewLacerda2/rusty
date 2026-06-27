@@ -15,7 +15,7 @@
 
 use ktx2::Format;
 
-use super::Renderer;
+use crate::render::Renderer;
 
 /// A decoded LDR cubemap on the CPU: a square edge length plus the six faces' RGBA8
 /// pixels in KTX2 face order (+X, -X, +Y, -Y, +Z, -Z), each `size * size * 4` bytes.

@@ -4,13 +4,13 @@
 use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
-use super::draw_resources::{AxisResource, PathResource};
-use super::mesh::Vertex;
-use super::{EntityUniform, Renderer};
+use crate::render::draw::resources::{AxisResource, PathResource};
+use crate::render::gpu::mesh::Vertex;
+use crate::render::{EntityUniform, Renderer};
 use crate::scene::Scene;
 
 impl Renderer {
-    pub(super) fn precreate_axis_arrows(&self, scene: &Scene) -> Vec<AxisResource> {
+    pub(crate) fn precreate_axis_arrows(&self, scene: &Scene) -> Vec<AxisResource> {
         let mut axis_arrow_resources = Vec::new();
         let Some(selected_id) = scene.selected_entity_id else {
             return axis_arrow_resources;
@@ -73,7 +73,7 @@ impl Renderer {
         (i, entity_buf, bind_group)
     }
 
-    pub(super) fn precreate_path(&self, pathfinding_points: &[Vec3]) -> Option<PathResource> {
+    pub(crate) fn precreate_path(&self, pathfinding_points: &[Vec3]) -> Option<PathResource> {
         if pathfinding_points.len() < 2 {
             return None;
         }

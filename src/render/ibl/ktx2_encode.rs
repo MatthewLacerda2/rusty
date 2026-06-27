@@ -10,8 +10,8 @@
 //! Output is plain baked-asset bytes — a pure function of the prefiltered faces, no
 //! wall-clock / RNG — so the encode is clean under the determinism guard.
 
-use super::reflection_prefilter::PrefilteredCubemap;
-use super::CubemapFace;
+use crate::render::ibl::reflection_prefilter::PrefilteredCubemap;
+use crate::render::CubemapFace;
 
 const MAGIC: [u8; 12] = [
     0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A,
@@ -26,7 +26,7 @@ const VK_FORMAT_R8G8B8A8_SRGB: u32 = 43;
 /// `CubemapFace::ALL` order. The bytes parse with `ktx2::Reader` / `parse_ktx2_cubemap`.
 pub fn encode_cubemap(cube: &PrefilteredCubemap) -> Vec<u8> {
     debug_assert!(
-        super::reflection_prefilter::validate_layout(cube),
+        crate::render::ibl::reflection_prefilter::validate_layout(cube),
         "prefiltered cube has a malformed mip layout"
     );
     let levels = cube.level_count();

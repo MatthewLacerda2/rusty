@@ -20,8 +20,8 @@ use std::f32::consts::PI;
 
 use glam::{Vec2, Vec3};
 
-use super::cube_sample::{linear_to_srgb, sample_linear, FaceProjections};
-use super::{CubemapCapture, CubemapFace};
+use crate::render::ibl::cube_sample::{linear_to_srgb, sample_linear, FaceProjections};
+use crate::render::{CubemapCapture, CubemapFace};
 
 /// Number of importance samples per output texel for the rough mips. A few hundred taps
 /// gives a smooth lobe at the small cubemap sizes a probe uses; raising it trades bake

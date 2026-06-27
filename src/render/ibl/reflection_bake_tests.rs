@@ -8,16 +8,16 @@
 
 use glam::{Quat, Vec3};
 
-use super::super::cube_sample::srgb_to_linear;
-use super::super::cubemap::parse_ktx2_cubemap_mips;
-use super::super::{CubemapFace, Renderer};
+use crate::render::ibl::cube_sample::srgb_to_linear;
+use crate::render::ibl::cubemap::parse_ktx2_cubemap_mips;
+use crate::render::{CubemapFace, Renderer};
 use crate::components::MaterialAsset;
 use crate::scene::{MeshComponent, Scene};
 
 const RES: u32 = 32;
 
 fn box_mesh() -> MeshComponent {
-    let (vertices, indices) = crate::render::mesh::generate_box(1.0, 1.0, 1.0);
+    let (vertices, indices) = crate::render::gpu::mesh::generate_box(1.0, 1.0, 1.0);
     MeshComponent {
         primitive_type: "Box".to_string(),
         asset_ref: None,

@@ -5,11 +5,11 @@
 
 use std::rc::Rc;
 
-use super::bind_layouts;
-use super::{GpuTexture, Renderer};
+use crate::render::gpu::bind_layouts;
+use crate::render::{GpuTexture, Renderer};
 
 /// The group(2) texture layouts and the default texture/material bind group.
-pub(super) struct Textures {
+pub(crate) struct Textures {
     pub texture_layout: wgpu::BindGroupLayout,
     pub material_layout: wgpu::BindGroupLayout,
     pub default_texture: Rc<GpuTexture>,
@@ -18,7 +18,7 @@ pub(super) struct Textures {
 
 /// Build the single-texture + expanded-material group(2) layouts, the default
 /// checker texture, and the all-default material bind group (#202).
-pub(super) fn create_textures(device: &wgpu::Device, queue: &wgpu::Queue) -> Textures {
+pub(crate) fn create_textures(device: &wgpu::Device, queue: &wgpu::Queue) -> Textures {
     let texture_layout = bind_layouts::create_texture_layout(device);
     let material_layout = bind_layouts::create_material_layout(device);
     let default_texture = Rc::new(Renderer::create_default_checkerboard_texture(

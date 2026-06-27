@@ -5,12 +5,12 @@
 //! positions + UVs via the asset layer's pure [`generate_tangents`] so primitives
 //! sample normal maps correctly, exactly like an imported mesh (#207).
 
-use super::mesh::Vertex;
+use crate::render::gpu::mesh::Vertex;
 use crate::asset::tangents::generate_tangents;
 
 /// Overwrite each vertex's `tangent` with the basis derived from positions + UVs. The
 /// `generate_*` builders apply this before returning their geometry.
-pub(super) fn fill_tangents(
+pub(crate) fn fill_tangents(
     mut vertices: Vec<Vertex>,
     indices: Vec<u32>,
 ) -> (Vec<Vertex>, Vec<u32>) {

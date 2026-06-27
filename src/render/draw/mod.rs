@@ -2,14 +2,21 @@
 //! orchestration of pre-created resources into the scene render pass. Extracted
 //! from the original monolithic `Renderer::render` (behavior unchanged).
 
+mod lighting;
+mod overlays;
+mod pass;
+mod path;
+pub(crate) mod resources;
+mod uniforms;
+
 use glam::Vec3;
 
-use super::draw_lighting::{
+use self::lighting::{
     apply_reflection_probe, apply_scene_lights, apply_ssr_settings, default_lighting_uniform,
 };
-use super::draw_pass::{PassClear, ScenePassFrame};
-use super::postfx_params::build_post_params;
-use super::{build_camera_stack, Camera, CameraUniform, LightingUniform, Renderer};
+use self::pass::{PassClear, ScenePassFrame};
+use crate::render::postfx::params::build_post_params;
+use crate::render::{build_camera_stack, Camera, CameraUniform, LightingUniform, Renderer};
 use crate::scene::Scene;
 
 impl Renderer {
@@ -135,7 +142,7 @@ impl Renderer {
         view_proj: glam::Mat4,
         camera_pos: [f32; 3],
     ) {
-        use super::postfx::PostFxContext;
+        use crate::render::postfx::PostFxContext;
 
         let (mut post_params, bloom_enabled) = build_post_params(
             scene,

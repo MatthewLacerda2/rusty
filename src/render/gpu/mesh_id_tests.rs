@@ -1,7 +1,7 @@
 //! Unit tests for [`MeshId`] geometry-identity keying (#127). Split out of `mod.rs`
 //! to keep that file under the size cap.
 
-use super::MeshId;
+use crate::render::MeshId;
 use crate::scene::{DirtyFlag, MeshComponent};
 
 fn mesh(primitive: &str, asset: Option<&str>) -> MeshComponent {

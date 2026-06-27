@@ -71,7 +71,7 @@ pub struct Scene {
     /// ephemeral *visual* state spawned from raycast hits, NOT serialized scene
     /// data — the decal renderer reads them each frame and projects them onto the
     /// surfaces they overlap. Bounded FIFO (oldest evicted past `MAX_DECALS`).
-    pub decals: Vec<crate::render::decals::Decal>,
+    pub decals: Vec<crate::render::passes::decals::Decal>,
     /// Scene-level light-probe dataset (#240): probe POSITIONS + grid layout live in
     /// the scene document; their baked L2 SH irradiance lives in the
     /// `<scene>.lighting.json` sidecar. Dynamic (non-static) objects sample the
@@ -126,7 +126,7 @@ impl Scene {
         color: [f32; 4],
         texture: Option<String>,
     ) {
-        let decal = crate::render::decals::Decal::from_hit(
+        let decal = crate::render::passes::decals::Decal::from_hit(
             point,
             normal,
             size.max(1.0e-4),
@@ -135,7 +135,7 @@ impl Scene {
             color,
             texture,
         );
-        if self.decals.len() >= crate::render::decals::MAX_DECALS {
+        if self.decals.len() >= crate::render::passes::decals::MAX_DECALS {
             self.decals.remove(0);
         }
         self.decals.push(decal);

@@ -1,7 +1,7 @@
 //! Render-pipeline construction for the main forward renderer. The bind-group
 //! layouts these pipelines reference live in `bind_layouts` (behavior unchanged).
 
-use super::mesh::Vertex;
+use crate::render::gpu::mesh::Vertex;
 
 /// Fixed-function knobs that distinguish the three forward-pass pipelines.
 struct PipelineSpec {
@@ -14,7 +14,7 @@ struct PipelineSpec {
 }
 
 /// The four forward-target pipelines, all sharing one shader + vertex layout.
-pub(super) struct ForwardPipelines {
+pub(crate) struct ForwardPipelines {
     /// Opaque/cutout solids: REPLACE, depth write on.
     pub forward: wgpu::RenderPipeline,
     /// Alpha-blended translucent solids (#242): ALPHA_BLENDING, depth write off.
@@ -30,7 +30,7 @@ pub(super) struct ForwardPipelines {
 // (device, shader, format, four bind-group layouts); bundling them into a struct
 // would only add an indirection without clarifying intent.
 #[allow(clippy::too_many_arguments)]
-pub(super) fn create_pipelines(
+pub(crate) fn create_pipelines(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
     format: wgpu::TextureFormat,

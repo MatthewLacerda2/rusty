@@ -45,7 +45,7 @@ fn vc() -> VisualCorrectionComponent {
 /// `color` with `alpha`. Returns nothing; the entity is appended to the scene.
 fn add_quad(scene: &mut Scene, name: &str, z: f32, color: [f32; 3], alpha: f32) {
     let id = scene.add_entity(name.to_string());
-    let (vertices, indices) = rusty::render::mesh::generate_box(8.0, 8.0, 0.1);
+    let (vertices, indices) = rusty::render::gpu::mesh::generate_box(8.0, 8.0, 0.1);
     let mut e = scene.get_entity_mut(id).unwrap();
     e.transform.position = Vec3::new(0.0, 0.0, z);
     e.mesh = Some(MeshComponent {

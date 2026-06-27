@@ -7,16 +7,16 @@
 //! straight into the assembled renderer, so the seams follow real boundaries (what
 //! depends on what) instead of a pass-through layer (#211). Behavior is unchanged.
 
-use super::bind_layouts;
-use super::pipelines;
-use super::postfx::{PostFx, QualityPreset, HDR_FORMAT};
-use super::setup_textures::{create_textures, Textures};
-use super::shaders::ShaderRegistry;
-use super::{shadows, skybox};
-use super::{CameraUniform, GpuTexture, LightingUniform, Renderer};
+use crate::render::gpu::bind_layouts;
+use crate::render::gpu::pipelines;
+use crate::render::postfx::{PostFx, QualityPreset, HDR_FORMAT};
+use crate::render::setup::textures::{create_textures, Textures};
+use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::{passes::shadows, ibl::skybox};
+use crate::render::{CameraUniform, GpuTexture, LightingUniform, Renderer};
 
 /// Camera + lighting uniform buffers and the group(0) bind group.
-pub(super) struct GlobalBindings {
+pub(crate) struct GlobalBindings {
     pub camera_buffer: wgpu::Buffer,
     pub lighting_buffer: wgpu::Buffer,
     pub global_bind_group: wgpu::BindGroup,
@@ -24,7 +24,7 @@ pub(super) struct GlobalBindings {
 
 /// Shadow renderer, its light-space uniform buffer, and the main-pass bind group
 /// that samples the active shadow map.
-pub(super) struct ShadowSystem {
+pub(crate) struct ShadowSystem {
     pub layout: wgpu::BindGroupLayout,
     pub renderer: shadows::ShadowRenderer,
     pub uniform_buffer: wgpu::Buffer,
@@ -33,7 +33,7 @@ pub(super) struct ShadowSystem {
 
 /// The forward-lit, line, outline and skybox passes — everything that draws into
 /// the HDR offscreen target.
-pub(super) struct ForwardPasses {
+pub(crate) struct ForwardPasses {
     pub render_pipeline: wgpu::RenderPipeline,
     pub transparent_pipeline: wgpu::RenderPipeline,
     pub line_pipeline: wgpu::RenderPipeline,
@@ -43,15 +43,15 @@ pub(super) struct ForwardPasses {
 
 /// Billboard particle + box-projector decal passes; both reuse the renderer's
 /// `texture_layout` (group 1 / group 3 respectively).
-pub(super) struct BillboardPasses {
-    pub particle_renderer: super::particles::ParticleRenderer,
-    pub decal_renderer: super::decals::DecalRenderer,
+pub(crate) struct BillboardPasses {
+    pub particle_renderer: crate::render::passes::particles::ParticleRenderer,
+    pub decal_renderer: crate::render::passes::decals::DecalRenderer,
 }
 
 /// Every non-trivial GPU resource a [`Renderer`] needs, grouped by role. Built in
 /// dependency order (layouts → textures → bindings → passes) and consumed once by
 /// [`Renderer::from_parts`], which moves each group into the flat renderer.
-pub(super) struct GpuResources {
+pub(crate) struct GpuResources {
     pub depth_texture: wgpu::Texture,
     pub depth_view: wgpu::TextureView,
     pub camera_lighting_layout: wgpu::BindGroupLayout,
@@ -67,7 +67,7 @@ pub(super) struct GpuResources {
 
 impl GpuResources {
     /// Build every GPU resource from an already-created device/queue/config.
-    pub(super) fn build(
+    pub(crate) fn build(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         config: &wgpu::SurfaceConfiguration,
@@ -114,12 +114,12 @@ fn create_billboard_passes(
     registry: &mut ShaderRegistry,
 ) -> BillboardPasses {
     BillboardPasses {
-        particle_renderer: super::particles::ParticleRenderer::new(
+        particle_renderer: crate::render::passes::particles::ParticleRenderer::new(
             device,
             texture_layout,
             registry,
         ),
-        decal_renderer: super::decals::DecalRenderer::new(device, texture_layout, registry),
+        decal_renderer: crate::render::passes::decals::DecalRenderer::new(device, texture_layout, registry),
     }
 }
 
@@ -165,7 +165,7 @@ fn create_global_bindings(
     // A throwaway fallback cube satisfies binding 4 until the per-frame rebuild swaps in
     // the active reflection probe's cubemap (or the renderer's own fallback). The shader
     // ignores it (the `refl_has_cubemap` flag stays 0) and samples the 2D skybox instead.
-    let cube = super::cubemap::fallback_cube(device);
+    let cube = crate::render::ibl::cubemap::fallback_cube(device);
     let global_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Global Bind Group"),
         layout: camera_lighting_layout,

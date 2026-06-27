@@ -5,7 +5,7 @@
 //! are progressively blurrier (higher roughness) than mip0 while keeping the room's mean
 //! colour. We measure "blurrier" as lower spatial variance across a face.
 
-use super::super::cube_sample::srgb_to_linear;
+use crate::render::ibl::cube_sample::srgb_to_linear;
 use super::*;
 
 /// A capture whose +X face is a sharp half-red / half-black split and the other faces a

@@ -12,8 +12,8 @@
 
 use glam::{Mat4, Quat, Vec3};
 
-use super::postfx::HDR_FORMAT;
-use super::shaders::ShaderRegistry;
+use crate::render::postfx::HDR_FORMAT;
+use crate::render::gpu::shaders::ShaderRegistry;
 
 /// Maximum decals drawn per frame. Bullet holes/scorch accumulate, but old ones
 /// are evicted (FIFO) so the pass stays bounded; matches a typical FPS budget.
@@ -93,34 +93,34 @@ fn quat_look_along(dir: Vec3) -> Quat {
 /// Per-decal data uploaded to the GPU (one dynamic-uniform slot per decal).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(super) struct DecalUniform {
+pub(crate) struct DecalUniform {
     /// Object→world (unit cube → box).
-    pub(super) model: [f32; 16],
+    pub(crate) model: [f32; 16],
     /// World→object (box → unit cube); used to test/project the surface point.
-    pub(super) inv_model: [f32; 16],
+    pub(crate) inv_model: [f32; 16],
     /// RGBA tint.
-    pub(super) color: [f32; 4],
+    pub(crate) color: [f32; 4],
 }
 
 /// Camera globals for the decal pass: view-proj (box → clip) and the inverse
 /// view-proj (depth → world surface position), plus camera position for fades.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(super) struct DecalGlobals {
-    pub(super) view_proj: [f32; 16],
-    pub(super) inv_view_proj: [f32; 16],
-    pub(super) camera_pos: [f32; 4],
+pub(crate) struct DecalGlobals {
+    pub(crate) view_proj: [f32; 16],
+    pub(crate) inv_view_proj: [f32; 16],
+    pub(crate) camera_pos: [f32; 4],
 }
 
 /// Owns every GPU resource for the decal pass. One per `Renderer`.
 pub struct DecalRenderer {
-    pub(super) pipeline: wgpu::RenderPipeline,
-    pub(super) globals_buffer: wgpu::Buffer,
-    pub(super) globals_bind_group: wgpu::BindGroup,
-    pub(super) decal_layout: wgpu::BindGroupLayout,
-    pub(super) depth_layout: wgpu::BindGroupLayout,
-    pub(super) index_buffer: wgpu::Buffer,
-    pub(super) vertex_buffer: wgpu::Buffer,
+    pub(crate) pipeline: wgpu::RenderPipeline,
+    pub(crate) globals_buffer: wgpu::Buffer,
+    pub(crate) globals_bind_group: wgpu::BindGroup,
+    pub(crate) decal_layout: wgpu::BindGroupLayout,
+    pub(crate) depth_layout: wgpu::BindGroupLayout,
+    pub(crate) index_buffer: wgpu::Buffer,
+    pub(crate) vertex_buffer: wgpu::Buffer,
 }
 
 impl DecalRenderer {
@@ -182,7 +182,7 @@ impl DecalRenderer {
     /// 36 indices) the projector pass draws.
     fn cube_buffers(device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Buffer) {
         use wgpu::util::DeviceExt;
-        let (verts, indices) = super::decals_draw::unit_cube();
+        let (verts, indices) = crate::render::passes::decals_draw::unit_cube();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Decal Cube Vertices"),
             contents: bytemuck::cast_slice(&verts),
@@ -255,7 +255,7 @@ impl DecalRenderer {
             vertex: wgpu::VertexState {
                 module: shader,
                 entry_point: "vs_main",
-                buffers: &[super::decals_draw::decal_vertex_layout()],
+                buffers: &[crate::render::passes::decals_draw::decal_vertex_layout()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shader,

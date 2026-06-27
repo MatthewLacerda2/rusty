@@ -5,7 +5,7 @@
 
 use glam::Mat4;
 
-use super::EntityUniform;
+use crate::render::EntityUniform;
 use crate::components::{Entity, MaterialAsset, RenderMode};
 use crate::scene::Scene;
 
@@ -14,7 +14,7 @@ use crate::scene::Scene;
 /// entities via its referenced material's `base_color`; the engine carries no
 /// per-name colour assumptions. `material` is the entity's resolved library material
 /// (`None` when it references none).
-pub(super) fn solid_entity_uniform(
+pub(crate) fn solid_entity_uniform(
     scene: &Scene,
     entity: &Entity,
     material: Option<&MaterialAsset>,

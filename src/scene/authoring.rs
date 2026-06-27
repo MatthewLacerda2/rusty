@@ -16,8 +16,8 @@
 
 use glam::Vec3;
 
-use crate::render::mesh as primitives;
-use crate::render::mesh::Vertex;
+use crate::render::gpu::mesh as primitives;
+use crate::render::gpu::mesh::Vertex;
 use crate::scene::authoring_defaults::light;
 use crate::scene::{LightComponent, LightType, MeshComponent, Scene};
 

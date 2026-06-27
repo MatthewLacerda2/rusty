@@ -5,14 +5,11 @@
 
 use glam::Vec3;
 
-use super::{
-    AmbientLightUniform, DirectionalLightUniform, LightingUniform, PointLightUniform,
-    SpotlightUniform,
-};
+use crate::render::{AmbientLightUniform, DirectionalLightUniform, LightingUniform, PointLightUniform, SpotlightUniform};
 use crate::scene::{LightType, Scene};
 
 /// The base lighting uniform before scene lights/SSR are scanned in.
-pub(super) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
+pub(crate) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
     LightingUniform {
         ambient: AmbientLightUniform {
             color: scene.ambient_color.to_array(),
@@ -62,7 +59,7 @@ pub(super) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
 /// the lighting uniform (#244). The probe whose box contains the camera and is nearest
 /// to it wins; with none, `refl_active` stays 0 and the shader keeps the plain skybox
 /// reflection. The selection mirrors `ReflectionProbeSet::select` (unit-tested there).
-pub(super) fn apply_reflection_probe(
+pub(crate) fn apply_reflection_probe(
     lighting_uniform: &mut LightingUniform,
     scene: &Scene,
     camera_pos: Vec3,
@@ -77,7 +74,7 @@ pub(super) fn apply_reflection_probe(
 
 /// Populate the dynamic light slots from active light entities (point lights capped
 /// at the 4-slot budget).
-pub(super) fn apply_scene_lights(lighting_uniform: &mut LightingUniform, scene: &Scene) {
+pub(crate) fn apply_scene_lights(lighting_uniform: &mut LightingUniform, scene: &Scene) {
     let mut pt_idx = 0;
     for entity in scene.iter() {
         if !entity.active {
@@ -124,7 +121,7 @@ pub(super) fn apply_scene_lights(lighting_uniform: &mut LightingUniform, scene: 
 }
 
 /// Build the spotlight uniform, baking cone half-angles into their cosines.
-pub(super) fn spotlight_uniform(
+pub(crate) fn spotlight_uniform(
     entity: &crate::components::Entity,
     light: &crate::components::LightComponent,
 ) -> SpotlightUniform {
@@ -144,7 +141,7 @@ pub(super) fn spotlight_uniform(
 }
 
 /// Fold active Visual Correction (SSR) components into the uniform; last one wins.
-pub(super) fn apply_ssr_settings(lighting_uniform: &mut LightingUniform, scene: &Scene) {
+pub(crate) fn apply_ssr_settings(lighting_uniform: &mut LightingUniform, scene: &Scene) {
     let mut ssr_active = 0.0;
     let mut ssr_quality = 2.0; // High default
     let mut ssr_temporal = 0.0;

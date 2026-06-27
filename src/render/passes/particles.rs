@@ -11,17 +11,17 @@
 
 use wgpu::util::DeviceExt;
 
-use super::postfx::HDR_FORMAT;
-use super::shaders::ShaderRegistry;
+use crate::render::postfx::HDR_FORMAT;
+use crate::render::gpu::shaders::ShaderRegistry;
 use crate::components::particle::ParticleBlend;
 
 /// Per-particle instance data uploaded to the GPU (matches `InstanceInput`).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(super) struct ParticleInstance {
-    pub(super) center: [f32; 3],
-    pub(super) size: f32,
-    pub(super) color: [f32; 4],
+pub(crate) struct ParticleInstance {
+    pub(crate) center: [f32; 3],
+    pub(crate) size: f32,
+    pub(crate) color: [f32; 4],
 }
 
 impl ParticleInstance {
@@ -31,7 +31,7 @@ impl ParticleInstance {
         2 => Float32x4, // color
     ];
 
-    pub(super) fn desc() -> wgpu::VertexBufferLayout<'static> {
+    pub(crate) fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<ParticleInstance>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
@@ -43,19 +43,19 @@ impl ParticleInstance {
 /// Globals uniform: view-projection + camera right/up for billboarding.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(super) struct ParticleGlobals {
-    pub(super) view_proj: [f32; 16],
-    pub(super) cam_right: [f32; 4],
-    pub(super) cam_up: [f32; 4],
+pub(crate) struct ParticleGlobals {
+    pub(crate) view_proj: [f32; 16],
+    pub(crate) cam_right: [f32; 4],
+    pub(crate) cam_up: [f32; 4],
 }
 
 /// Owns every GPU resource for the particle pass. One per `Renderer`.
 pub struct ParticleRenderer {
     alpha_pipeline: wgpu::RenderPipeline,
     additive_pipeline: wgpu::RenderPipeline,
-    pub(super) globals_buffer: wgpu::Buffer,
-    pub(super) globals_bind_group: wgpu::BindGroup,
-    pub(super) index_buffer: wgpu::Buffer,
+    pub(crate) globals_buffer: wgpu::Buffer,
+    pub(crate) globals_bind_group: wgpu::BindGroup,
+    pub(crate) index_buffer: wgpu::Buffer,
 }
 
 impl ParticleRenderer {
@@ -170,7 +170,7 @@ impl ParticleRenderer {
         })
     }
 
-    pub(super) fn pipeline_for(&self, blend: ParticleBlend) -> &wgpu::RenderPipeline {
+    pub(crate) fn pipeline_for(&self, blend: ParticleBlend) -> &wgpu::RenderPipeline {
         match blend {
             ParticleBlend::Alpha => &self.alpha_pipeline,
             ParticleBlend::Additive => &self.additive_pipeline,

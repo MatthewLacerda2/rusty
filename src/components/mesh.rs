@@ -9,7 +9,7 @@
 //! single thread.
 
 use crate::asset::{AnimationClip, SkinData};
-use crate::render::mesh::Vertex;
+use crate::render::gpu::mesh::Vertex;
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 

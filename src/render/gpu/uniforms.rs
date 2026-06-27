@@ -1,12 +1,12 @@
 //! GPU uniform memory layouts for the forward renderer, split out of `mod.rs` to keep it
 //! under the size cap. Each `#[repr(C)]` struct mirrors a `struct` in `shader.wgsl`
 //! byte-for-byte; the comments call out the alignment padding that keeps the two in sync.
-//! `pub(super)` so the render submodules that build and write these uniforms can name them
+//! `pub(crate)` so the render submodules that build and write these uniforms can name them
 //! and their fields, exactly as when they lived in `mod.rs` (behavior unchanged).
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(super) struct CameraUniform {
+pub(crate) struct CameraUniform {
     pub view_proj: [f32; 16],
     pub camera_pos: [f32; 3],
     pub _pad: f32,
@@ -14,14 +14,14 @@ pub(super) struct CameraUniform {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(super) struct AmbientLightUniform {
+pub(crate) struct AmbientLightUniform {
     pub color: [f32; 3],
     pub intensity: f32,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(super) struct DirectionalLightUniform {
+pub(crate) struct DirectionalLightUniform {
     pub direction: [f32; 3],
     pub _pad1: f32,
     pub color: [f32; 3],
@@ -31,7 +31,7 @@ pub(super) struct DirectionalLightUniform {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(super) struct PointLightUniform {
+pub(crate) struct PointLightUniform {
     pub position: [f32; 3],
     pub _pad1: f32,
     pub color: [f32; 3],
@@ -42,7 +42,7 @@ pub(super) struct PointLightUniform {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(super) struct SpotlightUniform {
+pub(crate) struct SpotlightUniform {
     pub position: [f32; 3],
     pub _pad1: f32,
     pub direction: [f32; 3],
@@ -57,7 +57,7 @@ pub(super) struct SpotlightUniform {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(super) struct LightingUniform {
+pub(crate) struct LightingUniform {
     pub ambient: AmbientLightUniform,
     pub dir_light: DirectionalLightUniform,
     pub point_lights: [PointLightUniform; 4],
@@ -81,7 +81,7 @@ pub(super) struct LightingUniform {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(super) struct EntityUniform {
+pub(crate) struct EntityUniform {
     pub model_matrix: [f32; 16],
     pub color_tint: [f32; 4],
     pub use_texture: u32,
@@ -122,6 +122,6 @@ pub(super) struct EntityUniform {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(super) struct BoneUniform {
+pub(crate) struct BoneUniform {
     pub bones: [[f32; 16]; 64],
 }

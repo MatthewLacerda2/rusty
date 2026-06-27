@@ -6,7 +6,7 @@
 
 use glam::Vec3;
 
-use crate::render::mesh as primitives;
+use crate::render::gpu::mesh as primitives;
 use crate::scene::{
     AnimatorComponent, ColliderComponent, ColliderShape, DirtyFlag, HealthComponent, MaterialAsset,
     MaterialComponent, MeshComponent, RigidBodyComponent, Scene, ScriptComponent,

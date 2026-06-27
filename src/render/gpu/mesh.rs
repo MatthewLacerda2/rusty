@@ -1,4 +1,4 @@
-use super::tangents::fill_tangents;
+use crate::render::gpu::tangents::fill_tangents;
 use glam::Vec3;
 
 #[repr(C)]

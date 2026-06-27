@@ -47,7 +47,7 @@ fn scene(emissive: [f32; 3], bloom: bool) -> Scene {
     scene.ambient_intensity = 0.0;
 
     let id = scene.add_entity("Box".to_string());
-    let (vertices, indices) = rusty::render::mesh::generate_box(8.0, 8.0, 8.0);
+    let (vertices, indices) = rusty::render::gpu::mesh::generate_box(8.0, 8.0, 8.0);
     let mut e = scene.get_entity_mut(id).unwrap();
     e.mesh = Some(MeshComponent {
         primitive_type: "Box".to_string(),

@@ -3,8 +3,8 @@
 //! toggling, and quality-tier switching — everything that reacts to the window or
 //! settings changing *after* the renderer exists.
 
-use super::postfx::QualityPreset;
-use super::Renderer;
+use crate::render::postfx::QualityPreset;
+use crate::render::Renderer;
 
 impl Renderer {
     /// Switch the scalability tier. Reallocates the bloom buffers when the new
@@ -26,7 +26,7 @@ impl Renderer {
         }
     }
 
-    pub(super) fn create_depth_resources(
+    pub(crate) fn create_depth_resources(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
     ) -> (wgpu::Texture, wgpu::TextureView) {

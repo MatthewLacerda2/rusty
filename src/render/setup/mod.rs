@@ -1,8 +1,13 @@
+pub(crate) mod build;
+pub(crate) mod headless;
+pub(crate) mod resize;
+pub(crate) mod textures;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::setup_build::GpuResources;
-use super::Renderer;
+use self::build::GpuResources;
+use crate::render::Renderer;
 
 impl Renderer {
     /// Build the windowed renderer. Returns `Err` with a human-readable message
@@ -67,7 +72,7 @@ impl Renderer {
     /// groups from an already-created device/queue. Both the windowed (`new`) and
     /// the headless offscreen (`new_headless`) paths funnel through here, so they
     /// produce a byte-identical renderer apart from the optional window surface.
-    pub(super) fn from_parts(
+    pub(crate) fn from_parts(
         device: wgpu::Device,
         queue: wgpu::Queue,
         surface: Option<wgpu::Surface<'static>>,
@@ -115,8 +120,8 @@ impl Renderer {
             post_fx,
             quality,
         } = gpu;
-        let entity_pool = Some(super::entity_pool::EntityPool::new(&device));
-        let default_cube = super::cubemap::fallback_cube(&device);
+        let entity_pool = Some(crate::render::gpu::entity_pool::EntityPool::new(&device));
+        let default_cube = crate::render::ibl::cubemap::fallback_cube(&device);
         Self {
             device,
             queue,

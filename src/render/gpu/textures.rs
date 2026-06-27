@@ -2,11 +2,11 @@ use std::rc::Rc;
 
 use image::GenericImageView;
 
-use super::{GpuTexture, Renderer};
+use crate::render::{GpuTexture, Renderer};
 
 impl Renderer {
     /// Generates a standard checkerboard texture for meshes that don't have texture files assigned
-    pub(super) fn create_default_checkerboard_texture(
+    pub(crate) fn create_default_checkerboard_texture(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         layout: &wgpu::BindGroupLayout,

@@ -13,8 +13,8 @@
 
 use glam::{Mat4, Vec3, Vec4, Vec4Swizzles};
 
-use super::cubemap_capture::face_camera;
-use super::CubemapFace;
+use crate::render::ibl::cubemap_capture::face_camera;
+use crate::render::CubemapFace;
 
 /// The six faces' forward + inverse view-projection matrices, cached once so the
 /// prefilter can map directions and texels without rebuilding cameras per sample.

@@ -15,8 +15,8 @@
 
 use glam::{Mat4, Vec3, Vec4, Vec4Swizzles};
 
-use super::cubemap_capture::face_camera;
-use super::{CubemapCapture, CubemapFace, Renderer};
+use crate::render::ibl::cubemap_capture::face_camera;
+use crate::render::{CubemapCapture, CubemapFace, Renderer};
 use crate::scene::sh::Sh9;
 use crate::scene::Scene;
 

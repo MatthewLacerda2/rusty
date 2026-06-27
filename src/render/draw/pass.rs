@@ -3,14 +3,14 @@
 
 use glam::Vec3;
 
-use super::draw_resources::{OutlineResource, Overlays, SolidResource};
-use super::Renderer;
+use crate::render::draw::resources::{OutlineResource, Overlays, SolidResource};
+use crate::render::Renderer;
 use crate::scene::{ClearFlags, LightType, Scene};
 
 /// The framebuffer clear behavior for one camera in the stack (#93). Derived from the
 /// camera's [`ClearFlags`] and whether it is the first (bottom) pass of the frame.
 #[derive(Clone, Copy)]
-pub(super) struct PassClear {
+pub(crate) struct PassClear {
     /// `Some(backdrop)` clears color to that RGBA; `None` loads the existing color so
     /// this camera composites on top of what is already drawn (`DepthOnly`).
     pub color: Option<wgpu::Color>,
@@ -32,7 +32,7 @@ impl PassClear {
     /// is under it); `DepthOnly` preserves color so a viewmodel/UI camera layers on
     /// top of the world. Every camera clears depth, so stacked geometry never clips
     /// against the layer below — the FPS viewmodel fix.
-    pub(super) fn for_pass(is_first: bool, flags: ClearFlags) -> Self {
+    pub(crate) fn for_pass(is_first: bool, flags: ClearFlags) -> Self {
         let color = match flags {
             ClearFlags::Skybox | ClearFlags::SolidColor => Some(BACKDROP),
             // A DepthOnly bottom pass has nothing to composite over, so clear anyway.
@@ -44,13 +44,13 @@ impl PassClear {
 }
 
 /// Per-camera inputs threaded into the scene pass.
-pub(super) struct ScenePassFrame {
+pub(crate) struct ScenePassFrame {
     pub editor_mode: bool,
     pub clear: PassClear,
 }
 
 impl Renderer {
-    pub(super) fn execute_scene_pass(
+    pub(crate) fn execute_scene_pass(
         &mut self,
         scene: &Scene,
         frame: ScenePassFrame,

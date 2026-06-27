@@ -10,8 +10,8 @@ use std::rc::Rc;
 use glam::Vec3;
 use wgpu::util::DeviceExt;
 
-use super::particles::{ParticleGlobals, ParticleInstance};
-use super::{Camera, GpuTexture, Renderer};
+use crate::render::passes::particles::{ParticleGlobals, ParticleInstance};
+use crate::render::{Camera, GpuTexture, Renderer};
 use crate::components::particle::ParticleBlend;
 use crate::scene::Scene;
 
@@ -41,7 +41,7 @@ struct ParticleBatch {
 impl Renderer {
     /// Draw every emitter's live particles into the HDR scene target. Called from
     /// the scene pass after solids/skybox, before the post-FX chain runs.
-    pub(super) fn draw_particles(&mut self, scene: &Scene, camera: &Camera) {
+    pub(crate) fn draw_particles(&mut self, scene: &Scene, camera: &Camera) {
         let batches = self.collect_particle_batches(scene, camera.culling_mask);
         if batches.is_empty() {
             return;
