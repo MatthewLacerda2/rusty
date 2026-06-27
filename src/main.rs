@@ -588,7 +588,7 @@ fn handle_viewport_interaction(
     interaction: &ViewportInteraction,
     pixels_per_point: f32,
 ) {
-    use rusty::editor::{viewport_gizmo, viewport_pick};
+    use rusty::editor::viewport::{gizmo, pick};
 
     if interaction.tab != ViewportTab::Scene {
         frontend.editor_ui.gizmo_drag = None;
@@ -602,12 +602,12 @@ fn handle_viewport_interaction(
     };
     let _ = pixels_per_point; // NDC uses points; the image rect is already in points.
     let size = interaction.size;
-    let Some((ndc_x, ndc_y)) = viewport_pick::local_to_ndc(local.x, local.y, size.x, size.y) else {
+    let Some((ndc_x, ndc_y)) = pick::local_to_ndc(local.x, local.y, size.x, size.y) else {
         return;
     };
     let aspect = if size.y > 0.0 { size.x / size.y } else { 1.0 };
     let camera = game.camera().borrow().clone();
-    let ray = viewport_pick::ray_from_ndc(&camera, aspect, ndc_x, ndc_y);
+    let ray = pick::ray_from_ndc(&camera, aspect, ndc_x, ndc_y);
 
     let mut scene = game.scene().borrow_mut();
     let selected = frontend.editor_ui.selected_entity_id;
@@ -615,14 +615,14 @@ fn handle_viewport_interaction(
     // 1. Continue or start a gizmo drag on the current selection's axis handles.
     if interaction.dragging {
         if let Some(id) = selected {
-            if let Some(origin) = viewport_pick::entity_world_position(&scene, id) {
+            if let Some(origin) = pick::entity_world_position(&scene, id) {
                 if interaction.drag_started {
                     // Handle pick radius scales with distance so far handles stay grabbable.
                     let radius = (origin - camera.position).length() * 0.06 + 0.15;
-                    frontend.editor_ui.gizmo_drag = viewport_gizmo::begin_drag(origin, ray, radius);
+                    frontend.editor_ui.gizmo_drag = gizmo::begin_drag(origin, ray, radius);
                 }
                 if let Some(drag) = frontend.editor_ui.gizmo_drag.as_mut() {
-                    if viewport_gizmo::drag(&mut scene, id, drag, origin, ray) {
+                    if gizmo::drag(&mut scene, id, drag, origin, ray) {
                         frontend.editor_ui.is_dirty = true;
                     }
                     return;
@@ -635,7 +635,7 @@ fn handle_viewport_interaction(
 
     // 2. A plain click selects the entity under the cursor, or deselects empty space.
     if interaction.clicked {
-        let hit = viewport_pick::pick_entity(&scene, ray).map(|(id, _)| id);
+        let hit = pick::pick_entity(&scene, ray).map(|(id, _)| id);
         frontend.editor_ui.selected_entity_id = hit;
         frontend.editor_ui.selected_asset_path = None;
         scene.selected_entity_id = hit;

@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 
 use egui_phosphor::regular as icon;
 
-use crate::editor::inspector_card::component_card;
+use crate::editor::inspector::components::card::component_card;
 use crate::scene::{Entity, MaterialAsset, RenderMode};
 
 /// 3B2. Render the Material card for `entity`, editing the shared `MaterialAsset` it

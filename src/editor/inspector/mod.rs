@@ -1,12 +1,13 @@
+pub mod assets;
+pub mod components;
+
 use egui_phosphor::regular as icon;
 
-use crate::editor::inspector_context::gather_context;
-use crate::editor::{
-    inspector_add, inspector_audio, inspector_camera, inspector_gameplay, inspector_material,
-    inspector_particles, inspector_prefab, inspector_render, inspector_settings,
-    inspector_transform,
+use self::components::context::gather_context;
+use self::components::{
+    add, audio, camera, gameplay, material, particles, prefab, render, settings, transform,
 };
-use crate::editor::{inspectors, EditorUi, InspectorTarget};
+use crate::editor::{EditorUi, InspectorTarget};
 use crate::navigation::NavigationGraph;
 use crate::scene::{Entity, MaterialAsset, Scene};
 use crate::scripting::ConsoleLogs;
@@ -57,10 +58,10 @@ pub fn draw(
                         draw_entity_inspector(editor, ui, scene, nav, selected_id);
                     }
                     InspectorTarget::Asset(asset_path) => {
-                        inspectors::draw_inspector(ui, editor, scene, console, nav, &asset_path);
+                        assets::draw_inspector(ui, editor, scene, console, nav, &asset_path);
                     }
                     InspectorTarget::SceneSettings => {
-                        inspector_settings::draw(editor, ui, scene);
+                        settings::draw(editor, ui, scene);
                     }
                 }
             });
@@ -97,7 +98,7 @@ struct PendingEdits {
     parent_change: Option<Option<u32>>,
     nav_bake: bool,
     layer_changed: bool,
-    prefab_action: Option<inspector_prefab::PrefabAction>,
+    prefab_action: Option<prefab::PrefabAction>,
 }
 
 impl PendingEdits {
@@ -108,7 +109,7 @@ impl PendingEdits {
             editor.is_dirty = true;
         }
         if let Some(action) = self.prefab_action {
-            if inspector_prefab::dispatch(scene, action) {
+            if prefab::dispatch(scene, action) {
                 editor.is_dirty = true;
             }
         }
@@ -152,9 +153,9 @@ fn draw_entity_inspector(
 
         // Linked-prefab override affordance, just under the header (a no-op for a plain
         // entity). Emits a deferred action so the prefab verbs run after the guard drops.
-        pending.prefab_action = inspector_prefab::draw(ui, entity, cx.prefab_root);
+        pending.prefab_action = prefab::draw(ui, entity, cx.prefab_root);
 
-        inspector_transform::draw(
+        transform::draw(
             ui,
             entity,
             cx.parent_mat,
@@ -240,21 +241,21 @@ fn draw_components(
     is_dirty: &mut bool,
     pending_nav_bake: &mut bool,
 ) {
-    inspector_render::draw_mesh(ui, entity, is_dirty);
-    inspector_material::draw_material_card(ui, entity, materials, is_dirty);
-    inspector_render::draw_light(ui, entity, is_dirty);
+    render::draw_mesh(ui, entity, is_dirty);
+    material::draw_material_card(ui, entity, materials, is_dirty);
+    render::draw_light(ui, entity, is_dirty);
 
-    inspector_gameplay::draw_script(ui, entity, is_dirty);
-    inspector_gameplay::draw_health(ui, entity, is_dirty);
-    inspector_gameplay::draw_collider(ui, entity, is_dirty, pending_nav_bake);
-    inspector_gameplay::draw_rigidbody(ui, entity, is_dirty);
-    inspector_gameplay::draw_nav_agent(ui, entity, is_dirty);
+    gameplay::draw_script(ui, entity, is_dirty);
+    gameplay::draw_health(ui, entity, is_dirty);
+    gameplay::draw_collider(ui, entity, is_dirty, pending_nav_bake);
+    gameplay::draw_rigidbody(ui, entity, is_dirty);
+    gameplay::draw_nav_agent(ui, entity, is_dirty);
 
-    inspector_camera::draw_camera(ui, entity, named_layers, is_dirty);
-    inspector_camera::draw_visual_correction(ui, entity, is_dirty);
+    camera::draw_camera(ui, entity, named_layers, is_dirty);
+    camera::draw_visual_correction(ui, entity, is_dirty);
 
-    inspector_particles::draw(ui, entity, is_dirty);
-    inspector_audio::draw(ui, entity, is_dirty);
+    particles::draw(ui, entity, is_dirty);
+    audio::draw(ui, entity, is_dirty);
 
-    inspector_add::draw(ui, entity);
+    add::draw(ui, entity);
 }

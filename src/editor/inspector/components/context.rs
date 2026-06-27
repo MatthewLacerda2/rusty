@@ -6,7 +6,7 @@
 //! mutable entity guard (which borrows the scene for the rest of the frame), so these
 //! whole-scene reads can't fight that borrow.
 
-use crate::editor::inspector_prefab;
+use crate::editor::inspector::components::prefab;
 use crate::scene::{Scene, LAYER_COUNT};
 
 /// Read-only context the inspector needs that borrows the whole `Scene`, gathered
@@ -55,7 +55,7 @@ pub(crate) fn gather_context(scene: &Scene, selected_id: u32) -> InspectorContex
         parent_mat,
         selected_parent_name,
         valid_parents: collect_valid_parents(scene, selected_id),
-        prefab_root: inspector_prefab::instance_root(scene, selected_id),
+        prefab_root: prefab::instance_root(scene, selected_id),
     }
 }
 

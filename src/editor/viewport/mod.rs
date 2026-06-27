@@ -7,6 +7,9 @@
 //! owns no GPU state; `main.rs` registers the texture and feeds the [`egui::TextureId`]
 //! in, and reads the returned [`ViewportInteraction`] back to drive picking/gizmo.
 
+pub mod gizmo;
+pub mod pick;
+
 /// Which view the viewport tab strip is showing.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ViewportTab {

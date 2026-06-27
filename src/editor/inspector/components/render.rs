@@ -1,7 +1,7 @@
 use egui_phosphor::regular as icon;
 use glam::Vec3;
 
-use crate::editor::inspector_card::component_card;
+use crate::editor::inspector::components::card::component_card;
 use crate::scene::{Entity, LightType};
 
 /// 3B. Mesh details

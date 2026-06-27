@@ -15,7 +15,7 @@
 
 use egui_phosphor::regular as icon;
 
-use crate::editor::inspector_card::component_card;
+use crate::editor::inspector::components::card::component_card;
 use crate::editor::theme;
 use crate::scene::{authoring, Entity, Scene};
 
@@ -244,5 +244,5 @@ fn revert_field(scene: &mut Scene, root: u32, entity: u32, path: &str) -> bool {
 }
 
 #[cfg(test)]
-#[path = "inspector_prefab_tests.rs"]
+#[path = "prefab_tests.rs"]
 mod inspector_prefab_tests;

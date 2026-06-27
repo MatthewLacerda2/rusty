@@ -9,7 +9,7 @@
 
 use glam::Vec3;
 
-use super::viewport_pick::Ray;
+use super::pick::Ray;
 use crate::scene::Scene;
 
 /// Which translation axis a gizmo drag is bound to.

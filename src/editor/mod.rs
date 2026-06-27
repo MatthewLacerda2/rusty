@@ -7,25 +7,9 @@ pub mod header;
 pub mod hierarchy;
 mod hierarchy_tree;
 pub mod inspector;
-mod inspector_add;
-mod inspector_audio;
-mod inspector_camera;
-mod inspector_card;
-mod inspector_context;
-mod inspector_gameplay;
-mod inspector_material;
-mod inspector_particles;
-mod inspector_prefab;
-mod inspector_render;
-mod inspector_script_fields;
-mod inspector_settings;
-mod inspector_transform;
-pub mod inspectors;
 mod menu_create;
 pub mod theme;
 pub mod viewport;
-pub mod viewport_gizmo;
-pub mod viewport_pick;
 
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
@@ -96,7 +80,7 @@ pub struct EditorUi {
     /// front-end can size the offscreen render target to match the displayed rect.
     pub viewport_image_size: egui::Vec2,
     /// Live move-gizmo drag, if an axis handle is currently grabbed (#183).
-    pub gizmo_drag: Option<viewport_gizmo::GizmoDrag>,
+    pub gizmo_drag: Option<viewport::gizmo::GizmoDrag>,
 
     /// Live Lua REPL input line (dev builds only). The editor only collects the
     /// submitted text here; the front-end (main.rs) drains `pending_repl` and runs

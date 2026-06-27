@@ -8,7 +8,7 @@
 
 use egui_phosphor::regular as icon;
 
-use crate::editor::inspector_card::component_card;
+use crate::editor::inspector::components::card::component_card;
 use crate::scene::{CollisionResponse, EmitMode, Entity, ParticleBlend, ParticleEmitterComponent};
 
 /// 3F-particles. Particle System component card.
