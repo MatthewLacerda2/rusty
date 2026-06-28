@@ -1,4 +1,4 @@
-//! src/render/probe_bake.rs — Full-bounce light-probe bake (#241).
+//! src/render/probe_bake.rs — Light-probe capture + SH projection (#241).
 //!
 //! The rendered-capture counterpart to the analytic stand-in (`scene::probe_fill`).
 //! For each probe we capture the STATIC scene to a 6-face cubemap from the probe's
@@ -8,6 +8,11 @@
 //! cubemap solid angle (cosine-lobe convolution then happens on read-back in
 //! `Sh9::eval`). The 27 floats per probe land in `Scene::probes`, ready for the
 //! `<scene>.lighting.json` sidecar the runtime already loads.
+//!
+//! A single capture/projection here is ONE bounce (the static scene lit by direct
+//! light only). The true multi-bounce solve that iterates these passes and folds the
+//! probe field back into each capture lives in `probe_bounce.rs` (#285); `bake_probes`
+//! drives it.
 //!
 //! Pure render layer: a function of (static scene, probe positions, resolution),
 //! no wall-clock / RNG — exempt from (and clean under) the determinism guard, like
@@ -34,15 +39,15 @@ impl Renderer {
         project_cubemap(&capture)
     }
 
-    /// Bake every probe in `scene.probes`, writing each probe's SH in place. The probe
-    /// positions and grid layout are untouched — only the SH coefficients change, so a
-    /// later `save_lighting_sidecar` persists the bounce next to the scene.
+    /// Bake every probe in `scene.probes` with the multi-bounce GI solve (#285),
+    /// writing each probe's converged SH in place. The probe positions and grid layout
+    /// are untouched — only the SH coefficients change, so a later
+    /// `save_lighting_sidecar` persists the bounce next to the scene. Thin wrapper over
+    /// [`Renderer::bake_probes_multibounce`] (the iteration lives in `probe_bounce.rs`);
+    /// the discarded [`crate::render::ibl::probe_bounce::BounceReport`] is available
+    /// from that method when the caller wants the bounce count.
     pub fn bake_probes(&mut self, scene: &mut Scene, resolution: u32) {
-        let positions: Vec<Vec3> = scene.probes.probes.iter().map(|p| p.position).collect();
-        for (i, position) in positions.into_iter().enumerate() {
-            let sh = self.bake_probe(scene, position, resolution);
-            scene.probes.probes[i].sh = sh;
-        }
+        self.bake_probes_multibounce(scene, resolution);
     }
 }
 

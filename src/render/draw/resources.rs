@@ -139,6 +139,7 @@ impl Renderer {
             entity,
             material,
             model_matrix,
+            self.capture_probe_bounce,
         );
         // The active bone palette: the live animated pose when a clip plays (#80),
         // else the bind pose (#79). Primitives/static meshes leave it empty, so the

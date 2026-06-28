@@ -1,4 +1,4 @@
-//! src/dev/probe_bake.rs — Headless entry point for the full-bounce probe bake (#241).
+//! src/dev/probe_bake.rs — Headless entry point for the multi-bounce probe bake (#241, #285).
 //!
 //! The dev-layer bridge between the script-side `Probe.Bake()` action and the
 //! render-layer bake (`Renderer::bake_probes`). Like `screenshot.rs`, it spins up a

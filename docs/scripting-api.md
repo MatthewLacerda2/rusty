@@ -536,18 +536,23 @@ Probes are addressed by **index** (0-based, in placement order), not by entity i
 | `Probe.Count` | `()` | probe count |
 | `Probe.FillGrid` | `(minX, minY, minZ, maxX, maxY, maxZ, spacing)` | — (regular grid; replaces existing probes) |
 | `Probe.BakeAnalytic` | `()` | — (deterministic stand-in fill: projects the scene's ambient sky + first directional light to SH) |
-| `Probe.Bake` *(dev-only)* | `()` | `true` if the bake ran, `false` if no GPU/software adapter was available (skipped) — the real full-bounce bake |
+| `Probe.Bake` *(dev-only)* | `()` | `true` if the bake ran, `false` if no GPU/software adapter was available (skipped) — the real multi-bounce GI bake |
 | `Probe.SampleIrradiance` | `(x, y, z, nx, ny, nz)` | `r, g, b` — interpolated probe irradiance for a surface normal at a world position (linear RGB; black when there are no probes) |
 
-`Bake` is the real, full-bounce bake (#241): for every probe it captures the STATIC
-scene to a cubemap from the probe's position (dynamic actors excluded) and projects
-that rendered radiance into L2 irradiance SH — so probes pick up the actual coloured
-bounce off nearby static surfaces, directional and position-dependent (a probe by a
-red wall reads red; one across the room does not). It needs a GPU or software adapter
-(e.g. lavapipe); with none it skips gracefully and returns `false`, never erroring.
-It is **dev-only** (an authoring action driving a headless renderer), so it is absent
-from ship builds. Save the scene afterward to persist the baked SH into the
-`<scene>.lighting.json` sidecar the runtime loads.
+`Bake` is the real multi-bounce GI bake (#241, #285): for every probe it captures the
+STATIC scene to a cubemap from the probe's position (dynamic actors excluded) and
+projects that rendered radiance into L2 irradiance SH — so probes pick up the actual
+coloured bounce off nearby static surfaces, directional and position-dependent (a probe
+by a red wall reads red; one across the room does not). The first pass captures direct
+light only; each later pass re-lights the static scene with the previous pass's probe
+field, folding in one more indirect bounce, so colour bleeds further with each
+iteration. It runs **up to 5 bounces** and stops early once a pass adds negligible
+energy (the field stops changing), whichever comes first. It needs a GPU or software
+adapter (e.g. lavapipe); with none it skips gracefully and returns `false`, never
+erroring. It is **dev-only** (an authoring action driving a headless renderer), so it is
+absent from ship builds. The bake is deterministic — the same scene bakes byte-identical
+SH. Save the scene afterward to persist the baked SH into the `<scene>.lighting.json`
+sidecar the runtime loads.
 
 `BakeAnalytic` is the headless, render-free stand-in: it ignores occlusion and bounce
 (every probe sees the same analytic sky+sun, with a gentle height gradient so the

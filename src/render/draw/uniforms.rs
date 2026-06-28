@@ -19,9 +19,10 @@ pub(crate) fn solid_entity_uniform(
     entity: &Entity,
     material: Option<&MaterialAsset>,
     model_matrix: Mat4,
+    light_static_from_probes: bool,
 ) -> EntityUniform {
     let is_lit = if entity.light.is_some() { 0u32 } else { 1u32 };
-    let (use_sh, sh) = entity_probe_sh(scene, entity, model_matrix);
+    let (use_sh, sh) = entity_probe_sh(scene, entity, model_matrix, light_static_from_probes);
     let color_tint = material_color_tint(material);
 
     let (metallic, roughness) = match material {
@@ -83,8 +84,18 @@ fn material_color_tint(material: Option<&MaterialAsset>) -> [f32; 4] {
 /// layout. Only NON-STATIC objects opt in — static geometry keeps the flat ambient
 /// term (and is the bake's target, not its consumer). Returns `(use_sh, coeffs)`;
 /// `use_sh == 0` with zeroed coeffs when the entity is static or no probe covers it.
-fn entity_probe_sh(scene: &Scene, entity: &Entity, model_matrix: Mat4) -> (u32, [[f32; 4]; 9]) {
-    if entity.is_static {
+///
+/// `light_static_from_probes` overrides the "static ⇒ no probe SH" rule (#285): the
+/// multi-bounce probe bake sets it so static surfaces *do* sample the in-progress
+/// probe field during a bounce-≥2 capture, feeding the previous bounce's indirect
+/// light back into the scene. It is off everywhere else (runtime shading, bounce 1).
+fn entity_probe_sh(
+    scene: &Scene,
+    entity: &Entity,
+    model_matrix: Mat4,
+    light_static_from_probes: bool,
+) -> (u32, [[f32; 4]; 9]) {
+    if entity.is_static && !light_static_from_probes {
         return (0, [[0.0; 4]; 9]);
     }
     let position = model_matrix.w_axis.truncate();

@@ -89,13 +89,43 @@ impl Renderer {
         position: Vec3,
         resolution: u32,
     ) -> CubemapCapture {
+        self.capture_static_cubemap_inner(scene, position, resolution, false)
+    }
+
+    /// Like [`Renderer::capture_static_cubemap`], but the static surfaces are *also*
+    /// lit by the scene's current probe field — one indirect bounce (#285). The
+    /// multi-bounce probe bake calls this for bounce ≥2 after writing the previous
+    /// bounce's SH into `scene.probes`, so each capture re-injects the last bounce's
+    /// indirect light. Bounce 1 (and reflection bakes) use the direct-only path.
+    pub fn capture_static_cubemap_lit(
+        &mut self,
+        scene: &Scene,
+        position: Vec3,
+        resolution: u32,
+    ) -> CubemapCapture {
+        self.capture_static_cubemap_inner(scene, position, resolution, true)
+    }
+
+    /// Shared capture spine: render the static scene into a 6-face cubemap from
+    /// `position`. `light_static_from_probes` decides whether the static surfaces
+    /// pick up the probe field (bounce ≥2) or stay direct-only (bounce 1).
+    fn capture_static_cubemap_inner(
+        &mut self,
+        scene: &Scene,
+        position: Vec3,
+        resolution: u32,
+        light_static_from_probes: bool,
+    ) -> CubemapCapture {
         let resolution = resolution.max(1);
         let target = self.make_face_target(resolution);
         let view = target.create_view(&wgpu::TextureViewDescriptor::default());
 
-        // Gather only static geometry for the duration of the capture, then restore.
+        // Gather only static geometry, and (for bounce ≥2) let those static surfaces
+        // sample the probe field. Both flags are restored after the six faces.
         let prev_static = self.static_capture;
+        let prev_bounce = self.capture_probe_bounce;
         self.static_capture = true;
+        self.capture_probe_bounce = light_static_from_probes;
 
         let faces = CubemapFace::ALL.map(|face| {
             let camera = face_camera(position, face);
@@ -104,6 +134,7 @@ impl Renderer {
         });
 
         self.static_capture = prev_static;
+        self.capture_probe_bounce = prev_bounce;
         CubemapCapture { resolution, faces }
     }
 
