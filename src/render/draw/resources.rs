@@ -37,6 +37,9 @@ pub(crate) type GridResource = (wgpu::Buffer, wgpu::BindGroup);
 pub(crate) type AabbResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
 pub(crate) type AxisResource = (usize, wgpu::Buffer, wgpu::BindGroup);
 pub(crate) type PathResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup, u32);
+// One probe gizmo line draw (#284): its world-space line-list vertex buffer, the flat
+// overlay uniform it owns, its group-1 bind group, and the vertex count to draw.
+pub(crate) type ProbeResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup, u32);
 
 /// The editor-only overlay resources for one scene pass (selection outline, grid,
 /// collider AABBs, axis arrows). Empty outside editor mode. Bundled so the scene pass
@@ -47,6 +50,9 @@ pub(crate) struct Overlays {
     pub grid: Option<GridResource>,
     pub aabb: Vec<AabbResource>,
     pub axis: Vec<AxisResource>,
+    // Light- and reflection-probe gizmos (#284): probe markers tinted by baked SH plus
+    // reflection parallax-box wireframes. Editor-only, like the rest of `Overlays`.
+    pub probes: Vec<ProbeResource>,
 }
 
 impl Renderer {
@@ -69,6 +75,7 @@ impl Renderer {
             grid: self.precreate_grid(),
             aabb: self.precreate_aabb(scene),
             axis: self.precreate_axis_arrows(scene),
+            probes: self.precreate_probes(scene),
         }
     }
 

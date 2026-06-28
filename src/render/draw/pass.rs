@@ -148,6 +148,9 @@ impl Renderer {
         if editor_mode {
             let o = overlays;
             self.draw_editor_overlays(&mut render_pass, &o.grid, &o.aabb, &o.axis);
+            // Light- & reflection-probe gizmos (#284): same line pipeline, same
+            // editor-only gate. Visualization only — never drawn in a game render.
+            self.draw_probe_overlays(&mut render_pass, &o.probes);
         }
     }
 

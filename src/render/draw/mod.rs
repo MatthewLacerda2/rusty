@@ -6,6 +6,7 @@ mod lighting;
 mod overlays;
 mod pass;
 mod path;
+mod probes;
 pub(crate) mod resources;
 mod uniforms;
 
