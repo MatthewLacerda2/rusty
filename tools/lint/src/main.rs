@@ -16,6 +16,7 @@ use std::process::exit;
 
 mod components;
 mod determinism;
+mod parity;
 
 const MAX_FILE_LINES: usize = 300;
 /// Test/fixture files get a looser cap than source: Rust test files legitimately
@@ -40,6 +41,15 @@ fn main() {
     // inspector card, and an API namespace, or be grandfathered in the baseline.
     if args.iter().any(|a| a == "--components") {
         components::run();
+        return;
+    }
+
+    // `--parity` runs the editor↔shared-op parity gate (#287): every *migrated*
+    // first-class component's inspector card must route its mutations through a
+    // shared `scene::authoring` op (no direct `&mut entity.<field>`); cards not yet
+    // migrated are grandfathered in `parity_baseline.txt` (a burn-down list).
+    if args.iter().any(|a| a == "--parity") {
+        parity::run();
         return;
     }
 

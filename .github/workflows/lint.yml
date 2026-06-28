@@ -58,6 +58,9 @@ jobs:
       - name: Component completeness gate (4 axes per first-class component)
         if: needs.changes.outputs.code != 'false'
         run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- --components
+      - name: Editor↔shared-op parity gate (migrated cards route through authoring ops)
+        if: needs.changes.outputs.code != 'false'
+        run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- --parity
       # Clippy is a HARD gate: every warning fails CI, for both feature sets.
       # The 50-line function cap (clippy::too_many_lines, threshold in clippy.toml)
       # is enforced crate-wide via `-D clippy::too_many_lines`. The legacy burn-down
