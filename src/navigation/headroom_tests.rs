@@ -110,6 +110,27 @@ fn high_overhang_is_no_op() {
     );
 }
 
+/// Boundary: a cell whose clearance is *exactly* the agent height stays walkable — the
+/// agent just fits, since the carve threshold is "below the height" (`< agent_height`, not
+/// `<=`). An overhang underside at y = 2.0 over flat ground (support 0.0) ⇒ clearance
+/// exactly 2.0, equal to the agent height. Pins the `<` so a `<=` mutant (which would carve
+/// a cell the agent exactly clears) cannot survive.
+#[test]
+fn clearance_exactly_equal_to_height_stays_walkable() {
+    let mut scene = Scene::new();
+    add_overhang(&mut scene, 2.6, 7.4, 2.6, 7.4, 2.0); // underside 2.0 == agent height 2.0
+    scene.nav_settings.agent_radius = 0.0;
+    let g = baked(&mut scene, 2.0);
+    for gz in 3..=6 {
+        for gx in 3..=6 {
+            assert!(
+                g.is_walkable(gx, gz),
+                "cell ({gx},{gz}) with clearance exactly 2.0 fits a 2.0 agent: not carved"
+            );
+        }
+    }
+}
+
 /// A scene with no overhead geometry bakes identically with the feature on (default
 /// height) and off (height 0) — the back-compat proof that simple scenes are untouched.
 #[test]
