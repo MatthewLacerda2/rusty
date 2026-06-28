@@ -5,7 +5,10 @@
 
 use glam::Vec3;
 
-use crate::render::{AmbientLightUniform, DirectionalLightUniform, LightingUniform, PointLightUniform, SpotlightUniform};
+use crate::render::{
+    AmbientLightUniform, DirectionalLightUniform, LightingUniform, PointLightUniform,
+    SpotlightUniform,
+};
 use crate::scene::{LightType, Scene};
 
 /// The base lighting uniform before scene lights/SSR are scanned in.

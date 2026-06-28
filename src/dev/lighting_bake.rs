@@ -110,11 +110,8 @@ fn auto_place_reflection(scene: &mut Scene, params: &LightingBakeParams) -> bool
     if !scene.reflection_probes.is_empty() {
         return false;
     }
-    let plans = placement::plan_reflection_probes(
-        scene,
-        params.reflection_region,
-        params.reflection_cap,
-    );
+    let plans =
+        placement::plan_reflection_probes(scene, params.reflection_region, params.reflection_cap);
     if plans.is_empty() {
         return false;
     }

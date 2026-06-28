@@ -6,8 +6,8 @@
 
 use std::rc::Rc;
 
-use crate::render::{GpuTexture, MeshId, Renderer};
 use crate::components::MaterialAsset;
+use crate::render::{GpuTexture, MeshId, Renderer};
 use crate::scene::Scene;
 
 // One solid draw item: the entity id (its persistent entity + material bind groups
@@ -127,8 +127,12 @@ impl Renderer {
         let transparent = material.is_some_and(MaterialAsset::is_transparent);
         let model_matrix = scene.compute_world_matrix(entity.id);
         let world_pos = model_matrix.w_axis.truncate();
-        let uniform =
-            crate::render::draw::uniforms::solid_entity_uniform(scene, entity, material, model_matrix);
+        let uniform = crate::render::draw::uniforms::solid_entity_uniform(
+            scene,
+            entity,
+            material,
+            model_matrix,
+        );
         // The active bone palette: the live animated pose when a clip plays (#80),
         // else the bind pose (#79). Primitives/static meshes leave it empty, so the
         // pool binds the shared identity palette and allocates no per-entity buffer.

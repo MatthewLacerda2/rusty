@@ -12,8 +12,8 @@
 
 use glam::{Mat4, Quat, Vec3};
 
-use crate::render::postfx::HDR_FORMAT;
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::postfx::HDR_FORMAT;
 
 /// Maximum decals drawn per frame. Bullet holes/scorch accumulate, but old ones
 /// are evicted (FIFO) so the pass stays bounded; matches a typical FPS budget.

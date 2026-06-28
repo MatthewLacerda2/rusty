@@ -4,10 +4,10 @@ mod draw;
 mod setup;
 mod viewport;
 
-pub mod postfx;
 pub mod gpu;
 pub(crate) mod ibl;
 pub(crate) mod passes;
+pub mod postfx;
 
 // Moved submodules pulled back under short names so this module's body keeps
 // naming them directly (grouped by subfolder — see the convention in CLAUDE.md).
@@ -171,4 +171,3 @@ pub struct Renderer {
     /// without the dynamic actors that would otherwise bake into the captured lighting.
     static_capture: bool,
 }
-

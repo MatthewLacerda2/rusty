@@ -39,19 +39,20 @@ pub use lighting::io::{
     apply_lighting, extract_lighting, load_lighting_sidecar, save_lighting_sidecar, sidecar_path,
     LightingData,
 };
-pub use prefab::{
-    extract_prefab, instantiate_prefab, instantiate_prefab_linked, is_prefab_path,
-    load_and_instantiate, load_and_instantiate_linked, read_prefab_file, save_prefab,
-    write_prefab_file, PrefabData, PREFAB_EXTENSION,
-};
+pub use lighting::probe::{Probe, ProbeGrid, ProbeVolume};
+pub use lighting::probe_fill::{analytic_fill, AnalyticEnv};
+pub use lighting::reflection_probe::{ReflectionProbe, ReflectionProbeSet};
+pub use lighting::sh::{Sh9, SH_COEFFS};
 pub use prefab::apply::{apply_instance_field_to_source, apply_instance_to_source};
 pub use prefab::link::{
     list_instance_overrides, record_instance_overrides, reimport_all_linked_instances,
     reimport_instance, revert_instance_overrides,
 };
-pub use lighting::probe::{Probe, ProbeGrid, ProbeVolume};
-pub use lighting::probe_fill::{analytic_fill, AnalyticEnv};
-pub use lighting::reflection_probe::{ReflectionProbe, ReflectionProbeSet};
+pub use prefab::{
+    extract_prefab, instantiate_prefab, instantiate_prefab_linked, is_prefab_path,
+    load_and_instantiate, load_and_instantiate_linked, read_prefab_file, save_prefab,
+    write_prefab_file, PrefabData, PREFAB_EXTENSION,
+};
 pub use scene::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
     ColliderShape, CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent,
@@ -61,5 +62,4 @@ pub use scene::{
     VisualCorrectionComponent, DEFAULT_AMBIENT_COLOR, DEFAULT_AMBIENT_INTENSITY,
 };
 pub use serialize::{apply_scene_data, asset_mesh_component, to_scene_data, SceneData};
-pub use lighting::sh::{Sh9, SH_COEFFS};
 pub use snapshot::SceneSnapshot;

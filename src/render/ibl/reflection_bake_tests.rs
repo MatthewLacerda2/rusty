@@ -8,10 +8,10 @@
 
 use glam::{Quat, Vec3};
 
+use crate::components::MaterialAsset;
 use crate::render::ibl::cube_sample::srgb_to_linear;
 use crate::render::ibl::cubemap::parse_ktx2_cubemap_mips;
 use crate::render::{CubemapFace, Renderer};
-use crate::components::MaterialAsset;
 use crate::scene::{MeshComponent, Scene};
 
 const RES: u32 = 32;

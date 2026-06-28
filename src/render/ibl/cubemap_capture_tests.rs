@@ -6,8 +6,8 @@
 
 use glam::{Quat, Vec3};
 
-use crate::render::{CubemapFace, Renderer};
 use crate::components::MaterialAsset;
+use crate::render::{CubemapFace, Renderer};
 use crate::scene::{MeshComponent, Scene};
 
 const RES: u32 = 32;

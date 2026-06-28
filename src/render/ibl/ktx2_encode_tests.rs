@@ -2,9 +2,9 @@
 //! 300-line cap. Pure bytes in/out — no GPU. The key contract: what we ENCODE the #244
 //! loader can PARSE back (the bake -> write -> load round-trip the issue requires).
 
+use super::*;
 use crate::render::ibl::cubemap::{parse_ktx2_cubemap, parse_ktx2_cubemap_mips};
 use crate::render::ibl::reflection_prefilter::PrefilteredCubemap;
-use super::*;
 
 /// A tiny prefiltered cube: `base`-edge mip0 down to 1×1, each level six solid faces tinted
 /// `face_index * 40` in red so face order is checkable after the round-trip.

@@ -3,8 +3,8 @@ use wgpu::util::DeviceExt;
 
 use std::collections::HashSet;
 
-use crate::render::gpu::mesh::Vertex;
 use super::{GpuMesh, MeshId, Renderer};
+use crate::render::gpu::mesh::Vertex;
 use crate::scene::Scene;
 
 impl Renderer {

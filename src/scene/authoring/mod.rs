@@ -158,12 +158,12 @@ pub use crate::scene::authoring::components::{add_component, remove_component, C
 // itself; re-exported here so editor and API reach extract / instantiate (unpacked
 // and linked) and the apply/revert/list verbs through this one shared authoring entry
 // point.
-pub use crate::scene::prefab::{extract_prefab, instantiate_prefab, instantiate_prefab_linked};
 pub use crate::scene::prefab::apply::{apply_instance_field_to_source, apply_instance_to_source};
 pub use crate::scene::prefab::link::{
     list_instance_overrides, record_instance_overrides, reimport_instance,
     revert_instance_overrides,
 };
+pub use crate::scene::prefab::{extract_prefab, instantiate_prefab, instantiate_prefab_linked};
 
 // The asset-instantiate verb (#182) lives in `scene::asset_instance` (size-cap
 // split); re-exported here so the editor's model inspector and the `Scene.Instantiate`

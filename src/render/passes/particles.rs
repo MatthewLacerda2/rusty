@@ -11,9 +11,9 @@
 
 use wgpu::util::DeviceExt;
 
-use crate::render::postfx::HDR_FORMAT;
-use crate::render::gpu::shaders::ShaderRegistry;
 use crate::components::particle::ParticleBlend;
+use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::postfx::HDR_FORMAT;
 
 /// Per-particle instance data uploaded to the GPU (matches `InstanceInput`).
 #[repr(C)]

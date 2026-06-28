@@ -10,9 +10,9 @@ use std::rc::Rc;
 use glam::Vec3;
 use wgpu::util::DeviceExt;
 
+use crate::components::particle::ParticleBlend;
 use crate::render::passes::particles::{ParticleGlobals, ParticleInstance};
 use crate::render::{Camera, GpuTexture, Renderer};
-use crate::components::particle::ParticleBlend;
 use crate::scene::Scene;
 
 /// Camera-facing billboard basis (right, up). Derived from the camera forward, with

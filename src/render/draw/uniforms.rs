@@ -5,8 +5,8 @@
 
 use glam::Mat4;
 
-use crate::render::EntityUniform;
 use crate::components::{Entity, MaterialAsset, RenderMode};
+use crate::render::EntityUniform;
 use crate::scene::Scene;
 
 /// Compute the per-entity uniform (tint, lit flag, PBR params, cutout) for a solid

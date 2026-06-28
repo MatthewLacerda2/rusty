@@ -9,10 +9,10 @@
 
 use crate::render::gpu::bind_layouts;
 use crate::render::gpu::pipelines;
+use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::postfx::{PostFx, QualityPreset, HDR_FORMAT};
 use crate::render::setup::textures::{create_textures, Textures};
-use crate::render::gpu::shaders::ShaderRegistry;
-use crate::render::{passes::shadows, ibl::skybox};
+use crate::render::{ibl::skybox, passes::shadows};
 use crate::render::{CameraUniform, GpuTexture, LightingUniform, Renderer};
 
 /// Camera + lighting uniform buffers and the group(0) bind group.
@@ -119,7 +119,11 @@ fn create_billboard_passes(
             texture_layout,
             registry,
         ),
-        decal_renderer: crate::render::passes::decals::DecalRenderer::new(device, texture_layout, registry),
+        decal_renderer: crate::render::passes::decals::DecalRenderer::new(
+            device,
+            texture_layout,
+            registry,
+        ),
     }
 }
 

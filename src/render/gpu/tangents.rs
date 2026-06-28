@@ -5,8 +5,8 @@
 //! positions + UVs via the asset layer's pure [`generate_tangents`] so primitives
 //! sample normal maps correctly, exactly like an imported mesh (#207).
 
-use crate::render::gpu::mesh::Vertex;
 use crate::asset::tangents::generate_tangents;
+use crate::render::gpu::mesh::Vertex;
 
 /// Overwrite each vertex's `tangent` with the basis derived from positions + UVs. The
 /// `generate_*` builders apply this before returning their geometry.

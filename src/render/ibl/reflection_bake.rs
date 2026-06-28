@@ -41,7 +41,10 @@ impl Renderer {
         log::debug!(
             "[ReflectionBake] {} mips, roughest at mip {:.1}",
             prefiltered.level_count(),
-            crate::render::ibl::reflection_prefilter::roughness_to_mip(1.0, prefiltered.level_count() as u32)
+            crate::render::ibl::reflection_prefilter::roughness_to_mip(
+                1.0,
+                prefiltered.level_count() as u32
+            )
         );
         encode_cubemap(&prefiltered)
     }
