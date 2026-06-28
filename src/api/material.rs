@@ -6,13 +6,21 @@
 //! references one by name via its `MaterialComponent`. These verbs resolve the
 //! entity's material (creating a default one if it has none yet) and mutate the
 //! asset in the library, so every entity sharing that material sees the change.
+//!
+//! This is a THIN adapter (#287): each setter resolves the library key via the
+//! shared `authoring::material::ensure_material_key`, parses the render-mode string,
+//! then calls the matching `authoring::material::*` op. The field write + validation
+//! (e.g. the `[0, 1]` alpha clamp) lives ONCE in that shared module, which the editor's
+//! Material card calls too — the egui panel and the Lua binding are siblings over the
+//! same Rust op, so they can never drift.
 
 use std::cell::RefCell;
 
 use mlua::Lua;
 
 use super::{put, Reg};
-use crate::components::{MaterialAsset, MaterialComponent, RenderMode};
+use crate::components::RenderMode;
+use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
 /// Register the `Material` namespace onto `lua`.
@@ -42,30 +50,18 @@ fn parse_render_mode(name: &str) -> RenderMode {
     }
 }
 
-/// Resolve the library key for entity `id`'s material, creating a default material
-/// (under `entity_{id}_material`) and attaching the reference if it has none yet.
-/// Returns `None` only when the entity does not exist.
-fn ensure_material_key(scene: &mut Scene, id: u32) -> Option<String> {
-    let key = {
-        let mut e = scene.get_entity_mut(id)?;
-        if e.material.is_none() {
-            e.material = Some(MaterialComponent {
-                material: format!("entity_{id}_material"),
-            });
-        }
-        e.material.as_ref().unwrap().material.clone()
-    };
-    scene.materials.entry(key.clone()).or_default();
-    Some(key)
-}
-
-/// Run `edit` against entity `id`'s (resolved or freshly created) library material.
-fn with_material(scene: &RefCell<Scene>, id: u32, edit: impl FnOnce(&mut MaterialAsset)) {
+/// Resolve entity `id`'s (resolved or freshly created) library material key and run
+/// `apply` against the shared library + key. The resolve-or-create is the shared
+/// `authoring::material::ensure_material_key`; `apply` is one of the shared
+/// `authoring::material::*` ops, so the field write + validation is never duplicated.
+fn with_material(
+    scene: &RefCell<Scene>,
+    id: u32,
+    apply: impl FnOnce(&mut mat_ops::MaterialLibrary, &str),
+) {
     let mut scene = scene.borrow_mut();
-    if let Some(key) = ensure_material_key(&mut scene, id) {
-        if let Some(mat) = scene.materials.get_mut(&key) {
-            edit(mat);
-        }
+    if let Some(key) = mat_ops::ensure_material_key(&mut scene, id) {
+        apply(&mut scene.materials, &key);
     }
 }
 
@@ -79,7 +75,7 @@ fn register_scalars<'lua, 'scope>(
         table,
         "SetMetallic",
         scope.create_function(|_, (id, val): (u32, f32)| {
-            with_material(scene, id, |mat| mat.metallic = val);
+            with_material(scene, id, |m, key| mat_ops::set_metallic(m, key, val));
             Ok(())
         }),
     )?;
@@ -88,7 +84,7 @@ fn register_scalars<'lua, 'scope>(
         table,
         "SetRoughness",
         scope.create_function(|_, (id, val): (u32, f32)| {
-            with_material(scene, id, |mat| mat.roughness = val);
+            with_material(scene, id, |m, key| mat_ops::set_roughness(m, key, val));
             Ok(())
         }),
     )?;
@@ -97,7 +93,7 @@ fn register_scalars<'lua, 'scope>(
         table,
         "SetEmissive",
         scope.create_function(|_, (id, rgb): (u32, [f32; 3])| {
-            with_material(scene, id, |mat| mat.emissive = rgb);
+            with_material(scene, id, |m, key| mat_ops::set_emissive(m, key, rgb));
             Ok(())
         }),
     )
@@ -114,7 +110,9 @@ fn register_maps<'lua, 'scope>(
         table,
         "SetMetallicMap",
         scope.create_function(|_, (id, path): (u32, String)| {
-            with_material(scene, id, |mat| mat.metallic_map = Some(path));
+            with_material(scene, id, |m, key| {
+                mat_ops::set_metallic_map(m, key, Some(path))
+            });
             Ok(())
         }),
     )?;
@@ -123,7 +121,9 @@ fn register_maps<'lua, 'scope>(
         table,
         "SetRoughnessMap",
         scope.create_function(|_, (id, path): (u32, String)| {
-            with_material(scene, id, |mat| mat.roughness_map = Some(path));
+            with_material(scene, id, |m, key| {
+                mat_ops::set_roughness_map(m, key, Some(path))
+            });
             Ok(())
         }),
     )?;
@@ -132,8 +132,8 @@ fn register_maps<'lua, 'scope>(
         table,
         "SetTexture",
         scope.create_function(|_, (id, path): (u32, String)| {
-            with_material(scene, id, |mat| {
-                mat.base_color_map = (!path.is_empty()).then_some(path);
+            with_material(scene, id, |m, key| {
+                mat_ops::set_base_color_map(m, key, path)
             });
             Ok(())
         }),
@@ -143,7 +143,9 @@ fn register_maps<'lua, 'scope>(
         table,
         "SetNormalMap",
         scope.create_function(|_, (id, path): (u32, String)| {
-            with_material(scene, id, |mat| mat.normal_map = Some(path));
+            with_material(scene, id, |m, key| {
+                mat_ops::set_normal_map(m, key, Some(path))
+            });
             Ok(())
         }),
     )?;
@@ -152,7 +154,9 @@ fn register_maps<'lua, 'scope>(
         table,
         "SetEmissiveMap",
         scope.create_function(|_, (id, path): (u32, String)| {
-            with_material(scene, id, |mat| mat.emissive_map = Some(path));
+            with_material(scene, id, |m, key| {
+                mat_ops::set_emissive_map(m, key, Some(path))
+            });
             Ok(())
         }),
     )
@@ -170,7 +174,8 @@ fn register_transparency<'lua, 'scope>(
         table,
         "SetRenderMode",
         scope.create_function(|_, (id, mode): (u32, String)| {
-            with_material(scene, id, |mat| mat.render_mode = parse_render_mode(&mode));
+            let mode = parse_render_mode(&mode);
+            with_material(scene, id, |m, key| mat_ops::set_render_mode(m, key, mode));
             Ok(())
         }),
     )?;
@@ -179,7 +184,7 @@ fn register_transparency<'lua, 'scope>(
         table,
         "SetAlpha",
         scope.create_function(|_, (id, val): (u32, f32)| {
-            with_material(scene, id, |mat| mat.alpha = val.clamp(0.0, 1.0));
+            with_material(scene, id, |m, key| mat_ops::set_alpha(m, key, val));
             Ok(())
         }),
     )?;
@@ -188,7 +193,7 @@ fn register_transparency<'lua, 'scope>(
         table,
         "SetAlphaCutoff",
         scope.create_function(|_, (id, val): (u32, f32)| {
-            with_material(scene, id, |mat| mat.alpha_cutoff = val.clamp(0.0, 1.0));
+            with_material(scene, id, |m, key| mat_ops::set_alpha_cutoff(m, key, val));
             Ok(())
         }),
     )
