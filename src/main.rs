@@ -124,6 +124,9 @@ fn seed_project_workspace() {
     std::fs::create_dir_all("project/assets/textures").ok();
     std::fs::create_dir_all("project/assets/models").ok();
     std::fs::create_dir_all("project/assets/audio").ok();
+    // Authored shaders (#272) bake here, the same gitignored workspace pattern as
+    // authored textures; a `ShaderRegistry` pointed at it loads a variant by name.
+    std::fs::create_dir_all(rusty::shadergen::DEFAULT_OUT_DIR).ok();
     std::fs::create_dir_all("project/scenes").ok();
 
     // Seed the bundled default scripts (player_controller.lua, bot.lua) into the
