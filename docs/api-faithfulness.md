@@ -90,7 +90,9 @@ The per-scene navmesh bake settings (#276). Each setter writes `scene.nav_settin
 then re-bakes the shared graph, so the **bake** is the read-site — proven in
 `src/api/nav/settings_tests.rs` (set via binding → `nav_settings` reflects it → a
 re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
-(`bake_sources_max_step_from_scene_settings`, `bake_reshapes_grid_from_grid_spacing`).
+(`bake_sources_max_step_from_scene_settings`, `bake_reshapes_grid_from_grid_spacing`),
+`src/navigation/erosion_tests.rs` (radius), and `src/navigation/headroom/tests.rs`
+(height — `low_overhang_carves_cells_beneath`).
 
 | Setter | Status | Read-site |
 |---|---|---|
@@ -98,6 +100,7 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 | `SetMaxStep` | ✅ | sim — `navigation/bake.rs::bake` copies it into `NavigationGraph::max_step` (the per-edge step rule); round-trips. `bake_sources_max_step_from_scene_settings` proves a ledge flips reachability |
 | `SetGridSpacing` | ✅ | sim — `navigation/bake.rs::bake` re-shapes the grid dimensions from it (`apply_grid_spacing`); round-trips |
 | `SetAgentRadius` | ✅ | sim — `navigation/bake.rs::bake` **erodes the walkable surface by the radius** (#277): the agent-radius read-site. Passages narrower than ~`2*radius` close and the surface pulls off walls/world-edge; `radius==0` is an exact no-op. Round-trips through `SceneData`; `thin_passage_closes_under_erosion` / `wide_corridor_keeps_core_pulled_off_both_walls` prove it |
+| `SetAgentHeight` | ✅ | sim — `navigation/headroom.rs::carve_low_headroom` (run from `bake.rs::bake`) **carves cells whose overhead clearance is below the height** (#278): the agent-height read-site. A cell under a low overhang is marked non-walkable; a cell with nothing overhead (headroom ∞) and `height==0` are no-ops. Round-trips through `SceneData`; `set_agent_height_round_trips_and_rebakes` (`api/nav`) + `low_overhang_carves_cells_beneath` / `no_overhead_bakes_identically_to_feature_off` (`navigation::headroom`) prove it |
 
 ### `NavMeshAgent` — over `Entity.nav_agent`
 
@@ -218,14 +221,18 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 61 |
+| ✅ faithful | 62 |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 
 `Navigation.SetAgentRadius` became fully faithful in #277: the bake now **erodes the
 walkable surface inward by the agent radius** (the standard Recast/Unity meaning), so the
 radius has a live sim read-site and changes the baked result. It had been stored-but-inert
-since #276 — a documented, conscious step, now closed.
+since #276 — a documented, conscious step, now closed. `Navigation.SetAgentHeight` lands
+faithful at birth in #278 — its vertical companion: the bake **carves cells whose overhead
+clearance is below the agent height** (no pathing under a low overhang / through a
+crawlspace), the standard radius+height pair Unity exposes. It only subtracts low cells from
+the existing single surface; a true multi-level navmesh stays out of scope.
 
 The full glTF-PBR map surface is now **faithful**. `Material.SetMetallicMap` /
 `SetRoughnessMap` were wired by #202 (per-entity group(2) material bind group +

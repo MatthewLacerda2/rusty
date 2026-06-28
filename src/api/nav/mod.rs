@@ -59,7 +59,7 @@ fn register_navigation<'lua, 'scope>(
         .map_err(|e| e.to_string())
 }
 
-/// The four read-only getters over `scene.nav_settings` (#276).
+/// The read-only getters over `scene.nav_settings` (#276, + `agent_height` #278).
 fn register_settings_getters<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,
@@ -69,6 +69,11 @@ fn register_settings_getters<'lua, 'scope>(
         table,
         "GetAgentRadius",
         scope.create_function(|_, ()| Ok(scene.borrow().nav_settings.agent_radius)),
+    )?;
+    put(
+        table,
+        "GetAgentHeight",
+        scope.create_function(|_, ()| Ok(scene.borrow().nav_settings.agent_height)),
     )?;
     put(
         table,
@@ -87,11 +92,13 @@ fn register_settings_getters<'lua, 'scope>(
     )
 }
 
-/// The four setters (#276): write `scene.nav_settings`, then re-bake the shared graph
-/// from the scene so the knob is consumed (the bake is the read-site) — the same effect
-/// the scene inspector's Navmesh section has (editor↔API parity). `agent_radius` is live
-/// too (#277): the re-bake erodes the walkable surface inward by the radius, so a larger
-/// radius closes thin passages and pulls the surface off walls.
+/// The setters (#276): write `scene.nav_settings`, then re-bake the shared graph from the
+/// scene so the knob is consumed (the bake is the read-site) — the same effect the scene
+/// inspector's Navmesh section has (editor↔API parity). `agent_radius` is live (#277): the
+/// re-bake erodes the walkable surface inward by the radius, so a larger radius closes thin
+/// passages and pulls the surface off walls. `agent_height` is live too (#278): the re-bake
+/// carves cells whose overhead clearance is below the height, so a taller agent loses access
+/// to low overhangs / crawlspaces.
 fn register_settings_setters<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,
@@ -102,6 +109,11 @@ fn register_settings_setters<'lua, 'scope>(
         table,
         "SetAgentRadius",
         scope.create_function(move |_, r: f32| set_and_rebake(scene, nav, |s| s.agent_radius = r)),
+    )?;
+    put(
+        table,
+        "SetAgentHeight",
+        scope.create_function(move |_, h: f32| set_and_rebake(scene, nav, |s| s.agent_height = h)),
     )?;
     put(
         table,

@@ -100,6 +100,51 @@ fn set_grid_spacing_reshapes_grid_on_rebake() {
     );
 }
 
+/// `SetAgentHeight` round-trips into `scene.nav_settings` AND is consumed by the re-bake
+/// (#278): a low overhang (underside 1.0 above the floor) leaves the cell beneath it
+/// walkable at a short agent height but carves it once the agent height is raised past the
+/// clearance — proving the bake's headroom pass is the read-site, via the binding.
+#[test]
+fn set_agent_height_round_trips_and_rebakes() {
+    // A slab over cell (4,4): footprint [3.6,4.4]², underside y=1.0 (above the y=0 floor).
+    let (scene, nav) = scene_and_nav(Vec3::new(3.6, 1.0, 3.6), Vec3::new(4.4, 1.5, 4.4));
+    // Keep radius 0 so erosion doesn't blur the single carved cell we assert on.
+    scene.borrow_mut().nav_settings.agent_radius = 0.0;
+    nav.borrow_mut().bake(&scene.borrow());
+
+    let lua = Lua::new();
+    lua.scope(|scope| {
+        register(&lua, scope, &scene, &nav).unwrap();
+
+        // Short agent (0.5 < 1.0 clearance): the cell under the overhang stays walkable.
+        lua.load("Navigation.SetAgentHeight(0.5)").exec().unwrap();
+        assert!(
+            nav.borrow().is_walkable(4, 4),
+            "0.5 agent fits under a 1.0 overhang"
+        );
+
+        // Tall agent (2.0 > 1.0 clearance): the setter re-bakes and carves the cell.
+        lua.load("Navigation.SetAgentHeight(2.0)").exec().unwrap();
+        let h: f32 = lua
+            .load("return Navigation.GetAgentHeight()")
+            .eval()
+            .unwrap();
+        assert_eq!(h, 2.0, "getter reflects the write");
+        assert!(
+            !nav.borrow().is_walkable(4, 4),
+            "2.0 agent cannot fit under a 1.0 overhang — cell carved on re-bake"
+        );
+        Ok(())
+    })
+    .unwrap();
+
+    assert_eq!(
+        scene.borrow().nav_settings.agent_height,
+        2.0,
+        "scene settings updated"
+    );
+}
+
 /// `SetAgentRadius`/`SetMaxSlope` round-trip into the scene settings via the bindings.
 /// Radius is stored-but-inert (#276), so this is the persistence proof the bake doesn't
 /// yet consume it — only that the write survives.
