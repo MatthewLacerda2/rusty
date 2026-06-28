@@ -21,6 +21,7 @@ use std::rc::Rc;
 pub use camera::{build_camera_stack, game_camera_from_scene, sync_lens_from_scene, Camera};
 pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
 pub use ibl::probe_bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
+pub use ibl::probe_bounce::{BounceReport, CONVERGENCE_EPSILON, MAX_BOUNCES};
 pub use ibl::reflection_bake::DEFAULT_REFLECTION_RESOLUTION;
 pub use setup::headless::OFFSCREEN_FORMAT;
 
@@ -170,4 +171,12 @@ pub struct Renderer {
     /// so probe/reflection bakes see the distant environment (static walls + skybox)
     /// without the dynamic actors that would otherwise bake into the captured lighting.
     static_capture: bool,
+
+    /// When set, static surfaces sample the probe field during a static-cubemap
+    /// capture instead of falling back to flat ambient (#285). The multi-bounce probe
+    /// bake toggles this on for bounce ≥2 so each capture re-lights the static scene
+    /// from the previous bounce's probe SH, adding one indirect bounce per pass.
+    /// Off everywhere else, so direct-only capture (bounce 1, reflection bakes) and
+    /// runtime shading keep their "static ⇒ no probe SH" rule.
+    capture_probe_bounce: bool,
 }

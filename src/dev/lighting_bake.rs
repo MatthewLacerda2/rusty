@@ -5,7 +5,7 @@
 //!   1. auto-places light probes (a grid through the navigable volume / static AABB)
 //!      and reflection probes (one per coarse region of the static AABB) — UNLESS that
 //!      set is already manually authored, in which case its placement is left untouched;
-//!   2. runs the two existing dev bakes — the full-bounce light-probe bake (#250,
+//!   2. runs the two existing dev bakes — the multi-bounce light-probe bake (#250, #285,
 //!      `probe_bake`) and the GGX reflection-probe bake (#252, `reflection_bake`).
 //!
 //! Placement is the deterministic, pure step (`scene::lighting_placement`); the bakes

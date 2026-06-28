@@ -1,5 +1,6 @@
-//! Tests for the full-bounce probe bake (#241). Sibling of `probe_bake.rs`; shares
-//! its 300-line source cap.
+//! Tests for the probe capture + SH projection (#241). Sibling of `probe_bake.rs`;
+//! shares its 300-line source cap. The multi-bounce iteration is tested separately in
+//! `probe_bounce_tests.rs` (#285).
 //!
 //! The GPU bake skips gracefully when no adapter is present — same contract as the
 //! cubemap-capture and screenshot headless tests. The pure SH projection

@@ -171,6 +171,7 @@ impl Renderer {
             default_cube,
             decal_depth_bind_group: None,
             static_capture: false,
+            capture_probe_bounce: false,
         }
     }
 }

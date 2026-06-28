@@ -7,6 +7,7 @@ pub(crate) mod cubemap;
 pub(crate) mod cubemap_capture;
 pub(crate) mod ktx2_encode;
 pub(crate) mod probe_bake;
+pub(crate) mod probe_bounce;
 pub(crate) mod reflection_bake;
 pub(crate) mod reflection_prefilter;
 pub(crate) mod skybox;
