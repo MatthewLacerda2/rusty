@@ -4,9 +4,10 @@
 -- the WRITABLE Input from Update() — pressing the same W/A/S/D + arrow + SPACE keys
 -- winit would inject — to navigate toward the enemy, aim the follow-camera at it, and
 -- pull the trigger. It presses keys ONLY; the bundled player_controller turns those
--- presses into movement, camera follow, and the hitscan shot. So the bot exercises
+-- presses into movement, camera follow, and the hitscan cast. So the bot exercises
 -- the exact same control path a human does, validating that the de-hardcoded
--- player_controller.lua actually plays the demo.
+-- player_controller.lua actually plays the demo. The match is a proximity demo: the
+-- bot closes on the enemy and settles once it is within ARRIVE_RANGE.
 --
 -- Because one entity has one script slot, attaching the bot replaces the Player's
 -- controller; the bot therefore loads the shared controller and runs its drive() each
@@ -23,6 +24,7 @@ local Controller = dofile("project/assets/scripts/player_controller.lua")
 
 local ENEMY = "Enemy_1"
 local SHOOT_RANGE = 14.0    -- start firing once within this distance
+local ARRIVE_RANGE = 4.0    -- stop and settle once within this distance of the enemy
 local AIM_TOLERANCE = 6.0   -- degrees of yaw error we tolerate before shooting
 local SHOOT_KEY = "SPACE"   -- the trigger key the controller fires on (rising edge)
 local SHOOT_COOLDOWN = 12   -- frames between shots (fire ~5x/second @ 60Hz)
@@ -47,20 +49,20 @@ function Bot.Update(entity_id, delta_time)
         return
     end
 
-    -- Stop once the enemy is dead: release every key so the world settles.
-    local hp = Health.Get(enemy)
-    if hp <= 0.0 then
+    local px, py, pz = Transform.GetPosition(entity_id)
+    local ex, ey, ez = Transform.GetPosition(enemy)
+    local dx, dz = ex - px, ez - pz
+    local dist = math.sqrt(dx * dx + dz * dz)
+
+    -- Stop once we have closed to within ARRIVE_RANGE: release every key so the
+    -- world settles. This is the proximity-demo win condition.
+    if dist <= ARRIVE_RANGE then
         Input.Release("W")
         Input.Release("LEFT")
         Input.Release("RIGHT")
         Input.Release(SHOOT_KEY)
         return
     end
-
-    local px, py, pz = Transform.GetPosition(entity_id)
-    local ex, ey, ez = Transform.GetPosition(enemy)
-    local dx, dz = ex - px, ez - pz
-    local dist = math.sqrt(dx * dx + dz * dz)
 
     -- The follow-camera's forward is (cos(yaw), _, sin(yaw)); the bearing to the enemy
     -- in that same convention is atan2(dz, dx). Steer the camera by pressing the arrow
@@ -75,12 +77,9 @@ function Bot.Update(entity_id, delta_time)
         Input.Press("LEFT")
     end
 
-    -- Close the distance: hold W while we are still out of comfortable range.
-    if dist > 4.0 then
-        Input.Press("W")
-    else
-        Input.Release("W")
-    end
+    -- Close the distance: we only reach here while still beyond ARRIVE_RANGE
+    -- (the arrival check above returns otherwise), so hold W to keep advancing.
+    Input.Press("W")
 
     -- Pull the trigger when in range and on-target. Press SPACE for one frame so the
     -- controller sees a rising edge and fires; release it the rest of the cooldown so

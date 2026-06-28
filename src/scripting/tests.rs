@@ -3,7 +3,6 @@ use std::rc::Rc;
 
 use super::console::ConsoleLogs;
 use super::manager::ScriptManager;
-use crate::components::HealthComponent;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::render::Camera;
@@ -13,14 +12,7 @@ use glam::Vec3;
 
 fn manager() -> (ScriptManager, Rc<RefCell<Scene>>, Rc<RefCell<Camera>>) {
     let mut raw = Scene::new();
-    let id = raw.add_entity("Target".to_string());
-    if let Some(mut e) = raw.get_entity_mut(id) {
-        e.health = Some(HealthComponent {
-            current_health: 100.0,
-            max_health: 100.0,
-            is_dead: false,
-        });
-    }
+    raw.add_entity("Target".to_string());
     let scene = Rc::new(RefCell::new(raw));
     let input = Rc::new(RefCell::new(InputState::new()));
     let nav = Rc::new(RefCell::new(NavigationGraph::new(
@@ -38,22 +30,10 @@ fn manager() -> (ScriptManager, Rc<RefCell<Scene>>, Rc<RefCell<Camera>>) {
         Rc::clone(&camera),
         time,
     );
-    // No live physics world in these unit tests, so Physics.Raycast/Shoot miss.
+    // No live physics world in these unit tests, so Physics.Raycast misses.
     let physics = Rc::new(RefCell::new(None));
     m.init_runtime(&physics).expect("runtime inits");
     (m, scene, camera)
-}
-
-#[test]
-fn health_get_damage_heal_roundtrip() {
-    let (m, scene, _cam) = manager();
-    m.exec("Health.Damage(1, 30)").unwrap();
-    m.exec("Health.Heal(1, 5)").unwrap();
-    let hp = scene
-        .borrow()
-        .get_entity(1)
-        .and_then(|e| e.health.as_ref().map(|h| h.current_health));
-    assert_eq!(hp, Some(75.0));
 }
 
 #[test]

@@ -2,7 +2,7 @@
 //!
 //! Split out of `world` so the step/sync pipeline and the read-only ray casts stay
 //! separately legible. Both the in-engine hitscan and the Lua
-//! `Physics.Raycast`/`Shoot` bindings go through `cast_ray_filtered`, so a script's
+//! `Physics.Raycast` binding go through `cast_ray_filtered`, so a script's
 //! cast and the engine's cast agree for the same ray.
 
 use glam::Vec3;

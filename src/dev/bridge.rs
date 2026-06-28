@@ -5,8 +5,8 @@
 //! the outside (Step/StepUntil), it does not run as an entity behaviour.
 //!
 //! Tables: Harness.{Step,StepUntil,Snapshot,Log,Expect,Frame}, plus read helpers
-//! Scene.FindEntityByName / Transform.GetPosition / Health.Get / Animator.GetClip and
-//! the writable Input.{Press,Release}. Shooting is just pressing the SPACE key the
+//! Scene.FindEntityByName / Transform.GetPosition / Animator.GetClip and the
+//! writable Input.{Press,Release}. Shooting is just pressing the SPACE key the
 //! player-controller script edge-detects — there is no separate click/shoot signal.
 
 use std::cell::RefCell;
@@ -138,7 +138,6 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
 fn register_scene(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     register_scene_lookup(lua, harness)?;
     register_scene_transform(lua, harness)?;
-    register_scene_health(lua, harness)?;
     register_scene_animator(lua, harness)
 }
 
@@ -172,25 +171,6 @@ fn register_scene_transform(lua: &Lua, harness: &Shared) -> LuaResult<()> {
         })?,
     )?;
     lua.globals().set("Transform", transform_t)
-}
-
-/// Health.Get — entity id -> current health.
-fn register_scene_health(lua: &Lua, harness: &Shared) -> LuaResult<()> {
-    let health_t = lua.create_table()?;
-    let world = world_of(harness);
-    health_t.set(
-        "Get",
-        lua.create_function(move |_, id: u32| {
-            let w = world.borrow();
-            let s = w.scene().borrow();
-            let hp = s
-                .get_entity(id)
-                .and_then(|e| e.health.as_ref().map(|h| h.current_health))
-                .unwrap_or(0.0);
-            Ok(hp)
-        })?,
-    )?;
-    lua.globals().set("Health", health_t)
 }
 
 /// Animator.GetClip — entity id -> current clip name.

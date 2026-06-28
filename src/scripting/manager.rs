@@ -44,7 +44,7 @@ pub struct ScriptManager {
     /// window).
     pub(super) video: Rc<RefCell<VideoSettings>>,
     /// Live rapier physics world shared with `GameWorld` — used by
-    /// `Physics.Raycast`/`Shoot`. `None` until Play builds the world.
+    /// `Physics.Raycast`. `None` until Play builds the world.
     pub(super) physics: Rc<RefCell<Option<crate::physics::PhysicsWorld>>>,
     /// The scene file the editor/session is currently editing — the write-back
     /// target for `Scene.Save()` (no-path). Shared with the platform layer (the

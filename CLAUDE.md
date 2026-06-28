@@ -190,7 +190,7 @@ is the only difference between an empty marker and a fully-dressed enemy.
    `Input`, the nav graph, the console, the active camera, play-state, the renderer).
    Global state the systems read and write.
 2. **Components** — per-entity data, the Unity-style "classes" (`Transform`, `Mesh`,
-   `Camera`, `Light`, `Collider`, `Rigidbody`, `NavMeshAgent`, `Health`, `Animator`,
+   `Camera`, `Light`, `Collider`, `Rigidbody`, `NavMeshAgent`, `Animator`,
    …). These are the engine's **first-class components** — engine-provided, systems
    expect them, and each must satisfy the four axes the completeness gate enforces
    (see `docs/linting.md`). Every entity has exactly one `Transform` (mandatory, cannot
@@ -210,7 +210,7 @@ is the only difference between an empty marker and a fully-dressed enemy.
    clone-on-Play / restore-on-Stop snapshot makes edit-mode authoritative, mirroring
    Unity's play-mode behaviour.
 5. **The API surface** — one stable set of namespaces (`Transform`, `Input`, `Time`,
-   `Physics`, `Scene`, `Animator`, `Nav`, `Health`, `Camera`, `Material`, and the
+   `Physics`, `Scene`, `Animator`, `Nav`, `Camera`, `Material`, and the
    dev-only `Debug`) shared by gameplay scripts, the console REPL, and bot-players.
    One surface, three callers — they never drift apart.
 

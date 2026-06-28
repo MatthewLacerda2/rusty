@@ -10,8 +10,8 @@
 //! Allowed deps: components, scene.
 
 use crate::scene::authoring::defaults::{
-    attach_default_material, default_animator, default_camera, default_collider, default_health,
-    default_light, default_nav_agent, default_rigidbody, default_visual_correction,
+    attach_default_material, default_animator, default_camera, default_collider, default_light,
+    default_nav_agent, default_rigidbody, default_visual_correction,
 };
 use crate::scene::{AudioSourceComponent, ParticleEmitterComponent, Scene};
 
@@ -21,7 +21,6 @@ use crate::scene::{AudioSourceComponent, ParticleEmitterComponent, Scene};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ComponentKind {
     Light,
-    Health,
     Animator,
     Collider,
     RigidBody,
@@ -39,7 +38,6 @@ impl ComponentKind {
     pub fn parse(name: &str) -> Option<Self> {
         match name.to_lowercase().as_str() {
             "light" => Some(Self::Light),
-            "health" => Some(Self::Health),
             "animator" => Some(Self::Animator),
             "collider" => Some(Self::Collider),
             "rigidbody" => Some(Self::RigidBody),
@@ -69,7 +67,6 @@ pub fn add_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool {
     };
     match kind {
         ComponentKind::Light => entity.light = Some(default_light()),
-        ComponentKind::Health => entity.health = Some(default_health()),
         ComponentKind::Animator => entity.animator = Some(default_animator()),
         ComponentKind::Collider => entity.collider = Some(default_collider()),
         ComponentKind::RigidBody => entity.rigidbody = Some(default_rigidbody()),
@@ -86,20 +83,15 @@ pub fn add_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool {
 }
 
 /// Detach a first-class component of `kind` from entity `id`, applying the same
-/// cascades the editor's inspector enforces: removing `Health` also drops the
-/// `Animator` it manages, and removing `Camera` also drops the camera-only
-/// `VisualCorrection` stack. Returns `false` if the entity does not exist
-/// (clearing an absent component is otherwise a no-op success).
+/// cascade the editor's inspector enforces: removing `Camera` also drops the
+/// camera-only `VisualCorrection` stack. Returns `false` if the entity does not
+/// exist (clearing an absent component is otherwise a no-op success).
 pub fn remove_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool {
     let Some(mut entity) = scene.get_entity_mut(id) else {
         return false;
     };
     match kind {
         ComponentKind::Light => entity.light = None,
-        ComponentKind::Health => {
-            entity.health = None;
-            entity.animator = None;
-        }
         ComponentKind::Animator => entity.animator = None,
         ComponentKind::Collider => entity.collider = None,
         ComponentKind::RigidBody => entity.rigidbody = None,
@@ -126,10 +118,10 @@ mod tests {
     fn add_remove_component_with_cascades() {
         let mut scene = Scene::new();
         let id = create_entity(&mut scene, "Mob", None);
-        assert!(add_component(&mut scene, id, ComponentKind::Health));
-        assert!(scene.get_entity(id).unwrap().health.is_some());
-        assert!(remove_component(&mut scene, id, ComponentKind::Health));
-        assert!(scene.get_entity(id).unwrap().health.is_none());
+        assert!(add_component(&mut scene, id, ComponentKind::Light));
+        assert!(scene.get_entity(id).unwrap().light.is_some());
+        assert!(remove_component(&mut scene, id, ComponentKind::Light));
+        assert!(scene.get_entity(id).unwrap().light.is_none());
 
         // Removing Camera cascades to VisualCorrection (editor parity).
         add_component(&mut scene, id, ComponentKind::Camera);

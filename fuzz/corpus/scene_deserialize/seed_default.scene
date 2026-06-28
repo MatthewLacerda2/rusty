@@ -54,7 +54,6 @@
         ]
       },
       "rigidbody": null,
-      "health": null,
       "nav_agent": null,
       "camera": null,
       "visual_correction": null,
@@ -137,7 +136,6 @@
         ],
         "use_gravity": false
       },
-      "health": null,
       "nav_agent": null,
       "camera": null,
       "visual_correction": null,
@@ -198,7 +196,6 @@
         ]
       },
       "rigidbody": null,
-      "health": null,
       "nav_agent": null,
       "camera": null,
       "visual_correction": null,
@@ -259,7 +256,6 @@
         ]
       },
       "rigidbody": null,
-      "health": null,
       "nav_agent": null,
       "camera": null,
       "visual_correction": null,
@@ -307,7 +303,6 @@
       },
       "collider": null,
       "rigidbody": null,
-      "health": null,
       "nav_agent": null,
       "camera": null,
       "visual_correction": null,
@@ -386,11 +381,6 @@
           0.0
         ],
         "use_gravity": false
-      },
-      "health": {
-        "current_health": 100.0,
-        "max_health": 100.0,
-        "is_dead": false
       },
       "nav_agent": null,
       "camera": null,

@@ -234,7 +234,7 @@ impl GameWorld {
 
         // Build the rapier world from the (post-start) scene: bodies + colliders
         // for every entity with a ColliderComponent. Stepped each frame in play.
-        // Shared with the script runtime's Physics.Raycast/Shoot bindings.
+        // Shared with the script runtime's Physics.Raycast binding.
         *self.resources.physics.borrow_mut() =
             Some(PhysicsWorld::from_scene(&self.world.scene.borrow()));
 

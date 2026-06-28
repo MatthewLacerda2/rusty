@@ -2,7 +2,7 @@
 //!
 //! Script/REPL/bot control over the scene's box-projector decals (bullet holes,
 //! scorch, blood splats). `Spawn` stamps a projector at a world point + surface
-//! normal — exactly the pair `Physics.Raycast`/`Physics.Shoot` already hands a
+//! normal — exactly the pair `Physics.Raycast` already hands a
 //! script — so decals stay decoupled from gameplay: the engine never decides
 //! *when* to mark a surface, the script does. `Clear` wipes them (level reset).
 //!

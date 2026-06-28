@@ -39,28 +39,36 @@ pub fn draw_script(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) 
     }
 }
 
-/// 3E. Health component
-pub fn draw_health(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
-    if entity.health.is_none() {
+/// 3E. Animator Component — the entity's skeletal-animation playback state. The
+/// clips themselves live on the skinned mesh; this card edits which one plays and
+/// how.
+pub fn draw_animator(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
+    if entity.animator.is_none() {
         return;
     }
     let mut remove = false;
-    component_card(ui, icon::HEART, "Health", Some(&mut remove), |ui| {
-        let Some(health) = &mut entity.health else {
-            return;
-        };
-        ui.horizontal(|ui| {
-            ui.label("Current HP:");
-            ui.add(egui::DragValue::new(&mut health.current_health));
-        });
-        ui.horizontal(|ui| {
-            ui.label("Max HP:");
-            ui.add(egui::DragValue::new(&mut health.max_health));
-        });
-        ui.checkbox(&mut health.is_dead, "Is Dead");
-    });
+    component_card(
+        ui,
+        icon::PERSON_SIMPLE_RUN,
+        "Animator",
+        Some(&mut remove),
+        |ui| {
+            let Some(anim) = &mut entity.animator else {
+                return;
+            };
+            ui.horizontal(|ui| {
+                ui.label("Clip:");
+                ui.text_edit_singleline(&mut anim.current_clip);
+            });
+            ui.horizontal(|ui| {
+                ui.label("Speed:");
+                ui.add(egui::DragValue::new(&mut anim.speed).speed(0.05));
+            });
+            ui.checkbox(&mut anim.is_playing, "Is Playing");
+            ui.checkbox(&mut anim.freeze, "Freeze");
+        },
+    );
     if remove {
-        entity.health = None;
         entity.animator = None;
         *is_dirty = true;
     }

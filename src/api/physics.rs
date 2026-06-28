@@ -1,8 +1,8 @@
 //! src/api/physics.rs — `Physics` namespace.
 //!
-//! Rigidbody velocity/force/kinematic controls, plus `Raycast` / `Shoot`
-//! hitscan cast against the live rapier/parry `PhysicsWorld` — the same query
-//! pipeline the engine hitscan uses, so script and engine casts agree (#31).
+//! Rigidbody velocity/force/kinematic controls, plus the `Raycast` hitscan cast
+//! against the live rapier/parry `PhysicsWorld` — the same query pipeline the
+//! engine hitscan uses, so script and engine casts agree (#31).
 //! `register` creates the `Physics` table; `register_hitscan` extends it once
 //! the live physics handle is available.
 
@@ -11,11 +11,9 @@ use std::cell::RefCell;
 use glam::Vec3;
 use mlua::Lua;
 
-use super::health::apply_damage;
 use super::{global_table, put, Reg};
 use crate::physics::{is_hittable, PhysicsWorld};
 use crate::scene::{layer_in_mask, Scene};
-use crate::scripting::ConsoleLogs;
 use crate::time::FIXED_DELTA_TIME;
 
 /// Register the rigidbody half of `Physics` (velocity/force/kinematic) onto
@@ -113,22 +111,19 @@ fn register_force<'lua, 'scope>(
     )
 }
 
-/// Extend `Physics` with `Raycast` (query) and `Shoot` (raycast + apply damage).
-/// Both route through the live rapier/parry `PhysicsWorld` — the same query
-/// pipeline the engine hitscan uses — so a script's cast and the engine's cast
-/// return identical hits for the same ray. `Shoot` is the hitscan that used to be
-/// inline in `app/play.rs`.
+/// Extend `Physics` with `Raycast` (the query-only hitscan). It routes through the
+/// live rapier/parry `PhysicsWorld` — the same query pipeline the engine hitscan
+/// uses — so a script's cast and the engine's cast return identical hits for the
+/// same ray.
 pub fn register_hitscan<'lua, 'scope>(
     lua: &'lua Lua,
     scope: &mlua::Scope<'lua, 'scope>,
     scene: &'scope RefCell<Scene>,
     physics: &'scope RefCell<Option<PhysicsWorld>>,
-    console: &'scope RefCell<ConsoleLogs>,
 ) -> Reg {
     let table = global_table(lua, "Physics")?;
 
     register_raycast(scope, &table, scene, physics)?;
-    register_shoot(scope, &table, scene, physics, console)?;
 
     Ok(())
 }
@@ -167,49 +162,6 @@ fn register_raycast<'lua, 'scope>(
                     mask,
                 ) {
                     Some((id, t)) => Ok((true, id, t)),
-                    None => Ok((false, 0u32, 0.0f32)),
-                }
-            },
-        ),
-    )
-}
-
-/// `Shoot` — raycast plus apply damage to the hit entity (the engine hitscan).
-fn register_shoot<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-    physics: &'scope RefCell<Option<PhysicsWorld>>,
-    console: &'scope RefCell<ConsoleLogs>,
-) -> Reg {
-    put(
-        table,
-        "Shoot",
-        scope.create_function(
-            |_,
-             (ox, oy, oz, dx, dy, dz, damage, ignore, mask): (
-                f32,
-                f32,
-                f32,
-                f32,
-                f32,
-                f32,
-                f32,
-                Option<u32>,
-                Option<u32>,
-            )| {
-                match cast(
-                    physics,
-                    scene,
-                    Vec3::new(ox, oy, oz),
-                    Vec3::new(dx, dy, dz),
-                    ignore,
-                    mask,
-                ) {
-                    Some((id, t)) => {
-                        apply_damage(scene, console, id, damage);
-                        Ok((true, id, t))
-                    }
                     None => Ok((false, 0u32, 0.0f32)),
                 }
             },

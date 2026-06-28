@@ -90,9 +90,7 @@ fn save_as_prefab(scene: &Scene, entity_id: u32, name: &str) {
 
 /// Monochrome type glyph for an entity, mirroring VS Code's restrained icons.
 fn node_glyph(e: &Entity) -> &'static str {
-    if e.health.is_some() {
-        icon::HEART
-    } else if e.camera.is_some() {
+    if e.camera.is_some() {
         icon::VIDEO_CAMERA
     } else if e.light.is_some() {
         icon::LIGHTBULB
@@ -103,12 +101,9 @@ fn node_glyph(e: &Entity) -> &'static str {
     }
 }
 
-/// Glyph tint: dead entities read as danger, lights as the yellow accent, the rest
-/// as muted secondary text.
+/// Glyph tint: lights read as the yellow accent, the rest as muted secondary text.
 fn node_color(e: &Entity, t: Theme) -> egui::Color32 {
-    if e.health.as_ref().map(|h| h.is_dead).unwrap_or(false) {
-        t.danger
-    } else if e.light.is_some() {
+    if e.light.is_some() {
         t.accent_yellow
     } else {
         t.text_secondary

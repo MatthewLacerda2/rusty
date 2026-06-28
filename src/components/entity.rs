@@ -10,8 +10,8 @@ use glam::{Mat4, Vec3};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    AnimatorComponent, AudioSourceComponent, CameraComponent, ColliderComponent, HealthComponent,
-    LightComponent, MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent,
+    AnimatorComponent, AudioSourceComponent, CameraComponent, ColliderComponent, LightComponent,
+    MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent,
     ParticleEmitterComponent, RigidBodyComponent, ScriptComponent, TextureComponent,
     TransformComponent, VisualCorrectionComponent,
 };
@@ -78,7 +78,6 @@ pub struct Entity {
     pub light: Option<LightComponent>,
     pub collider: Option<ColliderComponent>,
     pub rigidbody: Option<RigidBodyComponent>,
-    pub health: Option<HealthComponent>,
     pub nav_agent: Option<NavMeshAgentComponent>,
     pub camera: Option<CameraComponent>,
     pub visual_correction: Option<VisualCorrectionComponent>,
@@ -127,7 +126,6 @@ struct EntityRepr {
     light: Option<LightComponent>,
     collider: Option<ColliderComponent>,
     rigidbody: Option<RigidBodyComponent>,
-    health: Option<HealthComponent>,
     nav_agent: Option<NavMeshAgentComponent>,
     camera: Option<CameraComponent>,
     visual_correction: Option<VisualCorrectionComponent>,
@@ -177,7 +175,6 @@ impl From<EntityRepr> for Entity {
             light: r.light,
             collider: r.collider,
             rigidbody: r.rigidbody,
-            health: r.health,
             nav_agent: r.nav_agent,
             camera: r.camera,
             visual_correction: r.visual_correction,
@@ -207,7 +204,6 @@ impl Entity {
             light: None,
             collider: None,
             rigidbody: None,
-            health: None,
             nav_agent: None,
             camera: None,
             visual_correction: None,

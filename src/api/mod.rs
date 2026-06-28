@@ -2,7 +2,7 @@
 //!
 //! The single stable API surface shared by Lua scripts, the console REPL and
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
-//! `Scene`, `Health`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
+//! `Scene`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
 //! `Assets`, `Particles`, `Layers`, `Graphics`, `Video`, `Storage`, plus the
 //! dev-only `Debug`)
 //! is registered from this tree onto the live Lua runtime.
@@ -21,7 +21,6 @@ pub mod camera;
 pub mod debug;
 pub mod decals;
 pub mod graphics;
-pub mod health;
 pub mod input;
 pub mod layers;
 pub mod light;
@@ -113,8 +112,7 @@ pub fn register<'lua, 'scope>(
     scene::register(lua, scope, ctx.scene, ctx.scene_path)?;
     nav::register(lua, scope, ctx.scene, ctx.nav)?;
     physics::register(lua, scope, ctx.scene)?;
-    health::register(lua, scope, ctx.scene, ctx.console)?;
-    physics::register_hitscan(lua, scope, ctx.scene, ctx.physics, ctx.console)?;
+    physics::register_hitscan(lua, scope, ctx.scene, ctx.physics)?;
     time::register(lua, scope, ctx.time)?;
     camera::register(lua, scope, ctx.camera)?;
     light::register(lua, scope, ctx.scene)?;

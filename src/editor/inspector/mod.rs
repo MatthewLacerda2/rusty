@@ -246,7 +246,7 @@ fn draw_components(
     render::draw_light(ui, entity, is_dirty);
 
     gameplay::draw_script(ui, entity, is_dirty);
-    gameplay::draw_health(ui, entity, is_dirty);
+    gameplay::draw_animator(ui, entity, is_dirty);
     gameplay::draw_collider(ui, entity, is_dirty, pending_nav_bake);
     gameplay::draw_rigidbody(ui, entity, is_dirty);
     gameplay::draw_nav_agent(ui, entity, is_dirty);

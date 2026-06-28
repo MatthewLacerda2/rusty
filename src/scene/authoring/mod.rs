@@ -28,9 +28,9 @@ use crate::scene::{LightComponent, LightType, MeshComponent, Scene};
 // API) reach them through this one entry point; they live in `authoring_defaults`
 // only to keep this module under the size cap.
 pub use crate::scene::authoring::defaults::{
-    attach_default_material, default_animator, default_camera, default_collider, default_health,
-    default_light, default_material, default_nav_agent, default_rigidbody,
-    default_visual_correction, material_asset_from_import,
+    attach_default_material, default_animator, default_camera, default_collider, default_light,
+    default_material, default_nav_agent, default_rigidbody, default_visual_correction,
+    material_asset_from_import,
 };
 
 /// The primitive set the hierarchy toolbar's "Create" dropdown offers — meshes

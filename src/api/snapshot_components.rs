@@ -9,8 +9,8 @@ use serde_json::{json, Value};
 use super::snapshot::vec3;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ColliderComponent, ColliderShape,
-    HealthComponent, LightComponent, LightType, MaterialAsset, MeshComponent,
-    NavMeshAgentComponent, ParticleEmitterComponent, RigidBodyComponent,
+    LightComponent, LightType, MaterialAsset, MeshComponent, NavMeshAgentComponent,
+    ParticleEmitterComponent, RigidBodyComponent,
 };
 
 /// Mesh identity: the primitive kind and, for imported meshes, the
@@ -145,14 +145,6 @@ pub(crate) fn animator_value(a: &AnimatorComponent) -> Value {
         "time": a.time,
         "speed": a.speed,
         "playing": a.is_playing,
-    })
-}
-
-pub(crate) fn health_value(h: &HealthComponent) -> Value {
-    json!({
-        "current": h.current_health,
-        "max": h.max_health,
-        "dead": h.is_dead,
     })
 }
 

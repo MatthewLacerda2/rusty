@@ -10,8 +10,8 @@
 //! Example scenario:
 //!   local enemy = Scene.FindEntityByName("Enemy_1")
 //!   Input.Press("W"); Harness.Step(120)            -- walk 2s @ 1/60
-//!   Input.Press("SPACE"); Harness.Step(1); Input.Release("SPACE")
-//!   Harness.Expect(Health.Get(enemy) < 100, "the weapon script should damage enemy")
+//!   local _, _, ez = Transform.GetPosition(enemy)
+//!   Harness.Expect(ez ~= nil, "the bot should have advanced toward the enemy")
 //!
 //! Runs in its own Lua VM, separate from the gameplay scripts inside `GameWorld`.
 

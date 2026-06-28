@@ -5,16 +5,16 @@
 //! determinism contract holds.
 
 use proptest::prelude::*;
-use rusty::scene::{HealthComponent, Scene};
+use rusty::scene::{LightComponent, LightType, Scene};
 
-/// One generated entity: a name, a position, and an optional Health component.
-/// Kept small and finite (bounded coords/health) so the generated scenes are
-/// always valid documents the save/load path accepts.
+/// One generated entity: a name, a position, and an optional Light component
+/// carrying a generated intensity. Kept small and finite (bounded coords/intensity)
+/// so the generated scenes are always valid documents the save/load path accepts.
 #[derive(Clone, Debug)]
 struct EntitySpec {
     name: String,
     pos: [f32; 3],
-    health: Option<f32>,
+    intensity: Option<f32>,
 }
 
 fn entity_spec() -> impl Strategy<Value = EntitySpec> {
@@ -23,7 +23,11 @@ fn entity_spec() -> impl Strategy<Value = EntitySpec> {
         prop::array::uniform3(-1.0e4_f32..1.0e4),
         prop::option::of(1.0_f32..1.0e4),
     )
-        .prop_map(|(name, pos, health)| EntitySpec { name, pos, health })
+        .prop_map(|(name, pos, intensity)| EntitySpec {
+            name,
+            pos,
+            intensity,
+        })
 }
 
 fn tmp(tag: u64) -> String {
@@ -35,8 +39,8 @@ fn tmp(tag: u64) -> String {
 
 proptest! {
     /// For any generated scene, save -> load reproduces every entity's name,
-    /// position, and health exactly (positions are finite, so bitwise-equal after
-    /// the JSON round-trip).
+    /// position, and light intensity exactly (positions are finite, so bitwise-equal
+    /// after the JSON round-trip).
     #[test]
     fn save_load_preserves_generated_entities(
         specs in prop::collection::vec(entity_spec(), 0..12),
@@ -49,11 +53,14 @@ proptest! {
             ids.push(id);
             let mut e = scene.get_entity_mut(id).unwrap();
             e.transform.position = glam::Vec3::from_array(spec.pos);
-            if let Some(max) = spec.health {
-                e.health = Some(HealthComponent {
-                    current_health: max,
-                    max_health: max,
-                    is_dead: false,
+            if let Some(intensity) = spec.intensity {
+                e.light = Some(LightComponent {
+                    light_type: LightType::Point,
+                    color: glam::Vec3::ONE,
+                    intensity,
+                    range: 10.0,
+                    inner_cone: 30.0,
+                    outer_cone: 45.0,
                 });
             }
         }
@@ -69,10 +76,10 @@ proptest! {
             let e = loaded.get_entity(*id).unwrap();
             prop_assert_eq!(&e.name, &spec.name);
             prop_assert_eq!(e.transform.position.to_array(), spec.pos);
-            match (&e.health, spec.health) {
-                (Some(h), Some(max)) => prop_assert_eq!(h.max_health, max),
+            match (&e.light, spec.intensity) {
+                (Some(l), Some(intensity)) => prop_assert_eq!(l.intensity, intensity),
                 (None, None) => {}
-                _ => prop_assert!(false, "health presence must round-trip"),
+                _ => prop_assert!(false, "light presence must round-trip"),
             }
         }
     }

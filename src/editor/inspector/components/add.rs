@@ -44,17 +44,12 @@ fn add_audio(ui: &mut egui::Ui, entity: &mut Entity) {
     }
 }
 
-/// Add-menu entries for light, health, animator and collider. Each entry is
-/// offered only when absent. Animator now has its own entry (#82) — it used to be
-/// created only as a side-effect of Health, which left it without an Add Component
-/// axis of its own.
+/// Add-menu entries for light, animator and collider. Each entry is offered only
+/// when absent. Animator has its own entry (#82) and is added/removed
+/// independently.
 fn add_lighting_combat(ui: &mut egui::Ui, entity: &mut Entity) {
     if entity.light.is_none() && ui.button("Light Component").clicked() {
         entity.light = Some(authoring::default_light());
-        ui.close_menu();
-    }
-    if entity.health.is_none() && ui.button("Health Component (Enemies)").clicked() {
-        entity.health = Some(authoring::default_health());
         ui.close_menu();
     }
     if entity.animator.is_none() && ui.button("Animator Component").clicked() {
