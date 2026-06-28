@@ -435,13 +435,20 @@ flag is honoured at body build and each tick, so toggling it at runtime takes ef
 
 ## `Time`
 
-Read-only clock accessors.
+Clock accessors plus the time-scale control.
 
 | Function | Signature | Returns |
 |---|---|---|
-| `Time.deltaTime` | `()` | seconds since last frame |
-| `Time.fixedDeltaTime` | `()` | fixed-step seconds |
+| `Time.deltaTime` | `()` | seconds since last frame, **scaled** by `time_scale` |
+| `Time.unscaledDeltaTime` | `()` | seconds since last frame, ignoring `time_scale` (raw) |
+| `Time.fixedDeltaTime` | `()` | fixed-step seconds (never scaled) |
 | `Time.frameCount` | `()` | frames since start |
+| `Time.GetTimeScale` | `()` | current time scale (`1.0` = real time) |
+| `Time.SetTimeScale` | `(scale)` — set the global time scale; clamped to `≥ 0`. `0` pauses the sim (`deltaTime` → 0), `0.5` is half-speed slow-mo, `2.0` double-speed. `fixedDeltaTime` is unaffected. Persists across play-mode reset (it's deterministic game state). |
+
+> Only `deltaTime` is scaled — read `unscaledDeltaTime` for anything that must
+> keep ticking through a pause or slow-mo (UI, debug cameras). `SetTimeScale` is
+> the slow-mo / pause / bullet-time knob; see `tests/time_scale.rs`.
 
 ## `Camera`
 
