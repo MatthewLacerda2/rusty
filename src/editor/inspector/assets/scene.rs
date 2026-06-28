@@ -27,7 +27,50 @@ pub fn draw(
     ui.add_space(5.0);
 
     draw_scene_operations(ui, editor, scene, console, path, filename);
+    draw_navmesh(ui, scene, nav);
     draw_bake_lighting(ui, scene, console, nav, path);
+}
+
+/// The per-scene Navmesh bake settings section (#276): edit agent radius, max slope,
+/// and max step (Unity's per-scene navmesh bake parameters), then re-bake the shared
+/// nav graph from the live scene so the edit takes effect — the SAME `nav.bake(scene)`
+/// path the entity inspector's collider/static toggles trigger via `pending_nav_bake`,
+/// no second re-bake mechanism. `agent_radius` is editable but stored-but-inert (no
+/// erosion yet — follow-up #277), so a re-bake reflects only slope/step today.
+fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph) {
+    ui.add_space(8.0);
+    egui::CollapsingHeader::new("🧭 Navmesh")
+        .default_open(false)
+        .show(ui, |ui| {
+            // Edit the settings behind a scoped borrow so it has dropped before the
+            // re-bake (which needs `&Scene`) below.
+            let changed = {
+                let s = &mut scene.nav_settings;
+                let mut changed = false;
+                changed |= ui
+                    .add(egui::Slider::new(&mut s.agent_radius, 0.0..=5.0).text("Agent Radius"))
+                    .on_hover_text("Stored for now; bake does not erode by radius yet (#277)")
+                    .changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut s.max_slope, 0.0..=4.0).text("Max Slope"))
+                    .on_hover_text("Max walkable grade (rise per unit travelled)")
+                    .changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut s.max_step, 0.0..=4.0).text("Max Step"))
+                    .on_hover_text("Max step height between adjacent cells (stairs, curbs)")
+                    .changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut s.grid_spacing, 0.25..=4.0).text("Grid Spacing"))
+                    .on_hover_text("Cell size; smaller = finer grid (re-shapes the grid)")
+                    .changed();
+                changed
+            };
+            // Re-bake on apply through the shared bake path, so the knobs take effect
+            // immediately exactly like an entity's collider/static edit does.
+            if changed {
+                nav.bake(scene);
+            }
+        });
 }
 
 /// The "Bake Lighting" button (#246): auto-place + bake both probe sets through the

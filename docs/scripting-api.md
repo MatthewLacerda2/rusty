@@ -391,6 +391,27 @@ of the next cell — agents climb and descend instead of sliding through geometr
 |---|---|---|
 | `Navigation.GetNextPathStep` | `(cx, cy, cz, tx, ty, tz)` | next waypoint `x, y, z` on the baked surface along the A* path |
 
+### Per-scene bake settings (#276)
+
+The bake tunables are authored **per scene** (Unity's per-scene navmesh bake
+settings) and serialize with it. Every setter writes `scene.nav_settings` and
+**re-bakes** the navmesh, so the change takes effect at once — the same effect as the
+scene inspector's **Navmesh** section (editor↔API parity). `AgentRadius` is
+**stored-but-inert** today: it persists and re-bakes for consistency, but the bake does
+not yet erode walkability by radius (that is the follow-up #277), so it changes nothing
+in the baked result for now.
+
+| Function | Signature | Returns / Effect |
+|---|---|---|
+| `Navigation.GetAgentRadius` | `()` | agent radius (world units) |
+| `Navigation.SetAgentRadius` | `(radius)` | writes `nav_settings.agent_radius` + re-bakes (inert) |
+| `Navigation.GetMaxSlope` | `()` | max walkable grade (rise per unit travelled) |
+| `Navigation.SetMaxSlope` | `(slope)` | writes `nav_settings.max_slope` + re-bakes |
+| `Navigation.GetMaxStep` | `()` | max step height between adjacent cells |
+| `Navigation.SetMaxStep` | `(step)` | writes `nav_settings.max_step` + re-bakes |
+| `Navigation.GetGridSpacing` | `()` | grid cell size (world units) |
+| `Navigation.SetGridSpacing` | `(spacing)` | writes `nav_settings.grid_spacing` + re-bakes (re-shapes the grid) |
+
 ## `NavMeshAgent`
 
 Per-entity navmesh agent control.

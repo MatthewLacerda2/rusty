@@ -14,6 +14,7 @@ use glam::{Mat4, Vec3};
 
 use crate::ecs::world::{Ref, RefMut};
 use crate::ecs::World;
+use crate::navigation::NavMeshSettings;
 use crate::scene::collision_matrix::CollisionMatrix;
 use crate::scene::layers::LayerRegistry;
 
@@ -56,6 +57,11 @@ pub struct Scene {
     pub skybox_path: String,
     pub ambient_color: Vec3,
     pub ambient_intensity: f32,
+    /// Per-scene navmesh bake tunables (#276): Unity's per-scene navmesh bake
+    /// settings (agent radius, max slope, max step, grid spacing). The nav bake
+    /// reads these off the active scene; serialized with the scene like the ambient
+    /// scalars, with serde defaults so older scenes load with the historical values.
+    pub nav_settings: NavMeshSettings,
     /// The project's shared Layers registry (Unity's Tags & Layers). Serialized
     /// with the scene; the per-entity `layer` index points into it.
     pub layers: LayerRegistry,
@@ -93,6 +99,7 @@ impl Default for Scene {
             skybox_path: default_skybox_path(),
             ambient_color: default_ambient_color(),
             ambient_intensity: default_ambient_intensity(),
+            nav_settings: NavMeshSettings::default(),
             layers: LayerRegistry::default(),
             collision_matrix: CollisionMatrix::default(),
             materials: BTreeMap::new(),

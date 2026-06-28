@@ -7,6 +7,12 @@ pub const DEFAULT_MAX_STEP: f32 = 0.5;
 /// horizontal travel (i.e. `rise / grid_spacing`). A ramp steeper than this is
 /// not traversable. `1.0` ≈ 45° at unit spacing.
 pub const DEFAULT_MAX_SLOPE: f32 = 1.0;
+/// Default grid cell size in world units — the spacing every runtime
+/// `NavigationGraph` is created with. The per-scene [`NavMeshSettings`] default
+/// matches this so an unconfigured scene bakes at the historical resolution.
+///
+/// [`NavMeshSettings`]: super::NavMeshSettings
+pub const DEFAULT_GRID_SPACING: f32 = 1.0;
 
 /// Height-field navigation model (#130). The flat 2D walkability grid is extended
 /// with a parallel per-cell surface-height field so agents traverse ramps, stairs,

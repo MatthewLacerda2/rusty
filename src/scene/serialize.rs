@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::asset::{self, MeshVertex, SubMesh};
 use crate::components::{Entity, MaterialAsset};
+use crate::navigation::NavMeshSettings;
 use crate::render::gpu::mesh::Vertex;
 use crate::scene::authoring::{primitive_geometry, Primitive};
 use crate::scene::collision_matrix::CollisionMatrix;
@@ -56,6 +57,12 @@ pub struct SceneData {
     pub ambient_color: Vec3,
     #[serde(default = "default_ambient_intensity")]
     pub ambient_intensity: f32,
+    /// Per-scene navmesh bake settings (#276). `#[serde(default)]` so a pre-#276
+    /// scene that omits the block loads with the historical bake constants — and the
+    /// per-field serde defaults inside `NavMeshSettings` mean a partial block (only
+    /// some knobs authored) fills the rest in too.
+    #[serde(default)]
+    pub nav_settings: NavMeshSettings,
     /// Project layer names. `#[serde(default)]` so pre-#90 scenes load with the
     /// stock registry ("Default" + 31 unnamed slots).
     #[serde(default)]
@@ -94,6 +101,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         skybox_path: scene.skybox_path.clone(),
         ambient_color: scene.ambient_color,
         ambient_intensity: scene.ambient_intensity,
+        nav_settings: scene.nav_settings.clone(),
         layers: scene.layers.clone(),
         collision_matrix: scene.collision_matrix.clone(),
         materials: scene.materials.clone(),
@@ -254,6 +262,7 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     scene.skybox_path = data.skybox_path;
     scene.ambient_color = data.ambient_color;
     scene.ambient_intensity = data.ambient_intensity;
+    scene.nav_settings = data.nav_settings;
     data.layers.normalize();
     scene.layers = data.layers;
     scene.collision_matrix = data.collision_matrix;
