@@ -57,6 +57,25 @@ response **without** tearing the session down. The channel ends at EOF.
 Note: `local` bindings are scoped to their own line; use a **global** (no `local`)
 to carry a value across commands, as with `pid` above.
 
+### Attaching to a windowed playtest
+
+The same command channel is also exposed by the **windowed** engine (`cargo run
+--features dev`), so an agent can attach to a *running, rendered* playtest and drive
+it live — not just the headless `session` binary. The framing and protocol are
+**identical** to the headless session above; only the transport differs:
+
+- **Linux / macOS:** a unix domain socket. Path is `$RUSTY_CMD_SOCK` if set, else
+  `$XDG_RUNTIME_DIR/rusty.sock`, else `/tmp/rusty.sock`.
+- **Windows:** a TCP listener on `127.0.0.1`. Address is `$RUSTY_CMD_ADDR` if set,
+  else `127.0.0.1:8787`.
+
+The chosen address/path is logged to the engine console on boot (`[cmd] command
+channel listening on …`). Connect, then send one Lua command per line and read one
+JSON response per command, exactly as with the headless session. Commands are
+evaluated on the engine's main loop (once per frame), so they never race the sim. A
+bind failure is non-fatal — the window simply runs without the channel. The channel
+is **dev-only** and absent from ship builds.
+
 ---
 
 ## `Transform`

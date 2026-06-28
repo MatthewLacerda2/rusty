@@ -61,6 +61,12 @@ struct Frontend {
     /// panel (#183). Registered lazily on the first frame a target exists, then
     /// rebound to the resized view each frame so the `egui::Image` reference stays valid.
     viewport_texture_id: Option<egui::TextureId>,
+    /// Dev-only socket command channel (#282): lets an external process drive this
+    /// running playtest through the same evaluator the console uses. `None` if the
+    /// socket failed to bind — the window keeps running without it. Absent entirely
+    /// in ship builds (the listener is dev-gated).
+    #[cfg(feature = "dev")]
+    cmd_channel: Option<rusty::dev::command_channel::CommandChannel>,
 }
 
 fn main() {
@@ -73,6 +79,13 @@ fn main() {
     let window = create_window(&event_loop);
     let (mut frontend, boot_scene_path) = init_frontend(&window);
     let mut game = init_game(boot_scene_path.clone());
+    // Dev-only: open the socket command channel so an external agent can drive this
+    // running playtest through the same evaluator the console uses (#282). A bind
+    // failure logs and leaves the channel `None` — the window keeps running.
+    #[cfg(feature = "dev")]
+    {
+        frontend.cmd_channel = rusty::dev::command_channel::CommandChannel::start(game.console());
+    }
     init_audio(&game);
     frontend.editor_ui.current_scene_path = Some(boot_scene_path);
     let keymap = load_keymap(&game);
@@ -164,6 +177,10 @@ fn init_frontend(window: &Arc<winit::window::Window>) -> (Frontend, String) {
         last_fps_update: Instant::now(),
         applied_video: rusty::core::video::VideoSettings::default(),
         viewport_texture_id: None,
+        // Started in `main` once the game's shared console cell exists (so a bind
+        // failure logs to the same console the editor shows).
+        #[cfg(feature = "dev")]
+        cmd_channel: None,
     };
     (frontend, rusty::scene::seed_default_scene())
 }
@@ -654,6 +671,12 @@ fn drain_repl(frontend: &mut Frontend, game: &mut GameWorld) {
             &game.resources.console,
             &line,
         );
+    }
+    // Drain any socket-delivered commands (#282) on the main loop too — same
+    // evaluator, same shared console cell as the typed REPL above, so a windowed
+    // playtest answers an external agent byte-identically to the headless session.
+    if let Some(channel) = frontend.cmd_channel.as_ref() {
+        channel.drain(game.script_manager(), &game.resources.console);
     }
 }
 

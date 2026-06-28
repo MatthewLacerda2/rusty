@@ -9,7 +9,8 @@
 //! behaviour).
 //!
 //! Submodules:
-//!   session     — long-lived edit-mode host + command channel (the keystone, #177)
+//!   session         — long-lived edit-mode host + command channel (the keystone, #177)
+//!   command_channel — windowed socket command channel: drive a live playtest (#282)
 //!   harness     — headless deterministic runner: Step / StepUntil / results.json
 //!   scenario    — loads and runs a `.lua` scenario, captures observations
 //!   bridge      — Lua bindings for the scenario VM (the control surface)
@@ -23,6 +24,7 @@
 
 pub mod botplayer;
 pub mod bridge;
+pub mod command_channel;
 pub mod console;
 pub mod demo_scene;
 pub mod harness;
