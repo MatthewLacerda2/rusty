@@ -211,6 +211,21 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 | `Set` / `SetTable` | ✅ | round-trip — readable via `Get`/`GetTable`; flushed to disk at Stop/quit (#86) |
 | `Delete` | ✅ | round-trip — removes the key from the same store |
 
+### `Texture` — writes a `.png` the renderer loads (over the material map slots)
+
+`Texture` writes files rather than mutating a component, so its "read-site" is the
+renderer's texture loader: a baked PNG path handed to any `Material.Set*Map` is
+loaded by `draw::upload_scene_assets` → `load_texture(path)` and bound for sampling,
+exactly like an imported map. Proven by `tests/texture_api.rs` (a baked map wired
+into a slot decodes at the requested resolution) and the bake tests
+(`tests/procgen_bake.rs`: byte-identical determinism, per-slot sRGB/linear encoding,
+metallic→B/roughness→G packing, seamless tiling).
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `Bake` / `BakeJson` | ✅ | renderer — writes a `.png` consumed by `load_texture` via the material map slots; per-slot glTF encoding applied on bake |
+| `ToJson` | ✅ | round-trip — the recipe's canonical serde form; re-bakes byte-identically |
+
 ### `Debug` (dev-only) — over `ConsoleLogs`
 
 | Setter | Status | Read-site |
@@ -221,7 +236,7 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 62 |
+| ✅ faithful | 65 |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 
