@@ -169,6 +169,16 @@ impl GameWorld {
         transition
     }
 
+    /// Process only the play-state transition (enter/exit play) **without advancing
+    /// the sim** (issue #283). The windowed "playing-but-stepped" loop calls this on a
+    /// paused, no-step frame: the world is frozen, but a Play/Stop pressed while paused
+    /// must still take effect (Stop → `exit_play` restores the edit snapshot). Returns
+    /// the transition so the platform layer can grab/release the cursor exactly as a
+    /// normal `tick` would. No clock advance, no schedule run, no editor fly.
+    pub fn poll_transition(&mut self) -> PlayTransition {
+        self.handle_transition()
+    }
+
     /// Run the schedule's per-frame stages. The schedule is moved out of `Resources`
     /// for the duration so its systems can take `&mut Resources`.
     fn run_schedule_frame(&mut self) {
