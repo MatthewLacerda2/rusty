@@ -7,17 +7,8 @@
 # That direct mutation is the drift this gate exists to stop: the editor and the Lua
 # binding can silently diverge.
 #
-# Burn-down only (#287). When you migrate a card to route through a shared op (the
-# `material` card is the first — note it is ABSENT here), REMOVE its line; a routed
-# card left on this list fails the gate as a stale entry. Never add a new line: a new
-# direct card is fresh drift to fix, not to grandfather (baseline only, exceptionally,
-# with written justification).
-animator
-audio
-camera
-collider
-light
-nav_agent
-particles
-rigidbody
-visual_correction
+# EMPTY (#287 burn-down complete). Every first-class component's inspector card now
+# routes every field write through a shared `scene::authoring` op, so no card is
+# grandfathered. A routed card left on this list would fail the gate as a stale entry;
+# never add a new line — a new direct card is fresh drift to fix, not to grandfather
+# (baseline only, exceptionally, with written justification).

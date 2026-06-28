@@ -14,6 +14,7 @@ use mlua::Lua;
 
 use super::{put, Reg};
 use crate::components::LightType;
+use crate::scene::authoring::light as light_ops;
 use crate::scene::Scene;
 
 /// Register the `Light` namespace onto `lua`.
@@ -57,9 +58,7 @@ fn register_color<'lua, 'scope>(
         scope.create_function(|_, (id, r, g, b): (u32, f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(light) = &mut e.light {
-                    light.color = Vec3::new(r, g, b);
-                }
+                light_ops::set_color(&mut e, Vec3::new(r, g, b));
             }
             Ok(())
         }),
@@ -90,9 +89,7 @@ fn register_intensity<'lua, 'scope>(
         scope.create_function(|_, (id, value): (u32, f32)| {
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(light) = &mut e.light {
-                    light.intensity = value.max(0.0);
-                }
+                light_ops::set_intensity(&mut e, value);
             }
             Ok(())
         }),
@@ -123,9 +120,7 @@ fn register_range<'lua, 'scope>(
         scope.create_function(|_, (id, value): (u32, f32)| {
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(light) = &mut e.light {
-                    light.range = value.max(0.0);
-                }
+                light_ops::set_range(&mut e, value);
             }
             Ok(())
         }),
@@ -158,10 +153,8 @@ fn register_type<'lua, 'scope>(
         scope.create_function(|_, (id, name): (u32, String)| {
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(light) = &mut e.light {
-                    if let Some(t) = parse_type(&name) {
-                        light.light_type = t;
-                    }
+                if let Some(t) = parse_type(&name) {
+                    light_ops::set_type(&mut e, t);
                 }
             }
             Ok(())

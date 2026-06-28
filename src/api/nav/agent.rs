@@ -9,6 +9,7 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::super::{put, Reg};
+use crate::scene::authoring::nav_agent as nav_ops;
 use crate::scene::Scene;
 
 /// `NavMeshAgent.*` target / speed / radius accessors over the nav-agent component.
@@ -41,9 +42,7 @@ fn register_agent_target<'lua, 'scope>(
         scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(agent) = &mut e.nav_agent {
-                    agent.target = Vec3::new(x, y, z);
-                }
+                nav_ops::set_target(&mut e, Vec3::new(x, y, z));
             }
             Ok(())
         }),
@@ -77,9 +76,7 @@ fn register_agent_motion<'lua, 'scope>(
         scope.create_function(|_, (id, speed): (u32, f32)| {
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(agent) = &mut e.nav_agent {
-                    agent.speed = speed;
-                }
+                nav_ops::set_speed(&mut e, speed);
             }
             Ok(())
         }),
@@ -91,9 +88,7 @@ fn register_agent_motion<'lua, 'scope>(
         scope.create_function(|_, (id, acc): (u32, f32)| {
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(agent) = &mut e.nav_agent {
-                    agent.acceleration = acc;
-                }
+                nav_ops::set_acceleration(&mut e, acc);
             }
             Ok(())
         }),
@@ -112,9 +107,7 @@ fn register_agent_size<'lua, 'scope>(
         scope.create_function(|_, (id, dist): (u32, f32)| {
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(agent) = &mut e.nav_agent {
-                    agent.stopping_distance = dist;
-                }
+                nav_ops::set_stopping_distance(&mut e, dist);
             }
             Ok(())
         }),
@@ -126,9 +119,7 @@ fn register_agent_size<'lua, 'scope>(
         scope.create_function(|_, (id, r): (u32, f32)| {
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(agent) = &mut e.nav_agent {
-                    agent.radius = r;
-                }
+                nav_ops::set_radius(&mut e, r);
             }
             Ok(())
         }),
@@ -178,9 +169,7 @@ fn register_agent_queries<'lua, 'scope>(
         scope.create_function(|_, (id, active): (u32, bool)| {
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(agent) = &mut e.nav_agent {
-                    agent.active = active;
-                }
+                nav_ops::set_active(&mut e, active);
             }
             Ok(())
         }),
