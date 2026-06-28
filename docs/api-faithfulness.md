@@ -97,7 +97,7 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 | `SetMaxSlope` | ✅ | sim — `navigation/bake.rs::bake` copies it into `NavigationGraph::max_slope` (the per-edge slope rule); round-trips through `SceneData` |
 | `SetMaxStep` | ✅ | sim — `navigation/bake.rs::bake` copies it into `NavigationGraph::max_step` (the per-edge step rule); round-trips. `bake_sources_max_step_from_scene_settings` proves a ledge flips reachability |
 | `SetGridSpacing` | ✅ | sim — `navigation/bake.rs::bake` re-shapes the grid dimensions from it (`apply_grid_spacing`); round-trips |
-| `SetAgentRadius` | ⚠️ | round-trip — **stored-but-inert** (#276): persists through `SceneData` and re-bakes for consistency, but the bake does NOT yet erode walkability by radius. The radius read-site (erosion) lands in #277 |
+| `SetAgentRadius` | ✅ | sim — `navigation/bake.rs::bake` **erodes the walkable surface by the radius** (#277): the agent-radius read-site. Passages narrower than ~`2*radius` close and the surface pulls off walls/world-edge; `radius==0` is an exact no-op. Round-trips through `SceneData`; `thin_passage_closes_under_erosion` / `wide_corridor_keeps_core_pulled_off_both_walls` prove it |
 
 ### `NavMeshAgent` — over `Entity.nav_agent`
 
@@ -215,13 +215,14 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 57 |
-| ⚠️ partial | 1 |
+| ✅ faithful | 58 |
+| ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 
-The single ⚠️ partial is `Navigation.SetAgentRadius` (#276): it persists and re-bakes,
-but the radius is **stored-but-inert** until the navmesh-erosion follow-up (#277) gives
-it a live bake read-site. It is a documented, conscious step, not a silent no-op.
+`Navigation.SetAgentRadius` became fully faithful in #277: the bake now **erodes the
+walkable surface inward by the agent radius** (the standard Recast/Unity meaning), so the
+radius has a live sim read-site and changes the baked result. It had been stored-but-inert
+since #276 — a documented, conscious step, now closed.
 
 The full glTF-PBR map surface is now **faithful**. `Material.SetMetallicMap` /
 `SetRoughnessMap` were wired by #202 (per-entity group(2) material bind group +

@@ -19,6 +19,8 @@ mod astar_tests;
 mod bake;
 #[cfg(test)]
 mod bake_tests;
+#[cfg(test)]
+mod erosion_tests;
 mod grid;
 mod settings;
 

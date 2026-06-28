@@ -128,6 +128,33 @@ fn reflection_per_axis_cap_is_honoured() {
     assert_eq!(plans.len(), 9);
 }
 
+/// Probe-placement interaction with agent-radius erosion (#277). Light-probe bounds
+/// follow the baked WALKABLE extent, so eroding the surface (a larger agent radius) must
+/// TIGHTEN — never grow — the placement bounds: probes track where agents can actually
+/// stand. Built on a flat scene so erosion pulls the walkable rim in off the world edge.
+#[test]
+fn erosion_tightens_light_probe_bounds() {
+    let bake_with = |radius: f32| {
+        let mut scene = room_scene();
+        scene.nav_settings.agent_radius = radius;
+        let mut nav = NavigationGraph::new(-10.0, 10.0, -10.0, 10.0, 1.0);
+        nav.bake(&scene);
+        plan_light_probes(&scene, Some(&nav), 4.0).expect("a plan from the baked nav")
+    };
+    let wide = bake_with(0.0); // no erosion: full walkable rectangle
+    let eroded = bake_with(2.0); // erodes the outer rim by ~2 cells
+    let wide_span = wide.max - wide.min;
+    let eroded_span = eroded.max - eroded.min;
+    assert!(
+        eroded_span.x <= wide_span.x + 1e-4 && eroded_span.z <= wide_span.z + 1e-4,
+        "erosion must not grow the probe bounds (x/z)"
+    );
+    assert!(
+        eroded_span.x < wide_span.x - 1e-4 || eroded_span.z < wide_span.z - 1e-4,
+        "a 2-unit radius visibly tightens the probe bounds off the world edge"
+    );
+}
+
 #[test]
 fn placement_is_deterministic() {
     // Same scene built twice → identical plans (no RNG, no clock, stable iteration).

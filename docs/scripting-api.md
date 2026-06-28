@@ -396,15 +396,16 @@ of the next cell — agents climb and descend instead of sliding through geometr
 The bake tunables are authored **per scene** (Unity's per-scene navmesh bake
 settings) and serialize with it. Every setter writes `scene.nav_settings` and
 **re-bakes** the navmesh, so the change takes effect at once — the same effect as the
-scene inspector's **Navmesh** section (editor↔API parity). `AgentRadius` is
-**stored-but-inert** today: it persists and re-bakes for consistency, but the bake does
-not yet erode walkability by radius (that is the follow-up #277), so it changes nothing
-in the baked result for now.
+scene inspector's **Navmesh** section (editor↔API parity). `AgentRadius` **erodes the
+walkable surface** at bake time (#277, the standard Recast/Unity meaning): the surface is
+pulled back off every wall — and off the world edge — by the radius, so passages narrower
+than ~`2 * radius` close up and paths keep clearance instead of hugging geometry. A radius
+of `0` is an exact no-op (the surface hugs geometry as before).
 
 | Function | Signature | Returns / Effect |
 |---|---|---|
 | `Navigation.GetAgentRadius` | `()` | agent radius (world units) |
-| `Navigation.SetAgentRadius` | `(radius)` | writes `nav_settings.agent_radius` + re-bakes (inert) |
+| `Navigation.SetAgentRadius` | `(radius)` | writes `nav_settings.agent_radius` + re-bakes (erodes walkable surface by radius) |
 | `Navigation.GetMaxSlope` | `()` | max walkable grade (rise per unit travelled) |
 | `Navigation.SetMaxSlope` | `(slope)` | writes `nav_settings.max_slope` + re-bakes |
 | `Navigation.GetMaxStep` | `()` | max step height between adjacent cells |

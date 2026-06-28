@@ -81,24 +81,32 @@ fn nav_is_baked(nav: &NavigationGraph) -> bool {
     nav.width > 1 && nav.height > 1 && nav.max_x > nav.min_x && nav.max_z > nav.min_z
 }
 
-/// AABB of the baked nav surface: the walkable XZ rectangle, with `y` spanning the
-/// height field (floor) up to `floor + VERTICAL_HEADROOM` so probes cover the volume
-/// actors move through. `None` when the graph is unbaked.
+/// AABB of the baked nav surface: the bounding box of the cells an agent can actually
+/// stand on (the WALKABLE cells), with `y` spanning their height field (floor) up to
+/// `floor + VERTICAL_HEADROOM` so probes cover the volume actors move through. Bounding
+/// the *walkable* cells (not the full grid) means the agent-radius erosion (#277) tightens
+/// this extent: as the walkable surface pulls back off walls and through thin passages,
+/// the probe bounds follow where agents can actually stand. `None` when the graph is
+/// unbaked or nothing is walkable.
 fn nav_surface_aabb(nav: &NavigationGraph) -> Option<(Vec3, Vec3)> {
     if !nav_is_baked(nav) {
         return None;
     }
-    let mut min_y = f32::MAX;
-    let mut max_y = f32::MIN;
-    for &h in &nav.heightfield {
-        min_y = min_y.min(h);
-        max_y = max_y.max(h);
+    let (mut min, mut max) = (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN));
+    for gz in 0..nav.height {
+        for gx in 0..nav.width {
+            if !nav.is_walkable(gx, gz) {
+                continue;
+            }
+            let w = nav.grid_to_world(gx, gz); // XZ cell center carried to its surface y
+            min = min.min(w);
+            max = max.max(w);
+        }
     }
-    if !min_y.is_finite() || !max_y.is_finite() {
-        return None;
+    if !min.is_finite() || !max.is_finite() {
+        return None; // no walkable cell to bound
     }
-    let min = Vec3::new(nav.min_x, min_y, nav.min_z);
-    let max = Vec3::new(nav.max_x, max_y + VERTICAL_HEADROOM, nav.max_z);
+    max.y += VERTICAL_HEADROOM;
     Some((min, max))
 }
 

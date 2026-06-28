@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize};
 
 use super::grid::{DEFAULT_GRID_SPACING, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP};
 
-/// A sensible default agent radius (world units). Stored-but-inert today (#276): no
-/// erosion happens yet; agent-radius walkability carving is the follow-up (#277).
+/// A sensible default agent radius (world units). Consumed at bake time (#277): the bake
+/// erodes the walkable surface inward by this radius (clearance off walls/world-edge).
 pub const DEFAULT_AGENT_RADIUS: f32 = 0.5;
 
 /// Per-scene navmesh bake settings (Unity's per-scene navmesh bake parameters).
@@ -26,10 +26,10 @@ pub const DEFAULT_AGENT_RADIUS: f32 = 0.5;
 /// older scene missing the block (back-compat) bakes byte-identically to before.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct NavMeshSettings {
-    /// Agent radius (world units). **Stored-but-inert** in #276: it persists and is
-    /// editable, but the bake does NOT consume it yet (no walkability erosion). The
-    /// radius-based carve is the documented follow-up (#277); keeping the knob honest
-    /// means it is wired through everywhere *except* the bake math, on purpose.
+    /// Agent radius (world units). Consumed by the bake (#277): the walkable surface is
+    /// eroded inward by this radius (the standard Recast/Unity meaning) — passages
+    /// narrower than ~`2 * radius` close, and the surface keeps clearance off walls and
+    /// the world edge. `0` is an exact no-op (the surface hugs geometry as before).
     #[serde(default = "default_agent_radius")]
     pub agent_radius: f32,
     /// Max walkable grade (rise per unit of horizontal travel). A ramp steeper than
