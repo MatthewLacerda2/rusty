@@ -31,12 +31,14 @@ pub fn draw(
     draw_bake_lighting(ui, scene, console, nav, path);
 }
 
-/// The per-scene Navmesh bake settings section (#276): edit agent radius, max slope,
-/// and max step (Unity's per-scene navmesh bake parameters), then re-bake the shared
-/// nav graph from the live scene so the edit takes effect — the SAME `nav.bake(scene)`
+/// The per-scene Navmesh bake settings section (#276): edit agent radius, agent height,
+/// max slope, and max step (Unity's per-scene navmesh bake parameters), then re-bake the
+/// shared nav graph from the live scene so the edit takes effect — the SAME `nav.bake(scene)`
 /// path the entity inspector's collider/static toggles trigger via `pending_nav_bake`,
 /// no second re-bake mechanism. `agent_radius` is live (#277): the re-bake erodes the
 /// walkable surface inward by the radius (clearance off walls, thin passages close).
+/// `agent_height` is live (#278): the re-bake carves cells whose overhead clearance is
+/// below the height (no pathing under a low overhang / through a crawlspace).
 fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph) {
     ui.add_space(8.0);
     egui::CollapsingHeader::new("🧭 Navmesh")
@@ -50,6 +52,10 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
                 changed |= ui
                     .add(egui::Slider::new(&mut s.agent_radius, 0.0..=5.0).text("Agent Radius"))
                     .on_hover_text("Erodes the walkable surface inward by this radius on bake")
+                    .changed();
+                changed |= ui
+                    .add(egui::Slider::new(&mut s.agent_height, 0.0..=5.0).text("Agent Height"))
+                    .on_hover_text("Carves cells with less overhead clearance than this height")
                     .changed();
                 changed |= ui
                     .add(egui::Slider::new(&mut s.max_slope, 0.0..=4.0).text("Max Slope"))

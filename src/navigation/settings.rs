@@ -18,6 +18,12 @@ use super::grid::{DEFAULT_GRID_SPACING, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP};
 /// erodes the walkable surface inward by this radius (clearance off walls/world-edge).
 pub const DEFAULT_AGENT_RADIUS: f32 = 0.5;
 
+/// Default agent height (world units) — Unity's default humanoid agent height. Consumed
+/// at bake time (#278): a walkable cell whose vertical clearance to the lowest static
+/// geometry overhead is less than this height is marked non-walkable (no crawling under
+/// a low overhang). With nothing overhead, headroom is ∞, so the pass is a no-op.
+pub const DEFAULT_AGENT_HEIGHT: f32 = 2.0;
+
 /// Per-scene navmesh bake settings (Unity's per-scene navmesh bake parameters).
 ///
 /// Serialized on the `Scene` document and editable from the scene inspector + the
@@ -32,6 +38,13 @@ pub struct NavMeshSettings {
     /// the world edge. `0` is an exact no-op (the surface hugs geometry as before).
     #[serde(default = "default_agent_radius")]
     pub agent_radius: f32,
+    /// Agent height (world units). Consumed by the bake (#278): a walkable cell whose
+    /// vertical clearance to the lowest static geometry overhead is below this height is
+    /// carved out (so an agent can't path under a low overhang / through a crawlspace).
+    /// A cell with nothing overhead has infinite headroom, so it is never carved — simple
+    /// scenes (floor + walls, no ceilings) bake unchanged.
+    #[serde(default = "default_agent_height")]
+    pub agent_height: f32,
     /// Max walkable grade (rise per unit of horizontal travel). A ramp steeper than
     /// this is not traversable; `1.0` ≈ 45° at unit spacing. Sourced into
     /// `NavigationGraph::max_slope` at bake time.
@@ -51,6 +64,9 @@ pub struct NavMeshSettings {
 fn default_agent_radius() -> f32 {
     DEFAULT_AGENT_RADIUS
 }
+fn default_agent_height() -> f32 {
+    DEFAULT_AGENT_HEIGHT
+}
 fn default_max_slope() -> f32 {
     DEFAULT_MAX_SLOPE
 }
@@ -65,6 +81,7 @@ impl Default for NavMeshSettings {
     fn default() -> Self {
         Self {
             agent_radius: DEFAULT_AGENT_RADIUS,
+            agent_height: DEFAULT_AGENT_HEIGHT,
             max_slope: DEFAULT_MAX_SLOPE,
             max_step: DEFAULT_MAX_STEP,
             grid_spacing: DEFAULT_GRID_SPACING,
@@ -85,6 +102,7 @@ mod tests {
         assert_eq!(d.max_slope, DEFAULT_MAX_SLOPE);
         assert_eq!(d.grid_spacing, DEFAULT_GRID_SPACING);
         assert_eq!(d.agent_radius, DEFAULT_AGENT_RADIUS);
+        assert_eq!(d.agent_height, DEFAULT_AGENT_HEIGHT);
     }
 
     /// A JSON object missing every field deserializes to the defaults (back-compat).
@@ -94,10 +112,21 @@ mod tests {
         assert_eq!(s, NavMeshSettings::default());
     }
 
+    /// A pre-#278 scene that carries the other knobs but omits `agent_height` still loads,
+    /// filling the new field with its serde default (back-compat for the height addition).
+    #[test]
+    fn legacy_json_without_agent_height_uses_default() {
+        let json = r#"{"agent_radius":0.5,"max_slope":1.0,"max_step":0.5,"grid_spacing":1.0}"#;
+        let s: NavMeshSettings = serde_json::from_str(json).expect("legacy object loads");
+        assert_eq!(s.agent_height, DEFAULT_AGENT_HEIGHT);
+        assert_eq!(s, NavMeshSettings::default());
+    }
+
     #[test]
     fn round_trips_through_json() {
         let s = NavMeshSettings {
             agent_radius: 0.7,
+            agent_height: 1.8,
             max_slope: 0.5,
             max_step: 0.25,
             grid_spacing: 2.0,

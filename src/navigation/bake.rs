@@ -45,9 +45,19 @@ impl NavigationGraph {
             }
         }
 
+        // Agent-height clearance (#278): carve cells whose vertical clearance to the
+        // lowest static collider overhead is below the agent height (no crawling under a
+        // low overhang). Runs AFTER `raise_surface` settles the floor (clearance is
+        // measured from the final per-cell floor) but BEFORE the radius erosion below, so
+        // the radius clearance also pulls back from the freshly-carved holes — a
+        // newly-blocked low-headroom region is treated like any other obstacle the agent
+        // must keep its footprint off of (headroom-carve THEN radius-erode).
+        self.carve_low_headroom(scene);
+
         // Agent-radius erosion (#277): pull the final walkable surface back off every
         // obstacle by the agent radius. Runs LAST so it erodes the settled surface
-        // (heightfield + reachability), not an intermediate one.
+        // (heightfield + reachability + the headroom holes carved just above), not an
+        // intermediate one.
         self.erode_for_agent_radius(scene.nav_settings.agent_radius);
     }
 

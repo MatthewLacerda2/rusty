@@ -400,12 +400,20 @@ scene inspector's **Navmesh** section (editor↔API parity). `AgentRadius` **ero
 walkable surface** at bake time (#277, the standard Recast/Unity meaning): the surface is
 pulled back off every wall — and off the world edge — by the radius, so passages narrower
 than ~`2 * radius` close up and paths keep clearance instead of hugging geometry. A radius
-of `0` is an exact no-op (the surface hugs geometry as before).
+of `0` is an exact no-op (the surface hugs geometry as before). `AgentHeight` **carves
+low-headroom cells** at bake time (#278, the radius's vertical companion): a walkable cell
+whose clearance to the lowest static geometry overhead is below the height is marked
+non-walkable, so the agent can't path under a low overhang or through a crawlspace. A cell
+with nothing overhead has infinite headroom and is never carved (height `0` and overhead-free
+scenes are no-ops). This is single-surface only — it subtracts low cells, it does not add a
+second walkable layer.
 
 | Function | Signature | Returns / Effect |
 |---|---|---|
 | `Navigation.GetAgentRadius` | `()` | agent radius (world units) |
 | `Navigation.SetAgentRadius` | `(radius)` | writes `nav_settings.agent_radius` + re-bakes (erodes walkable surface by radius) |
+| `Navigation.GetAgentHeight` | `()` | agent height (world units) |
+| `Navigation.SetAgentHeight` | `(height)` | writes `nav_settings.agent_height` + re-bakes (carves cells with overhead clearance below the height) |
 | `Navigation.GetMaxSlope` | `()` | max walkable grade (rise per unit travelled) |
 | `Navigation.SetMaxSlope` | `(slope)` | writes `nav_settings.max_slope` + re-bakes |
 | `Navigation.GetMaxStep` | `()` | max step height between adjacent cells |

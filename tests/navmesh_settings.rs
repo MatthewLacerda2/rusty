@@ -23,6 +23,7 @@ fn fresh_scene_uses_default_nav_settings() {
     assert_eq!(scene.nav_settings.max_slope, 1.0);
     assert_eq!(scene.nav_settings.grid_spacing, 1.0);
     assert_eq!(scene.nav_settings.agent_radius, 0.5);
+    assert_eq!(scene.nav_settings.agent_height, 2.0);
 }
 
 #[test]
@@ -47,6 +48,7 @@ fn nav_settings_survive_round_trip() {
     let mut scene = Scene::new();
     scene.nav_settings = NavMeshSettings {
         agent_radius: 0.8,
+        agent_height: 1.8,
         max_slope: 0.6,
         max_step: 0.3,
         grid_spacing: 1.5,
@@ -57,6 +59,7 @@ fn nav_settings_survive_round_trip() {
     let mut loaded = Scene::new();
     loaded.load_from_file(&path).unwrap();
     assert_eq!(loaded.nav_settings.agent_radius, 0.8);
+    assert_eq!(loaded.nav_settings.agent_height, 1.8);
     assert_eq!(loaded.nav_settings.max_slope, 0.6);
     assert_eq!(loaded.nav_settings.max_step, 0.3);
     assert_eq!(loaded.nav_settings.grid_spacing, 1.5);
@@ -88,6 +91,10 @@ fn partial_nav_settings_block_fills_missing_fields() {
     );
     assert_eq!(
         loaded.nav_settings.agent_radius, 0.5,
+        "missing field defaulted"
+    );
+    assert_eq!(
+        loaded.nav_settings.agent_height, 2.0,
         "missing field defaulted"
     );
 }
