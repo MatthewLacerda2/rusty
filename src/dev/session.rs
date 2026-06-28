@@ -98,7 +98,10 @@ impl Session {
 /// Each command yields exactly one JSON object on its own line, so an agent can
 /// read responses one-per-line in lockstep with the commands it sent:
 /// `{"ok":true,"result":"…"}` or `{"ok":false,"error":"…"}`.
-fn response_line(outcome: &Result<String, String>) -> String {
+///
+/// Shared with the windowed command channel ([`super::command_channel`]) so the
+/// headless and windowed responses are byte-identical — the framing lives here once.
+pub(crate) fn response_line(outcome: &Result<String, String>) -> String {
     let value = match outcome {
         Ok(result) => json!({ "ok": true, "result": result }),
         Err(error) => json!({ "ok": false, "error": error }),
