@@ -102,15 +102,6 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `SetVelocity` | ✅ | sim — `physics/world.rs` integrates / writes back `velocity` |
 | `AddForce` | ✅ | sim — folds impulse into `velocity` (read above); skips kinematic |
 | `SetKinematic` | ✅ | sim — `physics/build.rs::is_kinematic` / `world.rs` body class |
-| `Shoot` (write: damage) | ✅ | sim — routes through `apply_damage` (see `Health`) |
-
-### `Health` — over `Entity.health`
-
-| Setter | Status | Read-site |
-|---|---|---|
-| `Set` | ✅ | sim/renderer — `current_health`/`is_dead` drive death state + dead-tint in `solid_entity_uniform`; round-trips |
-| `Heal` | ✅ | same |
-| `Damage` | ✅ | sim — `apply_damage` flips `is_dead`, freezes the death clip, logs |
 
 ### `Time` — over the `Time` resource
 

@@ -174,7 +174,7 @@ fn set_pointer(value: &mut Value, pointer: &str, leaf: Value) {
 /// Step one token into a container, materializing a missing object key as an empty
 /// object so a deep override path can be created. A child slot that is currently
 /// `null` (an absent component being *added* by the override) is promoted to an empty
-/// object first, so paths like `/health/current_health` can be built over a `None`
+/// object first, so paths like `/light/intensity` can be built over a `None`
 /// baseline. Returns `None` for an out-of-range array index (we never grow arrays).
 fn descend<'a>(cursor: &'a mut Value, token: &str) -> Option<&'a mut Value> {
     match cursor {

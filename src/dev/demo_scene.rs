@@ -8,7 +8,7 @@ use glam::Vec3;
 
 use crate::render::gpu::mesh as primitives;
 use crate::scene::{
-    AnimatorComponent, ColliderComponent, ColliderShape, DirtyFlag, HealthComponent, MaterialAsset,
+    AnimatorComponent, ColliderComponent, ColliderShape, DirtyFlag, MaterialAsset,
     MaterialComponent, MeshComponent, RigidBodyComponent, Scene, ScriptComponent,
 };
 
@@ -150,11 +150,6 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
     enemy.mesh = Some(mesh("Box", primitives::generate_box(1.3, 2.0, 1.3)));
     enemy.collider = Some(box_collider(Vec3::new(1.3, 2.0, 1.3)));
     enemy.rigidbody = Some(kinematic_body());
-    enemy.health = Some(HealthComponent {
-        current_health: 100.0,
-        max_health: 100.0,
-        is_dead: false,
-    });
     enemy.animator = Some(AnimatorComponent {
         current_clip: "Walk".to_string(),
         speed: 3.0,

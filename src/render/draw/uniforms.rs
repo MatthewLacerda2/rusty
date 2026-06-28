@@ -22,7 +22,7 @@ pub(crate) fn solid_entity_uniform(
 ) -> EntityUniform {
     let is_lit = if entity.light.is_some() { 0u32 } else { 1u32 };
     let (use_sh, sh) = entity_probe_sh(scene, entity, model_matrix);
-    let color_tint = material_color_tint(entity, material);
+    let color_tint = material_color_tint(material);
 
     let (metallic, roughness) = match material {
         Some(mat) => (mat.metallic, mat.roughness),
@@ -67,18 +67,15 @@ pub(crate) fn solid_entity_uniform(
 }
 
 /// The RGBA tint lane for a solid mesh. RGB comes from the material's `base_color`
-/// (or a health-driven fallback when no material). The alpha lane is 1.0 for
+/// (or white when the entity references no material). The alpha lane is 1.0 for
 /// Opaque/Cutout — keeping the opaque path byte-for-byte unchanged — and the
 /// material's `alpha` only for a Transparent material, where it is the blend factor.
-fn material_color_tint(entity: &Entity, material: Option<&MaterialAsset>) -> [f32; 4] {
+fn material_color_tint(material: Option<&MaterialAsset>) -> [f32; 4] {
     if let Some(mat) = material {
         let a = if mat.is_transparent() { mat.alpha } else { 1.0 };
         return [mat.base_color[0], mat.base_color[1], mat.base_color[2], a];
     }
-    match &entity.health {
-        Some(health) if health.is_dead => [0.2, 0.2, 0.2, 1.0],
-        _ => [1.0, 1.0, 1.0, 1.0],
-    }
+    [1.0, 1.0, 1.0, 1.0]
 }
 
 /// Resolve the light-probe SH for one entity (#240): the scene's probe field sampled

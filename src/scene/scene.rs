@@ -21,8 +21,8 @@ use crate::scene::layers::LayerRegistry;
 // resolve. The structs themselves live in `crate::components`.
 pub use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
-    ColliderShape, CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent,
-    LightType, MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent, Particle,
+    ColliderShape, CollisionResponse, DirtyFlag, EmitMode, Entity, LightComponent, LightType,
+    MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent, Particle,
     ParticleBlend, ParticleEmitterComponent, RenderMode, RigidBodyComponent, ScriptComponent,
     ScriptFieldValue, TextureComponent, Tonemap, TransformComponent, VisualCorrectionComponent,
 };
@@ -109,7 +109,7 @@ impl Scene {
     }
 
     /// Spawn a box-projector decal at a surface hit (the point + outward normal
-    /// already produced by `Physics.Raycast`/`Physics.Shoot`). `size` is the
+    /// already produced by `Physics.Raycast`). `size` is the
     /// stamp's width/height in world units; `depth` how far the box projects
     /// through the surface; `rotation_deg` spins the stamp around its axis;
     /// `color` tints the texel (alpha scales the blend); `texture` is the decal

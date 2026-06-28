@@ -50,7 +50,7 @@ pub struct Resources {
     pub script_manager: ScriptManager,
     /// rapier3d simulation, rebuilt from the scene on Play and torn down on Stop.
     /// `None` in edit mode. Shared (via `Rc`) with the script runtime so
-    /// `Physics.Raycast`/`Shoot` cast against the very same world the engine
+    /// `Physics.Raycast` casts against the very same world the engine
     /// hitscan does (#31).
     pub physics: Rc<RefCell<Option<PhysicsWorld>>>,
     /// Persistent key-value store (issue #86). Shared with the script runtime; the

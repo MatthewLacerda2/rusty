@@ -202,12 +202,12 @@ case-insensitive: `Box`, `Sphere`, `Plane`, `Cylinder` (meshes) or `PointLight`,
 entity carrying only its mandatory `Transform` — the menu's **Create Empty**.
 
 **`kind`** is one of the Add Component menu's first-class components,
-case-insensitive: `Light`, `Health`, `Animator`, `Collider`, `RigidBody`,
+case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `Texture` (alias `Material`), `NavMeshAgent`, `Camera`, `Particles`,
 `VisualCorrection`. Each is added with the inspector's default values; adding an
-existing kind replaces it. Removing `Health` also removes its `Animator`, and
-removing `Camera` also removes `VisualCorrection`, matching the inspector's
-cascades. (Scripts attach by path, not as a defaulted kind — a separate concern.)
+existing kind replaces it. Removing `Camera` also removes `VisualCorrection`,
+matching the inspector's cascade. (Scripts attach by path, not as a defaulted kind
+— a separate concern.)
 
 **`Scene.Deactivate`** is Unity's deferred `Object.Destroy`: it sets `active =
 false` but leaves the entity in the scene. **`Scene.DestroyEntity`** is the
@@ -390,7 +390,7 @@ Per-entity navmesh agent control.
 
 ## `Physics`
 
-Rigidbody control plus raycast queries. `Raycast`/`Shoot` return
+Rigidbody control plus raycast queries. `Raycast` returns
 `(hit, entity_id, distance)`; on a miss the id and distance are `0`.
 
 | Function | Signature | Returns |
@@ -400,11 +400,10 @@ Rigidbody control plus raycast queries. `Raycast`/`Shoot` return
 | `Physics.AddForce` | `(id, fx, fy, fz)` | — (continuous force, see below) |
 | `Physics.SetKinematic` | `(id, is_kinematic)` | — |
 | `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` |
-| `Physics.Shoot` | `(ox, oy, oz, dx, dy, dz, damage [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` (applies damage on hit) |
 
 The optional trailing `ignore_id` skips one entity in the cast — pass the shooter's
 own id so a shot can't hit its source. The engine has no built-in "don't hit the
-player" rule; the only thing it never hits is a dead entity.
+player" rule; an entity is hittable simply if it exists.
 
 The optional `layer_mask` is a Unity-style bitmask (one bit per layer): the cast
 only hits entities whose layer's bit is set, ignoring all others. Build one from a
@@ -423,15 +422,6 @@ scene) controls whether a dynamic body is pulled by the world's gravity (Unity:
 `Rigidbody.useGravity`). `false` exempts the body from gravity (rapier
 `gravity_scale = 0`) while still letting it move under velocity and collisions; the
 flag is honoured at body build and each tick, so toggling it at runtime takes effect.
-
-## `Health`
-
-| Function | Signature | Returns |
-|---|---|---|
-| `Health.Get` | `(id)` | `current, max` |
-| `Health.Set` | `(id, value)` | — (clamped to `[0, max]`) |
-| `Health.Heal` | `(id, amount)` | — |
-| `Health.Damage` | `(id, amount)` | — (plays death clip + logs at 0) |
 
 ## `Time`
 
@@ -870,7 +860,6 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
   "nav_agent": { "active": true, "radius": .., "target": [x,y,z], "speed": .., .. },
   "particles": { "active": true, "texture": null, "rate": .., "lifetime": .., .. },
   "animator":  { "clip": "Idle", "time": .., "speed": .., "playing": true },
-  "health":    { "current": .., "max": .., "dead": false },
   "audio":     { "clip": "music/theme.ogg", "volume": .., "loop": false,
                  "play_on_start": false, "is_time_scaled": true,
                  "spatial_blend": 0.0, "initial_distance": .., "final_distance": .. }

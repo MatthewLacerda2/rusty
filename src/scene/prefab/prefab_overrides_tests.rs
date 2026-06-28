@@ -1,7 +1,7 @@
 //! Tests for the generic per-instance override diff (#216).
 
 use super::*;
-use crate::components::{HealthComponent, MaterialComponent};
+use crate::components::{CameraComponent, ClearFlags, MaterialComponent};
 
 /// A bare entity baseline with one local id.
 fn base() -> Entity {
@@ -10,12 +10,20 @@ fn base() -> Entity {
     e
 }
 
-/// A health component with distinctive values (no `Default` on the type).
-fn health() -> HealthComponent {
-    HealthComponent {
-        current_health: 75.0,
-        max_health: 100.0,
-        is_dead: false,
+/// A camera component with distinctive scalar values (no `Default` on the type). All
+/// fields are scalars, so the component round-trips through the override diff even when
+/// rebuilt over a `None` baseline (the apply path does not grow JSON arrays).
+fn camera() -> CameraComponent {
+    CameraComponent {
+        active: true,
+        fov: 75.0,
+        near: 0.1,
+        far: 100.0,
+        culling_mask: u32::MAX,
+        render_order: 0,
+        clear_flags: ClearFlags::Skybox,
+        motion_blur_active: true,
+        motion_blur_samples: 64,
     }
 }
 
@@ -43,11 +51,11 @@ fn a_changed_scalar_is_a_single_pointer_override() {
 fn adding_a_component_is_an_override_at_its_path() {
     let baseline = base();
     let mut instance = baseline.clone();
-    instance.health = Some(health());
+    instance.camera = Some(camera());
     let diff = diff_entity(&instance, &baseline);
-    // The added component surfaces as one-or-more leaves under `/health`.
+    // The added component surfaces as one-or-more leaves under `/camera`.
     assert!(
-        diff.keys().any(|k| k.starts_with("/health")),
+        diff.keys().any(|k| k.starts_with("/camera")),
         "added component appears in the diff: {diff:?}"
     );
 }
@@ -55,12 +63,12 @@ fn adding_a_component_is_an_override_at_its_path() {
 #[test]
 fn removing_a_component_overrides_it_to_null() {
     let mut baseline = base();
-    baseline.health = Some(health());
+    baseline.camera = Some(camera());
     let mut instance = baseline.clone();
-    instance.health = None;
+    instance.camera = None;
     let diff = diff_entity(&instance, &baseline);
     assert_eq!(
-        diff.get("/health"),
+        diff.get("/camera"),
         Some(&serde_json::Value::Null),
         "removed component is a null override: {diff:?}"
     );
@@ -116,32 +124,32 @@ fn applying_an_empty_diff_is_a_noop() {
 
 #[test]
 fn apply_can_add_a_component_over_a_none_baseline() {
-    // The baseline has NO health; the instance ADDS one. Round-tripping the diff must
+    // The baseline has NO camera; the instance ADDS one. Round-tripping the diff must
     // rebuild the whole component (the override paths are created over a `null` slot).
     let baseline = base();
     let mut instance = baseline.clone();
-    instance.health = Some(health());
+    instance.camera = Some(camera());
     let diff = diff_entity(&instance, &baseline);
 
     let mut rebuilt = baseline.clone();
     apply_overrides(&mut rebuilt, &diff);
-    let h = rebuilt.health.as_ref().expect("added component rebuilt");
-    assert_eq!(h.current_health, 75.0);
-    assert_eq!(h.max_health, 100.0);
+    let c = rebuilt.camera.as_ref().expect("added component rebuilt");
+    assert_eq!(c.fov, 75.0);
+    assert_eq!(c.far, 100.0);
 }
 
 #[test]
 fn apply_can_remove_a_component_via_null() {
-    // The baseline HAS health; a `/health -> null` override drops it.
+    // The baseline HAS a camera; a `/camera -> null` override drops it.
     let mut baseline = base();
-    baseline.health = Some(health());
+    baseline.camera = Some(camera());
     let mut overrides = std::collections::BTreeMap::new();
-    overrides.insert("/health".to_string(), serde_json::Value::Null);
+    overrides.insert("/camera".to_string(), serde_json::Value::Null);
 
     let mut rebuilt = baseline.clone();
     apply_overrides(&mut rebuilt, &overrides);
     assert!(
-        rebuilt.health.is_none(),
+        rebuilt.camera.is_none(),
         "null override removes the component"
     );
 }

@@ -16,7 +16,7 @@ use glam::{Mat4, Vec3};
 use serde_json::{json, Value};
 
 use super::snapshot_components::{
-    animator_value, audio_value, camera_component_value, collider_value, health_value, light_value,
+    animator_value, audio_value, camera_component_value, collider_value, light_value,
     material_value, mesh_value, nav_agent_value, particle_value, rigidbody_value,
 };
 use crate::components::{Entity, MaterialAsset, TransformComponent};
@@ -86,7 +86,6 @@ pub fn entity_value(e: &Entity, material: Option<&MaterialAsset>, world_matrix: 
         "nav_agent": e.nav_agent.as_ref().map(nav_agent_value),
         "particles": e.particles.as_ref().map(particle_value),
         "animator": e.animator.as_ref().map(animator_value),
-        "health": e.health.as_ref().map(health_value),
         "audio": e.audio.as_ref().map(audio_value),
     })
 }
@@ -121,9 +120,6 @@ fn inventory(e: &Entity) -> Vec<&'static str> {
     }
     if e.animator.is_some() {
         names.push("Animator");
-    }
-    if e.health.is_some() {
-        names.push("Health");
     }
     if e.audio.is_some() {
         names.push("AudioSource");

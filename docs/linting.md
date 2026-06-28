@@ -56,7 +56,7 @@ An axis can be satisfied in two ways:
 
 - **Closed** — the artifact exists (the field, Add Component entry, inspector card,
   or `src/api/<x>.rs` namespace + doc). #82 closed `animator add_menu` (Animator got
-  its own Add Component entry, decoupled from Health) and `light api` (the new
+  its own Add Component entry, added/removed independently) and `light api` (the new
   `src/api/light.rs` `Light` namespace).
 - **Waived** — a documented decision *not* to add a per-component artifact, because
   the axis is already served by a shared namespace or a content-driven workflow, and

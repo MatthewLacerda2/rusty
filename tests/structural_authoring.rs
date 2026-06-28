@@ -26,13 +26,13 @@ fn create_configure_parent_save_round_trips() {
     assert_ne!(parent_id, "0");
     assert_ne!(child_id, "0");
 
-    // Add + configure a component on the child, then parent it. `Health.Set`
-    // writes current health (clamped to the default max of 100).
+    // Add + configure a component on the child, then parent it. `Light.SetIntensity`
+    // writes the light's scalar intensity.
     ok(
         &session,
-        &format!("Scene.AddComponent({child_id}, \"Health\")"),
+        &format!("Scene.AddComponent({child_id}, \"Light\")"),
     );
-    ok(&session, &format!("Health.Set({child_id}, 42)"));
+    ok(&session, &format!("Light.SetIntensity({child_id}, 42)"));
     ok(
         &session,
         &format!("Scene.SetParent({child_id}, {parent_id})"),
@@ -58,8 +58,8 @@ fn create_configure_parent_save_round_trips() {
     let mesh = e.mesh.as_ref().expect("box primitive mesh round-trips");
     assert_eq!(mesh.primitive_type, "Box");
     assert!(!mesh.vertices.is_empty(), "primitive geometry rehydrated");
-    let health = e.health.as_ref().expect("added Health round-trips");
-    assert_eq!(health.current_health, 42.0, "configured value round-trips");
+    let light = e.light.as_ref().expect("added Light round-trips");
+    assert_eq!(light.intensity, 42.0, "configured value round-trips");
 }
 
 #[test]

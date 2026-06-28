@@ -64,8 +64,8 @@ impl ScriptManager {
                 .collect();
             // Sorted by (entity, script index) so per-frame Update order is
             // deterministic (HashMap iteration order varies per run). Gameplay now
-            // happens inside scripts — e.g. the weapon's Physics.Shoot vs. the enemy's
-            // animation Update race in the kill frame — so a stable order is what keeps
+            // happens inside scripts — e.g. the weapon's Physics.Raycast vs. the enemy's
+            // animation Update race in a hit frame — so a stable order is what keeps
             // replays byte-identical.
             keys.sort_unstable();
             keys

@@ -22,7 +22,7 @@ agent could build a shooter of that caliber on it.
 ## What it is
 
 - **Unity-shaped.** Entities each have a `Transform` plus optional components (`Mesh`,
-  `Camera`, `Light`, `Collider`, `Rigidbody`, `NavMeshAgent`, `Health`, `Animator`,
+  `Camera`, `Light`, `Collider`, `Rigidbody`, `NavMeshAgent`, `Animator`,
   …). Behaviour lives in Lua scripts that act like MonoBehaviours, with lifecycle
   hooks (`Start`, `Update(dt)`, `FixedUpdate`, `OnTriggerEnter`, `OnDamage`,
   `OnDestroy`).
@@ -30,7 +30,7 @@ agent could build a shooter of that caliber on it.
   and values. Entering Play runs on a *clone*, and Stop restores your edits, so
   edit-mode is always what gets saved.
 - **Scriptable against one stable API.** Gameplay calls a single set of namespaces —
-  `Transform`, `Input`, `Time`, `Physics`, `Scene`, `Camera`, `Health`, `Nav`,
+  `Transform`, `Input`, `Time`, `Physics`, `Scene`, `Camera`, `Nav`,
   `Animator`, `Material`. See [`docs/scripting-api.md`](docs/scripting-api.md).
 - **A real 3D engine underneath:** rendering, physics (rapier3d), navigation/navmesh,
   shadows, a skybox, and a post-processing chain.

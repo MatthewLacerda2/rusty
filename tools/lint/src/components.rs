@@ -21,7 +21,7 @@
 //! ## Waivers (#82)
 //! A few axes are *intentionally* unmet because closing them mechanically would
 //! fragment the engine's one stable API surface
-//! (`Transform`/`Input`/`Time`/`Physics`/`Scene`/`Animator`/`Nav`/`Health`/
+//! (`Transform`/`Input`/`Time`/`Physics`/`Scene`/`Animator`/`Nav`/
 //! `Camera`/`Material`/…). Those live in [`WAIVERS`] — an auditable, in-code list
 //! of `(component, axis, rationale)` rows. A waived axis counts as satisfied, but
 //! unlike the burn-down baseline each waiver carries its written justification
@@ -80,7 +80,7 @@ const WAIVERS: &[(&str, &str, &str)] = &[
         "collider",
         "api",
         "Served by the `Physics` namespace (the collider is queried via \
-         Physics.Raycast/Shoot, the same rapier world the engine casts against). \
+         Physics.Raycast, the same rapier world the engine casts against). \
          A separate `Collider` namespace would split physics across two surfaces.",
     ),
     (
@@ -164,8 +164,8 @@ fn discover_from(src: &str) -> Vec<String> {
 }
 
 /// Axis 2: a standalone Add Component entry guards on `entity.<field>.is_none()`.
-/// A component only added as a side-effect of another (e.g. Animator via Health)
-/// has no such guard and is reported until it gets its own entry (#82).
+/// A component only added as a side-effect of another has no such guard and is
+/// reported until it gets its own entry (#82).
 fn has_add_menu(field: &str, add_src: &str) -> bool {
     add_src.contains(&format!("entity.{field}.is_none()"))
 }

@@ -3,7 +3,7 @@
 //! "Save as-is in EDIT mode" guarantee: edit-mode is authoritative.
 //! - Entering Play -> snapshot the edit scene (clone); run Play on the live one.
 //! - Exiting Play  -> restore the snapshot, discarding all play-mode mutation
-//!   (script/physics moves, health changes, spawns/despawns).
+//!   (script/physics moves, component changes, spawns/despawns).
 //!
 //! So Save never persists played state. Mirrors Unity's play-mode behaviour.
 //!

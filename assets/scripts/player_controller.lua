@@ -9,8 +9,8 @@
 --   * WASD moves the Player along the camera's ground plane at MOVE_SPEED.
 --   * Arrow keys turn the follow-camera (yaw/pitch), pitch clamped to +/-80.
 --   * The camera trails the Player at -forward*FOLLOW_BACK + up*FOLLOW_UP.
---   * The shoot key fires a hitscan on its RISING edge (one shot per press) for
---     SHOOT_DAMAGE, casting Physics.Shoot from the camera along its forward.
+--   * The shoot key casts a hitscan on its RISING edge (one cast per press),
+--     firing Physics.Raycast from the camera along its forward.
 --
 -- Determinism: reads Input + Time only, never the wall clock, so a headless replay
 -- is identical every run.
@@ -23,7 +23,6 @@ local PITCH_LIMIT = 80.0    -- clamp camera pitch to +/- this
 local FOLLOW_BACK = 4.5     -- how far the camera trails behind the Player
 local FOLLOW_UP = 1.5       -- how high above the Player the camera sits
 local SHOOT_KEY = "SPACE"   -- the trigger key the windowed front-end maps Space to
-local SHOOT_DAMAGE = 25.0   -- per-shot hitscan damage (the value lives in the SCRIPT)
 
 -- Move the Player along the camera's ground plane from WASD.
 local function move(entity_id, dt)
@@ -61,15 +60,15 @@ local function aim_camera(entity_id, dt)
     Camera.SetPosition(px - fx * FOLLOW_BACK, py - fy * FOLLOW_BACK + FOLLOW_UP, pz - fz * FOLLOW_BACK)
 end
 
--- Fire a hitscan on the rising edge of the shoot key (one shot per press).
--- Passes entity_id as the ignore id so the shot can't hit the shooter itself —
+-- Cast a hitscan on the rising edge of the shoot key (one cast per press).
+-- Passes entity_id as the ignore id so the cast can't hit the shooter itself —
 -- the "don't hit the Player" rule lives HERE, not as a name check in the engine.
 local function shoot(self, entity_id)
     local down = Input.IsKeyDown(SHOOT_KEY)
     if down and not self.shoot_was_down then
         local cx, cy, cz = Camera.GetPosition()
         local fx, fy, fz = Camera.GetForward()
-        Physics.Shoot(cx, cy, cz, fx, fy, fz, SHOOT_DAMAGE, entity_id)
+        Physics.Raycast(cx, cy, cz, fx, fy, fz, entity_id)
     end
     self.shoot_was_down = down
 end

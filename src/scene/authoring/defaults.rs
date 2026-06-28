@@ -10,8 +10,8 @@ use glam::Vec3;
 
 use crate::scene::{
     AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape,
-    HealthComponent, LightComponent, LightType, MaterialAsset, MaterialComponent,
-    NavMeshAgentComponent, RigidBodyComponent, Scene, Tonemap, VisualCorrectionComponent,
+    LightComponent, LightType, MaterialAsset, MaterialComponent, NavMeshAgentComponent,
+    RigidBodyComponent, Scene, Tonemap, VisualCorrectionComponent,
 };
 
 /// Construct a `LightComponent` with the standard cone defaults. Shared by the
@@ -35,15 +35,6 @@ pub(crate) fn light(
 /// Default `LightComponent` (the Add-Component menu's values).
 pub fn default_light() -> LightComponent {
     light(LightType::Point, Vec3::ONE, 1.5, 10.0)
-}
-
-/// Default `HealthComponent` (the Add-Component menu's values).
-pub fn default_health() -> HealthComponent {
-    HealthComponent {
-        current_health: 100.0,
-        max_health: 100.0,
-        is_dead: false,
-    }
 }
 
 /// Default `AnimatorComponent` (the Add-Component menu's values).
