@@ -16,6 +16,7 @@
 
 pub mod components;
 pub mod defaults;
+pub mod material;
 
 use glam::Vec3;
 
@@ -169,6 +170,12 @@ pub use crate::scene::prefab::{extract_prefab, instantiate_prefab, instantiate_p
 // split); re-exported here so the editor's model inspector and the `Scene.Instantiate`
 // asset branch both spawn imported sub-objects through this one shared entry point.
 pub use crate::scene::asset_instance::instantiate_asset;
+
+// The per-field material-mutation ops (#287) live in `material`; the editor card and
+// the Lua `Material.*` API are siblings over them, so the field write + validation
+// (e.g. the alpha clamp) lives once. `ensure_material_key` is the shared resolve-or-
+// create the API uses; callers reach the ops via `authoring::material::*`.
+pub use crate::scene::authoring::material::ensure_material_key;
 
 #[cfg(test)]
 mod tests {
