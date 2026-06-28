@@ -25,6 +25,7 @@ pub mod input;
 pub mod layers;
 pub mod light;
 pub mod lighting;
+pub(crate) mod lua_json;
 pub mod material;
 pub mod nav;
 pub mod particle;
