@@ -14,7 +14,7 @@ user to understand how you came up to a conclusion or if it's blocking you in so
 (or if invalidates one of your options).
 
 ## North star
-The bar rusty aims for is a game on par with **F.E.A.R.** (2005) or **Trepang2** —
+The bar rusty aims for is a game on par with **Trepang2** —
 visceral first-person combat carried by reactive enemy AI. That is the quality target
 every decision serves: the engine is "good enough" when an agent could build a shooter
 of that caliber on it. Keep this goal in mind when weighing features, architecture, and
