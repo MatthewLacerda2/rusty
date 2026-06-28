@@ -89,9 +89,9 @@ fn register_settings_getters<'lua, 'scope>(
 
 /// The four setters (#276): write `scene.nav_settings`, then re-bake the shared graph
 /// from the scene so the knob is consumed (the bake is the read-site) — the same effect
-/// the scene inspector's Navmesh section has (editor↔API parity). `agent_radius` is
-/// stored-but-inert: it round-trips and re-bakes for consistency, but the bake ignores
-/// it until the radius-erosion follow-up (#277), so it changes nothing in the result.
+/// the scene inspector's Navmesh section has (editor↔API parity). `agent_radius` is live
+/// too (#277): the re-bake erodes the walkable surface inward by the radius, so a larger
+/// radius closes thin passages and pulls the surface off walls.
 fn register_settings_setters<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,

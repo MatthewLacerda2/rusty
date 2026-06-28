@@ -1,9 +1,9 @@
 //! Faithfulness tests for the `Navigation` per-scene bake settings API (#276).
 //!
 //! Each setter must prove its write is *consumed*: we set via the Lua binding, assert
-//! `scene.nav_settings` reflects it, and (for the live knobs) that a re-bake observes it
-//! — the bake is the read-site. `agent_radius` is stored-but-inert, so it only needs a
-//! persistence/round-trip assertion.
+//! `scene.nav_settings` reflects it, and that a re-bake observes it — the bake is the
+//! read-site. `agent_radius`'s bake effect (walkable-surface erosion) is exercised in the
+//! navigation tests (`navigation::erosion_tests`); here we assert it persists/round-trips.
 
 use std::cell::RefCell;
 
@@ -123,7 +123,7 @@ fn set_radius_and_slope_round_trip() {
     .unwrap();
 
     let s = scene.borrow();
-    assert_eq!(s.nav_settings.agent_radius, 0.75, "radius persists (inert)");
+    assert_eq!(s.nav_settings.agent_radius, 0.75, "radius persists");
     assert_eq!(s.nav_settings.max_slope, 2.0);
     assert_eq!(
         nav.borrow().max_slope,

@@ -35,8 +35,8 @@ pub fn draw(
 /// and max step (Unity's per-scene navmesh bake parameters), then re-bake the shared
 /// nav graph from the live scene so the edit takes effect — the SAME `nav.bake(scene)`
 /// path the entity inspector's collider/static toggles trigger via `pending_nav_bake`,
-/// no second re-bake mechanism. `agent_radius` is editable but stored-but-inert (no
-/// erosion yet — follow-up #277), so a re-bake reflects only slope/step today.
+/// no second re-bake mechanism. `agent_radius` is live (#277): the re-bake erodes the
+/// walkable surface inward by the radius (clearance off walls, thin passages close).
 fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph) {
     ui.add_space(8.0);
     egui::CollapsingHeader::new("🧭 Navmesh")
@@ -49,7 +49,7 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
                 let mut changed = false;
                 changed |= ui
                     .add(egui::Slider::new(&mut s.agent_radius, 0.0..=5.0).text("Agent Radius"))
-                    .on_hover_text("Stored for now; bake does not erode by radius yet (#277)")
+                    .on_hover_text("Erodes the walkable surface inward by this radius on bake")
                     .changed();
                 changed |= ui
                     .add(egui::Slider::new(&mut s.max_slope, 0.0..=4.0).text("Max Slope"))
