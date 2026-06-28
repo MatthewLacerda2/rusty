@@ -2,4 +2,4 @@
 # Path-matched, so they're skipped regardless of exact line count.
 # Burn this list down during migration; do NOT add new entries.
 src/main.rs
-src/render/shadows.rs
+src/render/passes/shadows.rs

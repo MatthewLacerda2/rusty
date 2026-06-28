@@ -3,8 +3,8 @@
 //! Every first-class component must satisfy four axes that deliberately live in layers
 //! which don't depend on each other:
 //!   1. a field on `Entity` (`src/components/entity.rs`) — the discovery source,
-//!   2. an Add Component entry (`src/editor/inspector_add.rs`),
-//!   3. an inspector card (some `src/editor/inspector_*.rs`),
+//!   2. an Add Component entry (`src/editor/inspector/components/add.rs`),
+//!   3. an inspector card (some `src/editor/inspector/components/*.rs`),
 //!   4. an API namespace (`src/api/<x>.rs` + registration in `src/api/mod.rs`, and a
 //!      mention in `docs/scripting-api.md`).
 //!
@@ -37,7 +37,7 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 
 const ENTITY: &str = "src/components/entity.rs";
-const ADD_MENU: &str = "src/editor/inspector_add.rs";
+const ADD_MENU: &str = "src/editor/inspector/components/add.rs";
 const EDITOR_DIR: &str = "src/editor";
 const API_DIR: &str = "src/api";
 const API_MOD: &str = "src/api/mod.rs";

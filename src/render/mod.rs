@@ -1,56 +1,32 @@
-pub mod mesh;
-pub mod postfx;
-pub mod shaders;
-pub mod shadows;
-pub mod skybox;
-
-mod bind_layouts;
 mod camera;
-mod cube_sample;
-pub mod cubemap;
-mod cubemap_capture;
 mod debug_meshes;
-pub mod decals;
-mod decals_draw;
 mod draw;
-mod draw_lighting;
-mod draw_overlays;
-mod draw_pass;
-mod draw_path;
-mod draw_resources;
-mod draw_uniforms;
-mod entity_pool;
-mod ktx2_encode;
-mod particles;
-mod particles_draw;
-mod pipelines;
-mod postfx_params;
-mod probe_bake;
-mod reflection_bake;
-mod reflection_prefilter;
 mod setup;
-mod setup_build;
-mod setup_headless;
-mod setup_resize;
-mod setup_textures;
-mod tangents;
-mod textures;
-mod transparent;
-mod uniforms;
 mod viewport;
+
+pub mod gpu;
+pub(crate) mod ibl;
+pub(crate) mod passes;
+pub mod postfx;
+
+// Moved submodules pulled back under short names so this module's body keeps
+// naming them directly (grouped by subfolder — see the convention in CLAUDE.md).
+use gpu::entity_pool;
+use ibl::{cubemap, skybox};
+use passes::{decals, particles, shadows};
 
 use std::collections::HashMap;
 use std::rc::Rc;
 
 pub use camera::{build_camera_stack, game_camera_from_scene, sync_lens_from_scene, Camera};
-pub use cubemap_capture::{CubemapCapture, CubemapFace};
-pub use probe_bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
-pub use reflection_bake::DEFAULT_REFLECTION_RESOLUTION;
-pub use setup_headless::OFFSCREEN_FORMAT;
+pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
+pub use ibl::probe_bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
+pub use ibl::reflection_bake::DEFAULT_REFLECTION_RESOLUTION;
+pub use setup::headless::OFFSCREEN_FORMAT;
 
-// GPU uniform memory layouts live in `uniforms.rs` (split out to keep this file under
-// the size cap); re-imported here so the render submodules still name them via `super::`.
-use uniforms::{
+// GPU uniform memory layouts live in `gpu/uniforms.rs` (split out to keep files under
+// the size cap); re-imported here so the render module body still names them directly.
+pub(crate) use gpu::uniforms::{
     AmbientLightUniform, BoneUniform, CameraUniform, DirectionalLightUniform, EntityUniform,
     LightingUniform, PointLightUniform, SpotlightUniform,
 };
@@ -195,7 +171,3 @@ pub struct Renderer {
     /// without the dynamic actors that would otherwise bake into the captured lighting.
     static_capture: bool,
 }
-
-#[cfg(test)]
-#[path = "mesh_id_tests.rs"]
-mod mesh_id_tests;

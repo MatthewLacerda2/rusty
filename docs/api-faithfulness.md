@@ -164,7 +164,7 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `Spawn` | ✅ | renderer — `render/decals_draw.rs` projects each decal; loads its texture |
+| `Spawn` | ✅ | renderer — `render/passes/decals_draw.rs` projects each decal; loads its texture |
 | `Clear` | ✅ | renderer — empties the projected set |
 
 ### `Layers` — over `Entity.layer`

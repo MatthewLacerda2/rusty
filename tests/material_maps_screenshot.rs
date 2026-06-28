@@ -63,7 +63,7 @@ fn scene(metallic: f32, metallic_map: Option<String>) -> Scene {
     let id = scene.add_entity("Box".to_string());
     // A large box so it fills the frame — the mean-brightness signal is dominated by
     // the surface, not the background, making the metallic gating clearly visible.
-    let (vertices, indices) = rusty::render::mesh::generate_box(8.0, 8.0, 8.0);
+    let (vertices, indices) = rusty::render::gpu::mesh::generate_box(8.0, 8.0, 8.0);
     let mut e = scene.get_entity_mut(id).unwrap();
     e.mesh = Some(MeshComponent {
         primitive_type: "Box".to_string(),

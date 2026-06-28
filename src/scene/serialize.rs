@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::asset::{self, MeshVertex, SubMesh};
 use crate::components::{Entity, MaterialAsset};
-use crate::render::mesh::Vertex;
+use crate::render::gpu::mesh::Vertex;
 use crate::scene::authoring::{primitive_geometry, Primitive};
 use crate::scene::collision_matrix::CollisionMatrix;
 use crate::scene::layers::LayerRegistry;
@@ -76,13 +76,13 @@ pub struct SceneData {
     /// `<scene>.lighting.json` sidecar. `#[serde(default)]` so pre-#240 scenes load
     /// with no probes.
     #[serde(default)]
-    pub probes: crate::scene::probe::ProbeVolume,
+    pub probes: crate::scene::lighting::probe::ProbeVolume,
     /// Reflection-probe positions, parallax boxes, and cubemap PATHS (#244). The
     /// baked cubemaps are referenced files (KTX2), never inlined — exactly like
     /// `skybox_path`. `#[serde(default)]` so pre-#244 scenes load with no reflection
     /// probes.
     #[serde(default)]
-    pub reflection_probes: crate::scene::reflection_probe::ReflectionProbeSet,
+    pub reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet,
 }
 
 /// Read the live World's component values out into a serializable document.
@@ -270,5 +270,5 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     // re-baseline from the current `.prefab`, then re-apply each instance's recorded
     // overrides on top. A missing/renamed source is skipped per instance (the
     // instance keeps its last-saved values), so this never aborts the load.
-    crate::scene::prefab_link::reimport_all_linked_instances(scene);
+    crate::scene::prefab::link::reimport_all_linked_instances(scene);
 }

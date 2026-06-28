@@ -240,6 +240,14 @@ is the only difference between an empty marker and a fully-dressed enemy.
   `physics`, `navigation`); the platform layer (`main.rs`, `render`, `dev`) is exempt.
 - **Use `glam`** for all math; keep egui / wgpu / mlua decoupled.
 - **Single crate.**
+- **Group by subfolder, not by filename prefix.** A shared name prefix on sibling
+  files (`draw_*`, `setup_*`, `inspector_*`, `prefab_*`) is a subfolder waiting to
+  happen: make it one and drop the prefix (`draw_lighting.rs` → `draw/lighting.rs`).
+  Aim for ≲10 source files per module directory; past that, cluster by responsibility
+  into subfolders. This is the missing half of the 300-line size cap — small files plus
+  flat directories is sprawl by construction, and Rust modules nest for free. **One
+  exception:** flat registries where one file *is* one public unit (e.g. each `api/`
+  file is one Lua namespace) stay flat — there the flat list *is* the documentation.
 - **Asset sources are glTF/OBJ, never `.blend`.** Authored 3D content comes from
   Blender's native glTF 2.0 export (or `glTF`/`glb`/`obj`/`fbx` from elsewhere). The
   engine reads those interchange formats directly and **never parses `.blend` nor

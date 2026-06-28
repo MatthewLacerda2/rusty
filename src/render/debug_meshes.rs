@@ -3,8 +3,8 @@ use wgpu::util::DeviceExt;
 
 use std::collections::HashSet;
 
-use super::mesh::Vertex;
 use super::{GpuMesh, MeshId, Renderer};
+use crate::render::gpu::mesh::Vertex;
 use crate::scene::Scene;
 
 impl Renderer {
@@ -13,7 +13,7 @@ impl Renderer {
     /// pair. `seen` dedups within the frame; resident-and-clean ids are skipped.
     /// Each mesh's dirty flag is cleared as it's visited, so a re-bake re-uploads
     /// the shared geometry exactly once.
-    pub(super) fn upload_scene_meshes(&mut self, scene: &Scene) {
+    pub(crate) fn upload_scene_meshes(&mut self, scene: &Scene) {
         let mut seen: HashSet<MeshId> = HashSet::new();
         let mut updates: Vec<(MeshId, Vec<Vertex>, Vec<u32>)> = Vec::new();
         for entity in scene.iter() {
@@ -88,7 +88,7 @@ impl Renderer {
     }
 
     /// Pre-generates the static 3D line grid mesh for Editor visual feedback
-    pub(super) fn generate_grid_mesh(&mut self) {
+    pub(crate) fn generate_grid_mesh(&mut self) {
         let mut vertices = Vec::new();
         let spacing = 2.0;
         let extent = 30.0;
@@ -121,7 +121,7 @@ impl Renderer {
     }
 
     /// Pre-generates 3D line-based arrows for X, Y, Z global translation axes
-    pub(super) fn generate_axis_arrows(&mut self) {
+    pub(crate) fn generate_axis_arrows(&mut self) {
         let axis_length = 2.0;
         let arrow_head_length = 0.35;
         let w = 0.12; // arrow head half-width

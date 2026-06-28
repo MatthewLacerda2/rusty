@@ -19,24 +19,14 @@
 
 pub mod asset_instance;
 pub mod authoring;
-pub mod authoring_components;
-pub mod authoring_defaults;
 pub mod collision_matrix;
 pub mod io;
 pub mod layers;
-pub mod lighting_io;
-pub mod lighting_placement;
+pub mod lighting;
 pub mod prefab;
-pub mod prefab_apply;
-pub mod prefab_link;
-pub mod prefab_overrides;
-pub mod probe;
-pub mod probe_fill;
-pub mod reflection_probe;
 #[allow(clippy::module_inception)]
 pub mod scene;
 pub mod serialize;
-pub mod sh;
 pub mod snapshot;
 
 pub use collision_matrix::CollisionMatrix;
@@ -45,23 +35,24 @@ pub use io::{
     DEFAULT_SCENE_PATH, DEFAULT_SCENE_SOURCE, DEFAULT_SCRIPTS_DEST_DIR, SCENE_EXTENSION,
 };
 pub use layers::{layer_in_mask, LayerRegistry, LAYER_COUNT};
-pub use lighting_io::{
+pub use lighting::io::{
     apply_lighting, extract_lighting, load_lighting_sidecar, save_lighting_sidecar, sidecar_path,
     LightingData,
+};
+pub use lighting::probe::{Probe, ProbeGrid, ProbeVolume};
+pub use lighting::probe_fill::{analytic_fill, AnalyticEnv};
+pub use lighting::reflection_probe::{ReflectionProbe, ReflectionProbeSet};
+pub use lighting::sh::{Sh9, SH_COEFFS};
+pub use prefab::apply::{apply_instance_field_to_source, apply_instance_to_source};
+pub use prefab::link::{
+    list_instance_overrides, record_instance_overrides, reimport_all_linked_instances,
+    reimport_instance, revert_instance_overrides,
 };
 pub use prefab::{
     extract_prefab, instantiate_prefab, instantiate_prefab_linked, is_prefab_path,
     load_and_instantiate, load_and_instantiate_linked, read_prefab_file, save_prefab,
     write_prefab_file, PrefabData, PREFAB_EXTENSION,
 };
-pub use prefab_apply::{apply_instance_field_to_source, apply_instance_to_source};
-pub use prefab_link::{
-    list_instance_overrides, record_instance_overrides, reimport_all_linked_instances,
-    reimport_instance, revert_instance_overrides,
-};
-pub use probe::{Probe, ProbeGrid, ProbeVolume};
-pub use probe_fill::{analytic_fill, AnalyticEnv};
-pub use reflection_probe::{ReflectionProbe, ReflectionProbeSet};
 pub use scene::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
     ColliderShape, CollisionResponse, DirtyFlag, EmitMode, Entity, HealthComponent, LightComponent,
@@ -71,5 +62,4 @@ pub use scene::{
     VisualCorrectionComponent, DEFAULT_AMBIENT_COLOR, DEFAULT_AMBIENT_INTENSITY,
 };
 pub use serialize::{apply_scene_data, asset_mesh_component, to_scene_data, SceneData};
-pub use sh::{Sh9, SH_COEFFS};
 pub use snapshot::SceneSnapshot;

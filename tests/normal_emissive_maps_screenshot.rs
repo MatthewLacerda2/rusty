@@ -54,7 +54,7 @@ fn scene(material: MaterialAsset) -> Scene {
     let mut s = Scene::new();
     s.ambient_intensity = 1.0;
     let id = s.add_entity("Plane".to_string());
-    let (vertices, indices) = rusty::render::mesh::generate_plane(16.0, 16.0);
+    let (vertices, indices) = rusty::render::gpu::mesh::generate_plane(16.0, 16.0);
     let mut e = s.get_entity_mut(id).unwrap();
     e.mesh = Some(MeshComponent {
         primitive_type: "Plane".to_string(),

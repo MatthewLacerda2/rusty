@@ -1,7 +1,7 @@
 //! Resource construction for the post-process chain: bind-group layout, the three
 //! fullscreen pipelines, the params buffer, sampler, and the render targets.
 
-use crate::render::shaders::ShaderRegistry;
+use crate::render::gpu::shaders::ShaderRegistry;
 
 use super::{PfxTarget, PostFx, PostParams, HDR_FORMAT};
 
