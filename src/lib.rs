@@ -14,6 +14,7 @@ pub mod ecs;
 pub mod editor;
 pub mod navigation;
 pub mod physics;
+pub mod procgen;
 pub mod render;
 pub mod scene;
 pub mod scripting;
