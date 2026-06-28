@@ -6,9 +6,35 @@
 
 use std::cell::RefCell;
 
-use crate::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
+use super::super::{put, Reg};
+use crate::components::{CameraComponent, Entity, Tonemap, VisualCorrectionComponent};
 use crate::render::postfx::QualityPreset;
 use crate::scene::Scene;
+
+/// Global quality preset value get/set over the shared resource cell. Lives here (not
+/// `mod.rs`) to keep that file under the size cap; reaches `quality_name`/`parse_quality`
+/// directly.
+pub(super) fn register_quality<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    quality: &'scope RefCell<QualityPreset>,
+) -> Reg {
+    put(
+        table,
+        "GetQuality",
+        scope.create_function(|_, ()| Ok(quality_name(*quality.borrow()).to_string())),
+    )?;
+    put(
+        table,
+        "SetQuality",
+        scope.create_function(|_, name: String| {
+            if let Some(p) = parse_quality(&name) {
+                *quality.borrow_mut() = p;
+            }
+            Ok(())
+        }),
+    )
+}
 
 /// Run `f` on the first active visual-correction volume, returning its result.
 pub(super) fn with_vc<R>(
@@ -24,8 +50,10 @@ pub(super) fn with_vc<R>(
     result
 }
 
-/// Mutate the first active visual-correction volume (no-op when there is none).
-pub(super) fn with_vc_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut VisualCorrectionComponent)) {
+/// Mutate the entity owning the first active visual-correction volume (no-op when
+/// there is none). The closure runs against the whole `Entity` so the caller routes
+/// the write through a shared `authoring::visual_correction::*` op (#287).
+pub(super) fn with_vc_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut Entity)) {
     let mut scene = scene.borrow_mut();
     let target = scene
         .iter()
@@ -35,9 +63,7 @@ pub(super) fn with_vc_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut VisualCorr
     let Some(mut e) = scene.get_entity_mut(id) else {
         return;
     };
-    if let Some(vc) = &mut e.visual_correction {
-        f(vc);
-    }
+    f(&mut e);
 }
 
 /// Run `f` on the first active camera component, returning its result.
@@ -54,8 +80,10 @@ pub(super) fn with_cam<R>(
     result
 }
 
-/// Mutate the first active camera component (no-op when there is none).
-pub(super) fn with_cam_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut CameraComponent)) {
+/// Mutate the entity owning the first active camera component (no-op when there is
+/// none). The closure runs against the whole `Entity` so the caller routes the write
+/// through a shared `authoring::camera::*` op (#287).
+pub(super) fn with_cam_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut Entity)) {
     let mut scene = scene.borrow_mut();
     let target = scene
         .iter()
@@ -65,9 +93,7 @@ pub(super) fn with_cam_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut CameraCom
     let Some(mut e) = scene.get_entity_mut(id) else {
         return;
     };
-    if let Some(c) = &mut e.camera {
-        f(c);
-    }
+    f(&mut e);
 }
 
 pub(super) fn parse_tonemap(name: &str) -> Option<Tonemap> {

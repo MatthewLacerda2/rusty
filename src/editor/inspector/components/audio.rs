@@ -9,13 +9,16 @@
 use egui_phosphor::regular as icon;
 
 use crate::editor::inspector::components::card::component_card;
+use crate::scene::authoring::audio as audio_ops;
 use crate::scene::{AudioSourceComponent, Entity};
 
-/// 3F-audio. AudioSource component card.
+/// 3F-audio. AudioSource component card. A THIN client (#287): each widget reads the
+/// field from a snapshot and routes its write through a shared `authoring::audio::*`
+/// op (no mutable component borrow); remove detaches the component.
 pub fn draw(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
-    if entity.audio.is_none() {
+    let Some(a) = entity.audio.clone() else {
         return;
-    }
+    };
     let mut remove = false;
     let mut changed = false;
     component_card(
@@ -24,14 +27,11 @@ pub fn draw(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
         "Audio Source",
         Some(&mut remove),
         |ui| {
-            let Some(a) = &mut entity.audio else {
-                return;
-            };
-            changed |= draw_clip(ui, a);
+            changed |= draw_clip(ui, entity, &a);
             ui.separator();
-            changed |= draw_playback(ui, a);
+            changed |= draw_playback(ui, entity, &a);
             ui.separator();
-            changed |= draw_spatial(ui, a);
+            changed |= draw_spatial(ui, entity, &a);
         },
     );
     if remove {
@@ -43,37 +43,69 @@ pub fn draw(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
 }
 
 /// The clip path + per-source volume.
-fn draw_clip(ui: &mut egui::Ui, a: &mut AudioSourceComponent) -> bool {
+fn draw_clip(ui: &mut egui::Ui, entity: &mut Entity, a: &AudioSourceComponent) -> bool {
     let mut changed = false;
+    let mut clip = a.clip.clone();
     ui.horizontal(|ui| {
         ui.label("Clip:");
-        changed |= ui.text_edit_singleline(&mut a.clip).changed();
+        if ui.text_edit_singleline(&mut clip).changed() {
+            audio_ops::set_clip(entity, clip);
+            changed = true;
+        }
     });
-    changed |= clamped(ui, "Volume:", &mut a.volume, 0.0..=1.0);
+    let mut volume = a.volume;
+    if clamped(ui, "Volume:", &mut volume, 0.0..=1.0) {
+        audio_ops::set_volume(entity, volume);
+        changed = true;
+    }
     changed
 }
 
 /// Playback flags: loop, play-on-start, and the time-scaled toggle.
-fn draw_playback(ui: &mut egui::Ui, a: &mut AudioSourceComponent) -> bool {
-    let mut changed = ui.checkbox(&mut a.looping, "Loop").changed();
-    changed |= ui.checkbox(&mut a.play_on_start, "Play On Start").changed();
-    changed |= ui
-        .checkbox(
-            &mut a.is_time_scaled,
-            "Time-Scaled (follows Time.timeScale)",
-        )
+fn draw_playback(ui: &mut egui::Ui, entity: &mut Entity, a: &AudioSourceComponent) -> bool {
+    let mut changed = false;
+    let mut looping = a.looping;
+    if ui.checkbox(&mut looping, "Loop").changed() {
+        audio_ops::set_looping(entity, looping);
+        changed = true;
+    }
+    let mut play_on_start = a.play_on_start;
+    if ui.checkbox(&mut play_on_start, "Play On Start").changed() {
+        audio_ops::set_play_on_start(entity, play_on_start);
+        changed = true;
+    }
+    let mut is_time_scaled = a.is_time_scaled;
+    if ui
+        .checkbox(&mut is_time_scaled, "Time-Scaled (follows Time.timeScale)")
         .on_hover_text("Off: wall-clock rate, for music / UI that plays through a pause.")
-        .changed();
+        .changed()
+    {
+        audio_ops::set_time_scaled(entity, is_time_scaled);
+        changed = true;
+    }
     changed
 }
 
 /// Spatial fields — stored now, consumed by #213. Shown so an author can set them
 /// up ahead of the spatialization landing.
-fn draw_spatial(ui: &mut egui::Ui, a: &mut AudioSourceComponent) -> bool {
+fn draw_spatial(ui: &mut egui::Ui, entity: &mut Entity, a: &AudioSourceComponent) -> bool {
     ui.label("Spatial (3D — applied by #213)");
-    let mut changed = clamped(ui, "Spatial Blend:", &mut a.spatial_blend, 0.0..=1.0);
-    changed |= clamped(ui, "Min Distance:", &mut a.initial_distance, 0.0..=1000.0);
-    changed |= clamped(ui, "Max Distance:", &mut a.final_distance, 0.0..=1000.0);
+    let mut changed = false;
+    let mut spatial_blend = a.spatial_blend;
+    if clamped(ui, "Spatial Blend:", &mut spatial_blend, 0.0..=1.0) {
+        audio_ops::set_spatial_blend(entity, spatial_blend);
+        changed = true;
+    }
+    let mut initial_distance = a.initial_distance;
+    if clamped(ui, "Min Distance:", &mut initial_distance, 0.0..=1000.0) {
+        audio_ops::set_initial_distance(entity, initial_distance);
+        changed = true;
+    }
+    let mut final_distance = a.final_distance;
+    if clamped(ui, "Max Distance:", &mut final_distance, 0.0..=1000.0) {
+        audio_ops::set_final_distance(entity, final_distance);
+        changed = true;
+    }
     changed
 }
 

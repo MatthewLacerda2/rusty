@@ -14,9 +14,18 @@
 //!
 //! Allowed deps: components, render::mesh (primitive geometry), scene.
 
+pub mod animator;
+pub mod audio;
+pub mod camera;
+pub mod collider;
 pub mod components;
 pub mod defaults;
+pub mod light;
 pub mod material;
+pub mod nav_agent;
+pub mod particles;
+pub mod rigidbody;
+pub mod visual_correction;
 
 use glam::Vec3;
 

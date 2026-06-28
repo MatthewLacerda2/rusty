@@ -9,13 +9,13 @@
 //!   uniform from these EVERY frame, so a write here takes effect next frame for
 //!   free — no GPU pipeline is touched from script.
 //! * The global `QualityPreset` resource (Low/Medium/High), gating SSR + motion
-//!   blur. Exposed as a plain value get/set; the platform layer reads the shared
-//!   cell each frame and hands it to `renderer.set_quality`, which already guards
-//!   the bloom-buffer reallocation a tier change needs.
+//!   blur. A plain value get/set (`register_quality`, in `state`); the platform layer
+//!   reads the shared cell each frame and hands it to `renderer.set_quality`.
 //!
 //! Every write is ONE-WAY into render-only state: it never feeds back into
-//! `FixedUpdate`, so toggling these knobs can't change how the deterministic sim
-//! evolves.
+//! `FixedUpdate`, so toggling these knobs can't change the deterministic sim. The
+//! per-volume setters route through the shared `authoring::{camera,
+//! visual_correction}` ops the editor cards use, so panel and binding never drift.
 
 use std::cell::RefCell;
 
@@ -24,11 +24,11 @@ mod state;
 use mlua::Lua;
 
 use self::state::{
-    parse_quality, parse_tonemap, quality_name, tonemap_name, with_cam, with_cam_mut, with_vc,
-    with_vc_mut,
+    parse_tonemap, register_quality, tonemap_name, with_cam, with_cam_mut, with_vc, with_vc_mut,
 };
 use super::{put, Reg};
 use crate::render::postfx::QualityPreset;
+use crate::scene::authoring::{camera as camera_ops, visual_correction as vc_ops};
 use crate::scene::Scene;
 
 /// Register the `Graphics` namespace onto `lua`.
@@ -63,7 +63,7 @@ fn register_bloom<'lua, 'scope>(
         table,
         "SetBloomActive",
         scope.create_function(|_, active: bool| {
-            with_vc_mut(scene, |vc| vc.bloom_active = active);
+            with_vc_mut(scene, |e| vc_ops::set_bloom_active(e, active));
             Ok(())
         }),
     )?;
@@ -77,7 +77,7 @@ fn register_bloom<'lua, 'scope>(
         table,
         "SetBloomIntensity",
         scope.create_function(|_, v: f32| {
-            with_vc_mut(scene, |vc| vc.bloom_intensity = v.max(0.0));
+            with_vc_mut(scene, |e| vc_ops::set_bloom_intensity(e, v));
             Ok(())
         }),
     )?;
@@ -91,7 +91,7 @@ fn register_bloom<'lua, 'scope>(
         table,
         "SetBloomThreshold",
         scope.create_function(|_, v: f32| {
-            with_vc_mut(scene, |vc| vc.bloom_threshold = v.max(0.0));
+            with_vc_mut(scene, |e| vc_ops::set_bloom_threshold(e, v));
             Ok(())
         }),
     )?;
@@ -112,7 +112,7 @@ fn register_exposure_contrast<'lua, 'scope>(
         table,
         "SetExposure",
         scope.create_function(|_, v: f32| {
-            with_vc_mut(scene, |vc| vc.exposure = v);
+            with_vc_mut(scene, |e| vc_ops::set_exposure(e, v));
             Ok(())
         }),
     )?;
@@ -126,7 +126,7 @@ fn register_exposure_contrast<'lua, 'scope>(
         table,
         "SetContrast",
         scope.create_function(|_, v: f32| {
-            with_vc_mut(scene, |vc| vc.contrast = v);
+            with_vc_mut(scene, |e| vc_ops::set_contrast(e, v));
             Ok(())
         }),
     )?;
@@ -147,7 +147,7 @@ fn register_saturation_gamma<'lua, 'scope>(
         table,
         "SetSaturation",
         scope.create_function(|_, v: f32| {
-            with_vc_mut(scene, |vc| vc.saturation = v);
+            with_vc_mut(scene, |e| vc_ops::set_saturation(e, v));
             Ok(())
         }),
     )?;
@@ -161,7 +161,7 @@ fn register_saturation_gamma<'lua, 'scope>(
         table,
         "SetGamma",
         scope.create_function(|_, v: f32| {
-            with_vc_mut(scene, |vc| vc.gamma = v.max(0.01));
+            with_vc_mut(scene, |e| vc_ops::set_gamma(e, v));
             Ok(())
         }),
     )?;
@@ -183,7 +183,7 @@ fn register_tonemap<'lua, 'scope>(
         "SetTonemap",
         scope.create_function(|_, name: String| {
             if let Some(tm) = parse_tonemap(&name) {
-                with_vc_mut(scene, |vc| vc.tonemap = tm);
+                with_vc_mut(scene, |e| vc_ops::set_tonemap(e, tm));
             }
             Ok(())
         }),
@@ -208,7 +208,7 @@ fn register_ssr<'lua, 'scope>(
         table,
         "SetSsrActive",
         scope.create_function(|_, active: bool| {
-            with_vc_mut(scene, |vc| vc.ssr_active = active);
+            with_vc_mut(scene, |e| vc_ops::set_ssr_active(e, active));
             Ok(())
         }),
     )?;
@@ -222,7 +222,7 @@ fn register_ssr<'lua, 'scope>(
         table,
         "SetSsrQuality",
         scope.create_function(|_, q: String| {
-            with_vc_mut(scene, |vc| vc.ssr_quality = q.clone());
+            with_vc_mut(scene, |e| vc_ops::set_ssr_quality(e, q.clone()));
             Ok(())
         }),
     )?;
@@ -245,7 +245,7 @@ fn register_motion_blur<'lua, 'scope>(
         table,
         "SetMotionBlurActive",
         scope.create_function(|_, active: bool| {
-            with_cam_mut(scene, |c| c.motion_blur_active = active);
+            with_cam_mut(scene, |e| camera_ops::set_motion_blur_active(e, active));
             Ok(())
         }),
     )?;
@@ -261,7 +261,11 @@ fn register_motion_blur<'lua, 'scope>(
         table,
         "SetMotionBlurSamples",
         scope.create_function(|_, n: u32| {
-            with_cam_mut(scene, |c| c.motion_blur_samples = n.clamp(2, 32));
+            // `2..=32` is an API-input clamp the editor card doesn't apply (it forces
+            // 64), so it stays here; the op is a plain set, keeping both identical.
+            with_cam_mut(scene, |e| {
+                camera_ops::set_motion_blur_samples(e, n.clamp(2, 32))
+            });
             Ok(())
         }),
     )?;
@@ -269,28 +273,5 @@ fn register_motion_blur<'lua, 'scope>(
         table,
         "GetMotionBlurSamples",
         scope.create_function(|_, ()| Ok(with_cam(scene, |c| c.motion_blur_samples).unwrap_or(0))),
-    )
-}
-
-/// Global quality preset value get/set over the shared resource cell.
-fn register_quality<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &mlua::Table,
-    quality: &'scope RefCell<QualityPreset>,
-) -> Reg {
-    put(
-        table,
-        "GetQuality",
-        scope.create_function(|_, ()| Ok(quality_name(*quality.borrow()).to_string())),
-    )?;
-    put(
-        table,
-        "SetQuality",
-        scope.create_function(|_, name: String| {
-            if let Some(p) = parse_quality(&name) {
-                *quality.borrow_mut() = p;
-            }
-            Ok(())
-        }),
     )
 }

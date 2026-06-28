@@ -11,6 +11,7 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::scene::authoring::particles as particle_ops;
 use crate::scene::Scene;
 
 /// Register the `Particles` namespace onto `lua`.
@@ -79,7 +80,10 @@ fn register_tuning<'lua, 'scope>(
         table,
         "SetActive",
         scope.create_function(|_, (id, active): (u32, bool)| {
-            with_emitter(scene, id, |p| p.active = active);
+            let mut scene = scene.borrow_mut();
+            if let Some(mut e) = scene.get_entity_mut(id) {
+                particle_ops::set_active(&mut e, active);
+            }
             Ok(())
         }),
     )?;
@@ -88,7 +92,10 @@ fn register_tuning<'lua, 'scope>(
         table,
         "SetRate",
         scope.create_function(|_, (id, rate): (u32, f32)| {
-            with_emitter(scene, id, |p| p.rate = rate.max(0.0));
+            let mut scene = scene.borrow_mut();
+            if let Some(mut e) = scene.get_entity_mut(id) {
+                particle_ops::set_rate(&mut e, rate);
+            }
             Ok(())
         }),
     )

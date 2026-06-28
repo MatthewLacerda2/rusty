@@ -13,6 +13,7 @@ use mlua::Lua;
 
 use super::{global_table, put, Reg};
 use crate::physics::{is_hittable, PhysicsWorld};
+use crate::scene::authoring::rigidbody as rb_ops;
 use crate::scene::{layer_in_mask, Scene};
 use crate::time::FIXED_DELTA_TIME;
 
@@ -59,9 +60,7 @@ fn register_velocity<'lua, 'scope>(
         scope.create_function(|_, (id, vx, vy, vz): (u32, f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(rb) = &mut e.rigidbody {
-                    rb.velocity = Vec3::new(vx, vy, vz);
-                }
+                rb_ops::set_velocity(&mut e, Vec3::new(vx, vy, vz));
             }
             Ok(())
         }),
@@ -102,9 +101,7 @@ fn register_force<'lua, 'scope>(
         scope.create_function(|_, (id, is_kinematic): (u32, bool)| {
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(rb) = &mut e.rigidbody {
-                    rb.is_kinematic = is_kinematic;
-                }
+                rb_ops::set_kinematic(&mut e, is_kinematic);
             }
             Ok(())
         }),

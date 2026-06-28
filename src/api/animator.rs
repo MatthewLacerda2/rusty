@@ -10,6 +10,7 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::scene::authoring::animator as animator_ops;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
@@ -82,9 +83,7 @@ fn register_stop<'lua, 'scope>(
         scope.create_function(|_, id: u32| {
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(anim) = &mut e.animator {
-                    anim.is_playing = false;
-                }
+                animator_ops::set_playing(&mut e, false);
             }
             Ok(())
         }),
