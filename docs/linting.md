@@ -43,7 +43,7 @@ entries. When the file is empty, the size gate is fully on.
 ## Component completeness (`--components`)
 A first-class component is only "done" when it appears on all four axes that
 deliberately live in non-dependent layers: a field on `Entity`, an Add Component
-entry (`inspector_add.rs`), an inspector card (some `inspector_*.rs`), and an API
+entry (`inspector/components/add.rs`), an inspector card (some `inspector/components/*.rs`), and an API
 namespace (`src/api/<x>.rs` registered in `api/mod.rs` and documented in
 `scripting-api.md`). The gate discovers components from `Entity`'s
 `Option<…Component>` fields — so a new one can't slip through — and fails on any
@@ -99,7 +99,7 @@ The rule is deliberately narrow:
   where a `Result` should propagate, `.expect(...)` where the invariant is real and
   local; reach for the bare `.unwrap()` nowhere in the sim core.
 - **Sim modules only.** The platform layer (`main.rs`, `render`, `dev`) is exempt —
-  e.g. `render/shaders.rs` panicking at boot on a bad shader is fail-fast-at-startup,
+  e.g. `render/gpu/shaders.rs` panicking at boot on a bad shader is fail-fast-at-startup,
   not a mid-sim hazard. This is the exact boundary the determinism guard uses.
 - **Tests exempt.** `clippy.toml`'s `allow-unwrap-in-tests = true` lets test code
   unwrap freely, so no per-test `#[allow]` noise.
