@@ -215,7 +215,9 @@ impl Renderer {
 }
 
 /// Generate the 24 line vertices (12 edges) of an axis-aligned box's wireframe.
-fn aabb_wireframe(min: Vec3, max: Vec3) -> Vec<Vertex> {
+/// Shared with the reflection-probe parallax-box gizmo (#284), which reuses this
+/// exact helper rather than duplicating the edge layout.
+pub(crate) fn aabb_wireframe(min: Vec3, max: Vec3) -> Vec<Vertex> {
     let mut line_vertices = Vec::new();
     let normal = Vec3::Y;
     let uv = [0.0, 0.0];
