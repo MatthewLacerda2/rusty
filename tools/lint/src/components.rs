@@ -139,7 +139,9 @@ pub fn run() {
 }
 
 /// Discover components from `Entity`'s `pub <field>: Option<…Component>` lines.
-fn discover() -> Vec<String> {
+/// Shared with the parity gate (`parity.rs`), so both gates enumerate first-class
+/// components from the same non-fragile source — `Entity`'s component fields.
+pub(crate) fn discover() -> Vec<String> {
     discover_from(&read(ENTITY))
 }
 

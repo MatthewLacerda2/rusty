@@ -14,6 +14,7 @@ result is written to `.lint/report.txt` so an agent can read exactly what failed
 | Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation` |
 | Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
+| Editor↔shared-op parity | `tools/lint -- --parity` | every *migrated* first-class component's inspector card routes its mutations through a shared `scene::authoring` op (no direct `&mut entity.<field>`), minus the burn-down baseline |
 
 ## The `*_tests.rs` sibling rule
 The tight test cap exists to discourage over-splitting a bundle of `#[test]`s. But a
@@ -72,6 +73,52 @@ A waiver is never a silent skip — its rationale lives in code and is reviewabl
 `git`. To add one, add a row to `WAIVERS` with a clear justification; to revisit one,
 delete the row and the gate will demand the artifact again. The particle system is on
 neither list — it is the gate's first fully-green component, satisfied on all axes.
+
+## Editor↔shared-op parity (`--parity`)
+A first-class component is authored from two places that must never drift: the
+editor's inspector card and the Lua API namespace. The fix is to make them siblings
+over **one shared `scene::authoring` op** — the card AND the Lua binding both call it,
+so the field write and its validation live once and can't diverge. The `material`
+card is the first migrated capability (#287): its widgets read fields immutably and
+route every change through `scene::authoring::material::*`, the same ops the
+`Material.*` Lua API calls.
+
+This gate keeps migrated cards honest. It discovers components the same way
+`--components` does — from `Entity`'s `Option<…Component>` fields — and, for each one
+that has an inspector card, classifies the card as:
+
+- **routed** — reads fields immutably and routes every write through an
+  `authoring::…` op (like the migrated `material` card). Detaching the reference on
+  remove (`entity.<field> = None`) is *not* a field mutation, so a routed card may
+  still do it; a read-only card (e.g. `mesh`) trivially qualifies.
+- **direct** — takes a mutable borrow of the component (`&mut entity.<field>`) and
+  writes its fields through egui widgets bound to them — the pattern every un-migrated
+  card uses.
+
+The detection signal is exactly `&mut entity.<field>`: every direct card takes that
+borrow to edit fields, while the routed `material` card never does (it reads via
+`entity.material.as_ref()` and only detaches on remove). Coarse substring scan,
+matching the other gates.
+
+### Routed vs direct, and the burn-down (#287)
+`tools/lint/parity_baseline.txt` grandfathers the not-yet-migrated cards as bare
+component names (the same burn-down rule as the other baselines). Enforcement:
+
+- A **direct** card *not* in the baseline → **violation** (drift: a direct mutation
+  was added without grandfathering it).
+- A component in the baseline whose card is actually **routed** → **violation** (stale
+  entry — you migrated the card but left it listed; remove the line). This forces
+  burn-down hygiene, exactly like the size/components baselines.
+- A **routed** card *not* in the baseline → ok. This is the gate's **teeth**:
+  `material` is absent and must pass as routed, so reverting it to a direct mutation
+  fails the build.
+- A **direct** card *in* the baseline → ok (grandfathered, awaiting migration).
+
+This is a **hard gate** (CI `--parity` step, both in the lint workflow): correctness
+of the no-drift invariant, green-to-merge. Burn it down by migrating a card to a
+shared op and removing its baseline line — never add a new line (a new direct card is
+fresh drift to fix, not to grandfather; baseline only, exceptionally, with written
+justification).
 
 ## The function-length cap (`too_many_lines`)
 The 50-line per-function cap is a **hard clippy gate** (`-D clippy::too_many_lines`,
