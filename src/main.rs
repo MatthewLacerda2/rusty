@@ -332,8 +332,10 @@ fn render_frame(
 ) {
     let (delta_time, current_frame_duration) = tick_timing(frontend);
 
-    // Advance the simulation (decoupled from window + GPU).
-    let transition = game.tick(delta_time);
+    // Advance the simulation (decoupled from window + GPU). The "playing-but-stepped"
+    // mode (#283) gates this: while paused, the wall-clock advance is bypassed and the
+    // sim only moves when steps were queued — at the fixed dt, not wall-clock.
+    let transition = advance_sim(game, delta_time);
     apply_play_transition(transition, window);
 
     // Apply any video setting (resolution / vsync / fullscreen) a script wrote
@@ -354,6 +356,44 @@ fn render_frame(
     // paint) is orchestrated by `render_egui_overlay` (#183).
     render_egui_overlay(window, frontend, game, &view, current_frame_duration);
     frame.present();
+}
+
+/// Advance the simulation for one rendered frame, honouring the "playing-but-stepped"
+/// mode (#283).
+///
+/// - **Not paused:** a normal real-time tick with the wall-clock `delta_time` — the
+///   original windowed behaviour, unchanged.
+/// - **Paused:** the wall-clock advance is bypassed entirely. The world only moves
+///   when steps were queued (`Time.Step(n)`), and each step is one
+///   [`FIXED_DELTA_TIME`](rusty::time::FIXED_DELTA_TIME) tick — the *same* fixed-dt
+///   semantics the headless harness uses, so windowed and headless stepping produce
+///   identical frame sequences. All currently-queued steps drain this frame, then the
+///   loop halts again. A paused frame with no pending steps runs no schedule at all,
+///   but still processes a Play/Stop transition (so Stop restores the edit snapshot
+///   even while paused). Rendering continues every frame regardless — see `render_frame`.
+fn advance_sim(game: &mut GameWorld, delta_time: f32) -> PlayTransition {
+    let paused = game.time().borrow().paused;
+    if !paused {
+        return game.tick(delta_time);
+    }
+
+    // Paused: pump exactly the queued number of fixed-dt steps, capturing the first
+    // tick's transition (the rest are `None` once the boundary is crossed).
+    let mut transition = PlayTransition::None;
+    let mut stepped = false;
+    while game.time().borrow_mut().take_pending_step() {
+        let t = game.tick(rusty::time::FIXED_DELTA_TIME);
+        if t != PlayTransition::None {
+            transition = t;
+        }
+        stepped = true;
+    }
+    // No step this frame: the sim is frozen, but a Play/Stop pressed while paused must
+    // still take effect without advancing the clock or the schedule.
+    if !stepped {
+        transition = game.poll_transition();
+    }
+    transition
 }
 
 /// Update front-end timing/FPS counters, returning (delta_time, frame_ms).

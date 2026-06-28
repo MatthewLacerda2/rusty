@@ -123,6 +123,9 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 | Setter | Status | Read-site |
 |---|---|---|
 | `SetTimeScale` | ✅ | sim — `time/mod.rs` scales `delta_time` the whole sim reads (`tests/time_scale.rs`) |
+| `Pause` | ✅ | platform — the windowed frame loop (`main::advance_sim`, #283) reads `Time.paused` **before** it ticks and bypasses the wall-clock advance when set (proven by `tests/pause_step.rs`) |
+| `Resume` | ✅ | platform — same read-site: a cleared `paused` returns the loop to the normal real-time `game.tick(delta_time)` path; also clears `pending_steps` (`tests/pause_step.rs`) |
+| `Step` | ✅ | platform — while paused, `main::advance_sim` drains `pending_steps` one `FIXED_DELTA_TIME` tick at a time (the harness's fixed-dt step semantics), so windowed and headless stepping are frame-identical (`tests/pause_step.rs`) |
 
 ### `Camera` — over the shared `render::Camera`
 
@@ -215,7 +218,7 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 58 |
+| ✅ faithful | 61 |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 
