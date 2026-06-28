@@ -118,6 +118,56 @@ map; an empty path clears it.
 | `Material.SetAlpha` | `(id, a)` — base-color alpha in `[0,1]`; the blend factor for a `Transparent` material (ignored by Opaque/Cutout) |
 | `Material.SetAlphaCutoff` | `(id, c)` — alpha-test threshold in `[0,1]` for `Cutout`: fragments below it are discarded (default 0.5) |
 
+### Standalone material assets
+
+The setters above mutate the material an *entity* references. To author a reusable
+material as a **named asset** from scratch — decoupled from any entity, the way an
+imported glTF material is — define it directly into the library, then point any
+entity's `MaterialComponent` at the name. The asset round-trips through `SceneData`
+like any library material (no engine special-casing).
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Material.DefineAsset` | `(name, recipe)` | — (inserts/overwrites the library asset under `name`) |
+| `Material.DefineAssetJson` | `(name, json)` | — (same, from the recipe's JSON string) |
+| `Material.GetAsset` | `(name)` | the asset's canonical JSON string, or `nil` if absent |
+| `Material.HasAsset` | `(name)` | `bool` |
+
+The **recipe** is a table whose shape mirrors the `MaterialAsset` document one-to-one
+(every field optional — omit one to take its default), bounded to exactly what the
+renderer samples:
+
+```lua
+Material.DefineAsset("brick", {
+  base_color   = {0.5, 0.25, 0.125},   -- albedo tint (rgb)
+  base_color_map = "brick_albedo.png", -- albedo map
+  metallic     = 0.0,
+  roughness    = 0.8,
+  metallic_map = "brick_mr.png",       -- packed metallic→B
+  roughness_map = "brick_mr.png",      -- packed roughness→G (same PNG)
+  normal_map   = "brick_n.png",        -- tangent-space normal
+  emissive     = {0.0, 0.0, 0.0},      -- emissive factor (rgb)
+  emissive_map = "brick_e.png",
+  render_mode  = "Cutout",             -- "Opaque" (default) / "Cutout" / "Transparent"
+  alpha        = 1.0,                  -- base-color alpha in [0,1]
+  alpha_cutoff = 0.4,                  -- alpha-test threshold in [0,1]
+})
+
+-- An entity uses the asset by referencing its name:
+Scene.AddComponent(id, "Material")   -- attaches a MaterialComponent
+-- (point the reference at "brick" — e.g. via the inspector, or load a scene whose
+--  entity already references it). Saving the scene persists both the asset and the ref.
+```
+
+The map slots point at any PNG — typically one baked by `Texture.Bake` (e.g.
+`Material.DefineAsset("brick", { metallic_map = Texture.Bake(recipe,
+"out/brick_mr.png", "metallic_roughness"), ... })`), but any PNG works. The factors +
+maps decode through the asset's serde derive, while the validated fields are applied
+through the *same* shared ops the per-entity setters use: `alpha`/`alpha_cutoff` clamp
+to `[0,1]`, and an unknown `render_mode` string degrades to `Opaque` — so validation is
+single-sourced, not re-implemented. `Material.DefineAsset` **overwrites** any existing
+asset of that name.
+
 > **Rendering modes (transparency).** A material's `render_mode` controls how its
 > surface composites (#242), mirroring Unity's rendering modes:
 > - **Opaque** *(default)* — fully solid, the fast path. `alpha`/`alpha_cutoff` are

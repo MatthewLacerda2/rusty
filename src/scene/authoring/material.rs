@@ -26,6 +26,23 @@ use crate::scene::{MaterialAsset, MaterialComponent, RenderMode, Scene};
 /// `Scene.materials`; aliased here so callers name one type.
 pub type MaterialLibrary = BTreeMap<String, MaterialAsset>;
 
+/// Define a named library asset, inserting (or overwriting) `asset` under `name`. The
+/// single insert-by-name both the `Material.DefineAsset` binding and any future editor
+/// "new material asset" entry use, so a standalone material is authored one way. The
+/// asset's own fields are still validated by routing each value through the per-field
+/// `set_*` ops (the API does this), so the clamps stay single-sourced.
+pub fn define_asset(materials: &mut MaterialLibrary, name: &str, asset: MaterialAsset) {
+    materials.insert(name.to_string(), asset);
+}
+
+/// Ensure a named library asset exists, inserting a default one if absent, and return
+/// `name` for chaining the per-field `set_*` ops. Unlike [`define_asset`] this never
+/// overwrites an existing asset — it is the resolve-or-create the per-field authoring
+/// path uses when building an asset up field by field under a chosen name.
+pub fn ensure_named(materials: &mut MaterialLibrary, name: &str) {
+    materials.entry(name.to_string()).or_default();
+}
+
 /// Resolve the library key for entity `id`'s material, creating a default material
 /// (under `entity_{id}_material`) and attaching the reference if it has none yet.
 /// Returns `None` only when the entity does not exist. This is the shared
@@ -192,6 +209,42 @@ mod tests {
         let mut materials = one();
         set_metallic(&mut materials, "absent", 0.9);
         assert_eq!(materials["k"].metallic, MaterialAsset::default().metallic);
+    }
+
+    #[test]
+    fn define_asset_inserts_and_overwrites_by_name() {
+        let mut materials = MaterialLibrary::new();
+        define_asset(
+            &mut materials,
+            "brick",
+            MaterialAsset {
+                metallic: 0.3,
+                ..MaterialAsset::default()
+            },
+        );
+        assert_eq!(materials["brick"].metallic, 0.3);
+        // A second define under the same name overwrites (insert semantics).
+        define_asset(
+            &mut materials,
+            "brick",
+            MaterialAsset {
+                metallic: 0.9,
+                ..MaterialAsset::default()
+            },
+        );
+        assert_eq!(materials["brick"].metallic, 0.9);
+        assert_eq!(materials.len(), 1);
+    }
+
+    #[test]
+    fn ensure_named_creates_default_but_never_overwrites() {
+        let mut materials = MaterialLibrary::new();
+        ensure_named(&mut materials, "k");
+        // Mutate via a per-field op, then ensure again: the existing asset is kept.
+        set_metallic(&mut materials, "k", 0.6);
+        ensure_named(&mut materials, "k");
+        assert_eq!(materials["k"].metallic, 0.6, "ensure does not reset");
+        assert_eq!(materials.len(), 1);
     }
 
     #[test]

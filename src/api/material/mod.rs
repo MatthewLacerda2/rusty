@@ -1,18 +1,28 @@
-//! src/api/material.rs — `Material` namespace.
+//! src/api/material/mod.rs — `Material` namespace.
 //!
-//! `SetMetallic/Roughness/Emissive`, their map variants, and `SetTexture`. A
-//! *material* is a
-//! shared asset in the scene's material library (`Scene.materials`); an entity
-//! references one by name via its `MaterialComponent`. These verbs resolve the
-//! entity's material (creating a default one if it has none yet) and mutate the
-//! asset in the library, so every entity sharing that material sees the change.
+//! Two authoring surfaces over one shared material model:
 //!
-//! This is a THIN adapter (#287): each setter resolves the library key via the
-//! shared `authoring::material::ensure_material_key`, parses the render-mode string,
-//! then calls the matching `authoring::material::*` op. The field write + validation
-//! (e.g. the `[0, 1]` alpha clamp) lives ONCE in that shared module, which the editor's
-//! Material card calls too — the egui panel and the Lua binding are siblings over the
-//! same Rust op, so they can never drift.
+//! 1. **Per-entity setters** — `SetMetallic/Roughness/Emissive`, their map variants,
+//!    `SetTexture`, and the transparency knobs. A *material* is a shared asset in the
+//!    scene's material library (`Scene.materials`); an entity references one by name via
+//!    its `MaterialComponent`. These verbs resolve the entity's material (creating a
+//!    default one if it has none yet) and mutate the asset, so every entity sharing it
+//!    sees the change.
+//! 2. **Standalone named-asset authoring** ([`asset`], #271) — `DefineAsset` /
+//!    `DefineAssetJson` / `GetAsset` / `HasAsset`: author a reusable `MaterialAsset`
+//!    into the library under a chosen *name*, decoupled from any entity. An entity then
+//!    uses it by pointing its `MaterialComponent.material` at that name. Round-trips
+//!    through `SceneData` like any library asset.
+//!
+//! Both are THIN adapters (#287): each setter resolves a library key (the entity's via
+//! `authoring::material::ensure_material_key`, or the chosen name via
+//! `authoring::material::ensure_named`), parses the render-mode string, then calls the
+//! matching `authoring::material::*` op. The field write + validation (e.g. the `[0, 1]`
+//! alpha clamp) lives ONCE in that shared module, which the editor's Material card calls
+//! too — egui panel and Lua binding are siblings over the same Rust op.
+
+mod asset;
+mod from_lua;
 
 use std::cell::RefCell;
 
@@ -34,6 +44,7 @@ pub fn register<'lua, 'scope>(
     register_scalars(scope, &table, scene)?;
     register_maps(scope, &table, scene)?;
     register_transparency(scope, &table, scene)?;
+    asset::register(scope, &table, scene)?;
 
     lua.globals()
         .set("Material", table)
@@ -42,7 +53,8 @@ pub fn register<'lua, 'scope>(
 
 /// Parse a render-mode name (case-insensitive) into a [`RenderMode`]; unknown names
 /// fall back to `Opaque` so a typo degrades to the safe default rather than erroring.
-fn parse_render_mode(name: &str) -> RenderMode {
+/// Shared with [`asset`] so the standalone recipe parses modes identically.
+pub(super) fn parse_render_mode(name: &str) -> RenderMode {
     match name.to_ascii_lowercase().as_str() {
         "cutout" => RenderMode::Cutout,
         "transparent" => RenderMode::Transparent,

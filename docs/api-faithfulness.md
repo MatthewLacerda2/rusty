@@ -58,6 +58,8 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `SetEmissive` | ✅ | renderer — `draw_resources::solid_entity_uniform` packs `emissive` into `EntityUniform`; `shader.wgsl` adds it after lighting (blooms when >1.0) (#222) |
 | `SetNormalMap` | ✅ | renderer — `draw::upload_scene_assets` loads the map, `build_solid_resource` binds `t_normal` to the group(2) material bind group, and `shader.wgsl` perturbs the shading normal in tangent space (per-vertex tangents + TBN) (#207) |
 | `SetEmissiveMap` | ✅ | renderer — same upload/bind path; `shader.wgsl` samples `t_emissive` and modulates the emissive factor (`factor × map.rgb`) (#207) |
+| `DefineAsset` / `DefineAssetJson` | ✅ | renderer + round-trip (#271) — writes a `MaterialAsset` into `scene.materials` under a chosen name; an entity referencing that name via its `MaterialComponent` is sampled by the renderer through the SAME per-entity material path as every row above (`draw_resources::build_solid_resource` + `shader.wgsl`). The asset is part of `SceneData` (`materials` map), so it survives save→load. Proven by `tests/material_authoring.rs` (round-trip; entity-uses-asset; clamps/unknown-mode degrade; packed map slots) |
+| `GetAsset` / `HasAsset` | ✅ | round-trip — read-back of the named library asset (canonical JSON / presence), so the authored asset is observable through the same surface |
 
 ### `Animator` — over `Entity.animator`
 
@@ -236,7 +238,7 @@ metallic→B/roughness→G packing, seamless tiling).
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 65 |
+| ✅ faithful | 69 |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 
@@ -261,3 +263,11 @@ normal in tangent space (a `tangent` vertex attribute — read from the glTF `TA
 accessor or generated from positions + UVs — feeds a TBN basis in `fs_main`), and
 `SetEmissiveMap` modulates the emissive factor by the sampled `t_emissive` rgb. No
 material-map setter is a write-only no-op anymore.
+
+**#271** added standalone named-asset authoring (`Material.DefineAsset` /
+`DefineAssetJson`, plus the `GetAsset` / `HasAsset` read-back): an agent can author a
+reusable `MaterialAsset` into the library by name, decoupled from any entity. Its
+read-site is the same per-entity material path — an entity that references the named
+asset is sampled exactly like any material edited piecemeal — and the asset persists in
+`SceneData`, so it is faithful on both the renderer and round-trip axes. The four verbs
+take the faithful count from 65 to 69.
