@@ -8,7 +8,7 @@ function BotAI.Start(entity_id)
     NavMeshAgent.SetActive(entity_id, true)
     NavMeshAgent.SetSpeed(entity_id, 3.5)
     NavMeshAgent.SetAcceleration(entity_id, 8.0)
-    NavMeshAgent.SetStoppingDistance(entity_id, 2.5) -- Stop 2.5 units away from player
+    NavMeshAgent.SetStoppingDistance(entity_id, 0.5) -- Stop 0.5 units away from player
     Animator.Play(entity_id, "Walk")
     print("[Lua] Bot initialized at position (8, 1, 8) with NavMeshAgent")
 end
@@ -28,8 +28,8 @@ function BotAI.Update(entity_id, delta_time)
 
     -- Dynamic rotation towards movement velocity direction and clean animation transition
     local vx, vy, vz = NavMeshAgent.GetVelocity(entity_id)
-    let_speed_sq = vx * vx + vz * vz
-    if let_speed_sq > 0.01 then
+    local speed_sq = vx * vx + vz * vz
+    if speed_sq > 0.01 then
         local angle = math.atan2(vx, vz) * (180.0 / math.pi)
         Transform.SetRotation(entity_id, 0.0, angle, 0.0)
         Animator.Play(entity_id, "Walk")
