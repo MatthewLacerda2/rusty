@@ -16,6 +16,16 @@ impl NavigationGraph {
     /// walkable (reachable by a chain of small steps) while rejecting wall faces.
     /// Deterministic: fixed scene iteration order and an order-independent max-fold.
     pub fn bake(&mut self, scene: &Scene) {
+        // Source the per-scene bake tunables (#276) instead of the historical
+        // hardcoded defaults: step/slope are cheap scalar copies; grid_spacing may
+        // re-shape the grid (see `apply_grid_spacing`). `agent_radius` is read into
+        // the settings but deliberately UNUSED here — it is stored-but-inert until the
+        // radius-erosion follow-up (#277). Doing this first means the reset below sizes
+        // the freshly-spaced grid.
+        self.max_step = scene.nav_settings.max_step;
+        self.max_slope = scene.nav_settings.max_slope;
+        self.apply_grid_spacing(scene.nav_settings.grid_spacing);
+
         // A new bake may change cell heights / reachability, so bump the generation:
         // any agent whose cached path was planned against an older bake re-plans (#126).
         self.bake_generation = self.bake_generation.wrapping_add(1);
@@ -35,6 +45,26 @@ impl NavigationGraph {
                 }
             }
         }
+    }
+
+    /// Re-shape the grid to a new cell size (#276 `grid_spacing` knob) when it differs
+    /// from the current spacing, keeping the same world bounds. Cell counts are derived
+    /// with the SAME formula as [`NavigationGraph::new`], so a graph created at spacing
+    /// `s` and one re-spaced to `s` are identical. The walkability / height buffers are
+    /// resized and zeroed here; the caller's reset + collider pass then re-fills them,
+    /// so the knob actually changes the baked resolution. A no-op when unchanged (the
+    /// common case), so the cheap step/slope path stays cheap. Out-of-range spacings
+    /// (≤ 0, non-finite) are ignored to keep the bake a total, panic-free function.
+    fn apply_grid_spacing(&mut self, spacing: f32) {
+        if !spacing.is_finite() || spacing <= 0.0 || spacing == self.grid_spacing {
+            return;
+        }
+        self.grid_spacing = spacing;
+        self.width = ((self.max_x - self.min_x) / spacing).ceil() as i32 + 1;
+        self.height = ((self.max_z - self.min_z) / spacing).ceil() as i32 + 1;
+        let cells = (self.width * self.height) as usize;
+        self.walkability = vec![true; cells];
+        self.heightfield = vec![0.0; cells];
     }
 
     /// Raise the surface height of every cell whose center lies under this
@@ -78,136 +108,5 @@ impl NavigationGraph {
             }
             (self.height_at(nx, nz) - h).abs() <= self.max_step
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::scene::{ColliderComponent, ColliderShape, Scene};
-
-    /// Adds a static box collider spanning the given world AABB to `scene`.
-    pub(super) fn add_box(scene: &mut Scene, name: &str, min: Vec3, max: Vec3) {
-        let id = scene.add_entity(name.to_string());
-        let mut e = scene.get_entity_mut(id).expect("entity exists");
-        e.is_static = true;
-        e.collider = Some(ColliderComponent {
-            active: true,
-            shape: ColliderShape::Box { size: max - min },
-            is_trigger: false,
-            aabb_min: min,
-            aabb_max: max,
-        });
-    }
-
-    /// A staircase rising 0.5/step at z = 4 (cells x = 3..=6), ground elsewhere.
-    fn stair_graph() -> NavigationGraph {
-        let mut scene = Scene::new();
-        for (i, gx) in (3..=6).enumerate() {
-            let y = 0.5 * i as f32;
-            let fx = gx as f32;
-            add_box(
-                &mut scene,
-                &format!("step{i}"),
-                Vec3::new(fx - 0.25, 0.0, 2.0),
-                Vec3::new(fx + 0.25, y, 6.0),
-            );
-        }
-        let mut graph = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
-        graph.bake(&scene);
-        graph
-    }
-
-    #[test]
-    fn stairs_bake_rising_height_field() {
-        let graph = stair_graph();
-        assert_eq!(graph.height_at(3, 4), 0.0);
-        assert_eq!(graph.height_at(4, 4), 0.5);
-        assert_eq!(graph.height_at(5, 4), 1.0);
-        assert_eq!(graph.height_at(6, 4), 1.5);
-        // Each 0.5 step is within max_step, so adjacent run cells stay connected.
-        for gx in 3..=5 {
-            assert!(
-                graph.step_connected(gx, 4, gx + 1, 4),
-                "step {gx} -> {} connected",
-                gx + 1
-            );
-        }
-        // Every step cell is reachable from a neighbour within max_step.
-        for gx in 3..=6 {
-            assert!(graph.cell_reachable(gx, 4), "step {gx} reachable");
-        }
-    }
-
-    #[test]
-    fn steep_wall_top_is_unreachable() {
-        // Tall isolated box (top y=3) surrounded by ground (y=0): every neighbour is
-        // a 3.0 drop, far beyond max_step 0.5, so the top is unreachable and no edge
-        // connects to it — while the surrounding ground stays walkable.
-        let mut scene = Scene::new();
-        // Box footprint [3.6,4.4]x[3.6,4.4] covers only the single cell-center (4,4).
-        add_box(
-            &mut scene,
-            "wall",
-            Vec3::new(3.6, 0.0, 3.6),
-            Vec3::new(4.4, 3.0, 4.4),
-        );
-        let mut graph = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
-        graph.bake(&scene);
-        assert_eq!(graph.height_at(4, 4), 3.0);
-        assert_eq!(graph.height_at(5, 4), 0.0, "neighbour stays ground");
-        assert!(
-            !graph.cell_reachable(4, 4),
-            "wall top is isolated by 3.0 drops"
-        );
-        assert!(!graph.step_connected(3, 4, 4, 4), "cannot step up the wall");
-        assert!(
-            graph.cell_reachable(1, 1),
-            "distant flat ground stays reachable"
-        );
-    }
-
-    #[test]
-    fn bake_is_deterministic_across_runs() {
-        let a = stair_graph();
-        let b = stair_graph();
-        assert_eq!(a.heightfield, b.heightfield, "height field must be stable");
-        assert_eq!(a.walkability, b.walkability, "walkability must be stable");
-        assert_eq!(a.bake_generation, b.bake_generation);
-    }
-
-    /// Kill "replace > with <" in raise_surface max-fold: overlapping boxes must
-    /// leave the cell at the MAXIMUM top, not the minimum or the first seen.
-    #[test]
-    fn raise_surface_takes_max_of_overlapping_colliders() {
-        let mut scene = Scene::new();
-        add_box(
-            &mut scene,
-            "lo",
-            Vec3::new(3.0, 0.0, 3.0),
-            Vec3::new(5.0, 1.0, 5.0),
-        );
-        add_box(
-            &mut scene,
-            "hi",
-            Vec3::new(3.0, 0.0, 3.0),
-            Vec3::new(5.0, 3.0, 5.0),
-        );
-        let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
-        g.bake(&scene);
-        assert_eq!(g.height_at(4, 4), 3.0, "max(1.0, 3.0) = 3.0");
-        assert_eq!(g.height_at(3, 3), 3.0, "corner cell also takes max");
-    }
-
-    /// Kill cell_reachable `<= → <`: a cell exactly max_step above a neighbour
-    /// must be reachable; max_step + epsilon must not.
-    #[test]
-    fn cell_reachable_boundary_at_max_step() {
-        let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
-        let idx = g.index(5, 5);
-        g.heightfield[idx] = g.max_step;
-        assert!(g.cell_reachable(5, 5), "exactly max_step: reachable");
-        g.heightfield[idx] += 0.001;
-        assert!(!g.cell_reachable(5, 5), "above max_step: unreachable");
     }
 }

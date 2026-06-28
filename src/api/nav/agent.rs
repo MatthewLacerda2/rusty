@@ -1,56 +1,18 @@
-//! src/api/nav.rs — `Navigation` + `NavMeshAgent` namespaces.
+//! src/api/nav/agent.rs — the `NavMeshAgent` namespace.
 //!
-//! `Navigation.GetNextPathStep` queries the shared nav graph; `NavMeshAgent.*`
-//! reads and writes an entity's optional nav-agent component.
+//! Reads and writes an entity's optional nav-agent component: destination, motion
+//! tuning, footprint, and the runtime queries the steering tick feeds.
 
 use std::cell::RefCell;
 
 use glam::Vec3;
 use mlua::Lua;
 
-use super::{put, Reg};
-use crate::navigation::NavigationGraph;
+use super::super::{put, Reg};
 use crate::scene::Scene;
 
-/// Register the `Navigation` and `NavMeshAgent` namespaces onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
-    scene: &'scope RefCell<Scene>,
-    nav: &'scope RefCell<NavigationGraph>,
-) -> Reg {
-    register_navigation(lua, scope, nav)?;
-    register_agent(lua, scope, scene)
-}
-
-/// `Navigation.GetNextPathStep` over the shared nav graph.
-fn register_navigation<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
-    nav: &'scope RefCell<NavigationGraph>,
-) -> Reg {
-    let table = lua.create_table().map_err(|e| e.to_string())?;
-
-    put(
-        &table,
-        "GetNextPathStep",
-        scope.create_function(
-            |_, (cx, cy, cz, tx, ty, tz): (f32, f32, f32, f32, f32, f32)| {
-                let step = nav
-                    .borrow()
-                    .get_next_path_step(Vec3::new(cx, cy, cz), Vec3::new(tx, ty, tz));
-                Ok((step.x, step.y, step.z))
-            },
-        ),
-    )?;
-
-    lua.globals()
-        .set("Navigation", table)
-        .map_err(|e| e.to_string())
-}
-
 /// `NavMeshAgent.*` target / speed / radius accessors over the nav-agent component.
-fn register_agent<'lua, 'scope>(
+pub fn register<'lua, 'scope>(
     lua: &'lua Lua,
     scope: &mlua::Scope<'lua, 'scope>,
     scene: &'scope RefCell<Scene>,

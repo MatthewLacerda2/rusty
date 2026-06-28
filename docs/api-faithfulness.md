@@ -84,6 +84,21 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `RevertPrefabOverrides` / `ReimportPrefab` | ✅ | rebuild each instance entity from a fresh source baseline (re-applying overrides on reimport); the resulting component values feed the same renderer/sim read-sites as any edited entity |
 | `ApplyPrefabToSource` / `ApplyPrefabFieldToSource` | ✅ | write the instance's overrides into the source `.prefab` on disk (reusing the override setter + the one `.prefab` writer), then clear them — other instances pick the edit up on reload/reimport (#268) |
 
+### `Navigation` — over `Scene.nav_settings`
+
+The per-scene navmesh bake settings (#276). Each setter writes `scene.nav_settings`
+then re-bakes the shared graph, so the **bake** is the read-site — proven in
+`src/api/nav/settings_tests.rs` (set via binding → `nav_settings` reflects it → a
+re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
+(`bake_sources_max_step_from_scene_settings`, `bake_reshapes_grid_from_grid_spacing`).
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetMaxSlope` | ✅ | sim — `navigation/bake.rs::bake` copies it into `NavigationGraph::max_slope` (the per-edge slope rule); round-trips through `SceneData` |
+| `SetMaxStep` | ✅ | sim — `navigation/bake.rs::bake` copies it into `NavigationGraph::max_step` (the per-edge step rule); round-trips. `bake_sources_max_step_from_scene_settings` proves a ledge flips reachability |
+| `SetGridSpacing` | ✅ | sim — `navigation/bake.rs::bake` re-shapes the grid dimensions from it (`apply_grid_spacing`); round-trips |
+| `SetAgentRadius` | ⚠️ | round-trip — **stored-but-inert** (#276): persists through `SceneData` and re-bakes for consistency, but the bake does NOT yet erode walkability by radius. The radius read-site (erosion) lands in #277 |
+
 ### `NavMeshAgent` — over `Entity.nav_agent`
 
 | Setter | Status | Read-site |
@@ -200,9 +215,13 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 54 |
-| ⚠️ partial | 0 |
+| ✅ faithful | 57 |
+| ⚠️ partial | 1 |
 | ❌ no-op | 0 |
+
+The single ⚠️ partial is `Navigation.SetAgentRadius` (#276): it persists and re-bakes,
+but the radius is **stored-but-inert** until the navmesh-erosion follow-up (#277) gives
+it a live bake read-site. It is a documented, conscious step, not a silent no-op.
 
 The full glTF-PBR map surface is now **faithful**. `Material.SetMetallicMap` /
 `SetRoughnessMap` were wired by #202 (per-entity group(2) material bind group +

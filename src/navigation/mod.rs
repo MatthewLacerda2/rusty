@@ -17,6 +17,10 @@ mod astar;
 #[cfg(test)]
 mod astar_tests;
 mod bake;
+#[cfg(test)]
+mod bake_tests;
 mod grid;
+mod settings;
 
 pub use grid::NavigationGraph;
+pub use settings::{NavMeshSettings, DEFAULT_AGENT_RADIUS};
