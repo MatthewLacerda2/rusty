@@ -58,6 +58,9 @@ the same API as gameplay, all compiled out of a shipped build (the `dev` feature
   agent can "play as the user".
 - **Console + REPL** — evaluate API calls against the live game; the same evaluator
   backs the in-editor terminal and the headless runs, so they never drift.
+- **MCP bridge** — the same evaluator spoken as the Model Context Protocol, so Claude
+  Code attaches to a live edit-mode session natively and drives it like Blender-MCP
+  drives Blender (see [`docs/mcp.md`](docs/mcp.md)).
 - **Screenshots** — render a single frame offscreen to a PNG so the agent can actually
   *see* and critique a frame.
 
@@ -69,6 +72,8 @@ the game for you, and only open a window when you want to.
 - `cargo run` — the editor and game window.
 - `cargo run --bin play --features dev -- <scenario.lua> <out_dir>` — the headless
   harness; writes `results.json` + `console.log` (and any screenshots) to `<out_dir>`.
+- `cargo run --bin session-mcp --features dev` — drive the live engine from Claude
+  Code over MCP (see [`docs/mcp.md`](docs/mcp.md)).
 - `cargo doc --no-deps` — the Rust API reference.
 
 For the engine's architecture and the conventions agents follow, see

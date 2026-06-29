@@ -93,6 +93,38 @@ impl Session {
     }
 }
 
+/// Resolve the boot scene from a session bin's CLI args, applying `--project` first.
+///
+/// Shared by the `session` and `session-mcp` bins so they parse arguments
+/// identically. The accepted forms are:
+///   - `--project <dir>` — `chdir` into a project directory **before** booting, so
+///     the relative asset/scene paths the engine reads resolve against it. On a bad
+///     directory this prints to stderr and exits 2.
+///   - `--empty`         — start from a blank scene (returns an empty boot path).
+///   - `<scene-path>`    — boot that specific scene.
+///   - none              — boot (and seed) the bundled default scene.
+///
+/// `--project` may precede any of the scene forms; it is consumed first and the rest
+/// is interpreted as the scene argument.
+pub fn boot_scene_from_args(args: &[String]) -> String {
+    let mut rest = args;
+    if let [first, dir, tail @ ..] = rest {
+        if first == "--project" {
+            if let Err(e) = std::env::set_current_dir(dir) {
+                eprintln!("session: failed to enter project dir {dir}: {e}");
+                std::process::exit(2);
+            }
+            rest = tail;
+        }
+    }
+
+    match rest.first().map(String::as_str) {
+        Some("--empty") => String::new(),
+        Some(path) => path.to_string(),
+        None => crate::scene::seed_default_scene(),
+    }
+}
+
 /// One framed response line for an evaluated command.
 ///
 /// Each command yields exactly one JSON object on its own line, so an agent can
