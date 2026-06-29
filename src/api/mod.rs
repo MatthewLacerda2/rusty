@@ -3,8 +3,8 @@
 //! The single stable API surface shared by Lua scripts, the console REPL and
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
 //! `Scene`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
-//! `Assets`, `Texture`, `Particles`, `Layers`, `Graphics`, `Video`, `Storage`,
-//! plus the dev-only `Debug`)
+//! `Assets`, `Texture`, `Shader`, `Particles`, `Layers`, `Graphics`, `Video`,
+//! `Storage`, plus the dev-only `Debug`)
 //! is registered from this tree onto the live Lua runtime.
 //! `scripting`
 //! owns the runtime and lifecycle; `api` owns the surface. One surface, three
@@ -34,6 +34,7 @@ pub mod probe;
 pub mod reflection;
 pub mod scene;
 pub mod scene_prefab;
+pub mod shader;
 pub mod snapshot;
 mod snapshot_components;
 pub mod storage;
@@ -111,6 +112,9 @@ pub fn register<'lua, 'scope>(
     // `Texture` (#270) also borrows no engine state — it reads a recipe and writes a
     // PNG file — so it likewise registers as a plain static namespace.
     texture::register(lua)?;
+    // `Shader` (#272) likewise borrows no engine state — it reads a recipe, validates
+    // it through naga_oil, and writes a `.wgsl` file — a plain static namespace.
+    shader::register(lua)?;
     material::register(lua, scope, ctx.scene)?;
     animator::register(lua, scope, ctx.scene, ctx.console)?;
     input::register_readable(lua, scope, ctx.input)?;

@@ -228,6 +228,29 @@ metallic→B/roughness→G packing, seamless tiling).
 | `Bake` / `BakeJson` | ✅ | renderer — writes a `.png` consumed by `load_texture` via the material map slots; per-slot glTF encoding applied on bake |
 | `ToJson` | ✅ | round-trip — the recipe's canonical serde form; re-bakes byte-identically |
 
+### `Shader` — writes a `.wgsl` the `ShaderRegistry` loads (over the pass contract)
+
+`Shader` writes files rather than mutating a component, so its **read-site is the
+engine's own shader loader**: a baked `<name>.wgsl` is exactly the file a
+`ShaderRegistry` reads (`<base>/<name>.wgsl`), composes through the same `naga_oil`
+`Composer` (with `common` registered), and compiles to a wgpu module. The bake
+**validates by composing through that identical path before it writes** — so a baked
+module is, by construction, one the engine can load: validated-at-bake is the same
+code as load-time. A surface variant keeps the standard `vs_main`/`fs_main` + the
+forward bind groups (it binds against the forward pipeline unchanged); a postfx
+variant has the fullscreen `vs_fullscreen`/`fs_main` shape. Proven by the spine
+tests (`src/shadergen/tests.rs`: a baked surface AND postfx variant compose cleanly,
+an intentionally-broken recipe fails the bake with no file written, the same recipe
+assembles byte-identical WGSL) and the API tests (`src/api/shader/mod.rs`).
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `Bake` / `BakeJson` | ✅ | renderer — writes a `.wgsl` the `ShaderRegistry` loads + compiles by name; **validated through the same `naga_oil` compose path at bake** (a non-composing module is rejected, never written) |
+| `ToJson` | ✅ | round-trip — the recipe's canonical serde form; re-assembles byte-identically |
+
+(`Shader.Validate` and `Shader.Blocks` are read-only introspection — a compose
+dry-run and the block-catalog listing — not setters, so they don't add to the count.)
+
 ### `Debug` (dev-only) — over `ConsoleLogs`
 
 | Setter | Status | Read-site |
@@ -238,7 +261,7 @@ metallic→B/roughness→G packing, seamless tiling).
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 69 |
+| ✅ faithful | 72 |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 
@@ -271,3 +294,10 @@ read-site is the same per-entity material path — an entity that references the
 asset is sampled exactly like any material edited piecemeal — and the asset persists in
 `SceneData`, so it is faithful on both the renderer and round-trip axes. The four verbs
 take the faithful count from 65 to 69.
+
+**#272** added agent-composed shader authoring (`Shader.Bake` / `BakeJson` / `ToJson`):
+an agent composes a recipe from a curated WGSL building-block library and bakes a
+contract-conformant `.wgsl` module. Its read-site is the engine's `ShaderRegistry` — the
+same loader the shipped shaders use — and the bake **validates through that exact
+`naga_oil` compose path before writing**, so a bad shader never reaches disk. The three
+write/serialize verbs take the faithful count from 69 to 72.

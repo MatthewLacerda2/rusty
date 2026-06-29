@@ -18,6 +18,7 @@ pub mod procgen;
 pub mod render;
 pub mod scene;
 pub mod scripting;
+pub mod shadergen;
 pub mod time;
 
 #[cfg(feature = "dev")]

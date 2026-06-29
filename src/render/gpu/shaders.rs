@@ -74,6 +74,48 @@ impl ShaderRegistry {
             .unwrap_or_else(|e| panic!("ShaderRegistry: {path} failed to compose: {e:?}"))
     }
 
+    /// Build a bare composer pre-loaded with `common.wgsl` from `base`, the
+    /// validation context a shader is compiled in — but without the disk-file
+    /// loading [`new`] panics on. The shader-authoring bake (#272) reuses this so
+    /// an assembled module is validated through the **same** `naga_oil` +
+    /// `common` path the engine loads it by, with errors returned (not panicked)
+    /// so a bad authored shader fails the bake instead of shipping.
+    ///
+    /// Returns the composer, or a message if `common.wgsl` is missing/invalid.
+    pub fn composer_with_common(base: &str) -> Result<Composer, String> {
+        let mut composer = Composer::default();
+        let common_path = format!("{base}/common.wgsl");
+        let common_src = std::fs::read_to_string(&common_path)
+            .map_err(|e| format!("cannot read {common_path}: {e}"))?;
+        composer
+            .add_composable_module(ComposableModuleDescriptor {
+                source: &common_src,
+                file_path: "common",
+                as_name: Some("common".to_owned()),
+                ..Default::default()
+            })
+            .map_err(|e| format!("common.wgsl failed to compose: {e:?}"))?;
+        Ok(composer)
+    }
+
+    /// Compose a WGSL `source` **string** (not a file) against `common`,
+    /// returning the validated naga module or an error message. This is the
+    /// GPU-free validate path the #272 bake calls to prove an assembled shader
+    /// would load — the same `make_naga_module` the engine uses, only fed from a
+    /// string and surfacing errors rather than panicking.
+    pub fn validate_source(
+        composer: &mut Composer,
+        source: &str,
+    ) -> Result<wgpu::naga::Module, String> {
+        composer
+            .make_naga_module(NagaModuleDescriptor {
+                source,
+                file_path: "authored.wgsl",
+                ..Default::default()
+            })
+            .map_err(|e| format!("{e:?}"))
+    }
+
     /// Load `<base>/<name>`, run it through the naga_oil Composer (resolving
     /// any `#import "common"` directives), and create a wgpu shader module.
     ///
