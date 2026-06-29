@@ -1,3 +1,5 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use mlua::Table;
 
 use crate::api;
@@ -182,7 +184,86 @@ impl ScriptManager {
         })
         .map_err(|e| e.to_string())
     }
+
+    /// The live Lua API surface as `namespace → {function names}`.
+    ///
+    /// Registers the whole `api::` surface into a fresh scope (the namespaces are
+    /// scope-tied closures), then walks the Lua globals: every global table that is
+    /// not a Lua 5.4 stdlib global contributes its function-valued keys. This is the
+    /// ground truth the doc-drift gate checks `docs/scripting-api.md` against, so it
+    /// can never silently lie about *what exists* (#280). Empty when the runtime is
+    /// not live. Signatures are out of scope — Lua closures are opaque at runtime.
+    pub fn api_surface(&self) -> BTreeMap<String, BTreeSet<String>> {
+        let Some(lua) = self.lua.as_ref() else {
+            return BTreeMap::new();
+        };
+        let ctx = self.make_ctx();
+        let mut surface = BTreeMap::new();
+        let _ = lua.scope(|scope| -> mlua::Result<()> {
+            api::register(lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
+            for pair in lua.globals().pairs::<String, mlua::Value>() {
+                let (name, value) = pair?;
+                let mlua::Value::Table(table) = value else {
+                    continue;
+                };
+                if LUA_STDLIB_GLOBALS.contains(&name.as_str()) {
+                    continue;
+                }
+                let mut fns = BTreeSet::new();
+                for entry in table.pairs::<String, mlua::Value>() {
+                    let (key, val) = entry?;
+                    if matches!(val, mlua::Value::Function(_)) {
+                        fns.insert(key);
+                    }
+                }
+                surface.insert(name, fns);
+            }
+            Ok(())
+        });
+        surface
+    }
 }
+
+/// Lua 5.4 standard-library globals — excluded from the API surface walk so the
+/// drift gate compares only engine namespaces (capitalized `Debug` is the engine's,
+/// not the lowercase stdlib `debug`). The injected `print` override is a function,
+/// not a table, so it is filtered out naturally.
+const LUA_STDLIB_GLOBALS: &[&str] = &[
+    "_G",
+    "_VERSION",
+    "assert",
+    "collectgarbage",
+    "dofile",
+    "error",
+    "getmetatable",
+    "ipairs",
+    "load",
+    "loadfile",
+    "next",
+    "pairs",
+    "pcall",
+    "print",
+    "rawequal",
+    "rawget",
+    "rawlen",
+    "rawset",
+    "select",
+    "setmetatable",
+    "tonumber",
+    "tostring",
+    "type",
+    "xpcall",
+    "require",
+    "string",
+    "table",
+    "math",
+    "io",
+    "os",
+    "coroutine",
+    "utf8",
+    "package",
+    "debug",
+];
 
 /// Render a single Lua value for the REPL echo. Mirrors Lua's `tostring`/`print`
 /// for the common cases (nil/bool/number/string) and falls back to a typed tag.

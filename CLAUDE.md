@@ -229,7 +229,10 @@ is the only difference between an empty marker and a fully-dressed enemy.
   user-facing editor capability has an API equivalent.
 - **Keep the API doc in lockstep.** When you add or change an API function, update
   `docs/scripting-api.md` in the *same* change. That doc is the API reference the agent
-  reads to drive the engine, so it must never lag the bindings.
+  reads to drive the engine, so it must never lag the bindings. This is no longer just
+  convention: a **CI drift gate** (`tests/api_doc_drift.rs`, #280) fails the build when
+  the doc and the live Lua surface disagree about *what exists* (existence parity both
+  directions; signatures stay out of scope).
 - **ECS via `hecs`.** `Transform` is the one mandatory component; all others optional.
 - **No event bus, no plugin trait.** Modules self-register via `register(&mut app)`;
   cross-system signals are direct typed returns.

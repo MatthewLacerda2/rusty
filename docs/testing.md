@@ -15,6 +15,20 @@
 - CI (`.github/workflows/ci.yml`) runs `cargo test` for both the engine and the
   lint xtask.
 
+## API-doc drift gate
+`tests/api_doc_drift.rs` (dev-only, #280) is a **hard gate** that keeps
+`docs/scripting-api.md` honest against the **live Lua API surface**. It boots an
+empty `Session`, walks the registered namespaces via
+`ScriptManager::api_surface()` (every non-stdlib global table's function-valued
+keys), and parses the doc's `##` namespace headings and table rows. It then asserts
+**existence parity in both directions**: every documented `Namespace.Function` is a
+registered binding, and every registered binding is documented (the failure message
+lists the exact offenders per namespace). The doc is served to the agent over MCP
+(#288), so a drifted doc would lie to it — this is what stops that. **Scope:**
+existence only. Signatures/types are out of scope, because Lua closures are opaque at
+runtime; checking them would need the deferred self-describing-binding macro. The
+source of truth for existence is the live surface — reconcile by editing the doc.
+
 ## Example (unit, in-module)
 See `tools/lint/src/main.rs` — a `#[cfg(test)] mod tests` block testing the
 size-cap selection and path normalization.
