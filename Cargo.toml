@@ -29,6 +29,13 @@ name = "session"
 path = "src/bin/session.rs"
 required-features = ["dev"]
 
+# MCP stdio bridge: drive the edit-mode session over the Model Context Protocol,
+# so Claude Code attaches to the engine natively (#288). Dev-only.
+[[bin]]
+name = "session-mcp"
+path = "src/bin/session_mcp.rs"
+required-features = ["dev"]
+
 [features]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
 dev = []

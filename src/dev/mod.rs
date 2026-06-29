@@ -11,6 +11,7 @@
 //! Submodules:
 //!   session         — long-lived edit-mode host + command channel (the keystone, #177)
 //!   command_channel — windowed socket command channel: drive a live playtest (#282)
+//!   mcp             — MCP stdio server over the same evaluator (Blender-MCP-style, #288)
 //!   harness     — headless deterministic runner: Step / StepUntil / results.json
 //!   scenario    — loads and runs a `.lua` scenario, captures observations
 //!   bridge      — Lua bindings for the scenario VM (the control surface)
@@ -29,6 +30,7 @@ pub mod console;
 pub mod demo_scene;
 pub mod harness;
 pub mod lighting_bake;
+pub mod mcp;
 pub mod probe_bake;
 pub mod reflection_bake;
 pub mod scenario;
