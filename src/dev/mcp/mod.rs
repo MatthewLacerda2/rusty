@@ -27,6 +27,7 @@
 //! continues — a bad message never panics and never tears down the server. The loop
 //! ends only at EOF (stdin closed).
 
+pub mod attach;
 pub mod protocol;
 pub mod resources;
 pub mod tools;
@@ -38,12 +39,32 @@ use serde_json::{json, Value};
 use crate::dev::session::Session;
 use protocol::Incoming;
 
+/// The one thing the MCP dispatch needs from whatever it fronts: evaluate one line of
+/// the rusty Lua API and return the rendered result or an error message.
+///
+/// Two backends implement it, giving the `session-mcp` bin its two modes — both still
+/// running one line through the *same* evaluator, so the MCP surface, the console and
+/// the headless session can never drift apart:
+///   - [`Session`] (**embed**): evaluate in-process against a headless edit-mode world.
+///   - [`attach::SocketClient`] (**attach**): forward the line to a *running window's*
+///     command socket (#282) and unwrap its framed reply (#307).
+pub trait EvalBackend {
+    /// Evaluate one Lua API line; `Ok` is the rendered result, `Err` the message.
+    fn eval(&self, line: &str) -> Result<String, String>;
+}
+
+impl EvalBackend for Session {
+    fn eval(&self, line: &str) -> Result<String, String> {
+        Session::eval(self, line)
+    }
+}
+
 /// Run the MCP stdio server: read newline-delimited JSON-RPC messages from `input`,
 /// dispatch each against the live `session`, and write one response line per request
 /// to `output` (notifications produce nothing). Blank lines are skipped. The loop
 /// ends at EOF; an I/O error on the channel itself is fatal and propagates.
 pub fn run<R: BufRead, W: Write>(
-    session: &Session,
+    backend: &dyn EvalBackend,
     input: R,
     mut output: W,
 ) -> std::io::Result<()> {
@@ -52,7 +73,7 @@ pub fn run<R: BufRead, W: Write>(
         if line.trim().is_empty() {
             continue;
         }
-        if let Some(response) = handle_line(session, &line) {
+        if let Some(response) = handle_line(backend, &line) {
             writeln!(output, "{response}")?;
             output.flush()?;
         }
@@ -63,10 +84,10 @@ pub fn run<R: BufRead, W: Write>(
 /// Process one wire line, returning the response to write (a request) or `None` (a
 /// notification, or a blank/handled line). Never panics: an unparseable line becomes
 /// a parse-error response.
-fn handle_line(session: &Session, line: &str) -> Option<String> {
+fn handle_line(backend: &dyn EvalBackend, line: &str) -> Option<String> {
     match protocol::parse(line) {
         Some(Incoming::Request { id, method, params }) => {
-            Some(dispatch(session, &id, &method, &params))
+            Some(dispatch(backend, &id, &method, &params))
         }
         // Notifications are processed for side effects only; `notifications/*` here
         // carry none, so we simply acknowledge by writing nothing back.
@@ -78,12 +99,12 @@ fn handle_line(session: &Session, line: &str) -> Option<String> {
 /// Route a parsed request to its handler and frame the JSON-RPC response. Method
 /// handlers return either a result `Value` (success) or a `(code, message)` protocol
 /// error; tool/resource *execution* errors are reported in-band, not here.
-fn dispatch(session: &Session, id: &Value, method: &str, params: &Value) -> String {
+fn dispatch(backend: &dyn EvalBackend, id: &Value, method: &str, params: &Value) -> String {
     let outcome: Result<Value, (i64, String)> = match method {
         "initialize" => Ok(initialize(params)),
         "ping" => Ok(json!({})),
         "tools/list" => Ok(tools::tools_list()),
-        "tools/call" => tools::tools_call(session, params),
+        "tools/call" => tools::tools_call(backend, params),
         "resources/list" => Ok(resources::resources_list()),
         "resources/read" => resources::resources_read(params),
         other => Err((-32601, format!("Method not found: {other}"))),
