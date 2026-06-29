@@ -30,9 +30,10 @@ pub(super) struct Bound {
 // ---------------------------------------------------------------------------
 
 /// Resolve the unix socket path: `$RUSTY_CMD_SOCK`, else `$XDG_RUNTIME_DIR/rusty.sock`,
-/// else `/tmp/rusty.sock`.
+/// else `/tmp/rusty.sock`. Shared with the dial-in [`super::client`] so a client and
+/// the window it connects to never disagree about where the socket is.
 #[cfg(unix)]
-fn socket_path() -> std::path::PathBuf {
+pub(super) fn socket_path() -> std::path::PathBuf {
     if let Ok(path) = std::env::var("RUSTY_CMD_SOCK") {
         return std::path::PathBuf::from(path);
     }
@@ -64,9 +65,10 @@ pub(super) fn bind_and_listen(tx: Sender<Command>) -> std::io::Result<Bound> {
 // Transport: windows TCP loopback (std only — no named-pipe dependency).
 // ---------------------------------------------------------------------------
 
-/// Resolve the TCP bind address: `$RUSTY_CMD_ADDR`, else `127.0.0.1:8787`.
+/// Resolve the TCP bind address: `$RUSTY_CMD_ADDR`, else `127.0.0.1:8787`. Shared
+/// with the dial-in [`super::client`] so client and window agree on the address.
 #[cfg(windows)]
-fn tcp_addr() -> String {
+pub(super) fn tcp_addr() -> String {
     std::env::var("RUSTY_CMD_ADDR").unwrap_or_else(|_| "127.0.0.1:8787".to_string())
 }
 

@@ -31,6 +31,7 @@
 //! A malformed line comes back as `{"ok":false,…}` and tears down neither the
 //! connection nor the engine; EOF / read error ends only that connection's handler.
 
+pub mod client;
 mod transport;
 
 use std::cell::RefCell;

@@ -2,13 +2,14 @@
 //!
 //! Two tools front the *one* evaluator: `eval` (run a line of the rusty Lua API
 //! against the live edit-mode world) and `snapshot` (a convenience wrapper for
-//! `Debug.Snapshot()`). Both ultimately call [`Session::eval`], so the MCP surface
-//! is the same control surface the console and the headless session already drive —
-//! no second engine API exists.
+//! `Debug.Snapshot()`). Both ultimately call the active [`EvalBackend`], so the MCP
+//! surface is the same control surface the console and the headless session already
+//! drive — no second engine API exists, and the embed and attach modes go through one
+//! code path here.
 
 use serde_json::{json, Value};
 
-use crate::dev::session::Session;
+use super::EvalBackend;
 
 /// The `tools/list` result: the two tools and their JSON-Schema input shapes.
 pub fn tools_list() -> Value {
@@ -52,7 +53,7 @@ pub fn tools_list() -> Value {
 /// `isError` flag for engine/eval failures, per MCP convention); `Err` is a
 /// JSON-RPC protocol error `(code, message)` for a malformed call (unknown tool, or
 /// `eval` missing its `line` argument).
-pub fn tools_call(session: &Session, params: &Value) -> Result<Value, (i64, String)> {
+pub fn tools_call(backend: &dyn EvalBackend, params: &Value) -> Result<Value, (i64, String)> {
     let name = params.get("name").and_then(Value::as_str).unwrap_or("");
     let arguments = params.get("arguments").cloned().unwrap_or(Value::Null);
 
@@ -62,9 +63,9 @@ pub fn tools_call(session: &Session, params: &Value) -> Result<Value, (i64, Stri
                 .get("line")
                 .and_then(Value::as_str)
                 .ok_or_else(|| (-32602, "eval requires a string `line` argument".to_string()))?;
-            Ok(eval_result(session.eval(line)))
+            Ok(eval_result(backend.eval(line)))
         }
-        "snapshot" => Ok(eval_result(session.eval("Debug.Snapshot()"))),
+        "snapshot" => Ok(eval_result(backend.eval("Debug.Snapshot()"))),
         other => Err((-32602, format!("Unknown tool: {other}"))),
     }
 }
@@ -86,6 +87,7 @@ fn eval_result(outcome: Result<String, String>) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dev::session::Session;
 
     fn session() -> Session {
         Session::new("").expect("session boots in edit mode")
