@@ -8,6 +8,11 @@ ignore = [
   # via wgpu → wgpu-hal → metal; there is no safe upgrade and it is NOT a
   # vulnerability. Real RUSTSEC vulnerabilities still fail the deny job.
   "RUSTSEC-2024-0436",
+  # `ttf-parser` is unmaintained but only reaches us transitively via
+  # egui/epaint → ab_glyph and winit → sctk-adwaita; the advisory offers no safe
+  # upgrade on this path and it is NOT a vulnerability. Real RUSTSEC
+  # vulnerabilities still fail the deny job.
+  "RUSTSEC-2026-0192",
 ]
 
 [bans]
