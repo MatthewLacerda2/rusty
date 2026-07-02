@@ -239,8 +239,10 @@ impl GameWorld {
                 .error(format!("Lua init error: {}", err));
             return;
         }
-        self.load_entity_scripts();
-        self.resources.script_manager.start_scripts();
+        // Load every scene entity's scripts, then run the two-phase init (#322):
+        // ALL `Awake`s, then ALL `Start`s, actives only — a disabled-at-load
+        // entity defers both until its first active tick.
+        self.resources.script_manager.init_scripts();
 
         // Build the rapier world from the (post-start) scene: bodies + colliders
         // for every entity with a ColliderComponent. Stepped each frame in play.

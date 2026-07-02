@@ -23,6 +23,7 @@ fn dispatch_fires_enter_stay_exit_in_order() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
+    m.init_scripts(); // triggers only reach awoken instances (#322)
 
     // Overlap begins: enter fires before that tick's stay.
     m.dispatch_trigger_events(TriggerEvents {
@@ -58,6 +59,7 @@ fn missing_edge_callbacks_are_optional() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
+    m.init_scripts(); // triggers only reach awoken instances (#322)
     m.dispatch_trigger_events(TriggerEvents {
         entered: vec![(id, 7)],
         stayed: vec![(id, 7)],

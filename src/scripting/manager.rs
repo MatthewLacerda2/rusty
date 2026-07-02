@@ -1,7 +1,6 @@
-use mlua::{Lua, RegistryKey, Table};
+use mlua::{Lua, RegistryKey};
 use std::cell::RefCell;
-use std::collections::HashMap;
-use std::path::Path;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
 use crate::api::ApiScopedCtx;
@@ -17,13 +16,28 @@ use crate::time::Time;
 
 use super::console::ConsoleLogs;
 
+/// One live script instance: the Lua registry key of its lifecycle table plus
+/// the once-per-instance init flags (#322). `awoken` / `started` record that
+/// `Awake` / `Start` already fired, so each fires exactly once per instance.
+pub(super) struct ScriptInstance {
+    pub(super) table: RegistryKey,
+    pub(super) awoken: bool,
+    pub(super) started: bool,
+}
+
 pub struct ScriptManager {
     pub(super) lua: Option<Lua>,
-    /// One lifecycle table per attached script, keyed by `(entity_id,
+    /// One live instance per attached script, keyed by `(entity_id,
     /// script_index)`. An entity can carry many scripts (#83); each keeps its own
     /// state, and the index is the slot in the entity's `scripts` vec so two
-    /// scripts on one entity never collide.
-    pub(super) entity_scripts: HashMap<(u32, usize), RegistryKey>,
+    /// scripts on one entity never collide. A `BTreeMap` so every dispatch loop
+    /// iterates in ascending `(entity, script index)` order — the determinism
+    /// discipline replays rely on — without re-sorting per hook.
+    pub(super) entity_scripts: BTreeMap<(u32, usize), ScriptInstance>,
+    /// Every `(entity_id, script_index)` slot a load was ever attempted for,
+    /// including failures — so the per-tick spawn scan (`load_new_scripts`)
+    /// never retries (and re-logs) a script that failed to compile.
+    pub(super) load_attempted: BTreeSet<(u32, usize)>,
     pub(super) scene: Rc<RefCell<Scene>>,
     pub(super) input: Rc<RefCell<InputState>>,
     pub(super) nav: Rc<RefCell<NavigationGraph>>,
@@ -73,7 +87,8 @@ impl ScriptManager {
     ) -> Self {
         Self {
             lua: None,
-            entity_scripts: HashMap::new(),
+            entity_scripts: BTreeMap::new(),
+            load_attempted: BTreeSet::new(),
             scene,
             input,
             nav,
@@ -186,6 +201,7 @@ impl ScriptManager {
 
         self.lua = Some(lua);
         self.entity_scripts.clear();
+        self.load_attempted.clear();
 
         Ok(())
     }
@@ -213,51 +229,10 @@ impl ScriptManager {
         }
     }
 
-    /// Loads and runs one of an entity's scripts, then registers its lifecycle
-    /// methods. `script_index` is the slot in the entity's `scripts` vec, so an
-    /// entity's many scripts (#83) each get their own keyed lifecycle table.
-    pub fn load_entity_script(
-        &mut self,
-        entity_id: u32,
-        script_index: usize,
-        script_path: &str,
-        field_values: &std::collections::BTreeMap<String, crate::components::ScriptFieldValue>,
-    ) -> Result<(), String> {
-        let lua = self.lua.as_ref().ok_or("Lua runtime not initialized")?;
-
-        if !Path::new(script_path).exists() {
-            return Err(format!("Script file not found: {}", script_path));
-        }
-
-        let script_code = std::fs::read_to_string(script_path)
-            .map_err(|e| format!("Failed to read script: {}", e))?;
-
-        // Load the script chunk
-        let chunk = lua.load(&script_code);
-        let table: Table = chunk
-            .eval()
-            .map_err(|e| format!("Syntax error compiling {}: {}", script_path, e))?;
-
-        // Merge the inspector-set field values (#84) over the schema defaults onto
-        // the lifecycle table, so `self.<field>` inside the script reads the
-        // configured value. Pure data assignment — determinism-clean.
-        super::schema::apply_field_values(&table, &script_code, field_values)
-            .map_err(|e| format!("Failed to apply script fields for {}: {}", script_path, e))?;
-
-        // Cache the returned lifecycle table in the Lua registry
-        let reg_key = lua
-            .create_registry_value(table)
-            .map_err(|e| format!("Failed to register script table: {}", e))?;
-
-        self.entity_scripts
-            .insert((entity_id, script_index), reg_key);
-
-        Ok(())
-    }
-
     /// Stops and clears the script environment
     pub fn shutdown(&mut self) {
         self.entity_scripts.clear();
+        self.load_attempted.clear();
         self.lua = None;
     }
 

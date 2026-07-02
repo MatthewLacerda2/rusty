@@ -71,7 +71,7 @@ fn eval_lua_error_propagates_as_err() {
 }
 
 #[test]
-fn start_scripts_invokes_start_for_each_entity() {
+fn init_scripts_invokes_start_for_each_entity() {
     let (mut m, id) = manager_with_entity();
     m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
     let path = write_script(
@@ -80,7 +80,7 @@ fn start_scripts_invokes_start_for_each_entity() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
-    m.start_scripts();
+    m.init_scripts();
     assert_eq!(m.eval("__start_id").unwrap(), id.to_string());
 }
 
@@ -94,6 +94,7 @@ fn update_scripts_passes_delta_time_to_update() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
+    m.init_scripts(); // Update is gated on Start having run (#322)
     m.update_scripts(0.25);
     let got: f64 = m.eval("__update_dt").unwrap().parse().unwrap();
     assert!((got - 0.25).abs() < 1e-6, "dt should be 0.25, got {got}");
@@ -109,6 +110,7 @@ fn dispatch_trigger_events_calls_on_trigger() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
+    m.init_scripts(); // triggers only reach awoken instances (#322)
     m.dispatch_trigger_events(crate::physics::TriggerEvents {
         stayed: vec![(id, 99)],
         ..Default::default()
