@@ -24,8 +24,8 @@ agent could build a shooter of that caliber on it.
 - **Unity-shaped.** Entities each have a `Transform` plus optional components (`Mesh`,
   `Camera`, `Light`, `Collider`, `Rigidbody`, `NavMeshAgent`, `Animator`,
   …). Behaviour lives in Lua scripts that act like MonoBehaviours, with lifecycle
-  hooks (`Start`, `Update(dt)`, `FixedUpdate`, `OnTriggerEnter`, `OnDamage`,
-  `OnDestroy`).
+  hooks (`Start`, `Update(dt)`, `OnTrigger`) — see
+  [`docs/scripting-api.md`](docs/scripting-api.md#script-lifecycle-callbacks).
 - **One scene at a time.** A scene is saved to disk as a plain document of references
   and values. Entering Play runs on a *clone*, and Stop restores your edits, so
   edit-mode is always what gets saved.

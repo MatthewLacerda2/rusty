@@ -4,6 +4,7 @@ use mlua::Table;
 
 use crate::api;
 
+use super::callbacks::{ON_TRIGGER, START, UPDATE};
 use super::manager::ScriptManager;
 
 impl ScriptManager {
@@ -31,13 +32,14 @@ impl ScriptManager {
                 let Ok(table) = lua.registry_value::<Table>(reg) else {
                     continue;
                 };
-                let Ok(start_fn) = table.get::<_, mlua::Function>("Start") else {
+                let Ok(start_fn) = table.get::<_, mlua::Function>(START) else {
                     continue;
                 };
                 if let Err(e) = start_fn.call::<_, ()>(id) {
-                    self.console
-                        .borrow_mut()
-                        .error(format!("[Lua Error] Start on entity {} failed: {}", id, e));
+                    self.console.borrow_mut().error(format!(
+                        "[Lua Error] {} on entity {} failed: {}",
+                        START, id, e
+                    ));
                 }
             }
             Ok(())
@@ -85,13 +87,14 @@ impl ScriptManager {
                 let Ok(table) = lua.registry_value::<Table>(reg) else {
                     continue;
                 };
-                let Ok(update_fn) = table.get::<_, mlua::Function>("Update") else {
+                let Ok(update_fn) = table.get::<_, mlua::Function>(UPDATE) else {
                     continue;
                 };
                 if let Err(e) = update_fn.call::<_, ()>((id, delta_time)) {
-                    self.console
-                        .borrow_mut()
-                        .error(format!("[Lua Error] Update on entity {} failed: {}", id, e));
+                    self.console.borrow_mut().error(format!(
+                        "[Lua Error] {} on entity {} failed: {}",
+                        UPDATE, id, e
+                    ));
                 }
             }
             Ok(())
@@ -128,13 +131,13 @@ impl ScriptManager {
                         let Ok(table) = lua.registry_value::<Table>(reg) else {
                             continue;
                         };
-                        let Ok(trigger_fn) = table.get::<_, mlua::Function>("OnTrigger") else {
+                        let Ok(trigger_fn) = table.get::<_, mlua::Function>(ON_TRIGGER) else {
                             continue;
                         };
                         if let Err(e) = trigger_fn.call::<_, ()>((id, other)) {
                             self.console.borrow_mut().error(format!(
-                                "[Lua Error] OnTrigger on entity {} failed: {}",
-                                id, e
+                                "[Lua Error] {} on entity {} failed: {}",
+                                ON_TRIGGER, id, e
                             ));
                         }
                     }
