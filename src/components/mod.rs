@@ -24,7 +24,7 @@ pub mod texture;
 pub mod transform;
 pub mod visual_correction;
 
-pub use animator::AnimatorComponent;
+pub use animator::{AnimatorComponent, AnimatorParameter, AnimatorParameters};
 pub use audio_source::AudioSourceComponent;
 pub use camera::{CameraComponent, ClearFlags};
 pub use collider::{ColliderComponent, ColliderShape};
