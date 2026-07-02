@@ -138,8 +138,14 @@ fn play_frame_accumulates_each_tick() {
 /// Start and its first Update all run — the spawn tick itself never touches it.
 #[test]
 fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
-    // Author the prefab: one entity carrying a callback-logging script.
-    let enemy_lua = "/tmp/rusty_322_enemy.lua";
+    // Author the prefab: one entity carrying a callback-logging script. Paths
+    // go through the platform temp dir so the test also passes on Windows.
+    let tmp = std::env::temp_dir();
+    let enemy_lua = tmp
+        .join("rusty_322_enemy.lua")
+        .to_string_lossy()
+        .into_owned();
+    let enemy_lua = enemy_lua.as_str();
     std::fs::write(
         enemy_lua,
         "_G.__enemy_log = _G.__enemy_log or ''\nreturn {\n\
@@ -148,7 +154,11 @@ fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
          Update = function(id, dt) __enemy_log = __enemy_log .. 'U' end,\n}",
     )
     .unwrap();
-    let prefab = "/tmp/rusty_322_enemy.prefab";
+    let prefab = tmp
+        .join("rusty_322_enemy.prefab")
+        .to_string_lossy()
+        .into_owned();
+    let prefab = prefab.as_str();
     {
         let mut authoring = Scene::new();
         let id = authoring.add_entity("Enemy".to_string());
@@ -160,13 +170,19 @@ fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
     }
 
     // The live scene: a spawner whose first Update instantiates that prefab.
-    let spawner_lua = "/tmp/rusty_322_spawner.lua";
+    let spawner_lua = tmp
+        .join("rusty_322_spawner.lua")
+        .to_string_lossy()
+        .into_owned();
+    let spawner_lua = spawner_lua.as_str();
+    // Forward slashes in the Lua literal: a Windows `\` would be a Lua escape.
+    let prefab_lua = prefab.replace('\\', "/");
     std::fs::write(
         spawner_lua,
         format!(
             "return {{ Update = function(id, dt)\n\
              if not _G.__spawned then _G.__spawned = true; \
-             Scene.Instantiate('{prefab}') end\nend }}"
+             Scene.Instantiate('{prefab_lua}') end\nend }}"
         ),
     )
     .unwrap();
