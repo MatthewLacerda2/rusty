@@ -8,6 +8,9 @@
 
 use serde::{Deserialize, Serialize};
 
+mod parameters;
+pub use parameters::{AnimatorParameter, AnimatorParameters};
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AnimatorComponent {
     /// Name of the clip currently playing (matched against the mesh's clip list).
@@ -43,6 +46,14 @@ pub struct AnimatorComponent {
     /// Total crossfade length in seconds; `0.0` means no crossfade is active.
     #[serde(default)]
     pub crossfade_duration: f32,
+    /// Typed graph parameters (#314): the named `Bool`/`Float`/`Int`/`Trigger`
+    /// values scripts set (`Animator.Set*`) and the `AnimationGraph`'s edge
+    /// conditions will read (#315/#316). Values live here and serialize with the
+    /// entity; declarations belong to the graph asset. Name-sorted (`BTreeMap`) so
+    /// the evaluator's fixed-step walk is deterministic. The typed accessors
+    /// (`set_bool` … `consume_trigger`) live in the `parameters` submodule.
+    #[serde(default, skip_serializing_if = "AnimatorParameters::is_empty")]
+    pub parameters: AnimatorParameters,
 }
 
 impl Default for AnimatorComponent {
@@ -58,6 +69,7 @@ impl Default for AnimatorComponent {
             previous_time: 0.0,
             crossfade_elapsed: 0.0,
             crossfade_duration: 0.0,
+            parameters: AnimatorParameters::new(),
         }
     }
 }
@@ -136,5 +148,7 @@ impl AnimatorComponent {
     }
 }
 
+#[cfg(test)]
+mod parameters_tests;
 #[cfg(test)]
 mod tests;

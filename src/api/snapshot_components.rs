@@ -139,6 +139,10 @@ pub(crate) fn particle_value(p: &ParticleEmitterComponent) -> Value {
     })
 }
 
+/// Animator playback state plus the typed graph parameters (#314), so a script can
+/// read back what `Animator.Set*` wrote. Each parameter serializes externally
+/// tagged, e.g. `{"Bool": true}` / `{"Trigger": false}`; the `BTreeMap` keeps the
+/// keys name-sorted.
 pub(crate) fn animator_value(a: &AnimatorComponent) -> Value {
     json!({
         "clip": a.current_clip,
@@ -147,6 +151,7 @@ pub(crate) fn animator_value(a: &AnimatorComponent) -> Value {
         "playing": a.is_playing,
         "loop": a.loop_clip,
         "paused": a.freeze,
+        "parameters": a.parameters,
     })
 }
 

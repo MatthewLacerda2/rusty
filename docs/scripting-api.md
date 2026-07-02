@@ -255,6 +255,14 @@ sampler poses the skeleton each fixed step, so playback — including a looping
 clip's wrap — is deterministic. A non-looping clip holds its last frame at the
 end.
 
+The `Set*` parameter setters write the animator's named, typed **graph
+parameters** (Unity's Animator parameters): the variables the animation graph's
+transition conditions will read each fixed step to decide state changes (#312).
+A parameter is created on first set; once a name holds a type, a set of a
+*different* type is ignored (a console warning, never an error). Parameter
+values are saved with the entity, and `Debug.Snapshot` reports them under the
+animator's `parameters` key.
+
 | Function | Signature | Notes |
 |---|---|---|
 | `Animator.Play` | `(id, clip)` | Hard-cut to `clip` from its start (also releases a `Pause`). |
@@ -263,6 +271,10 @@ end.
 | `Animator.Pause` | `(id)` | Hold the playhead where it is: the pose freezes but playback stays active (a hold, not a `Stop`). |
 | `Animator.Resume` | `(id)` | Release a `Pause`, continuing from the held playhead. |
 | `Animator.SetLooping` | `(id, loop)` | `loop = true` wraps the playhead at the current clip's end so it repeats seamlessly (idle/run/walk cycles); `false` (the default) holds the last frame. Persists across `Play`/`Crossfade`, like speed. |
+| `Animator.SetBool` | `(id, name, value)` | Set the `Bool` parameter `name` (e.g. `Animator.SetBool(id, "isGrounded", true)`). |
+| `Animator.SetFloat` | `(id, name, value)` | Set the `Float` parameter `name` (e.g. `Animator.SetFloat(id, "speed", 4.2)`). |
+| `Animator.SetInt` | `(id, name, value)` | Set the `Int` parameter `name` (truncating: Lua numbers convert to a 32-bit integer). |
+| `Animator.SetTrigger` | `(id, name)` | Latch the one-shot `Trigger` parameter `name`. The graph evaluator auto-clears it the moment it consumes a transition (#316); until then an unconsumed trigger stays latched — scripts never reset it by hand. |
 
 ## `Input`
 
@@ -1266,7 +1278,8 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
   "nav_agent": { "active": true, "radius": .., "target": [x,y,z], "speed": .., .. },
   "particles": { "active": true, "texture": null, "rate": .., "lifetime": .., .. },
   "animator":  { "clip": "Idle", "time": .., "speed": .., "playing": true,
-                 "loop": false, "paused": false },
+                 "loop": false, "paused": false,
+                 "parameters": { "Jump": { "Trigger": false }, "speed": { "Float": 4.2 } } },
   "audio":     { "clip": "music/theme.ogg", "volume": .., "loop": false,
                  "play_on_start": false, "is_time_scaled": true,
                  "spatial_blend": 0.0, "initial_distance": .., "final_distance": .. }

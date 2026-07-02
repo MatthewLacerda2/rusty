@@ -115,4 +115,19 @@ fn animator_card_body(
         animator_ops::set_looping(entity, loop_clip);
         *is_dirty = true;
     }
+    draw_parameters(ui, anim);
+}
+
+/// Read-only listing of the animator's typed graph parameters (#314). They are
+/// runtime state driven by `Animator.Set*` (and, later, authored defaults on the
+/// graph asset, #315), so the card shows them without offering edits.
+fn draw_parameters(ui: &mut egui::Ui, anim: &crate::components::AnimatorComponent) {
+    if anim.parameters.is_empty() {
+        return;
+    }
+    ui.separator();
+    ui.label("Parameters (set via Animator.Set*):");
+    for (name, value) in &anim.parameters {
+        ui.label(format!("    {name}: {value}"));
+    }
 }
