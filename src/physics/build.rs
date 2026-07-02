@@ -1,8 +1,9 @@
 //! src/physics/build.rs — body/collider construction helpers.
 //!
 //! Pure mapping from the engine's component model to rapier builders, plus the
-//! body-class decision. Kept out of `world.rs` so that file stays focused on the
-//! step/sync lifecycle (and under the size cap).
+//! body-class decision and the per-tick body-state snapshot. Kept out of
+//! `world.rs` so that file stays focused on the step/sync lifecycle (and under
+//! the size cap).
 
 use glam::{Quat, Vec3};
 use rapier3d::prelude::*;
@@ -96,6 +97,39 @@ pub(super) fn collider_inputs(entity: &Entity) -> Option<ColliderInputs> {
         use_gravity: entity.rigidbody.as_ref().is_none_or(|r| r.use_gravity),
         layer: entity.layer,
     })
+}
+
+/// The per-entity component state `sync_to_rapier` pushes into a body each tick.
+pub(super) struct EntityBodyState {
+    pub pos: Vec3,
+    pub rot: Quat,
+    pub vel: Vec3,
+    pub active: bool,
+    pub kinematic: bool,
+    pub is_static: bool,
+    pub use_gravity: bool,
+}
+
+/// Snapshot an entity's transform/velocity/body-class state for one tick.
+pub(super) fn body_state(entity: &Entity) -> EntityBodyState {
+    // Gravity needs an authored rigidbody opting in: a collider-only entity
+    // (kinematic by default) is script-driven scenery and must never fall (#318),
+    // so a missing rigidbody reads as `use_gravity = false` here. Dynamic bodies
+    // always have one, so this matches `collider_inputs` for them.
+    let use_gravity = entity.rigidbody.as_ref().is_some_and(|r| r.use_gravity);
+    EntityBodyState {
+        pos: entity.transform.position,
+        rot: entity.transform.rotation,
+        vel: entity
+            .rigidbody
+            .as_ref()
+            .map(|r| r.velocity)
+            .unwrap_or(Vec3::ZERO),
+        active: entity.active,
+        kinematic: is_kinematic(entity.is_static, entity.rigidbody.as_ref()),
+        is_static: entity.is_static,
+        use_gravity,
+    }
 }
 
 /// Build a parry collider shape from the engine's `ColliderShape`, baking in the
