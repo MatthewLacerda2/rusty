@@ -7,7 +7,15 @@
 //! it — one list, so dispatch, discovery, and doc can never disagree about which
 //! callbacks exist.
 
-/// Called once per script when Play begins, before the first frame ticks.
+/// Called once per script instance when it first participates in the sim
+/// (#322): at play-enter for active scene entities, at the head of the next
+/// tick's script phase for entities spawned during play (a deliberate
+/// divergence from Unity's synchronous `Awake` — see `docs/scripting-api.md`),
+/// or on the first active tick for entities loaded disabled. Always the
+/// instance's first callback.
+pub const AWAKE: &str = "Awake";
+/// Called once per script instance, after its `Awake`, immediately before its
+/// first `Update` — deferred while the owning entity is inactive.
 pub const START: &str = "Start";
 /// Called every frame of play while the owning entity is active.
 pub const UPDATE: &str = "Update";
@@ -22,5 +30,11 @@ pub const ON_TRIGGER: &str = "OnTrigger";
 pub const ON_TRIGGER_EXIT: &str = "OnTriggerExit";
 
 /// Every callback the engine dispatches — the ground truth the doc gate reads.
-pub const LIFECYCLE_CALLBACKS: &[&str] =
-    &[START, UPDATE, ON_TRIGGER_ENTER, ON_TRIGGER, ON_TRIGGER_EXIT];
+pub const LIFECYCLE_CALLBACKS: &[&str] = &[
+    AWAKE,
+    START,
+    UPDATE,
+    ON_TRIGGER_ENTER,
+    ON_TRIGGER,
+    ON_TRIGGER_EXIT,
+];

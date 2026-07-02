@@ -4,7 +4,7 @@
 //! fixed dt, no wall-clock, no RNG.
 
 use super::*;
-use crate::scene::Scene;
+use crate::scene::{Scene, ScriptComponent};
 use glam::Vec3;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -23,6 +23,14 @@ fn empty_world() -> GameWorld {
 }
 
 const DT: f32 = 1.0 / 60.0;
+
+/// Platform-safe temp path (the Windows runner has no `/tmp`).
+fn temp_path(name: &str) -> String {
+    std::env::temp_dir()
+        .join(name)
+        .to_string_lossy()
+        .into_owned()
+}
 
 #[test]
 fn editor_fly_pitch_clamps_at_eighty() {
@@ -131,6 +139,66 @@ fn play_frame_accumulates_each_tick() {
     }
     // enter_play set 0, then five ticks each run advance_frame once.
     assert_eq!(gw.play_frame(), 5);
+}
+
+/// End-to-end #322: a prefab spawned from inside a script's `Update` gets its
+/// own script loaded at the head of the NEXT tick's script phase, where Awake,
+/// Start and its first Update all run — the spawn tick itself never touches it.
+#[test]
+fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
+    // Author the prefab: one entity carrying a callback-logging script.
+    let enemy_lua = &temp_path("rusty_322_enemy.lua");
+    std::fs::write(
+        enemy_lua,
+        "_G.__enemy_log = _G.__enemy_log or ''\nreturn {\n\
+         Awake = function(id) __enemy_log = __enemy_log .. 'A' end,\n\
+         Start = function(id) __enemy_log = __enemy_log .. 'S' end,\n\
+         Update = function(id, dt) __enemy_log = __enemy_log .. 'U' end,\n}",
+    )
+    .unwrap();
+    let prefab = &temp_path("rusty_322_enemy.prefab");
+    {
+        let mut authoring = Scene::new();
+        let id = authoring.add_entity("Enemy".to_string());
+        authoring.get_entity_mut(id).unwrap().scripts = vec![ScriptComponent {
+            path: enemy_lua.to_string(),
+            ..Default::default()
+        }];
+        crate::scene::save_prefab(&authoring, id, prefab).unwrap();
+    }
+
+    // The live scene: a spawner whose first Update instantiates that prefab.
+    let spawner_lua = &temp_path("rusty_322_spawner.lua");
+    // Forward slashes in the Lua literal: a Windows `\` would be a Lua escape.
+    let prefab_lua = prefab.replace('\\', "/");
+    std::fs::write(
+        spawner_lua,
+        format!(
+            "return {{ Update = function(id, dt)\n\
+             if not _G.__spawned then _G.__spawned = true; \
+             Scene.Instantiate('{prefab_lua}') end\nend }}"
+        ),
+    )
+    .unwrap();
+    let mut s = Scene::new();
+    let id = s.add_entity("Spawner".to_string());
+    s.get_entity_mut(id).unwrap().scripts = vec![ScriptComponent {
+        path: spawner_lua.to_string(),
+        ..Default::default()
+    }];
+    let mut gw = world_with(Rc::new(RefCell::new(s)));
+    gw.set_playing(true);
+
+    gw.tick(DT); // spawn tick: the enemy entity exists, its script untouched
+    let eval = |gw: &GameWorld, line: &str| gw.script_manager().eval(line).unwrap();
+    assert_eq!(eval(&gw, "__spawned"), "true");
+    assert_eq!(eval(&gw, "__enemy_log"), "nil", "no load in the spawn tick");
+
+    gw.tick(DT); // next tick: queued load drains → Awake, Start, first Update
+    assert_eq!(eval(&gw, "__enemy_log"), "ASU");
+
+    gw.tick(DT); // steady state: Update only, init never re-fires
+    assert_eq!(eval(&gw, "__enemy_log"), "ASUU");
 }
 
 #[test]

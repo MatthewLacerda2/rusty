@@ -47,32 +47,6 @@ impl GameWorld {
         }
     }
 
-    /// Compile + load every entity script, logging per-entity compile errors.
-    pub(super) fn load_entity_scripts(&mut self) {
-        // Each entity can carry many scripts (#83); load each, keyed by its slot.
-        type ScriptRow = (
-            u32,
-            usize,
-            String,
-            std::collections::BTreeMap<String, crate::components::ScriptFieldValue>,
-        );
-        let mut to_load: Vec<ScriptRow> = Vec::new();
-        for e in self.world.scene.borrow().iter() {
-            let rows = e.scripts.iter().enumerate();
-            to_load.extend(rows.map(|(i, s)| (e.id, i, s.path.clone(), s.values.clone())));
-        }
-        for (id, index, path, values) in to_load {
-            if let Err(e) = self
-                .resources
-                .script_manager
-                .load_entity_script(id, index, &path, &values)
-            {
-                let msg = format!("Lua compile error (Entity {}): {}", id, e);
-                self.resources.console.borrow_mut().error(msg);
-            }
-        }
-    }
-
     /// Run the one-shot `Startup` stage now that the Play session is fully set
     /// up. No built-in module registers Startup systems yet; this is the wired
     /// hook modules will register into (Unity's `Start`).
@@ -101,8 +75,12 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, advance_frame);
 }
 
-/// Drive every entity script's `Update`.
+/// The script phase. Its head drains queued script loads — entities spawned
+/// during play get their scripts compiled here, one tick after the spawn — and
+/// runs every pending `Awake` then `Start` (#322), so init always precedes any
+/// `Update` of the tick. Then every started script's `Update` runs.
 fn update_scripts(_world: &mut World, res: &mut Resources) {
+    res.script_manager.init_scripts();
     res.script_manager.update_scripts(res.frame_dt);
 }
 

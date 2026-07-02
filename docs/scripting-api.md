@@ -90,8 +90,9 @@ Component menu offers.
 
 | Callback | Signature | When it runs |
 |---|---|---|
-| `Start` | `Start(id)` | Once, when Play begins — after every entity script has loaded, before the first frame ticks. |
-| `Update` | `Update(id, dt)` | Every frame of play while the owning entity is `active`. `dt` is the frame's scaled delta (`Time.deltaTime`); under the headless harness / `Time.Step` it is the fixed step. |
+| `Awake` | `Awake(id)` | Once per script instance, when it first participates in the sim while its entity is `active`: at play-enter for active scene entities, at the head of the next tick's script phase for entities spawned during play (see the divergence note below), or on the entity's first active tick when it is loaded/spawned disabled. Always the instance's first callback. |
+| `Start` | `Start(id)` | Once per script instance, after its `Awake`, immediately before its first `Update` — deferred while the owning entity is inactive, so an object instantiated disabled initializes when first enabled (the spawn-pool pattern). |
+| `Update` | `Update(id, dt)` | Every frame of play while the owning entity is `active`, after the instance's `Start` has run. `dt` is the frame's scaled delta (`Time.deltaTime`); under the headless harness / `Time.Step` it is the fixed step. |
 | `OnTriggerEnter` | `OnTriggerEnter(id, other)` | Once, on the first frame an overlap involving the entity's trigger/sensor (or static) collider exists — before that frame's `OnTrigger`. |
 | `OnTrigger` | `OnTrigger(id, other)` | After the physics step, once per overlapping pair involving the entity's trigger/sensor (or static) collider. It is the overlap "stay": it repeats every frame the overlap persists, including the frame `OnTriggerEnter` fires. |
 | `OnTriggerExit` | `OnTriggerExit(id, other)` | Once, on the first frame a previously overlapping pair no longer overlaps — after that frame's `OnTrigger` dispatches (no stay fires for the ended pair). |
@@ -102,12 +103,31 @@ to); `other` is the other entity in the overlap.
 **Deterministic dispatch order** (enforced in `src/scripting/lifecycle.rs`, so
 headless replays stay byte-identical):
 
-- `Start` and `Update` run in ascending `(entity id, script index)` order.
+- Init is two-phase, at play-enter and again at the head of every tick's
+  script phase: **all** pending `Awake`s run first, then **all** pending
+  `Start`s — so a `Start` can safely read state another script set up in
+  `Awake`, matching Unity's contract. Each phase, and `Update`, runs in
+  ascending `(entity id, script index)` order.
+- Each `Awake` and `Start` fires **exactly once** per script instance, and
+  `Awake` always precedes every other callback on that instance (a trigger
+  callback never reaches a script whose `Awake` hasn't run).
 - The trigger callbacks dispatch in a fixed per-frame phase order — all
   `OnTriggerEnter`, then all `OnTrigger`, then all `OnTriggerExit` — with each
   phase's pair list sorted ascending. Every trigger callback notifies both
   sides of its pair — A about B, then B about A — and an entity carrying
   several scripts is notified in ascending script-index order.
+
+> **Divergence from Unity — spawns are queued, not synchronous.** Unity runs
+> `Awake` synchronously inside `Object.Instantiate`. In rusty a spawn
+> (`Scene.Instantiate`, `Scene.CreateEntity`, …) usually happens *inside*
+> another script's callback, mid-dispatch — a synchronous `Awake` would
+> re-enter the script runtime. Instead the new entity's scripts are compiled at
+> the head of the **next tick's** script phase, where their `Awake` and `Start`
+> run before any `Update` of that tick, in the deterministic order above. Code
+> must not expect a spawned object's `Awake` to have run on the line after
+> `Instantiate` returns — configure the instance through the `Scene` /
+> `Transform` verbs and let it initialize next tick (spawning it disabled and
+> enabling it when ready defers init the same way).
 
 > **Drift gate:** the callback list is centralized in
 > `src/scripting/callbacks.rs` (dispatch and MonoBehaviour discovery both read
