@@ -8,6 +8,20 @@ ignore = [
   # via wgpu → wgpu-hal → metal; there is no safe upgrade and it is NOT a
   # vulnerability. Real RUSTSEC vulnerabilities still fail the deny job.
   "RUSTSEC-2024-0436",
+  # `ttf-parser` is unmaintained but only reaches us transitively via
+  # egui/epaint → ab_glyph and winit → sctk-adwaita; the advisory offers no safe
+  # upgrade on this path and it is NOT a vulnerability. Real RUSTSEC
+  # vulnerabilities still fail the deny job.
+  "RUSTSEC-2026-0192",
+  # `quick-xml` 0.39 DoS advisories (quadratic duplicate-attribute check;
+  # unbounded namespace allocation). Both require an attacker feeding untrusted
+  # XML to the parser. Our only consumer is `wayland-scanner`, a build-time code
+  # generator parsing the protocol XML vendored inside the wayland-protocols
+  # crates — trusted, static input; nothing at runtime. No upgrade path:
+  # wayland-scanner (latest 0.31.10) pins quick-xml 0.39 (fix is in 0.41).
+  # Drop these when the wayland stack releases against quick-xml >= 0.41.
+  "RUSTSEC-2026-0194",
+  "RUSTSEC-2026-0195",
 ]
 
 [bans]
