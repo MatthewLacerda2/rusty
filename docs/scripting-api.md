@@ -78,6 +78,39 @@ is **dev-only** and absent from ship builds.
 
 ---
 
+## Script lifecycle callbacks
+
+The MonoBehaviour half of the surface: the functions a `.lua` entity script
+*implements* (as keys on the table it returns) and the engine calls. These are
+the **only** callbacks dispatched — a function under any other name (a
+`FixedUpdate`, an `OnTriggerEnter`, …) is simply never called, with no error.
+Every callback is optional; a script defines any subset, and exposing at least
+one of them is what marks a script as a MonoBehaviour the inspector's Add
+Component menu offers.
+
+| Callback | Signature | When it runs |
+|---|---|---|
+| `Start` | `Start(id)` | Once, when Play begins — after every entity script has loaded, before the first frame ticks. |
+| `Update` | `Update(id, dt)` | Every frame of play while the owning entity is `active`. `dt` is the frame's scaled delta (`Time.deltaTime`); under the headless harness / `Time.Step` it is the fixed step. |
+| `OnTrigger` | `OnTrigger(id, other)` | After the physics step, once per overlapping pair involving the entity's trigger/sensor (or static) collider. It is an overlap "stay", not an edge: it repeats every frame the overlap persists. |
+
+`id` is always the **owning** entity's id (the entity the script is attached
+to); `other` is the other entity in the overlap.
+
+**Deterministic dispatch order** (enforced in `src/scripting/lifecycle.rs`, so
+headless replays stay byte-identical):
+
+- `Start` and `Update` run in ascending `(entity id, script index)` order.
+- `OnTrigger` notifies both sides of each pair — A about B, then B about A —
+  and an entity carrying several scripts is notified in ascending script-index
+  order.
+
+> **Drift gate:** the callback list is centralized in
+> `src/scripting/callbacks.rs` (dispatch and MonoBehaviour discovery both read
+> it), and `tests/callback_doc_drift.rs` fails CI when this section and that
+> list disagree — the callback sibling of the #280 namespace gate
+> (`tests/api_doc_drift.rs`).
+
 ## `Transform`
 
 Per-entity position / rotation (Euler degrees) / scale. Mutators re-sync the

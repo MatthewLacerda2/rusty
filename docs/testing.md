@@ -29,6 +29,12 @@ existence only. Signatures/types are out of scope, because Lua closures are opaq
 runtime; checking them would need the deferred self-describing-binding macro. The
 source of truth for existence is the live surface — reconcile by editing the doc.
 
+The **callback half** of the surface has its own gate: `tests/callback_doc_drift.rs`
+(#309, both feature sets) asserts the same existence parity between the doc's
+"Script lifecycle callbacks" section and `src/scripting/callbacks.rs` — the one
+list dispatch and MonoBehaviour discovery read — so a script callback can neither
+be added undocumented nor advertised when the engine never dispatches it.
+
 ## Example (unit, in-module)
 See `tools/lint/src/main.rs` — a `#[cfg(test)] mod tests` block testing the
 size-cap selection and path normalization.

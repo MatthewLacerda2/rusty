@@ -2,8 +2,9 @@
 //!
 //! A project `.lua` script is a "MonoBehaviour" (addable from the inspector's Add
 //! Component menu, #83) when it `return`s a table exposing at least one lifecycle
-//! method (`Start` / `Update` / `OnTrigger`). Plain `require`-d helper modules,
-//! which return values/functions but no lifecycle table, are NOT offered.
+//! callback (the shared `callbacks::LIFECYCLE_CALLBACKS` list). Plain `require`-d
+//! helper modules, which return values/functions but no lifecycle table, are NOT
+//! offered.
 //!
 //! Detection evaluates each chunk in a throwaway sandboxed `Lua` and inspects the
 //! returned table — the same eval the runtime does, so the menu can never offer a
@@ -14,8 +15,7 @@ use std::path::Path;
 
 use mlua::{Lua, Table, Value};
 
-/// The lifecycle method names that mark a returned table as a MonoBehaviour.
-const LIFECYCLE_METHODS: &[&str] = &["Start", "Update", "OnTrigger"];
+use super::callbacks::LIFECYCLE_CALLBACKS;
 
 /// Scan `dir` (non-recursively) for `.lua` files that expose a lifecycle table.
 /// Returns their paths (using `dir`'s separator), sorted for a stable menu order.
@@ -50,7 +50,7 @@ pub fn exposes_lifecycle(code: &str) -> bool {
     let Ok(table) = lua.load(code).eval::<Table>() else {
         return false;
     };
-    LIFECYCLE_METHODS
+    LIFECYCLE_CALLBACKS
         .iter()
         .any(|m| matches!(table.get::<_, Value>(*m), Ok(Value::Function(_))))
 }
