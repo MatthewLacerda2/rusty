@@ -80,7 +80,12 @@ pub(super) fn corrected_next_pose(
 
     let translation = match shape {
         Some(shape) => {
-            let filter = QueryFilter::default().exclude_rigid_body(body_handle);
+            // Sensors are trigger volumes, not walls: they must never block the
+            // move, or a character could not enter the volume whose
+            // OnTriggerEnter it is meant to fire (#310).
+            let filter = QueryFilter::default()
+                .exclude_sensors()
+                .exclude_rigid_body(body_handle);
             let movement = controller.move_shape(
                 dt,
                 refs.bodies,

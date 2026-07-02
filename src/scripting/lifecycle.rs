@@ -4,8 +4,9 @@ use mlua::Table;
 
 use crate::api;
 
-use super::callbacks::{ON_TRIGGER, START, UPDATE};
+use super::callbacks::{ON_TRIGGER, ON_TRIGGER_ENTER, ON_TRIGGER_EXIT, START, UPDATE};
 use super::manager::ScriptManager;
+use crate::physics::TriggerEvents;
 
 impl ScriptManager {
     /// Invokes the Start function on all loaded entity scripts
@@ -101,44 +102,54 @@ impl ScriptManager {
         });
     }
 
-    /// Invokes the OnTrigger callback on scripts of entities involved in a trigger overlap
-    pub fn dispatch_trigger_events(&mut self, events: Vec<(u32, u32)>) {
+    /// Invokes the trigger callbacks on scripts of entities involved in trigger
+    /// overlaps: `OnTriggerEnter` for this tick's new pairs, then `OnTrigger`
+    /// (stay) for every overlapping pair, then `OnTriggerExit` for the pairs
+    /// that ended (#310) — a fixed hook order so replays stay byte-identical.
+    pub fn dispatch_trigger_events(&mut self, events: TriggerEvents) {
         let lua = match &self.lua {
             Some(l) => l,
             None => return,
         };
 
         let ctx = self.make_ctx();
+        let hooks = [
+            (ON_TRIGGER_ENTER, &events.entered),
+            (ON_TRIGGER, &events.stayed),
+            (ON_TRIGGER_EXIT, &events.exited),
+        ];
         let _ = lua.scope(|scope| -> mlua::Result<()> {
             api::register(lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
 
-            for (id_a, id_b) in events {
-                // Notify each side of the overlap, in order: A about B, then B about A.
-                for (id, other) in [(id_a, id_b), (id_b, id_a)] {
-                    // An entity may carry many scripts (#83): notify each, in
-                    // ascending script-index order so dispatch stays deterministic.
-                    let mut indices: Vec<usize> = self
-                        .entity_scripts
-                        .keys()
-                        .filter(|&&(eid, _)| eid == id)
-                        .map(|&(_, idx)| idx)
-                        .collect();
-                    indices.sort_unstable();
-                    for idx in indices {
-                        let Some(reg) = self.entity_scripts.get(&(id, idx)) else {
-                            continue;
-                        };
-                        let Ok(table) = lua.registry_value::<Table>(reg) else {
-                            continue;
-                        };
-                        let Ok(trigger_fn) = table.get::<_, mlua::Function>(ON_TRIGGER) else {
-                            continue;
-                        };
-                        if let Err(e) = trigger_fn.call::<_, ()>((id, other)) {
-                            self.console.borrow_mut().error(format!(
-                                "[Lua Error] {} on entity {} failed: {}",
-                                ON_TRIGGER, id, e
-                            ));
+            for (hook, pairs) in hooks {
+                for &(id_a, id_b) in pairs {
+                    // Notify each side of the overlap, in order: A about B, then B about A.
+                    for (id, other) in [(id_a, id_b), (id_b, id_a)] {
+                        // An entity may carry many scripts (#83): notify each, in
+                        // ascending script-index order so dispatch stays deterministic.
+                        let mut indices: Vec<usize> = self
+                            .entity_scripts
+                            .keys()
+                            .filter(|&&(eid, _)| eid == id)
+                            .map(|&(_, idx)| idx)
+                            .collect();
+                        indices.sort_unstable();
+                        for idx in indices {
+                            let Some(reg) = self.entity_scripts.get(&(id, idx)) else {
+                                continue;
+                            };
+                            let Ok(table) = lua.registry_value::<Table>(reg) else {
+                                continue;
+                            };
+                            let Ok(trigger_fn) = table.get::<_, mlua::Function>(hook) else {
+                                continue;
+                            };
+                            if let Err(e) = trigger_fn.call::<_, ()>((id, other)) {
+                                self.console.borrow_mut().error(format!(
+                                    "[Lua Error] {} on entity {} failed: {}",
+                                    hook, id, e
+                                ));
+                            }
                         }
                     }
                 }

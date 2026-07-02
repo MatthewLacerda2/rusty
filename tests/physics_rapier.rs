@@ -172,7 +172,7 @@ fn trigger_overlap_reports_pair() {
     let mut saw = false;
     for _ in 0..5 {
         let pairs = physics.step(&mut scene, 1.0 / 60.0);
-        if pairs.contains(&(a, b)) {
+        if pairs.stayed.contains(&(a, b)) {
             saw = true;
         }
     }
