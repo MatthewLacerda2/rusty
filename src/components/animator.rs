@@ -18,8 +18,16 @@ pub struct AnimatorComponent {
     /// Playback rate multiplier applied to the fixed timestep.
     pub speed: f32,
     pub is_playing: bool,
-    /// Editor/debug hold: freezes the playhead without clearing `is_playing`.
+    /// Pause hold (`Animator.Pause`/`Resume`, the editor's Freeze toggle): freezes
+    /// the playhead without clearing `is_playing`, so the pose holds and playback
+    /// resumes from the same frame.
     pub freeze: bool,
+    /// Loop the current clip: [`advance`](Self::advance) wraps the playhead modulo
+    /// the clip's duration so it repeats seamlessly. Off, the playhead runs past the
+    /// end and the sampler holds the last frame. Persists across
+    /// [`play`](Self::play)/[`crossfade`](Self::crossfade), like `speed` (#313).
+    #[serde(default)]
+    pub loop_clip: bool,
     /// The clip being faded *out* during a crossfade, with its own playhead. `None`
     /// outside a crossfade. Sampling blends this pose into `current_clip`'s.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -45,6 +53,7 @@ impl Default for AnimatorComponent {
             speed: 1.0,
             is_playing: false,
             freeze: false,
+            loop_clip: false,
             previous_clip: None,
             previous_time: 0.0,
             crossfade_elapsed: 0.0,
@@ -97,14 +106,24 @@ impl AnimatorComponent {
         self.previous_clip.is_some() && self.crossfade_duration > 0.0
     }
 
-    /// Advance both playheads (and any crossfade) by `dt` scaled seconds. Ending the
-    /// crossfade clears the previous clip so sampling falls back to a single pose.
-    pub fn advance(&mut self, dt: f32) {
+    /// Advance both playheads (and any crossfade) by `dt` scaled seconds.
+    /// `clip_duration` is the current clip's length in seconds (non-positive when
+    /// unknown): with [`loop_clip`](Self::loop_clip) set the playhead wraps modulo
+    /// it, so the clip repeats seamlessly — a pure `rem_euclid`, deterministic at
+    /// the fixed timestep. A non-looping clip runs past the end and the sampler
+    /// holds its last frame, as before. The outgoing crossfade playhead never
+    /// wraps — it stays independent, so a loop wrap mid-crossfade cannot glitch the
+    /// fading-out pose. Ending the crossfade clears the previous clip so sampling
+    /// falls back to a single pose.
+    pub fn advance(&mut self, dt: f32, clip_duration: f32) {
         if !self.is_playing || self.freeze {
             return;
         }
         let step = dt * self.speed;
         self.time += step;
+        if self.loop_clip && clip_duration > 0.0 {
+            self.time = self.time.rem_euclid(clip_duration);
+        }
         if self.is_crossfading() {
             self.previous_time += step;
             self.crossfade_elapsed += dt;

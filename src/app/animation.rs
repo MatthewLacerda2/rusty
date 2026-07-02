@@ -58,6 +58,14 @@ fn find_clip<'a>(mesh: &'a MeshComponent, name: &str) -> Option<&'a AnimationCli
     mesh.clips.iter().find(|c| c.name == name)
 }
 
+/// Duration of `anim`'s current clip on `mesh`, in seconds — the wrap length a
+/// looping [`AnimatorComponent::advance`] needs. `0.0` when there is no mesh or the
+/// clip is unresolvable (the "unknown, never wrap" sentinel `advance` expects).
+pub fn current_clip_duration(anim: &AnimatorComponent, mesh: Option<&MeshComponent>) -> f32 {
+    mesh.and_then(|m| find_clip(m, &anim.current_clip))
+        .map_or(0.0, |c| c.duration)
+}
+
 /// Pose `skin` with `clip` sampled at `time` seconds, returning one mesh-local
 /// matrix per joint slot (matching the vertices' `joint_indices`). A joint the clip
 /// never animates keeps its bind-pose local transform, so a clip that drives only

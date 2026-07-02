@@ -64,40 +64,55 @@ pub fn draw_animator(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool
         icon::PERSON_SIMPLE_RUN,
         "Animator",
         Some(&mut remove),
-        |ui| {
-            let mut clip = anim.current_clip.clone();
-            ui.horizontal(|ui| {
-                ui.label("Clip:");
-                if ui.text_edit_singleline(&mut clip).changed() {
-                    animator_ops::set_clip(entity, clip);
-                    *is_dirty = true;
-                }
-            });
-            let mut speed = anim.speed;
-            ui.horizontal(|ui| {
-                ui.label("Speed:");
-                if ui
-                    .add(egui::DragValue::new(&mut speed).speed(0.05))
-                    .changed()
-                {
-                    animator_ops::set_speed(entity, speed);
-                    *is_dirty = true;
-                }
-            });
-            let mut is_playing = anim.is_playing;
-            if ui.checkbox(&mut is_playing, "Is Playing").changed() {
-                animator_ops::set_playing(entity, is_playing);
-                *is_dirty = true;
-            }
-            let mut freeze = anim.freeze;
-            if ui.checkbox(&mut freeze, "Freeze").changed() {
-                animator_ops::set_freeze(entity, freeze);
-                *is_dirty = true;
-            }
-        },
+        |ui| animator_card_body(ui, entity, &anim, is_dirty),
     );
     if remove {
         entity.animator = None;
+        *is_dirty = true;
+    }
+}
+
+/// The Animator card's widgets: every field write routes through the shared
+/// `authoring::animator` ops (#287), the same writes the `Animator.*` Lua
+/// bindings use.
+fn animator_card_body(
+    ui: &mut egui::Ui,
+    entity: &mut Entity,
+    anim: &crate::components::AnimatorComponent,
+    is_dirty: &mut bool,
+) {
+    let mut clip = anim.current_clip.clone();
+    ui.horizontal(|ui| {
+        ui.label("Clip:");
+        if ui.text_edit_singleline(&mut clip).changed() {
+            animator_ops::set_clip(entity, clip);
+            *is_dirty = true;
+        }
+    });
+    let mut speed = anim.speed;
+    ui.horizontal(|ui| {
+        ui.label("Speed:");
+        if ui
+            .add(egui::DragValue::new(&mut speed).speed(0.05))
+            .changed()
+        {
+            animator_ops::set_speed(entity, speed);
+            *is_dirty = true;
+        }
+    });
+    let mut is_playing = anim.is_playing;
+    if ui.checkbox(&mut is_playing, "Is Playing").changed() {
+        animator_ops::set_playing(entity, is_playing);
+        *is_dirty = true;
+    }
+    let mut freeze = anim.freeze;
+    if ui.checkbox(&mut freeze, "Freeze").changed() {
+        animator_ops::set_freeze(entity, freeze);
+        *is_dirty = true;
+    }
+    let mut loop_clip = anim.loop_clip;
+    if ui.checkbox(&mut loop_clip, "Loop").changed() {
+        animator_ops::set_looping(entity, loop_clip);
         *is_dirty = true;
     }
 }

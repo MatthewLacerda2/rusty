@@ -218,13 +218,18 @@ asset of that name.
 
 Drive an entity's animation clips. Clips are imported from the entity's skinned
 glTF mesh (its `animations`); the named `clip` selects one to play. A keyframe
-sampler poses the skeleton each fixed step, so playback is deterministic.
+sampler poses the skeleton each fixed step, so playback — including a looping
+clip's wrap — is deterministic. A non-looping clip holds its last frame at the
+end.
 
 | Function | Signature | Notes |
 |---|---|---|
-| `Animator.Play` | `(id, clip)` | Hard-cut to `clip` from its start. |
+| `Animator.Play` | `(id, clip)` | Hard-cut to `clip` from its start (also releases a `Pause`). |
 | `Animator.Crossfade` | `(id, clip, duration)` | Blend out of the current clip over `duration` seconds (a zero/negative duration, or a fade into the current clip, degrades to `Play`). |
 | `Animator.Stop` | `(id)` | Halt playback (freezes the pose). |
+| `Animator.Pause` | `(id)` | Hold the playhead where it is: the pose freezes but playback stays active (a hold, not a `Stop`). |
+| `Animator.Resume` | `(id)` | Release a `Pause`, continuing from the held playhead. |
+| `Animator.SetLooping` | `(id, loop)` | `loop = true` wraps the playhead at the current clip's end so it repeats seamlessly (idle/run/walk cycles); `false` (the default) holds the last frame. Persists across `Play`/`Crossfade`, like speed. |
 
 ## `Input`
 
@@ -1189,7 +1194,8 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
                  "render_order": 0 },
   "nav_agent": { "active": true, "radius": .., "target": [x,y,z], "speed": .., .. },
   "particles": { "active": true, "texture": null, "rate": .., "lifetime": .., .. },
-  "animator":  { "clip": "Idle", "time": .., "speed": .., "playing": true },
+  "animator":  { "clip": "Idle", "time": .., "speed": .., "playing": true,
+                 "loop": false, "paused": false },
   "audio":     { "clip": "music/theme.ogg", "volume": .., "loop": false,
                  "play_on_start": false, "is_time_scaled": true,
                  "spatial_blend": 0.0, "initial_distance": .., "final_distance": .. }
