@@ -145,6 +145,8 @@ pub(crate) fn animator_value(a: &AnimatorComponent) -> Value {
         "time": a.time,
         "speed": a.speed,
         "playing": a.is_playing,
+        "loop": a.loop_clip,
+        "paused": a.freeze,
     })
 }
 
