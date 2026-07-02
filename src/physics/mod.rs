@@ -5,7 +5,9 @@
 //! now go through rapier/parry's query pipeline
 //! (`PhysicsWorld::cast_ray` / `cast_ray_filtered`), so a script's cast and the
 //! engine's cast agree for the same ray. The old AABB approximation
-//! (`cast_ray_in_scene`) has been retired.
+//! (`cast_ray_in_scene`) has been retired. The area-shaped queries (`spatial`:
+//! overlap, sphere-cast, closest-point, containment, #311) ride the same
+//! pipeline, so every spatial answer comes from the one live world.
 
 // Panic-free sim core (#195): bare `.unwrap()` is denied here (use `?` or a
 // documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
@@ -17,6 +19,9 @@ mod build_tests;
 mod character;
 mod convert;
 mod query;
+mod spatial;
+#[cfg(test)]
+mod spatial_tests;
 mod world;
 
 pub use world::PhysicsWorld;

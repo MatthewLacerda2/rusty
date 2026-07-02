@@ -674,8 +674,11 @@ Per-entity navmesh agent control.
 
 ## `Physics`
 
-Rigidbody control plus raycast queries. `Raycast` returns
-`(hit, entity_id, distance)`; on a miss the id and distance are `0`.
+Rigidbody control plus the spatial query surface over the live rapier world —
+line casts, volume overlaps, and per-collider point queries (#311). Every query
+routes through the same query pipeline the engine uses, so a script's query and
+the engine's agree. Casts return `(hit, entity_id, distance)`; on a miss the id
+and distance are `0`.
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -684,16 +687,51 @@ Rigidbody control plus raycast queries. `Raycast` returns
 | `Physics.AddForce` | `(id, fx, fy, fz)` | — (continuous force, see below) |
 | `Physics.SetKinematic` | `(id, is_kinematic)` | — |
 | `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` |
+| `Physics.SphereCast` | `(ox, oy, oz, dx, dy, dz, radius [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` |
+| `Physics.OverlapSphere` | `(cx, cy, cz, radius [, layer_mask])` | array of entity ids |
+| `Physics.OverlapBox` | `(cx, cy, cz, hx, hy, hz [, layer_mask])` | array of entity ids |
+| `Physics.OverlapCapsule` | `(x0, y0, z0, x1, y1, z1, radius [, layer_mask])` | array of entity ids |
+| `Physics.CheckSphere` | `(cx, cy, cz, radius [, layer_mask])` | `bool` |
+| `Physics.CheckBox` | `(cx, cy, cz, hx, hy, hz [, layer_mask])` | `bool` |
+| `Physics.ClosestPoint` | `(id, x, y, z)` | `found, cx, cy, cz` |
+| `Physics.ContainsPoint` | `(id, x, y, z)` | `bool` |
+| `Physics.GetBounds` | `(id)` | `found, min_x, min_y, min_z, max_x, max_y, max_z` |
 
 The optional trailing `ignore_id` skips one entity in the cast — pass the shooter's
 own id so a shot can't hit its source. The engine has no built-in "don't hit the
 player" rule; an entity is hittable simply if it exists.
 
-The optional `layer_mask` is a Unity-style bitmask (one bit per layer): the cast
-only hits entities whose layer's bit is set, ignoring all others. Build one from a
-layer name with `1 << Layers.NameToIndex("Enemy")`, or OR several together. Omit it
-(or pass `nil`) to hit every layer. This is independent of the **Layer Collision
+The optional `layer_mask` is a Unity-style bitmask (one bit per layer): the query
+only reports entities whose layer's bit is set, ignoring all others. Build one from
+a layer name with `1 << Layers.NameToIndex("Enemy")`, or OR several together. Omit
+it (or pass `nil`) to hit every layer. This is independent of the **Layer Collision
 Matrix** (Scene Settings), which governs which layers physically collide.
+
+### Spatial queries (#311)
+
+Every query except `GetBounds` asks the **live rapier world**, so it needs Play
+mode — before Play, casts and checks miss/return `false` and overlaps are empty,
+exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` /
+`OverlapCapsule` / `CheckSphere` / `CheckBox` / `SphereCast`,
+`Collider.ClosestPoint`, and `Collider.bounds`.
+
+- **`SphereCast`** is a raycast with thickness — the melee-swing / thick-projectile
+  query. `distance` is how far the sphere's *center* traveled before impact.
+- **`OverlapSphere` / `OverlapBox` / `OverlapCapsule`** return the ids of every
+  entity whose collider intersects the volume *right now* (the grenade-radius /
+  zone-check query), as a Lua array sorted ascending. `OverlapBox` takes
+  half-extents (`hx, hy, hz`, Unity's `halfExtents`) and is axis-aligned;
+  `OverlapCapsule` spans the two sphere centers `p0`→`p1` with `radius`.
+- **`CheckSphere` / `CheckBox`** are the boolean fast-path when you only need
+  "is anything there?".
+- **`ClosestPoint`** returns the nearest point on that entity's collider to the
+  query point; a point inside the collider is its own closest point.
+  `found=false` ⇒ the entity has no live collider (edit mode, or no collider) and
+  the query point echoes back.
+- **`ContainsPoint`** is `true` when the point is inside that entity's collider.
+- **`GetBounds`** surfaces the collider's world-space AABB, which the engine keeps
+  current on transform edits and each physics step — the one query that also works
+  in edit mode. `found=false` ⇒ the entity has no collider component.
 
 `AddForce` applies a **continuous force** (Unity's `ForceMode.Force`): the velocity
 change for one call is `F / mass · fixedDeltaTime`, so applying the same force each
