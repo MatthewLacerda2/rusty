@@ -7,27 +7,40 @@
 //! translation that stops at — and slides along — obstacles. The corrected pose is
 //! the one we hand to `set_next_kinematic_position`, restoring wall blocking.
 //!
+//! rapier's controller deliberately does **not** apply gravity, so a `use_gravity`
+//! kinematic body gets it fed here (#318): a fall speed accumulated across fixed
+//! ticks is folded into the desired translation and zeroed on ground contact.
+//!
 //! Determinism: the controller is configured statically and `move_shape` is a pure
 //! query over the current pipeline state at a fixed `dt`; no wall-clock or RNG.
 
 use rapier3d::control::KinematicCharacterController;
 use rapier3d::prelude::*;
 
-/// A character controller tuned for the engine's flat-ground walkers.
+/// A character controller tuned for the engine's walkers.
 ///
-/// `slide` is on (collide-and-slide); ground-snapping and autostep are off so a
-/// horizontally-driven body keeps exactly the vertical motion the script asked for
-/// (the existing kinematic bodies opt out of gravity).
-pub(super) fn controller() -> KinematicCharacterController {
-    // Only `snap_to_ground` departs from rapier's defaults: disabling it keeps a
-    // horizontally-driven body's vertical motion exactly as the script asked (the
-    // kinematic bodies opt out of gravity). rapier's defaults already give us
-    // `slide: true` (collide-and-slide) and `autostep: None`, so we don't restate
-    // them — restating a value identical to the default would be a silent no-op.
-    KinematicCharacterController {
-        snap_to_ground: None,
-        ..KinematicCharacterController::default()
+/// rapier's defaults already give us `slide: true` (collide-and-slide) and
+/// `autostep: None`; the one knob is ground snapping. A gravity-driven body keeps
+/// rapier's default `snap_to_ground` — snapping is the grounded detection that
+/// stops a resting body from accumulating fall speed and jittering — while a body
+/// that opts out of gravity disables it, so its vertical motion stays exactly what
+/// the script asked for.
+pub(super) fn controller(gravity: bool) -> KinematicCharacterController {
+    let mut controller = KinematicCharacterController::default();
+    if !gravity {
+        controller.snap_to_ground = None;
     }
+    controller
+}
+
+/// Gravity feed for one kinematic body's tick (#318). rapier's controller never
+/// integrates gravity itself, so the engine carries a per-body fall speed across
+/// ticks and folds it into the desired motion here.
+pub(super) struct GravityFall {
+    /// Downward acceleration magnitude (m/s², positive).
+    pub accel: f32,
+    /// Fall speed carried in from the previous tick (m/s, positive = falling).
+    pub speed: f32,
 }
 
 /// Borrowed rapier state the controller queries against. Bundled so the resolve
@@ -39,20 +52,26 @@ pub(super) struct RapierRefs<'a> {
 }
 
 /// Resolve a kinematic body's move toward `target` and return the corrected next
-/// pose. The desired translation (last solved pos -> target) is run through the
-/// controller (collide-and-slide); the target rotation is kept verbatim, since the
-/// controller only resolves translation. The body is excluded from the query so it
-/// never collides with itself.
+/// pose plus the fall speed to carry into the next tick. The desired translation
+/// (last solved pos -> target, plus the gravity term when `gravity` is given) is
+/// run through the controller (collide-and-slide); the target rotation is kept
+/// verbatim, since the controller only resolves translation. The body is excluded
+/// from the query so it never collides with itself.
 pub(super) fn corrected_next_pose(
-    controller: &KinematicCharacterController,
     refs: RapierRefs<'_>,
     body_handle: RigidBodyHandle,
     target: Isometry<Real>,
     dt: Real,
-) -> Isometry<Real> {
+    gravity: Option<GravityFall>,
+) -> (Isometry<Real>, f32) {
     let body = &refs.bodies[body_handle];
     let current = *body.position();
-    let desired = target.translation.vector - current.translation.vector;
+    let mut desired = target.translation.vector - current.translation.vector;
+    // Semi-implicit Euler: accelerate the carried fall speed first, then pull the
+    // desired motion down by it on top of whatever the script asked for.
+    let mut fall_speed = gravity.as_ref().map_or(0.0, |g| g.speed + g.accel * dt);
+    desired.y -= fall_speed * dt;
+    let controller = controller(gravity.is_some());
     let shape = body
         .colliders()
         .first()
@@ -62,28 +81,33 @@ pub(super) fn corrected_next_pose(
     let translation = match shape {
         Some(shape) => {
             let filter = QueryFilter::default().exclude_rigid_body(body_handle);
-            controller
-                .move_shape(
-                    dt,
-                    refs.bodies,
-                    refs.colliders,
-                    refs.queries,
-                    shape.as_ref(),
-                    &current,
-                    desired,
-                    filter,
-                    |_| {},
-                )
-                .translation
+            let movement = controller.move_shape(
+                dt,
+                refs.bodies,
+                refs.colliders,
+                refs.queries,
+                shape.as_ref(),
+                &current,
+                desired,
+                filter,
+                |_| {},
+            );
+            if movement.grounded {
+                // Standing on the floor: stop accumulating, so stepping off a
+                // ledge starts a fresh fall instead of an instant plummet.
+                fall_speed = 0.0;
+            }
+            movement.translation
         }
         // No collider shape to sweep: fall back to the raw desired motion.
         None => desired,
     };
 
-    Isometry::from_parts(
+    let pose = Isometry::from_parts(
         (current.translation.vector + translation).into(),
         target.rotation,
-    )
+    );
+    (pose, fall_speed)
 }
 
 #[cfg(test)]
@@ -91,16 +115,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn controller_disables_snap_to_ground() {
-        let c = controller();
-        // The one departure from rapier's defaults: kinematic bodies keep the exact
-        // vertical motion scripts drive, so ground-snapping must be off.
-        assert!(
-            c.snap_to_ground.is_none(),
-            "snap_to_ground must be disabled"
-        );
-        // The resulting config we rely on (these happen to match rapier defaults).
-        assert!(c.slide, "collide-and-slide stays on");
-        assert!(c.autostep.is_none(), "autostep stays off");
+    fn controller_snaps_to_ground_only_under_gravity() {
+        // Without gravity, kinematic bodies keep the exact vertical motion scripts
+        // drive, so ground-snapping must be off.
+        let free = controller(false);
+        assert!(free.snap_to_ground.is_none(), "snap off without gravity");
+        // With gravity, snapping is the grounded detection that keeps a resting
+        // body from accumulating fall speed.
+        let falling = controller(true);
+        assert!(falling.snap_to_ground.is_some(), "snap on under gravity");
+        // The shared config we rely on (these happen to match rapier defaults).
+        for c in [free, falling] {
+            assert!(c.slide, "collide-and-slide stays on");
+            assert!(c.autostep.is_none(), "autostep stays off");
+        }
     }
 }

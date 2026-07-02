@@ -6,9 +6,10 @@
 //!
 //!   1. `sync_to_rapier`  — push the (externally mutated) component transforms and
 //!      velocities into rapier. Kinematic bodies (player/enemy) are routed through
-//!      the `KinematicCharacterController` (collide-and-slide vs. walls; see
-//!      `character`) and given the corrected next pose; dynamic bodies get their
-//!      pose, linear velocity, and gravity scale; static bodies stay put.
+//!      the `KinematicCharacterController` (collide-and-slide vs. walls, plus the
+//!      gravity fall speed when `use_gravity` is authored; see `character`) and
+//!      given the corrected next pose; dynamic bodies get their pose, linear
+//!      velocity, and gravity scale; static bodies stay put.
 //!   2. `step`            — advance the rapier world by `dt` under gravity.
 //!   3. `sync_from_rapier`— write the integrated transforms + velocities back onto
 //!      the entities, and return the trigger/collision pairs scripts expect.
@@ -17,13 +18,11 @@
 
 use std::collections::HashMap;
 
-use glam::Vec3;
-use rapier3d::control::KinematicCharacterController;
 use rapier3d::prelude::*;
 
 use super::build::{
-    build_shape, collider_inputs, gravity_scale, interaction_groups, is_kinematic, order_pair,
-    BodyClass,
+    body_state, build_shape, collider_inputs, gravity_scale, interaction_groups, order_pair,
+    BodyClass, EntityBodyState,
 };
 use super::character;
 use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
@@ -43,8 +42,9 @@ pub struct PhysicsWorld {
     ccd_solver: CCDSolver,
     /// Exposed to the `physics` module (see `query`) for ray casts.
     pub(super) query_pipeline: QueryPipeline,
-    /// Collide-and-slide controller for kinematic (player/enemy) bodies.
-    character_controller: KinematicCharacterController,
+    /// Per-body downward fall speed for gravity-driven kinematic bodies (#318),
+    /// keyed by entity id and carried across ticks; zeroed on ground contact.
+    fall_speeds: HashMap<u32, f32>,
     /// stable entity id -> rigid-body handle.
     id_to_body: HashMap<u32, RigidBodyHandle>,
     /// collider handle -> stable entity id (for event/raycast lookup).
@@ -70,7 +70,7 @@ impl PhysicsWorld {
             multibody_joints: MultibodyJointSet::new(),
             ccd_solver: CCDSolver::new(),
             query_pipeline: QueryPipeline::new(),
-            character_controller: character::controller(),
+            fall_speeds: HashMap::new(),
             id_to_body: HashMap::new(),
             collider_to_id: HashMap::new(),
             id_is_trigger: HashMap::new(),
@@ -138,23 +138,34 @@ impl PhysicsWorld {
         let entries: Vec<(u32, RigidBodyHandle)> =
             self.id_to_body.iter().map(|(&id, &h)| (id, h)).collect();
         for (id, handle) in entries {
-            let Some(snapshot) = read_entity_body_state(scene, id) else {
+            let Some(snapshot) = scene.get_entity(id).as_deref().map(body_state) else {
                 continue;
             };
             if self.bodies.get(handle).is_none() {
                 continue;
             }
-            self.apply_body_state(handle, &snapshot, dt);
+            self.apply_body_state(id, handle, &snapshot, dt);
         }
     }
 
     /// Push one entity's snapshot into its rapier body for this tick.
-    fn apply_body_state(&mut self, handle: RigidBodyHandle, snap: &EntityBodyState, dt: f32) {
+    fn apply_body_state(
+        &mut self,
+        id: u32,
+        handle: RigidBodyHandle,
+        snap: &EntityBodyState,
+        dt: f32,
+    ) {
         if snap.kinematic {
             // Route the script/input-set move through the controller so the
             // body collides-and-slides against walls instead of teleporting.
-            let next = character::corrected_next_pose(
-                &self.character_controller,
+            // With `use_gravity` authored, feed the accumulated fall speed into
+            // the move (#318) — rapier never gravity-integrates a kinematic body.
+            let gravity = (snap.active && snap.use_gravity).then(|| character::GravityFall {
+                accel: -self.gravity.y,
+                speed: self.fall_speeds.get(&id).copied().unwrap_or(0.0),
+            });
+            let (next, fall_speed) = character::corrected_next_pose(
                 character::RapierRefs {
                     bodies: &self.bodies,
                     colliders: &self.colliders,
@@ -163,12 +174,17 @@ impl PhysicsWorld {
                 handle,
                 to_iso(snap.pos, snap.rot),
                 dt,
+                gravity,
             );
+            self.fall_speeds.insert(id, fall_speed);
             let body = &mut self.bodies[handle];
             body.set_enabled(snap.active);
             body.set_next_kinematic_position(next);
             return;
         }
+        // Leaving the kinematic class (`Physics.SetKinematic`) drops any carried
+        // fall speed, so toggling back later starts a fresh fall.
+        self.fall_speeds.remove(&id);
         let body = &mut self.bodies[handle];
         body.set_enabled(snap.active);
         if snap.is_static {
@@ -265,36 +281,4 @@ impl PhysicsWorld {
             scene.update_entity_collider(id);
         }
     }
-}
-
-/// The per-entity component state `sync_to_rapier` pushes into a body each tick.
-struct EntityBodyState {
-    pos: Vec3,
-    rot: glam::Quat,
-    vel: Vec3,
-    active: bool,
-    kinematic: bool,
-    is_static: bool,
-    use_gravity: bool,
-}
-
-/// Read an entity's transform/velocity/body-class snapshot, or `None` if absent.
-fn read_entity_body_state(scene: &Scene, id: u32) -> Option<EntityBodyState> {
-    let entity = scene.get_entity(id)?;
-    let kinematic = is_kinematic(entity.is_static, entity.rigidbody.as_ref());
-    let vel = entity
-        .rigidbody
-        .as_ref()
-        .map(|r| r.velocity)
-        .unwrap_or(Vec3::ZERO);
-    let use_gravity = entity.rigidbody.as_ref().is_none_or(|r| r.use_gravity);
-    Some(EntityBodyState {
-        pos: entity.transform.position,
-        rot: entity.transform.rotation,
-        vel,
-        active: entity.active,
-        kinematic,
-        is_static: entity.is_static,
-        use_gravity,
-    })
 }
