@@ -31,3 +31,5 @@ mod tests_lifecycle;
 mod tests_manager;
 #[cfg(test)]
 mod tests_physics;
+#[cfg(test)]
+mod tests_spatial;

@@ -1,10 +1,17 @@
-//! src/api/physics.rs — `Physics` namespace.
+//! src/api/physics/mod.rs — `Physics` namespace.
 //!
-//! Rigidbody velocity/force/kinematic controls, plus the `Raycast` hitscan cast
-//! against the live rapier/parry `PhysicsWorld` — the same query pipeline the
-//! engine hitscan uses, so script and engine casts agree (#31).
+//! Rigidbody velocity/force/kinematic controls plus the spatial query surface
+//! over the live rapier/parry `PhysicsWorld` — the same query pipeline the
+//! engine uses, so script and engine queries agree (#31, #311). The queries
+//! split by shape: line casts (`Raycast`/`SphereCast`) in `cast`, volume
+//! overlaps (`Overlap*`/`Check*`) in `volume`, per-collider point queries
+//! (`ClosestPoint`/`ContainsPoint`/`GetBounds`) in `point`.
 //! `register` creates the `Physics` table; `register_hitscan` extends it once
 //! the live physics handle is available.
+
+mod cast;
+mod point;
+mod volume;
 
 use std::cell::RefCell;
 
@@ -12,9 +19,9 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::{global_table, put, Reg};
-use crate::physics::{is_hittable, PhysicsWorld};
+use crate::physics::PhysicsWorld;
 use crate::scene::authoring::rigidbody as rb_ops;
-use crate::scene::{layer_in_mask, Scene};
+use crate::scene::Scene;
 use crate::time::FIXED_DELTA_TIME;
 
 /// Register the rigidbody half of `Physics` (velocity/force/kinematic) onto
@@ -108,10 +115,12 @@ fn register_force<'lua, 'scope>(
     )
 }
 
-/// Extend `Physics` with `Raycast` (the query-only hitscan). It routes through the
-/// live rapier/parry `PhysicsWorld` — the same query pipeline the engine hitscan
-/// uses — so a script's cast and the engine's cast return identical hits for the
-/// same ray.
+/// Extend `Physics` with the spatial query surface (#31, #311): the line casts
+/// (`Raycast`/`SphereCast`), the volume overlaps (`OverlapSphere`/`OverlapBox`/
+/// `OverlapCapsule` + `CheckSphere`/`CheckBox`), and the per-collider point
+/// queries (`ClosestPoint`/`ContainsPoint`/`GetBounds`). All route through the
+/// live rapier/parry `PhysicsWorld` — the same query pipeline the engine uses —
+/// so a script's query and the engine's return identical answers.
 pub fn register_hitscan<'lua, 'scope>(
     lua: &'lua Lua,
     scope: &mlua::Scope<'lua, 'scope>,
@@ -120,78 +129,9 @@ pub fn register_hitscan<'lua, 'scope>(
 ) -> Reg {
     let table = global_table(lua, "Physics")?;
 
-    register_raycast(scope, &table, scene, physics)?;
+    cast::register(scope, &table, scene, physics)?;
+    volume::register(scope, &table, scene, physics)?;
+    point::register(scope, &table, scene, physics)?;
 
     Ok(())
-}
-
-/// `Raycast` — query-only cast returning `(hit, entity_id, distance)`.
-fn register_raycast<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-    physics: &'scope RefCell<Option<PhysicsWorld>>,
-) -> Reg {
-    put(
-        table,
-        "Raycast",
-        scope.create_function(
-            |_,
-             (ox, oy, oz, dx, dy, dz, ignore, mask): (
-                f32,
-                f32,
-                f32,
-                f32,
-                f32,
-                f32,
-                Option<u32>,
-                Option<u32>,
-            )| {
-                // (hit, entity_id, distance) — hit=false ⇒ id/dist are 0. The
-                // optional trailing `ignore` id is skipped (e.g. the shooter); the
-                // optional `mask` limits hits to entities on those layers (#91).
-                match cast(
-                    physics,
-                    scene,
-                    Vec3::new(ox, oy, oz),
-                    Vec3::new(dx, dy, dz),
-                    ignore,
-                    mask,
-                ) {
-                    Some((id, t)) => Ok((true, id, t)),
-                    None => Ok((false, 0u32, 0.0f32)),
-                }
-            },
-        ),
-    )
-}
-
-/// Cast `origin`→`dir` through the live rapier world under the shared hitscan
-/// filter ([`is_hittable`]), additionally skipping `ignore` (the shooter's own
-/// entity, so a shot can't hit its source). Returns `None` when no physics world
-/// exists yet (edit mode / no Play has built one) or on a miss.
-fn cast(
-    physics: &RefCell<Option<PhysicsWorld>>,
-    scene: &RefCell<Scene>,
-    origin: Vec3,
-    dir: Vec3,
-    ignore: Option<u32>,
-    mask: Option<u32>,
-) -> Option<(u32, f32)> {
-    let physics = physics.borrow();
-    let physics = physics.as_ref()?;
-    let scene = scene.borrow();
-    physics.cast_ray_filtered(origin, dir, f32::MAX, |id| {
-        if Some(id) == ignore || !is_hittable(&scene, id) {
-            return false;
-        }
-        // A layer mask (bit per layer) limits hits to entities on those layers;
-        // absent, every layer is eligible. Excluded colliders are passed through.
-        match mask {
-            Some(m) => scene
-                .get_entity(id)
-                .is_some_and(|e| layer_in_mask(e.layer, m)),
-            None => true,
-        }
-    })
 }

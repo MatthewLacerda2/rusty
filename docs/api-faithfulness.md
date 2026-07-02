@@ -123,6 +123,18 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 | `AddForce` | ✅ | sim — folds impulse into `velocity` (read above); skips kinematic |
 | `SetKinematic` | ✅ | sim — `physics/build.rs::is_kinematic` / `world.rs` body class |
 
+(The #311 spatial query surface — `Raycast`'s siblings `SphereCast`,
+`OverlapSphere`/`OverlapBox`/`OverlapCapsule`, `CheckSphere`/`CheckBox`,
+`ClosestPoint`/`ContainsPoint`, and `GetBounds` — is read-only introspection over
+the live rapier world, not setters, so it doesn't add to the count. Its
+faithfulness claim is script↔engine **agreement**: every query routes through the
+same `PhysicsWorld` query pipeline the engine uses, proven by
+`src/physics/spatial_tests.rs` (the queries against hand-computed geometry) and
+`src/scripting/tests_spatial.rs` (the Lua bindings return those same answers,
+including the #91 layer-mask filter). `GetBounds` reads the collider's cached
+world AABB — the `calculate_world_aabb` value the scene recomputes on transform
+edits and each physics step.)
+
 ### `Time` — over the `Time` resource
 
 | Setter | Status | Read-site |

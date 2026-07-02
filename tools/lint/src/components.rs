@@ -79,9 +79,11 @@ const WAIVERS: &[(&str, &str, &str)] = &[
     (
         "collider",
         "api",
-        "Served by the `Physics` namespace (the collider is queried via \
-         Physics.Raycast, the same rapier world the engine casts against). \
-         A separate `Collider` namespace would split physics across two surfaces.",
+        "Served by the `Physics` namespace: the collider is queried via \
+         Physics.Raycast plus the #311 spatial surface (Overlap*/Check*, \
+         SphereCast, ClosestPoint/ContainsPoint, GetBounds) — the same rapier \
+         world the engine casts against. A separate `Collider` namespace would \
+         split physics across two surfaces.",
     ),
     (
         "rigidbody",
