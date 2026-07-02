@@ -26,6 +26,7 @@ use super::build::{
 };
 use super::character;
 use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
+use super::trigger_events::TriggerEvents;
 use crate::scene::Scene;
 
 pub struct PhysicsWorld {
@@ -51,6 +52,10 @@ pub struct PhysicsWorld {
     pub(super) collider_to_id: HashMap<ColliderHandle, u32>,
     /// stable entity id -> its trigger flag (sensors surface trigger pairs).
     id_is_trigger: HashMap<u32, bool>,
+    /// Last tick's trigger-overlap pairs, diffed each step to recover the
+    /// enter/exit edges (#310). Starts empty, so a play session's first
+    /// overlapping tick is an "enter".
+    prev_triggers: Vec<(u32, u32)>,
 }
 
 impl PhysicsWorld {
@@ -74,6 +79,7 @@ impl PhysicsWorld {
             id_to_body: HashMap::new(),
             collider_to_id: HashMap::new(),
             id_is_trigger: HashMap::new(),
+            prev_triggers: Vec::new(),
         };
         world.build_bodies(scene);
         // Prime the query pipeline so a raycast works before the first step.
@@ -198,8 +204,10 @@ impl PhysicsWorld {
         }
     }
 
-    /// Advance the rapier world by `dt` and surface trigger/collision pairs.
-    pub fn step(&mut self, scene: &mut Scene, dt: f32) -> Vec<(u32, u32)> {
+    /// Advance the rapier world by `dt` and surface the tick's trigger events —
+    /// enter/stay/exit distinctly (#310), each list sorted for deterministic
+    /// dispatch.
+    pub fn step(&mut self, scene: &mut Scene, dt: f32) -> TriggerEvents {
         self.integration_parameters.dt = dt;
         self.sync_to_rapier(scene, dt);
 
@@ -219,9 +227,10 @@ impl PhysicsWorld {
             &(),
         );
 
-        let triggers = self.collect_triggers();
+        let events = TriggerEvents::from_overlap_sets(&self.prev_triggers, self.collect_triggers());
+        self.prev_triggers = events.stayed.clone();
         self.sync_from_rapier(scene);
-        triggers
+        events
     }
 
     /// Gather overlapping pairs that involve a trigger/sensor or static body,

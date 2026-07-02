@@ -13,7 +13,7 @@ use crate::time::Time;
 use super::console::ConsoleLogs;
 use super::manager::ScriptManager;
 
-fn manager_with_entity() -> (ScriptManager, u32) {
+pub(super) fn manager_with_entity() -> (ScriptManager, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("E".to_string());
     let m = ScriptManager::new(
@@ -29,7 +29,7 @@ fn manager_with_entity() -> (ScriptManager, u32) {
     (m, id)
 }
 
-fn write_script(name: &str, code: &str) -> String {
+pub(super) fn write_script(name: &str, code: &str) -> String {
     let path = format!("/tmp/rusty_lifecycle_{}.lua", name);
     std::fs::write(&path, code).unwrap();
     path
@@ -109,6 +109,9 @@ fn dispatch_trigger_events_calls_on_trigger() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
-    m.dispatch_trigger_events(vec![(id, 99)]);
+    m.dispatch_trigger_events(crate::physics::TriggerEvents {
+        stayed: vec![(id, 99)],
+        ..Default::default()
+    });
     assert_eq!(m.eval("__other").unwrap(), "99");
 }

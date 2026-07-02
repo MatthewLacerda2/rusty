@@ -83,7 +83,7 @@ is **dev-only** and absent from ship builds.
 The MonoBehaviour half of the surface: the functions a `.lua` entity script
 *implements* (as keys on the table it returns) and the engine calls. These are
 the **only** callbacks dispatched — a function under any other name (a
-`FixedUpdate`, an `OnTriggerEnter`, …) is simply never called, with no error.
+`FixedUpdate`, an `OnDestroy`, …) is simply never called, with no error.
 Every callback is optional; a script defines any subset, and exposing at least
 one of them is what marks a script as a MonoBehaviour the inspector's Add
 Component menu offers.
@@ -92,7 +92,9 @@ Component menu offers.
 |---|---|---|
 | `Start` | `Start(id)` | Once, when Play begins — after every entity script has loaded, before the first frame ticks. |
 | `Update` | `Update(id, dt)` | Every frame of play while the owning entity is `active`. `dt` is the frame's scaled delta (`Time.deltaTime`); under the headless harness / `Time.Step` it is the fixed step. |
-| `OnTrigger` | `OnTrigger(id, other)` | After the physics step, once per overlapping pair involving the entity's trigger/sensor (or static) collider. It is an overlap "stay", not an edge: it repeats every frame the overlap persists. |
+| `OnTriggerEnter` | `OnTriggerEnter(id, other)` | Once, on the first frame an overlap involving the entity's trigger/sensor (or static) collider exists — before that frame's `OnTrigger`. |
+| `OnTrigger` | `OnTrigger(id, other)` | After the physics step, once per overlapping pair involving the entity's trigger/sensor (or static) collider. It is the overlap "stay": it repeats every frame the overlap persists, including the frame `OnTriggerEnter` fires. |
+| `OnTriggerExit` | `OnTriggerExit(id, other)` | Once, on the first frame a previously overlapping pair no longer overlaps — after that frame's `OnTrigger` dispatches (no stay fires for the ended pair). |
 
 `id` is always the **owning** entity's id (the entity the script is attached
 to); `other` is the other entity in the overlap.
@@ -101,9 +103,11 @@ to); `other` is the other entity in the overlap.
 headless replays stay byte-identical):
 
 - `Start` and `Update` run in ascending `(entity id, script index)` order.
-- `OnTrigger` notifies both sides of each pair — A about B, then B about A —
-  and an entity carrying several scripts is notified in ascending script-index
-  order.
+- The trigger callbacks dispatch in a fixed per-frame phase order — all
+  `OnTriggerEnter`, then all `OnTrigger`, then all `OnTriggerExit` — with each
+  phase's pair list sorted ascending. Every trigger callback notifies both
+  sides of its pair — A about B, then B about A — and an entity carrying
+  several scripts is notified in ascending script-index order.
 
 > **Drift gate:** the callback list is centralized in
 > `src/scripting/callbacks.rs` (dispatch and MonoBehaviour discovery both read
