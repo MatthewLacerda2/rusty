@@ -22,8 +22,12 @@ mod query;
 mod spatial;
 #[cfg(test)]
 mod spatial_tests;
+mod trigger_events;
+#[cfg(test)]
+mod trigger_tests;
 mod world;
 
+pub use trigger_events::TriggerEvents;
 pub use world::PhysicsWorld;
 
 use crate::scene::Scene;

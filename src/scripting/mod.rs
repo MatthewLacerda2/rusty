@@ -35,3 +35,5 @@ mod tests_manager;
 mod tests_physics;
 #[cfg(test)]
 mod tests_spatial;
+#[cfg(test)]
+mod tests_triggers;

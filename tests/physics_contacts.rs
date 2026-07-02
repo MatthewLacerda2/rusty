@@ -47,7 +47,7 @@ fn static_floor_contact_is_reported() {
     let mut physics = PhysicsWorld::from_scene(&scene);
     let mut saw = false;
     for _ in 0..240 {
-        if physics.step(&mut scene, 1.0 / 60.0).contains(&want) {
+        if physics.step(&mut scene, 1.0 / 60.0).stayed.contains(&want) {
             saw = true;
             break;
         }

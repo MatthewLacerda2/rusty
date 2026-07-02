@@ -11,9 +11,16 @@
 pub const START: &str = "Start";
 /// Called every frame of play while the owning entity is active.
 pub const UPDATE: &str = "Update";
+/// Called once, the tick a trigger-overlap pair involving the owning entity
+/// begins (#310) — before that tick's `OnTrigger`.
+pub const ON_TRIGGER_ENTER: &str = "OnTriggerEnter";
 /// Called once per trigger-overlap pair involving the owning entity, each frame
-/// the overlap persists.
+/// the overlap persists (the "stay" callback, including the enter tick).
 pub const ON_TRIGGER: &str = "OnTrigger";
+/// Called once, the tick after a trigger-overlap pair involving the owning
+/// entity ends (#310) — after that tick's `OnTrigger` dispatches.
+pub const ON_TRIGGER_EXIT: &str = "OnTriggerExit";
 
 /// Every callback the engine dispatches — the ground truth the doc gate reads.
-pub const LIFECYCLE_CALLBACKS: &[&str] = &[START, UPDATE, ON_TRIGGER];
+pub const LIFECYCLE_CALLBACKS: &[&str] =
+    &[START, UPDATE, ON_TRIGGER_ENTER, ON_TRIGGER, ON_TRIGGER_EXIT];

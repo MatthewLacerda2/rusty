@@ -109,15 +109,15 @@ fn update_scripts(_world: &mut World, res: &mut Resources) {
 /// Step the rapier world and dispatch any resulting trigger events to scripts.
 fn step_physics(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
-    let triggers = {
+    let events = {
         let mut s = world.scene.borrow_mut();
         match res.physics.borrow_mut().as_mut() {
             Some(physics) => physics.step(&mut s, dt),
-            None => Vec::new(),
+            None => crate::physics::TriggerEvents::default(),
         }
     };
-    if !triggers.is_empty() {
-        res.script_manager.dispatch_trigger_events(triggers);
+    if !events.is_empty() {
+        res.script_manager.dispatch_trigger_events(events);
     }
 }
 
