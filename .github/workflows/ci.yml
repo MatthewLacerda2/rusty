@@ -77,9 +77,20 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'merge_group' ||
       github.event.pull_request.draft == false
+    env:
+      # Debuginfo dominates target/'s size and the tests never read it. Without
+      # this, the two feature-set builds plus the restored cache overflow the
+      # runner's ~14 GB free disk — recurring "No space left on device" flakes
+      # (seen on #329 and #332).
+      CARGO_PROFILE_DEV_DEBUG: "0"
     steps:
       - uses: actions/checkout@v4
         if: needs.changes.outputs.code != 'false'
+      - name: Free runner disk (drop preinstalled toolchains we never use)
+        if: needs.changes.outputs.code != 'false'
+        # Hosted runners ship Android/.NET/Haskell toolchains that eat ~25 GB of
+        # the disk this job needs for two full engine builds.
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost
       - name: Toolchain (from rust-toolchain.toml)
         if: needs.changes.outputs.code != 'false'
         run: rustup show
@@ -120,6 +131,10 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'merge_group' ||
       (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
+    env:
+      # Same disk guard as build-test: tests never read debuginfo, and the
+      # Windows runner has the same ~14 GB free-disk budget as Linux.
+      CARGO_PROFILE_DEV_DEBUG: "0"
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain (from rust-toolchain.toml)
