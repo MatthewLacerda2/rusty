@@ -24,6 +24,14 @@ fn empty_world() -> GameWorld {
 
 const DT: f32 = 1.0 / 60.0;
 
+/// Platform-safe temp path (the Windows runner has no `/tmp`).
+fn temp_path(name: &str) -> String {
+    std::env::temp_dir()
+        .join(name)
+        .to_string_lossy()
+        .into_owned()
+}
+
 #[test]
 fn editor_fly_pitch_clamps_at_eighty() {
     let mut gw = empty_world();
@@ -138,14 +146,8 @@ fn play_frame_accumulates_each_tick() {
 /// Start and its first Update all run — the spawn tick itself never touches it.
 #[test]
 fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
-    // Author the prefab: one entity carrying a callback-logging script. Paths
-    // go through the platform temp dir so the test also passes on Windows.
-    let tmp = std::env::temp_dir();
-    let enemy_lua = tmp
-        .join("rusty_322_enemy.lua")
-        .to_string_lossy()
-        .into_owned();
-    let enemy_lua = enemy_lua.as_str();
+    // Author the prefab: one entity carrying a callback-logging script.
+    let enemy_lua = &temp_path("rusty_322_enemy.lua");
     std::fs::write(
         enemy_lua,
         "_G.__enemy_log = _G.__enemy_log or ''\nreturn {\n\
@@ -154,11 +156,7 @@ fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
          Update = function(id, dt) __enemy_log = __enemy_log .. 'U' end,\n}",
     )
     .unwrap();
-    let prefab = tmp
-        .join("rusty_322_enemy.prefab")
-        .to_string_lossy()
-        .into_owned();
-    let prefab = prefab.as_str();
+    let prefab = &temp_path("rusty_322_enemy.prefab");
     {
         let mut authoring = Scene::new();
         let id = authoring.add_entity("Enemy".to_string());
@@ -170,11 +168,7 @@ fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
     }
 
     // The live scene: a spawner whose first Update instantiates that prefab.
-    let spawner_lua = tmp
-        .join("rusty_322_spawner.lua")
-        .to_string_lossy()
-        .into_owned();
-    let spawner_lua = spawner_lua.as_str();
+    let spawner_lua = &temp_path("rusty_322_spawner.lua");
     // Forward slashes in the Lua literal: a Windows `\` would be a Lua escape.
     let prefab_lua = prefab.replace('\\', "/");
     std::fs::write(
