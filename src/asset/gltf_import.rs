@@ -8,11 +8,15 @@
 //!
 //! Each glTF *mesh* becomes one addressable `SubMesh`; its primitives are merged
 //! (index offsets fixed up) into one vertex/index stream, since a primitive split
-//! is a material boundary, not a separate addressable object.
+//! is a material boundary, not a separate addressable object. Topology is
+//! normalized on the way in (#317): every triangle mode (`TRIANGLES`,
+//! `TRIANGLE_STRIP`, `TRIANGLE_FAN`) becomes a plain triangle list, and
+//! non-surface modes (`POINTS`/`LINES`/`LINE_*`) are skipped with a warning.
 
 use super::mesh_data::{ImportedAsset, MaterialData, MeshVertex, SkinData, SubMesh};
 use super::ImportError;
 use super::{gltf_anim, gltf_skin};
+use gltf::mesh::Mode;
 use std::path::Path;
 
 /// Import a `.gltf` or `.glb` file into addressable sub-meshes + materials.
@@ -163,11 +167,11 @@ fn append_primitive(
         .map(|w| w.into_f32().collect())
         .unwrap_or_default();
 
-    // Local (pre-offset) indices: needed both for the merged stream and to generate
-    // tangents when the glTF declares none.
-    let local: Vec<u32> = match reader.read_indices() {
-        Some(read) => read.into_u32().collect(),
-        None => (0..positions.len() as u32).collect(),
+    // Local (pre-offset) indices, normalized to a triangle list (#317): needed both
+    // for the merged stream and to generate tangents when the glTF declares none.
+    let read: Option<Vec<u32>> = reader.read_indices().map(|r| r.into_u32().collect());
+    let Some(local) = triangle_list(primitive.mode(), read, positions.len() as u32) else {
+        return; // Non-surface mode; `triangle_list` logged the skip.
     };
     // glTF `TANGENT` accessor when present, else generate from positions + UVs (#207).
     let tangents: Vec<[f32; 4]> =
@@ -192,4 +196,52 @@ fn append_primitive(
     }
 
     indices.extend(local.into_iter().map(|i| i + base));
+}
+
+/// Normalize a primitive's index stream to a triangle list per its topology
+/// `mode` (#317). glTF's three triangle modes carry the same kind of surface
+/// under different index conventions: `TRIANGLES` passes through untouched,
+/// `TRIANGLE_STRIP` / `TRIANGLE_FAN` are rewritten. A non-indexed primitive
+/// (`indices == None`) is the sequential run `0..vertex_count` under the same
+/// rules — a bare `0..n` is only a valid triangle soup under `TRIANGLES`.
+/// Non-surface modes (`POINTS`/`LINES`/`LINE_LOOP`/`LINE_STRIP`) return `None`
+/// with a logged skip: feeding their indices to the triangle path would
+/// silently corrupt geometry (and the #77 trimesh collider build).
+fn triangle_list(mode: Mode, indices: Option<Vec<u32>>, vertex_count: u32) -> Option<Vec<u32>> {
+    let indices = indices.unwrap_or_else(|| (0..vertex_count).collect());
+    match mode {
+        Mode::Triangles => Some(indices),
+        Mode::TriangleStrip => Some(strip_triangles(&indices)),
+        Mode::TriangleFan => Some(fan_triangles(&indices)),
+        Mode::Points | Mode::Lines | Mode::LineLoop | Mode::LineStrip => {
+            log::warn!("[Asset] skipping glTF primitive: mode {mode:?} is not a triangle surface");
+            None
+        }
+    }
+}
+
+/// `TRIANGLE_STRIP` → triangle list: one triangle per index window `(i, i+1, i+2)`,
+/// swapping the leading pair on odd triangles so every emitted triangle keeps the
+/// strip's front-face winding.
+fn strip_triangles(strip: &[u32]) -> Vec<u32> {
+    strip
+        .windows(3)
+        .enumerate()
+        .flat_map(|(i, w)| {
+            if i % 2 == 0 {
+                [w[0], w[1], w[2]]
+            } else {
+                [w[1], w[0], w[2]]
+            }
+        })
+        .collect()
+}
+
+/// `TRIANGLE_FAN` → triangle list: each consecutive rim edge pairs with the first
+/// index (the fan's hub).
+fn fan_triangles(fan: &[u32]) -> Vec<u32> {
+    let Some((&hub, rim)) = fan.split_first() else {
+        return Vec::new();
+    };
+    rim.windows(2).flat_map(|w| [hub, w[0], w[1]]).collect()
 }

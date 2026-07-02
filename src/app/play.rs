@@ -182,7 +182,9 @@ fn animate(world: &mut World, res: &mut Resources) {
         let Some(anim) = animator else {
             continue;
         };
-        anim.advance(dt);
+        // The current clip's duration is the wrap length when the animator loops.
+        let duration = super::animation::current_clip_duration(anim, mesh.as_ref());
+        anim.advance(dt, duration);
         if let Some(mesh) = mesh {
             super::animation::repose_mesh(anim, mesh);
         }

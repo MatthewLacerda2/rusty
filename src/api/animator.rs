@@ -1,9 +1,11 @@
 //! src/api/animator.rs — `Animator` namespace.
 //!
-//! `Play`/`Crossfade`/`Stop` over an entity's optional animator component. `Play`
-//! hard-cuts to a clip; `Crossfade` blends out of the current clip over a duration
-//! (#80); both drive the component's minimal state machine, which the `animate`
-//! system samples against the mesh's imported clips.
+//! `Play`/`Crossfade`/`Stop` plus `Pause`/`Resume` and `SetLooping` (#313) over an
+//! entity's optional animator component. `Play` hard-cuts to a clip; `Crossfade`
+//! blends out of the current clip over a duration (#80); both drive the component's
+//! minimal state machine, which the `animate` system samples against the mesh's
+//! imported clips. `Pause`/`Resume` hold and release the playhead over the
+//! component's `freeze` flag; `SetLooping` wraps the playhead at the clip's end.
 
 use std::cell::RefCell;
 
@@ -25,6 +27,8 @@ pub fn register<'lua, 'scope>(
 
     register_play(scope, &table, scene, console)?;
     register_stop(scope, &table, scene)?;
+    register_pause_resume(scope, &table, scene)?;
+    register_set_looping(scope, &table, scene)?;
 
     lua.globals()
         .set("Animator", table)
@@ -84,6 +88,59 @@ fn register_stop<'lua, 'scope>(
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 animator_ops::set_playing(&mut e, false);
+            }
+            Ok(())
+        }),
+    )
+}
+
+/// `Pause` / `Resume` — hold and release the playhead over the component's `freeze`
+/// flag (#313). Unlike `Stop`, `is_playing` stays set: the pose holds where it is
+/// and `Resume` continues from the same frame.
+fn register_pause_resume<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "Pause",
+        scope.create_function(|_, id: u32| {
+            let mut scene = scene.borrow_mut();
+            if let Some(mut e) = scene.get_entity_mut(id) {
+                animator_ops::set_freeze(&mut e, true);
+            }
+            Ok(())
+        }),
+    )?;
+
+    put(
+        table,
+        "Resume",
+        scope.create_function(|_, id: u32| {
+            let mut scene = scene.borrow_mut();
+            if let Some(mut e) = scene.get_entity_mut(id) {
+                animator_ops::set_freeze(&mut e, false);
+            }
+            Ok(())
+        }),
+    )
+}
+
+/// `SetLooping` — wrap the playhead at the current clip's end so it repeats
+/// seamlessly (idle/run/walk cycles, #313). Off, the last frame holds as before.
+fn register_set_looping<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "SetLooping",
+        scope.create_function(|_, (id, looping): (u32, bool)| {
+            let mut scene = scene.borrow_mut();
+            if let Some(mut e) = scene.get_entity_mut(id) {
+                animator_ops::set_looping(&mut e, looping);
             }
             Ok(())
         }),
