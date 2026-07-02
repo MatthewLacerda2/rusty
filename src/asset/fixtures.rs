@@ -174,6 +174,65 @@ pub const SKINNED_GLTF: &str = r#"{
 }
 "#;
 
+/// A glTF whose one mesh `Quad` has a single primitive over the same four corner
+/// vertices, with the given topology `mode` and u16 index stream (empty = a
+/// non-indexed primitive) — the #317 primitive-mode fixtures. Keeping the vertex
+/// pool fixed lets a strip/fan import be compared triangle-for-triangle against
+/// the equivalent plain-`TRIANGLES` list. Returns the JSON plus the binary buffer
+/// the caller writes as a sibling `quad.bin`.
+pub fn quad_mode_gltf(mode: u32, indices: &[u16]) -> (String, Vec<u8>) {
+    let mut bin = Vec::new();
+    let corners: [f32; 12] = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0];
+    for c in corners {
+        bin.extend_from_slice(&c.to_le_bytes());
+    }
+    for i in indices {
+        bin.extend_from_slice(&i.to_le_bytes());
+    }
+    // The index accessor/bufferView (and the primitive's "indices" key) exist only
+    // for an indexed fixture.
+    let (indices_key, index_accessor, index_view) = if indices.is_empty() {
+        (String::new(), String::new(), String::new())
+    } else {
+        (
+            r#", "indices": 1"#.to_string(),
+            format!(
+                r#",
+    {{ "bufferView": 1, "componentType": 5123, "count": {}, "type": "SCALAR" }}"#,
+                indices.len()
+            ),
+            format!(
+                r#",
+    {{ "buffer": 0, "byteOffset": 48, "byteLength": {} }}"#,
+                indices.len() * 2
+            ),
+        )
+    };
+    let json = format!(
+        r#"{{
+  "asset": {{ "version": "2.0" }},
+  "scene": 0,
+  "scenes": [ {{ "nodes": [ 0 ] }} ],
+  "nodes": [ {{ "mesh": 0 }} ],
+  "meshes": [
+    {{ "name": "Quad",
+      "primitives": [ {{ "attributes": {{ "POSITION": 0 }}, "mode": {mode}{indices_key} }} ] }}
+  ],
+  "accessors": [
+    {{ "bufferView": 0, "componentType": 5126, "count": 4, "type": "VEC3",
+      "min": [0.0, 0.0, 0.0], "max": [1.0, 1.0, 0.0] }}{index_accessor}
+  ],
+  "bufferViews": [
+    {{ "buffer": 0, "byteOffset": 0, "byteLength": 48 }}{index_view}
+  ],
+  "buffers": [ {{ "byteLength": {}, "uri": "quad.bin" }} ]
+}}
+"#,
+        bin.len()
+    );
+    (json, bin)
+}
+
 /// The binary buffer for [`SKINNED_GLTF`], built little-endian: 3 positions, then
 /// `JOINTS_0` (u8 vec4), `WEIGHTS_0` (f32 vec4), then 2 column-major inverse-bind
 /// matrices (the inverses of `translate(1,0,0)` and `translate(1,2,0)`).
