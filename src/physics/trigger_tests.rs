@@ -5,7 +5,7 @@
 use glam::Vec3;
 
 use super::PhysicsWorld;
-use crate::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
+use crate::components::{ColliderComponent, ColliderShape, CollisionDetection, RigidBodyComponent};
 use crate::scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
@@ -43,6 +43,7 @@ fn step_surfaces_enter_stay_exit_edges() {
             velocity: Vec3::ZERO,
             angular_velocity: Vec3::ZERO,
             use_gravity: false,
+            collision_detection: CollisionDetection::Discrete,
         });
     }
 

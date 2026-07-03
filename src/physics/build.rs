@@ -8,7 +8,8 @@
 use glam::{Quat, Vec3};
 use rapier3d::prelude::*;
 
-use crate::components::{ColliderShape, Entity, RigidBodyComponent};
+use super::convert::{to_iso, to_na_vec};
+use crate::components::{ColliderShape, CollisionDetection, Entity, RigidBodyComponent};
 
 /// Body class derived from the entity flags. Mirrors the legacy solver's encoding:
 /// static (fixed), kinematic (position-driven), or dynamic (gravity + solver).
@@ -62,6 +63,10 @@ pub(super) struct ColliderInputs {
     /// Maps to rapier's `gravity_scale` (1.0 when true, 0.0 when false).
     pub use_gravity: bool,
     pub layer: u8,
+    /// Discrete vs. continuous (CCD) collision testing (#321), read off the
+    /// rigidbody; a body with no `RigidBodyComponent` (a bare static collider)
+    /// has nothing to sweep, so it defaults to `Discrete`.
+    pub collision_detection: CollisionDetection,
 }
 
 /// Snapshot an entity's active-collider inputs, or `None` if it has no active
@@ -102,7 +107,29 @@ pub(super) fn collider_inputs(entity: &Entity) -> Option<ColliderInputs> {
             .unwrap_or(Vec3::ZERO),
         use_gravity: entity.rigidbody.as_ref().is_none_or(|r| r.use_gravity),
         layer: entity.layer,
+        collision_detection: entity
+            .rigidbody
+            .as_ref()
+            .map(|r| r.collision_detection)
+            .unwrap_or_default(),
     })
+}
+
+/// Build the rigid-body half of an entity's physics body: body class (static /
+/// kinematic / dynamic), initial pose + velocity, and the CCD flag from its
+/// collision-detection mode (#321). Kept alongside [`collider_inputs`] so
+/// `world.rs` stays focused on the rapier set/handle bookkeeping.
+pub(super) fn body_builder(inp: &ColliderInputs) -> RigidBodyBuilder {
+    match inp.class {
+        BodyClass::Static => RigidBodyBuilder::fixed(),
+        BodyClass::Kinematic => RigidBodyBuilder::kinematic_position_based(),
+        BodyClass::Dynamic => RigidBodyBuilder::dynamic()
+            .linvel(to_na_vec(inp.velocity))
+            .angvel(to_na_vec(inp.angular_velocity))
+            .gravity_scale(gravity_scale(inp.use_gravity)),
+    }
+    .position(to_iso(inp.pos, inp.rot))
+    .ccd_enabled(inp.collision_detection == CollisionDetection::Continuous)
 }
 
 /// The per-entity component state `sync_to_rapier` pushes into a body each tick.
@@ -115,6 +142,9 @@ pub(super) struct EntityBodyState {
     pub kinematic: bool,
     pub is_static: bool,
     pub use_gravity: bool,
+    /// Discrete vs. continuous (CCD) collision testing (#321), re-applied every
+    /// tick so flipping the mode mid-play takes effect live.
+    pub collision_detection: CollisionDetection,
 }
 
 /// Snapshot an entity's transform/velocity/body-class state for one tick.
@@ -141,6 +171,11 @@ pub(super) fn body_state(entity: &Entity) -> EntityBodyState {
         kinematic: is_kinematic(entity.is_static, entity.rigidbody.as_ref()),
         is_static: entity.is_static,
         use_gravity,
+        collision_detection: entity
+            .rigidbody
+            .as_ref()
+            .map(|r| r.collision_detection)
+            .unwrap_or_default(),
     }
 }
 

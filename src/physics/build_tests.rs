@@ -12,7 +12,9 @@ use glam::Vec3;
 use rapier3d::prelude::*;
 
 use super::build::{build_shape, collider_inputs, interaction_groups, is_kinematic};
-use crate::components::{ColliderComponent, ColliderShape, Entity, RigidBodyComponent};
+use crate::components::{
+    ColliderComponent, ColliderShape, CollisionDetection, Entity, RigidBodyComponent,
+};
 
 /// Local-AABB half-extents `(x, y, z)` of a built collider.
 fn half_extents(c: &Collider) -> [f32; 3] {
@@ -176,6 +178,7 @@ fn is_kinematic_only_for_non_static_bodies_without_a_dynamic_rigidbody() {
         velocity: Vec3::ZERO,
         angular_velocity: Vec3::ZERO,
         use_gravity: true,
+        collision_detection: CollisionDetection::Discrete,
     };
     assert!(!is_kinematic(true, None), "static is not kinematic");
     assert!(

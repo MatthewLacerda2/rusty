@@ -1,7 +1,7 @@
 //! Kinematic character controller: bodies driven into static walls are blocked.
 
 use glam::Vec3;
-use rusty::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
+use rusty::components::{ColliderComponent, ColliderShape, CollisionDetection, RigidBodyComponent};
 use rusty::physics::PhysicsWorld;
 use rusty::scene::Scene;
 
@@ -23,6 +23,7 @@ fn kinematic_body() -> RigidBodyComponent {
         velocity: Vec3::ZERO,
         angular_velocity: Vec3::ZERO,
         use_gravity: false,
+        collision_detection: CollisionDetection::Discrete,
     }
 }
 

@@ -111,6 +111,7 @@ fn add_force_applies_dt_scaled_velocity() {
             velocity: Vec3::ZERO,
             angular_velocity: Vec3::ZERO,
             use_gravity: true,
+            collision_detection: crate::components::CollisionDetection::Discrete,
         });
     }
     // AddForce is a continuous force (Unity ForceMode.Force): Δv = F/m · dt.

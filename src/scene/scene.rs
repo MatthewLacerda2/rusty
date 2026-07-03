@@ -22,10 +22,11 @@ use crate::scene::layers::LayerRegistry;
 // resolve. The structs themselves live in `crate::components`.
 pub use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
-    ColliderShape, CollisionResponse, DirtyFlag, EmitMode, Entity, LightComponent, LightType,
-    MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent, Particle,
-    ParticleBlend, ParticleEmitterComponent, RenderMode, RigidBodyComponent, ScriptComponent,
-    ScriptFieldValue, TextureComponent, Tonemap, TransformComponent, VisualCorrectionComponent,
+    ColliderShape, CollisionDetection, CollisionResponse, DirtyFlag, EmitMode, Entity,
+    LightComponent, LightType, MaterialAsset, MaterialComponent, MeshComponent,
+    NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent, RenderMode,
+    RigidBodyComponent, ScriptComponent, ScriptFieldValue, TextureComponent, Tonemap,
+    TransformComponent, VisualCorrectionComponent,
 };
 
 fn default_skybox_path() -> String {

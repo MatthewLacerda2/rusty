@@ -123,6 +123,7 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 | `AddForce` | ✅ | sim — folds impulse into `velocity` (read above); skips kinematic |
 | `SetKinematic` | ✅ | sim — `physics/build.rs::is_kinematic` / `world.rs` body class |
 | `SetAngularVelocity` | ✅ | sim — `physics/world.rs::sync_to_rapier` pushes it via rapier's `set_angvel` on a dynamic body each tick, and `sync_from_rapier` reads `body.angvel()` back onto `angular_velocity`; round-trips through `SceneData`. A no-op on kinematic/static bodies (`scene::authoring::rigidbody::set_angular_velocity`), mirroring `AddForce`'s kinematic skip — rapier drives a kinematic body's rotation from the character controller's corrected pose, never by integrating an angular velocity (#319) |
+| `SetCollisionDetection` | ✅ | sim (#321) — `physics/build.rs::body_builder` sets `ccd_enabled` at body build, and `world.rs::apply_body_state` re-applies `RigidBody::enable_ccd` every tick; proven live (not just stored) by `tests/physics_ccd.rs` — a fast dynamic sphere tunnels through a thin static wall under `Discrete` but is stopped under `Continuous` |
 
 (The #311 spatial query surface — `Raycast`'s siblings `SphereCast`,
 `OverlapSphere`/`OverlapBox`/`OverlapCapsule`, `CheckSphere`/`CheckBox`,

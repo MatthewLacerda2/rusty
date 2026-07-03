@@ -1,6 +1,6 @@
 //! src/editor/inspector/components/gameplay/physics.rs — the physics-flavoured
-//! gameplay inspector cards: Collider, RigidBody, and NavMesh Agent. Split out of the
-//! gameplay card module to stay under the size cap.
+//! gameplay inspector cards: Collider and NavMesh Agent. RigidBody lives in the
+//! `rigidbody` sibling (split apart to stay under the size cap).
 //!
 //! Each is a THIN client (#287): widgets read fields from a snapshot and route every
 //! write through a shared `authoring::*` op, never a mutable component borrow; the
@@ -11,9 +11,7 @@ use egui_phosphor::regular as icon;
 use glam::Vec3;
 
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::{
-    collider as collider_ops, nav_agent as nav_ops, rigidbody as rigidbody_ops,
-};
+use crate::scene::authoring::{collider as collider_ops, nav_agent as nav_ops};
 use crate::scene::{ColliderShape, Entity};
 
 pub fn draw_collider(
@@ -154,59 +152,6 @@ fn drag(ui: &mut egui::Ui, value: &mut f32) -> bool {
     .changed()
 }
 
-/// 3EG. RigidBody Component
-pub fn draw_rigidbody(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
-    let Some(rb) = entity.rigidbody.clone() else {
-        return;
-    };
-    let mut remove = false;
-    component_card(ui, icon::CUBE, "RigidBody", Some(&mut remove), |ui| {
-        let mut active = rb.active;
-        if ui.checkbox(&mut active, "Active").changed() {
-            rigidbody_ops::set_active(entity, active);
-            *is_dirty = true;
-        }
-        let mut is_kinematic = rb.is_kinematic;
-        if ui.checkbox(&mut is_kinematic, "Is Kinematic").changed() {
-            rigidbody_ops::set_kinematic(entity, is_kinematic);
-            *is_dirty = true;
-        }
-        let mut use_gravity = rb.use_gravity;
-        if ui.checkbox(&mut use_gravity, "Use Gravity").changed() {
-            rigidbody_ops::set_use_gravity(entity, use_gravity);
-            *is_dirty = true;
-        }
-        let mut mass = rb.mass;
-        ui.horizontal(|ui| {
-            ui.label("Mass:");
-            if ui
-                .add(
-                    egui::DragValue::new(&mut mass)
-                        .speed(0.05)
-                        .clamp_range(0.01..=1000.0),
-                )
-                .changed()
-            {
-                rigidbody_ops::set_mass(entity, mass);
-                *is_dirty = true;
-            }
-        });
-        draw_rb_velocity(ui, entity, rb.velocity, is_dirty);
-    });
-    if remove {
-        entity.rigidbody = None;
-        *is_dirty = true;
-    }
-}
-
-/// The rigidbody velocity x/y/z row, routing a change through the shared op.
-fn draw_rb_velocity(ui: &mut egui::Ui, entity: &mut Entity, velocity: Vec3, is_dirty: &mut bool) {
-    if let Some(v) = vec3_row(ui, "Velocity:", velocity) {
-        rigidbody_ops::set_velocity(entity, v);
-        *is_dirty = true;
-    }
-}
-
 /// 3EH. NavMeshAgent Component
 pub fn draw_nav_agent(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
     let Some(agent) = entity.nav_agent.clone() else {
@@ -261,7 +206,8 @@ fn draw_agent_target(ui: &mut egui::Ui, entity: &mut Entity, target: Vec3, is_di
 
 /// A labelled x/y/z drag row over a `Vec3`. Returns the new value when any axis
 /// changed (so the caller routes it through the matching shared op), else `None`.
-fn vec3_row(ui: &mut egui::Ui, label: &str, value: Vec3) -> Option<Vec3> {
+/// `pub(super)`: the `rigidbody` sibling's velocity row reuses this same widget.
+pub(super) fn vec3_row(ui: &mut egui::Ui, label: &str, value: Vec3) -> Option<Vec3> {
     let mut value = value;
     let changed = ui
         .horizontal(|ui| {

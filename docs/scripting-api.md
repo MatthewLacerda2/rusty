@@ -784,6 +784,8 @@ and distance are `0`.
 | `Physics.SetAngularVelocity` | `(id, vx, vy, vz)` | — (radians/sec; no-op on kinematic/static, see below) |
 | `Physics.AddForce` | `(id, fx, fy, fz)` | — (continuous force, see below) |
 | `Physics.SetKinematic` | `(id, is_kinematic)` | — |
+| `Physics.GetCollisionDetection` | `(id)` | `"Discrete"` / `"Continuous"` |
+| `Physics.SetCollisionDetection` | `(id, mode)` | — (`"Discrete"` / `"Continuous"`, case-insensitive) |
 | `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` |
 | `Physics.SphereCast` | `(ox, oy, oz, dx, dy, dz, radius [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` |
 | `Physics.OverlapSphere` | `(cx, cy, cz, radius [, layer_mask])` | array of entity ids |
@@ -860,6 +862,18 @@ kinematic body keeps exactly the vertical motion its scripts set. An entity with
 collider but **no rigidbody** never falls. The flag is honoured at body build and
 each tick, so toggling it (or `Physics.SetKinematic`, which resets any accumulated
 fall speed) at runtime takes effect.
+
+A rigidbody's **collision-detection mode** (Unity's `Rigidbody.collisionDetectionMode`,
+reduced to two modes) picks how it is tested against other colliders each tick.
+`"Discrete"` (the default) only tests overlap at the tick's final pose — cheap, but a
+small/fast body (a bullet, a thrown object) can tunnel clean through thin geometry
+between ticks. `"Continuous"` sweeps the body's motion from its previous pose to its
+new pose within the tick (CCD), at extra solver cost, so it never skips past a
+thin/static collider. `SetCollisionDetection` accepts either mode string
+case-insensitively and is a no-op on an unrecognized name; `GetCollisionDetection`
+always returns the canonical `"Discrete"`/`"Continuous"` spelling. The mode is
+re-applied every tick, so flipping it mid-play (e.g. arming a projectile's CCD only
+once it's launched) takes effect immediately.
 
 ## `Time`
 

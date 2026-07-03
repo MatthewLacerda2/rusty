@@ -20,6 +20,7 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::{global_table, put, Reg};
+use crate::components::CollisionDetection;
 use crate::physics::PhysicsWorld;
 use crate::scene::authoring::rigidbody as rb_ops;
 use crate::scene::Scene;
@@ -37,10 +38,65 @@ pub fn register<'lua, 'scope>(
     register_velocity(scope, &table, scene)?;
     register_angular_velocity(scope, &table, scene)?;
     register_force(scope, &table, scene)?;
+    register_collision_detection(scope, &table, scene)?;
 
     lua.globals()
         .set("Physics", table)
         .map_err(|e| e.to_string())
+}
+
+/// `"Discrete"`/`"Continuous"` (case-insensitive) <-> [`CollisionDetection`],
+/// mirroring the string-enum bridge `Graphics.SetQuality` uses.
+fn parse_collision_detection(name: &str) -> Option<CollisionDetection> {
+    match name.to_ascii_lowercase().as_str() {
+        "discrete" => Some(CollisionDetection::Discrete),
+        "continuous" => Some(CollisionDetection::Continuous),
+        _ => None,
+    }
+}
+
+fn collision_detection_name(mode: CollisionDetection) -> &'static str {
+    match mode {
+        CollisionDetection::Discrete => "Discrete",
+        CollisionDetection::Continuous => "Continuous",
+    }
+}
+
+/// `GetCollisionDetection` / `SetCollisionDetection` — the Discrete/Continuous
+/// (CCD) mode over the entity's rigidbody (#321). An unrecognized mode string is
+/// a no-op, same as an unrecognized `Graphics.SetQuality` name.
+fn register_collision_detection<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "GetCollisionDetection",
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
+            let mode = scene
+                .get_entity(id)
+                .and_then(|e| e.rigidbody.as_ref().map(|rb| rb.collision_detection))
+                .unwrap_or_default();
+            Ok(collision_detection_name(mode).to_string())
+        }),
+    )?;
+
+    put(
+        table,
+        "SetCollisionDetection",
+        scope.create_function(|_, (id, mode): (u32, String)| {
+            let Some(mode) = parse_collision_detection(&mode) else {
+                return Ok(());
+            };
+            let mut scene = scene.borrow_mut();
+            if let Some(mut e) = scene.get_entity_mut(id) {
+                rb_ops::set_collision_detection(&mut e, mode);
+            }
+            Ok(())
+        }),
+    )
 }
 
 /// `GetVelocity` / `SetVelocity` over the entity's rigidbody.

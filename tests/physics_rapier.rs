@@ -1,7 +1,7 @@
 //! rapier3d-backed physics: gravity, kinematic drive, static blocking, raycast.
 
 use glam::Vec3;
-use rusty::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
+use rusty::components::{ColliderComponent, ColliderShape, CollisionDetection, RigidBodyComponent};
 use rusty::physics::PhysicsWorld;
 use rusty::scene::Scene;
 
@@ -23,6 +23,7 @@ fn dynamic_body() -> RigidBodyComponent {
         velocity: Vec3::ZERO,
         angular_velocity: Vec3::ZERO,
         use_gravity: true,
+        collision_detection: CollisionDetection::Discrete,
     }
 }
 

@@ -3,7 +3,7 @@
 //! stepping off a ledge (grounded contact zeroes the accumulated fall speed).
 
 use glam::Vec3;
-use rusty::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
+use rusty::components::{ColliderComponent, ColliderShape, CollisionDetection, RigidBodyComponent};
 use rusty::physics::PhysicsWorld;
 use rusty::scene::Scene;
 
@@ -27,6 +27,7 @@ fn kinematic_body(use_gravity: bool) -> RigidBodyComponent {
         velocity: Vec3::ZERO,
         angular_velocity: Vec3::ZERO,
         use_gravity,
+        collision_detection: CollisionDetection::Discrete,
     }
 }
 

@@ -10,8 +10,8 @@ use glam::Vec3;
 
 use crate::scene::{
     AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape,
-    LightComponent, LightType, MaterialAsset, MaterialComponent, NavMeshAgentComponent,
-    RigidBodyComponent, Scene, Tonemap, VisualCorrectionComponent,
+    CollisionDetection, LightComponent, LightType, MaterialAsset, MaterialComponent,
+    NavMeshAgentComponent, RigidBodyComponent, Scene, Tonemap, VisualCorrectionComponent,
 };
 
 /// Construct a `LightComponent` with the standard cone defaults. Shared by the
@@ -67,6 +67,7 @@ pub fn default_rigidbody() -> RigidBodyComponent {
         velocity: Vec3::ZERO,
         angular_velocity: Vec3::ZERO,
         use_gravity: true,
+        collision_detection: CollisionDetection::Discrete,
     }
 }
 

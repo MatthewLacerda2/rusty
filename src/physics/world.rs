@@ -21,13 +21,14 @@ use std::collections::HashMap;
 use rapier3d::prelude::*;
 
 use super::build::{
-    body_state, build_shape, collider_inputs, gravity_scale, interaction_groups, BodyClass,
+    body_builder, body_state, build_shape, collider_inputs, gravity_scale, interaction_groups,
     EntityBodyState,
 };
 use super::character;
 use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
 use super::overlap::collect_triggers;
 use super::trigger_events::TriggerEvents;
+use crate::components::CollisionDetection;
 use crate::scene::Scene;
 
 pub struct PhysicsWorld {
@@ -104,17 +105,7 @@ impl PhysicsWorld {
                 continue;
             };
 
-            let body_builder = match inp.class {
-                BodyClass::Static => RigidBodyBuilder::fixed(),
-                BodyClass::Kinematic => RigidBodyBuilder::kinematic_position_based(),
-                BodyClass::Dynamic => RigidBodyBuilder::dynamic()
-                    .linvel(to_na_vec(inp.velocity))
-                    .angvel(to_na_vec(inp.angular_velocity))
-                    // `use_gravity = false` exempts the body from world gravity (#209).
-                    .gravity_scale(gravity_scale(inp.use_gravity)),
-            }
-            .position(to_iso(inp.pos, inp.rot));
-            let body_handle = self.bodies.insert(body_builder.build());
+            let body_handle = self.bodies.insert(body_builder(&inp).build());
             collider.set_sensor(inp.is_trigger);
             collider.set_active_events(ActiveEvents::COLLISION_EVENTS);
             // The demo's bodies are kinematic/static, so the default
@@ -164,6 +155,7 @@ impl PhysicsWorld {
         snap: &EntityBodyState,
         dt: f32,
     ) {
+        let ccd = snap.collision_detection == CollisionDetection::Continuous;
         if snap.kinematic {
             // Route the script/input-set move through the controller so the
             // body collides-and-slides against walls instead of teleporting.
@@ -187,6 +179,7 @@ impl PhysicsWorld {
             self.fall_speeds.insert(id, fall_speed);
             let body = &mut self.bodies[handle];
             body.set_enabled(snap.active);
+            body.enable_ccd(ccd);
             body.set_next_kinematic_position(next);
             return;
         }
@@ -195,6 +188,7 @@ impl PhysicsWorld {
         self.fall_speeds.remove(&id);
         let body = &mut self.bodies[handle];
         body.set_enabled(snap.active);
+        body.enable_ccd(ccd);
         if snap.is_static {
             body.set_position(to_iso(snap.pos, snap.rot), true);
         } else {

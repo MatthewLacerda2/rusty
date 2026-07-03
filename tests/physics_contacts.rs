@@ -5,7 +5,7 @@
 //! dynamic body resting on a non-trigger static floor must be reported.
 
 use glam::Vec3;
-use rusty::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
+use rusty::components::{ColliderComponent, ColliderShape, CollisionDetection, RigidBodyComponent};
 use rusty::physics::PhysicsWorld;
 use rusty::scene::Scene;
 
@@ -40,6 +40,7 @@ fn static_floor_contact_is_reported() {
             velocity: Vec3::ZERO,
             angular_velocity: Vec3::ZERO,
             use_gravity: true,
+            collision_detection: CollisionDetection::Discrete,
         });
     }
     // collect_triggers orders each pair (low, high).
