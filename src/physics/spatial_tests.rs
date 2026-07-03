@@ -5,7 +5,9 @@
 //! geometry, so a broken filter, a wrong shape placement, or a dropped hit is
 //! caught — not merely that the calls return.
 
-use glam::Vec3;
+use std::f32::consts::FRAC_PI_4;
+
+use glam::{Quat, Vec3};
 
 use super::PhysicsWorld;
 use crate::components::{ColliderComponent, ColliderShape};
@@ -134,4 +136,73 @@ fn contains_point_answers_inside_outside_and_missing() {
     let bare = scene.add_entity("Bare".to_string());
     let world = PhysicsWorld::from_scene(&scene);
     assert_eq!(world.collider_contains_point(bare, Vec3::ZERO), None);
+}
+
+#[test]
+fn contains_point_follows_a_rotated_box_not_its_loose_aabb() {
+    // A 2×2×2 box (half-extent 1) rotated 45° about Y: its corner now points
+    // straight down the world X/Z axes, sqrt(2) ≈ 1.414 out from the center.
+    // That diagonal reach is also exactly the box's loose AABB half-extent on
+    // every axis (`he*cosθ + he*sinθ` at θ=45°), so a query point placed just
+    // inside that AABB but off both corners is the case an AABB-only check
+    // gets wrong: still "inside the bounds", but outside the actual diamond.
+    let mut scene = Scene::new();
+    let id = scene.add_entity("Diamond".to_string());
+    if let Some(mut e) = scene.get_entity_mut(id) {
+        e.transform.position = Vec3::ZERO;
+        e.transform.rotation = Quat::from_rotation_y(FRAC_PI_4);
+        e.is_static = true;
+        e.collider = Some(ColliderComponent {
+            active: true,
+            shape: ColliderShape::Box {
+                size: Vec3::splat(2.0),
+            },
+            is_trigger: false,
+            aabb_min: Vec3::ZERO,
+            aabb_max: Vec3::ZERO,
+        });
+    }
+    let world = PhysicsWorld::from_scene(&scene);
+
+    // On the X axis alone, the rotated corner reaches to sqrt(2): inside only
+    // because the rotation was applied (an unrotated half-extent-1 box would
+    // reject this point outright).
+    assert_eq!(
+        world.collider_contains_point(id, Vec3::new(1.3, 0.0, 0.0)),
+        Some(true)
+    );
+    // Off-axis and near the corner: within the box's loose AABB (which also
+    // reaches sqrt(2) on x *and* z) but outside the actual rotated diamond.
+    assert_eq!(
+        world.collider_contains_point(id, Vec3::new(1.3, 0.0, 1.3)),
+        Some(false)
+    );
+}
+
+#[test]
+fn contains_point_follows_a_sphere_not_its_bounding_cube() {
+    let mut scene = Scene::new();
+    let id = scene.add_entity("Ball".to_string());
+    if let Some(mut e) = scene.get_entity_mut(id) {
+        e.is_static = true;
+        e.collider = Some(ColliderComponent {
+            active: true,
+            shape: ColliderShape::Sphere { radius: 1.0 },
+            is_trigger: false,
+            aabb_min: Vec3::ZERO,
+            aabb_max: Vec3::ZERO,
+        });
+    }
+    let world = PhysicsWorld::from_scene(&scene);
+
+    assert_eq!(
+        world.collider_contains_point(id, Vec3::new(0.5, 0.5, 0.0)),
+        Some(true)
+    );
+    // A corner of the sphere's bounding cube (±1 on every axis) sits well
+    // outside the radius-1 ball itself — an AABB check would wrongly say yes.
+    assert_eq!(
+        world.collider_contains_point(id, Vec3::new(1.0, 1.0, 1.0)),
+        Some(false)
+    );
 }
