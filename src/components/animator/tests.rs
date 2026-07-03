@@ -150,3 +150,18 @@ fn loop_wrap_keeps_the_outgoing_crossfade_playhead_independent() {
     );
     assert!(anim.is_crossfading());
 }
+
+#[test]
+fn graph_reference_defaults_to_none_and_round_trips_by_path() {
+    // The #315 path reference: absent it stays out of the JSON (older scenes load
+    // unchanged); set, it round-trips — the path, never the graph contents.
+    let anim = AnimatorComponent::default();
+    assert_eq!(anim.graph, None);
+    assert!(!serde_json::to_string(&anim).unwrap().contains("graph"));
+
+    let mut anim = idle();
+    anim.graph = Some("project/anims/guard.animgraph".to_string());
+    let json = serde_json::to_string(&anim).unwrap();
+    let back: AnimatorComponent = serde_json::from_str(&json).unwrap();
+    assert_eq!(back.graph.as_deref(), Some("project/anims/guard.animgraph"));
+}

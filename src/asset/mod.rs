@@ -17,6 +17,7 @@
 //! scene-load re-import is deterministic given the same file.
 
 pub mod anim_data;
+pub mod animation_graph;
 pub mod gltf_anim;
 pub mod gltf_import;
 pub mod gltf_skin;
@@ -27,6 +28,9 @@ pub mod sidecar;
 pub mod tangents;
 
 pub use anim_data::{AnimationClip, Interpolation, JointTrack, Track};
+pub use animation_graph::{
+    AnimationGraph, Condition, GraphEdge, GraphError, GraphNode, NumericOp, ParameterDeclaration,
+};
 pub use manifest::{build_manifest, AssetEntry, AssetManifest, SubObjectEntry};
 pub use mesh_data::{ImportedAsset, JointTransform, MaterialData, MeshVertex, SkinData, SubMesh};
 pub use sidecar::{import_and_sync_sidecar, ImportSettings, MeshColliderKind};
