@@ -115,7 +115,40 @@ fn animator_card_body(
         animator_ops::set_looping(entity, loop_clip);
         *is_dirty = true;
     }
+    draw_graph(ui, entity, anim, is_dirty);
     draw_parameters(ui, anim);
+}
+
+/// The animation-graph reference (#315/#316): the `.animgraph` path driving this
+/// animator, the auto-evaluation toggle, and (read-only) the active graph state.
+/// Writes route through the shared `authoring::animator` ops, like every other
+/// field on the card.
+fn draw_graph(
+    ui: &mut egui::Ui,
+    entity: &mut Entity,
+    anim: &crate::components::AnimatorComponent,
+    is_dirty: &mut bool,
+) {
+    ui.separator();
+    let mut graph = anim.graph.clone().unwrap_or_default();
+    ui.horizontal(|ui| {
+        ui.label("Graph:");
+        if ui.text_edit_singleline(&mut graph).changed() {
+            animator_ops::set_graph(entity, (!graph.is_empty()).then_some(graph));
+            *is_dirty = true;
+        }
+    });
+    if anim.graph.is_none() {
+        return;
+    }
+    let mut enabled = anim.graph_enabled;
+    if ui.checkbox(&mut enabled, "Graph enabled").changed() {
+        animator_ops::set_graph_enabled(entity, enabled);
+        *is_dirty = true;
+    }
+    if let Some(node) = &anim.current_node {
+        ui.label(format!("State: {node}"));
+    }
 }
 
 /// Read-only listing of the animator's typed graph parameters (#314). They are

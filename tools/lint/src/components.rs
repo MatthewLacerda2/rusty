@@ -199,7 +199,10 @@ fn candidates(field: &str) -> Vec<String> {
     v
 }
 
-/// File stems under `src/api/` (the registered namespace module names), minus `mod`.
+/// Module stems under `src/api/` (the registered namespace module names), minus
+/// `mod`: plain `<x>.rs` files AND `<x>/mod.rs` directory modules — a namespace
+/// split into a subfolder to fit the size cap (e.g. `animator/`, `nav/`) is still
+/// one namespace unit.
 fn api_stems() -> Vec<String> {
     let mut out = Vec::new();
     let Ok(entries) = fs::read_dir(API_DIR) else {
@@ -207,7 +210,9 @@ fn api_stems() -> Vec<String> {
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().is_some_and(|e| e == "rs") {
+        let is_file_mod = path.extension().is_some_and(|e| e == "rs");
+        let is_dir_mod = path.is_dir() && path.join("mod.rs").is_file();
+        if is_file_mod || is_dir_mod {
             if let Some(stem) = path.file_stem().map(|s| s.to_string_lossy().into_owned()) {
                 if stem != "mod" {
                     out.push(stem);

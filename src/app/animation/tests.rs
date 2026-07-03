@@ -132,6 +132,75 @@ fn blend_palettes_is_linear() {
     assert!(blend_palettes(&a, &b, 1.0)[0].abs_diff_eq(b[0], 1e-6));
 }
 
+/// A named clip whose single track ends at `end` seconds (so `duration == end`).
+fn named_clip(name: &str, end: f32) -> AnimationClip {
+    let mut clip = translate_clip();
+    clip.name = name.to_string();
+    clip.tracks[0].translation.times = vec![0.0, end];
+    clip.recompute_duration();
+    clip
+}
+
+/// A mesh carrying two clips of different lengths (the geometry is irrelevant).
+fn two_clip_mesh() -> MeshComponent {
+    MeshComponent {
+        primitive_type: "Asset".to_string(),
+        asset_ref: Some("model.glb::Rig".to_string()),
+        vertices: Vec::new(),
+        indices: Vec::new(),
+        bind_palette: Vec::new(),
+        skin: Some(chain_skin()),
+        clips: vec![named_clip("Short", 0.75), named_clip("Long", 2.5)],
+        pose_palette: Vec::new(),
+        is_dirty: Default::default(),
+    }
+}
+
+fn looping_animator(clip: &str) -> AnimatorComponent {
+    AnimatorComponent {
+        current_clip: clip.to_string(),
+        is_playing: true,
+        loop_clip: true,
+        ..Default::default()
+    }
+}
+
+/// #312 mutation audit: `current_clip_duration` must report each clip's ACTUAL
+/// length — a stub returning 0.0 / 1.0 / -1.0 fails on both clips here.
+#[test]
+fn current_clip_duration_reports_the_actual_clip_length() {
+    let mesh = two_clip_mesh();
+    let short = looping_animator("Short");
+    let long = looping_animator("Long");
+    assert_eq!(current_clip_duration(&short, Some(&mesh)), 0.75);
+    assert_eq!(current_clip_duration(&long, Some(&mesh)), 2.5);
+    // The "unknown, never wrap" sentinel: no mesh, or a clip the mesh lacks.
+    assert_eq!(current_clip_duration(&short, None), 0.0);
+    assert_eq!(
+        current_clip_duration(&looping_animator("Ghost"), Some(&mesh)),
+        0.0
+    );
+}
+
+/// Two clips of different lengths wrap the looping playhead at different, exact
+/// times — pinning the (duration → wrap) path end to end.
+#[test]
+fn looping_playhead_wraps_at_each_clips_own_duration() {
+    let mesh = two_clip_mesh();
+    let mut short = looping_animator("Short");
+    let mut long = looping_animator("Long");
+    for anim in [&mut short, &mut long] {
+        for _ in 0..2 {
+            let duration = current_clip_duration(anim, Some(&mesh));
+            anim.advance(0.5, duration);
+        }
+    }
+    // 1.0 s of playback: the 0.75 s clip has wrapped (1.0 % 0.75), the 2.5 s
+    // clip has not.
+    assert_eq!(short.time, 0.25);
+    assert_eq!(long.time, 1.0);
+}
+
 #[test]
 fn sampling_is_bitwise_deterministic() {
     let skin = chain_skin();

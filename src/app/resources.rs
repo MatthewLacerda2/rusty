@@ -31,6 +31,7 @@ use crate::scene::{Scene, SceneSnapshot};
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
 
+use super::animation::graph::GraphCache;
 use super::Schedule;
 
 /// The engine singletons (Unity's engine statics) plus the play-mode bookkeeping the
@@ -74,6 +75,10 @@ pub struct Resources {
     /// The ordered per-stage system registry that drives the tick. Built once at
     /// construction from `app::build()`, where every module self-registers.
     pub(super) schedule: Schedule,
+    /// Lazily-loaded `AnimationGraph` assets keyed by path (#316), shared by every
+    /// entity referencing the same graph. Cleared on Play enter so per-session
+    /// edits to the asset files are picked up.
+    pub(super) animation_graphs: GraphCache,
 }
 
 impl Resources {
@@ -121,6 +126,7 @@ impl Resources {
             edit_snapshot: None,
             frame_dt: 0.0,
             schedule: super::build().into_schedule(),
+            animation_graphs: GraphCache::default(),
         }
     }
 

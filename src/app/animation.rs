@@ -9,6 +9,8 @@
 //! time) — no wall clock, no RNG — so a headless replay at the fixed timestep is
 //! byte-reproducible. `glam` math only.
 
+pub(crate) mod graph;
+
 use crate::asset::anim_data::{AnimationClip, Interpolation, Track};
 use crate::asset::mesh_data::{JointTransform, SkinData};
 use crate::components::{AnimatorComponent, MeshComponent};
