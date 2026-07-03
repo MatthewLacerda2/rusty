@@ -54,6 +54,13 @@ pub struct AnimatorComponent {
     /// (`set_bool` … `consume_trigger`) live in the `parameters` submodule.
     #[serde(default, skip_serializing_if = "AnimatorParameters::is_empty")]
     pub parameters: AnimatorParameters,
+    /// Path to the `AnimationGraph` asset (`guard.animgraph`, #315) driving this
+    /// animator — a path-based reference, exactly like a mesh references its source
+    /// file, so the scene stores the reference and the graph is rehydrated on load.
+    /// `None` means no graph: the animator only does what scripts tell it. The
+    /// evaluator that walks the graph each fixed step is #316.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub graph: Option<String>,
 }
 
 impl Default for AnimatorComponent {
@@ -70,6 +77,7 @@ impl Default for AnimatorComponent {
             crossfade_elapsed: 0.0,
             crossfade_duration: 0.0,
             parameters: AnimatorParameters::new(),
+            graph: None,
         }
     }
 }
