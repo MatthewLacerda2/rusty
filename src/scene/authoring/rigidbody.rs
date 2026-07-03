@@ -2,19 +2,21 @@
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `RigidBodyComponent` field by field: the `active` / `is_kinematic` / `use_gravity`
-//! flags, the `mass` (clamped to a sane positive range), and the `velocity`.
+//! flags, the `mass` (clamped to a sane positive range), the linear/angular
+//! `velocity`, and the `collision_detection` mode.
 //!
 //! BOTH the editor's RigidBody card and the Lua `Physics.*` field-setters
-//! (`SetVelocity`, `SetKinematic`) route through these, so the egui panel and the
-//! binding share one write (#287). `Physics.AddForce` stays an integrator step in the
-//! API (it reads mass + the kinematic gate to derive a velocity delta), not a field
-//! write, so it is not an op here.
+//! (`SetVelocity`, `SetAngularVelocity`, `SetKinematic`, `SetCollisionDetection`)
+//! route through these, so the egui panel and the binding share one write (#287).
+//! `Physics.AddForce` stays an integrator step in the API (it reads mass + the
+//! kinematic gate to derive a velocity delta), not a field write, so it is not an
+//! op here.
 //!
 //! Allowed deps: components (the `RigidBodyComponent` data). Pure.
 
 use glam::Vec3;
 
-use crate::components::Entity;
+use crate::components::{CollisionDetection, Entity};
 
 /// Set the rigidbody's `active` flag.
 pub fn set_active(entity: &mut Entity, active: bool) {
@@ -52,6 +54,20 @@ pub fn set_velocity(entity: &mut Entity, velocity: Vec3) {
     }
 }
 
+/// Set the rigidbody's angular velocity (radians/sec per axis).
+pub fn set_angular_velocity(entity: &mut Entity, angular_velocity: Vec3) {
+    if let Some(rb) = &mut entity.rigidbody {
+        rb.angular_velocity = angular_velocity;
+    }
+}
+
+/// Set the rigidbody's collision-detection mode (Discrete / Continuous).
+pub fn set_collision_detection(entity: &mut Entity, mode: CollisionDetection) {
+    if let Some(rb) = &mut entity.rigidbody {
+        rb.collision_detection = mode;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -67,7 +83,9 @@ mod tests {
                 is_kinematic: false,
                 mass: 1.0,
                 velocity: Vec3::ZERO,
+                angular_velocity: Vec3::ZERO,
                 use_gravity: true,
+                collision_detection: CollisionDetection::Discrete,
             });
         }
         (scene, id)
@@ -82,11 +100,15 @@ mod tests {
         set_use_gravity(&mut e, false);
         set_mass(&mut e, 5000.0);
         set_velocity(&mut e, Vec3::new(1.0, 2.0, 3.0));
+        set_angular_velocity(&mut e, Vec3::new(0.0, 4.0, 0.0));
+        set_collision_detection(&mut e, CollisionDetection::Continuous);
         let rb = e.rigidbody.as_ref().unwrap();
         assert!(!rb.active);
         assert!(rb.is_kinematic);
         assert!(!rb.use_gravity);
         assert_eq!(rb.mass, 1000.0, "mass clamps to the upper bound");
         assert_eq!(rb.velocity, Vec3::new(1.0, 2.0, 3.0));
+        assert_eq!(rb.angular_velocity, Vec3::new(0.0, 4.0, 0.0));
+        assert_eq!(rb.collision_detection, CollisionDetection::Continuous);
     }
 }

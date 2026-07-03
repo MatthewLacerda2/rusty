@@ -16,6 +16,8 @@
 mod build;
 #[cfg(test)]
 mod build_tests;
+#[cfg(test)]
+mod ccd_tests;
 mod character;
 mod convert;
 mod query;

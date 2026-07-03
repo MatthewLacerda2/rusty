@@ -120,8 +120,10 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 | Setter | Status | Read-site |
 |---|---|---|
 | `SetVelocity` | ✅ | sim — `physics/world.rs` integrates / writes back `velocity` |
+| `SetAngularVelocity` | ✅ | sim — `physics/world.rs` pushes `set_angvel` / writes back `angvel` |
 | `AddForce` | ✅ | sim — folds impulse into `velocity` (read above); skips kinematic |
 | `SetKinematic` | ✅ | sim — `physics/build.rs::is_kinematic` / `world.rs` body class |
+| `SetCollisionDetection` | ✅ | sim — `physics/build.rs::ccd_enabled` / `world.rs` `enable_ccd` (proven by `physics/ccd_tests.rs`: Discrete tunnels, Continuous stops) |
 
 (The #311 spatial query surface — `Raycast`'s siblings `SphereCast`,
 `OverlapSphere`/`OverlapBox`/`OverlapCapsule`, `CheckSphere`/`CheckBox`,
@@ -313,3 +315,16 @@ contract-conformant `.wgsl` module. Its read-site is the engine's `ShaderRegistr
 same loader the shipped shaders use — and the bake **validates through that exact
 `naga_oil` compose path before writing**, so a bad shader never reaches disk. The three
 write/serialize verbs take the faithful count from 69 to 72.
+
+**#319** surfaced a dynamic body's angular velocity (`Physics.SetAngularVelocity` /
+`GetAngularVelocity`): the setter pushes `set_angvel` into rapier each tick and the
+sync writes `body.angvel()` back onto the component — the same round-trip
+`velocity` already had, so a read reflects the integrated spin and a set injects
+one. The one write verb takes the faithful count from 72 to 73.
+
+**#321** added the per-body collision-detection mode (`Physics.SetCollisionDetection`
+/ `GetCollisionDetection`): the setter maps `Continuous` onto rapier's per-body CCD
+switch (`ccd_enabled` at build, `enable_ccd` re-applied per tick), whose effect on
+the simulation is proven by `physics/ccd_tests.rs` — a fast sphere tunnels through a
+thin wall under Discrete and is stopped by it under Continuous. The one write verb
+takes the faithful count from 73 to 74.

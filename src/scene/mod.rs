@@ -55,11 +55,12 @@ pub use prefab::{
 };
 pub use scene::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
-    ColliderShape, CollisionResponse, DirtyFlag, EmitMode, Entity, LightComponent, LightType,
-    MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent, Particle,
-    ParticleBlend, ParticleEmitterComponent, RenderMode, RigidBodyComponent, Scene,
-    ScriptComponent, ScriptFieldValue, TextureComponent, Tonemap, TransformComponent,
-    VisualCorrectionComponent, DEFAULT_AMBIENT_COLOR, DEFAULT_AMBIENT_INTENSITY,
+    ColliderShape, CollisionDetection, CollisionResponse, DirtyFlag, EmitMode, Entity,
+    LightComponent, LightType, MaterialAsset, MaterialComponent, MeshComponent,
+    NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent, RenderMode,
+    RigidBodyComponent, Scene, ScriptComponent, ScriptFieldValue, TextureComponent, Tonemap,
+    TransformComponent, VisualCorrectionComponent, DEFAULT_AMBIENT_COLOR,
+    DEFAULT_AMBIENT_INTENSITY,
 };
 pub use serialize::{apply_scene_data, asset_mesh_component, to_scene_data, SceneData};
 pub use snapshot::SceneSnapshot;

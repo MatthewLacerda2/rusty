@@ -12,7 +12,7 @@ use std::rc::Rc;
 use glam::Vec3;
 use mlua::Lua;
 use rusty::components::{
-    AnimatorComponent, CameraComponent, ClearFlags, LightComponent, LightType,
+    AnimatorComponent, CameraComponent, ClearFlags, CollisionDetection, LightComponent, LightType,
     NavMeshAgentComponent, ParticleEmitterComponent, RigidBodyComponent, Tonemap,
     VisualCorrectionComponent,
 };
@@ -94,7 +94,9 @@ fn entity_with_rb(scene: &mut Scene, name: &str) -> u32 {
             is_kinematic: false,
             mass: 1.0,
             velocity: Vec3::ZERO,
+            angular_velocity: Vec3::ZERO,
             use_gravity: true,
+            collision_detection: CollisionDetection::Discrete,
         });
     }
     id
@@ -113,6 +115,8 @@ fn physics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>
             r#"
             Physics.SetVelocity({via_lua}, 1.0, 2.0, 3.0)
             Physics.SetKinematic({via_lua}, true)
+            Physics.SetAngularVelocity({via_lua}, 0.0, 4.0, 0.0)
+            Physics.SetCollisionDetection({via_lua}, "Continuous")
         "#
         ))
         .exec()
@@ -125,6 +129,8 @@ fn physics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>
         let mut e = sc.get_entity_mut(via_op).unwrap();
         rb_ops::set_velocity(&mut e, Vec3::new(1.0, 2.0, 3.0));
         rb_ops::set_kinematic(&mut e, true);
+        rb_ops::set_angular_velocity(&mut e, Vec3::new(0.0, 4.0, 0.0));
+        rb_ops::set_collision_detection(&mut e, CollisionDetection::Continuous);
     }
 
     let sc = scene.borrow();
@@ -132,6 +138,8 @@ fn physics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>
     let b = sc.get_entity(via_op).unwrap().rigidbody.clone().unwrap();
     assert_eq!(a.velocity, b.velocity);
     assert_eq!(a.is_kinematic, b.is_kinematic);
+    assert_eq!(a.angular_velocity, b.angular_velocity);
+    assert_eq!(a.collision_detection, b.collision_detection);
     Ok(())
 }
 

@@ -19,6 +19,7 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::{global_table, put, Reg};
+use crate::components::CollisionDetection;
 use crate::physics::PhysicsWorld;
 use crate::scene::authoring::rigidbody as rb_ops;
 use crate::scene::Scene;
@@ -34,7 +35,9 @@ pub fn register<'lua, 'scope>(
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     register_velocity(scope, &table, scene)?;
+    register_angular(scope, &table, scene)?;
     register_force(scope, &table, scene)?;
+    register_collision_detection(scope, &table, scene)?;
 
     lua.globals()
         .set("Physics", table)
@@ -68,6 +71,81 @@ fn register_velocity<'lua, 'scope>(
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 rb_ops::set_velocity(&mut e, Vec3::new(vx, vy, vz));
+            }
+            Ok(())
+        }),
+    )
+}
+
+/// `GetAngularVelocity` / `SetAngularVelocity` (radians/sec per axis, Unity
+/// `Rigidbody.angularVelocity`) over the entity's rigidbody. The setter no-ops on
+/// kinematic/static bodies at the physics layer, mirroring `AddForce` and Unity.
+fn register_angular<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "GetAngularVelocity",
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
+            if let Some(e) = scene.get_entity(id) {
+                if let Some(rb) = &e.rigidbody {
+                    let w = rb.angular_velocity;
+                    return Ok((w.x, w.y, w.z));
+                }
+            }
+            Ok((0.0, 0.0, 0.0))
+        }),
+    )?;
+
+    put(
+        table,
+        "SetAngularVelocity",
+        scope.create_function(|_, (id, wx, wy, wz): (u32, f32, f32, f32)| {
+            let mut scene = scene.borrow_mut();
+            if let Some(mut e) = scene.get_entity_mut(id) {
+                rb_ops::set_angular_velocity(&mut e, Vec3::new(wx, wy, wz));
+            }
+            Ok(())
+        }),
+    )
+}
+
+/// `GetCollisionDetection` / `SetCollisionDetection` (Unity
+/// `Rigidbody.collisionDetectionMode`, the two-mode subset). The mode is the
+/// string `"Discrete"` or `"Continuous"`; an unknown string is a script error.
+fn register_collision_detection<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "GetCollisionDetection",
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
+            let mode = scene
+                .get_entity(id)
+                .and_then(|e| e.rigidbody.as_ref().map(|rb| rb.collision_detection))
+                .unwrap_or_default();
+            Ok(mode.as_str().to_string())
+        }),
+    )?;
+
+    put(
+        table,
+        "SetCollisionDetection",
+        scope.create_function(|_, (id, mode): (u32, String)| {
+            let mode = CollisionDetection::parse(&mode).ok_or_else(|| {
+                mlua::Error::RuntimeError(format!(
+                    "SetCollisionDetection: unknown mode {mode:?} (want \"Discrete\" or \"Continuous\")"
+                ))
+            })?;
+            let mut scene = scene.borrow_mut();
+            if let Some(mut e) = scene.get_entity_mut(id) {
+                rb_ops::set_collision_detection(&mut e, mode);
             }
             Ok(())
         }),

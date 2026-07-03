@@ -99,7 +99,9 @@ pub(crate) fn rigidbody_value(r: &RigidBodyComponent) -> Value {
         "is_kinematic": r.is_kinematic,
         "mass": r.mass,
         "velocity": vec3(r.velocity),
+        "angular_velocity": vec3(r.angular_velocity),
         "use_gravity": r.use_gravity,
+        "collision_detection": r.collision_detection.as_str(),
     })
 }
 

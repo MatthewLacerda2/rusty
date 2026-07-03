@@ -4,6 +4,53 @@
 //! the previous tick's — rapier's `Started`/`Stopped` events carry the same
 //! information, but the diff keeps the edge definition tied to exactly the set
 //! `OnTrigger` already fires from, so enter/stay/exit can never disagree.
+//!
+//! `collect_overlap_pairs` gathers that current-tick set from rapier's narrow
+//! phase; it lives here (next to the diff that consumes it) rather than in
+//! `world.rs`, keeping the step lifecycle file focused and under the size cap.
+
+use std::collections::HashMap;
+
+use rapier3d::prelude::*;
+
+use super::build::order_pair;
+
+/// Gather the overlapping pairs that involve a trigger/sensor or static body,
+/// as `(low, high)` entity-id tuples, sorted + deduped. Sensors land in rapier's
+/// intersection graph; solid contacts in the contact graph (kept only when one
+/// side is a trigger). This is the current-tick set `TriggerEvents` diffs.
+pub(super) fn collect_overlap_pairs(
+    narrow_phase: &NarrowPhase,
+    collider_to_id: &HashMap<ColliderHandle, u32>,
+    id_is_trigger: &HashMap<u32, bool>,
+) -> Vec<(u32, u32)> {
+    let mut pairs = Vec::new();
+    for (h1, h2, intersecting) in narrow_phase.intersection_pairs() {
+        if !intersecting {
+            continue;
+        }
+        if let (Some(&a), Some(&b)) = (collider_to_id.get(&h1), collider_to_id.get(&h2)) {
+            pairs.push(order_pair(a, b));
+        }
+    }
+    for contact in narrow_phase.contact_pairs() {
+        if !contact.has_any_active_contact {
+            continue;
+        }
+        let a = collider_to_id.get(&contact.collider1);
+        let b = collider_to_id.get(&contact.collider2);
+        if let (Some(&a), Some(&b)) = (a, b) {
+            let trig_a = *id_is_trigger.get(&a).unwrap_or(&false);
+            let trig_b = *id_is_trigger.get(&b).unwrap_or(&false);
+            if trig_a || trig_b {
+                pairs.push(order_pair(a, b));
+            }
+        }
+    }
+    pairs.sort_unstable();
+    pairs.dedup();
+    pairs
+}
 
 /// Trigger-overlap events for one physics tick. Every pair is `(low, high)`
 /// entity ids and every list is sorted ascending — the same deterministic

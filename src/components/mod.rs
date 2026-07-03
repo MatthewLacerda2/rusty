@@ -36,7 +36,7 @@ pub use nav_agent::NavMeshAgentComponent;
 pub use particle::{
     CollisionResponse, EmitMode, Particle, ParticleBlend, ParticleEmitterComponent,
 };
-pub use rigidbody::RigidBodyComponent;
+pub use rigidbody::{CollisionDetection, RigidBodyComponent};
 pub use script::{ScriptComponent, ScriptFieldValue};
 pub use texture::TextureComponent;
 pub use transform::TransformComponent;
