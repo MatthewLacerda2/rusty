@@ -39,6 +39,7 @@ fn fast_bullet(mode: CollisionDetection) -> RigidBodyComponent {
         is_kinematic: false,
         mass: 1.0,
         velocity: Vec3::new(0.0, 0.0, 200.0),
+        angular_velocity: Vec3::ZERO,
         use_gravity: false,
         collision_detection: mode,
     }

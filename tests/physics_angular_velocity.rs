@@ -2,7 +2,7 @@
 //! the kinematic/static no-op, and scene save/load persistence.
 
 use glam::Vec3;
-use rusty::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
+use rusty::components::{CollisionDetection, ColliderComponent, ColliderShape, RigidBodyComponent};
 use rusty::physics::PhysicsWorld;
 use rusty::scene::authoring::rigidbody as rb_ops;
 use rusty::scene::Scene;
@@ -25,6 +25,7 @@ fn dynamic_body(angular_velocity: Vec3) -> RigidBodyComponent {
         velocity: Vec3::ZERO,
         angular_velocity,
         use_gravity: false,
+        collision_detection: CollisionDetection::Discrete,
     }
 }
 
