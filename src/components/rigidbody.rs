@@ -12,5 +12,11 @@ pub struct RigidBodyComponent {
     pub is_kinematic: bool,
     pub mass: f32,
     pub velocity: Vec3,
+    /// Angular velocity in radians/sec per axis (Unity: `Rigidbody.angularVelocity`).
+    /// rapier integrates a dynamic body's rotation from this each tick; a
+    /// kinematic body's rotation instead comes from the corrected next pose, so
+    /// this field is inert there (#319).
+    #[serde(default)]
+    pub angular_velocity: Vec3,
     pub use_gravity: bool,
 }

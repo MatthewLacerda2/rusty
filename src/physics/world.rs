@@ -8,8 +8,8 @@
 //!      velocities into rapier. Kinematic bodies (player/enemy) are routed through
 //!      the `KinematicCharacterController` (collide-and-slide vs. walls, plus the
 //!      gravity fall speed when `use_gravity` is authored; see `character`) and
-//!      given the corrected next pose; dynamic bodies get their pose, linear
-//!      velocity, and gravity scale; static bodies stay put.
+//!      given the corrected next pose; dynamic bodies get their pose, linear +
+//!      angular velocity, and gravity scale; static bodies stay put.
 //!   2. `step`            — advance the rapier world by `dt` under gravity.
 //!   3. `sync_from_rapier`— write the integrated transforms + velocities back onto
 //!      the entities, and return the trigger/collision pairs scripts expect.
@@ -21,11 +21,12 @@ use std::collections::HashMap;
 use rapier3d::prelude::*;
 
 use super::build::{
-    body_state, build_shape, collider_inputs, gravity_scale, interaction_groups, order_pair,
-    BodyClass, EntityBodyState,
+    body_state, build_shape, collider_inputs, gravity_scale, interaction_groups, BodyClass,
+    EntityBodyState,
 };
 use super::character;
 use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
+use super::overlap::collect_triggers;
 use super::trigger_events::TriggerEvents;
 use crate::scene::Scene;
 
@@ -108,6 +109,7 @@ impl PhysicsWorld {
                 BodyClass::Kinematic => RigidBodyBuilder::kinematic_position_based(),
                 BodyClass::Dynamic => RigidBodyBuilder::dynamic()
                     .linvel(to_na_vec(inp.velocity))
+                    .angvel(to_na_vec(inp.angular_velocity))
                     // `use_gravity = false` exempts the body from world gravity (#209).
                     .gravity_scale(gravity_scale(inp.use_gravity)),
             }
@@ -197,9 +199,11 @@ impl PhysicsWorld {
             body.set_position(to_iso(snap.pos, snap.rot), true);
         } else {
             // Dynamic: trust rapier for pose, but let scripts inject velocity
-            // (SetVelocity / AddForce mutate the component between ticks) and
-            // re-apply `use_gravity` so toggling it at runtime takes effect.
+            // (SetVelocity / AddForce / SetAngularVelocity mutate the component
+            // between ticks) and re-apply `use_gravity` so toggling it at runtime
+            // takes effect.
             body.set_linvel(to_na_vec(snap.vel), true);
+            body.set_angvel(to_na_vec(snap.angular_vel), true);
             body.set_gravity_scale(gravity_scale(snap.use_gravity), true);
         }
     }
@@ -227,56 +231,32 @@ impl PhysicsWorld {
             &(),
         );
 
-        let events = TriggerEvents::from_overlap_sets(&self.prev_triggers, self.collect_triggers());
+        let pairs = collect_triggers(
+            &self.narrow_phase,
+            &self.collider_to_id,
+            &self.id_is_trigger,
+        );
+        let events = TriggerEvents::from_overlap_sets(&self.prev_triggers, pairs);
         self.prev_triggers = events.stayed.clone();
         self.sync_from_rapier(scene);
         events
     }
 
-    /// Gather overlapping pairs that involve a trigger/sensor or static body,
-    /// preserving the legacy `Vec<(u32, u32)>` trigger-pair contract. Sensors land
-    /// in the intersection graph; solid contacts in the contact graph.
-    fn collect_triggers(&self) -> Vec<(u32, u32)> {
-        let mut pairs = Vec::new();
-        for (h1, h2, intersecting) in self.narrow_phase.intersection_pairs() {
-            if !intersecting {
-                continue;
-            }
-            if let (Some(&a), Some(&b)) =
-                (self.collider_to_id.get(&h1), self.collider_to_id.get(&h2))
-            {
-                pairs.push(order_pair(a, b));
-            }
-        }
-        for contact in self.narrow_phase.contact_pairs() {
-            if !contact.has_any_active_contact {
-                continue;
-            }
-            let a = self.collider_to_id.get(&contact.collider1);
-            let b = self.collider_to_id.get(&contact.collider2);
-            if let (Some(&a), Some(&b)) = (a, b) {
-                let trig_a = *self.id_is_trigger.get(&a).unwrap_or(&false);
-                let trig_b = *self.id_is_trigger.get(&b).unwrap_or(&false);
-                if trig_a || trig_b {
-                    pairs.push(order_pair(a, b));
-                }
-            }
-        }
-        pairs.sort_unstable();
-        pairs.dedup();
-        pairs
-    }
-
     /// Write integrated poses + velocities back onto the entities.
     fn sync_from_rapier(&self, scene: &mut Scene) {
         for (&id, &handle) in &self.id_to_body {
-            let (pos, rot, vel) = {
+            let (pos, rot, vel, angular_vel) = {
                 let body = match self.bodies.get(handle) {
                     Some(b) => b,
                     None => continue,
                 };
                 let (pos, rot) = from_iso(body.position());
-                (pos, rot, from_na_vec(*body.linvel()))
+                (
+                    pos,
+                    rot,
+                    from_na_vec(*body.linvel()),
+                    from_na_vec(*body.angvel()),
+                )
             };
             if let Some(mut entity) = scene.get_entity_mut(id) {
                 entity.transform.position = pos;
@@ -284,6 +264,7 @@ impl PhysicsWorld {
                 if let Some(rb) = &mut entity.rigidbody {
                     if !rb.is_kinematic {
                         rb.velocity = vel;
+                        rb.angular_velocity = angular_vel;
                     }
                 }
             }

@@ -18,6 +18,7 @@ mod build;
 mod build_tests;
 mod character;
 mod convert;
+mod overlap;
 mod query;
 mod spatial;
 #[cfg(test)]

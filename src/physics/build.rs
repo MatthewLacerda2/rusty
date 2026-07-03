@@ -57,6 +57,7 @@ pub(super) struct ColliderInputs {
     pub is_static: bool,
     pub class: BodyClass,
     pub velocity: Vec3,
+    pub angular_velocity: Vec3,
     /// Whether a dynamic body is pulled by world gravity (Unity: `useGravity`).
     /// Maps to rapier's `gravity_scale` (1.0 when true, 0.0 when false).
     pub use_gravity: bool,
@@ -94,6 +95,11 @@ pub(super) fn collider_inputs(entity: &Entity) -> Option<ColliderInputs> {
             .as_ref()
             .map(|r| r.velocity)
             .unwrap_or(Vec3::ZERO),
+        angular_velocity: entity
+            .rigidbody
+            .as_ref()
+            .map(|r| r.angular_velocity)
+            .unwrap_or(Vec3::ZERO),
         use_gravity: entity.rigidbody.as_ref().is_none_or(|r| r.use_gravity),
         layer: entity.layer,
     })
@@ -104,6 +110,7 @@ pub(super) struct EntityBodyState {
     pub pos: Vec3,
     pub rot: Quat,
     pub vel: Vec3,
+    pub angular_vel: Vec3,
     pub active: bool,
     pub kinematic: bool,
     pub is_static: bool,
@@ -124,6 +131,11 @@ pub(super) fn body_state(entity: &Entity) -> EntityBodyState {
             .rigidbody
             .as_ref()
             .map(|r| r.velocity)
+            .unwrap_or(Vec3::ZERO),
+        angular_vel: entity
+            .rigidbody
+            .as_ref()
+            .map(|r| r.angular_velocity)
             .unwrap_or(Vec3::ZERO),
         active: entity.active,
         kinematic: is_kinematic(entity.is_static, entity.rigidbody.as_ref()),

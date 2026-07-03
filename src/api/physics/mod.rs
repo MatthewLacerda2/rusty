@@ -1,6 +1,7 @@
 //! src/api/physics/mod.rs — `Physics` namespace.
 //!
-//! Rigidbody velocity/force/kinematic controls plus the spatial query surface
+//! Rigidbody linear/angular velocity, force, and kinematic controls plus the
+//! spatial query surface
 //! over the live rapier/parry `PhysicsWorld` — the same query pipeline the
 //! engine uses, so script and engine queries agree (#31, #311). The queries
 //! split by shape: line casts (`Raycast`/`SphereCast`) in `cast`, volume
@@ -34,6 +35,7 @@ pub fn register<'lua, 'scope>(
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     register_velocity(scope, &table, scene)?;
+    register_angular_velocity(scope, &table, scene)?;
     register_force(scope, &table, scene)?;
 
     lua.globals()
@@ -68,6 +70,43 @@ fn register_velocity<'lua, 'scope>(
             let mut scene = scene.borrow_mut();
             if let Some(mut e) = scene.get_entity_mut(id) {
                 rb_ops::set_velocity(&mut e, Vec3::new(vx, vy, vz));
+            }
+            Ok(())
+        }),
+    )
+}
+
+/// `GetAngularVelocity` / `SetAngularVelocity` (radians/sec per axis, Unity
+/// `Rigidbody.angularVelocity`) over the entity's rigidbody. `SetAngularVelocity`
+/// is a no-op on a kinematic or static body (#319) — see
+/// `rb_ops::set_angular_velocity`.
+fn register_angular_velocity<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "GetAngularVelocity",
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
+            if let Some(e) = scene.get_entity(id) {
+                if let Some(rb) = &e.rigidbody {
+                    let v = rb.angular_velocity;
+                    return Ok((v.x, v.y, v.z));
+                }
+            }
+            Ok((0.0, 0.0, 0.0))
+        }),
+    )?;
+
+    put(
+        table,
+        "SetAngularVelocity",
+        scope.create_function(|_, (id, vx, vy, vz): (u32, f32, f32, f32)| {
+            let mut scene = scene.borrow_mut();
+            if let Some(mut e) = scene.get_entity_mut(id) {
+                rb_ops::set_angular_velocity(&mut e, Vec3::new(vx, vy, vz));
             }
             Ok(())
         }),

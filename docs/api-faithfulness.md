@@ -122,6 +122,7 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 | `SetVelocity` | ✅ | sim — `physics/world.rs` integrates / writes back `velocity` |
 | `AddForce` | ✅ | sim — folds impulse into `velocity` (read above); skips kinematic |
 | `SetKinematic` | ✅ | sim — `physics/build.rs::is_kinematic` / `world.rs` body class |
+| `SetAngularVelocity` | ✅ | sim — `physics/world.rs::sync_to_rapier` pushes it via rapier's `set_angvel` on a dynamic body each tick, and `sync_from_rapier` reads `body.angvel()` back onto `angular_velocity`; round-trips through `SceneData`. A no-op on kinematic/static bodies (`scene::authoring::rigidbody::set_angular_velocity`), mirroring `AddForce`'s kinematic skip — rapier drives a kinematic body's rotation from the character controller's corrected pose, never by integrating an angular velocity (#319) |
 
 (The #311 spatial query surface — `Raycast`'s siblings `SphereCast`,
 `OverlapSphere`/`OverlapBox`/`OverlapCapsule`, `CheckSphere`/`CheckBox`,
@@ -273,7 +274,7 @@ dry-run and the block-catalog listing — not setters, so they don't add to the 
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 72 |
+| ✅ faithful | 73 |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 
@@ -313,3 +314,9 @@ contract-conformant `.wgsl` module. Its read-site is the engine's `ShaderRegistr
 same loader the shipped shaders use — and the bake **validates through that exact
 `naga_oil` compose path before writing**, so a bad shader never reaches disk. The three
 write/serialize verbs take the faithful count from 69 to 72.
+
+**#319** added `Physics.SetAngularVelocity` / `GetAngularVelocity`: rapier already
+integrated a dynamic body's rotation from an angular velocity every tick, but the engine
+never read it back onto the component or let a script set it — the linear-velocity half
+of the pair (`SetVelocity`/`AddForce`) had a sim read-site while its angular twin didn't
+exist. The setter takes the faithful count from 72 to 73.

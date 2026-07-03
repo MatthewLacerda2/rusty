@@ -94,6 +94,7 @@ fn entity_with_rb(scene: &mut Scene, name: &str) -> u32 {
             is_kinematic: false,
             mass: 1.0,
             velocity: Vec3::ZERO,
+            angular_velocity: Vec3::ZERO,
             use_gravity: true,
         });
     }

@@ -174,6 +174,7 @@ fn is_kinematic_only_for_non_static_bodies_without_a_dynamic_rigidbody() {
         is_kinematic: false,
         mass: 1.0,
         velocity: Vec3::ZERO,
+        angular_velocity: Vec3::ZERO,
         use_gravity: true,
     };
     assert!(!is_kinematic(true, None), "static is not kinematic");

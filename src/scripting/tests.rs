@@ -109,6 +109,7 @@ fn add_force_applies_dt_scaled_velocity() {
             is_kinematic: false,
             mass: 2.0,
             velocity: Vec3::ZERO,
+            angular_velocity: Vec3::ZERO,
             use_gravity: true,
         });
     }

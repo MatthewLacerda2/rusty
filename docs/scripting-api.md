@@ -780,6 +780,8 @@ and distance are `0`.
 |---|---|---|
 | `Physics.GetVelocity` | `(id)` | `x, y, z` |
 | `Physics.SetVelocity` | `(id, vx, vy, vz)` | — |
+| `Physics.GetAngularVelocity` | `(id)` | `x, y, z` (radians/sec) |
+| `Physics.SetAngularVelocity` | `(id, vx, vy, vz)` | — (radians/sec; no-op on kinematic/static, see below) |
 | `Physics.AddForce` | `(id, fx, fy, fz)` | — (continuous force, see below) |
 | `Physics.SetKinematic` | `(id, is_kinematic)` | — |
 | `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` |
@@ -834,6 +836,16 @@ change for one call is `F / mass · fixedDeltaTime`, so applying the same force 
 `Update` accelerates the body smoothly rather than in dt-independent jumps. It is a
 no-op on kinematic bodies. For an instantaneous velocity change, set the velocity
 directly with `SetVelocity`.
+
+`GetAngularVelocity` / `SetAngularVelocity` mirror `GetVelocity`/`SetVelocity` for a
+dynamic body's spin (Unity's `Rigidbody.angularVelocity`, radians/sec per axis): rapier
+integrates the body's rotation from it every physics tick, and the engine reads the
+integrated value back each tick, so a script sees rapier's actual spin (including any
+change from collisions), not just what it last set. `SetAngularVelocity` is a **no-op on
+a kinematic or static body** (matching `AddForce`'s kinematic no-op): a kinematic body's
+rotation comes from the character controller's corrected next pose, never from an
+integrated angular velocity, so storing one there would be inert data a script could
+mistake for effect.
 
 A rigidbody's **`use_gravity`** flag (authored in the inspector / serialized in the
 scene) controls whether a body is pulled by the world's gravity (Unity:

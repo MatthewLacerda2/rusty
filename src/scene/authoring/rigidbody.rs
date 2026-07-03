@@ -52,6 +52,22 @@ pub fn set_velocity(entity: &mut Entity, velocity: Vec3) {
     }
 }
 
+/// Set the rigidbody's angular velocity (rad/s per axis). A no-op on a
+/// static or kinematic body: rapier drives a kinematic body's rotation from the
+/// character controller's corrected next pose, never by integrating an angular
+/// velocity, so storing one there would be inert data a script could mistake
+/// for effect (mirrors `Physics.AddForce`'s kinematic no-op, #319).
+pub fn set_angular_velocity(entity: &mut Entity, angular_velocity: Vec3) {
+    if entity.is_static {
+        return;
+    }
+    if let Some(rb) = &mut entity.rigidbody {
+        if !rb.is_kinematic {
+            rb.angular_velocity = angular_velocity;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -67,6 +83,7 @@ mod tests {
                 is_kinematic: false,
                 mass: 1.0,
                 velocity: Vec3::ZERO,
+                angular_velocity: Vec3::ZERO,
                 use_gravity: true,
             });
         }
@@ -78,15 +95,56 @@ mod tests {
         let (mut scene, id) = scene_with_rb();
         let mut e = scene.get_entity_mut(id).unwrap();
         set_active(&mut e, false);
-        set_kinematic(&mut e, true);
+        set_kinematic(&mut e, false);
         set_use_gravity(&mut e, false);
         set_mass(&mut e, 5000.0);
         set_velocity(&mut e, Vec3::new(1.0, 2.0, 3.0));
+        set_angular_velocity(&mut e, Vec3::new(0.1, 0.2, 0.3));
         let rb = e.rigidbody.as_ref().unwrap();
         assert!(!rb.active);
-        assert!(rb.is_kinematic);
+        assert!(!rb.is_kinematic);
         assert!(!rb.use_gravity);
         assert_eq!(rb.mass, 1000.0, "mass clamps to the upper bound");
         assert_eq!(rb.velocity, Vec3::new(1.0, 2.0, 3.0));
+        assert_eq!(rb.angular_velocity, Vec3::new(0.1, 0.2, 0.3));
+    }
+
+    #[test]
+    fn set_angular_velocity_is_a_no_op_on_kinematic_or_static() {
+        let (mut scene, id) = scene_with_rb();
+        {
+            let mut e = scene.get_entity_mut(id).unwrap();
+            set_kinematic(&mut e, true);
+            set_angular_velocity(&mut e, Vec3::new(1.0, 1.0, 1.0));
+        }
+        assert_eq!(
+            scene
+                .get_entity(id)
+                .unwrap()
+                .rigidbody
+                .as_ref()
+                .unwrap()
+                .angular_velocity,
+            Vec3::ZERO,
+            "kinematic bodies ignore SetAngularVelocity"
+        );
+
+        {
+            let mut e = scene.get_entity_mut(id).unwrap();
+            set_kinematic(&mut e, false);
+            e.is_static = true;
+            set_angular_velocity(&mut e, Vec3::new(1.0, 1.0, 1.0));
+        }
+        assert_eq!(
+            scene
+                .get_entity(id)
+                .unwrap()
+                .rigidbody
+                .as_ref()
+                .unwrap()
+                .angular_velocity,
+            Vec3::ZERO,
+            "static bodies ignore SetAngularVelocity"
+        );
     }
 }

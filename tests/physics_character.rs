@@ -21,6 +21,7 @@ fn kinematic_body() -> RigidBodyComponent {
         is_kinematic: true,
         mass: 1.0,
         velocity: Vec3::ZERO,
+        angular_velocity: Vec3::ZERO,
         use_gravity: false,
     }
 }
