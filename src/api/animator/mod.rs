@@ -1,4 +1,4 @@
-//! src/api/animator.rs — `Animator` namespace.
+//! src/api/animator/ — `Animator` namespace.
 //!
 //! `Play`/`Crossfade`/`Stop` plus `Pause`/`Resume` and `SetLooping` (#313) over an
 //! entity's optional animator component. `Play` hard-cuts to a clip; `Crossfade`
@@ -7,7 +7,12 @@
 //! imported clips. `Pause`/`Resume` hold and release the playhead over the
 //! component's `freeze` flag; `SetLooping` wraps the playhead at the clip's end.
 //! `SetBool`/`SetFloat`/`SetInt`/`SetTrigger` (#314) write the typed graph
-//! parameters the animation-graph evaluator (#316) will read to decide transitions.
+//! parameters the animation-graph evaluator (#316) reads to decide transitions.
+//! The graph control surface (#316: `SetGraph`, `SetGraphEnabled`, `PlayNode`,
+//! `PlayAnimation`, `GetCurrentNode`) lives in `graph.rs` — one namespace, split
+//! to stay under the size cap.
+
+mod graph;
 
 use std::cell::RefCell;
 
@@ -34,6 +39,7 @@ pub fn register<'lua, 'scope>(
     register_set_looping(scope, &table, scene)?;
     register_set_bool_float(scope, &table, scene, console)?;
     register_set_int_trigger(scope, &table, scene, console)?;
+    graph::register(scope, &table, scene, console)?;
 
     lua.globals()
         .set("Animator", table)

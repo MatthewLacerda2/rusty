@@ -201,6 +201,88 @@ fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
     assert_eq!(eval(&gw, "__enemy_log"), "ASUU");
 }
 
+/// A one-entity scene carrying `anim`; returns (scene handle, entity id).
+fn rig_scene(anim: crate::components::AnimatorComponent) -> (Rc<RefCell<Scene>>, u32) {
+    let mut s = Scene::new();
+    let id = s.add_entity("Rig".to_string());
+    s.get_entity_mut(id).unwrap().animator = Some(anim);
+    (Rc::new(RefCell::new(s)), id)
+}
+
+fn animator_of(scene: &Rc<RefCell<Scene>>, id: u32) -> crate::components::AnimatorComponent {
+    scene
+        .borrow()
+        .get_entity(id)
+        .unwrap()
+        .animator
+        .clone()
+        .unwrap()
+}
+
+/// #312 mutation audit: the `animate` system must actually run inside the play
+/// loop's `FixedUpdate` dispatch — stepped ticks visibly advance animator state.
+#[test]
+fn play_tick_advances_the_animator_through_the_loop() {
+    let (scene, id) = rig_scene(crate::components::AnimatorComponent {
+        current_clip: "Walk".to_string(),
+        is_playing: true,
+        ..Default::default()
+    });
+    let mut gw = world_with(Rc::clone(&scene));
+    gw.set_playing(true);
+    gw.tick(DT);
+    gw.tick(DT);
+    let time = animator_of(&scene, id).time;
+    assert_eq!(time, 2.0 * DT, "two stepped frames advanced the playhead");
+}
+
+/// End-to-end #316: a graph-referencing animator binds (entry node) and then
+/// transitions from a parameter change, all through `GameWorld::tick`'s dispatch.
+#[test]
+fn graph_driven_animator_transitions_through_the_play_loop() {
+    use crate::asset::animation_graph::{self, AnimationGraph};
+    let path = std::env::temp_dir().join("rusty_316_loop.animgraph");
+    let graph: AnimationGraph = serde_json::from_value(serde_json::json!({
+        "parameters": { "speed": { "Float": 0.0 } },
+        "nodes": [
+            { "name": "Idle", "clip": "IdleClip", "is_loop": true },
+            { "name": "Run", "clip": "RunClip", "is_loop": true }
+        ],
+        "edges": [ {
+            "from": "Idle", "to": "Run", "transition_duration": 0.25,
+            "conditions": [ { "Float": { "parameter": "speed", "op": "Greater", "value": 1.0 } } ]
+        } ],
+        "entry": "Idle"
+    }))
+    .unwrap();
+    animation_graph::save(&path, &graph).unwrap();
+
+    let (scene, id) = rig_scene(crate::components::AnimatorComponent {
+        graph: Some(path.to_string_lossy().into_owned()),
+        ..Default::default()
+    });
+    let mut gw = world_with(Rc::clone(&scene));
+    gw.set_playing(true);
+    gw.tick(DT); // first step binds: seeds "speed" = 0.0 and enters Idle
+    let anim = animator_of(&scene, id);
+    assert_eq!(anim.current_node.as_deref(), Some("Idle"));
+    assert_eq!(anim.current_clip, "IdleClip");
+    assert_eq!(anim.get_float("speed"), Some(0.0), "default seeded");
+    scene
+        .borrow_mut()
+        .get_entity_mut(id)
+        .unwrap()
+        .animator
+        .as_mut()
+        .unwrap()
+        .set_float("speed", 2.0);
+    gw.tick(DT); // the Idle → Run edge fires and crossfades
+    let anim = animator_of(&scene, id);
+    assert_eq!(anim.current_node.as_deref(), Some("Run"));
+    assert_eq!(anim.previous_clip.as_deref(), Some("IdleClip"));
+    assert_eq!(anim.crossfade_duration, 0.25);
+}
+
 #[test]
 fn snap_camera_to_player_positions_behind_player() {
     let mut s = Scene::new();

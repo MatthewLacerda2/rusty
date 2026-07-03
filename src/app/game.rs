@@ -213,6 +213,9 @@ impl GameWorld {
     fn enter_play(&mut self) {
         self.resources.play_frame = 0;
         self.resources.time.borrow_mut().reset();
+        // Reload animation graphs fresh each Play session (#316), so asset edits
+        // made in between are picked up without restarting the engine.
+        self.resources.animation_graphs.clear();
         // Start the audio log fresh for this Play session (#212) and silence any
         // voice that lingered from a prior run.
         {

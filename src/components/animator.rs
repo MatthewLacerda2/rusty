@@ -8,6 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 
+mod graph_state;
 mod parameters;
 pub use parameters::{AnimatorParameter, AnimatorParameters};
 
@@ -61,6 +62,40 @@ pub struct AnimatorComponent {
     /// evaluator that walks the graph each fixed step is #316.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub graph: Option<String>,
+    /// Auto-evaluate the referenced graph each fixed step (#316). On by default;
+    /// off (`Animator.SetGraphEnabled(id, false)`), the graph is inert data and
+    /// the animator stays under direct `Play`/`Crossfade` control.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub graph_enabled: bool,
+    /// Name of the graph node (state) currently active (#316). `None` until the
+    /// evaluator binds the graph — its first step seeds the declared parameter
+    /// defaults and enters the entry node — or after the graph reference changes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_node: Option<String>,
+    /// The active graph node's per-node playback-rate multiplier, stacked on the
+    /// component's own [`speed`](Self::speed) by [`advance`](Self::advance).
+    /// `1.0` outside a graph or for a node with no speed override.
+    #[serde(
+        default = "default_node_speed",
+        skip_serializing_if = "is_default_speed"
+    )]
+    pub node_speed: f32,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn is_true(v: &bool) -> bool {
+    *v
+}
+
+fn default_node_speed() -> f32 {
+    1.0
+}
+
+fn is_default_speed(v: &f32) -> bool {
+    *v == 1.0
 }
 
 impl Default for AnimatorComponent {
@@ -78,6 +113,9 @@ impl Default for AnimatorComponent {
             crossfade_duration: 0.0,
             parameters: AnimatorParameters::new(),
             graph: None,
+            graph_enabled: true,
+            current_node: None,
+            node_speed: 1.0,
         }
     }
 }
@@ -126,7 +164,9 @@ impl AnimatorComponent {
         self.previous_clip.is_some() && self.crossfade_duration > 0.0
     }
 
-    /// Advance both playheads (and any crossfade) by `dt` scaled seconds.
+    /// Advance both playheads (and any crossfade) by `dt` scaled seconds — the
+    /// scale is `speed * node_speed`, the component multiplier stacked with the
+    /// active graph node's own rate (#316).
     /// `clip_duration` is the current clip's length in seconds (non-positive when
     /// unknown): with [`loop_clip`](Self::loop_clip) set the playhead wraps modulo
     /// it, so the clip repeats seamlessly — a pure `rem_euclid`, deterministic at
@@ -139,7 +179,7 @@ impl AnimatorComponent {
         if !self.is_playing || self.freeze {
             return;
         }
-        let step = dt * self.speed;
+        let step = dt * self.speed * self.node_speed;
         self.time += step;
         if self.loop_clip && clip_duration > 0.0 {
             self.time = self.time.rem_euclid(clip_duration);
@@ -156,6 +196,8 @@ impl AnimatorComponent {
     }
 }
 
+#[cfg(test)]
+mod graph_state_tests;
 #[cfg(test)]
 mod parameters_tests;
 #[cfg(test)]

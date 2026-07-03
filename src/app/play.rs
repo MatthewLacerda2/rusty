@@ -65,11 +65,15 @@ const REBAKE_INTERVAL_FRAMES: u64 = 60;
 
 /// Register the play-mode systems into the schedule, in the exact order the old
 /// hand-wired loop ran them. All are sim systems, so they live in `FixedUpdate`.
+/// The graph evaluator (#316) sits after the scripts (so parameters set this tick
+/// are seen) and right before `animate` (so a fired transition is sampled the
+/// same tick).
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::FixedUpdate, rebake_and_path)
         .add_system(Stage::FixedUpdate, update_scripts)
         .add_system(Stage::FixedUpdate, tick_nav)
         .add_system(Stage::FixedUpdate, step_physics)
+        .add_system(Stage::FixedUpdate, super::animation::graph::evaluate_graphs)
         .add_system(Stage::FixedUpdate, animate)
         .add_system(Stage::FixedUpdate, super::particles::tick_particles)
         .add_system(Stage::FixedUpdate, advance_frame);

@@ -52,6 +52,25 @@ pub fn set_looping(entity: &mut Entity, loop_clip: bool) {
     }
 }
 
+/// Set (or clear, with `None`) the animator's `AnimationGraph` asset path (#316).
+/// Resets the active-node state so the evaluator re-binds: its next step seeds the
+/// new graph's declared defaults and enters its entry node.
+pub fn set_graph(entity: &mut Entity, graph: Option<String>) {
+    if let Some(a) = &mut entity.animator {
+        a.graph = graph;
+        a.current_node = None;
+        a.node_speed = 1.0;
+    }
+}
+
+/// Enable/disable graph auto-evaluation (#316). Disabled, the graph is inert and
+/// the animator stays under direct `Play`/`Crossfade` control.
+pub fn set_graph_enabled(entity: &mut Entity, enabled: bool) {
+    if let Some(a) = &mut entity.animator {
+        a.graph_enabled = enabled;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -76,11 +95,31 @@ mod tests {
         set_playing(&mut e, true);
         set_freeze(&mut e, true);
         set_looping(&mut e, true);
+        set_graph(&mut e, Some("guard.animgraph".to_string()));
+        set_graph_enabled(&mut e, false);
         let a = e.animator.as_ref().unwrap();
         assert_eq!(a.current_clip, "Run");
         assert_eq!(a.speed, 2.0);
         assert!(a.is_playing);
         assert!(a.freeze);
         assert!(a.loop_clip);
+        assert_eq!(a.graph.as_deref(), Some("guard.animgraph"));
+        assert!(!a.graph_enabled);
+    }
+
+    #[test]
+    fn set_graph_resets_the_active_node_state() {
+        let (mut scene, id) = scene_with_animator();
+        let mut e = scene.get_entity_mut(id).unwrap();
+        {
+            let a = e.animator.as_mut().unwrap();
+            a.current_node = Some("Run".to_string());
+            a.node_speed = 2.0;
+        }
+        set_graph(&mut e, None);
+        let a = e.animator.as_ref().unwrap();
+        assert_eq!(a.graph, None);
+        assert_eq!(a.current_node, None, "the stale active node is dropped");
+        assert_eq!(a.node_speed, 1.0, "the node speed override is dropped");
     }
 }
