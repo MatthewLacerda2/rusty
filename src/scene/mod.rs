@@ -20,6 +20,7 @@
 pub mod asset_instance;
 pub mod authoring;
 pub mod collision_matrix;
+pub mod destroy_queue;
 pub mod io;
 pub mod layers;
 pub mod lighting;

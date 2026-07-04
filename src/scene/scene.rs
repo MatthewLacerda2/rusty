@@ -90,6 +90,9 @@ pub struct Scene {
     /// applicable probe with box-projected parallax correction instead of the global
     /// skybox. The cubemaps themselves are baked by a later issue (#245).
     pub reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet,
+    /// Ids queued for deferred destruction by play-mode `Scene.DestroyEntity`
+    /// (#323); drained in `destroy_queue`. Transient, never serialized.
+    pub pending_destroy: Vec<u32>,
 }
 
 impl Default for Scene {
@@ -107,6 +110,7 @@ impl Default for Scene {
             decals: Vec::new(),
             probes: crate::scene::lighting::probe::ProbeVolume::new(),
             reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet::new(),
+            pending_destroy: Vec::new(),
         }
     }
 }

@@ -46,4 +46,6 @@ pub use world::World;
 #[cfg(test)]
 mod late_update_tests;
 #[cfg(test)]
+mod lifecycle_tests;
+#[cfg(test)]
 mod schedule_tests;

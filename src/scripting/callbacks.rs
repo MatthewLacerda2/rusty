@@ -35,14 +35,32 @@ pub const ON_TRIGGER: &str = "OnTrigger";
 /// Called once, the tick after a trigger-overlap pair involving the owning
 /// entity ends (#310) — after that tick's `OnTrigger` dispatches.
 pub const ON_TRIGGER_EXIT: &str = "OnTriggerExit";
+/// Called when the owning entity becomes active (#323): on its first activation
+/// — between `Awake` and `Start`, so the first-tick order is
+/// `Awake → OnEnable → Start` — and again on every later inactive→active edge.
+/// Detected by diffing the entity's `active` flag against the previous tick, so
+/// it fires exactly once per rising edge.
+pub const ON_ENABLE: &str = "OnEnable";
+/// Called when the owning entity becomes inactive (#323): once on each
+/// active→inactive edge, and once more — immediately before `OnDestroy` — when
+/// an active entity is destroyed. Fires exactly once per falling edge.
+pub const ON_DISABLE: &str = "OnDisable";
+/// Called once when the entity is removed during play via `Scene.DestroyEntity`
+/// (#323), after its `OnDisable` if it was active. Deliberately **not** fired on
+/// play-exit (Stop restores the edit snapshot — a reset, not gameplay), a
+/// documented divergence from Unity's scene-teardown `OnDestroy`.
+pub const ON_DESTROY: &str = "OnDestroy";
 
 /// Every callback the engine dispatches — the ground truth the doc gate reads.
 pub const LIFECYCLE_CALLBACKS: &[&str] = &[
     AWAKE,
+    ON_ENABLE,
     START,
     UPDATE,
     LATE_UPDATE,
     ON_TRIGGER_ENTER,
     ON_TRIGGER,
     ON_TRIGGER_EXIT,
+    ON_DISABLE,
+    ON_DESTROY,
 ];

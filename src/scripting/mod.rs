@@ -43,4 +43,6 @@ mod tests_physics;
 #[cfg(test)]
 mod tests_spatial;
 #[cfg(test)]
+mod tests_transitions;
+#[cfg(test)]
 mod tests_triggers;

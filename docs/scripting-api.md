@@ -97,6 +97,9 @@ Component menu offers.
 | `OnTriggerEnter` | `OnTriggerEnter(id, other)` | Once, on the first frame an overlap involving the entity's trigger/sensor (or static) collider exists — before that frame's `OnTrigger`. |
 | `OnTrigger` | `OnTrigger(id, other)` | After the physics step, once per overlapping pair involving the entity's trigger/sensor (or static) collider. It is the overlap "stay": it repeats every frame the overlap persists, including the frame `OnTriggerEnter` fires. |
 | `OnTriggerExit` | `OnTriggerExit(id, other)` | Once, on the first frame a previously overlapping pair no longer overlaps — after that frame's `OnTrigger` dispatches (no stay fires for the ended pair). |
+| `OnEnable` | `OnEnable(id)` | When the owning entity becomes `active`: on its **first** activation — between `Awake` and `Start`, so the first-tick order is `Awake → OnEnable → Start` — and again on every later inactive→active transition (e.g. a script or `Scene.Activate` re-enabling a pooled object). Detected by diffing the entity's `active` flag against the previous tick, so it fires **exactly once** per rising edge. |
+| `OnDisable` | `OnDisable(id)` | When the owning entity becomes inactive: once on each `active`→inactive transition (e.g. `Scene.Deactivate`), and once more — immediately **before** `OnDestroy` — when an *active* entity is destroyed. Fires **exactly once** per falling edge. While disabled, the entity receives no other gameplay callback (no `Update`/`LateUpdate`/`OnTrigger`). |
+| `OnDestroy` | `OnDestroy(id)` | Once, when the entity is removed **during play** via `Scene.DestroyEntity` — after its `OnDisable` if it was active. The entity is still readable during the callback (removal happens just after). See the divergence note: **Stop does not fire `OnDestroy`.** |
 
 `id` is always the **owning** entity's id (the entity the script is attached
 to); `other` is the other entity in the overlap.
@@ -122,6 +125,19 @@ headless replays stay byte-identical):
   phase's pair list sorted ascending. Every trigger callback notifies both
   sides of its pair — A about B, then B about A — and an entity carrying
   several scripts is notified in ascending script-index order.
+- `OnEnable`/`OnDisable` are detected at the head of the script phase by diffing
+  each instance's `active` state against the previous tick, in the order
+  `OnDisable` (falling edges) → `Awake` → `OnEnable` (rising edges) → `Start` —
+  so a first activation runs `Awake → OnEnable → Start`, all before that tick's
+  `Update`. `OnDestroy` runs in a dedicated destroy phase at the **tail** of the
+  tick (after `LateUpdate`), draining the ids `Scene.DestroyEntity` queued this
+  tick: all `OnDisable`s first, then all `OnDestroy`s, in ascending
+  `(entity id, script index)` order, before the entities are removed. Every
+  edge fires exactly once, so replays stay byte-identical.
+- **One active gate for every gameplay hook.** A disabled entity receives *no*
+  gameplay callback — not `Update`, `LateUpdate`, or the trigger hooks. Going
+  inactive is announced once by `OnDisable`; coming back is announced once by
+  `OnEnable`.
 
 > **Divergence from Unity — spawns are queued, not synchronous.** Unity runs
 > `Awake` synchronously inside `Object.Instantiate`. In rusty a spawn
@@ -134,6 +150,16 @@ headless replays stay byte-identical):
 > `Instantiate` returns — configure the instance through the `Scene` /
 > `Transform` verbs and let it initialize next tick (spawning it disabled and
 > enabling it when ready defers init the same way).
+
+> **Divergence from Unity — Stop does not fire `OnDestroy`.** Unity calls
+> `OnDestroy` on every object when a scene is torn down. In rusty, leaving Play
+> (Stop) **restores the edit-mode snapshot** — it discards all play-mode state
+> and rewinds to the authored scene, a reset rather than gameplay. Scripts must
+> not observe it, so no `OnDisable`/`OnDestroy` fires on Stop. `OnDestroy` fires
+> **only** for an entity removed *during* play via `Scene.DestroyEntity` (the
+> destructive verb) — that is real gameplay. `Scene.Deactivate` (Unity's
+> deferred destroy) never fires `OnDestroy`; it flips `active`, so it fires
+> `OnDisable` instead.
 
 > **Drift gate:** the callback list is centralized in
 > `src/scripting/callbacks.rs` (dispatch and MonoBehaviour discovery both read

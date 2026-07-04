@@ -68,6 +68,7 @@ impl ScriptManager {
                 table: reg_key,
                 awoken: false,
                 started: false,
+                enabled_last: false,
             },
         );
 

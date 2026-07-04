@@ -1,4 +1,4 @@
-//! src/scripting/lifecycle.rs — dispatch the lifecycle hooks to entity scripts.
+//! src/scripting/lifecycle/ — dispatch the lifecycle hooks to entity scripts.
 //!
 //! Every hook routes through the same two helpers: [`ScriptManager::with_api_scope`]
 //! (live-runtime check + API-surface registration) and [`ScriptManager::call_hook`]
@@ -7,14 +7,23 @@
 //! deterministic everywhere: `entity_scripts` is a `BTreeMap`, so iterating it
 //! is ascending `(entity id, script index)` — replays must stay byte-identical.
 //!
-//! The init contract (#322): [`ScriptManager::init_scripts`] runs at play-enter
-//! and again at the head of every tick's script phase. It drains queued script
-//! loads (runtime spawns), then fires every pending `Awake`, then every pending
-//! `Start` — two phases, so a `Start` can rely on state any other script set up
-//! in `Awake`, matching Unity. Both hooks are gated on the owning entity being
-//! active — that is what defers a disabled-at-load entity's init to its first
-//! active tick — and each fires exactly once per instance (the
-//! `ScriptInstance` flags).
+//! The init contract (#322 + #323): [`ScriptManager::init_scripts`] runs at
+//! play-enter and again at the head of every tick's script phase. It drains
+//! queued script loads (runtime spawns), then dispatches the transition edges in
+//! Unity's order — a leaving `OnDisable`, then `Awake`, `OnEnable`, `Start` for
+//! entering instances — so an entity's first active tick fires
+//! `Awake → OnEnable → Start` before any `Update`. Enable/disable edges are
+//! detected by diffing each instance's `enabled_last` flag against the entity's
+//! current `active` state, so each edge fires exactly once. Every gameplay hook
+//! obeys ONE active gate ([`ScriptManager::entity_active`]): a disabled entity
+//! receives no callbacks at all — `Update`, `LateUpdate` and the trigger hooks
+//! alike — which is precisely what `OnDisable` announces.
+//!
+//! The transition-specific dispatch — the `OnDisable` falling-edge sweep and the
+//! deferred-destroy drain (`OnDisable`→`OnDestroy`) — lives in the `transitions`
+//! submodule; this file holds the shared dispatch core and the per-frame hooks.
+
+mod transitions;
 
 use mlua::{Lua, Table};
 
@@ -22,7 +31,7 @@ use crate::api;
 use crate::physics::TriggerEvents;
 
 use super::callbacks::{
-    AWAKE, LATE_UPDATE, ON_TRIGGER, ON_TRIGGER_ENTER, ON_TRIGGER_EXIT, START, UPDATE,
+    AWAKE, LATE_UPDATE, ON_ENABLE, ON_TRIGGER, ON_TRIGGER_ENTER, ON_TRIGGER_EXIT, START, UPDATE,
 };
 use super::manager::{ScriptInstance, ScriptManager};
 
@@ -68,31 +77,66 @@ impl ScriptManager {
         }
     }
 
-    /// Ascending keys of instances passing `pred` whose owning entity exists
-    /// and is active — the dispatch-eligible set, collected before the scope so
-    /// no scene borrow is held across dispatch (scripts re-borrow the scene).
+    /// The single active gate every gameplay hook obeys: `Some(true)` when the
+    /// entity exists and is active, `Some(false)` when it exists but is inactive,
+    /// `None` when it is gone. Enable/disable edge detection and the
+    /// `Update`/`LateUpdate`/trigger dispatch all read it, so no hook can drift
+    /// from the rule "a disabled entity receives no callbacks".
+    fn entity_active(&self, id: u32) -> Option<bool> {
+        self.scene.borrow().get_entity(id).map(|e| e.active)
+    }
+
+    /// Ascending keys of instances passing `pred` whose owning entity is active —
+    /// the dispatch-eligible set, collected before the scope so no scene borrow is
+    /// held across dispatch (scripts re-borrow the scene).
     fn eligible_keys(&self, pred: impl Fn(&ScriptInstance) -> bool) -> Vec<(u32, usize)> {
-        let scene = self.scene.borrow();
         self.entity_scripts
             .iter()
-            .filter(|(&(id, _), inst)| pred(inst) && scene.get_entity(id).is_some_and(|e| e.active))
+            .filter(|(&(id, _), inst)| pred(inst) && self.entity_active(id) == Some(true))
             .map(|(&key, _)| key)
             .collect()
     }
 
-    /// The init phase at the head of the script phase (and at play-enter):
-    /// drain queued script loads, then fire all pending `Awake`s, then all
-    /// pending `Start`s — before any `Update` of the tick (#322).
+    /// Call the single-arg hook `hook(id)` on `keys`, in the given order, inside
+    /// one API scope. The shared body behind every `(id)`-signature dispatch
+    /// (Awake/OnEnable/Start/OnDisable/OnDestroy); marking the instances is the
+    /// caller's job so each phase records its own edge exactly once.
+    fn dispatch_keys(&self, keys: &[(u32, usize)], hook: &str) {
+        if keys.is_empty() {
+            return;
+        }
+        self.with_api_scope(|lua| {
+            for &key in keys {
+                self.call_hook(lua, key, hook, key.0);
+            }
+        });
+    }
+
+    /// The init phase at the head of the script phase (and at play-enter): drain
+    /// queued script loads, then dispatch the transition edges in Unity's order —
+    /// leaving instances' `OnDisable` first, then `Awake`, `OnEnable`, `Start` for
+    /// entering ones. An entity's first active tick therefore fires
+    /// `Awake → OnEnable → Start`, all before any `Update` of the tick (#322/#323).
     pub fn init_scripts(&mut self) {
         self.load_new_scripts();
+        // Falling edges: an awoken, currently-enabled instance whose entity went
+        // inactive since the last sweep gets `OnDisable`, then clears the flag.
+        self.dispatch_disabled();
+        // Rising path, in order. `Awake` marks `awoken`; `OnEnable` then sees the
+        // fresh instance (awoken && !enabled_last) and slots between Awake and Start.
         self.dispatch_pending(|i| !i.awoken, AWAKE, |i| i.awoken = true);
+        self.dispatch_pending(
+            |i| i.awoken && !i.enabled_last,
+            ON_ENABLE,
+            |i| i.enabled_last = true,
+        );
         self.dispatch_pending(|i| i.awoken && !i.started, START, |i| i.started = true);
     }
 
-    /// One init sub-phase: call `hook(id)` on every eligible instance passing
-    /// `pred`, in ascending key order, then `mark` each so it never re-fires.
-    /// The eligible set is re-read per phase, so an `Awake` that deactivates an
-    /// entity defers that entity's `Start`.
+    /// One rising-edge sub-phase: call `hook(id)` on every active instance passing
+    /// `pred`, in ascending key order, then `mark` each so it never re-fires. The
+    /// eligible set is re-read per phase, so an `Awake` that deactivates an entity
+    /// defers that entity's `OnEnable`/`Start`.
     fn dispatch_pending(
         &mut self,
         pred: impl Fn(&ScriptInstance) -> bool,
@@ -100,14 +144,7 @@ impl ScriptManager {
         mark: impl Fn(&mut ScriptInstance),
     ) {
         let keys = self.eligible_keys(pred);
-        if keys.is_empty() {
-            return;
-        }
-        self.with_api_scope(|lua| {
-            for &key in &keys {
-                self.call_hook(lua, key, hook, key.0);
-            }
-        });
+        self.dispatch_keys(&keys, hook);
         for key in keys {
             if let Some(inst) = self.entity_scripts.get_mut(&key) {
                 mark(inst);
@@ -154,8 +191,9 @@ impl ScriptManager {
     /// overlaps: `OnTriggerEnter` for this tick's new pairs, then `OnTrigger`
     /// (stay) for every overlapping pair, then `OnTriggerExit` for the pairs
     /// that ended (#310) — a fixed hook order so replays stay byte-identical.
-    /// Only awoken instances are notified: `Awake` is always an instance's
-    /// first callback.
+    /// Only awoken instances of ACTIVE entities are notified: `Awake` is always
+    /// an instance's first callback, and a disabled entity receives no gameplay
+    /// callbacks (#323) — the same active gate `Update` obeys.
     pub fn dispatch_trigger_events(&mut self, events: TriggerEvents) {
         let hooks = [
             (ON_TRIGGER_ENTER, &events.entered),
@@ -178,8 +216,13 @@ impl ScriptManager {
         });
     }
 
-    /// Ascending script-slot keys of entity `id`'s awoken instances.
+    /// Ascending script-slot keys of entity `id`'s awoken instances — empty when
+    /// the entity is inactive or gone, so the trigger hooks share the same active
+    /// gate as every other gameplay callback (#323).
     fn awoken_keys_for(&self, id: u32) -> Vec<(u32, usize)> {
+        if self.entity_active(id) != Some(true) {
+            return Vec::new();
+        }
         self.entity_scripts
             .range((id, 0)..=(id, usize::MAX))
             .filter(|(_, inst)| inst.awoken)
