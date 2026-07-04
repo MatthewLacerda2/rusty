@@ -389,6 +389,11 @@ impl ShadowRenderer {
         gpu_meshes: &HashMap<crate::render::MeshId, crate::render::GpuMesh>,
         want_static: bool,
     ) -> Vec<(crate::render::MeshId, u32, u32)> {
+        // Cull shadow casters against the LIGHT's frustum, not the camera's (#330): an
+        // off-screen caster can still throw a shadow into view, so this uses the light-
+        // space (ortho) volume. Culling by the camera here would be the classic
+        // pop-a-shadow bug.
+        let frustum = crate::render::Frustum::from_view_projection(self.light_space_matrix);
         let mut render_resources = Vec::new();
         for entity in scene.iter() {
             if !entity.active || entity.is_static != want_static {
@@ -399,7 +404,13 @@ impl ShadowRenderer {
             let Some(gpu_mesh) = gpu_meshes.get(&mesh_id) else {
                 continue;
             };
-            let model_arr = scene.world_matrix(entity.id).to_cols_array();
+            let world = scene.world_matrix(entity.id);
+            let (min, max) =
+                crate::render::transformed_aabb(gpu_mesh.local_aabb.0, gpu_mesh.local_aabb.1, world);
+            if !frustum.intersects_aabb(min, max) {
+                continue;
+            }
+            let model_arr = world.to_cols_array();
             self.sync_entity_slot(device, queue, entity.id, &model_arr);
             render_resources.push((mesh_id, entity.id, gpu_mesh.num_indices));
         }

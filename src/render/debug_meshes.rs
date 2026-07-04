@@ -46,6 +46,9 @@ impl Renderer {
         let v_bytes: &[u8] = bytemuck::cast_slice(vertices);
         let i_bytes: &[u8] = bytemuck::cast_slice(indices);
         let num_indices = indices.len() as u32;
+        // Cache the mesh's local-space AABB once, here at upload (#330): the frustum cull
+        // transforms it per frame instead of re-walking these vertices.
+        let local_aabb = local_aabb(vertices);
 
         // Re-use resident buffers when the new data still fits (the dirty-path
         // case: same geometry re-uploaded). Both buffers carry COPY_DST so they
@@ -55,6 +58,7 @@ impl Renderer {
                 && existing.index_buffer.size() >= i_bytes.len() as u64
             {
                 existing.num_indices = num_indices;
+                existing.local_aabb = local_aabb;
                 self.queue.write_buffer(&existing.vertex_buffer, 0, v_bytes);
                 self.queue.write_buffer(&existing.index_buffer, 0, i_bytes);
                 return;
@@ -83,6 +87,7 @@ impl Renderer {
                 vertex_buffer,
                 index_buffer,
                 num_indices,
+                local_aabb,
             },
         );
     }
@@ -181,6 +186,20 @@ impl Renderer {
                 usage: wgpu::BufferUsages::VERTEX,
             })
     }
+}
+
+/// The local-space AABB of a mesh's vertices (min/max over positions), cached on the
+/// `GpuMesh` for frustum culling (#330). `update_gpu_mesh` only reaches here with a
+/// non-empty vertex list, so the fold always has a real bound.
+fn local_aabb(vertices: &[Vertex]) -> (Vec3, Vec3) {
+    let mut min = Vec3::splat(f32::MAX);
+    let mut max = Vec3::splat(f32::MIN);
+    for v in vertices {
+        let p = Vec3::from_array(v.position);
+        min = min.min(p);
+        max = max.max(p);
+    }
+    (min, max)
 }
 
 /// Build one axis arrow's line-list vertices: the shaft from the origin to `tip`,

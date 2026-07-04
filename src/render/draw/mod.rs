@@ -17,7 +17,9 @@ use self::lighting::{
 };
 use self::pass::{PassClear, ScenePassFrame};
 use crate::render::postfx::params::build_post_params;
-use crate::render::{build_camera_stack, Camera, CameraUniform, LightingUniform, Renderer};
+use crate::render::{
+    build_camera_stack, Camera, CameraUniform, Frustum, LightingUniform, Renderer,
+};
 use crate::scene::Scene;
 
 impl Renderer {
@@ -83,8 +85,10 @@ impl Renderer {
             // forward entity buffers/bind groups persist in the pool; this only
             // rewrites their contents and returns lightweight draw items (#210). The
             // split separates opaque/cutout (the solids pass) from transparent (the
-            // sorted alpha-blended pass below) (#242).
-            let solids = self.precreate_solid_resources(scene, cam);
+            // sorted alpha-blended pass below) (#242). Only entities whose world AABB
+            // intersects this camera's view frustum are synced/drawn (#330).
+            let frustum = Frustum::from_view_projection(view_proj);
+            let solids = self.precreate_solid_resources(scene, cam, &frustum);
             let overlays = self.precreate_overlays(scene, editor_mode);
             let _path_resources = self.precreate_path(pathfinding_points);
 

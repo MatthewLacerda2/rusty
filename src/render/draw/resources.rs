@@ -83,6 +83,7 @@ impl Renderer {
         &mut self,
         scene: &Scene,
         cam: &crate::render::Camera,
+        frustum: &crate::render::Frustum,
     ) -> SolidResources {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
         let mut out = SolidResources::default();
@@ -100,7 +101,8 @@ impl Renderer {
             if !crate::scene::layer_in_mask(entity.layer, cam.culling_mask) {
                 continue;
             }
-            let Some((res, world_pos, transparent)) = self.sync_solid_resource(scene, &entity)
+            let Some((res, world_pos, transparent)) =
+                self.sync_solid_resource(scene, &entity, frustum)
             else {
                 continue;
             };
@@ -125,14 +127,24 @@ impl Renderer {
         &mut self,
         scene: &Scene,
         entity: &crate::components::Entity,
+        frustum: &crate::render::Frustum,
     ) -> Option<(SolidResource, glam::Vec3, bool)> {
         let mesh = entity.mesh.as_ref()?;
         let mesh_id = MeshId::from_mesh(mesh);
-        let num_indices = self.gpu_meshes.get(&mesh_id)?.num_indices;
+        let gpu_mesh = self.gpu_meshes.get(&mesh_id)?;
+        let (num_indices, local_aabb) = (gpu_mesh.num_indices, gpu_mesh.local_aabb);
+
+        let model_matrix = scene.world_matrix(entity.id);
+        // Frustum cull (#330): reject before any uniform sync / bind-group work / draw
+        // when the world-space AABB is entirely outside this camera's view volume.
+        let (world_min, world_max) =
+            crate::render::transformed_aabb(local_aabb.0, local_aabb.1, model_matrix);
+        if !frustum.intersects_aabb(world_min, world_max) {
+            return None;
+        }
 
         let material = scene.material_of(entity);
         let transparent = material.is_some_and(MaterialAsset::is_transparent);
-        let model_matrix = scene.world_matrix(entity.id);
         let world_pos = model_matrix.w_axis.truncate();
         let uniform = crate::render::draw::uniforms::solid_entity_uniform(
             scene,

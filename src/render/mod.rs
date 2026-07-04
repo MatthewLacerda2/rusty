@@ -1,4 +1,5 @@
 mod camera;
+mod culling;
 mod debug_meshes;
 mod draw;
 mod setup;
@@ -14,6 +15,8 @@ pub mod postfx;
 use gpu::entity_pool;
 use ibl::{cubemap, skybox};
 use passes::{decals, particles, shadows};
+
+pub(crate) use culling::{transformed_aabb, Frustum};
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -37,6 +40,13 @@ pub struct GpuMesh {
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub num_indices: u32,
+    /// The mesh's LOCAL-space AABB (min, max over its vertex positions), computed once
+    /// at upload and cached here alongside the vertex buffer (#330). Frustum culling
+    /// transforms these 8 corners by the entity's world matrix each frame — O(1) — so
+    /// the hot loop never re-walks the vertices (that walk survives only for one-off
+    /// picking via `Entity::compute_world_aabb`). Shared per `MeshId`, so identical
+    /// geometry stores it once.
+    pub local_aabb: (glam::Vec3, glam::Vec3),
 }
 
 /// Stable identity for a mesh's GPU geometry, derived from its *source*
