@@ -67,7 +67,9 @@ const REBAKE_INTERVAL_FRAMES: u64 = 60;
 /// hand-wired loop ran them. All are sim systems, so they live in `FixedUpdate`.
 /// The graph evaluator (#316) sits after the scripts (so parameters set this tick
 /// are seen) and right before `animate` (so a fired transition is sampled the
-/// same tick).
+/// same tick). `late_update_scripts` (#324) is the tick's tail: it runs after
+/// physics, animation and particles have resolved this tick's state, so scripts
+/// can react to settled transforms, and before `advance_frame`.
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::FixedUpdate, rebake_and_path)
         .add_system(Stage::FixedUpdate, update_scripts)
@@ -76,6 +78,7 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, super::animation::graph::evaluate_graphs)
         .add_system(Stage::FixedUpdate, animate)
         .add_system(Stage::FixedUpdate, super::particles::tick_particles)
+        .add_system(Stage::FixedUpdate, late_update_scripts)
         .add_system(Stage::FixedUpdate, advance_frame);
 }
 
@@ -86,6 +89,16 @@ pub(super) fn register(app: &mut App) {
 fn update_scripts(_world: &mut World, res: &mut Resources) {
     res.script_manager.init_scripts();
     res.script_manager.update_scripts(res.frame_dt);
+}
+
+/// The post-physics script phase (#324): once physics, animation and particles
+/// have resolved this tick's state, every started script's `LateUpdate(id, dt)`
+/// runs — still inside the deterministic `FixedUpdate` stage, before
+/// `advance_frame`. A follow-cam / look-at / aim / recoil script placed here reads
+/// *this* tick's settled transforms instead of last tick's, closing the one-step
+/// lag. It reuses the same scaled `frame_dt` the tick handed `update_scripts`.
+fn late_update_scripts(_world: &mut World, res: &mut Resources) {
+    res.script_manager.late_update_scripts(res.frame_dt);
 }
 
 /// Step the rapier world and dispatch any resulting trigger events to scripts.

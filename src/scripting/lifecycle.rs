@@ -21,7 +21,9 @@ use mlua::{Lua, Table};
 use crate::api;
 use crate::physics::TriggerEvents;
 
-use super::callbacks::{AWAKE, ON_TRIGGER, ON_TRIGGER_ENTER, ON_TRIGGER_EXIT, START, UPDATE};
+use super::callbacks::{
+    AWAKE, LATE_UPDATE, ON_TRIGGER, ON_TRIGGER_ENTER, ON_TRIGGER_EXIT, START, UPDATE,
+};
 use super::manager::{ScriptInstance, ScriptManager};
 
 impl ScriptManager {
@@ -124,6 +126,26 @@ impl ScriptManager {
         self.with_api_scope(|lua| {
             for &key in &keys {
                 self.call_hook(lua, key, UPDATE, (key.0, delta_time));
+            }
+        });
+    }
+
+    /// Invokes `LateUpdate(id, dt)` on every started instance whose entity is
+    /// active — the post-physics twin of [`update_scripts`](Self::update_scripts)
+    /// (#324). Its play-mode system is registered after physics/animation/particles
+    /// and before `advance_frame`, so a follow-cam / look-at / aim script reads
+    /// *this* tick's resolved transforms, not last tick's. Same eligible set,
+    /// same ascending `(entity, script index)` order, and the same scaled `dt`
+    /// the tick handed `Update` — it rides the shared dispatch core, so it is one
+    /// more loop, not a new copy of it.
+    pub fn late_update_scripts(&mut self, delta_time: f32) {
+        let keys = self.eligible_keys(|inst| inst.started);
+        if keys.is_empty() {
+            return;
+        }
+        self.with_api_scope(|lua| {
+            for &key in &keys {
+                self.call_hook(lua, key, LATE_UPDATE, (key.0, delta_time));
             }
         });
     }

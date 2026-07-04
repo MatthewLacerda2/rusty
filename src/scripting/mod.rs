@@ -33,6 +33,8 @@ mod tests_awake;
 #[cfg(test)]
 mod tests_console;
 #[cfg(test)]
+mod tests_late_update;
+#[cfg(test)]
 mod tests_lifecycle;
 #[cfg(test)]
 mod tests_manager;

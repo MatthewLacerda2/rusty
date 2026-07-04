@@ -19,6 +19,13 @@ pub const AWAKE: &str = "Awake";
 pub const START: &str = "Start";
 /// Called every frame of play while the owning entity is active.
 pub const UPDATE: &str = "Update";
+/// Called every frame of play while the owning entity is active, after **every**
+/// script's `Update` and after this tick's physics, animation and particle steps
+/// have resolved — the post-physics hook (#324). Same scaled `dt` and same
+/// deterministic `(entity, script index)` order as `Update`, still inside the one
+/// `FixedUpdate` sim tick (it is not a render-rate callback). Lets a follow-cam /
+/// look-at / aim / recoil script read *this* tick's settled transforms.
+pub const LATE_UPDATE: &str = "LateUpdate";
 /// Called once, the tick a trigger-overlap pair involving the owning entity
 /// begins (#310) — before that tick's `OnTrigger`.
 pub const ON_TRIGGER_ENTER: &str = "OnTriggerEnter";
@@ -34,6 +41,7 @@ pub const LIFECYCLE_CALLBACKS: &[&str] = &[
     AWAKE,
     START,
     UPDATE,
+    LATE_UPDATE,
     ON_TRIGGER_ENTER,
     ON_TRIGGER,
     ON_TRIGGER_EXIT,

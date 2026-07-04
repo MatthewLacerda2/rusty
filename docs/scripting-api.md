@@ -93,6 +93,7 @@ Component menu offers.
 | `Awake` | `Awake(id)` | Once per script instance, when it first participates in the sim while its entity is `active`: at play-enter for active scene entities, at the head of the next tick's script phase for entities spawned during play (see the divergence note below), or on the entity's first active tick when it is loaded/spawned disabled. Always the instance's first callback. |
 | `Start` | `Start(id)` | Once per script instance, after its `Awake`, immediately before its first `Update` — deferred while the owning entity is inactive, so an object instantiated disabled initializes when first enabled (the spawn-pool pattern). |
 | `Update` | `Update(id, dt)` | Every frame of play while the owning entity is `active`, after the instance's `Start` has run. `dt` is the frame's scaled delta (`Time.deltaTime`); under the headless harness / `Time.Step` it is the fixed step. |
+| `LateUpdate` | `LateUpdate(id, dt)` | Every frame of play while the owning entity is `active`, after **every** script's `Update` and after this tick's physics, animation and particle steps have resolved — the post-physics hook. Same scaled `dt` as `Update` (`Time.deltaTime`) and the same deterministic `(entity, script index)` order, still inside the one `FixedUpdate` sim tick — it is **not** a render-rate callback. Reach for it when a script must read *this* tick's settled transforms: follow-cameras, look-ats, aim, recoil recovery, and other post-move corrections that visibly lag by a step if run in `Update`. |
 | `OnTriggerEnter` | `OnTriggerEnter(id, other)` | Once, on the first frame an overlap involving the entity's trigger/sensor (or static) collider exists — before that frame's `OnTrigger`. |
 | `OnTrigger` | `OnTrigger(id, other)` | After the physics step, once per overlapping pair involving the entity's trigger/sensor (or static) collider. It is the overlap "stay": it repeats every frame the overlap persists, including the frame `OnTriggerEnter` fires. |
 | `OnTriggerExit` | `OnTriggerExit(id, other)` | Once, on the first frame a previously overlapping pair no longer overlaps — after that frame's `OnTrigger` dispatches (no stay fires for the ended pair). |
@@ -108,6 +109,11 @@ headless replays stay byte-identical):
   `Start`s — so a `Start` can safely read state another script set up in
   `Awake`, matching Unity's contract. Each phase, and `Update`, runs in
   ascending `(entity id, script index)` order.
+- `LateUpdate` is the tick's tail: **all** `Update`s across every entity run
+  first, then nav, physics, animation and particles resolve, and only then does
+  `LateUpdate` run — in the same ascending `(entity id, script index)` order,
+  with the same scaled `dt`. So within one tick a script's `Update` observes the
+  pre-physics transform and its `LateUpdate` observes the post-physics one.
 - Each `Awake` and `Start` fires **exactly once** per script instance, and
   `Awake` always precedes every other callback on that instance (a trigger
   callback never reaches a script whose `Awake` hasn't run).

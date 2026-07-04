@@ -44,4 +44,6 @@ pub use system::System;
 pub use world::World;
 
 #[cfg(test)]
+mod late_update_tests;
+#[cfg(test)]
 mod schedule_tests;
