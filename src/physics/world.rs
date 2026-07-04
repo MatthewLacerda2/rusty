@@ -21,12 +21,12 @@ use std::collections::HashMap;
 use rapier3d::prelude::*;
 
 use super::build::{
-    body_state, build_shape, collider_inputs, gravity_scale, interaction_groups, order_pair,
+    body_state, build_shape, ccd_enabled, collider_inputs, gravity_scale, interaction_groups,
     BodyClass, EntityBodyState,
 };
 use super::character;
 use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
-use super::trigger_events::TriggerEvents;
+use super::trigger_events::{self, TriggerEvents};
 use crate::scene::Scene;
 
 pub struct PhysicsWorld {
@@ -108,9 +108,14 @@ impl PhysicsWorld {
                 BodyClass::Kinematic => RigidBodyBuilder::kinematic_position_based(),
                 BodyClass::Dynamic => RigidBodyBuilder::dynamic()
                     .linvel(to_na_vec(inp.velocity))
+                    .angvel(to_na_vec(inp.angular_velocity))
                     // `use_gravity = false` exempts the body from world gravity (#209).
                     .gravity_scale(gravity_scale(inp.use_gravity)),
             }
+            // Continuous mode switches on rapier's CCD sweep (anti-tunnelling, #321);
+            // Discrete leaves it off. Honoured for every class — mainly dynamic, but a
+            // kinematic body may opt in to be swept against dynamic bodies.
+            .ccd_enabled(ccd_enabled(inp.collision_detection))
             .position(to_iso(inp.pos, inp.rot));
             let body_handle = self.bodies.insert(body_builder.build());
             collider.set_sensor(inp.is_trigger);
@@ -185,6 +190,7 @@ impl PhysicsWorld {
             self.fall_speeds.insert(id, fall_speed);
             let body = &mut self.bodies[handle];
             body.set_enabled(snap.active);
+            body.enable_ccd(snap.ccd_enabled);
             body.set_next_kinematic_position(next);
             return;
         }
@@ -193,13 +199,18 @@ impl PhysicsWorld {
         self.fall_speeds.remove(&id);
         let body = &mut self.bodies[handle];
         body.set_enabled(snap.active);
+        // Re-apply the CCD mode each tick so `Physics.SetCollisionDetection`
+        // toggled mid-play takes effect (mirrors the `gravity_scale` re-apply).
+        body.enable_ccd(snap.ccd_enabled);
         if snap.is_static {
             body.set_position(to_iso(snap.pos, snap.rot), true);
         } else {
-            // Dynamic: trust rapier for pose, but let scripts inject velocity
-            // (SetVelocity / AddForce mutate the component between ticks) and
-            // re-apply `use_gravity` so toggling it at runtime takes effect.
+            // Dynamic: trust rapier for pose, but let scripts inject linear and
+            // angular velocity (SetVelocity / SetAngularVelocity / AddForce mutate
+            // the component between ticks) and re-apply `use_gravity` so toggling
+            // it at runtime takes effect.
             body.set_linvel(to_na_vec(snap.vel), true);
+            body.set_angvel(to_na_vec(snap.angular_velocity), true);
             body.set_gravity_scale(gravity_scale(snap.use_gravity), true);
         }
     }
@@ -227,56 +238,32 @@ impl PhysicsWorld {
             &(),
         );
 
-        let events = TriggerEvents::from_overlap_sets(&self.prev_triggers, self.collect_triggers());
+        let current = trigger_events::collect_overlap_pairs(
+            &self.narrow_phase,
+            &self.collider_to_id,
+            &self.id_is_trigger,
+        );
+        let events = TriggerEvents::from_overlap_sets(&self.prev_triggers, current);
         self.prev_triggers = events.stayed.clone();
         self.sync_from_rapier(scene);
         events
     }
 
-    /// Gather overlapping pairs that involve a trigger/sensor or static body,
-    /// preserving the legacy `Vec<(u32, u32)>` trigger-pair contract. Sensors land
-    /// in the intersection graph; solid contacts in the contact graph.
-    fn collect_triggers(&self) -> Vec<(u32, u32)> {
-        let mut pairs = Vec::new();
-        for (h1, h2, intersecting) in self.narrow_phase.intersection_pairs() {
-            if !intersecting {
-                continue;
-            }
-            if let (Some(&a), Some(&b)) =
-                (self.collider_to_id.get(&h1), self.collider_to_id.get(&h2))
-            {
-                pairs.push(order_pair(a, b));
-            }
-        }
-        for contact in self.narrow_phase.contact_pairs() {
-            if !contact.has_any_active_contact {
-                continue;
-            }
-            let a = self.collider_to_id.get(&contact.collider1);
-            let b = self.collider_to_id.get(&contact.collider2);
-            if let (Some(&a), Some(&b)) = (a, b) {
-                let trig_a = *self.id_is_trigger.get(&a).unwrap_or(&false);
-                let trig_b = *self.id_is_trigger.get(&b).unwrap_or(&false);
-                if trig_a || trig_b {
-                    pairs.push(order_pair(a, b));
-                }
-            }
-        }
-        pairs.sort_unstable();
-        pairs.dedup();
-        pairs
-    }
-
     /// Write integrated poses + velocities back onto the entities.
     fn sync_from_rapier(&self, scene: &mut Scene) {
         for (&id, &handle) in &self.id_to_body {
-            let (pos, rot, vel) = {
+            let (pos, rot, vel, angvel) = {
                 let body = match self.bodies.get(handle) {
                     Some(b) => b,
                     None => continue,
                 };
                 let (pos, rot) = from_iso(body.position());
-                (pos, rot, from_na_vec(*body.linvel()))
+                (
+                    pos,
+                    rot,
+                    from_na_vec(*body.linvel()),
+                    from_na_vec(*body.angvel()),
+                )
             };
             if let Some(mut entity) = scene.get_entity_mut(id) {
                 entity.transform.position = pos;
@@ -284,6 +271,7 @@ impl PhysicsWorld {
                 if let Some(rb) = &mut entity.rigidbody {
                     if !rb.is_kinematic {
                         rb.velocity = vel;
+                        rb.angular_velocity = angvel;
                     }
                 }
             }

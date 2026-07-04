@@ -8,8 +8,8 @@ use glam::Vec3;
 
 use crate::render::gpu::mesh as primitives;
 use crate::scene::{
-    AnimatorComponent, ColliderComponent, ColliderShape, DirtyFlag, MaterialAsset,
-    MaterialComponent, MeshComponent, RigidBodyComponent, Scene, ScriptComponent,
+    AnimatorComponent, ColliderComponent, ColliderShape, CollisionDetection, DirtyFlag,
+    MaterialAsset, MaterialComponent, MeshComponent, RigidBodyComponent, Scene, ScriptComponent,
 };
 
 /// Bundled default player brain (movement + camera + weapon), seeded next to
@@ -62,7 +62,9 @@ fn kinematic_body() -> RigidBodyComponent {
         is_kinematic: true,
         mass: 80.0,
         velocity: Vec3::ZERO,
+        angular_velocity: Vec3::ZERO,
         use_gravity: false,
+        collision_detection: CollisionDetection::Discrete,
     }
 }
 

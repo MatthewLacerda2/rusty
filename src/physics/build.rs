@@ -8,7 +8,7 @@
 use glam::{Quat, Vec3};
 use rapier3d::prelude::*;
 
-use crate::components::{ColliderShape, Entity, RigidBodyComponent};
+use crate::components::{ColliderShape, CollisionDetection, Entity, RigidBodyComponent};
 
 /// Body class derived from the entity flags. Mirrors the legacy solver's encoding:
 /// static (fixed), kinematic (position-driven), or dynamic (gravity + solver).
@@ -43,6 +43,15 @@ pub(super) fn gravity_scale(use_gravity: bool) -> f32 {
     }
 }
 
+/// Whether rapier's continuous collision detection is switched on for a body's
+/// `collision_detection` mode (#321): `Continuous` sweeps the body's motion and
+/// stops it at the time of impact (anti-tunnelling), `Discrete` (default) tests
+/// overlap only at the tick's final pose. rapier already builds a `CCDSolver`
+/// into every step — this flag is the per-body switch that was dormant.
+pub(super) fn ccd_enabled(mode: CollisionDetection) -> bool {
+    matches!(mode, CollisionDetection::Continuous)
+}
+
 /// The per-entity inputs needed to build one rapier body + collider, captured in a
 /// single borrow of the entity so `world.rs` can release it before touching `self`.
 pub(super) struct ColliderInputs {
@@ -57,9 +66,14 @@ pub(super) struct ColliderInputs {
     pub is_static: bool,
     pub class: BodyClass,
     pub velocity: Vec3,
+    /// Initial angular velocity (radians/sec per axis) seeded onto a dynamic body
+    /// at build (#319); rapier integrates rotation from it thereafter.
+    pub angular_velocity: Vec3,
     /// Whether a dynamic body is pulled by world gravity (Unity: `useGravity`).
     /// Maps to rapier's `gravity_scale` (1.0 when true, 0.0 when false).
     pub use_gravity: bool,
+    /// Discrete vs. Continuous (CCD) contact detection for this body (#321).
+    pub collision_detection: CollisionDetection,
     pub layer: u8,
 }
 
@@ -94,7 +108,17 @@ pub(super) fn collider_inputs(entity: &Entity) -> Option<ColliderInputs> {
             .as_ref()
             .map(|r| r.velocity)
             .unwrap_or(Vec3::ZERO),
+        angular_velocity: entity
+            .rigidbody
+            .as_ref()
+            .map(|r| r.angular_velocity)
+            .unwrap_or(Vec3::ZERO),
         use_gravity: entity.rigidbody.as_ref().is_none_or(|r| r.use_gravity),
+        collision_detection: entity
+            .rigidbody
+            .as_ref()
+            .map(|r| r.collision_detection)
+            .unwrap_or_default(),
         layer: entity.layer,
     })
 }
@@ -104,10 +128,14 @@ pub(super) struct EntityBodyState {
     pub pos: Vec3,
     pub rot: Quat,
     pub vel: Vec3,
+    pub angular_velocity: Vec3,
     pub active: bool,
     pub kinematic: bool,
     pub is_static: bool,
     pub use_gravity: bool,
+    /// Whether CCD is on for this body — re-applied per tick so flipping the
+    /// mode mid-play (`Physics.SetCollisionDetection`) takes effect (#321).
+    pub ccd_enabled: bool,
 }
 
 /// Snapshot an entity's transform/velocity/body-class state for one tick.
@@ -117,6 +145,11 @@ pub(super) fn body_state(entity: &Entity) -> EntityBodyState {
     // so a missing rigidbody reads as `use_gravity = false` here. Dynamic bodies
     // always have one, so this matches `collider_inputs` for them.
     let use_gravity = entity.rigidbody.as_ref().is_some_and(|r| r.use_gravity);
+    let collision_detection = entity
+        .rigidbody
+        .as_ref()
+        .map(|r| r.collision_detection)
+        .unwrap_or_default();
     EntityBodyState {
         pos: entity.transform.position,
         rot: entity.transform.rotation,
@@ -125,10 +158,16 @@ pub(super) fn body_state(entity: &Entity) -> EntityBodyState {
             .as_ref()
             .map(|r| r.velocity)
             .unwrap_or(Vec3::ZERO),
+        angular_velocity: entity
+            .rigidbody
+            .as_ref()
+            .map(|r| r.angular_velocity)
+            .unwrap_or(Vec3::ZERO),
         active: entity.active,
         kinematic: is_kinematic(entity.is_static, entity.rigidbody.as_ref()),
         is_static: entity.is_static,
         use_gravity,
+        ccd_enabled: ccd_enabled(collision_detection),
     }
 }
 

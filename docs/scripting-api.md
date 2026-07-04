@@ -780,8 +780,12 @@ and distance are `0`.
 |---|---|---|
 | `Physics.GetVelocity` | `(id)` | `x, y, z` |
 | `Physics.SetVelocity` | `(id, vx, vy, vz)` | — |
+| `Physics.GetAngularVelocity` | `(id)` | `x, y, z` (radians/sec per axis) |
+| `Physics.SetAngularVelocity` | `(id, wx, wy, wz)` | — |
 | `Physics.AddForce` | `(id, fx, fy, fz)` | — (continuous force, see below) |
 | `Physics.SetKinematic` | `(id, is_kinematic)` | — |
+| `Physics.GetCollisionDetection` | `(id)` | `"Discrete"` \| `"Continuous"` |
+| `Physics.SetCollisionDetection` | `(id, mode)` | — (`mode` is `"Discrete"` or `"Continuous"`) |
 | `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` |
 | `Physics.SphereCast` | `(ox, oy, oz, dx, dy, dz, radius [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` |
 | `Physics.OverlapSphere` | `(cx, cy, cz, radius [, layer_mask])` | array of entity ids |
@@ -834,6 +838,34 @@ change for one call is `F / mass · fixedDeltaTime`, so applying the same force 
 `Update` accelerates the body smoothly rather than in dt-independent jumps. It is a
 no-op on kinematic bodies. For an instantaneous velocity change, set the velocity
 directly with `SetVelocity`.
+
+**Angular velocity** (Unity: `Rigidbody.angularVelocity`) is the other half of a
+body's motion state — how fast, and about which axis, it spins, in radians/sec per
+axis. `GetAngularVelocity` reads the value rapier integrated this tick (read the
+tumble of a knocked prop, or check "is this still rotating?"); `SetAngularVelocity`
+injects a spin between ticks (spawn a prop already rotating). Like `SetVelocity` it
+takes effect on **dynamic** bodies; on a kinematic/static body it has no solver
+effect (rapier drives their motion from the transform), matching Unity.
+
+**Collision detection** (Unity: `Rigidbody.collisionDetectionMode`) chooses how a
+body's contacts are found each fixed tick:
+
+- **`"Discrete"`** (the default for every body class) tests overlap only at the
+  tick's final pose. Cheap and correct for slow or large bodies.
+- **`"Continuous"`** turns on CCD: the body's motion is swept from its previous
+  pose to its new pose within the tick and stopped at the time of impact. This is
+  what prevents **tunnelling** — a fast, small body (a bullet, a thrown prop)
+  crossing thin geometry entirely between two ticks so no overlap ever exists to
+  detect. A 100 m/s projectile moves ~1.6 m per 60 Hz tick, so anything thinner
+  than that is passed straight through under Discrete.
+
+Sweeping costs more, so flag only what is important or fast-moving for its size and
+leave everything else Discrete. Kinematic bodies (the player/bots) default to
+Discrete like everything else and **already** don't tunnel through walls — their
+movement is routed through rapier's collide-and-slide character sweep; setting them
+Continuous only helps rapier account for their fast motion against dynamic bodies,
+it is not a wall-behavior change. The mode is honoured at body build and re-applied
+every tick, so flipping it mid-play takes effect immediately.
 
 A rigidbody's **`use_gravity`** flag (authored in the inspector / serialized in the
 scene) controls whether a body is pulled by the world's gravity (Unity:
