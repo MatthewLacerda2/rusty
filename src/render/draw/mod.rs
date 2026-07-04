@@ -54,6 +54,13 @@ impl Renderer {
         // Drop pool slots for entities no longer active, so the persistent forward
         // buffers track the live scene rather than growing without bound (#210).
         self.prune_entity_pool(scene);
+
+        // Fill the world-matrix store once for the whole frame (#331). The solid pass and
+        // both shadow collects — across every camera in the stack — then read each entity's
+        // world matrix from this one O(N) fill instead of walking the parent chain per
+        // entity per consumer. Nothing mutates transforms during rendering, so one refresh
+        // here serves the entire frame.
+        scene.refresh_world_matrices();
         let aspect = self.size.width as f32 / self.size.height as f32;
 
         // The ordered camera stack (one entry in edit mode / when no scene camera).
@@ -65,6 +72,10 @@ impl Renderer {
         for (idx, cam) in stack.iter().enumerate() {
             // 1. Write this camera's view/projection uniform.
             let view_proj = cam.build_view_projection(aspect);
+            // This camera's world-space frustum, for culling off-screen entities (#330).
+            // Built per camera because each stacked camera has its own lens/orientation;
+            // the reflection-capture faces call `render` per face and so get it for free.
+            let frustum = crate::render::Frustum::from_view_proj(view_proj);
             let camera_uniform = CameraUniform {
                 view_proj: view_proj.to_cols_array(),
                 camera_pos: cam.position.to_array(),
@@ -78,7 +89,7 @@ impl Renderer {
             // rewrites their contents and returns lightweight draw items (#210). The
             // split separates opaque/cutout (the solids pass) from transparent (the
             // sorted alpha-blended pass below) (#242).
-            let solids = self.precreate_solid_resources(scene, cam);
+            let solids = self.precreate_solid_resources(scene, cam, &frustum);
             let overlays = self.precreate_overlays(scene, editor_mode);
             let _path_resources = self.precreate_path(pathfinding_points);
 

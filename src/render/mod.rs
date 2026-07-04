@@ -1,6 +1,7 @@
 mod camera;
 mod debug_meshes;
 mod draw;
+mod frustum;
 mod setup;
 mod viewport;
 
@@ -19,6 +20,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub use camera::{build_camera_stack, game_camera_from_scene, sync_lens_from_scene, Camera};
+pub use frustum::{transform_aabb, Frustum};
 pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
 pub use ibl::probe_bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
 pub use ibl::probe_bounce::{BounceReport, CONVERGENCE_EPSILON, MAX_BOUNCES};
@@ -37,6 +39,11 @@ pub struct GpuMesh {
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub num_indices: u32,
+    /// Local-space AABB `(min, max)` over this geometry's vertices, computed once at
+    /// upload and stored alongside the vertex data (#330). Frustum culling transforms
+    /// it by the entity's world matrix (8 corners, O(1)) each frame instead of ever
+    /// re-walking the vertices.
+    pub local_aabb: (glam::Vec3, glam::Vec3),
 }
 
 /// Stable identity for a mesh's GPU geometry, derived from its *source*

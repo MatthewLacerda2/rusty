@@ -1,5 +1,6 @@
 use crate::render::gpu::mesh::Vertex;
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::{transform_aabb, Frustum};
 use crate::scene::Scene;
 use glam::{Mat4, Vec3};
 use std::collections::HashMap;
@@ -389,6 +390,10 @@ impl ShadowRenderer {
         gpu_meshes: &HashMap<crate::render::MeshId, crate::render::GpuMesh>,
         want_static: bool,
     ) -> Vec<(crate::render::MeshId, u32, u32)> {
+        // Cull casters against the LIGHT's frustum, not the camera's (#330). An off-screen
+        // caster still inside the light's ortho volume must keep its shadow — culling
+        // casters by the player camera is the classic pop-a-shadow bug.
+        let frustum = Frustum::from_view_proj(self.light_space_matrix);
         let mut render_resources = Vec::new();
         for entity in scene.iter() {
             if !entity.active || entity.is_static != want_static {
@@ -399,8 +404,17 @@ impl ShadowRenderer {
             let Some(gpu_mesh) = gpu_meshes.get(&mesh_id) else {
                 continue;
             };
-            let model_arr = scene.compute_world_matrix(entity.id).to_cols_array();
-            self.sync_entity_slot(device, queue, entity.id, &model_arr);
+            let world = scene.world_matrix(entity.id);
+            // Skinned casters are never culled — their AABB is the rest pose, which an
+            // animation can exceed; a wrongly-culled caster would drop its shadow (#330).
+            if !mesh.is_skinned() {
+                let (amin, amax) =
+                    transform_aabb(gpu_mesh.local_aabb.0, gpu_mesh.local_aabb.1, world);
+                if !frustum.intersects_aabb(amin, amax) {
+                    continue;
+                }
+            }
+            self.sync_entity_slot(device, queue, entity.id, &world.to_cols_array());
             render_resources.push((mesh_id, entity.id, gpu_mesh.num_indices));
         }
         render_resources

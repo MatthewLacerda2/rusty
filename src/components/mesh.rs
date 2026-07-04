@@ -94,4 +94,13 @@ impl MeshComponent {
             &self.pose_palette
         }
     }
+
+    /// Whether this mesh is skinned (carries an imported skeleton). Frustum culling
+    /// leaves skinned meshes uncelled (#330): their cached AABB is the rest pose, which
+    /// an animation can push a limb outside of, so testing it risks popping a visible
+    /// actor — animated actors are few, while the static geometry that *is* culled is the
+    /// bulk of a level.
+    pub fn is_skinned(&self) -> bool {
+        self.skin.is_some()
+    }
 }
