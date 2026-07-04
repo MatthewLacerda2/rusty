@@ -7,7 +7,7 @@
 use std::rc::Rc;
 
 use crate::components::MaterialAsset;
-use crate::render::{GpuTexture, MeshId, Renderer};
+use crate::render::{transform_aabb, Frustum, GpuTexture, MeshId, Renderer};
 use crate::scene::Scene;
 
 // One solid draw item: the entity id (its persistent entity + material bind groups
@@ -83,6 +83,7 @@ impl Renderer {
         &mut self,
         scene: &Scene,
         cam: &crate::render::Camera,
+        frustum: &Frustum,
     ) -> SolidResources {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
         let mut out = SolidResources::default();
@@ -98,6 +99,11 @@ impl Renderer {
             }
             // Skip meshes the active camera's culling mask excludes (#92).
             if !crate::scene::layer_in_mask(entity.layer, cam.culling_mask) {
+                continue;
+            }
+            // View-frustum cull (#330): skip the uniform sync, binds, and draw for any
+            // entity whose world-space AABB is fully outside what this camera can see.
+            if self.is_culled(scene, &entity, frustum) {
                 continue;
             }
             let Some((res, world_pos, transparent)) = self.sync_solid_resource(scene, &entity)
@@ -117,6 +123,35 @@ impl Renderer {
         out
     }
 
+    /// Whether `entity` is fully outside `frustum` and can be skipped this pass (#330).
+    /// Transforms the mesh's cached local AABB by the entity's world matrix (O(1)) and
+    /// tests it. An entity with no mesh, or whose geometry is not resident on the GPU yet
+    /// (no cached AABB), is never culled here — the downstream sync produces no draw for it
+    /// anyway, and culling a not-yet-uploaded mesh could wrongly hide it on its first frame.
+    fn is_culled(
+        &self,
+        scene: &Scene,
+        entity: &crate::components::Entity,
+        frustum: &Frustum,
+    ) -> bool {
+        let Some(mesh) = entity.mesh.as_ref() else {
+            return false;
+        };
+        // Skinned meshes are never culled here — their AABB is the rest pose (#330).
+        if mesh.is_skinned() {
+            return false;
+        }
+        let Some(gpu_mesh) = self.gpu_meshes.get(&MeshId::from_mesh(mesh)) else {
+            return false;
+        };
+        let (min, max) = transform_aabb(
+            gpu_mesh.local_aabb.0,
+            gpu_mesh.local_aabb.1,
+            scene.world_matrix(entity.id),
+        );
+        !frustum.intersects_aabb(min, max)
+    }
+
     /// Sync one solid entity's persistent pool slot (uniform + palette written in
     /// place, bind groups reused) and return its draw item, the entity's world-space
     /// origin (the transparent sort key's anchor), and whether its material is
@@ -132,7 +167,7 @@ impl Renderer {
 
         let material = scene.material_of(entity);
         let transparent = material.is_some_and(MaterialAsset::is_transparent);
-        let model_matrix = scene.compute_world_matrix(entity.id);
+        let model_matrix = scene.world_matrix(entity.id);
         let world_pos = model_matrix.w_axis.truncate();
         let uniform = crate::render::draw::uniforms::solid_entity_uniform(
             scene,

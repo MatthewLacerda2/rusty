@@ -7,6 +7,24 @@ use super::{GpuMesh, MeshId, Renderer};
 use crate::render::gpu::mesh::Vertex;
 use crate::scene::Scene;
 
+/// The local-space AABB `(min, max)` over a mesh's vertices. Callers upload only
+/// non-empty geometry, so the fold always sees at least one vertex; an empty slice
+/// degenerates to a zero-extent box at the origin (never rendered).
+fn local_aabb(vertices: &[Vertex]) -> (Vec3, Vec3) {
+    let mut min = Vec3::splat(f32::MAX);
+    let mut max = Vec3::splat(f32::MIN);
+    for v in vertices {
+        let p = Vec3::from_array(v.position);
+        min = min.min(p);
+        max = max.max(p);
+    }
+    if vertices.is_empty() {
+        (Vec3::ZERO, Vec3::ZERO)
+    } else {
+        (min, max)
+    }
+}
+
 impl Renderer {
     /// Upload every active entity's mesh once per unique mesh-asset identity
     /// (#127): N entities sharing a primitive/asset collapse to a single buffer
@@ -46,6 +64,10 @@ impl Renderer {
         let v_bytes: &[u8] = bytemuck::cast_slice(vertices);
         let i_bytes: &[u8] = bytemuck::cast_slice(indices);
         let num_indices = indices.len() as u32;
+        // Local-space AABB computed once here, at upload, so frustum culling never walks
+        // the vertices per frame (#330). Re-derived on every re-upload so an edited mesh's
+        // bounds stay correct.
+        let local_aabb = local_aabb(vertices);
 
         // Re-use resident buffers when the new data still fits (the dirty-path
         // case: same geometry re-uploaded). Both buffers carry COPY_DST so they
@@ -55,6 +77,7 @@ impl Renderer {
                 && existing.index_buffer.size() >= i_bytes.len() as u64
             {
                 existing.num_indices = num_indices;
+                existing.local_aabb = local_aabb;
                 self.queue.write_buffer(&existing.vertex_buffer, 0, v_bytes);
                 self.queue.write_buffer(&existing.index_buffer, 0, i_bytes);
                 return;
@@ -83,6 +106,7 @@ impl Renderer {
                 vertex_buffer,
                 index_buffer,
                 num_indices,
+                local_aabb,
             },
         );
     }

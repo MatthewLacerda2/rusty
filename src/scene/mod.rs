@@ -29,6 +29,7 @@ pub mod prefab;
 pub mod scene;
 pub mod serialize;
 pub mod snapshot;
+pub mod world_cache;
 
 pub use collision_matrix::CollisionMatrix;
 pub use io::{

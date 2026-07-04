@@ -10,13 +10,14 @@
 
 use std::collections::BTreeMap;
 
-use glam::{Mat4, Vec3};
+use glam::Vec3;
 
 use crate::ecs::world::{Ref, RefMut};
 use crate::ecs::World;
 use crate::navigation::NavMeshSettings;
 use crate::scene::collision_matrix::CollisionMatrix;
 use crate::scene::layers::LayerRegistry;
+use crate::scene::world_cache::WorldMatrixCache;
 
 // Re-export the component types so the many existing `scene::…Component` paths
 // resolve. The structs themselves live in `crate::components`.
@@ -93,6 +94,12 @@ pub struct Scene {
     /// Ids queued for deferred destruction by play-mode `Scene.DestroyEntity`
     /// (#323); drained in `destroy_queue`. Transient, never serialized.
     pub pending_destroy: Vec<u32>,
+    /// Authoritative per-frame world-matrix store (#331): filled O(N) once per frame in
+    /// hierarchy order, then read by every render-frame consumer (the forward pass, both
+    /// shadow collects, and #330's frustum culling) instead of each walking the parent
+    /// chain itself. Not serialized — it is derived, per-frame runtime state. See
+    /// `world_cache.rs` for the fill algorithm and the freshness contract.
+    pub(crate) world_cache: WorldMatrixCache,
 }
 
 impl Default for Scene {
@@ -111,6 +118,7 @@ impl Default for Scene {
             probes: crate::scene::lighting::probe::ProbeVolume::new(),
             reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet::new(),
             pending_destroy: Vec::new(),
+            world_cache: WorldMatrixCache::default(),
         }
     }
 }
@@ -210,34 +218,6 @@ impl Scene {
 
     pub fn is_empty(&self) -> bool {
         self.world.is_empty()
-    }
-
-    pub fn compute_world_matrix(&self, entity_id: u32) -> Mat4 {
-        if let Some(entity) = self.get_entity(entity_id) {
-            let local_mat = entity.transform.to_matrix();
-            if let Some(parent_id) = entity.parent_id {
-                self.compute_world_matrix(parent_id) * local_mat
-            } else {
-                local_mat
-            }
-        } else {
-            Mat4::IDENTITY
-        }
-    }
-
-    pub fn update_entity_collider(&mut self, id: u32) {
-        let parent_id = self.get_entity(id).and_then(|e| e.parent_id);
-        let parent_mat = parent_id.map(|p| self.compute_world_matrix(p));
-        if let Some(mut entity) = self.get_entity_mut(id) {
-            entity.update_collider(parent_mat);
-        }
-    }
-
-    pub fn update_all_colliders(&mut self) {
-        let ids = self.world.ids().to_vec();
-        for id in ids {
-            self.update_entity_collider(id);
-        }
     }
 
     pub fn set_parent(&mut self, entity_id: u32, parent_id: Option<u32>) -> Result<(), String> {
