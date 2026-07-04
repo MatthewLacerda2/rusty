@@ -9,6 +9,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+use crate::components::ScriptComponent;
 use crate::physics::TriggerEvents;
 
 use super::tests_lifecycle::{manager_with_entity, write_script};
@@ -104,6 +105,60 @@ fn destroy_already_disabled_fires_only_destroy() {
         m.eval("__log").unwrap(),
         format!("X{id}"),
         "destroying an already-disabled entity fires only OnDestroy (no second OnDisable)"
+    );
+}
+
+#[test]
+fn destroying_one_entity_leaves_a_sibling_running() {
+    // Destroying A mid-play must touch only A. apply_pending_destroys's two
+    // `!ids.contains` predicates keep every *surviving* entity's script instance
+    // (entity_scripts) AND its load record (load_attempted). Drop the `!` on the
+    // first and B's instance is evicted — B goes silent, no more Update. Drop it on
+    // the second and B is dropped from load_attempted, so the next spawn scan
+    // reloads it — B re-runs Awake/OnEnable/Start on a fresh instance mid-play. A
+    // lone-entity destroy triangulates neither; it needs a surviving sibling, and
+    // the sibling must carry a real ScriptComponent so the reload path is live.
+    let (mut m, a) = manager_with_entity();
+    let b = m.scene.borrow_mut().add_entity("B".to_string());
+    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    let path = write_script("trans_sibling", LOGGER);
+    for id in [a, b] {
+        m.scene
+            .borrow_mut()
+            .get_entity_mut(id)
+            .unwrap()
+            .scripts
+            .push(ScriptComponent {
+                path: path.clone(),
+                ..Default::default()
+            });
+    }
+    // The spawn scan owns loading (sets load_attempted); both come alive and run one
+    // active tick together.
+    m.load_new_scripts();
+    m.init_scripts();
+    m.update_scripts(DT);
+    // Destroy A; isolate the log so only the teardown + B's next tick show up.
+    m.eval("__log = ''").unwrap();
+    m.scene.borrow_mut().request_destroy(a);
+    m.apply_pending_destroys();
+    // A full next tick: the spawn scan (the reload path), init, then update.
+    m.load_new_scripts();
+    m.init_scripts();
+    m.update_scripts(DT);
+    assert_eq!(
+        m.eval("__log").unwrap(),
+        format!("D{a}X{a}U{b}"),
+        "A tears down (OnDisable→OnDestroy); B keeps updating with no re-Awake/Start \
+         — its instance is neither evicted nor reloaded"
+    );
+    assert!(
+        m.scene.borrow().get_entity(a).is_none(),
+        "the destroyed entity is gone"
+    );
+    assert!(
+        m.scene.borrow().get_entity(b).is_some(),
+        "the sibling survives"
     );
 }
 
