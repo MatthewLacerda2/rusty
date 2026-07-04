@@ -249,7 +249,14 @@ impl PhysicsWorld {
         events
     }
 
-    /// Write integrated poses + velocities back onto the entities.
+    /// Write integrated poses + velocities back onto the entities, then refresh each
+    /// body's collider AABB.
+    ///
+    /// The two are split into separate passes on purpose (#331): first every body's
+    /// integrated transform lands, then ONE `rebuild_world_matrices` reflects all of
+    /// them, then each collider refresh reads its parent's world matrix from that cache.
+    /// The old code refreshed each collider inline, re-walking the parent chain per body
+    /// per tick (~30k walks/s at 60 Hz × 500 bodies); this pays one O(N) fill instead.
     fn sync_from_rapier(&self, scene: &mut Scene) {
         for (&id, &handle) in &self.id_to_body {
             let (pos, rot, vel, angvel) = {
@@ -275,7 +282,12 @@ impl PhysicsWorld {
                     }
                 }
             }
-            scene.update_entity_collider(id);
+        }
+        // All integrated transforms are in; one O(N) fill makes every parent matrix the
+        // collider refresh needs available from the cache.
+        scene.rebuild_world_matrices();
+        for &id in self.id_to_body.keys() {
+            scene.refresh_collider_cached(id);
         }
     }
 }

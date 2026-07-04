@@ -8,7 +8,8 @@
 //! (whose deps are restricted to hecs + components). This wrapper lives in the
 //! `scene` layer, which is allowed to depend on `crate::scene` and rendering.
 
-use std::collections::BTreeMap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
 
 use glam::{Mat4, Vec3};
 
@@ -90,6 +91,19 @@ pub struct Scene {
     /// applicable probe with box-projected parallax correction instead of the global
     /// skybox. The cubemaps themselves are baked by a later issue (#245).
     pub reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet,
+    /// Per-frame world-matrix cache (#331): one authoritative store, filled O(N) in
+    /// hierarchy order by [`Scene::rebuild_world_matrices`] at fixed frame points (the
+    /// start of a render, and the physics write-back after all bodies are integrated),
+    /// then read by every per-frame consumer via [`Scene::world_matrix`]. Replaces the
+    /// old pattern where render, both shadow collects, and the physics collider refresh
+    /// each walked the parent chain independently — O(consumers × N × depth). Interior
+    /// mutability so `&Scene` render consumers can trigger the fill; it is derived state
+    /// (a pure function of the transforms), never serialized. The recursive
+    /// [`Scene::compute_world_matrix`] survives as the fill primitive and as the
+    /// always-fresh fallback for one-off edit-mode callers (picking, inspector, snapshot).
+    /// `pub(crate)` only so crate-internal `..Scene::default()` struct-update construction
+    /// resolves; the intended access is through `world_matrix` / `rebuild_world_matrices`.
+    pub(crate) world_matrices: RefCell<HashMap<u32, Mat4>>,
 }
 
 impl Default for Scene {
@@ -107,6 +121,7 @@ impl Default for Scene {
             decals: Vec::new(),
             probes: crate::scene::lighting::probe::ProbeVolume::new(),
             reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet::new(),
+            world_matrices: RefCell::new(HashMap::new()),
         }
     }
 }
@@ -208,33 +223,9 @@ impl Scene {
         self.world.is_empty()
     }
 
-    pub fn compute_world_matrix(&self, entity_id: u32) -> Mat4 {
-        if let Some(entity) = self.get_entity(entity_id) {
-            let local_mat = entity.transform.to_matrix();
-            if let Some(parent_id) = entity.parent_id {
-                self.compute_world_matrix(parent_id) * local_mat
-            } else {
-                local_mat
-            }
-        } else {
-            Mat4::IDENTITY
-        }
-    }
-
-    pub fn update_entity_collider(&mut self, id: u32) {
-        let parent_id = self.get_entity(id).and_then(|e| e.parent_id);
-        let parent_mat = parent_id.map(|p| self.compute_world_matrix(p));
-        if let Some(mut entity) = self.get_entity_mut(id) {
-            entity.update_collider(parent_mat);
-        }
-    }
-
-    pub fn update_all_colliders(&mut self) {
-        let ids = self.world.ids().to_vec();
-        for id in ids {
-            self.update_entity_collider(id);
-        }
-    }
+    // The world-matrix cache (`rebuild_world_matrices` / `world_matrix` /
+    // `compute_world_matrix`) and the collider-AABB refresh built on it live in the
+    // sibling `world_matrix` module (#331).
 
     pub fn set_parent(&mut self, entity_id: u32, parent_id: Option<u32>) -> Result<(), String> {
         // 1. Detect cycles

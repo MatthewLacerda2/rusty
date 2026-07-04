@@ -36,6 +36,12 @@ impl Renderer {
         editor_mode: bool,
         pathfinding_points: &[Vec3],
     ) {
+        // Fill the per-frame world-matrix cache once, up front (#331): every consumer
+        // below — the solid pass, both shadow collects, and light placement — reads it
+        // via `scene.world_matrix(id)` instead of walking the parent chain per entity
+        // per pass. One O(N) pass replaces O(consumers × N × depth).
+        scene.rebuild_world_matrices();
+
         self.upload_scene_assets(scene);
 
         // Load the active reflection probe's baked cubemap for the primary camera (#245),

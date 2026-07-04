@@ -132,7 +132,7 @@ impl Renderer {
 
         let material = scene.material_of(entity);
         let transparent = material.is_some_and(MaterialAsset::is_transparent);
-        let model_matrix = scene.compute_world_matrix(entity.id);
+        let model_matrix = scene.world_matrix(entity.id);
         let world_pos = model_matrix.w_axis.truncate();
         let uniform = crate::render::draw::uniforms::solid_entity_uniform(
             scene,

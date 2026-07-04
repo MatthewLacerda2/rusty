@@ -399,7 +399,7 @@ impl ShadowRenderer {
             let Some(gpu_mesh) = gpu_meshes.get(&mesh_id) else {
                 continue;
             };
-            let model_arr = scene.compute_world_matrix(entity.id).to_cols_array();
+            let model_arr = scene.world_matrix(entity.id).to_cols_array();
             self.sync_entity_slot(device, queue, entity.id, &model_arr);
             render_resources.push((mesh_id, entity.id, gpu_mesh.num_indices));
         }
