@@ -17,12 +17,17 @@ use crate::time::Time;
 use super::console::ConsoleLogs;
 
 /// One live script instance: the Lua registry key of its lifecycle table plus
-/// the once-per-instance init flags (#322). `awoken` / `started` record that
-/// `Awake` / `Start` already fired, so each fires exactly once per instance.
+/// the per-instance lifecycle flags. `awoken` / `started` record that `Awake` /
+/// `Start` already fired, so each fires exactly once per instance (#322).
+/// `enabled_last` is the enable/disable edge tracker (#323): the entity's
+/// `active` state as of the last transition sweep, diffed each tick so
+/// `OnEnable` fires on the rising edge and `OnDisable` on the falling one,
+/// exactly once per edge.
 pub(super) struct ScriptInstance {
     pub(super) table: RegistryKey,
     pub(super) awoken: bool,
     pub(super) started: bool,
+    pub(super) enabled_last: bool,
 }
 
 pub struct ScriptManager {

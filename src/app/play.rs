@@ -67,7 +67,11 @@ const REBAKE_INTERVAL_FRAMES: u64 = 60;
 /// hand-wired loop ran them. All are sim systems, so they live in `FixedUpdate`.
 /// The graph evaluator (#316) sits after the scripts (so parameters set this tick
 /// are seen) and right before `animate` (so a fired transition is sampled the
-/// same tick).
+/// same tick). `late_update_scripts` (#324) runs after physics, animation and
+/// particles have resolved this tick's state, so scripts can react to settled
+/// transforms. `apply_destroys` (#323) is the tick's tail: it drains the
+/// deferred-destroy queue (firing `OnDisable`/`OnDestroy`) after every other
+/// system has seen the entity, and right before `advance_frame`.
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::FixedUpdate, rebake_and_path)
         .add_system(Stage::FixedUpdate, update_scripts)
@@ -76,6 +80,8 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, super::animation::graph::evaluate_graphs)
         .add_system(Stage::FixedUpdate, animate)
         .add_system(Stage::FixedUpdate, super::particles::tick_particles)
+        .add_system(Stage::FixedUpdate, late_update_scripts)
+        .add_system(Stage::FixedUpdate, apply_destroys)
         .add_system(Stage::FixedUpdate, advance_frame);
 }
 
@@ -86,6 +92,26 @@ pub(super) fn register(app: &mut App) {
 fn update_scripts(_world: &mut World, res: &mut Resources) {
     res.script_manager.init_scripts();
     res.script_manager.update_scripts(res.frame_dt);
+}
+
+/// The post-physics script phase (#324): once physics, animation and particles
+/// have resolved this tick's state, every started script's `LateUpdate(id, dt)`
+/// runs — still inside the deterministic `FixedUpdate` stage, before
+/// `advance_frame`. A follow-cam / look-at / aim / recoil script placed here reads
+/// *this* tick's settled transforms instead of last tick's, closing the one-step
+/// lag. It reuses the same scaled `frame_dt` the tick handed `update_scripts`.
+fn late_update_scripts(_world: &mut World, res: &mut Resources) {
+    res.script_manager.late_update_scripts(res.frame_dt);
+}
+
+/// The destroy phase (#323): drain the deferred-destroy queue that play-mode
+/// `Scene.DestroyEntity` calls filled this tick, firing each doomed entity's
+/// `OnDisable` (if it was active) then `OnDestroy` before the entity — and its
+/// script instances — are removed. Registered at the tick's tail, after
+/// `late_update_scripts` and before `advance_frame`, so a destroyed entity still
+/// took part in this whole tick (Unity's end-of-frame `Object.Destroy`).
+fn apply_destroys(_world: &mut World, res: &mut Resources) {
+    res.script_manager.apply_pending_destroys();
 }
 
 /// Step the rapier world and dispatch any resulting trigger events to scripts.

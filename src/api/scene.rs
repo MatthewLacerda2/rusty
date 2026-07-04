@@ -33,11 +33,12 @@ pub fn register<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     scene: &'scope RefCell<Scene>,
     scene_path: &'scope RefCell<Option<String>>,
+    is_playing: &'scope RefCell<bool>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     register_lookup_create(scope, &table, scene)?;
-    register_destroy(scope, &table, scene)?;
+    register_destroy(scope, &table, scene, is_playing)?;
     register_components(scope, &table, scene)?;
     register_parenting(scope, &table, scene)?;
     register_save(scope, &table, scene, scene_path)?;
@@ -80,6 +81,7 @@ fn register_destroy<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
+    is_playing: &'scope RefCell<bool>,
 ) -> Reg {
     // Soft delete — mirrors Unity's deferred `Object.Destroy`. The entity stays in
     // the scene but inactive; this is the historical `DestroyEntity` behaviour,
@@ -96,16 +98,28 @@ fn register_destroy<'lua, 'scope>(
         }),
     )?;
 
-    // Hard delete — the editor's Destroy button: actually removes the entity (and
-    // clears the selection if it was selected), via `Scene::destroy_entity`.
+    // Hard delete — the editor's Destroy button: actually removes the entity.
     // Returns whether an entity actually existed at `id`.
+    //
+    // During PLAY the removal is DEFERRED (#323): the id is queued and the entity
+    // stays live until the script system's destroy phase, which fires its
+    // `OnDisable`/`OnDestroy` before removing it — matching Unity's end-of-frame
+    // `Object.Destroy`. In EDIT mode there is no script tick to drain the queue
+    // (and no scripts to notify), so removal is immediate, via `Scene::destroy_entity`
+    // (which also clears the selection if it was selected).
     put(
         table,
         "DestroyEntity",
         scope.create_function(|_, id: u32| {
             let mut s = scene.borrow_mut();
             let existed = s.get_entity(id).is_some();
-            s.destroy_entity(id);
+            if *is_playing.borrow() {
+                if existed {
+                    s.request_destroy(id);
+                }
+            } else {
+                s.destroy_entity(id);
+            }
             Ok(existed)
         }),
     )

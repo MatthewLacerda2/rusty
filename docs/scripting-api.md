@@ -93,9 +93,13 @@ Component menu offers.
 | `Awake` | `Awake(id)` | Once per script instance, when it first participates in the sim while its entity is `active`: at play-enter for active scene entities, at the head of the next tick's script phase for entities spawned during play (see the divergence note below), or on the entity's first active tick when it is loaded/spawned disabled. Always the instance's first callback. |
 | `Start` | `Start(id)` | Once per script instance, after its `Awake`, immediately before its first `Update` — deferred while the owning entity is inactive, so an object instantiated disabled initializes when first enabled (the spawn-pool pattern). |
 | `Update` | `Update(id, dt)` | Every frame of play while the owning entity is `active`, after the instance's `Start` has run. `dt` is the frame's scaled delta (`Time.deltaTime`); under the headless harness / `Time.Step` it is the fixed step. |
+| `LateUpdate` | `LateUpdate(id, dt)` | Every frame of play while the owning entity is `active`, after **every** script's `Update` and after this tick's physics, animation and particle steps have resolved — the post-physics hook. Same scaled `dt` as `Update` (`Time.deltaTime`) and the same deterministic `(entity, script index)` order, still inside the one `FixedUpdate` sim tick — it is **not** a render-rate callback. Reach for it when a script must read *this* tick's settled transforms: follow-cameras, look-ats, aim, recoil recovery, and other post-move corrections that visibly lag by a step if run in `Update`. |
 | `OnTriggerEnter` | `OnTriggerEnter(id, other)` | Once, on the first frame an overlap involving the entity's trigger/sensor (or static) collider exists — before that frame's `OnTrigger`. |
 | `OnTrigger` | `OnTrigger(id, other)` | After the physics step, once per overlapping pair involving the entity's trigger/sensor (or static) collider. It is the overlap "stay": it repeats every frame the overlap persists, including the frame `OnTriggerEnter` fires. |
 | `OnTriggerExit` | `OnTriggerExit(id, other)` | Once, on the first frame a previously overlapping pair no longer overlaps — after that frame's `OnTrigger` dispatches (no stay fires for the ended pair). |
+| `OnEnable` | `OnEnable(id)` | When the owning entity becomes `active`: on its **first** activation — between `Awake` and `Start`, so the first-tick order is `Awake → OnEnable → Start` — and again on every later inactive→active transition (e.g. a script or `Scene.Activate` re-enabling a pooled object). Detected by diffing the entity's `active` flag against the previous tick, so it fires **exactly once** per rising edge. |
+| `OnDisable` | `OnDisable(id)` | When the owning entity becomes inactive: once on each `active`→inactive transition (e.g. `Scene.Deactivate`), and once more — immediately **before** `OnDestroy` — when an *active* entity is destroyed. Fires **exactly once** per falling edge. While disabled, the entity receives no other gameplay callback (no `Update`/`LateUpdate`/`OnTrigger`). |
+| `OnDestroy` | `OnDestroy(id)` | Once, when the entity is removed **during play** via `Scene.DestroyEntity` — after its `OnDisable` if it was active. The entity is still readable during the callback (removal happens just after). See the divergence note: **Stop does not fire `OnDestroy`.** |
 
 `id` is always the **owning** entity's id (the entity the script is attached
 to); `other` is the other entity in the overlap.
@@ -108,6 +112,11 @@ headless replays stay byte-identical):
   `Start`s — so a `Start` can safely read state another script set up in
   `Awake`, matching Unity's contract. Each phase, and `Update`, runs in
   ascending `(entity id, script index)` order.
+- `LateUpdate` is the tick's tail: **all** `Update`s across every entity run
+  first, then nav, physics, animation and particles resolve, and only then does
+  `LateUpdate` run — in the same ascending `(entity id, script index)` order,
+  with the same scaled `dt`. So within one tick a script's `Update` observes the
+  pre-physics transform and its `LateUpdate` observes the post-physics one.
 - Each `Awake` and `Start` fires **exactly once** per script instance, and
   `Awake` always precedes every other callback on that instance (a trigger
   callback never reaches a script whose `Awake` hasn't run).
@@ -116,6 +125,19 @@ headless replays stay byte-identical):
   phase's pair list sorted ascending. Every trigger callback notifies both
   sides of its pair — A about B, then B about A — and an entity carrying
   several scripts is notified in ascending script-index order.
+- `OnEnable`/`OnDisable` are detected at the head of the script phase by diffing
+  each instance's `active` state against the previous tick, in the order
+  `OnDisable` (falling edges) → `Awake` → `OnEnable` (rising edges) → `Start` —
+  so a first activation runs `Awake → OnEnable → Start`, all before that tick's
+  `Update`. `OnDestroy` runs in a dedicated destroy phase at the **tail** of the
+  tick (after `LateUpdate`), draining the ids `Scene.DestroyEntity` queued this
+  tick: all `OnDisable`s first, then all `OnDestroy`s, in ascending
+  `(entity id, script index)` order, before the entities are removed. Every
+  edge fires exactly once, so replays stay byte-identical.
+- **One active gate for every gameplay hook.** A disabled entity receives *no*
+  gameplay callback — not `Update`, `LateUpdate`, or the trigger hooks. Going
+  inactive is announced once by `OnDisable`; coming back is announced once by
+  `OnEnable`.
 
 > **Divergence from Unity — spawns are queued, not synchronous.** Unity runs
 > `Awake` synchronously inside `Object.Instantiate`. In rusty a spawn
@@ -128,6 +150,16 @@ headless replays stay byte-identical):
 > `Instantiate` returns — configure the instance through the `Scene` /
 > `Transform` verbs and let it initialize next tick (spawning it disabled and
 > enabling it when ready defers init the same way).
+
+> **Divergence from Unity — Stop does not fire `OnDestroy`.** Unity calls
+> `OnDestroy` on every object when a scene is torn down. In rusty, leaving Play
+> (Stop) **restores the edit-mode snapshot** — it discards all play-mode state
+> and rewinds to the authored scene, a reset rather than gameplay. Scripts must
+> not observe it, so no `OnDisable`/`OnDestroy` fires on Stop. `OnDestroy` fires
+> **only** for an entity removed *during* play via `Scene.DestroyEntity` (the
+> destructive verb) — that is real gameplay. `Scene.Deactivate` (Unity's
+> deferred destroy) never fires `OnDestroy`; it flips `active`, so it fires
+> `OnDisable` instead.
 
 > **Drift gate:** the callback list is centralized in
 > `src/scripting/callbacks.rs` (dispatch and MonoBehaviour discovery both read

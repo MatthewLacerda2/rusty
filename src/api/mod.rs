@@ -118,7 +118,7 @@ pub fn register<'lua, 'scope>(
     material::register(lua, scope, ctx.scene)?;
     animator::register(lua, scope, ctx.scene, ctx.console)?;
     input::register_readable(lua, scope, ctx.input)?;
-    scene::register(lua, scope, ctx.scene, ctx.scene_path)?;
+    scene::register(lua, scope, ctx.scene, ctx.scene_path, ctx.is_playing)?;
     nav::register(lua, scope, ctx.scene, ctx.nav)?;
     physics::register(lua, scope, ctx.scene)?;
     physics::register_hitscan(lua, scope, ctx.scene, ctx.physics)?;
