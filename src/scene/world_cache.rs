@@ -64,9 +64,10 @@ impl Scene {
     /// callers (picking, inspector, the snapshot API) that read outside a refreshed frame
     /// and must see the current transforms, not a frame-old cache.
     pub fn compute_world_matrix(&self, entity_id: u32) -> Mat4 {
-        if let Some(entity) = self.get_entity(entity_id) {
-            let local_mat = entity.transform.to_matrix();
-            if let Some(parent_id) = entity.parent_id {
+        if let Some(transform) = self.world.transform(entity_id) {
+            let local_mat = transform.to_matrix();
+            drop(transform);
+            if let Some(parent_id) = self.world.parent_id(entity_id) {
                 self.compute_world_matrix(parent_id) * local_mat
             } else {
                 local_mat
@@ -95,12 +96,10 @@ impl Scene {
         if let Some(cached) = map.get(&id) {
             return *cached;
         }
-        let Some((local, parent)) = self
-            .get_entity(id)
-            .map(|e| (e.transform.to_matrix(), e.parent_id))
-        else {
+        let Some(local) = self.world.transform(id).map(|t| t.to_matrix()) else {
             return Mat4::IDENTITY;
         };
+        let parent = self.world.parent_id(id);
         let world = match parent {
             Some(parent_id) => self.fill_world_matrix(parent_id, map) * local,
             None => local,
@@ -124,10 +123,21 @@ impl Scene {
     /// sees the parent transform as just written this tick — see the module note on why the
     /// collider path stays live.
     pub fn update_entity_collider(&mut self, id: u32) {
-        let parent_id = self.get_entity(id).and_then(|e| e.parent_id);
-        let parent_mat = parent_id.map(|p| self.compute_world_matrix(p));
-        if let Some(mut entity) = self.get_entity_mut(id) {
-            entity.update_collider(parent_mat);
+        let parent_mat = self
+            .world
+            .parent_id(id)
+            .map(|p| self.compute_world_matrix(p));
+        let Some(local) = self.world.transform(id).map(|t| t.to_matrix()) else {
+            return;
+        };
+        let world_matrix = match parent_mat {
+            Some(parent) => parent * local,
+            None => local,
+        };
+        if let Some(mut col) = self.world.collider_mut(id) {
+            let (min, max) = col.calculate_world_aabb(world_matrix);
+            col.aabb_min = min;
+            col.aabb_max = max;
         }
     }
 

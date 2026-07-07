@@ -103,4 +103,21 @@ impl MeshComponent {
     pub fn is_skinned(&self) -> bool {
         self.skin.is_some()
     }
+
+    /// World-space AABB of the vertices under `world_matrix`, or `None` for an
+    /// empty mesh. (Was `Entity::compute_world_aabb`; lives on the component so
+    /// callers reach it through the #344 accessor facade.)
+    pub fn world_aabb(&self, world_matrix: glam::Mat4) -> Option<(glam::Vec3, glam::Vec3)> {
+        if self.vertices.is_empty() {
+            return None;
+        }
+        let mut min = glam::Vec3::splat(f32::MAX);
+        let mut max = glam::Vec3::splat(f32::MIN);
+        for v in &self.vertices {
+            let world_pos = world_matrix.transform_point3(glam::Vec3::from_array(v.position));
+            min = min.min(world_pos);
+            max = max.max(world_pos);
+        }
+        Some((min, max))
+    }
 }
