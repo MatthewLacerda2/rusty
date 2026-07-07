@@ -70,7 +70,8 @@ pub(super) fn with_vc_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut VisualCorr
     let Some(id) = active_vc_id(&scene) else {
         return;
     };
-    if let Some(mut vc) = scene.world.visual_correction_mut(id) {
+    let world = &mut scene.world;
+    if let Some(mut vc) = world.visual_correction_mut(id) {
         f(&mut vc);
     }
 }
@@ -92,7 +93,8 @@ pub(super) fn with_cam_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut CameraCom
     let Some(id) = active_cam_id(&scene) else {
         return;
     };
-    if let Some(mut c) = scene.world.camera_mut(id) {
+    let world = &mut scene.world;
+    if let Some(mut c) = world.camera_mut(id) {
         f(&mut c);
     }
 }

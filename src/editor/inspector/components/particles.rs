@@ -17,17 +17,12 @@ use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::particles as particle_ops;
 use crate::scene::{CollisionResponse, EmitMode, ParticleBlend, ParticleEmitterComponent};
 
-/// Bundles the world + this entity's id so the per-section draw helpers below take
-/// three params (fitting rustfmt's single-line signature width) instead of four.
-struct Cx<'w> {
-    world: &'w mut crate::ecs::World,
-    id: u32,
-}
+/// `(world, entity id)`, threaded through the draw helpers below as one param.
+type Cx<'w> = (&'w mut crate::ecs::World, u32);
 
-/// Route a field write through the shared particle-authoring op, a no-op when the
-/// entity has no `ParticleEmitterComponent` (mirrors `world.particles_mut`'s gate).
+/// Routes a field write through the shared particle-authoring op; a no-op absent.
 fn apply(cx: &mut Cx, f: impl FnOnce(&mut ParticleEmitterComponent)) {
-    if let Some(mut c) = cx.world.particles_mut(cx.id) {
+    if let Some(mut c) = cx.0.particles_mut(cx.1) {
         f(&mut c);
     }
 }
@@ -37,7 +32,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
     let Some(p) = world.particles(id).map(|p| p.clone()) else {
         return;
     };
-    let mut cx = Cx { world, id };
+    let mut cx: Cx = (world, id);
     let mut remove = false;
     let mut changed = false;
     component_card(
@@ -67,7 +62,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         },
     );
     if remove {
-        cx.world.set_particles(id, None);
+        cx.0.set_particles(id, None);
         *is_dirty = true;
     } else if changed {
         *is_dirty = true;

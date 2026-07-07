@@ -55,12 +55,12 @@ fn register_velocity<'lua, 'scope>(
         "GetVelocity",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            if let Some(e) = scene.get_entity(id) {
-                if let Some(rb) = &e.rigidbody {
-                    return Ok((rb.velocity.x, rb.velocity.y, rb.velocity.z));
-                }
-            }
-            Ok((0.0, 0.0, 0.0))
+            let v = scene
+                .world
+                .rigidbody(id)
+                .map(|rb| rb.velocity)
+                .unwrap_or(Vec3::ZERO);
+            Ok((v.x, v.y, v.z))
         }),
     )?;
 
@@ -90,13 +90,12 @@ fn register_angular<'lua, 'scope>(
         "GetAngularVelocity",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            if let Some(e) = scene.get_entity(id) {
-                if let Some(rb) = &e.rigidbody {
-                    let w = rb.angular_velocity;
-                    return Ok((w.x, w.y, w.z));
-                }
-            }
-            Ok((0.0, 0.0, 0.0))
+            let w = scene
+                .world
+                .rigidbody(id)
+                .map(|rb| rb.angular_velocity)
+                .unwrap_or(Vec3::ZERO);
+            Ok((w.x, w.y, w.z))
         }),
     )?;
 
@@ -163,16 +162,14 @@ fn register_force<'lua, 'scope>(
         "AddForce",
         scope.create_function(|_, (id, fx, fy, fz): (u32, f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(rb) = &mut e.rigidbody {
-                    if !rb.is_kinematic {
-                        // Continuous force (Unity `ForceMode.Force`): a force F over a
-                        // fixed step dt changes velocity by F/m · dt. Scaling by the
-                        // fixed step makes one call's effect match the physics tick it
-                        // feeds, instead of an unscaled (dt-independent) velocity jump.
-                        let dv = Vec3::new(fx, fy, fz) / rb.mass.max(0.0001) * FIXED_DELTA_TIME;
-                        rb.velocity += dv;
-                    }
+            if let Some(mut rb) = scene.world.rigidbody_mut(id) {
+                if !rb.is_kinematic {
+                    // Continuous force (Unity `ForceMode.Force`): a force F over a
+                    // fixed step dt changes velocity by F/m · dt. Scaling by the
+                    // fixed step makes one call's effect match the physics tick it
+                    // feeds, instead of an unscaled (dt-independent) velocity jump.
+                    let dv = Vec3::new(fx, fy, fz) / rb.mass.max(0.0001) * FIXED_DELTA_TIME;
+                    rb.velocity += dv;
                 }
             }
             Ok(())

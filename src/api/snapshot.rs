@@ -19,7 +19,8 @@ use super::snapshot_components::{
     animator_value, audio_value, camera_component_value, collider_value, light_value,
     material_value, mesh_value, nav_agent_value, particle_value, rigidbody_value,
 };
-use crate::components::{Entity, MaterialAsset, TransformComponent};
+use crate::components::TransformComponent;
+use crate::ecs::World;
 use crate::render::Camera;
 use crate::scene::Scene;
 
@@ -30,16 +31,15 @@ pub(crate) fn vec3(v: Vec3) -> Value {
 
 /// The whole-world snapshot: play-state envelope + camera + every entity.
 pub fn world_value(scene: &Scene, camera: &Camera, frame: u64, playing: bool) -> Value {
-    // Collect ids first so the per-entity borrow for the world matrix and the
-    // entity read don't overlap the iterator's guards.
-    let ids: Vec<u32> = scene.iter().map(|e| e.id).collect();
+    // Collect ids first so the per-entity accessor borrows below don't overlap
+    // any iterator-held guard.
+    let ids = scene.entity_ids();
     let entities: Vec<Value> = ids
         .iter()
         .filter_map(|&id| {
-            let world_matrix = scene.compute_world_matrix(id);
-            scene.get_entity(id).map(|e| {
-                let material = scene.material_of(&e);
-                entity_value(&e, material, world_matrix)
+            scene.world.contains(id).then(|| {
+                let world_matrix = scene.compute_world_matrix(id);
+                entity_value(scene, id, world_matrix)
             })
         })
         .collect();
@@ -62,69 +62,78 @@ fn camera_value(cam: &Camera) -> Value {
 }
 
 /// One entity in the stable authoring shape. `world_matrix` is the entity's
-/// parent-aware world transform, used for the world-space bounds; `material` is the
-/// entity's resolved library material (`None` when it references none).
-pub fn entity_value(e: &Entity, material: Option<&MaterialAsset>, world_matrix: Mat4) -> Value {
+/// parent-aware world transform, used for the world-space bounds. Reads route
+/// through the `World` component accessors (#344) instead of projecting fields
+/// out of a whole-`Entity` borrow, so heavy fields (meshes) are never cloned.
+pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4) -> Value {
+    let world = &scene.world;
+    let material = scene.material_asset_of(id);
     json!({
-        "id": e.id,
-        "name": e.name,
-        "active": e.active,
-        "static": e.is_static,
-        "layer": e.layer,
-        "parent": e.parent_id,
-        "children": e.children,
-        "components": inventory(e),
-        "transform": transform_value(&e.transform),
-        "bounds": bounds_value(e, world_matrix),
-        "scripts": e.scripts.iter().map(|s| s.path.clone()).collect::<Vec<_>>(),
-        "mesh": e.mesh.as_ref().map(mesh_value),
+        "id": id,
+        "name": world.name(id).map(|n| n.clone()).unwrap_or_default(),
+        "active": world.is_active(id),
+        "static": world.is_static(id),
+        "layer": world.layer(id),
+        "parent": world.parent_id(id),
+        "children": world.children(id),
+        "components": inventory(world, id),
+        "transform": world
+            .transform(id)
+            .map(|t| transform_value(&t))
+            .unwrap_or(Value::Null),
+        "bounds": bounds_value(scene, id, world_matrix),
+        "scripts": world
+            .scripts(id)
+            .map(|s| s.iter().map(|sc| sc.path.clone()).collect::<Vec<_>>())
+            .unwrap_or_default(),
+        "mesh": world.mesh(id).map(|m| mesh_value(&m)),
         "material": material.map(material_value),
-        "light": e.light.as_ref().map(light_value),
-        "collider": e.collider.as_ref().map(collider_value),
-        "rigidbody": e.rigidbody.as_ref().map(rigidbody_value),
-        "camera": e.camera.as_ref().map(camera_component_value),
-        "nav_agent": e.nav_agent.as_ref().map(nav_agent_value),
-        "particles": e.particles.as_ref().map(particle_value),
-        "animator": e.animator.as_ref().map(animator_value),
-        "audio": e.audio.as_ref().map(audio_value),
+        "light": world.light(id).map(|l| light_value(&l)),
+        "collider": world.collider(id).map(|c| collider_value(&c)),
+        "rigidbody": world.rigidbody(id).map(|r| rigidbody_value(&r)),
+        "camera": world.camera(id).map(|c| camera_component_value(&c)),
+        "nav_agent": world.nav_agent(id).map(|n| nav_agent_value(&n)),
+        "particles": world.particles(id).map(|p| particle_value(&p)),
+        "animator": world.animator(id).map(|a| animator_value(&a)),
+        "audio": world.audio(id).map(|a| audio_value(&a)),
     })
 }
 
 /// Names of the optional first-class components this entity carries (the
 /// "component inventory" authoring needs). `Transform` is mandatory and omitted.
-fn inventory(e: &Entity) -> Vec<&'static str> {
+fn inventory(world: &World, id: u32) -> Vec<&'static str> {
     let mut names = Vec::new();
-    if e.mesh.is_some() {
+    if world.has_mesh(id) {
         names.push("Mesh");
     }
-    if e.material.is_some() {
+    if world.has_material(id) {
         names.push("Material");
     }
-    if e.light.is_some() {
+    if world.has_light(id) {
         names.push("Light");
     }
-    if e.collider.is_some() {
+    if world.has_collider(id) {
         names.push("Collider");
     }
-    if e.rigidbody.is_some() {
+    if world.has_rigidbody(id) {
         names.push("Rigidbody");
     }
-    if e.camera.is_some() {
+    if world.has_camera(id) {
         names.push("Camera");
     }
-    if e.nav_agent.is_some() {
+    if world.has_nav_agent(id) {
         names.push("NavMeshAgent");
     }
-    if e.particles.is_some() {
+    if world.has_particles(id) {
         names.push("ParticleEmitter");
     }
-    if e.animator.is_some() {
+    if world.has_animator(id) {
         names.push("Animator");
     }
-    if e.audio.is_some() {
+    if world.has_audio(id) {
         names.push("AudioSource");
     }
-    if !e.scripts.is_empty() {
+    if world.scripts(id).is_some_and(|s| !s.is_empty()) {
         names.push("Script");
     }
     names
@@ -141,12 +150,17 @@ fn transform_value(t: &TransformComponent) -> Value {
 
 /// World-space AABB for overlap-aware placement: the mesh bounds when present,
 /// else the collider bounds, else `null`.
-fn bounds_value(e: &Entity, world_matrix: Mat4) -> Value {
-    let aabb = e.compute_world_aabb(world_matrix).or_else(|| {
-        e.collider
-            .as_ref()
-            .map(|c| c.calculate_world_aabb(world_matrix))
-    });
+fn bounds_value(scene: &Scene, id: u32, world_matrix: Mat4) -> Value {
+    let aabb = scene
+        .world
+        .mesh(id)
+        .and_then(|m| m.world_aabb(world_matrix))
+        .or_else(|| {
+            scene
+                .world
+                .collider(id)
+                .map(|c| c.calculate_world_aabb(world_matrix))
+        });
     match aabb {
         Some((min, max)) => json!({ "min": vec3(min), "max": vec3(max) }),
         None => Value::Null,

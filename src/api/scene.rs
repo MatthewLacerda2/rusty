@@ -90,10 +90,7 @@ fn register_destroy<'lua, 'scope>(
         table,
         "Deactivate",
         scope.create_function(|_, id: u32| {
-            let mut s = scene.borrow_mut();
-            if let Some(mut e) = s.get_entity_mut(id) {
-                e.active = false;
-            }
+            scene.borrow_mut().world.set_active(id, false);
             Ok(())
         }),
     )?;
@@ -112,7 +109,7 @@ fn register_destroy<'lua, 'scope>(
         "DestroyEntity",
         scope.create_function(|_, id: u32| {
             let mut s = scene.borrow_mut();
-            let existed = s.get_entity(id).is_some();
+            let existed = s.world.contains(id);
             if *is_playing.borrow() {
                 if existed {
                     s.request_destroy(id);

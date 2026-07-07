@@ -53,13 +53,12 @@ fn register_agent_target<'lua, 'scope>(
         "GetTarget",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            if let Some(e) = scene.get_entity(id) {
-                if let Some(agent) = &e.nav_agent {
-                    let t = agent.target;
-                    return Ok((t.x, t.y, t.z));
-                }
-            }
-            Ok((0.0, 0.0, 0.0))
+            let t = scene
+                .world
+                .nav_agent(id)
+                .map(|a| a.target)
+                .unwrap_or(Vec3::ZERO);
+            Ok((t.x, t.y, t.z))
         }),
     )
 }
@@ -137,14 +136,20 @@ fn register_agent_queries<'lua, 'scope>(
         "IsAtTarget",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            if let Some(e) = scene.get_entity(id) {
-                if let Some(agent) = &e.nav_agent {
-                    let current_pos = e.transform.position;
+            let at_target = scene
+                .world
+                .nav_agent(id)
+                .map(|agent| {
+                    let current_pos = scene
+                        .world
+                        .transform(id)
+                        .map(|t| t.position)
+                        .unwrap_or(Vec3::ZERO);
                     let to_target = agent.target - current_pos;
-                    return Ok(to_target.length() <= agent.stopping_distance);
-                }
-            }
-            Ok(true)
+                    to_target.length() <= agent.stopping_distance
+                })
+                .unwrap_or(true);
+            Ok(at_target)
         }),
     )?;
 
@@ -153,13 +158,12 @@ fn register_agent_queries<'lua, 'scope>(
         "GetVelocity",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            if let Some(e) = scene.get_entity(id) {
-                if let Some(agent) = &e.nav_agent {
-                    let v = agent.velocity;
-                    return Ok((v.x, v.y, v.z));
-                }
-            }
-            Ok((0.0, 0.0, 0.0))
+            let v = scene
+                .world
+                .nav_agent(id)
+                .map(|a| a.velocity)
+                .unwrap_or(Vec3::ZERO);
+            Ok((v.x, v.y, v.z))
         }),
     )?;
 

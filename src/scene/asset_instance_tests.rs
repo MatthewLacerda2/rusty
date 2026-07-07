@@ -85,7 +85,6 @@ fn instantiate_places_textured_entity_and_dedups_material() {
         Some(format!("{path}::PartA").as_str())
     );
     assert!(!mesh.vertices.is_empty());
-    drop(mesh);
 
     // Both sub-objects share ONE library key (dedup).
     let key = format!("{path}::Shared");

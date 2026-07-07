@@ -23,9 +23,7 @@ pub(super) fn accepts(scene: &Scene, id: u32, ignore: Option<u32>, mask: Option<
         return false;
     }
     match mask {
-        Some(m) => scene
-            .get_entity(id)
-            .is_some_and(|e| layer_in_mask(e.layer, m)),
+        Some(m) => layer_in_mask(scene.world.layer(id), m),
         None => true,
     }
 }

@@ -53,8 +53,8 @@ fn register_position<'lua, 'scope>(
         "SetPosition",
         scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                e.transform.position = Vec3::new(x, y, z);
+            if let Some(mut t) = scene.world.transform_mut(id) {
+                t.position = Vec3::new(x, y, z);
             }
             scene.update_entity_collider(id);
             Ok(())
@@ -73,7 +73,7 @@ fn register_rotation<'lua, 'scope>(
         "GetRotation",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            let rot = scene.get_entity(id).map(|e| e.transform.euler_angles());
+            let rot = scene.world.transform(id).map(|t| t.euler_angles());
             match rot {
                 Some(rot) => Ok((rot.x, rot.y, rot.z)),
                 None => Ok((0.0, 0.0, 0.0)),
@@ -86,8 +86,8 @@ fn register_rotation<'lua, 'scope>(
         "SetRotation",
         scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                e.transform.set_euler_angles(Vec3::new(x, y, z));
+            if let Some(mut t) = scene.world.transform_mut(id) {
+                t.set_euler_angles(Vec3::new(x, y, z));
             }
             scene.update_entity_collider(id);
             Ok(())
@@ -119,8 +119,8 @@ fn register_scale<'lua, 'scope>(
         "SetScale",
         scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                e.transform.scale = Vec3::new(x, y, z);
+            if let Some(mut t) = scene.world.transform_mut(id) {
+                t.scale = Vec3::new(x, y, z);
             }
             scene.update_entity_collider(id);
             Ok(())
@@ -139,15 +139,15 @@ fn register_move_towards<'lua, 'scope>(
         "MoveTowards",
         scope.create_function(|_, (id, tx, ty, tz, step): (u32, f32, f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                let pos = e.transform.position;
+            if let Some(mut t) = scene.world.transform_mut(id) {
+                let pos = t.position;
                 let target = Vec3::new(tx, ty, tz);
                 let dir = target - pos;
                 let len = dir.length();
                 if len <= step || len < 0.001 {
-                    e.transform.position = target;
+                    t.position = target;
                 } else {
-                    e.transform.position += dir.normalize() * step;
+                    t.position += dir.normalize() * step;
                 }
             }
             scene.update_entity_collider(id);

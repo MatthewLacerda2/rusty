@@ -23,20 +23,14 @@ pub fn register<'lua, 'scope>(
     put(
         &table,
         "GetLayer",
-        scope.create_function(|_, id: u32| {
-            let scene = scene.borrow();
-            Ok(scene.get_entity(id).map(|e| e.layer).unwrap_or(0))
-        }),
+        scope.create_function(|_, id: u32| Ok(scene.borrow().world.layer(id))),
     )?;
 
     put(
         &table,
         "SetLayer",
         scope.create_function(|_, (id, layer): (u32, u8)| {
-            let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                e.layer = layer;
-            }
+            scene.borrow_mut().world.set_layer(id, layer);
             Ok(())
         }),
     )?;
