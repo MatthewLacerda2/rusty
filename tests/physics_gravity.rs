@@ -31,15 +31,16 @@ fn dynamic_body(use_gravity: bool) -> RigidBodyComponent {
 
 fn falling_ball(scene: &mut Scene, use_gravity: bool) -> u32 {
     let id = scene.add_entity("Ball".to_string());
-    let mut e = scene.get_entity_mut(id).unwrap();
-    e.transform.position = Vec3::new(0.0, 10.0, 0.0);
-    e.collider = Some(box_collider(Vec3::ONE));
-    e.rigidbody = Some(dynamic_body(use_gravity));
+    scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 10.0, 0.0);
+    scene.world.set_collider(id, Some(box_collider(Vec3::ONE)));
+    scene
+        .world
+        .set_rigidbody(id, Some(dynamic_body(use_gravity)));
     id
 }
 
 fn pos_y(scene: &Scene, id: u32) -> f32 {
-    scene.get_entity(id).unwrap().transform.position.y
+    scene.world.transform(id).unwrap().position.y
 }
 
 #[test]
@@ -87,13 +88,7 @@ fn toggling_use_gravity_at_runtime_takes_effect() {
     let held = pos_y(&scene, id);
     assert!((held - 10.0).abs() < 1e-3, "should still be held aloft");
 
-    scene
-        .get_entity_mut(id)
-        .unwrap()
-        .rigidbody
-        .as_mut()
-        .unwrap()
-        .use_gravity = true;
+    scene.world.rigidbody_mut(id).unwrap().use_gravity = true;
     for _ in 0..120 {
         physics.step(&mut scene, 1.0 / 60.0);
     }

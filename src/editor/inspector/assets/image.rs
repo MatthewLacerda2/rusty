@@ -126,15 +126,15 @@ fn draw_apply_to_entity(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Sc
 /// library material under a per-entity key if the entity has none yet. Reuses the
 /// entity's existing referenced material when present so its other params survive.
 fn apply_albedo_to_entity(scene: &mut Scene, entity_id: u32, path: &str) {
-    if !scene.world.has_material(entity_id) {
-        if !scene.world.set_material(
+    if !scene.world.has_material(entity_id)
+        && !scene.world.set_material(
             entity_id,
             Some(MaterialComponent {
                 material: format!("entity_{entity_id}_material"),
             }),
-        ) {
-            return;
-        }
+        )
+    {
+        return;
     }
     let Some(key) = scene.world.material(entity_id).map(|m| m.material.clone()) else {
         return;

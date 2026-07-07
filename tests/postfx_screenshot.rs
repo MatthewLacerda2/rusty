@@ -38,21 +38,22 @@ fn scene_with_exposure(exposure: f32) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_intensity = 1.0;
     let id = scene.add_entity("Box".to_string());
-    let mut e = scene.get_entity_mut(id).unwrap();
     let (vertices, indices) = rusty::render::gpu::mesh::generate_box(2.0, 2.0, 2.0);
-    e.mesh = Some(MeshComponent {
-        primitive_type: "Box".to_string(),
-        asset_ref: None,
-        vertices,
-        indices,
-        bind_palette: Vec::new(),
-        skin: None,
-        clips: Vec::new(),
-        pose_palette: Vec::new(),
-        is_dirty: rusty::scene::DirtyFlag::new(true),
-    });
-    e.visual_correction = Some(vc(exposure));
-    drop(e);
+    scene.world.set_mesh(
+        id,
+        Some(MeshComponent {
+            primitive_type: "Box".to_string(),
+            asset_ref: None,
+            vertices,
+            indices,
+            bind_palette: Vec::new(),
+            skin: None,
+            clips: Vec::new(),
+            pose_palette: Vec::new(),
+            is_dirty: rusty::scene::DirtyFlag::new(true),
+        }),
+    );
+    scene.world.set_visual_correction(id, Some(vc(exposure)));
     scene
 }
 

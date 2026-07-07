@@ -15,6 +15,47 @@ use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::{nav_agent as nav_ops, rigidbody as rigidbody_ops};
 use crate::scene::CollisionDetection;
 
+/// A checkbox row that routes its write through a shared rigidbody op (#287).
+#[allow(clippy::too_many_arguments)] // (world, id) replaced the single &mut Entity handle
+fn rb_checkbox(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    label: &str,
+    mut value: bool,
+    op: fn(&mut crate::scene::RigidBodyComponent, bool),
+    is_dirty: &mut bool,
+) {
+    if ui.checkbox(&mut value, label).changed() {
+        if let Some(mut r) = world.rigidbody_mut(id) {
+            op(&mut r, value);
+        }
+        *is_dirty = true;
+    }
+}
+
+/// The Mass drag row (clamped ≥ 0.01), routed through the shared op (#287).
+fn draw_rb_mass(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    mut mass: f32,
+    is_dirty: &mut bool,
+) {
+    ui.horizontal(|ui| {
+        ui.label("Mass:");
+        let drag = egui::DragValue::new(&mut mass)
+            .speed(0.05)
+            .clamp_range(0.01..=1000.0);
+        if ui.add(drag).changed() {
+            if let Some(mut r) = world.rigidbody_mut(id) {
+                rigidbody_ops::set_mass(&mut r, mass);
+            }
+            *is_dirty = true;
+        }
+    });
+}
+
 /// 3EG. RigidBody Component
 pub fn draw_rigidbody(
     ui: &mut egui::Ui,
@@ -27,44 +68,34 @@ pub fn draw_rigidbody(
     };
     let mut remove = false;
     component_card(ui, icon::CUBE, "RigidBody", Some(&mut remove), |ui| {
-        let mut active = rb.active;
-        if ui.checkbox(&mut active, "Active").changed() {
-            if let Some(mut r) = world.rigidbody_mut(id) {
-                rigidbody_ops::set_active(&mut r, active);
-            }
-            *is_dirty = true;
-        }
-        let mut is_kinematic = rb.is_kinematic;
-        if ui.checkbox(&mut is_kinematic, "Is Kinematic").changed() {
-            if let Some(mut r) = world.rigidbody_mut(id) {
-                rigidbody_ops::set_kinematic(&mut r, is_kinematic);
-            }
-            *is_dirty = true;
-        }
-        let mut use_gravity = rb.use_gravity;
-        if ui.checkbox(&mut use_gravity, "Use Gravity").changed() {
-            if let Some(mut r) = world.rigidbody_mut(id) {
-                rigidbody_ops::set_use_gravity(&mut r, use_gravity);
-            }
-            *is_dirty = true;
-        }
-        let mut mass = rb.mass;
-        ui.horizontal(|ui| {
-            ui.label("Mass:");
-            if ui
-                .add(
-                    egui::DragValue::new(&mut mass)
-                        .speed(0.05)
-                        .clamp_range(0.01..=1000.0),
-                )
-                .changed()
-            {
-                if let Some(mut r) = world.rigidbody_mut(id) {
-                    rigidbody_ops::set_mass(&mut r, mass);
-                }
-                *is_dirty = true;
-            }
-        });
+        rb_checkbox(
+            ui,
+            world,
+            id,
+            "Active",
+            rb.active,
+            rigidbody_ops::set_active,
+            is_dirty,
+        );
+        rb_checkbox(
+            ui,
+            world,
+            id,
+            "Is Kinematic",
+            rb.is_kinematic,
+            rigidbody_ops::set_kinematic,
+            is_dirty,
+        );
+        rb_checkbox(
+            ui,
+            world,
+            id,
+            "Use Gravity",
+            rb.use_gravity,
+            rigidbody_ops::set_use_gravity,
+            is_dirty,
+        );
+        draw_rb_mass(ui, world, id, rb.mass, is_dirty);
         draw_rb_velocity(ui, world, id, rb.velocity, is_dirty);
         draw_rb_angular_velocity(ui, world, id, rb.angular_velocity, is_dirty);
         draw_rb_collision_detection(ui, world, id, rb.collision_detection, is_dirty);

@@ -126,7 +126,9 @@ fn register_collision_detection<'lua, 'scope>(
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
             let mode = scene
-                .world.rigidbody(id).map(|rb| rb.collision_detection)
+                .world
+                .rigidbody(id)
+                .map(|rb| rb.collision_detection)
                 .unwrap_or_default();
             Ok(mode.as_str().to_string())
         }),

@@ -21,7 +21,11 @@ pub(crate) fn solid_entity_uniform(
     model_matrix: Mat4,
     light_static_from_probes: bool,
 ) -> EntityUniform {
-    let is_lit = if scene.world.has_light(id) { 0u32 } else { 1u32 };
+    let is_lit = if scene.world.has_light(id) {
+        0u32
+    } else {
+        1u32
+    };
     let (use_sh, sh) = entity_probe_sh(scene, id, model_matrix, light_static_from_probes);
     let color_tint = material_color_tint(material);
 

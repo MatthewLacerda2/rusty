@@ -4,7 +4,9 @@
 //! which don't depend on each other:
 //!   1. a field on `Entity` (`src/components/entity.rs`) — the discovery source,
 //!   2. an Add Component entry (`src/editor/inspector/components/add.rs`),
-//!   3. an inspector card (some `src/editor/inspector/components/*.rs`),
+//!      guarding on absence through the #344 accessor facade,
+//!   3. an inspector card (some `src/editor/inspector/components/*.rs`) writing
+//!      through the facade's `_mut`/`set_` accessors,
 //!   4. an API namespace (`src/api/<x>.rs` + registration in `src/api/mod.rs`, and a
 //!      mention in `docs/scripting-api.md`).
 //!
@@ -167,16 +169,20 @@ fn discover_from(src: &str) -> Vec<String> {
     out
 }
 
-/// Axis 2: a standalone Add Component entry guards on `entity.<field>.is_none()`.
-/// A component only added as a side-effect of another has no such guard and is
-/// reported until it gets its own entry (#82).
+/// Axis 2: a standalone Add Component entry guards on absence via the #344
+/// accessor facade (`!world.has_<field>(id)`). A component only added as a
+/// side-effect of another has no such guard and is reported until it gets its
+/// own entry (#82).
 fn has_add_menu(field: &str, add_src: &str) -> bool {
-    add_src.contains(&format!("entity.{field}.is_none()"))
+    add_src.contains(&format!("!world.has_{field}(id)"))
 }
 
-/// Axis 3: some editor file other than the Add menu edits the field in a card.
+/// Axis 3: some editor file other than the Add menu edits the component in a
+/// card — through the facade, that is a mutable accessor (`.<field>_mut(`) or a
+/// detach/attach write (`.set_<field>(`).
 fn has_inspector(field: &str, editor_blob: &str) -> bool {
-    editor_blob.contains(&format!("entity.{field}"))
+    editor_blob.contains(&format!(".{field}_mut("))
+        || editor_blob.contains(&format!(".set_{field}("))
 }
 
 /// Axis 4: an API namespace named after the component (its field, or the singular
@@ -317,8 +323,11 @@ mod tests {
 
     #[test]
     fn add_menu_axis_needs_a_standalone_guard() {
-        assert!(has_add_menu("particles", "if entity.particles.is_none() {"));
-        assert!(!has_add_menu("animator", "entity.animator = Some(x);"));
+        assert!(has_add_menu("particles", "if !world.has_particles(id) {"));
+        assert!(!has_add_menu(
+            "animator",
+            "world.set_animator(id, Some(x));"
+        ));
     }
 
     #[test]

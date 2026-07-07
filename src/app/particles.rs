@@ -34,7 +34,9 @@ pub(super) fn tick_particles(world: &mut World, res: &mut Resources) {
             if !scene.world.contains(id) || !scene.world.is_active(id) {
                 continue;
             }
-            let origin = scene.world.transform(id).unwrap().position;
+            let Some(origin) = scene.world.transform(id).map(|t| t.position) else {
+                continue;
+            };
             scene
                 .world
                 .take_particles(id)
@@ -47,7 +49,11 @@ pub(super) fn tick_particles(world: &mut World, res: &mut Resources) {
 
         simulate_emitter(&mut emitter, origin, dt, &res.physics);
 
-        world.scene.borrow_mut().world.set_particles(id, Some(emitter));
+        world
+            .scene
+            .borrow_mut()
+            .world
+            .set_particles(id, Some(emitter));
     }
 }
 

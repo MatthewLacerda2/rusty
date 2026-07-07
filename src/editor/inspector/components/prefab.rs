@@ -193,7 +193,11 @@ fn field_label(path: &str) -> String {
 /// Returns `selected_id` itself when it is not a linked instance, so callers can pass
 /// the result unconditionally.
 pub fn instance_root(scene: &Scene, selected_id: u32) -> u32 {
-    let Some(source) = scene.world.prefab_link(selected_id).map(|l| l.source.clone()) else {
+    let Some(source) = scene
+        .world
+        .prefab_link(selected_id)
+        .map(|l| l.source.clone())
+    else {
         return selected_id;
     };
     let mut current = selected_id;

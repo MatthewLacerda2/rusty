@@ -37,9 +37,10 @@ fn falling_body_world() -> GameWorld {
 
     let mut s = Scene::new();
     let id = s.add_entity("Faller".to_string());
-    {
-        s.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 10.0, 0.0);
-        s.world.set_rigidbody(id, Some(RigidBodyComponent {
+    s.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 10.0, 0.0);
+    s.world.set_rigidbody(
+        id,
+        Some(RigidBodyComponent {
             active: true,
             is_kinematic: false,
             mass: 1.0,
@@ -47,10 +48,13 @@ fn falling_body_world() -> GameWorld {
             angular_velocity: Vec3::ZERO,
             use_gravity: false,
             collision_detection: CollisionDetection::Discrete,
-        });
-        // A collider gives the dynamic body mass so rapier integrates it (a
-        // rigidbody-only entity has zero mass and never moves).
-        e.collider = Some(ColliderComponent {
+        }),
+    );
+    // A collider gives the dynamic body mass so rapier integrates it (a
+    // rigidbody-only entity has zero mass and never moves).
+    s.world.set_collider(
+        id,
+        Some(ColliderComponent {
             active: true,
             shape: ColliderShape::Box {
                 size: Vec3::splat(1.0),
@@ -58,13 +62,13 @@ fn falling_body_world() -> GameWorld {
             is_trigger: false,
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
-        });
-        // Forward slashes: a Windows `\` would be a Lua escape in the path literal.
-        e.scripts = vec![ScriptComponent {
-            path: script.to_string_lossy().replace('\\', "/"),
-            ..Default::default()
-        }];
-    }
+        }),
+    );
+    // Forward slashes: a Windows `\` would be a Lua escape in the path literal.
+    *s.world.scripts_mut(id).unwrap() = vec![ScriptComponent {
+        path: script.to_string_lossy().replace('\\', "/"),
+        ..Default::default()
+    }];
 
     let input = Rc::new(RefCell::new(InputState::new()));
     let nav = Rc::new(RefCell::new(NavigationGraph::new(

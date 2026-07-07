@@ -88,15 +88,19 @@ fn entity_uses_the_named_asset_by_reference() {
     let id = {
         let mut sc = scene.borrow_mut();
         let id = sc.add_entity("Trophy".to_string());
-        sc.get_entity_mut(id).unwrap().material = Some(MaterialComponent {
-            material: "gold".to_string(),
-        });
+        sc.world.set_material(
+            id,
+            Some(MaterialComponent {
+                material: "gold".to_string(),
+            }),
+        );
         id
     };
 
     let sc = scene.borrow();
-    let e = sc.get_entity(id).unwrap();
-    let resolved = sc.material_of(&e).expect("reference resolves to the asset");
+    let resolved = sc
+        .material_asset_of(id)
+        .expect("reference resolves to the asset");
     assert_eq!(resolved.metallic, 1.0);
     assert_eq!(resolved.roughness, 0.15);
     assert_eq!(resolved.base_color, [1.0, 0.84, 0.0]);

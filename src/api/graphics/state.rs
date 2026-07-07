@@ -38,9 +38,17 @@ pub(super) fn register_quality<'lua, 'scope>(
 
 /// The first *active* entity whose visual-correction volume is itself active.
 fn active_vc_id(scene: &Scene) -> Option<u32> {
-    scene.world.ids_with_visual_correction().into_iter().find(|&id| {
-        scene.world.is_active(id) && scene.world.visual_correction(id).is_some_and(|vc| vc.active)
-    })
+    scene
+        .world
+        .ids_with_visual_correction()
+        .into_iter()
+        .find(|&id| {
+            scene.world.is_active(id)
+                && scene
+                    .world
+                    .visual_correction(id)
+                    .is_some_and(|vc| vc.active)
+        })
 }
 
 /// The first *active* entity whose camera component is itself active.

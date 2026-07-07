@@ -64,23 +64,27 @@ fn scene(metallic: f32, metallic_map: Option<String>) -> Scene {
     // A large box so it fills the frame — the mean-brightness signal is dominated by
     // the surface, not the background, making the metallic gating clearly visible.
     let (vertices, indices) = rusty::render::gpu::mesh::generate_box(8.0, 8.0, 8.0);
-    let mut e = scene.get_entity_mut(id).unwrap();
-    e.mesh = Some(MeshComponent {
-        primitive_type: "Box".to_string(),
-        asset_ref: None,
-        vertices,
-        indices,
-        bind_palette: Vec::new(),
-        skin: None,
-        clips: Vec::new(),
-        pose_palette: Vec::new(),
-        is_dirty: rusty::scene::DirtyFlag::new(true),
-    });
-    e.material = Some(MaterialComponent {
-        material: "mat".to_string(),
-    });
-    e.visual_correction = Some(vc());
-    drop(e);
+    scene.world.set_mesh(
+        id,
+        Some(MeshComponent {
+            primitive_type: "Box".to_string(),
+            asset_ref: None,
+            vertices,
+            indices,
+            bind_palette: Vec::new(),
+            skin: None,
+            clips: Vec::new(),
+            pose_palette: Vec::new(),
+            is_dirty: rusty::scene::DirtyFlag::new(true),
+        }),
+    );
+    scene.world.set_material(
+        id,
+        Some(MaterialComponent {
+            material: "mat".to_string(),
+        }),
+    );
+    scene.world.set_visual_correction(id, Some(vc()));
     scene.materials.insert(
         "mat".to_string(),
         MaterialAsset {

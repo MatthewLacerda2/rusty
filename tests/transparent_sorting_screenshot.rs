@@ -46,24 +46,28 @@ fn vc() -> VisualCorrectionComponent {
 fn add_quad(scene: &mut Scene, name: &str, z: f32, color: [f32; 3], alpha: f32) {
     let id = scene.add_entity(name.to_string());
     let (vertices, indices) = rusty::render::gpu::mesh::generate_box(8.0, 8.0, 0.1);
-    let mut e = scene.get_entity_mut(id).unwrap();
-    e.transform.position = Vec3::new(0.0, 0.0, z);
-    e.mesh = Some(MeshComponent {
-        primitive_type: "Box".to_string(),
-        asset_ref: None,
-        vertices,
-        indices,
-        bind_palette: Vec::new(),
-        skin: None,
-        clips: Vec::new(),
-        pose_palette: Vec::new(),
-        is_dirty: rusty::scene::DirtyFlag::new(true),
-    });
-    e.material = Some(MaterialComponent {
-        material: name.to_string(),
-    });
-    e.visual_correction = Some(vc());
-    drop(e);
+    scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 0.0, z);
+    scene.world.set_mesh(
+        id,
+        Some(MeshComponent {
+            primitive_type: "Box".to_string(),
+            asset_ref: None,
+            vertices,
+            indices,
+            bind_palette: Vec::new(),
+            skin: None,
+            clips: Vec::new(),
+            pose_palette: Vec::new(),
+            is_dirty: rusty::scene::DirtyFlag::new(true),
+        }),
+    );
+    scene.world.set_material(
+        id,
+        Some(MaterialComponent {
+            material: name.to_string(),
+        }),
+    );
+    scene.world.set_visual_correction(id, Some(vc()));
     scene.materials.insert(
         name.to_string(),
         MaterialAsset {

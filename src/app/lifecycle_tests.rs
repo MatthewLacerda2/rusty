@@ -20,9 +20,11 @@ use super::GameWorld;
 const DT: f32 = 1.0 / 60.0;
 
 /// A play-ready world with one scripted entity, plus a clone of the shared
-/// console so a test can read what the script's callbacks logged.
-fn world_with_script(code: &str) -> (GameWorld, Rc<RefCell<ConsoleLogs>>, u32) {
-    let script = std::env::temp_dir().join("rusty_323_lifecycle.lua");
+/// console so a test can read what the script's callbacks logged. `tag` keeps
+/// each test's temp script file distinct — the tests run in parallel threads,
+/// and a shared path is a write/load race.
+fn world_with_script(tag: &str, code: &str) -> (GameWorld, Rc<RefCell<ConsoleLogs>>, u32) {
+    let script = std::env::temp_dir().join(format!("rusty_323_lifecycle_{tag}.lua"));
     std::fs::write(&script, code).unwrap();
 
     let mut s = Scene::new();
@@ -54,6 +56,7 @@ fn log_index(console: &Rc<RefCell<ConsoleLogs>>, msg: &str) -> Option<usize> {
 fn destroy_during_play_fires_disable_then_destroy_and_removes_entity() {
     // The script destroys itself on its first Update; its teardown callbacks log.
     let (mut gw, console, id) = world_with_script(
+        "destroy",
         "return {\n\
          Update = function(id) Scene.DestroyEntity(id) end,\n\
          OnDisable = function(id) print('disable') end,\n\
@@ -83,6 +86,7 @@ fn destroy_during_play_fires_disable_then_destroy_and_removes_entity() {
 fn stop_fires_no_teardown_callbacks() {
     // Same teardown-logging script, but this time we Stop instead of destroying.
     let (mut gw, console, id) = world_with_script(
+        "stop",
         "return {\n\
          OnDisable = function(id) print('disable') end,\n\
          OnDestroy = function(id) print('destroy') end,\n\

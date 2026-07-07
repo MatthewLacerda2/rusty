@@ -124,7 +124,9 @@ mod tests {
     fn scene_with_particles() -> (Scene, u32) {
         let mut scene = Scene::new();
         let id = scene.add_entity("Emitter".to_string());
-        scene.world.set_particles(id, Some(ParticleEmitterComponent::default()));
+        scene
+            .world
+            .set_particles(id, Some(ParticleEmitterComponent::default()));
         (scene, id)
     }
 
@@ -148,6 +150,6 @@ mod tests {
             assert_eq!(p.seed, 42);
         }
         set_texture(&mut e, String::new()); // empty clears
-        assert_eq!((&*e).texture, None);
+        assert_eq!(e.texture, None);
     }
 }

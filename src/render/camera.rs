@@ -86,7 +86,10 @@ pub fn sync_lens_from_scene(camera: &mut Camera, scene: &Scene, is_playing: bool
     if is_playing {
         let mut best_order = i32::MAX;
         for id in scene.world.ids_with_camera() {
-            let c = scene.world.camera(id).expect("id came from ids_with_camera");
+            let c = scene
+                .world
+                .camera(id)
+                .expect("id came from ids_with_camera");
             if scene.world.is_active(id) && c.active && c.render_order <= best_order {
                 best_order = c.render_order;
                 lens = Some((c.fov, c.near, c.far, c.culling_mask));
@@ -119,7 +122,10 @@ pub fn game_camera_from_scene(base: &Camera, scene: &Scene) -> Camera {
     let mut best_order = i32::MAX;
     let mut chosen: Option<Camera> = None;
     for id in scene.world.ids_with_camera() {
-        let c = scene.world.camera(id).expect("id came from ids_with_camera");
+        let c = scene
+            .world
+            .camera(id)
+            .expect("id came from ids_with_camera");
         if !scene.world.is_active(id) || !c.active || c.render_order > best_order {
             continue;
         }
@@ -173,7 +179,10 @@ pub fn build_camera_stack(base: &Camera, scene: &Scene, is_playing: bool) -> Vec
         if !scene.world.is_active(id) {
             continue;
         }
-        let c = scene.world.camera(id).expect("id came from ids_with_camera");
+        let c = scene
+            .world
+            .camera(id)
+            .expect("id came from ids_with_camera");
         if !c.active {
             continue;
         }

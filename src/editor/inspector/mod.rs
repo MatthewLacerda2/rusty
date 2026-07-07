@@ -184,6 +184,7 @@ fn draw_entity_inspector(
 
 /// The Unity-style object header card: name + active/static toggles + layer combo.
 /// Widgets edit local snapshots and write back through the facade on change (#344).
+#[allow(clippy::too_many_arguments)] // (world, id) replaced the single &mut Entity handle
 fn draw_object_header(
     ui: &mut egui::Ui,
     t: crate::editor::theme::Theme,
@@ -224,30 +225,42 @@ fn draw_object_header(
                     *pending_nav_bake = true;
                 }
             });
-            ui.horizontal(|ui| {
-                ui.label("Layer:");
-                let mut layer = world.layer(id);
-                let selected = layer_labels
-                    .get(layer as usize)
-                    .cloned()
-                    .unwrap_or_default();
-                egui::ComboBox::from_id_source("entity_layer")
-                    .selected_text(selected)
-                    .show_ui(ui, |ui| {
-                        for (i, label) in layer_labels.iter().enumerate() {
-                            if ui.selectable_value(&mut layer, i as u8, label).clicked() {
-                                world.set_layer(id, layer);
-                                *layer_changed = true;
-                            }
-                        }
-                    });
-            });
+            draw_layer_combo(ui, world, id, layer_labels, layer_changed);
         });
     ui.add_space(t.space_xs);
 }
 
+/// The header's Layer combo: a snapshot-selected row written back via the facade.
+fn draw_layer_combo(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    layer_labels: &[String],
+    layer_changed: &mut bool,
+) {
+    ui.horizontal(|ui| {
+        ui.label("Layer:");
+        let mut layer = world.layer(id);
+        let selected = layer_labels
+            .get(layer as usize)
+            .cloned()
+            .unwrap_or_default();
+        egui::ComboBox::from_id_source("entity_layer")
+            .selected_text(selected)
+            .show_ui(ui, |ui| {
+                for (i, label) in layer_labels.iter().enumerate() {
+                    if ui.selectable_value(&mut layer, i as u8, label).clicked() {
+                        world.set_layer(id, layer);
+                        *layer_changed = true;
+                    }
+                }
+            });
+    });
+}
+
 /// The per-component card chain (mesh, material, light, gameplay, camera, …) plus
 /// the Add Component menu, in the canonical inspector order.
+#[allow(clippy::too_many_arguments)] // (world, id) replaced the single &mut Entity handle
 fn draw_components(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,

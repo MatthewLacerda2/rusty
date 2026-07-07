@@ -56,7 +56,9 @@ mod tests {
     fn scene_with_agent() -> (Scene, u32) {
         let mut scene = Scene::new();
         let id = scene.add_entity("Agent".to_string());
-        scene.world.set_nav_agent(id, Some(NavMeshAgentComponent::default()));
+        scene
+            .world
+            .set_nav_agent(id, Some(NavMeshAgentComponent::default()));
         (scene, id)
     }
 

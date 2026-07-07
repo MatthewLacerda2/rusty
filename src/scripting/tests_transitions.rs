@@ -156,10 +156,7 @@ fn destroying_one_entity_leaves_a_sibling_running() {
         !m.scene.borrow().world.contains(a),
         "the destroyed entity is gone"
     );
-    assert!(
-        m.scene.borrow().world.contains(b),
-        "the sibling survives"
-    );
+    assert!(m.scene.borrow().world.contains(b), "the sibling survives");
 }
 
 #[test]

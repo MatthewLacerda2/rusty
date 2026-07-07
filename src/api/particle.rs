@@ -44,9 +44,12 @@ fn register_emission<'lua, 'scope>(
         "Emit",
         scope.create_function(|_, (id, count): (u32, u32)| {
             let mut scene = scene.borrow_mut();
-            let spawned = scene.get_entity_mut(id).and_then(|mut e| {
-                let origin = e.transform.position;
-                e.particles.as_mut().map(|p| p.emit_at(origin, count))
+            let origin = scene.world.transform(id).map(|t| t.position);
+            let spawned = origin.and_then(|origin| {
+                scene
+                    .world
+                    .particles_mut(id)
+                    .map(|mut p| p.emit_at(origin, count))
             });
             Ok(spawned.unwrap_or(0))
         }),
@@ -59,11 +62,12 @@ fn register_emission<'lua, 'scope>(
         "Burst",
         scope.create_function(|_, id: u32| {
             let mut scene = scene.borrow_mut();
-            let spawned = scene.get_entity_mut(id).and_then(|mut e| {
-                let origin = e.transform.position;
-                e.particles
-                    .as_mut()
-                    .map(|p| p.emit_at(origin, p.burst_count))
+            let origin = scene.world.transform(id).map(|t| t.position);
+            let spawned = origin.and_then(|origin| {
+                scene.world.particles_mut(id).map(|mut p| {
+                    let burst = p.burst_count;
+                    p.emit_at(origin, burst)
+                })
             });
             Ok(spawned.unwrap_or(0))
         }),
@@ -112,8 +116,7 @@ fn register_state<'lua, 'scope>(
         "IsActive",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            let active = scene
-                .world.particles(id).map(|p| p.active);
+            let active = scene.world.particles(id).map(|p| p.active);
             Ok(active.unwrap_or(false))
         }),
     )?;
@@ -123,8 +126,7 @@ fn register_state<'lua, 'scope>(
         "GetCount",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            let count = scene
-                .world.particles(id).map(|p| p.live_count() as u32);
+            let count = scene.world.particles(id).map(|p| p.live_count() as u32);
             Ok(count.unwrap_or(0))
         }),
     )?;
@@ -146,10 +148,8 @@ fn with_emitter(
     f: impl FnOnce(&mut crate::scene::ParticleEmitterComponent),
 ) {
     let mut scene = scene.borrow_mut();
-    let Some(mut e) = scene.get_entity_mut(id) else {
-        return;
-    };
-    if let Some(p) = &mut e.particles {
-        f(p);
+    let guard = scene.world.particles_mut(id);
+    if let Some(mut p) = guard {
+        f(&mut p);
     }
 }

@@ -16,7 +16,7 @@
 
 use glam::Vec3;
 
-use crate::components::{LightType, LightComponent};
+use crate::components::{LightComponent, LightType};
 
 /// Set the light's linear RGB colour.
 pub fn set_color(l: &mut LightComponent, rgb: Vec3) {

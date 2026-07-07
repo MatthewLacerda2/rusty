@@ -12,7 +12,7 @@
 //!
 //! Allowed deps: components (the `ColliderComponent`/`ColliderShape` data). Pure.
 
-use crate::components::{ColliderShape, ColliderComponent};
+use crate::components::{ColliderComponent, ColliderShape};
 
 /// Set the collider's `active` flag.
 pub fn set_active(c: &mut ColliderComponent, active: bool) {

@@ -18,7 +18,7 @@
 //!
 //! Allowed deps: components (the `CameraComponent`/`ClearFlags` data). Pure.
 
-use crate::components::{ClearFlags, CameraComponent};
+use crate::components::{CameraComponent, ClearFlags};
 
 /// Set the camera's field of view (degrees).
 pub fn set_fov(c: &mut CameraComponent, fov: f32) {

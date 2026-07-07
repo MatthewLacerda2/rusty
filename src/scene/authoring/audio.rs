@@ -65,7 +65,9 @@ mod tests {
     fn scene_with_audio() -> (Scene, u32) {
         let mut scene = Scene::new();
         let id = scene.add_entity("Speaker".to_string());
-        scene.world.set_audio(id, Some(AudioSourceComponent::default()));
+        scene
+            .world
+            .set_audio(id, Some(AudioSourceComponent::default()));
         (scene, id)
     }
 

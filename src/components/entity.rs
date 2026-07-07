@@ -6,7 +6,6 @@
 //! `transform` is the one mandatory field (Transform is never optional); every
 //! other component is `Option<…>`. Moved verbatim from the legacy `core/scene.rs`.
 
-use glam::{Mat4, Vec3};
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -212,38 +211,6 @@ impl Entity {
             prefab_link: None,
             parent_id: None,
             children: Vec::new(),
-        }
-    }
-
-    pub fn compute_world_aabb(&self, world_matrix: Mat4) -> Option<(Vec3, Vec3)> {
-        let mesh = self.mesh.as_ref()?;
-        if mesh.vertices.is_empty() {
-            return None;
-        }
-
-        let mut min = Vec3::splat(f32::MAX);
-        let mut max = Vec3::splat(f32::MIN);
-
-        for v in &mesh.vertices {
-            let local_pos = Vec3::from_array(v.position);
-            let world_pos = world_matrix.transform_point3(local_pos);
-            min = min.min(world_pos);
-            max = max.max(world_pos);
-        }
-
-        Some((min, max))
-    }
-
-    pub fn update_collider(&mut self, parent_world_matrix: Option<Mat4>) {
-        if let Some(col) = &mut self.collider {
-            let world_matrix = if let Some(parent_mat) = parent_world_matrix {
-                parent_mat * self.transform.to_matrix()
-            } else {
-                self.transform.to_matrix()
-            };
-            let (min, max) = col.calculate_world_aabb(world_matrix);
-            col.aabb_min = min;
-            col.aabb_max = max;
         }
     }
 }

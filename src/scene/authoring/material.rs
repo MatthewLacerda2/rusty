@@ -257,10 +257,7 @@ mod tests {
         let key = ensure_material_key(&mut scene, id).expect("entity exists");
         assert_eq!(key, format!("entity_{id}_material"));
         assert!(scene.materials.contains_key(&key), "library entry created");
-        assert!(
-            scene.world.has_material(id),
-            "ref attached"
-        );
+        assert!(scene.world.has_material(id), "ref attached");
         // Idempotent: a second resolve returns the same key, no duplicate entry.
         assert_eq!(
             ensure_material_key(&mut scene, id).as_deref(),

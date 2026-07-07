@@ -113,7 +113,7 @@ mod tests {
         set_tonemap(&mut e, Tonemap::Reinhard);
         set_ssr_quality(&mut e, "High".to_string());
         set_ssr_temporal_upsampling(&mut e, true);
-        let vc = (&*e);
+        let vc = &*e;
         assert_eq!(vc.bloom_intensity, 0.0);
         assert_eq!(vc.bloom_threshold, 0.0);
         assert_eq!(vc.gamma, 0.01, "gamma clamps to its floor");

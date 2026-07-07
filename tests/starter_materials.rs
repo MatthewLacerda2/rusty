@@ -58,7 +58,9 @@ fn starter_materials_resolve_as_library_references_round_trip() {
             .materials
             .insert(key.clone(), material_asset_from_import(data));
         let id = scene.add_entity(data.name.clone());
-        scene.get_entity_mut(id).unwrap().material = Some(MaterialComponent { material: key });
+        scene
+            .world
+            .set_material(id, Some(MaterialComponent { material: key }));
         ids.push((id, data.name.clone()));
     }
 
@@ -72,14 +74,13 @@ fn starter_materials_resolve_as_library_references_round_trip() {
             .iter()
             .find(|(n, ..)| n == name)
             .unwrap_or_else(|| panic!("unexpected starter material {name}"));
-        let entity = loaded.get_entity(*id).unwrap();
         assert_eq!(
-            entity.material.as_ref().unwrap().material,
+            loaded.world.material(*id).unwrap().material,
             format!("{STARTER}::{name}"),
             "{name} keeps its deterministic library key across save/load"
         );
         let resolved = loaded
-            .material_of(&entity)
+            .material_asset_of(*id)
             .unwrap_or_else(|| panic!("{name} reference resolves post-load"));
         assert_eq!(resolved.metallic, *metallic, "{name} metallic");
         assert_eq!(resolved.roughness, *roughness, "{name} roughness");

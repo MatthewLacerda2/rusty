@@ -12,16 +12,18 @@ use rusty::scene::Scene;
 /// A static box of `size` centred at `pos`; returns its entity id.
 fn static_box(scene: &mut Scene, pos: Vec3, size: Vec3) -> u32 {
     let id = scene.add_entity("Box".to_string());
-    let mut e = scene.get_entity_mut(id).unwrap();
-    e.is_static = true;
-    e.transform.position = pos;
-    e.collider = Some(ColliderComponent {
-        active: true,
-        shape: ColliderShape::Box { size },
-        is_trigger: false,
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
-    });
+    scene.world.set_static(id, true);
+    scene.world.transform_mut(id).unwrap().position = pos;
+    scene.world.set_collider(
+        id,
+        Some(ColliderComponent {
+            active: true,
+            shape: ColliderShape::Box { size },
+            is_trigger: false,
+            aabb_min: Vec3::ZERO,
+            aabb_max: Vec3::ZERO,
+        }),
+    );
     id
 }
 

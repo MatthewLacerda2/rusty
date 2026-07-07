@@ -53,7 +53,10 @@ fn create_configure_parent_save_round_trips() {
 
     let child: u32 = child_id.parse().unwrap();
     let parent: u32 = parent_id.parse().unwrap();
-    let e = reloaded.get_entity(child).expect("child entity present");
+    let e = reloaded
+        .world
+        .entity_document(child)
+        .expect("child entity present");
     assert_eq!(e.parent_id, Some(parent), "parenting round-trips");
     let mesh = e.mesh.as_ref().expect("box primitive mesh round-trips");
     assert_eq!(mesh.primitive_type, "Box");
@@ -80,11 +83,11 @@ fn destroy_really_removes_while_deactivate_keeps() {
     let gone_id: u32 = gone.parse().unwrap();
     let scene = session.world().scene().borrow();
     assert!(
-        scene.get_entity(keep_id).is_some_and(|e| !e.active),
+        scene.world.contains(keep_id) && !scene.world.is_active(keep_id),
         "Deactivate keeps the entity but clears its active flag"
     );
     assert!(
-        scene.get_entity(gone_id).is_none(),
+        !scene.world.contains(gone_id),
         "DestroyEntity actually removes the entity"
     );
 }
@@ -102,5 +105,5 @@ fn remove_component_round_trips_through_api() {
 
     let eid: u32 = id.parse().unwrap();
     let scene = session.world().scene().borrow();
-    assert!(scene.get_entity(eid).unwrap().collider.is_none());
+    assert!(!scene.world.has_collider(eid));
 }

@@ -23,17 +23,18 @@ fn box_collider(size: Vec3, is_trigger: bool) -> ColliderComponent {
 fn static_floor_contact_is_reported() {
     let mut scene = Scene::new();
     let floor = scene.add_entity("Floor".to_string());
-    {
-        let mut e = scene.get_entity_mut(floor).unwrap();
-        e.is_static = true;
-        e.collider = Some(box_collider(Vec3::new(20.0, 0.5, 20.0), false));
-    }
+    scene.world.set_static(floor, true);
+    scene
+        .world
+        .set_collider(floor, Some(box_collider(Vec3::new(20.0, 0.5, 20.0), false)));
     let ball = scene.add_entity("Ball".to_string());
-    {
-        let mut e = scene.get_entity_mut(ball).unwrap();
-        e.transform.position = Vec3::new(0.0, 1.0, 0.0);
-        e.collider = Some(box_collider(Vec3::ONE, false));
-        e.rigidbody = Some(RigidBodyComponent {
+    scene.world.transform_mut(ball).unwrap().position = Vec3::new(0.0, 1.0, 0.0);
+    scene
+        .world
+        .set_collider(ball, Some(box_collider(Vec3::ONE, false)));
+    scene.world.set_rigidbody(
+        ball,
+        Some(RigidBodyComponent {
             active: true,
             is_kinematic: false,
             mass: 1.0,
@@ -41,8 +42,8 @@ fn static_floor_contact_is_reported() {
             angular_velocity: Vec3::ZERO,
             use_gravity: true,
             collision_detection: CollisionDetection::Discrete,
-        });
-    }
+        }),
+    );
     // collect_triggers orders each pair (low, high).
     let want = (floor.min(ball), floor.max(ball));
 

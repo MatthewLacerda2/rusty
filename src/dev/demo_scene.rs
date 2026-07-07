@@ -152,7 +152,9 @@ fn add_walls(scene: &mut Scene) {
         wall1_id,
         Some(mesh("Box", primitives::generate_box(1.0, 1.0, 1.0))),
     );
-    scene.world.set_collider(wall1_id, Some(box_collider(Vec3::ONE)));
+    scene
+        .world
+        .set_collider(wall1_id, Some(box_collider(Vec3::ONE)));
 
     let wall2_id = scene.add_entity("Obstacle_Wall_Right".to_string());
     {
@@ -165,7 +167,9 @@ fn add_walls(scene: &mut Scene) {
         wall2_id,
         Some(mesh("Box", primitives::generate_box(1.0, 1.0, 1.0))),
     );
-    scene.world.set_collider(wall2_id, Some(box_collider(Vec3::ONE)));
+    scene
+        .world
+        .set_collider(wall2_id, Some(box_collider(Vec3::ONE)));
 }
 
 /// 5 — Enemy_1 (id 5)

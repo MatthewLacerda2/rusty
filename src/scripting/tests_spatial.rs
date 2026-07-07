@@ -23,15 +23,18 @@ fn add_box(scene: &mut Scene, name: &str, pos: Vec3, layer: u8) -> u32 {
     scene.world.transform_mut(id).unwrap().position = pos;
     scene.world.set_static(id, true);
     scene.world.set_layer(id, layer);
-    scene.world.set_collider(id, Some(ColliderComponent {
-        active: true,
-        shape: ColliderShape::Box {
-            size: Vec3::splat(2.0),
-        },
-        is_trigger: false,
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
-    });
+    scene.world.set_collider(
+        id,
+        Some(ColliderComponent {
+            active: true,
+            shape: ColliderShape::Box {
+                size: Vec3::splat(2.0),
+            },
+            is_trigger: false,
+            aabb_min: Vec3::ZERO,
+            aabb_max: Vec3::ZERO,
+        }),
+    );
     scene.update_entity_collider(id);
     id
 }

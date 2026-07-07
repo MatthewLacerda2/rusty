@@ -16,13 +16,16 @@ fn add_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3) -> u32 {
     let id = scene.add_entity(name.to_string());
     scene.world.transform_mut(id).unwrap().position = pos;
     scene.world.set_static(id, true);
-    scene.world.set_collider(id, Some(ColliderComponent {
-        active: true,
-        shape: ColliderShape::Box { size },
-        is_trigger: false,
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
-    });
+    scene.world.set_collider(
+        id,
+        Some(ColliderComponent {
+            active: true,
+            shape: ColliderShape::Box { size },
+            is_trigger: false,
+            aabb_min: Vec3::ZERO,
+            aabb_max: Vec3::ZERO,
+        }),
+    );
     id
 }
 

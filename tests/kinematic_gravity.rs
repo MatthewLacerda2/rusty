@@ -34,24 +34,22 @@ fn kinematic_body(use_gravity: bool) -> RigidBodyComponent {
 /// Static floor slab: top face at y = 0.5.
 fn add_floor(scene: &mut Scene, size: Vec3) -> u32 {
     let id = scene.add_entity("Floor".to_string());
-    let mut e = scene.get_entity_mut(id).unwrap();
-    e.is_static = true;
-    e.collider = Some(box_collider(size));
+    scene.world.set_static(id, true);
+    scene.world.set_collider(id, Some(box_collider(size)));
     id
 }
 
 /// Unit-box character at `pos`, kinematic, with the given gravity opt-in.
 fn add_character(scene: &mut Scene, pos: Vec3, rb: Option<RigidBodyComponent>) -> u32 {
     let id = scene.add_entity("Character".to_string());
-    let mut e = scene.get_entity_mut(id).unwrap();
-    e.transform.position = pos;
-    e.collider = Some(box_collider(Vec3::ONE));
-    e.rigidbody = rb;
+    scene.world.transform_mut(id).unwrap().position = pos;
+    scene.world.set_collider(id, Some(box_collider(Vec3::ONE)));
+    scene.world.set_rigidbody(id, rb);
     id
 }
 
 fn pos_of(scene: &Scene, id: u32) -> Vec3 {
-    scene.get_entity(id).unwrap().transform.position
+    scene.world.transform(id).unwrap().position
 }
 
 #[test]
@@ -124,7 +122,7 @@ fn grounded_body_starts_a_fresh_fall_off_a_ledge() {
     let rested = pos_of(&scene, id).y;
     // Step off the ledge (a script teleport) and tick once: the first tick of a
     // *fresh* fall drops ~g·dt² ≈ 0.003 m; a carried speed would plummet ~0.33 m.
-    scene.get_entity_mut(id).unwrap().transform.position.x = 5.0;
+    scene.world.transform_mut(id).unwrap().position.x = 5.0;
     physics.step(&mut scene, DT);
     let after = pos_of(&scene, id).y;
     assert!(
@@ -165,13 +163,7 @@ fn gravity_needs_a_rigidbody_opting_in() {
         "use_gravity=false: holds altitude"
     );
     // Flipping the authored flag at runtime takes effect next tick.
-    scene
-        .get_entity_mut(opted_out)
-        .unwrap()
-        .rigidbody
-        .as_mut()
-        .unwrap()
-        .use_gravity = true;
+    scene.world.rigidbody_mut(opted_out).unwrap().use_gravity = true;
     for _ in 0..60 {
         physics.step(&mut scene, DT);
     }

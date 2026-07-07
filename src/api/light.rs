@@ -44,8 +44,7 @@ fn register_color<'lua, 'scope>(
         "GetColor",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            let c = scene
-                .world.light(id).map(|l| l.color);
+            let c = scene.world.light(id).map(|l| l.color);
             let c = c.unwrap_or(Vec3::ONE);
             Ok((c.x, c.y, c.z))
         }),
@@ -75,9 +74,7 @@ fn register_intensity<'lua, 'scope>(
         "GetIntensity",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            Ok(scene
-                .world.light(id).map(|l| l.intensity)
-                .unwrap_or(0.0))
+            Ok(scene.world.light(id).map(|l| l.intensity).unwrap_or(0.0))
         }),
     )?;
 
@@ -105,9 +102,7 @@ fn register_range<'lua, 'scope>(
         "GetRange",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            Ok(scene
-                .world.light(id).map(|l| l.range)
-                .unwrap_or(0.0))
+            Ok(scene.world.light(id).map(|l| l.range).unwrap_or(0.0))
         }),
     )?;
 
@@ -137,7 +132,9 @@ fn register_type<'lua, 'scope>(
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
             let name = scene
-                .world.light(id).map(|l| type_name(&l.light_type))
+                .world
+                .light(id)
+                .map(|l| type_name(&l.light_type))
                 .unwrap_or("None");
             Ok(name.to_string())
         }),
@@ -190,16 +187,17 @@ mod tests {
     fn scene_with_light() -> (RefCell<Scene>, u32) {
         let mut scene = Scene::default();
         let id = scene.add_entity("Lamp".to_string());
-        if let Some(mut e) = scene.get_entity_mut(id) {
-            e.light = Some(LightComponent {
+        scene.world.set_light(
+            id,
+            Some(LightComponent {
                 light_type: LightType::Point,
                 color: Vec3::ONE,
                 intensity: 1.5,
                 range: 10.0,
                 inner_cone: 30.0,
                 outer_cone: 45.0,
-            });
-        }
+            }),
+        );
         (RefCell::new(scene), id)
     }
 

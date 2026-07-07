@@ -8,15 +8,17 @@ use rusty::scene::{ColliderComponent, ColliderShape, NavMeshAgentComponent, Scen
 
 fn add_box(scene: &mut Scene, name: &str, min: Vec3, max: Vec3) {
     let id = scene.add_entity(name.to_string());
-    let mut e = scene.get_entity_mut(id).expect("entity exists");
-    e.is_static = true;
-    e.collider = Some(ColliderComponent {
-        active: true,
-        shape: ColliderShape::Box { size: max - min },
-        is_trigger: false,
-        aabb_min: min,
-        aabb_max: max,
-    });
+    scene.world.set_static(id, true);
+    scene.world.set_collider(
+        id,
+        Some(ColliderComponent {
+            active: true,
+            shape: ColliderShape::Box { size: max - min },
+            is_trigger: false,
+            aabb_min: min,
+            aabb_max: max,
+        }),
+    );
 }
 
 /// A ramp rising 0.5/cell along +x (cells x=3..=7), spanning z=2..6, ground else.
@@ -99,10 +101,14 @@ fn agent_rides_ramp_to_elevated_target() {
         let graph = ramp_graph();
         let mut scene = Scene::new();
         let id = scene.add_entity("agent".to_string());
-        {
-            let mut e = scene.get_entity_mut(id).expect("entity exists");
-            e.transform.position = graph.grid_to_world(1, 4);
-            e.nav_agent = Some(NavMeshAgentComponent {
+        scene
+            .world
+            .transform_mut(id)
+            .expect("entity exists")
+            .position = graph.grid_to_world(1, 4);
+        scene.world.set_nav_agent(
+            id,
+            Some(NavMeshAgentComponent {
                 active: true,
                 radius: 0.5,
                 target: graph.grid_to_world(7, 4), // y = 2.0
@@ -111,14 +117,14 @@ fn agent_rides_ramp_to_elevated_target() {
                 stopping_distance: 0.5,
                 velocity: Vec3::ZERO,
                 ..Default::default()
-            });
-        }
+            }),
+        );
         let dt = 1.0 / 60.0;
         for _ in 0..900 {
             graph.tick_nav_agents(&mut scene, dt);
         }
-        let guard = scene.get_entity(id).expect("entity");
-        guard.transform.position
+        let pos = scene.world.transform(id).expect("entity").position;
+        pos
     };
 
     let pos = run();

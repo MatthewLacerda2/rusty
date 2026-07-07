@@ -203,7 +203,10 @@ mod tests {
         assert_eq!(mesh.primitive_type, "Box");
         assert!(!mesh.vertices.is_empty() && !scene.world.has_light(boxed));
         assert!(!scene.world.has_mesh(lamp));
-        assert_eq!(scene.world.light(lamp).unwrap().light_type, LightType::Point);
+        assert_eq!(
+            scene.world.light(lamp).unwrap().light_type,
+            LightType::Point
+        );
     }
 
     #[test]

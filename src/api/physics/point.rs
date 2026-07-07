@@ -86,8 +86,7 @@ fn register_bounds<'lua, 'scope>(
         "GetBounds",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            let bounds = scene
-                .world.collider(id).map(|c| (c.aabb_min, c.aabb_max));
+            let bounds = scene.world.collider(id).map(|c| (c.aabb_min, c.aabb_max));
             Ok(match bounds {
                 Some((min, max)) => (true, min.x, min.y, min.z, max.x, max.y, max.z),
                 None => (false, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),

@@ -98,7 +98,31 @@ fn draw_bloom(
     }
 }
 
+/// A labelled slider row that routes its write through a shared vc op (#287).
+/// Returns whether the value changed; `cx` is the (world, entity-id) pair.
+fn slider_row(
+    ui: &mut egui::Ui,
+    cx: (&mut crate::ecs::World, u32),
+    label: &str,
+    mut value: f32,
+    range: std::ops::RangeInclusive<f32>,
+    op: fn(&mut VisualCorrectionComponent, f32),
+) -> bool {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        let changed = ui.add(egui::Slider::new(&mut value, range)).changed();
+        if changed {
+            if let Some(mut c) = cx.0.visual_correction_mut(cx.1) {
+                op(&mut c, value);
+            }
+        }
+        changed
+    })
+    .inner
+}
+
 /// The Color Correction section (exposure, contrast, saturation, tonemap, gamma).
+#[rustfmt::skip]
 fn draw_color_correction(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -108,56 +132,11 @@ fn draw_color_correction(
 ) {
     ui.add_space(3.0);
     ui.label("Color Correction");
-    let mut exposure = vc.exposure;
-    ui.horizontal(|ui| {
-        ui.label("  Exposure (EV):");
-        if ui
-            .add(egui::Slider::new(&mut exposure, -4.0..=4.0))
-            .changed()
-        {
-            if let Some(mut c) = world.visual_correction_mut(id) {
-                vc_ops::set_exposure(&mut c, exposure);
-            }
-            *is_dirty = true;
-        }
-    });
-    let mut contrast = vc.contrast;
-    ui.horizontal(|ui| {
-        ui.label("  Contrast:");
-        if ui
-            .add(egui::Slider::new(&mut contrast, 0.0..=2.0))
-            .changed()
-        {
-            if let Some(mut c) = world.visual_correction_mut(id) {
-                vc_ops::set_contrast(&mut c, contrast);
-            }
-            *is_dirty = true;
-        }
-    });
-    let mut saturation = vc.saturation;
-    ui.horizontal(|ui| {
-        ui.label("  Saturation:");
-        if ui
-            .add(egui::Slider::new(&mut saturation, 0.0..=2.0))
-            .changed()
-        {
-            if let Some(mut c) = world.visual_correction_mut(id) {
-                vc_ops::set_saturation(&mut c, saturation);
-            }
-            *is_dirty = true;
-        }
-    });
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Exposure (EV):", vc.exposure, -4.0..=4.0, vc_ops::set_exposure);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Contrast:", vc.contrast, 0.0..=2.0, vc_ops::set_contrast);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Saturation:", vc.saturation, 0.0..=2.0, vc_ops::set_saturation);
     draw_tonemap(ui, world, id, vc, is_dirty);
-    let mut gamma = vc.gamma;
-    ui.horizontal(|ui| {
-        ui.label("  Gamma:");
-        if ui.add(egui::Slider::new(&mut gamma, 1.0..=3.0)).changed() {
-            if let Some(mut c) = world.visual_correction_mut(id) {
-                vc_ops::set_gamma(&mut c, gamma);
-            }
-            *is_dirty = true;
-        }
-    });
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Gamma:", vc.gamma, 1.0..=3.0, vc_ops::set_gamma);
 }
 
 /// The tonemap-operator selector, reading the snapshot and routing through the op.

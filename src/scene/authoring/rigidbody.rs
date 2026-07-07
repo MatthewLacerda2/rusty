@@ -87,7 +87,7 @@ mod tests {
         set_velocity(&mut e, Vec3::new(1.0, 2.0, 3.0));
         set_angular_velocity(&mut e, Vec3::new(0.0, 4.0, 0.0));
         set_collision_detection(&mut e, CollisionDetection::Continuous);
-        let rb = (&*e);
+        let rb = &*e;
         assert!(!rb.active);
         assert!(rb.is_kinematic);
         assert!(!rb.use_gravity);

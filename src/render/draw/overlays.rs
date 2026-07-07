@@ -61,13 +61,13 @@ impl Renderer {
             }
 
             let line_vertices = aabb_wireframe(col.aabb_min, col.aabb_max);
-            let aabb_wire_buffer = self
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: None,
-                    contents: bytemuck::cast_slice(&line_vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+            let aabb_wire_buffer =
+                self.device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: None,
+                        contents: bytemuck::cast_slice(&line_vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
 
             // Bright glowing green if selected, cyan otherwise
             let is_selected = scene.selected_entity_id == Some(id);
@@ -118,6 +118,7 @@ impl Renderer {
     }
 
     pub(crate) fn precreate_outline(&self, scene: &Scene) -> Option<OutlineResource> {
+        // (uniform literal split into `outline_uniform` below for the 50-line fn cap)
         let selected_id = scene.selected_entity_id?;
         let mesh = scene.world.mesh(selected_id)?;
         let mesh_id = MeshId::from_mesh(&mesh);
@@ -138,24 +139,7 @@ impl Renderer {
             transform.position,
         );
 
-        let outline_uniform = EntityUniform {
-            model_matrix: scaled_transform.to_cols_array(),
-            color_tint: [1.0, 0.5, 0.0, 1.0], // Vibrant glowing orange outline
-            use_texture: 0,
-            is_lit: 0,
-            metallic: 0.0,
-            roughness: 0.5,
-            use_metallic_map: 0,
-            use_roughness_map: 0,
-            use_normal_map: 0,
-            use_emissive_map: 0,
-            emissive: [0.0; 4],
-            use_sh: 0,
-            use_cutout: 0,
-            alpha_cutoff: 0.0,
-            _sh_pad: 0,
-            sh: [[0.0; 4]; 9],
-        };
+        let outline_uniform = outline_uniform(scaled_transform);
 
         let outline_ent_buf = self
             .device
@@ -217,6 +201,29 @@ impl Renderer {
                 render_pass.draw(0..self.axis_count, 0..1);
             }
         }
+    }
+}
+
+/// The fixed outline-hull uniform (orange tint, unlit) at `model` — split out of
+/// `precreate_outline` for the 50-line fn cap.
+fn outline_uniform(model: Mat4) -> EntityUniform {
+    EntityUniform {
+        model_matrix: model.to_cols_array(),
+        color_tint: [1.0, 0.5, 0.0, 1.0], // Vibrant glowing orange outline
+        use_texture: 0,
+        is_lit: 0,
+        metallic: 0.0,
+        roughness: 0.5,
+        use_metallic_map: 0,
+        use_roughness_map: 0,
+        use_normal_map: 0,
+        use_emissive_map: 0,
+        emissive: [0.0; 4],
+        use_sh: 0,
+        use_cutout: 0,
+        alpha_cutoff: 0.0,
+        _sh_pad: 0,
+        sh: [[0.0; 4]; 9],
     }
 }
 

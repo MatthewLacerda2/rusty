@@ -36,11 +36,10 @@ pub fn world_value(scene: &Scene, camera: &Camera, frame: u64, playing: bool) ->
     let ids = scene.entity_ids();
     let entities: Vec<Value> = ids
         .iter()
-        .filter_map(|&id| {
-            scene.world.contains(id).then(|| {
-                let world_matrix = scene.compute_world_matrix(id);
-                entity_value(scene, id, world_matrix)
-            })
+        .filter(|&&id| scene.world.contains(id))
+        .map(|&id| {
+            let world_matrix = scene.compute_world_matrix(id);
+            entity_value(scene, id, world_matrix)
         })
         .collect();
     json!({

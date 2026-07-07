@@ -12,7 +12,6 @@ use std::collections::BTreeMap;
 
 use glam::Vec3;
 
-use crate::ecs::world::{Ref, RefMut};
 use crate::ecs::World;
 use crate::navigation::NavMeshSettings;
 use crate::scene::collision_matrix::CollisionMatrix;
@@ -177,14 +176,6 @@ impl Scene {
         }
     }
 
-    pub fn get_entity(&self, id: u32) -> Option<Ref<'_, Entity>> {
-        self.world.get(id)
-    }
-
-    pub fn get_entity_mut(&mut self, id: u32) -> Option<RefMut<'_, Entity>> {
-        self.world.get_mut(id)
-    }
-
     pub fn find_entity_by_name(&self, name: &str) -> Option<u32> {
         self.world.find_by_name(name)
     }
@@ -195,23 +186,6 @@ impl Scene {
     pub fn material_asset_of(&self, id: u32) -> Option<&MaterialAsset> {
         let key = self.world.material(id)?.material.clone();
         self.materials.get(&key)
-    }
-
-    /// TRANSITIONAL (#344): document-shaped variant of [`Scene::material_asset_of`],
-    /// removed once the last consumer stops holding whole-`Entity` borrows.
-    pub fn material_of(&self, entity: &Entity) -> Option<&MaterialAsset> {
-        entity
-            .material
-            .as_ref()
-            .and_then(|m| self.materials.get(&m.material))
-    }
-
-    /// Iterate entities in insertion order (immutably). Replaces the legacy
-    /// `&scene.entities` iteration; each item is a borrow guard derefing to
-    /// `&Entity`.
-    pub fn iter(&self) -> impl Iterator<Item = Ref<'_, Entity>> {
-        let world = &self.world;
-        world.ids().iter().filter_map(move |&id| world.get(id))
     }
 
     /// Stable ids in insertion order.

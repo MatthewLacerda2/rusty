@@ -52,7 +52,12 @@ fn late_update_observes_post_physics_transform_same_tick() {
     // Update reads the pre-physics x (0.0, the default).
     m.update_scripts(1.0 / 60.0);
     // "Physics" resolves this tick: the body ends up at x = 5.
-    m.scene.borrow_mut().world.transform_mut(id).unwrap().position = Vec3::new(5.0, 0.0, 0.0);
+    m.scene
+        .borrow_mut()
+        .world
+        .transform_mut(id)
+        .unwrap()
+        .position = Vec3::new(5.0, 0.0, 0.0);
     // LateUpdate reads the post-physics x, same tick.
     m.late_update_scripts(1.0 / 60.0);
 

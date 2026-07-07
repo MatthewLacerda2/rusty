@@ -28,20 +28,27 @@ fn step_surfaces_enter_stay_exit_edges() {
 
     let zone = scene.add_entity("Zone".to_string());
     scene.world.set_static(zone, true);
-    scene.world.set_collider(zone, Some(box_collider(2.0, true));
+    scene
+        .world
+        .set_collider(zone, Some(box_collider(2.0, true)));
 
     let walker = scene.add_entity("Walker".to_string());
     scene.world.transform_mut(walker).unwrap().position = Vec3::new(10.0, 0.0, 0.0);
-    scene.world.set_collider(walker, Some(box_collider(1.0, false));
-    e.rigidbody = Some(RigidBodyComponent {
-        active: true,
-        is_kinematic: true,
-        mass: 1.0,
-        velocity: Vec3::ZERO,
-        angular_velocity: Vec3::ZERO,
-        use_gravity: false,
-        collision_detection: crate::components::CollisionDetection::Discrete,
-    });
+    scene
+        .world
+        .set_collider(walker, Some(box_collider(1.0, false)));
+    scene.world.set_rigidbody(
+        walker,
+        Some(RigidBodyComponent {
+            active: true,
+            is_kinematic: true,
+            mass: 1.0,
+            velocity: Vec3::ZERO,
+            angular_velocity: Vec3::ZERO,
+            use_gravity: false,
+            collision_detection: crate::components::CollisionDetection::Discrete,
+        }),
+    );
 
     let pair = (zone.min(walker), zone.max(walker));
     let mut world = PhysicsWorld::from_scene(&scene);

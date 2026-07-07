@@ -6,10 +6,9 @@
 //! and the deterministic seed. The live particle count (transient runtime) is shown
 //! read-only so an author can see the emitter working in Play.
 //!
-//! A THIN client (#287): each widget reads its field from a snapshot and routes the
-//! write through a shared `authoring::particles::*` op — never a mutable component
-//! borrow for a field edit. The `Particles.*` Lua surface's `SetActive` / `SetRate`
-//! call the same ops, so the panel and the binding share one write.
+//! A THIN client (#287): each widget reads its field from a snapshot and routes
+//! the write through a shared `authoring::particles::*` op. The `Particles.*` Lua
+//! surface's `SetActive` / `SetRate` call the same ops — one shared write.
 
 use egui_phosphor::regular as icon;
 
@@ -17,24 +16,20 @@ use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::particles as particle_ops;
 use crate::scene::{CollisionResponse, EmitMode, ParticleBlend, ParticleEmitterComponent};
 
-/// `(world, entity id)`, threaded through the draw helpers below as one param.
-type Cx<'w> = (&'w mut crate::ecs::World, u32);
-
+type Cx<'w> = (&'w mut crate::ecs::World, u32); // world + entity id, as one param
 /// Routes a field write through the shared particle-authoring op; a no-op absent.
-fn apply(cx: &mut Cx, f: impl FnOnce(&mut ParticleEmitterComponent)) {
+fn apply(cx: &mut Cx<'_>, f: impl FnOnce(&mut ParticleEmitterComponent)) {
     if let Some(mut c) = cx.0.particles_mut(cx.1) {
         f(&mut c);
     }
 }
-
 /// 3F-particles. Particle System component card.
 pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool) {
     let Some(p) = world.particles(id).map(|p| p.clone()) else {
         return;
     };
-    let mut cx: Cx = (world, id);
-    let mut remove = false;
-    let mut changed = false;
+    let mut cx: Cx<'_> = (world, id);
+    let (mut remove, mut changed) = (false, false);
     component_card(
         ui,
         icon::SPARKLE,
@@ -278,8 +273,7 @@ fn vec3(ui: &mut egui::Ui, label: &str, value: &mut glam::Vec3, speed: f32) -> b
     .inner
 }
 
-/// A combo box over a small set of `Copy + PartialEq` enum variants with labels.
-/// Returns whether the selection changed.
+/// A combo box over a small set of `Copy + PartialEq` enum variants; returns whether it changed.
 fn combo<T: Copy + PartialEq>(
     ui: &mut egui::Ui,
     label: &str,

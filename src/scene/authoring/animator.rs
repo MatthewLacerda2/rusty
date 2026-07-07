@@ -66,7 +66,9 @@ mod tests {
     fn scene_with_animator() -> (Scene, u32) {
         let mut scene = Scene::new();
         let id = scene.add_entity("Rig".to_string());
-        scene.world.set_animator(id, Some(AnimatorComponent::default()));
+        scene
+            .world
+            .set_animator(id, Some(AnimatorComponent::default()));
         (scene, id)
     }
 
@@ -96,7 +98,7 @@ mod tests {
         let (mut scene, id) = scene_with_animator();
         let mut e = scene.world.animator_mut(id).unwrap();
         {
-            let a = (&mut *e);
+            let a = &mut *e;
             a.current_node = Some("Run".to_string());
             a.node_speed = 2.0;
         }

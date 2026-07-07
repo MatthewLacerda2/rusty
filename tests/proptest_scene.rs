@@ -51,17 +51,19 @@ proptest! {
         for spec in &specs {
             let id = scene.add_entity(spec.name.clone());
             ids.push(id);
-            let mut e = scene.get_entity_mut(id).unwrap();
-            e.transform.position = glam::Vec3::from_array(spec.pos);
+            scene.world.transform_mut(id).unwrap().position = glam::Vec3::from_array(spec.pos);
             if let Some(intensity) = spec.intensity {
-                e.light = Some(LightComponent {
-                    light_type: LightType::Point,
-                    color: glam::Vec3::ONE,
-                    intensity,
-                    range: 10.0,
-                    inner_cone: 30.0,
-                    outer_cone: 45.0,
-                });
+                scene.world.set_light(
+                    id,
+                    Some(LightComponent {
+                        light_type: LightType::Point,
+                        color: glam::Vec3::ONE,
+                        intensity,
+                        range: 10.0,
+                        inner_cone: 30.0,
+                        outer_cone: 45.0,
+                    }),
+                );
             }
         }
 
@@ -73,7 +75,7 @@ proptest! {
 
         prop_assert_eq!(loaded.entity_count(), specs.len());
         for (id, spec) in ids.iter().zip(&specs) {
-            let e = loaded.get_entity(*id).unwrap();
+            let e = loaded.world.entity_document(*id).unwrap();
             prop_assert_eq!(&e.name, &spec.name);
             prop_assert_eq!(e.transform.position.to_array(), spec.pos);
             match (&e.light, spec.intensity) {

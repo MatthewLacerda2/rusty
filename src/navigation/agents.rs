@@ -97,13 +97,15 @@ impl NavigationGraph {
             let Some(mut agent) = scene.world.take_nav_agent(id) else {
                 continue;
             };
-            if agent.active {
-                let current_pos = scene.world.transform(id).unwrap().position;
+            let current_pos = scene.world.transform(id).map(|t| t.position);
+            if let (true, Some(current_pos)) = (agent.active, current_pos) {
                 let dist = (agent.target - current_pos).length();
 
                 if dist > agent.stopping_distance {
                     let new_pos = self.steer_agent(&mut agent, current_pos, delta_time);
-                    scene.world.transform_mut(id).unwrap().position = new_pos;
+                    if let Some(mut t) = scene.world.transform_mut(id) {
+                        t.position = new_pos;
+                    }
                 } else {
                     // Decelerate to zero velocity when close
                     agent.velocity -= agent.velocity * (agent.acceleration * delta_time).min(1.0);
@@ -114,8 +116,8 @@ impl NavigationGraph {
 
                 // Keep entity's collider bounds aligned with transform positioning
                 // (local matrix only — the legacy path never resolved the parent here).
-                let local = scene.world.transform(id).unwrap().to_matrix();
-                if let Some(mut col) = scene.world.collider_mut(id) {
+                let local = scene.world.transform(id).map(|t| t.to_matrix());
+                if let (Some(local), Some(mut col)) = (local, scene.world.collider_mut(id)) {
                     let (min, max) = col.calculate_world_aabb(local);
                     col.aabb_min = min;
                     col.aabb_max = max;

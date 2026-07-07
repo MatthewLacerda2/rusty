@@ -12,13 +12,16 @@ use glam::Vec3;
 fn add_box(scene: &mut Scene, name: &str, min: Vec3, max: Vec3) {
     let id = scene.add_entity(name.to_string());
     scene.world.set_static(id, true);
-    scene.world.set_collider(id, Some(ColliderComponent {
-        active: true,
-        shape: ColliderShape::Box { size: max - min },
-        is_trigger: false,
-        aabb_min: min,
-        aabb_max: max,
-    });
+    scene.world.set_collider(
+        id,
+        Some(ColliderComponent {
+            active: true,
+            shape: ColliderShape::Box { size: max - min },
+            is_trigger: false,
+            aabb_min: min,
+            aabb_max: max,
+        }),
+    );
 }
 
 /// A floating ceiling slab over `x = x0..=x1`, `z = z0..=z1`, spanning `y = bottom..top`.
