@@ -90,10 +90,9 @@ fn add_floor(scene: &mut Scene) {
         floor_id,
         Some(mesh("Plane", primitives::generate_plane(15.0, 15.0))),
     );
-    scene.world.set_collider(
-        floor_id,
-        Some(box_collider(Vec3::new(15.0, 0.1, 15.0))),
-    );
+    scene
+        .world
+        .set_collider(floor_id, Some(box_collider(Vec3::new(15.0, 0.1, 15.0))));
 }
 
 /// 2 — Player (id 2)
@@ -177,10 +176,9 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
         enemy_id,
         Some(mesh("Box", primitives::generate_box(1.3, 2.0, 1.3))),
     );
-    scene.world.set_collider(
-        enemy_id,
-        Some(box_collider(Vec3::new(1.3, 2.0, 1.3))),
-    );
+    scene
+        .world
+        .set_collider(enemy_id, Some(box_collider(Vec3::new(1.3, 2.0, 1.3))));
     scene.world.set_rigidbody(enemy_id, Some(kinematic_body()));
     scene.world.set_animator(
         enemy_id,

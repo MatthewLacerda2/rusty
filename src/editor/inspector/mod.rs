@@ -9,7 +9,7 @@ use self::components::{
 };
 use crate::editor::{EditorUi, InspectorTarget};
 use crate::navigation::NavigationGraph;
-use crate::scene::{Entity, MaterialAsset, Scene};
+use crate::scene::{MaterialAsset, Scene};
 use crate::scripting::ConsoleLogs;
 use std::collections::BTreeMap;
 
