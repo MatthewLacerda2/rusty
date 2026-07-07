@@ -76,7 +76,7 @@ fn register_source_control<'lua, 'scope>(
         "Play",
         scope.create_function(|_, id: u32| {
             let now = tick(time);
-            let src = scene.borrow().get_entity(id).and_then(|e| e.audio.clone());
+            let src = scene.borrow().world.audio(id).map(|c| c.clone());
             let pos = src
                 .as_ref()
                 .and_then(|_| source_clip_pos(scene, id))

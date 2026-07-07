@@ -40,7 +40,7 @@ fn register_position<'lua, 'scope>(
         "GetPosition",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            let pos = scene.get_entity(id).map(|e| e.transform.position);
+            let pos = scene.world.transform(id).map(|t| t.position);
             match pos {
                 Some(pos) => Ok((pos.x, pos.y, pos.z)),
                 None => Ok((0.0, 0.0, 0.0)),
@@ -106,7 +106,7 @@ fn register_scale<'lua, 'scope>(
         "GetScale",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            let scl = scene.get_entity(id).map(|e| e.transform.scale);
+            let scl = scene.world.transform(id).map(|t| t.scale);
             match scl {
                 Some(scl) => Ok((scl.x, scl.y, scl.z)),
                 None => Ok((1.0, 1.0, 1.0)),

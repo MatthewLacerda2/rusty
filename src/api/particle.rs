@@ -81,8 +81,8 @@ fn register_tuning<'lua, 'scope>(
         "SetActive",
         scope.create_function(|_, (id, active): (u32, bool)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                particle_ops::set_active(&mut e, active);
+            if let Some(mut c) = scene.world.particles_mut(id) {
+                particle_ops::set_active(&mut c, active);
             }
             Ok(())
         }),
@@ -93,8 +93,8 @@ fn register_tuning<'lua, 'scope>(
         "SetRate",
         scope.create_function(|_, (id, rate): (u32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                particle_ops::set_rate(&mut e, rate);
+            if let Some(mut c) = scene.world.particles_mut(id) {
+                particle_ops::set_rate(&mut c, rate);
             }
             Ok(())
         }),
@@ -113,8 +113,7 @@ fn register_state<'lua, 'scope>(
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
             let active = scene
-                .get_entity(id)
-                .and_then(|e| e.particles.as_ref().map(|p| p.active));
+                .world.particles(id).map(|p| p.active);
             Ok(active.unwrap_or(false))
         }),
     )?;
@@ -125,8 +124,7 @@ fn register_state<'lua, 'scope>(
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
             let count = scene
-                .get_entity(id)
-                .and_then(|e| e.particles.as_ref().map(|p| p.live_count() as u32));
+                .world.particles(id).map(|p| p.live_count() as u32);
             Ok(count.unwrap_or(0))
         }),
     )?;

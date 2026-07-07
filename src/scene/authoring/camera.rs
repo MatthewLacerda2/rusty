@@ -18,62 +18,46 @@
 //!
 //! Allowed deps: components (the `CameraComponent`/`ClearFlags` data). Pure.
 
-use crate::components::{ClearFlags, Entity};
+use crate::components::{ClearFlags, CameraComponent};
 
 /// Set the camera's field of view (degrees).
-pub fn set_fov(entity: &mut Entity, fov: f32) {
-    if let Some(c) = &mut entity.camera {
-        c.fov = fov;
-    }
+pub fn set_fov(c: &mut CameraComponent, fov: f32) {
+    c.fov = fov;
 }
 
 /// Set the camera's near clip plane.
-pub fn set_near(entity: &mut Entity, near: f32) {
-    if let Some(c) = &mut entity.camera {
-        c.near = near;
-    }
+pub fn set_near(c: &mut CameraComponent, near: f32) {
+    c.near = near;
 }
 
 /// Set the camera's far clip plane.
-pub fn set_far(entity: &mut Entity, far: f32) {
-    if let Some(c) = &mut entity.camera {
-        c.far = far;
-    }
+pub fn set_far(c: &mut CameraComponent, far: f32) {
+    c.far = far;
 }
 
 /// Set the camera's layer culling mask (one bit per layer).
-pub fn set_culling_mask(entity: &mut Entity, mask: u32) {
-    if let Some(c) = &mut entity.camera {
-        c.culling_mask = mask;
-    }
+pub fn set_culling_mask(c: &mut CameraComponent, mask: u32) {
+    c.culling_mask = mask;
 }
 
 /// Set the camera's stacking order (Unity "Depth").
-pub fn set_render_order(entity: &mut Entity, render_order: i32) {
-    if let Some(c) = &mut entity.camera {
-        c.render_order = render_order;
-    }
+pub fn set_render_order(c: &mut CameraComponent, render_order: i32) {
+    c.render_order = render_order;
 }
 
 /// Set the camera's clear flags (how it initializes the framebuffer).
-pub fn set_clear_flags(entity: &mut Entity, clear_flags: ClearFlags) {
-    if let Some(c) = &mut entity.camera {
-        c.clear_flags = clear_flags;
-    }
+pub fn set_clear_flags(c: &mut CameraComponent, clear_flags: ClearFlags) {
+    c.clear_flags = clear_flags;
 }
 
 /// Set the camera's motion-blur active flag.
-pub fn set_motion_blur_active(entity: &mut Entity, active: bool) {
-    if let Some(c) = &mut entity.camera {
-        c.motion_blur_active = active;
-    }
+pub fn set_motion_blur_active(c: &mut CameraComponent, active: bool) {
+    c.motion_blur_active = active;
 }
 
 /// Set the camera's motion-blur sample count (no clamp — callers bound their input).
-pub fn set_motion_blur_samples(entity: &mut Entity, samples: u32) {
-    if let Some(c) = &mut entity.camera {
-        c.motion_blur_samples = samples;
-    }
+pub fn set_motion_blur_samples(c: &mut CameraComponent, samples: u32) {
+    c.motion_blur_samples = samples;
 }
 
 #[cfg(test)]
@@ -85,26 +69,25 @@ mod tests {
     fn scene_with_camera() -> (Scene, u32) {
         let mut scene = Scene::new();
         let id = scene.add_entity("Cam".to_string());
-        if let Some(mut e) = scene.get_entity_mut(id) {
-            e.camera = Some(CameraComponent {
-                active: true,
-                fov: 60.0,
-                near: 0.1,
-                far: 1000.0,
-                culling_mask: u32::MAX,
-                render_order: 0,
-                clear_flags: ClearFlags::Skybox,
-                motion_blur_active: false,
-                motion_blur_samples: 0,
-            });
-        }
+        let c = CameraComponent {
+            active: true,
+            fov: 60.0,
+            near: 0.1,
+            far: 1000.0,
+            culling_mask: u32::MAX,
+            render_order: 0,
+            clear_flags: ClearFlags::Skybox,
+            motion_blur_active: false,
+            motion_blur_samples: 0,
+        };
+        scene.world.set_camera(id, Some(c));
         (scene, id)
     }
 
     #[test]
     fn ops_write_through() {
         let (mut scene, id) = scene_with_camera();
-        let mut e = scene.get_entity_mut(id).unwrap();
+        let mut e = scene.world.camera_mut(id).unwrap();
         set_fov(&mut e, 90.0);
         set_near(&mut e, 0.5);
         set_far(&mut e, 500.0);
@@ -113,7 +96,7 @@ mod tests {
         set_clear_flags(&mut e, ClearFlags::DepthOnly);
         set_motion_blur_active(&mut e, true);
         set_motion_blur_samples(&mut e, 64);
-        let c = e.camera.as_ref().unwrap();
+        let c = &*e;
         assert_eq!(c.fov, 90.0);
         assert_eq!(c.near, 0.5);
         assert_eq!(c.far, 500.0);

@@ -41,8 +41,8 @@ fn register_agent_target<'lua, 'scope>(
         "SetTarget",
         scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                nav_ops::set_target(&mut e, Vec3::new(x, y, z));
+            if let Some(mut c) = scene.world.nav_agent_mut(id) {
+                nav_ops::set_target(&mut c, Vec3::new(x, y, z));
             }
             Ok(())
         }),
@@ -75,8 +75,8 @@ fn register_agent_motion<'lua, 'scope>(
         "SetSpeed",
         scope.create_function(|_, (id, speed): (u32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                nav_ops::set_speed(&mut e, speed);
+            if let Some(mut c) = scene.world.nav_agent_mut(id) {
+                nav_ops::set_speed(&mut c, speed);
             }
             Ok(())
         }),
@@ -87,8 +87,8 @@ fn register_agent_motion<'lua, 'scope>(
         "SetAcceleration",
         scope.create_function(|_, (id, acc): (u32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                nav_ops::set_acceleration(&mut e, acc);
+            if let Some(mut c) = scene.world.nav_agent_mut(id) {
+                nav_ops::set_acceleration(&mut c, acc);
             }
             Ok(())
         }),
@@ -106,8 +106,8 @@ fn register_agent_size<'lua, 'scope>(
         "SetStoppingDistance",
         scope.create_function(|_, (id, dist): (u32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                nav_ops::set_stopping_distance(&mut e, dist);
+            if let Some(mut c) = scene.world.nav_agent_mut(id) {
+                nav_ops::set_stopping_distance(&mut c, dist);
             }
             Ok(())
         }),
@@ -118,8 +118,8 @@ fn register_agent_size<'lua, 'scope>(
         "SetRadius",
         scope.create_function(|_, (id, r): (u32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                nav_ops::set_radius(&mut e, r);
+            if let Some(mut c) = scene.world.nav_agent_mut(id) {
+                nav_ops::set_radius(&mut c, r);
             }
             Ok(())
         }),
@@ -168,8 +168,8 @@ fn register_agent_queries<'lua, 'scope>(
         "SetActive",
         scope.create_function(|_, (id, active): (u32, bool)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                nav_ops::set_active(&mut e, active);
+            if let Some(mut c) = scene.world.nav_agent_mut(id) {
+                nav_ops::set_active(&mut c, active);
             }
             Ok(())
         }),

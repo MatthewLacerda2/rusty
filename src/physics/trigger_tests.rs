@@ -27,25 +27,21 @@ fn step_surfaces_enter_stay_exit_edges() {
     let mut scene = Scene::new();
 
     let zone = scene.add_entity("Zone".to_string());
-    if let Some(mut e) = scene.get_entity_mut(zone) {
-        e.is_static = true;
-        e.collider = Some(box_collider(2.0, true));
-    }
+    scene.world.set_static(zone, true);
+    scene.world.set_collider(zone, Some(box_collider(2.0, true));
 
     let walker = scene.add_entity("Walker".to_string());
-    if let Some(mut e) = scene.get_entity_mut(walker) {
-        e.transform.position = Vec3::new(10.0, 0.0, 0.0);
-        e.collider = Some(box_collider(1.0, false));
-        e.rigidbody = Some(RigidBodyComponent {
-            active: true,
-            is_kinematic: true,
-            mass: 1.0,
-            velocity: Vec3::ZERO,
-            angular_velocity: Vec3::ZERO,
-            use_gravity: false,
-            collision_detection: crate::components::CollisionDetection::Discrete,
-        });
-    }
+    scene.world.transform_mut(walker).unwrap().position = Vec3::new(10.0, 0.0, 0.0);
+    scene.world.set_collider(walker, Some(box_collider(1.0, false));
+    e.rigidbody = Some(RigidBodyComponent {
+        active: true,
+        is_kinematic: true,
+        mass: 1.0,
+        velocity: Vec3::ZERO,
+        angular_velocity: Vec3::ZERO,
+        use_gravity: false,
+        collision_detection: crate::components::CollisionDetection::Discrete,
+    });
 
     let pair = (zone.min(walker), zone.max(walker));
     let mut world = PhysicsWorld::from_scene(&scene);
@@ -54,9 +50,7 @@ fn step_surfaces_enter_stay_exit_edges() {
     assert!(world.step(&mut scene, DT).is_empty());
 
     // Walk into the zone: the overlap's first tick is enter + stay.
-    if let Some(mut e) = scene.get_entity_mut(walker) {
-        e.transform.position = Vec3::ZERO;
-    }
+    scene.world.transform_mut(walker).unwrap().position = Vec3::ZERO;
     let ev = world.step(&mut scene, DT);
     assert_eq!(ev.entered, vec![pair], "first overlapping tick enters");
     assert_eq!(ev.stayed, vec![pair], "stay covers the enter tick too");
@@ -69,9 +63,7 @@ fn step_surfaces_enter_stay_exit_edges() {
     assert!(ev.exited.is_empty());
 
     // Walk out: the tick after the overlap ends is exit only.
-    if let Some(mut e) = scene.get_entity_mut(walker) {
-        e.transform.position = Vec3::new(10.0, 0.0, 0.0);
-    }
+    scene.world.transform_mut(walker).unwrap().position = Vec3::new(10.0, 0.0, 0.0);
     let ev = world.step(&mut scene, DT);
     assert!(ev.entered.is_empty());
     assert!(ev.stayed.is_empty(), "no stay once the overlap ended");

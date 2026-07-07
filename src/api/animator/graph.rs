@@ -44,8 +44,8 @@ fn register_set_graph<'lua, 'scope>(
         "SetGraph",
         scope.create_function(|_, (id, path): (u32, String)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                animator_ops::set_graph(&mut e, (!path.is_empty()).then_some(path));
+            if let Some(mut c) = scene.world.animator_mut(id) {
+                animator_ops::set_graph(&mut c, (!path.is_empty()).then_some(path));
             }
             Ok(())
         }),
@@ -56,8 +56,8 @@ fn register_set_graph<'lua, 'scope>(
         "SetGraphEnabled",
         scope.create_function(|_, (id, enabled): (u32, bool)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                animator_ops::set_graph_enabled(&mut e, enabled);
+            if let Some(mut c) = scene.world.animator_mut(id) {
+                animator_ops::set_graph_enabled(&mut c, enabled);
             }
             Ok(())
         }),

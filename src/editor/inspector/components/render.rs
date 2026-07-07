@@ -3,16 +3,16 @@ use glam::Vec3;
 
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::light as light_ops;
-use crate::scene::{Entity, LightComponent, LightType};
+use crate::scene::{LightComponent, LightType};
 
 /// 3B. Mesh details
-pub fn draw_mesh(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
-    if entity.mesh.is_none() {
+pub fn draw_mesh(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool) {
+    if !world.has_mesh(id) {
         return;
     }
     let mut remove = false;
     component_card(ui, icon::CUBE, "Mesh Filter", Some(&mut remove), |ui| {
-        if let Some(mesh) = &entity.mesh {
+        if let Some(mesh) = world.mesh(id) {
             ui.label(format!("Type: {} primitive", mesh.primitive_type));
             ui.label(format!(
                 "Geometry: {} verts | {} indices",
@@ -22,7 +22,7 @@ pub fn draw_mesh(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
         }
     });
     if remove {
-        entity.mesh = None;
+        world.set_mesh(id, None);
         *is_dirty = true;
     }
 }
@@ -31,19 +31,21 @@ pub fn draw_mesh(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
 /// a local and, on change, routes the write through the shared `authoring::light::*`
 /// op — never mutating `LightComponent` fields directly. Remove detaches the
 /// reference (allowed: not a field mutation).
-pub fn draw_light(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
-    let Some(light) = entity.light.clone() else {
+pub fn draw_light(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool) {
+    let Some(light) = world.light(id).map(|l| l.clone()) else {
         return;
     };
     let mut remove = false;
     component_card(ui, icon::LIGHTBULB, "Light", Some(&mut remove), |ui| {
-        draw_light_type(ui, entity, &light, is_dirty);
+        draw_light_type(ui, world, id, &light, is_dirty);
 
         let mut color_arr = [light.color.x, light.color.y, light.color.z];
         ui.horizontal(|ui| {
             ui.label("Color:");
             if ui.color_edit_button_rgb(&mut color_arr).changed() {
-                light_ops::set_color(entity, Vec3::from_array(color_arr));
+                if let Some(mut l) = world.light_mut(id) {
+                    light_ops::set_color(&mut l, Vec3::from_array(color_arr));
+                }
                 *is_dirty = true;
             }
         });
@@ -55,7 +57,9 @@ pub fn draw_light(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
                 .add(egui::Slider::new(&mut intensity, 0.0..=20.0))
                 .changed()
             {
-                light_ops::set_intensity(entity, intensity);
+                if let Some(mut l) = world.light_mut(id) {
+                    light_ops::set_intensity(&mut l, intensity);
+                }
                 *is_dirty = true;
             }
         });
@@ -65,18 +69,20 @@ pub fn draw_light(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
             ui.horizontal(|ui| {
                 ui.label("Distance:");
                 if ui.add(egui::Slider::new(&mut range, 0.1..=100.0)).changed() {
-                    light_ops::set_range(entity, range);
+                    if let Some(mut l) = world.light_mut(id) {
+                        light_ops::set_range(&mut l, range);
+                    }
                     *is_dirty = true;
                 }
             });
         }
 
         if light.light_type == LightType::Spotlight {
-            draw_spot_cones(ui, entity, &light, is_dirty);
+            draw_spot_cones(ui, world, id, &light, is_dirty);
         }
     });
     if remove {
-        entity.light = None;
+        world.set_light(id, None);
         *is_dirty = true;
     }
 }
@@ -86,7 +92,8 @@ pub fn draw_light(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
 /// snapshot of the current values; writes route through the shared ops.
 fn draw_light_type(
     ui: &mut egui::Ui,
-    entity: &mut Entity,
+    world: &mut crate::ecs::World,
+    id: u32,
     light: &LightComponent,
     is_dirty: &mut bool,
 ) {
@@ -105,24 +112,32 @@ fn draw_light_type(
                     .selectable_label(light.light_type == LightType::Point, "Point")
                     .clicked()
                 {
-                    light_ops::set_type(entity, LightType::Point);
+                    if let Some(mut l) = world.light_mut(id) {
+                        light_ops::set_type(&mut l, LightType::Point);
+                    }
                     *is_dirty = true;
                 }
                 if ui
                     .selectable_label(light.light_type == LightType::Directional, "Directional")
                     .clicked()
                 {
-                    light_ops::set_type(entity, LightType::Directional);
+                    if let Some(mut l) = world.light_mut(id) {
+                        light_ops::set_type(&mut l, LightType::Directional);
+                    }
                     *is_dirty = true;
                 }
                 if ui
                     .selectable_label(light.light_type == LightType::Spotlight, "Spot")
                     .clicked()
                 {
-                    light_ops::set_type(entity, LightType::Spotlight);
+                    if let Some(mut l) = world.light_mut(id) {
+                        light_ops::set_type(&mut l, LightType::Spotlight);
+                    }
                     *is_dirty = true;
                     if light.inner_cone == 0.0 && light.outer_cone == 0.0 {
-                        light_ops::set_cones(entity, 30.0, 45.0);
+                        if let Some(mut l) = world.light_mut(id) {
+                            light_ops::set_cones(&mut l, 30.0, 45.0);
+                        }
                     }
                 }
             });
@@ -134,7 +149,8 @@ fn draw_light_type(
 /// edit a local, and route the pair through `set_cones`.
 fn draw_spot_cones(
     ui: &mut egui::Ui,
-    entity: &mut Entity,
+    world: &mut crate::ecs::World,
+    id: u32,
     light: &LightComponent,
     is_dirty: &mut bool,
 ) {
@@ -146,7 +162,9 @@ fn draw_spot_cones(
             .changed()
         {
             // Outer shrank below inner ⇒ pull inner down with it (op enforces it).
-            light_ops::set_cones(entity, light.inner_cone, outer);
+            if let Some(mut l) = world.light_mut(id) {
+                light_ops::set_cones(&mut l, light.inner_cone, outer);
+            }
             *is_dirty = true;
         }
     });
@@ -159,7 +177,9 @@ fn draw_spot_cones(
         {
             // Inner grew past outer ⇒ raise outer to match (mirrors the old card).
             let outer = light.outer_cone.max(inner);
-            light_ops::set_cones(entity, inner, outer);
+            if let Some(mut l) = world.light_mut(id) {
+                light_ops::set_cones(&mut l, inner, outer);
+            }
             *is_dirty = true;
         }
     });

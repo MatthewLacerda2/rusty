@@ -5,7 +5,7 @@
 
 use glam::Mat4;
 
-use crate::components::{Entity, MaterialAsset, RenderMode};
+use crate::components::{MaterialAsset, RenderMode};
 use crate::render::EntityUniform;
 use crate::scene::Scene;
 
@@ -16,13 +16,13 @@ use crate::scene::Scene;
 /// (`None` when it references none).
 pub(crate) fn solid_entity_uniform(
     scene: &Scene,
-    entity: &Entity,
+    id: u32,
     material: Option<&MaterialAsset>,
     model_matrix: Mat4,
     light_static_from_probes: bool,
 ) -> EntityUniform {
-    let is_lit = if entity.light.is_some() { 0u32 } else { 1u32 };
-    let (use_sh, sh) = entity_probe_sh(scene, entity, model_matrix, light_static_from_probes);
+    let is_lit = if scene.world.has_light(id) { 0u32 } else { 1u32 };
+    let (use_sh, sh) = entity_probe_sh(scene, id, model_matrix, light_static_from_probes);
     let color_tint = material_color_tint(material);
 
     let (metallic, roughness) = match material {
@@ -91,11 +91,11 @@ fn material_color_tint(material: Option<&MaterialAsset>) -> [f32; 4] {
 /// light back into the scene. It is off everywhere else (runtime shading, bounce 1).
 fn entity_probe_sh(
     scene: &Scene,
-    entity: &Entity,
+    id: u32,
     model_matrix: Mat4,
     light_static_from_probes: bool,
 ) -> (u32, [[f32; 4]; 9]) {
-    if entity.is_static && !light_static_from_probes {
+    if scene.world.is_static(id) && !light_static_from_probes {
         return (0, [[0.0; 4]; 9]);
     }
     let position = model_matrix.w_axis.truncate();

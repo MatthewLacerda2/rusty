@@ -50,15 +50,18 @@ pub fn ensure_named(materials: &mut MaterialLibrary, name: &str) {
 /// already has a key in hand (it only edits an existing reference), so it does not
 /// need it.
 pub fn ensure_material_key(scene: &mut Scene, id: u32) -> Option<String> {
-    let key = {
-        let mut e = scene.get_entity_mut(id)?;
-        if e.material.is_none() {
-            e.material = Some(MaterialComponent {
+    if !scene.world.contains(id) {
+        return None;
+    }
+    if !scene.world.has_material(id) {
+        scene.world.set_material(
+            id,
+            Some(MaterialComponent {
                 material: format!("entity_{id}_material"),
-            });
-        }
-        e.material.as_ref().unwrap().material.clone()
-    };
+            }),
+        );
+    }
+    let key = scene.world.material(id).unwrap().material.clone();
     scene.materials.entry(key.clone()).or_default();
     Some(key)
 }
@@ -255,7 +258,7 @@ mod tests {
         assert_eq!(key, format!("entity_{id}_material"));
         assert!(scene.materials.contains_key(&key), "library entry created");
         assert!(
-            scene.get_entity(id).unwrap().material.is_some(),
+            scene.world.has_material(id),
             "ref attached"
         );
         // Idempotent: a second resolve returns the same key, no duplicate entry.

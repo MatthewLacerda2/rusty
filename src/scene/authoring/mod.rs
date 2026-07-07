@@ -147,12 +147,10 @@ fn primitive_light(primitive: Primitive) -> Option<LightComponent> {
 pub fn create_entity(scene: &mut Scene, name: &str, primitive: Option<Primitive>) -> u32 {
     let id = scene.add_entity(name.to_string());
     if let Some(primitive) = primitive {
-        if let Some(mut entity) = scene.get_entity_mut(id) {
-            if let Some(mesh) = primitive_mesh_component(primitive) {
-                entity.mesh = Some(mesh);
-            } else if let Some(light) = primitive_light(primitive) {
-                entity.light = Some(light);
-            }
+        if let Some(mesh) = primitive_mesh_component(primitive) {
+            scene.world.set_mesh(id, Some(mesh));
+        } else if let Some(light) = primitive_light(primitive) {
+            scene.world.set_light(id, Some(light));
         }
     }
     id
@@ -197,18 +195,15 @@ mod tests {
         let boxed = create_entity(&mut scene, "Crate", Some(Primitive::Box));
         let lamp = create_entity(&mut scene, "Lamp", Some(Primitive::PointLight));
 
-        let e = scene.get_entity(bare).unwrap();
         assert!(
-            e.mesh.is_none() && e.light.is_none(),
+            !scene.world.has_mesh(bare) && !scene.world.has_light(bare),
             "bare = transform only"
         );
-        let e = scene.get_entity(boxed).unwrap();
-        let mesh = e.mesh.as_ref().expect("box gets a mesh");
+        let mesh = scene.world.mesh(boxed).expect("box gets a mesh");
         assert_eq!(mesh.primitive_type, "Box");
-        assert!(!mesh.vertices.is_empty() && e.light.is_none());
-        let e = scene.get_entity(lamp).unwrap();
-        assert!(e.mesh.is_none());
-        assert_eq!(e.light.as_ref().unwrap().light_type, LightType::Point);
+        assert!(!mesh.vertices.is_empty() && !scene.world.has_light(boxed));
+        assert!(!scene.world.has_mesh(lamp));
+        assert_eq!(scene.world.light(lamp).unwrap().light_type, LightType::Point);
     }
 
     #[test]

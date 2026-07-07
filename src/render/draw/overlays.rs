@@ -45,38 +45,40 @@ impl Renderer {
 
     pub(crate) fn precreate_aabb(&self, scene: &Scene) -> Vec<AabbResource> {
         let mut aabb_resources = Vec::new();
-        for entity in scene.iter() {
-            if !entity.active {
+        for id in scene.world.ids_with_collider() {
+            if !scene.world.is_active(id) {
                 continue;
             }
-            if scene.selected_entity_id == Some(entity.id) {
+            if scene.selected_entity_id == Some(id) {
                 continue;
             }
-            if let Some(col) = &entity.collider {
-                if !col.active {
-                    continue;
-                }
-
-                let line_vertices = aabb_wireframe(col.aabb_min, col.aabb_max);
-                let aabb_wire_buffer =
-                    self.device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: None,
-                            contents: bytemuck::cast_slice(&line_vertices),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
-
-                // Bright glowing green if selected, cyan otherwise
-                let is_selected = scene.selected_entity_id == Some(entity.id);
-                let tint_color = if is_selected {
-                    [0.0, 1.0, 0.4, 1.0]
-                } else {
-                    [0.0, 0.8, 1.0, 0.8]
-                };
-
-                let (entity_buf, col_bind_group) = self.build_aabb_bindings(tint_color);
-                aabb_resources.push((aabb_wire_buffer, entity_buf, col_bind_group));
+            let col = scene
+                .world
+                .collider(id)
+                .expect("id came from ids_with_collider");
+            if !col.active {
+                continue;
             }
+
+            let line_vertices = aabb_wireframe(col.aabb_min, col.aabb_max);
+            let aabb_wire_buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    contents: bytemuck::cast_slice(&line_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+
+            // Bright glowing green if selected, cyan otherwise
+            let is_selected = scene.selected_entity_id == Some(id);
+            let tint_color = if is_selected {
+                [0.0, 1.0, 0.4, 1.0]
+            } else {
+                [0.0, 0.8, 1.0, 0.8]
+            };
+
+            let (entity_buf, col_bind_group) = self.build_aabb_bindings(tint_color);
+            aabb_resources.push((aabb_wire_buffer, entity_buf, col_bind_group));
         }
         aabb_resources
     }
@@ -117,19 +119,23 @@ impl Renderer {
 
     pub(crate) fn precreate_outline(&self, scene: &Scene) -> Option<OutlineResource> {
         let selected_id = scene.selected_entity_id?;
-        let entity = scene.get_entity(selected_id)?;
-        let mesh_id = MeshId::from_mesh(entity.mesh.as_ref()?);
-        if !entity.active {
+        let mesh = scene.world.mesh(selected_id)?;
+        let mesh_id = MeshId::from_mesh(&mesh);
+        if !scene.world.is_active(selected_id) {
             return None;
         }
         let gpu_mesh = self.gpu_meshes.get(&mesh_id)?;
 
+        let transform = scene
+            .world
+            .transform(selected_id)
+            .expect("mandatory Transform");
         // Scale up the model matrix slightly for the outline hull
         let outline_scale = 1.05;
         let scaled_transform = Mat4::from_scale_rotation_translation(
-            entity.transform.scale * outline_scale,
-            entity.transform.rotation,
-            entity.transform.position,
+            transform.scale * outline_scale,
+            transform.rotation,
+            transform.position,
         );
 
         let outline_uniform = EntityUniform {

@@ -15,7 +15,7 @@ impl Renderer {
         let Some(selected_id) = scene.selected_entity_id else {
             return axis_arrow_resources;
         };
-        if scene.get_entity(selected_id).is_none() {
+        if !scene.world.contains(selected_id) {
             return axis_arrow_resources;
         }
         let world_matrix = scene.compute_world_matrix(selected_id);

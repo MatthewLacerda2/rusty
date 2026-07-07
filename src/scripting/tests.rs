@@ -103,8 +103,7 @@ fn add_force_applies_dt_scaled_velocity() {
     // Give entity 1 a dynamic rigidbody so AddForce takes effect.
     {
         let mut s = scene.borrow_mut();
-        let mut e = s.get_entity_mut(1).unwrap();
-        e.rigidbody = Some(crate::components::RigidBodyComponent {
+        s.world.set_rigidbody(1, Some(crate::components::RigidBodyComponent {
             active: true,
             is_kinematic: false,
             mass: 2.0,
@@ -119,8 +118,7 @@ fn add_force_applies_dt_scaled_velocity() {
     m.exec("Physics.AddForce(1, 20, 0, 0)").unwrap();
     let vx = scene
         .borrow()
-        .get_entity(1)
-        .and_then(|e| e.rigidbody.as_ref().map(|r| r.velocity.x))
+        .world.rigidbody(1).map(|r| r.velocity.x)
         .unwrap();
     let expected = 10.0 * crate::time::FIXED_DELTA_TIME;
     assert!(

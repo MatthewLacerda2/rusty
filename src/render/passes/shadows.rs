@@ -395,16 +395,16 @@ impl ShadowRenderer {
         // casters by the player camera is the classic pop-a-shadow bug.
         let frustum = Frustum::from_view_proj(self.light_space_matrix);
         let mut render_resources = Vec::new();
-        for entity in scene.iter() {
-            if !entity.active || entity.is_static != want_static {
+        for id in scene.world.ids_with_mesh() {
+            if !scene.world.is_active(id) || scene.world.is_static(id) != want_static {
                 continue;
             }
-            let Some(mesh) = &entity.mesh else { continue };
-            let mesh_id = crate::render::MeshId::from_mesh(mesh);
+            let mesh = scene.world.mesh(id).expect("id came from ids_with_mesh");
+            let mesh_id = crate::render::MeshId::from_mesh(&mesh);
             let Some(gpu_mesh) = gpu_meshes.get(&mesh_id) else {
                 continue;
             };
-            let world = scene.world_matrix(entity.id);
+            let world = scene.world_matrix(id);
             // Skinned casters are never culled — their AABB is the rest pose, which an
             // animation can exceed; a wrongly-culled caster would drop its shadow (#330).
             if !mesh.is_skinned() {
@@ -414,8 +414,8 @@ impl ShadowRenderer {
                     continue;
                 }
             }
-            self.sync_entity_slot(device, queue, entity.id, &world.to_cols_array());
-            render_resources.push((mesh_id, entity.id, gpu_mesh.num_indices));
+            self.sync_entity_slot(device, queue, id, &world.to_cols_array());
+            render_resources.push((mesh_id, id, gpu_mesh.num_indices));
         }
         render_resources
     }

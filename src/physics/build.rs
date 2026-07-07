@@ -8,7 +8,8 @@
 use glam::{Quat, Vec3};
 use rapier3d::prelude::*;
 
-use crate::components::{ColliderShape, CollisionDetection, Entity, RigidBodyComponent};
+use crate::components::{ColliderShape, CollisionDetection, RigidBodyComponent};
+use crate::ecs::World;
 
 /// Body class derived from the entity flags. Mirrors the legacy solver's encoding:
 /// static (fixed), kinematic (position-driven), or dynamic (gravity + solver).
@@ -78,14 +79,12 @@ pub(super) struct ColliderInputs {
 }
 
 /// Snapshot an entity's active-collider inputs, or `None` if it has no active
-/// collider. A mesh collider also captures the rest-pose geometry it rebuilds from.
-pub(super) fn collider_inputs(entity: &Entity) -> Option<ColliderInputs> {
-    let collider = match &entity.collider {
-        Some(c) if c.active => c,
-        _ => return None,
-    };
+/// collider (or is dead). A mesh collider also captures the rest-pose geometry it
+/// rebuilds from. Reads through the #344 accessor facade — shared guards only.
+pub(super) fn collider_inputs(world: &World, id: u32) -> Option<ColliderInputs> {
+    let collider = world.collider(id).filter(|c| c.active)?;
     let mesh_geom = if matches!(collider.shape, ColliderShape::Mesh { .. }) {
-        entity.mesh.as_ref().map(|m| {
+        world.mesh(id).map(|m| {
             (
                 m.vertices.iter().map(|v| v.position).collect::<Vec<_>>(),
                 m.indices.clone(),
@@ -94,32 +93,24 @@ pub(super) fn collider_inputs(entity: &Entity) -> Option<ColliderInputs> {
     } else {
         None
     };
+    let transform = world.transform(id)?;
+    let is_static = world.is_static(id);
+    let rb = world.rigidbody(id);
+    let rb = rb.as_deref();
     Some(ColliderInputs {
-        pos: entity.transform.position,
-        rot: entity.transform.rotation,
-        scale: entity.transform.scale,
+        pos: transform.position,
+        rot: transform.rotation,
+        scale: transform.scale,
         shape: collider.shape.clone(),
         mesh_geom,
         is_trigger: collider.is_trigger,
-        is_static: entity.is_static,
-        class: classify(entity.is_static, entity.rigidbody.as_ref()),
-        velocity: entity
-            .rigidbody
-            .as_ref()
-            .map(|r| r.velocity)
-            .unwrap_or(Vec3::ZERO),
-        angular_velocity: entity
-            .rigidbody
-            .as_ref()
-            .map(|r| r.angular_velocity)
-            .unwrap_or(Vec3::ZERO),
-        use_gravity: entity.rigidbody.as_ref().is_none_or(|r| r.use_gravity),
-        collision_detection: entity
-            .rigidbody
-            .as_ref()
-            .map(|r| r.collision_detection)
-            .unwrap_or_default(),
-        layer: entity.layer,
+        is_static,
+        class: classify(is_static, rb),
+        velocity: rb.map(|r| r.velocity).unwrap_or(Vec3::ZERO),
+        angular_velocity: rb.map(|r| r.angular_velocity).unwrap_or(Vec3::ZERO),
+        use_gravity: rb.is_none_or(|r| r.use_gravity),
+        collision_detection: rb.map(|r| r.collision_detection).unwrap_or_default(),
+        layer: world.layer(id),
     })
 }
 
@@ -138,37 +129,30 @@ pub(super) struct EntityBodyState {
     pub ccd_enabled: bool,
 }
 
-/// Snapshot an entity's transform/velocity/body-class state for one tick.
-pub(super) fn body_state(entity: &Entity) -> EntityBodyState {
+/// Snapshot an entity's transform/velocity/body-class state for one tick
+/// (`None` when the entity is dead).
+pub(super) fn body_state(world: &World, id: u32) -> Option<EntityBodyState> {
+    let transform = world.transform(id)?;
     // Gravity needs an authored rigidbody opting in: a collider-only entity
     // (kinematic by default) is script-driven scenery and must never fall (#318),
     // so a missing rigidbody reads as `use_gravity = false` here. Dynamic bodies
     // always have one, so this matches `collider_inputs` for them.
-    let use_gravity = entity.rigidbody.as_ref().is_some_and(|r| r.use_gravity);
-    let collision_detection = entity
-        .rigidbody
-        .as_ref()
-        .map(|r| r.collision_detection)
-        .unwrap_or_default();
-    EntityBodyState {
-        pos: entity.transform.position,
-        rot: entity.transform.rotation,
-        vel: entity
-            .rigidbody
-            .as_ref()
-            .map(|r| r.velocity)
-            .unwrap_or(Vec3::ZERO),
-        angular_velocity: entity
-            .rigidbody
-            .as_ref()
-            .map(|r| r.angular_velocity)
-            .unwrap_or(Vec3::ZERO),
-        active: entity.active,
-        kinematic: is_kinematic(entity.is_static, entity.rigidbody.as_ref()),
-        is_static: entity.is_static,
+    let rb = world.rigidbody(id);
+    let rb = rb.as_deref();
+    let is_static = world.is_static(id);
+    let use_gravity = rb.is_some_and(|r| r.use_gravity);
+    let collision_detection = rb.map(|r| r.collision_detection).unwrap_or_default();
+    Some(EntityBodyState {
+        pos: transform.position,
+        rot: transform.rotation,
+        vel: rb.map(|r| r.velocity).unwrap_or(Vec3::ZERO),
+        angular_velocity: rb.map(|r| r.angular_velocity).unwrap_or(Vec3::ZERO),
+        active: world.is_active(id),
+        kinematic: is_kinematic(is_static, rb),
+        is_static,
         use_gravity,
         ccd_enabled: ccd_enabled(collision_detection),
-    }
+    })
 }
 
 /// Build a parry collider shape from the engine's `ColliderShape`, baking in the

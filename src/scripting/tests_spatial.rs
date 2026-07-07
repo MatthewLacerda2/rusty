@@ -20,20 +20,18 @@ use glam::Vec3;
 /// Add a static 2×2×2 box entity at `pos` on layer `layer`.
 fn add_box(scene: &mut Scene, name: &str, pos: Vec3, layer: u8) -> u32 {
     let id = scene.add_entity(name.to_string());
-    if let Some(mut e) = scene.get_entity_mut(id) {
-        e.transform.position = pos;
-        e.is_static = true;
-        e.layer = layer;
-        e.collider = Some(ColliderComponent {
-            active: true,
-            shape: ColliderShape::Box {
-                size: Vec3::splat(2.0),
-            },
-            is_trigger: false,
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
-        });
-    }
+    scene.world.transform_mut(id).unwrap().position = pos;
+    scene.world.set_static(id, true);
+    scene.world.set_layer(id, layer);
+    scene.world.set_collider(id, Some(ColliderComponent {
+        active: true,
+        shape: ColliderShape::Box {
+            size: Vec3::splat(2.0),
+        },
+        is_trigger: false,
+        aabb_min: Vec3::ZERO,
+        aabb_max: Vec3::ZERO,
+    });
     scene.update_entity_collider(id);
     id
 }

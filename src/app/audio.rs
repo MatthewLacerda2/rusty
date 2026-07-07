@@ -31,15 +31,17 @@ fn start_play_on_start(world: &mut World, res: &mut Resources) {
     let rows: Vec<Row> = {
         let scene = world.scene.borrow();
         scene
-            .iter()
-            .filter(|e| e.active)
-            .filter_map(|e| {
-                let src = e.audio.as_ref()?;
+            .world
+            .ids_with_audio()
+            .into_iter()
+            .filter(|&id| scene.world.is_active(id))
+            .filter_map(|id| {
+                let src = scene.world.audio(id)?;
                 if !src.play_on_start {
                     return None;
                 }
-                let p = e.transform.position;
-                Some((e.id, src.clone(), [p.x, p.y, p.z]))
+                let p = scene.world.transform(id)?.position;
+                Some((id, src.clone(), [p.x, p.y, p.z]))
             })
             .collect()
     };

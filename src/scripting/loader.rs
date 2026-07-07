@@ -88,14 +88,21 @@ impl ScriptManager {
         let mut rows: Vec<ScriptRow> = {
             let scene = self.scene.borrow();
             scene
-                .iter()
-                .flat_map(|e| {
-                    e.scripts
-                        .iter()
-                        .enumerate()
-                        .filter(|&(i, _)| !self.load_attempted.contains(&(e.id, i)))
-                        .map(|(i, s)| (e.id, i, s.path.clone(), s.values.clone()))
-                        .collect::<Vec<_>>()
+                .entity_ids()
+                .into_iter()
+                .flat_map(|id| {
+                    scene
+                        .world
+                        .scripts(id)
+                        .map(|scripts| {
+                            scripts
+                                .iter()
+                                .enumerate()
+                                .filter(|&(i, _)| !self.load_attempted.contains(&(id, i)))
+                                .map(|(i, s)| (id, i, s.path.clone(), s.values.clone()))
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default()
                 })
                 .collect()
         };

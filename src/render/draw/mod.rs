@@ -222,8 +222,11 @@ impl Renderer {
     /// Evict persistent forward-pass slots for entities no longer active in the
     /// scene, keeping the pool bounded to the live set (#210).
     fn prune_entity_pool(&mut self, scene: &Scene) {
-        let live: std::collections::HashSet<u32> =
-            scene.iter().filter(|e| e.active).map(|e| e.id).collect();
+        let live: std::collections::HashSet<u32> = scene
+            .entity_ids()
+            .into_iter()
+            .filter(|&id| scene.world.is_active(id))
+            .collect();
         if let Some(pool) = self.entity_pool.as_mut() {
             pool.retain(&live);
         }
@@ -236,11 +239,11 @@ impl Renderer {
 /// scene borrow ends before the textures are uploaded (#202, #207).
 fn active_material_map_paths(scene: &Scene) -> Vec<String> {
     scene
-        .entity_ids()
-        .iter()
-        .filter_map(|&id| scene.get_entity(id))
-        .filter(|e| e.active)
-        .filter_map(|e| scene.material_of(&e).cloned())
+        .world
+        .ids_with_material()
+        .into_iter()
+        .filter(|&id| scene.world.is_active(id))
+        .filter_map(|id| scene.material_asset_of(id).cloned())
         .flat_map(|m| {
             [
                 m.base_color_map,

@@ -122,18 +122,21 @@ fn draw_attach_to_entity(
     egui::ComboBox::from_id_source("AttachScriptToEntity")
         .selected_text(selected_ent_name)
         .show_ui(ui, |ui| {
-            for entity in scene.iter() {
-                if ui.selectable_label(false, &entity.name).clicked() {
-                    clicked_entity_id = Some(entity.id);
-                    clicked_entity_name = entity.name.clone();
+            for id in scene.entity_ids() {
+                let Some(name) = scene.world.name(id).map(|n| n.clone()) else {
+                    continue;
+                };
+                if ui.selectable_label(false, &name).clicked() {
+                    clicked_entity_id = Some(id);
+                    clicked_entity_name = name;
                 }
             }
         });
 
     if let Some(entity_id) = clicked_entity_id {
-        if let Some(mut ent) = scene.get_entity_mut(entity_id) {
+        if let Some(mut scripts) = scene.world.scripts_mut(entity_id) {
             // An entity can hold many scripts (#83); append rather than replace.
-            ent.scripts.push(ScriptComponent {
+            scripts.push(ScriptComponent {
                 path: path.to_string(),
                 is_loaded: false,
                 ..Default::default()

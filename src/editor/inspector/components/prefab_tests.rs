@@ -20,9 +20,12 @@ fn write_prefab(tag: &str) -> String {
     scene
         .materials
         .insert("Stone".into(), MaterialAsset::default());
-    scene.get_entity_mut(root).unwrap().material = Some(MaterialComponent {
-        material: "Stone".into(),
-    });
+    scene.world.set_material(
+        root,
+        Some(MaterialComponent {
+            material: "Stone".into(),
+        }),
+    );
     let path = std::env::temp_dir()
         .join(format!("rusty_263_{tag}.prefab"))
         .to_string_lossy()
@@ -42,7 +45,7 @@ fn linked(tag: &str) -> (Scene, u32) {
 #[test]
 fn instance_root_walks_up_from_a_child() {
     let (scene, root) = linked("root_from_child");
-    let child = scene.get_entity(root).unwrap().children[0];
+    let child = scene.world.children(root)[0];
     // From either the root or the child, the resolved root is the same instance root.
     assert_eq!(instance_root(&scene, root), root);
     assert_eq!(instance_root(&scene, child), root);
@@ -58,7 +61,7 @@ fn instance_root_of_a_plain_entity_is_itself() {
 #[test]
 fn record_action_records_overrides_like_the_api() {
     let (mut scene, root) = linked("record");
-    scene.get_entity_mut(root).unwrap().transform.position.x = 5.0;
+    scene.world.transform_mut(root).unwrap().position.x = 5.0;
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
 
     assert!(dispatch(&mut scene, PrefabAction::Record(root)));
@@ -69,23 +72,23 @@ fn record_action_records_overrides_like_the_api() {
 #[test]
 fn apply_to_source_action_writes_prefab_and_clears_overrides() {
     let (mut scene, root) = linked("apply_to_source");
-    scene.get_entity_mut(root).unwrap().transform.position.x = 6.0;
+    scene.world.transform_mut(root).unwrap().position.x = 6.0;
     record_instance_overrides(&mut scene, root).unwrap();
 
     // Apply-to-source clears the instance overrides (it now matches the source) and the
     // value persists, baked into the .prefab. Same effect as Scene.ApplyPrefabToSource.
     assert!(dispatch(&mut scene, PrefabAction::ApplyToSource(root)));
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
-    assert_eq!(scene.get_entity(root).unwrap().transform.position.x, 6.0);
+    assert_eq!(scene.world.transform(root).unwrap().position.x, 6.0);
 }
 
 #[test]
 fn apply_field_to_source_action_clears_only_that_field() {
     let (mut scene, root) = linked("apply_field");
     {
-        let mut e = scene.get_entity_mut(root).unwrap();
-        e.transform.position.x = 2.0;
-        e.transform.position.y = 3.0;
+        let mut t = scene.world.transform_mut(root).unwrap();
+        t.position.x = 2.0;
+        t.position.y = 3.0;
     }
     record_instance_overrides(&mut scene, root).unwrap();
 
@@ -97,39 +100,39 @@ fn apply_field_to_source_action_clears_only_that_field() {
     // X is now in the source (override cleared); Y stays an override.
     let remaining = list_instance_overrides(&scene, root).unwrap();
     assert_eq!(remaining, vec!["0:/transform/position/1".to_string()]);
-    let e = scene.get_entity(root).unwrap();
-    assert_eq!(e.transform.position.x, 2.0);
-    assert_eq!(e.transform.position.y, 3.0);
+    let t = scene.world.transform(root).unwrap();
+    assert_eq!(t.position.x, 2.0);
+    assert_eq!(t.position.y, 3.0);
 }
 
 #[test]
 fn revert_action_drops_overrides_and_restores_source() {
     let (mut scene, root) = linked("revert");
-    scene.get_entity_mut(root).unwrap().transform.position.x = 9.0;
+    scene.world.transform_mut(root).unwrap().position.x = 9.0;
     record_instance_overrides(&mut scene, root).unwrap();
 
     assert!(dispatch(&mut scene, PrefabAction::Revert(root)));
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
-    assert_eq!(scene.get_entity(root).unwrap().transform.position.x, 0.0);
+    assert_eq!(scene.world.transform(root).unwrap().position.x, 0.0);
 }
 
 #[test]
 fn reimport_action_keeps_recorded_overrides() {
     let (mut scene, root) = linked("reimport");
-    scene.get_entity_mut(root).unwrap().transform.position.x = 7.0;
+    scene.world.transform_mut(root).unwrap().position.x = 7.0;
     record_instance_overrides(&mut scene, root).unwrap();
 
     assert!(dispatch(&mut scene, PrefabAction::Reimport(root)));
-    assert_eq!(scene.get_entity(root).unwrap().transform.position.x, 7.0);
+    assert_eq!(scene.world.transform(root).unwrap().position.x, 7.0);
 }
 
 #[test]
 fn revert_field_drops_one_override_and_keeps_the_rest() {
     let (mut scene, root) = linked("revert_field");
     {
-        let mut e = scene.get_entity_mut(root).unwrap();
-        e.transform.position.x = 3.0;
-        e.transform.position.y = 4.0;
+        let mut t = scene.world.transform_mut(root).unwrap();
+        t.position.x = 3.0;
+        t.position.y = 4.0;
     }
     record_instance_overrides(&mut scene, root).unwrap();
 
@@ -140,15 +143,15 @@ fn revert_field_drops_one_override_and_keeps_the_rest() {
         path: "/transform/position/0".to_string(),
     };
     assert!(dispatch(&mut scene, action));
-    let e = scene.get_entity(root).unwrap();
-    assert_eq!(e.transform.position.x, 0.0, "reverted leaf tracks source");
-    assert_eq!(e.transform.position.y, 4.0, "other override preserved");
+    let t = scene.world.transform(root).unwrap();
+    assert_eq!(t.position.x, 0.0, "reverted leaf tracks source");
+    assert_eq!(t.position.y, 4.0, "other override preserved");
 }
 
 #[test]
 fn revert_field_on_an_unknown_path_is_a_noop() {
     let (mut scene, root) = linked("revert_field_noop");
-    scene.get_entity_mut(root).unwrap().transform.position.x = 1.0;
+    scene.world.transform_mut(root).unwrap().position.x = 1.0;
     record_instance_overrides(&mut scene, root).unwrap();
     let before = list_instance_overrides(&scene, root).unwrap();
 

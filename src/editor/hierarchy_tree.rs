@@ -6,7 +6,7 @@ use egui::collapsing_header::CollapsingState;
 use egui_phosphor::regular as icon;
 
 use crate::editor::theme::Theme;
-use crate::scene::{Entity, Scene};
+use crate::scene::Scene;
 
 /// Draw `entity_id` and (when expanded) its subtree. `sel_entity` / `sel_asset`
 /// are the editor's selection fields; clicking a row updates them.
@@ -18,15 +18,12 @@ pub fn draw_node(
     sel_asset: &mut Option<String>,
     t: Theme,
 ) {
-    let (name, children, glyph, glyph_color) = match scene.get_entity(entity_id) {
-        Some(e) => (
-            e.name.clone(),
-            e.children.clone(),
-            node_glyph(&e),
-            node_color(&e, t),
-        ),
-        None => return,
+    let Some(name) = scene.world.name(entity_id).map(|n| n.clone()) else {
+        return;
     };
+    let children = scene.world.children(entity_id);
+    let glyph = node_glyph(&scene.world, entity_id);
+    let glyph_color = node_color(&scene.world, entity_id, t);
     let is_selected = *sel_entity == Some(entity_id);
 
     // The clickable row: type glyph + name. Selecting toggles off to None (which
@@ -89,12 +86,12 @@ fn save_as_prefab(scene: &Scene, entity_id: u32, name: &str) {
 }
 
 /// Monochrome type glyph for an entity, mirroring VS Code's restrained icons.
-fn node_glyph(e: &Entity) -> &'static str {
-    if e.camera.is_some() {
+fn node_glyph(world: &crate::ecs::World, id: u32) -> &'static str {
+    if world.has_camera(id) {
         icon::VIDEO_CAMERA
-    } else if e.light.is_some() {
+    } else if world.has_light(id) {
         icon::LIGHTBULB
-    } else if e.mesh.is_some() {
+    } else if world.has_mesh(id) {
         icon::CUBE
     } else {
         icon::CIRCLE
@@ -102,8 +99,8 @@ fn node_glyph(e: &Entity) -> &'static str {
 }
 
 /// Glyph tint: lights read as the yellow accent, the rest as muted secondary text.
-fn node_color(e: &Entity, t: Theme) -> egui::Color32 {
-    if e.light.is_some() {
+fn node_color(world: &crate::ecs::World, id: u32, t: Theme) -> egui::Color32 {
+    if world.has_light(id) {
         t.accent_yellow
     } else {
         t.text_secondary

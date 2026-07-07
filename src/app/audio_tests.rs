@@ -15,14 +15,12 @@ use crate::app::GameWorld;
 fn world_with_audio(play_on_start: bool) -> GameWorld {
     let mut scene = Scene::new();
     let id = scene.add_entity("Speaker".to_string());
-    if let Some(mut e) = scene.get_entity_mut(id) {
-        e.audio = Some(AudioSourceComponent {
-            clip: "music/theme.ogg".to_string(),
-            play_on_start,
-            looping: true,
-            ..Default::default()
-        });
-    }
+    scene.world.set_audio(id, Some(AudioSourceComponent {
+        clip: "music/theme.ogg".to_string(),
+        play_on_start,
+        looping: true,
+        ..Default::default()
+    });
     let scene = Rc::new(RefCell::new(scene));
     let input = Rc::new(RefCell::new(InputState::new()));
     let nav = Rc::new(RefCell::new(NavigationGraph::new(

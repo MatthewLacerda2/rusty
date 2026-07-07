@@ -53,14 +53,14 @@ pub fn local_to_ndc(local_x: f32, local_y: f32, width: f32, height: f32) -> Opti
 pub fn pick_entity(scene: &Scene, ray: Ray) -> Option<(u32, f32)> {
     let mut best: Option<(u32, f32)> = None;
     for id in scene.entity_ids() {
-        let Some(entity) = scene.get_entity(id) else {
-            continue;
-        };
-        if !entity.active {
+        if !scene.world.is_active(id) {
             continue;
         }
+        let Some(mesh) = scene.world.mesh(id) else {
+            continue;
+        };
         let world = scene.compute_world_matrix(id);
-        let Some((min, max)) = entity.compute_world_aabb(world) else {
+        let Some((min, max)) = mesh.world_aabb(world) else {
             continue;
         };
         if let Some(toi) = ray_aabb(ray, min, max) {
@@ -92,7 +92,9 @@ fn ray_aabb(ray: Ray, min: Vec3, max: Vec3) -> Option<f32> {
 /// The world-space position of `entity_id` (its world matrix's translation), used to
 /// anchor the move gizmo. `None` when the entity is gone.
 pub fn entity_world_position(scene: &Scene, entity_id: u32) -> Option<Vec3> {
-    scene.get_entity(entity_id)?;
+    if !scene.world.contains(entity_id) {
+        return None;
+    }
     Some(world_translation(scene.compute_world_matrix(entity_id)))
 }
 

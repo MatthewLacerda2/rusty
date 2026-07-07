@@ -54,13 +54,10 @@ pub fn static_scene_aabb(scene: &Scene) -> Option<(Vec3, Vec3)> {
     let mut max = Vec3::splat(f32::MIN);
     let mut found = false;
     for id in scene.entity_ids() {
-        let Some(entity) = scene.get_entity(id) else {
-            continue;
-        };
-        if !entity.is_static || !entity.active {
+        if !scene.world.is_static(id) || !scene.world.is_active(id) {
             continue;
         }
-        let Some(collider) = &entity.collider else {
+        let Some(collider) = scene.world.collider(id) else {
             continue;
         };
         if !collider.active {

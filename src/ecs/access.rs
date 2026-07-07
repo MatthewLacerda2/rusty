@@ -86,10 +86,11 @@ impl<T: ?Sized> DerefMut for CompMut<'_, T> {
 
 /// Generate the accessor family for one OPTIONAL first-class component:
 /// `get` / `get_mut` (None when absent), `has`, `set` (Some = attach/replace,
-/// None = detach; hecs insert/remove after #345), and `ids_with` (stable ids
-/// carrying the component, in insertion order).
+/// None = detach; hecs insert/remove after #345), `take` (detach returning the
+/// component — the sim's take/simulate/write-back idiom), and `ids_with`
+/// (stable ids carrying the component, in insertion order).
 macro_rules! optional_component_accessors {
-    ($($field:ident : $ty:ty => $get:ident, $get_mut:ident, $has:ident, $set:ident, $ids_with:ident;)*) => {
+    ($($field:ident : $ty:ty => $get:ident, $get_mut:ident, $has:ident, $set:ident, $take:ident, $ids_with:ident;)*) => {
         impl World {
             $(
                 pub fn $get(&self, id: u32) -> Option<CompRef<'_, $ty>> {
@@ -128,6 +129,12 @@ macro_rules! optional_component_accessors {
                     }
                 }
 
+                /// Detach and return the component (`None` when absent or the
+                /// entity is dead).
+                pub fn $take(&mut self, id: u32) -> Option<$ty> {
+                    self.get_mut(id)?.$field.take()
+                }
+
                 /// Stable ids of the entities carrying this component, in
                 /// insertion order (the determinism-safe iteration order).
                 pub fn $ids_with(&self) -> Vec<u32> {
@@ -143,16 +150,16 @@ macro_rules! optional_component_accessors {
 }
 
 optional_component_accessors! {
-    mesh: MeshComponent => mesh, mesh_mut, has_mesh, set_mesh, ids_with_mesh;
-    material: MaterialComponent => material, material_mut, has_material, set_material, ids_with_material;
-    animator: AnimatorComponent => animator, animator_mut, has_animator, set_animator, ids_with_animator;
-    light: LightComponent => light, light_mut, has_light, set_light, ids_with_light;
-    collider: ColliderComponent => collider, collider_mut, has_collider, set_collider, ids_with_collider;
-    rigidbody: RigidBodyComponent => rigidbody, rigidbody_mut, has_rigidbody, set_rigidbody, ids_with_rigidbody;
-    nav_agent: NavMeshAgentComponent => nav_agent, nav_agent_mut, has_nav_agent, set_nav_agent, ids_with_nav_agent;
-    camera: CameraComponent => camera, camera_mut, has_camera, set_camera, ids_with_camera;
-    visual_correction: VisualCorrectionComponent => visual_correction, visual_correction_mut, has_visual_correction, set_visual_correction, ids_with_visual_correction;
-    particles: ParticleEmitterComponent => particles, particles_mut, has_particles, set_particles, ids_with_particles;
-    audio: AudioSourceComponent => audio, audio_mut, has_audio, set_audio, ids_with_audio;
-    prefab_link: PrefabLink => prefab_link, prefab_link_mut, has_prefab_link, set_prefab_link, ids_with_prefab_link;
+    mesh: MeshComponent => mesh, mesh_mut, has_mesh, set_mesh, take_mesh, ids_with_mesh;
+    material: MaterialComponent => material, material_mut, has_material, set_material, take_material, ids_with_material;
+    animator: AnimatorComponent => animator, animator_mut, has_animator, set_animator, take_animator, ids_with_animator;
+    light: LightComponent => light, light_mut, has_light, set_light, take_light, ids_with_light;
+    collider: ColliderComponent => collider, collider_mut, has_collider, set_collider, take_collider, ids_with_collider;
+    rigidbody: RigidBodyComponent => rigidbody, rigidbody_mut, has_rigidbody, set_rigidbody, take_rigidbody, ids_with_rigidbody;
+    nav_agent: NavMeshAgentComponent => nav_agent, nav_agent_mut, has_nav_agent, set_nav_agent, take_nav_agent, ids_with_nav_agent;
+    camera: CameraComponent => camera, camera_mut, has_camera, set_camera, take_camera, ids_with_camera;
+    visual_correction: VisualCorrectionComponent => visual_correction, visual_correction_mut, has_visual_correction, set_visual_correction, take_visual_correction, ids_with_visual_correction;
+    particles: ParticleEmitterComponent => particles, particles_mut, has_particles, set_particles, take_particles, ids_with_particles;
+    audio: AudioSourceComponent => audio, audio_mut, has_audio, set_audio, take_audio, ids_with_audio;
+    prefab_link: PrefabLink => prefab_link, prefab_link_mut, has_prefab_link, set_prefab_link, take_prefab_link, ids_with_prefab_link;
 }

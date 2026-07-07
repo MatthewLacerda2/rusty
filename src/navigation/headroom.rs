@@ -99,11 +99,11 @@ impl NavigationGraph {
 /// Gather every active static collider's AABB (the same gate `bake` uses for the floor).
 fn collect_overhead(scene: &Scene) -> Vec<Overhead> {
     let mut out = Vec::new();
-    for entity in scene.iter() {
-        if !entity.active || !entity.is_static {
+    for id in scene.world.ids_with_collider() {
+        if !scene.world.is_active(id) || !scene.world.is_static(id) {
             continue;
         }
-        if let Some(col) = &entity.collider {
+        if let Some(col) = scene.world.collider(id) {
             if col.active {
                 out.push(Overhead {
                     min: col.aabb_min,

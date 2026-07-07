@@ -31,17 +31,14 @@ pub(super) fn tick_particles(world: &mut World, res: &mut Resources) {
         // ray-casts (which immutably borrow the scene through the filter).
         let taken = {
             let mut scene = world.scene.borrow_mut();
-            let mut entity = match scene.get_entity_mut(id) {
-                Some(e) => e,
-                None => continue,
-            };
-            if !entity.active {
+            if !scene.world.contains(id) || !scene.world.is_active(id) {
                 continue;
             }
-            entity
-                .particles
-                .take()
-                .map(|emitter| (emitter, entity.transform.position))
+            let origin = scene.world.transform(id).unwrap().position;
+            scene
+                .world
+                .take_particles(id)
+                .map(|emitter| (emitter, origin))
         };
         let (mut emitter, origin) = match taken {
             Some(v) => v,
@@ -50,9 +47,7 @@ pub(super) fn tick_particles(world: &mut World, res: &mut Resources) {
 
         simulate_emitter(&mut emitter, origin, dt, &res.physics);
 
-        if let Some(mut entity) = world.scene.borrow_mut().get_entity_mut(id) {
-            entity.particles = Some(emitter);
-        }
+        world.scene.borrow_mut().world.set_particles(id, Some(emitter));
     }
 }
 

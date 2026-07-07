@@ -17,7 +17,7 @@ use egui_phosphor::regular as icon;
 
 use crate::editor::inspector::components::card::component_card;
 use crate::editor::theme;
-use crate::scene::{authoring, Entity, Scene};
+use crate::scene::{authoring, Scene};
 
 /// A prefab-override edit the card requested this frame, dispatched by the caller once
 /// the entity guard has dropped (the verbs need `&mut Scene`). Whole-object verbs take
@@ -46,19 +46,25 @@ pub enum PrefabAction {
     ApplyFieldToSource { entity: u32, path: String },
 }
 
-/// Draw the prefab-instance card for `entity`, if it is a linked instance. `root` is
-/// the instance's root id (the entity carrying `local_id == 0`), pre-resolved by the
-/// caller because finding it needs the scene. Returns the requested action, if any.
-pub fn draw(ui: &mut egui::Ui, entity: &Entity, root: u32) -> Option<PrefabAction> {
-    let link = entity.prefab_link.as_ref()?;
+/// Draw the prefab-instance card for the entity `id`, if it is a linked instance.
+/// `root` is the instance's root id (the entity carrying `local_id == 0`), pre-resolved
+/// by the caller because finding it needs the scene. Returns the requested action, if
+/// any.
+pub fn draw(
+    ui: &mut egui::Ui,
+    world: &crate::ecs::World,
+    id: u32,
+    root: u32,
+) -> Option<PrefabAction> {
+    let source = world.prefab_link(id)?.source.clone();
     let mut action = None;
     let title = format!("{}  Prefab", icon::LINK_SIMPLE);
     component_card(ui, "", &title, None, |ui| {
         let t = theme::from_ui(ui);
-        ui.label(format!("Source: {}", link.source));
+        ui.label(format!("Source: {source}"));
         ui.add_space(t.space_xs);
         action = draw_object_buttons(ui, root);
-        draw_overrides_list(ui, entity, root, &mut action);
+        draw_overrides_list(ui, world, id, root, &mut action);
     });
     action
 }
@@ -108,19 +114,19 @@ fn labeled(ui: &mut egui::Ui, glyph: &str, label: &str, hover: &str) -> bool {
         .clicked()
 }
 
-/// The per-field override list: one row per overridden leaf on `entity`, each with the
-/// Unity blue "modified" dot, a readable field label, and a per-field Revert button.
+/// The per-field override list: one row per overridden leaf on entity `id`, each with
+/// the Unity blue "modified" dot, a readable field label, and a per-field Revert button.
 /// Shows a muted "no overrides" line when the instance entity matches the source.
 fn draw_overrides_list(
     ui: &mut egui::Ui,
-    entity: &Entity,
+    world: &crate::ecs::World,
+    id: u32,
     root: u32,
     action: &mut Option<PrefabAction>,
 ) {
     let t = theme::from_ui(ui);
-    let paths: Vec<String> = entity
-        .prefab_link
-        .as_ref()
+    let paths: Vec<String> = world
+        .prefab_link(id)
         .map(|l| l.overrides.keys().cloned().collect())
         .unwrap_or_default();
     ui.separator();
@@ -130,7 +136,7 @@ fn draw_overrides_list(
     }
     ui.label("Overridden fields:");
     for path in paths {
-        draw_override_row(ui, t.accent_blue, entity.id, root, &path, action);
+        draw_override_row(ui, t.accent_blue, id, root, &path, action);
     }
 }
 
@@ -187,18 +193,15 @@ fn field_label(path: &str) -> String {
 /// Returns `selected_id` itself when it is not a linked instance, so callers can pass
 /// the result unconditionally.
 pub fn instance_root(scene: &Scene, selected_id: u32) -> u32 {
-    let Some(source) = scene
-        .get_entity(selected_id)
-        .and_then(|e| e.prefab_link.as_ref().map(|l| l.source.clone()))
-    else {
+    let Some(source) = scene.world.prefab_link(selected_id).map(|l| l.source.clone()) else {
         return selected_id;
     };
     let mut current = selected_id;
-    while let Some(parent) = scene.get_entity(current).and_then(|e| e.parent_id) {
+    while let Some(parent) = scene.world.parent_id(current) {
         let parent_linked = scene
-            .get_entity(parent)
-            .map(|e| e.prefab_link.as_ref().is_some_and(|l| l.source == source))
-            .unwrap_or(false);
+            .world
+            .prefab_link(parent)
+            .is_some_and(|l| l.source == source);
         if !parent_linked {
             break;
         }
@@ -233,9 +236,9 @@ pub fn dispatch(scene: &mut Scene, action: PrefabAction) -> bool {
 /// leaf returns to the source value while every other override is preserved.
 fn revert_field(scene: &mut Scene, root: u32, entity: u32, path: &str) -> bool {
     let removed = scene
-        .get_entity_mut(entity)
-        .and_then(|mut e| e.prefab_link.as_mut().map(|l| l.overrides.remove(path)))
-        .flatten()
+        .world
+        .prefab_link_mut(entity)
+        .and_then(|mut l| l.overrides.remove(path))
         .is_some();
     if removed {
         let _ = authoring::reimport_instance(scene, root);

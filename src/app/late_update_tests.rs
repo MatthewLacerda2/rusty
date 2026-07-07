@@ -38,9 +38,8 @@ fn falling_body_world() -> GameWorld {
     let mut s = Scene::new();
     let id = s.add_entity("Faller".to_string());
     {
-        let mut e = s.get_entity_mut(id).unwrap();
-        e.transform.position = Vec3::new(0.0, 10.0, 0.0);
-        e.rigidbody = Some(RigidBodyComponent {
+        s.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 10.0, 0.0);
+        s.world.set_rigidbody(id, Some(RigidBodyComponent {
             active: true,
             is_kinematic: false,
             mass: 1.0,

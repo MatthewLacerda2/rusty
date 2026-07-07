@@ -79,44 +79,44 @@ pub(crate) fn apply_reflection_probe(
 /// at the 4-slot budget).
 pub(crate) fn apply_scene_lights(lighting_uniform: &mut LightingUniform, scene: &Scene) {
     let mut pt_idx = 0;
-    for entity in scene.iter() {
-        if !entity.active {
+    for id in scene.world.ids_with_light() {
+        if !scene.world.is_active(id) {
             continue;
         }
-        if let Some(light) = &entity.light {
-            match light.light_type {
-                LightType::Ambient => {
-                    lighting_uniform.ambient = AmbientLightUniform {
-                        color: light.color.to_array(),
-                        intensity: light.intensity,
-                    };
-                }
-                LightType::Directional => {
-                    let dir = entity.transform.rotation * Vec3::NEG_Z;
-                    lighting_uniform.dir_light = DirectionalLightUniform {
-                        direction: dir.to_array(),
+        let light = scene.world.light(id).expect("id came from ids_with_light");
+        let transform = scene.world.transform(id).expect("mandatory Transform");
+        match light.light_type {
+            LightType::Ambient => {
+                lighting_uniform.ambient = AmbientLightUniform {
+                    color: light.color.to_array(),
+                    intensity: light.intensity,
+                };
+            }
+            LightType::Directional => {
+                let dir = transform.rotation * Vec3::NEG_Z;
+                lighting_uniform.dir_light = DirectionalLightUniform {
+                    direction: dir.to_array(),
+                    _pad1: 0.0,
+                    color: light.color.to_array(),
+                    intensity: light.intensity,
+                    _pad2: [0.0; 4],
+                };
+            }
+            LightType::Point => {
+                if pt_idx < 4 {
+                    lighting_uniform.point_lights[pt_idx] = PointLightUniform {
+                        position: transform.position.to_array(),
                         _pad1: 0.0,
                         color: light.color.to_array(),
                         intensity: light.intensity,
-                        _pad2: [0.0; 4],
+                        range: light.range,
+                        _pad2: [0.0; 3],
                     };
+                    pt_idx += 1;
                 }
-                LightType::Point => {
-                    if pt_idx < 4 {
-                        lighting_uniform.point_lights[pt_idx] = PointLightUniform {
-                            position: entity.transform.position.to_array(),
-                            _pad1: 0.0,
-                            color: light.color.to_array(),
-                            intensity: light.intensity,
-                            range: light.range,
-                            _pad2: [0.0; 3],
-                        };
-                        pt_idx += 1;
-                    }
-                }
-                LightType::Spotlight => {
-                    lighting_uniform.spot_light = spotlight_uniform(&entity, light);
-                }
+            }
+            LightType::Spotlight => {
+                lighting_uniform.spot_light = spotlight_uniform(&transform, &light);
             }
         }
     }
@@ -125,12 +125,12 @@ pub(crate) fn apply_scene_lights(lighting_uniform: &mut LightingUniform, scene: 
 
 /// Build the spotlight uniform, baking cone half-angles into their cosines.
 pub(crate) fn spotlight_uniform(
-    entity: &crate::components::Entity,
+    transform: &crate::components::TransformComponent,
     light: &crate::components::LightComponent,
 ) -> SpotlightUniform {
-    let dir = entity.transform.rotation * Vec3::NEG_Z;
+    let dir = transform.rotation * Vec3::NEG_Z;
     SpotlightUniform {
-        position: entity.transform.position.to_array(),
+        position: transform.position.to_array(),
         _pad1: 0.0,
         direction: dir.to_array(),
         _pad2: 0.0,
@@ -148,24 +148,26 @@ pub(crate) fn apply_ssr_settings(lighting_uniform: &mut LightingUniform, scene: 
     let mut ssr_active = 0.0;
     let mut ssr_quality = 2.0; // High default
     let mut ssr_temporal = 0.0;
-    for entity in scene.iter() {
-        if !entity.active {
+    for id in scene.world.ids_with_visual_correction() {
+        if !scene.world.is_active(id) {
             continue;
         }
-        if let Some(vc) = &entity.visual_correction {
-            if vc.ssr_active {
-                ssr_active = 1.0;
-            }
-            ssr_quality = match vc.ssr_quality.as_str() {
-                "Low" => 0.0,
-                "Medium" => 1.0,
-                "High" => 2.0,
-                "Ultra" => 3.0,
-                _ => 2.0,
-            };
-            if vc.ssr_temporal_upsampling {
-                ssr_temporal = 1.0;
-            }
+        let vc = scene
+            .world
+            .visual_correction(id)
+            .expect("id came from ids_with_visual_correction");
+        if vc.ssr_active {
+            ssr_active = 1.0;
+        }
+        ssr_quality = match vc.ssr_quality.as_str() {
+            "Low" => 0.0,
+            "Medium" => 1.0,
+            "High" => 2.0,
+            "Ultra" => 3.0,
+            _ => 2.0,
+        };
+        if vc.ssr_temporal_upsampling {
+            ssr_temporal = 1.0;
         }
     }
     lighting_uniform.ssr_active = ssr_active;

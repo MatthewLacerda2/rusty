@@ -40,9 +40,9 @@ pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
 
             egui::ScrollArea::vertical().show(ui, |ui| {
                 let root_ids: Vec<u32> = scene
-                    .iter()
-                    .filter(|e| e.parent_id.is_none())
-                    .map(|e| e.id)
+                    .entity_ids()
+                    .into_iter()
+                    .filter(|&id| scene.world.parent_id(id).is_none())
                     .collect();
                 for entity_id in root_ids {
                     hierarchy_tree::draw_node(

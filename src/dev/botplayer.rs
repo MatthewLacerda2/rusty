@@ -27,8 +27,8 @@ pub fn attach_player_bot(scene: &mut Scene, script_path: &str) -> bool {
     let Some(player_id) = scene.find_entity_by_name("Player") else {
         return false;
     };
-    if let Some(mut player) = scene.get_entity_mut(player_id) {
-        player.scripts = vec![ScriptComponent {
+    if let Some(mut scripts) = scene.world.scripts_mut(player_id) {
+        *scripts = vec![ScriptComponent {
             path: script_path.to_string(),
             is_loaded: false,
             ..Default::default()

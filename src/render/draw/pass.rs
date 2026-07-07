@@ -157,13 +157,14 @@ impl Renderer {
     /// Pick the directional caster, update light space, run static+dynamic shadow sweeps.
     fn run_shadow_passes(&mut self, encoder: &mut wgpu::CommandEncoder, scene: &Scene) {
         let mut dir_light_dir = Vec3::new(-0.5, -1.0, -0.3).normalize();
-        for entity in scene.iter() {
-            if entity.active {
-                if let Some(light) = &entity.light {
-                    if light.light_type == LightType::Directional {
-                        dir_light_dir = (entity.transform.rotation * Vec3::NEG_Z).normalize();
-                    }
-                }
+        for id in scene.world.ids_with_light() {
+            if !scene.world.is_active(id) {
+                continue;
+            }
+            let light = scene.world.light(id).expect("id came from ids_with_light");
+            if light.light_type == LightType::Directional {
+                let transform = scene.world.transform(id).expect("mandatory Transform");
+                dir_light_dir = (transform.rotation * Vec3::NEG_Z).normalize();
             }
         }
         self.shadow_renderer

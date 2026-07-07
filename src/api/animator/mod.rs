@@ -97,8 +97,8 @@ fn register_stop<'lua, 'scope>(
         "Stop",
         scope.create_function(|_, id: u32| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                animator_ops::set_playing(&mut e, false);
+            if let Some(mut c) = scene.world.animator_mut(id) {
+                animator_ops::set_playing(&mut c, false);
             }
             Ok(())
         }),
@@ -118,8 +118,8 @@ fn register_pause_resume<'lua, 'scope>(
         "Pause",
         scope.create_function(|_, id: u32| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                animator_ops::set_freeze(&mut e, true);
+            if let Some(mut c) = scene.world.animator_mut(id) {
+                animator_ops::set_freeze(&mut c, true);
             }
             Ok(())
         }),
@@ -130,8 +130,8 @@ fn register_pause_resume<'lua, 'scope>(
         "Resume",
         scope.create_function(|_, id: u32| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                animator_ops::set_freeze(&mut e, false);
+            if let Some(mut c) = scene.world.animator_mut(id) {
+                animator_ops::set_freeze(&mut c, false);
             }
             Ok(())
         }),
@@ -150,8 +150,8 @@ fn register_set_looping<'lua, 'scope>(
         "SetLooping",
         scope.create_function(|_, (id, looping): (u32, bool)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                animator_ops::set_looping(&mut e, looping);
+            if let Some(mut c) = scene.world.animator_mut(id) {
+                animator_ops::set_looping(&mut c, looping);
             }
             Ok(())
         }),

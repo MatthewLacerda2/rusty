@@ -19,19 +19,17 @@ use glam::Vec3;
 fn raycast_matches_engine_cast_through_rapier() {
     let mut raw = Scene::new();
     let target = raw.add_entity("Target".to_string());
-    if let Some(mut e) = raw.get_entity_mut(target) {
-        e.transform.position = Vec3::new(0.0, 0.0, 5.0);
-        e.is_static = true;
-        e.collider = Some(ColliderComponent {
-            active: true,
-            shape: ColliderShape::Box {
-                size: Vec3::splat(2.0),
-            },
-            is_trigger: false,
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
-        });
-    }
+    raw.world.transform_mut(target).unwrap().position = Vec3::new(0.0, 0.0, 5.0);
+    raw.world.set_static(target, true);
+    raw.world.set_collider(target, Some(ColliderComponent {
+        active: true,
+        shape: ColliderShape::Box {
+            size: Vec3::splat(2.0),
+        },
+        is_trigger: false,
+        aabb_min: Vec3::ZERO,
+        aabb_max: Vec3::ZERO,
+    });
     let scene = Rc::new(RefCell::new(raw));
     let input = Rc::new(RefCell::new(InputState::new()));
     let nav = Rc::new(RefCell::new(NavigationGraph::new(
@@ -74,17 +72,15 @@ fn raycast_matches_engine_cast_through_rapier() {
 fn manager_with_dynamic_body() -> (ScriptManager, Rc<RefCell<Option<PhysicsWorld>>>, u32) {
     let mut raw = Scene::new();
     let id = raw.add_entity("Body".to_string());
-    if let Some(mut e) = raw.get_entity_mut(id) {
-        e.rigidbody = Some(RigidBodyComponent {
-            active: true,
-            is_kinematic: false,
-            mass: 1.0,
-            velocity: Vec3::ZERO,
-            angular_velocity: Vec3::ZERO,
-            use_gravity: false,
-            collision_detection: CollisionDetection::Discrete,
-        });
-    }
+    raw.world.set_rigidbody(id, Some(RigidBodyComponent {
+        active: true,
+        is_kinematic: false,
+        mass: 1.0,
+        velocity: Vec3::ZERO,
+        angular_velocity: Vec3::ZERO,
+        use_gravity: false,
+        collision_detection: CollisionDetection::Discrete,
+    });
     let scene = Rc::new(RefCell::new(raw));
     let input = Rc::new(RefCell::new(InputState::new()));
     let nav = Rc::new(RefCell::new(NavigationGraph::new(

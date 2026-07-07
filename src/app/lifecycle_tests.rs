@@ -27,7 +27,7 @@ fn world_with_script(code: &str) -> (GameWorld, Rc<RefCell<ConsoleLogs>>, u32) {
 
     let mut s = Scene::new();
     let id = s.add_entity("Scripted".to_string());
-    s.get_entity_mut(id).unwrap().scripts = vec![ScriptComponent {
+    *s.world.scripts_mut(id).unwrap() = vec![ScriptComponent {
         path: script.to_string_lossy().replace('\\', "/"),
         ..Default::default()
     }];
@@ -74,7 +74,7 @@ fn destroy_during_play_fires_disable_then_destroy_and_removes_entity() {
         "OnDisable fires immediately before OnDestroy"
     );
     assert!(
-        gw.scene().borrow().get_entity(id).is_none(),
+        !gw.scene().borrow().world.contains(id),
         "the destroyed entity is removed within the same tick"
     );
 }
@@ -103,7 +103,7 @@ fn stop_fires_no_teardown_callbacks() {
         "Stop fires neither OnDisable nor OnDestroy — the snapshot restore is a reset"
     );
     assert!(
-        gw.scene().borrow().get_entity(id).is_some(),
+        gw.scene().borrow().world.contains(id),
         "Stop restores the edit scene, so the entity is back (not destroyed)"
     );
 }

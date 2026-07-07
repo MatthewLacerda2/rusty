@@ -138,17 +138,18 @@ impl Renderer {
         // Pre-load every referenced sprite texture (mutably borrows self), then
         // build the batches in a second pass.
         let mut specs: Vec<(ParticleBlend, Option<String>, Vec<ParticleInstance>)> = Vec::new();
-        for entity in scene.iter() {
-            if !entity.active {
+        for id in scene.world.ids_with_particles() {
+            if !scene.world.is_active(id) {
                 continue;
             }
             // Emitters on a layer the camera culls don't draw (#92).
-            if !crate::scene::layer_in_mask(entity.layer, culling_mask) {
+            if !crate::scene::layer_in_mask(scene.world.layer(id), culling_mask) {
                 continue;
             }
-            let Some(emitter) = &entity.particles else {
-                continue;
-            };
+            let emitter = scene
+                .world
+                .particles(id)
+                .expect("id came from ids_with_particles");
             if emitter.runtime.particles.is_empty() {
                 continue;
             }

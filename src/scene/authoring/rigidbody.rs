@@ -16,56 +16,42 @@
 
 use glam::Vec3;
 
-use crate::components::{CollisionDetection, Entity};
+use crate::components::{CollisionDetection, RigidBodyComponent};
 
 /// Set the rigidbody's `active` flag.
-pub fn set_active(entity: &mut Entity, active: bool) {
-    if let Some(rb) = &mut entity.rigidbody {
-        rb.active = active;
-    }
+pub fn set_active(rb: &mut RigidBodyComponent, active: bool) {
+    rb.active = active;
 }
 
 /// Set the rigidbody's `is_kinematic` flag.
-pub fn set_kinematic(entity: &mut Entity, is_kinematic: bool) {
-    if let Some(rb) = &mut entity.rigidbody {
-        rb.is_kinematic = is_kinematic;
-    }
+pub fn set_kinematic(rb: &mut RigidBodyComponent, is_kinematic: bool) {
+    rb.is_kinematic = is_kinematic;
 }
 
 /// Set the rigidbody's `use_gravity` flag.
-pub fn set_use_gravity(entity: &mut Entity, use_gravity: bool) {
-    if let Some(rb) = &mut entity.rigidbody {
-        rb.use_gravity = use_gravity;
-    }
+pub fn set_use_gravity(rb: &mut RigidBodyComponent, use_gravity: bool) {
+    rb.use_gravity = use_gravity;
 }
 
 /// Set the rigidbody's mass, clamped to `[0.01, 1000.0]` (the editor card's range;
 /// the clamp lives HERE, once, so a script set is bounded the same way).
-pub fn set_mass(entity: &mut Entity, mass: f32) {
-    if let Some(rb) = &mut entity.rigidbody {
-        rb.mass = mass.clamp(0.01, 1000.0);
-    }
+pub fn set_mass(rb: &mut RigidBodyComponent, mass: f32) {
+    rb.mass = mass.clamp(0.01, 1000.0);
 }
 
 /// Set the rigidbody's linear velocity.
-pub fn set_velocity(entity: &mut Entity, velocity: Vec3) {
-    if let Some(rb) = &mut entity.rigidbody {
-        rb.velocity = velocity;
-    }
+pub fn set_velocity(rb: &mut RigidBodyComponent, velocity: Vec3) {
+    rb.velocity = velocity;
 }
 
 /// Set the rigidbody's angular velocity (radians/sec per axis).
-pub fn set_angular_velocity(entity: &mut Entity, angular_velocity: Vec3) {
-    if let Some(rb) = &mut entity.rigidbody {
-        rb.angular_velocity = angular_velocity;
-    }
+pub fn set_angular_velocity(rb: &mut RigidBodyComponent, angular_velocity: Vec3) {
+    rb.angular_velocity = angular_velocity;
 }
 
 /// Set the rigidbody's collision-detection mode (Discrete / Continuous).
-pub fn set_collision_detection(entity: &mut Entity, mode: CollisionDetection) {
-    if let Some(rb) = &mut entity.rigidbody {
-        rb.collision_detection = mode;
-    }
+pub fn set_collision_detection(rb: &mut RigidBodyComponent, mode: CollisionDetection) {
+    rb.collision_detection = mode;
 }
 
 #[cfg(test)]
@@ -77,24 +63,23 @@ mod tests {
     fn scene_with_rb() -> (Scene, u32) {
         let mut scene = Scene::new();
         let id = scene.add_entity("Body".to_string());
-        if let Some(mut e) = scene.get_entity_mut(id) {
-            e.rigidbody = Some(RigidBodyComponent {
-                active: true,
-                is_kinematic: false,
-                mass: 1.0,
-                velocity: Vec3::ZERO,
-                angular_velocity: Vec3::ZERO,
-                use_gravity: true,
-                collision_detection: CollisionDetection::Discrete,
-            });
-        }
+        let c = RigidBodyComponent {
+            active: true,
+            is_kinematic: false,
+            mass: 1.0,
+            velocity: Vec3::ZERO,
+            angular_velocity: Vec3::ZERO,
+            use_gravity: true,
+            collision_detection: CollisionDetection::Discrete,
+        };
+        scene.world.set_rigidbody(id, Some(c));
         (scene, id)
     }
 
     #[test]
     fn ops_write_through_with_mass_clamp() {
         let (mut scene, id) = scene_with_rb();
-        let mut e = scene.get_entity_mut(id).unwrap();
+        let mut e = scene.world.rigidbody_mut(id).unwrap();
         set_active(&mut e, false);
         set_kinematic(&mut e, true);
         set_use_gravity(&mut e, false);
@@ -102,7 +87,7 @@ mod tests {
         set_velocity(&mut e, Vec3::new(1.0, 2.0, 3.0));
         set_angular_velocity(&mut e, Vec3::new(0.0, 4.0, 0.0));
         set_collision_detection(&mut e, CollisionDetection::Continuous);
-        let rb = e.rigidbody.as_ref().unwrap();
+        let rb = (&*e);
         assert!(!rb.active);
         assert!(rb.is_kinematic);
         assert!(!rb.use_gravity);

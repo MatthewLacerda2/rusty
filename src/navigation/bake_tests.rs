@@ -10,9 +10,8 @@ use glam::Vec3;
 /// Adds a static box collider spanning the given world AABB to `scene`.
 fn add_box(scene: &mut Scene, name: &str, min: Vec3, max: Vec3) {
     let id = scene.add_entity(name.to_string());
-    let mut e = scene.get_entity_mut(id).expect("entity exists");
-    e.is_static = true;
-    e.collider = Some(ColliderComponent {
+    scene.world.set_static(id, true);
+    scene.world.set_collider(id, Some(ColliderComponent {
         active: true,
         shape: ColliderShape::Box { size: max - min },
         is_trigger: false,

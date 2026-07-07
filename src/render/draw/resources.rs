@@ -87,27 +87,26 @@ impl Renderer {
     ) -> SolidResources {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
         let mut out = SolidResources::default();
-        for entity in scene.iter() {
-            if !entity.active {
+        for id in scene.world.ids_with_mesh() {
+            if !scene.world.is_active(id) {
                 continue;
             }
             // During a static-cubemap capture, gather only static geometry — dynamic
             // actors must not bake into a probe/reflection (#243), mirroring the
             // shadow pass's `want_static` filter.
-            if self.static_capture && !entity.is_static {
+            if self.static_capture && !scene.world.is_static(id) {
                 continue;
             }
             // Skip meshes the active camera's culling mask excludes (#92).
-            if !crate::scene::layer_in_mask(entity.layer, cam.culling_mask) {
+            if !crate::scene::layer_in_mask(scene.world.layer(id), cam.culling_mask) {
                 continue;
             }
             // View-frustum cull (#330): skip the uniform sync, binds, and draw for any
             // entity whose world-space AABB is fully outside what this camera can see.
-            if self.is_culled(scene, &entity, frustum) {
+            if self.is_culled(scene, id, frustum) {
                 continue;
             }
-            let Some((res, world_pos, transparent)) = self.sync_solid_resource(scene, &entity)
-            else {
+            let Some((res, world_pos, transparent)) = self.sync_solid_resource(scene, id) else {
                 continue;
             };
             if transparent {
@@ -128,26 +127,21 @@ impl Renderer {
     /// tests it. An entity with no mesh, or whose geometry is not resident on the GPU yet
     /// (no cached AABB), is never culled here — the downstream sync produces no draw for it
     /// anyway, and culling a not-yet-uploaded mesh could wrongly hide it on its first frame.
-    fn is_culled(
-        &self,
-        scene: &Scene,
-        entity: &crate::components::Entity,
-        frustum: &Frustum,
-    ) -> bool {
-        let Some(mesh) = entity.mesh.as_ref() else {
+    fn is_culled(&self, scene: &Scene, id: u32, frustum: &Frustum) -> bool {
+        let Some(mesh) = scene.world.mesh(id) else {
             return false;
         };
         // Skinned meshes are never culled here — their AABB is the rest pose (#330).
         if mesh.is_skinned() {
             return false;
         }
-        let Some(gpu_mesh) = self.gpu_meshes.get(&MeshId::from_mesh(mesh)) else {
+        let Some(gpu_mesh) = self.gpu_meshes.get(&MeshId::from_mesh(&mesh)) else {
             return false;
         };
         let (min, max) = transform_aabb(
             gpu_mesh.local_aabb.0,
             gpu_mesh.local_aabb.1,
-            scene.world_matrix(entity.id),
+            scene.world_matrix(id),
         );
         !frustum.intersects_aabb(min, max)
     }
@@ -159,19 +153,19 @@ impl Renderer {
     fn sync_solid_resource(
         &mut self,
         scene: &Scene,
-        entity: &crate::components::Entity,
+        id: u32,
     ) -> Option<(SolidResource, glam::Vec3, bool)> {
-        let mesh = entity.mesh.as_ref()?;
-        let mesh_id = MeshId::from_mesh(mesh);
+        let mesh = scene.world.mesh(id)?;
+        let mesh_id = MeshId::from_mesh(&mesh);
         let num_indices = self.gpu_meshes.get(&mesh_id)?.num_indices;
 
-        let material = scene.material_of(entity);
+        let material = scene.material_asset_of(id);
         let transparent = material.is_some_and(MaterialAsset::is_transparent);
-        let model_matrix = scene.world_matrix(entity.id);
+        let model_matrix = scene.world_matrix(id);
         let world_pos = model_matrix.w_axis.truncate();
         let uniform = crate::render::draw::uniforms::solid_entity_uniform(
             scene,
-            entity,
+            id,
             material,
             model_matrix,
             self.capture_probe_bounce,
@@ -199,12 +193,12 @@ impl Renderer {
             palette: &palette,
             material_sig,
         };
-        self.sync_entity_slot(entity.id, update, |s| {
+        self.sync_entity_slot(id, update, |s| {
             let maps = std::array::from_fn(|i| s.resolve_map(paths[i].as_ref()));
             s.material_bind_group(&maps)
         });
 
-        Some(((entity.id, mesh_id, num_indices), world_pos, transparent))
+        Some(((id, mesh_id, num_indices), world_pos, transparent))
     }
 
     /// Resolve a material map path to a resident GPU texture, falling back to the

@@ -69,8 +69,8 @@ fn register_velocity<'lua, 'scope>(
         "SetVelocity",
         scope.create_function(|_, (id, vx, vy, vz): (u32, f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                rb_ops::set_velocity(&mut e, Vec3::new(vx, vy, vz));
+            if let Some(mut c) = scene.world.rigidbody_mut(id) {
+                rb_ops::set_velocity(&mut c, Vec3::new(vx, vy, vz));
             }
             Ok(())
         }),
@@ -105,8 +105,8 @@ fn register_angular<'lua, 'scope>(
         "SetAngularVelocity",
         scope.create_function(|_, (id, wx, wy, wz): (u32, f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                rb_ops::set_angular_velocity(&mut e, Vec3::new(wx, wy, wz));
+            if let Some(mut c) = scene.world.rigidbody_mut(id) {
+                rb_ops::set_angular_velocity(&mut c, Vec3::new(wx, wy, wz));
             }
             Ok(())
         }),
@@ -127,8 +127,7 @@ fn register_collision_detection<'lua, 'scope>(
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
             let mode = scene
-                .get_entity(id)
-                .and_then(|e| e.rigidbody.as_ref().map(|rb| rb.collision_detection))
+                .world.rigidbody(id).map(|rb| rb.collision_detection)
                 .unwrap_or_default();
             Ok(mode.as_str().to_string())
         }),
@@ -144,8 +143,8 @@ fn register_collision_detection<'lua, 'scope>(
                 ))
             })?;
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                rb_ops::set_collision_detection(&mut e, mode);
+            if let Some(mut c) = scene.world.rigidbody_mut(id) {
+                rb_ops::set_collision_detection(&mut c, mode);
             }
             Ok(())
         }),
@@ -185,8 +184,8 @@ fn register_force<'lua, 'scope>(
         "SetKinematic",
         scope.create_function(|_, (id, is_kinematic): (u32, bool)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                rb_ops::set_kinematic(&mut e, is_kinematic);
+            if let Some(mut c) = scene.world.rigidbody_mut(id) {
+                rb_ops::set_kinematic(&mut c, is_kinematic);
             }
             Ok(())
         }),
