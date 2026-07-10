@@ -21,83 +21,47 @@ pub(in crate::ecs) struct Core {
     pub children: Vec<u32>,
 }
 
+/// Attach each `Some` value in `$field` to the builder; a `None` simply
+/// leaves that column unattached. Keeps `build_bundle` under the function
+/// line cap despite the component list being long.
+macro_rules! add_present {
+    ($b:expr, $($field:expr),* $(,)?) => {
+        $( if let Some(v) = $field { $b.add(v); } )*
+    };
+}
+
 /// Build the full component bundle for one `Entity` document — the mandatory
-/// core/name/transform/scripts plus every present optional component.
+/// core/name/transform/scripts plus every present optional component. Moves
+/// fields directly off `entity` (a series of partial moves) rather than one
+/// big destructure pattern, to stay well under the function line cap.
 pub(in crate::ecs) fn build_bundle(entity: Entity) -> hecs::EntityBuilder {
-    let Entity {
-        id,
-        name,
-        active,
-        is_static,
-        layer,
-        transform,
-        mesh,
-        material,
-        pending_material,
-        scripts,
-        animator,
-        light,
-        collider,
-        rigidbody,
-        nav_agent,
-        camera,
-        visual_correction,
-        particles,
-        audio,
-        prefab_link,
-        parent_id,
-        children,
-    } = entity;
     let mut b = hecs::EntityBuilder::new();
     b.add(Core {
-        id,
-        active,
-        is_static,
-        layer,
-        parent_id,
-        children,
+        id: entity.id,
+        active: entity.active,
+        is_static: entity.is_static,
+        layer: entity.layer,
+        parent_id: entity.parent_id,
+        children: entity.children,
     });
-    b.add(name);
-    b.add(transform);
-    b.add(scripts);
-    if let Some(v) = mesh {
-        b.add(v);
-    }
-    if let Some(v) = material {
-        b.add(v);
-    }
-    if let Some(v) = pending_material {
-        b.add(v);
-    }
-    if let Some(v) = animator {
-        b.add(v);
-    }
-    if let Some(v) = light {
-        b.add(v);
-    }
-    if let Some(v) = collider {
-        b.add(v);
-    }
-    if let Some(v) = rigidbody {
-        b.add(v);
-    }
-    if let Some(v) = nav_agent {
-        b.add(v);
-    }
-    if let Some(v) = camera {
-        b.add(v);
-    }
-    if let Some(v) = visual_correction {
-        b.add(v);
-    }
-    if let Some(v) = particles {
-        b.add(v);
-    }
-    if let Some(v) = audio {
-        b.add(v);
-    }
-    if let Some(v) = prefab_link {
-        b.add(v);
-    }
+    b.add(entity.name);
+    b.add(entity.transform);
+    b.add(entity.scripts);
+    add_present!(
+        b,
+        entity.mesh,
+        entity.material,
+        entity.pending_material,
+        entity.animator,
+        entity.light,
+        entity.collider,
+        entity.rigidbody,
+        entity.nav_agent,
+        entity.camera,
+        entity.visual_correction,
+        entity.particles,
+        entity.audio,
+        entity.prefab_link,
+    );
     b
 }
