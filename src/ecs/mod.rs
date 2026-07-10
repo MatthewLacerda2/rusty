@@ -16,6 +16,7 @@
 //! Allowed deps: hecs, components.
 
 pub mod access;
+mod bundle;
 pub mod core;
 pub mod world;
 

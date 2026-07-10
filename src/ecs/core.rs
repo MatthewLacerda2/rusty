@@ -19,7 +19,7 @@ use crate::components::{
 };
 
 use super::access::{CompMut, CompRef};
-use super::world::Core;
+use super::bundle::Core;
 use super::world::World;
 
 impl World {
@@ -177,10 +177,6 @@ impl World {
     /// stable id keep their slots. Returns `false` when the entity does not
     /// exist.
     pub fn replace_entity(&mut self, entity: Entity) -> bool {
-        if !self.contains(entity.id) {
-            return false;
-        }
-        self.write_components(entity);
-        true
+        self.overwrite(entity)
     }
 }

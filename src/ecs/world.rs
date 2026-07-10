@@ -17,27 +17,19 @@
 //! `has_component`/`with_pair_mut` helpers are the ONLY place raw hecs column
 //! access happens; `access.rs` and `core.rs` build the typed, named surface on
 //! top of them. `Entity` stays the on-disk *document* shape (see
-//! `components::entity`) — `write_components`/`entity_document` are the
-//! decompose/recompose bridge between the document and the columns.
+//! `components::entity`) — `bundle::build_bundle`, used by `place`/
+//! `overwrite`, decomposes a document into one `EntityBuilder` placement (a
+//! single archetype move rather than N sequential per-column migrations);
+//! `core.rs`'s `entity_document` recomposes one back out through the named
+//! accessors.
 
 use std::collections::HashMap;
 
 use crate::components::Entity;
 
-pub(in crate::ecs) use hecs::{Ref, RefMut};
+use super::bundle::{build_bundle, Core};
 
-/// The slim mandatory identity/hierarchy core every GameObject has (#343's
-/// "core component"). Everything else — name, transform, scripts, and every
-/// optional first-class component — is its own separately-attached hecs
-/// column so narrow queries (#346) can skip entities that lack it.
-pub(in crate::ecs) struct Core {
-    pub id: u32,
-    pub active: bool,
-    pub is_static: bool,
-    pub layer: u8,
-    pub parent_id: Option<u32>,
-    pub children: Vec<u32>,
-}
+pub(in crate::ecs) use hecs::{Ref, RefMut};
 
 pub struct World {
     inner: hecs::World,
@@ -92,10 +84,7 @@ impl World {
     pub fn spawn(&mut self, name: String) -> u32 {
         let id = self.next_id;
         self.next_id += 1;
-        let handle = self.inner.spawn(());
-        self.handles.insert(id, handle);
-        self.order.push(id);
-        self.write_components(Entity::new(id, name));
+        self.place(Entity::new(id, name));
         id
     }
 
@@ -103,14 +92,10 @@ impl World {
     /// from disk), decomposing it into the mandatory + optional columns. The
     /// entity's `id` is honoured; `next_id` is advanced past it.
     pub fn insert_entity(&mut self, entity: Entity) {
-        let id = entity.id;
-        let handle = self.inner.spawn(());
-        self.handles.insert(id, handle);
-        self.order.push(id);
-        if id >= self.next_id {
-            self.next_id = id + 1;
+        if entity.id >= self.next_id {
+            self.next_id = entity.id + 1;
         }
-        self.write_components(entity);
+        self.place(entity);
     }
 
     /// Despawn an entity by stable id.
@@ -137,8 +122,14 @@ impl World {
     /// Matches the legacy `Scene::find_entity_by_name` semantics.
     pub fn find_by_name(&self, name: &str) -> Option<u32> {
         self.order.iter().copied().find(|&id| {
-            self.component::<String>(id).is_some_and(|n| *n == *name)
-                && self.component::<Core>(id).is_some_and(|c| c.active)
+            let Some(&handle) = self.handles.get(&id) else {
+                return false;
+            };
+            self.inner
+                .query_one::<(&String, &Core)>(handle)
+                .ok()
+                .and_then(|mut q| q.get().map(|(n, c)| *n == *name && c.active))
+                .unwrap_or(false)
         })
     }
 
@@ -220,60 +211,32 @@ impl World {
         Some(f(a, b))
     }
 
-    /// Decompose an `Entity` document into its mandatory + optional columns
-    /// and write them onto an already-registered handle — the shared bridge
-    /// `spawn`/`insert_entity`/`replace_entity` all route through.
-    pub(in crate::ecs) fn write_components(&mut self, entity: Entity) {
-        let Entity {
-            id,
-            name,
-            active,
-            is_static,
-            layer,
-            transform,
-            mesh,
-            material,
-            pending_material,
-            scripts,
-            animator,
-            light,
-            collider,
-            rigidbody,
-            nav_agent,
-            camera,
-            visual_correction,
-            particles,
-            audio,
-            prefab_link,
-            parent_id,
-            children,
-        } = entity;
-        self.set_component(
-            id,
-            Some(Core {
-                id,
-                active,
-                is_static,
-                layer,
-                parent_id,
-                children,
-            }),
-        );
-        self.set_component(id, Some(name));
-        self.set_component(id, Some(transform));
-        self.set_component(id, Some(scripts));
-        self.set_component(id, mesh);
-        self.set_component(id, material);
-        self.set_component(id, pending_material);
-        self.set_component(id, animator);
-        self.set_component(id, light);
-        self.set_component(id, collider);
-        self.set_component(id, rigidbody);
-        self.set_component(id, nav_agent);
-        self.set_component(id, camera);
-        self.set_component(id, visual_correction);
-        self.set_component(id, particles);
-        self.set_component(id, audio);
-        self.set_component(id, prefab_link);
+    /// Spawn a brand-new hecs entity carrying every column of `entity` at
+    /// once — a single archetype placement via `EntityBuilder`, instead of N
+    /// sequential `insert_one` calls that would each re-migrate the entity
+    /// through its own archetype (O(k) placement, not O(k²) migration).
+    fn place(&mut self, entity: Entity) {
+        let id = entity.id;
+        let mut builder = build_bundle(entity);
+        let handle = self.inner.spawn(builder.build());
+        self.handles.insert(id, handle);
+        self.order.push(id);
+    }
+
+    /// Decompose an `Entity` document and overwrite a LIVE entity's whole
+    /// column set with it in one placement (despawn + respawn under the same
+    /// stable id) — `replace_entity`'s bridge. Despawning first guarantees no
+    /// column absent from the new document survives stale. Returns `false`
+    /// when the entity does not exist.
+    pub(in crate::ecs) fn overwrite(&mut self, entity: Entity) -> bool {
+        let id = entity.id;
+        let Some(&old_handle) = self.handles.get(&id) else {
+            return false;
+        };
+        let _ = self.inner.despawn(old_handle);
+        let mut builder = build_bundle(entity);
+        let new_handle = self.inner.spawn(builder.build());
+        self.handles.insert(id, new_handle);
+        true
     }
 }
