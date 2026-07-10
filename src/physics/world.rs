@@ -88,7 +88,9 @@ impl PhysicsWorld {
     }
 
     fn build_bodies(&mut self, scene: &Scene) {
-        for id in scene.entity_ids() {
+        // Narrow query (#346): only entities carrying a collider can yield a
+        // body; `collider_inputs` still rejects inactive/degenerate ones.
+        for id in scene.world.ids_with_collider() {
             let Some(inp) = collider_inputs(&scene.world, id) else {
                 continue;
             };

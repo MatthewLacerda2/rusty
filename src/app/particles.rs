@@ -24,7 +24,7 @@ use crate::physics::PhysicsWorld;
 /// into the play loop, now a canonical `fn(&mut World, &mut Resources)` system.
 pub(super) fn tick_particles(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
-    let ids = world.scene.borrow().entity_ids();
+    let ids = world.scene.borrow().world.ids_with_particles();
     for id in ids {
         // Pull the emitter + spawn origin out, simulate, then write it back. Taking
         // the component out avoids holding the scene borrow across the physics

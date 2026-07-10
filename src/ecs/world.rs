@@ -39,6 +39,9 @@ pub struct World {
     order: Vec<u32>,
     /// Monotonic stable-id allocator (mirrors the legacy `next_entity_id`).
     next_id: u32,
+    /// Monotonic insertion-sequence allocator: each `place` stamps `Core::seq`
+    /// from it so narrow queries can sort matches back into insertion order.
+    next_seq: u64,
 }
 
 impl Default for World {
@@ -54,6 +57,7 @@ impl World {
             handles: HashMap::new(),
             order: Vec::new(),
             next_id: 1,
+            next_seq: 0,
         }
     }
 
@@ -112,6 +116,7 @@ impl World {
         self.handles.clear();
         self.order.clear();
         self.next_id = 1;
+        self.next_seq = 0;
     }
 
     pub fn contains(&self, id: u32) -> bool {
@@ -166,6 +171,23 @@ impl World {
         self.component::<T>(id).is_some()
     }
 
+    /// Stable ids of the entities carrying component `T`, in insertion order —
+    /// the narrow query (#346). Cost tracks the carrier population, not the
+    /// scene: hecs yields only matching archetypes (O(k)), and the sort on
+    /// `Core::seq` (O(k log k)) restores the insertion order hecs's
+    /// per-archetype iteration doesn't provide.
+    pub(in crate::ecs) fn ids_with_component<T: hecs::Component>(&self) -> Vec<u32> {
+        let mut matches: Vec<(u64, u32)> = self
+            .inner
+            .query::<&Core>()
+            .with::<&T>()
+            .iter()
+            .map(|(_, core)| (core.seq, core.id))
+            .collect();
+        matches.sort_unstable_by_key(|&(seq, _)| seq);
+        matches.into_iter().map(|(_, id)| id).collect()
+    }
+
     /// Attach (`Some`) or detach (`None`) a component column. Returns `false`
     /// when the entity does not exist.
     pub(in crate::ecs) fn set_component<T: hecs::Component>(
@@ -217,7 +239,9 @@ impl World {
     /// through its own archetype (O(k) placement, not O(k²) migration).
     fn place(&mut self, entity: Entity) {
         let id = entity.id;
-        let mut builder = build_bundle(entity);
+        let seq = self.next_seq;
+        self.next_seq += 1;
+        let mut builder = build_bundle(entity, seq);
         let handle = self.inner.spawn(builder.build());
         self.handles.insert(id, handle);
         self.order.push(id);
@@ -233,8 +257,15 @@ impl World {
         let Some(&old_handle) = self.handles.get(&id) else {
             return false;
         };
+        // The entity keeps its slot in insertion order (`self.order` is not
+        // touched), so it must also keep its sequence stamp — a fresh one
+        // would let narrow queries sort it to the back.
+        let seq = match self.inner.get::<&Core>(old_handle) {
+            Ok(core) => core.seq,
+            Err(_) => return false,
+        };
         let _ = self.inner.despawn(old_handle);
-        let mut builder = build_bundle(entity);
+        let mut builder = build_bundle(entity, seq);
         let new_handle = self.inner.spawn(builder.build());
         self.handles.insert(id, new_handle);
         true
