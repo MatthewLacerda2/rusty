@@ -25,10 +25,11 @@ fn wall_and_projectile(mode: CollisionDetection) -> (Scene, PhysicsWorld, u32) {
     let mut scene = Scene::new();
 
     let wall = scene.add_entity("Wall".to_string());
-    if let Some(mut e) = scene.get_entity_mut(wall) {
-        e.transform.position = Vec3::new(WALL_X, 0.0, 0.0);
-        e.is_static = true;
-        e.collider = Some(ColliderComponent {
+    scene.world.transform_mut(wall).unwrap().position = Vec3::new(WALL_X, 0.0, 0.0);
+    scene.world.set_static(wall, true);
+    scene.world.set_collider(
+        wall,
+        Some(ColliderComponent {
             active: true,
             shape: ColliderShape::Box {
                 size: Vec3::new(0.2, 4.0, 4.0),
@@ -36,20 +37,24 @@ fn wall_and_projectile(mode: CollisionDetection) -> (Scene, PhysicsWorld, u32) {
             is_trigger: false,
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
-        });
-    }
+        }),
+    );
 
     let sphere = scene.add_entity("Bullet".to_string());
-    if let Some(mut e) = scene.get_entity_mut(sphere) {
-        e.transform.position = Vec3::ZERO;
-        e.collider = Some(ColliderComponent {
+    scene.world.transform_mut(sphere).unwrap().position = Vec3::ZERO;
+    scene.world.set_collider(
+        sphere,
+        Some(ColliderComponent {
             active: true,
             shape: ColliderShape::Sphere { radius: 0.25 },
             is_trigger: false,
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
-        });
-        e.rigidbody = Some(RigidBodyComponent {
+        }),
+    );
+    scene.world.set_rigidbody(
+        sphere,
+        Some(RigidBodyComponent {
             active: true,
             is_kinematic: false,
             mass: 1.0,
@@ -59,8 +64,8 @@ fn wall_and_projectile(mode: CollisionDetection) -> (Scene, PhysicsWorld, u32) {
             angular_velocity: Vec3::ZERO,
             use_gravity: false,
             collision_detection: mode,
-        });
-    }
+        }),
+    );
 
     let world = PhysicsWorld::from_scene(&scene);
     (scene, world, sphere)
@@ -72,10 +77,7 @@ fn final_x(mode: CollisionDetection) -> f32 {
     for _ in 0..3 {
         world.step(&mut scene, DT);
     }
-    scene
-        .get_entity(sphere)
-        .map(|e| e.transform.position.x)
-        .unwrap()
+    scene.world.transform(sphere).map(|t| t.position.x).unwrap()
 }
 
 #[test]

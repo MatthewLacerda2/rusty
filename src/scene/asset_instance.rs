@@ -51,10 +51,12 @@ pub fn instantiate_asset(
 
     let label = name.unwrap_or(&asset_ref.sub_object);
     let id = scene.add_entity(label.to_string());
-    if let Some(mut entity) = scene.get_entity_mut(id) {
-        entity.transform.position = position;
-        entity.mesh = Some(crate::scene::asset_mesh_component(reference));
+    if let Some(mut transform) = scene.world.transform_mut(id) {
+        transform.position = position;
     }
+    scene
+        .world
+        .set_mesh(id, Some(crate::scene::asset_mesh_component(reference)));
 
     apply_material(scene, id, &asset_ref.path, &asset, &asset_ref.sub_object);
     if sync_collider(scene, id, &asset_ref.path, &asset, &asset_ref.sub_object) {
@@ -74,9 +76,9 @@ fn apply_material(scene: &mut Scene, id: u32, path: &str, asset: &ImportedAsset,
         .and_then(|idx| import_material(scene, path, asset, idx));
     match key {
         Some(key) => {
-            if let Some(mut entity) = scene.get_entity_mut(id) {
-                entity.material = Some(MaterialComponent { material: key });
-            }
+            scene
+                .world
+                .set_material(id, Some(MaterialComponent { material: key }));
         }
         None => {
             crate::scene::authoring::attach_default_material(scene, id);
@@ -117,15 +119,14 @@ fn sync_collider(scene: &mut Scene, id: u32, path: &str, asset: &ImportedAsset, 
     let Some((min, max)) = asset.sub_mesh(sub).and_then(|s| s.bounds()) else {
         return false;
     };
-    if let Some(mut entity) = scene.get_entity_mut(id) {
-        entity.collider = Some(ColliderComponent::from_mesh_bounds(
+    scene.world.set_collider(
+        id,
+        Some(ColliderComponent::from_mesh_bounds(
             kind.is_convex(),
             min,
             max,
-        ));
-        return true;
-    }
-    false
+        )),
+    )
 }
 
 #[cfg(test)]

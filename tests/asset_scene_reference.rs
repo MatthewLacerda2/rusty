@@ -29,20 +29,12 @@ fn asset_mesh_reference_rehydrates_on_load() {
 
     let mut scene = Scene::new();
     let id = scene.add_entity("Quad".to_string());
-    scene.get_entity_mut(id).unwrap().mesh = Some(rusty::scene::asset_mesh_component(&reference));
+    scene
+        .world
+        .set_mesh(id, Some(rusty::scene::asset_mesh_component(&reference)));
 
     // The component imported geometry up front.
-    assert_eq!(
-        scene
-            .get_entity(id)
-            .unwrap()
-            .mesh
-            .as_ref()
-            .unwrap()
-            .vertices
-            .len(),
-        4
-    );
+    assert_eq!(scene.world.mesh(id).unwrap().vertices.len(), 4);
 
     let path = tmp("rusty_asset_ref.scene");
     scene.save_to_file(path.to_str().unwrap()).unwrap();
@@ -61,7 +53,7 @@ fn asset_mesh_reference_rehydrates_on_load() {
     // Loading re-imports the file and rebuilds the geometry from the reference.
     let mut loaded = Scene::new();
     loaded.load_from_file(path.to_str().unwrap()).unwrap();
-    let mesh = loaded.get_entity(id).unwrap().mesh.clone().unwrap();
+    let mesh = loaded.world.mesh(id).unwrap().clone();
     assert_eq!(mesh.primitive_type, "Asset");
     assert_eq!(mesh.asset_ref.as_deref(), Some(reference.as_str()));
     assert_eq!(mesh.vertices.len(), 4);

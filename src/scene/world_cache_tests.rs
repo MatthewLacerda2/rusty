@@ -9,9 +9,9 @@ fn nested_chain(scene: &mut Scene) -> (u32, u32, u32) {
     let gp = scene.add_entity("grandparent".into());
     let p = scene.add_entity("parent".into());
     let c = scene.add_entity("child".into());
-    scene.get_entity_mut(gp).unwrap().transform.position = Vec3::new(1.0, 0.0, 0.0);
-    scene.get_entity_mut(p).unwrap().transform.position = Vec3::new(2.0, 0.0, 0.0);
-    scene.get_entity_mut(c).unwrap().transform.position = Vec3::new(4.0, 0.0, 0.0);
+    scene.world.transform_mut(gp).unwrap().position = Vec3::new(1.0, 0.0, 0.0);
+    scene.world.transform_mut(p).unwrap().position = Vec3::new(2.0, 0.0, 0.0);
+    scene.world.transform_mut(c).unwrap().position = Vec3::new(4.0, 0.0, 0.0);
     scene.set_parent(p, Some(gp)).unwrap();
     scene.set_parent(c, Some(p)).unwrap();
     (gp, p, c)
@@ -47,7 +47,7 @@ fn a_refresh_makes_a_mid_tick_transform_write_observable() {
     assert_eq!(world_translation(&scene, c), Vec3::new(7.0, 0.0, 0.0));
 
     // A "script Update" moves the grandparent (+10 on X) mid-tick.
-    scene.get_entity_mut(gp).unwrap().transform.position = Vec3::new(11.0, 0.0, 0.0);
+    scene.world.transform_mut(gp).unwrap().position = Vec3::new(11.0, 0.0, 0.0);
 
     // Until the next refresh the cache still reports the as-of-refresh value (contract),
     // while the live walk already sees the write.
@@ -72,7 +72,7 @@ fn a_cache_miss_falls_back_to_the_live_walk_never_stale_wrong() {
     scene.refresh_world_matrices();
 
     let late = scene.add_entity("spawned-after-refresh".into());
-    scene.get_entity_mut(late).unwrap().transform.position = Vec3::new(5.0, 6.0, 7.0);
+    scene.world.transform_mut(late).unwrap().position = Vec3::new(5.0, 6.0, 7.0);
 
     // `late` was never cached, yet the read is correct via fallback.
     assert_eq!(world_translation(&scene, late), Vec3::new(5.0, 6.0, 7.0));

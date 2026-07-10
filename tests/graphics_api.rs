@@ -15,33 +15,37 @@ use rusty::scene::Scene;
 fn scene_with_volume() -> Rc<RefCell<Scene>> {
     let mut scene = Scene::new();
     let id = scene.add_entity("PostFx".to_string());
-    let mut e = scene.get_entity_mut(id).unwrap();
-    e.visual_correction = Some(VisualCorrectionComponent {
-        active: true,
-        bloom_active: false,
-        bloom_intensity: 1.0,
-        bloom_threshold: 0.8,
-        exposure: 0.0,
-        contrast: 1.0,
-        saturation: 1.0,
-        ssr_active: false,
-        ssr_quality: "Low".to_string(),
-        ssr_temporal_upsampling: false,
-        tonemap: Tonemap::Aces,
-        gamma: 2.2,
-    });
-    e.camera = Some(CameraComponent {
-        active: true,
-        fov: 60.0,
-        near: 0.1,
-        far: 100.0,
-        culling_mask: u32::MAX,
-        render_order: 0,
-        clear_flags: ClearFlags::Skybox,
-        motion_blur_active: false,
-        motion_blur_samples: 8,
-    });
-    drop(e);
+    scene.world.set_visual_correction(
+        id,
+        Some(VisualCorrectionComponent {
+            active: true,
+            bloom_active: false,
+            bloom_intensity: 1.0,
+            bloom_threshold: 0.8,
+            exposure: 0.0,
+            contrast: 1.0,
+            saturation: 1.0,
+            ssr_active: false,
+            ssr_quality: "Low".to_string(),
+            ssr_temporal_upsampling: false,
+            tonemap: Tonemap::Aces,
+            gamma: 2.2,
+        }),
+    );
+    scene.world.set_camera(
+        id,
+        Some(CameraComponent {
+            active: true,
+            fov: 60.0,
+            near: 0.1,
+            far: 100.0,
+            culling_mask: u32::MAX,
+            render_order: 0,
+            clear_flags: ClearFlags::Skybox,
+            motion_blur_active: false,
+            motion_blur_samples: 8,
+        }),
+    );
     Rc::new(RefCell::new(scene))
 }
 
@@ -66,7 +70,8 @@ fn bloom_and_color_round_trip() {
         .unwrap();
 
         let s = scene.borrow();
-        let vc = s.iter().next().unwrap().visual_correction.clone().unwrap();
+        let id = s.entity_ids()[0];
+        let vc = s.world.visual_correction(id).unwrap().clone();
         assert!(vc.bloom_active);
         assert_eq!(vc.bloom_intensity, 3.5);
         assert_eq!(vc.exposure, 1.25);
@@ -94,7 +99,8 @@ fn motion_blur_samples_are_clamped() {
             .exec()
             .unwrap();
         let s = scene.borrow();
-        let cam = s.iter().next().unwrap().camera.clone().unwrap();
+        let id = s.entity_ids()[0];
+        let cam = s.world.camera(id).unwrap().clone();
         assert!(cam.motion_blur_active);
         assert_eq!(cam.motion_blur_samples, 32, "clamped into 2..=32");
         Ok(())

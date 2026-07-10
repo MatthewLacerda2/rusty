@@ -55,9 +55,8 @@ fn tick(time: &RefCell<Time>) -> u64 {
 /// Returns `None` when the entity has no `AudioSource`.
 fn source_clip_pos(scene: &RefCell<Scene>, id: u32) -> Option<(String, [f32; 3])> {
     let scene = scene.borrow();
-    let e = scene.get_entity(id)?;
-    let src = e.audio.as_ref()?;
-    let p = e.transform.position;
+    let src = scene.world.audio(id)?;
+    let p = scene.world.transform(id)?.position;
     Some((src.clip.clone(), [p.x, p.y, p.z]))
 }
 
@@ -76,7 +75,7 @@ fn register_source_control<'lua, 'scope>(
         "Play",
         scope.create_function(|_, id: u32| {
             let now = tick(time);
-            let src = scene.borrow().get_entity(id).and_then(|e| e.audio.clone());
+            let src = scene.borrow().world.audio(id).map(|c| c.clone());
             let pos = src
                 .as_ref()
                 .and_then(|_| source_clip_pos(scene, id))
@@ -170,14 +169,13 @@ fn register_spatial<'lua, 'scope>(
         table,
         "GetSpatial",
         scope.create_function(|_, id: u32| {
-            let Some((src, pos)) = ({
-                let scene = scene.borrow();
-                scene.get_entity(id).and_then(|e| {
-                    let s = e.audio.as_ref()?.clone();
-                    let p = e.transform.position;
-                    Some((s, p))
-                })
-            }) else {
+            let scene_ref = scene.borrow();
+            let Some((src, pos)) = scene_ref
+                .world
+                .audio(id)
+                .map(|a| a.clone())
+                .zip(scene_ref.world.transform(id).map(|t| t.position))
+            else {
                 // No source: report silent + centred + not playing.
                 return Ok((0.0_f32, 0.0_f32, false));
             };

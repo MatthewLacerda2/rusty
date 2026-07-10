@@ -14,7 +14,7 @@ result is written to `.lint/report.txt` so an agent can read exactly what failed
 | Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation` |
 | Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
-| Editor↔shared-op parity | `tools/lint -- --parity` | every *migrated* first-class component's inspector card routes its mutations through a shared `scene::authoring` op (no direct `&mut entity.<field>`), minus the burn-down baseline |
+| Editor↔shared-op parity | `tools/lint -- --parity` | every *migrated* first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard), minus the burn-down baseline |
 
 ## The `*_tests.rs` sibling rule
 The tight test cap exists to discourage over-splitting a bundle of `#[test]`s. But a
@@ -87,17 +87,17 @@ This gate keeps migrated cards honest. It discovers components the same way
 `--components` does — from `Entity`'s `Option<…Component>` fields — and, for each one
 that has an inspector card, classifies the card as:
 
-- **routed** — reads fields immutably and routes every write through an
-  `authoring::…` op (like the migrated `material` card). Detaching the reference on
-  remove (`entity.<field> = None`) is *not* a field mutation, so a routed card may
+- **routed** — reads a snapshot immutably and routes every write through an
+  `authoring::…` op: the component's mutable accessor (`world.<field>_mut(id)`,
+  #344) is only ever taken to hand `&mut c` into a shared op. Detaching on remove
+  (`world.set_<field>(id, None)`) is *not* a field mutation, so a routed card may
   still do it; a read-only card (e.g. `mesh`) trivially qualifies.
-- **direct** — takes a mutable borrow of the component (`&mut entity.<field>`) and
-  writes its fields through egui widgets bound to them — the pattern every un-migrated
-  card uses.
+- **direct** — takes the component's mutable accessor with no `scene::authoring`
+  ops for that component in scope, and writes fields through egui widgets — the
+  regression shape this gate exists to stop.
 
-The detection signal is exactly `&mut entity.<field>`: every direct card takes that
-borrow to edit fields, while the routed `material` card never does (it reads via
-`entity.material.as_ref()` and only detaches on remove). Coarse substring scan,
+The detection signal is facade-shaped (#344): `.<field>_mut(` present in the cards
+with no `authoring::<field>` ops import marks a direct card. Coarse substring scan,
 matching the other gates.
 
 ### Routed vs direct, and the burn-down (#287)

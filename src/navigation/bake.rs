@@ -34,11 +34,11 @@ impl NavigationGraph {
         self.walkability.fill(true);
         self.heightfield.fill(0.0);
 
-        for entity in scene.iter() {
-            if !entity.active || !entity.is_static {
+        for id in scene.world.ids_with_collider() {
+            if !scene.world.is_active(id) || !scene.world.is_static(id) {
                 continue;
             }
-            if let Some(col) = &entity.collider {
+            if let Some(col) = scene.world.collider(id) {
                 if col.active {
                     self.raise_surface(col.aabb_min, col.aabb_max);
                 }

@@ -83,7 +83,8 @@ impl ScriptManager {
     /// `Update`/`LateUpdate`/trigger dispatch all read it, so no hook can drift
     /// from the rule "a disabled entity receives no callbacks".
     fn entity_active(&self, id: u32) -> Option<bool> {
-        self.scene.borrow().get_entity(id).map(|e| e.active)
+        let scene = self.scene.borrow();
+        scene.world.contains(id).then(|| scene.world.is_active(id))
     }
 
     /// Ascending keys of instances passing `pred` whose owning entity is active —

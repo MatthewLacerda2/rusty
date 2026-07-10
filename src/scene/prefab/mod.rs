@@ -59,7 +59,9 @@ pub struct PrefabData {
 /// the root's own parent — and slice out the materials the subtree references.
 /// Returns `None` if `root_id` is not a live entity.
 pub fn extract_prefab(scene: &Scene, root_id: u32) -> Option<PrefabData> {
-    scene.get_entity(root_id)?; // existence check
+    if !scene.world.contains(root_id) {
+        return None;
+    }
     let order = collect_subtree(scene, root_id);
 
     // Stable old-id -> local-id map (root = 0, then descendants in subtree order).
@@ -72,7 +74,7 @@ pub fn extract_prefab(scene: &Scene, root_id: u32) -> Option<PrefabData> {
     let mut entities = Vec::with_capacity(order.len());
     let mut materials = BTreeMap::new();
     for &old_id in &order {
-        let mut entity = (*scene.get_entity(old_id)?).clone();
+        let mut entity = scene.world.entity_document(old_id)?;
         remap_entity(&mut entity, &local, old_id == root_id);
         if let Some(mat) = &entity.material {
             if let Some(asset) = scene.materials.get(&mat.material) {
@@ -97,11 +99,9 @@ fn collect_subtree(scene: &Scene, root_id: u32) -> Vec<u32> {
     let mut stack = vec![root_id];
     while let Some(id) = stack.pop() {
         order.push(id);
-        if let Some(entity) = scene.get_entity(id) {
-            // Push children reversed so they come out in declared order.
-            for &child in entity.children.iter().rev() {
-                stack.push(child);
-            }
+        // Push children reversed so they come out in declared order.
+        for child in scene.world.children(id).into_iter().rev() {
+            stack.push(child);
         }
     }
     order

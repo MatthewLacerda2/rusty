@@ -20,10 +20,10 @@ use rusty::scripting::ConsoleLogs;
 fn run_emitter(seed: u64, frames: u32) -> Vec<(Vec3, f32, f32)> {
     let mut scene = Scene::new();
     let id = scene.add_entity("Emitter".to_string());
-    {
-        let mut e = scene.get_entity_mut(id).unwrap();
-        e.transform.position = Vec3::new(0.0, 0.0, 0.0);
-        e.particles = Some(ParticleEmitterComponent {
+    scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 0.0, 0.0);
+    scene.world.set_particles(
+        id,
+        Some(ParticleEmitterComponent {
             emit_mode: EmitMode::Continuous,
             blend: ParticleBlend::Additive,
             rate: 30.0,
@@ -34,8 +34,8 @@ fn run_emitter(seed: u64, frames: u32) -> Vec<(Vec3, f32, f32)> {
             gravity: Vec3::new(0.0, -9.81, 0.0),
             seed,
             ..Default::default()
-        });
-    }
+        }),
+    );
 
     let world = build_world(scene);
     {
@@ -48,10 +48,8 @@ fn run_emitter(seed: u64, frames: u32) -> Vec<(Vec3, f32, f32)> {
 
     let w = world.borrow();
     let scene = w.scene().borrow();
-    let e = scene.get_entity(id).unwrap();
-    e.particles
-        .as_ref()
-        .unwrap()
+    let particles = scene.world.particles(id).unwrap();
+    particles
         .runtime
         .particles
         .iter()
@@ -100,17 +98,17 @@ fn different_seeds_diverge() {
 fn max_particles_cap_is_respected() {
     let mut scene = Scene::new();
     let id = scene.add_entity("Capped".to_string());
-    {
-        let mut e = scene.get_entity_mut(id).unwrap();
-        e.particles = Some(ParticleEmitterComponent {
+    scene.world.set_particles(
+        id,
+        Some(ParticleEmitterComponent {
             emit_mode: EmitMode::Continuous,
             rate: 10_000.0,
             max_particles: 50,
             lifetime: 100.0,
             seed: 7,
             ..Default::default()
-        });
-    }
+        }),
+    );
     let world = build_world(scene);
     {
         let mut w = world.borrow_mut();
@@ -121,13 +119,7 @@ fn max_particles_cap_is_respected() {
     }
     let w = world.borrow();
     let scene = w.scene().borrow();
-    let count = scene
-        .get_entity(id)
-        .unwrap()
-        .particles
-        .as_ref()
-        .unwrap()
-        .live_count();
+    let count = scene.world.particles(id).unwrap().live_count();
     assert!(
         count <= 50,
         "live particle count {count} exceeded the cap of 50"

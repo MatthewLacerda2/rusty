@@ -13,59 +13,111 @@ use glam::Vec3;
 
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::{nav_agent as nav_ops, rigidbody as rigidbody_ops};
-use crate::scene::{CollisionDetection, Entity};
+use crate::scene::CollisionDetection;
+
+/// A checkbox row that routes its write through a shared rigidbody op (#287).
+#[allow(clippy::too_many_arguments)] // (world, id) replaced the single &mut Entity handle
+fn rb_checkbox(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    label: &str,
+    mut value: bool,
+    op: fn(&mut crate::scene::RigidBodyComponent, bool),
+    is_dirty: &mut bool,
+) {
+    if ui.checkbox(&mut value, label).changed() {
+        if let Some(mut r) = world.rigidbody_mut(id) {
+            op(&mut r, value);
+        }
+        *is_dirty = true;
+    }
+}
+
+/// The Mass drag row (clamped ≥ 0.01), routed through the shared op (#287).
+fn draw_rb_mass(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    mut mass: f32,
+    is_dirty: &mut bool,
+) {
+    ui.horizontal(|ui| {
+        ui.label("Mass:");
+        let drag = egui::DragValue::new(&mut mass)
+            .speed(0.05)
+            .clamp_range(0.01..=1000.0);
+        if ui.add(drag).changed() {
+            if let Some(mut r) = world.rigidbody_mut(id) {
+                rigidbody_ops::set_mass(&mut r, mass);
+            }
+            *is_dirty = true;
+        }
+    });
+}
 
 /// 3EG. RigidBody Component
-pub fn draw_rigidbody(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
-    let Some(rb) = entity.rigidbody.clone() else {
+pub fn draw_rigidbody(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    is_dirty: &mut bool,
+) {
+    let Some(rb) = world.rigidbody(id).map(|rb| rb.clone()) else {
         return;
     };
     let mut remove = false;
     component_card(ui, icon::CUBE, "RigidBody", Some(&mut remove), |ui| {
-        let mut active = rb.active;
-        if ui.checkbox(&mut active, "Active").changed() {
-            rigidbody_ops::set_active(entity, active);
-            *is_dirty = true;
-        }
-        let mut is_kinematic = rb.is_kinematic;
-        if ui.checkbox(&mut is_kinematic, "Is Kinematic").changed() {
-            rigidbody_ops::set_kinematic(entity, is_kinematic);
-            *is_dirty = true;
-        }
-        let mut use_gravity = rb.use_gravity;
-        if ui.checkbox(&mut use_gravity, "Use Gravity").changed() {
-            rigidbody_ops::set_use_gravity(entity, use_gravity);
-            *is_dirty = true;
-        }
-        let mut mass = rb.mass;
-        ui.horizontal(|ui| {
-            ui.label("Mass:");
-            if ui
-                .add(
-                    egui::DragValue::new(&mut mass)
-                        .speed(0.05)
-                        .clamp_range(0.01..=1000.0),
-                )
-                .changed()
-            {
-                rigidbody_ops::set_mass(entity, mass);
-                *is_dirty = true;
-            }
-        });
-        draw_rb_velocity(ui, entity, rb.velocity, is_dirty);
-        draw_rb_angular_velocity(ui, entity, rb.angular_velocity, is_dirty);
-        draw_rb_collision_detection(ui, entity, rb.collision_detection, is_dirty);
+        rb_checkbox(
+            ui,
+            world,
+            id,
+            "Active",
+            rb.active,
+            rigidbody_ops::set_active,
+            is_dirty,
+        );
+        rb_checkbox(
+            ui,
+            world,
+            id,
+            "Is Kinematic",
+            rb.is_kinematic,
+            rigidbody_ops::set_kinematic,
+            is_dirty,
+        );
+        rb_checkbox(
+            ui,
+            world,
+            id,
+            "Use Gravity",
+            rb.use_gravity,
+            rigidbody_ops::set_use_gravity,
+            is_dirty,
+        );
+        draw_rb_mass(ui, world, id, rb.mass, is_dirty);
+        draw_rb_velocity(ui, world, id, rb.velocity, is_dirty);
+        draw_rb_angular_velocity(ui, world, id, rb.angular_velocity, is_dirty);
+        draw_rb_collision_detection(ui, world, id, rb.collision_detection, is_dirty);
     });
     if remove {
-        entity.rigidbody = None;
+        world.set_rigidbody(id, None);
         *is_dirty = true;
     }
 }
 
 /// The rigidbody velocity x/y/z row, routing a change through the shared op.
-fn draw_rb_velocity(ui: &mut egui::Ui, entity: &mut Entity, velocity: Vec3, is_dirty: &mut bool) {
+fn draw_rb_velocity(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    velocity: Vec3,
+    is_dirty: &mut bool,
+) {
     if let Some(v) = vec3_row(ui, "Velocity:", velocity) {
-        rigidbody_ops::set_velocity(entity, v);
+        if let Some(mut r) = world.rigidbody_mut(id) {
+            rigidbody_ops::set_velocity(&mut r, v);
+        }
         *is_dirty = true;
     }
 }
@@ -74,12 +126,15 @@ fn draw_rb_velocity(ui: &mut egui::Ui, entity: &mut Entity, velocity: Vec3, is_d
 /// change through the shared op.
 fn draw_rb_angular_velocity(
     ui: &mut egui::Ui,
-    entity: &mut Entity,
+    world: &mut crate::ecs::World,
+    id: u32,
     angular_velocity: Vec3,
     is_dirty: &mut bool,
 ) {
     if let Some(w) = vec3_row(ui, "Angular Velocity:", angular_velocity) {
-        rigidbody_ops::set_angular_velocity(entity, w);
+        if let Some(mut r) = world.rigidbody_mut(id) {
+            rigidbody_ops::set_angular_velocity(&mut r, w);
+        }
         *is_dirty = true;
     }
 }
@@ -88,7 +143,8 @@ fn draw_rb_angular_velocity(
 /// the shared op (editor↔API parity with `Physics.SetCollisionDetection`).
 fn draw_rb_collision_detection(
     ui: &mut egui::Ui,
-    entity: &mut Entity,
+    world: &mut crate::ecs::World,
+    id: u32,
     current: CollisionDetection,
     is_dirty: &mut bool,
 ) {
@@ -100,59 +156,84 @@ fn draw_rb_collision_detection(
             ui.selectable_value(&mut mode, CollisionDetection::Continuous, "Continuous");
         });
     if mode != current {
-        rigidbody_ops::set_collision_detection(entity, mode);
+        if let Some(mut r) = world.rigidbody_mut(id) {
+            rigidbody_ops::set_collision_detection(&mut r, mode);
+        }
         *is_dirty = true;
     }
 }
 
 /// 3EH. NavMeshAgent Component
-pub fn draw_nav_agent(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
-    let Some(agent) = entity.nav_agent.clone() else {
+pub fn draw_nav_agent(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    is_dirty: &mut bool,
+) {
+    let Some(agent) = world.nav_agent(id).map(|a| a.clone()) else {
         return;
     };
     let mut remove = false;
     component_card(ui, icon::PATH, "NavMesh Agent", Some(&mut remove), |ui| {
         let mut active = agent.active;
         if ui.checkbox(&mut active, "Active").changed() {
-            nav_ops::set_active(entity, active);
+            if let Some(mut a) = world.nav_agent_mut(id) {
+                nav_ops::set_active(&mut a, active);
+            }
             *is_dirty = true;
         }
         let mut speed = agent.speed;
         if clamped(ui, "Speed:", &mut speed, 0.0..=100.0) {
-            nav_ops::set_speed(entity, speed);
+            if let Some(mut a) = world.nav_agent_mut(id) {
+                nav_ops::set_speed(&mut a, speed);
+            }
             *is_dirty = true;
         }
         let mut acceleration = agent.acceleration;
         if clamped(ui, "Acceleration:", &mut acceleration, 0.0..=100.0) {
-            nav_ops::set_acceleration(entity, acceleration);
+            if let Some(mut a) = world.nav_agent_mut(id) {
+                nav_ops::set_acceleration(&mut a, acceleration);
+            }
             *is_dirty = true;
         }
         let mut stopping_distance = agent.stopping_distance;
         if clamped(ui, "Stopping Distance:", &mut stopping_distance, 0.0..=50.0) {
-            nav_ops::set_stopping_distance(entity, stopping_distance);
+            if let Some(mut a) = world.nav_agent_mut(id) {
+                nav_ops::set_stopping_distance(&mut a, stopping_distance);
+            }
             *is_dirty = true;
         }
         let mut radius = agent.radius;
         if clamped(ui, "Radius:", &mut radius, 0.01..=10.0) {
-            nav_ops::set_radius(entity, radius);
+            if let Some(mut a) = world.nav_agent_mut(id) {
+                nav_ops::set_radius(&mut a, radius);
+            }
             *is_dirty = true;
         }
-        draw_agent_target(ui, entity, agent.target, is_dirty);
+        draw_agent_target(ui, world, id, agent.target, is_dirty);
         ui.label(format!(
             "Velocity: [{:.2}, {:.2}, {:.2}]",
             agent.velocity.x, agent.velocity.y, agent.velocity.z
         ));
     });
     if remove {
-        entity.nav_agent = None;
+        world.set_nav_agent(id, None);
         *is_dirty = true;
     }
 }
 
 /// The nav-agent destination x/y/z row, routing a change through the shared op.
-fn draw_agent_target(ui: &mut egui::Ui, entity: &mut Entity, target: Vec3, is_dirty: &mut bool) {
+fn draw_agent_target(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    target: Vec3,
+    is_dirty: &mut bool,
+) {
     if let Some(t) = vec3_row(ui, "Target:", target) {
-        nav_ops::set_target(entity, t);
+        if let Some(mut a) = world.nav_agent_mut(id) {
+            nav_ops::set_target(&mut a, t);
+        }
         *is_dirty = true;
     }
 }

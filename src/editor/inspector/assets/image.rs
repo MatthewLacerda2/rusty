@@ -106,9 +106,12 @@ fn draw_apply_to_entity(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Sc
     egui::ComboBox::from_id_source("ApplyTextureToEntity")
         .selected_text(selected_ent_name)
         .show_ui(ui, |ui| {
-            for entity in scene.iter() {
-                if ui.selectable_label(false, &entity.name).clicked() {
-                    clicked_entity_id = Some(entity.id);
+            for id in scene.entity_ids() {
+                let Some(name) = scene.world.name(id).map(|n| n.clone()) else {
+                    continue;
+                };
+                if ui.selectable_label(false, &name).clicked() {
+                    clicked_entity_id = Some(id);
                 }
             }
         });
@@ -123,16 +126,18 @@ fn draw_apply_to_entity(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Sc
 /// library material under a per-entity key if the entity has none yet. Reuses the
 /// entity's existing referenced material when present so its other params survive.
 fn apply_albedo_to_entity(scene: &mut Scene, entity_id: u32, path: &str) {
-    let key = {
-        let Some(mut ent) = scene.get_entity_mut(entity_id) else {
-            return;
-        };
-        if ent.material.is_none() {
-            ent.material = Some(MaterialComponent {
+    if !scene.world.has_material(entity_id)
+        && !scene.world.set_material(
+            entity_id,
+            Some(MaterialComponent {
                 material: format!("entity_{entity_id}_material"),
-            });
-        }
-        ent.material.as_ref().unwrap().material.clone()
+            }),
+        )
+    {
+        return;
+    }
+    let Some(key) = scene.world.material(entity_id).map(|m| m.material.clone()) else {
+        return;
     };
     let mat = scene.materials.entry(key).or_default();
     mat.base_color_map = Some(path.to_string());

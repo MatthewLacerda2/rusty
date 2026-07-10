@@ -102,16 +102,13 @@ fn instance_ids(scene: &Scene, root_id: u32) -> Result<Vec<u32>, String> {
     let mut ids = Vec::new();
     let mut stack = vec![root_id];
     while let Some(id) = stack.pop() {
-        let Some(entity) = scene.get_entity(id) else {
-            continue;
-        };
-        if entity
-            .prefab_link
-            .as_ref()
+        if scene
+            .world
+            .prefab_link(id)
             .is_some_and(|l| l.source == source)
         {
             ids.push(id);
-            stack.extend(entity.children.iter().copied());
+            stack.extend(scene.world.children(id));
         }
     }
     Ok(ids)
@@ -122,11 +119,11 @@ fn instance_ids(scene: &Scene, root_id: u32) -> Result<Vec<u32>, String> {
 fn instance_root(scene: &Scene, id: u32) -> Result<u32, String> {
     let source = link_source(scene, id)?;
     let mut current = id;
-    while let Some(parent) = scene.get_entity(current).and_then(|e| e.parent_id) {
+    while let Some(parent) = scene.world.parent_id(current) {
         let shares = scene
-            .get_entity(parent)
-            .map(|e| e.prefab_link.as_ref().is_some_and(|l| l.source == source))
-            .unwrap_or(false);
+            .world
+            .prefab_link(parent)
+            .is_some_and(|l| l.source == source);
         if !shares {
             break;
         }
@@ -138,34 +135,30 @@ fn instance_root(scene: &Scene, id: u32) -> Result<u32, String> {
 /// The source `.prefab` path entity `id` links to, or an error if it isn't linked.
 fn link_source(scene: &Scene, id: u32) -> Result<String, String> {
     scene
-        .get_entity(id)
-        .and_then(|e| e.prefab_link.as_ref().map(|l| l.source.clone()))
+        .world
+        .prefab_link(id)
+        .map(|l| l.source.clone())
         .ok_or_else(|| format!("entity {id} is not a linked prefab instance"))
 }
 
 /// The source `local_id` recorded on entity `id`, if it is linked.
 fn local_id_of(scene: &Scene, id: u32) -> Option<u32> {
-    scene
-        .get_entity(id)?
-        .prefab_link
-        .as_ref()
-        .map(|l| l.local_id)
+    scene.world.prefab_link(id).map(|l| l.local_id)
 }
 
 /// Entity `id`'s recorded override map (empty if it has none / is unlinked).
 fn overrides_of(scene: &Scene, id: u32) -> BTreeMap<String, Value> {
     scene
-        .get_entity(id)
-        .and_then(|e| e.prefab_link.as_ref().map(|l| l.overrides.clone()))
+        .world
+        .prefab_link(id)
+        .map(|l| l.overrides.clone())
         .unwrap_or_default()
 }
 
 /// Drop one override `path` from entity `id`'s link (a no-op if absent).
 fn drop_override(scene: &mut Scene, id: u32, path: &str) {
-    if let Some(mut entity) = scene.get_entity_mut(id) {
-        if let Some(link) = entity.prefab_link.as_mut() {
-            link.overrides.remove(path);
-        }
+    if let Some(mut link) = scene.world.prefab_link_mut(id) {
+        link.overrides.remove(path);
     }
 }
 

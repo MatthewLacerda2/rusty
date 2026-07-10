@@ -79,15 +79,15 @@ pub fn drag(
     if delta.abs() < f32::EPSILON {
         return false;
     }
-    let Some(mut entity) = scene.get_entity_mut(entity_id) else {
+    let Some(mut transform) = scene.world.transform_mut(entity_id) else {
         return false;
     };
     // World-axis translation applied to the local position. With no parent rotation
     // (the common case) world and local axes coincide; parented entities translate
     // along the world axis projected by the unchanged local basis, matching how the
     // inspector edits the same `position` field.
-    entity.transform.position += axis * delta;
-    drop(entity);
+    transform.position += axis * delta;
+    drop(transform);
     scene.update_entity_collider(entity_id);
     true
 }
@@ -164,7 +164,7 @@ mod tests {
         let r1 = ray(Vec3::new(2.0, 0.0, 5.0), Vec3::new(0.0, 0.0, -1.0));
         let moved = drag(&mut scene, id, &mut g, origin, r1);
         assert!(moved);
-        let pos = scene.get_entity(id).unwrap().transform.position;
+        let pos = scene.world.transform(id).unwrap().position;
         assert!((pos.x - 2.0).abs() < 1e-3, "x moved: {pos:?}");
         assert!(
             pos.y.abs() < 1e-3 && pos.z.abs() < 1e-3,

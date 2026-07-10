@@ -20,17 +20,17 @@ use crate::scene::Scene;
 fn scene_and_nav(min: Vec3, max: Vec3) -> (RefCell<Scene>, RefCell<NavigationGraph>) {
     let mut scene = Scene::new();
     let id = scene.add_entity("step".to_string());
-    {
-        let mut e = scene.get_entity_mut(id).expect("entity exists");
-        e.is_static = true;
-        e.collider = Some(ColliderComponent {
+    scene.world.set_static(id, true);
+    scene.world.set_collider(
+        id,
+        Some(ColliderComponent {
             active: true,
             shape: ColliderShape::Box { size: max - min },
             is_trigger: false,
             aabb_min: min,
             aabb_max: max,
-        });
-    }
+        }),
+    );
     let mut nav = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     nav.bake(&scene);
     (RefCell::new(scene), RefCell::new(nav))

@@ -89,13 +89,18 @@ fn add_box(
         },
     );
     let id = scene.add_entity(name.to_string());
-    let mut e = scene.get_entity_mut(id).unwrap();
-    e.mesh = Some(box_mesh());
-    e.is_static = true;
-    e.transform.position = pos;
-    e.transform.scale = scale;
-    e.transform.rotation = glam::Quat::IDENTITY;
-    e.material = Some(crate::components::MaterialComponent { material: mat_name });
+    scene.world.set_mesh(id, Some(box_mesh()));
+    scene.world.set_static(id, true);
+    {
+        let mut t = scene.world.transform_mut(id).unwrap();
+        t.position = pos;
+        t.scale = scale;
+        t.rotation = glam::Quat::IDENTITY;
+    }
+    scene.world.set_material(
+        id,
+        Some(crate::components::MaterialComponent { material: mat_name }),
+    );
 }
 
 /// A closed-ish room: a bright emissive light source plus a strongly-coloured red

@@ -95,22 +95,17 @@ fn exiting_play_clears_runtime_state() {
 fn stop_restores_the_edit_scene_snapshot() {
     let mut s = Scene::new();
     let id = s.add_entity("Mover".to_string());
-    s.get_entity_mut(id).unwrap().transform.position = Vec3::new(1.0, 0.0, 0.0);
+    s.world.transform_mut(id).unwrap().position = Vec3::new(1.0, 0.0, 0.0);
     let scene = Rc::new(RefCell::new(s));
     let mut gw = world_with(Rc::clone(&scene));
 
     gw.set_playing(true);
     gw.tick(DT); // Entered: snapshot captured
                  // Mutate the entity mid-play.
-    scene
-        .borrow_mut()
-        .get_entity_mut(id)
-        .unwrap()
-        .transform
-        .position = Vec3::new(9.0, 9.0, 9.0);
+    scene.borrow_mut().world.transform_mut(id).unwrap().position = Vec3::new(9.0, 9.0, 9.0);
     gw.set_playing(false);
     gw.tick(DT); // Exited: restore snapshot
-    let restored = scene.borrow().get_entity(id).unwrap().transform.position;
+    let restored = scene.borrow().world.transform(id).unwrap().position;
     assert!(
         restored.abs_diff_eq(Vec3::new(1.0, 0.0, 0.0), 1e-6),
         "play-mode mutation leaked into the edit scene: {restored:?}"
@@ -160,7 +155,7 @@ fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
     {
         let mut authoring = Scene::new();
         let id = authoring.add_entity("Enemy".to_string());
-        authoring.get_entity_mut(id).unwrap().scripts = vec![ScriptComponent {
+        *authoring.world.scripts_mut(id).unwrap() = vec![ScriptComponent {
             path: enemy_lua.to_string(),
             ..Default::default()
         }];
@@ -182,7 +177,7 @@ fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
     .unwrap();
     let mut s = Scene::new();
     let id = s.add_entity("Spawner".to_string());
-    s.get_entity_mut(id).unwrap().scripts = vec![ScriptComponent {
+    *s.world.scripts_mut(id).unwrap() = vec![ScriptComponent {
         path: spawner_lua.to_string(),
         ..Default::default()
     }];
@@ -205,18 +200,12 @@ fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
 fn rig_scene(anim: crate::components::AnimatorComponent) -> (Rc<RefCell<Scene>>, u32) {
     let mut s = Scene::new();
     let id = s.add_entity("Rig".to_string());
-    s.get_entity_mut(id).unwrap().animator = Some(anim);
+    s.world.set_animator(id, Some(anim));
     (Rc::new(RefCell::new(s)), id)
 }
 
 fn animator_of(scene: &Rc<RefCell<Scene>>, id: u32) -> crate::components::AnimatorComponent {
-    scene
-        .borrow()
-        .get_entity(id)
-        .unwrap()
-        .animator
-        .clone()
-        .unwrap()
+    scene.borrow().world.animator(id).unwrap().clone()
 }
 
 /// #312 mutation audit: the `animate` system must actually run inside the play
@@ -270,10 +259,8 @@ fn graph_driven_animator_transitions_through_the_play_loop() {
     assert_eq!(anim.get_float("speed"), Some(0.0), "default seeded");
     scene
         .borrow_mut()
-        .get_entity_mut(id)
-        .unwrap()
-        .animator
-        .as_mut()
+        .world
+        .animator_mut(id)
         .unwrap()
         .set_float("speed", 2.0);
     gw.tick(DT); // the Idle → Run edge fires and crossfades
@@ -287,7 +274,7 @@ fn graph_driven_animator_transitions_through_the_play_loop() {
 fn snap_camera_to_player_positions_behind_player() {
     let mut s = Scene::new();
     let id = s.add_entity("Player".to_string());
-    s.get_entity_mut(id).unwrap().transform.position = Vec3::new(2.0, 0.0, 3.0);
+    s.world.transform_mut(id).unwrap().position = Vec3::new(2.0, 0.0, 3.0);
     let mut gw = world_with(Rc::new(RefCell::new(s)));
     gw.set_playing(true);
     gw.tick(DT); // enter_play calls snap_camera_to_player

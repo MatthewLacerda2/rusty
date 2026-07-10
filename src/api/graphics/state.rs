@@ -7,7 +7,7 @@
 use std::cell::RefCell;
 
 use super::super::{put, Reg};
-use crate::components::{CameraComponent, Entity, Tonemap, VisualCorrectionComponent};
+use crate::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
 use crate::render::postfx::QualityPreset;
 use crate::scene::Scene;
 
@@ -36,34 +36,52 @@ pub(super) fn register_quality<'lua, 'scope>(
     )
 }
 
+/// The first *active* entity whose visual-correction volume is itself active.
+fn active_vc_id(scene: &Scene) -> Option<u32> {
+    scene
+        .world
+        .ids_with_visual_correction()
+        .into_iter()
+        .find(|&id| {
+            scene.world.is_active(id)
+                && scene
+                    .world
+                    .visual_correction(id)
+                    .is_some_and(|vc| vc.active)
+        })
+}
+
+/// The first *active* entity whose camera component is itself active.
+fn active_cam_id(scene: &Scene) -> Option<u32> {
+    scene
+        .world
+        .ids_with_camera()
+        .into_iter()
+        .find(|&id| scene.world.is_active(id) && scene.world.camera(id).is_some_and(|c| c.active))
+}
+
 /// Run `f` on the first active visual-correction volume, returning its result.
 pub(super) fn with_vc<R>(
     scene: &RefCell<Scene>,
     f: impl FnOnce(&VisualCorrectionComponent) -> R,
 ) -> Option<R> {
     let scene = scene.borrow();
-    let entity = scene
-        .iter()
-        .find(|e| e.active && e.visual_correction.as_ref().is_some_and(|vc| vc.active))?;
-    let result = entity.visual_correction.as_ref().map(f);
-    drop(entity);
-    result
+    let id = active_vc_id(&scene)?;
+    scene.world.visual_correction(id).map(|vc| f(&vc))
 }
 
-/// Mutate the entity owning the first active visual-correction volume (no-op when
-/// there is none). The closure runs against the whole `Entity` so the caller routes
-/// the write through a shared `authoring::visual_correction::*` op (#287).
-pub(super) fn with_vc_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut Entity)) {
+/// Mutate the first active visual-correction volume (no-op when there is none).
+/// The caller routes the write through a shared
+/// `authoring::visual_correction::*` op (#287).
+pub(super) fn with_vc_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut VisualCorrectionComponent)) {
     let mut scene = scene.borrow_mut();
-    let target = scene
-        .iter()
-        .find(|e| e.active && e.visual_correction.as_ref().is_some_and(|vc| vc.active))
-        .map(|e| e.id);
-    let Some(id) = target else { return };
-    let Some(mut e) = scene.get_entity_mut(id) else {
+    let Some(id) = active_vc_id(&scene) else {
         return;
     };
-    f(&mut e);
+    let guard = scene.world.visual_correction_mut(id);
+    if let Some(mut vc) = guard {
+        f(&mut vc);
+    }
 }
 
 /// Run `f` on the first active camera component, returning its result.
@@ -72,28 +90,21 @@ pub(super) fn with_cam<R>(
     f: impl FnOnce(&CameraComponent) -> R,
 ) -> Option<R> {
     let scene = scene.borrow();
-    let entity = scene
-        .iter()
-        .find(|e| e.active && e.camera.as_ref().is_some_and(|c| c.active))?;
-    let result = entity.camera.as_ref().map(f);
-    drop(entity);
-    result
+    let id = active_cam_id(&scene)?;
+    scene.world.camera(id).map(|c| f(&c))
 }
 
-/// Mutate the entity owning the first active camera component (no-op when there is
-/// none). The closure runs against the whole `Entity` so the caller routes the write
-/// through a shared `authoring::camera::*` op (#287).
-pub(super) fn with_cam_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut Entity)) {
+/// Mutate the first active camera component (no-op when there is none). The
+/// caller routes the write through a shared `authoring::camera::*` op (#287).
+pub(super) fn with_cam_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut CameraComponent)) {
     let mut scene = scene.borrow_mut();
-    let target = scene
-        .iter()
-        .find(|e| e.active && e.camera.as_ref().is_some_and(|c| c.active))
-        .map(|e| e.id);
-    let Some(id) = target else { return };
-    let Some(mut e) = scene.get_entity_mut(id) else {
+    let Some(id) = active_cam_id(&scene) else {
         return;
     };
-    f(&mut e);
+    let guard = scene.world.camera_mut(id);
+    if let Some(mut c) = guard {
+        f(&mut c);
+    }
 }
 
 pub(super) fn parse_tonemap(name: &str) -> Option<Tonemap> {

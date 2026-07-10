@@ -6,24 +6,30 @@
 //! and the deterministic seed. The live particle count (transient runtime) is shown
 //! read-only so an author can see the emitter working in Play.
 //!
-//! A THIN client (#287): each widget reads its field from a snapshot and routes the
-//! write through a shared `authoring::particles::*` op — never a mutable component
-//! borrow for a field edit. The `Particles.*` Lua surface's `SetActive` / `SetRate`
-//! call the same ops, so the panel and the binding share one write.
+//! A THIN client (#287): each widget reads its field from a snapshot and routes
+//! the write through a shared `authoring::particles::*` op. The `Particles.*` Lua
+//! surface's `SetActive` / `SetRate` call the same ops — one shared write.
 
 use egui_phosphor::regular as icon;
 
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::particles as particle_ops;
-use crate::scene::{CollisionResponse, EmitMode, Entity, ParticleBlend, ParticleEmitterComponent};
+use crate::scene::{CollisionResponse, EmitMode, ParticleBlend, ParticleEmitterComponent};
 
+type Cx<'w> = (&'w mut crate::ecs::World, u32); // world + entity id, as one param
+/// Routes a field write through the shared particle-authoring op; a no-op absent.
+fn apply(cx: &mut Cx<'_>, f: impl FnOnce(&mut ParticleEmitterComponent)) {
+    if let Some(mut c) = cx.0.particles_mut(cx.1) {
+        f(&mut c);
+    }
+}
 /// 3F-particles. Particle System component card.
-pub fn draw(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
-    let Some(p) = entity.particles.clone() else {
+pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool) {
+    let Some(p) = world.particles(id).map(|p| p.clone()) else {
         return;
     };
-    let mut remove = false;
-    let mut changed = false;
+    let mut cx: Cx<'_> = (world, id);
+    let (mut remove, mut changed) = (false, false);
     component_card(
         ui,
         icon::SPARKLE,
@@ -32,26 +38,26 @@ pub fn draw(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
         |ui| {
             let mut active = p.active;
             if ui.checkbox(&mut active, "Active").changed() {
-                particle_ops::set_active(entity, active);
+                apply(&mut cx, |c| particle_ops::set_active(c, active));
                 changed = true;
             }
             ui.label(format!("Live particles: {}", p.live_count()));
             ui.separator();
-            changed |= draw_emission(ui, entity, &p);
+            changed |= draw_emission(ui, &mut cx, &p);
             ui.separator();
-            changed |= draw_rendering(ui, entity, &p);
+            changed |= draw_rendering(ui, &mut cx, &p);
             ui.separator();
-            changed |= draw_motion(ui, entity, &p);
+            changed |= draw_motion(ui, &mut cx, &p);
             ui.separator();
-            changed |= draw_size_color(ui, entity, &p);
+            changed |= draw_size_color(ui, &mut cx, &p);
             ui.separator();
-            changed |= draw_collision(ui, entity, &p);
+            changed |= draw_collision(ui, &mut cx, &p);
             ui.separator();
-            changed |= draw_determinism(ui, entity, &p);
+            changed |= draw_determinism(ui, &mut cx, &p);
         },
     );
     if remove {
-        entity.particles = None;
+        cx.0.set_particles(id, None);
         *is_dirty = true;
     } else if changed {
         *is_dirty = true;
@@ -59,7 +65,7 @@ pub fn draw(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
 }
 
 /// Emission controls: mode, looping, rate, burst count and particle cap.
-fn draw_emission(ui: &mut egui::Ui, entity: &mut Entity, p: &ParticleEmitterComponent) -> bool {
+fn draw_emission(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
     let mut changed = false;
     let mut mode = p.emit_mode;
     if combo(
@@ -71,34 +77,34 @@ fn draw_emission(ui: &mut egui::Ui, entity: &mut Entity, p: &ParticleEmitterComp
             (EmitMode::Burst, "Burst"),
         ],
     ) {
-        particle_ops::set_emit_mode(entity, mode);
+        apply(cx, |c| particle_ops::set_emit_mode(c, mode));
         changed = true;
     }
     let mut looping = p.looping;
     if ui.checkbox(&mut looping, "Looping").changed() {
-        particle_ops::set_looping(entity, looping);
+        apply(cx, |c| particle_ops::set_looping(c, looping));
         changed = true;
     }
     let mut rate = p.rate;
     if clamped(ui, "Rate (per sec):", &mut rate, 0.0..=1000.0) {
-        particle_ops::set_rate(entity, rate);
+        apply(cx, |c| particle_ops::set_rate(c, rate));
         changed = true;
     }
     let mut burst = p.burst_count;
     if drag_u32(ui, "Burst Count:", &mut burst, 1..=100_000) {
-        particle_ops::set_burst_count(entity, burst);
+        apply(cx, |c| particle_ops::set_burst_count(c, burst));
         changed = true;
     }
     let mut cap = p.max_particles;
     if drag_u32(ui, "Max Particles:", &mut cap, 1..=100_000) {
-        particle_ops::set_max_particles(entity, cap);
+        apply(cx, |c| particle_ops::set_max_particles(c, cap));
         changed = true;
     }
     changed
 }
 
 /// Rendering controls: blend mode and the optional texture path.
-fn draw_rendering(ui: &mut egui::Ui, entity: &mut Entity, p: &ParticleEmitterComponent) -> bool {
+fn draw_rendering(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
     let mut changed = false;
     let mut blend = p.blend;
     if combo(
@@ -110,14 +116,14 @@ fn draw_rendering(ui: &mut egui::Ui, entity: &mut Entity, p: &ParticleEmitterCom
             (ParticleBlend::Additive, "Additive"),
         ],
     ) {
-        particle_ops::set_blend(entity, blend);
+        apply(cx, |c| particle_ops::set_blend(c, blend));
         changed = true;
     }
     let mut tex = p.texture.clone().unwrap_or_default();
     ui.horizontal(|ui| {
         ui.label("Texture:");
         if ui.text_edit_singleline(&mut tex).changed() {
-            particle_ops::set_texture(entity, tex);
+            apply(cx, |c| particle_ops::set_texture(c, tex));
             changed = true;
         }
     });
@@ -125,54 +131,54 @@ fn draw_rendering(ui: &mut egui::Ui, entity: &mut Entity, p: &ParticleEmitterCom
 }
 
 /// Per-particle motion: lifetime, speed, direction, spread and gravity.
-fn draw_motion(ui: &mut egui::Ui, entity: &mut Entity, p: &ParticleEmitterComponent) -> bool {
+fn draw_motion(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
     let mut changed = false;
     let mut lifetime = p.lifetime;
     if clamped(ui, "Lifetime (sec):", &mut lifetime, 0.0..=60.0) {
-        particle_ops::set_lifetime(entity, lifetime);
+        apply(cx, |c| particle_ops::set_lifetime(c, lifetime));
         changed = true;
     }
     let mut speed = p.speed;
     if clamped(ui, "Speed:", &mut speed, 0.0..=100.0) {
-        particle_ops::set_speed(entity, speed);
+        apply(cx, |c| particle_ops::set_speed(c, speed));
         changed = true;
     }
     let mut direction = p.direction;
     if vec3(ui, "Direction:", &mut direction, 0.05) {
-        particle_ops::set_direction(entity, direction);
+        apply(cx, |c| particle_ops::set_direction(c, direction));
         changed = true;
     }
     let mut spread = p.spread;
     if clamped(ui, "Spread:", &mut spread, 0.0..=1.0) {
-        particle_ops::set_spread(entity, spread);
+        apply(cx, |c| particle_ops::set_spread(c, spread));
         changed = true;
     }
     let mut gravity = p.gravity;
     if vec3(ui, "Gravity:", &mut gravity, 0.1) {
-        particle_ops::set_gravity(entity, gravity);
+        apply(cx, |c| particle_ops::set_gravity(c, gravity));
         changed = true;
     }
     changed
 }
 
 /// Size-over-life and colour controls.
-fn draw_size_color(ui: &mut egui::Ui, entity: &mut Entity, p: &ParticleEmitterComponent) -> bool {
+fn draw_size_color(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
     let mut changed = false;
     let mut size_start = p.size_start;
     if clamped(ui, "Size Start:", &mut size_start, 0.0..=50.0) {
-        particle_ops::set_size_start(entity, size_start);
+        apply(cx, |c| particle_ops::set_size_start(c, size_start));
         changed = true;
     }
     let mut size_end = p.size_end;
     if clamped(ui, "Size End:", &mut size_end, 0.0..=50.0) {
-        particle_ops::set_size_end(entity, size_end);
+        apply(cx, |c| particle_ops::set_size_end(c, size_end));
         changed = true;
     }
     let mut color = p.color;
     ui.horizontal(|ui| {
         ui.label("Color (RGBA):");
         if ui.color_edit_button_rgba_unmultiplied(&mut color).changed() {
-            particle_ops::set_color(entity, color);
+            apply(cx, |c| particle_ops::set_color(c, color));
             changed = true;
         }
     });
@@ -180,7 +186,7 @@ fn draw_size_color(ui: &mut egui::Ui, entity: &mut Entity, p: &ParticleEmitterCo
 }
 
 /// Collision response and bounciness controls.
-fn draw_collision(ui: &mut egui::Ui, entity: &mut Entity, p: &ParticleEmitterComponent) -> bool {
+fn draw_collision(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
     let mut changed = false;
     let mut collision = p.collision;
     if combo(
@@ -193,19 +199,19 @@ fn draw_collision(ui: &mut egui::Ui, entity: &mut Entity, p: &ParticleEmitterCom
             (CollisionResponse::Bounce, "Bounce"),
         ],
     ) {
-        particle_ops::set_collision(entity, collision);
+        apply(cx, |c| particle_ops::set_collision(c, collision));
         changed = true;
     }
     let mut bounciness = p.bounciness;
     if clamped(ui, "Bounciness:", &mut bounciness, 0.0..=1.0) {
-        particle_ops::set_bounciness(entity, bounciness);
+        apply(cx, |c| particle_ops::set_bounciness(c, bounciness));
         changed = true;
     }
     changed
 }
 
 /// The deterministic seed control.
-fn draw_determinism(ui: &mut egui::Ui, entity: &mut Entity, p: &ParticleEmitterComponent) -> bool {
+fn draw_determinism(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
     let mut seed = p.seed;
     let changed = ui
         .horizontal(|ui| {
@@ -214,7 +220,7 @@ fn draw_determinism(ui: &mut egui::Ui, entity: &mut Entity, p: &ParticleEmitterC
         })
         .inner;
     if changed {
-        particle_ops::set_seed(entity, seed);
+        apply(cx, |c| particle_ops::set_seed(c, seed));
     }
     changed
 }
@@ -267,8 +273,7 @@ fn vec3(ui: &mut egui::Ui, label: &str, value: &mut glam::Vec3, speed: f32) -> b
     .inner
 }
 
-/// A combo box over a small set of `Copy + PartialEq` enum variants with labels.
-/// Returns whether the selection changed.
+/// A combo box over a small set of `Copy + PartialEq` enum variants; returns whether it changed.
 fn combo<T: Copy + PartialEq>(
     ui: &mut egui::Ui,
     label: &str,

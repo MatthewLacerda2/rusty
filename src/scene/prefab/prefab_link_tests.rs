@@ -17,9 +17,12 @@ fn write_prefab(tag: &str) -> String {
     scene
         .materials
         .insert("Stone".into(), MaterialAsset::default());
-    scene.get_entity_mut(root).unwrap().material = Some(MaterialComponent {
-        material: "Stone".into(),
-    });
+    scene.world.set_material(
+        root,
+        Some(MaterialComponent {
+            material: "Stone".into(),
+        }),
+    );
     let path = std::env::temp_dir()
         .join(format!("rusty_216_{tag}.prefab"))
         .to_string_lossy()
@@ -44,14 +47,11 @@ fn linked_instance_stamps_link_on_every_entity() {
     let mut scene = Scene::new();
     let root = load_and_instantiate_linked(&mut scene, &path, None).unwrap();
 
-    let r = scene.get_entity(root).unwrap();
-    let link = r.prefab_link.as_ref().expect("root is linked");
+    let link = scene.world.prefab_link(root).expect("root is linked");
     assert_eq!(link.source, path);
     assert_eq!(link.local_id, 0, "root maps to source local id 0");
-    let child = r.children[0];
-    drop(r);
-    let c = scene.get_entity(child).unwrap();
-    let clink = c.prefab_link.as_ref().expect("child is linked too");
+    let child = scene.world.children(root)[0];
+    let clink = scene.world.prefab_link(child).expect("child is linked too");
     assert_eq!(clink.source, path);
     assert_eq!(clink.local_id, 1, "child maps to source local id 1");
 }
@@ -63,13 +63,13 @@ fn override_survives_propagation() {
     let root = load_and_instantiate_linked(&mut scene, &path, None).unwrap();
 
     // Override the root's position, then record it.
-    scene.get_entity_mut(root).unwrap().transform.position.x = 5.0;
+    scene.world.transform_mut(root).unwrap().position.x = 5.0;
     record_instance_overrides(&mut scene, root).unwrap();
     assert!(!list_instance_overrides(&scene, root).unwrap().is_empty());
 
     // Reimport (propagation): the override is preserved.
     reimport_instance(&mut scene, root).unwrap();
-    assert_eq!(scene.get_entity(root).unwrap().transform.position.x, 5.0);
+    assert_eq!(scene.world.transform(root).unwrap().position.x, 5.0);
 }
 
 #[test]
@@ -77,13 +77,13 @@ fn non_overridden_field_updates_on_source_edit() {
     let path = write_prefab("source_edit");
     let mut scene = Scene::new();
     let root = load_and_instantiate_linked(&mut scene, &path, None).unwrap();
-    let child = scene.get_entity(root).unwrap().children[0];
-    assert_eq!(scene.get_entity(child).unwrap().name, "Child");
+    let child = scene.world.children(root)[0];
+    assert_eq!(*scene.world.name(child).unwrap(), "Child");
 
     // Edit the SOURCE on disk, then reimport — the un-overridden child name updates.
     rewrite_prefab_child_name(&path, "Renamed");
     reimport_instance(&mut scene, root).unwrap();
-    assert_eq!(scene.get_entity(child).unwrap().name, "Renamed");
+    assert_eq!(*scene.world.name(child).unwrap(), "Renamed");
 }
 
 #[test]
@@ -91,16 +91,16 @@ fn override_wins_over_a_conflicting_source_edit() {
     let path = write_prefab("override_wins");
     let mut scene = Scene::new();
     let root = load_and_instantiate_linked(&mut scene, &path, None).unwrap();
-    let child = scene.get_entity(root).unwrap().children[0];
+    let child = scene.world.children(root)[0];
 
     // Override the child's name, record it, THEN change the same field in the source.
-    scene.get_entity_mut(child).unwrap().name = "Mine".into();
+    scene.world.set_name(child, "Mine".into());
     record_instance_overrides(&mut scene, root).unwrap();
     rewrite_prefab_child_name(&path, "SourceWins");
 
     reimport_instance(&mut scene, root).unwrap();
     assert_eq!(
-        scene.get_entity(child).unwrap().name,
+        *scene.world.name(child).unwrap(),
         "Mine",
         "a recorded override beats a source edit to the same field"
     );
@@ -111,7 +111,7 @@ fn prefab_link_roundtrips_through_save_load() {
     let path = write_prefab("roundtrip");
     let mut scene = Scene::new();
     let root = load_and_instantiate_linked(&mut scene, &path, None).unwrap();
-    scene.get_entity_mut(root).unwrap().transform.position.y = 8.0;
+    scene.world.transform_mut(root).unwrap().position.y = 8.0;
     record_instance_overrides(&mut scene, root).unwrap();
 
     // Save -> load (apply_scene_data also runs propagation). The link + override
@@ -122,11 +122,13 @@ fn prefab_link_roundtrips_through_save_load() {
     let mut scene2 = Scene::new();
     apply_scene_data(&mut scene2, reloaded);
 
-    let r = scene2.get_entity(root).unwrap();
-    let link = r.prefab_link.as_ref().expect("link survived save/load");
+    let link = scene2
+        .world
+        .prefab_link(root)
+        .expect("link survived save/load");
     assert_eq!(link.source, path);
     assert!(!link.overrides.is_empty(), "overrides survived save/load");
-    assert_eq!(r.transform.position.y, 8.0);
+    assert_eq!(scene2.world.transform(root).unwrap().position.y, 8.0);
 }
 
 #[test]
@@ -134,13 +136,13 @@ fn revert_drops_overrides_and_restores_source() {
     let path = write_prefab("revert");
     let mut scene = Scene::new();
     let root = load_and_instantiate_linked(&mut scene, &path, None).unwrap();
-    scene.get_entity_mut(root).unwrap().transform.position.x = 99.0;
+    scene.world.transform_mut(root).unwrap().position.x = 99.0;
     record_instance_overrides(&mut scene, root).unwrap();
 
     revert_instance_overrides(&mut scene, root).unwrap();
     assert!(list_instance_overrides(&scene, root).unwrap().is_empty());
     assert_eq!(
-        scene.get_entity(root).unwrap().transform.position.x,
+        scene.world.transform(root).unwrap().position.x,
         0.0,
         "reverted to the source's value"
     );

@@ -68,24 +68,22 @@ impl GraphCache {
 /// every active entity's graph-driven animator one transition decision.
 pub fn evaluate_graphs(world: &mut World, res: &mut Resources) {
     let mut scene = world.scene.borrow_mut();
-    for id in scene.entity_ids() {
-        let Some(mut entity) = scene.get_entity_mut(id) else {
-            continue;
-        };
-        if !entity.active {
+    for id in scene.world.ids_with_animator() {
+        if !scene.world.is_active(id) {
             continue;
         }
-        let Some(anim) = &mut entity.animator else {
-            continue;
-        };
-        if !anim.graph_enabled {
-            continue;
-        }
-        let Some(path) = anim.graph.clone() else {
+        let Some(path) = scene
+            .world
+            .animator(id)
+            .filter(|a| a.graph_enabled)
+            .and_then(|a| a.graph.clone())
+        else {
             continue;
         };
         if let Some(graph) = res.animation_graphs.get_or_load(&path, &res.console) {
-            step_graph(anim, graph);
+            if let Some(mut anim) = scene.world.animator_mut(id) {
+                step_graph(&mut anim, graph);
+            }
         }
     }
 }

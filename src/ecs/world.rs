@@ -18,7 +18,7 @@ use std::collections::HashMap;
 
 use crate::components::Entity;
 
-pub use hecs::{Ref, RefMut};
+pub(in crate::ecs) use hecs::{Ref, RefMut};
 
 pub struct World {
     inner: hecs::World,
@@ -112,14 +112,16 @@ impl World {
     }
 
     /// Borrow an entity's bundle. The returned guard derefs to `&Entity`.
-    pub fn get(&self, id: u32) -> Option<Ref<'_, Entity>> {
+    /// Facade-internal (#344): consumers go through the typed accessors in
+    /// `access.rs` / `core.rs`, never through the whole bundle.
+    pub(in crate::ecs) fn get(&self, id: u32) -> Option<Ref<'_, Entity>> {
         let handle = *self.handles.get(&id)?;
         self.inner.get::<&Entity>(handle).ok()
     }
 
     /// Mutably borrow an entity's bundle. The returned guard derefs to
-    /// `&mut Entity`.
-    pub fn get_mut(&mut self, id: u32) -> Option<RefMut<'_, Entity>> {
+    /// `&mut Entity`. Facade-internal (#344), like [`World::get`].
+    pub(in crate::ecs) fn get_mut(&mut self, id: u32) -> Option<RefMut<'_, Entity>> {
         let handle = *self.handles.get(&id)?;
         self.inner.get::<&mut Entity>(handle).ok()
     }

@@ -16,17 +16,20 @@ use crate::scene::Scene;
 /// Add a static box entity with a box collider of `size`, centred at `pos`.
 fn add_static_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3) {
     let id = scene.add_entity(name.to_string());
-    let mut e = scene.get_entity_mut(id).unwrap();
-    e.is_static = true;
-    e.transform.position = pos;
-    e.collider = Some(ColliderComponent {
-        active: true,
-        shape: ColliderShape::Box { size },
-        is_trigger: false,
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
-    });
-    drop(e);
+    scene.world.set_static(id, true);
+    if let Some(mut t) = scene.world.transform_mut(id) {
+        t.position = pos;
+    }
+    scene.world.set_collider(
+        id,
+        Some(ColliderComponent {
+            active: true,
+            shape: ColliderShape::Box { size },
+            is_trigger: false,
+            aabb_min: Vec3::ZERO,
+            aabb_max: Vec3::ZERO,
+        }),
+    );
     scene.update_entity_collider(id);
 }
 

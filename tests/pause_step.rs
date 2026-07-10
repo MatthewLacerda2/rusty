@@ -37,13 +37,13 @@ fn drain_steps(h: &Harness) -> u32 {
 }
 
 /// Read an entity's world position. The `let` binding is load-bearing: it drops the
-/// `Ref<Entity>` `get_entity` returns before `scene` goes out of scope, so the borrow
-/// checker is satisfied (returning the field expression directly would outlive `scene`).
+/// transform guard before `scene` goes out of scope, so the borrow checker is
+/// satisfied (returning the field expression directly would outlive `scene`).
 #[allow(clippy::let_and_return)]
 fn entity_pos(h: &Harness, id: u32) -> glam::Vec3 {
     let world = h.world.borrow();
     let scene = world.scene().borrow();
-    let pos = scene.get_entity(id).unwrap().transform.position;
+    let pos = scene.world.transform(id).unwrap().position;
     pos
 }
 
@@ -188,7 +188,7 @@ fn pause_keeps_play_state_unlike_stop() {
     {
         let world = h.world.borrow();
         let mut scene = world.scene().borrow_mut();
-        scene.get_entity_mut(player).unwrap().transform.position.x = 42.0;
+        scene.world.transform_mut(player).unwrap().position.x = 42.0;
     }
 
     // Pause + a step does not reset: the mutated position persists.

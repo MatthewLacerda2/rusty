@@ -12,17 +12,18 @@
 //! non-fragile enumeration, not a fresh attempt to auto-find arbitrary editor
 //! capabilities. For each discovered component that has an inspector card, the card is
 //! classified:
-//!   * **direct** — the card takes a mutable borrow of the component (`&mut
-//!     entity.<field>`) and writes its fields through egui widgets, OR
-//!   * **routed** — the card reads fields immutably and routes every write through a
-//!     shared `authoring::…` op (like the migrated `material` card). Detaching the
-//!     reference on remove (`entity.<field> = None`) is NOT a field mutation, so a
-//!     routed card may still do it.
+//!   * **direct** — the card takes the component's mutable accessor and writes
+//!     fields through egui widgets without routing through its authoring ops, OR
+//!   * **routed** — the card reads a snapshot immutably and routes every write
+//!     through a shared `authoring::…` op. Detaching on remove
+//!     (`set_<field>(id, None)`) is NOT a field mutation, so a routed card may
+//!     still do it.
 //!
-//! The signal is `&mut entity.<field>`: every un-migrated card takes that borrow to
-//! edit fields, while the migrated material card reads via `entity.material.as_ref()`
-//! and only does `entity.material = None` on remove — so the marker cleanly separates
-//! them with a very low false-positive rate.
+//! Post-#344 the cards reach components through the accessor facade, so the signal
+//! is facade-shaped: a card that takes a mutable accessor (`.<field>_mut(`) without
+//! importing that component's `scene::authoring` ops is mutating fields directly;
+//! a routed card only ever takes the guard to hand `&mut c` into a shared op.
+//! Detach on remove (`.set_<field>(id, None)`) is not a field mutation.
 //!
 //! ## Enforcement (teeth + burn-down)
 //!   * A **direct** card NOT in `parity_baseline.txt` → violation (drift: a direct
@@ -47,7 +48,7 @@ use crate::components;
 
 /// The inspector cards live here (one module per first-class component). Scoping the
 /// scan to this directory is exact: a grep confirms no other editor file takes a
-/// `&mut entity.<component>` borrow, so the cards are the sole authoring surface.
+/// component's mutable accessor, so the cards are the sole authoring surface.
 const CARDS_DIR: &str = "src/editor/inspector/components";
 const BASELINE: &str = "tools/lint/parity_baseline.txt";
 const REPORT: &str = ".lint/report.txt";
@@ -57,9 +58,11 @@ const REPORT: &str = ".lint/report.txt";
 enum Card {
     /// No card references this component (skip — not a parity concern).
     None,
-    /// Routes every write through a shared `authoring::…` op (no `&mut` to the field).
+    /// Routes every write through a shared `authoring::…` op (the mutable accessor
+    /// is only ever taken to hand `&mut c` into an op).
     Routed,
-    /// Takes `&mut entity.<field>` and writes fields directly via egui widgets.
+    /// Takes the component's mutable accessor without the shared ops in scope —
+    /// fields are being written directly via egui widgets.
     Direct,
 }
 
@@ -93,8 +96,9 @@ fn violation(field: &str, card: Card, baselined: bool) -> Option<String> {
         // Drift: a direct card must be grandfathered, or it is unaccounted-for.
         (Card::Direct, false) => Some(format!(
             "PARITY_DRIFT `{field}` card mutates the component directly \
-             (`&mut entity.{field}`) but is not in {BASELINE} — route it through a \
-             `scene::authoring` op, or (exceptionally) baseline it with justification"
+             (`{field}_mut` without its `scene::authoring` ops) but is not in \
+             {BASELINE} — route it through a shared op, or (exceptionally) baseline \
+             it with justification"
         )),
         // Stale: a migrated (routed) card must not stay on the burn-down list.
         (Card::Routed, true) => Some(format!(
@@ -108,14 +112,23 @@ fn violation(field: &str, card: Card, baselined: bool) -> Option<String> {
 
 /// Classify `field`'s inspector card from the concatenated cards source.
 ///
-/// A card "exists" when some card source references `entity.<field>` (mirrors the
-/// completeness gate's inspector axis). It is **direct** when it takes a mutable
-/// borrow of the component (`&mut entity.<field>`), else **routed**.
+/// A card "exists" when some card source touches the component through the #344
+/// facade (mirrors the completeness gate's inspector axis). It is **direct** when
+/// it takes the mutable accessor (`.<field>_mut(`) with no `scene::authoring` ops
+/// for that component in scope — a routed card only takes the guard to hand
+/// `&mut c` into a shared op it imported (`authoring::<field>` / `<field> as
+/// <x>_ops`), and a read-only-plus-remove card never takes it at all.
 fn classify(field: &str, blob: &str) -> Card {
-    if !blob.contains(&format!("entity.{field}")) {
+    let takes_mut = blob.contains(&format!(".{field}_mut("));
+    let exists = takes_mut
+        || blob.contains(&format!(".set_{field}("))
+        || blob.contains(&format!(".has_{field}("));
+    if !exists {
         return Card::None;
     }
-    if blob.contains(&format!("&mut entity.{field}")) {
+    let has_ops =
+        blob.contains(&format!("authoring::{field}")) || blob.contains(&format!("{field} as "));
+    if takes_mut && !has_ops {
         Card::Direct
     } else {
         Card::Routed
@@ -185,24 +198,32 @@ fn report(violations: &[String]) {
 mod tests {
     use super::*;
 
-    /// A routed snippet (calls `authoring::…`, no `&mut` to the component) classifies
-    /// as routed; a direct snippet (`&mut entity.light` then field writes) as direct.
+    /// A routed snippet (ops imported, guard only feeds the op) classifies as
+    /// routed; a direct snippet (mutable accessor, no ops) as direct.
     #[test]
     fn classify_separates_routed_from_direct() {
-        let routed = "let key = entity.material.as_ref();\n\
-                      mat_ops::set_metallic(materials, key, metallic);\n\
-                      entity.material = None;";
-        assert_eq!(classify("material", routed), Card::Routed);
+        let routed = "use crate::scene::authoring::light as light_ops;\n\
+                      if let Some(mut c) = world.light_mut(id) {\n\
+                          light_ops::set_color(&mut c, rgb);\n\
+                      }";
+        assert_eq!(classify("light", routed), Card::Routed);
 
-        let direct = "let Some(light) = &mut entity.light else { return; };\n\
-                      light.color = Vec3::new(r, g, b);";
+        let direct = "let mut l = world.light_mut(id).unwrap();\n\
+                      l.color = Vec3::new(r, g, b);";
         assert_eq!(classify("light", direct), Card::Direct);
+
+        // Read-only + detach-on-remove (the mesh card's shape) stays routed.
+        let read_only = "if world.has_mesh(id) { world.set_mesh(id, None); }";
+        assert_eq!(classify("mesh", read_only), Card::Routed);
     }
 
     /// A component no card references is skipped (not a parity concern).
     #[test]
     fn classify_reports_no_card() {
-        assert_eq!(classify("rigidbody", "entity.light = None;"), Card::None);
+        assert_eq!(
+            classify("rigidbody", "world.set_light(id, None);"),
+            Card::None
+        );
     }
 
     /// The enforcement table: drift, stale baseline, and the two ok cases.
@@ -221,14 +242,15 @@ mod tests {
         assert!(violation("mesh", Card::None, true).is_none());
     }
 
-    /// The teeth: reintroducing a direct `MaterialAsset` mutation into the (un-
+    /// The teeth: reintroducing a direct `MaterialComponent` mutation into the (un-
     /// baselined) material card is flagged. We model "material went direct" as a card
-    /// that takes `&mut entity.material`; with material absent from the baseline, that
-    /// is a drift violation — exactly what stops the migration from being reverted.
+    /// that takes the mutable accessor with no shared ops in scope; with material
+    /// absent from the baseline, that is a drift violation — exactly what stops the
+    /// migration from being reverted.
     #[test]
     fn material_regression_to_direct_is_flagged() {
-        let regressed = "let Some(mat) = &mut entity.material else { return; };\n\
-                         mat.metallic = 1.0;";
+        let regressed = "let mut mat = world.material_mut(id).unwrap();\n\
+                         mat.material = \"other\".to_string();";
         assert_eq!(classify("material", regressed), Card::Direct);
         assert!(violation("material", Card::Direct, false).is_some());
     }

@@ -55,8 +55,7 @@ fn scene(material: MaterialAsset) -> Scene {
     s.ambient_intensity = 1.0;
     let id = s.add_entity("Plane".to_string());
     let (vertices, indices) = rusty::render::gpu::mesh::generate_plane(16.0, 16.0);
-    let mut e = s.get_entity_mut(id).unwrap();
-    e.mesh = Some(MeshComponent {
+    let mesh = MeshComponent {
         primitive_type: "Plane".to_string(),
         asset_ref: None,
         vertices,
@@ -66,12 +65,13 @@ fn scene(material: MaterialAsset) -> Scene {
         clips: Vec::new(),
         pose_palette: Vec::new(),
         is_dirty: rusty::scene::DirtyFlag::new(true),
-    });
-    e.material = Some(MaterialComponent {
+    };
+    let mat = MaterialComponent {
         material: "mat".to_string(),
-    });
-    e.visual_correction = Some(vc());
-    drop(e);
+    };
+    s.world.set_mesh(id, Some(mesh));
+    s.world.set_material(id, Some(mat));
+    s.world.set_visual_correction(id, Some(vc()));
     s.materials.insert("mat".to_string(), material);
     s
 }

@@ -28,8 +28,8 @@ fn entity_reports_transform_scale_and_component_inventory() {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "Crate", Some(Primitive::Box));
     add_component(&mut scene, id, ComponentKind::Light);
-    if let Some(mut e) = scene.get_entity_mut(id) {
-        e.transform.scale = Vec3::new(2.0, 3.0, 4.0);
+    if let Some(mut t) = scene.world.transform_mut(id) {
+        t.scale = Vec3::new(2.0, 3.0, 4.0);
     }
 
     let v = world_value(&scene, &cam(), 0, false);
@@ -54,14 +54,7 @@ fn mesh_and_material_reflect_authored_values() {
     let id = create_entity(&mut scene, "Box", Some(Primitive::Box));
     add_component(&mut scene, id, ComponentKind::Texture);
     // Edit the entity's referenced library material (the data is shared, not inline).
-    let key = scene
-        .get_entity(id)
-        .unwrap()
-        .material
-        .as_ref()
-        .unwrap()
-        .material
-        .clone();
+    let key = scene.world.material(id).unwrap().material.clone();
     if let Some(mat) = scene.materials.get_mut(&key) {
         mat.base_color = [0.5, 0.25, 0.125];
         mat.base_color_map = Some("project/textures/wood.png".to_string());
@@ -95,8 +88,7 @@ fn entity_value_matches_world_entry() {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "Solo", None);
     let wm = scene.compute_world_matrix(id);
-    let e = scene.get_entity(id).unwrap();
-    let direct = entity_value(&e, scene.material_of(&e), wm);
+    let direct = entity_value(&scene, id, wm);
     assert_eq!(direct["name"].as_str(), Some("Solo"));
     // A transform-only entity has no mesh/collider, so no bounds.
     assert!(direct["bounds"].is_null());

@@ -19,11 +19,11 @@ fn scene_with_wall(response: CollisionResponse) -> (Scene, u32) {
     let mut scene = Scene::new();
 
     let wall = scene.add_entity("Wall".to_string());
-    {
-        let mut e = scene.get_entity_mut(wall).unwrap();
-        e.is_static = true;
-        e.transform.position = Vec3::new(3.0, 0.0, 0.0);
-        e.collider = Some(ColliderComponent {
+    scene.world.set_static(wall, true);
+    scene.world.transform_mut(wall).unwrap().position = Vec3::new(3.0, 0.0, 0.0);
+    scene.world.set_collider(
+        wall,
+        Some(ColliderComponent {
             active: true,
             shape: ColliderShape::Box {
                 size: Vec3::new(1.0, 4.0, 4.0),
@@ -31,15 +31,15 @@ fn scene_with_wall(response: CollisionResponse) -> (Scene, u32) {
             is_trigger: false,
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
-        });
-    }
+        }),
+    );
     scene.update_entity_collider(wall);
 
     let emitter = scene.add_entity("Emitter".to_string());
-    {
-        let mut e = scene.get_entity_mut(emitter).unwrap();
-        e.transform.position = Vec3::ZERO;
-        e.particles = Some(ParticleEmitterComponent {
+    scene.world.transform_mut(emitter).unwrap().position = Vec3::ZERO;
+    scene.world.set_particles(
+        emitter,
+        Some(ParticleEmitterComponent {
             emit_mode: EmitMode::Burst,
             burst_count: 16,
             looping: false,
@@ -53,8 +53,8 @@ fn scene_with_wall(response: CollisionResponse) -> (Scene, u32) {
             bounciness: 0.8,
             seed: 3,
             ..Default::default()
-        });
-    }
+        }),
+    );
     (scene, emitter)
 }
 
@@ -81,8 +81,8 @@ fn run(scene: Scene, emitter: u32, frames: u32) -> (usize, f32, bool) {
     }
     let w = world.borrow();
     let scene = w.scene().borrow();
-    let e = scene.get_entity(emitter).unwrap();
-    let ps = &e.particles.as_ref().unwrap().runtime.particles;
+    let particles = scene.world.particles(emitter).unwrap();
+    let ps = &particles.runtime.particles;
     let max_x = ps.iter().map(|p| p.position.x).fold(f32::MIN, f32::max);
     let any_forward = ps.iter().any(|p| p.velocity.x > 0.1);
     (ps.len(), max_x, any_forward)

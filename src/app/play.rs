@@ -36,12 +36,12 @@ impl GameWorld {
     /// Place the play-mode camera just behind the Player entity (no-op if absent).
     pub(super) fn snap_camera_to_player(&mut self) {
         let scene = self.world.scene.borrow();
-        let player = scene
+        let player_pos = scene
             .find_entity_by_name(PLAYER_NAME)
-            .and_then(|id| scene.get_entity(id));
-        if let Some(player) = player {
+            .and_then(|id| scene.world.transform(id).map(|t| t.position));
+        if let Some(pos) = player_pos {
             let mut cam = self.resources.camera.borrow_mut();
-            cam.position = player.transform.position + Vec3::new(0.0, 1.5, -4.5);
+            cam.position = pos + Vec3::new(0.0, 1.5, -4.5);
             cam.yaw = 90.0;
             cam.pitch = -10.0;
         }
@@ -144,12 +144,10 @@ fn rebake_and_path(world: &mut World, res: &mut Resources) {
     res.nav.borrow_mut().bake(&s);
     let enemy_pos = s
         .find_entity_by_name(ENEMY_NAME)
-        .and_then(|id| s.get_entity(id))
-        .map(|e| e.transform.position);
+        .and_then(|id| s.world.transform(id).map(|t| t.position));
     let player_pos = s
         .find_entity_by_name(PLAYER_NAME)
-        .and_then(|id| s.get_entity(id))
-        .map(|e| e.transform.position);
+        .and_then(|id| s.world.transform(id).map(|t| t.position));
     if let (Some(enemy_pos), Some(player_pos)) = (enemy_pos, player_pos) {
         let grid = res.nav.borrow();
         let (es_x, es_z) = grid.world_to_grid(enemy_pos);
@@ -177,24 +175,19 @@ fn tick_nav(world: &mut World, res: &mut Resources) {
 fn animate(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
     let mut s = world.scene.borrow_mut();
-    for id in s.entity_ids() {
-        let Some(mut entity) = s.get_entity_mut(id) else {
-            continue;
-        };
-        if !entity.active {
+    for id in s.world.ids_with_animator() {
+        if !s.world.is_active(id) {
             continue;
         }
-        // Split the borrow: `animator` and `mesh` are distinct fields of `entity`,
-        // so destructure to mutate both without aliasing.
-        let crate::components::Entity { animator, mesh, .. } = &mut *entity;
-        let Some(anim) = animator else {
-            continue;
-        };
-        // The current clip's duration is the wrap length when the animator loops.
-        let duration = super::animation::current_clip_duration(anim, mesh.as_ref());
-        anim.advance(dt, duration);
-        if let Some(mesh) = mesh {
-            super::animation::repose_mesh(anim, mesh);
-        }
+        // The animator + mesh split borrow goes through the facade's sanctioned
+        // helper (#344) — the animate system's re-pose step.
+        s.world.with_animator_and_mesh_mut(id, |anim, mesh| {
+            // The current clip's duration is the wrap length when the animator loops.
+            let duration = super::animation::current_clip_duration(anim, mesh.as_deref());
+            anim.advance(dt, duration);
+            if let Some(mesh) = mesh {
+                super::animation::repose_mesh(anim, mesh);
+            }
+        });
     }
 }

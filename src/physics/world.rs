@@ -89,7 +89,7 @@ impl PhysicsWorld {
 
     fn build_bodies(&mut self, scene: &Scene) {
         for id in scene.entity_ids() {
-            let Some(inp) = scene.get_entity(id).as_deref().and_then(collider_inputs) else {
+            let Some(inp) = collider_inputs(&scene.world, id) else {
                 continue;
             };
 
@@ -149,7 +149,7 @@ impl PhysicsWorld {
         let entries: Vec<(u32, RigidBodyHandle)> =
             self.id_to_body.iter().map(|(&id, &h)| (id, h)).collect();
         for (id, handle) in entries {
-            let Some(snapshot) = scene.get_entity(id).as_deref().map(body_state) else {
+            let Some(snapshot) = body_state(&scene.world, id) else {
                 continue;
             };
             if self.bodies.get(handle).is_none() {
@@ -265,14 +265,14 @@ impl PhysicsWorld {
                     from_na_vec(*body.angvel()),
                 )
             };
-            if let Some(mut entity) = scene.get_entity_mut(id) {
-                entity.transform.position = pos;
-                entity.transform.rotation = rot;
-                if let Some(rb) = &mut entity.rigidbody {
-                    if !rb.is_kinematic {
-                        rb.velocity = vel;
-                        rb.angular_velocity = angvel;
-                    }
+            if let Some(mut t) = scene.world.transform_mut(id) {
+                t.position = pos;
+                t.rotation = rot;
+            }
+            if let Some(mut rb) = scene.world.rigidbody_mut(id) {
+                if !rb.is_kinematic {
+                    rb.velocity = vel;
+                    rb.angular_velocity = angvel;
                 }
             }
             scene.update_entity_collider(id);

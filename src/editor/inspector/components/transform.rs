@@ -2,13 +2,13 @@ use egui_phosphor::regular as icon;
 use glam::Mat4;
 
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::Entity;
 
 /// Transform editor with integrated parenting controls.
 #[allow(clippy::too_many_arguments)]
 pub fn draw(
     ui: &mut egui::Ui,
-    entity: &mut Entity,
+    world: &mut crate::ecs::World,
+    id: u32,
     parent_mat: Option<Mat4>,
     selected_parent_name: &str,
     valid_parents: &[(u32, String)],
@@ -20,7 +20,8 @@ pub fn draw(
     component_card(ui, icon::ARROWS_OUT_CARDINAL, "Transform", None, |ui| {
         draw_body(
             ui,
-            entity,
+            world,
+            id,
             parent_mat,
             selected_parent_name,
             valid_parents,
@@ -34,7 +35,8 @@ pub fn draw(
 #[allow(clippy::too_many_arguments)]
 fn draw_body(
     ui: &mut egui::Ui,
-    entity: &mut Entity,
+    world: &mut crate::ecs::World,
+    id: u32,
     parent_mat: Option<Mat4>,
     selected_parent_name: &str,
     valid_parents: &[(u32, String)],
@@ -42,15 +44,29 @@ fn draw_body(
     pending_nav_bake: &mut bool,
     is_dirty: &mut bool,
 ) {
-    let is_static = entity.is_static;
-    let trans = &mut entity.transform;
+    let is_static = world.is_static(id);
 
-    let pos_changed = draw_position(ui, trans);
-    let rot_changed = draw_rotation(ui, trans);
-    let scl_changed = draw_scale(ui, trans);
+    let Some(mut trans) = world.transform_mut(id) else {
+        return;
+    };
+    let pos_changed = draw_position(ui, &mut trans);
+    let rot_changed = draw_rotation(ui, &mut trans);
+    let scl_changed = draw_scale(ui, &mut trans);
+    drop(trans);
 
     if pos_changed || rot_changed || scl_changed {
-        entity.update_collider(parent_mat);
+        let local = world.transform(id).map(|t| t.to_matrix());
+        if let Some(local) = local {
+            let wm = match parent_mat {
+                Some(p) => p * local,
+                None => local,
+            };
+            if let Some(mut col) = world.collider_mut(id) {
+                let (min, max) = col.calculate_world_aabb(wm);
+                col.aabb_min = min;
+                col.aabb_max = max;
+            }
+        }
         *is_dirty = true;
         if is_static {
             *pending_nav_bake = true;

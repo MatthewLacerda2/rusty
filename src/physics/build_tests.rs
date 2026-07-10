@@ -12,7 +12,7 @@ use glam::Vec3;
 use rapier3d::prelude::*;
 
 use super::build::{build_shape, collider_inputs, interaction_groups, is_kinematic};
-use crate::components::{ColliderComponent, ColliderShape, Entity, RigidBodyComponent};
+use crate::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
 
 /// Local-AABB half-extents `(x, y, z)` of a built collider.
 fn half_extents(c: &Collider) -> [f32; 3] {
@@ -191,22 +191,26 @@ fn is_kinematic_only_for_non_static_bodies_without_a_dynamic_rigidbody() {
 
 #[test]
 fn collider_inputs_respects_the_active_flag() {
-    let mut e = Entity::new(1, "Box".to_string());
-    e.collider = Some(ColliderComponent {
-        active: false,
-        shape: ColliderShape::Box { size: Vec3::ONE },
-        is_trigger: false,
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
-    });
+    let mut world = crate::ecs::World::new();
+    let id = world.spawn("Box".to_string());
+    world.set_collider(
+        id,
+        Some(ColliderComponent {
+            active: false,
+            shape: ColliderShape::Box { size: Vec3::ONE },
+            is_trigger: false,
+            aabb_min: Vec3::ZERO,
+            aabb_max: Vec3::ZERO,
+        }),
+    );
     assert!(
-        collider_inputs(&e).is_none(),
+        collider_inputs(&world, id).is_none(),
         "an inactive collider yields no body"
     );
     // Activating it produces inputs — pins the match guard in both directions.
-    e.collider.as_mut().unwrap().active = true;
+    world.collider_mut(id).unwrap().active = true;
     assert!(
-        collider_inputs(&e).is_some(),
+        collider_inputs(&world, id).is_some(),
         "an active collider yields inputs"
     );
 }

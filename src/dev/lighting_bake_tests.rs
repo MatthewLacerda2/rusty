@@ -17,11 +17,11 @@ use crate::scene::Scene;
 fn room_scene() -> Scene {
     let mut scene = Scene::new();
     let id = scene.add_entity("Floor".to_string());
-    {
-        let mut e = scene.get_entity_mut(id).unwrap();
-        e.is_static = true;
-        e.transform.position = Vec3::ZERO;
-        e.collider = Some(ColliderComponent {
+    scene.world.set_static(id, true);
+    scene.world.transform_mut(id).unwrap().position = Vec3::ZERO;
+    scene.world.set_collider(
+        id,
+        Some(ColliderComponent {
             active: true,
             shape: ColliderShape::Box {
                 size: Vec3::new(20.0, 6.0, 20.0),
@@ -29,8 +29,8 @@ fn room_scene() -> Scene {
             is_trigger: false,
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
-        });
-    }
+        }),
+    );
     scene.update_entity_collider(id);
     scene
 }

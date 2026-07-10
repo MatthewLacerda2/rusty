@@ -164,8 +164,9 @@ fn register_scene_transform(lua: &Lua, harness: &Shared) -> LuaResult<()> {
             let w = world.borrow();
             let s = w.scene().borrow();
             let p = s
-                .get_entity(id)
-                .map(|e| e.transform.position)
+                .world
+                .transform(id)
+                .map(|t| t.position)
                 .unwrap_or(Vec3::ZERO);
             Ok((p.x, p.y, p.z))
         })?,
@@ -183,8 +184,9 @@ fn register_scene_animator(lua: &Lua, harness: &Shared) -> LuaResult<()> {
             let w = world.borrow();
             let s = w.scene().borrow();
             let clip = s
-                .get_entity(id)
-                .and_then(|e| e.animator.as_ref().map(|a| a.current_clip.clone()))
+                .world
+                .animator(id)
+                .map(|a| a.current_clip.clone())
                 .unwrap_or_default();
             Ok(clip)
         })?,

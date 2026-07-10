@@ -112,13 +112,14 @@ pub fn material_asset_from_import(data: &crate::asset::MaterialData) -> Material
 /// "Add Component" verb that creates a shared library asset, not just entity data.
 pub fn attach_default_material(scene: &mut Scene, id: u32) -> bool {
     let key = format!("entity_{id}_material");
-    {
-        let Some(mut entity) = scene.get_entity_mut(id) else {
-            return false;
-        };
-        entity.material = Some(MaterialComponent {
+    let attached = scene.world.set_material(
+        id,
+        Some(MaterialComponent {
             material: key.clone(),
-        });
+        }),
+    );
+    if !attached {
+        return false;
     }
     scene.materials.insert(key, default_material());
     true

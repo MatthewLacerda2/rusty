@@ -48,13 +48,18 @@ fn add_box(
         },
     );
     let id = scene.add_entity(name.to_string());
-    let mut e = scene.get_entity_mut(id).unwrap();
-    e.mesh = Some(box_mesh());
-    e.is_static = is_static;
-    e.transform.position = pos;
-    e.transform.scale = scale;
-    e.transform.rotation = Quat::IDENTITY;
-    e.material = Some(crate::components::MaterialComponent { material: mat_name });
+    scene.world.set_mesh(id, Some(box_mesh()));
+    scene.world.set_static(id, is_static);
+    {
+        let mut t = scene.world.transform_mut(id).unwrap();
+        t.position = pos;
+        t.scale = scale;
+        t.rotation = Quat::IDENTITY;
+    }
+    scene.world.set_material(
+        id,
+        Some(crate::components::MaterialComponent { material: mat_name }),
+    );
 }
 
 /// Build a box of six coloured static walls around the origin, each glowing a

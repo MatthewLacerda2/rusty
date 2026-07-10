@@ -15,9 +15,8 @@ fn scene_with_animator() -> (RefCell<Scene>, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Rig".to_string());
     scene
-        .get_entity_mut(id)
-        .expect("entity just added")
-        .animator = Some(AnimatorComponent::default());
+        .world
+        .set_animator(id, Some(AnimatorComponent::default()));
     (RefCell::new(scene), id)
 }
 
@@ -47,7 +46,7 @@ fn lua_setters_write_every_parameter_kind() {
         ),
     );
     let scene = scene.borrow();
-    let anim = scene.get_entity(id).unwrap().animator.clone().unwrap();
+    let anim = scene.world.animator(id).unwrap().clone();
     assert_eq!(anim.get_bool("isGrounded"), Some(true));
     assert_eq!(anim.get_float("speed"), Some(4.2));
     assert_eq!(anim.get_int("weapon"), Some(2));
@@ -70,7 +69,7 @@ fn wrong_typed_lua_set_is_a_warned_no_op() {
         ),
     );
     let scene = scene.borrow();
-    let anim = scene.get_entity(id).unwrap().animator.clone().unwrap();
+    let anim = scene.world.animator(id).unwrap().clone();
     assert_eq!(
         anim.get_bool("isGrounded"),
         Some(true),
@@ -98,7 +97,7 @@ fn setter_on_missing_entity_or_animator_is_a_silent_no_op() {
                Animator.SetTrigger(9999, "Jump")"#
         ),
     );
-    assert!(scene.borrow().get_entity(id).unwrap().animator.is_none());
+    assert!(!scene.borrow().world.has_animator(id));
 }
 
 #[test]
@@ -106,8 +105,7 @@ fn every_parameter_kind_round_trips_through_scene_data() {
     let (scene, id) = scene_with_animator();
     {
         let mut sc = scene.borrow_mut();
-        let mut e = sc.get_entity_mut(id).unwrap();
-        let anim = e.animator.as_mut().unwrap();
+        let mut anim = sc.world.animator_mut(id).unwrap();
         anim.set_bool("isGrounded", true);
         anim.set_float("speed", 4.2);
         anim.set_int("weapon", 2);
@@ -120,7 +118,7 @@ fn every_parameter_kind_round_trips_through_scene_data() {
     let mut loaded = Scene::new();
     apply_scene_data(&mut loaded, data);
 
-    let anim = loaded.get_entity(id).unwrap().animator.clone().unwrap();
+    let anim = loaded.world.animator(id).unwrap().clone();
     assert_eq!(
         anim.parameters.into_iter().collect::<Vec<_>>(),
         [

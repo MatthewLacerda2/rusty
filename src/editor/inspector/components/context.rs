@@ -38,12 +38,13 @@ pub(crate) fn gather_context(scene: &Scene, selected_id: u32) -> InspectorContex
         .map(|i| (i, scene.layers.label(i)))
         .collect();
 
-    let current_parent_id = scene.get_entity(selected_id).and_then(|e| e.parent_id);
+    let current_parent_id = scene.world.parent_id(selected_id);
     let parent_mat = current_parent_id.map(|p| scene.compute_world_matrix(p));
     let selected_parent_name = if let Some(p_id) = current_parent_id {
         scene
-            .get_entity(p_id)
-            .map(|e| e.name.clone())
+            .world
+            .name(p_id)
+            .map(|n| n.clone())
             .unwrap_or("None".to_string())
     } else {
         "None".to_string()
@@ -63,12 +64,13 @@ pub(crate) fn gather_context(scene: &Scene, selected_id: u32) -> InspectorContex
 /// itself and its own descendants (which would create a cycle).
 fn collect_valid_parents(scene: &Scene, selected_id: u32) -> Vec<(u32, String)> {
     scene
-        .iter()
-        .filter(|e| e.id != selected_id)
-        .map(|e| (e.id, e.name.clone()))
+        .entity_ids()
+        .into_iter()
+        .filter(|&id| id != selected_id)
+        .filter_map(|id| scene.world.name(id).map(|n| (id, n.clone())))
         .filter(|(id, _)| {
             let mut curr = *id;
-            while let Some(ancestor) = scene.get_entity(curr).and_then(|x| x.parent_id) {
+            while let Some(ancestor) = scene.world.parent_id(curr) {
                 if ancestor == selected_id {
                     return false;
                 }

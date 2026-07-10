@@ -15,14 +15,16 @@ pub use physics::{draw_nav_agent, draw_rigidbody};
 use crate::editor::inspector::components::card::component_card;
 use crate::editor::theme;
 use crate::scene::authoring::animator as animator_ops;
-use crate::scene::Entity;
 
 /// 3D. Script bindings — one card per attached script (#83). An entity can carry
 /// many scripts; each renders as its own removable Lua Script card.
-pub fn draw_script(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
+pub fn draw_script(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool) {
     // Collect the index to remove (if any) so we don't mutate the vec mid-draw.
     let mut remove_index: Option<usize> = None;
-    for (i, script) in entity.scripts.iter_mut().enumerate() {
+    let Some(mut scripts) = world.scripts_mut(id) else {
+        return;
+    };
+    for (i, script) in scripts.iter_mut().enumerate() {
         let mut remove = false;
         component_card(ui, icon::SCROLL, "Lua Script", Some(&mut remove), |ui| {
             ui.horizontal(|ui| {
@@ -45,7 +47,7 @@ pub fn draw_script(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) 
         }
     }
     if let Some(i) = remove_index {
-        entity.scripts.remove(i);
+        scripts.remove(i);
         *is_dirty = true;
     }
 }
@@ -53,23 +55,25 @@ pub fn draw_script(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) 
 /// 3E. Animator Component — the entity's skeletal-animation playback state. The
 /// clips themselves live on the skinned mesh; this card edits which one plays and
 /// how.
-pub fn draw_animator(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
-    if entity.animator.is_none() {
-        return;
-    }
-    let mut remove = false;
-    let Some(anim) = entity.animator.clone() else {
+pub fn draw_animator(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    is_dirty: &mut bool,
+) {
+    let Some(anim) = world.animator(id).map(|a| a.clone()) else {
         return;
     };
+    let mut remove = false;
     component_card(
         ui,
         icon::PERSON_SIMPLE_RUN,
         "Animator",
         Some(&mut remove),
-        |ui| animator_card_body(ui, entity, &anim, is_dirty),
+        |ui| animator_card_body(ui, world, id, &anim, is_dirty),
     );
     if remove {
-        entity.animator = None;
+        world.set_animator(id, None);
         *is_dirty = true;
     }
 }
@@ -79,7 +83,8 @@ pub fn draw_animator(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool
 /// bindings use.
 fn animator_card_body(
     ui: &mut egui::Ui,
-    entity: &mut Entity,
+    world: &mut crate::ecs::World,
+    id: u32,
     anim: &crate::components::AnimatorComponent,
     is_dirty: &mut bool,
 ) {
@@ -87,7 +92,9 @@ fn animator_card_body(
     ui.horizontal(|ui| {
         ui.label("Clip:");
         if ui.text_edit_singleline(&mut clip).changed() {
-            animator_ops::set_clip(entity, clip);
+            if let Some(mut a) = world.animator_mut(id) {
+                animator_ops::set_clip(&mut a, clip);
+            }
             *is_dirty = true;
         }
     });
@@ -98,26 +105,34 @@ fn animator_card_body(
             .add(egui::DragValue::new(&mut speed).speed(0.05))
             .changed()
         {
-            animator_ops::set_speed(entity, speed);
+            if let Some(mut a) = world.animator_mut(id) {
+                animator_ops::set_speed(&mut a, speed);
+            }
             *is_dirty = true;
         }
     });
     let mut is_playing = anim.is_playing;
     if ui.checkbox(&mut is_playing, "Is Playing").changed() {
-        animator_ops::set_playing(entity, is_playing);
+        if let Some(mut a) = world.animator_mut(id) {
+            animator_ops::set_playing(&mut a, is_playing);
+        }
         *is_dirty = true;
     }
     let mut freeze = anim.freeze;
     if ui.checkbox(&mut freeze, "Freeze").changed() {
-        animator_ops::set_freeze(entity, freeze);
+        if let Some(mut a) = world.animator_mut(id) {
+            animator_ops::set_freeze(&mut a, freeze);
+        }
         *is_dirty = true;
     }
     let mut loop_clip = anim.loop_clip;
     if ui.checkbox(&mut loop_clip, "Loop").changed() {
-        animator_ops::set_looping(entity, loop_clip);
+        if let Some(mut a) = world.animator_mut(id) {
+            animator_ops::set_looping(&mut a, loop_clip);
+        }
         *is_dirty = true;
     }
-    draw_graph(ui, entity, anim, is_dirty);
+    draw_graph(ui, world, id, anim, is_dirty);
     draw_parameters(ui, anim);
 }
 
@@ -127,7 +142,8 @@ fn animator_card_body(
 /// field on the card.
 fn draw_graph(
     ui: &mut egui::Ui,
-    entity: &mut Entity,
+    world: &mut crate::ecs::World,
+    id: u32,
     anim: &crate::components::AnimatorComponent,
     is_dirty: &mut bool,
 ) {
@@ -136,7 +152,9 @@ fn draw_graph(
     ui.horizontal(|ui| {
         ui.label("Graph:");
         if ui.text_edit_singleline(&mut graph).changed() {
-            animator_ops::set_graph(entity, (!graph.is_empty()).then_some(graph));
+            if let Some(mut a) = world.animator_mut(id) {
+                animator_ops::set_graph(&mut a, (!graph.is_empty()).then_some(graph));
+            }
             *is_dirty = true;
         }
     });
@@ -145,7 +163,9 @@ fn draw_graph(
     }
     let mut enabled = anim.graph_enabled;
     if ui.checkbox(&mut enabled, "Graph enabled").changed() {
-        animator_ops::set_graph_enabled(entity, enabled);
+        if let Some(mut a) = world.animator_mut(id) {
+            animator_ops::set_graph_enabled(&mut a, enabled);
+        }
         *is_dirty = true;
     }
     if let Some(node) = &anim.current_node {

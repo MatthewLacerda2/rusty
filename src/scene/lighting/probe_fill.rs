@@ -35,19 +35,19 @@ impl AnalyticEnv {
         let sky = scene.ambient_color * scene.ambient_intensity;
         let mut sun_dir = None;
         let mut sun_radiance = Vec3::ZERO;
-        for entity in scene.iter() {
-            if !entity.active {
+        for id in scene.world.ids_with_light() {
+            if !scene.world.is_active(id) {
                 continue;
             }
-            if let Some(light) = &entity.light {
-                if light.light_type == LightType::Directional {
-                    // The light shines along -Z of its transform; the sample
-                    // direction *toward* the source is the negation.
-                    let forward = entity.transform.rotation * Vec3::NEG_Z;
-                    sun_dir = Some((-forward).normalize_or_zero());
-                    sun_radiance = light.color * light.intensity;
-                    break;
-                }
+            let light = scene.world.light(id).expect("id came from ids_with_light");
+            if light.light_type == LightType::Directional {
+                // The light shines along -Z of its transform; the sample
+                // direction *toward* the source is the negation.
+                let rotation = scene.world.transform(id).expect("mandatory").rotation;
+                let forward = rotation * Vec3::NEG_Z;
+                sun_dir = Some((-forward).normalize_or_zero());
+                sun_radiance = light.color * light.intensity;
+                break;
             }
         }
         Self {
@@ -146,18 +146,21 @@ mod tests {
     fn directional_sun_adds_directionality() {
         let mut scene = scene_with_ambient(Vec3::splat(0.1), 1.0);
         let id = scene.add_entity("Sun".to_string());
-        if let Some(mut e) = scene.get_entity_mut(id) {
-            // Point the light's -Z straight down, so the sample direction is +Y.
-            e.transform.rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
-            e.light = Some(LightComponent {
+        // Point the light's -Z straight down, so the sample direction is +Y.
+        if let Some(mut transform) = scene.world.transform_mut(id) {
+            transform.rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
+        }
+        scene.world.set_light(
+            id,
+            Some(LightComponent {
                 light_type: LightType::Directional,
                 color: Vec3::ONE,
                 intensity: 5.0,
                 range: 0.0,
                 inner_cone: 0.0,
                 outer_cone: 0.0,
-            });
-        }
+            }),
+        );
         scene.probes.add_probe(Vec3::ZERO);
         analytic_fill(&mut scene);
         let sh = scene.probes.probes[0].sh;

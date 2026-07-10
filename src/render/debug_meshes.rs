@@ -34,17 +34,19 @@ impl Renderer {
     pub(crate) fn upload_scene_meshes(&mut self, scene: &Scene) {
         let mut seen: HashSet<MeshId> = HashSet::new();
         let mut updates: Vec<(MeshId, Vec<Vertex>, Vec<u32>)> = Vec::new();
-        for entity in scene.iter() {
-            if !entity.active {
+        for entity_id in scene.world.ids_with_mesh() {
+            if !scene.world.is_active(entity_id) {
                 continue;
             }
-            if let Some(mesh) = &entity.mesh {
-                let id = MeshId::from_mesh(mesh);
-                let dirty = mesh.is_dirty.get();
-                mesh.is_dirty.set(false);
-                if (dirty || !self.gpu_meshes.contains_key(&id)) && seen.insert(id.clone()) {
-                    updates.push((id, mesh.vertices.clone(), mesh.indices.clone()));
-                }
+            let mesh = scene
+                .world
+                .mesh(entity_id)
+                .expect("id came from ids_with_mesh");
+            let id = MeshId::from_mesh(&mesh);
+            let dirty = mesh.is_dirty.get();
+            mesh.is_dirty.set(false);
+            if (dirty || !self.gpu_meshes.contains_key(&id)) && seen.insert(id.clone()) {
+                updates.push((id, mesh.vertices.clone(), mesh.indices.clone()));
             }
         }
         for (id, vertices, indices) in updates {

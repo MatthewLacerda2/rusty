@@ -42,13 +42,18 @@ fn add_static_box(scene: &mut Scene, name: &str, pos: Vec3, scale: Vec3, emissiv
         },
     );
     let id = scene.add_entity(name.to_string());
-    let mut e = scene.get_entity_mut(id).unwrap();
-    e.mesh = Some(box_mesh());
-    e.is_static = true;
-    e.transform.position = pos;
-    e.transform.scale = scale;
-    e.transform.rotation = Quat::IDENTITY;
-    e.material = Some(crate::components::MaterialComponent { material: mat_name });
+    scene.world.set_mesh(id, Some(box_mesh()));
+    scene.world.set_static(id, true);
+    {
+        let mut t = scene.world.transform_mut(id).unwrap();
+        t.position = pos;
+        t.scale = scale;
+        t.rotation = Quat::IDENTITY;
+    }
+    scene.world.set_material(
+        id,
+        Some(crate::components::MaterialComponent { material: mat_name }),
+    );
 }
 
 /// A scene with a single big red static wall 6 units out on +X (and otherwise empty),

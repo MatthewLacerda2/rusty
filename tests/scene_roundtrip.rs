@@ -16,10 +16,10 @@ fn save_load_preserves_values_and_rehydrates_mesh() {
     let mut scene = Scene::new();
     scene.skybox_path = "sky.png".to_string();
     let id = scene.add_entity("Box".to_string());
-    {
-        let mut e = scene.get_entity_mut(id).unwrap();
-        e.transform.position = Vec3::new(1.0, 2.0, 3.0);
-        e.mesh = Some(rusty::scene::MeshComponent {
+    scene.world.transform_mut(id).unwrap().position = Vec3::new(1.0, 2.0, 3.0);
+    scene.world.set_mesh(
+        id,
+        Some(rusty::scene::MeshComponent {
             primitive_type: "Box".to_string(),
             asset_ref: None,
             vertices: Vec::new(),
@@ -29,8 +29,8 @@ fn save_load_preserves_values_and_rehydrates_mesh() {
             clips: Vec::new(),
             pose_palette: Vec::new(),
             is_dirty: rusty::scene::DirtyFlag::new(true),
-        });
-    }
+        }),
+    );
     let path = tmp("rusty_scene_roundtrip.scene");
     scene.save_to_file(&path).unwrap();
 
@@ -38,7 +38,7 @@ fn save_load_preserves_values_and_rehydrates_mesh() {
     loaded.load_from_file(&path).unwrap();
     assert_eq!(loaded.entity_count(), 1);
     assert_eq!(loaded.skybox_path, "sky.png");
-    let e = loaded.get_entity(id).unwrap();
+    let e = loaded.world.entity_document(id).unwrap();
     assert_eq!(e.transform.position, Vec3::new(1.0, 2.0, 3.0));
     // GPU vertex data is never persisted; it is rehydrated from primitive_type.
     assert!(!e.mesh.as_ref().unwrap().vertices.is_empty());
@@ -49,7 +49,7 @@ fn save_load_preserves_layer_names_and_entity_layer() {
     let mut scene = Scene::new();
     scene.layers.set_name(3, "Enemy");
     let id = scene.add_entity("Grunt".to_string());
-    scene.get_entity_mut(id).unwrap().layer = 3;
+    scene.world.set_layer(id, 3);
 
     let path = tmp("rusty_layers_roundtrip.scene");
     scene.save_to_file(&path).unwrap();
@@ -59,7 +59,7 @@ fn save_load_preserves_layer_names_and_entity_layer() {
     // The registry name and the entity's layer index both survive the round-trip.
     assert_eq!(loaded.layers.name(3), "Enemy");
     assert_eq!(loaded.layers.index_of("Enemy"), Some(3));
-    assert_eq!(loaded.get_entity(id).unwrap().layer, 3);
+    assert_eq!(loaded.world.layer(id), 3);
     // Layer 0 stays the fixed Default and cannot be renamed.
     scene.layers.set_name(0, "NotDefault");
     assert_eq!(scene.layers.name(0), "Default");
@@ -97,9 +97,9 @@ fn legacy_single_script_scene_loads_into_scripts_vec() {
     let mut scene = Scene::new();
     let id = scene.add_entity("Bot".to_string());
     scene
-        .get_entity_mut(id)
+        .world
+        .scripts_mut(id)
         .unwrap()
-        .scripts
         .push(rusty::scene::ScriptComponent {
             path: "project/assets/scripts/bot.lua".to_string(),
             is_loaded: false,
@@ -121,9 +121,9 @@ fn legacy_single_script_scene_loads_into_scripts_vec() {
 
     let mut loaded = Scene::new();
     loaded.load_from_file(&path).unwrap();
-    let e = loaded.get_entity(id).unwrap();
-    assert_eq!(e.scripts.len(), 1);
-    assert_eq!(e.scripts[0].path, "project/assets/scripts/bot.lua");
+    let scripts = loaded.world.scripts(id).unwrap();
+    assert_eq!(scripts.len(), 1);
+    assert_eq!(scripts[0].path, "project/assets/scripts/bot.lua");
 }
 
 #[test]
@@ -131,7 +131,7 @@ fn snapshot_restore_discards_mutations() {
     let mut scene = Scene::new();
     let id = scene.add_entity("Player".to_string());
     let snap = SceneSnapshot::capture(&scene);
-    scene.get_entity_mut(id).unwrap().transform.position = Vec3::splat(9.0);
+    scene.world.transform_mut(id).unwrap().position = Vec3::splat(9.0);
     snap.restore(&mut scene);
-    assert_eq!(scene.get_entity(id).unwrap().transform.position, Vec3::ZERO);
+    assert_eq!(scene.world.transform(id).unwrap().position, Vec3::ZERO);
 }

@@ -80,17 +80,19 @@ impl Camera {
 /// when none exists. This drives the API/particle camera and edit-mode rendering;
 /// the multi-camera stack itself is built by [`build_camera_stack`].
 pub fn sync_lens_from_scene(camera: &mut Camera, scene: &Scene, is_playing: bool) {
-    // `Scene::iter` yields `Ref` guards, so copy the lens values out while the guard
-    // is alive rather than returning a borrow.
+    // `World::camera` yields a `CompRef` guard, so copy the lens values out while
+    // the guard is alive rather than returning a borrow.
     let mut lens = None;
     if is_playing {
         let mut best_order = i32::MAX;
-        for entity in scene.iter() {
-            if let Some(c) = &entity.camera {
-                if entity.active && c.active && c.render_order <= best_order {
-                    best_order = c.render_order;
-                    lens = Some((c.fov, c.near, c.far, c.culling_mask));
-                }
+        for id in scene.world.ids_with_camera() {
+            let c = scene
+                .world
+                .camera(id)
+                .expect("id came from ids_with_camera");
+            if scene.world.is_active(id) && c.active && c.render_order <= best_order {
+                best_order = c.render_order;
+                lens = Some((c.fov, c.near, c.far, c.culling_mask));
             }
         }
     }
@@ -119,12 +121,12 @@ pub fn sync_lens_from_scene(camera: &mut Camera, scene: &Scene, is_playing: bool
 pub fn game_camera_from_scene(base: &Camera, scene: &Scene) -> Camera {
     let mut best_order = i32::MAX;
     let mut chosen: Option<Camera> = None;
-    for id in scene.entity_ids() {
-        let Some(entity) = scene.get_entity(id) else {
-            continue;
-        };
-        let Some(c) = &entity.camera else { continue };
-        if !entity.active || !c.active || c.render_order > best_order {
+    for id in scene.world.ids_with_camera() {
+        let c = scene
+            .world
+            .camera(id)
+            .expect("id came from ids_with_camera");
+        if !scene.world.is_active(id) || !c.active || c.render_order > best_order {
             continue;
         }
         best_order = c.render_order;
@@ -173,22 +175,24 @@ pub fn build_camera_stack(base: &Camera, scene: &Scene, is_playing: bool) -> Vec
     // Collect (render_order, camera) for every active camera component, layering its
     // lens/mask/clear-flags onto the shared viewport position + orientation.
     let mut stack: Vec<(i32, Camera)> = Vec::new();
-    for entity in scene.iter() {
-        if !entity.active {
+    for id in scene.world.ids_with_camera() {
+        if !scene.world.is_active(id) {
             continue;
         }
-        if let Some(c) = &entity.camera {
-            if !c.active {
-                continue;
-            }
-            let mut cam = base.clone();
-            cam.fov = c.fov;
-            cam.near = c.near;
-            cam.far = c.far;
-            cam.culling_mask = c.culling_mask;
-            cam.clear_flags = c.clear_flags;
-            stack.push((c.render_order, cam));
+        let c = scene
+            .world
+            .camera(id)
+            .expect("id came from ids_with_camera");
+        if !c.active {
+            continue;
         }
+        let mut cam = base.clone();
+        cam.fov = c.fov;
+        cam.near = c.near;
+        cam.far = c.far;
+        cam.culling_mask = c.culling_mask;
+        cam.clear_flags = c.clear_flags;
+        stack.push((c.render_order, cam));
     }
 
     if stack.is_empty() {
@@ -221,7 +225,7 @@ mod tests {
 
     fn add_camera(scene: &mut Scene, name: &str, comp: CameraComponent) {
         let id = scene.add_entity(name.to_string());
-        scene.get_entity_mut(id).unwrap().camera = Some(comp);
+        scene.world.set_camera(id, Some(comp));
     }
 
     #[test]

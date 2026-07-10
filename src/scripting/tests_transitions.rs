@@ -58,13 +58,13 @@ fn disable_then_reenable_fire_each_edge_exactly_once() {
         m.update_scripts(DT);
     }
     // Disable: OnDisable fires at the next tick's head; no Update while inactive.
-    m.scene.borrow_mut().get_entity_mut(id).unwrap().active = false;
+    m.scene.borrow_mut().world.set_active(id, false);
     for _ in 0..2 {
         m.init_scripts();
         m.update_scripts(DT);
     }
     // Re-enable: OnEnable fires (NOT Awake/Start again), then Update resumes.
-    m.scene.borrow_mut().get_entity_mut(id).unwrap().active = true;
+    m.scene.borrow_mut().world.set_active(id, true);
     m.init_scripts();
     m.update_scripts(DT);
     assert_eq!(
@@ -87,7 +87,7 @@ fn destroy_active_fires_disable_then_destroy_and_removes_entity() {
         "an active entity's destroy fires OnDisable then OnDestroy"
     );
     assert!(
-        m.scene.borrow().get_entity(id).is_none(),
+        !m.scene.borrow().world.contains(id),
         "the entity is actually removed after the teardown dispatch"
     );
 }
@@ -96,7 +96,7 @@ fn destroy_active_fires_disable_then_destroy_and_removes_entity() {
 fn destroy_already_disabled_fires_only_destroy() {
     let (mut m, id) = logging_manager("trans_destroy_disabled");
     m.init_scripts(); // Awake/OnEnable/Start
-    m.scene.borrow_mut().get_entity_mut(id).unwrap().active = false;
+    m.scene.borrow_mut().world.set_active(id, false);
     m.init_scripts(); // OnDisable (the falling edge)
     m.eval("__log = ''").unwrap(); // isolate the teardown callbacks
     m.scene.borrow_mut().request_destroy(id);
@@ -125,9 +125,9 @@ fn destroying_one_entity_leaves_a_sibling_running() {
     for id in [a, b] {
         m.scene
             .borrow_mut()
-            .get_entity_mut(id)
+            .world
+            .scripts_mut(id)
             .unwrap()
-            .scripts
             .push(ScriptComponent {
                 path: path.clone(),
                 ..Default::default()
@@ -153,13 +153,10 @@ fn destroying_one_entity_leaves_a_sibling_running() {
          — its instance is neither evicted nor reloaded"
     );
     assert!(
-        m.scene.borrow().get_entity(a).is_none(),
+        !m.scene.borrow().world.contains(a),
         "the destroyed entity is gone"
     );
-    assert!(
-        m.scene.borrow().get_entity(b).is_some(),
-        "the sibling survives"
-    );
+    assert!(m.scene.borrow().world.contains(b), "the sibling survives");
 }
 
 #[test]
@@ -173,7 +170,7 @@ fn disabled_entity_receives_no_on_trigger() {
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
     m.init_scripts(); // awoken while active
-    m.scene.borrow_mut().get_entity_mut(id).unwrap().active = false;
+    m.scene.borrow_mut().world.set_active(id, false);
     m.dispatch_trigger_events(TriggerEvents {
         stayed: vec![(id, 99)],
         ..Default::default()

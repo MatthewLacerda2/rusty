@@ -17,28 +17,29 @@ use egui_phosphor::regular as icon;
 
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::material as mat_ops;
-use crate::scene::{Entity, MaterialAsset, RenderMode};
+use crate::scene::{MaterialAsset, RenderMode};
 
-/// 3B2. Render the Material card for `entity`, editing the shared `MaterialAsset` it
-/// references in the library. Folds in any `pending_material` the Add menu staged
-/// (it lacked library access); on the card's "remove" detaches the entity's
-/// reference — the shared asset stays in the library for other referencing entities.
-/// No-op when the entity references no material.
+/// 3B2. Render the Material card for the entity `id`, editing the shared `MaterialAsset`
+/// it references in the library. Folds in any pending material the Add menu staged (it
+/// lacked library access); on the card's "remove" detaches the entity's reference — the
+/// shared asset stays in the library for other referencing entities. No-op when the
+/// entity references no material.
 pub fn draw_material_card(
     ui: &mut egui::Ui,
-    entity: &mut Entity,
+    world: &mut crate::ecs::World,
+    id: u32,
     materials: &mut BTreeMap<String, MaterialAsset>,
     is_dirty: &mut bool,
 ) {
-    let Some(key) = entity.material.as_ref().map(|m| m.material.clone()) else {
+    let Some(key) = world.material(id).map(|m| m.material.clone()) else {
         return;
     };
-    if let Some(pending) = entity.pending_material.take() {
+    if let Some(pending) = world.take_pending_material(id) {
         materials.insert(key.clone(), pending);
     }
     materials.entry(key.clone()).or_default();
     if draw_material(ui, materials, &key, is_dirty) {
-        entity.material = None;
+        world.set_material(id, None);
     }
 }
 

@@ -62,24 +62,21 @@ pub fn add_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool {
     if kind == ComponentKind::Texture {
         return attach_default_material(scene, id);
     }
-    let Some(mut entity) = scene.get_entity_mut(id) else {
-        return false;
-    };
+    let w = &mut scene.world;
     match kind {
-        ComponentKind::Light => entity.light = Some(default_light()),
-        ComponentKind::Animator => entity.animator = Some(default_animator()),
-        ComponentKind::Collider => entity.collider = Some(default_collider()),
-        ComponentKind::RigidBody => entity.rigidbody = Some(default_rigidbody()),
+        ComponentKind::Light => w.set_light(id, Some(default_light())),
+        ComponentKind::Animator => w.set_animator(id, Some(default_animator())),
+        ComponentKind::Collider => w.set_collider(id, Some(default_collider())),
+        ComponentKind::RigidBody => w.set_rigidbody(id, Some(default_rigidbody())),
         ComponentKind::Texture => unreachable!("handled above"),
-        ComponentKind::NavMeshAgent => entity.nav_agent = Some(default_nav_agent()),
-        ComponentKind::Camera => entity.camera = Some(default_camera()),
-        ComponentKind::Particles => entity.particles = Some(ParticleEmitterComponent::default()),
+        ComponentKind::NavMeshAgent => w.set_nav_agent(id, Some(default_nav_agent())),
+        ComponentKind::Camera => w.set_camera(id, Some(default_camera())),
+        ComponentKind::Particles => w.set_particles(id, Some(ParticleEmitterComponent::default())),
         ComponentKind::VisualCorrection => {
-            entity.visual_correction = Some(default_visual_correction())
+            w.set_visual_correction(id, Some(default_visual_correction()))
         }
-        ComponentKind::Audio => entity.audio = Some(AudioSourceComponent::default()),
+        ComponentKind::Audio => w.set_audio(id, Some(AudioSourceComponent::default())),
     }
-    true
 }
 
 /// Detach a first-class component of `kind` from entity `id`, applying the same
@@ -87,26 +84,23 @@ pub fn add_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool {
 /// camera-only `VisualCorrection` stack. Returns `false` if the entity does not
 /// exist (clearing an absent component is otherwise a no-op success).
 pub fn remove_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool {
-    let Some(mut entity) = scene.get_entity_mut(id) else {
-        return false;
-    };
+    let w = &mut scene.world;
     match kind {
-        ComponentKind::Light => entity.light = None,
-        ComponentKind::Animator => entity.animator = None,
-        ComponentKind::Collider => entity.collider = None,
-        ComponentKind::RigidBody => entity.rigidbody = None,
+        ComponentKind::Light => w.set_light(id, None),
+        ComponentKind::Animator => w.set_animator(id, None),
+        ComponentKind::Collider => w.set_collider(id, None),
+        ComponentKind::RigidBody => w.set_rigidbody(id, None),
         // Drop only the reference; the shared library material may still be in use.
-        ComponentKind::Texture => entity.material = None,
-        ComponentKind::NavMeshAgent => entity.nav_agent = None,
+        ComponentKind::Texture => w.set_material(id, None),
+        ComponentKind::NavMeshAgent => w.set_nav_agent(id, None),
         ComponentKind::Camera => {
-            entity.camera = None;
-            entity.visual_correction = None;
+            w.set_visual_correction(id, None);
+            w.set_camera(id, None)
         }
-        ComponentKind::Particles => entity.particles = None,
-        ComponentKind::VisualCorrection => entity.visual_correction = None,
-        ComponentKind::Audio => entity.audio = None,
+        ComponentKind::Particles => w.set_particles(id, None),
+        ComponentKind::VisualCorrection => w.set_visual_correction(id, None),
+        ComponentKind::Audio => w.set_audio(id, None),
     }
-    true
 }
 
 #[cfg(test)]
@@ -119,18 +113,15 @@ mod tests {
         let mut scene = Scene::new();
         let id = create_entity(&mut scene, "Mob", None);
         assert!(add_component(&mut scene, id, ComponentKind::Light));
-        assert!(scene.get_entity(id).unwrap().light.is_some());
+        assert!(scene.world.has_light(id));
         assert!(remove_component(&mut scene, id, ComponentKind::Light));
-        assert!(scene.get_entity(id).unwrap().light.is_none());
+        assert!(!scene.world.has_light(id));
 
         // Removing Camera cascades to VisualCorrection (editor parity).
         add_component(&mut scene, id, ComponentKind::Camera);
         add_component(&mut scene, id, ComponentKind::VisualCorrection);
         remove_component(&mut scene, id, ComponentKind::Camera);
-        {
-            let e = scene.get_entity(id).unwrap();
-            assert!(e.camera.is_none() && e.visual_correction.is_none());
-        }
+        assert!(!scene.world.has_camera(id) && !scene.world.has_visual_correction(id));
 
         assert!(!add_component(&mut scene, 9999, ComponentKind::Light));
     }
@@ -140,9 +131,9 @@ mod tests {
         let mut scene = Scene::new();
         let id = create_entity(&mut scene, "Speaker", None);
         assert!(add_component(&mut scene, id, ComponentKind::Audio));
-        assert!(scene.get_entity(id).unwrap().audio.is_some());
+        assert!(scene.world.has_audio(id));
         assert!(remove_component(&mut scene, id, ComponentKind::Audio));
-        assert!(scene.get_entity(id).unwrap().audio.is_none());
+        assert!(!scene.world.has_audio(id));
     }
 
     #[test]

@@ -73,13 +73,12 @@ fn instantiate_places_textured_entity_and_dedups_material() {
     .unwrap();
 
     // Placed at the requested transform; named from the sub-object when None.
-    let ea = scene.get_entity(a).unwrap();
-    assert_eq!(ea.transform.position, pos);
-    assert_eq!(ea.name, "PartA");
-    assert_eq!(scene.get_entity(b).unwrap().name, "Tower");
+    assert_eq!(scene.world.transform(a).unwrap().position, pos);
+    assert_eq!(*scene.world.name(a).unwrap(), "PartA");
+    assert_eq!(*scene.world.name(b).unwrap(), "Tower");
 
     // Mesh is a reference-backed "Asset" with real geometry, not inlined.
-    let mesh = ea.mesh.as_ref().expect("asset mesh attached");
+    let mesh = scene.world.mesh(a).expect("asset mesh attached");
     assert_eq!(mesh.primitive_type, "Asset");
     assert_eq!(
         mesh.asset_ref.as_deref(),
@@ -90,17 +89,8 @@ fn instantiate_places_textured_entity_and_dedups_material() {
     // Both sub-objects share ONE library key (dedup).
     let key = format!("{path}::Shared");
     assert_eq!(scene.materials.len(), 1);
-    assert_eq!(ea.material.as_ref().unwrap().material, key);
-    assert_eq!(
-        scene
-            .get_entity(b)
-            .unwrap()
-            .material
-            .as_ref()
-            .unwrap()
-            .material,
-        key
-    );
+    assert_eq!(scene.world.material(a).unwrap().material, key);
+    assert_eq!(scene.world.material(b).unwrap().material, key);
 }
 
 #[test]
@@ -117,7 +107,7 @@ fn instantiated_asset_round_trips_as_a_reference() {
     // Reload re-imports geometry from the reference and keeps the material.
     let mut restored = Scene::new();
     apply_scene_data(&mut restored, to_scene_data(&scene));
-    let mesh = restored.get_entity(id).unwrap().mesh.clone().unwrap();
+    let mesh = restored.world.mesh(id).unwrap().clone();
     assert_eq!(
         mesh.asset_ref.as_deref(),
         Some(format!("{path}::PartA").as_str())
@@ -132,12 +122,7 @@ fn material_less_asset_gets_engine_default() {
     let mut scene = Scene::new();
     let id = instantiate_asset(&mut scene, &format!("{path}::Bare"), None, Vec3::ZERO).unwrap();
 
-    let m = scene
-        .get_entity(id)
-        .unwrap()
-        .material
-        .clone()
-        .expect("default material");
+    let m = scene.world.material(id).expect("default material");
     assert!(
         scene.materials.contains_key(&m.material),
         "reference resolves"

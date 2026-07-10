@@ -58,13 +58,16 @@ fn register_play<'lua, 'scope>(
         "Play",
         scope.create_function(|_, (id, clip): (u32, String)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(anim) = &mut e.animator {
-                    anim.play(clip.clone());
-                    console
-                        .borrow_mut()
-                        .info(format!("Entity {} playing animation: {}", e.name, clip));
-                }
+            let played = scene
+                .world
+                .animator_mut(id)
+                .map(|mut anim| anim.play(clip.clone()))
+                .is_some();
+            if played {
+                let name = scene.world.name(id).map(|n| n.clone()).unwrap_or_default();
+                console
+                    .borrow_mut()
+                    .info(format!("Entity {} playing animation: {}", name, clip));
             }
             Ok(())
         }),
@@ -76,10 +79,8 @@ fn register_play<'lua, 'scope>(
         scope.create_function(|_, (id, clip, duration): (u32, String, f32)| {
             // Blend out of the current clip over `duration` seconds (#80).
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                if let Some(anim) = &mut e.animator {
-                    anim.crossfade(clip, duration);
-                }
+            if let Some(mut anim) = scene.world.animator_mut(id) {
+                anim.crossfade(clip, duration);
             }
             Ok(())
         }),
@@ -97,8 +98,8 @@ fn register_stop<'lua, 'scope>(
         "Stop",
         scope.create_function(|_, id: u32| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                animator_ops::set_playing(&mut e, false);
+            if let Some(mut c) = scene.world.animator_mut(id) {
+                animator_ops::set_playing(&mut c, false);
             }
             Ok(())
         }),
@@ -118,8 +119,8 @@ fn register_pause_resume<'lua, 'scope>(
         "Pause",
         scope.create_function(|_, id: u32| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                animator_ops::set_freeze(&mut e, true);
+            if let Some(mut c) = scene.world.animator_mut(id) {
+                animator_ops::set_freeze(&mut c, true);
             }
             Ok(())
         }),
@@ -130,8 +131,8 @@ fn register_pause_resume<'lua, 'scope>(
         "Resume",
         scope.create_function(|_, id: u32| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                animator_ops::set_freeze(&mut e, false);
+            if let Some(mut c) = scene.world.animator_mut(id) {
+                animator_ops::set_freeze(&mut c, false);
             }
             Ok(())
         }),
@@ -150,8 +151,8 @@ fn register_set_looping<'lua, 'scope>(
         "SetLooping",
         scope.create_function(|_, (id, looping): (u32, bool)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                animator_ops::set_looping(&mut e, looping);
+            if let Some(mut c) = scene.world.animator_mut(id) {
+                animator_ops::set_looping(&mut c, looping);
             }
             Ok(())
         }),
@@ -223,14 +224,16 @@ fn write_parameter(
     value: AnimatorParameter,
 ) {
     let mut scene = scene.borrow_mut();
-    if let Some(mut e) = scene.get_entity_mut(id) {
-        if let Some(anim) = &mut e.animator {
-            if !anim.set_parameter(name, value) {
-                console.borrow_mut().warn(format!(
-                    "Animator parameter '{}' on entity {} already holds a different type; set ignored",
-                    name, e.name
-                ));
-            }
-        }
-    };
+    let failed = scene
+        .world
+        .animator_mut(id)
+        .map(|mut anim| !anim.set_parameter(name, value))
+        .unwrap_or(false);
+    if failed {
+        let entity_name = scene.world.name(id).map(|n| n.clone()).unwrap_or_default();
+        console.borrow_mut().warn(format!(
+            "Animator parameter '{}' on entity {} already holds a different type; set ignored",
+            name, entity_name
+        ));
+    }
 }

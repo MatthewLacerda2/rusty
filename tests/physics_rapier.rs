@@ -28,19 +28,18 @@ fn dynamic_body() -> RigidBodyComponent {
 }
 
 fn pos_of(scene: &Scene, id: u32) -> Vec3 {
-    scene.get_entity(id).unwrap().transform.position
+    scene.world.transform(id).unwrap().position
 }
 
 #[test]
 fn dynamic_body_falls_under_gravity() {
     let mut scene = Scene::new();
     let id = scene.add_entity("Ball".to_string());
-    {
-        let mut e = scene.get_entity_mut(id).unwrap();
-        e.transform.position = Vec3::new(0.0, 10.0, 0.0);
-        e.collider = Some(box_collider(Vec3::ONE, false));
-        e.rigidbody = Some(dynamic_body());
-    }
+    scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 10.0, 0.0);
+    scene
+        .world
+        .set_collider(id, Some(box_collider(Vec3::ONE, false)));
+    scene.world.set_rigidbody(id, Some(dynamic_body()));
     let mut physics = PhysicsWorld::from_scene(&scene);
     for _ in 0..30 {
         physics.step(&mut scene, 1.0 / 60.0);
@@ -52,18 +51,16 @@ fn dynamic_body_falls_under_gravity() {
 fn static_floor_blocks_falling_body() {
     let mut scene = Scene::new();
     let floor = scene.add_entity("Floor".to_string());
-    {
-        let mut e = scene.get_entity_mut(floor).unwrap();
-        e.is_static = true;
-        e.collider = Some(box_collider(Vec3::new(20.0, 0.5, 20.0), false));
-    }
+    scene.world.set_static(floor, true);
+    scene
+        .world
+        .set_collider(floor, Some(box_collider(Vec3::new(20.0, 0.5, 20.0), false)));
     let ball = scene.add_entity("Ball".to_string());
-    {
-        let mut e = scene.get_entity_mut(ball).unwrap();
-        e.transform.position = Vec3::new(0.0, 3.0, 0.0);
-        e.collider = Some(box_collider(Vec3::ONE, false));
-        e.rigidbody = Some(dynamic_body());
-    }
+    scene.world.transform_mut(ball).unwrap().position = Vec3::new(0.0, 3.0, 0.0);
+    scene
+        .world
+        .set_collider(ball, Some(box_collider(Vec3::ONE, false)));
+    scene.world.set_rigidbody(ball, Some(dynamic_body()));
     let mut physics = PhysicsWorld::from_scene(&scene);
     for _ in 0..240 {
         physics.step(&mut scene, 1.0 / 60.0);
@@ -77,23 +74,22 @@ fn static_floor_blocks_falling_body() {
 fn kinematic_body_follows_its_transform() {
     let mut scene = Scene::new();
     let id = scene.add_entity("Player".to_string());
-    {
-        let mut e = scene.get_entity_mut(id).unwrap();
-        e.transform.position = Vec3::new(0.0, 1.0, 0.0);
-        e.collider = Some(box_collider(Vec3::ONE, false));
-        e.rigidbody = Some(RigidBodyComponent {
+    scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 1.0, 0.0);
+    scene
+        .world
+        .set_collider(id, Some(box_collider(Vec3::ONE, false)));
+    scene.world.set_rigidbody(
+        id,
+        Some(RigidBodyComponent {
             is_kinematic: true,
             use_gravity: false,
             ..dynamic_body()
-        });
-    }
+        }),
+    );
     let mut physics = PhysicsWorld::from_scene(&scene);
     // Externally drive the kinematic body (as input/scripts do) each tick.
     for _ in 0..10 {
-        {
-            let mut e = scene.get_entity_mut(id).unwrap();
-            e.transform.position.x += 0.1;
-        }
+        scene.world.transform_mut(id).unwrap().position.x += 0.1;
         physics.step(&mut scene, 1.0 / 60.0);
     }
     let p = pos_of(&scene, id);
@@ -105,12 +101,11 @@ fn kinematic_body_follows_its_transform() {
 fn raycast_hits_nearest_collider() {
     let mut scene = Scene::new();
     let target = scene.add_entity("Target".to_string());
-    {
-        let mut e = scene.get_entity_mut(target).unwrap();
-        e.transform.position = Vec3::new(0.0, 0.0, 5.0);
-        e.is_static = true;
-        e.collider = Some(box_collider(Vec3::new(2.0, 2.0, 2.0), false));
-    }
+    scene.world.transform_mut(target).unwrap().position = Vec3::new(0.0, 0.0, 5.0);
+    scene.world.set_static(target, true);
+    scene
+        .world
+        .set_collider(target, Some(box_collider(Vec3::new(2.0, 2.0, 2.0), false)));
     let physics = PhysicsWorld::from_scene(&scene);
     let hit = physics.cast_ray(Vec3::ZERO, Vec3::Z, 100.0);
     assert_eq!(hit.map(|(id, _)| id), Some(target));
@@ -123,19 +118,17 @@ fn cast_ray_filtered_skips_excluded_and_reports_next() {
     // skip-and-continue behaviour the engine hitscan and Lua bindings share (#31).
     let mut scene = Scene::new();
     let near = scene.add_entity("Near".to_string());
-    {
-        let mut e = scene.get_entity_mut(near).unwrap();
-        e.transform.position = Vec3::new(0.0, 0.0, 3.0);
-        e.is_static = true;
-        e.collider = Some(box_collider(Vec3::new(2.0, 2.0, 2.0), false));
-    }
+    scene.world.transform_mut(near).unwrap().position = Vec3::new(0.0, 0.0, 3.0);
+    scene.world.set_static(near, true);
+    scene
+        .world
+        .set_collider(near, Some(box_collider(Vec3::new(2.0, 2.0, 2.0), false)));
     let far = scene.add_entity("Far".to_string());
-    {
-        let mut e = scene.get_entity_mut(far).unwrap();
-        e.transform.position = Vec3::new(0.0, 0.0, 8.0);
-        e.is_static = true;
-        e.collider = Some(box_collider(Vec3::new(2.0, 2.0, 2.0), false));
-    }
+    scene.world.transform_mut(far).unwrap().position = Vec3::new(0.0, 0.0, 8.0);
+    scene.world.set_static(far, true);
+    scene
+        .world
+        .set_collider(far, Some(box_collider(Vec3::new(2.0, 2.0, 2.0), false)));
     let physics = PhysicsWorld::from_scene(&scene);
 
     // Unfiltered: hits the nearer box.
@@ -154,22 +147,23 @@ fn cast_ray_filtered_skips_excluded_and_reports_next() {
 fn trigger_overlap_reports_pair() {
     let mut scene = Scene::new();
     let a = scene.add_entity("Sensor".to_string());
-    {
-        let mut e = scene.get_entity_mut(a).unwrap();
-        e.is_static = true;
-        e.collider = Some(box_collider(Vec3::new(2.0, 2.0, 2.0), true));
-    }
+    scene.world.set_static(a, true);
+    scene
+        .world
+        .set_collider(a, Some(box_collider(Vec3::new(2.0, 2.0, 2.0), true)));
     let b = scene.add_entity("Walker".to_string());
-    {
-        let mut e = scene.get_entity_mut(b).unwrap();
-        e.transform.position = Vec3::new(0.0, 0.0, 0.0);
-        e.collider = Some(box_collider(Vec3::ONE, false));
-        e.rigidbody = Some(RigidBodyComponent {
+    scene.world.transform_mut(b).unwrap().position = Vec3::new(0.0, 0.0, 0.0);
+    scene
+        .world
+        .set_collider(b, Some(box_collider(Vec3::ONE, false)));
+    scene.world.set_rigidbody(
+        b,
+        Some(RigidBodyComponent {
             is_kinematic: true,
             use_gravity: false,
             ..dynamic_body()
-        });
-    }
+        }),
+    );
     let mut physics = PhysicsWorld::from_scene(&scene);
     let mut saw = false;
     for _ in 0..5 {

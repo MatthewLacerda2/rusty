@@ -28,16 +28,17 @@ use rusty::scripting::ConsoleLogs;
 /// Attach a default-ish light to a fresh entity named `name`; returns its id.
 fn entity_with_light(scene: &mut Scene, name: &str) -> u32 {
     let id = scene.add_entity(name.to_string());
-    if let Some(mut e) = scene.get_entity_mut(id) {
-        e.light = Some(LightComponent {
+    scene.world.set_light(
+        id,
+        Some(LightComponent {
             light_type: LightType::Point,
             color: Vec3::ONE,
             intensity: 1.0,
             range: 5.0,
             inner_cone: 0.0,
             outer_cone: 0.0,
-        });
-    }
+        }),
+    );
     id
 }
 
@@ -65,7 +66,7 @@ fn light_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> 
 
     {
         let mut sc = scene.borrow_mut();
-        let mut e = sc.get_entity_mut(via_op).unwrap();
+        let mut e = sc.world.light_mut(via_op).unwrap();
         light_ops::set_color(&mut e, Vec3::new(0.2, 0.4, 0.6));
         light_ops::set_intensity(&mut e, -5.0); // clamped to 0 by the shared op
         light_ops::set_range(&mut e, -2.0); // clamped to 0 by the shared op
@@ -73,8 +74,8 @@ fn light_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> 
     }
 
     let sc = scene.borrow();
-    let a = sc.get_entity(via_lua).unwrap().light.clone().unwrap();
-    let b = sc.get_entity(via_op).unwrap().light.clone().unwrap();
+    let a = sc.world.light(via_lua).unwrap().clone();
+    let b = sc.world.light(via_op).unwrap().clone();
     assert_eq!(a.color, b.color);
     assert_eq!(a.intensity, b.intensity);
     assert_eq!(a.range, b.range);
@@ -88,8 +89,9 @@ fn light_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> 
 /// Attach a default rigidbody to a fresh entity; returns its id.
 fn entity_with_rb(scene: &mut Scene, name: &str) -> u32 {
     let id = scene.add_entity(name.to_string());
-    if let Some(mut e) = scene.get_entity_mut(id) {
-        e.rigidbody = Some(RigidBodyComponent {
+    scene.world.set_rigidbody(
+        id,
+        Some(RigidBodyComponent {
             active: true,
             is_kinematic: false,
             mass: 1.0,
@@ -97,8 +99,8 @@ fn entity_with_rb(scene: &mut Scene, name: &str) -> u32 {
             angular_velocity: Vec3::ZERO,
             use_gravity: true,
             collision_detection: CollisionDetection::Discrete,
-        });
-    }
+        }),
+    );
     id
 }
 
@@ -126,7 +128,7 @@ fn physics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>
 
     {
         let mut sc = scene.borrow_mut();
-        let mut e = sc.get_entity_mut(via_op).unwrap();
+        let mut e = sc.world.rigidbody_mut(via_op).unwrap();
         rb_ops::set_velocity(&mut e, Vec3::new(1.0, 2.0, 3.0));
         rb_ops::set_kinematic(&mut e, true);
         rb_ops::set_angular_velocity(&mut e, Vec3::new(0.0, 4.0, 0.0));
@@ -134,8 +136,8 @@ fn physics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>
     }
 
     let sc = scene.borrow();
-    let a = sc.get_entity(via_lua).unwrap().rigidbody.clone().unwrap();
-    let b = sc.get_entity(via_op).unwrap().rigidbody.clone().unwrap();
+    let a = sc.world.rigidbody(via_lua).unwrap().clone();
+    let b = sc.world.rigidbody(via_op).unwrap().clone();
     assert_eq!(a.velocity, b.velocity);
     assert_eq!(a.is_kinematic, b.is_kinematic);
     assert_eq!(a.angular_velocity, b.angular_velocity);
@@ -146,9 +148,9 @@ fn physics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>
 /// Attach a default nav-agent to a fresh entity; returns its id.
 fn entity_with_agent(scene: &mut Scene, name: &str) -> u32 {
     let id = scene.add_entity(name.to_string());
-    if let Some(mut e) = scene.get_entity_mut(id) {
-        e.nav_agent = Some(NavMeshAgentComponent::default());
-    }
+    scene
+        .world
+        .set_nav_agent(id, Some(NavMeshAgentComponent::default()));
     id
 }
 
@@ -179,7 +181,7 @@ fn nav_agent_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Erro
 
     {
         let mut sc = scene.borrow_mut();
-        let mut e = sc.get_entity_mut(via_op).unwrap();
+        let mut e = sc.world.nav_agent_mut(via_op).unwrap();
         nav_ops::set_active(&mut e, true);
         nav_ops::set_speed(&mut e, 3.5);
         nav_ops::set_acceleration(&mut e, 8.0);
@@ -189,8 +191,8 @@ fn nav_agent_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Erro
     }
 
     let sc = scene.borrow();
-    let a = sc.get_entity(via_lua).unwrap().nav_agent.clone().unwrap();
-    let b = sc.get_entity(via_op).unwrap().nav_agent.clone().unwrap();
+    let a = sc.world.nav_agent(via_lua).unwrap().clone();
+    let b = sc.world.nav_agent(via_op).unwrap().clone();
     assert_eq!(a.active, b.active);
     assert_eq!(a.speed, b.speed);
     assert_eq!(a.acceleration, b.acceleration);
@@ -213,13 +215,13 @@ fn animator_stop_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::
     let via_lua = {
         let mut sc = scene.borrow_mut();
         let id = sc.add_entity("ViaLua".to_string());
-        sc.get_entity_mut(id).unwrap().animator = Some(playing());
+        sc.world.set_animator(id, Some(playing()));
         id
     };
     let via_op = {
         let mut sc = scene.borrow_mut();
         let id = sc.add_entity("ViaOp".to_string());
-        sc.get_entity_mut(id).unwrap().animator = Some(playing());
+        sc.world.set_animator(id, Some(playing()));
         id
     };
 
@@ -234,13 +236,13 @@ fn animator_stop_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::
 
     {
         let mut sc = scene.borrow_mut();
-        let mut e = sc.get_entity_mut(via_op).unwrap();
+        let mut e = sc.world.animator_mut(via_op).unwrap();
         animator_ops::set_playing(&mut e, false);
     }
 
     let sc = scene.borrow();
-    let a = sc.get_entity(via_lua).unwrap().animator.clone().unwrap();
-    let b = sc.get_entity(via_op).unwrap().animator.clone().unwrap();
+    let a = sc.world.animator(via_lua).unwrap().clone();
+    let b = sc.world.animator(via_op).unwrap().clone();
     assert_eq!(a.is_playing, b.is_playing);
     assert!(!a.is_playing);
     Ok(())
@@ -250,9 +252,9 @@ fn animator_stop_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::
 fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("PostFx".to_string());
-    {
-        let mut e = scene.get_entity_mut(id).unwrap();
-        e.visual_correction = Some(VisualCorrectionComponent {
+    scene.world.set_visual_correction(
+        id,
+        Some(VisualCorrectionComponent {
             active: true,
             bloom_active: false,
             bloom_intensity: 1.0,
@@ -265,8 +267,11 @@ fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
             ssr_temporal_upsampling: false,
             tonemap: Tonemap::Aces,
             gamma: 2.2,
-        });
-        e.camera = Some(CameraComponent {
+        }),
+    );
+    scene.world.set_camera(
+        id,
+        Some(CameraComponent {
             active: true,
             fov: 60.0,
             near: 0.1,
@@ -276,23 +281,26 @@ fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
             clear_flags: ClearFlags::Skybox,
             motion_blur_active: false,
             motion_blur_samples: 8,
-        });
-    }
+        }),
+    );
     (Rc::new(RefCell::new(scene)), id)
 }
 
 /// Apply the same writes the `Graphics.*` script does, via the shared ops directly.
 fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
     let mut sc = scene.borrow_mut();
-    let mut e = sc.get_entity_mut(id).unwrap();
-    vc_ops::set_bloom_active(&mut e, true);
-    vc_ops::set_bloom_intensity(&mut e, -3.0); // clamped to 0
-    vc_ops::set_gamma(&mut e, -5.0); // clamped to 0.01
-    vc_ops::set_tonemap(&mut e, Tonemap::Reinhard);
-    vc_ops::set_ssr_active(&mut e, true);
-    vc_ops::set_ssr_quality(&mut e, "High".to_string());
-    camera_ops::set_motion_blur_active(&mut e, true);
-    camera_ops::set_motion_blur_samples(&mut e, 16);
+    {
+        let mut vc = sc.world.visual_correction_mut(id).unwrap();
+        vc_ops::set_bloom_active(&mut vc, true);
+        vc_ops::set_bloom_intensity(&mut vc, -3.0); // clamped to 0
+        vc_ops::set_gamma(&mut vc, -5.0); // clamped to 0.01
+        vc_ops::set_tonemap(&mut vc, Tonemap::Reinhard);
+        vc_ops::set_ssr_active(&mut vc, true);
+        vc_ops::set_ssr_quality(&mut vc, "High".to_string());
+    }
+    let mut cam = sc.world.camera_mut(id).unwrap();
+    camera_ops::set_motion_blur_active(&mut cam, true);
+    camera_ops::set_motion_blur_samples(&mut cam, 16);
 }
 
 #[test]
@@ -328,18 +336,8 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
 
     let ls = lua_scene.borrow();
     let os = op_scene.borrow();
-    let lvc = ls
-        .get_entity(lua_id)
-        .unwrap()
-        .visual_correction
-        .clone()
-        .unwrap();
-    let ovc = os
-        .get_entity(op_id)
-        .unwrap()
-        .visual_correction
-        .clone()
-        .unwrap();
+    let lvc = ls.world.visual_correction(lua_id).unwrap().clone();
+    let ovc = os.world.visual_correction(op_id).unwrap().clone();
     assert_eq!(lvc.bloom_active, ovc.bloom_active);
     assert_eq!(lvc.bloom_intensity, ovc.bloom_intensity);
     assert_eq!(lvc.gamma, ovc.gamma);
@@ -348,8 +346,8 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     assert_eq!(lvc.ssr_quality, ovc.ssr_quality);
     assert_eq!(lvc.bloom_intensity, 0.0, "single-sourced clamp");
     assert_eq!(lvc.gamma, 0.01, "single-sourced clamp");
-    let lcam = ls.get_entity(lua_id).unwrap().camera.clone().unwrap();
-    let ocam = os.get_entity(op_id).unwrap().camera.clone().unwrap();
+    let lcam = ls.world.camera(lua_id).unwrap().clone();
+    let ocam = os.world.camera(op_id).unwrap().clone();
     assert_eq!(lcam.motion_blur_active, ocam.motion_blur_active);
     assert_eq!(lcam.motion_blur_samples, ocam.motion_blur_samples);
     Ok(())
@@ -358,9 +356,9 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
 /// Attach a default emitter to a fresh entity; returns its id.
 fn entity_with_emitter(scene: &mut Scene, name: &str) -> u32 {
     let id = scene.add_entity(name.to_string());
-    if let Some(mut e) = scene.get_entity_mut(id) {
-        e.particles = Some(ParticleEmitterComponent::default());
-    }
+    scene
+        .world
+        .set_particles(id, Some(ParticleEmitterComponent::default()));
     id
 }
 
@@ -388,14 +386,14 @@ fn particles_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Erro
 
     {
         let mut sc = scene.borrow_mut();
-        let mut e = sc.get_entity_mut(via_op).unwrap();
+        let mut e = sc.world.particles_mut(via_op).unwrap();
         particle_ops::set_active(&mut e, false);
         particle_ops::set_rate(&mut e, -5.0);
     }
 
     let sc = scene.borrow();
-    let a = sc.get_entity(via_lua).unwrap().particles.clone().unwrap();
-    let b = sc.get_entity(via_op).unwrap().particles.clone().unwrap();
+    let a = sc.world.particles(via_lua).unwrap().clone();
+    let b = sc.world.particles(via_op).unwrap().clone();
     assert_eq!(a.active, b.active);
     assert_eq!(a.rate, b.rate);
     assert_eq!(a.rate, 0.0, "single-sourced clamp");

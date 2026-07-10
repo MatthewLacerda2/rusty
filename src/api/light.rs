@@ -44,9 +44,7 @@ fn register_color<'lua, 'scope>(
         "GetColor",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            let c = scene
-                .get_entity(id)
-                .and_then(|e| e.light.as_ref().map(|l| l.color));
+            let c = scene.world.light(id).map(|l| l.color);
             let c = c.unwrap_or(Vec3::ONE);
             Ok((c.x, c.y, c.z))
         }),
@@ -57,8 +55,8 @@ fn register_color<'lua, 'scope>(
         "SetColor",
         scope.create_function(|_, (id, r, g, b): (u32, f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                light_ops::set_color(&mut e, Vec3::new(r, g, b));
+            if let Some(mut c) = scene.world.light_mut(id) {
+                light_ops::set_color(&mut c, Vec3::new(r, g, b));
             }
             Ok(())
         }),
@@ -76,10 +74,7 @@ fn register_intensity<'lua, 'scope>(
         "GetIntensity",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            Ok(scene
-                .get_entity(id)
-                .and_then(|e| e.light.as_ref().map(|l| l.intensity))
-                .unwrap_or(0.0))
+            Ok(scene.world.light(id).map(|l| l.intensity).unwrap_or(0.0))
         }),
     )?;
 
@@ -88,8 +83,8 @@ fn register_intensity<'lua, 'scope>(
         "SetIntensity",
         scope.create_function(|_, (id, value): (u32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                light_ops::set_intensity(&mut e, value);
+            if let Some(mut c) = scene.world.light_mut(id) {
+                light_ops::set_intensity(&mut c, value);
             }
             Ok(())
         }),
@@ -107,10 +102,7 @@ fn register_range<'lua, 'scope>(
         "GetRange",
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
-            Ok(scene
-                .get_entity(id)
-                .and_then(|e| e.light.as_ref().map(|l| l.range))
-                .unwrap_or(0.0))
+            Ok(scene.world.light(id).map(|l| l.range).unwrap_or(0.0))
         }),
     )?;
 
@@ -119,8 +111,8 @@ fn register_range<'lua, 'scope>(
         "SetRange",
         scope.create_function(|_, (id, value): (u32, f32)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                light_ops::set_range(&mut e, value);
+            if let Some(mut c) = scene.world.light_mut(id) {
+                light_ops::set_range(&mut c, value);
             }
             Ok(())
         }),
@@ -140,8 +132,9 @@ fn register_type<'lua, 'scope>(
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
             let name = scene
-                .get_entity(id)
-                .and_then(|e| e.light.as_ref().map(|l| type_name(&l.light_type)))
+                .world
+                .light(id)
+                .map(|l| type_name(&l.light_type))
                 .unwrap_or("None");
             Ok(name.to_string())
         }),
@@ -152,9 +145,9 @@ fn register_type<'lua, 'scope>(
         "SetType",
         scope.create_function(|_, (id, name): (u32, String)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
+            if let Some(mut c) = scene.world.light_mut(id) {
                 if let Some(t) = parse_type(&name) {
-                    light_ops::set_type(&mut e, t);
+                    light_ops::set_type(&mut c, t);
                 }
             }
             Ok(())
@@ -194,16 +187,17 @@ mod tests {
     fn scene_with_light() -> (RefCell<Scene>, u32) {
         let mut scene = Scene::default();
         let id = scene.add_entity("Lamp".to_string());
-        if let Some(mut e) = scene.get_entity_mut(id) {
-            e.light = Some(LightComponent {
+        scene.world.set_light(
+            id,
+            Some(LightComponent {
                 light_type: LightType::Point,
                 color: Vec3::ONE,
                 intensity: 1.5,
                 range: 10.0,
                 inner_cone: 30.0,
                 outer_cone: 45.0,
-            });
-        }
+            }),
+        );
         (RefCell::new(scene), id)
     }
 
@@ -231,7 +225,7 @@ mod tests {
         .unwrap();
 
         let e = scene.borrow();
-        let light = e.get_entity(id).unwrap().light.as_ref().unwrap().clone();
+        let light = e.world.light(id).unwrap().clone();
         assert_eq!(light.color, Vec3::new(0.2, 0.4, 0.6));
         assert_eq!(light.intensity, 3.0);
         assert_eq!(light.range, 25.0);
@@ -259,7 +253,7 @@ mod tests {
         .unwrap();
 
         let e = scene.borrow();
-        let light = e.get_entity(id).unwrap().light.as_ref().unwrap().clone();
+        let light = e.world.light(id).unwrap().clone();
         assert_eq!(light.intensity, 0.0);
         assert_eq!(light.range, 0.0);
         // Unknown name kept the original Point type.

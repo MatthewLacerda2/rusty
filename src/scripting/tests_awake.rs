@@ -44,7 +44,7 @@ fn init_runs_all_awakes_then_all_starts_exactly_once() {
 #[test]
 fn disabled_at_load_defers_awake_and_start_until_first_active_tick() {
     let (mut m, id) = manager_with_entity();
-    m.scene.borrow_mut().get_entity_mut(id).unwrap().active = false;
+    m.scene.borrow_mut().world.set_active(id, false);
     m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
     let path = write_script("awake_disabled", LOGGER);
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
@@ -58,7 +58,7 @@ fn disabled_at_load_defers_awake_and_start_until_first_active_tick() {
     assert_eq!(m.eval("__log").unwrap(), "");
 
     // First active tick: Awake, then Start, then Update — all in one tick.
-    m.scene.borrow_mut().get_entity_mut(id).unwrap().active = true;
+    m.scene.borrow_mut().world.set_active(id, true);
     m.init_scripts();
     m.update_scripts(0.016);
     assert_eq!(m.eval("__log").unwrap(), format!("A{id}S{id}U{id}"));
@@ -77,14 +77,10 @@ fn runtime_spawned_entity_scripts_run_from_the_next_tick() {
     let spawned = {
         let mut scene = m.scene.borrow_mut();
         let id = scene.add_entity("Spawned".to_string());
-        scene
-            .get_entity_mut(id)
-            .unwrap()
-            .scripts
-            .push(ScriptComponent {
-                path: path.clone(),
-                ..Default::default()
-            });
+        scene.world.scripts_mut(id).unwrap().push(ScriptComponent {
+            path: path.clone(),
+            ..Default::default()
+        });
         id
     };
     m.update_scripts(0.016);

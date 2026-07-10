@@ -9,7 +9,7 @@ use self::components::{
 };
 use crate::editor::{EditorUi, InspectorTarget};
 use crate::navigation::NavigationGraph;
-use crate::scene::{Entity, MaterialAsset, Scene};
+use crate::scene::{MaterialAsset, Scene};
 use crate::scripting::ConsoleLogs;
 use std::collections::BTreeMap;
 
@@ -132,32 +132,34 @@ fn draw_entity_inspector(
     let mut pending = PendingEdits::default();
     let cx = gather_context(scene, selected_id);
 
-    // Borrow the entity (`scene.world`) and the material library (`scene.materials`)
-    // as DISJOINT fields of `Scene`, so the material card can edit the shared library
-    // asset while the entity guard is live (they never alias).
+    // The cards borrow the world (`scene.world`) and the material library
+    // (`scene.materials`) as DISJOINT fields of `Scene`, so the material card can
+    // edit the shared library asset alongside the component accessors (#344).
     let materials = &mut scene.materials;
-    if let Some(mut entity_guard) = scene.world.get_mut(selected_id) {
-        let entity: &mut Entity = &mut entity_guard;
-        if entity.camera.is_none() && entity.visual_correction.is_some() {
-            entity.visual_correction = None;
+    let world = &mut scene.world;
+    if world.contains(selected_id) {
+        if !world.has_camera(selected_id) && world.has_visual_correction(selected_id) {
+            world.set_visual_correction(selected_id, None);
         }
 
         draw_object_header(
             ui,
             editor.theme,
-            entity,
+            world,
+            selected_id,
             &cx.layer_labels,
             &mut pending.nav_bake,
             &mut pending.layer_changed,
         );
 
         // Linked-prefab override affordance, just under the header (a no-op for a plain
-        // entity). Emits a deferred action so the prefab verbs run after the guard drops.
-        pending.prefab_action = prefab::draw(ui, entity, cx.prefab_root);
+        // entity). Emits a deferred action so the prefab verbs run outside the card pass.
+        pending.prefab_action = prefab::draw(ui, world, selected_id, cx.prefab_root);
 
         transform::draw(
             ui,
-            entity,
+            world,
+            selected_id,
             cx.parent_mat,
             &cx.selected_parent_name,
             &cx.valid_parents,
@@ -168,7 +170,8 @@ fn draw_entity_inspector(
 
         draw_components(
             ui,
-            entity,
+            world,
+            selected_id,
             materials,
             &cx.named_layers,
             &mut editor.is_dirty,
@@ -180,10 +183,13 @@ fn draw_entity_inspector(
 }
 
 /// The Unity-style object header card: name + active/static toggles + layer combo.
+/// Widgets edit local snapshots and write back through the facade on change (#344).
+#[allow(clippy::too_many_arguments)] // (world, id) replaced the single &mut Entity handle
 fn draw_object_header(
     ui: &mut egui::Ui,
     t: crate::editor::theme::Theme,
-    entity: &mut Entity,
+    world: &mut crate::ecs::World,
+    id: u32,
     layer_labels: &[String],
     pending_nav_bake: &mut bool,
     layer_changed: &mut bool,
@@ -196,66 +202,89 @@ fn draw_object_header(
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.colored_label(t.text_secondary, icon::CUBE_FOCUS);
-                ui.add(egui::TextEdit::singleline(&mut entity.name).desired_width(f32::INFINITY));
-            });
-            ui.horizontal(|ui| {
-                ui.checkbox(&mut entity.active, "Active");
+                let mut name = world.name(id).map(|n| n.clone()).unwrap_or_default();
                 if ui
-                    .checkbox(&mut entity.is_static, "Static")
-                    .on_hover_text("Blocks the navmesh")
+                    .add(egui::TextEdit::singleline(&mut name).desired_width(f32::INFINITY))
                     .changed()
                 {
-                    *pending_nav_bake = true;
+                    world.set_name(id, name);
                 }
             });
             ui.horizontal(|ui| {
-                ui.label("Layer:");
-                let selected = layer_labels
-                    .get(entity.layer as usize)
-                    .cloned()
-                    .unwrap_or_default();
-                egui::ComboBox::from_id_source("entity_layer")
-                    .selected_text(selected)
-                    .show_ui(ui, |ui| {
-                        for (i, label) in layer_labels.iter().enumerate() {
-                            if ui
-                                .selectable_value(&mut entity.layer, i as u8, label)
-                                .clicked()
-                            {
-                                *layer_changed = true;
-                            }
-                        }
-                    });
+                let mut active = world.is_active(id);
+                if ui.checkbox(&mut active, "Active").changed() {
+                    world.set_active(id, active);
+                }
+                let mut is_static = world.is_static(id);
+                if ui
+                    .checkbox(&mut is_static, "Static")
+                    .on_hover_text("Blocks the navmesh")
+                    .changed()
+                {
+                    world.set_static(id, is_static);
+                    *pending_nav_bake = true;
+                }
             });
+            draw_layer_combo(ui, world, id, layer_labels, layer_changed);
         });
     ui.add_space(t.space_xs);
 }
 
+/// The header's Layer combo: a snapshot-selected row written back via the facade.
+fn draw_layer_combo(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    layer_labels: &[String],
+    layer_changed: &mut bool,
+) {
+    ui.horizontal(|ui| {
+        ui.label("Layer:");
+        let mut layer = world.layer(id);
+        let selected = layer_labels
+            .get(layer as usize)
+            .cloned()
+            .unwrap_or_default();
+        egui::ComboBox::from_id_source("entity_layer")
+            .selected_text(selected)
+            .show_ui(ui, |ui| {
+                for (i, label) in layer_labels.iter().enumerate() {
+                    if ui.selectable_value(&mut layer, i as u8, label).clicked() {
+                        world.set_layer(id, layer);
+                        *layer_changed = true;
+                    }
+                }
+            });
+    });
+}
+
 /// The per-component card chain (mesh, material, light, gameplay, camera, …) plus
 /// the Add Component menu, in the canonical inspector order.
+#[allow(clippy::too_many_arguments)] // (world, id) replaced the single &mut Entity handle
 fn draw_components(
     ui: &mut egui::Ui,
-    entity: &mut Entity,
+    world: &mut crate::ecs::World,
+    id: u32,
     materials: &mut BTreeMap<String, MaterialAsset>,
     named_layers: &[(u8, String)],
     is_dirty: &mut bool,
     pending_nav_bake: &mut bool,
 ) {
-    render::draw_mesh(ui, entity, is_dirty);
-    material::draw_material_card(ui, entity, materials, is_dirty);
-    render::draw_light(ui, entity, is_dirty);
+    render::draw_mesh(ui, world, id, is_dirty);
+    material::draw_material_card(ui, world, id, materials, is_dirty);
+    render::draw_light(ui, world, id, is_dirty);
 
-    gameplay::draw_script(ui, entity, is_dirty);
-    gameplay::draw_animator(ui, entity, is_dirty);
-    gameplay::draw_collider(ui, entity, is_dirty, pending_nav_bake);
-    gameplay::draw_rigidbody(ui, entity, is_dirty);
-    gameplay::draw_nav_agent(ui, entity, is_dirty);
+    gameplay::draw_script(ui, world, id, is_dirty);
+    gameplay::draw_animator(ui, world, id, is_dirty);
+    gameplay::draw_collider(ui, world, id, is_dirty, pending_nav_bake);
+    gameplay::draw_rigidbody(ui, world, id, is_dirty);
+    gameplay::draw_nav_agent(ui, world, id, is_dirty);
 
-    camera::draw_camera(ui, entity, named_layers, is_dirty);
-    camera::draw_visual_correction(ui, entity, is_dirty);
+    camera::draw_camera(ui, world, id, named_layers, is_dirty);
+    camera::draw_visual_correction(ui, world, id, is_dirty);
 
-    particles::draw(ui, entity, is_dirty);
-    audio::draw(ui, entity, is_dirty);
+    particles::draw(ui, world, id, is_dirty);
+    audio::draw(ui, world, id, is_dirty);
 
-    add::draw(ui, entity);
+    add::draw(ui, world, id);
 }

@@ -14,62 +14,46 @@
 //!
 //! Allowed deps: components (the `AudioSourceComponent` data). Pure.
 
-use crate::components::Entity;
+use crate::components::AudioSourceComponent;
 
 /// Set the source's clip path.
-pub fn set_clip(entity: &mut Entity, clip: String) {
-    if let Some(a) = &mut entity.audio {
-        a.clip = clip;
-    }
+pub fn set_clip(a: &mut AudioSourceComponent, clip: String) {
+    a.clip = clip;
 }
 
 /// Set the source's per-source linear volume.
-pub fn set_volume(entity: &mut Entity, volume: f32) {
-    if let Some(a) = &mut entity.audio {
-        a.volume = volume;
-    }
+pub fn set_volume(a: &mut AudioSourceComponent, volume: f32) {
+    a.volume = volume;
 }
 
 /// Set whether the source loops.
-pub fn set_looping(entity: &mut Entity, looping: bool) {
-    if let Some(a) = &mut entity.audio {
-        a.looping = looping;
-    }
+pub fn set_looping(a: &mut AudioSourceComponent, looping: bool) {
+    a.looping = looping;
 }
 
 /// Set whether the source plays automatically on Play.
-pub fn set_play_on_start(entity: &mut Entity, play_on_start: bool) {
-    if let Some(a) = &mut entity.audio {
-        a.play_on_start = play_on_start;
-    }
+pub fn set_play_on_start(a: &mut AudioSourceComponent, play_on_start: bool) {
+    a.play_on_start = play_on_start;
 }
 
 /// Set whether the source's rate follows `Time.timeScale`.
-pub fn set_time_scaled(entity: &mut Entity, is_time_scaled: bool) {
-    if let Some(a) = &mut entity.audio {
-        a.is_time_scaled = is_time_scaled;
-    }
+pub fn set_time_scaled(a: &mut AudioSourceComponent, is_time_scaled: bool) {
+    a.is_time_scaled = is_time_scaled;
 }
 
 /// Set the source's spatial blend (0 = 2D, 1 = fully 3D).
-pub fn set_spatial_blend(entity: &mut Entity, spatial_blend: f32) {
-    if let Some(a) = &mut entity.audio {
-        a.spatial_blend = spatial_blend;
-    }
+pub fn set_spatial_blend(a: &mut AudioSourceComponent, spatial_blend: f32) {
+    a.spatial_blend = spatial_blend;
 }
 
 /// Set the rolloff's near (full-volume) distance.
-pub fn set_initial_distance(entity: &mut Entity, initial_distance: f32) {
-    if let Some(a) = &mut entity.audio {
-        a.initial_distance = initial_distance;
-    }
+pub fn set_initial_distance(a: &mut AudioSourceComponent, initial_distance: f32) {
+    a.initial_distance = initial_distance;
 }
 
 /// Set the rolloff's far (silent) distance.
-pub fn set_final_distance(entity: &mut Entity, final_distance: f32) {
-    if let Some(a) = &mut entity.audio {
-        a.final_distance = final_distance;
-    }
+pub fn set_final_distance(a: &mut AudioSourceComponent, final_distance: f32) {
+    a.final_distance = final_distance;
 }
 
 #[cfg(test)]
@@ -81,16 +65,16 @@ mod tests {
     fn scene_with_audio() -> (Scene, u32) {
         let mut scene = Scene::new();
         let id = scene.add_entity("Speaker".to_string());
-        if let Some(mut e) = scene.get_entity_mut(id) {
-            e.audio = Some(AudioSourceComponent::default());
-        }
+        scene
+            .world
+            .set_audio(id, Some(AudioSourceComponent::default()));
         (scene, id)
     }
 
     #[test]
     fn ops_write_through() {
         let (mut scene, id) = scene_with_audio();
-        let mut e = scene.get_entity_mut(id).unwrap();
+        let mut e = scene.world.audio_mut(id).unwrap();
         set_clip(&mut e, "sfx/hit.ogg".to_string());
         set_volume(&mut e, 0.5);
         set_looping(&mut e, true);
@@ -99,7 +83,7 @@ mod tests {
         set_spatial_blend(&mut e, 1.0);
         set_initial_distance(&mut e, 2.0);
         set_final_distance(&mut e, 20.0);
-        let a = e.audio.as_ref().unwrap();
+        let a = &*e;
         assert_eq!(a.clip, "sfx/hit.ogg");
         assert_eq!(a.volume, 0.5);
         assert!(a.looping);

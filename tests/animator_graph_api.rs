@@ -18,20 +18,13 @@ fn scene_with_animator() -> (RefCell<Scene>, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Rig".to_string());
     scene
-        .get_entity_mut(id)
-        .expect("entity just added")
-        .animator = Some(AnimatorComponent::default());
+        .world
+        .set_animator(id, Some(AnimatorComponent::default()));
     (RefCell::new(scene), id)
 }
 
 fn animator_of(scene: &RefCell<Scene>, id: u32) -> AnimatorComponent {
-    scene
-        .borrow()
-        .get_entity(id)
-        .unwrap()
-        .animator
-        .clone()
-        .unwrap()
+    scene.borrow().world.animator(id).unwrap().clone()
 }
 
 /// Register the `Animator` namespace against `scene`, run `script`, return its
@@ -118,21 +111,24 @@ fn play_animation_returns_whether_the_mesh_carries_the_clip() {
         "false"
     );
     assert!(!animator_of(&scene, id).is_playing);
-    scene.borrow_mut().get_entity_mut(id).unwrap().mesh = Some(MeshComponent {
-        primitive_type: "Asset".to_string(),
-        asset_ref: None,
-        vertices: Vec::new(),
-        indices: Vec::new(),
-        bind_palette: Vec::new(),
-        skin: None,
-        clips: vec![AnimationClip {
-            name: "Walk".to_string(),
-            tracks: Vec::new(),
-            duration: 1.0,
-        }],
-        pose_palette: Vec::new(),
-        is_dirty: Default::default(),
-    });
+    scene.borrow_mut().world.set_mesh(
+        id,
+        Some(MeshComponent {
+            primitive_type: "Asset".to_string(),
+            asset_ref: None,
+            vertices: Vec::new(),
+            indices: Vec::new(),
+            bind_palette: Vec::new(),
+            skin: None,
+            clips: vec![AnimationClip {
+                name: "Walk".to_string(),
+                tracks: Vec::new(),
+                duration: 1.0,
+            }],
+            pose_palette: Vec::new(),
+            is_dirty: Default::default(),
+        }),
+    );
     assert_eq!(
         run(&scene, &format!("Animator.PlayAnimation({id}, 'Walk')")),
         "true"

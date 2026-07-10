@@ -23,9 +23,12 @@ fn entity_referencing(
         scene.materials.insert(key.to_string(), mat);
     }
     let id = scene.add_entity(name.to_string());
-    scene.get_entity_mut(id).unwrap().material = Some(MaterialComponent {
-        material: key.to_string(),
-    });
+    scene.world.set_material(
+        id,
+        Some(MaterialComponent {
+            material: key.to_string(),
+        }),
+    );
     id
 }
 
@@ -39,10 +42,14 @@ fn two_entities_share_one_library_material() {
     scene.materials.get_mut("shared").unwrap().base_color = [0.1, 0.2, 0.3];
 
     // Both entities resolve to the same edited asset (sharing works).
-    let ea = scene.get_entity(a).unwrap();
-    let eb = scene.get_entity(b).unwrap();
-    assert_eq!(scene.material_of(&ea).unwrap().base_color, [0.1, 0.2, 0.3]);
-    assert_eq!(scene.material_of(&eb).unwrap().base_color, [0.1, 0.2, 0.3]);
+    assert_eq!(
+        scene.material_asset_of(a).unwrap().base_color,
+        [0.1, 0.2, 0.3]
+    );
+    assert_eq!(
+        scene.material_asset_of(b).unwrap().base_color,
+        [0.1, 0.2, 0.3]
+    );
     assert_eq!(scene.materials.len(), 1, "one shared asset, not per-entity");
 }
 
@@ -53,10 +60,10 @@ fn authoring_add_creates_library_asset_remove_keeps_it() {
     // Add creates the shared library asset AND attaches the reference.
     add_component(&mut scene, id, ComponentKind::Texture);
     assert_eq!(scene.materials.len(), 1);
-    assert!(scene.get_entity(id).unwrap().material.is_some());
+    assert!(scene.world.has_material(id));
     // Remove drops only the reference; the library asset is left for other users.
     rusty::scene::authoring::remove_component(&mut scene, id, ComponentKind::Texture);
-    assert!(scene.get_entity(id).unwrap().material.is_none());
+    assert!(!scene.world.has_material(id));
     assert_eq!(
         scene.materials.len(),
         1,
@@ -82,9 +89,8 @@ fn material_and_reference_survive_scene_data_round_trip() {
     let mut loaded = Scene::new();
     apply_scene_data(&mut loaded, data);
 
-    let e = loaded.get_entity(id).unwrap();
     let resolved = loaded
-        .material_of(&e)
+        .material_asset_of(id)
         .expect("reference resolves post-load");
     assert_eq!(resolved.base_color, [0.5, 0.25, 0.125]);
     assert_eq!(
@@ -93,7 +99,7 @@ fn material_and_reference_survive_scene_data_round_trip() {
     );
     assert_eq!(resolved.metallic, 0.8);
     assert_eq!(resolved.roughness, 0.2);
-    assert_eq!(e.material.as_ref().unwrap().material, "wood");
+    assert_eq!(loaded.world.material(id).unwrap().material, "wood");
 }
 
 #[test]
@@ -143,8 +149,8 @@ fn lua_material_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::E
     }
 
     let sc = scene.borrow();
-    let lua_mat = sc.material_of(&sc.get_entity(via_lua).unwrap()).unwrap();
-    let op_mat = sc.material_of(&sc.get_entity(via_op).unwrap()).unwrap();
+    let lua_mat = sc.material_asset_of(via_lua).unwrap();
+    let op_mat = sc.material_asset_of(via_op).unwrap();
 
     assert_eq!(lua_mat.metallic, op_mat.metallic);
     assert_eq!(lua_mat.roughness, op_mat.roughness);
@@ -186,10 +192,12 @@ fn legacy_inline_texture_migrates_into_library_material() {
     let mut scene = Scene::new();
     apply_scene_data(&mut scene, data);
 
-    let e = scene.get_entity(7).unwrap();
+    let e = scene.world.entity_document(7).unwrap();
     let key = &e.material.as_ref().expect("reference attached").material;
     assert_eq!(key, "entity_7_material");
-    let mat = scene.material_of(&e).expect("legacy material migrated");
+    let mat = scene
+        .material_asset_of(7)
+        .expect("legacy material migrated");
     assert_eq!(mat.base_color, [0.2, 0.4, 0.6]);
     assert_eq!(mat.base_color_map.as_deref(), Some("tex/brick.png"));
     assert_eq!(mat.metallic, 0.3);

@@ -12,7 +12,6 @@ use std::collections::BTreeMap;
 
 use glam::Vec3;
 
-use crate::ecs::world::{Ref, RefMut};
 use crate::ecs::World;
 use crate::navigation::NavMeshSettings;
 use crate::scene::collision_matrix::CollisionMatrix;
@@ -177,14 +176,6 @@ impl Scene {
         }
     }
 
-    pub fn get_entity(&self, id: u32) -> Option<Ref<'_, Entity>> {
-        self.world.get(id)
-    }
-
-    pub fn get_entity_mut(&mut self, id: u32) -> Option<RefMut<'_, Entity>> {
-        self.world.get_mut(id)
-    }
-
     pub fn find_entity_by_name(&self, name: &str) -> Option<u32> {
         self.world.find_by_name(name)
     }
@@ -192,19 +183,9 @@ impl Scene {
     /// Resolve an entity's referenced material from the library, if any. Returns
     /// `None` when the entity has no `MaterialComponent` or it points at a missing
     /// library key.
-    pub fn material_of(&self, entity: &Entity) -> Option<&MaterialAsset> {
-        entity
-            .material
-            .as_ref()
-            .and_then(|m| self.materials.get(&m.material))
-    }
-
-    /// Iterate entities in insertion order (immutably). Replaces the legacy
-    /// `&scene.entities` iteration; each item is a borrow guard derefing to
-    /// `&Entity`.
-    pub fn iter(&self) -> impl Iterator<Item = Ref<'_, Entity>> {
-        let world = &self.world;
-        world.ids().iter().filter_map(move |&id| world.get(id))
+    pub fn material_asset_of(&self, id: u32) -> Option<&MaterialAsset> {
+        let key = self.world.material(id)?.material.clone();
+        self.materials.get(&key)
     }
 
     /// Stable ids in insertion order.
@@ -229,7 +210,7 @@ impl Scene {
 
             // Traverse up from parent_id to check if entity_id is an ancestor
             let mut current = p_id;
-            while let Some(ancestor_parent) = self.get_entity(current).and_then(|e| e.parent_id) {
+            while let Some(ancestor_parent) = self.world.parent_id(current) {
                 if ancestor_parent == entity_id {
                     return Err("Circular parenting detected (ancestor loop).".to_string());
                 }
@@ -238,30 +219,21 @@ impl Scene {
         }
 
         // 2. Clear old parent's children list
-        let old_parent_id = if let Some(entity) = self.get_entity(entity_id) {
-            entity.parent_id
-        } else {
+        if !self.world.contains(entity_id) {
             return Err("Entity not found.".to_string());
-        };
-
-        if let Some(old_p) = old_parent_id {
-            if let Some(mut parent) = self.get_entity_mut(old_p) {
-                parent.children.retain(|&c| c != entity_id);
-            }
+        }
+        if let Some(old_p) = self.world.parent_id(entity_id) {
+            self.world.remove_child(old_p, entity_id);
         }
 
         // 3. Set new parent and update children list
         if let Some(new_p) = parent_id {
-            if let Some(mut parent) = self.get_entity_mut(new_p) {
-                parent.children.push(entity_id);
-            } else {
+            if !self.world.add_child(new_p, entity_id) {
                 return Err("Parent entity not found.".to_string());
             }
         }
 
-        if let Some(mut entity) = self.get_entity_mut(entity_id) {
-            entity.parent_id = parent_id;
-        }
+        self.world.set_parent_id(entity_id, parent_id);
 
         Ok(())
     }

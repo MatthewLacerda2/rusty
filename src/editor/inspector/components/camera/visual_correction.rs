@@ -11,11 +11,16 @@ use egui_phosphor::regular as icon;
 
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::visual_correction as vc_ops;
-use crate::scene::{Entity, Tonemap, VisualCorrectionComponent};
+use crate::scene::{Tonemap, VisualCorrectionComponent};
 
 /// Visual Correction Component panel.
-pub fn draw_visual_correction(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: &mut bool) {
-    let Some(vc) = entity.visual_correction.clone() else {
+pub fn draw_visual_correction(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    is_dirty: &mut bool,
+) {
+    let Some(vc) = world.visual_correction(id).map(|vc| vc.clone()) else {
         return;
     };
     let mut remove = false;
@@ -30,16 +35,18 @@ pub fn draw_visual_correction(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: 
                 .checkbox(&mut active, "Enable Visual Correction")
                 .changed()
             {
-                vc_ops::set_active(entity, active);
+                if let Some(mut c) = world.visual_correction_mut(id) {
+                    vc_ops::set_active(&mut c, active);
+                }
                 *is_dirty = true;
             }
-            draw_bloom(ui, entity, &vc, is_dirty);
-            draw_color_correction(ui, entity, &vc, is_dirty);
-            draw_ssr(ui, entity, &vc, is_dirty);
+            draw_bloom(ui, world, id, &vc, is_dirty);
+            draw_color_correction(ui, world, id, &vc, is_dirty);
+            draw_ssr(ui, world, id, &vc, is_dirty);
         },
     );
     if remove {
-        entity.visual_correction = None;
+        world.set_visual_correction(id, None);
         *is_dirty = true;
     }
 }
@@ -47,7 +54,8 @@ pub fn draw_visual_correction(ui: &mut egui::Ui, entity: &mut Entity, is_dirty: 
 /// The Bloom section of the Visual Correction card.
 fn draw_bloom(
     ui: &mut egui::Ui,
-    entity: &mut Entity,
+    world: &mut crate::ecs::World,
+    id: u32,
     vc: &VisualCorrectionComponent,
     is_dirty: &mut bool,
 ) {
@@ -55,7 +63,9 @@ fn draw_bloom(
     ui.label("Bloom");
     let mut bloom_active = vc.bloom_active;
     if ui.checkbox(&mut bloom_active, "  Bloom Active").changed() {
-        vc_ops::set_bloom_active(entity, bloom_active);
+        if let Some(mut c) = world.visual_correction_mut(id) {
+            vc_ops::set_bloom_active(&mut c, bloom_active);
+        }
         *is_dirty = true;
     }
     if vc.bloom_active {
@@ -66,7 +76,9 @@ fn draw_bloom(
                 .add(egui::Slider::new(&mut intensity, 0.0..=5.0))
                 .changed()
             {
-                vc_ops::set_bloom_intensity(entity, intensity);
+                if let Some(mut c) = world.visual_correction_mut(id) {
+                    vc_ops::set_bloom_intensity(&mut c, intensity);
+                }
                 *is_dirty = true;
             }
         });
@@ -77,70 +89,61 @@ fn draw_bloom(
                 .add(egui::Slider::new(&mut threshold, 0.0..=1.0))
                 .changed()
             {
-                vc_ops::set_bloom_threshold(entity, threshold);
+                if let Some(mut c) = world.visual_correction_mut(id) {
+                    vc_ops::set_bloom_threshold(&mut c, threshold);
+                }
                 *is_dirty = true;
             }
         });
     }
 }
 
+/// A labelled slider row that routes its write through a shared vc op (#287).
+/// Returns whether the value changed; `cx` is the (world, entity-id) pair.
+fn slider_row(
+    ui: &mut egui::Ui,
+    cx: (&mut crate::ecs::World, u32),
+    label: &str,
+    mut value: f32,
+    range: std::ops::RangeInclusive<f32>,
+    op: fn(&mut VisualCorrectionComponent, f32),
+) -> bool {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        let changed = ui.add(egui::Slider::new(&mut value, range)).changed();
+        if changed {
+            if let Some(mut c) = cx.0.visual_correction_mut(cx.1) {
+                op(&mut c, value);
+            }
+        }
+        changed
+    })
+    .inner
+}
+
 /// The Color Correction section (exposure, contrast, saturation, tonemap, gamma).
+#[rustfmt::skip]
 fn draw_color_correction(
     ui: &mut egui::Ui,
-    entity: &mut Entity,
+    world: &mut crate::ecs::World,
+    id: u32,
     vc: &VisualCorrectionComponent,
     is_dirty: &mut bool,
 ) {
     ui.add_space(3.0);
     ui.label("Color Correction");
-    let mut exposure = vc.exposure;
-    ui.horizontal(|ui| {
-        ui.label("  Exposure (EV):");
-        if ui
-            .add(egui::Slider::new(&mut exposure, -4.0..=4.0))
-            .changed()
-        {
-            vc_ops::set_exposure(entity, exposure);
-            *is_dirty = true;
-        }
-    });
-    let mut contrast = vc.contrast;
-    ui.horizontal(|ui| {
-        ui.label("  Contrast:");
-        if ui
-            .add(egui::Slider::new(&mut contrast, 0.0..=2.0))
-            .changed()
-        {
-            vc_ops::set_contrast(entity, contrast);
-            *is_dirty = true;
-        }
-    });
-    let mut saturation = vc.saturation;
-    ui.horizontal(|ui| {
-        ui.label("  Saturation:");
-        if ui
-            .add(egui::Slider::new(&mut saturation, 0.0..=2.0))
-            .changed()
-        {
-            vc_ops::set_saturation(entity, saturation);
-            *is_dirty = true;
-        }
-    });
-    draw_tonemap(ui, entity, vc, is_dirty);
-    let mut gamma = vc.gamma;
-    ui.horizontal(|ui| {
-        ui.label("  Gamma:");
-        if ui.add(egui::Slider::new(&mut gamma, 1.0..=3.0)).changed() {
-            vc_ops::set_gamma(entity, gamma);
-            *is_dirty = true;
-        }
-    });
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Exposure (EV):", vc.exposure, -4.0..=4.0, vc_ops::set_exposure);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Contrast:", vc.contrast, 0.0..=2.0, vc_ops::set_contrast);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Saturation:", vc.saturation, 0.0..=2.0, vc_ops::set_saturation);
+    draw_tonemap(ui, world, id, vc, is_dirty);
+    *is_dirty |= slider_row(ui, (&mut *world, id), "  Gamma:", vc.gamma, 1.0..=3.0, vc_ops::set_gamma);
 }
 
 /// The tonemap-operator selector, reading the snapshot and routing through the op.
 fn draw_tonemap(
     ui: &mut egui::Ui,
-    entity: &mut Entity,
+    world: &mut crate::ecs::World,
+    id: u32,
     vc: &VisualCorrectionComponent,
     is_dirty: &mut bool,
 ) {
@@ -156,7 +159,9 @@ fn draw_tonemap(
                     (Tonemap::None, "None"),
                 ] {
                     if ui.selectable_value(&mut tonemap, value, label).changed() {
-                        vc_ops::set_tonemap(entity, tonemap);
+                        if let Some(mut c) = world.visual_correction_mut(id) {
+                            vc_ops::set_tonemap(&mut c, tonemap);
+                        }
                         *is_dirty = true;
                     }
                 }
@@ -167,7 +172,8 @@ fn draw_tonemap(
 /// The Screen Space Reflections (SSR) section of the Visual Correction card.
 fn draw_ssr(
     ui: &mut egui::Ui,
-    entity: &mut Entity,
+    world: &mut crate::ecs::World,
+    id: u32,
     vc: &VisualCorrectionComponent,
     is_dirty: &mut bool,
 ) {
@@ -175,7 +181,9 @@ fn draw_ssr(
     ui.label("Screen Space Reflections (SSR)");
     let mut ssr_active = vc.ssr_active;
     if ui.checkbox(&mut ssr_active, "  SSR Active").changed() {
-        vc_ops::set_ssr_active(entity, ssr_active);
+        if let Some(mut c) = world.visual_correction_mut(id) {
+            vc_ops::set_ssr_active(&mut c, ssr_active);
+        }
         *is_dirty = true;
     }
     if vc.ssr_active {
@@ -190,7 +198,9 @@ fn draw_ssr(
                             .selectable_value(&mut quality, q.to_string(), q)
                             .changed()
                         {
-                            vc_ops::set_ssr_quality(entity, quality.clone());
+                            if let Some(mut c) = world.visual_correction_mut(id) {
+                                vc_ops::set_ssr_quality(&mut c, quality.clone());
+                            }
                             *is_dirty = true;
                         }
                     }
@@ -201,7 +211,9 @@ fn draw_ssr(
             .checkbox(&mut upsampling, "    Temporal Upsampling")
             .changed()
         {
-            vc_ops::set_ssr_temporal_upsampling(entity, upsampling);
+            if let Some(mut c) = world.visual_correction_mut(id) {
+                vc_ops::set_ssr_temporal_upsampling(&mut c, upsampling);
+            }
             *is_dirty = true;
         }
     }

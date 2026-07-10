@@ -225,7 +225,7 @@ mod tests {
         let mut scene = Scene::new();
         for _ in 0..3 {
             let id = scene.add_entity("Box".to_string());
-            scene.get_entity_mut(id).unwrap().mesh = Some(box_mesh());
+            scene.world.set_mesh(id, Some(box_mesh()));
         }
 
         let target = renderer.device.create_texture(&wgpu::TextureDescriptor {

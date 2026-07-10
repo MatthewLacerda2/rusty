@@ -88,26 +88,24 @@ impl NavigationGraph {
     /// Steers and updates positions of active NavMesh agents in the scene,
     /// constraining them strictly to walkable NavMesh cells using a 2D sliding projection check.
     pub fn tick_nav_agents(&self, scene: &mut Scene, delta_time: f32) {
-        for id in scene.entity_ids() {
-            let mut entity_guard = match scene.get_entity_mut(id) {
-                Some(e) => e,
-                None => continue,
-            };
-            let entity: &mut crate::scene::Entity = &mut entity_guard;
-            if !entity.active {
+        for id in scene.world.ids_with_nav_agent() {
+            if !scene.world.is_active(id) {
                 continue;
             }
-
-            if let Some(agent) = &mut entity.nav_agent {
-                if !agent.active {
-                    continue;
-                }
-
-                let current_pos = entity.transform.position;
+            // Take the agent out, steer, write it back — the same idiom as the
+            // particle tick, so the transform borrow never aliases the agent's.
+            let Some(mut agent) = scene.world.take_nav_agent(id) else {
+                continue;
+            };
+            let current_pos = scene.world.transform(id).map(|t| t.position);
+            if let (true, Some(current_pos)) = (agent.active, current_pos) {
                 let dist = (agent.target - current_pos).length();
 
                 if dist > agent.stopping_distance {
-                    entity.transform.position = self.steer_agent(agent, current_pos, delta_time);
+                    let new_pos = self.steer_agent(&mut agent, current_pos, delta_time);
+                    if let Some(mut t) = scene.world.transform_mut(id) {
+                        t.position = new_pos;
+                    }
                 } else {
                     // Decelerate to zero velocity when close
                     agent.velocity -= agent.velocity * (agent.acceleration * delta_time).min(1.0);
@@ -117,8 +115,15 @@ impl NavigationGraph {
                 }
 
                 // Keep entity's collider bounds aligned with transform positioning
-                entity.update_collider(None);
+                // (local matrix only — the legacy path never resolved the parent here).
+                let local = scene.world.transform(id).map(|t| t.to_matrix());
+                if let (Some(local), Some(mut col)) = (local, scene.world.collider_mut(id)) {
+                    let (min, max) = col.calculate_world_aabb(local);
+                    col.aabb_min = min;
+                    col.aabb_max = max;
+                }
             }
+            scene.world.set_nav_agent(id, Some(agent));
         }
     }
 
@@ -247,22 +252,17 @@ mod tests {
     fn agent_reaches_goal_through_repeated_ticks() {
         let mut scene = Scene::new();
         let id = scene.add_entity("agent".to_string());
-        {
-            let mut e = scene.get_entity_mut(id).expect("entity exists");
-            e.transform.position = Vec3::new(1.0, 0.0, 1.0);
-            e.nav_agent = Some(test_agent(Vec3::new(10.0, 0.0, 10.0)));
-        }
+        scene.world.transform_mut(id).unwrap().position = Vec3::new(1.0, 0.0, 1.0);
+        scene
+            .world
+            .set_nav_agent(id, Some(test_agent(Vec3::new(10.0, 0.0, 10.0))));
         let graph = open_graph();
         let dt = 1.0 / 60.0;
         for _ in 0..2000 {
             graph.tick_nav_agents(&mut scene, dt);
         }
 
-        let pos = scene
-            .get_entity(id)
-            .expect("entity exists")
-            .transform
-            .position;
+        let pos = scene.world.transform(id).expect("entity exists").position;
         let dx = pos.x - 10.0;
         let dz = pos.z - 10.0;
         let dist = (dx * dx + dz * dz).sqrt();
@@ -274,21 +274,16 @@ mod tests {
         let run = || {
             let mut scene = Scene::new();
             let id = scene.add_entity("agent".to_string());
-            {
-                let mut e = scene.get_entity_mut(id).expect("entity exists");
-                e.transform.position = Vec3::new(1.0, 0.0, 1.0);
-                e.nav_agent = Some(test_agent(Vec3::new(15.0, 0.0, 8.0)));
-            }
+            scene.world.transform_mut(id).unwrap().position = Vec3::new(1.0, 0.0, 1.0);
+            scene
+                .world
+                .set_nav_agent(id, Some(test_agent(Vec3::new(15.0, 0.0, 8.0))));
             let graph = open_graph();
             let dt = 1.0 / 60.0;
             for _ in 0..300 {
                 graph.tick_nav_agents(&mut scene, dt);
             }
-            let pos = scene
-                .get_entity(id)
-                .expect("entity exists")
-                .transform
-                .position;
+            let pos = scene.world.transform(id).expect("entity exists").position;
             pos.to_array()
         };
         assert_eq!(run(), run(), "cached pathing must be deterministic");

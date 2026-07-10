@@ -44,8 +44,8 @@ fn register_set_graph<'lua, 'scope>(
         "SetGraph",
         scope.create_function(|_, (id, path): (u32, String)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                animator_ops::set_graph(&mut e, (!path.is_empty()).then_some(path));
+            if let Some(mut c) = scene.world.animator_mut(id) {
+                animator_ops::set_graph(&mut c, (!path.is_empty()).then_some(path));
             }
             Ok(())
         }),
@@ -56,8 +56,8 @@ fn register_set_graph<'lua, 'scope>(
         "SetGraphEnabled",
         scope.create_function(|_, (id, enabled): (u32, bool)| {
             let mut scene = scene.borrow_mut();
-            if let Some(mut e) = scene.get_entity_mut(id) {
-                animator_ops::set_graph_enabled(&mut e, enabled);
+            if let Some(mut c) = scene.world.animator_mut(id) {
+                animator_ops::set_graph_enabled(&mut c, enabled);
             }
             Ok(())
         }),
@@ -79,10 +79,7 @@ fn register_play_node<'lua, 'scope>(
         "PlayNode",
         scope.create_function(|_, (id, node): (u32, String)| {
             let mut scene = scene.borrow_mut();
-            let Some(mut e) = scene.get_entity_mut(id) else {
-                return Ok(false);
-            };
-            let Some(anim) = &mut e.animator else {
+            let Some(mut anim) = scene.world.animator_mut(id) else {
                 return Ok(false);
             };
             let Some(path) = anim.graph.clone() else {
@@ -122,17 +119,14 @@ fn register_play_animation<'lua, 'scope>(
         "PlayAnimation",
         scope.create_function(|_, (id, name): (u32, String)| {
             let mut scene = scene.borrow_mut();
-            let Some(mut e) = scene.get_entity_mut(id) else {
-                return Ok(false);
-            };
-            let exists = e
-                .mesh
-                .as_ref()
+            let exists = scene
+                .world
+                .mesh(id)
                 .is_some_and(|m| m.clips.iter().any(|c| c.name == name));
             if !exists {
                 return Ok(false);
             }
-            let Some(anim) = &mut e.animator else {
+            let Some(mut anim) = scene.world.animator_mut(id) else {
                 return Ok(false);
             };
             anim.play(name);
@@ -154,8 +148,9 @@ fn register_get_current_node<'lua, 'scope>(
         scope.create_function(|_, id: u32| {
             let scene = scene.borrow();
             Ok(scene
-                .get_entity(id)
-                .and_then(|e| e.animator.as_ref().and_then(|a| a.current_node.clone())))
+                .world
+                .animator(id)
+                .and_then(|a| a.current_node.clone()))
         }),
     )
 }

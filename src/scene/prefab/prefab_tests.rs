@@ -17,9 +17,12 @@ fn fixture() -> (Scene, u32) {
     scene
         .materials
         .insert("Stone".into(), MaterialAsset::default());
-    scene.get_entity_mut(root).unwrap().material = Some(MaterialComponent {
-        material: "Stone".into(),
-    });
+    scene.world.set_material(
+        root,
+        Some(MaterialComponent {
+            material: "Stone".into(),
+        }),
+    );
     (scene, root)
 }
 
@@ -63,18 +66,19 @@ fn roundtrip_preserves_structure() {
     let new_root = instantiate_prefab(&mut target, &loaded, None);
 
     assert_eq!(target.entity_count(), 3);
-    let r = target.get_entity(new_root).unwrap();
-    assert_eq!(r.name, "Root");
-    assert_eq!(r.parent_id, None);
-    assert_eq!(r.children.len(), 1);
-    let child = r.children[0];
-    drop(r);
-    let c = target.get_entity(child).unwrap();
-    assert_eq!(c.name, "Child");
-    assert_eq!(c.children.len(), 1, "grandchild preserved");
+    assert_eq!(*target.world.name(new_root).unwrap(), "Root");
+    assert_eq!(target.world.parent_id(new_root), None);
+    let children = target.world.children(new_root);
+    assert_eq!(children.len(), 1);
+    let child = children[0];
+    assert_eq!(*target.world.name(child).unwrap(), "Child");
+    assert_eq!(
+        target.world.children(child).len(),
+        1,
+        "grandchild preserved"
+    );
     // The mesh is rehydrated on instantiate — geometry is present, not stored.
-    let r = target.get_entity(new_root).unwrap();
-    assert!(!r.mesh.as_ref().unwrap().vertices.is_empty());
+    assert!(!target.world.mesh(new_root).unwrap().vertices.is_empty());
 }
 
 #[test]
@@ -105,12 +109,8 @@ fn instantiate_parents_new_root_under_requested_parent() {
     let mut target = Scene::new();
     let host = create_entity(&mut target, "Host", None);
     let new_root = instantiate_prefab(&mut target, &prefab, Some(host));
-    assert_eq!(target.get_entity(new_root).unwrap().parent_id, Some(host));
-    assert!(target
-        .get_entity(host)
-        .unwrap()
-        .children
-        .contains(&new_root));
+    assert_eq!(target.world.parent_id(new_root), Some(host));
+    assert!(target.world.children(host).contains(&new_root));
 }
 
 #[test]
@@ -123,15 +123,7 @@ fn identical_material_is_reused_conflict_is_uniquified() {
     a.materials.insert("Stone".into(), MaterialAsset::default());
     let ra = instantiate_prefab(&mut a, &prefab, None);
     assert_eq!(a.materials.len(), 1);
-    assert_eq!(
-        a.get_entity(ra)
-            .unwrap()
-            .material
-            .as_ref()
-            .unwrap()
-            .material,
-        "Stone"
-    );
+    assert_eq!(a.world.material(ra).unwrap().material, "Stone");
 
     // Case 2: scene has a DIFFERENT "Stone" — prefab's is uniquified + rewritten.
     let mut b = Scene::new();
@@ -142,14 +134,7 @@ fn identical_material_is_reused_conflict_is_uniquified() {
     b.materials.insert("Stone".into(), other);
     let rb = instantiate_prefab(&mut b, &prefab, None);
     assert_eq!(b.materials.len(), 2);
-    let key = b
-        .get_entity(rb)
-        .unwrap()
-        .material
-        .as_ref()
-        .unwrap()
-        .material
-        .clone();
+    let key = b.world.material(rb).unwrap().material.clone();
     assert_ne!(key, "Stone");
     assert!(b.materials.contains_key(&key));
 }
@@ -169,12 +154,12 @@ fn unpacked_instantiate_leaves_no_link_linked_stamps_one() {
     // v1 unpacked copy: no live link back to the asset.
     let mut a = Scene::new();
     let ra = instantiate_prefab(&mut a, &prefab, None);
-    assert!(a.get_entity(ra).unwrap().prefab_link.is_none());
+    assert!(!a.world.has_prefab_link(ra));
 
     // Linked instance (#216): every entity carries a link to the given source path.
     let mut b = Scene::new();
     let rb = instantiate_prefab_linked(&mut b, &prefab, None, "Enemy.prefab");
-    let link = b.get_entity(rb).unwrap().prefab_link.clone().unwrap();
+    let link = b.world.prefab_link(rb).unwrap().clone();
     assert_eq!(link.source, "Enemy.prefab");
     assert_eq!(link.local_id, 0);
     assert!(

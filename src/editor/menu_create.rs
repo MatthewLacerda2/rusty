@@ -80,20 +80,16 @@ mod tests {
 
         spawn(&mut editor, &mut scene, "GameObject", None);
         let empty = editor.selected_entity_id.expect("empty selected");
-        // Read into owned values so the entity guard drops before the next spawn
-        // (a live `Ref` would hold an immutable borrow of `scene`).
-        let empty_is_bare = {
-            let e = scene.get_entity(empty).expect("empty exists");
-            e.mesh.is_none() && e.light.is_none()
-        };
+        let empty_is_bare = !scene.world.has_mesh(empty) && !scene.world.has_light(empty);
         assert!(empty_is_bare, "empty = transform only");
         assert!(editor.is_dirty, "creation marks the scene dirty");
 
         spawn(&mut editor, &mut scene, "Cube", Some(Primitive::Box));
         let cube = editor.selected_entity_id.expect("cube selected");
         let mesh_name = scene
-            .get_entity(cube)
-            .and_then(|e| e.mesh.as_ref().map(|m| m.primitive_type.clone()))
+            .world
+            .mesh(cube)
+            .map(|m| m.primitive_type.clone())
             .expect("cube gets a mesh");
         assert_eq!(mesh_name, "Box");
         assert_eq!(

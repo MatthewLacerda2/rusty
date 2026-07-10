@@ -42,7 +42,7 @@ use crate::scene::Scene;
 /// Routing both casts through this one predicate is what makes them return
 /// identical hits for the same ray.
 pub fn is_hittable(scene: &Scene, id: u32) -> bool {
-    scene.get_entity(id).is_some()
+    scene.world.contains(id)
 }
 
 #[cfg(test)]

@@ -31,13 +31,14 @@ pub fn build_post_params(
 
     let mut bloom_enabled = false;
 
-    for entity in scene.iter() {
-        if !entity.active {
+    for id in scene.world.ids_with_visual_correction() {
+        if !scene.world.is_active(id) {
             continue;
         }
-        let Some(vc) = &entity.visual_correction else {
-            continue;
-        };
+        let vc = scene
+            .world
+            .visual_correction(id)
+            .expect("id came from ids_with_visual_correction");
         if !vc.active {
             continue;
         }
@@ -61,7 +62,8 @@ pub fn build_post_params(
         };
 
         // Motion blur is gated by the camera component AND the preset.
-        let (mb_active, mb_samples) = match &entity.camera {
+        let cam = scene.world.camera(id);
+        let (mb_active, mb_samples) = match cam.as_deref() {
             Some(cam) if cam.motion_blur_active && quality.motion_blur() => {
                 (1.0, cam.motion_blur_samples.clamp(2, 32) as f32)
             }
@@ -84,10 +86,8 @@ mod tests {
     fn scene_with_vc(vc: VisualCorrectionComponent, cam: Option<CameraComponent>) -> Scene {
         let mut scene = Scene::new();
         let id = scene.add_entity("PostFx".to_string());
-        let mut e = scene.get_entity_mut(id).unwrap();
-        e.visual_correction = Some(vc);
-        e.camera = cam;
-        drop(e);
+        scene.world.set_visual_correction(id, Some(vc));
+        scene.world.set_camera(id, cam);
         scene
     }
 
