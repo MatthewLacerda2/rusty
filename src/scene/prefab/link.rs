@@ -156,7 +156,8 @@ pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String
 /// renamed/deleted `.prefab` never aborts the scene load.
 pub fn reimport_all_linked_instances(scene: &mut Scene) {
     let roots: Vec<u32> = scene
-        .entity_ids()
+        .world
+        .ids_with_prefab_link()
         .into_iter()
         .filter(|&id| scene.world.prefab_link(id).is_some_and(|l| l.local_id == 0))
         .collect();

@@ -14,6 +14,12 @@ use crate::components::Entity;
 /// column so narrow queries (#346) can skip entities that lack it.
 pub(in crate::ecs) struct Core {
     pub id: u32,
+    /// Monotonic insertion sequence, assigned by `World::place` and preserved
+    /// across `overwrite`. Narrow queries (#346) sort their matches by it to
+    /// recover insertion order — hecs iterates by archetype, and the
+    /// determinism contract (physics pair ordering, replay byte-identity)
+    /// requires insertion order.
+    pub seq: u64,
     pub active: bool,
     pub is_static: bool,
     pub layer: u8,
@@ -34,10 +40,11 @@ macro_rules! add_present {
 /// core/name/transform/scripts plus every present optional component. Moves
 /// fields directly off `entity` (a series of partial moves) rather than one
 /// big destructure pattern, to stay well under the function line cap.
-pub(in crate::ecs) fn build_bundle(entity: Entity) -> hecs::EntityBuilder {
+pub(in crate::ecs) fn build_bundle(entity: Entity, seq: u64) -> hecs::EntityBuilder {
     let mut b = hecs::EntityBuilder::new();
     b.add(Core {
         id: entity.id,
+        seq,
         active: entity.active,
         is_static: entity.is_static,
         layer: entity.layer,

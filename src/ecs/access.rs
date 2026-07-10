@@ -13,9 +13,10 @@
 //!   `guard.clone()` at a call site silently resolve to a re-borrow instead of
 //!   `T::clone()` via `Deref`. Wrapping suppresses that trap so `.clone()`
 //!   keeps meaning "clone the component", matching pre-#345 behaviour.
-//! - Ordered iteration (`ids_with_*`) walks insertion order — the determinism
-//!   contract (physics pair ordering, replay byte-identity) #346's narrow
-//!   queries must keep honouring.
+//! - Ordered iteration (`ids_with_*`) yields insertion order — the determinism
+//!   contract (physics pair ordering, replay byte-identity). Since #346 each is
+//!   a narrow hecs query (archetype-filtered, then sorted by `Core::seq`), so
+//!   its cost tracks the carrier population, not the scene size.
 //!
 //! Allowed deps: hecs, components.
 
@@ -102,8 +103,10 @@ macro_rules! optional_component_accessors {
 
                 /// Stable ids of the entities carrying this component, in
                 /// insertion order (the determinism-safe iteration order).
+                /// A narrow hecs query (#346): cost tracks the carrier
+                /// population, not the scene size.
                 pub fn $ids_with(&self) -> Vec<u32> {
-                    self.ids().iter().copied().filter(|&id| self.$has(id)).collect()
+                    self.ids_with_component::<$ty>()
                 }
             )*
         }
