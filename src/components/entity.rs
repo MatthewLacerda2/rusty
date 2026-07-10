@@ -1,10 +1,12 @@
-//! src/components/entity.rs — the per-entity component bundle.
+//! src/components/entity.rs — the GameObject document shape.
 //!
-//! Each game object is one hecs entity holding a single `Entity` value (this
-//! struct). Storing the whole bundle as one component keeps the editor/inspector
-//! "view the whole GameObject" ergonomics while hecs owns identity + storage.
-//! `transform` is the one mandatory field (Transform is never optional); every
-//! other component is `Option<…>`. Moved verbatim from the legacy `core/scene.rs`.
+//! `Entity` is no longer live storage (#345 split it into real per-component
+//! hecs columns — see `ecs::world`); it survives as the *document* shape one
+//! GameObject assembles into/out of for serialization, prefab diffing, and
+//! the editor/inspector's "view the whole GameObject" ergonomics. `transform`
+//! is the one mandatory field (Transform is never optional); every other
+//! component is `Option<…>`. Originally moved verbatim from the legacy
+//! `core/scene.rs`.
 
 use serde::{Deserialize, Serialize};
 

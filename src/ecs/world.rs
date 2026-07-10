@@ -1,22 +1,33 @@
 //! src/ecs/world.rs — World wrapper over `hecs::World`.
 //!
-//! Each game object is one hecs entity that holds a single `Entity` bundle
-//! component (see `components::entity`). hecs owns identity and storage
-//! (generational handles); this wrapper layers on the engine's stable `u32` ids
-//! — the surface Lua scripts, the editor, and the scene file all speak — plus a
-//! name lookup, fixing the old `Player == 2` / `Enemy == 5` fragility.
+//! Storage flip (#345): each game object is now a hecs entity carrying real
+//! per-component hecs columns — a slim mandatory [`Core`] (identity/hierarchy
+//! facts), the mandatory `name: String` and `TransformComponent`, the mandatory
+//! `Vec<ScriptComponent>`, and every optional first-class component attached
+//! only when present. hecs itself enforces one-per-type storage. This wrapper
+//! layers the engine's stable `u32` ids — the surface Lua scripts, the editor,
+//! and the scene file all speak — plus a name lookup, fixing the old
+//! `Player == 2` / `Enemy == 5` fragility.
 //!
 //! `spawn(name)` always attaches a Transform (via `Entity::new`): Transform is
 //! the one mandatory component. Iteration is in insertion order so the legacy
 //! `Vec<Entity>` semantics (physics pair ordering, render order) are preserved.
 //!
-//! Component access returns hecs borrow guards (`Ref`/`RefMut`) which deref to
-//! `&Entity` / `&mut Entity`; callers that hand the bundle to a helper pass
-//! `&*guard` / `&mut *guard`.
+//! The generic `component`/`component_mut`/`set_component`/`take_component`/
+//! `has_component`/`with_pair_mut` helpers are the ONLY place raw hecs column
+//! access happens; `access.rs` and `core.rs` build the typed, named surface on
+//! top of them. `Entity` stays the on-disk *document* shape (see
+//! `components::entity`) — `bundle::build_bundle`, used by `place`/
+//! `overwrite`, decomposes a document into one `EntityBuilder` placement (a
+//! single archetype move rather than N sequential per-column migrations);
+//! `core.rs`'s `entity_document` recomposes one back out through the named
+//! accessors.
 
 use std::collections::HashMap;
 
 use crate::components::Entity;
+
+use super::bundle::{build_bundle, Core};
 
 pub(in crate::ecs) use hecs::{Ref, RefMut};
 
@@ -73,22 +84,18 @@ impl World {
     pub fn spawn(&mut self, name: String) -> u32 {
         let id = self.next_id;
         self.next_id += 1;
-        let handle = self.inner.spawn((Entity::new(id, name),));
-        self.handles.insert(id, handle);
-        self.order.push(id);
+        self.place(Entity::new(id, name));
         id
     }
 
-    /// Insert a fully-formed `Entity` bundle (used when rehydrating a scene from
-    /// disk). The entity's `id` is honoured; `next_id` is advanced past it.
+    /// Insert a fully-formed `Entity` document (used when rehydrating a scene
+    /// from disk), decomposing it into the mandatory + optional columns. The
+    /// entity's `id` is honoured; `next_id` is advanced past it.
     pub fn insert_entity(&mut self, entity: Entity) {
-        let id = entity.id;
-        let handle = self.inner.spawn((entity,));
-        self.handles.insert(id, handle);
-        self.order.push(id);
-        if id >= self.next_id {
-            self.next_id = id + 1;
+        if entity.id >= self.next_id {
+            self.next_id = entity.id + 1;
         }
+        self.place(entity);
     }
 
     /// Despawn an entity by stable id.
@@ -111,27 +118,17 @@ impl World {
         self.handles.contains_key(&id)
     }
 
-    /// Borrow an entity's bundle. The returned guard derefs to `&Entity`.
-    /// Facade-internal (#344): consumers go through the typed accessors in
-    /// `access.rs` / `core.rs`, never through the whole bundle.
-    pub(in crate::ecs) fn get(&self, id: u32) -> Option<Ref<'_, Entity>> {
-        let handle = *self.handles.get(&id)?;
-        self.inner.get::<&Entity>(handle).ok()
-    }
-
-    /// Mutably borrow an entity's bundle. The returned guard derefs to
-    /// `&mut Entity`. Facade-internal (#344), like [`World::get`].
-    pub(in crate::ecs) fn get_mut(&mut self, id: u32) -> Option<RefMut<'_, Entity>> {
-        let handle = *self.handles.get(&id)?;
-        self.inner.get::<&mut Entity>(handle).ok()
-    }
-
     /// Find the first *active* entity with this name, returning its stable id.
     /// Matches the legacy `Scene::find_entity_by_name` semantics.
     pub fn find_by_name(&self, name: &str) -> Option<u32> {
         self.order.iter().copied().find(|&id| {
-            self.get(id)
-                .map(|e| e.name == name && e.active)
+            let Some(&handle) = self.handles.get(&id) else {
+                return false;
+            };
+            self.inner
+                .query_one::<(&String, &Core)>(handle)
+                .ok()
+                .and_then(|mut q| q.get().map(|(n, c)| *n == *name && c.active))
                 .unwrap_or(false)
         })
     }
@@ -141,12 +138,105 @@ impl World {
         &self.order
     }
 
-    /// Collect all entities (cloned) in insertion order — used for
-    /// serialization snapshots.
+    /// Collect all entities (assembled as documents) in insertion order — used
+    /// for serialization snapshots.
     pub fn collect_entities(&self) -> Vec<Entity> {
         self.order
             .iter()
-            .filter_map(|&id| self.get(id).map(|e| (*e).clone()))
+            .filter_map(|&id| self.entity_document(id))
             .collect()
+    }
+
+    /// Shared borrow of one component column, by stable id.
+    pub(in crate::ecs) fn component<T: hecs::Component>(&self, id: u32) -> Option<Ref<'_, T>> {
+        let &handle = self.handles.get(&id)?;
+        self.inner.get::<&T>(handle).ok()
+    }
+
+    /// Exclusive borrow of one component column, by stable id.
+    pub(in crate::ecs) fn component_mut<T: hecs::Component>(
+        &mut self,
+        id: u32,
+    ) -> Option<RefMut<'_, T>> {
+        let &handle = self.handles.get(&id)?;
+        self.inner.get::<&mut T>(handle).ok()
+    }
+
+    pub(in crate::ecs) fn has_component<T: hecs::Component>(&self, id: u32) -> bool {
+        self.component::<T>(id).is_some()
+    }
+
+    /// Attach (`Some`) or detach (`None`) a component column. Returns `false`
+    /// when the entity does not exist.
+    pub(in crate::ecs) fn set_component<T: hecs::Component>(
+        &mut self,
+        id: u32,
+        value: Option<T>,
+    ) -> bool {
+        let Some(&handle) = self.handles.get(&id) else {
+            return false;
+        };
+        match value {
+            Some(v) => {
+                let _ = self.inner.insert_one(handle, v);
+            }
+            None => {
+                let _ = self.inner.remove_one::<T>(handle);
+            }
+        }
+        true
+    }
+
+    /// Detach and return a component column (`None` when absent or the entity
+    /// is dead).
+    pub(in crate::ecs) fn take_component<T: hecs::Component>(&mut self, id: u32) -> Option<T> {
+        let &handle = self.handles.get(&id)?;
+        self.inner.remove_one::<T>(handle).ok()
+    }
+
+    /// Borrow two DIFFERENT component columns of the same entity mutably at
+    /// once — sound because they're independent hecs columns. `None` when the
+    /// entity is missing or lacks the mandatory `A`.
+    pub(in crate::ecs) fn with_pair_mut<A: hecs::Component, B: hecs::Component, R>(
+        &mut self,
+        id: u32,
+        f: impl FnOnce(&mut A, Option<&mut B>) -> R,
+    ) -> Option<R> {
+        let &handle = self.handles.get(&id)?;
+        let mut query = self
+            .inner
+            .query_one::<(&mut A, Option<&mut B>)>(handle)
+            .ok()?;
+        let (a, b) = query.get()?;
+        Some(f(a, b))
+    }
+
+    /// Spawn a brand-new hecs entity carrying every column of `entity` at
+    /// once — a single archetype placement via `EntityBuilder`, instead of N
+    /// sequential `insert_one` calls that would each re-migrate the entity
+    /// through its own archetype (O(k) placement, not O(k²) migration).
+    fn place(&mut self, entity: Entity) {
+        let id = entity.id;
+        let mut builder = build_bundle(entity);
+        let handle = self.inner.spawn(builder.build());
+        self.handles.insert(id, handle);
+        self.order.push(id);
+    }
+
+    /// Decompose an `Entity` document and overwrite a LIVE entity's whole
+    /// column set with it in one placement (despawn + respawn under the same
+    /// stable id) — `replace_entity`'s bridge. Despawning first guarantees no
+    /// column absent from the new document survives stale. Returns `false`
+    /// when the entity does not exist.
+    pub(in crate::ecs) fn overwrite(&mut self, entity: Entity) -> bool {
+        let id = entity.id;
+        let Some(&old_handle) = self.handles.get(&id) else {
+            return false;
+        };
+        let _ = self.inner.despawn(old_handle);
+        let mut builder = build_bundle(entity);
+        let new_handle = self.inner.spawn(builder.build());
+        self.handles.insert(id, new_handle);
+        true
     }
 }

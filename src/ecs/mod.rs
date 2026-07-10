@@ -8,12 +8,15 @@
 //!
 //! This module is also the component-accessor facade (#344): `access.rs` holds
 //! the per-component accessors, `core.rs` the identity-core + document verbs.
-//! Consumers never project fields out of the stored `Entity` bundle — they go
-//! through these accessors, so #345 can swap the storage under them.
+//! Consumers never touch storage directly — they go through these accessors.
+//! Storage itself is real per-component hecs columns (#345); `Entity`
+//! (`components::entity`) survives only as the on-disk document shape that
+//! `write_components`/`entity_document` decompose/recompose against.
 //!
 //! Allowed deps: hecs, components.
 
 pub mod access;
+mod bundle;
 pub mod core;
 pub mod world;
 
