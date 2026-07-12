@@ -252,9 +252,10 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && needs.changes.outputs.code != 'false')
     # Informational signal, never a merge blocker (CLAUDE.md gates-vs-signals).
-    # On `main` it ratchets the deterministic sim modules (app/scripting/physics/
-    # navigation) against the committed floors in `coverage-baseline.txt`: a drop
-    # below a floor is surfaced here but does not fail the build. The platform layer
+    # On `main` it ratchets the floored modules — the deterministic sim (app/
+    # scripting/physics/navigation) plus the script-facing `api` surface (#350) —
+    # against the committed floors in `coverage-baseline.txt`: a drop below a
+    # floor is surfaced here but does not fail the build. The platform layer
     # (main.rs, render, dev) is exempt — see docs/testing.md. `continue-on-error`
     # keeps even a regression non-blocking.
     continue-on-error: true
@@ -286,28 +287,32 @@ jobs:
             cargo llvm-cov report --summary-only
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Ratchet sim coverage against the committed baseline
+      - name: Ratchet module coverage against the committed baseline
         # Per-module line coverage vs the floors in coverage-baseline.txt. The
         # `regex` crate llvm-cov uses has no look-around, so each module is isolated
-        # by ignoring the other three plus all non-sim paths; `src/[^/]+\.rs` drops
-        # every top-level src file (main/lib/settings/…) so none can pollute the
-        # number (the #163 class of bug). Informational: a drop below a floor is
-        # flagged but the step never exits non-zero (and the job is continue-on-error
-        # regardless), honouring "inform on quality, never block".
+        # by ignoring the other floored modules plus every unfloored src directory;
+        # `src/[^/]+\.rs` drops every top-level src file (main/lib/settings/…) so
+        # none can pollute the number (the #163 class of bug). UNFLOORED must list
+        # EVERY unfloored src/ directory — a new module missing from it leaks into
+        # every floored measurement (audio/procgen/shadergen had done exactly that).
+        # Informational: a drop below a floor is flagged but the step never exits
+        # non-zero (and the job is continue-on-error regardless), honouring
+        # "inform on quality, never block".
         run: |
-          NONSIM='render|dev|api|asset|editor|components|core|ecs|scene|time'
+          FLOORED='app scripting physics navigation api'
+          UNFLOORED='render|dev|asset|editor|components|core|ecs|scene|time|audio|procgen|shadergen'
           {
-            echo '### Sim-module coverage ratchet (informational, non-blocking)'
+            echo '### Module coverage ratchet (informational, non-blocking)'
             echo ''
             echo '| Module | Floor | Current | Status |'
             echo '|---|---|---|---|'
             regressed=0
             while read -r module floor; do
               case "$module" in ''|\#*) continue ;; esac
-              others=$(echo "app scripting physics navigation" \
+              others=$(echo "$FLOORED" \
                 | tr ' ' '\n' | grep -v "^${module}$" | paste -sd'|')
               cur=$(cargo llvm-cov report --json --summary-only \
-                --ignore-filename-regex "src/(${others}|${NONSIM})/|src/[^/]+\.rs|src/bin/|tools/" \
+                --ignore-filename-regex "src/(${others}|${UNFLOORED})/|src/[^/]+\.rs|src/bin/|tools/" \
                 | jq '.data[0].totals.lines.percent')
               status='✅'
               if awk "BEGIN{exit !(${cur} < ${floor})}"; then status='❌ regression'; regressed=1; fi
@@ -315,10 +320,10 @@ jobs:
             done < coverage-baseline.txt
             echo ''
             if [ "$regressed" = 1 ]; then
-              echo '> A sim module dropped below its committed floor. Informational — add'
+              echo '> A module dropped below its committed floor. Informational — add'
               echo '> tests, or, if the drop is intended, lower it in `coverage-baseline.txt`.'
             else
-              echo '> All sim modules at or above their committed floor.'
+              echo '> All floored modules at or above their committed floor.'
             fi
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
