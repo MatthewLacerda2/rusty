@@ -49,9 +49,12 @@ Targets are deliberately differentiated:
 
 - **A per-module floor on the sim modules** (`app`, `scripting`, `physics`,
   `navigation`) — pure logic, no GPU, the part that must be right and where
-  mutation/property testing is aimed. The floors live in `coverage-baseline.txt`
-  at the repo root (one `module floor` line each) and **ratchet**: raise them as
-  coverage improves, never lower them silently.
+  mutation/property testing is aimed — **and on `api`** (#350), the Lua surface
+  every game script drives: the doc drift gate proves a binding *exists*, only a
+  behavioral test proves it *works* (`tests/<namespace>_api.rs`, one file per
+  namespace). The floors live in `coverage-baseline.txt` at the repo root (one
+  `module floor` line each) and **ratchet**: raise them as coverage improves,
+  never lower them silently.
 - **No floor on the platform layer** (`main.rs`, `render`, `dev`) — headless
   coverage there is low-value.
 

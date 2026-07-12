@@ -1,14 +1,16 @@
-# Per-sim-module line-coverage floors — the ratchet baseline (see docs/testing.md).
+# Per-module line-coverage floors — the ratchet baseline (see docs/testing.md).
 #
-# The `coverage` CI job (post-merge on main) measures each deterministic sim
-# module and flags — informationally, never blocking — any drop below its floor.
+# The `coverage` CI job (post-merge on main) measures each floored module and
+# flags — informationally, never blocking — any drop below its floor.
 # Format: `<module> <floor-percent>`, one per line; `#` lines are comments.
 #
 # These are RECORDED floors a hair below the achieved coverage (measured both
-# feature sets accumulated): app 95.54, scripting 92.10, physics 96.79,
-# navigation 96.46. Ratchet them UP as coverage improves; never lower one
-# silently to hide a regression.
+# feature sets accumulated, each module isolated from every other src/ dir):
+# app 95.03, scripting 96.63, physics 97.59, navigation 96.39, api 86.72.
+# Ratchet them UP as coverage improves; never lower one silently to hide a
+# regression.
 app 95.00
-scripting 91.00
-physics 96.00
+scripting 96.00
+physics 97.00
 navigation 96.00
+api 86.00
