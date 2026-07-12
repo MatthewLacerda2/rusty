@@ -6,11 +6,11 @@
 #
 # These are RECORDED floors a hair below the achieved coverage (measured both
 # feature sets accumulated, each module isolated from every other src/ dir):
-# app 95.36, scripting 92.11, physics 96.41, navigation 96.84, api 85.69.
+# app 95.03, scripting 96.63, physics 97.59, navigation 96.39, api 86.72.
 # Ratchet them UP as coverage improves; never lower one silently to hide a
 # regression.
 app 95.00
-scripting 91.00
-physics 96.00
+scripting 96.00
+physics 97.00
 navigation 96.00
-api 85.00
+api 86.00
