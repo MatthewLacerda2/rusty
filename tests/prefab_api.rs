@@ -14,7 +14,7 @@ use rusty::scene::Scene;
 fn fixture(tag: &str) -> (RefCell<Scene>, u32, String) {
     let mut scene = Scene::new();
     let root = scene.add_entity("Root".to_string());
-    scene.get_entity_mut(root).unwrap().transform.position = Vec3::new(1.0, 2.0, 3.0);
+    scene.world.transform_mut(root).unwrap().position = Vec3::new(1.0, 2.0, 3.0);
     let dir = std::env::temp_dir();
     let file = format!("rusty_prefab_api_{tag}_{}.prefab", std::process::id());
     let path = dir.join(file).to_string_lossy().into_owned();
@@ -24,8 +24,9 @@ fn fixture(tag: &str) -> (RefCell<Scene>, u32, String) {
 fn run(scene: &RefCell<Scene>, body: impl FnOnce(&Lua)) {
     let lua = Lua::new();
     let scene_path: RefCell<Option<String>> = RefCell::new(None);
+    let is_playing = RefCell::new(false);
     lua.scope(|scope| {
-        rusty::api::scene::register(&lua, scope, scene, &scene_path).unwrap();
+        rusty::api::scene::register(&lua, scope, scene, &scene_path, &is_playing).unwrap();
         body(&lua);
         Ok(())
     })
@@ -33,11 +34,11 @@ fn run(scene: &RefCell<Scene>, body: impl FnOnce(&Lua)) {
 }
 
 fn pos_of(scene: &RefCell<Scene>, id: u32) -> Vec3 {
-    scene.borrow().get_entity(id).unwrap().transform.position
+    scene.borrow().world.transform(id).unwrap().position
 }
 
 fn is_linked(scene: &RefCell<Scene>, id: u32) -> bool {
-    scene.borrow().get_entity(id).unwrap().prefab_link.is_some()
+    scene.borrow().world.has_prefab_link(id)
 }
 
 fn errors(lua: &Lua, code: &str) -> bool {
@@ -87,7 +88,7 @@ fn linked_instance_records_and_reverts_overrides() {
         // Diverge from the source, record, and the divergence is listed.
         {
             let mut s = scene.borrow_mut();
-            s.get_entity_mut(new_id).unwrap().transform.position = Vec3::splat(9.0);
+            s.world.transform_mut(new_id).unwrap().position = Vec3::splat(9.0);
         }
         let recorded: usize = lua
             .load(format!("return Scene.RecordPrefabOverrides({new_id})"))

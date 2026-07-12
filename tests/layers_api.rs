@@ -35,7 +35,7 @@ fn layer_index_round_trips_and_defaults_to_zero() {
             .eval()
             .unwrap();
         assert_eq!(layer, 5);
-        assert_eq!(scene.borrow().get_entity(id).unwrap().layer, 5);
+        assert_eq!(scene.borrow().world.layer(id), 5);
         Ok(())
     })
     .unwrap();

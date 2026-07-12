@@ -13,7 +13,9 @@ use rusty::scene::{ParticleEmitterComponent, Scene};
 fn scene_with_emitter() -> (RefCell<Scene>, u32, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Emitter".to_string());
-    scene.get_entity_mut(id).unwrap().particles = Some(ParticleEmitterComponent::default());
+    scene
+        .world
+        .set_particles(id, Some(ParticleEmitterComponent::default()));
     let bare = scene.add_entity("NoEmitter".to_string());
     (RefCell::new(scene), id, bare)
 }
@@ -107,7 +109,7 @@ fn tuning_verbs_write_the_component() {
             .unwrap();
         assert!(!active);
         let s = scene.borrow();
-        let p = s.get_entity(id).unwrap().particles.clone().unwrap();
+        let p = s.world.particles(id).unwrap().clone();
         assert!(!p.active);
         assert_eq!(p.rate, 7.5);
         Ok(())

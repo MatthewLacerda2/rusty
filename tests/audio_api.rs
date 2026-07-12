@@ -27,11 +27,14 @@ struct Fixture {
 fn fixture() -> Fixture {
     let mut scene = Scene::new();
     let source_id = scene.add_entity("Shooter".to_string());
-    scene.get_entity_mut(source_id).unwrap().audio = Some(AudioSourceComponent {
-        clip: "sounds/shot.ogg".to_string(),
-        volume: 0.8,
-        ..Default::default()
-    });
+    scene.world.set_audio(
+        source_id,
+        Some(AudioSourceComponent {
+            clip: "sounds/shot.ogg".to_string(),
+            volume: 0.8,
+            ..Default::default()
+        }),
+    );
     let bare_id = scene.add_entity("Silent".to_string());
     Fixture {
         scene: RefCell::new(scene),
