@@ -79,7 +79,7 @@ impl Renderer {
         let pipelines = create_pipelines(
             &self.device,
             &module,
-            self.config.format,
+            super::postfx::HDR_FORMAT,
             &self.camera_lighting_layout,
             &self.entity_bones_layout,
             &self.material_layout,
