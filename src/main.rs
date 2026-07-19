@@ -61,6 +61,10 @@ struct Frontend {
     /// panel (#183). Registered lazily on the first frame a target exists, then
     /// rebound to the resized view each frame so the `egui::Image` reference stays valid.
     viewport_texture_id: Option<egui::TextureId>,
+    /// Stable egui texture id for the Inspector's Preview tab offscreen target
+    /// (#352) — same lazily-registered, rebound-each-frame contract as
+    /// `viewport_texture_id`, just for the isolated asset-preview scene.
+    preview_texture_id: Option<egui::TextureId>,
     /// Dev-only socket command channel (#282): lets an external process drive this
     /// running playtest through the same evaluator the console uses. `None` if the
     /// socket failed to bind — the window keeps running without it. Absent entirely
@@ -180,6 +184,7 @@ fn init_frontend(window: &Arc<winit::window::Window>) -> (Frontend, String) {
         last_fps_update: Instant::now(),
         applied_video: rusty::core::video::VideoSettings::default(),
         viewport_texture_id: None,
+        preview_texture_id: None,
         // Started in `main` once the game's shared console cell exists (so a bind
         // failure logs to the same console the editor shows).
         #[cfg(feature = "dev")]
@@ -480,6 +485,7 @@ fn render_egui_overlay(
     let raw_input = frontend.egui_winit.take_egui_input(window);
     frontend.egui_ctx.begin_frame(raw_input);
 
+    frontend.editor_ui.preview_texture_id = frontend.preview_texture_id;
     let interaction = draw_editor_dashboard(frontend, game, current_frame_duration);
     drain_repl(frontend, game);
 
@@ -488,6 +494,9 @@ fn render_egui_overlay(
     let ppp = window.scale_factor() as f32;
     render_viewport_scene(frontend, game, &interaction, ppp);
     handle_viewport_interaction(frontend, game, &interaction, ppp);
+    // Only when the Inspector's Preview tab requested one this frame (#352) — a
+    // closed tab leaves `preview_request` `None` and this is a no-op.
+    render_preview_scene(frontend, ppp);
 
     let full_output = frontend.egui_ctx.end_frame();
     let paint_jobs = frontend
@@ -634,6 +643,62 @@ fn render_viewport_scene(
                 wgpu::FilterMode::Linear,
             );
             frontend.viewport_texture_id = Some(id);
+        }
+    }
+}
+
+/// Render the Inspector Preview tab's isolated scene into its own offscreen target,
+/// then (re)bind it to a stable egui texture id — the same two-phase contract
+/// [`render_viewport_scene`] uses for the main viewport, just against
+/// `EditorUi::preview_request`/`preview_cache` instead of the active game world.
+/// Isolation by construction: the rendered `Scene` is `preview_cache`'s freestanding
+/// value, never `game.world.scene` (#352). A no-op whenever the Preview tab isn't
+/// showing this frame (`preview_request` is `None`) or the panel rect is degenerate.
+fn render_preview_scene(frontend: &mut Frontend, pixels_per_point: f32) {
+    let Some(request) = frontend.editor_ui.preview_request.take() else {
+        return;
+    };
+    let px = (request.size.x * pixels_per_point).round() as u32;
+    let py = (request.size.y * pixels_per_point).round() as u32;
+    if px == 0 || py == 0 {
+        return;
+    }
+    frontend.renderer.resize_preview(px, py);
+    let Some(target_view) = frontend.renderer.preview_target_view() else {
+        return;
+    };
+    let Some(cache) = &frontend.editor_ui.preview_cache else {
+        return;
+    };
+
+    match &request.shader_override {
+        Some(path) => frontend.renderer.render_preview_with_shader(
+            &cache.scene,
+            &request.camera,
+            &target_view,
+            path,
+        ),
+        None => frontend
+            .renderer
+            .render(&cache.scene, &request.camera, &target_view, false, &[]),
+    }
+
+    match frontend.preview_texture_id {
+        Some(id) => frontend
+            .egui_renderer
+            .update_egui_texture_from_wgpu_texture(
+                &frontend.renderer.device,
+                &target_view,
+                wgpu::FilterMode::Linear,
+                id,
+            ),
+        None => {
+            let id = frontend.egui_renderer.register_native_texture(
+                &frontend.renderer.device,
+                &target_view,
+                wgpu::FilterMode::Linear,
+            );
+            frontend.preview_texture_id = Some(id);
         }
     }
 }

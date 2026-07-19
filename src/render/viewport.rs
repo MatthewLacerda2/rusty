@@ -37,21 +37,7 @@ impl Renderer {
             return;
         }
 
-        self.size = winit::dpi::PhysicalSize::new(width, height);
-
-        // The scene's depth + post-FX run at the viewport size, so a smaller panel
-        // renders fewer pixels rather than stretching a window-sized image.
-        let depth_config = wgpu::SurfaceConfiguration {
-            width,
-            height,
-            ..self.config.clone()
-        };
-        let (depth_tex, depth_view) = Self::create_depth_resources(&self.device, &depth_config);
-        self.depth_texture = depth_tex;
-        self.depth_view = depth_view;
-        self.decal_depth_bind_group = None;
-        self.post_fx
-            .resize(&self.device, width, height, self.quality.bloom_divisor());
+        self.resize_scene_targets(width, height);
 
         // The colour target the post-FX writes into; sampled by egui. Its format
         // matches the swapchain so the registered egui texture renders 1:1.
@@ -70,5 +56,26 @@ impl Renderer {
             view_formats: &[],
         });
         self.viewport_target = Some(target);
+    }
+
+    /// Resize the shared scene-internal targets (depth + post-FX) and `self.size`
+    /// (the projection aspect) to `width` x `height`, leaving the caller to allocate
+    /// its own colour target. Shared by [`Self::resize_viewport`] and
+    /// `resize_preview` (`preview.rs`, #352) — both drive one offscreen scene render
+    /// through the same forward pass, just into a differently-sized colour texture.
+    pub(super) fn resize_scene_targets(&mut self, width: u32, height: u32) {
+        self.size = winit::dpi::PhysicalSize::new(width, height);
+
+        let depth_config = wgpu::SurfaceConfiguration {
+            width,
+            height,
+            ..self.config.clone()
+        };
+        let (depth_tex, depth_view) = Self::create_depth_resources(&self.device, &depth_config);
+        self.depth_texture = depth_tex;
+        self.depth_view = depth_view;
+        self.decal_depth_bind_group = None;
+        self.post_fx
+            .resize(&self.device, width, height, self.quality.bloom_divisor());
     }
 }

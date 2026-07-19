@@ -1,5 +1,6 @@
 pub mod assets;
 pub mod components;
+pub mod preview;
 
 use egui_phosphor::regular as icon;
 
@@ -170,11 +171,11 @@ fn draw_entity_inspector(
 
         draw_components(
             ui,
+            editor,
             world,
             selected_id,
             materials,
             &cx.named_layers,
-            &mut editor.is_dirty,
             &mut pending.nav_bake,
         );
     }
@@ -263,28 +264,28 @@ fn draw_layer_combo(
 #[allow(clippy::too_many_arguments)] // (world, id) replaced the single &mut Entity handle
 fn draw_components(
     ui: &mut egui::Ui,
+    editor: &mut EditorUi,
     world: &mut crate::ecs::World,
     id: u32,
     materials: &mut BTreeMap<String, MaterialAsset>,
     named_layers: &[(u8, String)],
-    is_dirty: &mut bool,
     pending_nav_bake: &mut bool,
 ) {
-    render::draw_mesh(ui, world, id, is_dirty);
-    material::draw_material_card(ui, world, id, materials, is_dirty);
-    render::draw_light(ui, world, id, is_dirty);
+    render::draw_mesh(ui, world, id, &mut editor.is_dirty);
+    material::draw_material_card(ui, editor, world, id, materials);
+    render::draw_light(ui, world, id, &mut editor.is_dirty);
 
-    gameplay::draw_script(ui, world, id, is_dirty);
-    gameplay::draw_animator(ui, world, id, is_dirty);
-    gameplay::draw_collider(ui, world, id, is_dirty, pending_nav_bake);
-    gameplay::draw_rigidbody(ui, world, id, is_dirty);
-    gameplay::draw_nav_agent(ui, world, id, is_dirty);
+    gameplay::draw_script(ui, world, id, &mut editor.is_dirty);
+    gameplay::draw_animator(ui, world, id, &mut editor.is_dirty);
+    gameplay::draw_collider(ui, world, id, &mut editor.is_dirty, pending_nav_bake);
+    gameplay::draw_rigidbody(ui, world, id, &mut editor.is_dirty);
+    gameplay::draw_nav_agent(ui, world, id, &mut editor.is_dirty);
 
-    camera::draw_camera(ui, world, id, named_layers, is_dirty);
-    camera::draw_visual_correction(ui, world, id, is_dirty);
+    camera::draw_camera(ui, world, id, named_layers, &mut editor.is_dirty);
+    camera::draw_visual_correction(ui, world, id, &mut editor.is_dirty);
 
-    particles::draw(ui, world, id, is_dirty);
-    audio::draw(ui, world, id, is_dirty);
+    particles::draw(ui, world, id, &mut editor.is_dirty);
+    audio::draw(ui, world, id, &mut editor.is_dirty);
 
     add::draw(ui, world, id);
 }

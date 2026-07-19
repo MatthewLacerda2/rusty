@@ -2,6 +2,7 @@ mod camera;
 mod debug_meshes;
 mod draw;
 mod frustum;
+mod preview;
 mod setup;
 mod viewport;
 
@@ -118,6 +119,10 @@ pub struct Renderer {
     /// Offscreen colour target the editor viewport renders into, sized to the panel
     /// rect and shown as an `egui::Image`; `None` on the headless path (#183).
     viewport_target: Option<wgpu::Texture>,
+    /// Offscreen colour target the Inspector's Preview tab renders an isolated asset
+    /// preview scene into, sized to the Preview tab's own image rect; `None` until
+    /// the tab has rendered once (#352).
+    preview_target: Option<wgpu::Texture>,
 
     // Asset cache keyed by mesh-asset identity (#127): identical geometry shared
     // across entities resolves to one buffer pair, not one per entity.
