@@ -148,6 +148,7 @@ impl Renderer {
             depth_texture,
             depth_view,
             viewport_target: None,
+            preview_target: None,
             shadow_layout: shadows.layout,
             shadow_renderer: shadows.renderer,
             shadow_uniform_buffer: shadows.uniform_buffer,

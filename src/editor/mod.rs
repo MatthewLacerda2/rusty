@@ -15,6 +15,8 @@ use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
+pub use inspector::preview::{OrbitState, PreviewCache, PreviewMesh, PreviewRequest};
+
 pub use viewport::{ViewportInteraction, ViewportTab};
 
 /// What the Inspector panel is currently showing. The three modes are mutually
@@ -82,6 +84,23 @@ pub struct EditorUi {
     /// Live move-gizmo drag, if an axis handle is currently grabbed (#183).
     pub gizmo_drag: Option<viewport::gizmo::GizmoDrag>,
 
+    /// Whether the Inspector's asset/material cards show "Details" or "Preview"
+    /// (#352). One shared flag: entity and asset selection are mutually exclusive,
+    /// so only one card is ever showing it at a time.
+    pub preview_tab_active: bool,
+    /// The Preview tab's mesh toggle (sphere/cube/Suzanne).
+    pub preview_mesh: PreviewMesh,
+    /// The Preview tab's orbit-camera state, persisted across frames.
+    pub preview_orbit: OrbitState,
+    /// The isolated preview scene, rebuilt only when the subject/mesh choice changes.
+    pub preview_cache: Option<PreviewCache>,
+    /// This frame's render request for `main.rs`'s `render_preview_scene`; `None`
+    /// when the Preview tab isn't showing (skips the extra offscreen render).
+    pub preview_request: Option<PreviewRequest>,
+    /// Stable egui texture id for the offscreen preview target (#352), set by
+    /// `main.rs` before `draw` runs — mirrors `Frontend::viewport_texture_id`.
+    pub preview_texture_id: Option<egui::TextureId>,
+
     /// Live Lua REPL input line (dev builds only). The editor only collects the
     /// submitted text here; the front-end (main.rs) drains `pending_repl` and runs
     /// it through the single `dev::console` evaluator against the live runtime.
@@ -132,6 +151,13 @@ impl EditorUi {
             viewport_tab: ViewportTab::Scene,
             viewport_image_size: egui::Vec2::ZERO,
             gizmo_drag: None,
+
+            preview_tab_active: false,
+            preview_mesh: PreviewMesh::default(),
+            preview_orbit: OrbitState::default(),
+            preview_cache: None,
+            preview_request: None,
+            preview_texture_id: None,
 
             #[cfg(feature = "dev")]
             repl_input: crate::dev::console::ReplInput::new(),
@@ -210,6 +236,9 @@ impl EditorUi {
     ) -> ViewportInteraction {
         self.apply_theme(ctx);
         self.scan_assets();
+        // Recomputed by the Preview tab this frame if it's showing (#352); left
+        // `None` otherwise so the front-end skips the extra offscreen render.
+        self.preview_request = None;
 
         // Push editor selection to scene (editor UI is the authority)
         scene.selected_entity_id = self.selected_entity_id;

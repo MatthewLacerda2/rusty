@@ -16,6 +16,8 @@ use std::collections::BTreeMap;
 use egui_phosphor::regular as icon;
 
 use crate::editor::inspector::components::card::component_card;
+use crate::editor::inspector::preview::{self, PreviewSubject};
+use crate::editor::EditorUi;
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::{MaterialAsset, RenderMode};
 
@@ -23,13 +25,15 @@ use crate::scene::{MaterialAsset, RenderMode};
 /// it references in the library. Folds in any pending material the Add menu staged (it
 /// lacked library access); on the card's "remove" detaches the entity's reference — the
 /// shared asset stays in the library for other referencing entities. No-op when the
-/// entity references no material.
+/// entity references no material. Carries a Details/Preview tab strip (#352) — materials
+/// have no on-disk file to dispatch a Preview tab on the way `assets/mod.rs` does, so it
+/// hangs off this card instead.
 pub fn draw_material_card(
     ui: &mut egui::Ui,
+    editor: &mut EditorUi,
     world: &mut crate::ecs::World,
     id: u32,
     materials: &mut BTreeMap<String, MaterialAsset>,
-    is_dirty: &mut bool,
 ) {
     let Some(key) = world.material(id).map(|m| m.material.clone()) else {
         return;
@@ -38,7 +42,18 @@ pub fn draw_material_card(
         materials.insert(key.clone(), pending);
     }
     materials.entry(key.clone()).or_default();
-    if draw_material(ui, materials, &key, is_dirty) {
+
+    preview::draw_tab_strip(ui, &mut editor.preview_tab_active, editor.theme);
+    if editor.preview_tab_active {
+        preview::draw(
+            ui,
+            editor,
+            PreviewSubject::Material(materials[&key].clone()),
+        );
+        return;
+    }
+
+    if draw_material(ui, materials, &key, &mut editor.is_dirty) {
         world.set_material(id, None);
     }
 }
