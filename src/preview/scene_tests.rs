@@ -28,6 +28,22 @@ f 1//1 2//1 3//1
 f 1//1 3//1 4//1
 ";
 
+/// Two named objects that together span `x[8,12]` — neither sits at the union centre
+/// `(10, 0, 0)`, so a per-object recentring would pull them on top of each other.
+const TWO_PART_OBJ: &str = "\
+o Left
+v 8.0 -1.0 -1.0
+v 9.0 -1.0 -1.0
+v 9.0 1.0 1.0
+vn 0.0 1.0 0.0
+f 1//1 2//1 3//1
+o Right
+v 11.0 -1.0 -1.0
+v 12.0 -1.0 -1.0
+v 12.0 1.0 1.0
+f 4//1 5//1 6//1
+";
+
 fn write_temp_obj(name: &str) -> String {
     write_obj(name, QUAD_OBJ)
 }
@@ -126,6 +142,29 @@ fn an_off_origin_model_is_recentred_where_the_camera_looks() {
         (mesh_position(&scene) - expected).length() < 1e-3,
         "expected the subject centred on the origin, got {:?}",
         mesh_position(&scene)
+    );
+}
+
+#[test]
+fn a_multi_part_model_shares_one_offset_so_its_layout_survives() {
+    // Every sub-object is moved by the *union* centre, not its own: recentring each
+    // part independently would stack them all at the origin and silently rearrange
+    // the model. Also the only path that unions two sets of bounds together.
+    let path = write_obj("preview_scene_test_two_part.obj", TWO_PART_OBJ);
+    let scene = build_preview_scene(PreviewMesh::Sphere, &PreviewSubject::Model(path));
+
+    let positions: Vec<Vec3> = scene
+        .world
+        .ids_with_mesh()
+        .into_iter()
+        .map(|id| scene.world.transform(id).unwrap().position)
+        .collect();
+    assert_eq!(positions.len(), 2, "both sub-objects spawn");
+    assert!(
+        positions
+            .iter()
+            .all(|p| (*p - Vec3::new(-10.0, 0.0, 0.0)).length() < 1e-3),
+        "both parts share the union offset, got {positions:?}"
     );
 }
 
