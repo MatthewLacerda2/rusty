@@ -56,12 +56,22 @@ fn to_i16(s: f32) -> i16 {
     (s.clamp(-1.0, 1.0) * i16::MAX as f32).round() as i16
 }
 
-/// Encode `samples` and write them to `path`, returning the path on success.
+/// The directory `path` implies, or `None` when it names a file in the current
+/// directory. `Path::parent` reports a bare filename's parent as the *empty* path,
+/// which is not a directory anyone can create — so the two cases are folded here
+/// rather than left as a nested condition at the call site.
+fn parent_dir(path: &str) -> Option<&std::path::Path> {
+    std::path::Path::new(path)
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+}
+
+/// Encode `samples` and write them to `path`, returning the path on success. Any
+/// missing directories along `path` are created, so an agent can bake straight into
+/// a workspace folder that doesn't exist yet.
 pub fn write(samples: &[f32], sample_rate: u32, path: &str) -> Result<String, String> {
-    if let Some(parent) = std::path::Path::new(path).parent() {
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
+    if let Some(parent) = parent_dir(path) {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let bytes = encode(samples, sample_rate);
     let mut file = std::fs::File::create(path).map_err(|e| e.to_string())?;
@@ -103,6 +113,15 @@ mod tests {
         assert_eq!(to_i16(-1.0), -i16::MAX);
         assert_eq!(to_i16(9.0), i16::MAX, "a hot sample clamps, never wraps");
         assert_eq!(to_i16(-9.0), -i16::MAX);
+    }
+
+    #[test]
+    fn a_bare_filename_implies_no_directory_to_create() {
+        assert_eq!(parent_dir("beep.wav"), None, "nothing to create in the cwd");
+        assert_eq!(
+            parent_dir("sounds/sfx/beep.wav"),
+            Some(std::path::Path::new("sounds/sfx")),
+        );
     }
 
     #[test]
