@@ -13,13 +13,13 @@
 //! surfaces all blend rather than z-cull each other).
 
 use crate::render::draw::resources::TransparentResource;
-use crate::render::Renderer;
+use crate::render::{RenderView, Renderer};
 
 impl Renderer {
-    /// Draw the camera's translucent solids into the HDR target. `items` is already
+    /// Draw the camera's translucent solids into `view`'s HDR target. `items` is already
     /// sorted back-to-front (farthest first). No-op when there is nothing translucent,
     /// so opaque-only scenes pay nothing (#242).
-    pub(crate) fn draw_transparent(&self, items: &[TransparentResource]) {
+    pub(crate) fn draw_transparent(&self, view: &RenderView, items: &[TransparentResource]) {
         if items.is_empty() {
             return;
         }
@@ -32,7 +32,7 @@ impl Renderer {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Transparent Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.post_fx.scene_hdr.view,
+                    view: &view.post_fx.scene_hdr.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
@@ -40,7 +40,7 @@ impl Renderer {
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_view,
+                    view: &view.depth_view,
                     // Load the opaque depth so glass is occluded by solids in front,
                     // but the transparent pipeline writes no depth (store keeps it as-is
                     // for any later pass that reads it).

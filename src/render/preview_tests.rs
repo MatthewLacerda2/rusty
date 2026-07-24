@@ -6,10 +6,21 @@
 use glam::Vec3;
 
 use crate::components::MaterialComponent;
-use crate::render::{Camera, Renderer};
+use crate::render::{Camera, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::{DirtyFlag, MeshComponent, Scene};
 
 const RES: u32 = 32;
+
+/// A preview render view (own target + depth + post-FX) sized to the test resolution.
+fn preview_view(renderer: &Renderer) -> RenderView {
+    RenderView::offscreen(
+        &renderer.device,
+        OFFSCREEN_FORMAT,
+        RES,
+        RES,
+        renderer.quality.bloom_divisor(),
+    )
+}
 
 fn sphere_scene() -> Scene {
     let mut scene = Scene::new();
@@ -47,13 +58,12 @@ fn looking_at_origin_from_z() -> Camera {
 }
 
 #[test]
-fn resize_preview_allocates_a_target_the_view_reads_back() {
-    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
+fn offscreen_preview_view_allocates_a_target_the_view_reads_back() {
+    let Some(renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
         return; // No GPU/software adapter — skip, same contract as the screenshots.
     };
-    assert!(renderer.preview_target_view().is_none());
-    renderer.resize_preview(RES, RES);
-    assert!(renderer.preview_target_view().is_some());
+    let view = preview_view(&renderer);
+    assert!(view.color_target_view().is_some());
 }
 
 #[test]
@@ -61,12 +71,13 @@ fn plain_render_into_the_preview_target_does_not_panic() {
     let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
         return;
     };
-    renderer.resize_preview(RES, RES);
-    let view = renderer.preview_target_view().unwrap();
+    let mut view = preview_view(&renderer);
+    let target = view.color_target_view().unwrap();
     renderer.render(
+        &mut view,
         &sphere_scene(),
         &looking_at_origin_from_z(),
-        &view,
+        &target,
         false,
         &[],
     );
@@ -77,12 +88,13 @@ fn shader_override_with_an_unreadable_path_falls_back_instead_of_panicking() {
     let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
         return;
     };
-    renderer.resize_preview(RES, RES);
-    let view = renderer.preview_target_view().unwrap();
+    let mut view = preview_view(&renderer);
+    let target = view.color_target_view().unwrap();
     renderer.render_preview_with_shader(
+        &mut view,
         &sphere_scene(),
         &looking_at_origin_from_z(),
-        &view,
+        &target,
         "does/not/exist.wgsl",
     );
 }
@@ -92,12 +104,13 @@ fn shader_override_with_the_engine_default_shader_does_not_panic() {
     let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
         return;
     };
-    renderer.resize_preview(RES, RES);
-    let view = renderer.preview_target_view().unwrap();
+    let mut view = preview_view(&renderer);
+    let target = view.color_target_view().unwrap();
     renderer.render_preview_with_shader(
+        &mut view,
         &sphere_scene(),
         &looking_at_origin_from_z(),
-        &view,
+        &target,
         "assets/shaders/shader.wgsl",
     );
 }

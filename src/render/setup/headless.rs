@@ -61,14 +61,12 @@ impl Renderer {
             .await
             .ok()?;
 
-        let size = winit::dpi::PhysicalSize::new(width, height);
         // No real swapchain offscreen: only the always-available `Fifo` mode.
         Some(Self::from_parts(
             device,
             queue,
             None,
             offscreen_config(width, height),
-            size,
             vec![wgpu::PresentMode::Fifo],
         ))
     }

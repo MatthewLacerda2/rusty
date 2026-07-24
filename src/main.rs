@@ -14,7 +14,7 @@ use rusty::core::input::InputState;
 use rusty::core::keymap::{Keymap, KEYBINDINGS_KEY, KEYBINDINGS_NAMESPACE};
 use rusty::editor::{EditorUi, ViewportInteraction, ViewportTab};
 use rusty::navigation::NavigationGraph;
-use rusty::render::Renderer;
+use rusty::render::{RenderView, Renderer};
 use rusty::scene::Scene;
 use rusty::scripting::ConsoleLogs;
 
@@ -61,10 +61,17 @@ struct Frontend {
     /// panel (#183). Registered lazily on the first frame a target exists, then
     /// rebound to the resized view each frame so the `egui::Image` reference stays valid.
     viewport_texture_id: Option<egui::TextureId>,
+    /// The editor viewport's per-view render state (its own target, depth, post-FX);
+    /// owned here so it never shares targets with the preview view (#355). `None` until
+    /// the viewport has rendered once.
+    viewport_view: Option<RenderView>,
     /// Stable egui texture id for the Inspector's Preview tab offscreen target
     /// (#352) — same lazily-registered, rebound-each-frame contract as
     /// `viewport_texture_id`, just for the isolated asset-preview scene.
     preview_texture_id: Option<egui::TextureId>,
+    /// The Inspector preview's per-view render state, independent of the viewport's, so
+    /// the two render in the same frame without clobbering each other (#355).
+    preview_view: Option<RenderView>,
     /// Dev-only socket command channel (#282): lets an external process drive this
     /// running playtest through the same evaluator the console uses. `None` if the
     /// socket failed to bind — the window keeps running without it. Absent entirely
@@ -184,7 +191,9 @@ fn init_frontend(window: &Arc<winit::window::Window>) -> (Frontend, String) {
         last_fps_update: Instant::now(),
         applied_video: rusty::core::video::VideoSettings::default(),
         viewport_texture_id: None,
+        viewport_view: None,
         preview_texture_id: None,
+        preview_view: None,
         // Started in `main` once the game's shared console cell exists (so a bind
         // failure logs to the same console the editor shows).
         #[cfg(feature = "dev")]
@@ -458,7 +467,8 @@ fn acquire_frame(
     match surface_frame {
         Ok(f) => Some(f),
         Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-            renderer.resize(renderer.size);
+            // Reconfigure to the swapchain's own size (never a view's rect, #355).
+            renderer.reconfigure_surface();
             None
         }
         Err(wgpu::SurfaceError::OutOfMemory) => {
@@ -599,12 +609,22 @@ fn render_viewport_scene(
     if px == 0 || py == 0 {
         return;
     }
-    frontend.renderer.resize_viewport(px, py);
-
+    // Create-or-resize this viewport's own view (target + depth + post-FX). A view's
+    // resize guard checks its own size, so it never fights the preview view (#355).
+    RenderView::ensure_offscreen(
+        &mut frontend.viewport_view,
+        &frontend.renderer.device,
+        frontend.renderer.config.format,
+        px,
+        py,
+        frontend.renderer.quality.bloom_divisor(),
+    );
+    let Some(view) = frontend.viewport_view.as_mut() else {
+        return;
+    };
     // An owned view of the offscreen target. `wgpu::TextureView` is a refcounted
-    // handle, so this doesn't borrow `self.renderer` and `render(&mut self, ...)` can
-    // take it as the post-FX output. `None` only before the first `resize_viewport`.
-    let Some(target_view) = frontend.renderer.viewport_target_view() else {
+    // handle, so it doesn't borrow the view and `render` can take it as the output.
+    let Some(target_view) = view.color_target_view() else {
         return;
     };
 
@@ -618,6 +638,7 @@ fn render_viewport_scene(
         rusty::render::game_camera_from_scene(&game.camera().borrow(), &scene)
     };
     frontend.renderer.render(
+        view,
         &scene,
         &camera,
         &target_view,
@@ -663,8 +684,18 @@ fn render_preview_scene(frontend: &mut Frontend, pixels_per_point: f32) {
     if px == 0 || py == 0 {
         return;
     }
-    frontend.renderer.resize_preview(px, py);
-    let Some(target_view) = frontend.renderer.preview_target_view() else {
+    RenderView::ensure_offscreen(
+        &mut frontend.preview_view,
+        &frontend.renderer.device,
+        frontend.renderer.config.format,
+        px,
+        py,
+        frontend.renderer.quality.bloom_divisor(),
+    );
+    let Some(view) = frontend.preview_view.as_mut() else {
+        return;
+    };
+    let Some(target_view) = view.color_target_view() else {
         return;
     };
     let Some(cache) = &frontend.editor_ui.preview_cache else {
@@ -673,14 +704,20 @@ fn render_preview_scene(frontend: &mut Frontend, pixels_per_point: f32) {
 
     match &request.shader_override {
         Some(path) => frontend.renderer.render_preview_with_shader(
+            view,
             &cache.scene,
             &request.camera,
             &target_view,
             path,
         ),
-        None => frontend
-            .renderer
-            .render(&cache.scene, &request.camera, &target_view, false, &[]),
+        None => frontend.renderer.render(
+            view,
+            &cache.scene,
+            &request.camera,
+            &target_view,
+            false,
+            &[],
+        ),
     }
 
     match frontend.preview_texture_id {

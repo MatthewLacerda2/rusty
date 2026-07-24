@@ -196,7 +196,7 @@ impl crate::render::Renderer {
 
 #[cfg(test)]
 mod tests {
-    use crate::render::{Camera, Renderer, OFFSCREEN_FORMAT};
+    use crate::render::{Camera, RenderView, Renderer, OFFSCREEN_FORMAT};
     use crate::scene::{MeshComponent, Scene};
 
     fn box_mesh() -> MeshComponent {
@@ -244,10 +244,17 @@ mod tests {
         });
         let view = target.create_view(&wgpu::TextureViewDescriptor::default());
         let camera = Camera::new(glam::Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
+        let mut rv = RenderView::targetless(
+            &renderer.device,
+            OFFSCREEN_FORMAT,
+            64,
+            64,
+            renderer.quality.bloom_divisor(),
+        );
 
-        renderer.render(&scene, &camera, &view, false, &[]);
+        renderer.render(&mut rv, &scene, &camera, &view, false, &[]);
         assert_eq!(renderer.entity_slot_count(), 3, "one slot per entity");
-        renderer.render(&scene, &camera, &view, false, &[]);
+        renderer.render(&mut rv, &scene, &camera, &view, false, &[]);
         assert_eq!(
             renderer.entity_slot_count(),
             3,

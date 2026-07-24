@@ -12,7 +12,7 @@ use std::rc::Rc;
 use wgpu::util::DeviceExt;
 
 use crate::render::passes::decals::{Decal, DecalGlobals, DecalUniform};
-use crate::render::{Camera, GpuTexture, Renderer};
+use crate::render::{Camera, GpuTexture, RenderView, Renderer};
 use crate::scene::Scene;
 
 /// One decal resolved for drawing: its uniform bind group + sprite texture.
@@ -27,12 +27,12 @@ impl Renderer {
     /// Draw the scene's decals into the HDR target. Called from the scene pass
     /// after solids/skybox so decals overlay the lit surfaces, and before the
     /// particle pass + post-FX chain.
-    pub(crate) fn draw_decals(&mut self, scene: &Scene, camera: &Camera) {
+    pub(crate) fn draw_decals(&mut self, view: &mut RenderView, scene: &Scene, camera: &Camera) {
         if scene.decals.is_empty() {
             return;
         }
 
-        let aspect = self.size.width as f32 / self.size.height as f32;
+        let aspect = view.aspect();
         let view_proj = camera.build_view_projection(aspect);
         let inv_view_proj = view_proj.inverse();
         let globals = DecalGlobals {
@@ -64,7 +64,7 @@ impl Renderer {
             .map(|(decal, texture)| self.build_decal_draw(decal, texture))
             .collect();
 
-        self.encode_decal_pass(&draws);
+        self.encode_decal_pass(view, &draws);
     }
 
     /// Build the per-decal uniform buffer + its bind group.
@@ -100,14 +100,14 @@ impl Renderer {
     /// Record the decal render pass: load the existing HDR colour (no depth
     /// attachment — depth is bound as a sampled texture), then draw each projector
     /// box. The shader reconstructs the surface and projects the decal onto it.
-    fn encode_decal_pass(&mut self, draws: &[DecalDraw]) {
+    fn encode_decal_pass(&mut self, view: &mut RenderView, draws: &[DecalDraw]) {
         // Bind the scene depth as a sampled texture for surface reconstruction. The
-        // depth view only changes on resize, so this bind group is cached and reused
-        // across frames/cameras instead of rebuilt every call (#210); `resize`
-        // invalidates it.
-        self.ensure_decal_depth_bind_group();
+        // depth view only changes on resize, so this bind group is cached on the view
+        // and reused across frames/cameras instead of rebuilt every call (#210); the
+        // view's resize invalidates it.
+        self.ensure_decal_depth_bind_group(view);
         let dr = &self.decal_renderer;
-        let depth_bg = self
+        let depth_bg = view
             .decal_depth_bind_group
             .as_ref()
             .expect("decal depth bind group built");
@@ -121,7 +121,7 @@ impl Renderer {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Decal Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.post_fx.scene_hdr.view,
+                    view: &view.post_fx.scene_hdr.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
@@ -148,19 +148,19 @@ impl Renderer {
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 
-    /// Build the cached decal-pass depth bind group if absent (first decal frame or
-    /// after a resize invalidated it).
-    fn ensure_decal_depth_bind_group(&mut self) {
-        if self.decal_depth_bind_group.is_some() {
+    /// Build the view's cached decal-pass depth bind group if absent (first decal frame
+    /// or after the view's resize invalidated it).
+    fn ensure_decal_depth_bind_group(&self, view: &mut RenderView) {
+        if view.decal_depth_bind_group.is_some() {
             return;
         }
-        self.decal_depth_bind_group =
+        view.decal_depth_bind_group =
             Some(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("Decal Depth Bind Group"),
                 layout: &self.decal_renderer.depth_layout,
                 entries: &[wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&self.depth_view),
+                    resource: wgpu::BindingResource::TextureView(&view.depth_view),
                 }],
             }));
     }

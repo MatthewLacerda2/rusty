@@ -7,47 +7,11 @@ use crate::render::postfx::QualityPreset;
 use crate::render::Renderer;
 
 impl Renderer {
-    /// Switch the scalability tier. Reallocates the bloom buffers when the new
-    /// preset changes their resolution divisor; cheap no-op if unchanged.
+    /// Switch the scalability tier. Each [`crate::render::RenderView`] re-sizes its own
+    /// post-FX bloom buffers from this tier's divisor on its next render, so setting the
+    /// tier is all that happens here (#355).
     pub fn set_quality(&mut self, preset: QualityPreset) {
-        if self.quality == preset {
-            return;
-        }
-        let old_divisor = self.quality.bloom_divisor();
         self.quality = preset;
-        let new_divisor = preset.bloom_divisor();
-        if old_divisor != new_divisor {
-            self.post_fx.resize(
-                &self.device,
-                self.config.width,
-                self.config.height,
-                new_divisor,
-            );
-        }
-    }
-
-    pub(crate) fn create_depth_resources(
-        device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
-    ) -> (wgpu::Texture, wgpu::TextureView) {
-        let size = wgpu::Extent3d {
-            width: config.width,
-            height: config.height,
-            depth_or_array_layers: 1,
-        };
-        let desc = wgpu::TextureDescriptor {
-            label: Some("Depth Texture"),
-            size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        };
-        let texture = device.create_texture(&desc);
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        (texture, view)
     }
 
     /// Whether the surface can turn vsync OFF — i.e. advertises `Immediate`. `Fifo`
@@ -84,25 +48,26 @@ impl Renderer {
         self.config.present_mode == wgpu::PresentMode::Fifo
     }
 
+    /// Reconfigure the window surface/swapchain to `new_size`. This only touches the
+    /// surface (egui paints its panels over the swapchain); the scene renders into
+    /// per-view offscreen targets whose sizes each [`crate::render::RenderView`] owns,
+    /// so a surface resize never disturbs a view's targets (#355). No-op headless / on
+    /// a zero-size request.
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
-            self.size = new_size;
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             if let Some(surface) = &self.surface {
                 surface.configure(&self.device, &self.config);
             }
-            let (depth_tex, depth_view) = Self::create_depth_resources(&self.device, &self.config);
-            self.depth_texture = depth_tex;
-            self.depth_view = depth_view;
-            // The cached decal depth bind group references the old depth view (#210).
-            self.decal_depth_bind_group = None;
-            self.post_fx.resize(
-                &self.device,
-                self.config.width,
-                self.config.height,
-                self.quality.bloom_divisor(),
-            );
+        }
+    }
+
+    /// Re-apply the current surface configuration — the surface-loss recovery path,
+    /// which reconfigures to the swapchain's own size (never a view's size, #355).
+    pub fn reconfigure_surface(&mut self) {
+        if let Some(surface) = &self.surface {
+            surface.configure(&self.device, &self.config);
         }
     }
 }

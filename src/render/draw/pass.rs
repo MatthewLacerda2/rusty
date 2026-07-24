@@ -4,7 +4,7 @@
 use glam::Vec3;
 
 use crate::render::draw::resources::{OutlineResource, Overlays, SolidResource};
-use crate::render::Renderer;
+use crate::render::{RenderView, Renderer};
 use crate::scene::{ClearFlags, LightType, Scene};
 
 /// The framebuffer clear behavior for one camera in the stack (#93). Derived from the
@@ -52,6 +52,7 @@ pub(crate) struct ScenePassFrame {
 impl Renderer {
     pub(crate) fn execute_scene_pass(
         &mut self,
+        view: &RenderView,
         scene: &Scene,
         frame: ScenePassFrame,
         solid_render_resources: &[SolidResource],
@@ -69,7 +70,7 @@ impl Renderer {
         // Bind active skybox view & sampler into the global group for reflections.
         self.update_global_bind_group();
         // B. Main scene + overlay pass.
-        self.record_scene_pass(&mut encoder, &frame, solid_render_resources, overlays);
+        self.record_scene_pass(view, &mut encoder, &frame, solid_render_resources, overlays);
 
         // 6. Submit the scene pass (it filled the HDR target + depth). Particles +
         // post-FX run from the per-camera loop in `draw`.
@@ -79,6 +80,7 @@ impl Renderer {
     /// Record the main scene pass (solids, outline, skybox, overlays) into `encoder`.
     fn record_scene_pass(
         &self,
+        view: &RenderView,
         encoder: &mut wgpu::CommandEncoder,
         frame: &ScenePassFrame,
         solid_render_resources: &[SolidResource],
@@ -91,7 +93,7 @@ impl Renderer {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 // Scene draws into the HDR offscreen target (post-FX composites later).
                 // A `DepthOnly` camera loads existing color; others clear backdrop (#93).
-                view: &self.post_fx.scene_hdr.view,
+                view: &view.post_fx.scene_hdr.view,
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: match clear.color {
@@ -102,7 +104,7 @@ impl Renderer {
                 },
             })],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &self.depth_view,
+                view: &view.depth_view,
                 // Every camera clears depth so its geometry sorts independently of the
                 // layer below — a viewmodel never clips through walls.
                 depth_ops: Some(wgpu::Operations {

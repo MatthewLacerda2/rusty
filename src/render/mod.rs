@@ -4,7 +4,7 @@ mod draw;
 mod frustum;
 mod preview;
 mod setup;
-mod viewport;
+mod view;
 
 pub mod gpu;
 pub(crate) mod ibl;
@@ -27,6 +27,7 @@ pub use ibl::probe_bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
 pub use ibl::probe_bounce::{BounceReport, CONVERGENCE_EPSILON, MAX_BOUNCES};
 pub use ibl::reflection_bake::DEFAULT_REFLECTION_RESOLUTION;
 pub use setup::headless::OFFSCREEN_FORMAT;
+pub use view::RenderView;
 
 // GPU uniform memory layouts live in `gpu/uniforms.rs` (split out to keep files under
 // the size cap); re-imported here so the render module body still names them directly.
@@ -82,7 +83,6 @@ pub struct Renderer {
     /// surface to present to, only an offscreen colour texture.
     pub surface: Option<wgpu::Surface<'static>>,
     pub config: wgpu::SurfaceConfiguration,
-    pub size: winit::dpi::PhysicalSize<u32>,
 
     // Pipelines
     render_pipeline: wgpu::RenderPipeline,
@@ -111,18 +111,6 @@ pub struct Renderer {
     /// instead of reallocated per camera per entity (#210). `Option` so a slot can be
     /// borrowed out mutably while other renderer fields are read.
     entity_pool: Option<entity_pool::EntityPool>,
-
-    // Depth Stencil
-    depth_texture: wgpu::Texture,
-    depth_view: wgpu::TextureView,
-
-    /// Offscreen colour target the editor viewport renders into, sized to the panel
-    /// rect and shown as an `egui::Image`; `None` on the headless path (#183).
-    viewport_target: Option<wgpu::Texture>,
-    /// Offscreen colour target the Inspector's Preview tab renders an isolated asset
-    /// preview scene into, sized to the Preview tab's own image rect; `None` until
-    /// the tab has rendered once (#352).
-    preview_target: Option<wgpu::Texture>,
 
     // Asset cache keyed by mesh-asset identity (#127): identical geometry shared
     // across entities resolves to one buffer pair, not one per entity.
@@ -159,9 +147,9 @@ pub struct Renderer {
     pub shadow_uniform_buffer: wgpu::Buffer,
     pub shadow_bind_group: wgpu::BindGroup,
 
-    /// Post-process chain (color correction, bloom, motion blur, SSR).
-    pub post_fx: postfx::PostFx,
-    /// Active scalability tier; gates which post-FX passes run + buffer sizes.
+    /// Active scalability tier; gates which post-FX passes run + buffer sizes. Shared
+    /// across views — each view's post-FX chain (owned by its [`RenderView`]) sizes its
+    /// bloom buffers from this tier's divisor.
     pub quality: postfx::QualityPreset,
     /// Present modes the surface advertises, captured at construction. Used to
     /// decide whether vsync can be turned off (`Immediate`) without a wgpu panic;
@@ -174,9 +162,6 @@ pub struct Renderer {
     /// Box-projector decal pass (draws into the HDR target after solids/skybox,
     /// reconstructing the underlying surface from the scene depth target).
     decal_renderer: decals::DecalRenderer,
-    /// Cached decal-pass depth bind group; the depth view it samples only changes on
-    /// resize, so it is built lazily and invalidated there, not rebuilt per frame (#210).
-    decal_depth_bind_group: Option<wgpu::BindGroup>,
 
     /// When set, the forward pass gathers only `is_static` entities (#243). The
     /// static-cubemap capture toggles this on for its 6 faces and restores it after,

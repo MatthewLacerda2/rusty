@@ -17,25 +17,42 @@ use self::lighting::{
 };
 use self::pass::{PassClear, ScenePassFrame};
 use crate::render::postfx::params::build_post_params;
-use crate::render::{build_camera_stack, Camera, CameraUniform, LightingUniform, Renderer};
+use crate::render::{
+    build_camera_stack, Camera, CameraUniform, LightingUniform, RenderView, Renderer,
+};
 use crate::scene::Scene;
 
 impl Renderer {
-    /// Renders the 3D scene inside a viewport render pass.
+    /// Renders the 3D scene into `view` (a per-view target/depth/post-FX bundle, #355),
+    /// compositing the final image to `output`.
     ///
     /// In play mode this composites the camera stack (#93): the scene's active
     /// `CameraComponent` entities, sorted by `render_order`, each draw with their own
     /// culling mask / lens / clear flags so a viewmodel or UI camera layers on top of
     /// the world. In edit mode the free-fly `camera` is the single pass. Post-FX runs
     /// once over the composited HDR target.
+    // A `(view, scene, camera, output, mode, paths)` render entry: each argument is a
+    // distinct, irreducible input to one frame, so the width is inherent (#355).
+    #[allow(clippy::too_many_arguments)]
     pub fn render(
         &mut self,
+        view: &mut RenderView,
         scene: &Scene,
         camera: &Camera,
-        view_texture: &wgpu::TextureView,
+        output: &wgpu::TextureView,
         editor_mode: bool,
         pathfinding_points: &[Vec3],
     ) {
+        // Keep this view's post-FX bloom buffers sized to the active quality tier — a
+        // cheap no-op unless a live quality switch changed the divisor (#355).
+        let size = view.size();
+        view.resize(
+            &self.device,
+            size.width,
+            size.height,
+            self.quality.bloom_divisor(),
+        );
+
         self.upload_scene_assets(scene);
 
         // Load the active reflection probe's baked cubemap for the primary camera (#245),
@@ -61,7 +78,7 @@ impl Renderer {
         // entity per consumer. Nothing mutates transforms during rendering, so one refresh
         // here serves the entire frame.
         scene.refresh_world_matrices();
-        let aspect = self.size.width as f32 / self.size.height as f32;
+        let aspect = view.aspect();
 
         // The ordered camera stack (one entry in edit mode / when no scene camera).
         let stack = build_camera_stack(camera, scene, !editor_mode);
@@ -97,24 +114,24 @@ impl Renderer {
                 editor_mode,
                 clear: PassClear::for_pass(idx == 0, cam.clear_flags),
             };
-            self.execute_scene_pass(scene, frame, &solids.opaque, &overlays);
+            self.execute_scene_pass(view, scene, frame, &solids.opaque, &overlays);
 
             // Project box-decals over this camera's lit surfaces (reads the scene
             // depth to reconstruct geometry), after solids/skybox and before the
             // additive particles so decals sit on the surface, not over the sparks.
-            self.draw_decals(scene, cam);
+            self.draw_decals(view, scene, cam);
 
             // Translucent solids (#242): alpha-blended, depth-tested against opaque,
             // drawn back-to-front (already sorted) after opaque + decals so glass
             // composites over the world behind it.
-            self.draw_transparent(&solids.transparent);
+            self.draw_transparent(view, &solids.transparent);
 
             // Billboard particles for this camera (after solids, before the next pass).
-            self.draw_particles(scene, cam);
+            self.draw_particles(view, scene, cam);
 
             // 3. Composite + post-process once, over the final pass's HDR target.
             if idx == last {
-                self.run_post_fx(scene, view_texture, base_view_proj, cam.position.to_array());
+                self.run_post_fx(view, scene, output, base_view_proj, cam.position.to_array());
             }
         }
     }
@@ -146,11 +163,12 @@ impl Renderer {
     }
 
     /// Run the post-process chain (color correction, bloom, motion blur, SSR) over the
-    /// composited HDR target, writing the corrected image to `view_texture`.
+    /// view's composited HDR target, writing the corrected image to `output`.
     fn run_post_fx(
         &mut self,
+        view: &mut RenderView,
         scene: &Scene,
-        view_texture: &wgpu::TextureView,
+        output: &wgpu::TextureView,
         view_proj: glam::Mat4,
         camera_pos: [f32; 3],
     ) {
@@ -160,12 +178,12 @@ impl Renderer {
             scene,
             self.quality,
             view_proj,
-            self.post_fx.prev_view_proj,
+            view.post_fx.prev_view_proj,
             camera_pos,
         );
-        post_params.misc[1] = 1.0 / self.post_fx.bloom_size.0 as f32;
-        post_params.misc[2] = 1.0 / self.post_fx.bloom_size.1 as f32;
-        self.post_fx.prev_view_proj = view_proj;
+        post_params.misc[1] = 1.0 / view.post_fx.bloom_size.0 as f32;
+        post_params.misc[2] = 1.0 / view.post_fx.bloom_size.1 as f32;
+        view.post_fx.prev_view_proj = view_proj;
 
         let skybox_view = self
             .skybox_texture
@@ -173,11 +191,11 @@ impl Renderer {
             .map(|tex| &tex.view)
             .unwrap_or(&self.default_texture.view);
         let ctx = PostFxContext {
-            depth_view: &self.depth_view,
+            depth_view: &view.depth_view,
             skybox_view,
-            output: view_texture,
+            output,
         };
-        self.post_fx
+        view.post_fx
             .run(&self.device, &self.queue, ctx, post_params, bloom_enabled);
     }
 

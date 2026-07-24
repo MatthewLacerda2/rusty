@@ -12,7 +12,7 @@ use wgpu::util::DeviceExt;
 
 use crate::components::particle::ParticleBlend;
 use crate::render::passes::particles::{ParticleGlobals, ParticleInstance};
-use crate::render::{Camera, GpuTexture, Renderer};
+use crate::render::{Camera, GpuTexture, RenderView, Renderer};
 use crate::scene::Scene;
 
 /// Camera-facing billboard basis (right, up). Derived from the camera forward, with
@@ -41,13 +41,13 @@ struct ParticleBatch {
 impl Renderer {
     /// Draw every emitter's live particles into the HDR scene target. Called from
     /// the scene pass after solids/skybox, before the post-FX chain runs.
-    pub(crate) fn draw_particles(&mut self, scene: &Scene, camera: &Camera) {
+    pub(crate) fn draw_particles(&mut self, view: &RenderView, scene: &Scene, camera: &Camera) {
         let batches = self.collect_particle_batches(scene, camera.culling_mask);
         if batches.is_empty() {
             return;
         }
 
-        let aspect = self.size.width as f32 / self.size.height as f32;
+        let aspect = view.aspect();
         let view_proj = camera.build_view_projection(aspect);
         let (right, up) = billboard_basis(camera);
         let globals = ParticleGlobals {
@@ -77,13 +77,14 @@ impl Renderer {
                 usage: wgpu::BufferUsages::VERTEX,
             });
 
-        self.encode_particle_pass(&batches, &ranges, &instance_buffer);
+        self.encode_particle_pass(view, &batches, &ranges, &instance_buffer);
     }
 
     /// Record the particle render pass: load the existing HDR colour + depth, then
     /// draw each batch with its blend pipeline and sprite texture.
     fn encode_particle_pass(
         &self,
+        view: &RenderView,
         batches: &[ParticleBatch],
         ranges: &[(u32, u32)],
         instance_buffer: &wgpu::Buffer,
@@ -98,7 +99,7 @@ impl Renderer {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Particle Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &self.post_fx.scene_hdr.view,
+                    view: &view.post_fx.scene_hdr.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
@@ -106,7 +107,7 @@ impl Renderer {
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_view,
+                    view: &view.depth_view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Load,
                         store: wgpu::StoreOp::Store,

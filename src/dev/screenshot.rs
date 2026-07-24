@@ -17,7 +17,7 @@
 use std::path::Path;
 
 use crate::app::GameWorld;
-use crate::render::{Camera, Renderer, OFFSCREEN_FORMAT};
+use crate::render::{Camera, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::Scene;
 
 /// Default screenshot dimensions (16:9), matching the editor window aspect.
@@ -66,8 +66,17 @@ pub fn capture(
     });
     let target_view = target.create_view(&wgpu::TextureViewDescriptor::default());
 
+    // A per-view target bundle (own depth + post-FX) sized to the screenshot (#355).
+    let mut view = RenderView::targetless(
+        &renderer.device,
+        OFFSCREEN_FORMAT,
+        width,
+        height,
+        renderer.quality.bloom_divisor(),
+    );
+
     // Reuse the editor's exact render path (editor_mode = false: no gizmos/grid).
-    renderer.render(scene, camera, &target_view, false, &[]);
+    renderer.render(&mut view, scene, camera, &target_view, false, &[]);
 
     let pixels = copy_target_to_cpu(&renderer, &target, width, height);
     write_png(path, width, height, &pixels)?;

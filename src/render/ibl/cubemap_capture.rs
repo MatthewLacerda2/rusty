@@ -15,7 +15,7 @@
 
 use glam::Vec3;
 
-use crate::render::{Camera, Renderer, OFFSCREEN_FORMAT};
+use crate::render::{Camera, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::Scene;
 
 /// The six faces of a cubemap, in the conventional +X,-X,+Y,-Y,+Z,-Z order. The
@@ -118,7 +118,16 @@ impl Renderer {
     ) -> CubemapCapture {
         let resolution = resolution.max(1);
         let target = self.make_face_target(resolution);
-        let view = target.create_view(&wgpu::TextureViewDescriptor::default());
+        let output = target.create_view(&wgpu::TextureViewDescriptor::default());
+        // One throwaway view (its own depth + post-FX) sized to the face, reused across
+        // all six faces since they share a resolution (#355).
+        let mut render_view = RenderView::targetless(
+            &self.device,
+            OFFSCREEN_FORMAT,
+            resolution,
+            resolution,
+            self.quality.bloom_divisor(),
+        );
 
         // Gather only static geometry, and (for bounce ≥2) let those static surfaces
         // sample the probe field. Both flags are restored after the six faces.
@@ -129,7 +138,7 @@ impl Renderer {
 
         let faces = CubemapFace::ALL.map(|face| {
             let camera = face_camera(position, face);
-            self.render(scene, &camera, &view, false, &[]);
+            self.render(&mut render_view, scene, &camera, &output, false, &[]);
             read_face(self, &target, resolution)
         });
 
