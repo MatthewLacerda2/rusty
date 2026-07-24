@@ -759,6 +759,110 @@ Shader.Bake({
 > compose path **at bake**, so a baked variant is, by construction, one the engine can
 > load. See `docs/api-faithfulness.md`.
 
+## `Sound`
+
+Agent-composed **procedural sound authoring** (#357): describe an instrument as a
+*patch* and **bake** one note of it to a mono `.wav`. That single note is the whole
+one-shot SFX story — a gunshot, an impact, a footstep, a UI blip are each one
+rendered note of a noise / Karplus / FM patch — and the returned path drops straight
+into `Audio.PlayAt` or an `AudioSource`'s `clip`, so a sound the agent invented is
+audible in the same script that made it.
+
+A patch is authored as a Lua **table** whose shape mirrors the on-disk JSON document
+one-to-one, so the same document describes a Lua-built patch and one loaded from a
+file. Bakes are **deterministic**: the same patch + note + `seed` always writes a
+byte-identical WAV (every stochastic source draws from a seeded integer hash, never
+wall-clock or unseeded RNG). Output is always mono, 16-bit PCM, 44.1 kHz, and always
+passes a **limiter**, so a bake can never clip.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Sound.Bake` | `(patch, note, path [, opts])` | the written `path` |
+| `Sound.BakeJson` | `(json, note, path [, opts])` | the written `path` |
+| `Sound.ToJson` | `(patch)` | the patch's canonical JSON string |
+
+`patch` is a table; `json` is its serialized form (from `Sound.ToJson`, or a saved
+`.json`). `note` is either a **name** — a letter `A`–`G`, any accidentals (`#`/`s`
+sharp, `b`/`f` flat), then the octave, e.g. `"C#4"`, `"Bb3"`, `"C-1"` — or a **MIDI
+number** (`60` is middle C, `69` is A4 = 440 Hz; fractions are legal microtones).
+Pitch is equal temperament: `f = 440 × 2^((midi − 69) / 12)`.
+
+`opts` is optional, and so is every field in it:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `duration` | `0.5` | Gate length in seconds — how long the note is *held*. The amp release rings out **after** it, and an fx chain adds its own tail, so the file is longer than this. |
+| `velocity` | `0.8` | Striking force, `0..1`, scaling the note's peak amplitude. |
+| `seed` | `0` | Seed for the stochastic sources (noise, the Karplus pluck). |
+
+### The patch shape
+
+The signal path is **fixed** — `source → filter → amp envelope → fx`, with one LFO
+tapping one target. You choose what fills each stage, never how they connect; that
+is what makes a patch playable as a note. `source` and `amp` are mandatory, the rest
+optional.
+
+```lua
+{
+  source = { kind = "osc_stack", oscs = {
+    { wave = "saw",    detune_cents = -7, gain = 0.5, octave = 0 },
+    { wave = "square", detune_cents =  7, gain = 0.5, octave = -1 },
+  } },
+  filter = { kind = "lowpass", cutoff = 1200, resonance = 0.4,
+             env_amount = 2000, adsr = { a = 0.01, d = 0.2, s = 0.3, r = 0.2 } },
+  amp    = { a = 0.005, d = 0.1, s = 0.7, r = 0.3 },
+  lfo    = { rate = 5.0, depth = 0.5, target = "pitch" },   -- pitch | cutoff | amp
+  fx     = { { fx = "delay",  time = 0.25, feedback = 0.35, mix = 0.3 },
+             { fx = "reverb", size = 0.6,  damp = 0.5,      mix = 0.2 } },
+}
+```
+
+- **`source`** — one of four, tagged by `kind`:
+  - `osc_stack {oscs}` — up to **4** oscillators summed and normalized, each
+    `{wave, detune_cents, gain, octave}`. `wave` ∈ `sine`/`triangle`/`saw`/`square`
+    (saw and square are band-limited, so they don't alias up high). Detuning two
+    saws a few cents apart is the classic "fat" lead.
+  - `karplus {damping, brightness}` — plucked string: guitars, basses, harps.
+    `damping` (`0..1`, default `0.996`) is how long it rings; `brightness`
+    (`0..1`, default `0.5`) blends a soft pluck into a hard pick. Ignores a pitch
+    LFO — the string's length is fixed once plucked.
+  - `noise` — white noise. The head of every gunshot, impact and footstep; the
+    filter and amp envelope do the shaping.
+  - `fm2 {ratio, index, mod_decay}` — 2-operator FM: electric pianos, bells,
+    metallic hits. Whole-number `ratio` stays tonal, fractional goes inharmonic;
+    `index` is brightness; `mod_decay` (default `0.3`) is how fast the bright
+    transient collapses, which is what makes a note read as *struck*.
+- **`filter`** *(optional)* — `kind` ∈ `lowpass`/`highpass`, `cutoff` in Hz,
+  `resonance` `0..1`, and its own `adsr` sweeping the cutoff by `env_amount` Hz at
+  full level (negative sweeps down). The envelope sweep is what makes a subtractive
+  patch expressive rather than a buzz.
+- **`amp`** — the mandatory ADSR: `a`/`d`/`r` in seconds, `s` a level `0..1`.
+  Segments are linear. A note released mid-attack fades from where it got to.
+- **`lfo`** *(optional)* — one sine at `rate` Hz on one `target`: `pitch` (vibrato,
+  `depth` **semitones** either way), `cutoff` (wobble, `depth` **octaves** either
+  way), or `amp` (tremolo, dips by `depth`, so `1.0` dips to silence).
+- **`fx`** *(optional)* — applied in list order. `delay {time, feedback, mix}` is a
+  feedback echo; `reverb {size, damp, mix}` is Freeverb. The bake limiter is **not**
+  listed here: it is not a choice.
+
+Example — bake a gunshot and fire it where the shot happened:
+
+```lua
+local clip = Sound.Bake({
+  source = { kind = "noise" },
+  amp    = { a = 0.0, d = 0.09, s = 0.0, r = 0.06 },
+  filter = { kind = "lowpass", cutoff = 300, resonance = 0.5, env_amount = 6000,
+             adsr = { a = 0.0, d = 0.05, s = 0.0, r = 0.05 } },
+  fx     = { { fx = "reverb", size = 0.4, damp = 0.6, mix = 0.15 } },
+}, "C2", "project/assets/sounds/gunshot.wav", { duration = 0.12, seed = 9 })
+
+Audio.PlayAt(clip, muzzle.x, muzzle.y, muzzle.z, 0.9)
+```
+
+> **Faithfulness:** the read-site is the engine's own audio decoder — a baked `.wav`
+> is decoded by the same `ClipCache` path an imported clip is. See
+> `docs/api-faithfulness.md`.
+
 ## `Navigation`
 
 The navmesh is a height-field surface (#130): each grid cell carries a baked

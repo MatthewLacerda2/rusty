@@ -255,3 +255,30 @@ fn sidecar_persists_mesh_collider_choice() {
     );
     assert!(loaded.colliders.get("Quad").unwrap().is_convex());
 }
+
+#[test]
+fn concurrent_imports_never_read_a_half_written_sidecar() {
+    // Two systems importing the same asset at once is ordinary — the editor
+    // refreshing a model while a preview builds its scene, or simply a parallel
+    // test binary. A non-atomic save truncates the file first, so a reader lands on
+    // an empty one, and every caller treats that as "asset unavailable" and
+    // degrades silently. Before the atomic rename this failed within a few rounds.
+    let path = tmp("concurrent_quad.obj");
+    std::fs::write(&path, TRIANGLE_OBJ).unwrap();
+    // Start from no sidecar: the temp dir outlives the run, and a sidecar left
+    // behind by an earlier failure would otherwise decide this run's outcome.
+    std::fs::remove_file(sidecar::meta_path(&path)).ok();
+    for round in 0..20 {
+        let failures = std::thread::scope(|s| {
+            let handles: Vec<_> = (0..8)
+                .map(|_| s.spawn(|| import_and_sync_sidecar(&path).is_err()))
+                .collect();
+            handles
+                .into_iter()
+                .map(|h| h.join().unwrap_or(true))
+                .filter(|failed| *failed)
+                .count()
+        });
+        assert_eq!(failures, 0, "round {round}: concurrent imports failed");
+    }
+}

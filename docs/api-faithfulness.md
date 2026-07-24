@@ -265,6 +265,25 @@ assembles byte-identical WGSL) and the API tests (`src/api/shader/mod.rs`).
 (`Shader.Validate` and `Shader.Blocks` are read-only introspection — a compose
 dry-run and the block-catalog listing — not setters, so they don't add to the count.)
 
+### `Sound` — writes a `.wav` the audio runtime decodes (over `AudioSource.clip`)
+
+`Sound` writes files rather than mutating a component, so its **read-site is the
+engine's own audio decoder**: a baked `.wav` is handed to `Audio.PlayAt` or stored as
+an `AudioSource`'s `clip`, and `audio::decode::ClipCache::get_or_decode` decodes it
+into PCM the maestro plays — the identical path an imported `.ogg`/`.wav` takes. The
+bake writes exactly what that decoder expects (mono 16-bit PCM at 44.1 kHz) and
+always passes a limiter, so a baked clip can never arrive clipped. Proven by
+`tests/sound_api.rs` (a baked one-shot fired through `Audio.PlayAt` shows up in the
+maestro's event log under its baked path; a saved patch re-bakes byte-for-byte) and
+the module tests (`src/api/sound/bake_tests.rs`: the engine's own `ClipCache`
+decodes the bake as mono at 44.1 kHz; `src/soundgen/bake.rs`: byte-identical
+determinism, no file written on a rejected patch).
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `Bake` / `BakeJson` | ✅ | sim — writes a `.wav` decoded by `ClipCache` and played by the `AudioMaestro` (via `Audio.PlayAt` or an `AudioSource.clip`); limited at bake so it cannot clip |
+| `ToJson` | ✅ | round-trip — the patch's canonical serde form; re-bakes byte-identically |
+
 ### `Debug` (dev-only) — over `ConsoleLogs`
 
 | Setter | Status | Read-site |
@@ -275,7 +294,7 @@ dry-run and the block-catalog listing — not setters, so they don't add to the 
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 72 |
+| ✅ faithful | 75 |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 

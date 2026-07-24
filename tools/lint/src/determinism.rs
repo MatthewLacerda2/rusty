@@ -13,7 +13,18 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 
 /// Directories whose `.rs` files are sim code and must stay deterministic.
-const SIM_DIRS: &[&str] = &["src/app", "src/scripting", "src/physics", "src/navigation"];
+///
+/// `src/soundgen` is not sim code — it is a bake-time authoring module — but it
+/// makes the same promise (same patch + note + seed ⇒ byte-identical WAV), and that
+/// promise dies the moment a wall clock or an unseeded RNG creeps in. Guarding it
+/// here costs nothing and is the only mechanical check that promise has.
+const SIM_DIRS: &[&str] = &[
+    "src/app",
+    "src/scripting",
+    "src/physics",
+    "src/navigation",
+    "src/soundgen",
+];
 
 /// Banned call fragments. Matched as substrings on non-comment source.
 /// `rand::random` is the unseeded global RNG; seeded generators (`StdRng::from_seed`,
@@ -124,8 +135,11 @@ mod tests {
     }
 
     #[test]
-    fn sim_dirs_are_the_four_deterministic_trees() {
-        assert_eq!(SIM_DIRS.len(), 4);
+    fn sim_dirs_are_the_guarded_deterministic_trees() {
+        // The four sim trees, plus `soundgen` — not sim code, but it makes the same
+        // byte-identical promise, so it is held to the same rules.
+        assert_eq!(SIM_DIRS.len(), 5);
         assert!(SIM_DIRS.contains(&"src/physics"));
+        assert!(SIM_DIRS.contains(&"src/soundgen"));
     }
 }
