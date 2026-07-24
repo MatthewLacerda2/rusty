@@ -593,6 +593,32 @@ fn draw_editor_dashboard(
     interaction
 }
 
+/// (Re)bind a freshly-rendered offscreen `target_view` to a stable egui texture id so
+/// the `egui::Image` samples this frame's render — registering it lazily on first use.
+/// Shared by the viewport and Inspector-preview render paths (#183, #352).
+fn rebind_egui_texture(
+    egui_renderer: &mut egui_wgpu::Renderer,
+    device: &wgpu::Device,
+    id_slot: &mut Option<egui::TextureId>,
+    target_view: &wgpu::TextureView,
+) {
+    match id_slot {
+        Some(id) => egui_renderer.update_egui_texture_from_wgpu_texture(
+            device,
+            target_view,
+            wgpu::FilterMode::Linear,
+            *id,
+        ),
+        None => {
+            *id_slot = Some(egui_renderer.register_native_texture(
+                device,
+                target_view,
+                wgpu::FilterMode::Linear,
+            ));
+        }
+    }
+}
+
 /// Render the 3D scene into the offscreen viewport target sized to the panel's image
 /// rect, then (re)bind that target to the stable egui texture id (#183). The active
 /// tab selects the camera + mode: **Scene** = the free-fly editor camera with gizmos/
@@ -646,26 +672,12 @@ fn render_viewport_scene(
         game.pathfinding_points(),
     );
 
-    // (Re)bind the freshly-rendered target to the stable egui texture id so the
-    // `egui::Image` samples this frame's render.
-    match frontend.viewport_texture_id {
-        Some(id) => frontend
-            .egui_renderer
-            .update_egui_texture_from_wgpu_texture(
-                &frontend.renderer.device,
-                &target_view,
-                wgpu::FilterMode::Linear,
-                id,
-            ),
-        None => {
-            let id = frontend.egui_renderer.register_native_texture(
-                &frontend.renderer.device,
-                &target_view,
-                wgpu::FilterMode::Linear,
-            );
-            frontend.viewport_texture_id = Some(id);
-        }
-    }
+    rebind_egui_texture(
+        &mut frontend.egui_renderer,
+        &frontend.renderer.device,
+        &mut frontend.viewport_texture_id,
+        &target_view,
+    );
 }
 
 /// Render the Inspector Preview tab's isolated scene into its own offscreen target,
@@ -720,24 +732,12 @@ fn render_preview_scene(frontend: &mut Frontend, pixels_per_point: f32) {
         ),
     }
 
-    match frontend.preview_texture_id {
-        Some(id) => frontend
-            .egui_renderer
-            .update_egui_texture_from_wgpu_texture(
-                &frontend.renderer.device,
-                &target_view,
-                wgpu::FilterMode::Linear,
-                id,
-            ),
-        None => {
-            let id = frontend.egui_renderer.register_native_texture(
-                &frontend.renderer.device,
-                &target_view,
-                wgpu::FilterMode::Linear,
-            );
-            frontend.preview_texture_id = Some(id);
-        }
-    }
+    rebind_egui_texture(
+        &mut frontend.egui_renderer,
+        &frontend.renderer.device,
+        &mut frontend.preview_texture_id,
+        &target_view,
+    );
 }
 
 /// Apply the Scene-tab pointer interaction: a drag on an axis handle translates the
