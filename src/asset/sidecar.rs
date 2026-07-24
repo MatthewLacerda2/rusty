@@ -105,11 +105,42 @@ pub fn load(source: &Path) -> Result<ImportSettings, ImportError> {
 }
 
 /// Write a source file's sidecar (pretty JSON, diffable).
+///
+/// The write is **atomic**: the JSON goes to a temp file beside the target and is
+/// then renamed over it. A plain write truncates first, so anything reading the same
+/// sidecar at that moment sees an empty or half-written file and fails to parse it —
+/// and every caller here treats a sidecar error as "asset unavailable", which
+/// degrades silently (a preview quietly showing a fallback sphere, say). Two systems
+/// importing the same asset at once is ordinary, so the reader must never observe a
+/// partial file.
 pub fn save(source: &Path, settings: &ImportSettings) -> Result<(), ImportError> {
     let path = meta_path(source);
     let json =
         serde_json::to_string_pretty(settings).map_err(|e| ImportError::Sidecar(e.to_string()))?;
-    std::fs::write(&path, json).map_err(|e| ImportError::Sidecar(e.to_string()))
+    let temp = temp_path(&path);
+    std::fs::write(&temp, json).map_err(|e| ImportError::Sidecar(e.to_string()))?;
+    // Rename is atomic on every platform we target: a reader sees the whole old file
+    // or the whole new one, never a torn one. On failure the temp file is cleaned up
+    // so a crashed write leaves no litter beside the asset.
+    std::fs::rename(&temp, &path).map_err(|e| {
+        std::fs::remove_file(&temp).ok();
+        ImportError::Sidecar(e.to_string())
+    })
+}
+
+/// A scratch path beside `path`, unique per process and per call, so two concurrent
+/// saves never write the same temp file (which would reintroduce the tear the
+/// rename exists to prevent).
+fn temp_path(path: &Path) -> PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let ticket = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let mut name = path
+        .file_name()
+        .map(|n| n.to_os_string())
+        .unwrap_or_default();
+    name.push(format!(".{}.{ticket}.tmp", std::process::id()));
+    path.with_file_name(name)
 }
 
 /// Import the file, then write/refresh its sidecar's cached sub-object map,
