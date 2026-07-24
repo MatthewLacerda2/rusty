@@ -18,6 +18,7 @@
 //!   botplayer   — bot-player pattern notes + helper to attach a bot to the Player
 //!   demo_scene  — headless demo scene builder (mirrors the windowed scene)
 //!   screenshot  — offscreen render -> PNG (the GPU "eyes"); skips if no adapter
+//!   preview     — headless asset preview -> PNG (eyes on *assets*, #353)
 //!   snapshot    — world -> JSON observation
 //!
 //! Status: harness + scenario runner implemented (issue #3); offscreen screenshot
@@ -31,6 +32,7 @@ pub mod demo_scene;
 pub mod harness;
 pub mod lighting_bake;
 pub mod mcp;
+pub mod preview;
 pub mod probe_bake;
 pub mod reflection_bake;
 pub mod scenario;

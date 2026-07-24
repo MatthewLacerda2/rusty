@@ -1,4 +1,4 @@
-//! src/editor/inspector/preview/scene.rs — the isolated preview scene (#352).
+//! src/preview/scene.rs — the isolated preview scene (#352).
 //!
 //! [`build_preview_scene`] is the single entry point: given a mesh choice and a
 //! preview subject, it returns a brand-new [`Scene`] — never the active editor
@@ -8,6 +8,11 @@
 //! scene is thrown away and rebuilt whenever the subject or mesh choice changes
 //! (see `EditorUi::preview_cache`) — it is never assigned into `World::scene`, never
 //! serialized, and never touches Play-mode's snapshot/restore.
+//!
+//! Both front-ends build the scene through here: the Inspector's Preview tab and the
+//! headless `Debug.Preview` capture (`dev/preview.rs`, #353). Because it is a plain
+//! scene builder with no egui/GPU types, the agent-facing path gets the *same* mesh,
+//! light and sky the human sees — the "one preview machinery" the issue asks for.
 
 use std::path::Path;
 
@@ -49,6 +54,7 @@ impl PreviewMesh {
 /// What the Preview tab is showing — one per the issue's four asset kinds. Each
 /// carries the identity needed to (re)build the isolated scene and, for `Model`, to
 /// key the rebuild cache (`cache_key`).
+#[derive(Clone, Debug)]
 pub enum PreviewSubject {
     /// A model source file (`gltf`/`glb`/`obj`) — every sub-object is instantiated
     /// with its own materials, replacing the preview mesh entirely.
@@ -160,20 +166,50 @@ fn spawn_suzanne(scene: &mut Scene) -> u32 {
         return authoring::create_entity(scene, "PreviewMesh", Some(Primitive::Sphere));
     };
     let reference = format!("{SUZANNE_PATH}{}{}", asset::REF_SEPARATOR, sub.id);
-    authoring::instantiate_asset(scene, &reference, Some("PreviewMesh"), Vec3::ZERO)
-        .unwrap_or_else(|_| authoring::create_entity(scene, "PreviewMesh", Some(Primitive::Sphere)))
+    authoring::instantiate_asset(
+        scene,
+        &reference,
+        Some("PreviewMesh"),
+        -bounds_centre(&asset.sub_meshes),
+    )
+    .unwrap_or_else(|_| authoring::create_entity(scene, "PreviewMesh", Some(Primitive::Sphere)))
 }
 
-/// Instantiate every sub-object of `path` at the origin, carrying its own imported
-/// materials — mirrors `inspector/assets/model.rs`'s "Instantiate into Scene".
+/// Instantiate every sub-object of `path`, centred on the origin and carrying its own
+/// imported materials — mirrors `inspector/assets/model.rs`'s "Instantiate into Scene".
+/// All sub-objects share one offset, so a multi-part model keeps its internal layout.
 fn spawn_model(scene: &mut Scene, path: &str) {
     let Ok(asset) = asset::import_and_sync_sidecar(Path::new(path)) else {
         return;
     };
-    for id in asset.sub_mesh_ids() {
-        let reference = format!("{path}{}{id}", asset::REF_SEPARATOR);
-        let _ = authoring::instantiate_asset(scene, &reference, Some(&id), Vec3::ZERO);
+    let origin = -bounds_centre(&asset.sub_meshes);
+    for sub in &asset.sub_meshes {
+        let reference = format!("{path}{}{}", asset::REF_SEPARATOR, sub.id);
+        let _ = authoring::instantiate_asset(scene, &reference, Some(&sub.id), origin);
     }
+}
+
+/// The centre of the union of `subs`' local bounds (`Vec3::ZERO` when they have no
+/// geometry).
+///
+/// The preview camera always orbits the **world origin**, so a subject whose vertices
+/// were authored somewhere else renders as empty sky — the mesh is in the scene, just
+/// never in shot. That is not a rare edge case: the engine's own bundled Suzanne sits
+/// around `(-2.5, 1.3, 4.1)`, and exported models routinely carry whatever offset they
+/// had in the authoring tool. Spawning at `-centre` puts the subject where the camera
+/// is already looking, for the Inspector tab and `Debug.Preview` alike.
+fn bounds_centre(subs: &[asset::SubMesh]) -> Vec3 {
+    let mut bounds: Option<(Vec3, Vec3)> = None;
+    for sub in subs {
+        let Some((lo, hi)) = sub.bounds() else {
+            continue;
+        };
+        bounds = Some(match bounds {
+            Some((min, max)) => (min.min(lo), max.max(hi)),
+            None => (lo, hi),
+        });
+    }
+    bounds.map_or(Vec3::ZERO, |(min, max)| (min + max) * 0.5)
 }
 
 /// Insert `material` under a scene-local key and reference it from `id`. The

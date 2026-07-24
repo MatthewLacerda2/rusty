@@ -3,6 +3,7 @@ mod debug_meshes;
 mod draw;
 mod frustum;
 mod preview;
+pub mod readback;
 mod setup;
 mod view;
 

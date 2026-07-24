@@ -1360,6 +1360,43 @@ because the namespace is absent.
 | `Debug.Error` | `(message)` | — |
 | `Debug.Snapshot` | `()` | a pretty **JSON string**: the whole live world (below) |
 | `Debug.SnapshotEntity` | `(id)` | a pretty **JSON string**: one entity (below), or `null` if absent |
+| `Debug.Preview` | `(asset_path, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
+
+### The preview — eyes on an authored asset (#353)
+
+`Debug.Snapshot` is the structured read; **`Debug.Preview` is the visual one**. It
+renders an asset in the same isolated preview scene the editor's Inspector "Preview"
+tab shows a human — one stand-in mesh, a procedural sky, one key light — and writes it
+to a PNG, **headlessly**. That closes the authoring loop for shaders in particular:
+`Shader.Bake` proves a module *compiles*, and this shows what it *renders*.
+
+```lua
+-- bake -> preview -> look -> iterate, in one line
+local png = Debug.Preview(Shader.Bake(recipe), "out/preview.png")
+
+-- a texture on the cube instead of the default sphere, at 256²
+Debug.Preview("project/assets/brick.png", "out/brick.png", { mesh = "cube", resolution = 256 })
+```
+
+**Previewable kinds** — the same set the Inspector tab accepts, dispatched on the file
+extension: models (`gltf` / `glb` / `obj` / `fbx`, rendered as themselves), textures
+(`png` / `tga` / `jpg` / `jpeg`, applied as the base-color map), and shaders (`wgsl`,
+which shades the stand-in mesh). Material assets have no on-disk file, so they are
+previewable only from their Inspector card, not through this path-based call.
+
+**Options** (all optional): `mesh` is `"sphere"` (default), `"cube"` or `"suzanne"` and
+is ignored for models; `resolution` is the square output's edge in pixels (default
+`512`, clamped to `16`–`4096`).
+
+The framing is **fixed** — there are deliberately no camera parameters. Orbit/zoom is
+the human affordance in the editor; an agent needs the shot reproducible so two
+captures of the same asset are comparable pixel-for-pixel. Parent directories of
+`out_png` are created for you.
+
+Errors are raised for a caller mistake (a path that doesn't exist, an extension with no
+preview story, an unknown `mesh` name) so a typo can't quietly return a picture of an
+empty sky. The one non-error miss is a machine with no GPU or software adapter, where
+the call **returns `nil`** after a warning rather than failing the run.
 
 ### The snapshot — the structured scene-read (#180)
 

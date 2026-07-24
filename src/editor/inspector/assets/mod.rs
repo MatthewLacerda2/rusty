@@ -6,7 +6,7 @@ pub mod scene;
 pub mod script;
 pub mod shader;
 
-use super::preview::{self, PreviewSubject};
+use super::preview;
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
@@ -28,8 +28,9 @@ pub fn draw_inspector(
 
     // Model/texture/shader assets get a Preview tab (#352); everything else (audio,
     // scenes, prefabs, scripts) keeps its single Details view — there's no isolated
-    // scene rendering to preview for those.
-    if let Some(subject) = preview_subject(&extension, path) {
+    // scene rendering to preview for those. The dispatch table is shared with
+    // `Debug.Preview` (#353) so both front-ends accept exactly the same asset kinds.
+    if let Some(subject) = crate::preview::subject_for_path(path) {
         preview::draw_tab_strip(ui, &mut editor.preview_tab_active, editor.theme);
         if editor.preview_tab_active {
             preview::draw(ui, editor, subject);
@@ -72,16 +73,5 @@ pub fn draw_inspector(
                 "Unsupported file extension for specialized inspection.",
             );
         }
-    }
-}
-
-/// The Preview tab's subject for a previewable extension, or `None` for extensions
-/// with no preview story (audio/scene/prefab/lua/unsupported).
-fn preview_subject(extension: &str, path: &str) -> Option<PreviewSubject> {
-    match extension {
-        "png" | "tga" | "jpg" | "jpeg" => Some(PreviewSubject::Texture(path.to_string())),
-        "fbx" | "obj" | "gltf" | "glb" => Some(PreviewSubject::Model(path.to_string())),
-        "wgsl" => Some(PreviewSubject::Shader(path.to_string())),
-        _ => None,
     }
 }
