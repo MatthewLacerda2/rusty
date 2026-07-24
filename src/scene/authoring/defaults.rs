@@ -154,10 +154,10 @@ pub fn default_camera() -> CameraComponent {
     }
 }
 
-/// Default `VisualCorrectionComponent` (the Add-Component menu's values). The
-/// editor only offers this entry when a `Camera` is present; the API applies it
-/// unconditionally, mirroring the inspector's defaulted value (a visual-correction
-/// stack with no camera is simply inert).
+/// Default `VisualCorrectionComponent` (the Add-Component menu's values).
+/// `VisualCorrection` declares `requires(Camera)` (#359), so every surface that adds
+/// it auto-adds a `Camera` if missing — a correction stack is inert without a camera
+/// to correct, so the dependency is enforced rather than left to chance.
 pub fn default_visual_correction() -> VisualCorrectionComponent {
     VisualCorrectionComponent {
         active: true,

@@ -20,6 +20,7 @@ pub mod camera;
 pub mod collider;
 pub mod components;
 pub mod defaults;
+pub mod dependency;
 pub mod light;
 pub mod material;
 pub mod nav_agent;
@@ -160,6 +161,15 @@ pub fn create_entity(scene: &mut Scene, name: &str, primitive: Option<Primitive>
 // `authoring_components` (size-cap split); re-exported so existing
 // `authoring::{ComponentKind, add_component, remove_component}` paths still resolve.
 pub use crate::scene::authoring::components::{add_component, remove_component, ComponentKind};
+
+// The component-dependency mechanism (#359, rusty's `RequireComponent`) lives in
+// `authoring::dependency`; re-exported so the editor Add menu, the camera card's
+// remove cascade, the inspector's per-frame reconcile, and scene load all reach the
+// one enforcement path through this shared authoring entry point.
+pub use crate::scene::authoring::dependency::{
+    add_with_requirements, enforce_requirements, reconcile_requirements, remove_with_cascade,
+    satisfy_requirements,
+};
 
 // The prefab structural verbs live in `scene::prefab` (#215) and `scene::prefab_link`
 // (#216 linked instances + apply/revert), size-cap splits plus the `.prefab` format

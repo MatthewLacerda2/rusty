@@ -10,7 +10,7 @@ pub use visual_correction::draw_visual_correction;
 
 use crate::editor::inspector::components::card::component_card;
 use crate::editor::theme;
-use crate::scene::authoring::camera as camera_ops;
+use crate::scene::authoring::{self, camera as camera_ops, ComponentKind};
 use crate::scene::ClearFlags;
 
 /// Camera Component panel. `named_layers` are the `(index, label)` slots offered in
@@ -49,8 +49,9 @@ pub fn draw_camera(
         );
     });
     if remove {
-        world.set_visual_correction(id, None);
-        world.set_camera(id, None);
+        // Cascade to camera-dependent components (VisualCorrection) from the
+        // declaration (#359), not a hand-written pair of clears.
+        authoring::remove_with_cascade(world, id, ComponentKind::Camera);
         *is_dirty = true;
     }
 }
