@@ -135,8 +135,11 @@ mod tests {
     }
 
     #[test]
-    fn sim_dirs_are_the_four_deterministic_trees() {
-        assert_eq!(SIM_DIRS.len(), 4);
+    fn sim_dirs_are_the_guarded_deterministic_trees() {
+        // The four sim trees, plus `soundgen` — not sim code, but it makes the same
+        // byte-identical promise, so it is held to the same rules.
+        assert_eq!(SIM_DIRS.len(), 5);
         assert!(SIM_DIRS.contains(&"src/physics"));
+        assert!(SIM_DIRS.contains(&"src/soundgen"));
     }
 }
