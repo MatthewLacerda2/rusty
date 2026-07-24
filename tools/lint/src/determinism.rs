@@ -13,7 +13,18 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 
 /// Directories whose `.rs` files are sim code and must stay deterministic.
-const SIM_DIRS: &[&str] = &["src/app", "src/scripting", "src/physics", "src/navigation"];
+///
+/// `src/soundgen` is not sim code — it is a bake-time authoring module — but it
+/// makes the same promise (same patch + note + seed ⇒ byte-identical WAV), and that
+/// promise dies the moment a wall clock or an unseeded RNG creeps in. Guarding it
+/// here costs nothing and is the only mechanical check that promise has.
+const SIM_DIRS: &[&str] = &[
+    "src/app",
+    "src/scripting",
+    "src/physics",
+    "src/navigation",
+    "src/soundgen",
+];
 
 /// Banned call fragments. Matched as substrings on non-comment source.
 /// `rand::random` is the unseeded global RNG; seeded generators (`StdRng::from_seed`,
