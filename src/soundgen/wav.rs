@@ -66,13 +66,22 @@ fn parent_dir(path: &str) -> Option<&std::path::Path> {
         .filter(|p| !p.as_os_str().is_empty())
 }
 
+/// Ensure the directory `path` lives in exists, creating it if needed. A bare
+/// filename has no directory to make, so it succeeds having touched nothing —
+/// which is why this is a function and not an `if` inside [`write`]: the
+/// do-nothing case is a real outcome worth asserting without writing a file.
+fn create_parent_dir(path: &str) -> Result<(), String> {
+    match parent_dir(path) {
+        Some(parent) => std::fs::create_dir_all(parent).map_err(|e| e.to_string()),
+        None => Ok(()),
+    }
+}
+
 /// Encode `samples` and write them to `path`, returning the path on success. Any
 /// missing directories along `path` are created, so an agent can bake straight into
 /// a workspace folder that doesn't exist yet.
 pub fn write(samples: &[f32], sample_rate: u32, path: &str) -> Result<String, String> {
-    if let Some(parent) = parent_dir(path) {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
+    create_parent_dir(path)?;
     let bytes = encode(samples, sample_rate);
     let mut file = std::fs::File::create(path).map_err(|e| e.to_string())?;
     file.write_all(&bytes).map_err(|e| e.to_string())?;
@@ -122,6 +131,10 @@ mod tests {
             parent_dir("sounds/sfx/beep.wav"),
             Some(std::path::Path::new("sounds/sfx")),
         );
+        // And that is a success, not an error — baking to a bare filename is a
+        // perfectly ordinary call. Asserted here rather than by calling `write`,
+        // which would have to litter the process's working directory to prove it.
+        assert_eq!(create_parent_dir("beep.wav"), Ok(()));
     }
 
     #[test]
