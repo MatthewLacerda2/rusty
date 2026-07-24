@@ -1,22 +1,19 @@
-//! src/editor/inspector/preview/mod.rs — the Inspector's "Preview" tab (#352).
+//! src/editor/inspector/preview.rs — the Inspector's "Preview" tab (#352).
 //!
 //! Unity/Unreal/Blender's material-preview pattern: an isolated offscreen scene
 //! (mesh toggle + procedural sky + a hardcoded light) shown inside the Inspector for
 //! models, textures, shaders and materials, with drag-to-orbit + wheel-to-zoom.
 //!
-//! Split across three files: `scene` builds the isolated [`crate::scene::Scene`]
-//! (never the active editor World), `orbit` is the pure camera math, and this file
-//! is the egui surface — the tab strip, mesh toggle, and the image widget that turns
-//! pointer input into orbit updates. The actual GPU render happens in `main.rs`
-//! (`render_preview_scene`), the same two-phase split the Scene/Game viewport uses
-//! (`editor/viewport/mod.rs`): this module only lays out the panel and records what
-//! to render next; `main.rs` is the only place a `Renderer` is in scope.
+//! This file is only the **egui surface** — the tab strip, mesh toggle, and the image
+//! widget that turns pointer input into orbit updates. The machinery it draws lives in
+//! [`crate::preview`]: the isolated scene builder and the camera rig, shared verbatim
+//! with the headless `Debug.Preview` capture (#353) so the agent sees what the human
+//! sees. The actual GPU render happens in `main.rs` (`render_preview_scene`), the same
+//! two-phase split the Scene/Game viewport uses (`editor/viewport/mod.rs`): this module
+//! only lays out the panel and records what to render next; `main.rs` is the only place
+//! a `Renderer` is in scope.
 
-pub mod orbit;
-pub mod scene;
-
-pub use orbit::OrbitState;
-pub use scene::{build_preview_scene, PreviewMesh, PreviewSubject};
+pub use crate::preview::{build_preview_scene, OrbitState, PreviewMesh, PreviewSubject};
 
 use crate::editor::{theme::Theme, EditorUi};
 use crate::render::Camera;
@@ -90,9 +87,8 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, subject: PreviewSubject) {
     } else {
         0.0
     };
-    editor
-        .preview_orbit
-        .apply_input(response.drag_delta(), scroll);
+    let drag = response.drag_delta();
+    editor.preview_orbit.apply_input(drag.x, drag.y, scroll);
 
     editor.preview_request = Some(PreviewRequest {
         camera: editor.preview_orbit.camera(),

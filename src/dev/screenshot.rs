@@ -2,10 +2,10 @@
 //!
 //! The ONLY place the dev layer touches the renderer. Builds a wgpu device with NO
 //! window surface (`Renderer::new_headless`), renders ONE frame into an offscreen
-//! colour texture via the same `Renderer::render` the editor uses, copies the
-//! texture back to the CPU, and writes a PNG (via the `image` crate, already a
-//! dependency). Lets an agent literally SEE a frame and judge lighting / SSR /
-//! shadows against the CS1.6 -> FEAR -> Trepang2 visual bar.
+//! colour texture via the same `Renderer::render` the editor uses, then hands the
+//! target to `render::readback` for the copy-back + PNG encode. Lets an agent
+//! literally SEE a frame and judge lighting / SSR / shadows against the CS1.6 ->
+//! FEAR -> Trepang2 visual bar.
 //!
 //! Runtime caveat: needs a GPU or software adapter (e.g. lavapipe) in the
 //! container. When none is available, `capture`/`capture_world` return
@@ -17,7 +17,7 @@
 use std::path::Path;
 
 use crate::app::GameWorld;
-use crate::render::{Camera, RenderView, Renderer, OFFSCREEN_FORMAT};
+use crate::render::{readback, Camera, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::Scene;
 
 /// Default screenshot dimensions (16:9), matching the editor window aspect.
@@ -78,8 +78,9 @@ pub fn capture(
     // Reuse the editor's exact render path (editor_mode = false: no gizmos/grid).
     renderer.render(&mut view, scene, camera, &target_view, false, &[]);
 
-    let pixels = copy_target_to_cpu(&renderer, &target, width, height);
-    write_png(path, width, height, &pixels)?;
+    let pixels =
+        readback::read_texture_rgba8(&renderer.device, &renderer.queue, &target, width, height);
+    readback::write_png(path, width, height, &pixels)?;
     Ok(true)
 }
 
@@ -92,117 +93,4 @@ pub fn capture_world(
 ) -> Result<bool, String> {
     let scene = world.scene().borrow();
     capture(&scene, &world.camera().borrow(), path, width, height)
-}
-
-/// Copy the rendered texture back to the CPU as tightly-packed RGBA8 bytes.
-///
-/// `copy_texture_to_buffer` requires each row to be padded to a multiple of
-/// `COPY_BYTES_PER_ROW_ALIGNMENT` (256), so we copy into a padded buffer and then
-/// strip the padding back out.
-fn copy_target_to_cpu(
-    renderer: &Renderer,
-    target: &wgpu::Texture,
-    width: u32,
-    height: u32,
-) -> Vec<u8> {
-    let unpadded_bytes_per_row = width * 4;
-    let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-    let padded_bytes_per_row = unpadded_bytes_per_row.div_ceil(align) * align;
-
-    let buffer = renderer.device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Screenshot Readback Buffer"),
-        size: (padded_bytes_per_row * height) as u64,
-        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-        mapped_at_creation: false,
-    });
-
-    copy_texture_into_buffer(
-        renderer,
-        target,
-        &buffer,
-        padded_bytes_per_row,
-        width,
-        height,
-    );
-    read_buffer_pixels(
-        renderer,
-        &buffer,
-        padded_bytes_per_row,
-        unpadded_bytes_per_row,
-        height,
-    )
-}
-
-/// Encode and submit the texture->buffer copy into the padded readback buffer.
-fn copy_texture_into_buffer(
-    renderer: &Renderer,
-    target: &wgpu::Texture,
-    buffer: &wgpu::Buffer,
-    padded_bytes_per_row: u32,
-    width: u32,
-    height: u32,
-) {
-    let mut encoder = renderer
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Screenshot Copy Encoder"),
-        });
-    encoder.copy_texture_to_buffer(
-        wgpu::ImageCopyTexture {
-            texture: target,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-            aspect: wgpu::TextureAspect::All,
-        },
-        wgpu::ImageCopyBuffer {
-            buffer,
-            layout: wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: Some(padded_bytes_per_row),
-                rows_per_image: Some(height),
-            },
-        },
-        wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        },
-    );
-    renderer.queue.submit(std::iter::once(encoder.finish()));
-}
-
-/// Map the readback buffer (blocking) and strip the per-row padding back out.
-fn read_buffer_pixels(
-    renderer: &Renderer,
-    buffer: &wgpu::Buffer,
-    padded_bytes_per_row: u32,
-    unpadded_bytes_per_row: u32,
-    height: u32,
-) -> Vec<u8> {
-    // Map the buffer and block until the GPU signals completion.
-    let slice = buffer.slice(..);
-    let (tx, rx) = std::sync::mpsc::channel();
-    slice.map_async(wgpu::MapMode::Read, move |res| {
-        let _ = tx.send(res);
-    });
-    renderer.device.poll(wgpu::Maintain::Wait);
-    let _ = rx.recv();
-
-    let mapped = slice.get_mapped_range();
-    let mut pixels = Vec::with_capacity((unpadded_bytes_per_row * height) as usize);
-    for row in mapped.chunks(padded_bytes_per_row as usize) {
-        pixels.extend_from_slice(&row[..unpadded_bytes_per_row as usize]);
-    }
-    drop(mapped);
-    buffer.unmap();
-    pixels
-}
-
-/// Write packed RGBA8 `pixels` to `path` as a PNG.
-fn write_png(path: impl AsRef<Path>, width: u32, height: u32, pixels: &[u8]) -> Result<(), String> {
-    let buffer = image::RgbaImage::from_raw(width, height, pixels.to_vec())
-        .ok_or_else(|| "screenshot pixel buffer size mismatch".to_string())?;
-    buffer
-        .save(path.as_ref())
-        .map_err(|e| format!("failed to write PNG {}: {e}", path.as_ref().display()))
 }

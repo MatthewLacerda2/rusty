@@ -139,7 +139,13 @@ impl Renderer {
         let faces = CubemapFace::ALL.map(|face| {
             let camera = face_camera(position, face);
             self.render(&mut render_view, scene, &camera, &output, false, &[]);
-            read_face(self, &target, resolution)
+            crate::render::readback::read_texture_rgba8(
+                &self.device,
+                &self.queue,
+                &target,
+                resolution,
+                resolution,
+            )
         });
 
         self.static_capture = prev_static;
@@ -175,79 +181,6 @@ pub(crate) fn face_camera(position: Vec3, face: CubemapFace) -> Camera {
     let mut camera = Camera::new(position, yaw, pitch);
     camera.fov = 90.0;
     camera
-}
-
-/// Copy the rendered face texture back to the CPU as tightly-packed RGBA8 bytes.
-/// `copy_texture_to_buffer` requires each row padded to `COPY_BYTES_PER_ROW_ALIGNMENT`
-/// (256), so we copy into a padded buffer and strip the padding back out — the same
-/// readback the screenshot path uses.
-fn read_face(renderer: &Renderer, target: &wgpu::Texture, resolution: u32) -> Vec<u8> {
-    let unpadded_bytes_per_row = resolution * 4;
-    let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-    let padded_bytes_per_row = unpadded_bytes_per_row.div_ceil(align) * align;
-
-    let buffer = copy_face_to_buffer(renderer, target, resolution, padded_bytes_per_row);
-
-    let slice = buffer.slice(..);
-    let (tx, rx) = std::sync::mpsc::channel();
-    slice.map_async(wgpu::MapMode::Read, move |res| {
-        let _ = tx.send(res);
-    });
-    renderer.device.poll(wgpu::Maintain::Wait);
-    let _ = rx.recv();
-
-    let mapped = slice.get_mapped_range();
-    let mut pixels = Vec::with_capacity((unpadded_bytes_per_row * resolution) as usize);
-    for row in mapped.chunks(padded_bytes_per_row as usize) {
-        pixels.extend_from_slice(&row[..unpadded_bytes_per_row as usize]);
-    }
-    drop(mapped);
-    buffer.unmap();
-    pixels
-}
-
-/// Allocate a padded readback buffer and copy the rendered face texture into it.
-fn copy_face_to_buffer(
-    renderer: &Renderer,
-    target: &wgpu::Texture,
-    resolution: u32,
-    padded_bytes_per_row: u32,
-) -> wgpu::Buffer {
-    let buffer = renderer.device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Cubemap Face Readback Buffer"),
-        size: (padded_bytes_per_row * resolution) as u64,
-        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-        mapped_at_creation: false,
-    });
-
-    let mut encoder = renderer
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Cubemap Face Copy Encoder"),
-        });
-    encoder.copy_texture_to_buffer(
-        wgpu::ImageCopyTexture {
-            texture: target,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-            aspect: wgpu::TextureAspect::All,
-        },
-        wgpu::ImageCopyBuffer {
-            buffer: &buffer,
-            layout: wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: Some(padded_bytes_per_row),
-                rows_per_image: Some(resolution),
-            },
-        },
-        wgpu::Extent3d {
-            width: resolution,
-            height: resolution,
-            depth_or_array_layers: 1,
-        },
-    );
-    renderer.queue.submit(std::iter::once(encoder.finish()));
-    buffer
 }
 
 #[cfg(test)]
