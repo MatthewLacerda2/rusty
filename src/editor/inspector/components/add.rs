@@ -1,6 +1,6 @@
 use egui_phosphor::regular as icon;
 
-use crate::scene::authoring;
+use crate::scene::authoring::{self, ComponentKind};
 use crate::scene::{
     AudioSourceComponent, MaterialComponent, ParticleEmitterComponent, ScriptComponent,
     DEFAULT_SCRIPTS_DEST_DIR,
@@ -89,8 +89,11 @@ fn attach_default_material(world: &mut crate::ecs::World, id: u32) {
     world.stage_pending_material(id, authoring::default_material());
 }
 
-/// The rendering half of the Add Component menu: camera, particles and the
-/// camera-only visual correction stack. Each entry is offered only when absent.
+/// The rendering half of the Add Component menu: camera, particles and the visual
+/// correction stack. Each entry is offered only when absent. `VisualCorrection`
+/// declares `requires(Camera)` (#359), so picking it auto-adds a `Camera` if missing
+/// through the shared dependency verb — the menu no longer gates the entry on a camera
+/// being present, matching the `Scene.AddComponent` API exactly.
 fn add_render_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
     if !world.has_camera(id) && ui.button("Camera Component").clicked() {
         world.set_camera(id, Some(authoring::default_camera()));
@@ -104,11 +107,8 @@ fn add_render_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u
         world.set_particles(id, Some(ParticleEmitterComponent::default()));
         ui.close_menu();
     }
-    if world.has_camera(id)
-        && !world.has_visual_correction(id)
-        && ui.button("Visual Correction Component").clicked()
-    {
-        world.set_visual_correction(id, Some(authoring::default_visual_correction()));
+    if !world.has_visual_correction(id) && ui.button("Visual Correction Component").clicked() {
+        authoring::add_with_requirements(world, id, ComponentKind::VisualCorrection);
         ui.close_menu();
     }
 }

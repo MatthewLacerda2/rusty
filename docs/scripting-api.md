@@ -402,9 +402,25 @@ entity carrying only its mandatory `Transform` — the menu's **Create Empty**.
 case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `Texture` (alias `Material`), `NavMeshAgent`, `Camera`, `Particles`,
 `VisualCorrection`. Each is added with the inspector's default values; adding an
-existing kind replaces it. Removing `Camera` also removes `VisualCorrection`,
-matching the inspector's cascade. (Scripts attach by path, not as a defaulted kind
-— a separate concern.)
+existing kind replaces it. (Scripts attach by path, not as a defaulted kind — a
+separate concern.)
+
+**Component dependencies (`RequireComponent`).** A first-class component may
+*declare that it requires another* — rusty's analog of Unity's
+`[RequireComponent(typeof(T))]`. The rule is one declaration enforced identically on
+every surface (editor Add menu, this API, and scene load):
+
+- **Adding** a dependent auto-adds its requirement with defaults if missing, so
+  `AddComponent` never fails on a missing dependency — `Scene.AddComponent(id,
+  "VisualCorrection")` on a camera-less entity also attaches a `Camera`.
+- **Removing** a required component cascades to the dependents that require it —
+  `Scene.RemoveComponent(id, "Camera")` also removes the entity's `VisualCorrection`.
+- **Loading** a scene validates the same rule: a hand-edited document with a
+  dependent but no requirement gets the requirement auto-added (with a console
+  warning), so old scenes keep loading.
+
+The only declared dependency today is **`VisualCorrection` requires `Camera`** (a
+color/bloom/SSR correction stack is inert without a camera to correct).
 
 **`Scene.Deactivate`** is Unity's deferred `Object.Destroy`: it sets `active =
 false` but leaves the entity in the scene. **`Scene.DestroyEntity`** is the

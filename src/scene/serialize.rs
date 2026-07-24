@@ -280,4 +280,19 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     // overrides on top. A missing/renamed source is skipped per instance (the
     // instance keeps its last-saved values), so this never aborts the load.
     crate::scene::prefab::link::reimport_all_linked_instances(scene);
+
+    // Validate declared component dependencies on load (#359): a hand-edited or
+    // drifted scene carrying a dependent component without its requirement (e.g. a
+    // camera-less VisualCorrection) gets the requirement auto-added — the same rule
+    // `add` uses — so old scenes keep loading instead of silently violating it.
+    for id in scene.world.ids().to_vec() {
+        for (dependent, requirement) in
+            crate::scene::authoring::dependency::enforce_requirements(&mut scene.world, id)
+        {
+            log::warn!(
+                "[Scene] entity {id}: {dependent:?} requires {requirement:?}; auto-added a default \
+                 {requirement:?} (RequireComponent)."
+            );
+        }
+    }
 }

@@ -139,9 +139,10 @@ fn draw_entity_inspector(
     let materials = &mut scene.materials;
     let world = &mut scene.world;
     if world.contains(selected_id) {
-        if !world.has_camera(selected_id) && world.has_visual_correction(selected_id) {
-            world.set_visual_correction(selected_id, None);
-        }
+        // Reconcile declared component dependencies (#359): drop any component whose
+        // requirement was cleared out from under it (e.g. a Camera removed via its
+        // card, orphaning a VisualCorrection). Declaration-driven, not hand-written.
+        crate::scene::authoring::reconcile_requirements(world, selected_id);
 
         draw_object_header(
             ui,

@@ -9,11 +9,9 @@
 //!
 //! Allowed deps: components, scene.
 
-use crate::scene::authoring::defaults::{
-    attach_default_material, default_animator, default_camera, default_collider, default_light,
-    default_nav_agent, default_rigidbody, default_visual_correction,
-};
-use crate::scene::{AudioSourceComponent, ParticleEmitterComponent, Scene};
+use crate::scene::authoring::defaults::attach_default_material;
+use crate::scene::authoring::dependency;
+use crate::scene::Scene;
 
 /// The first-class components the inspector's "Add Component" menu can attach /
 /// detach. `Script` is excluded: a script attachment carries a path (it is "add
@@ -33,6 +31,37 @@ pub enum ComponentKind {
 }
 
 impl ComponentKind {
+    /// Every first-class kind, for the dependency machinery's reverse lookups —
+    /// finding a removed kind's dependents ([`dependency::remove_with_cascade`]) and
+    /// reconciling/enforcing unmet requirements. The per-kind matches in `dependency`
+    /// are compiler-checked exhaustive; a test guards this list against drift.
+    pub const ALL: [ComponentKind; 10] = [
+        Self::Light,
+        Self::Animator,
+        Self::Collider,
+        Self::RigidBody,
+        Self::Texture,
+        Self::NavMeshAgent,
+        Self::Camera,
+        Self::Particles,
+        Self::VisualCorrection,
+        Self::Audio,
+    ];
+
+    /// The first-class components this kind depends on — rusty's `RequireComponent`
+    /// (Unity's `[RequireComponent(typeof(T))]`). The single declaration every
+    /// add/remove/load surface consults: adding a kind auto-adds these if missing,
+    /// removing one of these cascades to the dependents that declare it. Flat
+    /// `kind → [kinds]`; `VisualCorrection → Camera` (a correction stack is inert
+    /// without a camera to correct) is the sole entry today — a new dependency is one
+    /// line here, enforced everywhere by construction.
+    pub fn requires(self) -> &'static [ComponentKind] {
+        match self {
+            ComponentKind::VisualCorrection => &[ComponentKind::Camera],
+            _ => &[],
+        }
+    }
+
     /// Parse an "Add Component" kind name (case-insensitive). Accepts the short
     /// names the menu uses (e.g. `RigidBody`, `Texture`, `NavMeshAgent`).
     pub fn parse(name: &str) -> Option<Self> {
@@ -53,54 +82,27 @@ impl ComponentKind {
 }
 
 /// Attach a first-class component of `kind` to entity `id` with the inspector's
-/// default values, replacing any existing one (editor offers it only when absent;
-/// the API is idempotent-by-replace). Returns `false` if the entity is missing. The
+/// default values, replacing any existing one (the API is idempotent-by-replace), and
+/// auto-adding any component `kind` requires (Unity's `RequireComponent`, via
+/// [`ComponentKind::requires`]). Returns `false` if the entity is missing. The
 /// inspector add-menu and the `Scene.AddComponent` API both route here.
 pub fn add_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool {
     // Material attaches a reference AND creates a shared library asset (it touches
-    // `scene.materials`, not just the entity guard), so it routes off on its own.
+    // `scene.materials`, not just the entity guard), so it routes off on its own; it
+    // has no requirements, so no dependency work follows.
     if kind == ComponentKind::Texture {
         return attach_default_material(scene, id);
     }
-    let w = &mut scene.world;
-    match kind {
-        ComponentKind::Light => w.set_light(id, Some(default_light())),
-        ComponentKind::Animator => w.set_animator(id, Some(default_animator())),
-        ComponentKind::Collider => w.set_collider(id, Some(default_collider())),
-        ComponentKind::RigidBody => w.set_rigidbody(id, Some(default_rigidbody())),
-        ComponentKind::Texture => unreachable!("handled above"),
-        ComponentKind::NavMeshAgent => w.set_nav_agent(id, Some(default_nav_agent())),
-        ComponentKind::Camera => w.set_camera(id, Some(default_camera())),
-        ComponentKind::Particles => w.set_particles(id, Some(ParticleEmitterComponent::default())),
-        ComponentKind::VisualCorrection => {
-            w.set_visual_correction(id, Some(default_visual_correction()))
-        }
-        ComponentKind::Audio => w.set_audio(id, Some(AudioSourceComponent::default())),
-    }
+    dependency::add_with_requirements(&mut scene.world, id, kind)
 }
 
-/// Detach a first-class component of `kind` from entity `id`, applying the same
-/// cascade the editor's inspector enforces: removing `Camera` also drops the
-/// camera-only `VisualCorrection` stack. Returns `false` if the entity does not
-/// exist (clearing an absent component is otherwise a no-op success).
+/// Detach a first-class component of `kind` from entity `id`, cascading to every
+/// dependent that requires it (e.g. removing `Camera` drops the camera-only
+/// `VisualCorrection` stack) — driven by [`ComponentKind::requires`], not hand-written
+/// here. Returns `false` if the entity does not exist (clearing an absent component is
+/// otherwise a no-op success).
 pub fn remove_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool {
-    let w = &mut scene.world;
-    match kind {
-        ComponentKind::Light => w.set_light(id, None),
-        ComponentKind::Animator => w.set_animator(id, None),
-        ComponentKind::Collider => w.set_collider(id, None),
-        ComponentKind::RigidBody => w.set_rigidbody(id, None),
-        // Drop only the reference; the shared library material may still be in use.
-        ComponentKind::Texture => w.set_material(id, None),
-        ComponentKind::NavMeshAgent => w.set_nav_agent(id, None),
-        ComponentKind::Camera => {
-            w.set_visual_correction(id, None);
-            w.set_camera(id, None)
-        }
-        ComponentKind::Particles => w.set_particles(id, None),
-        ComponentKind::VisualCorrection => w.set_visual_correction(id, None),
-        ComponentKind::Audio => w.set_audio(id, None),
-    }
+    dependency::remove_with_cascade(&mut scene.world, id, kind)
 }
 
 #[cfg(test)]
@@ -117,9 +119,11 @@ mod tests {
         assert!(remove_component(&mut scene, id, ComponentKind::Light));
         assert!(!scene.world.has_light(id));
 
-        // Removing Camera cascades to VisualCorrection (editor parity).
-        add_component(&mut scene, id, ComponentKind::Camera);
+        // Adding VisualCorrection auto-adds its required Camera (RequireComponent).
         add_component(&mut scene, id, ComponentKind::VisualCorrection);
+        assert!(scene.world.has_visual_correction(id) && scene.world.has_camera(id));
+
+        // Removing Camera cascades to VisualCorrection (editor parity).
         remove_component(&mut scene, id, ComponentKind::Camera);
         assert!(!scene.world.has_camera(id) && !scene.world.has_visual_correction(id));
 
