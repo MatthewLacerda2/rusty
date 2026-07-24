@@ -63,7 +63,6 @@ impl Renderer {
             queue,
             Some(surface),
             config,
-            size,
             present_modes,
         ))
     }
@@ -77,14 +76,14 @@ impl Renderer {
         queue: wgpu::Queue,
         surface: Option<wgpu::Surface<'static>>,
         config: wgpu::SurfaceConfiguration,
-        size: winit::dpi::PhysicalSize<u32>,
         present_modes: Vec<wgpu::PresentMode>,
     ) -> Self {
-        // Build every GPU resource up-front, grouped by role (textures, global
+        // Build every shared GPU resource up-front, grouped by role (textures, global
         // bindings, shadow system, forward/billboard passes), then assemble the
-        // flat renderer from those groups and seed the editor gizmo meshes.
-        let gpu = GpuResources::build(&device, &queue, &config);
-        let mut renderer = Self::assemble(device, queue, surface, config, size, present_modes, gpu);
+        // flat renderer from those groups and seed the editor gizmo meshes. Per-view
+        // targets (depth + post-FX) belong to each `RenderView`, not the renderer (#355).
+        let gpu = GpuResources::build(&device, &queue);
+        let mut renderer = Self::assemble(device, queue, surface, config, present_modes, gpu);
         renderer.generate_grid_mesh();
         renderer.generate_axis_arrows();
         renderer
@@ -103,13 +102,10 @@ impl Renderer {
         queue: wgpu::Queue,
         surface: Option<wgpu::Surface<'static>>,
         config: wgpu::SurfaceConfiguration,
-        size: winit::dpi::PhysicalSize<u32>,
         present_modes: Vec<wgpu::PresentMode>,
         gpu: GpuResources,
     ) -> Self {
         let GpuResources {
-            depth_texture,
-            depth_view,
             camera_lighting_layout,
             entity_bones_layout,
             textures,
@@ -117,7 +113,6 @@ impl Renderer {
             shadows,
             forward,
             billboards,
-            post_fx,
             quality,
         } = gpu;
         let entity_pool = Some(crate::render::gpu::entity_pool::EntityPool::new(&device));
@@ -127,7 +122,6 @@ impl Renderer {
             queue,
             surface,
             config,
-            size,
             present_modes,
             render_pipeline: forward.render_pipeline,
             transparent_pipeline: forward.transparent_pipeline,
@@ -145,17 +139,12 @@ impl Renderer {
             global_bind_group: global.global_bind_group,
             global_bind_group_dirty: false,
             entity_pool,
-            depth_texture,
-            depth_view,
-            viewport_target: None,
-            preview_target: None,
             shadow_layout: shadows.layout,
             shadow_renderer: shadows.renderer,
             shadow_uniform_buffer: shadows.uniform_buffer,
             shadow_bind_group: shadows.bind_group,
             particle_renderer: billboards.particle_renderer,
             decal_renderer: billboards.decal_renderer,
-            post_fx,
             quality,
             gpu_meshes: HashMap::new(),
             gpu_textures: HashMap::new(),
@@ -170,7 +159,6 @@ impl Renderer {
             reflection_cube: None,
             reflection_cube_path: String::new(),
             default_cube,
-            decal_depth_bind_group: None,
             static_capture: false,
             capture_probe_bounce: false,
         }
