@@ -171,4 +171,15 @@ mod tests {
         let peak = out.iter().fold(0.0f32, |m, s| m.max(s.abs()));
         assert!((peak - 1.0).abs() < 0.05, "peak {peak} is not normalized");
     }
+
+    #[test]
+    fn a_stack_with_no_gain_left_is_silence_not_a_divide_by_zero() {
+        // `Patch::validate` refuses this stack, so it can only arrive by calling the
+        // renderer directly — and then the normalization must not divide by zero.
+        let n = 512;
+        let mut out = vec![0.0; n];
+        let oscs = [osc(Wave::Saw, 0.0, 0, 0.0), osc(Wave::Sine, -1.0, 0, 0.0)];
+        render(&oscs, &vec![440.0; n], &mut out, 44_100.0);
+        assert!(out.iter().all(|s| *s == 0.0), "got {:?}", &out[..8]);
+    }
 }

@@ -172,4 +172,29 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn a_poisoned_sample_resets_the_filter_instead_of_spreading() {
+        // One non-finite input would otherwise infect the integrators forever, so
+        // every later sample would come out NaN. The guard flushes the state.
+        let mut buf = sine(440.0);
+        buf[100] = f32::INFINITY;
+        buf[200] = f32::NAN;
+        let cutoffs = vec![1000.0; buf.len()];
+        apply(
+            &mut buf,
+            &filter(FilterKind::Lowpass, 1000.0),
+            &cutoffs,
+            44_100.0,
+        );
+        assert!(
+            buf.iter().all(|s| s.is_finite()),
+            "the poison was contained"
+        );
+        // And the filter is still a filter afterwards, not a stuck zero.
+        assert!(
+            settled_peak(&buf) > 0.5,
+            "it recovered and kept passing signal"
+        );
+    }
 }
