@@ -1,61 +1,19 @@
-//! src/render/preview.rs — the Inspector's offscreen asset-preview target (#352).
+//! src/render/preview.rs — the Inspector's Shader-asset preview pass (#352).
 //!
-//! Sibling of `viewport.rs`: the Inspector's Preview tab renders a small, isolated
-//! scene (a toggleable mesh + a hardcoded light, never the active editor World) into
-//! its own offscreen colour texture, shown inside an `egui::Image` the same way the
-//! Scene/Game viewport is. `resize_preview` sizes only this target — it never touches
-//! `self.size`/the depth-post-FX chain the viewport owns, since the preview renders
-//! through the same forward pass at whatever small panel size the Preview tab has,
-//! independently of the main viewport's size.
+//! The Inspector's Preview tab renders a small, isolated scene (a toggleable mesh + a
+//! hardcoded light, never the active editor World) into its own [`RenderView`], shown
+//! inside an `egui::Image` the same way the Scene/Game viewport is. That view (its
+//! offscreen target, depth buffer, and post-FX chain) is owned by the front-end and
+//! independent of the main viewport's, so the two never fight over shared targets
+//! (#355). This module carries only the Shader-asset arm: rendering the preview with
+//! the forward pipeline swapped for a compiled `.wgsl` module.
 
 use super::gpu::pipelines::create_pipelines;
 use super::gpu::shaders::ShaderRegistry;
-use super::{Camera, Renderer};
+use super::{Camera, RenderView, Renderer};
 use crate::scene::Scene;
 
 impl Renderer {
-    /// An owned view of the offscreen preview target, or `None` before the first
-    /// [`Self::resize_preview`]. See [`Self::viewport_target_view`] for why an owned
-    /// `wgpu::TextureView` (not a borrow) is returned.
-    pub fn preview_target_view(&self) -> Option<wgpu::TextureView> {
-        self.preview_target
-            .as_ref()
-            .map(|t| t.create_view(&wgpu::TextureViewDescriptor::default()))
-    }
-
-    /// (Re)allocate the offscreen preview colour target at `width` x `height` — the
-    /// Preview tab's image rect in pixels — and resize the shared scene depth/post-FX
-    /// targets to match, exactly as [`Self::resize_viewport`] does for the main
-    /// viewport. The two share one `Renderer`, so whichever renders last in a frame
-    /// leaves `self.size` at its own dimensions; the other resizes back to its own
-    /// size the next time it runs (a cheap no-op reallocation, editor-only cost).
-    /// A cheap no-op when the size is already current.
-    pub fn resize_preview(&mut self, width: u32, height: u32) {
-        let width = width.max(1);
-        let height = height.max(1);
-        if self.size.width == width && self.size.height == height && self.preview_target.is_some() {
-            return;
-        }
-
-        self.resize_scene_targets(width, height);
-
-        let target = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Inspector Preview Target"),
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: self.config.format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        });
-        self.preview_target = Some(target);
-    }
-
     /// Render `scene` with the forward pipeline temporarily rebuilt from
     /// `shader_path`'s compiled module instead of `assets/shaders/shader.wgsl` — the
     /// Preview tab's Shader-asset arm ("the chosen preview mesh... shaded by the
@@ -67,13 +25,14 @@ impl Renderer {
     /// *something* instead of crashing the live editor.
     pub fn render_preview_with_shader(
         &mut self,
+        view: &mut RenderView,
         scene: &Scene,
         camera: &Camera,
-        view: &wgpu::TextureView,
+        output: &wgpu::TextureView,
         shader_path: &str,
     ) {
         let Some(module) = self.compose_preview_shader(shader_path) else {
-            self.render(scene, camera, view, false, &[]);
+            self.render(view, scene, camera, output, false, &[]);
             return;
         };
         let pipelines = create_pipelines(
@@ -90,7 +49,7 @@ impl Renderer {
         // pipelines never draw in this pass (`render(.., editor_mode: false, ..)`
         // skips the editor-only outline/grid overlays).
         let previous = std::mem::replace(&mut self.render_pipeline, pipelines.forward);
-        self.render(scene, camera, view, false, &[]);
+        self.render(view, scene, camera, output, false, &[]);
         self.render_pipeline = previous;
     }
 

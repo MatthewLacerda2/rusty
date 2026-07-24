@@ -10,10 +10,10 @@
 use crate::render::gpu::bind_layouts;
 use crate::render::gpu::pipelines;
 use crate::render::gpu::shaders::ShaderRegistry;
-use crate::render::postfx::{PostFx, QualityPreset, HDR_FORMAT};
+use crate::render::postfx::{QualityPreset, HDR_FORMAT};
 use crate::render::setup::textures::{create_textures, Textures};
 use crate::render::{ibl::skybox, passes::shadows};
-use crate::render::{CameraUniform, GpuTexture, LightingUniform, Renderer};
+use crate::render::{CameraUniform, GpuTexture, LightingUniform};
 
 /// Camera + lighting uniform buffers and the group(0) bind group.
 pub(crate) struct GlobalBindings {
@@ -52,8 +52,6 @@ pub(crate) struct BillboardPasses {
 /// dependency order (layouts → textures → bindings → passes) and consumed once by
 /// [`Renderer::from_parts`], which moves each group into the flat renderer.
 pub(crate) struct GpuResources {
-    pub depth_texture: wgpu::Texture,
-    pub depth_view: wgpu::TextureView,
     pub camera_lighting_layout: wgpu::BindGroupLayout,
     pub entity_bones_layout: wgpu::BindGroupLayout,
     pub textures: Textures,
@@ -61,19 +59,15 @@ pub(crate) struct GpuResources {
     pub shadows: ShadowSystem,
     pub forward: ForwardPasses,
     pub billboards: BillboardPasses,
-    pub post_fx: PostFx,
     pub quality: QualityPreset,
 }
 
 impl GpuResources {
-    /// Build every GPU resource from an already-created device/queue/config.
-    pub(crate) fn build(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        config: &wgpu::SurfaceConfiguration,
-    ) -> Self {
+    /// Build every *shared* GPU resource from an already-created device/queue. The
+    /// per-view targets (depth + post-FX chain) are no longer built here — each
+    /// [`crate::render::RenderView`] owns its own (#355).
+    pub(crate) fn build(device: &wgpu::Device, queue: &wgpu::Queue) -> Self {
         let mut registry = ShaderRegistry::new("assets/shaders");
-        let (depth_texture, depth_view) = Renderer::create_depth_resources(device, config);
         let camera_lighting_layout = bind_layouts::create_camera_lighting_layout(device);
         let entity_bones_layout = bind_layouts::create_entity_bones_layout(device);
         let textures = create_textures(device, queue);
@@ -88,11 +82,8 @@ impl GpuResources {
             &shadows.layout,
             &mut registry,
         );
-        let (post_fx, quality) = create_post_chain(device, config, &mut registry);
         let billboards = create_billboard_passes(device, &textures.texture_layout, &mut registry);
         Self {
-            depth_texture,
-            depth_view,
             camera_lighting_layout,
             entity_bones_layout,
             textures,
@@ -100,8 +91,7 @@ impl GpuResources {
             shadows,
             forward,
             billboards,
-            post_fx,
-            quality,
+            quality: QualityPreset::default(),
         }
     }
 }
@@ -125,24 +115,6 @@ fn create_billboard_passes(
             registry,
         ),
     }
-}
-
-/// Post-process chain sized to the framebuffer, plus the default quality tier.
-fn create_post_chain(
-    device: &wgpu::Device,
-    config: &wgpu::SurfaceConfiguration,
-    registry: &mut ShaderRegistry,
-) -> (PostFx, QualityPreset) {
-    let quality = QualityPreset::default();
-    let post_fx = PostFx::new(
-        device,
-        config.width,
-        config.height,
-        config.format,
-        quality.bloom_divisor(),
-        registry,
-    );
-    (post_fx, quality)
 }
 
 /// Camera + lighting uniform buffers and the group-0 bind group (also binds the
