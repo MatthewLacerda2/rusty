@@ -114,3 +114,31 @@ fn shader_override_with_the_engine_default_shader_does_not_panic() {
         "assets/shaders/shader.wgsl",
     );
 }
+
+/// The shader override belongs to the view, not the renderer (#355 step 4). The old
+/// mutate-and-restore left the *shared* forward pipeline swapped for the duration of
+/// the call, so anything that returned early or unwound in between shaded the whole
+/// editor with a preview module. A view-owned override cannot escape its view.
+#[test]
+fn the_shader_override_never_leaks_onto_another_view() {
+    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(32, 32)) else {
+        return;
+    };
+    let mut preview = preview_view(&renderer);
+    let mut plain = preview_view(&renderer);
+    let scene = sphere_scene();
+    let camera = looking_at_origin_from_z();
+
+    let out = preview.color_target_view().unwrap();
+    renderer.render_preview_with_shader(
+        &mut preview,
+        &scene,
+        &camera,
+        &out,
+        "assets/shaders/shader.wgsl",
+    );
+
+    // The other view is untouched by the preview's override, and renders fine after.
+    let out = plain.color_target_view().unwrap();
+    renderer.render(&mut plain, &scene, &camera, &out, false, &[]);
+}

@@ -129,6 +129,40 @@ fn two_scenes_keep_their_own_pool_slots() {
     assert_eq!(renderer.entity_slot_count(), 2);
 }
 
+/// The static shadow map must not be shared between scenes (#355). It used to be
+/// guarded by a bare `is_static_cached` bool: scene A baked its statics and set it,
+/// then scene B saw "cached", skipped its own bake and sampled A's shadows — the
+/// phantom shadows the Inspector preview showed on its mesh.
+#[test]
+fn a_second_scene_rebakes_its_own_static_shadows() {
+    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(64, 64)) else {
+        return;
+    };
+    let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 64, 64, 2);
+    let scene_a = box_scene();
+    let scene_b = box_scene();
+    let cam = camera();
+
+    let out = view.color_target_view().unwrap();
+    renderer.render(&mut view, &scene_a, &cam, &out, false, &[]);
+    assert!(
+        !renderer.shadow_renderer.needs_static_bake(scene_a.id()),
+        "scene A's statics are baked after its render"
+    );
+    assert!(
+        renderer.shadow_renderer.needs_static_bake(scene_b.id()),
+        "but scene B's are NOT — it must bake its own, not inherit A's"
+    );
+
+    let out = view.color_target_view().unwrap();
+    renderer.render(&mut view, &scene_b, &cam, &out, false, &[]);
+    assert!(!renderer.shadow_renderer.needs_static_bake(scene_b.id()));
+    assert!(
+        renderer.shadow_renderer.needs_static_bake(scene_a.id()),
+        "and the map now holds B's statics, not A's"
+    );
+}
+
 /// `resize` reallocates the offscreen target to the new size and is a cheap no-op when
 /// the size and quality divisor are unchanged.
 #[test]

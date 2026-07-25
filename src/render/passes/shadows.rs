@@ -20,7 +20,15 @@ pub struct ShadowRenderer {
     light_space_buffer: wgpu::Buffer,
     pub light_space_matrix: Mat4,
 
-    pub is_static_cached: bool,
+    /// Which scene's static casters are currently baked into the static depth map,
+    /// or `None` when it holds nothing usable (#355).
+    ///
+    /// This was a bare `bool`, which is the single-scene assumption in its purest
+    /// form: scene A baked its statics and set the flag, then scene B saw "cached",
+    /// skipped its own bake, and sampled **A's** shadows — the phantom shadows the
+    /// Inspector preview showed. Naming the scene makes the cache answer the question
+    /// actually being asked: not "is something baked?" but "is *this* scene baked?"
+    static_cache_scene: Option<SceneId>,
 
     global_bind_group: wgpu::BindGroup,
     entity_layout: wgpu::BindGroupLayout,
@@ -69,7 +77,7 @@ impl ShadowRenderer {
             pipeline,
             light_space_buffer,
             light_space_matrix: Mat4::IDENTITY,
-            is_static_cached: false,
+            static_cache_scene: None,
             global_bind_group,
             entity_layout,
             entity_slots: HashMap::new(),
@@ -269,6 +277,18 @@ impl ShadowRenderer {
         })
     }
 
+    /// Whether the static depth map must be re-baked for `scene`: it holds another
+    /// scene's statics, or nothing at all.
+    pub fn needs_static_bake(&self, scene: SceneId) -> bool {
+        self.static_cache_scene != Some(scene)
+    }
+
+    /// Drop the static bake, so the next render re-bakes it. Called when the editor
+    /// changes something that moves static geometry.
+    pub fn invalidate_static_cache(&mut self) {
+        self.static_cache_scene = None;
+    }
+
     /// Drop `scene`'s shadow slots for entities no longer in `live`, keeping the
     /// per-entity buffer pool bounded to the active scene (#210). Scoped to one
     /// scene, so a second scene's casters are not evicted — and cannot be sampled
@@ -326,7 +346,7 @@ impl ShadowRenderer {
             self.draw_resources(&mut render_pass, gpu_meshes, &render_resources);
         }
 
-        self.is_static_cached = true;
+        self.static_cache_scene = Some(scene.id());
     }
 
     pub fn render_dynamic(

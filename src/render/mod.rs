@@ -138,9 +138,16 @@ pub struct Renderer {
     pub skybox_path: String,
     /// The active reflection probe's loaded, prefiltered cubemap (#245) at group-0 binding
     /// 4; `None` until a baked probe covers the camera, then the shader uses the skybox.
-    /// Reloaded only when `reflection_cube_path` (its cache key) changes, not every frame.
-    reflection_cube: Option<cubemap::CubemapTexture>,
+    /// Rebound only when `reflection_cube_path` (its cache key) changes, not every frame.
+    reflection_cube: Option<Rc<cubemap::CubemapTexture>>,
     reflection_cube_path: String,
+    /// Decoded cubemaps by path — the content cache behind `reflection_cube` (#355).
+    /// Which cube is *bound* is per-scene state and legitimately flips when two scenes
+    /// with different probes render in one frame; without this, each flip re-read the
+    /// KTX2 from disk and re-uploaded every mip, i.e. a full disk load per frame. A
+    /// cached `None` remembers an unreadable file so it is not retried on every flip
+    /// either (the same shape as the audio `ClipCache`).
+    cubemaps: HashMap<String, Option<Rc<cubemap::CubemapTexture>>>,
     /// A 1×1×6 black cube bound at binding 4 when no probe cube is active, so the bind
     /// group always satisfies the layout (the shader ignores it via `refl_has_cubemap`).
     default_cube: cubemap::CubemapTexture,

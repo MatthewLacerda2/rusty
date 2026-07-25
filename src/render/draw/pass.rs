@@ -118,7 +118,7 @@ impl Renderer {
         });
 
         // Set global bindings
-        render_pass.set_pipeline(&self.render_pipeline);
+        render_pass.set_pipeline(view.forward_pipeline(&self.render_pipeline));
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
         render_pass.set_bind_group(3, &self.shadow_bind_group, &[]);
         // Solid entities, then the editor selection outline.
@@ -177,7 +177,7 @@ impl Renderer {
             bytemuck::bytes_of(&self.shadow_renderer.light_space_matrix.to_cols_array()),
         );
 
-        if !self.shadow_renderer.is_static_cached {
+        if self.shadow_renderer.needs_static_bake(scene.id()) {
             self.shadow_renderer.render_static(
                 &self.device,
                 &self.queue,
@@ -209,7 +209,10 @@ impl Renderer {
         // The active reflection probe's cube at binding 4, else the black fallback cube —
         // the shader picks skybox vs cube via the `refl_has_cubemap` flag, so a fallback
         // here is never sampled but keeps the bind group valid against the layout.
-        let cube = self.reflection_cube.as_ref().unwrap_or(&self.default_cube);
+        let cube = self
+            .reflection_cube
+            .as_deref()
+            .unwrap_or(&self.default_cube);
         self.global_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Global Bind Group with Reflections"),
             layout: &self.camera_lighting_layout,

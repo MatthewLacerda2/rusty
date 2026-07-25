@@ -13,6 +13,8 @@
 //! The CPU-side parse ([`parse_ktx2_cubemap`]) is split out as a pure function over
 //! bytes so it is unit-testable without a GPU or a file on disk.
 
+use std::rc::Rc;
+
 use ktx2::Format;
 
 use crate::render::Renderer;
@@ -134,6 +136,23 @@ impl Renderer {
         let bytes = std::fs::read(path).ok()?;
         let data = parse_ktx2_cubemap_mips(&bytes)?;
         Some(self.upload_cubemap_mips(path, &data))
+    }
+
+    /// [`load_cubemap_mips`](Self::load_cubemap_mips) behind a by-path content cache
+    /// (#355), returning a shared handle.
+    ///
+    /// Which cube is *bound* is per-scene state: two scenes with different reflection
+    /// probes rendering in one frame legitimately swap it every frame. Uncached, each
+    /// swap re-read the KTX2 from disk and re-uploaded every mip — a full disk load
+    /// per frame, per flip. The failure is cached too, so an unreadable path is not
+    /// retried on every flip either.
+    pub fn cached_cubemap(&mut self, path: &str) -> Option<Rc<CubemapTexture>> {
+        if let Some(hit) = self.cubemaps.get(path) {
+            return hit.clone();
+        }
+        let loaded = self.load_cubemap_mips(path).map(Rc::new);
+        self.cubemaps.insert(path.to_string(), loaded.clone());
+        loaded
     }
 
     /// Upload a decoded mipped cubemap into a mipped 6-layer cube texture with a cube view

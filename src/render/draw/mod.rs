@@ -213,11 +213,14 @@ impl Renderer {
         lighting_uniform
     }
 
-    /// Load (or clear) the active reflection probe's baked cubemap for `camera_pos` (#245):
+    /// Bind (or clear) the active reflection probe's baked cubemap for `camera_pos` (#245):
     /// the nearest probe whose box covers the camera and that carries a baked `cubemap_path`
-    /// wins. The KTX2 is loaded only when the active path changes (cached by
+    /// wins. Rebinding happens only when the active path changes (tracked by
     /// `reflection_cube_path`), and the group-0 bind group is marked dirty so the cube swaps
     /// in. A missing/unreadable file (or no probe) clears the cube and falls back to skybox.
+    ///
+    /// The cube itself comes from the by-path content cache, so two scenes flipping
+    /// between different probes cost a hash lookup, not a disk read (#355).
     fn update_reflection_cube(&mut self, scene: &Scene, camera_pos: Vec3) {
         let path = scene
             .reflection_probes
@@ -232,7 +235,7 @@ impl Renderer {
         self.reflection_cube = if path.is_empty() {
             None
         } else {
-            self.load_cubemap_mips(&path)
+            self.cached_cubemap(&path)
         };
         self.global_bind_group_dirty = true;
     }
