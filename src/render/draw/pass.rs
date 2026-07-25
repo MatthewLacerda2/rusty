@@ -249,11 +249,11 @@ impl Renderer {
     ) {
         // Groups 1 (entity) + 2 (material) are the pool's persistent bind groups (#210).
         let pool = self.entity_pool.as_ref().expect("entity pool present");
-        for (id, mesh_id, num_indices) in solid_render_resources {
+        for (key, mesh_id, num_indices) in solid_render_resources {
             let (Some(gpu_mesh), Some(entity_bg), Some(material_bg)) = (
                 self.gpu_meshes.get(mesh_id),
-                pool.entity_bind_group(*id),
-                pool.material_bind_group(*id),
+                pool.entity_bind_group(*key),
+                pool.material_bind_group(*key),
             ) else {
                 continue;
             };

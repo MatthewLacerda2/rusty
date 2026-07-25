@@ -1,7 +1,8 @@
 use crate::render::gpu::mesh::Vertex;
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::gpu::slot_key::SlotKey;
 use crate::render::{transform_aabb, Frustum};
-use crate::scene::Scene;
+use crate::scene::{Scene, SceneId};
 use glam::{Mat4, Vec3};
 use std::collections::HashMap;
 use wgpu::util::DeviceExt;
@@ -28,7 +29,7 @@ pub struct ShadowRenderer {
     /// The depth pass used to `create_buffer_init` one buffer + bind group per entity
     /// every frame (static *and* dynamic); these are written in place with
     /// `queue.write_buffer` and reused instead (#210).
-    entity_slots: HashMap<u32, ShadowSlot>,
+    entity_slots: HashMap<SlotKey, ShadowSlot>,
 }
 
 /// One entity's reused shadow-pass model-matrix buffer + its bind group.
@@ -268,10 +269,13 @@ impl ShadowRenderer {
         })
     }
 
-    /// Drop shadow slots for entities no longer in `live`, keeping the per-entity
-    /// buffer pool bounded to the active scene (#210).
-    pub fn retain_entities(&mut self, live: &std::collections::HashSet<u32>) {
-        self.entity_slots.retain(|id, _| live.contains(id));
+    /// Drop `scene`'s shadow slots for entities no longer in `live`, keeping the
+    /// per-entity buffer pool bounded to the active scene (#210). Scoped to one
+    /// scene, so a second scene's casters are not evicted — and cannot be sampled
+    /// as phantom shadows on this one (#355).
+    pub fn retain_entities(&mut self, scene: SceneId, live: &std::collections::HashSet<u32>) {
+        self.entity_slots
+            .retain(|key, _| key.survives_prune(scene, live));
     }
 
     pub fn update_light_space(&mut self, queue: &wgpu::Queue, light_dir: Vec3) {
@@ -389,7 +393,7 @@ impl ShadowRenderer {
         scene: &Scene,
         gpu_meshes: &HashMap<crate::render::MeshId, crate::render::GpuMesh>,
         want_static: bool,
-    ) -> Vec<(crate::render::MeshId, u32, u32)> {
+    ) -> Vec<(crate::render::MeshId, SlotKey, u32)> {
         // Cull casters against the LIGHT's frustum, not the camera's (#330). An off-screen
         // caster still inside the light's ortho volume must keep its shadow — culling
         // casters by the player camera is the classic pop-a-shadow bug.
@@ -414,22 +418,23 @@ impl ShadowRenderer {
                     continue;
                 }
             }
-            self.sync_entity_slot(device, queue, id, &world.to_cols_array());
-            render_resources.push((mesh_id, id, gpu_mesh.num_indices));
+            let key = SlotKey::new(scene.id(), id);
+            self.sync_entity_slot(device, queue, key, &world.to_cols_array());
+            render_resources.push((mesh_id, key, gpu_mesh.num_indices));
         }
         render_resources
     }
 
-    /// Get-or-create entity `id`'s shadow slot, writing the model matrix into its
+    /// Get-or-create `key`'s shadow slot, writing the model matrix into its
     /// persistent buffer (allocated once, on first appearance).
     fn sync_entity_slot(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        id: u32,
+        key: SlotKey,
         model_arr: &[f32; 16],
     ) {
-        if let Some(slot) = self.entity_slots.get(&id) {
+        if let Some(slot) = self.entity_slots.get(&key) {
             queue.write_buffer(&slot.buffer, 0, bytemuck::bytes_of(model_arr));
             return;
         }
@@ -447,7 +452,7 @@ impl ShadowRenderer {
             }],
         });
         self.entity_slots
-            .insert(id, ShadowSlot { buffer, bind_group });
+            .insert(key, ShadowSlot { buffer, bind_group });
     }
 
     /// Issue the depth-only draw calls for collected entity resources, pulling each
@@ -456,13 +461,14 @@ impl ShadowRenderer {
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         gpu_meshes: &'a HashMap<crate::render::MeshId, crate::render::GpuMesh>,
-        render_resources: &'a [(crate::render::MeshId, u32, u32)],
+        render_resources: &'a [(crate::render::MeshId, SlotKey, u32)],
     ) {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
 
-        for (mesh_id, id, num_indices) in render_resources {
-            let (Some(gpu_mesh), Some(slot)) = (gpu_meshes.get(mesh_id), self.entity_slots.get(id))
+        for (mesh_id, key, num_indices) in render_resources {
+            let (Some(gpu_mesh), Some(slot)) =
+                (gpu_meshes.get(mesh_id), self.entity_slots.get(key))
             else {
                 continue;
             };

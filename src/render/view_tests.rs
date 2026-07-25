@@ -83,6 +83,52 @@ fn two_views_two_scenes_keep_independent_sizes() {
     assert_eq!((tall.size().width, tall.size().height), (40, 80));
 }
 
+/// The per-scene half of the #355 invariant: rendering a second scene must not evict
+/// the first scene's pooled per-entity GPU resources.
+///
+/// Both scenes here hold one entity, and both call it entity 1 — every fresh `World`
+/// counts from 1. Keyed by entity id alone, the second render's prune dropped the
+/// first scene's slot and re-inserted its own under the same key, so the two scenes
+/// rebuilt each other's pool every frame — re-introducing exactly the per-frame churn
+/// #210 removed. Keyed by (scene, entity), both survive.
+#[test]
+fn two_scenes_keep_their_own_pool_slots() {
+    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(64, 64)) else {
+        return;
+    };
+    let mut view_a = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 64, 64, 2);
+    let mut view_b = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 64, 64, 2);
+    let scene_a = box_scene();
+    let scene_b = box_scene();
+    let cam = camera();
+
+    let out = view_a.color_target_view().unwrap();
+    renderer.render(&mut view_a, &scene_a, &cam, &out, false, &[]);
+    assert_eq!(renderer.scene_slot_count(scene_a.id()), 1);
+
+    // Rendering the second scene must leave the first scene's slot untouched.
+    let out = view_b.color_target_view().unwrap();
+    renderer.render(&mut view_b, &scene_b, &cam, &out, false, &[]);
+    assert_eq!(
+        renderer.scene_slot_count(scene_a.id()),
+        1,
+        "scene A's pooled resources survived scene B's render"
+    );
+    assert_eq!(renderer.scene_slot_count(scene_b.id()), 1);
+    assert_eq!(
+        renderer.entity_slot_count(),
+        2,
+        "two scenes' entity 1s are two slots, not one collided one"
+    );
+
+    // And a second frame settles rather than thrashing: still exactly two slots.
+    let out = view_a.color_target_view().unwrap();
+    renderer.render(&mut view_a, &scene_a, &cam, &out, false, &[]);
+    let out = view_b.color_target_view().unwrap();
+    renderer.render(&mut view_b, &scene_b, &cam, &out, false, &[]);
+    assert_eq!(renderer.entity_slot_count(), 2);
+}
+
 /// `resize` reallocates the offscreen target to the new size and is a cheap no-op when
 /// the size and quality divisor are unchanged.
 #[test]

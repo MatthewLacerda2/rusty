@@ -237,8 +237,9 @@ impl Renderer {
         self.global_bind_group_dirty = true;
     }
 
-    /// Evict persistent forward-pass slots for entities no longer active in the
-    /// scene, keeping the pool bounded to the live set (#210).
+    /// Evict `scene`'s persistent forward-pass slots for entities no longer active
+    /// in it, keeping the pool bounded to the live set (#210). Scoped to this scene's
+    /// own slots, so rendering a second scene never evicts the first's (#355).
     fn prune_entity_pool(&mut self, scene: &Scene) {
         let live: std::collections::HashSet<u32> = scene
             .entity_ids()
@@ -246,9 +247,9 @@ impl Renderer {
             .filter(|&id| scene.world.is_active(id))
             .collect();
         if let Some(pool) = self.entity_pool.as_mut() {
-            pool.retain(&live);
+            pool.retain(scene.id(), &live);
         }
-        self.shadow_renderer.retain_entities(&live);
+        self.shadow_renderer.retain_entities(scene.id(), &live);
     }
 }
 

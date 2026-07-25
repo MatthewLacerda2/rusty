@@ -15,6 +15,7 @@ use glam::Vec3;
 use crate::ecs::World;
 use crate::navigation::NavMeshSettings;
 use crate::scene::collision_matrix::CollisionMatrix;
+use crate::scene::identity::SceneId;
 use crate::scene::layers::LayerRegistry;
 use crate::scene::world_cache::WorldMatrixCache;
 
@@ -53,6 +54,10 @@ fn default_ambient_intensity() -> f32 {
 }
 
 pub struct Scene {
+    /// This live scene's runtime identity (#355). Not scene *data* — it names the
+    /// instance, so the renderer can key per-entity GPU caches by (scene, entity)
+    /// and stop two scenes' entity ids from colliding. See [`SceneId`].
+    id: SceneId,
     pub world: World,
     pub selected_entity_id: Option<u32>,
     pub skybox_path: String,
@@ -104,6 +109,7 @@ pub struct Scene {
 impl Default for Scene {
     fn default() -> Self {
         Self {
+            id: SceneId::next(),
             world: World::new(),
             selected_entity_id: None,
             skybox_path: default_skybox_path(),
@@ -125,6 +131,12 @@ impl Default for Scene {
 impl Scene {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// This scene's runtime identity (#355) — stable for the life of the object,
+    /// distinct from every other live scene's.
+    pub fn id(&self) -> SceneId {
+        self.id
     }
 
     /// Spawn a box-projector decal at a surface hit (the point + outward normal

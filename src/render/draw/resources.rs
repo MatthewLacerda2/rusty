@@ -7,13 +7,16 @@
 use std::rc::Rc;
 
 use crate::components::MaterialAsset;
+use crate::render::gpu::slot_key::SlotKey;
 use crate::render::{transform_aabb, Frustum, GpuTexture, MeshId, Renderer};
 use crate::scene::Scene;
 
-// One solid draw item: the entity id (its persistent entity + material bind groups
-// live in `entity_pool`, keyed by this id — #210), the `MeshId` geometry key the
-// pass resolves the shared vertex/index buffers through (#127), and the index count.
-pub(crate) type SolidResource = (u32, MeshId, u32);
+// One solid draw item: the pool key — the entity paired with its scene, because
+// entity ids restart at 1 in every `World` and two scenes may render in one frame
+// (#355) — under which its persistent entity + material bind groups live in
+// `entity_pool` (#210), the `MeshId` geometry key the pass resolves the shared
+// vertex/index buffers through (#127), and the index count.
+pub(crate) type SolidResource = (SlotKey, MeshId, u32);
 // A transparent draw item: the same draw tuple plus its view-space depth (distance
 // along the camera forward to the entity origin). The transparent pass sorts on this
 // key back-to-front so `ALPHA_BLENDING` composites correctly (#242).
@@ -193,12 +196,13 @@ impl Renderer {
             palette: &palette,
             material_sig,
         };
-        self.sync_entity_slot(id, update, |s| {
+        let key = SlotKey::new(scene.id(), id);
+        self.sync_entity_slot(key, update, |s| {
             let maps = std::array::from_fn(|i| s.resolve_map(paths[i].as_ref()));
             s.material_bind_group(&maps)
         });
 
-        Some(((id, mesh_id, num_indices), world_pos, transparent))
+        Some(((key, mesh_id, num_indices), world_pos, transparent))
     }
 
     /// Resolve a material map path to a resident GPU texture, falling back to the

@@ -8,6 +8,7 @@ pub(crate) mod entity_pool;
 pub mod mesh;
 pub(crate) mod pipelines;
 pub(crate) mod shaders;
+pub(crate) mod slot_key;
 pub(crate) mod tangents;
 pub(crate) mod textures;
 pub(crate) mod uniforms;
