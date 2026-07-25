@@ -11,6 +11,10 @@ use crate::scene::{DirtyFlag, MeshComponent, Scene};
 
 const RES: u32 = 32;
 
+/// The engine's own forward shader — a module guaranteed to compose, so the override
+/// path is exercised rather than its fallback.
+const SHADER: &str = "assets/shaders/shader.wgsl";
+
 /// A preview render view (own target + depth + post-FX) sized to the test resolution.
 fn preview_view(renderer: &Renderer) -> RenderView {
     RenderView::offscreen(
@@ -99,46 +103,28 @@ fn shader_override_with_an_unreadable_path_falls_back_instead_of_panicking() {
     );
 }
 
+/// A shader override renders, and — the #355 step-4 half — belongs to the *view*, so
+/// it never reaches another one. The old mutate-and-restore swapped the shared
+/// `Renderer::render_pipeline` for the duration of the call, which shades the whole
+/// editor with a preview module if anything in between returns early or unwinds.
+///
+/// Asserted in the same test as the render rather than its own: a second `Renderer`
+/// is a whole device + pipelines + shadow maps, and enough concurrent ones exhaust
+/// memory on a software adapter (Windows CI's WARP).
 #[test]
-fn shader_override_with_the_engine_default_shader_does_not_panic() {
+fn a_shader_override_renders_and_stays_on_its_own_view() {
     let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
         return;
     };
-    let mut view = preview_view(&renderer);
-    let target = view.color_target_view().unwrap();
-    renderer.render_preview_with_shader(
-        &mut view,
-        &sphere_scene(),
-        &looking_at_origin_from_z(),
-        &target,
-        "assets/shaders/shader.wgsl",
-    );
-}
-
-/// The shader override belongs to the view, not the renderer (#355 step 4). The old
-/// mutate-and-restore left the *shared* forward pipeline swapped for the duration of
-/// the call, so anything that returned early or unwound in between shaded the whole
-/// editor with a preview module. A view-owned override cannot escape its view.
-#[test]
-fn the_shader_override_never_leaks_onto_another_view() {
-    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(32, 32)) else {
-        return;
-    };
-    let mut preview = preview_view(&renderer);
-    let mut plain = preview_view(&renderer);
     let scene = sphere_scene();
     let camera = looking_at_origin_from_z();
 
-    let out = preview.color_target_view().unwrap();
-    renderer.render_preview_with_shader(
-        &mut preview,
-        &scene,
-        &camera,
-        &out,
-        "assets/shaders/shader.wgsl",
-    );
+    let mut view = preview_view(&renderer);
+    let target = view.color_target_view().unwrap();
+    renderer.render_preview_with_shader(&mut view, &scene, &camera, &target, SHADER);
 
-    // The other view is untouched by the preview's override, and renders fine after.
-    let out = plain.color_target_view().unwrap();
-    renderer.render(&mut plain, &scene, &camera, &out, false, &[]);
+    // A different view of the same renderer is untouched by that override.
+    let mut plain = preview_view(&renderer);
+    let target = plain.color_target_view().unwrap();
+    renderer.render(&mut plain, &scene, &camera, &target, false, &[]);
 }
