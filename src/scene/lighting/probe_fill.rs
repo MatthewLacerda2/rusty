@@ -118,14 +118,14 @@ mod tests {
     use crate::components::{LightComponent, LightType};
     use glam::Quat;
 
-    /// A default scene with a set ambient term. Uses functional struct-update so the
-    /// `field_reassign_with_default` lint doesn't fire on the large `Scene`.
+    /// A default scene with a set ambient term. Built through `Scene::new` rather
+    /// than functional struct-update: the scene's runtime `id` is private (#355), and
+    /// going through the constructor is what guarantees every scene gets its own.
     fn scene_with_ambient(color: Vec3, intensity: f32) -> Scene {
-        Scene {
-            ambient_color: color,
-            ambient_intensity: intensity,
-            ..Scene::default()
-        }
+        let mut scene = Scene::new();
+        scene.ambient_color = color;
+        scene.ambient_intensity = intensity;
+        scene
     }
 
     #[test]

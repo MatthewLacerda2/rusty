@@ -47,11 +47,24 @@ fn offscreen_view_owns_a_target_targetless_does_not() {
     assert!(none.color_target_view().is_none());
 }
 
-/// The core #355 invariant: two views of two independent scenes, rendered back to
-/// back in one frame through one shared renderer, each keep their own size — neither
-/// resizes to the other's dimensions (the double-realloc "resize fight" is gone).
+/// The #355 invariant, end to end: two views of two independent scenes, rendered
+/// back to back through one shared renderer, clobber none of each other's state.
+///
+/// One scenario, one renderer, every axis asserted — deliberately not three tests.
+/// Each `Renderer` is a full device + pipelines + shadow maps, and on a software
+/// adapter (Windows CI's WARP renders into system RAM) enough concurrent ones
+/// exhaust memory mid-suite. Sharing the scenario keeps the peak flat.
+///
+/// The three axes, and what each looked like when it was broken:
+/// - **size** — the two views' resize guards defeated each other, reallocating both
+///   targets twice per frame;
+/// - **pooled entity resources** — both scenes call their entity 1, so keyed by
+///   entity id alone each render evicted the other's slot and rebuilt it next frame,
+///   re-introducing the churn #210 removed;
+/// - **static shadows** — a bare `is_static_cached` bool let scene B skip its own
+///   bake and sample scene A's shadow map (the phantom shadows on the preview mesh).
 #[test]
-fn two_views_two_scenes_keep_independent_sizes() {
+fn two_views_two_scenes_never_clobber_each_other() {
     let Some(mut renderer) = pollster::block_on(Renderer::new_headless(64, 64)) else {
         return;
     };
@@ -63,24 +76,51 @@ fn two_views_two_scenes_keep_independent_sizes() {
     let cam = camera();
 
     // Render both views in the same frame, interleaved, as the editor viewport + the
-    // Inspector preview do. Before #355 this permanently reallocated both targets.
+    // Inspector preview do.
     let out_a = wide.color_target_view().unwrap();
     renderer.render(&mut wide, &scene_a, &cam, &out_a, false, &[]);
+    assert_eq!(renderer.scene_slot_count(scene_a.id()), 1);
+    assert!(
+        !renderer.shadow_renderer.needs_static_bake(scene_a.id()),
+        "scene A's statics are baked after its render"
+    );
+    assert!(
+        renderer.shadow_renderer.needs_static_bake(scene_b.id()),
+        "but scene B must bake its own rather than inherit A's"
+    );
+
     let out_b = tall.color_target_view().unwrap();
     renderer.render(&mut tall, &scene_b, &cam, &out_b, false, &[]);
 
-    assert_eq!(wide.size().width, 96);
-    assert_eq!(wide.size().height, 48);
-    assert_eq!(tall.size().width, 40);
-    assert_eq!(tall.size().height, 80);
+    // Sizes: each view kept its own.
+    assert_eq!((wide.size().width, wide.size().height), (96, 48));
+    assert_eq!((tall.size().width, tall.size().height), (40, 80));
 
-    // A second frame in the same order must still leave each view at its own size.
+    // Pooled resources: A's survived B's render, and two entity-1s are two slots.
+    assert_eq!(
+        renderer.scene_slot_count(scene_a.id()),
+        1,
+        "scene A's pooled resources survived scene B's render"
+    );
+    assert_eq!(renderer.scene_slot_count(scene_b.id()), 1);
+    assert_eq!(
+        renderer.entity_slot_count(),
+        2,
+        "two scenes' entity 1s are two slots, not one collided one"
+    );
+
+    // Static shadows: the map now holds B's statics, so A must re-bake.
+    assert!(!renderer.shadow_renderer.needs_static_bake(scene_b.id()));
+    assert!(renderer.shadow_renderer.needs_static_bake(scene_a.id()));
+
+    // A second frame settles rather than thrashing: same sizes, same slot count.
     let out_a = wide.color_target_view().unwrap();
     renderer.render(&mut wide, &scene_a, &cam, &out_a, false, &[]);
     let out_b = tall.color_target_view().unwrap();
     renderer.render(&mut tall, &scene_b, &cam, &out_b, false, &[]);
     assert_eq!((wide.size().width, wide.size().height), (96, 48));
     assert_eq!((tall.size().width, tall.size().height), (40, 80));
+    assert_eq!(renderer.entity_slot_count(), 2);
 }
 
 /// `resize` reallocates the offscreen target to the new size and is a cheap no-op when

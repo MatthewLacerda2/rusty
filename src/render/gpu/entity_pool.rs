@@ -15,7 +15,9 @@
 use std::collections::{HashMap, HashSet};
 use wgpu::util::DeviceExt;
 
+use crate::render::gpu::slot_key::SlotKey;
 use crate::render::{BoneUniform, EntityUniform};
+use crate::scene::SceneId;
 
 /// One entity's reused GPU resources. The material bind group is rebuilt only when
 /// the resolved map paths change (`material_sig`); the bones buffer exists only for
@@ -31,7 +33,7 @@ struct EntitySlot {
 /// Persistent forward-pass GPU resources keyed by entity id, plus the one shared
 /// identity bone palette every non-skinned mesh binds.
 pub(crate) struct EntityPool {
-    slots: HashMap<u32, EntitySlot>,
+    slots: HashMap<SlotKey, EntitySlot>,
     default_bones_buffer: wgpu::Buffer,
 }
 
@@ -57,20 +59,26 @@ impl EntityPool {
         &self.default_bones_buffer
     }
 
-    /// The reused entity (group 1) bind group for `id`, if a slot exists.
-    pub(crate) fn entity_bind_group(&self, id: u32) -> Option<&wgpu::BindGroup> {
-        self.slots.get(&id).map(|s| &s.entity_bind_group)
+    /// The reused entity (group 1) bind group for `key`, if a slot exists.
+    pub(crate) fn entity_bind_group(&self, key: SlotKey) -> Option<&wgpu::BindGroup> {
+        self.slots.get(&key).map(|s| &s.entity_bind_group)
     }
 
-    /// The reused material (group 2) bind group for `id`, if a slot exists.
-    pub(crate) fn material_bind_group(&self, id: u32) -> Option<&wgpu::BindGroup> {
-        self.slots.get(&id).map(|s| &s.material_bind_group)
+    /// The reused material (group 2) bind group for `key`, if a slot exists.
+    pub(crate) fn material_bind_group(&self, key: SlotKey) -> Option<&wgpu::BindGroup> {
+        self.slots.get(&key).map(|s| &s.material_bind_group)
     }
 
-    /// Drop slots for entities not touched this frame (despawned / deactivated), so
-    /// the pool tracks the live scene instead of growing without bound.
-    pub(crate) fn retain(&mut self, live: &HashSet<u32>) {
-        self.slots.retain(|id, _| live.contains(id));
+    /// Drop `scene`'s slots for entities not touched this frame (despawned /
+    /// deactivated), so the pool tracks the live scene instead of growing without
+    /// bound.
+    ///
+    /// Only `scene`'s own slots are considered: another scene rendered this frame
+    /// is not present in `live` and must keep its resources (#355). Pruning across
+    /// every scene is what made the editor viewport and the Inspector preview
+    /// rebuild each other's pool every frame.
+    pub(crate) fn retain(&mut self, scene: SceneId, live: &HashSet<u32>) {
+        self.slots.retain(|key, _| key.survives_prune(scene, live));
     }
 
     /// Number of live per-entity slots — used by tests to prove the pool reuses
@@ -78,6 +86,13 @@ impl EntityPool {
     #[cfg(test)]
     pub(crate) fn slot_count(&self) -> usize {
         self.slots.len()
+    }
+
+    /// Live slot count for one scene, so a test can prove one scene's resources
+    /// survive another scene's render (#355).
+    #[cfg(test)]
+    pub(crate) fn scene_slot_count(&self, scene: SceneId) -> usize {
+        self.slots.keys().filter(|k| k.scene == scene).count()
     }
 }
 
@@ -91,24 +106,24 @@ pub(crate) struct SlotUpdate<'a> {
 }
 
 impl crate::render::Renderer {
-    /// Ensure `id`'s pool slot is current: rewrite its uniform, refresh the bone
+    /// Ensure `key`'s pool slot is current: rewrite its uniform, refresh the bone
     /// palette (allocating a per-entity buffer only for skinned meshes), and rebuild
     /// bind groups only when their inputs changed. `build_material` resolves the
     /// material textures and is only invoked on the first frame or a map change.
     pub(crate) fn sync_entity_slot(
         &mut self,
-        id: u32,
+        key: SlotKey,
         update: SlotUpdate,
         build_material: impl FnOnce(&Self) -> wgpu::BindGroup,
     ) {
         // Take the pool out so a slot can be mutated while other `self` fields
         // (device, queue, layouts) are read; `None` is a safe transient hole.
         let mut pool = self.entity_pool.take().expect("entity pool present");
-        if let Some(slot) = pool.slots.get_mut(&id) {
+        if let Some(slot) = pool.slots.get_mut(&key) {
             self.refresh_slot(slot, update, build_material);
         } else {
             let slot = self.create_slot(&pool, update, build_material);
-            pool.slots.insert(id, slot);
+            pool.slots.insert(key, slot);
         }
         self.entity_pool = Some(pool);
     }
@@ -191,6 +206,14 @@ impl crate::render::Renderer {
     #[cfg(test)]
     pub(crate) fn entity_slot_count(&self) -> usize {
         self.entity_pool.as_ref().map_or(0, EntityPool::slot_count)
+    }
+
+    /// Live forward-pass slot count for one scene (#355).
+    #[cfg(test)]
+    pub(crate) fn scene_slot_count(&self, scene: SceneId) -> usize {
+        self.entity_pool
+            .as_ref()
+            .map_or(0, |p| p.scene_slot_count(scene))
     }
 }
 

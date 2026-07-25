@@ -48,9 +48,14 @@ impl Renderer {
         // `MaterialAsset::default()` (Opaque), so the transparent/line/outline
         // pipelines never draw in this pass (`render(.., editor_mode: false, ..)`
         // skips the editor-only outline/grid overlays).
-        let previous = std::mem::replace(&mut self.render_pipeline, pipelines.forward);
+        //
+        // The override rides on the *view*, not on the shared renderer (#355 step 4):
+        // this used to swap `Renderer::render_pipeline` out and put it back around the
+        // call, which leaves the whole editor shaded by a preview module if anything
+        // in between returns early or unwinds. A view-owned override cannot leak.
+        view.set_forward_override(Some(pipelines.forward));
         self.render(view, scene, camera, output, false, &[]);
-        self.render_pipeline = previous;
+        view.set_forward_override(None);
     }
 
     /// Read and compose `shader_path` against the engine's one shared `common.wgsl`

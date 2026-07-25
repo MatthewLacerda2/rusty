@@ -561,7 +561,7 @@ fn draw_editor_dashboard(
         )
     };
     if frontend.editor_ui.is_dirty {
-        frontend.renderer.shadow_renderer.is_static_cached = false;
+        frontend.renderer.shadow_renderer.invalidate_static_cache();
         frontend.editor_ui.is_dirty = false;
     }
     // Apply the selected post-FX scalability tier. The editor dropdown and

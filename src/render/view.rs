@@ -46,9 +46,34 @@ pub struct RenderView {
     /// preview), `RENDER_ATTACHMENT | TEXTURE_BINDING` so egui samples it. `None` for a
     /// targetless view whose caller supplies the output and reads it back itself.
     color_target: Option<wgpu::Texture>,
+    /// A forward pipeline this view draws solids with instead of the renderer's shared
+    /// one (#355 step 4) — the Inspector's Shader-asset preview, which shades its mesh
+    /// with the module being previewed.
+    ///
+    /// This replaces a mutate-and-restore on the shared `Renderer::render_pipeline`:
+    /// swapping a field out around a call and putting it back leaves the renderer in
+    /// the wrong state if anything between the two returns early or unwinds, and it is
+    /// invisible at the call site. Ownership by the view says the same thing
+    /// declaratively — *this* view shades this way — and cannot leak to another.
+    forward_override: Option<wgpu::RenderPipeline>,
 }
 
 impl RenderView {
+    /// The forward pipeline this view draws solids with: its own override when set,
+    /// else the renderer's shared one.
+    pub(crate) fn forward_pipeline<'a>(
+        &'a self,
+        shared: &'a wgpu::RenderPipeline,
+    ) -> &'a wgpu::RenderPipeline {
+        self.forward_override.as_ref().unwrap_or(shared)
+    }
+
+    /// Draw this view's solids with `pipeline` instead of the shared forward pipeline.
+    /// Pass `None` to go back to the shared one.
+    pub fn set_forward_override(&mut self, pipeline: Option<wgpu::RenderPipeline>) {
+        self.forward_override = pipeline;
+    }
+
     /// A view that owns an offscreen colour target — the editor viewport and Inspector
     /// preview render into it and show it as an `egui::Image`.
     pub fn offscreen(
@@ -99,6 +124,7 @@ impl RenderView {
             post_fx,
             decal_depth_bind_group: None,
             color_target,
+            forward_override: None,
         }
     }
 

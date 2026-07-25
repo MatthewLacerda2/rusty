@@ -158,6 +158,7 @@ impl Renderer {
             skybox_path: "".to_string(),
             reflection_cube: None,
             reflection_cube_path: String::new(),
+            cubemaps: HashMap::new(),
             default_cube,
             static_capture: false,
             capture_probe_bounce: false,

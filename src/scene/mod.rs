@@ -21,6 +21,7 @@ pub mod asset_instance;
 pub mod authoring;
 pub mod collision_matrix;
 pub mod destroy_queue;
+pub mod identity;
 pub mod io;
 pub mod layers;
 pub mod lighting;
@@ -32,6 +33,7 @@ pub mod snapshot;
 pub mod world_cache;
 
 pub use collision_matrix::CollisionMatrix;
+pub use identity::SceneId;
 pub use io::{
     is_scene_path, load_from_file, save_to_file, seed_default_scene, seed_default_scripts,
     DEFAULT_SCENE_PATH, DEFAULT_SCENE_SOURCE, DEFAULT_SCRIPTS_DEST_DIR, SCENE_EXTENSION,

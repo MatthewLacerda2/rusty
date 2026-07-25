@@ -70,11 +70,11 @@ impl Renderer {
         pass.set_pipeline(&self.transparent_pipeline);
         pass.set_bind_group(0, &self.global_bind_group, &[]);
         pass.set_bind_group(3, &self.shadow_bind_group, &[]);
-        for ((id, mesh_id, num_indices), _depth) in items {
+        for ((key, mesh_id, num_indices), _depth) in items {
             let (Some(gpu_mesh), Some(entity_bg), Some(material_bg)) = (
                 self.gpu_meshes.get(mesh_id),
-                pool.entity_bind_group(*id),
-                pool.material_bind_group(*id),
+                pool.entity_bind_group(*key),
+                pool.material_bind_group(*key),
             ) else {
                 continue;
             };
