@@ -10,7 +10,7 @@
 use glam::{Quat, Vec3};
 
 use crate::components::MaterialAsset;
-use crate::render::{project_cubemap, CubemapCapture, CubemapFace, Renderer};
+use crate::render::{project_cubemap, CubemapCapture, CubemapFace};
 use crate::scene::{MeshComponent, Scene};
 
 const RES: u32 = 32;
@@ -75,7 +75,7 @@ fn red_wall_scene() -> Scene {
 /// the room carries less red — the bake is position-dependent, the issue's acceptance.
 #[test]
 fn bake_red_wall_is_directional_and_position_dependent() {
-    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return; // No GPU/software adapter — skip, same contract as the screenshots.
     };
     let scene = red_wall_scene();
@@ -107,7 +107,7 @@ fn bake_red_wall_is_directional_and_position_dependent() {
 /// `bake_probes` writes SH onto every probe in place (skips with no adapter).
 #[test]
 fn bake_probes_fills_all_in_place() {
-    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
     let mut scene = red_wall_scene();

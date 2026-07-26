@@ -11,7 +11,7 @@ use glam::{Quat, Vec3};
 use crate::components::MaterialAsset;
 use crate::render::ibl::cube_sample::srgb_to_linear;
 use crate::render::ibl::cubemap::parse_ktx2_cubemap_mips;
-use crate::render::{CubemapFace, Renderer};
+use crate::render::CubemapFace;
 use crate::scene::{MeshComponent, Scene};
 
 const RES: u32 = 32;
@@ -94,7 +94,7 @@ fn variance(face: &[u8], size: u32) -> f32 {
 /// real GPU bake; skips with no adapter.
 #[test]
 fn bake_shows_room_and_mips_blur() {
-    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return; // No GPU/software adapter — skip, same contract as the screenshots.
     };
     let scene = colored_room();
@@ -137,7 +137,7 @@ fn bake_shows_room_and_mips_blur() {
 /// adapter.
 #[test]
 fn bake_writes_file_and_sets_path() {
-    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
     let mut scene = colored_room();

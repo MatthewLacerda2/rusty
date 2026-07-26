@@ -6,7 +6,7 @@
 use glam::Vec3;
 
 use super::RenderView;
-use crate::render::{Camera, Renderer, OFFSCREEN_FORMAT};
+use crate::render::{Camera, OFFSCREEN_FORMAT};
 use crate::scene::{DirtyFlag, MeshComponent, Scene};
 
 fn box_scene() -> Scene {
@@ -38,7 +38,7 @@ fn camera() -> Camera {
 /// An offscreen view exposes an owned colour target; a targetless one does not.
 #[test]
 fn offscreen_view_owns_a_target_targetless_does_not() {
-    let Some(renderer) = pollster::block_on(Renderer::new_headless(32, 32)) else {
+    let Some(renderer) = crate::render::test_gpu::headless_or_skip(32, 32) else {
         return;
     };
     let off = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 32, 32, 2);
@@ -65,7 +65,7 @@ fn offscreen_view_owns_a_target_targetless_does_not() {
 ///   bake and sample scene A's shadow map (the phantom shadows on the preview mesh).
 #[test]
 fn two_views_two_scenes_never_clobber_each_other() {
-    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(64, 64)) else {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(64, 64) else {
         return;
     };
 
@@ -127,7 +127,7 @@ fn two_views_two_scenes_never_clobber_each_other() {
 /// the size and quality divisor are unchanged.
 #[test]
 fn resize_tracks_the_new_size() {
-    let Some(renderer) = pollster::block_on(Renderer::new_headless(32, 32)) else {
+    let Some(renderer) = crate::render::test_gpu::headless_or_skip(32, 32) else {
         return;
     };
     let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 32, 32, 2);
