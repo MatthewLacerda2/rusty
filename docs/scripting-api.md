@@ -863,6 +863,81 @@ Audio.PlayAt(clip, muzzle.x, muzzle.y, muzzle.z, 0.9)
 > is decoded by the same `ClipCache` path an imported clip is. See
 > `docs/api-faithfulness.md`.
 
+### Songs (#358)
+
+A **song** is the same idea one level up: where a patch is one instrument, a song is a
+piece of music — which instruments play (`tracks`), what they play (`patterns` of
+notes), and in what order (`arrangement`). It bakes to a single mono WAV the audio
+runtime plays like any other clip.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Sound.BakeSong` | `(song, path)` | the written `path` |
+| `Sound.BakeSongJson` | `(json, path)` | the written `path` |
+| `Sound.SongToJson` | `(song)` | the song's canonical JSON string |
+
+The shape is **tracker-style** (the MOD/XM lineage), not a flat piano roll: patterns
+are named blocks you list in the arrangement, so a piece that repeats stays short
+enough to write, diff and iterate on by hand.
+
+```lua
+local theme = {
+  bpm = 120,
+  seed = 7,
+  tracks = {
+    { name = "bass", patch = "project/assets/sounds/bass.json", gain = 0.8 },
+    { name = "lead", patch = { source = { kind = "karplus", damping = 0.5,
+                                          brightness = 0.5 },
+                               amp = { a = 0.001, d = 0.3, s = 0.0, r = 0.2 } },
+      gain = 0.6 },
+  },
+  patterns = {
+    verse = { beats = 4, notes = {
+      { track = "bass", note = "E2", start = 0.0, dur = 0.5 },
+      { track = "lead", note = "B3", start = 2.0, dur = 1.0, vel = 0.8 },
+    } },
+  },
+  arrangement = { "verse", "verse" },
+}
+
+local clip = Sound.BakeSong(theme, "project/assets/sounds/theme.wav")
+Audio.PlayAt(clip, 0, 0, 0, 1.0)
+```
+
+| Field | Default | Meaning |
+|---|---|---|
+| `bpm` | — | Tempo. The one place beats become seconds, so retiming a finished song is one number. |
+| `seed` | `0` | Folded into every note's render seed. One number re-rolls every stochastic source in the piece. |
+| `tracks[].patch` | — | Either a **path** to a saved patch `.json` or an **inline patch table** — the same duality `Sound.Bake` / `Sound.BakeJson` have. |
+| `tracks[].gain` | `1.0` | Linear mix level for that track. A balance control, not a safety one — see the limiter below. |
+| `patterns[].beats` | — | How long the block occupies in the arrangement. Notes may ring out past it; the next pattern still starts on time. |
+| `notes[].note` | — | A name (`"C#4"`) or a MIDI number, exactly as `Sound.Bake` takes. |
+| `notes[].start` / `dur` | — | Onset and gate length **in beats**, measured from the start of the note's own pattern. |
+| `notes[].vel` | `1.0` | Velocity, `0..1`. |
+
+**Mixing is addition.** Every note is rendered independently through the patch layer
+above and summed into the master at its start offset — no voice limit and no
+voice-stealing, because this is a bake, not a real-time synth. The **master limiter
+always runs** on the sum, so a dense arrangement cannot clip no matter what the track
+gains say.
+
+**Length** is `max(arrangement, last tail)`: a song ending on a rest is still a full
+arrangement long, so its loop point falls where the score says, and a note held past
+the final beat rings out rather than being cut.
+
+**Determinism.** Each note's seed comes from `(song seed, track index, note ordinal)`
+through the same seeded integer hash the rest of the engine uses, so the same song and
+seed bake a byte-identical WAV in any process. A pattern played twice gets two
+different noise draws — a repeated snare is not a photocopy — and both are stable.
+
+Validation happens **before** any samples are produced: an arrangement naming an
+undefined pattern, a note naming an undefined track, a non-positive `bpm` / `beats` /
+`dur`, or an unreadable patch path each raise a message saying exactly which one went
+wrong, rather than rendering silence you would have to listen for.
+
+There is deliberately **no algorithmic composition** — no scale helpers, chord
+generators or euclidean rhythms. Claude writes the score; the engine renders it.
+
 ## `Navigation`
 
 The navmesh is a height-field surface (#130): each grid cell carries a baked

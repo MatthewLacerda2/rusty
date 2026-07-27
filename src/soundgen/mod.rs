@@ -30,6 +30,8 @@
 //! - [`fx`] — the post-chain (delay, reverb) and the mandatory bake limiter.
 //! - [`wav`] — the mono 16-bit PCM writer, the only place `f32` is quantized.
 //! - [`bake`] — the one-call front door: render → limit → write.
+//! - [`song`] — the song document (tracks, patterns, arrangement) and its mixer,
+//!   which renders every note through the stages above and sums them (#358).
 #![deny(clippy::unwrap_used)]
 
 pub mod bake;
@@ -37,6 +39,7 @@ pub mod core;
 pub mod fx;
 pub mod note;
 pub mod patch;
+pub mod song;
 pub mod wav;
 
 pub use bake::{bake_note, render_limited};
@@ -44,6 +47,8 @@ pub use bake::{bake_note, render_limited};
 pub use self::core::SAMPLE_RATE;
 pub use note::{midi_to_freq, parse_note, NoteOpts};
 pub use patch::Patch;
+pub use song::render::{bake_song, render_song};
+pub use song::Song;
 
 /// Where baked sounds belong by convention: the gitignored project workspace, the
 /// same pattern authored textures and shaders follow, so a bake never lands in the

@@ -9,7 +9,8 @@
 //!   Lua-authored patch is the same document as one loaded from `.json`;
 //! - a **note** → a MIDI number, accepting either the name a score would use
 //!   (`"C#4"`) or a raw number;
-//! - an **opts table** → [`NoteOpts`], every field optional.
+//! - an **opts table** → [`NoteOpts`], every field optional;
+//! - a **song table** → [`Song`], the same way (#358).
 //!
 //! The Lua patch shape mirrors the JSON one-to-one:
 //!
@@ -25,12 +26,22 @@
 use mlua::{Table, Value};
 
 use crate::api::lua_json::table_to_json;
-use crate::soundgen::{parse_note, NoteOpts, Patch};
+use crate::soundgen::{parse_note, NoteOpts, Patch, Song};
 
 /// Parse a Lua patch `table` into a [`Patch`].
 pub fn patch_from_table(table: &Table) -> Result<Patch, String> {
     let json = table_to_json(table)?;
     Patch::from_json(&serde_json::to_string(&json).map_err(|e| e.to_string())?)
+}
+
+/// Parse a Lua song `table` into a [`Song`] (#358).
+///
+/// Same one-liner as [`patch_from_table`] and for the same reason: the field decoding
+/// lives once, in the song's serde derive, so a Lua-authored song and one loaded from
+/// `.json` are the same document.
+pub fn song_from_table(table: &Table) -> Result<Song, String> {
+    let json = table_to_json(table)?;
+    Song::from_json(&serde_json::to_string(&json).map_err(|e| e.to_string())?)
 }
 
 /// Resolve a `note` argument to a MIDI number: a name (`"C#4"`, `"Bb3"`) or the

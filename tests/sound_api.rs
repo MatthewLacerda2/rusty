@@ -110,3 +110,41 @@ fn a_saved_patch_re_bakes_byte_for_byte() {
         std::fs::remove_file(f).ok();
     }
 }
+
+/// The song verbs end to end (#358): author a song in Lua, bake it, save it with
+/// `SongToJson`, and re-bake the saved JSON — the two WAVs must be identical. That
+/// exercises all three verbs and pins the promise a saved score is worth keeping:
+/// it re-renders the same asset, so a song can be committed instead of its audio.
+#[test]
+fn a_saved_song_re_bakes_the_identical_mix() {
+    let lua = Lua::new();
+    let authored = tmp("rusty_song_e2e_authored.wav");
+    let rebaked = tmp("rusty_song_e2e_rebaked.wav");
+
+    rusty::api::sound::register(&lua).unwrap();
+    let script = format!(
+        r#"
+        local song = {{
+          bpm = 140, seed = 3,
+          tracks = {{ {{ name = "lead", patch = {GUNSHOT}, gain = 0.7 }} }},
+          patterns = {{ riff = {{ beats = 2, notes = {{
+            {{ track = "lead", note = "C2", start = 0.0, dur = 0.5 }},
+            {{ track = "lead", note = 39,   start = 1.0, dur = 0.5, vel = 0.6 }},
+          }} }} }},
+          arrangement = {{ "riff", "riff" }},
+        }}
+        Sound.BakeSong(song, "{authored}")
+        Sound.BakeSongJson(Sound.SongToJson(song), "{rebaked}")
+    "#
+    );
+    lua.load(&script).exec().unwrap();
+
+    assert_eq!(
+        std::fs::read(&authored).unwrap(),
+        std::fs::read(&rebaked).unwrap(),
+        "a song saved to JSON must re-bake the identical mix"
+    );
+    for f in [authored, rebaked] {
+        std::fs::remove_file(f).ok();
+    }
+}
