@@ -1,3 +1,4 @@
+pub(crate) mod budget;
 pub(crate) mod build;
 pub(crate) mod headless;
 pub(crate) mod resize;
@@ -58,12 +59,15 @@ impl Renderer {
         surface.configure(&device, &config);
 
         let present_modes = surface_caps.present_modes.clone();
+        // No budget permit: there is exactly one windowed renderer and it is the
+        // application itself, so it never queues behind the headless budget (#366).
         Ok(Self::from_parts(
             device,
             queue,
             Some(surface),
             config,
             present_modes,
+            None,
         ))
     }
 
@@ -71,19 +75,33 @@ impl Renderer {
     /// groups from an already-created device/queue. Both the windowed (`new`) and
     /// the headless offscreen (`new_headless`) paths funnel through here, so they
     /// produce a byte-identical renderer apart from the optional window surface.
+    ///
+    /// `gpu_permit` is the caller's slot in the headless budget (#366): `Some` from the
+    /// headless path, `None` from the windowed one. It is merely *stored* here — it must
+    /// already have been acquired before the device was created, since the point of the
+    /// budget is to bound live GPU allocations, not constructor calls.
     pub(crate) fn from_parts(
         device: wgpu::Device,
         queue: wgpu::Queue,
         surface: Option<wgpu::Surface<'static>>,
         config: wgpu::SurfaceConfiguration,
         present_modes: Vec<wgpu::PresentMode>,
+        gpu_permit: Option<budget::Permit>,
     ) -> Self {
         // Build every shared GPU resource up-front, grouped by role (textures, global
         // bindings, shadow system, forward/billboard passes), then assemble the
         // flat renderer from those groups and seed the editor gizmo meshes. Per-view
         // targets (depth + post-FX) belong to each `RenderView`, not the renderer (#355).
         let gpu = GpuResources::build(&device, &queue);
-        let mut renderer = Self::assemble(device, queue, surface, config, present_modes, gpu);
+        let mut renderer = Self::assemble(
+            device,
+            queue,
+            surface,
+            config,
+            present_modes,
+            gpu,
+            gpu_permit,
+        );
         renderer.generate_grid_mesh();
         renderer.generate_axis_arrows();
         renderer
@@ -104,6 +122,7 @@ impl Renderer {
         config: wgpu::SurfaceConfiguration,
         present_modes: Vec<wgpu::PresentMode>,
         gpu: GpuResources,
+        gpu_permit: Option<budget::Permit>,
     ) -> Self {
         let GpuResources {
             camera_lighting_layout,
@@ -162,6 +181,7 @@ impl Renderer {
             default_cube,
             static_capture: false,
             capture_probe_bounce: false,
+            _gpu_permit: gpu_permit,
         }
     }
 }

@@ -15,6 +15,39 @@
 - CI (`.github/workflows/ci.yml`) runs `cargo test` for both the engine and the
   lint xtask.
 
+## GPU tests and the headless budget
+Tests that need a real device call `Renderer::new_headless`, which returns `None`
+when no adapter is present — so **every GPU test skips gracefully** rather than
+failing. In-crate tests should acquire one through
+`crate::render::test_gpu::headless_or_skip`, which carries that skip contract in one
+place; the `let Some(r) = … else { return }` shape is the whole convention.
+
+Where they actually run is not uniform, and it is worth knowing before you rely on one:
+
+| CI job | Adapter | GPU tests |
+|---|---|---|
+| `build-test` (ubuntu) | none installed | **skip** — the `None` path, ~0.00s |
+| `build-test-cross` (macos) | real Metal GPU | run, against real VRAM |
+| `build-test-cross` (windows) | **WARP** (software) | run, against **system RAM** |
+
+Because Linux skips them, a GPU test passing locally in a container proves nothing;
+macOS and Windows CI are where it is really exercised. Pair anything load-bearing with
+an adapter-free unit test on the underlying predicate so the rule is pinned everywhere.
+
+**Concurrency is capped.** A `Renderer` is a device, the full pipeline set and shadow
+maps, and Windows CI's WARP allocates all of that in system RAM shared with rustc — so
+unbounded parallel renderers exhausted memory and failed *unrelated* tests with a bare
+`Queue::write_texture: Not enough memory left.` (#366). `MAX_CONCURRENT_HEADLESS` in
+`src/render/setup/budget.rs` now bounds how many are alive at once, enforced by an RAII
+permit the renderer holds for its whole life. It applies to the normal library build,
+not just `cfg(test)`, because the screenshot integration tests reach the renderer
+indirectly through `screenshot::capture`.
+
+You do not need to do anything to opt in — but if a new GPU test makes CI run out of
+memory, **lower that constant to 1** before weakening the test. If a test hangs waiting
+on a permit, the guard panics with an explanation: it means something built a second
+headless renderer while still holding the first.
+
 ## API-doc drift gate
 `tests/api_doc_drift.rs` (dev-only, #280) is a **hard gate** that keeps
 `docs/scripting-api.md` honest against the **live Lua API surface**. It boots an

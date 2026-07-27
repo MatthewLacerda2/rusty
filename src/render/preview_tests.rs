@@ -63,7 +63,7 @@ fn looking_at_origin_from_z() -> Camera {
 
 #[test]
 fn offscreen_preview_view_allocates_a_target_the_view_reads_back() {
-    let Some(renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
+    let Some(renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return; // No GPU/software adapter — skip, same contract as the screenshots.
     };
     let view = preview_view(&renderer);
@@ -72,7 +72,7 @@ fn offscreen_preview_view_allocates_a_target_the_view_reads_back() {
 
 #[test]
 fn plain_render_into_the_preview_target_does_not_panic() {
-    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
     let mut view = preview_view(&renderer);
@@ -89,7 +89,7 @@ fn plain_render_into_the_preview_target_does_not_panic() {
 
 #[test]
 fn shader_override_with_an_unreadable_path_falls_back_instead_of_panicking() {
-    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
     let mut view = preview_view(&renderer);
@@ -113,7 +113,7 @@ fn shader_override_with_an_unreadable_path_falls_back_instead_of_panicking() {
 /// memory on a software adapter (Windows CI's WARP).
 #[test]
 fn a_shader_override_renders_and_stays_on_its_own_view() {
-    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
     let scene = sphere_scene();

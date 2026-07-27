@@ -5,6 +5,8 @@ mod frustum;
 mod preview;
 pub mod readback;
 mod setup;
+#[cfg(test)]
+pub(crate) mod test_gpu;
 mod view;
 
 pub mod gpu;
@@ -184,4 +186,15 @@ pub struct Renderer {
     /// Off everywhere else, so direct-only capture (bounce 1, reflection bakes) and
     /// runtime shading keep their "static ⇒ no probe SH" rule.
     capture_probe_bounce: bool,
+
+    /// This renderer's slot in the headless budget (#366) — `Some` for headless
+    /// renderers, `None` for the windowed one, which is the application itself and
+    /// never queues behind a test budget.
+    ///
+    /// **Declared last on purpose.** Struct fields drop in declaration order, so the
+    /// permit is released only after the device, queue and every GPU resource above it
+    /// have been dropped. Freeing the slot any earlier would let the next renderer
+    /// allocate against memory this one has not actually returned yet — which is the
+    /// entire failure this guard exists to prevent.
+    _gpu_permit: Option<setup::budget::Permit>,
 }

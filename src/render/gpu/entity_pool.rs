@@ -219,7 +219,7 @@ impl crate::render::Renderer {
 
 #[cfg(test)]
 mod tests {
-    use crate::render::{Camera, RenderView, Renderer, OFFSCREEN_FORMAT};
+    use crate::render::{Camera, RenderView, OFFSCREEN_FORMAT};
     use crate::scene::{MeshComponent, Scene};
 
     fn box_mesh() -> MeshComponent {
@@ -242,7 +242,7 @@ mod tests {
     /// written in place instead of allocated every frame. Skips with no GPU adapter.
     #[test]
     fn pool_reuses_slots_across_frames() {
-        let Some(mut renderer) = pollster::block_on(Renderer::new_headless(64, 64)) else {
+        let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(64, 64) else {
             return; // No GPU/software adapter — same skip contract as the screenshots.
         };
         let mut scene = Scene::new();

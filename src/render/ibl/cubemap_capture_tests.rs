@@ -7,7 +7,7 @@
 use glam::{Quat, Vec3};
 
 use crate::components::MaterialAsset;
-use crate::render::{CubemapFace, Renderer};
+use crate::render::CubemapFace;
 use crate::scene::{MeshComponent, Scene};
 
 const RES: u32 = 32;
@@ -107,7 +107,7 @@ fn center_rgb(face: &[u8], res: u32) -> (u8, u8, u8) {
 /// appear (the +X face is still red, not the actor's blue).
 #[test]
 fn static_cubemap_shows_walls_and_excludes_dynamic() {
-    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return; // No GPU/software adapter — skip, same contract as the screenshots.
     };
     let scene = colored_box_scene();

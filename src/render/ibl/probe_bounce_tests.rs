@@ -8,7 +8,7 @@
 use glam::Vec3;
 
 use crate::render::ibl::probe_bounce::{field_delta, pass_converged};
-use crate::render::{Renderer, MAX_BOUNCES};
+use crate::render::MAX_BOUNCES;
 use crate::scene::lighting::sh::Sh9;
 use crate::scene::Scene;
 
@@ -144,7 +144,7 @@ fn bleed_room(probe: Vec3) -> Scene {
 /// into the scene. The issue's headline acceptance.
 #[test]
 fn multibounce_increases_color_bleed() {
-    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return; // No GPU/software adapter — skip, same contract as the screenshots.
     };
     let probe = Vec3::new(0.0, 0.0, 0.0);
@@ -172,7 +172,7 @@ fn multibounce_increases_color_bleed() {
 /// short of [`MAX_BOUNCES`].
 #[test]
 fn early_out_on_dark_scene() {
-    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
     let mut scene = Scene::new();
@@ -198,7 +198,7 @@ fn early_out_on_dark_scene() {
 /// Determinism: the same scene bakes byte-identical SH across two independent runs.
 #[test]
 fn multibounce_is_deterministic() {
-    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(RES, RES)) else {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
     let probe = Vec3::new(0.0, 0.0, 0.0);

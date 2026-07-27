@@ -22,6 +22,15 @@ impl Renderer {
         let width = width.max(1);
         let height = height.max(1);
 
+        // Claim a slot in the headless budget *before* allocating anything, and hold it
+        // for this renderer's whole life (#366). Every headless consumer — the tests,
+        // the screenshot path, the probe/reflection bakes, `Debug.Preview` — funnels
+        // through here, so this is the one place the bound can be enforced for all of
+        // them. Claimed before the adapter/device requests below rather than after, so
+        // the count bounds live allocations; if one of those `?`s bails out, the permit
+        // drops with this frame and the slot is never leaked.
+        let permit = super::budget::acquire_headless();
+
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
             ..Default::default()
@@ -68,6 +77,7 @@ impl Renderer {
             None,
             offscreen_config(width, height),
             vec![wgpu::PresentMode::Fifo],
+            Some(permit),
         ))
     }
 }
