@@ -6,15 +6,19 @@ use super::{PostFx, PostParams};
 impl PostFx {
     /// Run the full chain. `depth_view` is the scene depth (for SSR + motion blur),
     /// `skybox_view` the cubemap fallback, `output` the final swapchain/screenshot
-    /// view. `bloom_enabled` skips the bloom passes when off.
+    /// view. `passes` says which optional passes run this frame.
     pub fn run(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         ctx: PostFxContext<'_>,
         params: PostParams,
-        bloom_enabled: bool,
+        passes: PostPasses,
     ) {
+        let PostPasses {
+            bloom: bloom_enabled,
+            fxaa: fxaa_enabled,
+        } = passes;
         queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -26,6 +30,9 @@ impl PostFx {
         }
 
         // Composite reads scene HDR + bloom_b (final blur result) + depth + skybox.
+        // With FXAA on it lands in the LDR target for that pass to sample; with FXAA
+        // off it writes the output directly, so the off path is byte-for-byte what
+        // the chain produced before this pass existed.
         let composite_bg = self.io_bind_group(
             device,
             &self.scene_hdr.view,
@@ -33,12 +40,30 @@ impl PostFx {
             ctx.depth_view,
             ctx.skybox_view,
         );
+        let composite_target = if fxaa_enabled {
+            &self.ldr.view
+        } else {
+            ctx.output
+        };
         Self::fullscreen(
             &mut encoder,
             &self.composite_pipeline,
             &composite_bg,
-            ctx.output,
+            composite_target,
         );
+
+        // FXAA: tonemapped LDR in, anti-aliased output out. The aux/depth/skybox
+        // bindings are unused by the pass but must satisfy the shared IO layout.
+        if fxaa_enabled {
+            let fxaa_bg = self.io_bind_group(
+                device,
+                &self.ldr.view,
+                &self.bloom_b.view,
+                ctx.depth_view,
+                ctx.skybox_view,
+            );
+            Self::fullscreen(&mut encoder, &self.fxaa_pipeline, &fxaa_bg, ctx.output);
+        }
 
         queue.submit(std::iter::once(encoder.finish()));
     }
@@ -145,6 +170,17 @@ impl PostFx {
         pass.set_bind_group(0, bind_group, &[]);
         pass.draw(0..3, 0..1);
     }
+}
+
+/// Which optional passes run this frame. Bundled rather than passed as loose bools so
+/// `run` stays under the 6-arg threshold — and so two same-typed flags can't be
+/// swapped silently at the call site.
+#[derive(Clone, Copy, Debug)]
+pub struct PostPasses {
+    /// Run the bright-pass + blur that feed the composite's bloom add.
+    pub bloom: bool,
+    /// Run the final anti-aliasing pass (#360).
+    pub fxaa: bool,
 }
 
 /// The per-frame views the chain reads/writes, bundled to keep `run` under the

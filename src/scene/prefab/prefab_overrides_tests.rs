@@ -24,6 +24,7 @@ fn camera() -> CameraComponent {
         clear_flags: ClearFlags::Skybox,
         motion_blur_active: true,
         motion_blur_samples: 64,
+        fxaa_active: false,
     }
 }
 

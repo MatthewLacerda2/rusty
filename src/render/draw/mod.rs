@@ -195,8 +195,12 @@ impl Renderer {
             skybox_view,
             output,
         };
+        let passes = crate::render::postfx::PostPasses {
+            bloom: bloom_enabled,
+            fxaa: crate::render::postfx::params::fxaa_enabled(scene),
+        };
         view.post_fx
-            .run(&self.device, &self.queue, ctx, post_params, bloom_enabled);
+            .run(&self.device, &self.queue, ctx, post_params, passes);
     }
 
     /// Builds the per-frame lighting uniform from the scene's lights and SSR settings.

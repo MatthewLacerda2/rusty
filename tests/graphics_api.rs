@@ -44,6 +44,7 @@ fn scene_with_volume() -> Rc<RefCell<Scene>> {
             clear_flags: ClearFlags::Skybox,
             motion_blur_active: false,
             motion_blur_samples: 8,
+            fxaa_active: true,
         }),
     );
     Rc::new(RefCell::new(scene))

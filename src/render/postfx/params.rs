@@ -77,6 +77,29 @@ pub fn build_post_params(
     (params, bloom_enabled)
 }
 
+/// Whether the FXAA pass runs this frame (#360).
+///
+/// Deliberately *not* folded into [`build_post_params`]: that walks visual-correction
+/// volumes, and FXAA lives on the camera, so tying it to that loop would make
+/// anti-aliasing depend on the scene having a `VisualCorrection` volume — the opposite
+/// of a default-on effect. It reads the first active camera component instead, the
+/// same selector the `Graphics.*` bindings use.
+///
+/// A scene with no camera component at all gets `true`: default-on means a scene that
+/// has never heard of the knob is still anti-aliased.
+///
+/// Unlike motion blur this is not gated by [`QualityPreset`] — FXAA runs on every
+/// tier, Low included, where it is precisely the cheap anti-aliasing an iGPU wants.
+pub fn fxaa_enabled(scene: &Scene) -> bool {
+    scene
+        .world
+        .ids_with_camera()
+        .into_iter()
+        .find(|&id| scene.world.is_active(id) && scene.world.camera(id).is_some_and(|c| c.active))
+        .and_then(|id| scene.world.camera(id).map(|c| c.fxaa_active))
+        .unwrap_or(true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -119,6 +142,7 @@ mod tests {
             clear_flags: ClearFlags::Skybox,
             motion_blur_active: true,
             motion_blur_samples: 16,
+            fxaa_active: true,
         }
     }
 

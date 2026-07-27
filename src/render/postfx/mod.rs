@@ -13,7 +13,7 @@ pub(crate) mod params;
 mod run;
 mod setup;
 
-pub use run::PostFxContext;
+pub use run::{PostFxContext, PostPasses};
 
 use glam::Mat4;
 
@@ -100,6 +100,8 @@ pub struct PostFx {
     pub bright_pipeline: wgpu::RenderPipeline,
     pub blur_pipeline: wgpu::RenderPipeline,
     pub composite_pipeline: wgpu::RenderPipeline,
+    /// Final anti-aliasing pass (#360), reading [`PostFx::ldr`] and writing the output.
+    pub fxaa_pipeline: wgpu::RenderPipeline,
     pub io_layout: wgpu::BindGroupLayout,
 
     pub params_buffer: wgpu::Buffer,
@@ -110,8 +112,21 @@ pub struct PostFx {
     /// Bloom ping-pong buffers (bright-pass / blur), at reduced resolution.
     pub bloom_a: PfxTarget,
     pub bloom_b: PfxTarget,
+    /// Full-resolution LDR image the composite writes when FXAA is on, so the FXAA
+    /// pass has a finished, tonemapped, gamma-encoded frame to sample.
+    ///
+    /// This is the one target the chain gained for #360, and it is unavoidable rather
+    /// than incidental: FXAA is defined on post-tonemap colour, so it cannot fold into
+    /// the composite, and the existing ping-pong buffers are at the bloom divisor's
+    /// reduced resolution and in HDR format. With FXAA off the composite writes
+    /// straight to the output and this texture is simply never read — the off path
+    /// stays a byte-exact pass-through.
+    pub ldr: PfxTarget,
     pub bloom_size: (u32, u32),
     pub full_size: (u32, u32),
+    /// The output format `ldr` and the composite/FXAA pipelines are built against,
+    /// kept so `resize` can reallocate `ldr` to match.
+    output_format: wgpu::TextureFormat,
 
     /// Previous-frame view-projection, for camera motion blur velocity.
     pub prev_view_proj: Mat4,

@@ -32,6 +32,14 @@ fn default_clear_flags() -> ClearFlags {
     ClearFlags::Skybox
 }
 
+/// Pre-#360 scenes have no `fxaa_active`, so they load with anti-aliasing **on** —
+/// which is the point of a default-on effect: existing scenes gain it rather than
+/// having to opt in. FXAA costs a fraction of a millisecond, so the off-switch is for
+/// the rare shot that wants raw edges, not a posture scenes must opt out of.
+fn default_fxaa_active() -> bool {
+    true
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CameraComponent {
     pub active: bool,
@@ -51,4 +59,12 @@ pub struct CameraComponent {
     pub clear_flags: ClearFlags,
     pub motion_blur_active: bool,
     pub motion_blur_samples: u32,
+    /// Run the FXAA pass at the end of the post-FX chain (#360). Defaults to `true`
+    /// (see [`default_fxaa_active`]) — the same default-on posture as motion blur,
+    /// because both are cheap whole-image effects a game wants unless it says
+    /// otherwise. Unlike motion blur this is *not* gated by the quality preset: FXAA
+    /// runs on every tier including Low, where it is exactly the anti-aliasing an
+    /// iGPU floor wants (MSAA being the expensive alternative).
+    #[serde(default = "default_fxaa_active")]
+    pub fxaa_active: bool,
 }

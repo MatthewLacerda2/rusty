@@ -281,6 +281,7 @@ fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
             clear_flags: ClearFlags::Skybox,
             motion_blur_active: false,
             motion_blur_samples: 8,
+            fxaa_active: true,
         }),
     );
     (Rc::new(RefCell::new(scene)), id)
@@ -301,6 +302,7 @@ fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
     let mut cam = sc.world.camera_mut(id).unwrap();
     camera_ops::set_motion_blur_active(&mut cam, true);
     camera_ops::set_motion_blur_samples(&mut cam, 16);
+    camera_ops::set_fxaa_active(&mut cam, false);
 }
 
 #[test]
@@ -325,6 +327,7 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
             Graphics.SetSsrQuality("High")
             Graphics.SetMotionBlurActive(true)
             Graphics.SetMotionBlurSamples(16)
+            Graphics.SetFxaaActive(false)
         "#,
         )
         .exec()
@@ -350,6 +353,11 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     let ocam = os.world.camera(op_id).unwrap().clone();
     assert_eq!(lcam.motion_blur_active, ocam.motion_blur_active);
     assert_eq!(lcam.motion_blur_samples, ocam.motion_blur_samples);
+    assert_eq!(lcam.fxaa_active, ocam.fxaa_active);
+    assert!(
+        !lcam.fxaa_active,
+        "both paths turned the default-on knob off"
+    );
     Ok(())
 }
 
