@@ -174,6 +174,14 @@ impl RenderView {
             .map(|t| t.create_view(&wgpu::TextureViewDescriptor::default()))
     }
 
+    /// The offscreen colour target itself, or `None` for a targetless view. Borrowed
+    /// rather than cloned because the copy-back path ([`crate::render::readback`]) needs
+    /// the `Texture`, not a view of it — that is what lets a capture read back the very
+    /// target it just drew instead of allocating a second one beside it.
+    pub fn color_target(&self) -> Option<&wgpu::Texture> {
+        self.color_target.as_ref()
+    }
+
     /// Create the offscreen view in `slot` if absent, else resize it in place — so a
     /// consumer keeps one view across frames and only reallocates when the panel size
     /// or quality tier changes.
@@ -225,7 +233,9 @@ fn create_depth(
     (texture, view)
 }
 
-/// Allocate the offscreen colour target sampled by egui.
+/// Allocate the offscreen colour target: sampled by egui (`TEXTURE_BINDING`) and
+/// readable back to the CPU (`COPY_SRC`), so one owned target serves both the editor's
+/// `egui::Image` and the dev layer's PNG capture instead of each allocating its own.
 fn create_color_target(
     device: &wgpu::Device,
     format: wgpu::TextureFormat,
@@ -243,7 +253,9 @@ fn create_color_target(
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+            | wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_SRC,
         view_formats: &[],
     })
 }

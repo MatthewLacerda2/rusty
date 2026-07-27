@@ -44,6 +44,11 @@ pub struct Harness {
     pub logs: Vec<String>,
     pub expectations: Vec<Expectation>,
     out_dir: PathBuf,
+    /// The renderer every `Harness.Screenshot` in this run draws through (#355 step 5).
+    /// A scenario that observes six moments used to build six wgpu devices; now it
+    /// builds one, on its first shot, and none at all if it never takes one. The budget
+    /// slot it holds is released when the harness is dropped.
+    capture: super::capture::CaptureHost,
 }
 
 impl Harness {
@@ -80,6 +85,7 @@ impl Harness {
             logs: Vec::new(),
             expectations: Vec::new(),
             out_dir: out_dir.as_ref().to_path_buf(),
+            capture: super::capture::CaptureHost::new(),
         }
     }
 
@@ -127,7 +133,8 @@ impl Harness {
     /// is available (skipped gracefully — never panics). Logs the outcome.
     pub fn screenshot(&mut self, path: impl AsRef<Path>) -> bool {
         let path = path.as_ref().to_path_buf();
-        let result = super::screenshot::capture_world(
+        let result = super::screenshot::capture_world_into(
+            &mut self.capture,
             &self.world.borrow(),
             &path,
             super::screenshot::DEFAULT_WIDTH,
