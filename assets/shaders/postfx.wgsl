@@ -1,9 +1,10 @@
 // postfx.wgsl — fullscreen post-process chain.
 //
-// Three entry points share one fullscreen-triangle vertex stage:
+// Four entry points share one fullscreen-triangle vertex stage:
 //   fs_bright    — bright-pass threshold (bloom prefilter)
 //   fs_blur      — separable gaussian blur (direction from uniform)
 //   fs_composite — bloom add + SSR + motion blur + color correction + tonemap
+//   fs_fxaa      — luma-based edge anti-aliasing; the last pass of all (#360)
 //
 // The composite is the one place the UI knobs (exposure/contrast/saturation/
 // bloom/motion-blur/SSR) finally take effect.
@@ -233,4 +234,75 @@ fn fs_composite(in: VsOut) -> @location(0) vec4<f32> {
     hdr = pow(hdr, vec3<f32>(1.0 / max(params.color.w, 0.01)));
 
     return vec4<f32>(hdr, 1.0);
+}
+
+// ---------------------------------------------------------------------------
+// FXAA (#360) — the final pass, run on the composite's output.
+//
+// FXAA 3.11's luma-based edge blend. It is defined on *post-tonemap, gamma-encoded*
+// colour, which is why it runs after `fs_composite` rather than inside it: it needs
+// the finished LDR image, and the neighbourhood taps below are only meaningful once
+// every pixel has been tonemapped.
+//
+// The texel size comes from `textureDimensions(t_color)` rather than the params
+// uniform, because `misc.yz` is the blur pass's texel size and this pass runs at full
+// resolution while the blur runs at the bloom divisor's.
+
+@fragment
+fn fs_fxaa(in: VsOut) -> @location(0) vec4<f32> {
+    // Tuning constants, at FXAA 3.11's defaults: how far along an edge to search,
+    // and the floor that stops near-flat regions from resolving a direction out of
+    // numerical noise.
+    let span_max = 8.0;
+    let reduce_mul = 1.0 / 8.0;
+    let reduce_min = 1.0 / 128.0;
+    // FXAA's own luma weights (NTSC), deliberately not `luminance()`'s Rec.709 ones:
+    // the algorithm's thresholds were tuned against these.
+    let luma = vec3<f32>(0.299, 0.587, 0.114);
+
+    let inv = vec2<f32>(1.0) / vec2<f32>(textureDimensions(t_color));
+
+    let nw = textureSample(t_color, s_color, in.uv + vec2<f32>(-1.0, -1.0) * inv).rgb;
+    let ne = textureSample(t_color, s_color, in.uv + vec2<f32>(1.0, -1.0) * inv).rgb;
+    let sw = textureSample(t_color, s_color, in.uv + vec2<f32>(-1.0, 1.0) * inv).rgb;
+    let se = textureSample(t_color, s_color, in.uv + vec2<f32>(1.0, 1.0) * inv).rgb;
+    let m = textureSample(t_color, s_color, in.uv).rgb;
+
+    let l_nw = dot(nw, luma);
+    let l_ne = dot(ne, luma);
+    let l_sw = dot(sw, luma);
+    let l_se = dot(se, luma);
+    let l_m = dot(m, luma);
+
+    let luma_min = min(l_m, min(min(l_nw, l_ne), min(l_sw, l_se)));
+    let luma_max = max(l_m, max(max(l_nw, l_ne), max(l_sw, l_se)));
+
+    // The blur direction is perpendicular to the local luma gradient, i.e. *along*
+    // the edge — which is what turns a staircase into a ramp.
+    var dir = vec2<f32>(
+        -((l_nw + l_ne) - (l_sw + l_se)),
+        ((l_nw + l_sw) - (l_ne + l_se)),
+    );
+    let dir_reduce = max((l_nw + l_ne + l_sw + l_se) * 0.25 * reduce_mul, reduce_min);
+    let rcp_dir_min = 1.0 / (min(abs(dir.x), abs(dir.y)) + dir_reduce);
+    dir = clamp(
+        dir * rcp_dir_min,
+        vec2<f32>(-span_max),
+        vec2<f32>(span_max),
+    ) * inv;
+
+    // Two taps for the narrow average, four for the wide one.
+    let rgb_a = 0.5 * (textureSample(t_color, s_color, in.uv + dir * (1.0 / 3.0 - 0.5)).rgb
+        + textureSample(t_color, s_color, in.uv + dir * (2.0 / 3.0 - 0.5)).rgb);
+    let rgb_b = rgb_a * 0.5
+        + 0.25 * (textureSample(t_color, s_color, in.uv + dir * -0.5).rgb
+            + textureSample(t_color, s_color, in.uv + dir * 0.5).rgb);
+
+    // The wide average is used only when it stays inside the neighbourhood's luma
+    // range; outside it, the wide tap has strayed off the edge and would smear.
+    let l_b = dot(rgb_b, luma);
+    if (l_b < luma_min || l_b > luma_max) {
+        return vec4<f32>(rgb_a, 1.0);
+    }
+    return vec4<f32>(rgb_b, 1.0);
 }

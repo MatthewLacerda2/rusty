@@ -47,11 +47,33 @@ pub fn draw_camera(
             theme::from_ui(ui).accent_blue,
             "✔ Intrinsic Motion Blur (Active | 64 Samples)",
         );
+        draw_fxaa(ui, world, id, cam.fxaa_active, is_dirty);
     });
     if remove {
         // Cascade to camera-dependent components (VisualCorrection) from the
         // declaration (#359), not a hand-written pair of clears.
         authoring::remove_with_cascade(world, id, ComponentKind::Camera);
+        *is_dirty = true;
+    }
+}
+
+/// The FXAA toggle (#360). Unlike the motion-blur line above — which the card forces
+/// to a fixed high-quality mode — this is a real checkbox, because FXAA is the one
+/// effect a shot might genuinely want off (a pixel-art look, or a screenshot being
+/// diffed for raw edges). Writes through the shared op, so this and
+/// `Graphics.SetFxaaActive` are one path.
+fn draw_fxaa(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    active: bool,
+    is_dirty: &mut bool,
+) {
+    let mut on = active;
+    if ui.checkbox(&mut on, "FXAA (Anti-Aliasing)").changed() {
+        if let Some(mut c) = world.camera_mut(id) {
+            camera_ops::set_fxaa_active(&mut c, on);
+        }
         *is_dirty = true;
     }
 }

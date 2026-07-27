@@ -220,6 +220,7 @@ mod tests {
             clear_flags: flags,
             motion_blur_active: false,
             motion_blur_samples: 0,
+            fxaa_active: true,
         }
     }
 

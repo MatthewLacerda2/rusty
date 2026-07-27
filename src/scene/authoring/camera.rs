@@ -60,6 +60,12 @@ pub fn set_motion_blur_samples(c: &mut CameraComponent, samples: u32) {
     c.motion_blur_samples = samples;
 }
 
+/// Set the camera's FXAA flag — the anti-aliasing pass at the end of the post-FX
+/// chain (#360). Shared by the editor's Camera card and `Graphics.SetFxaaActive`.
+pub fn set_fxaa_active(c: &mut CameraComponent, active: bool) {
+    c.fxaa_active = active;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -79,6 +85,7 @@ mod tests {
             clear_flags: ClearFlags::Skybox,
             motion_blur_active: false,
             motion_blur_samples: 0,
+            fxaa_active: true,
         };
         scene.world.set_camera(id, Some(c));
         (scene, id)
@@ -96,6 +103,7 @@ mod tests {
         set_clear_flags(&mut e, ClearFlags::DepthOnly);
         set_motion_blur_active(&mut e, true);
         set_motion_blur_samples(&mut e, 64);
+        set_fxaa_active(&mut e, false);
         let c = &*e;
         assert_eq!(c.fov, 90.0);
         assert_eq!(c.near, 0.5);
@@ -105,5 +113,6 @@ mod tests {
         assert_eq!(c.clear_flags, ClearFlags::DepthOnly);
         assert!(c.motion_blur_active);
         assert_eq!(c.motion_blur_samples, 64);
+        assert!(!c.fxaa_active, "the op must be able to turn FXAA off");
     }
 }

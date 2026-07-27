@@ -4,10 +4,10 @@
 //! can drive its own settings logic in Lua. Two backing stores:
 //!
 //! * Per-volume render state — the active entity's `VisualCorrectionComponent`
-//!   (bloom, exposure/contrast/saturation/gamma, tonemap, SSR) and its
-//!   `CameraComponent` motion-blur fields. `build_post_params` rebuilds the GPU
-//!   uniform from these EVERY frame, so a write here takes effect next frame for
-//!   free — no GPU pipeline is touched from script.
+//!   (bloom, exposure/contrast/saturation/gamma, tonemap, SSR), registered here,
+//!   plus its `CameraComponent` knobs (motion blur, FXAA) in the `camera` submodule.
+//!   `build_post_params` rebuilds the GPU uniform from these EVERY frame, so a write
+//!   here takes effect next frame for free — no GPU pipeline is touched from script.
 //! * The global `QualityPreset` resource (Low/Medium/High), gating SSR + motion
 //!   blur. A plain value get/set (`register_quality`, in `state`); the platform layer
 //!   reads the shared cell each frame and hands it to `renderer.set_quality`.
@@ -19,16 +19,15 @@
 
 use std::cell::RefCell;
 
+mod camera;
 mod state;
 
 use mlua::Lua;
 
-use self::state::{
-    parse_tonemap, register_quality, tonemap_name, with_cam, with_cam_mut, with_vc, with_vc_mut,
-};
+use self::state::{parse_tonemap, register_quality, tonemap_name, with_vc, with_vc_mut};
 use super::{put, Reg};
 use crate::render::postfx::QualityPreset;
-use crate::scene::authoring::{camera as camera_ops, visual_correction as vc_ops};
+use crate::scene::authoring::visual_correction as vc_ops;
 use crate::scene::Scene;
 
 /// Register the `Graphics` namespace onto `lua`.
@@ -45,7 +44,8 @@ pub fn register<'lua, 'scope>(
     register_saturation_gamma(scope, &table, scene)?;
     register_tonemap(scope, &table, scene)?;
     register_ssr(scope, &table, scene)?;
-    register_motion_blur(scope, &table, scene)?;
+    camera::register_motion_blur(scope, &table, scene)?;
+    camera::register_fxaa(scope, &table, scene)?;
     register_quality(scope, &table, quality)?;
 
     lua.globals()
@@ -232,46 +232,5 @@ fn register_ssr<'lua, 'scope>(
         scope.create_function(|_, ()| {
             Ok(with_vc(scene, |vc| vc.ssr_quality.clone()).unwrap_or_default())
         }),
-    )
-}
-
-/// Camera motion blur: active + sample count over the active camera component.
-fn register_motion_blur<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
-    put(
-        table,
-        "SetMotionBlurActive",
-        scope.create_function(|_, active: bool| {
-            with_cam_mut(scene, |e| camera_ops::set_motion_blur_active(e, active));
-            Ok(())
-        }),
-    )?;
-    put(
-        table,
-        "GetMotionBlurActive",
-        scope.create_function(|_, ()| {
-            Ok(with_cam(scene, |c| c.motion_blur_active).unwrap_or(false))
-        }),
-    )?;
-
-    put(
-        table,
-        "SetMotionBlurSamples",
-        scope.create_function(|_, n: u32| {
-            // `2..=32` is an API-input clamp the editor card doesn't apply (it forces
-            // 64), so it stays here; the op is a plain set, keeping both identical.
-            with_cam_mut(scene, |e| {
-                camera_ops::set_motion_blur_samples(e, n.clamp(2, 32))
-            });
-            Ok(())
-        }),
-    )?;
-    put(
-        table,
-        "GetMotionBlurSamples",
-        scope.create_function(|_, ()| Ok(with_cam(scene, |c| c.motion_blur_samples).unwrap_or(0))),
     )
 }

@@ -1369,13 +1369,23 @@ Getters return a neutral default when no active volume/camera exists.
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | `string` |
 | `Graphics.GetMotionBlurActive` / `SetMotionBlurActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetMotionBlurSamples` / `SetMotionBlurSamples` | `()` / `(n)` | `number` (clamped 2–32) |
+| `Graphics.GetFxaaActive` / `SetFxaaActive` | `()` / `(bool)` | `bool` (**default `true`**) |
 | `Graphics.GetQuality` / `SetQuality` | `()` / `(name)` | `"Low"` / `"Medium"` / `"High"` |
 
+**FXAA** is the anti-aliasing pass at the very end of the chain, running on the
+tonemapped image just before it reaches the screen. It is **on by default** — a
+scene saved before the knob existed loads with it on, and so does a scene with no
+camera component at all, which is why `GetFxaaActive` returns `true` rather than
+`false` when there is no active camera. It is *not* gated by the quality preset:
+it runs on every tier including Low, where a cheap fullscreen pass is exactly the
+anti-aliasing an integrated GPU wants. Turning it off restores raw, stair-stepped
+edges — useful for a pixel-art look, or for diffing screenshots.
+
 The global **quality preset** gates the heavier passes (SSR is High-tier only;
-motion blur is off on Low). `SetQuality` writes a shared resource cell that the
-platform layer reads each frame and hands to the renderer, which reallocates its
-bloom buffers when the tier actually changes. Unrecognized tonemap/quality names
-are ignored (the current value is kept).
+motion blur is off on Low; FXAA runs on all of them). `SetQuality` writes a shared
+resource cell that the platform layer reads each frame and hands to the renderer,
+which reallocates its bloom buffers when the tier actually changes. Unrecognized
+tonemap/quality names are ignored (the current value is kept).
 
 **Determinism.** Every `Graphics` write is **one-way** into render-only state: the
 post-FX volume and the preset cell are read by the render layer, never by
