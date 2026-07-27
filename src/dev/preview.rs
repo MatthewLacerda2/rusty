@@ -23,8 +23,8 @@
 
 use std::path::Path;
 
+use super::capture::CaptureHost;
 use crate::preview::{self, OrbitState, PreviewMesh, PreviewSubject};
-use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 
 /// Default edge length of a preview shot. Square, like every reference engine's
 /// material-preview thumbnail, and big enough to judge shading detail.
@@ -61,13 +61,16 @@ impl PreviewOptions {
     }
 }
 
-/// Render `asset_path`'s preview into a PNG at `out_png`.
+/// Render `asset_path`'s preview into a PNG at `out_png`, through `host`'s shared
+/// renderer — so previewing a folder of assets costs one device, not one per asset
+/// (#355 step 5).
 ///
 /// Returns `Ok(true)` when a frame was captured and written, `Ok(false)` when no
 /// GPU/software adapter is available (skipped gracefully, matching `screenshot`), and
 /// `Err` for a caller mistake — an asset that doesn't exist or has no preview story —
 /// so an agent gets a clear message instead of a plausible picture of nothing.
-pub fn capture_asset(
+pub fn capture_asset_into(
+    host: &mut CaptureHost,
     asset_path: &str,
     out_png: impl AsRef<Path>,
     options: PreviewOptions,
@@ -76,43 +79,38 @@ pub fn capture_asset(
     let scene = preview::build_preview_scene(options.mesh, &subject);
     let resolution = options.clamped_resolution();
 
-    let Some(mut renderer) = pollster::block_on(Renderer::new_headless(resolution, resolution))
-    else {
+    let Some((renderer, view)) = host.frame(resolution, resolution) else {
         log::warn!(
             "[Preview] no GPU/software adapter available — skipping preview of {asset_path}"
         );
         return Ok(false);
     };
-
-    let target = create_target(&renderer, resolution);
-    let target_view = target.create_view(&wgpu::TextureViewDescriptor::default());
-    let mut view = RenderView::targetless(
-        &renderer.device,
-        OFFSCREEN_FORMAT,
-        resolution,
-        resolution,
-        renderer.quality.bloom_divisor(),
-    );
+    let Some(target_view) = view.color_target_view() else {
+        return Err("preview view owns no colour target".to_string());
+    };
     let camera = OrbitState::default().camera();
 
-    // The shader arm swaps the forward pipeline for the previewed module — the same
-    // call the editor tab makes; every other subject renders the stock pipeline.
+    // The shader arm draws with the previewed module as this view's forward pipeline —
+    // the same call the editor tab makes; every other subject renders the stock one.
     match &subject {
         PreviewSubject::Shader(path) => {
-            renderer.render_preview_with_shader(&mut view, &scene, &camera, &target_view, path);
+            renderer.render_preview_with_shader(view, &scene, &camera, &target_view, path);
         }
-        _ => renderer.render(&mut view, &scene, &camera, &target_view, false, &[]),
+        _ => renderer.render(view, &scene, &camera, &target_view, false, &[]),
     }
 
-    let pixels = readback::read_texture_rgba8(
-        &renderer.device,
-        &renderer.queue,
-        &target,
-        resolution,
-        resolution,
-    );
-    readback::write_png(out_png, resolution, resolution, &pixels)?;
+    host.write_png(out_png)?;
     Ok(true)
+}
+
+/// One-shot [`capture_asset_into`]: a throwaway host for a single preview. Prefer
+/// holding a host when previewing more than one asset.
+pub fn capture_asset(
+    asset_path: &str,
+    out_png: impl AsRef<Path>,
+    options: PreviewOptions,
+) -> Result<bool, String> {
+    capture_asset_into(&mut CaptureHost::new(), asset_path, out_png, options)
 }
 
 /// The preview subject for `asset_path`, or a caller-facing error explaining exactly
@@ -129,24 +127,6 @@ fn resolve_subject(asset_path: &str) -> Result<PreviewSubject, String> {
             "no preview for {asset_path} — previewable kinds are models \
              (gltf/glb/obj/fbx), textures (png/tga/jpg/jpeg) and shaders (wgsl)"
         )
-    })
-}
-
-/// The offscreen colour target the preview pass draws into and we copy back from.
-fn create_target(renderer: &Renderer, resolution: u32) -> wgpu::Texture {
-    renderer.device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("Asset Preview Target"),
-        size: wgpu::Extent3d {
-            width: resolution,
-            height: resolution,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: OFFSCREEN_FORMAT,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-        view_formats: &[],
     })
 }
 
