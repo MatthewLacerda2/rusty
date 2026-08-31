@@ -78,23 +78,23 @@ means in progress.
 
 ## Labels
 
-**`plan` is the stage label, and its absence means ready.**
+**`planning` is the stage label, and its absence means ready.**
 
-- `plan` — still being discussed with the user. **Never started**, by any means.
+- `planning` — still being discussed with the user. **Never started**, by any means.
 - `human` — needs a human in the loop end to end. It is a type label here, but
   **treat it as not-ready**: do not start it.
 - *(neither)* — anyone can tell an agent "do issue N", subject to its blockers and
   to the file-and-start rule above.
 
-**The judgement lives in the label**, so put it on honestly. Broad or vague is what
-`plan` is for. A Claude-written issue **must** carry `plan` if it is a breaking
-change, changes human-facing behaviour, needs a judgement call, or proposes a
-structural change.
+**The judgement lives in the label**, so put it on honestly. Broad or vague is
+what `planning` is for. A Claude-written issue **must** carry `planning` if it
+is a breaking change, changes human-facing behaviour, needs a judgement call, or
+proposes a structural change.
 
 A `bug` usually should **not** carry one — it is specific, the deciding already
 happened when the code broke, and nothing is gained by making it wait.
 
-Type labels, combinable with `plan`:
+Type labels, combinable with `planning`:
 
 `architecture` (the engine's own shape: a module, a convention, a guardrail baked
 into the design — the determinism rule, the five kinds, the four-axis component
@@ -130,7 +130,7 @@ issue; see the `issue-batch` skill for why that costs more than it saves. A new
 first-class component is the standard trap: its four axes look like four issues
 and are one branch.
 
-If a `plan` issue would affect how another is implemented or thought of, mark
+If a `planning` issue would affect how another is implemented or thought of, mark
 that other one **blocked by** it.
 
 ## Closing

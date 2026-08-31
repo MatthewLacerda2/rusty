@@ -180,10 +180,10 @@ is wrong.
   the engine's **development process** (e.g. the lint/size gate, CI, the headless harness),
   making that development faster, solid, and correctly guardrailed — distinct from
   **architecture**, which is a guardrail in the engine's own design.
-- **plan** — *Being discussed or planned.* Still under discussion (see below) — must not be
-  started.
+- **planning** — *Approach still being discussed. Do not start.* Still under discussion
+  (see below) — must not be started.
 
-Issues tagged **plan** are still being discussed with the user. They must **NOT** be
+Issues tagged **planning** are still being discussed with the user. They must **NOT** be
 started by any means. If a planning issue would implement something that affects another
 issue — changing how it gets implemented, or even how it's thought of — that other issue
 must be marked **blocked by** the planning issue.
@@ -293,7 +293,7 @@ Commits are blocked unless the checks pass; failures are written to
 
 ## Overrides
 Any rule in this file may be overridden by the user's explicit say-so — in the current
-prompt or a previous one. The **one exception**: an issue tagged **plan** must never be
-started while that tag is on it. The user may tell you to **remove the `plan` label and
-then do it** — but never to do it with the label still on. (The user *may* greenlight an
+prompt or a previous one. The **one exception**: an issue tagged **planning** must never be
+started while that tag is on it. The user may tell you to **remove the `planning` label
+and then do it** — but never to do it with the label still on. (The user *may* greenlight an
 issue that is **blocked by** another; doing so automatically lifts that block.)

@@ -114,7 +114,7 @@ keep the second slot for whatever is furthest along.** The label order decides
 which one that is. An unblocked issue left unstarted is not wasted capacity; it is
 a rebase not yet paid for.
 
-**`plan` is the absolute stop.** It means *not yet*, and no amount of the issue
+**`planning` is the absolute stop.** It means *not yet*, and no amount of the issue
 looking ready overrides it; `human` is the same in practice. Everything else is
 startable — **except an issue filed minutes ago that is still settling**: rusty
 does not file-and-start unless the work is a direct consequence of an
@@ -147,7 +147,7 @@ sessions on a branch are the second kind. The line is not crisp, so err upwards.
 
 - ≈3 attempts at the same failure.
 - A decision that is genuinely theirs: an API name game scripts will type, a
-  change to the five kinds, anything a `plan` label would have carried.
+  change to the five kinds, anything a `planning` label would have carried.
 - Mark the pull request **draft**, say why in the description, and stop. Do not
   thrash.
 
