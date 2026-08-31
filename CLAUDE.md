@@ -27,6 +27,22 @@ craft — it is the reason the gates below are strict.
 - **auxmd.md** *(gitignored)* — the operator's short-term scratchpad; read it if a
   session points you there.
 
+**Three skills carry the working protocols**, so this file can hold the reasoning and
+they can hold the steps. Invoke them rather than reconstructing a procedure from
+memory, and name them when briefing a subagent:
+
+- **`issue-write`** — what an issue must contain, which label it carries, when
+  Claude may file one unprompted.
+- **`issue-batch`** — how a set of issues is worked: how many branches at once,
+  which can safely run together, worktrees, disk, re-reading the board.
+- **`ci-merge`** — how a finished branch becomes a merged one: the gate commands,
+  verifying a run happened on the head commit, rebasing, and triaging the mutation
+  and coverage signals.
+
+Where a rule below is stated in one line and a skill has ten, the line is the rule
+and the skill is how to keep it. Where they disagree, this file wins and the skill
+is wrong.
+
 ## How we work
 - **The gates (push back before you build).** An idea becomes an issue only when all
   three hold; if any fails, **push back instead of complying**:
@@ -171,6 +187,12 @@ Issues tagged **plan** are still being discussed with the user. They must **NOT*
 started by any means. If a planning issue would implement something that affects another
 issue — changing how it gets implemented, or even how it's thought of — that other issue
 must be marked **blocked by** the planning issue.
+
+**The `issue-write` skill** has the rest: what a good issue body contains, the
+evidence that makes one worth reading cold, how relationships are recorded, and
+when Claude may file one unprompted. **`issue-batch`** turns the priority order
+above into a running batch, and **`ci-merge`** takes each finished branch from
+green to merged.
 
 ## Architecture — the conceptual model
 A high-level map of how the engine is shaped. It deliberately doesn't enumerate every
