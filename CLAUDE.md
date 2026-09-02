@@ -27,6 +27,16 @@ craft — it is the reason the gates below are strict.
 - **auxmd.md** *(gitignored)* — the operator's short-term scratchpad; read it if a
   session points you there.
 
+**Three skills carry the working protocols** — `issue-write`, `issue-batch` and
+`ci-merge` — so this file can hold the reasoning and they can hold the steps. Each
+one names its own scope and when to reach for it, so this file does not restate
+them; invoke them rather than reconstructing a procedure from memory, and name
+them when briefing a subagent.
+
+Where a rule below is stated in one line and a skill has ten, the line is the rule
+and the skill is how to keep it. Where they disagree, this file wins and the skill
+is wrong.
+
 ## How we work
 - **The gates (push back before you build).** An idea becomes an issue only when all
   three hold; if any fails, **push back instead of complying**:
@@ -164,13 +174,19 @@ craft — it is the reason the gates below are strict.
   the engine's **development process** (e.g. the lint/size gate, CI, the headless harness),
   making that development faster, solid, and correctly guardrailed — distinct from
   **architecture**, which is a guardrail in the engine's own design.
-- **plan** — *Being discussed or planned.* Still under discussion (see below) — must not be
-  started.
+- **planning** — *Approach still being discussed. Do not start.* Still under discussion
+  (see below) — must not be started.
 
-Issues tagged **plan** are still being discussed with the user. They must **NOT** be
+Issues tagged **planning** are still being discussed with the user. They must **NOT** be
 started by any means. If a planning issue would implement something that affects another
 issue — changing how it gets implemented, or even how it's thought of — that other issue
 must be marked **blocked by** the planning issue.
+
+**The `issue-write` skill** has the rest: what a good issue body contains, the
+evidence that makes one worth reading cold, how relationships are recorded, and
+when Claude may file one unprompted. **`issue-batch`** turns the priority order
+above into a running batch, and **`ci-merge`** takes each finished branch from
+green to merged.
 
 ## Architecture — the conceptual model
 A high-level map of how the engine is shaped. It deliberately doesn't enumerate every
@@ -271,7 +287,7 @@ Commits are blocked unless the checks pass; failures are written to
 
 ## Overrides
 Any rule in this file may be overridden by the user's explicit say-so — in the current
-prompt or a previous one. The **one exception**: an issue tagged **plan** must never be
-started while that tag is on it. The user may tell you to **remove the `plan` label and
-then do it** — but never to do it with the label still on. (The user *may* greenlight an
+prompt or a previous one. The **one exception**: an issue tagged **planning** must never be
+started while that tag is on it. The user may tell you to **remove the `planning` label
+and then do it** — but never to do it with the label still on. (The user *may* greenlight an
 issue that is **blocked by** another; doing so automatically lifts that block.)
