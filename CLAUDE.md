@@ -27,17 +27,11 @@ craft — it is the reason the gates below are strict.
 - **auxmd.md** *(gitignored)* — the operator's short-term scratchpad; read it if a
   session points you there.
 
-**Three skills carry the working protocols**, so this file can hold the reasoning and
-they can hold the steps. Invoke them rather than reconstructing a procedure from
-memory, and name them when briefing a subagent:
-
-- **`issue-write`** — what an issue must contain, which label it carries, when
-  Claude may file one unprompted.
-- **`issue-batch`** — how a set of issues is worked: how many branches at once,
-  which can safely run together, worktrees, disk, re-reading the board.
-- **`ci-merge`** — how a finished branch becomes a merged one: the gate commands,
-  verifying a run happened on the head commit, rebasing, and triaging the mutation
-  and coverage signals.
+**Three skills carry the working protocols** — `issue-write`, `issue-batch` and
+`ci-merge` — so this file can hold the reasoning and they can hold the steps. Each
+one names its own scope and when to reach for it, so this file does not restate
+them; invoke them rather than reconstructing a procedure from memory, and name
+them when briefing a subagent.
 
 Where a rule below is stated in one line and a skill has ten, the line is the rule
 and the skill is how to keep it. Where they disagree, this file wins and the skill
