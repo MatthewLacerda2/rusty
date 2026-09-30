@@ -46,7 +46,7 @@ fn bake_writes_a_playable_wav_and_returns_its_path() {
 
     // The engine's own decoder must accept what we wrote — that is what "playable"
     // means here, not just "the bytes exist".
-    let mut cache = crate::audio::decode::ClipCache::new();
+    let mut cache = crate::audio::device::decode::ClipCache::new();
     let clip = cache
         .get_or_decode(&path)
         .expect("the engine decodes the bake");

@@ -1,4 +1,4 @@
-//! src/audio/decode.rs — path-cached PCM decode (#212).
+//! src/audio/device/decode.rs — path-cached PCM decode (#212).
 //!
 //! Decodes `.ogg` / `.wav` files to in-memory PCM **once per path** and caches the
 //! result, so replaying a clip (a footstep fired hundreds of times) re-reads neither

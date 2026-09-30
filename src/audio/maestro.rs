@@ -13,29 +13,48 @@
 //! reads a wall clock or unseeded RNG — voice ids are a monotone counter and the
 //! event `tick` is supplied by the caller — so nothing here threatens replay.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
-use super::backend::{AudioBackend, NullBackend, PlayParams, VoiceId};
-use super::introspection::{
-    AudioEvent, AudioEventKind, AudioEventLog, VoiceInfo, DEFAULT_EVENT_CAP,
-};
-use super::spatial::{self, Listener};
+use glam::Vec3;
+
+use super::backend::{AudioBackend, NullBackend, PlayParams, VoiceId, VoiceMix};
+use super::introspection::{AudioEvent, AudioEventKind, AudioEventLog, DEFAULT_EVENT_CAP};
+use super::mix::{self, MixEnv};
 use crate::components::AudioSourceComponent;
 
-/// A live entity voice: the backend handle plus the per-source (pre-master) volume,
-/// kept so a master-volume change can re-fold every voice.
-struct LiveVoice {
-    voice: VoiceId,
-    source_volume: f32,
+/// A live entity voice: the backend handle, the source settings and position it was
+/// last resolved from, its per-source (pre-master) volume, and the pre-master mix
+/// last handed to the backend — so a master change can re-fold it and the per-frame
+/// mix only sends what changed.
+pub(super) struct LiveVoice {
+    pub(super) voice: VoiceId,
+    pub(super) source: AudioSourceComponent,
+    pub(super) source_volume: f32,
+    pub(super) position: Vec3,
+    pub(super) mix: VoiceMix,
+}
+
+/// A fire-and-forget `PlayAt` voice still sounding: tracked only so the per-frame
+/// mix can keep it spatialized and time-scaled until the backend reports it done.
+pub(super) struct OneShot {
+    pub(super) source: AudioSourceComponent,
+    pub(super) volume: f32,
+    pub(super) position: Vec3,
+    pub(super) mix: VoiceMix,
 }
 
 /// The audio engine singleton. See the module docs.
 pub struct AudioMaestro {
-    backend: Box<dyn AudioBackend>,
+    pub(super) backend: Box<dyn AudioBackend>,
     /// Linear master gain in `[0, 1]`, multiplied into every voice.
-    master_volume: f32,
+    pub(super) master_volume: f32,
     /// Live entity voices, keyed by owning entity id (one voice per source).
-    entity_voices: HashMap<u32, LiveVoice>,
+    pub(super) entity_voices: HashMap<u32, LiveVoice>,
+    /// Live `PlayAt` one-shots, reaped once the backend reports them finished.
+    pub(super) oneshots: BTreeMap<VoiceId, OneShot>,
+    /// The listener + clock state of the last per-frame mix; a voice started between
+    /// frames is resolved against it so its first samples are already mixed.
+    pub(super) env: MixEnv,
     /// The agent-facing log of play/stop/one-shot actions.
     log: AudioEventLog,
     /// Monotone id source for backend voices (deterministic — never a clock/RNG).
@@ -57,6 +76,8 @@ impl AudioMaestro {
             backend,
             master_volume: 1.0,
             entity_voices: HashMap::new(),
+            oneshots: BTreeMap::new(),
+            env: MixEnv::default(),
             log: AudioEventLog::new(DEFAULT_EVENT_CAP),
             next_voice: 1,
         }
@@ -67,6 +88,7 @@ impl AudioMaestro {
     pub fn set_backend(&mut self, backend: Box<dyn AudioBackend>) {
         self.backend = backend;
         self.entity_voices.clear();
+        self.oneshots.clear();
     }
 
     /// The current master volume.
@@ -77,12 +99,7 @@ impl AudioMaestro {
     /// Set the master volume (clamped to `[0, 1]`), re-folding every live voice.
     pub fn set_master_volume(&mut self, master: f32) {
         self.master_volume = master.clamp(0.0, 1.0);
-        let folded: Vec<(VoiceId, f32)> = self
-            .entity_voices
-            .values()
-            .map(|v| (v.voice, v.source_volume * self.master_volume))
-            .collect();
-        self.backend.set_master_volume(self.master_volume, &folded);
+        self.refold_master();
     }
 
     /// Mint the next backend voice id (deterministic monotone counter).
@@ -105,13 +122,15 @@ impl AudioMaestro {
         // Replace any existing voice on this entity first.
         self.stop_source(id, position, tick, /*log_stop=*/ false);
         let source_volume = source.volume.max(0.0);
+        let at = Vec3::from(position);
+        let mix = mix::resolve_voice(&self.env, source, source_volume, at);
         let voice = self.mint();
         let started = self.backend.play(
             voice,
             &PlayParams {
                 clip: source.clip.clone(),
-                volume: source_volume * self.master_volume,
                 looping: source.looping,
+                mix: mix.with_master(self.master_volume),
             },
         );
         if started {
@@ -119,7 +138,10 @@ impl AudioMaestro {
                 id,
                 LiveVoice {
                     voice,
+                    source: source.clone(),
                     source_volume,
+                    position: at,
+                    mix,
                 },
             );
         }
@@ -158,8 +180,10 @@ impl AudioMaestro {
         let master = self.master_volume;
         if let Some(live) = self.entity_voices.get_mut(&id) {
             live.source_volume = volume.max(0.0);
+            live.mix =
+                mix::resolve_voice(&self.env, &live.source, live.source_volume, live.position);
             self.backend
-                .set_volume(live.voice, live.source_volume * master);
+                .set_mix(live.voice, &live.mix.with_master(master));
         }
     }
 
@@ -181,15 +205,30 @@ impl AudioMaestro {
         tick: u64,
     ) -> bool {
         let volume = volume.max(0.0);
+        let source = mix::oneshot_source(clip);
+        let at = Vec3::from(position);
+        let mix = mix::resolve_voice(&self.env, &source, volume, at);
         let voice = self.mint();
         let started = self.backend.play(
             voice,
             &PlayParams {
                 clip: clip.to_string(),
-                volume: volume * self.master_volume,
                 looping: false,
+                mix: mix.with_master(self.master_volume),
             },
         );
+        if started {
+            let position = at;
+            self.oneshots.insert(
+                voice,
+                OneShot {
+                    source,
+                    volume,
+                    position,
+                    mix,
+                },
+            );
+        }
         self.log.push(AudioEvent {
             kind: AudioEventKind::PlayAt,
             clip: clip.to_string(),
@@ -205,6 +244,7 @@ impl AudioMaestro {
     /// flight are stopped too via the backend's `stop_all`.
     pub fn stop_all(&mut self) {
         self.entity_voices.clear();
+        self.oneshots.clear();
         self.backend.stop_all();
     }
 
@@ -216,37 +256,6 @@ impl AudioMaestro {
     /// Clear the event log (e.g. on entering Play for a clean record).
     pub fn clear_log(&mut self) {
         self.log.clear();
-    }
-
-    /// Build a [`VoiceInfo`] for entity `id`'s source — the per-source roster row the
-    /// agent reads, with the live playing flag folded in and the spatial `(gain, pan)`
-    /// resolved against `listener` at the source's world `position` (#213). The caller
-    /// supplies the component, position and listener (the maestro doesn't hold the
-    /// scene or the active camera).
-    pub fn voice_info(
-        &self,
-        id: u32,
-        source: &AudioSourceComponent,
-        position: glam::Vec3,
-        listener: &Listener,
-    ) -> VoiceInfo {
-        let spatial = spatial::resolve(
-            listener,
-            position,
-            source.volume,
-            source.spatial_blend,
-            source.initial_distance,
-            source.final_distance,
-        );
-        VoiceInfo {
-            entity: id,
-            clip: source.clip.clone(),
-            volume: source.volume,
-            looping: source.looping,
-            is_time_scaled: source.is_time_scaled,
-            playing: self.is_source_playing(id),
-            spatial,
-        }
     }
 }
 
