@@ -115,16 +115,27 @@ bottleneck (hours-long foundation branches), never when the queue is.
 **How many:** 3–4 branches in flight **in total**, local and cloud together. Each
 one behind another still pays a rebase per merge ahead of it.
 
-**Launching one — and proving it is one.** Use the `Agent` tool with
-`isolation: "remote"`. A session meant to be cloud has silently turned out to be
-local before, so check from both ends:
+**Launching one — and proving it is one.** Not with the `Agent` tool's
+`isolation: "remote"`: in a local session that silently falls back to a local
+worktree (seen 2026-09-30). What works is a **one-off cloud routine** — the
+`RemoteTrigger` tool (the `schedule` skill has the body shape) with `run_once_at` a
+minute or two out, the repository as its source, and the whole brief as its prompt.
+Two traps decide whether it is really remote:
 
-- The brief's **first instruction**: run `echo "$CLAUDE_CODE_REMOTE"` (the variable
-  `.claude/hooks/session-start.sh` keys on). If it is not `true`, **stop before
-  touching anything** and report that the session is local.
-- From here, after launching: no new worktree under `.claude/worktrees/`, no new
-  local `cargo`/`rustc` process for that branch. Either one means it is local —
-  stop it.
+- **Pick the `anthropic_cloud` environment, never a `bridge` one.** The environment
+  list includes a *bridge* to the operator's own machine (`archlinux:…`); a routine
+  on it runs **here**. This is the likely cause of past "cloud" sessions that ran
+  locally.
+- The brief's **first instruction**: run `echo "$CLAUDE_CODE_REMOTE"; pwd` (the
+  variable `.claude/hooks/session-start.sh` keys on). If it is not `true`, or the
+  path is the operator's home, **stop before touching anything** and report that
+  the session is local.
+
+Then check from here: `list_runs` / `get_run_log` on the routine show the session's
+first tool result (`CLAUDE_CODE_REMOTE=true`, a `/home/user/…` path), and no new
+worktree under `.claude/worktrees/` or local `cargo`/`rustc` process appeared for
+that branch. The cloud session has GitHub MCP tools (`create_pull_request`,
+`add_issue_comment`), so it can open and update its own pull request.
 
 **The pull request is the report.** A cloud session cannot message this one back.
 Brief it to open a draft on its first commit, push often (a dead container takes
@@ -172,8 +183,9 @@ read cold. Beyond that:
 - Name the **base commit** and what has landed recently that it must respect.
 - Name the **siblings** and which files they are touching.
 - Tell it to invoke the **`ci-merge` skill** rather than restating that protocol.
-- For a **cloud** session: the `CLAUDE_CODE_REMOTE` self-check comes first, and
-  the pull request is its only way to report (see above).
+- For a **cloud** session: launched as a one-off routine on the `anthropic_cloud`
+  environment, the `CLAUDE_CODE_REMOTE` self-check comes first, and the pull request
+  is its only way to report (see above).
 - Tell it **not** to merge — merging is serialized and belongs to the session
   running the batch.
 - Tell it not to start a heavy build while two siblings are already compiling,
