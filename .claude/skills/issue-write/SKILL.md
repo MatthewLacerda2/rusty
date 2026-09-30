@@ -110,8 +110,11 @@ in the engine's design is `architecture`, a guardrail on how we build it is
 
 ## Priority
 
-**architecture → infrastructure → bug → foundation → feature.** `documentation`
-never waits its turn.
+**infrastructure → architecture → bug → foundation → feature.** `documentation`
+never waits its turn. Infrastructure leads because a faster, safer build/test/merge
+loop pays off on every branch queued behind it. A bug in the development tooling
+itself (CI, the gates, the hooks) ranks as infrastructure for ordering, whatever
+its label.
 
 That order is what to do **next** — and because merging is the serialized
 bottleneck, it is felt hardest as merge order. Two branches already in flight do
