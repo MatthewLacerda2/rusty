@@ -87,13 +87,15 @@ Grouped like Blender's node menus; `op` is the tag string in each node.
 Every periodic param is a **count of repeats per tile**, rounded at evaluation (the
 field stays a number, so `4.5` is accepted — it bakes as `5`):
 
-| Param | Rounds to |
-|---|---|
-| `noise.scale`, `voronoi.scale`, `wave.frequency`, `brick.cols` | nearest whole number ≥ 1 |
-| `brick.rows` | nearest **even** number ≥ 2 (the half-brick offset must close at the wrap) |
-| `checker.tiles` | up to **even** (an odd count puts two same-colour squares together at the wrap) |
-| `mapping.scale` (with `tiling = true`) | nearest whole number ≥ 1 per axis |
-| `mapping.rotation` (with `tiling = true`) | nearest quarter turn |
+| Op | Param | Rounds to |
+|---|---|---|
+| noise, voronoi | `scale` | nearest whole number ≥ 1 |
+| wave | `frequency` | nearest whole number ≥ 1 |
+| brick | `cols` | nearest whole number ≥ 1 |
+| brick | `rows` | nearest **even** number ≥ 2 (the half-brick offset must close at the wrap) |
+| checker | `tiles` | up to **even** (an odd count puts two same-colour squares together at the wrap) |
+| mapping (`tiling = true`) | `scale` | nearest whole number ≥ 1 per axis |
+| mapping (`tiling = true`) | `rotation` | nearest quarter turn |
 
 `mapping { tiling = false }` honours free scale and rotation — for decals and one-off
 maps that are never tiled; it opens a seam. `gradient linear` (0→1 left to right) is
