@@ -22,7 +22,7 @@ fn xz(v: Vec3) -> Vec2 {
 
 impl NavigationGraph {
     /// Steers and updates positions of active NavMesh agents in the scene, in
-    /// three passes: each agent computes its preferred velocity, [`avoidance`]
+    /// three passes: each agent computes its preferred velocity, ORCA local avoidance (#463)
     /// bends those so agents steer around each other, and each agent integrates
     /// the result, constrained to walkable cells by the 2D slide. Agents are
     /// visited in the ECS's stable order, so the tick stays deterministic.

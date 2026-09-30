@@ -11,6 +11,9 @@ use super::physics::vec3_row;
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::nav_agent as nav_ops;
 
+/// A shared `authoring::nav_agent` scalar setter, one per clamped drag row.
+type NavOp = fn(&mut crate::components::NavMeshAgentComponent, f32);
+
 /// 3EH. NavMeshAgent Component
 pub fn draw_nav_agent(
     ui: &mut egui::Ui,
@@ -30,33 +33,29 @@ pub fn draw_nav_agent(
             }
             *is_dirty = true;
         }
-        let mut speed = agent.speed;
-        if clamped(ui, "Speed:", &mut speed, 0.0..=100.0) {
-            if let Some(mut a) = world.nav_agent_mut(id) {
-                nav_ops::set_speed(&mut a, speed);
+        let rows: [(&str, f32, _, NavOp); 4] = [
+            ("Speed:", agent.speed, 0.0..=100.0, nav_ops::set_speed),
+            (
+                "Acceleration:",
+                agent.acceleration,
+                0.0..=100.0,
+                nav_ops::set_acceleration,
+            ),
+            (
+                "Stopping Distance:",
+                agent.stopping_distance,
+                0.0..=50.0,
+                nav_ops::set_stopping_distance,
+            ),
+            ("Radius:", agent.radius, 0.01..=10.0, nav_ops::set_radius),
+        ];
+        for (label, mut value, range, op) in rows {
+            if clamped(ui, label, &mut value, range) {
+                if let Some(mut a) = world.nav_agent_mut(id) {
+                    op(&mut a, value);
+                }
+                *is_dirty = true;
             }
-            *is_dirty = true;
-        }
-        let mut acceleration = agent.acceleration;
-        if clamped(ui, "Acceleration:", &mut acceleration, 0.0..=100.0) {
-            if let Some(mut a) = world.nav_agent_mut(id) {
-                nav_ops::set_acceleration(&mut a, acceleration);
-            }
-            *is_dirty = true;
-        }
-        let mut stopping_distance = agent.stopping_distance;
-        if clamped(ui, "Stopping Distance:", &mut stopping_distance, 0.0..=50.0) {
-            if let Some(mut a) = world.nav_agent_mut(id) {
-                nav_ops::set_stopping_distance(&mut a, stopping_distance);
-            }
-            *is_dirty = true;
-        }
-        let mut radius = agent.radius;
-        if clamped(ui, "Radius:", &mut radius, 0.01..=10.0) {
-            if let Some(mut a) = world.nav_agent_mut(id) {
-                nav_ops::set_radius(&mut a, radius);
-            }
-            *is_dirty = true;
         }
         draw_agent_avoidance(ui, world, id, &agent, is_dirty);
         draw_agent_target(ui, world, id, agent.target, is_dirty);
