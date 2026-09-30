@@ -8,10 +8,10 @@
 //!
 //! 1. **Selection** a script changed since last tick is announced (`OnDeselect`,
 //!    `OnSelect`), and a selection that went inactive or was destroyed is dropped.
-//! 2. **Keyboard navigation** ([`focus`]): arrows move focus, Tab / Shift+Tab cycle
+//! 2. **Keyboard navigation** (`focus`): arrows move focus, Tab / Shift+Tab cycle
 //!    it, Enter submits (`OnSubmit`), Escape cancels (`OnCancel`).
-//! 3. **Pointer** ([`pointer`]): the top-most raycast target under the mouse
-//!    ([`raycast`]) drives `OnPointerEnter` / `OnPointerExit`; each mouse button's
+//! 3. **Pointer** (`pointer`): the top-most raycast target under the mouse
+//!    ([`raycast()`]) drives `OnPointerEnter` / `OnPointerExit`; each mouse button's
 //!    edges drive `OnPointerDown` / `OnPointerUp` / `OnPointerClick` and the drag
 //!    callbacks; the wheel drives `OnScroll`.
 //!
@@ -19,7 +19,7 @@
 //! that handles it. A `Selectable` that is not interactable (its own flag or a
 //! `CanvasGroup` above it) cannot *start* an interaction — press, drag, scroll,
 //! submit and cancel stop at it without firing. The visual state of every
-//! Selectable ([`EventSystem::state_of`]) and its transition ([`transition`]) are
+//! Selectable ([`EventSystem::state_of`]) and its transition (`transition`) are
 //! derived from the same state, in `LateUpdate`.
 //!
 //! **Pointer coordinates** are UI screen pixels: bottom-left origin, y-up, the frame

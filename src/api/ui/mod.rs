@@ -4,7 +4,7 @@
 //! rect in its canvas's reference units and in screen pixels, computed on demand
 //! from the live scene (so it reflects a change made earlier in the same script, in
 //! edit mode as well as in Play) with the same math as the per-tick layout system.
-//! The pointer and focus verbs (#420) are in [`events`].
+//! The pointer and focus verbs (#420) are in `events`.
 
 mod events;
 
