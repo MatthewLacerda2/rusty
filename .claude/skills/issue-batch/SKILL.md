@@ -326,6 +326,46 @@ chose and why, and keep going. The batch exists so the user does not have to be
 here. (On 2026-09-30, holding three PRs for a smoke test and an ear check stalled
 the queue for hours; every one was fine.)
 
+## Learn from the batch: every lesson ends as a change
+
+A batch is trial by fire: it finds the traps, gaps and bugs in the tooling and in
+the engine faster than anything else. A lesson that only reaches the chat is lost,
+because the next session starts without it. So every lesson ends as exactly one of:
+
+- **fixed**: a pull request that removes the cause;
+- **enforced**: a lint, gate or test that makes it impossible to repeat;
+- **documented**: this skill, `ci-merge`, `issue-write` or CLAUDE.md, for what the
+  repo can't change (a platform behaviour, a procedure);
+- **tracked**: an issue with the evidence (run ids, PR numbers, measurements) and a
+  proposed fix, never just the symptom.
+
+**Mid-batch, fix what blocks or bites twice.** When a lesson costs the running batch
+time, such as a tooling bug that stalls the queue or a brief that makes every agent
+re-solve the same trap, fix it now. It is infrastructure, so it outranks whatever
+was next. A skill or doc edit is Markdown-only and merges without queuing. On
+2026-09-30, for example: #515 (red gates on cancelled runs), #555 (merges waiting
+on the mutation signal), and #519, #561 and #566 (skill fixes landed within the
+hour the lesson appeared).
+
+**Otherwise, file it and keep going.** The strongest issues come from doing the
+work. File an agent's "follow-up, not in this PR" notes and a PR's "decisions to
+check" the moment you read them, not at the end.
+
+**At the end, run a retro before reporting back:**
+
+1. List every trap, gap, surprise, workaround and hand-back from the batch: your
+   own notes, each PR's *Decisions* and *Not exercised* sections, the issues the
+   agents filed.
+2. Map each one to fixed, enforced, documented or tracked. Anything unmapped gets
+   an issue now.
+3. **Refresh the unstarted issues whose ground moved.** A batch invalidates line
+   references and assumptions fast, so add a short *Context update* comment to the
+   issues next in line: what merged that they build on, and what to rebase over.
+   Re-scope or close any that the batch made moot. Never touch a `planning`
+   issue's scope.
+4. Put the mapping in the report, so the user sees each lesson turned into a change
+   rather than only described.
+
 ## Finishing a batch
 
 The batch is not done when the last branch merges — it is done when the main
