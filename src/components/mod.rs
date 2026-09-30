@@ -12,6 +12,7 @@
 pub mod animator;
 pub mod audio_source;
 pub mod camera;
+pub mod canvas;
 pub mod collider;
 pub mod entity;
 pub mod light;
@@ -19,6 +20,7 @@ pub mod material;
 pub mod mesh;
 pub mod nav_agent;
 pub mod particle;
+pub mod rect_transform;
 pub mod rigidbody;
 pub mod script;
 pub mod texture;
@@ -28,6 +30,7 @@ pub mod visual_correction;
 pub use animator::{AnimatorComponent, AnimatorParameter, AnimatorParameters};
 pub use audio_source::AudioSourceComponent;
 pub use camera::{CameraComponent, ClearFlags};
+pub use canvas::{CanvasComponent, CanvasRenderMode};
 pub use collider::{ColliderComponent, ColliderShape};
 pub use entity::{Entity, PrefabLink};
 pub use light::{LightComponent, LightType};
@@ -37,6 +40,7 @@ pub use nav_agent::NavMeshAgentComponent;
 pub use particle::{
     CollisionResponse, EmitMode, Particle, ParticleBlend, ParticleEmitterComponent,
 };
+pub use rect_transform::RectTransformComponent;
 pub use rigidbody::{CollisionDetection, RigidBodyComponent};
 pub use script::{ScriptComponent, ScriptFieldValue};
 pub use texture::TextureComponent;

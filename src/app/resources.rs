@@ -16,7 +16,7 @@
 //! through the system call path — done here — removes the borrow-panic risk from the
 //! engine systems themselves: they no longer reach through one opaque blob.
 //!
-//! Allowed deps: app::*, core, navigation, physics, render, scene, scripting, time.
+//! Allowed deps: app::*, core, navigation, physics, render, scene, scripting, time, ui.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -30,6 +30,7 @@ use crate::scene::Camera;
 use crate::scene::{Scene, SceneSnapshot};
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
+use crate::ui::{ScreenSize, UiLayout};
 
 use super::animation::graph::GraphCache;
 use super::Schedule;
@@ -59,6 +60,14 @@ pub struct Resources {
     /// boundaries (Stop / quit). Empty + pathless in the harness, so headless runs
     /// never read a real save and stay reproducible.
     pub storage: Rc<RefCell<Storage>>,
+    /// The screen the UI lays out on (#417) — a sim input. The windowed platform
+    /// writes the game view's pixel size each frame; headless leaves it unset and
+    /// the video resolution stands in. Shared with the `UI` namespace.
+    pub screen: Rc<RefCell<ScreenSize>>,
+    /// Every UI rect as of the end of the last tick (#417), in draw order —
+    /// written by the `LateUpdate` layout system, read by the UI render pass
+    /// (#418) and pointer dispatch (#420). Empty until the first Play tick.
+    pub ui_layout: UiLayout,
     pub is_playing: bool,
     pub(super) was_playing: bool,
     pub(super) pathfinding_points: Vec<glam::Vec3>,
@@ -109,6 +118,8 @@ impl Resources {
         // with the script runtime so the `Audio` namespace drives the same maestro.
         let audio = Rc::new(RefCell::new(AudioMaestro::default()));
         script_manager.set_audio_cell(Rc::clone(&audio));
+        let screen = Rc::new(RefCell::new(ScreenSize::default()));
+        script_manager.set_screen_cell(Rc::clone(&screen));
         Self {
             input,
             nav,
@@ -118,6 +129,8 @@ impl Resources {
             audio,
             script_manager,
             storage,
+            screen,
+            ui_layout: UiLayout::default(),
             physics: Rc::new(RefCell::new(None)),
             is_playing: false,
             was_playing: false,
@@ -143,6 +156,14 @@ impl Resources {
                 .borrow_mut()
                 .error(format!("Failed to flush storage: {}", err));
         }
+    }
+
+    /// The screen size in pixels the UI lays out on this tick: the platform's game
+    /// view, else the video resolution (headless).
+    pub fn screen_pixels(&self) -> glam::Vec2 {
+        let video = self.script_manager.video_cell();
+        let video = *video.borrow();
+        self.screen.borrow().pixels(&video)
     }
 
     /// Number of play-mode frames simulated since the last `enter_play`.

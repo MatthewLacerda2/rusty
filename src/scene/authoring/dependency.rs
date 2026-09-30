@@ -26,6 +26,7 @@
 //!
 //! Allowed deps: components, scene, ecs.
 
+use crate::components::{CanvasComponent, RectTransformComponent};
 use crate::ecs::World;
 use crate::scene::authoring::components::ComponentKind;
 use crate::scene::authoring::defaults::{
@@ -48,6 +49,8 @@ pub(crate) fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::Particles => world.has_particles(id),
         ComponentKind::VisualCorrection => world.has_visual_correction(id),
         ComponentKind::Audio => world.has_audio(id),
+        ComponentKind::Canvas => world.has_canvas(id),
+        ComponentKind::RectTransform => world.has_rect_transform(id),
     }
 }
 
@@ -70,6 +73,10 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
             world.set_visual_correction(id, Some(default_visual_correction()))
         }
         ComponentKind::Audio => world.set_audio(id, Some(AudioSourceComponent::default())),
+        ComponentKind::Canvas => world.set_canvas(id, Some(CanvasComponent::default())),
+        ComponentKind::RectTransform => {
+            world.set_rect_transform(id, Some(RectTransformComponent::default()))
+        }
     }
 }
 
@@ -88,6 +95,8 @@ pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool
         ComponentKind::Particles => world.set_particles(id, None),
         ComponentKind::VisualCorrection => world.set_visual_correction(id, None),
         ComponentKind::Audio => world.set_audio(id, None),
+        ComponentKind::Canvas => world.set_canvas(id, None),
+        ComponentKind::RectTransform => world.set_rect_transform(id, None),
     }
 }
 

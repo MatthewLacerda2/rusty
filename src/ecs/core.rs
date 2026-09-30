@@ -166,6 +166,8 @@ impl World {
             visual_correction: self.visual_correction(id).map(|c| (*c).clone()),
             particles: self.particles(id).map(|c| (*c).clone()),
             audio: self.audio(id).map(|c| (*c).clone()),
+            canvas: self.canvas(id).map(|c| (*c).clone()),
+            rect_transform: self.rect_transform(id).map(|c| (*c).clone()),
             prefab_link: self.prefab_link(id).map(|c| (*c).clone()),
             parent_id: core.parent_id,
             children: core.children.clone(),

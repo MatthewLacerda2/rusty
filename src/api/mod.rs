@@ -61,6 +61,7 @@ use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 use crate::time::Time;
+use crate::ui::ScreenSize;
 
 /// Result alias every namespace registrar returns.
 pub type Reg = Result<(), String>;
@@ -100,6 +101,9 @@ pub struct ApiScopedCtx<'scope> {
     /// The seeded gameplay RNG (#443): the `Random` namespace and the sandboxed
     /// `math.random` both draw from it.
     pub random: &'scope RefCell<Random>,
+    /// The screen the UI lays out on (#417); resolved against `video` when no
+    /// platform reported a game-view size (headless).
+    pub screen: &'scope RefCell<ScreenSize>,
 }
 
 /// Register every namespace onto `lua` using `scope`-tied closures that borrow
