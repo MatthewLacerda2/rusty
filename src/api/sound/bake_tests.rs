@@ -9,7 +9,7 @@ use super::*;
 /// A temp path with forward slashes: a Windows path (`C:\Users\…`) interpolated
 /// into a Lua string literal trips Lua's escape parser (`\U`), and Windows accepts
 /// `/` for file I/O, so the round-trip matches on every platform.
-fn tmp(name: &str) -> String {
+pub(super) fn tmp(name: &str) -> String {
     std::env::temp_dir()
         .join(name)
         .to_str()
@@ -18,14 +18,14 @@ fn tmp(name: &str) -> String {
 }
 
 /// A percussive noise patch — the shape every impact / footstep SFX takes.
-const IMPACT_PATCH: &str = r#"{
+pub(super) const IMPACT_PATCH: &str = r#"{
     source = { kind = "noise" },
     amp = { a = 0.001, d = 0.08, s = 0.0, r = 0.05 },
     filter = { kind = "lowpass", cutoff = 400, resonance = 0.3, env_octaves = 3.5,
                adsr = { a = 0.0, d = 0.06, s = 0.0, r = 0.05 } },
 }"#;
 
-fn lua_with_sound() -> Lua {
+pub(super) fn lua_with_sound() -> Lua {
     let lua = Lua::new();
     register(&lua).expect("the namespace registers");
     lua

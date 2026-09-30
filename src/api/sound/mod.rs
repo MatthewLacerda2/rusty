@@ -17,7 +17,8 @@
 //! document — one surface, three callers.
 //!
 //! Verbs:
-//! - `Sound.Bake(patch, note, path [, opts])` — render + write; returns the path.
+//! - `Sound.Bake(patch, note, path [, opts])` — render + write; returns the path
+//!   and how loud it came out (#378, `level.rs`).
 //! - `Sound.BakeJson(json, note, path [, opts])` — same, from a patch JSON string,
 //!   so a saved patch re-bakes without a round-trip through Lua.
 //! - `Sound.ToJson(patch)` — serialize a patch table to canonical JSON for saving
@@ -28,6 +29,11 @@
 //! - `Sound.BakeSong(song, path)` / `Sound.BakeSongJson(json, path)` — render + write.
 //! - `Sound.SongToJson(song)` — canonical JSON for saving or diffing.
 //!
+//! Every bake verb returns `path, level`: the path first, because callers feed it
+//! straight to `Audio.PlayAt`, and the level table second, so the figures are never
+//! one forgotten call away. `Sound.Level(path)` measures any clip on disk the same
+//! way — an import, or an earlier bake being compared against (#378).
+//!
 //! `note` is a name (`"C#4"`) or a MIDI number; `opts` is
 //! `{ duration, velocity, timbre, glide = { semitones, seconds }, seed }`, each
 //! field optional. Same patch + note + seed ⇒ byte-identical WAV.
@@ -36,11 +42,13 @@
 //! registers as a plain static namespace, like `Texture` and `Shader`.
 
 mod from_lua;
+mod level;
 
 use mlua::{Lua, Table, Value};
 
 use super::{put, Reg};
 use from_lua::{note_from_value, opts_from_table, patch_from_table, song_from_table};
+use level::{level_table, measure_file};
 use zimmer::{Bake, Patch, Song};
 
 /// Register the `Sound` namespace onto `lua`.
@@ -51,9 +59,9 @@ pub fn register(lua: &Lua) -> Reg {
         &table,
         "Bake",
         lua.create_function(
-            |_, (patch, note, path, opts): (Table, Value, String, Option<Table>)| {
+            |lua, (patch, note, path, opts): (Table, Value, String, Option<Table>)| {
                 let patch = patch_from_table(&patch).map_err(mlua::Error::RuntimeError)?;
-                bake(&patch, &note, &path, opts.as_ref())
+                bake(lua, &patch, &note, &path, opts.as_ref())
             },
         ),
     )?;
@@ -62,9 +70,9 @@ pub fn register(lua: &Lua) -> Reg {
         &table,
         "BakeJson",
         lua.create_function(
-            |_, (json, note, path, opts): (String, Value, String, Option<Table>)| {
+            |lua, (json, note, path, opts): (String, Value, String, Option<Table>)| {
                 let patch = Patch::from_json(&json).map_err(lua_err)?;
-                bake(&patch, &note, &path, opts.as_ref())
+                bake(lua, &patch, &note, &path, opts.as_ref())
             },
         ),
     )?;
@@ -75,6 +83,17 @@ pub fn register(lua: &Lua) -> Reg {
         lua.create_function(|_, patch: Table| {
             let patch = patch_from_table(&patch).map_err(mlua::Error::RuntimeError)?;
             patch.to_json().map_err(lua_err)
+        }),
+    )?;
+
+    put(
+        &table,
+        "Level",
+        lua.create_function(|lua, path: String| {
+            level_table(
+                lua,
+                &measure_file(&path).map_err(mlua::Error::RuntimeError)?,
+            )
         }),
     )?;
 
@@ -90,18 +109,18 @@ fn register_song(lua: &Lua, table: &Table) -> Reg {
     put(
         table,
         "BakeSong",
-        lua.create_function(|_, (song, path): (Table, String)| {
+        lua.create_function(|lua, (song, path): (Table, String)| {
             let song = song_from_table(&song).map_err(mlua::Error::RuntimeError)?;
-            bake_song(&song, &path)
+            bake_song(lua, &song, &path)
         }),
     )?;
 
     put(
         table,
         "BakeSongJson",
-        lua.create_function(|_, (json, path): (String, String)| {
+        lua.create_function(|lua, (json, path): (String, String)| {
             let song = Song::from_json(&json).map_err(lua_err)?;
-            bake_song(&song, &path)
+            bake_song(lua, &song, &path)
         }),
     )?;
 
@@ -116,18 +135,23 @@ fn register_song(lua: &Lua, table: &Table) -> Reg {
 }
 
 /// Resolve the note + options, bake, and write — surfacing any error to Lua verbatim.
-fn bake(patch: &Patch, note: &Value, path: &str, opts: Option<&Table>) -> mlua::Result<String> {
+fn bake<'lua>(
+    lua: &'lua Lua,
+    patch: &Patch,
+    note: &Value,
+    path: &str,
+    opts: Option<&Table>,
+) -> Baked<'lua> {
     let midi = note_from_value(note).map_err(mlua::Error::RuntimeError)?;
     let opts = opts_from_table(opts).map_err(mlua::Error::RuntimeError)?;
-    write_bake(
-        zimmer::bake_note(patch, midi, &opts).map_err(lua_err)?,
-        path,
-    )
+    let bake = zimmer::bake_note(patch, midi, &opts).map_err(lua_err)?;
+    write_bake(lua, bake, path)
 }
 
 /// Bake `song`, resolving any track that names its patch by reading that `.json`.
-fn bake_song(song: &Song, path: &str) -> mlua::Result<String> {
-    write_bake(zimmer::bake_song(song, &load_patch).map_err(lua_err)?, path)
+fn bake_song<'lua>(lua: &'lua Lua, song: &Song, path: &str) -> Baked<'lua> {
+    let bake = zimmer::bake_song(song, &load_patch).map_err(lua_err)?;
+    write_bake(lua, bake, path)
 }
 
 /// The song resolver: a track's `patch` given as a string is a path to a saved
@@ -138,15 +162,19 @@ fn load_patch(path: &str) -> Result<Patch, String> {
     Patch::from_json(&json).map_err(|e| format!("invalid patch: {e}"))
 }
 
-/// Write a finished bake to `path`, creating its parent directory, and hand the
-/// path back so it drops straight into `Audio.PlayAt`. Only reached once the render
-/// succeeded, so a rejected recipe never leaves a file behind.
-fn write_bake(bake: Bake, path: &str) -> mlua::Result<String> {
+/// What every bake verb returns to Lua: the written path, then its level table.
+type Baked<'lua> = mlua::Result<(String, Table<'lua>)>;
+
+/// Write a finished bake to `path`, creating its parent directory, and hand back
+/// the path (so it drops straight into `Audio.PlayAt`) with how loud it came out —
+/// zimmer measured the samples before encoding, so this costs no second pass. Only
+/// reached once the render succeeded, so a rejected recipe never leaves a file behind.
+fn write_bake<'lua>(lua: &'lua Lua, bake: Bake, path: &str) -> Baked<'lua> {
     if let Some(dir) = std::path::Path::new(path).parent() {
         std::fs::create_dir_all(dir).map_err(lua_err)?;
     }
-    std::fs::write(path, bake.wav).map_err(lua_err)?;
-    Ok(path.to_string())
+    std::fs::write(path, &bake.wav).map_err(lua_err)?;
+    Ok((path.to_string(), level_table(lua, &bake.profile.whole)?))
 }
 
 /// Any displayable error (zimmer's `SynthError`, serde, I/O) as the Lua error the
@@ -158,3 +186,7 @@ fn lua_err(e: impl std::fmt::Display) -> mlua::Error {
 #[cfg(test)]
 #[path = "bake_tests.rs"]
 mod bake_tests;
+
+#[cfg(test)]
+#[path = "level_tests.rs"]
+mod level_tests;
