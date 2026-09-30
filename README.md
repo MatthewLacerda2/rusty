@@ -69,12 +69,34 @@ the game for you, and only open a window when you want to.
 
 ## Running it
 
-- `cargo run` — the editor and game window.
+- `cargo run` — the editor.
+- `cargo run --bin player` — the standalone player: the project's startup scene,
+  straight into Play, full-window, no editor (see *Shipping a build* below).
 - `cargo run --bin play --features dev -- <scenario.lua> <out_dir>` — the headless
   harness; writes `results.json` + `console.log` (and any screenshots) to `<out_dir>`.
 - `cargo run --bin session-mcp --features dev` — drive the live engine from Claude
   Code over MCP (see [`docs/mcp.md`](docs/mcp.md)).
 - `cargo doc --no-deps` — the Rust API reference.
+
+## Shipping a build
+
+A shipped game is the **player** binary built without the editor:
+
+```sh
+cargo build --release --bin player --no-default-features
+```
+
+`--no-default-features` drops the `editor` feature, so egui and the editor UI are not
+compiled in (and `dev` is off, so neither is the harness or console). The player
+reads `project/build_settings.json` — the startup scene, the product name (window
+title) and the first-launch window mode — which you edit in the editor under
+**File → Build Settings** or from a script through the `Application` namespace. It
+boots that scene straight into Play and exits when the game calls
+`Application.Quit()` (a main-menu Quit button) or the window closes, saving
+`Storage` on the way out.
+
+The binary expects the project folder (`project/`, `assets/`) beside it, as it is in
+the repository. Packaging those assets and building installers is not covered yet.
 
 For the engine's architecture and the conventions agents follow, see
 [`CLAUDE.md`](CLAUDE.md); for the commit gate, testing, and the Lua scripting API, see

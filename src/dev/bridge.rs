@@ -15,7 +15,7 @@ use std::rc::Rc;
 use glam::Vec3;
 use mlua::{Function, Lua, Result as LuaResult};
 
-use super::harness::{Harness, FIXED_DT};
+use super::harness::{tick_unless_quit, Harness};
 use crate::app::GameWorld;
 
 type Shared = Rc<RefCell<Harness>>;
@@ -48,7 +48,9 @@ fn register_harness_stepping(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lu
         lua.create_function(move |_, n: u32| {
             let mut w = world.borrow_mut();
             for _ in 0..n {
-                w.tick(FIXED_DT);
+                if !tick_unless_quit(&mut w) {
+                    break;
+                }
             }
             Ok(())
         })?,
@@ -59,9 +61,9 @@ fn register_harness_stepping(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lu
         "StepUntil",
         lua.create_function(move |_, (pred, max): (Function, u32)| {
             for _ in 0..max {
-                {
-                    let mut w = world.borrow_mut();
-                    w.tick(FIXED_DT);
+                // A quit game ends the run: the predicate can no longer come true.
+                if !tick_unless_quit(&mut world.borrow_mut()) {
+                    return Ok(false);
                 }
                 if pred.call::<_, bool>(())? {
                     return Ok(true);

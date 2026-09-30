@@ -8,7 +8,7 @@ agent can read exactly what failed.
 | Check | Tool | Rule |
 |---|---|---|
 | Style | rustfmt (`rustfmt.toml`) | `cargo fmt --check` |
-| Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (both feature sets) |
+| Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build) |
 | Merge helpers | `unittest` (`make scripts`) | **hard gate**: `.github/scripts/tests` pass — `make mergeable` is the only thing between a red PR and `main` while it has no required checks (#486, #491) |
 | Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]` |
 | File length | `tools/lint` | <= 300 lines |
@@ -182,7 +182,7 @@ The rule is deliberately narrow:
   hatch — it documents *why* the value must be present at the call site. Use `?`
   where a `Result` should propagate, `.expect(...)` where the invariant is real and
   local; reach for the bare `.unwrap()` nowhere in the sim core.
-- **Sim modules only.** The platform layer (`main.rs`, `render`, `dev`) is exempt —
+- **Sim modules only.** The platform layer (`shell`, `render`, `dev`) is exempt —
   e.g. `render/gpu/shaders.rs` panicking at boot on a bad shader is fail-fast-at-startup,
   not a mid-sim hazard. This is the exact boundary the determinism guard uses.
 - **Tests exempt.** `clippy.toml`'s `allow-unwrap-in-tests = true` lets test code

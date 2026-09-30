@@ -22,6 +22,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::audio::AudioMaestro;
+use crate::core::application::Application;
 use crate::core::input::InputState;
 use crate::core::storage::Storage;
 use crate::navigation::NavigationGraph;
@@ -68,6 +69,9 @@ pub struct Resources {
     /// written by the `LateUpdate` layout system, read by the UI render pass
     /// (#418) and pointer dispatch (#420). Empty until the first Play tick.
     pub ui_layout: UiLayout,
+    /// Build settings + the quit request (#431), shared with the script runtime's
+    /// `Application` namespace. Unbound by default; the platform layer loads it.
+    pub application: Rc<RefCell<Application>>,
     pub is_playing: bool,
     pub(super) was_playing: bool,
     pub(super) pathfinding_points: Vec<glam::Vec3>,
@@ -77,6 +81,9 @@ pub struct Resources {
     /// Edit-mode scene captured on Play and restored on Stop, so play-mode mutations
     /// never leak back into the authoritative edit scene (Unity-style).
     pub(super) edit_snapshot: Option<SceneSnapshot>,
+    /// A standalone run (the player, #431) has no edit mode to return to, so Play
+    /// takes no edit snapshot. Set once by `GameWorld::boot_standalone`.
+    pub(super) standalone: bool,
     /// The scaled per-frame delta (`Time::delta_time`) for the tick in flight, set by
     /// `GameWorld::tick` before the schedule runs. Systems read it instead of taking
     /// `dt` as a third argument, keeping the call shape `(&mut Scene, &mut Resources)`.
@@ -120,6 +127,8 @@ impl Resources {
         script_manager.set_audio_cell(Rc::clone(&audio));
         let screen = Rc::new(RefCell::new(ScreenSize::default()));
         script_manager.set_screen_cell(Rc::clone(&screen));
+        let application = Rc::new(RefCell::new(Application::new()));
+        script_manager.set_application_cell(Rc::clone(&application));
         Self {
             input,
             nav,
@@ -131,12 +140,14 @@ impl Resources {
             storage,
             screen,
             ui_layout: UiLayout::default(),
+            application,
             physics: Rc::new(RefCell::new(None)),
             is_playing: false,
             was_playing: false,
             pathfinding_points: Vec::new(),
             play_frame: 0,
             edit_snapshot: None,
+            standalone: false,
             frame_dt: 0.0,
             schedule: super::build().into_schedule(),
             animation_graphs: GraphCache::default(),

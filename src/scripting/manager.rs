@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use crate::api::ApiScopedCtx;
 use crate::audio::AudioMaestro;
+use crate::core::application::Application;
 use crate::core::input::InputState;
 use crate::core::quality::QualityPreset;
 use crate::core::random::Random;
@@ -88,6 +89,9 @@ pub struct ScriptManager {
     /// The screen the UI lays out on (#417), shared with `Resources` so `UI.GetRect`
     /// and the layout system agree on one size.
     pub(super) screen: Rc<RefCell<ScreenSize>>,
+    /// Build settings + the quit request (#431), shared with `Resources` and the
+    /// platform layer, which acts on `Application.Quit`. Defaults to unbound.
+    pub(super) application: Rc<RefCell<Application>>,
 }
 
 impl ScriptManager {
@@ -118,6 +122,7 @@ impl ScriptManager {
             audio: Rc::new(RefCell::new(AudioMaestro::default())),
             random: Rc::new(RefCell::new(Random::default())),
             screen: Rc::new(RefCell::new(ScreenSize::default())),
+            application: Rc::new(RefCell::new(Application::new())),
         }
     }
 
@@ -138,6 +143,12 @@ impl ScriptManager {
     /// `UI` namespace and the layout system read the same screen.
     pub fn set_screen_cell(&mut self, screen: Rc<RefCell<ScreenSize>>) {
         self.screen = screen;
+    }
+
+    /// Inject the shared `Application` cell (build settings + quit request), so the
+    /// `Application` namespace and the host that acts on `Quit` agree.
+    pub fn set_application_cell(&mut self, application: Rc<RefCell<Application>>) {
+        self.application = application;
     }
 
     /// Handle to the shared play-state cell, so `GameWorld::set_playing` can keep
@@ -253,6 +264,7 @@ impl ScriptManager {
             audio: &self.audio,
             random: &self.random,
             screen: &self.screen,
+            application: &self.application,
         }
     }
 

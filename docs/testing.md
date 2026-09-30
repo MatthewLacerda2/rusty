@@ -162,7 +162,7 @@ Targets are deliberately differentiated:
   namespace). The floors live in `coverage-baseline.txt` at the repo root (one
   `module floor` line each) and **ratchet**: raise them as coverage improves,
   never lower them silently.
-- **No floor on the platform layer** (`main.rs`, `render`, `dev`) — headless
+- **No floor on the platform layer** (`shell`, `render`, `dev`) — headless
   coverage there is low-value.
 
 It runs in two tiers, both non-blocking (mirroring mutation testing, below):

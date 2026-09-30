@@ -1,3 +1,4 @@
+pub mod application;
 pub mod input;
 pub mod keymap;
 pub mod quality;

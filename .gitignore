@@ -35,6 +35,8 @@ auxmd.md
 !/project/scripts/
 /project/scripts/*
 !/project/scripts/*.lua
+# The project's build settings (#431): startup scene, product name, window mode.
+!/project/build_settings.json
 # Ship the starter material library (#173) — glTF-PBR material assets, no textures.
 !/project/materials/
 /project/materials/*
