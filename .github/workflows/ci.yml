@@ -19,6 +19,12 @@ on:
     branches: [main]
   # Nightly full-sim mutation sweep (the `mutants` job): re-examines untouched code
   # the per-PR diff run never mutates and tracks/ratchets the survivor backlog.
+  # Which gating jobs also run on the schedule is a decision, not a side effect
+  # (#480): `deny` does — advisories land against code that has not changed, so a
+  # nightly check is how a new RUSTSEC reaches us between merges (RUSTSEC-2026-0257
+  # was spotted that way), and `ci-gate` goes red with it. `build-test` and
+  # `build-test-cross` do not: with the toolchain and Cargo.lock pinned, rebuilding
+  # an unchanged `main` re-proves what its `push` run already proved.
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
@@ -44,11 +50,18 @@ jobs:
       code: ${{ steps.filter.outputs.code || 'true' }}
       sim: ${{ steps.filter.outputs.sim || 'true' }}
     steps:
+      # On `pull_request` paths-filter reads the changed files from the API and
+      # needs no clone; on `push` it diffs `github.event.before..HEAD` in a local
+      # repo, so without this checkout it dies with git exit 128 — which failed
+      # every post-merge run and kept `coverage` from ever running (#480).
+      # paths-filter fetches `before` itself if the shallow clone lacks it.
+      - uses: actions/checkout@v4
+        if: github.event_name == 'push'
       - uses: dorny/paths-filter@v3
         id: filter
         # Runs on PRs (diff vs. base) and on push to main (diff of the merge
-        # commit) so the post-merge coverage/mutants jobs can skip docs-only or
-        # non-sim merges just as they did per-PR.
+        # commit) so the post-merge coverage job can skip docs-only merges just
+        # as the gating steps do per-PR.
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         with:
           filters: |
@@ -70,13 +83,20 @@ jobs:
   # non-draft PR / merge_group so the required check reports `success` (never
   # `skipped`); the build/test steps are guarded on `code`, so a Markdown-only PR
   # is a fast no-op success (issue #218).
+  #
+  # The events each gating job runs on are listed explicitly (#480). A bare
+  # `github.event.pull_request.draft == false` also matches `push` and `schedule`
+  # — there is no PR, and GitHub's loose equality makes null == false — so the
+  # old condition ran these jobs on events nobody had chosen. `push` is kept on
+  # purpose: it builds the commit that actually landed on `main`.
   build-test:
     needs: changes
     runs-on: ubuntu-latest
     if: >-
+      github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'merge_group' ||
-      github.event.pull_request.draft == false
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
     env:
       # Debuginfo dominates target/'s size and the tests never read it. Without
       # this, the two feature-set builds plus the restored cache overflow the
@@ -130,7 +150,9 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'merge_group' ||
-      (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
+      ((github.event_name == 'push' ||
+        (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) &&
+       needs.changes.outputs.code != 'false')
     env:
       # Same disk guard as build-test: tests never read debuginfo, and the
       # Windows runner has the same ~14 GB free-disk budget as Linux.
@@ -327,13 +349,17 @@ jobs:
             fi
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
+  # The one gating job that also runs nightly — see the `schedule` trigger note.
   deny:
     needs: changes
     runs-on: ubuntu-latest
     if: >-
+      github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'merge_group' ||
-      (github.event.pull_request.draft == false && needs.changes.outputs.code != 'false')
+      ((github.event_name == 'push' ||
+        (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) &&
+       needs.changes.outputs.code != 'false')
     steps:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
@@ -354,15 +380,25 @@ jobs:
   # leave a required check stuck "Expected" and wedge a docs-only PR. When a gating
   # job is added or removed, update this `needs:` list; branch protection never needs
   # touching again. (lint.yml exposes the analogous `lint-gate`.)
+  #
+  # `changes` is in `needs:` and must SUCCEED (#480): every gating job depends on
+  # it, so when it fails they are all skipped — and "skipped passes" alone would
+  # report a run where nothing was checked as green. That happened on every
+  # post-merge run until #480 (`changes` failed, `ci-gate` said success).
   ci-gate:
-    needs: [build-test, build-test-cross, deny]
+    needs: [changes, build-test, build-test-cross, deny]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Gate on the correctness jobs (success or skipped passes)
         env:
+          CHANGES: ${{ needs.changes.result }}
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
+          if [ "$CHANGES" != success ]; then
+            echo "::error::the changes job concluded '$CHANGES', so every gating job was skipped and nothing was checked"
+            exit 1
+          fi
           echo "gating job results: $RESULTS"
           for r in $RESULTS; do
             case "$r" in
@@ -472,10 +508,28 @@ jobs:
   # `schedule` or on demand; never on a PR, never blocking. No `needs: changes`:
   # there is no PR/push diff to filter on a scheduled/manual run, so it always
   # sweeps the full set.
+  #
+  # Sharded (#480). Unsharded, the sweep hit GitHub's 6 h job ceiling on every run
+  # and never produced a report: ~1,000 mutants at ~2 min each (every mutant
+  # rebuilds the single crate, then runs the dev suite) is ~33 runner-hours.
+  # Ten shards of ~100 mutants each run ~3.5 h — headroom for the sim to grow by
+  # half again before a shard nears the ceiling. Resize with
+  # `cargo mutants --list --file <the globs below> | wc -l`, which builds nothing.
+  # `round-robin` spreads each file's mutants over every shard, so no shard draws
+  # a whole slow module; a single crate rebuilds fully per mutant regardless, so
+  # the default `slice` sharding's build locality buys nothing here.
+  # `max-parallel` leaves most of the account's concurrent-job allowance free for
+  # PR runs of an overnight batch; wall-clock time is irrelevant to a nightly
+  # report. `mutants-report` merges the shards into one summary.
   mutants:
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain (from rust-toolchain.toml)
@@ -488,18 +542,89 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-mutants
-      - name: Mutation test (full deterministic sim, report-only)
+      - name: Mutation test (one shard of the full deterministic sim, report-only)
         # Build/test with the dev feature so the headless-harness sim tests run
         # too. Scoped by --file to the sim modules; the timeout multiplier guards
-        # against mutants that induce infinite loops.
+        # against mutants that induce infinite loops. The exit code is recorded
+        # so `mutants-report` can tell a finished shard (0 clean, 2 survivors,
+        # 3 timeouts) from one that was cut off or never got past its baseline.
         run: |
+          rc=0
           cargo mutants --no-shuffle --timeout-multiplier 3 \
+            --shard '${{ matrix.shard }}/${{ strategy.job-total }}' --sharding round-robin \
             --file 'src/app/**/*.rs' \
             --file 'src/scripting/**/*.rs' \
             --file 'src/physics/**/*.rs' \
             --file 'src/navigation/**/*.rs' \
-            -- --features dev
-      - name: Upload surviving-mutant report
+            -- --features dev || rc=$?
+          mkdir -p mutants.out
+          echo "$rc" > mutants.out/exit-code
+          exit "$rc"
+      - name: Record the shard count for the merge job
+        if: always()
+        run: |
+          mkdir -p mutants.out
+          echo '${{ strategy.job-total }}' > mutants.out/shard-total
+      - name: Upload this shard's report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutants-shard-${{ matrix.shard }}
+          path: mutants.out/
+
+  # Merges the shard reports into the one sweep report: a job summary (totals,
+  # unfinished shards, the survivor list) and a single `mutants-report` artifact.
+  # A shard that did not finish is named, because its mutants are unmeasured —
+  # silence from it is not a clean bill.
+  mutants-report:
+    needs: mutants
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Download every shard's report
+        uses: actions/download-artifact@v4
+        with:
+          pattern: mutants-shard-*
+          path: shards
+      - name: Merge shards and summarize
+        run: |
+          mkdir -p mutants.out
+          for kind in caught missed timeout unviable; do
+            cat shards/*/"$kind".txt 2>/dev/null | sort > "mutants.out/$kind.txt" || true
+          done
+          total=$(cat shards/*/shard-total 2>/dev/null | head -n1 || true)
+          unfinished=''
+          for k in $(seq 0 $(( ${total:-0} - 1 ))); do
+            rc=$(cat "shards/mutants-shard-$k/exit-code" 2>/dev/null || echo none)
+            case "$rc" in 0|2|3) ;; *) unfinished="$unfinished $k(exit:$rc)" ;; esac
+          done
+          count() { grep -c . "mutants.out/$1.txt" || true; }
+          {
+            echo '### Mutation sweep — full deterministic sim (informational, non-blocking)'
+            echo ''
+            echo '| caught | missed | timeout | unviable |'
+            echo '|---|---|---|---|'
+            echo "| $(count caught) | $(count missed) | $(count timeout) | $(count unviable) |"
+            echo ''
+            if [ -z "$total" ]; then
+              echo '> ❌ No shard uploaded a report — nothing was measured.'
+            elif [ -n "$unfinished" ]; then
+              echo "> ⚠️ Shards that did not finish (of $total):$unfinished — their mutants are unmeasured, not clean. \`exit:none\` means the shard was cut off (the 6 h ceiling) or failed before its run; resize the matrix if it recurs."
+            else
+              echo "> All $total shards finished."
+            fi
+            if [ -s mutants.out/missed.txt ]; then
+              echo ''
+              echo '<details><summary>Surviving mutants</summary>'
+              echo ''
+              echo '```'
+              cat mutants.out/missed.txt
+              echo '```'
+              echo '</details>'
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload the merged sweep report
         if: always()
         uses: actions/upload-artifact@v4
         with:

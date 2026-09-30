@@ -121,7 +121,7 @@ tiers, both **non-blocking** — mutation never gates a merge:
 | Run | Trigger | Scope | Where it lands |
 |---|---|---|---|
 | **PR run** (`mutants-pr`) | `pull_request`, `sim` filter | `--in-diff` — only lines the PR changed (∩ the `--file` sim globs) | job summary **and** a sticky PR comment, so the coding agent fixes survivors in-PR |
-| **Full sweep** (`mutants`) | nightly `schedule` + `workflow_dispatch` | full `--file` sim scope | uploaded survivor artifact (`mutants-report`) |
+| **Full sweep** (`mutants`, sharded) | nightly `schedule` + `workflow_dispatch` | full `--file` sim scope, split over a 10-shard matrix (`--shard k/10`) to stay under GitHub's 6 h job limit | `mutants-report` job: merged job summary (totals, unfinished shards, survivors) and the merged `mutants-report` artifact |
 
 Why split it: diff-scoping makes the per-PR run fast and every survivor
 attributable to a line the PR just wrote (the *fresh-context catch*), while the

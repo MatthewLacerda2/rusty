@@ -110,13 +110,13 @@ A healthy code branch shows: `build-test`, `build-test-cross (macos-latest)`,
 `build-test-cross (windows-latest)`, `deny`, `ci-gate` from `ci.yml`; `lint` and
 `lint-gate` from `lint.yml`; `changes` **twice**, once per workflow — that
 duplicate is normal and is exactly the shape that makes eyeballing a check list
-unreliable. `coverage` and `mutants` appear as **skipped** on every pull request
-by design (they are the post-merge and nightly runs). Skipped is the honest
+unreliable. `coverage`, `mutants` and `mutants-report` appear as **skipped** on
+every pull request by design (they are the post-merge and nightly runs). Skipped is the honest
 answer; never read it as green.
 
 `ci-gate` and `lint-gate` are the two that matter — each collapses its workflow's
-gating jobs into one verdict and passes only when every one of them succeeded or
-was legitimately skipped. If those two are `success` on the head SHA, the gates
+gating jobs into one verdict and passes only when its `changes` job succeeded and
+every gating job succeeded or was legitimately skipped. If those two are `success` on the head SHA, the gates
 are green on the code being merged.
 
 Three failure shapes to expect:
@@ -223,7 +223,7 @@ remember to launch.
 
 | | per pull request | the backstop |
 |---|---|---|
-| mutation | `mutants-pr`, `--in-diff`, sticky comment | `mutants`, nightly, full sim, artifact |
+| mutation | `mutants-pr`, `--in-diff`, sticky comment | `mutants`, nightly, full sim in 10 shards, `mutants-report` summary + artifact |
 | coverage | `coverage-pr`, `diff-cover`, sticky comment | `coverage`, post-merge on `main`, ratchet table |
 
 Three things about their scope, all of which change how a clean report reads:
