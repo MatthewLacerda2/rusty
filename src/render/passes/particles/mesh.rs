@@ -92,8 +92,8 @@ impl Renderer {
         (opaque.len() + transparent.len() - before) as u32
     }
 
-    /// What every particle of a mesh emitter shares: the batch key (mesh, material
-    /// bind group, per-draw uniform), the index count, and whether the material is
+    /// What every particle of a mesh emitter shares: the batch key (pipeline — the
+    /// material's surface shader, #396 — mesh, material bind group, per-draw uniform), the index count, and whether the material is
     /// translucent. `None` when the mesh is unset or fails to load.
     fn mesh_emitter_key(
         &mut self,
@@ -109,7 +109,9 @@ impl Renderer {
         for path in material_maps(material) {
             self.load_texture(&path);
         }
+        let shader = material.and_then(|m| m.shader.as_deref());
         let key = BatchKey {
+            pipeline: self.surface_shaders.pipeline_id(&self.device, shader),
             mesh,
             material: self.material_index(material),
             uniform: material_uniform(true, material).words(),
