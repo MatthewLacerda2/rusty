@@ -1846,7 +1846,7 @@ play-test can assert *what* played, *where*, and *by whom* — one-shots include
 | `Audio.Play` | `(id)` | `bool` — started the entity's `AudioSource` (logs a Play event) |
 | `Audio.Stop` | `(id)` | — (stops the entity's voice, logs a Stop event) |
 | `Audio.SetVolume` | `(id, v)` | — (retunes the live voice's volume, pre-master; no-op if not playing) |
-| `Audio.PlayAt` | `(path, x, y, z [, vol])` | `bool` — fire-and-forget one-shot at a world position (`vol` defaults to 1.0); fully 3D and time-scaled (see below); leaves no component, logged as a `PlayAt` event |
+| `Audio.PlayAt` | `(path, x, y, z [, vol [, min_distance, max_distance]])` | `bool` — fire-and-forget one-shot at a world position (`vol` defaults to 1.0; `nil` keeps the default); fully 3D and time-scaled (see below); the optional rolloff band (both or neither, `0 <= min_distance <= max_distance`, finite — else an error) replaces the default 1 → 16 m so a gunshot or explosion carries further; leaves no component, logged as a `PlayAt` event |
 | `Audio.GetMasterVolume` | `()` | `number` (linear, `[0, 1]`) |
 | `Audio.SetMasterVolume` | `(v)` | — (clamped to `[0, 1]`; re-folds every live voice) |
 | `Audio.GetSpatial` | `(id)` | `(gain, pan, playing)` — the source's resolved 3D state against the listener (the active camera): `gain` linear pre-master, `pan` `[-1, 1]` (left→right), `playing` bool |
@@ -1889,9 +1889,11 @@ applied in place — a moving source never restarts.
   clip is lerped toward its mono downmix `(l + r) / 2` by `spatial_blend`, then
   panned: fully 3D (`1`) is downmixed then panned, pure 2D (`0`) keeps its stereo
   image untouched. Clips with more than two channels use their first two as L/R.
-- **`PlayAt` one-shots** are diegetic: `spatial_blend = 1` with the default
-  `AudioSource` rolloff band (`initial_distance = 1`, `final_distance = 16`), and
-  time-scaled.
+- **`PlayAt` one-shots** are diegetic: `spatial_blend = 1` and time-scaled, with the
+  default `AudioSource` rolloff band (`initial_distance = 1`, `final_distance = 16`)
+  unless the call passes its own `min_distance, max_distance` — the same **linear**
+  rolloff, over the wider band. A gunshot 30 m away is silent by default and audible
+  with `Audio.PlayAt(clip, x, y, z, 1.0, 2, 80)`; distant fire is where the fight is.
 
 ### Time scale and pause
 

@@ -19,7 +19,7 @@ use mlua::Lua;
 use super::{put, Reg};
 use glam::Vec3;
 
-use crate::audio::{AudioMaestro, Listener};
+use crate::audio::{AudioMaestro, Listener, Rolloff};
 use crate::components::AudioSourceComponent;
 use crate::scene::Camera;
 use crate::scene::Scene;
@@ -125,6 +125,28 @@ fn register_source_control<'lua, 'scope>(
     )
 }
 
+/// `Audio.PlayAt(path, x, y, z [, vol [, min_distance, max_distance]])`.
+type PlayAtArgs = (String, f32, f32, f32, Option<f32>, Option<f32>, Option<f32>);
+
+/// `PlayAt`'s optional rolloff band: both distances or neither, `0 <= min <= max`.
+fn rolloff_arg(min: Option<f32>, max: Option<f32>) -> Result<Rolloff, String> {
+    let (min_distance, max_distance) = match (min, max) {
+        (None, None) => return Ok(Rolloff::default()),
+        (Some(min), Some(max)) => (min, max),
+        _ => return Err("Audio.PlayAt: pass both min_distance and max_distance".into()),
+    };
+    if !(min_distance >= 0.0 && max_distance >= min_distance && max_distance.is_finite()) {
+        return Err(format!(
+            "Audio.PlayAt: rolloff band needs 0 <= min_distance <= max_distance, \
+             got {min_distance} .. {max_distance}"
+        ));
+    }
+    Ok(Rolloff {
+        min_distance,
+        max_distance,
+    })
+}
+
 /// `PlayAt` (fire-and-forget one-shot) + master-volume get/set.
 fn register_oneshot_and_master<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
@@ -132,21 +154,22 @@ fn register_oneshot_and_master<'lua, 'scope>(
     audio: &'scope RefCell<AudioMaestro>,
     time: &'scope RefCell<Time>,
 ) -> Reg {
-    // Fire a one-shot at a world position. `vol` is optional (defaults to 1.0).
-    // Leaves no persistent component — its only trace is the maestro's event log.
+    // Fire a one-shot at a world position. `vol` defaults to 1.0; `min_distance` /
+    // `max_distance` (both or neither) widen its rolloff band past the 1 → 16 m
+    // default (#575). Leaves no persistent component — only the maestro's event log.
     put(
         table,
         "PlayAt",
-        scope.create_function(
-            |_, (path, x, y, z, vol): (String, f32, f32, f32, Option<f32>)| {
-                let now = tick(time);
-                let played =
-                    audio
-                        .borrow_mut()
-                        .play_at(&path, [x, y, z], vol.unwrap_or(1.0), 0, now);
-                Ok(played)
-            },
-        ),
+        scope.create_function(|_, args: PlayAtArgs| {
+            let (path, x, y, z, vol, min, max) = args;
+            let rolloff = rolloff_arg(min, max).map_err(mlua::Error::RuntimeError)?;
+            let now = tick(time);
+            let volume = vol.unwrap_or(1.0);
+            let played = audio
+                .borrow_mut()
+                .play_at(&path, [x, y, z], volume, rolloff, 0, now);
+            Ok(played)
+        }),
     )?;
 
     put(

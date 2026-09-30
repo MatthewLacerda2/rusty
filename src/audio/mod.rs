@@ -29,5 +29,5 @@ pub use backend::{AudioBackend, NullBackend, PlayParams, VoiceId, VoiceMix};
 pub use device::RodioBackend;
 pub use introspection::{AudioEvent, AudioEventKind, AudioEventLog, SpatialResult, VoiceInfo};
 pub use maestro::AudioMaestro;
-pub use mix::MixEnv;
+pub use mix::{MixEnv, Rolloff};
 pub use spatial::Listener;

@@ -195,17 +195,19 @@ impl AudioMaestro {
     /// Fire a one-shot at a world position — `Audio.PlayAt`. It owns no entity voice
     /// (it is fire-and-forget), so it is *only* recorded in the event log; that log
     /// entry is the one-shot's sole trace. `source_entity` attributes it to an
-    /// emitter (or `0`). Returns whether the backend accepted it.
+    /// emitter (or `0`). `rolloff` is its distance band. Returns whether the backend
+    /// accepted it.
     pub fn play_at(
         &mut self,
         clip: &str,
         position: [f32; 3],
         volume: f32,
+        rolloff: mix::Rolloff,
         source_entity: u32,
         tick: u64,
     ) -> bool {
         let volume = volume.max(0.0);
-        let source = mix::oneshot_source(clip);
+        let source = mix::oneshot_source(clip, rolloff);
         let at = Vec3::from(position);
         let mix = mix::resolve_voice(&self.env, &source, volume, at);
         let voice = self.mint();
