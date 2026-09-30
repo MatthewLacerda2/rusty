@@ -37,7 +37,8 @@ git config core.hooksPath .githooks || true
 # `make gates` ends on cargo-deny. Fetch its prebuilt Linux binary (seconds) rather
 # than compile it (minutes); best-effort — the gate names the install if it's missing.
 if ! command -v cargo-deny >/dev/null 2>&1 && [ "$(uname -sm)" = "Linux x86_64" ]; then
-  deny_ver=0.18.3
+  # 0.20+: older releases cannot parse the advisory DB's CVSS 4.0 entries.
+  deny_ver=0.20.2
   deny_tmp="$(mktemp -d)"
   curl -sSfL "https://github.com/EmbarkStudios/cargo-deny/releases/download/${deny_ver}/cargo-deny-${deny_ver}-x86_64-unknown-linux-musl.tar.gz" \
     | tar xz -C "$deny_tmp" 2>/dev/null \

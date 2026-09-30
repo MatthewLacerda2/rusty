@@ -81,7 +81,7 @@ jobs:
       # Clippy is a HARD gate: every warning fails CI, for both feature sets.
       # The 50-line function cap (clippy::too_many_lines, threshold in clippy.toml)
       # is denied crate-wide in Cargo.toml's [lints] table (#485). The legacy burn-down
-      # is complete (#124): no `#[allow(clippy::too_many_lines)]` remain in src/.
+      # is complete (#124); the one remaining allow is documented in docs/linting.md.
       # Split a function that grows past the cap — never add a new allow.
       # See docs/linting.md.
       - name: System libs for winit/wgpu builds
