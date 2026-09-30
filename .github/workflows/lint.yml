@@ -81,7 +81,7 @@ jobs:
       - name: Editor↔shared-op parity gate (migrated cards route through authoring ops)
         if: needs.changes.outputs.code != 'false'
         run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- --parity
-      # Clippy is a HARD gate: every warning fails CI, for both feature sets.
+      # Clippy is a HARD gate: every warning fails CI, for every feature set.
       # The 50-line function cap (clippy::too_many_lines, threshold in clippy.toml)
       # is denied crate-wide in Cargo.toml's [lints] table (#485). The legacy burn-down
       # is complete (#124); the one remaining allow is documented in docs/linting.md.
@@ -96,6 +96,13 @@ jobs:
       - name: Clippy (hard gate, dev features)
         if: needs.changes.outputs.code != 'false'
         run: cargo clippy --all-targets --features dev -- -D warnings
+      # The ship path (#431): the standalone player built with no editor and no dev
+      # layer. Both runs above have the `editor` feature on (it is default), so this
+      # is the only compile that proves egui-free code stays egui-free. A check, not
+      # a test run: the tests it would add already run with the editor on.
+      - name: Clippy (hard gate, player ship build — no editor)
+        if: needs.changes.outputs.code != 'false'
+        run: cargo clippy --all-targets --no-default-features -- -D warnings
       # Rustdoc is a HARD gate (#482): `cargo doc` is the Rust API reference agents
       # are pointed at, so a broken intra-doc link or a doc linking a private item
       # fails the PR instead of silently publishing a broken reference. Both

@@ -94,9 +94,10 @@ parity: ## [gate] Migrated inspector cards route through scene::authoring
 test-lint: ## [gate] tools/lint's own tests
 	cargo test --manifest-path tools/lint/Cargo.toml --locked
 
-clippy: ## [gate] Clippy, both feature sets; the lint policy is Cargo.toml [lints]
+clippy: ## [gate] Clippy: default, dev, and the no-editor player build
 	cargo clippy --all-targets -- -D warnings
 	cargo clippy --all-targets --features dev -- -D warnings
+	cargo clippy --all-targets --no-default-features -- -D warnings
 
 # No separate build gate: `cargo test` compiles every binary its feature set
 # enables, exactly as CI relies on (#482).

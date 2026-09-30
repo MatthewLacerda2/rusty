@@ -21,7 +21,9 @@ its own gate list is complete before running it.
 
 **Both feature sets, always.** Half this crate is behind `dev` — the harness, the
 session, the MCP bridge, `Debug.*` — and a default-features-only run compiles none
-of it. The two clippy passes and the two test passes are not redundancy.
+of it. The two clippy passes and the two test passes are not redundancy. The third
+clippy pass (`--no-default-features`) is the editor-free player build (#431): the
+only compile without egui.
 
 **Some hard gates hide inside `cargo test`.** `tests/api_doc_drift.rs` and
 `tests/callback_doc_drift.rs` fail the build when `docs/scripting-api.md`
@@ -302,7 +304,7 @@ flagging a drop without ever exiting non-zero. Raise a floor as coverage improve
 **never lower one silently to make a table green** — that is the one move it
 exists to make visible.
 
-The platform layer (`main.rs`, `render`, `dev`) is deliberately unfloored. GPU
+The platform layer (`shell`, `render`, `dev`) is deliberately unfloored. GPU
 tests run on all three CI OSes — Linux through Mesa's **lavapipe** software
 Vulkan driver (#489) — and `RUSTY_REQUIRE_GPU=1` fails the run if an adapter
 ever goes missing, so a green run means they rendered. Two of the three

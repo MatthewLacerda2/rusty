@@ -264,8 +264,8 @@ is the only difference between an empty marker and a fully-dressed enemy.
    clone-on-Play / restore-on-Stop snapshot makes edit-mode authoritative, mirroring
    Unity's play-mode behaviour.
 5. **The API surface** — one stable set of namespaces (`Transform`, `Input`, `Time`,
-   `Physics`, `Scene`, `Animator`, `Nav`, `Camera`, `Material`, and the
-   dev-only `Debug`) shared by gameplay scripts, the console REPL, and bot-players.
+   `Physics`, `Scene`, `Animator`, `Nav`, `Camera`, `Material`, `Application`, and
+   the dev-only `Debug`) shared by gameplay scripts, the console REPL, and bot-players.
    One surface, three callers — they never drift apart.
 
 ## Conventions that matter
@@ -292,9 +292,18 @@ is the only difference between an empty marker and a fully-dressed enemy.
   cross-system signals are direct typed returns.
 - **Dev-only build profile.** The console/REPL, harness, bot-players, and `Debug.*`
   live behind the `dev` Cargo feature and are stripped from ship builds.
+- **The editor is a feature too.** `src/editor`, the shell's editor frontend and egui
+  live behind the default-on `editor` Cargo feature (#431). A shipped game is the
+  `player` binary built with `--no-default-features`, so it carries neither the editor
+  nor `dev`. Engine code outside those two stays egui-free; clippy checks that build
+  (`--no-default-features`) so it can't rot.
+- **One runtime shell, two frontends.** `src/shell` owns the window, the frame loop,
+  input, cursor, settings and what `Application.Quit()` means; the editor and the
+  standalone player are its two frontends. Window/input behaviour both need goes in
+  the shell, once — never copied into a frontend.
 - **Determinism.** The sim is a pure function of (seed, inputs, fixed dt). Wall-clock
   reads and unseeded RNG are banned from the sim modules (`app`, `scripting`,
-  `physics`, `navigation`); the platform layer (`main.rs`, `render`, `dev`) is exempt.
+  `physics`, `navigation`); the platform layer (`shell`, `render`, `dev`) is exempt.
   Scripts run inside the sim too: the gameplay Lua VM has no `os`/`io`, and
   `math.random` routes to the seeded `Random` resource (`core::random`, #443).
 - **Use `glam`** for all math; keep egui / wgpu / mlua decoupled.
@@ -323,7 +332,8 @@ Failures from `tools/lint` are written to `.lint/report.txt`. See **docs/linting
 - **The commit hook** (`.githooks/pre-commit`, activated once per clone by `make
   setup`) runs formatting and the size gate only, so it stays under a second.
 - Size gate: files ≤ 300 lines, test/fixture files ≤ 150. Style is rustfmt;
-  **clippy is a hard gate** (`-D warnings`, both feature sets); the lint policy
+  **clippy is a hard gate** (`-D warnings`: default, `dev`, and the no-editor player
+  build); the lint policy
   lives in `Cargo.toml`'s `[lints]`, not in flags.
 - **Determinism guard** (`make determinism`) — fails on wall-clock / unseeded RNG
   in the sim modules (`app`, `scripting`, `physics`, `navigation`, `ui`); it protects the

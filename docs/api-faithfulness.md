@@ -216,9 +216,18 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetResolution` | ✅ | renderer/window — `main.rs` reconfigures the wgpu surface when the cell changes (clamped ≥ 1) |
+| `SetResolution` | ✅ | renderer/window — the shell (`shell/settings.rs`) reconfigures the wgpu surface when the cell changes (clamped ≥ 1) |
 | `SetVsync` | ✅ | renderer/window — present-mode reconfigure |
 | `SetFullscreen` | ✅ | window — winit fullscreen reconfigure |
+
+### `Application` — over the shared `Application` resource (#431)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `Quit` | ✅ | platform — the shell's frame loop takes the request (`shell::frame::quit_action`): the player exits, the editor stops Play; the harness stops stepping (`dev::harness::tick_unless_quit`, `tests/application_quit.rs`) |
+| `SetStartupScene` | ✅ | round-trip — written to `project/build_settings.json` (editor); the player loads that scene at boot (`shell::player::launch`) |
+| `SetProductName` | ✅ | round-trip — same file; the player's window title |
+| `SetWindowMode` | ✅ | round-trip — same file; the player's first-launch fullscreen default (`shell::player::video_defaults`) |
 
 ### `Storage` — over the `Storage` resource
 
@@ -309,7 +318,7 @@ determinism, no file written on a rejected patch).
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 84 |
+| ✅ faithful | 88 |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 
