@@ -1,0 +1,273 @@
+//! The size gate: per-file line caps over [`SCAN_ROOTS`] (or an explicit file list),
+//! minus the grandfathered baseline. Result to stdout and `.lint/report.txt`.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::exit;
+
+const MAX_FILE_LINES: usize = 300;
+/// Test/fixture files get a looser cap than source: Rust test files legitimately
+/// bundle several `#[test]` fns plus fixtures, and over-splitting them hurts
+/// readability more than it helps.
+const MAX_TEST_FILE_LINES: usize = 150;
+/// The directories the full scan walks: the engine, its integration suite, and the
+/// fuzz targets (#535), and the dev-tool crates under `tools/` (#541).
+const SCAN_ROOTS: &[&str] = &["src", "tests", "fuzz", "tools"];
+const BASELINE: &str = "tools/lint/baseline.txt";
+const REPORT: &str = ".lint/report.txt";
+
+/// Entry point: check `args` (explicit files) or, when empty, every scan root.
+pub fn run(args: &[String]) {
+    let files: Vec<PathBuf> = if args.is_empty() {
+        SCAN_ROOTS
+            .iter()
+            .flat_map(|root| scan_dir(Path::new(root)))
+            .collect()
+    } else {
+        args.iter().map(PathBuf::from).collect()
+    };
+    let baseline = load_baseline();
+
+    let mut violations = Vec::new();
+    for path in files {
+        if !is_rust(&path) || is_baselined(&path, &baseline) {
+            continue;
+        }
+        if let Some(v) = check_file(&path) {
+            violations.push(v);
+        }
+    }
+    report(&violations);
+    if violations.is_empty() {
+        println!("lint: ok");
+    } else {
+        exit(1);
+    }
+}
+
+fn scan_dir(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    walk(dir, &mut out);
+    out
+}
+
+fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
+    let entries = match fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            // Build output (e.g. `fuzz/target/` after `cargo fuzz`) holds generated code.
+            if path.file_name().is_some_and(|n| n == "target") {
+                continue;
+            }
+            walk(&path, out);
+        } else if is_rust(&path) {
+            out.push(path);
+        }
+    }
+}
+
+fn is_rust(path: &Path) -> bool {
+    path.extension().map_or(false, |e| e == "rs")
+}
+
+/// The cap a file is measured against.
+///
+/// Standalone test/fixture files (`tests/`, `fixtures/`, `*_test.rs`, `test_*`) get
+/// the tighter [`MAX_TEST_FILE_LINES`] cap, because over-splitting a bundle of
+/// `#[test]`s hurts readability more than it helps.
+///
+/// A `<name>_tests.rs` **sibling** is the exception: it is the dedicated, single
+/// test home for `<name>.rs` next to it, so source + sibling read as one logical
+/// unit. Splitting a source file's tests between an inline `#[cfg(test)] mod tests`
+/// AND such a sibling, purely to fit the tight cap, fragments that unit — so the
+/// sibling carries the source cap ([`MAX_FILE_LINES`]), letting all of one source's
+/// tests live in one place. (See issue #211.)
+fn limit_for(path: &Path) -> usize {
+    let p = normalize(path);
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if is_tests_sibling(&name) {
+        return MAX_FILE_LINES;
+    }
+    let in_test_dir = p.split('/').any(|seg| seg == "tests" || seg == "fixtures");
+    let is_test = in_test_dir || name.ends_with("_test.rs") || name.starts_with("test_");
+    if is_test {
+        MAX_TEST_FILE_LINES
+    } else {
+        MAX_FILE_LINES
+    }
+}
+
+/// Is `name` a `<x>_tests.rs` file — the dedicated test home for a `<x>.rs` source
+/// beside it? Such a sibling is part of that source's logical unit (the source cap),
+/// not an over-split standalone test file. The naming convention (`_tests.rs`, the
+/// plural sibling form, distinct from the standalone `_test.rs`) is the marker, so
+/// the rule holds whether the lint scans `src/` or checks an explicit file list.
+fn is_tests_sibling(name: &str) -> bool {
+    name.ends_with("_tests.rs")
+}
+
+fn check_file(path: &Path) -> Option<String> {
+    let content = fs::read_to_string(path).ok()?;
+    let lines = content.lines().count();
+    let limit = limit_for(path);
+    if lines > limit {
+        Some(format!(
+            "FILE_TOO_LONG {} {}/{}",
+            normalize(path),
+            lines,
+            limit
+        ))
+    } else {
+        None
+    }
+}
+
+fn normalize(path: &Path) -> String {
+    path.to_string_lossy()
+        .trim_start_matches("./")
+        .replace('\\', "/")
+}
+
+fn load_baseline() -> Vec<String> {
+    fs::read_to_string(BASELINE)
+        .unwrap_or_default()
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .map(String::from)
+        .collect()
+}
+
+fn is_baselined(path: &Path, baseline: &[String]) -> bool {
+    let n = normalize(path);
+    baseline.iter().any(|b| *b == n)
+}
+
+fn report(violations: &[String]) {
+    let mut body = if violations.is_empty() {
+        String::from("lint: ok\n")
+    } else {
+        String::from("lint: FAILED\n")
+    };
+    for v in violations {
+        body.push_str(v);
+        body.push('\n');
+    }
+    fs::create_dir_all(".lint").ok();
+    fs::write(REPORT, &body).ok();
+    if !violations.is_empty() {
+        eprint!("{}", body);
+        eprintln!(
+            "\n{} file(s) over the size cap. Split them meaningfully (see docs/linting.md).",
+            violations.len()
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn normal_files_get_the_default_cap() {
+        assert_eq!(limit_for(Path::new("src/render/mod.rs")), MAX_FILE_LINES);
+    }
+
+    #[test]
+    fn test_and_fixture_files_get_the_tight_cap() {
+        assert_eq!(limit_for(Path::new("tests/foo.rs")), MAX_TEST_FILE_LINES);
+        assert_eq!(limit_for(Path::new("src/bar_test.rs")), MAX_TEST_FILE_LINES);
+        assert_eq!(
+            limit_for(Path::new("src/fixtures/baz.rs")),
+            MAX_TEST_FILE_LINES
+        );
+    }
+
+    #[test]
+    fn one_binary_test_layout_keeps_the_tight_cap() {
+        // `tests/` is one binary (#483): its root, a module folder's `mod.rs`, and the
+        // files inside that folder are all still standalone test files.
+        assert_eq!(limit_for(Path::new("tests/main.rs")), MAX_TEST_FILE_LINES);
+        assert_eq!(
+            limit_for(Path::new("tests/gpu/mod.rs")),
+            MAX_TEST_FILE_LINES
+        );
+        assert_eq!(
+            limit_for(Path::new("tests/gpu/fxaa_screenshot.rs")),
+            MAX_TEST_FILE_LINES
+        );
+    }
+
+    #[test]
+    fn tests_sibling_gets_the_source_cap_not_the_tight_one() {
+        // A `<x>_tests.rs` sibling is one source's single test home (issue #211), so
+        // it shares `<x>.rs`'s source cap — keeping all of a source's tests in one
+        // place rather than spilling them into an inline block to fit the tight cap.
+        assert_eq!(
+            limit_for(Path::new("src/physics/build_tests.rs")),
+            MAX_FILE_LINES
+        );
+        // The standalone `_test.rs` (singular) form still gets the tight cap.
+        assert_eq!(limit_for(Path::new("src/bar_test.rs")), MAX_TEST_FILE_LINES);
+    }
+
+    #[test]
+    fn full_scan_flags_an_oversized_integration_test() {
+        // #535: the full scan once walked only `src/`, so `tests/` files over the
+        // tight cap passed unseen. Pin that `tests/` is a root and that a scanned
+        // file there over [`MAX_TEST_FILE_LINES`] is a violation.
+        assert!(SCAN_ROOTS.contains(&"tests"));
+        let root = std::env::temp_dir().join(format!("rusty-lint-535-{}", std::process::id()));
+        let file = root.join("tests").join("too_long.rs");
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(&file, "//\n".repeat(MAX_TEST_FILE_LINES + 1)).unwrap();
+        let generated = root.join("tests").join("target").join("gen.rs");
+        fs::create_dir_all(generated.parent().unwrap()).unwrap();
+        fs::write(&generated, "//\n".repeat(MAX_TEST_FILE_LINES + 1)).unwrap();
+        let found = scan_dir(&root.join("tests"));
+        let flagged = found.iter().filter_map(|p| check_file(p)).count();
+        fs::remove_dir_all(&root).ok();
+        assert_eq!(found, vec![file]);
+        assert_eq!(flagged, 1, "a tests/ file over the cap must fail the scan");
+    }
+
+    #[test]
+    fn full_scan_covers_tools_but_not_its_build_output() {
+        // #541: `tools/` is a root, and the lint crate's own `tools/lint/target/`
+        // (cargo build output) is never descended into.
+        assert!(SCAN_ROOTS.contains(&"tools"));
+        let root = std::env::temp_dir().join(format!("rusty-lint-541-{}", std::process::id()));
+        let file = root
+            .join("tools")
+            .join("lint")
+            .join("src")
+            .join("too_long.rs");
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(&file, "//\n".repeat(MAX_FILE_LINES + 1)).unwrap();
+        let generated = root
+            .join("tools")
+            .join("lint")
+            .join("target")
+            .join("gen.rs");
+        fs::create_dir_all(generated.parent().unwrap()).unwrap();
+        fs::write(&generated, "//\n".repeat(MAX_FILE_LINES + 1)).unwrap();
+        let found = scan_dir(&root.join("tools"));
+        let flagged = found.iter().filter_map(|p| check_file(p)).count();
+        fs::remove_dir_all(&root).ok();
+        assert_eq!(found, vec![file]);
+        assert_eq!(flagged, 1, "a tools/ file over the cap must fail the scan");
+    }
+
+    #[test]
+    fn normalize_strips_leading_dot_slash() {
+        assert_eq!(normalize(Path::new("./src/main.rs")), "src/main.rs");
+    }
+}

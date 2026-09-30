@@ -143,7 +143,7 @@ list dispatch and MonoBehaviour discovery read — so a script callback can neit
 be added undocumented nor advertised when the engine never dispatches it.
 
 ## Example (unit, in-module)
-See `tools/lint/src/main.rs` — a `#[cfg(test)] mod tests` block testing the
+See `tools/lint/src/size.rs` — a `#[cfg(test)] mod tests` block testing the
 size-cap selection and path normalization.
 
 ## Coverage
