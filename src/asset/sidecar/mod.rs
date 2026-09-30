@@ -1,4 +1,4 @@
-//! src/asset/sidecar.rs — the `<file>.meta` import-settings sidecar.
+//! src/asset/sidecar/mod.rs — the `<file>.meta` import-settings sidecar.
 //!
 //! Unity-style: every imported source file gets a sibling `<file>.meta` holding
 //! **import settings only** — never identity. Reference identity is path-based
@@ -15,6 +15,8 @@ use std::path::{Path, PathBuf};
 
 use super::mesh_data::ImportedAsset;
 use super::ImportError;
+
+mod replace;
 
 /// The `.meta` extension appended to the full source filename (Unity-style), so
 /// `crates.glb` → `crates.glb.meta`.
@@ -120,9 +122,10 @@ pub fn save(source: &Path, settings: &ImportSettings) -> Result<(), ImportError>
     let temp = temp_path(&path);
     std::fs::write(&temp, json).map_err(|e| ImportError::Sidecar(e.to_string()))?;
     // Rename is atomic on every platform we target: a reader sees the whole old file
-    // or the whole new one, never a torn one. On failure the temp file is cleaned up
-    // so a crashed write leaves no litter beside the asset.
-    std::fs::rename(&temp, &path).map_err(|e| {
+    // or the whole new one, never a torn one. Windows refuses it while a reader holds
+    // the target open, so `replace` rides that out (#520). On failure the temp file
+    // is cleaned up so a crashed write leaves no litter beside the asset.
+    replace::replace(&temp, &path).map_err(|e| {
         std::fs::remove_file(&temp).ok();
         ImportError::Sidecar(e.to_string())
     })
