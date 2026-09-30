@@ -138,7 +138,7 @@ impl AudioMaestro {
         lookup: impl Fn(u32) -> Option<(AudioSourceComponent, Vec3)>,
     ) {
         self.env = *env;
-        let master = self.master_volume;
+        let (master, mode) = (self.master_volume, self.speaker_mode);
         for (&id, live) in self.entity_voices.iter_mut() {
             if let Some((source, position)) = lookup(id) {
                 live.source = source;
@@ -147,7 +147,8 @@ impl AudioMaestro {
             let mix = resolve_voice(env, &live.source, live.source_volume, live.position);
             if mix != live.mix {
                 live.mix = mix;
-                self.backend.set_mix(live.voice, &mix.with_master(master));
+                self.backend
+                    .set_mix(live.voice, &mix.for_output(master, mode));
             }
         }
         let backend = &mut self.backend;
@@ -159,7 +160,7 @@ impl AudioMaestro {
             let mix = resolve_voice(env, &shot.source, shot.volume, shot.position);
             if mix != shot.mix {
                 shot.mix = mix;
-                backend.set_mix(voice, &mix.with_master(master));
+                backend.set_mix(voice, &mix.for_output(master, mode));
             }
             true
         });
@@ -202,15 +203,17 @@ impl AudioMaestro {
         }
     }
 
-    /// Re-send every live voice's current mix folded with the current master.
+    /// Re-send every live voice's current mix folded with the current master volume
+    /// and speaker mode.
     pub(super) fn refold_master(&mut self) {
-        let master = self.master_volume;
+        let (master, mode) = (self.master_volume, self.speaker_mode);
         for live in self.entity_voices.values() {
             self.backend
-                .set_mix(live.voice, &live.mix.with_master(master));
+                .set_mix(live.voice, &live.mix.for_output(master, mode));
         }
         for (&voice, shot) in &self.oneshots {
-            self.backend.set_mix(voice, &shot.mix.with_master(master));
+            self.backend
+                .set_mix(voice, &shot.mix.for_output(master, mode));
         }
     }
 

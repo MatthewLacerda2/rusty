@@ -116,6 +116,7 @@ impl EditorFrontend {
             self.editor_ui.is_dirty = false;
         }
         self.sync_quality(shell, game);
+        self.sync_speaker_mode(game);
         self.sync_scene_path(game);
         interaction
     }
@@ -134,6 +135,16 @@ impl EditorFrontend {
         }
         *cell.borrow_mut() = self.editor_ui.quality_preset;
         shell.renderer.set_quality(self.editor_ui.quality_preset);
+    }
+
+    /// Apply a speaker mode picked in Config, then mirror the maestro's mode (which
+    /// `Audio.SetSpeakerMode` may also have changed) back into the menu.
+    fn sync_speaker_mode(&mut self, game: &GameWorld) {
+        let mut audio = game.resources.audio.borrow_mut();
+        if let Some(mode) = self.editor_ui.speaker_mode_request.take() {
+            audio.set_speaker_mode(mode);
+        }
+        self.editor_ui.speaker_mode = audio.speaker_mode();
     }
 
     /// A different scene now sits in the World (its identity changed without the

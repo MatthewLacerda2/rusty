@@ -44,3 +44,26 @@ fn play_at_fires_a_oneshot_with_optional_volume() {
     })
     .unwrap();
 }
+
+#[test]
+fn speaker_mode_round_trips_and_rejects_unknown_names() {
+    let lua = Lua::new();
+    let f = fixture();
+
+    lua.scope(|scope| {
+        register(&lua, scope, &f);
+        let mode: String = lua.load("return Audio.GetSpeakerMode()").eval().unwrap();
+        assert_eq!(mode, "home_theater", "the default is the untouched mix");
+        for name in ["headphones", "tv", "home_theater"] {
+            lua.load(format!("Audio.SetSpeakerMode('{name}')"))
+                .exec()
+                .unwrap();
+            let got: String = lua.load("return Audio.GetSpeakerMode()").eval().unwrap();
+            assert_eq!(got, name);
+        }
+        let err = lua.load("Audio.SetSpeakerMode('surround')").exec();
+        assert!(err.unwrap_err().to_string().contains("unknown mode"));
+        Ok(())
+    })
+    .unwrap();
+}

@@ -20,6 +20,7 @@ use glam::Vec3;
 use super::backend::{AudioBackend, NullBackend, PlayParams, VoiceId, VoiceMix};
 use super::introspection::{AudioEvent, AudioEventKind, AudioEventLog, DEFAULT_EVENT_CAP};
 use super::mix::{self, MixEnv};
+use super::speaker::SpeakerMode;
 use crate::components::AudioSourceComponent;
 
 /// A live entity voice: the backend handle, the source settings and position it was
@@ -48,6 +49,9 @@ pub struct AudioMaestro {
     pub(super) backend: Box<dyn AudioBackend>,
     /// Linear master gain in `[0, 1]`, multiplied into every voice.
     pub(super) master_volume: f32,
+    /// The output profile every voice is shaped for (#546); output only — the sim
+    /// never reads it.
+    pub(super) speaker_mode: SpeakerMode,
     /// Live entity voices, keyed by owning entity id (one voice per source).
     pub(super) entity_voices: HashMap<u32, LiveVoice>,
     /// Live `PlayAt` one-shots, reaped once the backend reports them finished.
@@ -75,6 +79,7 @@ impl AudioMaestro {
         Self {
             backend,
             master_volume: 1.0,
+            speaker_mode: SpeakerMode::default(),
             entity_voices: HashMap::new(),
             oneshots: BTreeMap::new(),
             env: MixEnv::default(),
@@ -84,8 +89,10 @@ impl AudioMaestro {
     }
 
     /// Swap in a different backend (the windowed app injects the real `RodioBackend`
-    /// after `GameWorld::new`). Any voices live on the old backend are forgotten.
-    pub fn set_backend(&mut self, backend: Box<dyn AudioBackend>) {
+    /// after `GameWorld::new`). Any voices live on the old backend are forgotten;
+    /// the new one takes the current speaker mode.
+    pub fn set_backend(&mut self, mut backend: Box<dyn AudioBackend>) {
+        backend.set_speaker_mode(self.speaker_mode);
         self.backend = backend;
         self.entity_voices.clear();
         self.oneshots.clear();
@@ -100,6 +107,24 @@ impl AudioMaestro {
     pub fn set_master_volume(&mut self, master: f32) {
         self.master_volume = master.clamp(0.0, 1.0);
         self.refold_master();
+    }
+
+    /// The current speaker mode (#546).
+    pub fn speaker_mode(&self) -> SpeakerMode {
+        self.speaker_mode
+    }
+
+    /// Switch the speaker mode: the master bus is retuned and every live voice
+    /// re-sent with the new per-voice shaping.
+    pub fn set_speaker_mode(&mut self, mode: SpeakerMode) {
+        self.speaker_mode = mode;
+        self.backend.set_speaker_mode(mode);
+        self.refold_master();
+    }
+
+    /// `mix` as the backend receives it: master volume + speaker-mode shaping.
+    pub(super) fn output(&self, mix: VoiceMix) -> VoiceMix {
+        mix.for_output(self.master_volume, self.speaker_mode)
     }
 
     /// Mint the next backend voice id (deterministic monotone counter).
@@ -130,7 +155,7 @@ impl AudioMaestro {
             &PlayParams {
                 clip: source.clip.clone(),
                 looping: source.looping,
-                mix: mix.with_master(self.master_volume),
+                mix: self.output(mix),
             },
         );
         if started {
@@ -177,13 +202,13 @@ impl AudioMaestro {
     /// Retune entity `id`'s live voice volume (pre-master); persisted so a later
     /// master change keeps the right ratio. No-op if the entity has no live voice.
     pub fn set_source_volume(&mut self, id: u32, volume: f32) {
-        let master = self.master_volume;
+        let (master, mode) = (self.master_volume, self.speaker_mode);
         if let Some(live) = self.entity_voices.get_mut(&id) {
             live.source_volume = volume.max(0.0);
             live.mix =
                 mix::resolve_voice(&self.env, &live.source, live.source_volume, live.position);
             self.backend
-                .set_mix(live.voice, &live.mix.with_master(master));
+                .set_mix(live.voice, &live.mix.for_output(master, mode));
         }
     }
 
@@ -213,7 +238,7 @@ impl AudioMaestro {
             &PlayParams {
                 clip: clip.to_string(),
                 looping: false,
-                mix: mix.with_master(self.master_volume),
+                mix: self.output(mix),
             },
         );
         if started {
@@ -261,3 +286,7 @@ impl AudioMaestro {
 #[cfg(test)]
 #[path = "maestro_tests.rs"]
 mod maestro_tests;
+
+#[cfg(test)]
+#[path = "speaker_mix_tests.rs"]
+mod speaker_mix_tests;

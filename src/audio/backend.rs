@@ -15,6 +15,8 @@
 //! backend, while the actual sound is a platform-layer side effect the `NullBackend`
 //! simply skips.
 
+use super::speaker::SpeakerMode;
+
 /// A handle to one playing voice, opaque to the maestro. The backend maps it to its
 /// own internal sink/source; the maestro only stores it to later stop or remix.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -27,7 +29,8 @@ pub struct VoiceId(pub u64);
 pub struct VoiceMix {
     /// Linear gain, already folded with the master volume by the maestro.
     pub gain: f32,
-    /// Stereo pan in `[-1, 1]` (left → right), already scaled by `spatial_blend`.
+    /// Stereo pan in `[-1, 1]` (left → right), already scaled by `spatial_blend`
+    /// (and narrowed by the headphones speaker mode on its way to the backend).
     pub pan: f32,
     /// The source's `spatial_blend` in `[0, 1]`: how far a stereo clip is downmixed
     /// to mono before panning (`0` keeps its stereo image untouched).
@@ -54,6 +57,12 @@ impl VoiceMix {
             gain: self.gain * master,
             ..self
         }
+    }
+
+    /// The mix the backend receives: folded with `master`, then shaped by the
+    /// speaker `mode` (#546).
+    pub fn for_output(self, master: f32, mode: SpeakerMode) -> Self {
+        mode.shape(self.with_master(master))
     }
 }
 
@@ -88,6 +97,10 @@ pub trait AudioBackend {
 
     /// Drop every live voice (e.g. on Stop / leaving Play).
     fn stop_all(&mut self);
+
+    /// Shape the summed output for `mode` (#546) — the master-bus half of the
+    /// speaker mode; the per-voice half arrives already folded into each mix.
+    fn set_speaker_mode(&mut self, mode: SpeakerMode);
 }
 
 /// The do-nothing backend: holds no device, plays no sound, but reports a voice as
@@ -109,6 +122,8 @@ impl AudioBackend for NullBackend {
         false
     }
     fn stop_all(&mut self) {}
+    /// No output to shape; the maestro keeps the mode for read-back.
+    fn set_speaker_mode(&mut self, _mode: SpeakerMode) {}
 }
 
 #[cfg(test)]
@@ -129,5 +144,6 @@ mod tests {
         assert!(!b.is_live(VoiceId(1)));
         b.stop(VoiceId(1));
         b.stop_all();
+        b.set_speaker_mode(SpeakerMode::Tv);
     }
 }

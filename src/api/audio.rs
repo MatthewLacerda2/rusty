@@ -3,7 +3,7 @@
 //! Script/REPL/bot control over the engine's audio: start/stop an entity's
 //! `AudioSource` (`Play`/`Stop`), retune its volume (`SetVolume`), fire a
 //! fire-and-forget one-shot at a world position (`PlayAt`), and read/set the single
-//! master volume on the `AudioMaestro`. One surface, three callers — the same verbs
+//! master volume and the speaker mode (#546) on the `AudioMaestro`. One surface, three callers — the same verbs
 //! the editor's play-state and the play-mode systems drive.
 //!
 //! Every verb routes through the shared `AudioMaestro` (a Resource), so a scripted
@@ -19,7 +19,7 @@ use mlua::Lua;
 use super::{put, Reg};
 use glam::Vec3;
 
-use crate::audio::{AudioMaestro, Listener, Rolloff, Shot};
+use crate::audio::{AudioMaestro, Listener, Rolloff, Shot, SpeakerMode};
 use crate::components::AudioSourceComponent;
 use crate::scene::Camera;
 use crate::scene::Scene;
@@ -39,6 +39,7 @@ pub fn register<'lua, 'scope>(
     register_source_control(scope, &table, scene, audio, time)?;
     register_oneshot_and_master(scope, &table, audio, time)?;
     register_spatial(scope, &table, scene, audio, camera)?;
+    register_speaker_mode(scope, &table, audio)?;
 
     lua.globals().set("Audio", table).map_err(|e| e.to_string())
 }
@@ -185,6 +186,36 @@ fn register_oneshot_and_master<'lua, 'scope>(
         "SetMasterVolume",
         scope.create_function(|_, v: f32| {
             audio.borrow_mut().set_master_volume(v);
+            Ok(())
+        }),
+    )
+}
+
+/// `GetSpeakerMode` / `SetSpeakerMode` — the output profile (`headphones` / `tv` /
+/// `home_theater`). Output shaping only: the sim never reads it.
+fn register_speaker_mode<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    audio: &'scope RefCell<AudioMaestro>,
+) -> Reg {
+    put(
+        table,
+        "GetSpeakerMode",
+        scope.create_function(|_, ()| Ok(audio.borrow().speaker_mode().name())),
+    )?;
+
+    put(
+        table,
+        "SetSpeakerMode",
+        scope.create_function(|_, name: String| {
+            let mode = SpeakerMode::parse(&name).ok_or_else(|| {
+                let valid: Vec<_> = SpeakerMode::ALL.iter().map(|m| m.name()).collect();
+                mlua::Error::RuntimeError(format!(
+                    "Audio.SetSpeakerMode: unknown mode '{name}' (expected one of {})",
+                    valid.join(", ")
+                ))
+            })?;
+            audio.borrow_mut().set_speaker_mode(mode);
             Ok(())
         }),
     )
