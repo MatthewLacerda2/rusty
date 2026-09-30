@@ -29,13 +29,13 @@ pub fn register<'lua, 'scope>(
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     register_invoke(scope, &table, scene, timers)?;
+    register_handles(scope, &table, timers)?;
     register_coroutines(scope, &table, scene, timers, console)?;
     register_waits(lua, &table)?;
     lua.globals().set("Timer", table).map_err(|e| e.to_string())
 }
 
-/// `Invoke` / `InvokeRepeating` / `CancelInvoke` / `IsInvoking`, plus the
-/// handle-level `Cancel` / `IsPending` shared with coroutines.
+/// `Invoke` / `InvokeRepeating` / `CancelInvoke` / `IsInvoking`.
 fn register_invoke<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &Table,
@@ -88,7 +88,15 @@ fn register_invoke<'lua, 'scope>(
         scope.create_function(|_, (id, name): (u32, Option<String>)| {
             Ok(timers.borrow().is_invoking(id, name.as_deref()))
         }),
-    )?;
+    )
+}
+
+/// `Cancel` / `IsPending`: the handle-level verbs, for invokes and coroutines alike.
+fn register_handles<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &Table,
+    timers: &'scope RefCell<TimerScheduler>,
+) -> Reg {
     put(
         table,
         "Cancel",

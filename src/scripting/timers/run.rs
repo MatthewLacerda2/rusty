@@ -63,7 +63,11 @@ impl ScriptManager {
                 func,
                 name,
                 interval,
-            } => self.fire_invoke(lua, handle, owner, func, name, interval),
+            } => {
+                let name = name.unwrap_or_default();
+                let func = func.or_else(|| self.named_callback(lua, owner, &name));
+                self.fire_invoke(handle, owner, func.ok_or(name), interval);
+            }
             Step::Resume { thread, until } => self.resume(lua, handle, owner, thread, until),
         }
     }
@@ -94,27 +98,24 @@ impl ScriptManager {
         Some((job.owner, step))
     }
 
-    /// Fire an invoke: call `target(owner)`, then re-arm a repeating one (keeping
-    /// its overshoot, so it never drifts) or retire a one-shot.
+    /// Fire an invoke: call `target(owner)` (`Err` carries the name that did not
+    /// resolve), then re-arm a repeating one (keeping its overshoot, so it never
+    /// drifts) or retire a one-shot.
     fn fire_invoke(
         &self,
-        lua: &Lua,
         handle: u64,
         owner: u32,
-        func: Option<Function>,
-        name: Option<String>,
+        func: Result<Function, String>,
         interval: Option<f64>,
     ) {
-        let func = func.or_else(|| self.named_callback(lua, owner, name.as_deref()?));
-        let Some(func) = func else {
-            let name = name.unwrap_or_default();
-            self.log_error(
-                owner,
-                "Invoke",
-                &format!("no function `{name}` on its scripts"),
-            );
-            self.timers.borrow_mut().cancel(handle);
-            return;
+        let func = match func {
+            Ok(func) => func,
+            Err(name) => {
+                let msg = format!("no function `{name}` on its scripts");
+                self.log_error(owner, "Invoke", &msg);
+                self.timers.borrow_mut().cancel(handle);
+                return;
+            }
         };
         if let Err(e) = func.call::<_, ()>(owner) {
             self.log_error(owner, "Invoke", &e.to_string());
