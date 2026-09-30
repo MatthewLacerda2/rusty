@@ -141,11 +141,9 @@ impl PhysicsWorld {
         }
     }
 
-    /// The live collider built for entity `id`, if any. A linear scan of the
-    /// one-collider-per-entity handle map — fine at query rates, and it avoids
-    /// storing a second (inverse) map on the world.
+    /// The live collider built for entity `id` (the entity that owns the
+    /// collider, even when it is a compound part of an ancestor's body), if any.
     fn collider_of(&self, id: u32) -> Option<&Collider> {
-        let (&handle, _) = self.collider_to_id.iter().find(|&(_, &i)| i == id)?;
-        self.colliders.get(handle)
+        self.colliders.get(*self.id_to_collider.get(&id)?)
     }
 }

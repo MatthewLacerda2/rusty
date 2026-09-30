@@ -20,11 +20,9 @@ use std::collections::HashMap;
 
 use rapier3d::prelude::*;
 
-use super::build::{
-    body_state, build_shape, ccd_enabled, collider_inputs, gravity_scale, interaction_groups,
-    BodyClass, EntityBodyState,
-};
+use super::build::{body_state, gravity_scale, EntityBodyState};
 use super::character;
+use super::compound::{world_to_local, BodyPlan};
 use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
 use super::trigger_events::{self, TriggerEvents};
 use crate::scene::Scene;
@@ -33,25 +31,31 @@ pub struct PhysicsWorld {
     gravity: Vector<Real>,
     integration_parameters: IntegrationParameters,
     physics_pipeline: PhysicsPipeline,
-    islands: IslandManager,
+    pub(super) islands: IslandManager,
     broad_phase: DefaultBroadPhase,
     narrow_phase: NarrowPhase,
     pub(super) bodies: RigidBodySet,
     pub(super) colliders: ColliderSet,
-    impulse_joints: ImpulseJointSet,
-    multibody_joints: MultibodyJointSet,
+    pub(super) impulse_joints: ImpulseJointSet,
+    pub(super) multibody_joints: MultibodyJointSet,
     ccd_solver: CCDSolver,
     /// Exposed to the `physics` module (see `query`) for ray casts.
     pub(super) query_pipeline: QueryPipeline,
     /// Per-body downward fall speed for gravity-driven kinematic bodies (#318),
     /// keyed by entity id and carried across ticks; zeroed on ground contact.
     fall_speeds: HashMap<u32, f32>,
-    /// stable entity id -> rigid-body handle.
-    id_to_body: HashMap<u32, RigidBodyHandle>,
-    /// collider handle -> stable entity id (for event/raycast lookup).
+    /// The body layout last built (#445): owner entity id -> the collider
+    /// entities its body carries. Diffed each tick to rebuild changed bodies.
+    pub(super) plan: BodyPlan,
+    /// body-owner entity id -> rigid-body handle.
+    pub(super) id_to_body: HashMap<u32, RigidBodyHandle>,
+    /// collider handle -> the entity that owns the *collider* (not the body's
+    /// root), so a hit on a compound reports which part was hit.
     pub(super) collider_to_id: HashMap<ColliderHandle, u32>,
-    /// stable entity id -> its trigger flag (sensors surface trigger pairs).
-    id_is_trigger: HashMap<u32, bool>,
+    /// collider entity id -> its collider handle (inverse of `collider_to_id`).
+    pub(super) id_to_collider: HashMap<u32, ColliderHandle>,
+    /// collider entity id -> its trigger flag (sensors surface trigger pairs).
+    pub(super) id_is_trigger: HashMap<u32, bool>,
     /// Last tick's trigger-overlap pairs, diffed each step to recover the
     /// enter/exit edges (#310). Starts empty, so a play session's first
     /// overlapping tick is an "enter".
@@ -59,8 +63,8 @@ pub struct PhysicsWorld {
 }
 
 impl PhysicsWorld {
-    /// Build the rapier world from the current scene. One rigid body + one
-    /// collider per entity that has a `ColliderComponent`.
+    /// Build the rapier world from the current scene: one rigid body per plan
+    /// owner, carrying every collider attached to it (see `compound`).
     pub fn from_scene(scene: &Scene) -> Self {
         let mut world = Self {
             gravity: vector![0.0, -9.81, 0.0],
@@ -76,8 +80,10 @@ impl PhysicsWorld {
             ccd_solver: CCDSolver::new(),
             query_pipeline: QueryPipeline::new(),
             fall_speeds: HashMap::new(),
+            plan: BodyPlan::new(),
             id_to_body: HashMap::new(),
             collider_to_id: HashMap::new(),
+            id_to_collider: HashMap::new(),
             id_is_trigger: HashMap::new(),
             prev_triggers: Vec::new(),
         };
@@ -87,78 +93,24 @@ impl PhysicsWorld {
         world
     }
 
-    fn build_bodies(&mut self, scene: &Scene) {
-        // Narrow query (#346): only entities carrying a collider can yield a
-        // body; `collider_inputs` still rejects inactive/degenerate ones.
-        for id in scene.world.ids_with_collider() {
-            let Some(inp) = collider_inputs(&scene.world, id) else {
-                continue;
-            };
-
-            // Build the collider first: a mesh collider with missing/degenerate
-            // geometry yields `None`, in which case the entity gets no body at all.
-            let mesh_ref = inp
-                .mesh_geom
-                .as_ref()
-                .map(|(p, i)| (p.as_slice(), i.as_slice()));
-            let Some(mut collider) = build_shape(&inp.shape, inp.scale, mesh_ref) else {
-                continue;
-            };
-
-            let body_builder = match inp.class {
-                BodyClass::Static => RigidBodyBuilder::fixed(),
-                BodyClass::Kinematic => RigidBodyBuilder::kinematic_position_based(),
-                BodyClass::Dynamic => RigidBodyBuilder::dynamic()
-                    .linvel(to_na_vec(inp.velocity))
-                    .angvel(to_na_vec(inp.angular_velocity))
-                    // `use_gravity = false` exempts the body from world gravity (#209).
-                    .gravity_scale(gravity_scale(inp.use_gravity)),
-            }
-            // Continuous mode switches on rapier's CCD sweep (anti-tunnelling, #321);
-            // Discrete leaves it off. Honoured for every class — mainly dynamic, but a
-            // kinematic body may opt in to be swept against dynamic bodies.
-            .ccd_enabled(ccd_enabled(inp.collision_detection))
-            .position(to_iso(inp.pos, inp.rot));
-            let body_handle = self.bodies.insert(body_builder.build());
-            collider.set_sensor(inp.is_trigger);
-            collider.set_active_events(ActiveEvents::COLLISION_EVENTS);
-            // The demo's bodies are kinematic/static, so the default
-            // "only-if-one-is-dynamic" filtering would suppress every player↔wall
-            // and player↔enemy pair. Enable all type combinations.
-            collider.set_active_collision_types(ActiveCollisionTypes::all());
-            // The collision matrix (#91) decides which layers interact: a collider
-            // is a member of its own layer and filters to the layers it may collide
-            // with. Set on both collision and solver groups so contact generation
-            // and the solver agree.
-            let groups =
-                interaction_groups(inp.layer, scene.collision_matrix.filter_mask(inp.layer));
-            collider.set_collision_groups(groups);
-            collider.set_solver_groups(groups);
-            let collider_handle =
-                self.colliders
-                    .insert_with_parent(collider, body_handle, &mut self.bodies);
-            self.id_to_body.insert(id, body_handle);
-            self.collider_to_id.insert(collider_handle, id);
-            self.id_is_trigger
-                .insert(id, inp.is_trigger || inp.is_static);
-        }
-    }
-
-    /// Push current component state into rapier before stepping.
+    /// Push current component state into rapier before stepping: first rebuild
+    /// any body whose collider set changed, then each owner's world pose and
+    /// velocities, then each compound collider's offset. Walks the sorted plan,
+    /// so the order is deterministic.
     fn sync_to_rapier(&mut self, scene: &Scene, dt: f32) {
-        // Snapshot handles to avoid borrowing the map while the body sets below
-        // borrow `self.bodies` / `self.colliders` mutably or immutably.
-        let entries: Vec<(u32, RigidBodyHandle)> =
-            self.id_to_body.iter().map(|(&id, &h)| (id, h)).collect();
-        for (id, handle) in entries {
-            let Some(snapshot) = body_state(&scene.world, id) else {
+        self.resync_topology(scene);
+        let plan = std::mem::take(&mut self.plan);
+        for (&owner, ids) in &plan {
+            let Some(&handle) = self.id_to_body.get(&owner) else {
                 continue;
             };
-            if self.bodies.get(handle).is_none() {
+            let Some(snapshot) = body_state(scene, owner) else {
                 continue;
-            }
-            self.apply_body_state(id, handle, &snapshot, dt);
+            };
+            self.apply_body_state(owner, handle, &snapshot, dt);
+            self.sync_compound_parts(scene, owner, ids);
         }
+        self.plan = plan;
     }
 
     /// Push one entity's snapshot into its rapier body for this tick.
@@ -251,33 +203,38 @@ impl PhysicsWorld {
         events
     }
 
-    /// Write integrated poses + velocities back onto the entities.
+    /// Write integrated poses + velocities back onto the owner entities,
+    /// converting each body's world pose into the owner's local `Transform`
+    /// (#445). Static bodies are skipped: physics never moves them, so their
+    /// transform stays authoritative (no world↔local round-trip drift). Every
+    /// attached collider's world AABB is refreshed, since moving an owner moves
+    /// its compound children too.
     fn sync_from_rapier(&self, scene: &mut Scene) {
-        for (&id, &handle) in &self.id_to_body {
-            let (pos, rot, vel, angvel) = {
-                let body = match self.bodies.get(handle) {
-                    Some(b) => b,
-                    None => continue,
-                };
-                let (pos, rot) = from_iso(body.position());
-                (
-                    pos,
-                    rot,
-                    from_na_vec(*body.linvel()),
-                    from_na_vec(*body.angvel()),
-                )
+        for (&owner, ids) in &self.plan {
+            let Some(body) = self
+                .id_to_body
+                .get(&owner)
+                .and_then(|&h| self.bodies.get(h))
+            else {
+                continue;
             };
-            if let Some(mut t) = scene.world.transform_mut(id) {
-                t.position = pos;
-                t.rotation = rot;
-            }
-            if let Some(mut rb) = scene.world.rigidbody_mut(id) {
-                if !rb.is_kinematic {
-                    rb.velocity = vel;
-                    rb.angular_velocity = angvel;
+            if !body.is_fixed() {
+                let (pos, rot) = from_iso(body.position());
+                let (local_pos, local_rot) = world_to_local(scene, owner, pos, rot);
+                if let Some(mut t) = scene.world.transform_mut(owner) {
+                    t.position = local_pos;
+                    t.rotation = local_rot;
                 }
             }
-            scene.update_entity_collider(id);
+            if let Some(mut rb) = scene.world.rigidbody_mut(owner) {
+                if !rb.is_kinematic {
+                    rb.velocity = from_na_vec(*body.linvel());
+                    rb.angular_velocity = from_na_vec(*body.angvel());
+                }
+            }
+            for &id in ids {
+                scene.update_entity_collider(id);
+            }
         }
     }
 }

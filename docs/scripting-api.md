@@ -1108,6 +1108,36 @@ collider but **no rigidbody** never falls. The flag is honoured at body build an
 each tick, so toggling it (or `Physics.SetKinematic`, which resets any accumulated
 fall speed) at runtime takes effect.
 
+### Colliders and the parent hierarchy (#445)
+
+Physics works in **world space**; a `Transform` is local to its parent. Every
+collider is placed at its entity's world pose (its local pose composed through
+all its parents), and a collider's world scale is baked into its shape — so a
+collider on a child of a parent at `(10, 0, 0)` with local `(1, 0, 0)` sits at
+world `x = 11`. Unity semantics:
+
+- **Compound colliders.** A collider on an entity **without** its own Rigidbody
+  joins the **nearest ancestor that has a Rigidbody**: it becomes an extra
+  collider on that ancestor's body, at its pose relative to the ancestor. The
+  whole compound moves, collides and rests as one body — how a multi-part prop
+  or a character's per-bone hitboxes are built. Moving a part's `Transform`
+  (script, animator) moves its collider on the body. With no Rigidbody ancestor
+  the entity is its own body, as before (static, or an implicit kinematic body).
+- **Hits name the part.** `Raycast`, `SphereCast`, the overlaps, `ClosestPoint`,
+  `ContainsPoint` and trigger events report the entity that **owns the collider**
+  that was hit, never the body's root — so a script can tell a head hit from a
+  torso hit. A deactivated part's collider stops generating contacts and trigger events.
+- **A child with its own Rigidbody** is its own body. A **dynamic** one is
+  driven by physics: its world pose is what the solver says, and a moving parent
+  does **not** carry it — each physics step writes the body's world pose back
+  into the child's *local* `Transform`, relative to wherever the parent now is
+  (after its parent moves `+10` on x, the child's local x drops by 10).
+  A **kinematic** one is transform-driven, so it follows its parent like any
+  other child. Static bodies are never written back.
+- **Hierarchy changes apply on the next physics step.** Reparenting, adding or
+  removing a Collider or Rigidbody, or activating/deactivating a collider
+  rebuilds just the affected bodies at the start of the next fixed tick.
+
 ## `Time`
 
 Clock accessors, the time-scale control, and the windowed pause / step / resume loop.

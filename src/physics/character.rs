@@ -72,14 +72,23 @@ pub(super) fn corrected_next_pose(
     let mut fall_speed = gravity.as_ref().map_or(0.0, |g| g.speed + g.accel * dt);
     desired.y -= fall_speed * dt;
     let controller = controller(gravity.is_some());
-    let shape = body
+    // Sweep the body's first collider (its owner's own, see `compound`) at its
+    // offset on the body, so a collider not centred on the body sweeps from
+    // where it really is.
+    let swept = body
         .colliders()
         .first()
         .and_then(|&h| refs.colliders.get(h))
-        .map(|c| c.shared_shape().clone());
+        .map(|c| {
+            let offset = c
+                .position_wrt_parent()
+                .copied()
+                .unwrap_or_else(Isometry::identity);
+            (c.shared_shape().clone(), current * offset)
+        });
 
-    let translation = match shape {
-        Some(shape) => {
+    let translation = match swept {
+        Some((shape, shape_pos)) => {
             // Sensors are trigger volumes, not walls: they must never block the
             // move, or a character could not enter the volume whose
             // OnTriggerEnter it is meant to fire (#310).
@@ -92,7 +101,7 @@ pub(super) fn corrected_next_pose(
                 refs.colliders,
                 refs.queries,
                 shape.as_ref(),
-                &current,
+                &shape_pos,
                 desired,
                 filter,
                 |_| {},
