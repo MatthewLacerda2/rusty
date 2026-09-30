@@ -169,6 +169,11 @@ keep the second slot for whatever is furthest along.** The label order decides
 which one that is. An unblocked issue left unstarted is not wasted capacity; it is
 a rebase not yet paid for.
 
+**Dependabot pull requests** (`.github/dependabot.yml`, monthly, one grouped PR per
+ecosystem) have no issue, which is allowed for maintenance. A batch merges them like
+any other ready pull request, through the same serialized queue, at the **lowest
+priority** — after every labelled issue in flight.
+
 **`planning` is the absolute stop.** It means *not yet*, and no amount of the issue
 looking ready overrides it; `human` is the same in practice. Everything else is
 startable — **except an issue filed minutes ago that is still settling**: rusty
