@@ -59,6 +59,17 @@ therefore dropped ([`superseded`]); a cancelled run that *is* the newest is
 still a refusal, because nothing has answered. A `failure` is never dropped,
 whatever its age.
 
+## A run is settled when its gate is, not when its signals are
+
+`mutants-pr` and `coverage-pr` run inside the `ci` run but outside
+`ci-gate`'s `needs:` — informational signals that never block a merge. A
+mutation run can outlast the gates by far, so reading the *run's* status would
+hold a green pull request, and the whole queue behind it, until it ends
+(#555). An unfinished run is judged by its gate job instead ([`by_gate`]):
+once the gate concludes, its conclusion is the run's, and a signal still
+running or red is named but decides nothing. A gate that has not concluded is
+still a run in flight; a finished run keeps GitHub's own conclusion.
+
 ## A commit with no run at all
 
 Two causes, told apart in the output ([`no_run`]): scorsese#153 above, and a
@@ -163,6 +174,48 @@ def superseded(runs: list[dict]) -> list[dict]:
 
     newest = max((age(r) for r in runs), default=None)
     return [r for r in runs if r.get("conclusion") == "cancelled" and age(r) != newest]
+
+
+def by_gate(run: dict, jobs: dict[int, list[dict]], workflow: str) -> dict:
+    """`run`, settled by its gate job when the run itself has not (#555).
+
+    A run stays `in_progress` while any of its jobs does, and the signal jobs
+    (`mutants-pr`, `coverage-pr`) share the `ci` run without being in
+    `ci-gate`'s `needs:`. They never block a merge (CLAUDE.md, *Gates vs.
+    signals*), so an unfinished run is read as settled — status and conclusion
+    both the gate's — the moment the gate concludes, and a signal still running
+    or red changes nothing. The gate `needs:` every gated job, so a concluded
+    gate means they concluded too.
+
+    Only an *unfinished* run is read this way. A completed run keeps GitHub's
+    conclusion: the signals are `continue-on-error`, so they cannot redden it,
+    and a red run beside a green gate is still a refusal. A gate that has not
+    concluded, or was skipped (a cancelled run), leaves the run as reported:
+    running is running, absent is not passing.
+    """
+    if run.get("status") == "completed":
+        return run
+    gate = WORKFLOWS[workflow][0]
+    for j in jobs.get(run.get("id"), []):
+        if j.get("name") == gate and j.get("conclusion") not in (None, "skipped"):
+            return {**run, "status": "completed", "conclusion": j["conclusion"]}
+    return run
+
+
+def by_gates(runs: list[dict], jobs: dict[int, list[dict]], workflow: str) -> list[dict]:
+    """Every run of `workflow`, each read [`by_gate`]."""
+    return [by_gate(r, jobs, workflow) for r in runs]
+
+
+def signals(run: dict, jobs: dict[int, list[dict]], workflow: str) -> list[str]:
+    """The jobs of `run` still going that its gate does not wait for (#555)."""
+    gate, gated = WORKFLOWS[workflow]
+    waited = {gate, "changes", *gated}
+    return [
+        j.get("name", "")
+        for j in jobs.get(run.get("id"), [])
+        if j.get("conclusion") is None and base(j.get("name", "")) not in waited
+    ]
 
 
 def live(runs: list[dict]) -> list[dict]:
@@ -281,6 +334,8 @@ def assess(
     if not runs:
         return ABSENT, no_run(pull, short, workflow)
 
+    runs = by_gates(runs, jobs, workflow)
+
     kept = live(runs)
     failed = failed_runs(kept)
     if failed:
@@ -323,6 +378,9 @@ def assess(
         # Naming what did not run is the difference between this and the
         # report it was written to distrust.
         lines.append(f"Skipped: {', '.join(skipped)}.")
+    going = signals(run, jobs, workflow)
+    if going:
+        lines.append(f"Still running, and not gating: {', '.join(going)}.")
     if len(runs) > 1:
         # Said out loud: "which run answered" is what scorsese#245 was about.
         dropped = len(runs) - len(kept)
@@ -360,7 +418,7 @@ def judge(
 
     lines = [line for _, said in states.values() for line in said]
     if needs_drift_run(files):
-        ci = [r for r in live(runs_for(runs, sha, "ci")) if ran_something(r, jobs, "ci")]
+        ci = [r for r in live(by_gates(runs_for(runs, sha, "ci"), jobs, "ci")) if ran_something(r, jobs, "ci")]
         if not any(drift_ran(r, jobs) for r in ci):
             return False, [
                 f"`ci` passed on {sha[:7]}, but it never ran the doc-drift tests.",

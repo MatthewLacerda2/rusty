@@ -131,7 +131,8 @@ class Judgement(unittest.TestCase):
         self.assertIn("https://example.invalid/run/1", " ".join(lines))
 
     def test_a_run_in_flight_is_refused(self):
-        self.assert_refused(verdict(*both(status="in_progress", conclusion=None)), "in_progress")
+        ci, lint = both(status="in_progress", conclusion=None)
+        self.assert_refused(verdict(ci, lint, jobs={1: gates_running(), 2: built("lint")}), "in_progress")
 
     def test_a_failure_outranks_an_absence(self):
         # A red `ci` with no `lint` yet is answered: it is red.
@@ -161,6 +162,75 @@ class Judgement(unittest.TestCase):
         ok, lines = verdict(draft, ready, run("lint"), jobs=jobs)
         self.assertTrue(ok, lines)
         self.assertIn("2 `ci` runs exist", " ".join(lines))
+
+
+def gates_running() -> list[dict]:
+    """A `ci` run whose gated jobs, and so its gate, are still going."""
+    return [job("changes", "success"), job("build-test", None), job("deny", "success"), job("ci-gate", None)]
+
+
+def signalling(conclusion: str | None) -> list[dict]:
+    """A `ci` run whose gates concluded green beside `mutants-pr` in `conclusion`."""
+    return [*built("ci"), job("mutants-pr", conclusion), job("coverage-pr", "success")]
+
+
+class Signals(unittest.TestCase):
+    """#555: `mutants-pr` shares the `ci` run but is no gate's need."""
+
+    def in_flight(self, jobs: list[dict], **ci: object):
+        ci, lint = both(status="in_progress", conclusion=None, **ci)
+        return verdict(ci, lint, jobs={1: jobs, 2: built("lint")})
+
+    def test_green_gates_beside_a_running_mutation_job_are_mergeable(self):
+        ok, lines = self.in_flight(signalling(None))
+        self.assertTrue(ok, lines)
+        self.assertIn("Still running, and not gating: mutants-pr", " ".join(lines))
+
+    def test_gates_still_running_are_refused_whatever_the_signals_do(self):
+        ok, lines = self.in_flight([*gates_running(), job("mutants-pr", "success")])
+        self.assertFalse(ok, lines)
+        self.assertIn("in_progress", " ".join(lines))
+
+    def test_a_red_signal_never_blocks(self):
+        # Mid-run, and after: `continue-on-error` leaves the finished run green.
+        self.assertTrue(self.in_flight(signalling("failure"))[0])
+        ok, lines = verdict(*both(), jobs={1: signalling("failure"), 2: built("lint")})
+        self.assertTrue(ok, lines)
+
+    def test_a_finished_red_run_is_not_forgiven_by_a_green_gate(self):
+        ok, _ = verdict(*both(conclusion="failure"), jobs={1: signalling("success"), 2: built("lint")})
+        self.assertFalse(ok)
+
+    def test_a_red_gate_beside_a_running_signal_is_a_failure_now(self):
+        jobs = [*built("ci")[:-2], job("ci-gate", "failure"), job("mutants-pr", None)]
+        ok, lines = self.in_flight(jobs)
+        self.assertFalse(ok, lines)
+        self.assertIn("concluded failure", " ".join(lines))
+
+    def test_a_drafts_run_is_still_unbuilt_while_a_signal_runs(self):
+        ok, lines = self.in_flight([*drafted("ci"), job("mutants-pr", None)])
+        self.assertFalse(ok, lines)
+        self.assertIn("ran a gated job", " ".join(lines))
+
+    def test_the_api_doc_still_needs_its_drift_run_while_a_signal_runs(self):
+        skipped = [
+            job("build-test", "success", [{"name": "Test (engine, dev features)", "conclusion": "skipped"}]),
+            job("ci-gate", "success"),
+            job("mutants-pr", None),
+        ]
+        ok, lines = self.in_flight(skipped)
+        self.assertTrue(ok, lines)  # code files: the drift rule does not apply
+        ci, lint = both(status="in_progress", conclusion=None)
+        ok, lines = verdict(ci, lint, jobs={1: skipped, 2: built("lint")}, files=["docs/scripting-api.md"])
+        self.assertFalse(ok, lines)
+        self.assertIn("#525", " ".join(lines))
+
+    def test_a_cancelled_run_with_a_skipped_gate_still_reads_cancelled(self):
+        ci, lint = both(conclusion="cancelled")
+        jobs = {1: [job("build-test", "cancelled"), job("ci-gate", "skipped")], 2: built("lint")}
+        ok, lines = verdict(ci, lint, jobs=jobs)
+        self.assertFalse(ok)
+        self.assertIn("concluded cancelled", " ".join(lines))
 
 
 class Cancelled(unittest.TestCase):

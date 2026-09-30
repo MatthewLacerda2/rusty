@@ -81,9 +81,16 @@ class Polling(unittest.TestCase):
         self.assertEqual(state, queue.STOP)
 
     def test_a_run_in_flight_is_waited_on(self):
-        state, lines = asked(run("ci", status="queued", conclusion=None), run("lint"))
+        queued = run("ci", status="queued", conclusion=None)
+        state, lines = asked(queued, run("lint"), jobs={1: fixtures.gates_running(), 2: built("lint")})
         self.assertEqual(state, queue.WAIT)
         self.assertIn("queued", " ".join(lines))
+
+    def test_green_gates_are_not_held_by_a_running_mutation_job(self):
+        # #555: the signal shares the `ci` run; the queue must not wait it out.
+        busy = run("ci", status="in_progress", conclusion=None)
+        state, lines = asked(busy, run("lint"), jobs={1: fixtures.signalling(None), 2: built("lint")})
+        self.assertEqual(state, queue.GO, lines)
 
     def test_a_superseded_cancelled_run_does_not_stop_the_queue(self):
         old = run("ci", id=1, conclusion="cancelled", created_at="2026-09-30T00:00:00Z")
