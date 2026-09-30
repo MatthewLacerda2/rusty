@@ -3,14 +3,14 @@
 //! These are the MonoBehaviour-style functions the engine looks up on the table a
 //! script returns. `lifecycle` dispatches them, `discovery` uses the list to
 //! recognize a MonoBehaviour, and the doc-drift gate
-//! (`tests/callback_doc_drift.rs`, #309) checks `docs/scripting-api.md` against
+//! (`tests/callback_doc_drift.rs`, #309) checks `docs/api/index.md` against
 //! it — one list, so dispatch, discovery, and doc can never disagree about which
 //! callbacks exist.
 
 /// Called once per script instance when it first participates in the sim
 /// (#322): at play-enter for active scene entities, at the head of the next
 /// tick's script phase for entities spawned during play (a deliberate
-/// divergence from Unity's synchronous `Awake` — see `docs/scripting-api.md`),
+/// divergence from Unity's synchronous `Awake` — see `docs/api/index.md`),
 /// or on the first active tick for entities loaded disabled. Always the
 /// instance's first callback.
 pub const AWAKE: &str = "Awake";

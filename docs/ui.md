@@ -3,7 +3,7 @@
 rusty's in-game UI is **Unity 5's uGUI, adapted** — HUDs, menus and overlays are built
 from ordinary GameObjects. This page is the model: what the pieces are, how layout works,
 and the rules that keep it deterministic. The roadmap is the tracking issue #414; the
-script surface is in [`scripting-api.md`](scripting-api.md) (`Canvas`, `RectTransform`,
+script surface is in [`api/`](api/index.md) (`Canvas`, `RectTransform`,
 `UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Selectable`, `LayoutGroup`,
 `LayoutElement`).
 
@@ -279,7 +279,7 @@ would, and a replay of the same inputs fires the same callbacks. Once per tick, 
 the head of the script phase (after `Awake`/`Start`, before `Update`), the event
 system reads this tick's input and last tick's settled layout and fires the UI
 callbacks straight into the scripts — no event bus. The callbacks and the order
-they fire in are listed in *Script lifecycle callbacks* in `scripting-api.md`.
+they fire in are listed in *Script lifecycle callbacks* in [`api/index.md`](api/index.md#script-lifecycle-callbacks).
 
 ### Hit-testing
 
@@ -377,7 +377,7 @@ inactive or is destroyed loses the focus.
 `UI.IsPointerOverUI()` is Unity's `IsPointerOverGameObject`; `UI.IsPointerConsumed()`
 also stays true while a press that began over the UI is held, so dragging a slider
 off its edge never fires the weapon. Gameplay guards pointer input with it — the
-pattern is in `scripting-api.md`. For bots and tests, `UI.Raycast(x, y)` names what
+pattern is in [`api/UI.md`](api/UI.md). For bots and tests, `UI.Raycast(x, y)` names what
 is under a point, `UI.List()` lists every visible Selectable with its name, state
 and screen rect, and `UI.Click(id)` clicks one **through the real input path** (a
 covering modal or a locked cursor makes it miss, as it would a player).
@@ -396,5 +396,5 @@ direction guards: no wall clock, no unseeded RNG, and no `render` / `editor` / `
 A game's pause menu sets `Time.SetTimeScale(0)` and animates with
 `Time.unscaledDeltaTime()`: gameplay freezes, scripts keep running, and the menu stays
 alive. `Time.Pause` is something else — the **agent's** loop-level freeze, which halts
-scripts entirely (see *Pause vs. Step vs. Stop* in `scripting-api.md`). Never build a
+scripts entirely (see *Pause vs. Step vs. Stop* in [`api/Time.md`](api/Time.md#pause-vs-step-vs-stop--three-distinct-operations)). Never build a
 game's pause menu on `Time.Pause`.

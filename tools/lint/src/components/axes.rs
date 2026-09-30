@@ -101,6 +101,21 @@ pub(super) fn read<P: AsRef<Path>>(path: P) -> String {
     fs::read_to_string(path).unwrap_or_default()
 }
 
+/// Every `.md` file directly in `dir`, concatenated — the scripting-API reference is
+/// one file per namespace under `docs/api/` (#569).
+pub(super) fn read_md_dir(dir: &str) -> String {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return String::new();
+    };
+    entries
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "md"))
+        .map(read)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn normalize(path: &Path) -> String {
     path.to_string_lossy()
         .trim_start_matches("./")

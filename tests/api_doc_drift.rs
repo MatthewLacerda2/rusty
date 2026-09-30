@@ -1,4 +1,4 @@
-//! API-doc drift gate (#280): `docs/scripting-api.md` must agree with the **live Lua
+//! API-doc drift gate (#280): the scripting-API reference (`docs/api/`) must agree with the **live Lua
 //! API surface** about *what exists*. The doc is served to the agent over MCP (#288),
 //! so a drifted doc lies to it. This enforces existence-parity both directions — every
 //! documented `Namespace.Function` is a registered binding, and every registered
@@ -11,12 +11,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rusty::dev::session::Session;
 
-/// The committed scripting-API doc, embedded at build time so the test reads exactly
-/// what ships in the repo (not a path resolved at runtime).
-const DOC: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/docs/scripting-api.md"
-));
+/// The committed scripting-API doc, `docs/api/` assembled by `build.rs` (#569) and
+/// embedded at build time, so the test reads exactly what ships in the repo.
+const DOC: &str = include_str!(concat!(env!("OUT_DIR"), "/scripting-api.md"));
 
 /// Live namespaces deliberately *not* in the user-facing scripting doc. Empty by
 /// design: every live namespace (including dev-only `Debug`) is documented, so any
@@ -54,7 +51,7 @@ fn doc_matches_live_lua_surface() {
 
     assert!(
         problems.is_empty(),
-        "scripting-api.md has drifted from the live Lua surface — reconcile the doc \
+        "docs/api/ has drifted from the live Lua surface — reconcile the doc \
          (reality is the source of truth for existence):\n  {}",
         problems.join("\n  ")
     );

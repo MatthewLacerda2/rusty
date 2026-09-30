@@ -20,6 +20,7 @@ mod layout;
 mod animation_runtime;
 mod animator_graph_api;
 mod animator_parameters;
+mod api_doc_layout;
 mod asset_scene_reference;
 mod audio_api;
 mod callback_doc_drift;

@@ -3,7 +3,7 @@
 //! Every winit key the engine forwards, and the stable uppercase name the sim speaks
 //! for it. Names follow Unity's `KeyCode` where one exists (`LEFTSHIFT`, `EQUALS`,
 //! `KEYPAD0`, …), except letters and digits, which are bare (`"W"`, `"1"`). The
-//! same list is documented in `docs/scripting-api.md` (Input → Key names). Mouse
+//! same list is documented in `docs/api/Input.md` (Key names). Mouse
 //! buttons are named in [`mouse_button_name`]; gamepad buttons will join as more
 //! names (#471).
 

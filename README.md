@@ -25,13 +25,13 @@ agent could build a shooter of that caliber on it.
   `Camera`, `Light`, `Collider`, `Rigidbody`, `NavMeshAgent`, `Animator`,
   …). Behaviour lives in Lua scripts that act like MonoBehaviours, with lifecycle
   hooks (`Start`, `Update(dt)`, `OnTrigger`) — see
-  [`docs/scripting-api.md`](docs/scripting-api.md#script-lifecycle-callbacks).
+  [`docs/api/index.md`](docs/api/index.md#script-lifecycle-callbacks).
 - **One scene at a time.** A scene is saved to disk as a plain document of references
   and values. Entering Play runs on a *clone*, and Stop restores your edits, so
   edit-mode is always what gets saved.
 - **Scriptable against one stable API.** Gameplay calls a single set of namespaces —
   `Transform`, `Input`, `Time`, `Physics`, `Scene`, `Camera`, `Nav`,
-  `Animator`, `Material`. See [`docs/scripting-api.md`](docs/scripting-api.md).
+  `Animator`, `Material`. See [`docs/api/`](docs/api/index.md).
 - **A real 3D engine underneath:** rendering, physics (rapier3d), navigation/navmesh,
   shadows, a skybox, and a post-processing chain.
 

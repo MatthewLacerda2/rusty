@@ -52,8 +52,9 @@ The files where everything collides are the ones every feature appends to:
 - `src/app/registry.rs`'s `build()` — where order *is* the per-frame execution
   order, so a merge that reorders it changes behaviour silently.
 - `src/editor/inspector/components/add.rs` — the Add Component menu.
-- `docs/scripting-api.md` — 1700 lines of namespace tables, and a hard gate
-  parses it.
+- `docs/api/index.md` — the namespace list and the lifecycle callbacks, and a
+  hard gate parses it. The namespace tables are one file each since #569, so two
+  branches documenting different namespaces no longer collide.
 - `docs/api-faithfulness.md` — the setter catalog.
 - `src/scripting/callbacks.rs` — the one lifecycle-callback list.
 - The burn-down baselines (`tools/lint/baseline.txt`,

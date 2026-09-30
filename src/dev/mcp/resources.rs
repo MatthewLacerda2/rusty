@@ -1,7 +1,8 @@
 //! src/dev/mcp/resources.rs — the MCP `resources/list` and `resources/read` handlers.
 //!
-//! One resource is exposed: the engine's Lua scripting-API reference, embedded at
-//! compile time with `include_str!` so the binary always serves the doc that matches
+//! One resource is exposed: the engine's Lua scripting-API reference — `docs/api/`,
+//! assembled into one document by `build.rs` (#569) — embedded at compile time with
+//! `include_str!` so the binary always serves the doc that matches
 //! its own build (no path lookup, no drift). The agent reads it to learn the
 //! namespaces and functions it can drive through the `eval` tool.
 
@@ -12,10 +13,7 @@ const SCRIPTING_API_URI: &str = "rusty://scripting-api.md";
 
 /// The scripting-API reference, baked into the binary so it ships with the build and
 /// can never lag the engine it documents.
-const SCRIPTING_API: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/docs/scripting-api.md"
-));
+const SCRIPTING_API: &str = include_str!(concat!(env!("OUT_DIR"), "/scripting-api.md"));
 
 /// The `resources/list` result: the single scripting-API reference resource.
 pub fn resources_list() -> Value {

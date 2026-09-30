@@ -91,7 +91,7 @@ A first-class component is only "done" when it appears on all four axes that
 deliberately live in non-dependent layers: a field on `Entity`, an Add Component
 entry (`inspector/components/add.rs`), an inspector card (some `inspector/components/*.rs`), and an API
 namespace (`src/api/<x>.rs` registered in `api/mod.rs` and documented in
-`scripting-api.md`). The gate discovers components from `Entity`'s
+`docs/api/`). The gate discovers components from `Entity`'s
 `Option<…Component>` fields — so a new one can't slip through — and fails on any
 missing axis. `tools/lint/components_baseline.txt` grandfathers incomplete
 components as `<component> <axis>` lines (the same burn-down rule as above). As of

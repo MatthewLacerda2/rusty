@@ -35,10 +35,10 @@ A Markdown-only pull request passes that test honestly: `build-test` and `lint`
 still *run*, with their steps skipped, and report success (#218 is why the jobs
 run rather than skip). Nothing compiled, by design, and the verdict says so.
 
-**Except `docs/scripting-api.md`.** Two hard-gate tests parse it, so CLAUDE.md
-treats a pull request touching it as code. CI's `code` filter does not (#525):
+**Except the scripting-API reference, `docs/api/`.** Two hard-gate tests parse it,
+so CLAUDE.md treats a pull request touching it as code. CI's `code` filter does not (#525):
 a pull request whose changes are all Markdown skips every step, drift tests
-included. So when such a pull request touches that file, the pass additionally
+included. So when such a pull request touches that directory, the pass additionally
 needs the `build-test` step that runs the dev-feature tests to have concluded
 success ([`drift_ran`]) — which today it cannot, and the refusal says why.
 
@@ -122,8 +122,9 @@ WORKFLOWS: dict[str, tuple[str, tuple[str, ...]]] = {
     "lint": ("lint-gate", ("lint",)),
 }
 
-# Markdown that is code for merge purposes: tests parse it (CLAUDE.md).
-CODE_DOCS = ("docs/scripting-api.md",)
+# Markdown that is code for merge purposes: tests parse it (CLAUDE.md). Path
+# prefixes: the scripting-API reference is one file per namespace (#569).
+CODE_DOCS = ("docs/api/",)
 
 # Where the doc-drift tests run: a `build-test` step whose name says it runs
 # the tests with the dev features (`Test (engine, dev features)` today). Matched
@@ -291,12 +292,12 @@ def inert(files: list[str]) -> bool:
     """Whether a change to these paths cannot alter what any branch compiles
     or tests against: Markdown, [`CODE_DOCS`] aside (#587). Nothing changed
     is inert too."""
-    return all(f.endswith(".md") and f not in CODE_DOCS for f in files)
+    return all(f.endswith(".md") and not f.startswith(CODE_DOCS) for f in files)
 
 
 def needs_drift_run(files: list[str]) -> bool:
     """A Markdown-only change that touches a doc tests parse (#525)."""
-    return markdown_only(files) and any(f in CODE_DOCS for f in files)
+    return markdown_only(files) and any(f.startswith(CODE_DOCS) for f in files)
 
 
 def drift_ran(run: dict, jobs: dict[int, list[dict]]) -> bool:
@@ -472,9 +473,9 @@ def judge(
             return False, [
                 f"`ci` passed on {sha[:7]}, but it never ran the doc-drift tests.",
                 "Every change here is Markdown, so CI skipped its build steps —"
-                " and one of them is `docs/scripting-api.md`, which"
+                " and one of them is under `docs/api/`, which"
                 " `tests/api_doc_drift.rs` and `tests/callback_doc_drift.rs`"
-                " parse. CLAUDE.md treats that file as code; CI's filter does"
+                " parse. CLAUDE.md treats that directory as code; CI's filter does"
                 " not yet (#525).",
                 "Run `cargo test --features dev --test api_doc_drift --test"
                 " callback_doc_drift` and push any non-Markdown change alongside"
