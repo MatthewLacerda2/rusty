@@ -288,6 +288,9 @@ is the only difference between an empty marker and a fully-dressed enemy.
   `physics`, `navigation`); the platform layer (`main.rs`, `render`, `dev`) is exempt.
 - **Use `glam`** for all math; keep egui / wgpu / mlua decoupled.
 - **Single crate.**
+- **Ships for macOS and Linux; Windows comes later.** Those two are the platforms rusty
+  is used on and shipped to, so a change that works on only one of them is not done.
+  Windows is a planned target, not a current one.
 - **Group by subfolder, not by filename prefix.** A shared name prefix on sibling
   files (`draw_*`, `setup_*`, `inspector_*`, `prefab_*`) is a subfolder waiting to
   happen: make it one and drop the prefix (`draw_lighting.rs` → `draw/lighting.rs`).
