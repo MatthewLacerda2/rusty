@@ -63,6 +63,8 @@ mod bot_player_session;
 #[cfg(feature = "dev")]
 mod harness_determinism;
 #[cfg(feature = "dev")]
+mod lua_determinism;
+#[cfg(feature = "dev")]
 mod mcp_attach;
 #[cfg(feature = "dev")]
 mod mcp_bridge;
