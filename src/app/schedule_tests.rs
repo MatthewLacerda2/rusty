@@ -43,7 +43,7 @@ fn second(_w: &mut World, _r: &mut Resources) {
     rec("second");
 }
 
-fn bare() -> (World, Resources) {
+pub(super) fn bare() -> (World, Resources) {
     let scene = Rc::new(RefCell::new(Scene::new()));
     let input = Rc::new(RefCell::new(InputState::new()));
     let nav = Rc::new(RefCell::new(NavigationGraph::new(

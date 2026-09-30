@@ -1,4 +1,5 @@
 pub mod application;
+pub mod frame_stats;
 pub mod input;
 pub mod keymap;
 pub mod quality;

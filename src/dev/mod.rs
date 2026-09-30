@@ -21,6 +21,7 @@
 //!   screenshot  — offscreen render -> PNG (the GPU "eyes"); skips if no adapter
 //!   preview     — headless asset preview -> PNG (eyes on *assets*, #353)
 //!   snapshot    — world -> JSON observation
+//!   stats       — frame stats: the schedule timing probe + render counters (#433)
 //!
 //! Status: harness + scenario runner implemented (issue #3); offscreen screenshot
 //! implemented (issue #7); bot-player example implemented (issue #10).
@@ -41,3 +42,4 @@ pub mod scenario;
 pub mod screenshot;
 pub mod session;
 pub mod snapshot;
+pub mod stats;

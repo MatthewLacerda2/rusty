@@ -1,8 +1,9 @@
 //! src/api/debug.rs — `Debug` namespace (DEV-ONLY).
 //!
 //! `Debug.Log/Warn/Error`, the structured scene-read `Debug.Snapshot` /
-//! `Debug.SnapshotEntity` (#180), and the headless `Debug.Preview` asset shot (#353)
-//! — the agent's two observation channels, one structured and one visual. Registered
+//! `Debug.SnapshotEntity` (#180), the headless `Debug.Preview` asset shot (#353) and
+//! the frame stats `Debug.Stats` (#433) — the agent's observation channels:
+//! structured, visual, and performance. Registered
 //! only in dev builds — stripped from the shipped game, like Unity `Debug.*` under
 //! `[Conditional]`. The whole module is gated behind the `dev` feature in `api::mod`.
 
@@ -23,6 +24,7 @@ pub fn register<'lua, 'scope>(
     register_logging(scope, &table, ctx.console)?;
     register_snapshot(scope, &table, ctx)?;
     register_preview(lua, &table)?;
+    register_stats(scope, &table, ctx.stats)?;
 
     lua.globals().set("Debug", table).map_err(|e| e.to_string())
 }
@@ -56,6 +58,21 @@ fn register_logging<'lua, 'scope>(
             console.borrow_mut().error(msg);
             Ok(())
         }),
+    )
+}
+
+/// `Debug.Stats()` — the frame stats (#433) as a table: `frames`, each metric's
+/// `{last, min, avg, max, samples}`, and `systems` (per-system CPU ms). Filled by the
+/// dev layer's schedule probe; empty (`frames = 0`) where none is installed.
+fn register_stats<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &Table,
+    stats: &'scope std::cell::RefCell<crate::core::frame_stats::FrameStats>,
+) -> Reg {
+    put(
+        table,
+        "Stats",
+        scope.create_function(move |lua, ()| crate::dev::stats::to_lua(lua, &stats.borrow())),
     )
 }
 

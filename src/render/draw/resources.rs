@@ -30,6 +30,8 @@ pub(crate) type TransparentResource = (SolidResource, f32);
 pub(crate) struct SolidResources {
     pub opaque: Vec<SolidResource>,
     pub transparent: Vec<TransparentResource>,
+    /// Mesh entities the frustum cull skipped for this camera (#433's counters).
+    pub culled: u32,
 }
 // The overlay resources keep only the buffers they own (the per-overlay entity
 // uniform + any vertex buffer) plus their bind group; the bone palette they bind is
@@ -106,6 +108,7 @@ impl Renderer {
             // View-frustum cull (#330): skip the uniform sync, binds, and draw for any
             // entity whose world-space AABB is fully outside what this camera can see.
             if self.is_culled(scene, id, frustum) {
+                out.culled += 1;
                 continue;
             }
             let Some((res, world_pos, transparent)) = self.sync_solid_resource(scene, id) else {

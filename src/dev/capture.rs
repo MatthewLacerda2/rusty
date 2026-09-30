@@ -32,7 +32,7 @@
 
 use std::path::Path;
 
-use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
+use crate::render::{readback, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 
 /// A renderer + view held across captures, so N shots cost one device.
 ///
@@ -53,6 +53,9 @@ pub struct CaptureHost {
     /// Whether an adapter request has already been made. Stops a GPU-less box from
     /// paying for a failed adapter probe on every single shot.
     probed: bool,
+    /// The last shot's render counters and the CPU ms `Renderer::render` took to
+    /// record it (#433) — what a harness screenshot folds into the frame stats.
+    pub last_frame: Option<(RenderCounters, f64)>,
 }
 
 impl CaptureHost {

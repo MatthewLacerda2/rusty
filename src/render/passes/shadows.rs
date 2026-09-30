@@ -38,6 +38,9 @@ pub struct ShadowRenderer {
     /// every frame (static *and* dynamic); these are written in place with
     /// `queue.write_buffer` and reused instead (#210).
     entity_slots: HashMap<SlotKey, ShadowSlot>,
+    /// Index counts of the caster draws since the renderer last cleared it — one
+    /// frame's worth, read into the frame counters (#433).
+    pub(crate) drawn: Vec<u32>,
 }
 
 /// One entity's reused shadow-pass model-matrix buffer + its bind group.
@@ -81,6 +84,7 @@ impl ShadowRenderer {
             global_bind_group,
             entity_layout,
             entity_slots: HashMap::new(),
+            drawn: Vec::new(),
         }
     }
 
@@ -326,6 +330,7 @@ impl ShadowRenderer {
     ) {
         let render_resources =
             self.collect_entity_resources(device, queue, scene, gpu_meshes, true);
+        self.drawn.extend(render_resources.iter().map(|r| r.2));
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -381,6 +386,7 @@ impl ShadowRenderer {
 
         let render_resources =
             self.collect_entity_resources(device, queue, scene, gpu_meshes, false);
+        self.drawn.extend(render_resources.iter().map(|r| r.2));
 
         if !render_resources.is_empty() {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

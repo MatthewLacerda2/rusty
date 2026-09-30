@@ -191,6 +191,7 @@ impl Renderer {
             default_cube,
             static_capture: false,
             capture_probe_bounce: false,
+            frame_counters: Default::default(),
             _gpu_permit: gpu_permit,
         }
     }

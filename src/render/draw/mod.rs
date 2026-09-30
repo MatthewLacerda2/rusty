@@ -48,6 +48,7 @@ impl Renderer {
         );
 
         self.upload_scene_assets(scene);
+        self.begin_counters(scene);
 
         // Load the active reflection probe's baked cubemap for the primary camera (#245),
         // so the forward pass reflects that prefiltered cube instead of the skybox.
@@ -120,7 +121,8 @@ impl Renderer {
             self.draw_transparent(view, &solids.transparent);
 
             // Billboard particles for this camera (after solids, before the next pass).
-            self.draw_particles(view, scene, cam);
+            let particle_draws = self.draw_particles(view, scene, cam);
+            self.count_camera(&solids, scene.decals.len(), particle_draws);
 
             // 3. Composite + post-process once, over the final pass's HDR target.
             if idx == last {
@@ -133,6 +135,7 @@ impl Renderer {
         if !editor_mode {
             self.draw_ui(view, scene);
         }
+        self.finish_counters(view);
     }
 
     /// Upload/refresh per-frame GPU assets (meshes, textures, skybox) shared by every

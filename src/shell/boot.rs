@@ -82,7 +82,11 @@ pub fn load_game(scene_path: &str) -> GameWorld {
     // Baked over the scene's own bounds (#452) — the same path the headless harness takes.
     let nav = Rc::new(RefCell::new(NavigationGraph::from_scene(&scene.borrow())));
     let input = Rc::new(RefCell::new(InputState::new()));
-    let game = GameWorld::new(scene, input, nav, console);
+    #[cfg_attr(not(feature = "dev"), allow(unused_mut))] // the dev probe install mutates it
+    let mut game = GameWorld::new(scene, input, nav, console);
+    // Dev builds time the schedule so `Debug.Stats()` answers in a playtest (#433).
+    #[cfg(feature = "dev")]
+    crate::dev::stats::install(&mut game);
     *game.script_manager().scene_path_cell().borrow_mut() = Some(scene_path.to_string());
 
     // Bind the persistent store to its file and load it once — this boundary read is

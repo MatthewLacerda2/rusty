@@ -13,6 +13,7 @@
 #![deny(clippy::unwrap_used)]
 
 pub mod callbacks;
+mod cells;
 mod console;
 mod discovery;
 mod eval;

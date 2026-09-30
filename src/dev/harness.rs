@@ -12,7 +12,13 @@
 //! Determinism contract: fixed timestep + frame-count timers (no wall-clock reads in
 //! the tick), so a scenario replays identically every run.
 //!
-//! A run produces: <out_dir>/results.json + <out_dir>/console.log.
+//! A run produces: <out_dir>/results.json + <out_dir>/console.log + <out_dir>/stats.json.
+//!
+//! Frame stats (#433): the harness installs the dev-layer timing probe, so every run
+//! records CPU ms per stage/system and world counters (render counters too, on the
+//! frames a `Screenshot` draws). `results.json` carries only the deterministic counts
+//! — it stays byte-identical across replays — and `stats.json` carries everything,
+//! wall-clock timings included. `AssertBudget` turns a limit into an expectation.
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -21,6 +27,7 @@ use std::rc::Rc;
 use serde_json::{json, Value};
 
 use crate::app::GameWorld;
+use crate::core::frame_stats::FrameStats;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
@@ -62,6 +69,8 @@ pub struct Harness {
     /// builds one, on its first shot, and none at all if it never takes one. The budget
     /// slot it holds is released when the harness is dropped.
     capture: super::capture::CaptureHost,
+    /// The run's frame stats, filled by the timing probe and the screenshots.
+    pub stats: Rc<RefCell<FrameStats>>,
 }
 
 impl Harness {
@@ -91,6 +100,7 @@ impl Harness {
         );
         // Headless harness always runs the simulation (play mode).
         world.set_playing(true);
+        let stats = super::stats::install(&mut world);
 
         Self {
             world: Rc::new(RefCell::new(world)),
@@ -99,6 +109,7 @@ impl Harness {
             expectations: Vec::new(),
             out_dir: out_dir.as_ref().to_path_buf(),
             capture: super::capture::CaptureHost::new(),
+            stats,
         }
     }
 
@@ -155,6 +166,9 @@ impl Harness {
             super::screenshot::DEFAULT_WIDTH,
             super::screenshot::DEFAULT_HEIGHT,
         );
+        if let (Ok(true), Some((counters, ms))) = (&result, self.capture.last_frame.take()) {
+            super::stats::record_render(&mut self.stats.borrow_mut(), &counters, ms);
+        }
         match result {
             Ok(true) => {
                 self.log(format!("Screenshot written: {}", path.display()));
@@ -172,6 +186,22 @@ impl Harness {
                 false
             }
         }
+    }
+
+    /// Check each `(metric, limit)` budget against the worst frame recorded so far,
+    /// recording one expectation per budget. Returns whether all were met.
+    pub fn assert_budget(&mut self, budgets: &[(String, f64)]) -> bool {
+        let mut all = true;
+        for (key, limit) in budgets {
+            let checked = self.stats.borrow().check_budget(key, *limit);
+            all &= checked.is_ok();
+            let (passed, message) = match checked {
+                Ok(msg) => (true, msg),
+                Err(msg) => (false, msg),
+            };
+            self.expect(passed, message);
+        }
+        all
     }
 
     /// True if every recorded expectation passed.
@@ -195,10 +225,18 @@ impl Harness {
             "expectations": expects,
             "logs": self.logs,
             "final_snapshot": self.snapshot(),
+            "stats": self.stats.borrow().to_json(false),
         });
 
         let results_path = self.out_dir.join("results.json");
         std::fs::write(&results_path, serde_json::to_string_pretty(&results)?)?;
+
+        // Timings differ run to run, so they live beside results.json, not in it.
+        let stats = self.stats.borrow().to_json(true);
+        std::fs::write(
+            self.out_dir.join("stats.json"),
+            serde_json::to_string_pretty(&stats)?,
+        )?;
 
         let console_path = self.out_dir.join("console.log");
         let mut buf = String::new();

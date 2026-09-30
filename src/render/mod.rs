@@ -5,6 +5,7 @@ mod frustum;
 mod preview;
 pub mod readback;
 mod setup;
+mod stats;
 #[cfg(test)]
 pub(crate) mod test_gpu;
 mod view;
@@ -31,6 +32,7 @@ pub use ibl::probe_bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
 pub use ibl::probe_bounce::{BounceReport, CONVERGENCE_EPSILON, MAX_BOUNCES};
 pub use ibl::reflection_bake::DEFAULT_REFLECTION_RESOLUTION;
 pub use setup::headless::OFFSCREEN_FORMAT;
+pub use stats::RenderCounters;
 pub use view::RenderView;
 
 // GPU uniform memory layouts live in `gpu/uniforms.rs` (split out to keep files under
@@ -190,6 +192,9 @@ pub struct Renderer {
     /// Off everywhere else, so direct-only capture (bounce 1, reflection bakes) and
     /// runtime shading keep their "static ⇒ no probe SH" rule.
     capture_probe_bounce: bool,
+
+    /// What the last `render` call submitted (#433) — read by the dev layer's stats.
+    pub frame_counters: RenderCounters,
 
     /// This renderer's slot in the headless budget (#366) — `Some` for headless
     /// renderers, `None` for the windowed one, which is the application itself and
