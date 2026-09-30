@@ -172,7 +172,7 @@ pub fn default_visual_correction() -> VisualCorrectionComponent {
         ssr_quality: "High".to_string(),
         ssr_temporal_upsampling: true,
         tonemap: Tonemap::Aces,
-        gamma: 2.2,
+        gamma: 1.0,
     }
 }
 

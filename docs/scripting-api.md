@@ -1523,7 +1523,7 @@ Getters return a neutral default when no active volume/camera exists.
 | `Graphics.GetExposure` / `SetExposure` | `()` / `(ev)` | `number` (EV) |
 | `Graphics.GetContrast` / `SetContrast` | `()` / `(value)` | `number` |
 | `Graphics.GetSaturation` / `SetSaturation` | `()` / `(value)` | `number` |
-| `Graphics.GetGamma` / `SetGamma` | `()` / `(value)` | `number` (clamped ≥ 0.01) |
+| `Graphics.GetGamma` / `SetGamma` | `()` / `(value)` | `number` (display-gamma tweak, **neutral `1.0`**, clamped ≥ 0.01) |
 | `Graphics.GetTonemap` / `SetTonemap` | `()` / `(name)` | `"None"` / `"Reinhard"` / `"Aces"` |
 | `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | `string` |
@@ -1531,6 +1531,13 @@ Getters return a neutral default when no active volume/camera exists.
 | `Graphics.GetMotionBlurSamples` / `SetMotionBlurSamples` | `()` / `(n)` | `number` (clamped 2–32) |
 | `Graphics.GetFxaaActive` / `SetFxaaActive` | `()` / `(bool)` | `bool` (**default `true`**) |
 | `Graphics.GetQuality` / `SetQuality` | `()` / `(name)` | `"Low"` / `"Medium"` / `"High"` |
+
+**Gamma** is a display-gamma *tweak*, not the output encode: the render target
+(window, Game view, and headless screenshot alike) is sRGB and encodes linear →
+display in hardware, exactly once (#415). `1.0` leaves the image untouched; `> 1`
+lifts the midtones, `< 1` darkens them. Scenes saved before #415 stored the
+encode itself (`gamma: 2.2` meant "normal"); they load as `gamma / 2.2`, so an old
+2.2 becomes 1.0 and looks the same.
 
 **FXAA** is the anti-aliasing pass at the very end of the chain, running on the
 tonemapped image just before it reaches the screen. It is **on by default** — a

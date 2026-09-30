@@ -30,6 +30,7 @@ impl Tonemap {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(from = "VisualCorrectionFile")]
 pub struct VisualCorrectionComponent {
     pub active: bool,
     pub bloom_active: bool,
@@ -44,11 +45,101 @@ pub struct VisualCorrectionComponent {
     /// Tonemap operator. `#[serde(default)]` keeps older scene files loading.
     #[serde(default)]
     pub tonemap: Tonemap,
-    /// Output gamma for the final encode (2.2 is the usual sRGB-ish value).
-    #[serde(default = "default_gamma")]
+    /// Display-gamma *tweak* around the neutral `1.0` (#415): the final image is
+    /// `c^(1/gamma)` in linear space, then the sRGB render target does the real
+    /// linear→display encode. `> 1` brightens midtones, `< 1` darkens them.
+    ///
+    /// Saved as `display_gamma`; the pre-#415 key `gamma` meant "the encode itself"
+    /// (2.2 was neutral), so it loads as `gamma / 2.2` — see [`LEGACY_NEUTRAL_GAMMA`].
+    #[serde(rename = "display_gamma")]
     pub gamma: f32,
 }
 
+/// What the pre-#415 `gamma` field held as its neutral value. Dividing an old
+/// value by it keeps the user's deviation from neutral: `c^(1/g_old)` ≈
+/// `srgb(c^(2.2/g_old))`, i.e. a new tweak of `g_old / 2.2`.
+pub const LEGACY_NEUTRAL_GAMMA: f32 = 2.2;
+
 fn default_gamma() -> f32 {
-    2.2
+    1.0
+}
+
+/// The on-disk shape: today's fields plus the legacy `gamma` key, folded into
+/// [`VisualCorrectionComponent::gamma`] by the `From` impl below.
+#[derive(Deserialize)]
+struct VisualCorrectionFile {
+    active: bool,
+    bloom_active: bool,
+    bloom_intensity: f32,
+    bloom_threshold: f32,
+    exposure: f32,
+    contrast: f32,
+    saturation: f32,
+    ssr_active: bool,
+    ssr_quality: String,
+    ssr_temporal_upsampling: bool,
+    #[serde(default)]
+    tonemap: Tonemap,
+    display_gamma: Option<f32>,
+    /// Pre-#415 encode gamma; only read when `display_gamma` is absent.
+    gamma: Option<f32>,
+}
+
+impl From<VisualCorrectionFile> for VisualCorrectionComponent {
+    fn from(f: VisualCorrectionFile) -> Self {
+        let gamma = f
+            .display_gamma
+            .or(f.gamma.map(|g| g / LEGACY_NEUTRAL_GAMMA))
+            .unwrap_or_else(default_gamma);
+        Self {
+            active: f.active,
+            bloom_active: f.bloom_active,
+            bloom_intensity: f.bloom_intensity,
+            bloom_threshold: f.bloom_threshold,
+            exposure: f.exposure,
+            contrast: f.contrast,
+            saturation: f.saturation,
+            ssr_active: f.ssr_active,
+            ssr_quality: f.ssr_quality,
+            ssr_temporal_upsampling: f.ssr_temporal_upsampling,
+            tonemap: f.tonemap,
+            gamma,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::VisualCorrectionComponent;
+
+    const BODY: &str = r#""active": true, "bloom_active": false, "bloom_intensity": 1.0,
+        "bloom_threshold": 1.0, "exposure": 0.0, "contrast": 1.0, "saturation": 1.0,
+        "ssr_active": false, "ssr_quality": "Low", "ssr_temporal_upsampling": false"#;
+
+    fn load(extra: &str) -> VisualCorrectionComponent {
+        serde_json::from_str(&format!("{{{BODY}{extra}}}")).unwrap()
+    }
+
+    #[test]
+    fn a_legacy_encode_gamma_loads_relative_to_its_old_neutral() {
+        // A saved 2.2 meant "normal"; it must not load as a 2.2 brightening tweak.
+        assert!((load(r#", "gamma": 2.2"#).gamma - 1.0).abs() < 1e-6);
+        assert!((load(r#", "gamma": 1.1"#).gamma - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn display_gamma_wins_and_absence_is_neutral() {
+        assert_eq!(load(r#", "display_gamma": 1.3, "gamma": 2.2"#).gamma, 1.3);
+        assert_eq!(load("").gamma, 1.0);
+    }
+
+    #[test]
+    fn a_saved_component_round_trips_under_the_new_key() {
+        let mut vc = load("");
+        vc.gamma = 1.25;
+        let json = serde_json::to_string(&vc).unwrap();
+        assert!(json.contains(r#""display_gamma":1.25"#), "{json}");
+        let back: VisualCorrectionComponent = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.gamma, 1.25);
+    }
 }

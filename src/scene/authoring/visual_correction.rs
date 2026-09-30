@@ -51,7 +51,8 @@ pub fn set_saturation(vc: &mut VisualCorrectionComponent, value: f32) {
     vc.saturation = value;
 }
 
-/// Set the output gamma, clamped to `≥ 0.01` (avoids a divide-by-zero encode).
+/// Set the display-gamma tweak (neutral `1.0`), clamped to `≥ 0.01` (avoids a
+/// divide-by-zero in the shader's `c^(1/gamma)`).
 pub fn set_gamma(vc: &mut VisualCorrectionComponent, value: f32) {
     vc.gamma = value.max(0.01);
 }
@@ -97,7 +98,7 @@ mod tests {
             ssr_quality: "Medium".to_string(),
             ssr_temporal_upsampling: false,
             tonemap: Tonemap::Aces,
-            gamma: 2.2,
+            gamma: 1.0,
         };
         scene.world.set_visual_correction(id, Some(c));
         (scene, id)

@@ -29,7 +29,7 @@ fn scene_with_volume() -> Rc<RefCell<Scene>> {
             ssr_quality: "Low".to_string(),
             ssr_temporal_upsampling: false,
             tonemap: Tonemap::Aces,
-            gamma: 2.2,
+            gamma: 1.0,
         }),
     );
     scene.world.set_camera(
@@ -141,7 +141,7 @@ fn getters_return_defaults_with_no_active_volume() {
         let bloom: bool = lua.load("return Graphics.GetBloomActive()").eval().unwrap();
         assert!(!bloom);
         let gamma: f32 = lua.load("return Graphics.GetGamma()").eval().unwrap();
-        assert_eq!(gamma, 2.2);
+        assert_eq!(gamma, 1.0, "display gamma is neutral at 1.0 (#415)");
         Ok(())
     })
     .unwrap();

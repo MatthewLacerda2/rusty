@@ -229,7 +229,9 @@ fn fs_composite(in: VsOut) -> @location(0) vec4<f32> {
     let l = luminance(hdr);
     hdr = mix(vec3<f32>(l), hdr, params.color.z);
 
-    // 8. Gamma encode.
+    // 8. Display-gamma tweak (neutral 1.0). NOT the output encode: every target
+    //    this pass writes is sRGB, and the hardware does linear -> sRGB on write
+    //    (#415). Encoding here too would double it.
     hdr = clamp(hdr, vec3<f32>(0.0), vec3<f32>(1.0));
     hdr = pow(hdr, vec3<f32>(1.0 / max(params.color.w, 0.01)));
 
@@ -242,11 +244,19 @@ fn fs_composite(in: VsOut) -> @location(0) vec4<f32> {
 // FXAA 3.11's luma-based edge blend. It is defined on *post-tonemap, gamma-encoded*
 // colour, which is why it runs after `fs_composite` rather than inside it: it needs
 // the finished LDR image, and the neighbourhood taps below are only meaningful once
-// every pixel has been tonemapped.
+// every pixel has been tonemapped. The LDR target is sRGB (#415), so its taps come
+// back *linear*; `fxaa_luma` takes the sqrt as the usual cheap re-encode, so the
+// edge thresholds still see perceptual luma while the blend itself runs in linear.
 //
 // The texel size comes from `textureDimensions(t_color)` rather than the params
 // uniform, because `misc.yz` is the blur pass's texel size and this pass runs at full
 // resolution while the blur runs at the bloom divisor's.
+
+// FXAA's own luma weights (NTSC), deliberately not `luminance()`'s Rec.709 ones:
+// the algorithm's thresholds were tuned against these — on gamma-encoded colour.
+fn fxaa_luma(c: vec3<f32>) -> f32 {
+    return dot(sqrt(max(c, vec3<f32>(0.0))), vec3<f32>(0.299, 0.587, 0.114));
+}
 
 @fragment
 fn fs_fxaa(in: VsOut) -> @location(0) vec4<f32> {
@@ -256,9 +266,6 @@ fn fs_fxaa(in: VsOut) -> @location(0) vec4<f32> {
     let span_max = 8.0;
     let reduce_mul = 1.0 / 8.0;
     let reduce_min = 1.0 / 128.0;
-    // FXAA's own luma weights (NTSC), deliberately not `luminance()`'s Rec.709 ones:
-    // the algorithm's thresholds were tuned against these.
-    let luma = vec3<f32>(0.299, 0.587, 0.114);
 
     let inv = vec2<f32>(1.0) / vec2<f32>(textureDimensions(t_color));
 
@@ -268,11 +275,11 @@ fn fs_fxaa(in: VsOut) -> @location(0) vec4<f32> {
     let se = textureSample(t_color, s_color, in.uv + vec2<f32>(1.0, 1.0) * inv).rgb;
     let m = textureSample(t_color, s_color, in.uv).rgb;
 
-    let l_nw = dot(nw, luma);
-    let l_ne = dot(ne, luma);
-    let l_sw = dot(sw, luma);
-    let l_se = dot(se, luma);
-    let l_m = dot(m, luma);
+    let l_nw = fxaa_luma(nw);
+    let l_ne = fxaa_luma(ne);
+    let l_sw = fxaa_luma(sw);
+    let l_se = fxaa_luma(se);
+    let l_m = fxaa_luma(m);
 
     let luma_min = min(l_m, min(min(l_nw, l_ne), min(l_sw, l_se)));
     let luma_max = max(l_m, max(max(l_nw, l_ne), max(l_sw, l_se)));
@@ -300,7 +307,7 @@ fn fs_fxaa(in: VsOut) -> @location(0) vec4<f32> {
 
     // The wide average is used only when it stays inside the neighbourhood's luma
     // range; outside it, the wide tap has strayed off the edge and would smear.
-    let l_b = dot(rgb_b, luma);
+    let l_b = fxaa_luma(rgb_b);
     if (l_b < luma_min || l_b > luma_max) {
         return vec4<f32>(rgb_a, 1.0);
     }

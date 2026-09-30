@@ -35,7 +35,7 @@ fn vc() -> VisualCorrectionComponent {
         ssr_quality: "High".to_string(),
         ssr_temporal_upsampling: false,
         tonemap: Tonemap::Aces,
-        gamma: 2.2,
+        gamma: 1.0,
     }
 }
 

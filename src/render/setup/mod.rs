@@ -199,7 +199,12 @@ fn surface_config(
         .iter()
         .copied()
         .find(|f| f.is_srgb())
-        .unwrap_or(caps.formats[0]);
+        .unwrap_or_else(|| {
+            // The target format owns the one linear→display encode (#415); without an
+            // sRGB surface the window shows linear colour, darker than a screenshot.
+            log::warn!("no sRGB surface format; the window will not match screenshots");
+            caps.formats[0]
+        });
     wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format,
