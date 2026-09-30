@@ -72,9 +72,9 @@ jobs:
       # repo, so without this checkout it dies with git exit 128 — which failed
       # every post-merge run and kept `coverage` from ever running (#480).
       # paths-filter fetches `before` itself if the shallow clone lacks it.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: github.event_name == 'push'
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         # Runs on PRs (diff vs. base) and on push to main (diff of the merge
         # commit) so the post-merge coverage job can skip docs-only merges just
@@ -122,7 +122,7 @@ jobs:
       # (#489): the lavapipe step below is what gives this runner one.
       RUSTY_REQUIRE_GPU: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: needs.changes.outputs.code != 'false'
       - name: Free runner disk (drop preinstalled toolchains we never use)
         if: needs.changes.outputs.code != 'false'
@@ -211,7 +211,7 @@ jobs:
       # Metal (macOS) and WARP (Windows) are always there; require them (#489).
       RUSTY_REQUIRE_GPU: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Toolchain (from rust-toolchain.toml)
         run: rustup show
       - name: Cache cargo registry + target
@@ -271,7 +271,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Full history so diff-cover can diff the changed lines against the base.
           fetch-depth: 0
@@ -333,14 +333,14 @@ jobs:
           } | tee comment.md >> "$GITHUB_STEP_SUMMARY"
       - name: Post diff-coverage comment
         if: always() && steps.diffcov.outputs.has_gaps == 'true'
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: coverage-diff
           path: comment.md
       - name: Clear stale diff-coverage comment
         # Idempotent: once a re-push covers the changed lines, drop the comment.
         if: always() && steps.diffcov.outputs.has_gaps != 'true'
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: coverage-diff
           delete: true
@@ -363,7 +363,7 @@ jobs:
     # keeps even a regression non-blocking.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Toolchain (from rust-toolchain.toml)
         run: rustup show
       - name: Add llvm-tools-preview (required by cargo-llvm-cov)
@@ -452,7 +452,7 @@ jobs:
         (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) &&
        needs.changes.outputs.code != 'false')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           # Blocking supply-chain gate (no continue-on-error): a new RUSTSEC
@@ -521,7 +521,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Full history so we can diff against the PR base to build the --in-diff patch.
           fetch-depth: 0
@@ -604,7 +604,7 @@ jobs:
           fi
       - name: Post surviving-mutant comment
         if: always() && steps.prep.outputs.has_survivors == 'true'
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: mutants-diff
           path: comment.md
@@ -612,13 +612,13 @@ jobs:
         # Idempotent: when a re-push fixes the survivors, drop the old comment so the
         # PR doesn't carry a stale list.
         if: always() && steps.prep.outputs.has_survivors != 'true'
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           header: mutants-diff
           delete: true
       - name: Upload surviving-mutant report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mutants-pr-report
           path: mutants.out/
@@ -706,7 +706,7 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Toolchain (from rust-toolchain.toml)
         run: rustup show
       - name: Cache cargo registry + target
@@ -745,7 +745,7 @@ jobs:
           echo '${{ strategy.job-total }}' > mutants.out/shard-total
       - name: Upload this shard's report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mutants-shard-${{ matrix.shard }}
           path: mutants.out/
@@ -763,7 +763,7 @@ jobs:
     continue-on-error: true
     steps:
       - name: Download every shard's report
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: mutants-shard-*
           path: shards
@@ -808,7 +808,7 @@ jobs:
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload the merged sweep report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mutants-report
           path: mutants.out/

@@ -53,7 +53,7 @@ jobs:
       github.event.workflow_run.event == 'push' ||
       github.event.workflow_run.event == 'schedule'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: File or update the red-main issue
         env:
           GH_TOKEN: ${{ github.token }}
