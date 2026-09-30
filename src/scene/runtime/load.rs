@@ -9,7 +9,7 @@
 //! ([`Scene::dont_destroy_on_load`]); at the swap it and every descendant are carried
 //! into the incoming World **with their ids**, because scripts, timers and the UI
 //! event system hold those ids. An incoming entity whose id a survivor already holds
-//! is moved to a fresh id instead ([`make_room`]), its references rewritten with it.
+//! is moved to a fresh id instead (`make_room`), its references rewritten with it.
 
 use std::collections::{BTreeMap, BTreeSet};
 
