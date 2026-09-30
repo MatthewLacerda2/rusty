@@ -23,9 +23,10 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::components::{
-    AnimatorComponent, AudioSourceComponent, CameraComponent, ColliderComponent, LightComponent,
-    MaterialComponent, MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent, PrefabLink,
-    RigidBodyComponent, VisualCorrectionComponent,
+    AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent, ColliderComponent,
+    LightComponent, MaterialComponent, MeshComponent, NavMeshAgentComponent,
+    ParticleEmitterComponent, PrefabLink, RectTransformComponent, RigidBodyComponent,
+    VisualCorrectionComponent,
 };
 
 use super::world::{Ref, RefMut, World};
@@ -125,5 +126,7 @@ optional_component_accessors! {
     VisualCorrectionComponent => visual_correction, visual_correction_mut, has_visual_correction, set_visual_correction, take_visual_correction, ids_with_visual_correction;
     ParticleEmitterComponent => particles, particles_mut, has_particles, set_particles, take_particles, ids_with_particles;
     AudioSourceComponent => audio, audio_mut, has_audio, set_audio, take_audio, ids_with_audio;
+    CanvasComponent => canvas, canvas_mut, has_canvas, set_canvas, take_canvas, ids_with_canvas;
+    RectTransformComponent => rect_transform, rect_transform_mut, has_rect_transform, set_rect_transform, take_rect_transform, ids_with_rect_transform;
     PrefabLink => prefab_link, prefab_link_mut, has_prefab_link, set_prefab_link, take_prefab_link, ids_with_prefab_link;
 }

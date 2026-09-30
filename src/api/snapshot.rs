@@ -12,12 +12,13 @@
 //! harness (`dev::snapshot`) and the dev-only `Debug.Snapshot` binding both call
 //! it, and reads stay on the one API surface.
 
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec2, Vec3};
 use serde_json::{json, Value};
 
 use super::snapshot_components::{
-    animator_value, audio_value, camera_component_value, collider_value, light_value,
-    material_value, mesh_value, nav_agent_value, particle_value, rigidbody_value,
+    animator_value, audio_value, camera_component_value, canvas_value, collider_value, light_value,
+    material_value, mesh_value, nav_agent_value, particle_value, rect_transform_value,
+    rigidbody_value,
 };
 use crate::components::TransformComponent;
 use crate::ecs::World;
@@ -29,8 +30,15 @@ pub(crate) fn vec3(v: Vec3) -> Value {
     json!([v.x, v.y, v.z])
 }
 
-/// The whole-world snapshot: play-state envelope + camera + every entity.
-pub fn world_value(scene: &Scene, camera: &Camera, frame: u64, playing: bool) -> Value {
+/// The whole-world snapshot: play-state envelope + camera + every entity. `screen`
+/// is the UI's screen size in pixels (for each UI element's computed `ui_rect`).
+pub fn world_value(
+    scene: &Scene,
+    camera: &Camera,
+    frame: u64,
+    playing: bool,
+    screen: Vec2,
+) -> Value {
     // Collect ids first so the per-entity accessor borrows below don't overlap
     // any iterator-held guard.
     let ids = scene.entity_ids();
@@ -39,7 +47,7 @@ pub fn world_value(scene: &Scene, camera: &Camera, frame: u64, playing: bool) ->
         .filter(|&&id| scene.world.contains(id))
         .map(|&id| {
             let world_matrix = scene.compute_world_matrix(id);
-            entity_value(scene, id, world_matrix)
+            entity_value(scene, id, world_matrix, screen)
         })
         .collect();
     json!({
@@ -61,10 +69,11 @@ fn camera_value(cam: &Camera) -> Value {
 }
 
 /// One entity in the stable authoring shape. `world_matrix` is the entity's
-/// parent-aware world transform, used for the world-space bounds. Reads route
+/// parent-aware world transform, used for the world-space bounds; `screen` is the
+/// UI's screen size in pixels, used for the computed `ui_rect`. Reads route
 /// through the `World` component accessors (#344) instead of projecting fields
 /// out of a whole-`Entity` borrow, so heavy fields (meshes) are never cloned.
-pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4) -> Value {
+pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, screen: Vec2) -> Value {
     let world = &scene.world;
     let material = scene.material_asset_of(id);
     json!({
@@ -95,6 +104,10 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4) -> Value {
         "particles": world.particles(id).map(|p| particle_value(&p)),
         "animator": world.animator(id).map(|a| animator_value(&a)),
         "audio": world.audio(id).map(|a| audio_value(&a)),
+        "canvas": world.canvas(id).map(|c| canvas_value(&c)),
+        "rect_transform": world.rect_transform(id).map(|r| rect_transform_value(&r)),
+        "ui_rect": crate::ui::layout::rect_of(world, id, screen)
+            .map(|r| super::ui::rect_value(&r)),
     })
 }
 
@@ -131,6 +144,12 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
     }
     if world.has_audio(id) {
         names.push("AudioSource");
+    }
+    if world.has_canvas(id) {
+        names.push("Canvas");
+    }
+    if world.has_rect_transform(id) {
+        names.push("RectTransform");
     }
     if world.scripts(id).is_some_and(|s| !s.is_empty()) {
         names.push("Script");

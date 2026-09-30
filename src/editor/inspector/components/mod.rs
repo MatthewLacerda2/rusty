@@ -1,6 +1,6 @@
 //! Per-component inspector cards for the selected entity: one module per
 //! first-class component (transform, render, material, camera, audio, particles,
-//! gameplay) plus the shared card chrome, the read-only frame context, the
+//! gameplay, ui) plus the shared card chrome, the read-only frame context, the
 //! add-component menu, the linked-prefab override card, and the scene-settings panel.
 
 pub mod add;
@@ -16,3 +16,4 @@ pub mod render;
 pub mod script_fields;
 pub mod settings;
 pub mod transform;
+pub mod ui;

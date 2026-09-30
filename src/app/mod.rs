@@ -33,6 +33,7 @@ mod resources;
 mod schedule;
 mod stage;
 mod system;
+mod ui;
 mod world;
 
 pub use game::{GameWorld, PlayTransition};

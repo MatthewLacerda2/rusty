@@ -11,10 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 use super::{
-    AnimatorComponent, AudioSourceComponent, CameraComponent, ColliderComponent, LightComponent,
-    MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent,
-    ParticleEmitterComponent, RigidBodyComponent, ScriptComponent, TextureComponent,
-    TransformComponent, VisualCorrectionComponent,
+    AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent, ColliderComponent,
+    LightComponent, MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent,
+    ParticleEmitterComponent, RectTransformComponent, RigidBodyComponent, ScriptComponent,
+    TextureComponent, TransformComponent, VisualCorrectionComponent,
 };
 
 /// The live link from an instance entity back to the `.prefab` it was stamped from
@@ -88,6 +88,13 @@ pub struct Entity {
     /// load with no audio source.
     #[serde(default)]
     pub audio: Option<AudioSourceComponent>,
+    /// UI root (#417). `#[serde(default)]` so pre-#417 scenes load with no canvas.
+    #[serde(default)]
+    pub canvas: Option<CanvasComponent>,
+    /// 2D placement inside the parent rect (#417), beside the mandatory Transform.
+    /// `#[serde(default)]` so pre-#417 scenes load without one.
+    #[serde(default)]
+    pub rect_transform: Option<RectTransformComponent>,
     /// Live link back to the source `.prefab` for a *linked* prefab instance (#216).
     /// `None` on a plain entity or a v1 unpacked copy. Carried on every entity of an
     /// instance. `#[serde(default)]` so pre-#216 scenes load with no link.
@@ -135,6 +142,10 @@ struct EntityRepr {
     #[serde(default)]
     audio: Option<AudioSourceComponent>,
     #[serde(default)]
+    canvas: Option<CanvasComponent>,
+    #[serde(default)]
+    rect_transform: Option<RectTransformComponent>,
+    #[serde(default)]
     prefab_link: Option<PrefabLink>,
     parent_id: Option<u32>,
     children: Vec<u32>,
@@ -181,6 +192,8 @@ impl From<EntityRepr> for Entity {
             visual_correction: r.visual_correction,
             particles: r.particles,
             audio: r.audio,
+            canvas: r.canvas,
+            rect_transform: r.rect_transform,
             prefab_link: r.prefab_link,
             parent_id: r.parent_id,
             children: r.children,
@@ -210,6 +223,8 @@ impl Entity {
             visual_correction: None,
             particles: None,
             audio: None,
+            canvas: None,
+            rect_transform: None,
             prefab_link: None,
             parent_id: None,
             children: Vec::new(),

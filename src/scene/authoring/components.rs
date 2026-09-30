@@ -28,6 +28,8 @@ pub enum ComponentKind {
     Particles,
     VisualCorrection,
     Audio,
+    Canvas,
+    RectTransform,
 }
 
 impl ComponentKind {
@@ -35,7 +37,7 @@ impl ComponentKind {
     /// finding a removed kind's dependents ([`dependency::remove_with_cascade`]) and
     /// reconciling/enforcing unmet requirements. The per-kind matches in `dependency`
     /// are compiler-checked exhaustive; a test guards this list against drift.
-    pub const ALL: [ComponentKind; 10] = [
+    pub const ALL: [ComponentKind; 12] = [
         Self::Light,
         Self::Animator,
         Self::Collider,
@@ -46,6 +48,8 @@ impl ComponentKind {
         Self::Particles,
         Self::VisualCorrection,
         Self::Audio,
+        Self::Canvas,
+        Self::RectTransform,
     ];
 
     /// The first-class components this kind depends on — rusty's `RequireComponent`
@@ -76,6 +80,8 @@ impl ComponentKind {
             "particles" | "particlesystem" => Some(Self::Particles),
             "visualcorrection" => Some(Self::VisualCorrection),
             "audio" | "audiosource" => Some(Self::Audio),
+            "canvas" => Some(Self::Canvas),
+            "recttransform" => Some(Self::RectTransform),
             _ => None,
         }
     }

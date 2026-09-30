@@ -14,6 +14,7 @@ use crate::navigation::NavigationGraph;
 use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
+use crate::ui::ScreenSize;
 
 use super::console::ConsoleLogs;
 
@@ -84,6 +85,9 @@ pub struct ScriptManager {
     /// `math.random`. Restarted from its fixed default seed by every
     /// [`ScriptManager::init_runtime`], i.e. on every Play.
     pub(super) random: Rc<RefCell<Random>>,
+    /// The screen the UI lays out on (#417), shared with `Resources` so `UI.GetRect`
+    /// and the layout system agree on one size.
+    pub(super) screen: Rc<RefCell<ScreenSize>>,
 }
 
 impl ScriptManager {
@@ -113,6 +117,7 @@ impl ScriptManager {
             is_playing: Rc::new(RefCell::new(false)),
             audio: Rc::new(RefCell::new(AudioMaestro::default())),
             random: Rc::new(RefCell::new(Random::default())),
+            screen: Rc::new(RefCell::new(ScreenSize::default())),
         }
     }
 
@@ -127,6 +132,12 @@ impl ScriptManager {
     /// `RodioBackend` and read the introspection log.
     pub fn audio_cell(&self) -> Rc<RefCell<AudioMaestro>> {
         Rc::clone(&self.audio)
+    }
+
+    /// Inject the shared UI screen-size cell (#417). `Resources` calls this so the
+    /// `UI` namespace and the layout system read the same screen.
+    pub fn set_screen_cell(&mut self, screen: Rc<RefCell<ScreenSize>>) {
+        self.screen = screen;
     }
 
     /// Handle to the shared play-state cell, so `GameWorld::set_playing` can keep
@@ -241,6 +252,7 @@ impl ScriptManager {
             is_playing: &self.is_playing,
             audio: &self.audio,
             random: &self.random,
+            screen: &self.screen,
         }
     }
 

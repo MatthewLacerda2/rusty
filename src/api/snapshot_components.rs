@@ -8,9 +8,9 @@ use serde_json::{json, Value};
 
 use super::snapshot::vec3;
 use crate::components::{
-    AnimatorComponent, AudioSourceComponent, CameraComponent, ColliderComponent, ColliderShape,
-    LightComponent, LightType, MaterialAsset, MeshComponent, NavMeshAgentComponent,
-    ParticleEmitterComponent, RigidBodyComponent,
+    AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent, ColliderComponent,
+    ColliderShape, LightComponent, LightType, MaterialAsset, MeshComponent, NavMeshAgentComponent,
+    ParticleEmitterComponent, RectTransformComponent, RigidBodyComponent,
 };
 
 /// Mesh identity: the primitive kind and, for imported meshes, the
@@ -174,5 +174,29 @@ pub(crate) fn audio_value(a: &AudioSourceComponent) -> Value {
         "spatial_blend": a.spatial_blend,
         "initial_distance": a.initial_distance,
         "final_distance": a.final_distance,
+    })
+}
+
+/// Canvas authoring view (#417): render mode, sort order and the scaler. The
+/// computed rect is the entity's `ui_rect`, not part of the component.
+pub(crate) fn canvas_value(c: &CanvasComponent) -> Value {
+    json!({
+        "render_mode": crate::scene::authoring::canvas::render_mode_name(c.render_mode),
+        "sort_order": c.sort_order,
+        "reference_resolution": [c.reference_resolution.x, c.reference_resolution.y],
+        "match_width_or_height": c.match_width_or_height,
+    })
+}
+
+/// RectTransform authoring view (#417): anchors, pivot, anchored position and size
+/// delta, each `[x, y]` in reference units. The computed rect is `ui_rect`.
+pub(crate) fn rect_transform_value(r: &RectTransformComponent) -> Value {
+    let v = |v: glam::Vec2| json!([v.x, v.y]);
+    json!({
+        "anchor_min": v(r.anchor_min),
+        "anchor_max": v(r.anchor_max),
+        "pivot": v(r.pivot),
+        "anchored_position": v(r.anchored_position),
+        "size_delta": v(r.size_delta),
     })
 }

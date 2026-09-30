@@ -401,7 +401,8 @@ entity carrying only its mandatory `Transform` — the menu's **Create Empty**.
 **`kind`** is one of the Add Component menu's first-class components,
 case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `Texture` (alias `Material`), `NavMeshAgent`, `Camera`, `Particles`,
-`VisualCorrection`. Each is added with the inspector's default values; adding an
+`VisualCorrection`, `Audio` (alias `AudioSource`), `Canvas`, `RectTransform`.
+Each is added with the inspector's default values; adding an
 existing kind replaces it. (Scripts attach by path, not as a defaulted kind — a
 separate concern.)
 
@@ -1202,7 +1203,9 @@ a harder, loop-level halt: the windowed loop doesn't tick the sim at all (no sch
 run), which is what makes frame-precise `Step` meaningful. They layer: a paused world
 stepped via `Step` still scales each fixed step by the current `time_scale`. Reach
 for `SetTimeScale` for in-game time effects; reach for `Pause`/`Step`/`Resume` for the
-agent's "freeze the playtest, advance N frames, resume" loop. All of these are
+agent's "freeze the playtest, advance N frames, resume" loop. A game's **pause menu**
+is therefore `SetTimeScale(0)` plus UI animated with `unscaledDeltaTime` — never
+`Pause`, which would halt the menu's own scripts (see [`docs/ui.md`](ui.md)). All of these are
 reachable identically from the in-app console and the external command channel
 (issue #282), since they're plain `Time` verbs on the one shared evaluator.
 
@@ -1579,6 +1582,64 @@ the headless harness there is no window/surface, so the setters are inert.
 render/platform state and is never read by `FixedUpdate`, so it cannot change how
 the deterministic sim evolves; a headless replay is unaffected.
 
+## `Canvas`
+
+Read and tune an entity's `CanvasComponent` — the root of an in-game UI (#417).
+A canvas spans the whole screen; its descendants carrying a `RectTransform` are
+laid out inside it. The scaler is Unity's *Scale With Screen Size*: layout runs in
+**reference units** (default 1920×1080) and the scale factor maps them onto the
+live screen. The model — coordinates, draw order, determinism — is in
+[`docs/ui.md`](ui.md). Getters return a neutral default (`0`, `"None"`, `nil`) when
+the entity has no canvas.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Canvas.GetRenderMode` / `SetRenderMode` | `(id)` / `(id, name)` | `"ScreenSpaceOverlay"` (the only mode until #429) |
+| `Canvas.GetSortOrder` / `SetSortOrder` | `(id)` / `(id, order)` | integer; higher draws on top and is hit first |
+| `Canvas.GetReferenceResolution` / `SetReferenceResolution` | `(id)` / `(id, w, h)` | `w, h` (each clamped ≥ 1) |
+| `Canvas.GetMatchWidthOrHeight` / `SetMatchWidthOrHeight` | `(id)` / `(id, value)` | `0` = match width … `1` = match height (clamped) |
+| `Canvas.GetScaleFactor` | `(id)` | screen pixels per reference unit on the current screen, or `nil` |
+
+`SetRenderMode` is case-insensitive; an unrecognized name is ignored.
+
+## `RectTransform`
+
+Read and tune an entity's `RectTransformComponent` (#417) — 2D placement inside
+the parent's rect, with Unity's exact semantics. Every value is an `x, y` pair in
+the canvas's reference units, **y-up, origin bottom-left**. The anchors mark a
+region of the parent rect (a point when min == max, a stretch otherwise);
+`SizeDelta` is the size *minus* that region; `AnchoredPosition` is the pivot's
+offset from the anchors lerped by the pivot. The entity's `Transform` keeps
+**rotation and scale** (applied around the pivot); its position is ignored for a
+rect-laid-out entity. Getters return `0, 0` when the entity has no RectTransform.
+In `Debug.Snapshot` the component appears as `rect_transform`.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `RectTransform.GetAnchorMin` / `SetAnchorMin` | `(id)` / `(id, x, y)` | `x, y` (clamped to 0..1; pushes `AnchorMax` up to stay ≥) |
+| `RectTransform.GetAnchorMax` / `SetAnchorMax` | `(id)` / `(id, x, y)` | `x, y` (clamped to 0..1; pulls `AnchorMin` down to stay ≤) |
+| `RectTransform.GetPivot` / `SetPivot` | `(id)` / `(id, x, y)` | `x, y` (fraction of the element's own rect) |
+| `RectTransform.GetAnchoredPosition` / `SetAnchoredPosition` | `(id)` / `(id, x, y)` | `x, y` |
+| `RectTransform.GetSizeDelta` / `SetSizeDelta` | `(id)` / `(id, x, y)` | `x, y` |
+
+## `UI`
+
+EventSystem-level UI verbs (#417; pointer and focus verbs arrive with #420).
+
+| Function | Signature | Returns |
+|---|---|---|
+| `UI.GetRect` | `(id)` | rect table, or `nil` when the entity is not laid out under a canvas |
+| `UI.GetScreenSize` | `()` | `width, height` in pixels — the screen the UI lays out on |
+
+The rect table: `x, y, width, height` — the axis-aligned bounds of the element's
+final quad (after rotation / scale) in reference units; `screen = { x, y, width,
+height }` — the same in screen pixels (bottom-left origin, y-up); `corners` — the
+exact quad in reference units, `{ {x, y}, … }` bottom-left, top-left, top-right,
+bottom-right; `canvas` — the root canvas id; `scale_factor`. `GetRect` computes on
+demand from the live scene, so it reflects a change made earlier in the same
+script, in edit mode as well as in Play. The screen size is the game view's pixel
+size in the windowed app and the `Video` resolution headless.
+
 ## `Storage`
 
 A namespaced, JSON-backed key-value store that survives across runs — the engine's
@@ -1716,13 +1777,22 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
                  "parameters": { "Jump": { "Trigger": false }, "speed": { "Float": 4.2 } } },
   "audio":     { "clip": "music/theme.ogg", "volume": .., "loop": false,
                  "play_on_start": false, "is_time_scaled": true,
-                 "spatial_blend": 0.0, "initial_distance": .., "final_distance": .. }
+                 "spatial_blend": 0.0, "initial_distance": .., "final_distance": .. },
+  "canvas":    { "render_mode": "ScreenSpaceOverlay", "sort_order": 0,
+                 "reference_resolution": [1920, 1080], "match_width_or_height": 0.0 },
+  "rect_transform": { "anchor_min": [x,y], "anchor_max": [x,y], "pivot": [x,y],
+                      "anchored_position": [x,y], "size_delta": [x,y] },
+  "ui_rect":   { "x": .., "y": .., "width": .., "height": ..,      // UI.GetRect's shape
+                 "screen": { "x": .., "y": .., "width": .., "height": .. },
+                 "corners": [ { "x": .., "y": .. }, ... ], "canvas": 3, "scale_factor": .. }
 }
 ```
 
 Every per-component key is present only when the entity carries that component
 (absent ones serialize as `null`); `bounds` comes from the mesh when geometry is
-present, else the collider, else `null`. The shape is shared with the harness's
+present, else the collider, else `null`. `ui_rect` is the element's computed UI
+layout (see `UI.GetRect`) — `null` unless it is a canvas or laid out under one —
+so the agent can reason about the UI without a screenshot. The shape is shared with the harness's
 `Harness.Snapshot` (the play-testing path), so the read is identical wherever it's
 taken.
 

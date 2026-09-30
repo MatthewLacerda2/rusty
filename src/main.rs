@@ -633,6 +633,8 @@ fn render_viewport_scene(
     if px == 0 || py == 0 {
         return;
     }
+    // The UI lays out on the game view's pixel size (#417) — a sim input.
+    game.resources.screen.borrow_mut().set_game_view(px, py);
     // Create-or-resize this viewport's own view (target + depth + post-FX). A view's
     // resize guard checks its own size, so it never fights the preview view (#355).
     RenderView::ensure_offscreen(

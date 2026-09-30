@@ -14,7 +14,8 @@ use std::process::exit;
 
 /// Directories whose `.rs` files are sim code and must not depend on the display
 /// layer. Wider than the determinism guard's list: `scene`, `components`, `ecs`,
-/// `core`, `time` and `asset` hold the data the sim runs on.
+/// `core`, `time` and `asset` hold the data the sim runs on; `ui` is the in-game
+/// UI's layout, which runs headless in the sim (#417).
 const SIM_DIRS: &[&str] = &[
     "src/app",
     "src/scripting",
@@ -26,6 +27,7 @@ const SIM_DIRS: &[&str] = &[
     "src/core",
     "src/time",
     "src/asset",
+    "src/ui",
 ];
 
 /// Banned paths, matched as whole path segments on non-comment source: the engine's

@@ -126,6 +126,8 @@ fn register_snapshot<'lua, 'scope>(
     let camera = ctx.camera;
     let time = ctx.time;
     let is_playing = ctx.is_playing;
+    let (screen, video) = (ctx.screen, ctx.video);
+    let pixels = move || screen.borrow().pixels(&video.borrow());
     put(
         table,
         "Snapshot",
@@ -135,6 +137,7 @@ fn register_snapshot<'lua, 'scope>(
                 &camera.borrow(),
                 time.borrow().frame_count,
                 *is_playing.borrow(),
+                pixels(),
             );
             Ok(serde_json::to_string_pretty(&value).unwrap_or_default())
         }),
@@ -148,7 +151,7 @@ fn register_snapshot<'lua, 'scope>(
             let scene = scene.borrow();
             let world_matrix = scene.compute_world_matrix(id);
             let value = if scene.world.contains(id) {
-                snapshot::entity_value(&scene, id, world_matrix)
+                snapshot::entity_value(&scene, id, world_matrix, pixels())
             } else {
                 serde_json::Value::Null
             };

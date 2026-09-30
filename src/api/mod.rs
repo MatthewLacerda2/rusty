@@ -4,7 +4,7 @@
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
 //! `Scene`, `Random`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
 //! `Assets`, `Texture`, `Shader`, `Sound`, `Particles`, `Layers`, `Graphics`, `Video`,
-//! `Storage`, plus the dev-only `Debug`)
+//! `Storage`, `Canvas`, `RectTransform`, `UI`, plus the dev-only `Debug`)
 //! is registered from this tree onto the live Lua runtime.
 //! `scripting`
 //! owns the runtime and lifecycle; `api` owns the surface. One surface, three
@@ -17,6 +17,7 @@ pub mod animator;
 pub mod assets;
 pub mod audio;
 pub mod camera;
+pub mod canvas;
 #[cfg(feature = "dev")]
 pub mod debug;
 pub mod decals;
@@ -32,6 +33,7 @@ pub mod particle;
 pub mod physics;
 pub mod probe;
 pub mod random;
+pub mod rect_transform;
 pub mod reflection;
 pub mod scene;
 pub mod scene_prefab;
@@ -43,6 +45,7 @@ pub mod storage;
 pub mod texture;
 pub mod time;
 pub mod transform;
+pub mod ui;
 pub mod video;
 
 use std::cell::RefCell;
@@ -61,6 +64,7 @@ use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 use crate::time::Time;
+use crate::ui::ScreenSize;
 
 /// Result alias every namespace registrar returns.
 pub type Reg = Result<(), String>;
@@ -100,6 +104,9 @@ pub struct ApiScopedCtx<'scope> {
     /// The seeded gameplay RNG (#443): the `Random` namespace and the sandboxed
     /// `math.random` both draw from it.
     pub random: &'scope RefCell<Random>,
+    /// The screen the UI lays out on (#417); resolved against `video` when no
+    /// platform reported a game-view size (headless).
+    pub screen: &'scope RefCell<ScreenSize>,
 }
 
 /// Register every namespace onto `lua` using `scope`-tied closures that borrow
@@ -140,6 +147,9 @@ pub fn register<'lua, 'scope>(
     lighting::register(lua, scope, ctx.scene, ctx.scene_path, ctx.nav)?;
     particle::register(lua, scope, ctx.scene)?;
     audio::register(lua, scope, ctx.scene, ctx.audio, ctx.time, ctx.camera)?;
+    canvas::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
+    rect_transform::register(lua, scope, ctx.scene)?;
+    ui::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
     decals::register(lua, scope, ctx.scene)?;
     layers::register(lua, scope, ctx.scene)?;
     graphics::register(lua, scope, ctx.scene, ctx.quality)?;
