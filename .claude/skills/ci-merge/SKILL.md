@@ -103,10 +103,14 @@ gating jobs into one verdict and passes only when its `changes` job succeeded an
 every gating job succeeded or was legitimately skipped. If those two are `success` on the head SHA, the gates
 are green on the code being merged.
 
-Three failure shapes to expect:
+Four failure shapes to expect:
 
 - **A skipped run reading as green.** See above — `coverage`, `mutants`, and every
   step on a Markdown-only pull request.
+- **Two runs on one head.** A push and `ready_for_review` arriving together start
+  two runs; the older is cancelled (#482), and its jobs read `cancelled`. Its gates
+  are skipped (#515), so the live run's `ci-gate`/`lint-gate` are the only verdict —
+  read the ones that completed, not the first in the list.
 - **No run at all, because the pull request was readied moments after a push.**
   The checks are not green, they are absent. `ci.yml` triggers on
   `ready_for_review`, so this usually self-corrects; if it does not, force one with
