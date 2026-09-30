@@ -102,15 +102,17 @@ is wrong.
   rustc's linking is where memory and disk run out. Parallelise the work, stagger the
   compiles, and check the machine you are on (`df -h`, free memory) before starting a
   build — never a figure written down somewhere.
-- **Architecture- then infrastructure-first (NOT "make it up as we go").** We do **not**
+- **Infrastructure- then architecture-first (NOT "make it up as we go").** We do **not**
   improvise or pile on features ad hoc. Whenever we find a problem — something that
   already bites or will bite more than once, a pattern worth adopting, or a gold-standard
   practice we should have had — we **document it and implement it right away**, before
   continuing. We do **not** have the right to add more features/shenanigans until the
-  architecture/infrastructure itself is improved first. Architecture (how things are
-  organized) outranks infrastructure (the tools to build them), and both outrank features
-  — see *Issues, labels & priority* for the full order. Fix the foundation, then build on
-  it. Each such fix gets its own issue when it carries its own responsibility.
+  infrastructure/architecture itself is improved first. Infrastructure (the tools we build
+  with) outranks architecture (how things are organized) — make building cheap and safe
+  before reshaping what gets built, so every later change runs on the faster, safer loop
+  instead of burning compile time overnight — and both outrank features. See *Issues,
+  labels & priority* for the full order. Fix the foundation, then build on it. Each such
+  fix gets its own issue when it carries its own responsibility.
 - **Dependencies (not batches).** Once an issue is written, record how it relates to the
   others using GitHub's native issue **relationships** — set `Blocked by` / `Blocks`
   directly on the issue, and use GitHub **sub-issues** when one issue is literal
@@ -168,13 +170,17 @@ is wrong.
   hand? **File it rather than fix it** — a branch that grows to cover everything it
   noticed is a branch nobody can review.
 - **Priority by label.** When choosing what to do next, the order is
-  **architecture → infrastructure → bug → foundation → feature.** It encodes how the whole
+  **infrastructure → architecture → bug → foundation → feature.** It encodes how the whole
   project is built, in three stages:
   1. **Guardrail the development first.** If the *way we build the engine* isn't solid — a
-     missing structural shape or convention (**architecture**), or a missing tool or
-     guardrail for development (**infrastructure**) — we **halt everything and fix that
+     missing tool or guardrail for development (**infrastructure**), or a missing
+     structural shape or convention (**architecture**) — we **halt everything and fix that
      first**. We don't earn the right to build more until the means of building are sound.
-     A **bug** (broken stuff) sits here too: a broken engine is no foundation to build on.
+     Infrastructure leads because it makes every later branch cheaper: a faster build,
+     test or merge loop pays off on all the work queued behind it. A **bug** (broken stuff)
+     sits here too: a broken engine is no foundation to build on. A bug in the
+     *development tooling itself* — CI, the gates, the hooks — ranks as
+     **infrastructure**, not bug: while it stands, every branch pays for it.
   2. **Then make the engine as complete as it can be** — **foundation** work, which
      improves the *engine itself*.
   3. **Then features** — **feature** work that makes the eventual *game's* development
