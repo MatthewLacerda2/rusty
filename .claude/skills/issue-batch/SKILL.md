@@ -271,6 +271,16 @@ When working unattended, prefer leaving a comment on the issue and continuing
 over stalling the night on a question. Questions asked *while planning* are asked
 right away.
 
+**A human check is never a merge hold.** Some proof only a person can give: a real
+window, real speakers, taste. When a green pull request carries such a check, merge
+it anyway, and put the checklist in the PR description and an issue comment for
+the user to run later. If it turns out broken, that is a bug to file and fix, not
+a reason the batch waited. The same goes for a judgement call the issue left open:
+take the default the issue, CLAUDE.md or Unity points to, write down what you
+chose and why, and keep going. The batch exists so the user does not have to be
+here. (On 2026-09-30, holding three PRs for a smoke test and an ear check stalled
+the queue for hours; every one was fine.)
+
 ## Finishing a batch
 
 The batch is not done when the last branch merges — it is done when the main
