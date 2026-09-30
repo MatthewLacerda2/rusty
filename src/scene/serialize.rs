@@ -19,9 +19,9 @@ use glam::{Mat4, Vec3};
 use serde::{Deserialize, Serialize};
 
 use crate::asset::{self, MeshVertex, SubMesh};
+use crate::components::mesh::Vertex;
 use crate::components::{Entity, MaterialAsset};
 use crate::navigation::NavMeshSettings;
-use crate::render::gpu::mesh::Vertex;
 use crate::scene::authoring::{primitive_geometry, Primitive};
 use crate::scene::collision_matrix::CollisionMatrix;
 use crate::scene::layers::LayerRegistry;

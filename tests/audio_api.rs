@@ -9,7 +9,7 @@ use glam::Vec3;
 use mlua::Lua;
 use rusty::audio::AudioMaestro;
 use rusty::components::AudioSourceComponent;
-use rusty::render::Camera;
+use rusty::scene::Camera;
 use rusty::scene::Scene;
 use rusty::time::Time;
 

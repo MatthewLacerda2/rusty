@@ -85,7 +85,7 @@ impl Renderer {
     pub(crate) fn precreate_solid_resources(
         &mut self,
         scene: &Scene,
-        cam: &crate::render::Camera,
+        cam: &crate::scene::Camera,
         frustum: &Frustum,
     ) -> SolidResources {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());

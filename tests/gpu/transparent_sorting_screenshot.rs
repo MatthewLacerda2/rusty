@@ -15,7 +15,7 @@
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent, RenderMode, Tonemap};
 use rusty::dev::screenshot::capture;
-use rusty::render::Camera;
+use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
 
 fn tmp(name: &str) -> std::path::PathBuf {
@@ -43,7 +43,7 @@ fn vc() -> VisualCorrectionComponent {
 /// `color` with `alpha`. Returns nothing; the entity is appended to the scene.
 fn add_quad(scene: &mut Scene, name: &str, z: f32, color: [f32; 3], alpha: f32) {
     let id = scene.add_entity(name.to_string());
-    let (vertices, indices) = rusty::render::gpu::mesh::generate_box(8.0, 8.0, 0.1);
+    let (vertices, indices) = rusty::components::mesh::primitives::generate_box(8.0, 8.0, 0.1);
     scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 0.0, z);
     scene.world.set_mesh(
         id,

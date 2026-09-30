@@ -18,7 +18,7 @@ use mlua::Lua;
 
 use super::{put, Reg};
 use crate::audio::{AudioMaestro, Listener};
-use crate::render::Camera;
+use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
 

@@ -661,7 +661,7 @@ fn render_viewport_scene(
     let camera = if scene_tab {
         game.camera().borrow().clone()
     } else {
-        rusty::render::game_camera_from_scene(&game.camera().borrow(), &scene)
+        rusty::scene::game_camera_from_scene(&game.camera().borrow(), &scene)
     };
     frontend.renderer.render(
         view,

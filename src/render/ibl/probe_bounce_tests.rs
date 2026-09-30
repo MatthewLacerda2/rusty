@@ -56,7 +56,7 @@ fn pass_converged_thresholds_on_epsilon() {
 // --- GPU multi-bounce bakes (graceful-skip) -----------------------------------------
 
 fn box_mesh() -> crate::scene::MeshComponent {
-    let (vertices, indices) = crate::render::gpu::mesh::generate_box(1.0, 1.0, 1.0);
+    let (vertices, indices) = crate::components::mesh::primitives::generate_box(1.0, 1.0, 1.0);
     crate::scene::MeshComponent {
         primitive_type: "Box".to_string(),
         asset_ref: None,

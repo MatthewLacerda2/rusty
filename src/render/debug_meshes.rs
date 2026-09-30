@@ -4,7 +4,7 @@ use wgpu::util::DeviceExt;
 use std::collections::HashSet;
 
 use super::{GpuMesh, MeshId, Renderer};
-use crate::render::gpu::mesh::Vertex;
+use crate::components::mesh::Vertex;
 use crate::scene::Scene;
 
 /// The local-space AABB `(min, max)` over a mesh's vertices. Callers upload only

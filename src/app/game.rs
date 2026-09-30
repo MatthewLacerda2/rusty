@@ -21,7 +21,7 @@ use glam::Vec3;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
-use crate::render::Camera;
+use crate::scene::Camera;
 use crate::scene::{Scene, SceneSnapshot};
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;

@@ -10,7 +10,7 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::{put, Reg};
-use crate::render::Camera;
+use crate::scene::Camera;
 
 /// Register the `Camera` namespace onto `lua`.
 pub fn register<'lua, 'scope>(

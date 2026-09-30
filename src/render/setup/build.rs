@@ -7,10 +7,11 @@
 //! straight into the assembled renderer, so the seams follow real boundaries (what
 //! depends on what) instead of a pass-through layer (#211). Behavior is unchanged.
 
+use crate::core::quality::QualityPreset;
 use crate::render::gpu::bind_layouts;
 use crate::render::gpu::pipelines;
 use crate::render::gpu::shaders::ShaderRegistry;
-use crate::render::postfx::{QualityPreset, HDR_FORMAT};
+use crate::render::postfx::HDR_FORMAT;
 use crate::render::setup::textures::{create_textures, Textures};
 use crate::render::{ibl::skybox, passes::shadows};
 use crate::render::{CameraUniform, GpuTexture, LightingUniform};

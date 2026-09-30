@@ -7,11 +7,11 @@
 //! Unity-style culling mask (#92) take effect without the renderer reaching into the
 //! scene. Multi-camera stacking is the follow-up (#93).
 //!
-//! [`Camera`]: crate::render::Camera
+//! [`Camera`]: crate::scene::Camera
 
 use glam::Vec3;
 
-use crate::render::sync_lens_from_scene;
+use crate::scene::sync_lens_from_scene;
 
 use super::GameWorld;
 

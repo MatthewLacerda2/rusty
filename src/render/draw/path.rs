@@ -4,8 +4,8 @@
 use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
+use crate::components::mesh::Vertex;
 use crate::render::draw::resources::{AxisResource, PathResource};
-use crate::render::gpu::mesh::Vertex;
 use crate::render::{EntityUniform, Renderer};
 use crate::scene::Scene;
 

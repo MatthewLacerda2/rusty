@@ -16,7 +16,7 @@ TEST := cargo nextest run --locked
 
 # The gates, in the order `make gates` runs them. `deny` sits last: its failures
 # are about dependencies (and it needs the network), so a code failure reports first.
-GATES := fmt size determinism components parity test-lint scripts clippy doc test deny
+GATES := fmt size determinism direction components parity test-lint scripts clippy doc test deny
 # Checks on the gate runner itself, run before any gate.
 SELF_CHECKS := target-dir inventory
 
@@ -81,6 +81,9 @@ size: ## [gate] File-length cap, full scan (tools/lint)
 
 determinism: ## [gate] No wall-clock / unseeded RNG in the sim modules
 	$(LINT) -- --determinism
+
+direction: ## [gate] Sim modules never import render/editor/wgpu/egui
+	$(LINT) -- --direction
 
 components: ## [gate] Every first-class component has all four axes
 	$(LINT) -- --components

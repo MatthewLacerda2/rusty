@@ -24,7 +24,7 @@ use std::path::Path;
 
 use super::capture::CaptureHost;
 use crate::app::GameWorld;
-use crate::render::Camera;
+use crate::scene::Camera;
 use crate::scene::Scene;
 
 /// Default screenshot dimensions (16:9), matching the editor window aspect.

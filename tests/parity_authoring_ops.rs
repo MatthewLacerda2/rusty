@@ -16,8 +16,8 @@ use rusty::components::{
     NavMeshAgentComponent, ParticleEmitterComponent, RigidBodyComponent, Tonemap,
     VisualCorrectionComponent,
 };
+use rusty::core::quality::QualityPreset;
 use rusty::navigation::NavigationGraph;
-use rusty::render::postfx::QualityPreset;
 use rusty::scene::authoring::{
     animator as animator_ops, camera as camera_ops, light as light_ops, nav_agent as nav_ops,
     particles as particle_ops, rigidbody as rb_ops, visual_correction as vc_ops,

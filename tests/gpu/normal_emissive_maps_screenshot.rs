@@ -14,7 +14,7 @@
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent, Tonemap};
 use rusty::dev::screenshot::capture;
-use rusty::render::Camera;
+use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
 
 fn tmp(name: &str) -> std::path::PathBuf {
@@ -52,7 +52,7 @@ fn scene(material: MaterialAsset) -> Scene {
     let mut s = Scene::new();
     s.ambient_intensity = 1.0;
     let id = s.add_entity("Plane".to_string());
-    let (vertices, indices) = rusty::render::gpu::mesh::generate_plane(16.0, 16.0);
+    let (vertices, indices) = rusty::components::mesh::primitives::generate_plane(16.0, 16.0);
     let mesh = MeshComponent {
         primitive_type: "Plane".to_string(),
         asset_ref: None,

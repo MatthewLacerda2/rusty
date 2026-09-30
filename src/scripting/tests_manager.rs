@@ -5,11 +5,11 @@ use std::rc::Rc;
 use glam::Vec3;
 
 use crate::core::input::InputState;
+use crate::core::quality::QualityPreset;
 use crate::core::storage::Storage;
 use crate::core::video::VideoSettings;
 use crate::navigation::NavigationGraph;
-use crate::render::postfx::QualityPreset;
-use crate::render::Camera;
+use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
 

@@ -1,4 +1,4 @@
-use crate::render::gpu::mesh::Vertex;
+use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::GpuTexture;
 use wgpu::util::DeviceExt;
@@ -69,7 +69,7 @@ impl SkyboxRenderer {
             vertex: wgpu::VertexState {
                 module: shader,
                 entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
+                buffers: &[vertex_layout()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shader,
@@ -137,7 +137,7 @@ impl SkyboxRenderer {
 
     /// Generate the unit box vertex/index buffers the skybox is drawn with.
     fn create_box_buffers(device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Buffer, u32) {
-        let (vertices, indices) = crate::render::gpu::mesh::generate_box(2.0, 2.0, 2.0);
+        let (vertices, indices) = crate::components::mesh::primitives::generate_box(2.0, 2.0, 2.0);
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Skybox Vertex Buffer"),
             contents: bytemuck::cast_slice(&vertices),

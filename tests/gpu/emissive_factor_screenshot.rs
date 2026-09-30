@@ -14,7 +14,7 @@
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent, Tonemap};
 use rusty::dev::screenshot::capture;
-use rusty::render::Camera;
+use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
 
 fn tmp(name: &str) -> std::path::PathBuf {
@@ -45,7 +45,7 @@ fn scene(emissive: [f32; 3], bloom: bool) -> Scene {
     scene.ambient_intensity = 0.0;
 
     let id = scene.add_entity("Box".to_string());
-    let (vertices, indices) = rusty::render::gpu::mesh::generate_box(8.0, 8.0, 8.0);
+    let (vertices, indices) = rusty::components::mesh::primitives::generate_box(8.0, 8.0, 8.0);
     scene.world.set_mesh(
         id,
         Some(MeshComponent {

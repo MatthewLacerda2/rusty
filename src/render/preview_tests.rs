@@ -6,7 +6,8 @@
 use glam::Vec3;
 
 use crate::components::MaterialComponent;
-use crate::render::{Camera, RenderView, Renderer, OFFSCREEN_FORMAT};
+use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
+use crate::scene::Camera;
 use crate::scene::{DirtyFlag, MeshComponent, Scene};
 
 const RES: u32 = 32;
@@ -30,7 +31,7 @@ fn sphere_scene() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let id = scene.add_entity("PreviewMesh".to_string());
-    let (vertices, indices) = crate::render::gpu::mesh::generate_sphere(1.0, 8, 8);
+    let (vertices, indices) = crate::components::mesh::primitives::generate_sphere(1.0, 8, 8);
     scene.world.set_mesh(
         id,
         Some(MeshComponent {

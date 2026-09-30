@@ -6,7 +6,8 @@
 
 use glam::Mat4;
 
-use super::{PostParams, QualityPreset};
+use super::PostParams;
+use crate::core::quality::QualityPreset;
 use crate::scene::Scene;
 
 /// Scan `scene` for the first active visual-correction volume and matching camera

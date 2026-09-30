@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 use mlua::Lua;
 use rusty::components::{CameraComponent, ClearFlags, Tonemap, VisualCorrectionComponent};
-use rusty::render::postfx::QualityPreset;
+use rusty::core::quality::QualityPreset;
 use rusty::scene::Scene;
 
 fn scene_with_volume() -> Rc<RefCell<Scene>> {

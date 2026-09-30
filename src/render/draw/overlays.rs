@@ -5,8 +5,8 @@
 use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
+use crate::components::mesh::Vertex;
 use crate::render::draw::resources::{AabbResource, AxisResource, GridResource, OutlineResource};
-use crate::render::gpu::mesh::Vertex;
 use crate::render::{EntityUniform, MeshId, Renderer};
 use crate::scene::Scene;
 

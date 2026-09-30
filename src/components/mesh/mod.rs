@@ -1,4 +1,5 @@
-//! src/components/mesh.rs — Mesh component
+//! src/components/mesh/ — Mesh component, its vertex layout and the built-in
+//! primitive geometry (`vertex`, `primitives`).
 //!
 //! primitive/FBX vertex+index data. Moved verbatim from the legacy
 //! `core/scene.rs`, except the GPU dirty flag is now a `DirtyFlag` newtype: hecs
@@ -9,9 +10,13 @@
 //! single thread.
 
 use crate::asset::{AnimationClip, SkinData};
-use crate::render::gpu::mesh::Vertex;
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
+
+pub mod primitives;
+mod vertex;
+
+pub use vertex::Vertex;
 
 /// Interior-mutable boolean that is `Sync` (single-threaded engine invariant).
 #[derive(Debug, Default)]

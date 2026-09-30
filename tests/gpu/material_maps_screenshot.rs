@@ -19,7 +19,7 @@
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent, Tonemap};
 use rusty::dev::screenshot::capture;
-use rusty::render::Camera;
+use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
 
 fn tmp(name: &str) -> std::path::PathBuf {
@@ -61,7 +61,7 @@ fn scene(metallic: f32, metallic_map: Option<String>) -> Scene {
     let id = scene.add_entity("Box".to_string());
     // A large box so it fills the frame — the mean-brightness signal is dominated by
     // the surface, not the background, making the metallic gating clearly visible.
-    let (vertices, indices) = rusty::render::gpu::mesh::generate_box(8.0, 8.0, 8.0);
+    let (vertices, indices) = rusty::components::mesh::primitives::generate_box(8.0, 8.0, 8.0);
     scene.world.set_mesh(
         id,
         Some(MeshComponent {

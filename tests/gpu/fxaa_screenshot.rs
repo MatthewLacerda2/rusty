@@ -12,7 +12,7 @@
 use glam::Vec3;
 use rusty::components::{CameraComponent, ClearFlags};
 use rusty::dev::screenshot::capture;
-use rusty::render::Camera;
+use rusty::scene::Camera;
 use rusty::scene::{DirtyFlag, MeshComponent, Scene};
 
 fn tmp(name: &str) -> std::path::PathBuf {
@@ -26,7 +26,7 @@ fn scene_with_fxaa(on: bool) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_intensity = 1.0;
     let id = scene.add_entity("Box".to_string());
-    let (vertices, indices) = rusty::render::gpu::mesh::generate_box(2.0, 2.0, 2.0);
+    let (vertices, indices) = rusty::components::mesh::primitives::generate_box(2.0, 2.0, 2.0);
     scene.world.set_mesh(
         id,
         Some(MeshComponent {

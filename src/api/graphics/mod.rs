@@ -26,7 +26,7 @@ use mlua::Lua;
 
 use self::state::{parse_tonemap, register_quality, tonemap_name, with_vc, with_vc_mut};
 use super::{put, Reg};
-use crate::render::postfx::QualityPreset;
+use crate::core::quality::QualityPreset;
 use crate::scene::authoring::visual_correction as vc_ops;
 use crate::scene::Scene;
 
