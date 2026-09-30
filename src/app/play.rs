@@ -4,9 +4,9 @@
 //! NO gameplay here: no control scheme, no weapon, no damage constants. The player
 //! controller and the weapon are bundled GAME scripts
 //! (`assets/scripts/player_controller.lua`, `bot.lua`) attached to entities; the
-//! systems below only run engine logic (nav, physics, scripts, animator). Entity
-//! lookups for the debug nav path still go through the name map (the demo's
-//! "Player" / "Enemy_1"); that is debug visualisation, not gameplay.
+//! systems below only run engine logic (nav, physics, scripts, animator). No
+//! system looks an entity up by name (#450): where the play camera starts and what
+//! any entity does are scene and script decisions.
 //!
 //! These systems are no longer called by a hand-wired sequence: [`register`]
 //! pushes them into the schedule's `FixedUpdate` stage, in the order they used to
@@ -19,34 +19,15 @@
 //! borrow it too), the engine singletons through `res`, and the scaled per-frame
 //! delta through `res.dt()`.
 
-use glam::Vec3;
-
 use super::game::GameWorld;
 use super::registry::App;
 use super::resources::Resources;
 use super::stage::Stage;
 use super::world::World;
 
-const PLAYER_NAME: &str = "Player";
-const ENEMY_NAME: &str = "Enemy_1";
-
 /// Play-enter helpers, split out of `GameWorld::enter_play` so each phase stays
 /// small and named. These run once when the world transitions into Play.
 impl GameWorld {
-    /// Place the play-mode camera just behind the Player entity (no-op if absent).
-    pub(super) fn snap_camera_to_player(&mut self) {
-        let scene = self.world.scene.borrow();
-        let player_pos = scene
-            .find_entity_by_name(PLAYER_NAME)
-            .and_then(|id| scene.world.transform(id).map(|t| t.position));
-        if let Some(pos) = player_pos {
-            let mut cam = self.resources.camera.borrow_mut();
-            cam.position = pos + Vec3::new(0.0, 1.5, -4.5);
-            cam.yaw = 90.0;
-            cam.pitch = -10.0;
-        }
-    }
-
     /// Boot straight into Play, the way the standalone player runs a game (#431):
     /// no edit snapshot is taken (there is no edit mode to return to) and Play is
     /// requested at once, so the next `tick` enters it and reports
@@ -94,7 +75,7 @@ const REBAKE_INTERVAL_FRAMES: u64 = 60;
 /// deferred-destroy queue (firing `OnDisable`/`OnDestroy`) after every other
 /// system has seen the entity, and right before `advance_frame`.
 pub(super) fn register(app: &mut App) {
-    app.add_system(Stage::FixedUpdate, rebake_and_path)
+    app.add_system(Stage::FixedUpdate, rebake_nav)
         .add_system(Stage::FixedUpdate, update_scripts)
         .add_system(Stage::FixedUpdate, tick_nav)
         .add_system(Stage::FixedUpdate, step_physics)
@@ -155,33 +136,13 @@ fn advance_frame(_world: &mut World, res: &mut Resources) {
     res.play_frame += 1;
 }
 
-/// Rebake the navmesh once per second (every `REBAKE_INTERVAL_FRAMES` frames) and
-/// recompute the Enemy→Player debug path.
-fn rebake_and_path(world: &mut World, res: &mut Resources) {
+/// Rebake the navmesh once per second (every `REBAKE_INTERVAL_FRAMES` frames), so
+/// the graph follows static geometry that moved during play.
+fn rebake_nav(world: &mut World, res: &mut Resources) {
     if !res.play_frame.is_multiple_of(REBAKE_INTERVAL_FRAMES) {
         return;
     }
-    let s = world.scene.borrow();
-    res.nav.borrow_mut().bake(&s);
-    let enemy_pos = s
-        .find_entity_by_name(ENEMY_NAME)
-        .and_then(|id| s.world.transform(id).map(|t| t.position));
-    let player_pos = s
-        .find_entity_by_name(PLAYER_NAME)
-        .and_then(|id| s.world.transform(id).map(|t| t.position));
-    if let (Some(enemy_pos), Some(player_pos)) = (enemy_pos, player_pos) {
-        let grid = res.nav.borrow();
-        let (es_x, es_z) = grid.world_to_grid(enemy_pos);
-        let (pl_x, pl_z) = grid.world_to_grid(player_pos);
-        let mut pts = vec![enemy_pos];
-        if let Some(grid_pts) = grid.find_path(es_x, es_z, pl_x, pl_z) {
-            for &(gx, gz) in &grid_pts {
-                pts.push(grid.grid_to_world(gx, gz));
-            }
-        }
-        pts.push(player_pos);
-        res.pathfinding_points = pts;
-    }
+    res.nav.borrow_mut().bake(&world.scene.borrow());
 }
 
 fn tick_nav(world: &mut World, res: &mut Resources) {
@@ -216,3 +177,7 @@ fn animate(world: &mut World, res: &mut Resources) {
 #[cfg(test)]
 #[path = "standalone_tests.rs"]
 mod standalone_tests;
+
+#[cfg(test)]
+#[path = "play_tests.rs"]
+mod play_tests;

@@ -33,7 +33,7 @@ impl Renderer {
         shader_path: &str,
     ) {
         let Some(module) = self.compose_preview_shader(shader_path) else {
-            self.render(view, scene, camera, output, false, &[]);
+            self.render(view, scene, camera, output, false);
             return;
         };
         let pipelines = create_pipelines(
@@ -55,7 +55,7 @@ impl Renderer {
         // call, which leaves the whole editor shaded by a preview module if anything
         // in between returns early or unwinds. A view-owned override cannot leak.
         view.set_forward_override(Some(pipelines.forward));
-        self.render(view, scene, camera, output, false, &[]);
+        self.render(view, scene, camera, output, false);
         view.set_forward_override(None);
     }
 

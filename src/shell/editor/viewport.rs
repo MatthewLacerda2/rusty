@@ -84,14 +84,7 @@ impl EditorFrontend {
         } else {
             crate::scene::game_camera_from_scene(&game.camera().borrow(), &scene)
         };
-        renderer.render(
-            view,
-            &scene,
-            &camera,
-            &target_view,
-            scene_tab,
-            game.pathfinding_points(),
-        );
+        renderer.render(view, &scene, &camera, &target_view, scene_tab);
         rebind_egui_texture(
             &mut self.egui_renderer,
             &renderer.device,
@@ -138,14 +131,7 @@ impl EditorFrontend {
                 &target_view,
                 path,
             ),
-            None => renderer.render(
-                view,
-                &cache.scene,
-                &request.camera,
-                &target_view,
-                false,
-                &[],
-            ),
+            None => renderer.render(view, &cache.scene, &request.camera, &target_view, false),
         }
         rebind_egui_texture(
             &mut self.egui_renderer,

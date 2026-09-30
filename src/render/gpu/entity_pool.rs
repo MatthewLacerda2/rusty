@@ -276,9 +276,9 @@ mod tests {
             renderer.quality.bloom_divisor(),
         );
 
-        renderer.render(&mut rv, &scene, &camera, &view, false, &[]);
+        renderer.render(&mut rv, &scene, &camera, &view, false);
         assert_eq!(renderer.entity_slot_count(), 3, "one slot per entity");
-        renderer.render(&mut rv, &scene, &camera, &view, false, &[]);
+        renderer.render(&mut rv, &scene, &camera, &view, false);
         assert_eq!(
             renderer.entity_slot_count(),
             3,

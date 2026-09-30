@@ -57,7 +57,7 @@ pub fn capture_into(
     };
 
     // Reuse the editor's exact render path (editor_mode = false: no gizmos/grid).
-    renderer.render(view, scene, camera, &target_view, false, &[]);
+    renderer.render(view, scene, camera, &target_view, false);
 
     host.write_png(path)?;
     Ok(true)

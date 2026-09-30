@@ -2,10 +2,10 @@
 //! orchestration of pre-created resources into the scene render pass. Extracted
 //! from the original monolithic `Renderer::render` (behavior unchanged).
 
+mod axis;
 mod lighting;
 mod overlays;
 mod pass;
-mod path;
 mod probes;
 pub(crate) mod resources;
 mod uniforms;
@@ -29,9 +29,6 @@ impl Renderer {
     /// culling mask / lens / clear flags so a viewmodel or UI camera layers on top of
     /// the world. In edit mode the free-fly `camera` is the single pass. Post-FX runs
     /// once over the composited HDR target.
-    // A `(view, scene, camera, output, mode, paths)` render entry: each argument is a
-    // distinct, irreducible input to one frame, so the width is inherent (#355).
-    #[allow(clippy::too_many_arguments)]
     pub fn render(
         &mut self,
         view: &mut RenderView,
@@ -39,7 +36,6 @@ impl Renderer {
         camera: &Camera,
         output: &wgpu::TextureView,
         editor_mode: bool,
-        pathfinding_points: &[Vec3],
     ) {
         // Keep this view's post-FX bloom buffers sized to the active quality tier — a
         // cheap no-op unless a live quality switch changed the divisor (#355).
@@ -106,7 +102,6 @@ impl Renderer {
             // sorted alpha-blended pass below) (#242).
             let solids = self.precreate_solid_resources(scene, cam, &frustum);
             let overlays = self.precreate_overlays(scene, editor_mode);
-            let _path_resources = self.precreate_path(pathfinding_points);
 
             let frame = ScenePassFrame {
                 editor_mode,

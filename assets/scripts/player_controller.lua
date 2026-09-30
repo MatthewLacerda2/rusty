@@ -11,6 +11,8 @@
 --   * The camera trails the Player at -forward*FOLLOW_BACK + up*FOLLOW_UP.
 --   * The shoot key casts a hitscan on its RISING edge (one cast per press),
 --     firing Physics.Raycast from the camera along its forward.
+--   * Start frames the camera behind the Player (yaw 90, pitch -10) — this used to
+--     be an engine-side snap keyed on the name "Player" (#450).
 --
 -- Determinism: reads Input + Time only, never the wall clock, so a headless replay
 -- is identical every run.
@@ -23,6 +25,10 @@ local PITCH_LIMIT = 80.0    -- clamp camera pitch to +/- this
 local FOLLOW_BACK = 4.5     -- how far the camera trails behind the Player
 local FOLLOW_UP = 1.5       -- how high above the Player the camera sits
 local SHOOT_KEY = "SPACE"   -- the trigger key the windowed front-end maps Space to
+local START_YAW = 90.0      -- initial camera yaw: looking down +Z, across the arena
+local START_PITCH = -10.0   -- initial camera pitch: tilted slightly down
+local START_BACK = 4.5      -- initial camera offset behind the Player (along -Z)
+local START_UP = 1.5        -- initial camera height above the Player
 
 -- Move the Player along the camera's ground plane from WASD.
 local function move(entity_id, dt)
@@ -81,8 +87,18 @@ function PlayerController.drive(self, entity_id, dt)
     shoot(self, entity_id)
 end
 
+-- Frame the follow-camera behind the Player when play starts. This is the demo's
+-- choice, not the engine's: the engine never moves the camera on entering Play.
+local function frame_camera(entity_id)
+    local px, py, pz = Transform.GetPosition(entity_id)
+    Camera.SetPosition(px, py + START_UP, pz - START_BACK)
+    Camera.SetYaw(START_YAW)
+    Camera.SetPitch(START_PITCH)
+end
+
 function PlayerController.Start(entity_id)
     PlayerController.shoot_was_down = false
+    frame_camera(entity_id)
 end
 
 function PlayerController.Update(entity_id, delta_time)

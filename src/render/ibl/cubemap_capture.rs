@@ -140,7 +140,7 @@ impl Renderer {
 
         let faces = CubemapFace::ALL.map(|face| {
             let camera = face_camera(position, face);
-            self.render(&mut render_view, scene, &camera, &output, false, &[]);
+            self.render(&mut render_view, scene, &camera, &output, false);
             crate::render::readback::read_texture_rgba8(
                 &self.device,
                 &self.queue,

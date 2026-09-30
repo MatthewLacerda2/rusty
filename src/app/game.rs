@@ -187,10 +187,6 @@ impl GameWorld {
         self.resources.schedule = schedule;
     }
 
-    pub fn pathfinding_points(&self) -> &[Vec3] {
-        &self.resources.pathfinding_points
-    }
-
     /// Number of play-mode frames simulated since the last `enter_play`.
     pub fn play_frame(&self) -> u64 {
         self.resources.play_frame
@@ -228,7 +224,6 @@ impl GameWorld {
         if !self.resources.standalone {
             self.resources.edit_snapshot = Some(SceneSnapshot::capture(&self.world.scene.borrow()));
         }
-        self.snap_camera_to_player();
         self.resources
             .console
             .borrow_mut()
@@ -264,7 +259,6 @@ impl GameWorld {
         // save data survives even though the scene snapshot is discarded below).
         self.resources.flush_storage();
         self.resources.script_manager.shutdown();
-        self.resources.pathfinding_points.clear();
         self.resources.play_frame = 0;
         *self.resources.physics.borrow_mut() = None;
         // Silence every voice on Stop (Unity stops play-mode audio at exit).

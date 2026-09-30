@@ -74,7 +74,6 @@ pub struct Resources {
     pub application: Rc<RefCell<Application>>,
     pub is_playing: bool,
     pub(super) was_playing: bool,
-    pub(super) pathfinding_points: Vec<glam::Vec3>,
     /// Play-mode frame counter. Drives nav rebaking off a deterministic tick count
     /// instead of the wall clock, so a fixed-timestep replay is bit-for-bit stable.
     pub(super) play_frame: u64,
@@ -144,7 +143,6 @@ impl Resources {
             physics: Rc::new(RefCell::new(None)),
             is_playing: false,
             was_playing: false,
-            pathfinding_points: Vec::new(),
             play_frame: 0,
             edit_snapshot: None,
             standalone: false,
@@ -180,11 +178,6 @@ impl Resources {
     /// Number of play-mode frames simulated since the last `enter_play`.
     pub fn play_frame(&self) -> u64 {
         self.play_frame
-    }
-
-    /// The debug nav path computed by the play-mode nav system.
-    pub fn pathfinding_points(&self) -> &[glam::Vec3] {
-        &self.pathfinding_points
     }
 }
 
