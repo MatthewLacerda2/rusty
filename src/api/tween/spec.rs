@@ -120,7 +120,8 @@ fn read_opts<'lua>(
             return Err(runtime("tween options are named fields"));
         };
         let key = key.to_str()?;
-        if !OPTS.contains(&key) && !(in_sequence && key == "join") {
+        let allowed = OPTS.contains(&key) || (in_sequence && key == "join");
+        if !allowed {
             return Err(runtime(&format!(
                 "unknown tween option `{key}`; options: {}",
                 OPTS.join(", ")

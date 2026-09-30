@@ -55,7 +55,7 @@ impl Tween {
         let total = self.loops.map(|n| cycle_len * f64::from(n));
         if let Some(total) = total.filter(|total| t + ELAPSED_EPSILON >= *total) {
             let cycles = self.loops.unwrap_or(1);
-            let back_home = self.yoyo && cycles % 2 == 0 && total > 0.0;
+            let back_home = self.yoyo && cycles.is_multiple_of(2) && total > 0.0;
             return (if back_home { from } else { self.to }, true);
         }
         if cycle_len <= 0.0 {

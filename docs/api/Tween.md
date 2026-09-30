@@ -20,16 +20,14 @@ missing or inactive entity, or on a component the entity lacks, is an error.
 is an error listing them. A one-number property takes a number; the others take
 a table of exactly that many numbers:
 
-| Property | Value |
-|---|---|
-| `Transform.position` / `Transform.scale` | `{x, y, z}` |
-| `Transform.rotation` | `{x, y, z}` euler degrees (each angle interpolated on its own, like `Transform.SetRotation`) |
-| `RectTransform.anchored_position` / `size_delta` / `pivot` / `anchor_min` / `anchor_max` | `{x, y}` |
-| `CanvasGroup.alpha` | number |
-| `Image.color` / `Text.color` | `{r, g, b, a}` |
-| `Image.fill_amount` / `Text.font_size` | number |
-| `Light.color` | `{r, g, b}` |
-| `Light.intensity` / `Light.range` / `Camera.fov` / `AudioSource.volume` | number |
+- `{x, y, z}`: `Transform.position`, `Transform.scale`, and `Transform.rotation`
+  (euler degrees, each angle interpolated on its own, like `Transform.SetRotation`)
+- `{x, y}`: `RectTransform.anchored_position`, `RectTransform.size_delta`,
+  `RectTransform.pivot`, `RectTransform.anchor_min`, `RectTransform.anchor_max`
+- `{r, g, b, a}`: `Image.color`, `Text.color`
+- `{r, g, b}`: `Light.color`
+- a number: `CanvasGroup.alpha`, `Image.fill_amount`, `Text.font_size`,
+  `Light.intensity`, `Light.range`, `Camera.fov`, `AudioSource.volume`
 
 Each value is written through the same authoring op as the component's own
 setter (`CanvasGroup.SetAlpha`, `Image.SetColor`, …), so it is clamped the same
