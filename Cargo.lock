@@ -2520,6 +2520,7 @@ dependencies = [
  "egui-wgpu",
  "egui-winit",
  "env_logger",
+ "getrandom 0.3.4",
  "glam",
  "gltf",
  "hecs",

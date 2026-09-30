@@ -92,6 +92,12 @@ pollster = "0.4.0"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.120"
 rodio = { version = "0.19", default-features = false, features = ["symphonia-vorbis", "symphonia-wav"] }
+# Not used by rusty's code (#552). proptest turns on getrandom's `std` feature (via
+# rand_core), so without this line `cargo build` and `cargo test` resolve getrandom
+# differently. That split rebuilt ahash, hashbrown, hecs, the wgpu and egui stacks
+# and rusty itself once more for tests. Enabling `std` here makes both builds
+# resolve the same features. Keep the major version in step with Cargo.lock.
+getrandom = { version = "0.3", features = ["std"] }
 
 [dev-dependencies]
 # Property-based testing for the deterministic sim (#123): generators are seeded
