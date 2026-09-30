@@ -461,7 +461,8 @@ jobs:
           # advisory on any transitive dep fails the build, and licenses must be
           # on the explicit allow-list in deny.toml. v2 ships a newer cargo-deny
           # whose parser supports CVSS 4.0 advisories (v1 errors on those).
-          # `bans`/`sources` stay as-is (warn). Policy lives in deny.toml.
+          # `bans` warns; `sources` denies any git source but scorsese (#413).
+          # Policy lives in deny.toml.
           command: check advisories bans sources licenses
 
   # The single required status check for ci.yml (issue #229). Branch protection

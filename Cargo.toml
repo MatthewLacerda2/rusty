@@ -104,6 +104,12 @@ rodio = { version = "0.19", default-features = false, features = ["symphonia-vor
 # and rusty itself once more for tests. Enabling `std` here makes both builds
 # resolve the same features. Keep the major version in step with Cargo.lock.
 getrandom = { version = "0.3", features = ["std"] }
+# The synthesiser behind `Sound.*` (#413): scorsese's zimmer crate, pinned to a
+# commit — never a branch — because `zimmer::SYNTH_VERSION` moves whenever a recipe
+# would render differently, and rusty's bakes should change only when someone moves
+# this pin on purpose. No I/O inside it: rusty writes the files and resolves patch
+# references. Bump the rev in its own PR and record the new SYNTH_VERSION there.
+zimmer = { package = "scorsese-zimmer", git = "https://github.com/MatthewLacerda2/scorsese", rev = "342523ca32baf69d7423f8942953bb26d0a4b246" }
 
 [dev-dependencies]
 # Property-based testing for the deterministic sim (#123): generators are seeded

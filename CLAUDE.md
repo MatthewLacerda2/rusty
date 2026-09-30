@@ -280,6 +280,11 @@ is the only difference between an empty marker and a fully-dressed enemy.
    the dev-only `Debug`) shared by gameplay scripts, the console REPL, and bot-players.
    One surface, three callers — they never drift apart.
 
+One thing sits outside those five: **zimmer**, the synthesiser behind `Sound.*`, is
+an external crate from [scorsese](https://github.com/MatthewLacerda2/scorsese), a git
+dependency pinned to a commit (#413) — not a vendored module. `src/api/sound/` is
+only its adapter (Lua → zimmer document, file writes, patch-path resolution).
+
 ## Conventions that matter
 - **Unity is the reference; rusty is a deliberate subset.** Use Unity Engine as the
   yardstick for what rusty *must* be capable of. Unity is exhaustive, so we implement

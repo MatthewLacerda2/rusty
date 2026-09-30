@@ -19,7 +19,7 @@ use rusty::time::Time;
 const GUNSHOT: &str = r#"{
     source = { kind = "noise" },
     amp = { a = 0.0, d = 0.09, s = 0.0, r = 0.06 },
-    filter = { kind = "lowpass", cutoff = 300, resonance = 0.5, env_amount = 6000,
+    filter = { kind = "lowpass", cutoff = 300, resonance = 0.5, env_octaves = 4.4,
                adsr = { a = 0.0, d = 0.05, s = 0.0, r = 0.05 } },
     fx = { { fx = "reverb", size = 0.4, damp = 0.6, mix = 0.15 } },
 }"#;
@@ -94,12 +94,12 @@ fn a_saved_patch_re_bakes_byte_for_byte() {
     lua.load(&script).exec().unwrap();
 
     let saved = std::fs::read_to_string(&patch_json).expect("the patch was saved");
-    let opts = rusty::soundgen::NoteOpts {
-        seed: 4,
-        ..Default::default()
-    };
-    let patch = rusty::soundgen::Patch::from_json(&saved).expect("the saved patch parses");
-    rusty::soundgen::bake_note(&patch, 36.0, &opts, &rebaked).expect("re-bake");
+    lua.globals().set("SAVED", saved).unwrap();
+    lua.load(format!(
+        r#"Sound.BakeJson(SAVED, 36, "{rebaked}", {{ seed = 4 }})"#
+    ))
+    .exec()
+    .expect("re-bake from the saved JSON");
 
     assert_eq!(
         std::fs::read(&authored).unwrap(),

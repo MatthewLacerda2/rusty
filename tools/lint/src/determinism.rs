@@ -14,16 +14,13 @@ use std::process::exit;
 
 /// Directories whose `.rs` files are sim code and must stay deterministic.
 ///
-/// `src/soundgen` is not sim code — it is a bake-time authoring module — but it
-/// makes the same promise (same patch + note + seed ⇒ byte-identical WAV), and that
-/// promise dies the moment a wall clock or an unseeded RNG creeps in. Guarding it
-/// here costs nothing and is the only mechanical check that promise has.
+/// The synthesiser behind `Sound.*` is no longer here: it is scorsese's zimmer
+/// crate (#413), whose byte-identical promise scorsese guards itself.
 const SIM_DIRS: &[&str] = &[
     "src/app",
     "src/scripting",
     "src/physics",
     "src/navigation",
-    "src/soundgen",
     "src/ui",
 ];
 
@@ -137,12 +134,9 @@ mod tests {
 
     #[test]
     fn sim_dirs_are_the_guarded_deterministic_trees() {
-        // The four sim trees and the UI layout (#417), plus `soundgen` — not sim
-        // code, but it makes the same byte-identical promise, so it is held to the
-        // same rules.
-        assert_eq!(SIM_DIRS.len(), 6);
+        // The four sim trees and the UI layout (#417).
+        assert_eq!(SIM_DIRS.len(), 5);
         assert!(SIM_DIRS.contains(&"src/physics"));
         assert!(SIM_DIRS.contains(&"src/ui"));
-        assert!(SIM_DIRS.contains(&"src/soundgen"));
     }
 }

@@ -55,6 +55,7 @@ mod reflection_probes;
 mod scene_roundtrip;
 mod selectable_api;
 mod sound_api;
+mod sound_song_api;
 mod starter_materials;
 mod texture_api;
 mod transform_api;

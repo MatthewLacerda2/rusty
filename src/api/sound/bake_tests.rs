@@ -21,7 +21,7 @@ fn tmp(name: &str) -> String {
 const IMPACT_PATCH: &str = r#"{
     source = { kind = "noise" },
     amp = { a = 0.001, d = 0.08, s = 0.0, r = 0.05 },
-    filter = { kind = "lowpass", cutoff = 400, resonance = 0.3, env_amount = 4000,
+    filter = { kind = "lowpass", cutoff = 400, resonance = 0.3, env_octaves = 3.5,
                adsr = { a = 0.0, d = 0.06, s = 0.0, r = 0.05 } },
 }"#;
 
@@ -50,8 +50,9 @@ fn bake_writes_a_playable_wav_and_returns_its_path() {
     let clip = cache
         .get_or_decode(&path)
         .expect("the engine decodes the bake");
-    assert_eq!(clip.source().channels(), 1, "mono");
-    assert_eq!(clip.source().sample_rate(), crate::soundgen::SAMPLE_RATE);
+    // zimmer bakes stereo (its SYNTH_VERSION 3); the old in-tree synth was mono.
+    assert_eq!(clip.source().channels(), 2, "stereo");
+    assert_eq!(clip.source().sample_rate(), zimmer::SAMPLE_RATE);
     std::fs::remove_file(path).ok();
 }
 
@@ -150,5 +151,6 @@ fn to_json_round_trips_back_to_a_patch() {
         .eval()
         .expect("serializes");
     let patch = Patch::from_json(&json).expect("json parses");
+    assert_eq!(patch.filter.expect("filter").env_octaves, 3.5);
     assert_eq!(patch.filter.expect("filter survived").cutoff, 400.0);
 }
