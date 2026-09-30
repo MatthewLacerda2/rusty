@@ -43,7 +43,7 @@ use glam::{Vec2, Vec3};
 use crate::components::SelectionState;
 use crate::core::input::InputState;
 use crate::ecs::World;
-use crate::ui::{UiLayout, UiView};
+use crate::ui::{UiLayout, UiPointer, UiView};
 
 pub use focus::{find_selectable, nav_actions, NavAction, DIRECTIONS};
 pub use raycast::{raycast, raycast_pointer};
@@ -117,6 +117,13 @@ pub struct PointerEvent {
     pub delta: Vec2,
     /// The entity the raycast hit this tick (the callback may be an ancestor of it).
     pub target: Option<u32>,
+    /// The pointer on the *receiving* entity's canvas, in its reference units (the
+    /// frame of `UI.GetRect`'s `x, y`): the screen point over the scale factor, or
+    /// where the pointer's ray crosses a world canvas's plane (#429). `None` when it
+    /// is on neither (a locked cursor over a screen canvas, a ray missing the plane).
+    pub canvas_position: Option<Vec2>,
+    /// The pointer's motion on that canvas since last tick, reference units.
+    pub canvas_delta: Vec2,
 }
 
 /// One callback to fire: `hook` on `entity`'s scripts, with `event` for the pointer
@@ -166,6 +173,8 @@ pub struct EventSystem {
     hover: Vec<u32>,
     /// Last tick's pointer position.
     pointer: Option<Vec2>,
+    /// Last tick's pointer with its ray, for `canvas_delta` (#429).
+    last_ui: Option<UiPointer>,
     buttons: [ButtonState; 3],
     fades: BTreeMap<u32, transition::Fade>,
 }

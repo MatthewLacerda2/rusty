@@ -95,7 +95,8 @@ fn move_table<'lua>(lua: &'lua Lua, e: &PointerEvent) -> mlua::Result<Table<'lua
     Ok(t)
 }
 
-/// `{ button, position = {x, y}, delta = {x, y}, target }`.
+/// `{ button, position = {x, y}, delta = {x, y}, target, canvas_position = {x, y}
+/// (absent off the canvas), canvas_delta = {x, y} }`.
 fn event_table<'lua>(lua: &'lua Lua, e: &PointerEvent) -> mlua::Result<Table<'lua>> {
     let point = |v: Vec2| -> mlua::Result<Table<'lua>> {
         let t = lua.create_table()?;
@@ -108,5 +109,9 @@ fn event_table<'lua>(lua: &'lua Lua, e: &PointerEvent) -> mlua::Result<Table<'lu
     t.set("position", point(e.position)?)?;
     t.set("delta", point(e.delta)?)?;
     t.set("target", e.target)?;
+    if let Some(p) = e.canvas_position {
+        t.set("canvas_position", point(p)?)?;
+    }
+    t.set("canvas_delta", point(e.canvas_delta)?)?;
     Ok(t)
 }

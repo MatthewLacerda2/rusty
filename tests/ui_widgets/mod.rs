@@ -9,6 +9,7 @@ mod input_field;
 mod reads;
 mod scroll;
 mod slider;
+mod world;
 
 use std::cell::RefCell;
 use std::rc::Rc;

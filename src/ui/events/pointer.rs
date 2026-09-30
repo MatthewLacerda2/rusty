@@ -28,12 +28,17 @@ use super::{
     DRAG_THRESHOLD,
 };
 use crate::components::NavigationMode;
+use crate::ui::space::ray_to_canvas;
+use crate::ui::{CanvasSpace, UiPointer};
 
 /// What one button's step sees.
 struct Pointer {
     hit: Option<u32>,
     position: Option<Vec2>,
     delta: Vec2,
+    /// This tick's pointer with its ray, and last tick's.
+    ui: UiPointer,
+    prev: Option<UiPointer>,
 }
 
 impl Pointer {
@@ -43,7 +48,30 @@ impl Pointer {
             position: self.position.unwrap_or(Vec2::splat(-1.0)),
             delta,
             target: self.hit,
+            canvas_position: None,
+            canvas_delta: Vec2::ZERO,
         }
+    }
+
+    /// `event` as `entity` receives it: the pointer on its canvas, and the motion there.
+    fn on_canvas(&self, f: &Frame, entity: u32, event: PointerEvent) -> PointerEvent {
+        let now = canvas_point(f, entity, &self.ui);
+        let before = self.prev.and_then(|p| canvas_point(f, entity, &p));
+        PointerEvent {
+            canvas_position: now,
+            canvas_delta: now.zip(before).map_or(Vec2::ZERO, |(a, b)| a - b),
+            ..event
+        }
+    }
+}
+
+/// Where `pointer` is on `entity`'s canvas, in its reference units (see
+/// [`PointerEvent::canvas_position`]).
+fn canvas_point(f: &Frame, entity: u32, pointer: &UiPointer) -> Option<Vec2> {
+    let rect = f.layout.get(entity)?;
+    match f.layout.space(rect.canvas) {
+        CanvasSpace::Screen => pointer.screen.map(|p| p / rect.scale_factor),
+        CanvasSpace::World(m) => ray_to_canvas(m, pointer.ray?).map(|(p, _)| p),
     }
 }
 
@@ -65,6 +93,8 @@ impl EventSystem {
             hit,
             position,
             delta,
+            ui: pointer,
+            prev: self.last_ui.replace(pointer),
         };
         self.hover_to(f, &p, out);
         for button in PointerButton::ALL {
@@ -74,7 +104,7 @@ impl EventSystem {
         let scroller = hit.and_then(|h| nearest(f.world, h, |c| handles(f, c, &[UiHook::Scroll])));
         if let Some(target) = scroller.filter(|&s| wheel != 0.0 && accepts(f.world, s)) {
             let event = p.event(PointerButton::Left, Vec2::new(0.0, wheel));
-            emit(f, out, target, UiHook::Scroll, Some(event));
+            emit_on(f, out, &p, target, UiHook::Scroll, Some(event));
         }
     }
 
@@ -87,10 +117,10 @@ impl EventSystem {
         let event = Some(p.event(PointerButton::Left, p.delta));
         let old = std::mem::replace(&mut self.hover, now);
         for &id in old.iter().filter(|id| !self.hover.contains(id)) {
-            emit(f, out, id, UiHook::PointerExit, event);
+            emit_on(f, out, p, id, UiHook::PointerExit, event);
         }
         for &id in self.hover.iter().filter(|id| !old.contains(id)) {
-            emit(f, out, id, UiHook::PointerEnter, event);
+            emit_on(f, out, p, id, UiHook::PointerEnter, event);
         }
     }
 
@@ -151,13 +181,8 @@ impl EventSystem {
             dragging: false,
         };
         if let Some(owner) = press {
-            emit(
-                f,
-                out,
-                owner,
-                UiHook::PointerDown,
-                Some(p.event(b, p.delta)),
-            );
+            let event = Some(p.event(b, p.delta));
+            emit_on(f, out, p, owner, UiHook::PointerDown, event);
         }
     }
 
@@ -165,14 +190,14 @@ impl EventSystem {
         let st = std::mem::take(&mut self.buttons[b as usize]);
         let event = Some(p.event(b, p.delta));
         if let Some(owner) = st.press {
-            emit(f, out, owner, UiHook::PointerUp, event);
+            emit_on(f, out, p, owner, UiHook::PointerUp, event);
             let over_owner = p.hit.and_then(|h| press_owner(f, h)) == Some(owner);
             if over_owner {
-                emit(f, out, owner, UiHook::PointerClick, event);
+                emit_on(f, out, p, owner, UiHook::PointerClick, event);
             }
         }
         if let (true, Some(d)) = (st.dragging, st.drag) {
-            emit(f, out, d, UiHook::EndDrag, event);
+            emit_on(f, out, p, d, UiHook::EndDrag, event);
         }
     }
 
@@ -186,12 +211,12 @@ impl EventSystem {
             st.dragging = true;
             if let Some(owner) = st.press.filter(|&o| o != target) {
                 st.press = None;
-                emit(f, out, owner, UiHook::PointerUp, event);
+                emit_on(f, out, p, owner, UiHook::PointerUp, event);
             }
-            emit(f, out, target, UiHook::BeginDrag, event);
+            emit_on(f, out, p, target, UiHook::BeginDrag, event);
         }
         if st.dragging && p.delta != Vec2::ZERO {
-            emit(f, out, target, UiHook::Drag, event);
+            emit_on(f, out, p, target, UiHook::Drag, event);
         }
     }
 }
@@ -219,6 +244,24 @@ fn press_owner(f: &Frame, hit: u32) -> Option<u32> {
 /// Whether `id` handles any of `hooks`.
 fn handles(f: &Frame, id: u32, hooks: &[UiHook]) -> bool {
     hooks.iter().any(|&h| (f.handles)(id, h))
+}
+
+/// [`emit`] a pointer event as `entity` receives it (on its canvas).
+fn emit_on(
+    f: &Frame,
+    out: &mut Vec<Delivery>,
+    p: &Pointer,
+    entity: u32,
+    hook: UiHook,
+    event: Option<PointerEvent>,
+) {
+    emit(
+        f,
+        out,
+        entity,
+        hook,
+        event.map(|e| p.on_canvas(f, entity, e)),
+    );
 }
 
 /// Queue `hook` on `entity` when one of its scripts defines it.

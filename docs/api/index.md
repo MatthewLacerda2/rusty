@@ -141,8 +141,15 @@ contacts further apart are not reported.
 `button` (`"Left"`, `"Right"` or `"Middle"`), `position = {x, y}` (UI screen
 pixels, bottom-left origin — the frame of `UI.GetRect(id).screen`; `(-1, -1)`
 while the cursor is locked), `delta = {x, y}` (pointer motion since last tick,
-or the wheel for `OnScroll`) and `target` (the entity the pointer actually hit —
-the callback may be running on an ancestor of it). Pointer events **bubble**: a
+or the wheel for `OnScroll`), `target` (the entity the pointer actually hit —
+the callback may be running on an ancestor of it), and `canvas_position = {x, y}` /
+`canvas_delta = {x, y}` — the pointer and its motion on the **receiving** entity's
+canvas, in its reference units (the frame of `UI.GetRect(id)`'s `x, y`), on any
+canvas: the screen point over the scale factor, or where the pointer's camera ray
+crosses a world canvas's plane — the screen centre while the cursor is locked
+(#429). `canvas_position` is absent when the pointer is on neither. Map pointers
+onto an element with these, never `position` against `GetRect(id).screen`: they
+also work on world canvases. Pointer events **bubble**: a
 press, release and click go to one entity, the nearest one from the hit entity
 upward whose scripts define any of the three (or that carries a `Selectable`); a
 drag goes to the nearest defining a drag callback; the wheel to the nearest

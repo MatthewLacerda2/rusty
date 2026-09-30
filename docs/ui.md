@@ -430,6 +430,12 @@ by editing its components or forks its behaviour by copying its script.
   focus on Up / Down.
 - **Time.** Every widget animates and scrolls on **unscaled** time, so a pause
   menu under `Time.SetTimeScale(0)` still works.
+- **On a world canvas** (#429) every widget works as on the screen: the pointer's
+  camera ray reaches it (the screen centre while the cursor is locked), and the
+  widgets map the pointer with `event.canvas_position` / `canvas_delta` — the
+  pointer in the canvas's own reference units — never screen pixels. A dropdown
+  there opens its list on its own canvas (top-most child) rather than a popup
+  overlay. Dragging needs a free cursor; a locked one clicks.
 
 Each widget's inspector fields (its script's `fields` schema) and owner API:
 
