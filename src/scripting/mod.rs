@@ -55,6 +55,8 @@ mod tests_sandbox;
 #[cfg(test)]
 mod tests_spatial;
 #[cfg(test)]
+mod tests_timer_scope;
+#[cfg(test)]
 mod tests_timers;
 #[cfg(test)]
 mod tests_transitions;
