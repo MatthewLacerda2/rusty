@@ -7,28 +7,17 @@ description: Take a finished branch through to merged — the gates, CI, verifyi
 
 The steps, and the traps. `CLAUDE.md` carries why these exist; this is how.
 
-**There is no `make` here.** Every gate is a `cargo` line, and the list below is
-the list — `docs/linting.md` and `.github/workflows/{ci,lint}.yml` are the two
-sources of truth, and they agree.
+**The gate list is `make gates`.** The `Makefile`'s `GATES` list mirrors
+`.github/workflows/{ci,lint}.yml`; `make help` names each gate.
 
 ## Before marking a pull request ready
 
-All of these must be green. They are what CI blocks on, in the order that fails
-fastest first:
+All of these must be green — one command, fastest-failing first:
 
-    cargo fmt --all --check
-    cargo fmt --manifest-path tools/lint/Cargo.toml --check
-    cargo run --quiet --manifest-path tools/lint/Cargo.toml                  # size gate, full scan
-    cargo run --quiet --manifest-path tools/lint/Cargo.toml -- --determinism
-    cargo run --quiet --manifest-path tools/lint/Cargo.toml -- --components
-    cargo run --quiet --manifest-path tools/lint/Cargo.toml -- --parity
-    cargo clippy --all-targets -- -D warnings -D clippy::too_many_lines
-    cargo clippy --all-targets --features dev -- -D warnings -D clippy::too_many_lines
-    RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked
-    RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked --features dev
-    cargo test --locked && cargo test --features dev --locked
-    cargo test --manifest-path tools/lint/Cargo.toml --locked
-    cargo deny check advisories bans sources licenses
+    make gates
+
+It refuses to start when cargo's target dir is outside this worktree, and checks
+its own gate list is complete before running it.
 
 **Both feature sets, always.** Half this crate is behind `dev` — the harness, the
 session, the MCP bridge, `Debug.*` — and a default-features-only run compiles none
@@ -40,22 +29,16 @@ disagrees with the live Lua surface *in either direction* — an undocumented
 binding and a documented-but-absent one both redden CI. They are dev-only, so
 only the `--features dev` run sees them.
 
-**The local hook is not a substitute and may not exist.** `lefthook.yml` runs
-`fmt`, the size gate and default-feature clippy only — no build, no tests, no
-`--components`, no `--parity`, no dev feature set. And it only runs if somebody
-ran `lefthook install` in this clone; `git config core.hooksPath` and
-`ls .git/hooks` say whether they did. Assume nothing was caught for you.
+**The commit hook is not a substitute.** `.githooks/pre-commit` runs formatting
+and the size gate only — no clippy, rustdoc, tests or dev feature set — and only
+once `make setup` (or the cloud session-start hook) has pointed
+`core.hooksPath` at it. Assume nothing heavy was caught for you.
 
 The full list is deliberately **not** run before every push. Checkpoint commits
 stay cheap.
 
 **Failures land in `.lint/report.txt`** — read it rather than re-running the tool
 to see what it said.
-
-*(Gap worth building: nothing wraps this list. It is copied by hand into every
-session, it drifts, and no entry point exists that could also refuse to run under a
-shared `CARGO_TARGET_DIR`. One `tools/` command that runs the whole list is
-`infrastructure`-label work.)*
 
 ## The merge, one branch at a time
 

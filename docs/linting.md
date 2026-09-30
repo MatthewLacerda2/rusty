@@ -1,14 +1,15 @@
 # Linting & the commit gate
 
-Programmatic, no AI in the loop. A commit is blocked unless the checks pass; the
-result is written to `.lint/report.txt` so an agent can read exactly what failed.
+Programmatic, no AI in the loop. `make gates` runs every check below; the commit
+hook runs the fast ones. `tools/lint` writes its result to `.lint/report.txt` so an
+agent can read exactly what failed.
 
 ## What's enforced
 | Check | Tool | Rule |
 |---|---|---|
 | Style | rustfmt (`rustfmt.toml`) | `cargo fmt --check` |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (both feature sets) |
-| Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), enforced crate-wide via `-D clippy::too_many_lines`; no grandfathered functions remain |
+| Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]` |
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
 | Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation` |
@@ -28,14 +29,32 @@ from *two* places. To keep cohesion, a `<x>_tests.rs` **sibling** shares its sou
 
 ## Run it
 ```
-cargo run --manifest-path tools/lint/Cargo.toml          # size gate, full scan
-cargo fmt --check                                        # style
-cargo clippy --no-deps                                   # smells
+make gates     # everything CI blocks on, fastest-failing first
+make check     # the fast edit loop: formatting, size gate, dev-feature clippy
+make help      # every verb, and each gate on its own (make size, make clippy, …)
 ```
+`make gates` starts with two self-checks. **`target-dir`** asks cargo where it
+builds and refuses to run when that is outside the worktree: a target dir shared
+between worktrees lets one branch's artifacts stand in for another's, so a green
+run would not prove *this* branch compiled. **`inventory`** fails when a Makefile
+target documented `## [gate]` is missing from the `GATES` list, or the other way
+round, so the gate list cannot silently lose a gate.
 
 ## Where it runs
-- **Local:** `lefthook.yml` (install once with `lefthook install`).
-- **CI:** `.github/workflows/lint.yml` — the durable layer; survives `--no-verify`.
+- **Commit hook:** `.githooks/pre-commit` → `make pre-commit`: `cargo fmt --check`
+  and the size gate on the staged `.rs` files — nothing else, so it stays under a
+  second. Activate it once per clone with `make setup` (cloud sessions do it in
+  `.claude/hooks/session-start.sh`). `git commit --no-verify` skips it; CI doesn't.
+- **Before readying a PR:** `make gates`.
+- **CI:** `.github/workflows/{ci,lint}.yml` — the durable layer; survives `--no-verify`.
+
+## The lint policy lives in `Cargo.toml`
+Crate-wide lint levels go in `Cargo.toml`'s `[lints]` table, never in command-line
+flags: a plain `cargo clippy`, rust-analyzer and CI then all read the same policy,
+so nothing is green locally and red in CI. CI adds only `-D warnings`. Thresholds
+stay in `clippy.toml`. Module-scoped rules stay module-scoped — the sim modules'
+`#![deny(clippy::unwrap_used)]` below is deliberately not crate-wide. `tools/lint`
+has no `[lints]` table: it is not clippy-gated, so one would be dead config.
 
 ## The baseline (burn-down list)
 `tools/lint/baseline.txt` grandfathers the files that already exceed the cap. It is a
@@ -122,21 +141,23 @@ fresh drift to fix, not to grandfather; baseline only, exceptionally, with writt
 justification).
 
 ## The function-length cap (`too_many_lines`)
-The 50-line per-function cap is a **hard clippy gate** (`-D clippy::too_many_lines`,
-both feature sets) and is now **unconditionally on for the whole crate** — the legacy
-functions that predated it have all been split (#124), so **no
-`#[allow(clippy::too_many_lines)]` remain anywhere in `src/`**. Verify with:
+The 50-line per-function cap is a **hard clippy gate** (`too_many_lines = "deny"` in
+`Cargo.toml`'s `[lints.clippy]`, both feature sets) and is **on for the whole crate**
+— the legacy functions that predated it were split (#124). The one remaining
+`#[allow(clippy::too_many_lines)]` is `Renderer::assemble` in
+`src/render/setup/mod.rs`, a flat one-line-per-field constructor whose length is the
+struct's width. List any with:
 ```
-rg -c 'allow\(clippy::too_many_lines\)' src   # expect no output
+rg 'allow\(clippy::too_many_lines\)' src
 ```
-Keep it that way: if a function grows past 50 lines, split it — **do not** silence the
-lint with a new `#[allow]`.
+If a function grows past 50 lines, split it — **do not** silence the lint with a
+new `#[allow]`.
 
 ## Panic-free sim core (`unwrap_used`)
 The four deterministic sim modules (`app`, `scripting`, `physics`, `navigation`)
 carry a module-level `#![deny(clippy::unwrap_used)]`, so a bare `.unwrap()` in
 their **production** code is a hard clippy error (caught by the same `-D warnings`
-gate, both feature sets, CI + the local hook). This is the **survivability**
+gate, both feature sets, `make gates` + CI). This is the **survivability**
 sibling of the determinism guard's **reproducibility**: a `.unwrap()` that panics
 mid-frame kills an unattended/overnight play-test just as surely as a wall-clock
 read breaks replay — same protected boundary (#195), same rationale.
@@ -157,8 +178,7 @@ were all in `#[cfg(test)]`), so the lint went straight to `deny` with no grandfa
 sites. Keep it that way — fix the call site, don't add an `#[allow]`.
 
 ## Clippy: CI vs local
-Clippy lints the whole crate (it can't be scoped to changed files). In **CI** it's a
-hard gate — every warning (plus the function-length cap) fails the build, for both
-feature sets. The local pre-commit hook (`lefthook.yml`) runs the same hard clippy
-gate on the default feature set; CI additionally covers the dev feature set and is
-the durable gate that gates the PR.
+Clippy lints the whole crate (it can't be scoped to changed files), which is too
+slow for a commit hook — so the hook doesn't run it. `make gates` and CI run the
+same hard clippy gate (`-D warnings`, both feature sets); CI is the durable one that
+gates the PR.
