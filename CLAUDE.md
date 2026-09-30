@@ -27,6 +27,16 @@ craft — it is the reason the gates below are strict.
 - **auxmd.md** *(gitignored)* — the operator's short-term scratchpad; read it if a
   session points you there.
 
+**Three skills carry the working protocols** — `issue-write`, `issue-batch` and
+`ci-merge` — so this file can hold the reasoning and they can hold the steps. Each
+one names its own scope and when to reach for it, so this file does not restate
+them; invoke them rather than reconstructing a procedure from memory, and name
+them when briefing a subagent.
+
+Where a rule below is stated in one line and a skill has ten, the line is the rule
+and the skill is how to keep it. Where they disagree, this file wins and the skill
+is wrong.
+
 ## How we work
 - **The gates (push back before you build).** An idea becomes an issue only when all
   three hold; if any fails, **push back instead of complying**:
@@ -58,6 +68,10 @@ craft — it is the reason the gates below are strict.
   it's needed to understand the diff) — and carries the PR↔issue link when there is one.
   That description, the commit history, and that link are how we see what a branch adds in
   value and whether it still earns its place.
+  **A ready PR claims it passes; a draft makes no such claim.** CI's gating jobs skip
+  drafts, so readying a PR is the moment anything gets checked — run the gates first. A
+  red ready PR **stays ready** and is fixed forward; draft is for unfinished, blocked or
+  handed-back work, never for hiding a red run.
 - **Branch naming.** A PR that closes an issue uses `{issue_number}-short-slug` (e.g.
   `163-fix-coverage-scope`). An issue-less PR uses a readable short slug of its subject
   (e.g. `document-ai-parity`). Lowercase-hyphenated, brief.
@@ -70,7 +84,24 @@ craft — it is the reason the gates below are strict.
   it). So merging **cannot be parallelized**: rebase each PR onto the latest `main` →
   CI green on that rebased state → merge → repeat, one PR at a time. The only exception
   is a PR that touches **only** Markdown — CI is skipped for Markdown-only PRs, so they
-  needn't be serialized and can merge freely.
+  needn't be serialized and can merge freely. **Except `docs/scripting-api.md`:** the
+  API-doc drift tests parse it, and a Markdown-only PR skips exactly those tests — so a
+  PR touching it is serialized like code.
+- **Coding parallelises; merging does not.** Every branch behind another in the merge
+  queue pays a rebase per merge ahead of it, so the shape is **two branches in flight** —
+  one merging, one being written. The binding limit is **file collision**, not branch
+  count: two branches appending to the same enum or registry cost more than four in
+  separate modules. **One worktree per branch** under `.claude/worktrees/`, off the latest
+  `main`, removed the moment it merges, and **never a shared `CARGO_TARGET_DIR`** (worktrees
+  overwrite each other's artifacts and a green gate stops meaning this branch compiled).
+  Split issues by responsibility, never by parallelism. The **`issue-batch` skill** has
+  the arithmetic and the procedure.
+- **Worktrees are cheap, simultaneous builds are not.** rusty is developed by one person,
+  locally or in a cloud session — not by many contributors on many cold machines, so
+  don't propose tooling built for that. Each worktree's `target/` is ~12–16 GB, and
+  rustc's linking is where memory and disk run out. Parallelise the work, stagger the
+  compiles, and check the machine you are on (`df -h`, free memory) before starting a
+  build — never a figure written down somewhere.
 - **Architecture- then infrastructure-first (NOT "make it up as we go").** We do **not**
   improvise or pile on features ad hoc. Whenever we find a problem — something that
   already bites or will bite more than once, a pattern worth adopting, or a gold-standard
@@ -128,6 +159,14 @@ craft — it is the reason the gates below are strict.
   defeats planning: an idea still being shaped has to settle before anyone codes it.
 - **Issue-less PRs are allowed only** for documentation updates or bug fixes; everything
   else starts as an issue.
+- **File what you notice.** Claude may open an issue unprompted for anything that will
+  recur, or that a tool would solve more than once — when the benefit outweighs the cost
+  of building it. The strongest issues come out of doing the work. **A bug is always
+  filable**: that test is about whether something is worth *building*, never whether a
+  defect is worth *recording*. If the bug questions a decision or exposes a foundational
+  crack, tell the user; otherwise keep it brief and carry on. Found outside the branch in
+  hand? **File it rather than fix it** — a branch that grows to cover everything it
+  noticed is a branch nobody can review.
 - **Priority by label.** When choosing what to do next, the order is
   **architecture → infrastructure → bug → foundation → feature.** It encodes how the whole
   project is built, in three stages:
@@ -164,13 +203,19 @@ craft — it is the reason the gates below are strict.
   the engine's **development process** (e.g. the lint/size gate, CI, the headless harness),
   making that development faster, solid, and correctly guardrailed — distinct from
   **architecture**, which is a guardrail in the engine's own design.
-- **plan** — *Being discussed or planned.* Still under discussion (see below) — must not be
-  started.
+- **planning** — *Approach still being discussed. Do not start.* Still under discussion
+  (see below) — must not be started.
 
-Issues tagged **plan** are still being discussed with the user. They must **NOT** be
+Issues tagged **planning** are still being discussed with the user. They must **NOT** be
 started by any means. If a planning issue would implement something that affects another
 issue — changing how it gets implemented, or even how it's thought of — that other issue
 must be marked **blocked by** the planning issue.
+
+**The `issue-write` skill** has the rest: what a good issue body contains, the
+evidence that makes one worth reading cold, how relationships are recorded, and
+when Claude may file one unprompted. **`issue-batch`** turns the priority order
+above into a running batch, and **`ci-merge`** takes each finished branch from
+green to merged.
 
 ## Architecture — the conceptual model
 A high-level map of how the engine is shaped. It deliberately doesn't enumerate every
@@ -243,6 +288,9 @@ is the only difference between an empty marker and a fully-dressed enemy.
   `physics`, `navigation`); the platform layer (`main.rs`, `render`, `dev`) is exempt.
 - **Use `glam`** for all math; keep egui / wgpu / mlua decoupled.
 - **Single crate.**
+- **Ships for macOS and Linux; Windows comes later.** Those two are the platforms rusty
+  is used on and shipped to, so a change that works on only one of them is not done.
+  Windows is a planned target, not a current one.
 - **Group by subfolder, not by filename prefix.** A shared name prefix on sibling
   files (`draw_*`, `setup_*`, `inspector_*`, `prefab_*`) is a subfolder waiting to
   happen: make it one and drop the prefix (`draw_lighting.rs` → `draw/lighting.rs`).
@@ -271,7 +319,7 @@ Commits are blocked unless the checks pass; failures are written to
 
 ## Overrides
 Any rule in this file may be overridden by the user's explicit say-so — in the current
-prompt or a previous one. The **one exception**: an issue tagged **plan** must never be
-started while that tag is on it. The user may tell you to **remove the `plan` label and
-then do it** — but never to do it with the label still on. (The user *may* greenlight an
+prompt or a previous one. The **one exception**: an issue tagged **planning** must never be
+started while that tag is on it. The user may tell you to **remove the `planning` label
+and then do it** — but never to do it with the label still on. (The user *may* greenlight an
 issue that is **blocked by** another; doing so automatically lifts that block.)
