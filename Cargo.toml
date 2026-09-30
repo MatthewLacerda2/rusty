@@ -85,12 +85,13 @@ rodio = { version = "0.19", default-features = false, features = ["symphonia-vor
 # by proptest itself (no wall-clock), so the determinism guard is respected.
 proptest = "1"
 
-# Dev builds (#487). `cargo test` builds with this profile too (`test` inherits `dev`).
-# rusty's own crate stays at opt-level 0 so editing it rebuilds fast; it keeps only
-# line tables, so a backtrace still names file:line. Dependencies are built once per
-# `target/` and rarely rebuilt, so they are optimised and carry no debuginfo: rapier,
-# wgpu/naga, image decoding and the vendored Lua VM run near release speed in every
-# test, and full debuginfo — most of `target/`'s size and link time — is gone.
+# Dev builds (#487); `cargo test` inherits this profile, and so do CI, coverage and
+# mutants. rusty's own crate stays at opt-level 0 so an edit rebuilds in seconds, and
+# keeps only line tables so a backtrace still names file:line. Dependencies (rapier,
+# wgpu/naga, image, the vendored Lua VM) are optimised and carry no debuginfo: tests
+# and debug runs execute them at near-release speed, and `target/` loses the debuginfo
+# that was most of its size and link time. The price is a slower cold build of the
+# dependencies, paid once per fresh `target/`. PR #523 has the measurements.
 [profile.dev]
 debug = "line-tables-only"
 

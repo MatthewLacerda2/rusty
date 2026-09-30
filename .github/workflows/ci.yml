@@ -114,12 +114,10 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'merge_group' ||
       (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
+    # No debuginfo override here: Cargo.toml's `[profile.dev]` (#487) strips the
+    # dependency debuginfo that overflowed this runner's disk on #329/#332, so CI
+    # builds exactly what a local build does.
     env:
-      # Debuginfo dominates target/'s size and the tests never read it. Without
-      # this, the two feature-set builds plus the restored cache overflow the
-      # runner's ~14 GB free disk — recurring "No space left on device" flakes
-      # (seen on #329 and #332).
-      CARGO_PROFILE_DEV_DEBUG: "0"
       # A missing adapter fails the canary test instead of skipping every GPU test
       # (#489): the lavapipe step below is what gives this runner one.
       RUSTY_REQUIRE_GPU: "1"
@@ -210,9 +208,6 @@ jobs:
         (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) &&
        needs.changes.outputs.code != 'false')
     env:
-      # Same disk guard as build-test: tests never read debuginfo, and the
-      # Windows runner has the same ~14 GB free-disk budget as Linux.
-      CARGO_PROFILE_DEV_DEBUG: "0"
       # Metal (macOS) and WARP (Windows) are always there; require them (#489).
       RUSTY_REQUIRE_GPU: "1"
     steps:
