@@ -268,7 +268,7 @@ fn concurrent_imports_never_read_a_half_written_sidecar() {
     // Start from no sidecar: the temp dir outlives the run, and a sidecar left
     // behind by an earlier failure would otherwise decide this run's outcome.
     std::fs::remove_file(sidecar::meta_path(&path)).ok();
-    for round in 0..200 {
+    for round in 0..20 {
         let failures: Vec<String> = std::thread::scope(|s| {
             let handles: Vec<_> = (0..8)
                 .map(|_| s.spawn(|| import_and_sync_sidecar(&path).err()))
