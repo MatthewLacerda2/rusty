@@ -67,4 +67,93 @@ pub struct CameraComponent {
     /// iGPU floor wants (MSAA being the expensive alternative).
     #[serde(default = "default_fxaa_active")]
     pub fxaa_active: bool,
+    /// Perspective (the default) or orthographic — a top-down minimap (#430).
+    #[serde(default)]
+    pub projection: Projection,
+    /// Draw into a named render texture instead of the screen (#430): the camera
+    /// leaves the screen stack and UI `Image`s / material maps show it as
+    /// `"rt:<name>"`. `None` (the default) is an ordinary screen camera.
+    #[serde(default)]
+    pub target_texture: Option<RenderTarget>,
+}
+
+impl Default for CameraComponent {
+    /// A plain perspective screen camera: the scene defaults' lens, every layer,
+    /// skybox clear, FXAA on, motion blur off.
+    fn default() -> Self {
+        Self {
+            active: true,
+            fov: 45.0,
+            near: 0.1,
+            far: 200.0,
+            culling_mask: default_culling_mask(),
+            render_order: 0,
+            clear_flags: default_clear_flags(),
+            motion_blur_active: false,
+            motion_blur_samples: 0,
+            fxaa_active: default_fxaa_active(),
+            projection: Projection::Perspective,
+            target_texture: None,
+        }
+    }
+}
+
+/// How a camera projects the world (Unity's `Camera.orthographic`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub enum Projection {
+    /// Perspective through the camera's vertical `fov`.
+    #[default]
+    Perspective,
+    /// Parallel projection; `size` is half the view's height in world units
+    /// (Unity's `orthographicSize`), the width following the aspect.
+    Orthographic { size: f32 },
+}
+
+/// A camera's render-texture target (#430, Unity's `Camera.targetTexture`): the
+/// texture it draws into and what that costs.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RenderTarget {
+    /// The texture's name; consumers reference it as `"rt:<name>"`.
+    pub name: String,
+    /// Resolution in pixels (each at least 1).
+    pub width: u32,
+    pub height: u32,
+    /// Run the full post-FX chain (grading, bloom, FXAA, motion blur). Off, the
+    /// camera is only tonemapped — cheaper, and right for a flat minimap.
+    #[serde(default = "default_true")]
+    pub post_fx: bool,
+    /// Redraw every `n`th frame (1 = every frame); the texture holds its last
+    /// picture in between — a security monitor at 1/4 rate is a quarter the cost.
+    #[serde(default = "default_every")]
+    pub update_every: u32,
+}
+
+impl RenderTarget {
+    /// A target named `name` at `width` x `height`, post-FX on, every frame.
+    pub fn new(name: &str, width: u32, height: u32) -> Self {
+        Self {
+            name: name.to_string(),
+            width: width.max(1),
+            height: height.max(1),
+            post_fx: true,
+            update_every: 1,
+        }
+    }
+
+    /// The path a UI `Image` or a material map uses to show this texture.
+    pub fn path(&self) -> String {
+        format!("{RENDER_TEXTURE_PREFIX}{}", self.name)
+    }
+}
+
+/// The prefix that marks a texture path as a render texture's name (#430) — one
+/// convention for every consumer (`Image.texture`, material maps).
+pub const RENDER_TEXTURE_PREFIX: &str = "rt:";
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_every() -> u32 {
+    1
 }

@@ -25,6 +25,8 @@ fn camera() -> CameraComponent {
         motion_blur_active: true,
         motion_blur_samples: 64,
         fxaa_active: false,
+        projection: Default::default(),
+        target_texture: None,
     }
 }
 

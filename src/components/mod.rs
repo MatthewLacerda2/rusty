@@ -31,7 +31,7 @@ pub mod visual_correction;
 
 pub use animator::{AnimatorComponent, AnimatorParameter, AnimatorParameters};
 pub use audio_source::AudioSourceComponent;
-pub use camera::{CameraComponent, ClearFlags};
+pub use camera::{CameraComponent, ClearFlags, Projection, RenderTarget, RENDER_TEXTURE_PREFIX};
 pub use collider::{CapsuleAxis, ColliderComponent, ColliderShape, CombineMode, PhysicsMaterial};
 pub use entity::{Entity, PrefabLink};
 pub use joint::{JointComponent, JointKind};

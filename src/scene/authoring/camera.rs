@@ -86,6 +86,8 @@ mod tests {
             motion_blur_active: false,
             motion_blur_samples: 0,
             fxaa_active: true,
+            projection: Default::default(),
+            target_texture: None,
         };
         scene.world.set_camera(id, Some(c));
         (scene, id)

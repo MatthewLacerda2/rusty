@@ -68,8 +68,12 @@ impl LodSelection {
 
 /// The fraction of `cam`'s viewport height a `size`-metre object at `world`'s origin
 /// covers: `size / (2 · distance · tan(fov / 2))`. At the camera it is infinite
-/// (always the finest level).
+/// (always the finest level). Orthographic: `size / (2 · half-height)`.
 pub(crate) fn screen_height(size: f32, cam: &Camera, world: Mat4) -> f32 {
+    // An orthographic view (#430) shows everything at one scale, whatever the distance.
+    if let crate::components::Projection::Orthographic { size: half } = cam.projection {
+        return size / (2.0 * half.max(0.001));
+    }
     let distance = world.w_axis.truncate().distance(cam.position);
     let half_fov = (cam.fov.to_radians() * 0.5).tan();
     match distance * half_fov {

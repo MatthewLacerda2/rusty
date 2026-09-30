@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
-use rusty::components::{CameraComponent, ClearFlags, Tonemap, VisualCorrectionComponent};
+use rusty::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
 use rusty::core::quality::QualityPreset;
 use rusty::scene::authoring::default_visual_correction;
 use rusty::scene::Scene;
@@ -35,10 +35,8 @@ fn scene_with_volume() -> Rc<RefCell<Scene>> {
             far: 100.0,
             culling_mask: u32::MAX,
             render_order: 0,
-            clear_flags: ClearFlags::Skybox,
-            motion_blur_active: false,
             motion_blur_samples: 8,
-            fxaa_active: true,
+            ..Default::default()
         }),
     );
     Rc::new(RefCell::new(scene))

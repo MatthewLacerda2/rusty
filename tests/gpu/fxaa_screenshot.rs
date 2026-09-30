@@ -54,6 +54,8 @@ fn scene_with_fxaa(on: bool) -> Scene {
             motion_blur_active: false,
             motion_blur_samples: 0,
             fxaa_active: on,
+            projection: Default::default(),
+            target_texture: None,
         }),
     );
     scene
