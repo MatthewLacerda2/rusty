@@ -1,5 +1,6 @@
 pub(crate) mod budget;
 pub(crate) mod build;
+pub(crate) mod gpu_rule;
 pub(crate) mod headless;
 pub(crate) mod resize;
 pub(crate) mod textures;

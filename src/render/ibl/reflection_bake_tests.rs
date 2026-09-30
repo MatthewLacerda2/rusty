@@ -93,7 +93,7 @@ fn variance(face: &[u8], size: u32) -> f32 {
 /// colours, and successive mips are blurrier than mip0 (the issue's acceptance). Runs the
 /// real GPU bake; skips with no adapter.
 #[test]
-fn bake_shows_room_and_mips_blur() {
+fn gpu_bake_shows_room_and_mips_blur() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return; // No GPU/software adapter — skip, same contract as the screenshots.
     };
@@ -136,7 +136,7 @@ fn bake_shows_room_and_mips_blur() {
 /// file loads back as a mipped cube (the bake -> write -> load round-trip). Skips with no
 /// adapter.
 #[test]
-fn bake_writes_file_and_sets_path() {
+fn gpu_bake_writes_file_and_sets_path() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };

@@ -1,0 +1,39 @@
+# cargo-nextest configuration (#484). `make test` and CI run the suite through
+# nextest; doctests still go through `cargo test --doc` (nextest does not run them).
+# docs/testing.md explains the runner; this file only holds its settings.
+
+[profile.default]
+# Report every failure in one run: the end-of-run summary is what an agent reads to
+# decide what to fix, and stopping at the first failure hides the rest.
+fail-fast = false
+# No retries. A retried pass is reported as FLAKY but still green, and a flaky test
+# is a bug to root-cause, not something to paper over.
+retries = 0
+# A test past a minute is flagged SLOW; past five it is killed. Nothing in the suite
+# comes close (the slowest is seconds), so a kill means a hang — better a named
+# timeout than a CI job silently running to GitHub's six-hour ceiling.
+slow-timeout = { period = "60s", terminate-after = 5 }
+# Print only tests worth reading (slow, retried, failed) plus the summary, not a PASS
+# line per test: ~1,800 lines of passes per `make test` is output an agent pays for.
+status-level = "slow"
+
+# Tests that build a headless renderer. Under nextest every test is its own process,
+# so the in-process budget (src/render/setup/budget.rs, MAX_CONCURRENT_HEADLESS)
+# cannot see its neighbours; this group is its nextest equivalent, with the same cap.
+[test-groups]
+gpu = { max-threads = 2 }
+
+# Which tests are GPU tests is a naming rule, enforced at runtime: a test that builds
+# a headless renderer without matching this filter panics and names the rule
+# (`render::setup::gpu_rule`, which also checks that this filter is unchanged).
+#   - integration tests: live under `tests/gpu/`, so their path starts with `gpu::`;
+#   - in-crate tests:    the test function's name starts with `gpu_`.
+[[profile.default.overrides]]
+filter = 'test(/^gpu::|(^|::)gpu_[^:]*$/)'
+test-group = "gpu"
+
+# CI: the default profile plus a JUnit report for the job summary. Profiles inherit
+# `profile.default`, overrides included.
+[profile.ci]
+[profile.ci.junit]
+path = "junit.xml"

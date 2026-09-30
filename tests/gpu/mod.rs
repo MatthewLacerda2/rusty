@@ -1,10 +1,12 @@
 //! Integration tests that render: they build a headless [`Renderer`] (directly, or
 //! through `screenshot::capture` / `Debug.Preview`) and skip when no adapter exists.
 //!
-//! Grouped under one `gpu::` module path so they can be identified by name — the
-//! in-process headless budget (`render::setup::budget`) bounds how many renderers are
-//! alive at once, and a runner that isolates tests per process needs its own bound.
-//! A new test that renders belongs here, not beside the adapter-free tests.
+//! Grouped under one `gpu::` module path so they can be identified by name: nextest
+//! runs each test in its own process, where the in-process headless budget
+//! (`render::setup::budget`) cannot bound them, so the `gpu` test group in
+//! `.config/nextest.toml` selects them by this path instead. A new test that renders
+//! belongs here — building a renderer from a test outside it panics in debug builds
+//! (`render::setup::gpu_rule`).
 //!
 //! [`Renderer`]: rusty::render::Renderer
 

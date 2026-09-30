@@ -241,7 +241,7 @@ mod tests {
     /// entity, never growing per frame. The whole point of #210: persistent buffers
     /// written in place instead of allocated every frame. Skips with no GPU adapter.
     #[test]
-    fn pool_reuses_slots_across_frames() {
+    fn gpu_pool_reuses_slots_across_frames() {
         let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(64, 64) else {
             return; // No GPU/software adapter — same skip contract as the screenshots.
         };

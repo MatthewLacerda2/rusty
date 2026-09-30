@@ -23,10 +23,10 @@ its own gate list is complete before running it.
 session, the MCP bridge, `Debug.*` — and a default-features-only run compiles none
 of it. The two clippy passes and the two test passes are not redundancy.
 
-**Some hard gates hide inside `cargo test`.** `tests/api_doc_drift.rs` and
-`tests/callback_doc_drift.rs` fail the build when `docs/scripting-api.md`
-disagrees with the live Lua surface *in either direction* — an undocumented
-binding and a documented-but-absent one both redden CI. They are dev-only, so
+**Some hard gates hide inside the test run** (`make test`: nextest, then
+doctests). `tests/api_doc_drift.rs` and `tests/callback_doc_drift.rs` fail the
+build when `docs/scripting-api.md` disagrees with the live Lua surface *in either
+direction* — an undocumented binding and a documented-but-absent one both redden CI. They are dev-only, so
 only the `--features dev` run sees them.
 
 **The commit hook is not a substitute.** `.githooks/pre-commit` runs formatting

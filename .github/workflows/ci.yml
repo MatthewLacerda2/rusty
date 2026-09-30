@@ -146,15 +146,41 @@ jobs:
       - name: Software Vulkan driver (lavapipe)
         if: needs.changes.outputs.code != 'false'
         run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
-      # No separate `cargo build` steps (#482): `cargo test` already compiles every
+      - name: Install cargo-nextest
+        if: needs.changes.outputs.code != 'false'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      # No separate `cargo build` steps (#482): the test run already compiles every
       # binary target its feature set enables (Cargo builds them for the
       # integration tests), so a build step first only re-proved the same compile.
+      # nextest (#484) runs each test in its own process with the settings in
+      # .config/nextest.toml; the `ci` profile adds the JUnit report summarised
+      # below. It does not run doctests, hence the `--doc` step.
       - name: Test (engine, default)
         if: needs.changes.outputs.code != 'false'
-        run: cargo test --locked
+        run: |
+          rc=0
+          cargo nextest run --profile ci --locked || rc=$?
+          cp target/nextest/ci/junit.xml junit-default.xml || true
+          exit "$rc"
       - name: Test (engine, dev features)
         if: needs.changes.outputs.code != 'false'
-        run: cargo test --features dev --locked
+        run: |
+          rc=0
+          cargo nextest run --profile ci --features dev --locked || rc=$?
+          cp target/nextest/ci/junit.xml junit-dev.xml || true
+          exit "$rc"
+      - name: Doctests (both feature sets)
+        if: needs.changes.outputs.code != 'false'
+        run: |
+          cargo test --doc --locked
+          cargo test --doc --features dev --locked
+      - name: Test summary
+        if: always() && needs.changes.outputs.code != 'false'
+        uses: test-summary/action@v2
+        with:
+          paths: junit-*.xml
       - name: Test (lint xtask)
         if: needs.changes.outputs.code != 'false'
         run: cargo test --manifest-path tools/lint/Cargo.toml --locked
@@ -190,12 +216,37 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
       # macOS/Windows use their native backends and need no extra system libs; the
-      # apt step is Linux-only and lives on the `build-test` job above.
+      # apt step is Linux-only and lives on the `build-test` job above. Same runner
+      # and steps as build-test (#484); bash so Windows runs the same script.
       - name: Test (engine, default)
-        run: cargo test --locked
+        shell: bash
+        run: |
+          rc=0
+          cargo nextest run --profile ci --locked || rc=$?
+          cp target/nextest/ci/junit.xml junit-default.xml || true
+          exit "$rc"
       - name: Test (engine, dev features)
-        run: cargo test --features dev --locked
+        shell: bash
+        run: |
+          rc=0
+          cargo nextest run --profile ci --features dev --locked || rc=$?
+          cp target/nextest/ci/junit.xml junit-dev.xml || true
+          exit "$rc"
+      - name: Doctests (both feature sets)
+        shell: bash
+        run: |
+          cargo test --doc --locked
+          cargo test --doc --features dev --locked
+      - name: Test summary
+        if: always()
+        uses: test-summary/action@v2
+        with:
+          paths: junit-*.xml
       - name: Test (lint xtask)
         run: cargo test --manifest-path tools/lint/Cargo.toml --locked
 
@@ -233,17 +284,19 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: System libs for winit/wgpu builds
         run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
-      - name: Install cargo-llvm-cov
+      - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-llvm-cov
+          tool: cargo-llvm-cov,cargo-nextest
       - name: Install diff-cover
         run: pipx install diff-cover
       - name: Measure coverage (both feature sets, accumulated)
+        # Under nextest like build-test (#484), so the gpu test group applies here
+        # too; verified to give the same totals as `cargo llvm-cov` (test).
         run: |
           cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report --locked
-          cargo llvm-cov --no-report --features dev --locked
+          cargo llvm-cov nextest --no-report --locked
+          cargo llvm-cov nextest --no-report --features dev --locked
       - name: Cobertura report (sim modules only)
         # Same ignore-regex as the main job: restrict to app/scripting/physics/
         # navigation so diff-cover only ever scores changed *sim* lines. The
@@ -325,15 +378,17 @@ jobs:
       # changed sim lines, which rendering does not reach.
       - name: Software Vulkan driver (lavapipe)
         run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
-      - name: Install cargo-llvm-cov
+      - name: Install cargo-llvm-cov and cargo-nextest
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-llvm-cov
+          tool: cargo-llvm-cov,cargo-nextest
       - name: Measure coverage (both feature sets, accumulated)
+        # Under nextest like build-test (#484), so the gpu test group applies here
+        # too; verified to give the same totals as `cargo llvm-cov` (test).
         run: |
           cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report --locked
-          cargo llvm-cov --no-report --features dev --locked
+          cargo llvm-cov nextest --no-report --locked
+          cargo llvm-cov nextest --no-report --features dev --locked
       - name: Whole-crate summary
         run: |
           {

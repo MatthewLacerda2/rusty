@@ -44,7 +44,7 @@ mod tests {
     /// CI runner that lost its software driver would put every GPU test back on the
     /// silent `None` path and still report green — the state #489 fixed.
     #[test]
-    fn adapter_present_when_required() {
+    fn gpu_adapter_present_when_required() {
         if std::env::var(super::REQUIRE_GPU_ENV).as_deref() != Ok("1") {
             return;
         }

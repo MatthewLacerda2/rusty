@@ -106,7 +106,7 @@ fn center_rgb(face: &[u8], res: u32) -> (u8, u8, u8) {
 /// in the correct directions, and the dynamic actor blocking the +X wall does NOT
 /// appear (the +X face is still red, not the actor's blue).
 #[test]
-fn static_cubemap_shows_walls_and_excludes_dynamic() {
+fn gpu_static_cubemap_shows_walls_and_excludes_dynamic() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return; // No GPU/software adapter — skip, same contract as the screenshots.
     };

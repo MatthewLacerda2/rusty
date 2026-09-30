@@ -2,8 +2,9 @@
 
 | Kind | Lives in | Run with |
 |---|---|---|
-| Unit tests | `#[cfg(test)] mod tests` in the same file | `cargo test` |
-| Integration tests | `tests/*.rs`, one binary rooted at `tests/main.rs` | `cargo test` (or `cargo test --test integration <filter>`) |
+| Unit tests | `#[cfg(test)] mod tests` in the same file | `cargo nextest run` |
+| Integration tests | `tests/*.rs`, one binary rooted at `tests/main.rs` | `cargo nextest run` (or `cargo nextest run -E 'binary(integration)' <filter>`) |
+| Doctests | `///` examples | `cargo test --doc` (nextest does not run them) |
 | Harness scenarios | `project/scenarios/*.lua` (dev-only) | the headless `play` binary |
 
 ## Rules
@@ -12,8 +13,31 @@
   test file.
 - The sim must stay deterministic (fixed timestep, seeded RNG, no wall-clock in the
   tick) so harness/scenario tests are reproducible.
-- CI (`.github/workflows/ci.yml`) runs `cargo test` for both the engine and the
-  lint xtask.
+- CI (`.github/workflows/ci.yml`) and `make test` run the engine suite with
+  **cargo-nextest** plus `cargo test --doc`, both feature sets; the lint xtask keeps
+  plain `cargo test`. See *The test runner* below.
+
+## The test runner: cargo-nextest
+`make test` and CI run the suite with [cargo-nextest](https://nexte.st) (#484),
+configured in `.config/nextest.toml`. Install it once: `cargo install --locked
+cargo-nextest` (CI uses `taiki-e/install-action`). What it buys over `cargo test`:
+
+- **Each test is its own process**, so one test's panic, leaked global or stuck
+  thread cannot take its neighbours with it.
+- **Every failure, summarised at the end** (`fail-fast = false`), instead of stopping
+  at the first failing binary — the list an agent reads to decide what to fix.
+- **A hang is named, not waited out**: a test is flagged SLOW after 60 s and killed
+  after 5 min.
+- **No retries.** A retried pass is still green, and a flaky test is a bug.
+
+`cargo test` still works and is still correct — nothing in the suite depends on the
+runner — but the gate is nextest. Doctests stay on `cargo test --doc`, which nextest
+cannot run. CI's `ci` profile additionally writes JUnit, rendered as the
+`build-test` job summary.
+
+Handy forms: `cargo nextest run -E 'test(physics_)'` (filter by name),
+`cargo nextest list` (what would run), `cargo nextest show-config test-groups`
+(which tests the `gpu` group below holds).
 
 ## One integration-test binary
 Cargo's default builds **each** `tests/*.rs` as its own executable, and each one links
@@ -30,11 +54,11 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   not by a `#![cfg]` inside the file.
 - **Tests that render live in `tests/gpu/`**, so they share the `gpu::` module path and
   a runner can identify them by name (see the budget below).
-- **Every module shares one process.** Nothing in `tests/` may rely on having a process
-  to itself: use a temp path unique to the file (not one another file also writes), and
-  never `set_var` / `set_current_dir`. The headless-renderer budget is in-process, so it
-  now bounds the whole suite at once.
-- Filtering works as before, by module path: `cargo test --test integration physics_`.
+- **Every module can share one process.** nextest gives each test its own, but
+  `cargo test` runs the whole binary in one, and both must stay correct. Nothing in
+  `tests/` may rely on having a process to itself: use a temp path unique to the file
+  (not one another file also writes), and never `set_var` / `set_current_dir`.
+- Filtering works by module path: `cargo nextest run -E 'binary(integration)' physics_`.
 
 ## GPU tests and the headless budget
 Tests that need a real device call `Renderer::new_headless`, which returns `None`
@@ -52,7 +76,7 @@ Where they actually run is not uniform, and it is worth knowing before you rely 
 | `build-test-cross` (windows) | **WARP** (software) | run, against **system RAM** |
 
 **CI requires an adapter.** Those jobs set `RUSTY_REQUIRE_GPU=1`, which turns one
-canary test (`render::test_gpu::tests::adapter_present_when_required`) from a skip into
+canary test (`render::test_gpu::tests::gpu_adapter_present_when_required`) from a skip into
 a failure when no adapter is found — so a runner image that loses its driver goes red
 instead of quietly skipping every GPU test. Without the variable (any local machine)
 the skip contract above is unchanged.
@@ -69,16 +93,34 @@ adapter-free unit test on the underlying predicate so the rule is pinned everywh
 **Concurrency is capped.** A `Renderer` is a device, the full pipeline set and shadow
 maps, and Windows CI's WARP allocates all of that in system RAM shared with rustc — so
 unbounded parallel renderers exhausted memory and failed *unrelated* tests with a bare
-`Queue::write_texture: Not enough memory left.` (#366). `MAX_CONCURRENT_HEADLESS` in
-`src/render/setup/budget.rs` now bounds how many are alive at once, enforced by an RAII
-permit the renderer holds for its whole life. It applies to the normal library build,
-not just `cfg(test)`, because the screenshot integration tests reach the renderer
-indirectly through `screenshot::capture`.
+`Queue::write_texture: Not enough memory left.` (#366). Two caps, one per runner:
 
-You do not need to do anything to opt in — but if a new GPU test makes CI run out of
-memory, **lower that constant to 1** before weakening the test. If a test hangs waiting
-on a permit, the guard panics with an explanation: it means something built a second
-headless renderer while still holding the first.
+- **nextest (the gate):** every test is its own process, so nothing in-process can see
+  its neighbours. The `gpu` **test group** in `.config/nextest.toml` (`max-threads = 2`)
+  bounds how many GPU tests run at once.
+- **`cargo test`:** `MAX_CONCURRENT_HEADLESS` in `src/render/setup/budget.rs` bounds
+  how many renderers are alive in the one process, enforced by an RAII permit the
+  renderer holds for its whole life. It applies to the normal library build, not just
+  `cfg(test)`, because the screenshot integration tests reach the renderer indirectly
+  through `screenshot::capture`. If a test hangs waiting on a permit, the guard panics
+  with an explanation: something built a second headless renderer while still holding
+  the first.
+
+Keep the two numbers equal. If a new GPU test makes CI run out of memory, **lower both
+to 1** before weakening the test.
+
+**The GPU naming rule.** A test group selects tests by name, so the name says whether
+a test renders:
+
+- an **integration** test that renders lives under `tests/gpu/` (path `gpu::…`);
+- an **in-crate** test that renders has a function name starting with **`gpu_`**
+  (`fn gpu_resize_tracks_the_new_size`).
+
+You cannot forget it quietly: in debug builds, a test that builds a headless renderer
+without such a name panics and names this rule (`render::setup::gpu_rule`, called
+from the budget's acquire). A test in that module also fails if the filter in
+`.config/nextest.toml` stops matching the Rust predicate, so the two copies of the
+rule cannot drift apart.
 
 ## API-doc drift gate
 `tests/api_doc_drift.rs` (dev-only, #280) is a **hard gate** that keeps
@@ -138,7 +180,12 @@ the per-PR run cheap (the instrumented suite still runs in full), but it stays
 informational and is not a required check, so it never gates a merge and may even
 finish after one without stalling anything.
 
-Run it locally: `cargo llvm-cov --summary-only` (add `--features dev` for the
+Both jobs measure under nextest (`cargo llvm-cov nextest`, #484), so the `gpu`
+group caps them like `build-test`. Checked when it was adopted: on the default
+feature set it produced the same totals as `cargo llvm-cov` to the line
+(70.48% regions / 70.97% lines), from ~850 small per-process profiles (~280 MB).
+
+Run it locally: `cargo llvm-cov nextest --summary-only` (add `--features dev` for the
 dev-only surface); for the per-PR view, `cargo llvm-cov report --cobertura
 --output-path cov.xml` then `diff-cover cov.xml --compare-branch origin/main`.
 
@@ -163,6 +210,15 @@ where the agent acts on them rather than failing the build — is deliberate:
 `--in-diff` line-matching can drift after a rebase and timeouts can produce
 spurious "survivors," neither of which should redden CI. The per-PR sticky
 comment is cleared automatically once a re-push fixes the survivors.
+
+**The mutation jobs stay on `cargo test`, not nextest** (#484). A mutant's cost is
+the crate rebuild, not the test run, so nextest's scheduling buys little there — while
+process-per-test adds a process spawn per test per mutant, and `fail-fast = false`
+(right for the gate's summary) would make every *caught* mutant run the whole suite
+instead of stopping at its first failing binary. The mutation jobs also have no GPU
+driver, so the `gpu` group has nothing to bound. Revisit with
+`cargo mutants --test-tool nextest` plus a dedicated fail-fast profile if mutant
+test time ever dominates.
 
 Run it locally (the diff-scoped form mirrors the PR run):
 ```

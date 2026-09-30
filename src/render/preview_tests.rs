@@ -62,7 +62,7 @@ fn looking_at_origin_from_z() -> Camera {
 }
 
 #[test]
-fn offscreen_preview_view_allocates_a_target_the_view_reads_back() {
+fn gpu_offscreen_preview_view_allocates_a_target_the_view_reads_back() {
     let Some(renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return; // No GPU/software adapter — skip, same contract as the screenshots.
     };
@@ -71,7 +71,7 @@ fn offscreen_preview_view_allocates_a_target_the_view_reads_back() {
 }
 
 #[test]
-fn plain_render_into_the_preview_target_does_not_panic() {
+fn gpu_plain_render_into_the_preview_target_does_not_panic() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
@@ -88,7 +88,7 @@ fn plain_render_into_the_preview_target_does_not_panic() {
 }
 
 #[test]
-fn shader_override_with_an_unreadable_path_falls_back_instead_of_panicking() {
+fn gpu_shader_override_with_an_unreadable_path_falls_back_instead_of_panicking() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
@@ -112,7 +112,7 @@ fn shader_override_with_an_unreadable_path_falls_back_instead_of_panicking() {
 /// is a whole device + pipelines + shadow maps, and enough concurrent ones exhaust
 /// memory on a software adapter (Windows CI's WARP).
 #[test]
-fn a_shader_override_renders_and_stays_on_its_own_view() {
+fn gpu_a_shader_override_renders_and_stays_on_its_own_view() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
