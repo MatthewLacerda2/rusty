@@ -4,7 +4,7 @@
 
 use egui_phosphor::regular as icon;
 
-use super::vec4_row;
+use super::{combo, vec4_row};
 use crate::components::{FillMethod, FillOrigin, ImageComponent, ImageType};
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::image as image_ops;
@@ -104,25 +104,6 @@ fn draw_fill(ui: &mut egui::Ui, edit: &mut ImageComponent) -> bool {
         changed |= ui.checkbox(&mut edit.fill_clockwise, "Clockwise").changed();
     }
     changed
-}
-
-/// A labelled combo box over `options`, named by `name`.
-fn combo<T: Copy + PartialEq>(
-    ui: &mut egui::Ui,
-    label: &str,
-    value: &mut T,
-    options: &[T],
-    name: fn(T) -> &'static str,
-) -> bool {
-    let before = *value;
-    egui::ComboBox::from_label(label)
-        .selected_text(name(*value))
-        .show_ui(ui, |ui| {
-            for &o in options {
-                ui.selectable_value(value, o, name(o));
-            }
-        });
-    *value != before
 }
 
 /// Write the edited snapshot back through the shared ops (method before origin, so

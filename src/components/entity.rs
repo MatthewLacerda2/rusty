@@ -14,7 +14,7 @@ use super::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, ColliderComponent, ImageComponent, LightComponent, MaterialAsset,
     MaterialComponent, MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent,
-    RectMaskComponent, RectTransformComponent, RigidBodyComponent, ScriptComponent,
+    RectMaskComponent, RectTransformComponent, RigidBodyComponent, ScriptComponent, TextComponent,
     TextureComponent, TransformComponent, VisualCorrectionComponent,
 };
 
@@ -107,6 +107,9 @@ pub struct Entity {
     /// scenes.
     #[serde(default)]
     pub rect_mask: Option<RectMaskComponent>,
+    /// UI text label (#419). `#[serde(default)]` for pre-#419 scenes.
+    #[serde(default)]
+    pub text: Option<TextComponent>,
     /// Live link back to the source `.prefab` for a *linked* prefab instance (#216).
     /// `None` on a plain entity or a v1 unpacked copy. Carried on every entity of an
     /// instance. `#[serde(default)]` so pre-#216 scenes load with no link.
@@ -164,6 +167,8 @@ struct EntityRepr {
     #[serde(default)]
     rect_mask: Option<RectMaskComponent>,
     #[serde(default)]
+    text: Option<TextComponent>,
+    #[serde(default)]
     prefab_link: Option<PrefabLink>,
     parent_id: Option<u32>,
     children: Vec<u32>,
@@ -215,6 +220,7 @@ impl From<EntityRepr> for Entity {
             image: r.image,
             canvas_group: r.canvas_group,
             rect_mask: r.rect_mask,
+            text: r.text,
             prefab_link: r.prefab_link,
             parent_id: r.parent_id,
             children: r.children,
@@ -249,6 +255,7 @@ impl Entity {
             image: None,
             canvas_group: None,
             rect_mask: None,
+            text: None,
             prefab_link: None,
             parent_id: None,
             children: Vec::new(),

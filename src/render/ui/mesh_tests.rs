@@ -40,7 +40,14 @@ fn element(scene: &mut Scene, parent: u32, pos: Vec2, size: Vec2, texture: Optio
 
 fn build(scene: &Scene) -> Vec<CanvasMesh> {
     let layout = UiLayout::compute(&scene.world, SCREEN);
-    build_canvas_meshes(&scene.world, &layout, SCREEN, &|_| Some(Vec2::splat(8.0)))
+    let mut atlases = FontAtlases::default();
+    build_canvas_meshes(
+        &scene.world,
+        &layout,
+        SCREEN,
+        &|_| Some(Vec2::splat(8.0)),
+        &mut atlases,
+    )
 }
 
 #[test]
@@ -65,8 +72,9 @@ fn solid_images_share_one_batch_and_textures_break_it() {
     element(&mut scene, root, Vec2::ZERO, Vec2::ONE, Some("a.png"));
     element(&mut scene, root, Vec2::ZERO, Vec2::ONE, None);
     let batches = &build(&scene)[0].batches;
-    let textures: Vec<_> = batches.iter().map(|b| b.texture.as_deref()).collect();
-    assert_eq!(textures, [None, Some("a.png"), None]);
+    let sources: Vec<_> = batches.iter().map(|b| b.source.clone()).collect();
+    let png = UiSource::Texture("a.png".into());
+    assert_eq!(sources, [UiSource::Solid, png, UiSource::Solid]);
 }
 
 #[test]

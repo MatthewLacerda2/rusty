@@ -2514,6 +2514,7 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 name = "rusty"
 version = "0.1.0"
 dependencies = [
+ "ab_glyph",
  "bytemuck",
  "egui",
  "egui-phosphor",
@@ -2536,6 +2537,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tobj",
+ "ttf-parser",
  "wgpu",
  "winit",
 ]

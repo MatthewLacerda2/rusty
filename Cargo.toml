@@ -91,6 +91,12 @@ log = "0.4.22"
 pollster = "0.4.0"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.120"
+# Font parsing, metrics and glyph outlines for UI `Text` (#419). Direct, not through
+# egui: egui is editor-only (#431) and the player needs text. Same version egui pulls.
+ab_glyph = "0.2.32"
+# Its OpenType parser, read directly for GPOS pair kerning (ab_glyph reads only the
+# legacy `kern` table). Already in the tree through ab_glyph: same version.
+ttf-parser = "0.25.1"
 rodio = { version = "0.19", default-features = false, features = ["symphonia-vorbis", "symphonia-wav"] }
 # Not used by rusty's code (#552). proptest turns on getrandom's `std` feature (via
 # rand_core), so without this line `cargo build` and `cargo test` resolve getrandom

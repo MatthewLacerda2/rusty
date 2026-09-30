@@ -328,6 +328,14 @@ determinism, no file written on a rejected patch).
 |---|---|---|
 | `SetPadding` | ✅ | render — the subtree's scissor rect in `render::ui::mesh`; round-trips |
 
+### `Text` — over `Entity.text` (#419)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetText` / `SetFont` / `SetBoldFont` / `SetItalicFont` / `SetFontSize` / `SetColor` / `SetAlignment` / `SetWrap` / `SetOverflow` / `SetLineSpacing` / `SetLetterSpacing` / `SetAutoSize` / `SetRichText` | ✅ | sim — `ui::text::layout_text` (also `Text.GetLayout` / `GetPreferredSize`); render — `render::ui::text::quads` in the UI pass; round-trips (`tests/ui_text_api/`) |
+| `SetOutline` / `SetShadow` / `SetGlow` | ✅ | render — the SDF parameters and shadow quads of `render::ui::text::quads`, cut in `ui.wgsl` (`tests/gpu/ui_text_screenshot.rs`); round-trips |
+| `SetRaycastTarget` | ✅ | round-trips; read by pointer dispatch when #420 lands |
+
 ### `Debug` (dev-only) — over `ConsoleLogs`
 
 | Setter | Status | Read-site |
@@ -338,7 +346,7 @@ determinism, no file written on a rejected patch).
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 102 |
+| ✅ faithful | 119 |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 

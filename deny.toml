@@ -9,7 +9,8 @@ ignore = [
   # vulnerability. Real RUSTSEC vulnerabilities still fail the deny job.
   "RUSTSEC-2024-0436",
   # `ttf-parser` is unmaintained but only reaches us transitively via
-  # egui/epaint → ab_glyph and winit → sctk-adwaita; the advisory offers no safe
+  # ab_glyph (UI `Text`, #419; also egui/epaint) and winit → sctk-adwaita. It
+  # parses the project's own font assets, not untrusted input; the advisory offers no safe
   # upgrade on this path and it is NOT a vulnerability. Real RUSTSEC
   # vulnerabilities still fail the deny job.
   "RUSTSEC-2026-0192",

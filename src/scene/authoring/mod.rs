@@ -31,6 +31,7 @@ pub mod particles;
 pub mod rect_mask;
 pub mod rect_transform;
 pub mod rigidbody;
+pub mod text;
 pub mod visual_correction;
 
 use glam::Vec3;

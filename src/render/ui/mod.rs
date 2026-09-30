@@ -10,6 +10,7 @@
 //! - `geometry` — one `Image`'s triangles per image type (pure).
 //! - `mesh` — the layout → one vertex list per canvas, split into batches on
 //!   texture / clip changes, with CanvasGroup alpha and RectMask clips (pure).
+//! - `text` — SDF glyph generation, the per-font atlases and text quads.
 //! - `draw` — the per-view cache (re-upload only a canvas whose geometry
 //!   changed) and the pass itself.
 //!
@@ -20,6 +21,7 @@
 pub(crate) mod draw;
 pub(crate) mod geometry;
 pub(crate) mod mesh;
+pub(crate) mod text;
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -45,6 +47,10 @@ pub struct UiRenderer {
     /// Bind groups per texture path, kept with the texture they bind so a reloaded
     /// texture rebinds.
     textures: HashMap<String, (Rc<GpuTexture>, wgpu::BindGroup)>,
+    /// Every font's glyph atlas (CPU side, shared by all views).
+    atlases: text::atlas::FontAtlases,
+    /// Each atlas's GPU copy, by font path.
+    fonts: HashMap<Option<String>, text::gpu::AtlasGpu>,
 }
 
 impl UiRenderer {
@@ -78,6 +84,8 @@ impl UiRenderer {
             sampler,
             white,
             textures: HashMap::new(),
+            atlases: Default::default(),
+            fonts: HashMap::new(),
         }
     }
 

@@ -1,11 +1,13 @@
 //! src/render/ui/mesh.rs — the laid-out UI → one vertex list + batches per canvas (#418).
 //!
 //! GPU-free: [`build_canvas_meshes`] walks the layout in draw order (canvas
-//! `sort_order`, then hierarchy pre-order) and emits every visible `Image` as
-//! triangles in normalized device coordinates, tagged with what it samples and how
-//! it is clipped. Consecutive graphics sharing a texture and a clip merge into one
-//! [`UiBatch`]; a change of either starts a new one — so a HUD of solid bars is one
-//! draw call per canvas however many bars it has.
+//! `sort_order`, then hierarchy pre-order) and emits every visible `Image` and
+//! `Text` (an entity with both draws the image, then the text) as triangles in
+//! normalized device coordinates, tagged with what it samples and how it is
+//! clipped. Consecutive graphics sharing a source (solid, a texture, a font's
+//! atlas) and a clip merge into one [`UiBatch`]; a change of either starts a new
+//! one — so a HUD of solid bars is one draw call per canvas however many bars it
+//! has, and a label is one draw call however many glyphs it has.
 //!
 //! Inherited state rides down the walk (parents precede children in the layout):
 //! **visibility** (the entity and every ancestor active), **alpha** (the product of
@@ -14,20 +16,39 @@
 
 use std::collections::HashMap;
 
+use bytemuck::Zeroable;
 use glam::{Vec2, Vec4};
 
 use super::geometry::image_triangles;
+use super::text::atlas::FontAtlases;
+use super::text::emit::push_text;
 use crate::ecs::World;
 use crate::ui::{UiLayout, UiRect};
 
 /// One UI vertex: NDC position, texture coordinate (v down, as the GPU samples) and
-/// the straight-alpha display-space tint (group alpha folded in).
+/// the straight-alpha display-space tint (group alpha folded in). Text vertices
+/// also carry their outline and glow colours and the SDF parameters
+/// (`[1, dilate, outline, glow]` in atlas pixels); an image's are zero.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct UiVertex {
     pub(crate) pos: [f32; 2],
     pub(crate) uv: [f32; 2],
     pub(crate) color: [f32; 4],
+    pub(crate) outline: [f32; 4],
+    pub(crate) glow: [f32; 4],
+    pub(crate) sdf: [f32; 4],
+}
+
+/// What a batch samples.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum UiSource {
+    /// Nothing: the white texture, a solid colour.
+    Solid,
+    /// An image texture, by path.
+    Texture(String),
+    /// A font's SDF atlas, by font path (`None`: the default font).
+    Font(Option<String>),
 }
 
 /// A scissor rect in target pixels, top-left origin (wgpu's convention).
@@ -39,11 +60,11 @@ pub(crate) struct Scissor {
     pub(crate) h: u32,
 }
 
-/// A run of vertices drawn with one texture and one clip.
+/// A run of vertices drawn with one source and one clip.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct UiBatch {
-    /// The texture path sampled, or `None` for a solid colour.
-    pub(crate) texture: Option<String>,
+    /// What it samples.
+    pub(crate) source: UiSource,
     /// The scissor, or `None` for the whole target.
     pub(crate) clip: Option<Scissor>,
     /// The vertex range in the canvas's vertex list.
@@ -60,28 +81,30 @@ pub(crate) struct CanvasMesh {
 
 /// What an element passes to its children.
 #[derive(Clone, Copy)]
-struct Inherited {
+pub(super) struct Inherited {
     visible: bool,
-    alpha: f32,
+    pub(super) alpha: f32,
     /// Pixel bounds `(min, max)`, bottom-left origin.
     clip: Option<(Vec2, Vec2)>,
 }
 
 /// What every element of one build reads: the scene, the target size in pixels and
 /// the texture-size lookup.
-struct Frame<'a> {
-    world: &'a World,
-    screen: Vec2,
+pub(super) struct Frame<'a> {
+    pub(super) world: &'a World,
+    pub(super) screen: Vec2,
     tex_size: &'a dyn Fn(&str) -> Option<Vec2>,
 }
 
 /// Build every canvas's mesh on a `screen`-pixel target. `tex_size` reports a
-/// texture's size in texels (`None` when not loaded).
+/// texture's size in texels (`None` when not loaded); text glyphs are packed into
+/// `atlases` as they are first drawn.
 pub(crate) fn build_canvas_meshes(
     world: &World,
     layout: &UiLayout,
     screen: Vec2,
     tex_size: &dyn Fn(&str) -> Option<Vec2>,
+    atlases: &mut FontAtlases,
 ) -> Vec<CanvasMesh> {
     let frame = Frame {
         world,
@@ -106,6 +129,7 @@ pub(crate) fn build_canvas_meshes(
         }
         if let Some(mesh) = meshes.last_mut() {
             push_image(mesh, &frame, id, rect, here);
+            push_text(mesh, &frame, id, rect, here, atlases);
         }
     }
     meshes.retain(|m| !m.batches.is_empty());
@@ -157,39 +181,59 @@ fn push_image(mesh: &mut CanvasMesh, frame: &Frame, id: u32, rect: &UiRect, stat
     let Some(image) = frame.world.image(id) else {
         return;
     };
-    let screen = frame.screen;
     let color = image.color * Vec4::new(1.0, 1.0, 1.0, state.alpha);
-    if !state.visible || color.w <= 0.0 {
+    let Some(clip) = visible_clip(state, color.w, frame.screen) else {
         return;
-    }
-    let clip = match state.clip {
-        Some(bounds) => match scissor(bounds, screen) {
-            Some(s) => Some(s),
-            None => return, // clipped away entirely
-        },
-        None => None,
     };
     let tex = image.texture.as_deref().and_then(frame.tex_size);
     let tris = image_triangles(&image, rect.rect.1, tex);
     let [bl, tl, _, br] = rect.corners;
     let start = mesh.vertices.len() as u32;
-    mesh.vertices.extend(tris.iter().map(|&(p, uv)| {
-        let canvas = bl + (br - bl) * p.x + (tl - bl) * p.y;
-        let ndc = canvas * rect.scale_factor / screen * 2.0 - Vec2::ONE;
-        UiVertex {
-            pos: ndc.to_array(),
-            uv: [uv.x, 1.0 - uv.y],
-            color: color.to_array(),
-        }
+    mesh.vertices.extend(tris.iter().map(|&(p, uv)| UiVertex {
+        pos: to_ndc(bl + (br - bl) * p.x + (tl - bl) * p.y, rect, frame.screen),
+        uv: [uv.x, 1.0 - uv.y],
+        color: color.to_array(),
+        ..Zeroable::zeroed()
     }));
+    let source = image
+        .texture
+        .clone()
+        .map_or(UiSource::Solid, UiSource::Texture);
+    close_batch(mesh, source, clip, start);
+}
+
+/// The clip a graphic draws under, or `None` when it draws nothing (hidden, fully
+/// transparent, or clipped away entirely).
+pub(super) fn visible_clip(state: Inherited, alpha: f32, screen: Vec2) -> Option<Option<Scissor>> {
+    if !state.visible || alpha <= 0.0 {
+        return None;
+    }
+    match state.clip {
+        Some(bounds) => scissor(bounds, screen).map(Some),
+        None => Some(None),
+    }
+}
+
+/// A canvas point (reference units) → normalized device coordinates.
+pub(super) fn to_ndc(canvas: Vec2, rect: &UiRect, screen: Vec2) -> [f32; 2] {
+    (canvas * rect.scale_factor / screen * 2.0 - Vec2::ONE).to_array()
+}
+
+/// Close the vertices from `start` on into the last batch when it shares `source`
+/// and `clip`, else into a new one.
+pub(super) fn close_batch(
+    mesh: &mut CanvasMesh,
+    source: UiSource,
+    clip: Option<Scissor>,
+    start: u32,
+) {
     let end = mesh.vertices.len() as u32;
-    let texture = image.texture.clone();
     match mesh.batches.last_mut() {
-        Some(b) if b.texture == texture && b.clip == clip && b.range.end == start => {
+        Some(b) if b.source == source && b.clip == clip && b.range.end == start => {
             b.range.end = end
         }
         _ if end > start => mesh.batches.push(UiBatch {
-            texture,
+            source,
             clip,
             range: start..end,
         }),

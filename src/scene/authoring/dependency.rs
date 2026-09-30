@@ -28,7 +28,7 @@
 
 use crate::components::{
     CanvasComponent, CanvasGroupComponent, ImageComponent, RectMaskComponent,
-    RectTransformComponent,
+    RectTransformComponent, TextComponent,
 };
 use crate::ecs::World;
 use crate::scene::authoring::components::ComponentKind;
@@ -57,6 +57,7 @@ pub(crate) fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::Image => world.has_image(id),
         ComponentKind::CanvasGroup => world.has_canvas_group(id),
         ComponentKind::RectMask => world.has_rect_mask(id),
+        ComponentKind::Text => world.has_text(id),
     }
 }
 
@@ -88,6 +89,7 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
             world.set_canvas_group(id, Some(CanvasGroupComponent::default()))
         }
         ComponentKind::RectMask => world.set_rect_mask(id, Some(RectMaskComponent::default())),
+        ComponentKind::Text => world.set_text(id, Some(TextComponent::default())),
     }
 }
 
@@ -111,6 +113,7 @@ pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool
         ComponentKind::Image => world.set_image(id, None),
         ComponentKind::CanvasGroup => world.set_canvas_group(id, None),
         ComponentKind::RectMask => world.set_rect_mask(id, None),
+        ComponentKind::Text => world.set_text(id, None),
     }
 }
 
@@ -228,7 +231,11 @@ mod tests {
     #[test]
     fn ui_graphics_require_a_rect_transform() {
         let mut scene = Scene::new();
-        for kind in [ComponentKind::Image, ComponentKind::RectMask] {
+        for kind in [
+            ComponentKind::Image,
+            ComponentKind::Text,
+            ComponentKind::RectMask,
+        ] {
             let id = create_entity(&mut scene, "E", None);
             assert!(add_with_requirements(&mut scene.world, id, kind));
             assert!(scene.world.has_rect_transform(id), "{kind:?} brings a rect");

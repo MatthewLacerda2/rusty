@@ -235,3 +235,28 @@ pub(crate) fn rect_mask_value(m: &RectMaskComponent) -> Value {
     let p = m.padding;
     json!({ "padding": [p.x, p.y, p.z, p.w] })
 }
+
+/// Text authoring view (#419): the string, fonts, sizing, wrapping and effects.
+pub(crate) fn text_value(t: &crate::components::TextComponent) -> Value {
+    use crate::scene::authoring::text as ops;
+    let v4 = |v: glam::Vec4| json!([v.x, v.y, v.z, v.w]);
+    json!({
+        "text": t.text,
+        "font": t.font,
+        "font_bold": t.font_bold,
+        "font_italic": t.font_italic,
+        "font_size": t.font_size,
+        "color": v4(t.color),
+        "alignment": ops::alignment_name(t.alignment),
+        "wrap": t.wrap,
+        "overflow": ops::overflow_name(t.overflow),
+        "line_spacing": t.line_spacing,
+        "letter_spacing": t.letter_spacing,
+        "auto_size": [t.auto_size, t.auto_size_min, t.auto_size_max],
+        "rich_text": t.rich_text,
+        "raycast_target": t.raycast_target,
+        "outline": { "width": t.outline_width, "color": v4(t.outline_color) },
+        "shadow": { "offset": [t.shadow_offset.x, t.shadow_offset.y], "color": v4(t.shadow_color) },
+        "glow": { "size": t.glow_size, "color": v4(t.glow_color) },
+    })
+}
