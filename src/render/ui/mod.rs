@@ -127,6 +127,30 @@ impl UiRenderer {
     }
 }
 
+impl crate::render::Renderer {
+    /// The view of a swapchain frame the UI pass draws through, and its format: the
+    /// frame's non-sRGB twin when the surface was configured with one (display-space
+    /// blending), else the frame itself. Hand it to [`RenderView::set_ui_output`].
+    ///
+    /// [`RenderView::set_ui_output`]: crate::render::RenderView::set_ui_output
+    pub fn surface_ui_view(
+        &self,
+        frame: &wgpu::Texture,
+    ) -> (wgpu::TextureView, wgpu::TextureFormat) {
+        let format = self
+            .config
+            .view_formats
+            .first()
+            .copied()
+            .unwrap_or(self.config.format);
+        let view = frame.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(format),
+            ..Default::default()
+        });
+        (view, format)
+    }
+}
+
 /// A texture + the UI sampler as a bind group against `layout`.
 fn bind(
     device: &wgpu::Device,

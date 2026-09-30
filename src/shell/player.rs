@@ -2,8 +2,8 @@
 //!
 //! Boot: read the project's build settings, load the startup scene, enter Play at once
 //! (no edit snapshot — there is no edit mode to return to), apply the persisted video
-//! and keybinding settings, run. Each frame renders the active camera stack straight
-//! onto the swapchain with no chrome, and the game gets all input. `Application.Quit()`
+//! and keybinding settings, run. Each frame renders the active camera stack and the
+//! in-game UI straight onto the swapchain with no chrome, and the game gets all input. `Application.Quit()`
 //! closes the window; the loop's exit flushes `Storage` first.
 
 use winit::event_loop::EventLoop;
@@ -25,7 +25,13 @@ pub struct PlayerFrontend {
 impl Frontend for PlayerFrontend {
     const HOST: Host = Host::Player;
 
-    fn draw(&mut self, shell: &mut Shell, game: &mut GameWorld, target: &wgpu::TextureView) {
+    fn draw(
+        &mut self,
+        shell: &mut Shell,
+        game: &mut GameWorld,
+        frame: &wgpu::Texture,
+        target: &wgpu::TextureView,
+    ) {
         // `Graphics.SetQuality` reaches the renderer here — there is no editor dropdown
         // to reconcile with (`set_quality` guards the bloom realloc).
         let quality = *game.script_manager().quality_cell().borrow();
@@ -52,6 +58,10 @@ impl Frontend for PlayerFrontend {
                 bloom,
             )),
         };
+
+        // The view is targetless (it renders straight onto the swapchain), so hand it
+        // the frame to draw the in-game UI on (#418).
+        view.set_ui_output(Some(shell.renderer.surface_ui_view(frame)));
 
         let scene = game.scene().borrow();
         let camera = crate::scene::game_camera_from_scene(&game.camera().borrow(), &scene);

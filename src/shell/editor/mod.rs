@@ -152,7 +152,13 @@ impl Frontend for EditorFrontend {
         }
     }
 
-    fn draw(&mut self, shell: &mut Shell, game: &mut GameWorld, target: &wgpu::TextureView) {
+    fn draw(
+        &mut self,
+        shell: &mut Shell,
+        game: &mut GameWorld,
+        _frame: &wgpu::Texture,
+        target: &wgpu::TextureView,
+    ) {
         let raw_input = self.egui_winit.take_egui_input(&shell.window);
         self.egui_ctx.begin_frame(raw_input);
 

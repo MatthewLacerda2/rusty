@@ -1,4 +1,4 @@
-//! src/render/view.rs — per-view render state (#355).
+//! src/render/view/mod.rs — per-view render state (#355).
 //!
 //! A *view* is one (scene, camera, target) render per frame. The `Renderer` used to
 //! bake in a single-scene/single-view assumption: one `size`, one depth buffer, and
@@ -18,9 +18,8 @@
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::postfx::PostFx;
 
-/// The depth target's format — a depth buffer sampled by the decal + post-FX passes,
-/// so it needs `TEXTURE_BINDING` alongside `RENDER_ATTACHMENT`.
-const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+mod targets;
+use targets::{create_color_target, create_depth};
 
 /// Per-view render targets + post-FX chain. See the module docs for why this is owned
 /// per view rather than shared on the `Renderer`.
@@ -58,6 +57,9 @@ pub struct RenderView {
     forward_override: Option<wgpu::RenderPipeline>,
     /// The UI pass's format for the colour target (#418); see `create_color_target`.
     ui_format: Option<wgpu::TextureFormat>,
+    /// A targetless view's UI output for the next render (#418) — see
+    /// [`RenderView::set_ui_output`]. Consumed by that render.
+    ui_output: Option<(wgpu::TextureView, wgpu::TextureFormat)>,
     /// The UI pass's per-canvas vertex buffers for this view (#418).
     pub(crate) ui: crate::render::ui::UiViewCache,
 }
@@ -131,6 +133,7 @@ impl RenderView {
             color_target,
             forward_override: None,
             ui_format,
+            ui_output: None,
             ui: Default::default(),
         }
     }
@@ -182,11 +185,23 @@ impl RenderView {
             .map(|t| t.create_view(&wgpu::TextureViewDescriptor::default()))
     }
 
-    /// The view + format the UI pass draws through (#418) — see `create_color_target`.
-    /// `None` for a targetless view: its caller-owned output (the cubemap capture)
-    /// never shows UI.
-    pub(crate) fn ui_target(&self) -> Option<(wgpu::TextureView, wgpu::TextureFormat)> {
-        let (target, format) = (self.color_target.as_ref()?, self.ui_format?);
+    /// Have the next render draw the in-game UI through `output` (a view of the
+    /// frame the caller passes to `render`, and its format) — for a targetless view
+    /// that presents, like the standalone player's swapchain (#418). Views owning a
+    /// target need not: the UI draws onto their own target. A targetless view left
+    /// without one (the cubemap capture) never draws UI.
+    pub fn set_ui_output(&mut self, output: Option<(wgpu::TextureView, wgpu::TextureFormat)>) {
+        self.ui_output = output;
+    }
+
+    /// The view + format the UI pass draws through this render (#418): the owned
+    /// target's display-space alias (see `targets::create_color_target`), else the
+    /// caller's [`RenderView::set_ui_output`], taken so a stale frame is never reused.
+    pub(crate) fn take_ui_target(&mut self) -> Option<(wgpu::TextureView, wgpu::TextureFormat)> {
+        let Some(target) = self.color_target.as_ref() else {
+            return self.ui_output.take();
+        };
+        let format = self.ui_format?;
         let view = target.create_view(&wgpu::TextureViewDescriptor {
             format: Some(format),
             ..Default::default()
@@ -228,73 +243,6 @@ impl RenderView {
     }
 }
 
-/// Allocate a depth texture (+ its default view) at `width` x `height`. Sampled by the
-/// decal and post-FX passes, hence `TEXTURE_BINDING`.
-fn create_depth(
-    device: &wgpu::Device,
-    width: u32,
-    height: u32,
-) -> (wgpu::Texture, wgpu::TextureView) {
-    let texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("View Depth Texture"),
-        size: wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: DEPTH_FORMAT,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-        view_formats: &[],
-    });
-    let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    (texture, view)
-}
-
-/// Allocate the offscreen colour target: sampled by egui (`TEXTURE_BINDING`) and
-/// readable back to the CPU (`COPY_SRC`), so one owned target serves both the editor's
-/// `egui::Image` and the dev layer's PNG capture instead of each allocating its own.
-///
-/// Also returns the UI pass's format (#418): an sRGB target is made viewable as its
-/// non-sRGB twin so the UI blends in display space. A device without view-format
-/// support (some GL drivers) rejects that; it is caught and answered with a plain
-/// target, where the UI blends in linear space — slightly off, never broken.
-fn create_color_target(
-    device: &wgpu::Device,
-    format: wgpu::TextureFormat,
-    width: u32,
-    height: u32,
-) -> (wgpu::Texture, wgpu::TextureFormat) {
-    let alias = format.remove_srgb_suffix();
-    let (aliased, plain) = ([alias], []);
-    let desc = |view_formats| wgpu::TextureDescriptor {
-        label: Some("View Colour Target"),
-        size: wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-            | wgpu::TextureUsages::TEXTURE_BINDING
-            | wgpu::TextureUsages::COPY_SRC,
-        view_formats,
-    };
-    if alias != format {
-        device.push_error_scope(wgpu::ErrorFilter::Validation);
-        let texture = device.create_texture(&desc(&aliased));
-        if pollster::block_on(device.pop_error_scope()).is_none() {
-            return (texture, alias);
-        }
-    }
-    (device.create_texture(&desc(&plain)), format)
-}
-
 #[cfg(test)]
-#[path = "view_tests.rs"]
+#[path = "tests.rs"]
 mod view_tests;

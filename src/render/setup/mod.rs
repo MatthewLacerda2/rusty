@@ -56,7 +56,14 @@ impl Renderer {
 
         // 4. Configure surface swapchain.
         let surface_caps = surface.get_capabilities(&adapter);
-        let config = surface_config(&surface_caps, size);
+        let mut config = surface_config(&surface_caps, size);
+        // Let the UI pass view the sRGB swapchain as its non-sRGB twin, so a HUD
+        // blends in display space on the player's window too (#418).
+        let flags = adapter.get_downlevel_capabilities().flags;
+        let alias = config.format.remove_srgb_suffix();
+        if flags.contains(wgpu::DownlevelFlags::SURFACE_VIEW_FORMATS) && alias != config.format {
+            config.view_formats = vec![alias];
+        }
         surface.configure(&device, &config);
 
         let present_modes = surface_caps.present_modes.clone();

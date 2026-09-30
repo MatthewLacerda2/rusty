@@ -49,12 +49,19 @@ pub struct UiViewCache {
     canvases: Vec<CanvasGpu>,
     /// How many canvas buffers the last frame (re-)uploaded — the dirty signal.
     uploads: usize,
+    /// How many canvases the last frame drew.
+    drawn: usize,
 }
 
 impl UiViewCache {
-    /// Canvas buffers (re-)uploaded by the last UI draw of this view.
+    /// Canvas buffers (re-)uploaded by the last render of this view.
     pub fn last_uploads(&self) -> usize {
         self.uploads
+    }
+
+    /// Canvases the last render of this view drew (0 when it had nowhere to draw).
+    pub fn last_drawn(&self) -> usize {
+        self.drawn
     }
 
     /// Adopt this frame's `meshes`, uploading only the ones that changed.
@@ -99,10 +106,11 @@ fn create_buffer(device: &wgpu::Device, bytes: &[u8]) -> wgpu::Buffer {
 
 impl Renderer {
     /// Draw every visible canvas of `scene` over `view`'s finished frame. A no-op
-    /// for a view without its own colour target (the cubemap capture) and for a
-    /// scene without UI.
+    /// for a scene without UI and for a view with nowhere to draw it (a targetless
+    /// view given no `set_ui_output`: the cubemap capture).
     pub(crate) fn draw_ui(&mut self, view: &mut RenderView, scene: &Scene) {
-        let Some((target, format)) = view.ui_target() else {
+        (view.ui.uploads, view.ui.drawn) = (0, 0);
+        let Some((target, format)) = view.take_ui_target() else {
             return;
         };
         let size = view.size();
@@ -120,7 +128,8 @@ impl Renderer {
         };
         let meshes = build_canvas_meshes(&scene.world, &layout, screen, &tex_size);
         view.ui.sync(&self.device, &self.queue, meshes);
-        if view.ui.canvases.is_empty() {
+        view.ui.drawn = view.ui.canvases.len();
+        if view.ui.drawn == 0 {
             return;
         }
         self.ui_renderer.ensure_pipeline(&self.device, format);

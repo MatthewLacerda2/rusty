@@ -1,5 +1,6 @@
 //! GPU tests for the UI pass's per-view cache (#418): a canvas is re-uploaded only
-//! when its geometry changed, and views that must not show UI never draw it.
+//! when its geometry changed, views that must not show UI never draw it, and a
+//! targetless view draws it only onto an output its caller supplies.
 
 use glam::{Vec2, Vec3, Vec4};
 
@@ -63,9 +64,17 @@ fn gpu_a_static_hud_uploads_once_and_a_change_reuploads() {
     let mut scene_view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 32, 32, 2);
     let target = scene_view.color_target_view().expect("target");
     renderer.render(&mut scene_view, &scene, &cam, &target, true, &[]);
-    assert_eq!(scene_view.ui.last_uploads(), 0);
-    // A targetless view (the cubemap capture's) has no frame of its own to draw on.
+    assert_eq!(scene_view.ui.last_drawn(), 0);
+    // A targetless view (the cubemap capture's) has no frame of its own to draw on…
     let mut capture = RenderView::targetless(&renderer.device, OFFSCREEN_FORMAT, 32, 32, 2);
     renderer.render(&mut capture, &scene, &cam, &target, false, &[]);
-    assert_eq!(capture.ui.last_uploads(), 0);
+    assert_eq!(capture.ui.last_drawn(), 0);
+    // …unless its caller hands it one, as the player does with its swapchain frame;
+    // the output is used by that render only.
+    let output = scene_view.color_target_view().expect("target");
+    capture.set_ui_output(Some((output, OFFSCREEN_FORMAT)));
+    renderer.render(&mut capture, &scene, &cam, &target, false, &[]);
+    assert_eq!(capture.ui.last_drawn(), 1);
+    renderer.render(&mut capture, &scene, &cam, &target, false, &[]);
+    assert_eq!(capture.ui.last_drawn(), 0);
 }

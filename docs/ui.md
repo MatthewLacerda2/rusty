@@ -131,9 +131,11 @@ a `Tiled` image caps itself at 1024 tiles by growing the tile.
 
 - **When.** Inside `Renderer::render`, **after the whole post-FX chain** (after FXAA):
   a HUD is never tonemapped, bloomed, motion-blurred or FXAA-softened. It draws onto
-  the view's own colour target — the frame the editor's Game view, headless screenshots
-  and the player present. The Scene view (edit-mode camera) does not draw the game's UI,
-  nor does a view without its own target (the reflection-probe cubemap capture).
+  the frame each consumer presents: the view's own colour target for the editor's Game
+  view and headless screenshots, and the swapchain frame the standalone player hands
+  its targetless view (`RenderView::set_ui_output`). The Scene view (edit-mode camera)
+  does not draw the game's UI, nor does a targetless view given no output (the
+  reflection-probe cubemap capture).
 - **What.** The layout is recomputed for the view's pixel size with the same pure
   `UiLayout::compute` the sim runs, then walked in draw order. A graphic draws when it
   and every ancestor are `active`.
