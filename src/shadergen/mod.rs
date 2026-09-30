@@ -46,8 +46,8 @@ pub use recipe::{BlockSel, PassKind, ShaderRecipe};
 pub const ENGINE_SHADER_DIR: &str = "assets/shaders";
 
 /// The default output dir for authored shaders: the gitignored project workspace,
-/// the same pattern as authored textures/scripts. A `ShaderRegistry` pointed here
-/// loads a baked variant by name; bakes never touch the committed engine set.
+/// the same pattern as authored textures/scripts. A material naming a baked surface
+/// variant renders with it (#396); bakes never touch the committed engine set.
 pub const DEFAULT_OUT_DIR: &str = "project/assets/shaders";
 
 #[cfg(test)]
