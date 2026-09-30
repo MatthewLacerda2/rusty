@@ -313,14 +313,14 @@ determinism, no file written on a rejected patch).
 | Setter | Status | Read-site |
 |---|---|---|
 | `SetColor` / `SetTexture` / `SetType` / `SetBorder` / `SetFillMethod` / `SetFillOrigin` / `SetFillAmount` / `SetFillClockwise` / `SetPreserveAspect` | ✅ | render — `render::ui::mesh::build_canvas_meshes` + `render::ui::geometry::image_triangles` in the UI pass (`tests/gpu/ui_hud_screenshot.rs`); round-trips (`tests/ui_graphics_api.rs`) |
-| `SetRaycastTarget` | ✅ | round-trips; read by pointer dispatch when #420 lands |
+| `SetRaycastTarget` | ✅ | sim — `ui::events::raycast` (`UI.Raycast`, pointer dispatch; `src/ui/events/raycast_tests.rs`); round-trips |
 
 ### `CanvasGroup` — over `Entity.canvas_group` (#418)
 
 | Setter | Status | Read-site |
 |---|---|---|
 | `SetAlpha` | ✅ | render — multiplied down the subtree in `render::ui::mesh` (`tests/gpu/ui_hud_screenshot.rs`) |
-| `SetInteractable` / `SetBlocksRaycasts` | ✅ | round-trip; read by pointer dispatch when #420 lands |
+| `SetInteractable` / `SetBlocksRaycasts` | ✅ | sim — `ui::events::is_interactable` (Selectable `Disabled`, interaction gating) and `ui::events::raycast` (pass-through); round-trips |
 
 ### `RectMask` — over `Entity.rect_mask` (#418)
 
@@ -334,7 +334,22 @@ determinism, no file written on a rejected patch).
 |---|---|---|
 | `SetText` / `SetFont` / `SetBoldFont` / `SetItalicFont` / `SetFontSize` / `SetColor` / `SetAlignment` / `SetWrap` / `SetOverflow` / `SetLineSpacing` / `SetLetterSpacing` / `SetAutoSize` / `SetRichText` | ✅ | sim — `ui::text::layout_text` (also `Text.GetLayout` / `GetPreferredSize`); render — `render::ui::text::quads` in the UI pass; round-trips (`tests/ui_text_api/`) |
 | `SetOutline` / `SetShadow` / `SetGlow` | ✅ | render — the SDF parameters and shadow quads of `render::ui::text::quads`, cut in `ui.wgsl` (`tests/gpu/ui_text_screenshot.rs`); round-trips |
-| `SetRaycastTarget` | ✅ | round-trips; read by pointer dispatch when #420 lands |
+| `SetRaycastTarget` | ✅ | sim — `ui::events::raycast`; round-trips |
+
+### `Selectable` — over `Entity.selectable` (#420)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetInteractable` | ✅ | sim — `ui::events::is_interactable` (the `Disabled` state; press / drag / scroll / submit gating); round-trips (`tests/selectable_api.rs`) |
+| `SetTransition` / `SetTargetGraphic` / `SetColor` / `SetFadeDuration` / `SetSprite` | ✅ | sim — `EventSystem::apply_transitions` writes the target's runtime `state_tint` / `override_texture`; render — multiplied / preferred in `render::ui::mesh` and `render::ui::text::emit` (`src/ui/events/transition_tests.rs`); round-trips |
+| `SetNavigation` / `SetSelectOn` | ✅ | sim — `ui::events::focus` (arrow-key navigation; `src/ui/events/focus_tests.rs`); round-trips, references remapped through prefabs |
+
+### `UI` — the event system (#420)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetSelected` | ✅ | sim — `EventSystem::process` announces it (`OnDeselect` / `OnSelect`) and navigation moves from it (`tests/ui_events.rs`); runtime state, not saved |
+| `Click` | ✅ | sim — writes `Input`'s pointer + `Mouse0` edges, read by the next tick's pointer dispatch (`tests/ui_events.rs`) |
 
 ### `Debug` (dev-only) — over `ConsoleLogs`
 

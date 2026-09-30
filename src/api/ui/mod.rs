@@ -8,20 +8,27 @@
 
 mod events;
 
+pub use events::register_events;
+
+use std::cell::RefCell;
+
 use glam::Vec2;
 use mlua::{Lua, Table};
 use serde_json::{json, Value};
 
-use super::{put, ApiScopedCtx, Reg};
-use crate::ui::{layout, UiRect};
+use super::{put, Reg};
+use crate::core::video::VideoSettings;
+use crate::scene::Scene;
+use crate::ui::{layout, ScreenSize, UiRect};
 
 /// Register the `UI` namespace onto `lua`.
 pub fn register<'lua, 'scope>(
     lua: &'lua Lua,
     scope: &mlua::Scope<'lua, 'scope>,
-    ctx: &ApiScopedCtx<'scope>,
+    scene: &'scope RefCell<Scene>,
+    screen: &'scope RefCell<ScreenSize>,
+    video: &'scope RefCell<VideoSettings>,
 ) -> Reg {
-    let (scene, screen, video) = (ctx.scene, ctx.screen, ctx.video);
     let table = lua.create_table().map_err(|e| e.to_string())?;
     put(
         &table,
@@ -40,7 +47,6 @@ pub fn register<'lua, 'scope>(
             Ok((px.x, px.y))
         }),
     )?;
-    events::register(scope, &table, ctx)?;
     lua.globals().set("UI", table).map_err(|e| e.to_string())
 }
 

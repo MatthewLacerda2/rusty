@@ -10,18 +10,19 @@
 use glam::Vec2;
 use mlua::{Lua, Table};
 
-use super::super::{put, ApiScopedCtx, Reg};
+use super::super::{global_table, put, ApiScopedCtx, Reg};
 use crate::ecs::World;
 use crate::ui::events::{is_interactable, is_under, is_visible, raycast};
 use crate::ui::layout::rect_of;
 use crate::ui::{EventSystem, UiLayout};
 
-/// Add the event verbs to the `UI` table.
-pub(super) fn register<'lua, 'scope>(
+/// Add the event verbs to the `UI` table [`super::register`] created.
+pub fn register_events<'lua, 'scope>(
+    lua: &'lua Lua,
     scope: &mlua::Scope<'lua, 'scope>,
-    table: &Table<'lua>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
+    let table = &global_table(lua, "UI")?;
     let (scene, input, events) = (ctx.scene, ctx.input, ctx.event_system);
     let (screen, video) = (ctx.screen, ctx.video);
     let px = move || screen.borrow().pixels(&video.borrow());

@@ -4,12 +4,12 @@ rusty's in-game UI is **Unity 5's uGUI, adapted** — HUDs, menus and overlays a
 from ordinary GameObjects. This page is the model: what the pieces are, how layout works,
 and the rules that keep it deterministic. The roadmap is the tracking issue #414; the
 script surface is in [`scripting-api.md`](scripting-api.md) (`Canvas`, `RectTransform`,
-`UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`).
+`UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Selectable`).
 
 > Status: the model, the `Canvas` and `RectTransform` components and the layout pass
 > (#417); drawing — `Image`, `CanvasGroup`, `RectMask` and the render pass (#418);
-> fonts and SDF `Text` (#419). Pointer events and focus (#420) and layout groups
-> (#421) build on it.
+> fonts and SDF `Text` (#419); interaction — hit-testing, pointer and focus callbacks
+> and `Selectable` (#420). Layout groups (#421) build on it.
 
 ## The model
 
@@ -19,7 +19,7 @@ script surface is in [`scripting-api.md`](scripting-api.md) (`Canvas`, `RectTran
   prefabs, scene save and the Play/Stop snapshot all apply unchanged. There is no separate
   UI document or markup world, and no egui in the game (egui stays the editor's toolkit).
 - **Primitives in Rust, widgets in Lua.** First-class components are the primitives
-  (`Canvas`, `RectTransform`, `Image`, `CanvasGroup`, `RectMask`, `Text`, …);
+  (`Canvas`, `RectTransform`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Selectable`, …);
   Button, Slider, Dropdown and the rest ship as engine Lua scripts + prefabs.
 
 ### `Canvas`
@@ -108,7 +108,7 @@ adds a `RectTransform`.
 | `border` | `Sliced`: the frame in texels — left, bottom, right, top. |
 | `fill_method`, `fill_origin`, `fill_amount`, `fill_clockwise` | `Filled`: `Horizontal` / `Vertical` bars from an edge, or a `Radial360` sweep from an edge (health bars, cooldown rings, reload circles). |
 | `preserve_aspect` | `Simple`: letterbox the texture inside the rect instead of stretching it. |
-| `raycast_target` | Whether the pointer can hit it (read by #420). |
+| `raycast_target` | Whether the pointer can hit it (see *Interaction*). |
 
 **UI sprites.** One texel is one reference unit — Unity's 100-pixels-per-unit sprite on
 a 100-reference-pixels-per-unit canvas — so a `Sliced` border or a `Tiled` tile keeps its
@@ -121,8 +121,9 @@ a `Tiled` image caps itself at 1024 tiles by growing the tile.
 ### `CanvasGroup` and `RectMask`
 
 - **`CanvasGroup`** — `alpha` multiplies every graphic on the entity and below it;
-  nested groups multiply (screen fades, disabled panels). `interactable` and
-  `blocks_raycasts` are read by pointer dispatch (#420).
+  nested groups multiply (screen fades, disabled panels). `interactable = false`
+  disables every `Selectable` below it, and `blocks_raycasts = false` lets the pointer
+  pass through the whole subtree (see *Interaction*).
 - **`RectMask`** — Unity's `RectMask2D`: the entity's own graphic and its whole subtree
   are clipped to the axis-aligned screen bounds of its rect, inset by `padding`; nested
   masks intersect. The clip is a scissor rect, so a rotated mask clips to its bounding
@@ -147,7 +148,7 @@ entity's laid-out rect (after rotation and scale). Adding one also adds a
 | `letter_spacing` | Extra advance per character, in ems. |
 | `auto_size`, `auto_size_min`, `auto_size_max` | Pick the largest size in `[min, max]` at which the whole text fits the rect (the minimum when none does; `overflow` then applies). A fixed-step binary search, so the pick is a pure function of the inputs. |
 | `rich_text` | Parse the tag subset. Off draws tags literally (echoing user input). |
-| `raycast_target` | Whether the pointer can hit it (read by #420). |
+| `raycast_target` | Whether the pointer can hit it (see *Interaction*). |
 | `outline_width`, `outline_color` | An outline grown outward from the glyph edge, in ems. |
 | `shadow_offset`, `shadow_color` | A drop shadow — a copy of the (outlined) glyphs offset in reference units, drawn beneath the whole label. |
 | `glow_size`, `glow_color` | A soft glow fading out past the (outlined) edge over `glow_size` ems — neon labels. |
@@ -218,14 +219,125 @@ and widens the advance slightly.
   changed (a layout or graphic change) and reallocated only when it outgrows its
   capacity, so a static HUD uploads nothing per frame.
 
+## Interaction
+
+Unity's `EventSystem`, `StandaloneInputModule` and `GraphicRaycaster`, run **in the
+sim, on the CPU** (`src/ui/events/`): a headless run clicks exactly what a window
+would, and a replay of the same inputs fires the same callbacks. Once per tick, at
+the head of the script phase (after `Awake`/`Start`, before `Update`), the event
+system reads this tick's input and last tick's settled layout and fires the UI
+callbacks straight into the scripts — no event bus. The callbacks and the order
+they fire in are listed in *Script lifecycle callbacks* in `scripting-api.md`.
+
+### Hit-testing
+
+The pointer is in **UI screen pixels** — bottom-left origin, y-up, the frame of
+`UI.GetRect(id).screen` (`Input.GetMousePosition` is top-left, so `y` flips). The
+**top-most** hit wins: canvases by `sort_order`, then the reverse of hierarchy
+pre-order (the last-drawn graphic is on top). A graphic is hit when it is an
+`Image` or `Text` with `raycast_target`, it and every ancestor are `active`, no
+`CanvasGroup` on it or above it has `blocks_raycasts = false`, the point is inside
+every `RectMask` on its chain (padding applied, the same clip drawing uses), and
+the point is inside its **final quad** — rotation and scale included. A fully
+transparent graphic still blocks (Unity's default). While the cursor is locked
+(mouse-look) the pointer is off the UI.
+
+### Pointer events
+
+- **Hover.** The hit entity and every ancestor are *inside* the pointer. When the
+  hit changes, what was left gets `OnPointerExit`, what was reached gets
+  `OnPointerEnter` — deepest first. Moving from a button onto its own label leaves
+  the button inside: it neither exits nor re-enters.
+- **Press → click.** Down, up and click go to **one** entity: the nearest one from
+  the hit upward whose scripts define any of the three, or that carries a
+  `Selectable`. A click fires on release when the pointer is still over that same
+  entity. Left, right and middle buttons each track their own press (`event.button`).
+- **Drag.** The nearest entity defining a drag callback. Once the held pointer has
+  moved **10 pixels** (Unity's threshold): `OnBeginDrag`, then `OnDrag` on every
+  tick it moves, then `OnEndDrag` on release. A drag taken by a *different* entity
+  than the press cancels the press — it gets `OnPointerUp` and no click (dragging
+  a scroll view from one of its buttons).
+- **Scroll.** The wheel goes to the nearest `OnScroll` handler.
+
+This differs from Unity in one deliberate way: Unity bubbles down, up and click
+each to their own nearest handler, so a child handling only `OnPointerDown` can
+silently swallow its parent's click. Here the three share one owner.
+
+### `Selectable`
+
+Unity's `Selectable`, the base every widget (#422) builds on. Adding one also adds
+a `RectTransform`.
+
+| Field | Meaning |
+|---|---|
+| `interactable` | Whether it accepts input. A `CanvasGroup` with `interactable = false` above it disables it too. |
+| `transition` | How its state shows: `ColorTint`, `SpriteSwap` or `None`. |
+| `target_graphic` | The entity whose Image (and Text) shows the state; none is its own entity. |
+| `colors`, `fade_duration` | `ColorTint`: a colour per state, multiplied into the target's colour, fading linearly over `fade_duration` seconds of **unscaled** time (a menu under `Time.SetTimeScale(0)` still animates). |
+| `sprites` | `SpriteSwap`: a texture per state, shown instead of the target Image's; `Normal` shows the Image's own. |
+| `navigation` | How keyboard focus leaves it: `Automatic`, `Explicit` or `None` (never focused by navigation). |
+| `select_on_up/down/left/right` | `Explicit` targets. |
+
+**States**, first match wins: `Disabled` (not interactable) → `Pressed` (the left
+button pressed it and the pointer is still inside) → `Selected` (it has the focus)
+→ `Highlighted` (the pointer is inside) → `Normal`. A left press focuses the nearest
+interactable, navigable Selectable under the pointer — and a press anywhere else
+clears the focus, as in Unity. A Selectable that is **not interactable cannot start
+an interaction**: press, drag, scroll, submit and cancel stop at it without firing
+(Unity leaves that check to each widget; here every Lua widget gets it for free).
+Hover still reports enter and exit.
+
+The transition runs in `LateUpdate`, after layout, and writes two **runtime-only**
+slots on the target — its colour multiplier (Unity's `CanvasRenderer` colour) and
+its override sprite (`Image.overrideSprite`). Neither is saved, so the authored
+`color` and `texture` never change and Stop restores nothing extra. In edit mode
+nothing runs: graphics show untinted.
+
+**References.** `target_graphic` and the explicit targets are entity ids. Saving a
+prefab rewrites them to the prefab's local ids (a target outside the saved subtree
+is dropped), stamping rewrites them to the new instance's ids, and a linked
+instance's propagation compares them in its own ids — so a button prefab keeps
+pointing at its own icon however many times it is placed.
+
+### Keyboard focus
+
+The focused ("selected") entity is what the keyboard drives. Keys become **logical
+actions** first — Move (arrows), Next / Previous (Tab / Shift+Tab), Submit (Enter,
+keypad Enter), Cancel (Escape) — so a gamepad later maps onto the same actions.
+
+- **Move** follows the focused Selectable's `navigation`: `Explicit` takes the
+  target for that direction; `Automatic` picks, among the *candidates*, the centre
+  in front of the focused rect's edge maximizing `dot(direction, offset) /
+  distance²` (Unity's `FindSelectable`); `None` stays put. Nothing focused, nothing
+  moves.
+- **Next / Previous** cycle the candidates in draw order, wrapping, from the first
+  (last) when nothing is focused.
+- **Submit / Cancel** fire `OnSubmit` / `OnCancel` on the focused entity itself.
+
+A *candidate* is a visible, interactable Selectable whose navigation is not `None`.
+Every change of focus — a click, navigation or `UI.SetSelected` — fires
+`OnDeselect` on the old entity, then `OnSelect` on the new one; a script's
+`SetSelected` is announced at the head of the next tick. A focused entity that goes
+inactive or is destroyed loses the focus.
+
+### Gameplay vs UI, and the agent
+
+`UI.IsPointerOverUI()` is Unity's `IsPointerOverGameObject`; `UI.IsPointerConsumed()`
+also stays true while a press that began over the UI is held, so dragging a slider
+off its edge never fires the weapon. Gameplay guards pointer input with it — the
+pattern is in `scripting-api.md`. For bots and tests, `UI.Raycast(x, y)` names what
+is under a point, `UI.List()` lists every visible Selectable with its name, state
+and screen rect, and `UI.Click(id)` clicks one **through the real input path** (a
+covering modal or a locked cursor makes it miss, as it would a player).
+
 ## Determinism
 
 The layout is a pure function of (scene, **screen size**), so the screen size is a **sim
 input**, like the seed and the player's inputs. The windowed platform writes the game
 view's pixel size into the `ScreenSize` resource every frame; a headless run never writes
 it, and the `Video` resolution stands in. Same (seed, inputs, dt, screen size) ⇒ same
-layout. `src/ui` sits under the determinism and direction guards: no wall clock, no
-unseeded RNG, and no `render` / `editor` / `wgpu` / `egui` imports.
+layout — and the same hits and UI callbacks. `src/ui` sits under the determinism and
+direction guards: no wall clock, no unseeded RNG, and no `render` / `editor` / `wgpu` / `egui` imports.
 
 ## Pausing under a menu
 

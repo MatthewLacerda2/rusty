@@ -100,9 +100,36 @@ Component menu offers.
 | `OnEnable` | `OnEnable(id)` | When the owning entity becomes `active`: on its **first** activation — between `Awake` and `Start`, so the first-tick order is `Awake → OnEnable → Start` — and again on every later inactive→active transition (e.g. a script or `Scene.Activate` re-enabling a pooled object). Detected by diffing the entity's `active` flag against the previous tick, so it fires **exactly once** per rising edge. |
 | `OnDisable` | `OnDisable(id)` | When the owning entity becomes inactive: once on each `active`→inactive transition (e.g. `Scene.Deactivate`), and once more — immediately **before** `OnDestroy` — when an *active* entity is destroyed. Fires **exactly once** per falling edge. While disabled, the entity receives no other gameplay callback (no `Update`/`LateUpdate`/`OnTrigger`). |
 | `OnDestroy` | `OnDestroy(id)` | Once, when the entity is removed **during play** via `Scene.DestroyEntity` — after its `OnDisable` if it was active. The entity is still readable during the callback (removal happens just after). See the divergence note: **Stop does not fire `OnDestroy`.** |
+| `OnPointerEnter` | `OnPointerEnter(id, event)` | UI (#420): the pointer moved onto the entity or one of its descendants. Fires on every entity from the hit one up to the root that defines it, deepest first — moving from a button onto its own label does not re-enter the button. |
+| `OnPointerExit` | `OnPointerExit(id, event)` | UI: the pointer left the entity and all its descendants (deepest first). |
+| `OnPointerDown` | `OnPointerDown(id, event)` | UI: a mouse button went down over the entity. Bubbles — see below. |
+| `OnPointerUp` | `OnPointerUp(id, event)` | UI: the button pressed over the entity was released, wherever the pointer is now (or a drag took the press over). |
+| `OnPointerClick` | `OnPointerClick(id, event)` | UI: the press and the release were both over the entity. The button menus and bots use. |
+| `OnBeginDrag` | `OnBeginDrag(id, event)` | UI: a pointer held down on the entity moved 10 pixels (Unity's drag threshold). |
+| `OnDrag` | `OnDrag(id, event)` | UI: every tick the dragged pointer moves; `event.delta` is the motion. |
+| `OnEndDrag` | `OnEndDrag(id, event)` | UI: the dragging button was released. |
+| `OnScroll` | `OnScroll(id, event)` | UI: the wheel turned over the entity; `event.delta.y` is the lines scrolled (positive = away from the user). |
+| `OnSelect` | `OnSelect(id)` | UI: the entity became the focused (selected) one — by a click, keyboard navigation or `UI.SetSelected`. |
+| `OnDeselect` | `OnDeselect(id)` | UI: the entity stopped being focused (fires before the new focus's `OnSelect`). |
+| `OnSubmit` | `OnSubmit(id)` | UI: Enter was pressed while the entity is focused. |
+| `OnCancel` | `OnCancel(id)` | UI: Escape was pressed while the entity is focused. |
 
 `id` is always the **owning** entity's id (the entity the script is attached
 to); `other` is the other entity in the overlap.
+
+**UI callbacks (#420).** The pointer family's `event` is a table:
+`button` (`"Left"`, `"Right"` or `"Middle"`), `position = {x, y}` (UI screen
+pixels, bottom-left origin — the frame of `UI.GetRect(id).screen`; `(-1, -1)`
+while the cursor is locked), `delta = {x, y}` (pointer motion since last tick,
+or the wheel for `OnScroll`) and `target` (the entity the pointer actually hit —
+the callback may be running on an ancestor of it). Pointer events **bubble**: a
+press, release and click go to one entity, the nearest one from the hit entity
+upward whose scripts define any of the three (or that carries a `Selectable`); a
+drag goes to the nearest defining a drag callback; the wheel to the nearest
+defining `OnScroll`. A `Selectable` that is not interactable cannot *start* an
+interaction — press, drag, scroll, submit and cancel stop at it without firing.
+Focus callbacks (`OnSelect` … `OnCancel`) go to the focused entity itself. How
+hits are found and what a Selectable adds is in [`docs/ui.md`](ui.md).
 
 **Deterministic dispatch order** (enforced in `src/scripting/lifecycle.rs`, so
 headless replays stay byte-identical):
@@ -134,6 +161,14 @@ headless replays stay byte-identical):
   tick: all `OnDisable`s first, then all `OnDestroy`s, in ascending
   `(entity id, script index)` order, before the entities are removed. Every
   edge fires exactly once, so replays stay byte-identical.
+- The UI callbacks run in their own phase between the init phase and
+  `Update` (so a button reacts the same tick, and gameplay's `Update` already
+  sees `UI.IsPointerConsumed()` settled): focus changes a script made last tick
+  (`OnDeselect` → `OnSelect`), then keyboard navigation and `OnSubmit` /
+  `OnCancel`, then the pointer — `OnPointerExit` / `OnPointerEnter`, then each
+  button (left, right, middle) in down → up → click → drag order, then
+  `OnScroll`. A pointer that arrives and clicks in one tick reads enter → down
+  → up → click.
 - Right after **all** `Update`s (before nav/physics and `LateUpdate`) comes the
   timer phase: due [`Timer`](#timer) invokes fire and waiting coroutines resume,
   in ascending `(entity id, handle)` order.
@@ -509,7 +544,7 @@ case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `Texture` (alias `Material`), `NavMeshAgent`, `Camera`, `Particles`,
 `VisualCorrection`, `Audio` (alias `AudioSource`), `Canvas`, `RectTransform`,
 `Image`, `CanvasGroup`, `RectMask` (alias `RectMask2D`), `Text` (alias
-`TextMeshPro`).
+`TextMeshPro`), `Selectable`.
 Each is added with the inspector's default values; adding an
 existing kind replaces it. (Scripts attach by path, not as a defaulted kind — a
 separate concern.)
@@ -1918,12 +1953,49 @@ In `Debug.Snapshot` the component appears as `rect_transform`.
 
 ## `UI`
 
-EventSystem-level UI verbs (#417; pointer and focus verbs arrive with #420).
+EventSystem-level UI verbs: layout reads (#417), focus, the gameplay-vs-UI guards
+and the agent's pointer verbs (#420). Points are **UI screen pixels**: bottom-left
+origin, y-up — the frame of `GetRect(id).screen`. (`Input.GetMousePosition` is
+top-left: UI `y` = screen height − mouse `y`.)
 
 | Function | Signature | Returns |
 |---|---|---|
 | `UI.GetRect` | `(id)` | rect table, or `nil` when the entity is not laid out under a canvas |
 | `UI.GetScreenSize` | `()` | `width, height` in pixels — the screen the UI lays out on |
+| `UI.SetSelected` | `(id)` | — focus `id` (`nil` clears); `OnDeselect` / `OnSelect` fire at the head of the next tick's script phase |
+| `UI.GetSelected` | `()` | the focused entity's id, or `nil` |
+| `UI.IsPointerOverUI` | `()` | `true` when the pointer is over a raycast target this tick |
+| `UI.IsPointerConsumed` | `()` | `true` when gameplay should leave the pointer alone: it is over the UI, or a press that began over the UI is still held |
+| `UI.Raycast` | `(x, y)` | the top-most raycast target under the point, or `nil` |
+| `UI.Click` | `(id)` | `true` if the click will land on `id` (or its descendant) — see below |
+| `UI.List` | `()` | array of every visible `Selectable`, in draw order — see below |
+
+**Gameplay vs UI.** A click on a menu must not also fire the weapon. Guard
+gameplay pointer input with `UI.IsPointerConsumed()` — UI callbacks run before
+`Update`, so it is already settled for the tick:
+
+```lua
+function Weapon.Update(id, dt)
+  if Input.IsKeyDown("Mouse0") and not UI.IsPointerConsumed() then fire(id) end
+end
+```
+
+**`UI.Click(id)`** is a real click through the real input path: it moves the
+pointer to the centre of `id`'s final quad and presses and releases `Mouse0`, so
+on the next tick the pointer enters, presses, releases and clicks exactly as a
+player's would — a modal covering the button eats it, a locked cursor misses the
+UI. It returns whether the top-most hit at that point is `id` or one of its
+descendants (and the cursor is not locked). **`UI.Raycast(x, y)`** and
+**`UI.List()`** compute the layout on demand from the live scene, in edit mode
+too. Each `List` entry is `{ id, name, state, interactable, selected, rect }` —
+`state` as `Selectable.GetState`, `rect = { x, y, width, height }` in screen
+pixels — so a bot can find "Start Game" by name and click it:
+
+```lua
+for _, b in ipairs(UI.List()) do
+  if b.name == "Start Game" then UI.Click(b.id) end
+end
+```
 
 The rect table: `x, y, width, height` — the axis-aligned bounds of the element's
 final quad (after rotation / scale) in reference units; `screen = { x, y, width,
@@ -1955,7 +2027,7 @@ How each type draws is in [`docs/ui.md`](ui.md).
 | `Image.GetFillAmount` / `SetFillAmount` | `(id)` / `(id, amount)` | the visible fraction, clamped to 0..1 |
 | `Image.GetFillClockwise` / `SetFillClockwise` | `(id)` / `(id, bool)` | `Radial360` sweep direction |
 | `Image.GetPreserveAspect` / `SetPreserveAspect` | `(id)` / `(id, bool)` | `Simple`: fit the texture's aspect inside the rect |
-| `Image.GetRaycastTarget` / `SetRaycastTarget` | `(id)` / `(id, bool)` | whether the pointer can hit it (read by #420) |
+| `Image.GetRaycastTarget` / `SetRaycastTarget` | `(id)` / `(id, bool)` | whether the pointer can hit it |
 
 Name setters are case-insensitive; an unrecognized name is ignored. A health bar
 is `SetType(id, "Filled")` + `SetFillAmount(id, hp / max)`; a cooldown ring is the
@@ -1966,7 +2038,7 @@ same with `SetFillMethod(id, "Radial360")`.
 Read and tune an entity's `CanvasGroupComponent` (#418) — Unity's `CanvasGroup`.
 `Alpha` multiplies every graphic on the entity and below it (nested groups
 multiply) — screen fades, greyed-out panels. `Interactable` and `BlocksRaycasts`
-are read by pointer dispatch (#420). Without a CanvasGroup, `GetAlpha` returns `1`
+are read by the event system (#420). Without a CanvasGroup, `GetAlpha` returns `1`
 and the flags `false`; setters are then no-ops.
 
 | Function | Signature | Returns |
@@ -1986,6 +2058,31 @@ its rect, inset by the padding; nested masks intersect. Add or remove the clip w
 | Function | Signature | Returns |
 |---|---|---|
 | `RectMask.GetPadding` / `SetPadding` | `(id)` / `(id, l, b, r, t)` | inset in reference units (negative grows the clip) |
+
+## `Selectable`
+
+Read and tune an entity's `SelectableComponent` (#420) — Unity's `Selectable`, the
+base every widget builds on: it makes the entity something the pointer and the
+keyboard focus interact with, and shows its **state** — `"Normal"`,
+`"Highlighted"` (hovered), `"Pressed"`, `"Selected"` (focused) or `"Disabled"` —
+through a transition on its target graphic. Adding one also adds a
+`RectTransform`. Getters return a neutral default (`false`, `nil`, zeros) without
+a Selectable; setters are then no-ops. States, directions (`"Up"`, `"Down"`,
+`"Left"`, `"Right"`) and enum values are names, case-insensitive; an unknown name
+is ignored. The model is in [`docs/ui.md`](ui.md).
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Selectable.GetInteractable` / `SetInteractable` | `(id)` / `(id, bool)` | its own interactable flag |
+| `Selectable.IsInteractable` | `(id)` | whether it accepts input now — its flag and every `CanvasGroup.interactable` above it |
+| `Selectable.GetState` | `(id)` | the state name it shows this tick, or `nil` without a Selectable |
+| `Selectable.GetTransition` / `SetTransition` | `(id)` / `(id, name)` | `"None"`, `"ColorTint"` or `"SpriteSwap"` |
+| `Selectable.GetTargetGraphic` / `SetTargetGraphic` | `(id)` / `(id, targetId)` | the entity whose Image / Text shows the state; `nil` is the Selectable's own entity |
+| `Selectable.GetColor` / `SetColor` | `(id, state)` / `(id, state, r, g, b, [a])` | `ColorTint` colour for `state`, display-space RGBA 0..1 |
+| `Selectable.GetFadeDuration` / `SetFadeDuration` | `(id)` / `(id, seconds)` | `ColorTint` fade, in unscaled seconds (≥ 0) |
+| `Selectable.GetSprite` / `SetSprite` | `(id, state)` / `(id, state, path)` | `SpriteSwap` texture for `state`, or `nil` (the Image's own; `"Normal"` always is) |
+| `Selectable.GetNavigation` / `SetNavigation` | `(id)` / `(id, name)` | `"None"`, `"Automatic"` or `"Explicit"` |
+| `Selectable.GetSelectOn` / `SetSelectOn` | `(id, dir)` / `(id, dir, targetId)` | the `Explicit` target for `dir`, or `nil` |
 
 ## `Text`
 
