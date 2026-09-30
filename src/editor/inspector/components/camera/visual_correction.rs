@@ -44,6 +44,7 @@ pub fn draw_visual_correction(
             draw_color_correction(ui, world, id, &vc, is_dirty);
             draw_ssr(ui, world, id, &vc, is_dirty);
             draw_shadows(ui, world, id, &vc, is_dirty);
+            draw_ssao(ui, world, id, &vc, is_dirty);
         },
     );
     if remove {
@@ -252,4 +253,43 @@ fn draw_shadows(
             *is_dirty = true;
         }
     });
+}
+
+/// The Ambient Occlusion section (#436): on/off, radius and strength.
+fn draw_ssao(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    vc: &VisualCorrectionComponent,
+    is_dirty: &mut bool,
+) {
+    ui.add_space(3.0);
+    ui.label("Ambient Occlusion (SSAO)");
+    let mut active = vc.ssao.active;
+    if ui.checkbox(&mut active, "  SSAO Active").changed() {
+        if let Some(mut c) = world.visual_correction_mut(id) {
+            vc_ops::set_ssao_active(&mut c, active);
+        }
+        *is_dirty = true;
+    }
+    if vc.ssao.active {
+        let (r, i) = (vc.ssao.radius, vc.ssao.intensity);
+        let max = crate::components::SsaoSettings::MAX_INTENSITY;
+        *is_dirty |= slider_row(
+            ui,
+            (&mut *world, id),
+            "    Radius:",
+            r,
+            0.05..=3.0,
+            vc_ops::set_ssao_radius,
+        );
+        *is_dirty |= slider_row(
+            ui,
+            (&mut *world, id),
+            "    Intensity:",
+            i,
+            0.0..=max,
+            vc_ops::set_ssao_intensity,
+        );
+    }
 }

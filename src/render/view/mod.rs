@@ -41,6 +41,9 @@ pub struct RenderView {
     /// Cached decal-pass depth bind group; references this view's depth view, so it is
     /// invalidated (set `None`) whenever the depth target is reallocated on resize.
     pub(crate) decal_depth_bind_group: Option<wgpu::BindGroup>,
+    /// SSAO targets (#436), allocated the first frame this view runs AO; they check
+    /// their own size, so `resize` leaves them alone.
+    pub(crate) ssao: Option<crate::render::passes::ssao::SsaoTargets>,
     /// The offscreen colour target this view renders into (editor viewport / Inspector
     /// preview), `RENDER_ATTACHMENT | TEXTURE_BINDING` so egui samples it. `None` for a
     /// targetless view whose caller supplies the output and reads it back itself.
@@ -130,6 +133,7 @@ impl RenderView {
             depth_view,
             post_fx,
             decal_depth_bind_group: None,
+            ssao: None,
             color_target,
             forward_override: None,
             ui_format,

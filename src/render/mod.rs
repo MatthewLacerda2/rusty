@@ -161,7 +161,13 @@ pub struct Renderer {
     default_cube: cubemap::CubemapTexture,
     pub shadow_layout: wgpu::BindGroupLayout,
     pub shadow_uniform_buffer: wgpu::Buffer,
+    /// The forward pass's group 3 with the white no-AO fallback: every pass that
+    /// draws without SSAO (the transparent pass, a frame with SSAO off) binds this.
     pub shadow_bind_group: wgpu::BindGroup,
+    /// The SSAO depth prepass (#436): the forward vertex stage, depth only.
+    pub(crate) prepass_pipeline: wgpu::RenderPipeline,
+    /// The SSAO occlusion + blur passes and their no-AO fallback (#436).
+    pub(crate) ssao: passes::ssao::SsaoRenderer,
 
     /// Active scalability tier; gates which post-FX passes run + buffer sizes. Shared
     /// across views — each view's post-FX chain (owned by its [`RenderView`]) sizes its

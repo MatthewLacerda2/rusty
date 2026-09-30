@@ -18,6 +18,7 @@ use self::lighting::{
 };
 use self::pass::{PassClear, ScenePassFrame};
 use crate::render::gpu::uniforms::FogUniform;
+use crate::render::passes::ssao::{SsaoFrame, SsaoPlan};
 use crate::render::postfx::params::build_post_params;
 use crate::render::{build_camera_stack, CameraUniform, LightingUniform, RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -74,6 +75,7 @@ impl Renderer {
         let last = stack.len().saturating_sub(1);
         // The base (first) camera drives the shared post-FX history / motion vectors.
         let base_view_proj = stack[0].build_view_projection(aspect);
+        let ssao = SsaoPlan::for_scene(scene, self.quality);
 
         for (idx, cam) in stack.iter().enumerate() {
             // 1. Write this camera's view/projection uniform.
@@ -101,6 +103,12 @@ impl Renderer {
             let frame = ScenePassFrame {
                 editor_mode,
                 clear: PassClear::for_pass(idx == 0, cam.clear_flags),
+                ssao: ssao.map(|plan| SsaoFrame {
+                    plan,
+                    view_proj,
+                    camera_pos: cam.position,
+                    camera_forward: cam.forward(),
+                }),
             };
             self.execute_scene_pass(view, frame, &solids.draws.opaque, &overlays);
 

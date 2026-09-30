@@ -56,6 +56,10 @@ pub struct VisualCorrectionComponent {
     /// Directional-shadow cascades and reach (#435). `#[serde(default)]` loads older
     /// scenes with the engine defaults.
     pub shadows: ShadowSettings,
+    /// Screen-space ambient occlusion (#436). `#[serde(default)]` loads older scenes
+    /// with the engine defaults (on).
+    #[serde(default)]
+    pub ssao: SsaoSettings,
 }
 
 /// How the sun's cascaded shadow map covers the view (#435) — HDRP's Shadows volume
@@ -92,6 +96,42 @@ impl Default for ShadowSettings {
     }
 }
 
+/// Screen-space ambient occlusion (#436) — HDRP's Ambient Occlusion volume override.
+/// Darkens only the ambient/indirect light where geometry crowds a point (a crate's
+/// foot on the floor, a room's corners), never direct light. The quality tier decides
+/// the resolution and sample count; these are the look.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SsaoSettings {
+    /// Whether the AO passes run at all. Off costs nothing.
+    pub active: bool,
+    /// World-space reach of the occlusion search: how far from a surface another
+    /// surface still shades it.
+    pub radius: f32,
+    /// How strongly occlusion darkens the ambient term; `0` is none, `1` the
+    /// physically-plausible amount, above `1` exaggerated.
+    pub intensity: f32,
+}
+
+impl SsaoSettings {
+    /// The shortest radius a write accepts.
+    pub const MIN_RADIUS: f32 = 0.01;
+    /// The strongest intensity a write accepts.
+    pub const MAX_INTENSITY: f32 = 4.0;
+}
+
+impl Default for SsaoSettings {
+    /// On, half a metre, plain strength: the contact and corner shading an interior
+    /// needs, without the dark halo a wider radius paints around a character.
+    fn default() -> Self {
+        Self {
+            active: true,
+            radius: 0.5,
+            intensity: 1.0,
+        }
+    }
+}
+
 /// What the pre-#415 `gamma` field held as its neutral value. Dividing an old
 /// value by it keeps the user's deviation from neutral: `c^(1/g_old)` ≈
 /// `srgb(c^(2.2/g_old))`, i.e. a new tweak of `g_old / 2.2`.
@@ -122,6 +162,8 @@ struct VisualCorrectionFile {
     gamma: Option<f32>,
     #[serde(default)]
     shadows: ShadowSettings,
+    #[serde(default)]
+    ssao: SsaoSettings,
 }
 
 impl From<VisualCorrectionFile> for VisualCorrectionComponent {
@@ -144,6 +186,7 @@ impl From<VisualCorrectionFile> for VisualCorrectionComponent {
             tonemap: f.tonemap,
             gamma,
             shadows: f.shadows,
+            ssao: f.ssao,
         }
     }
 }
@@ -178,6 +221,16 @@ mod tests {
         assert_eq!(load("").shadows, super::ShadowSettings::default());
         let vc = load(r#", "shadows": { "cascades": 2 }"#);
         assert_eq!((vc.shadows.cascades, vc.shadows.distance), (2, 100.0));
+    }
+
+    #[test]
+    fn a_scene_without_ssao_settings_loads_the_defaults() {
+        assert_eq!(load("").ssao, super::SsaoSettings::default());
+        let vc = load(r#", "ssao": { "radius": 1.5 }"#);
+        assert_eq!(
+            (vc.ssao.active, vc.ssao.radius, vc.ssao.intensity),
+            (true, 1.5, 1.0)
+        );
     }
 
     #[test]

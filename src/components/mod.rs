@@ -52,4 +52,4 @@ pub use ui::{
     RectTransformComponent, SelectableComponent, SelectableTransition, SelectionState,
     TextAlignment, TextComponent, TextOverflow,
 };
-pub use visual_correction::{ShadowSettings, Tonemap, VisualCorrectionComponent};
+pub use visual_correction::{ShadowSettings, SsaoSettings, Tonemap, VisualCorrectionComponent};

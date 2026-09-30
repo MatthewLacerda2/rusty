@@ -13,7 +13,7 @@ struct PipelineSpec {
     depth_compare: wgpu::CompareFunction,
 }
 
-/// The four forward-target pipelines, all sharing one shader + vertex layout.
+/// The forward-target pipelines, all sharing one shader + vertex layout.
 pub(crate) struct ForwardPipelines {
     /// Opaque/cutout solids: REPLACE, depth write on.
     pub forward: wgpu::RenderPipeline,
@@ -23,6 +23,8 @@ pub(crate) struct ForwardPipelines {
     pub line: wgpu::RenderPipeline,
     /// Selection-silhouette inverted hull.
     pub outline: wgpu::RenderPipeline,
+    /// The SSAO depth prepass (#436): the forward vertex stage, no colour target.
+    pub prepass: wgpu::RenderPipeline,
 }
 
 /// Builds the forward-lit, transparent, line debug, and outline pipelines.
@@ -54,6 +56,7 @@ pub(crate) fn create_pipelines(
         transparent: p(&render_layout, &transparent_spec()),
         line: p(&line_layout, &line_spec()),
         outline: p(&render_layout, &outline_spec()),
+        prepass: make_prepass(device, shader, &render_layout),
     }
 }
 
@@ -173,6 +176,40 @@ fn make_pipeline(
             format: wgpu::TextureFormat::Depth32Float,
             depth_write_enabled: spec.depth_write_enabled,
             depth_compare: spec.depth_compare,
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState::default(),
+        }),
+        multisample: wgpu::MultisampleState::default(),
+        multiview: None,
+    })
+}
+
+/// The SSAO depth prepass (#436): the solids' depth alone, through the forward vertex
+/// stage (skinning, instancing) and `fs_prepass` (cutout clip, unlit skip). Same
+/// layout as the forward pass, so it records with the same bind groups.
+fn make_prepass(
+    device: &wgpu::Device,
+    shader: &wgpu::ShaderModule,
+    layout: &wgpu::PipelineLayout,
+) -> wgpu::RenderPipeline {
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("SSAO Depth Prepass Pipeline"),
+        layout: Some(layout),
+        vertex: wgpu::VertexState {
+            module: shader,
+            entry_point: "vs_main",
+            buffers: &[vertex_layout()],
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: shader,
+            entry_point: "fs_prepass",
+            targets: &[],
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: Some(wgpu::DepthStencilState {
+            format: wgpu::TextureFormat::Depth32Float,
+            depth_write_enabled: true,
+            depth_compare: wgpu::CompareFunction::Less,
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         }),

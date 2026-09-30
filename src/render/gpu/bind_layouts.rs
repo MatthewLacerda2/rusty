@@ -171,8 +171,9 @@ pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
     })
 }
 
-/// Main shadow bind group layout: the cascade uniform, the cascade depth array, and
-/// the comparison sampler (#435).
+/// Main shadow bind group layout: the cascade uniform, the cascade depth array, the
+/// comparison sampler (#435), and the view's ambient-occlusion texture (#436) — the
+/// forward pass's group 3, everything it reads that a per-frame pass produced.
 pub(crate) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Main Shadow Bind Group Layout"),
@@ -202,6 +203,50 @@ pub(crate) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayo
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
                 count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 3,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+        ],
+    })
+}
+
+/// The forward pass's group 3 over [`create_shadow_layout`]: the cascade `uniform`,
+/// the shadow renderer's active cascade array + sampler, and `ao` — a view's SSAO
+/// result, or the 1x1 white fallback where no AO ran.
+pub(crate) fn create_shadow_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    uniform: &wgpu::Buffer,
+    shadows: &crate::render::passes::shadows::ShadowRenderer,
+    ao: &wgpu::TextureView,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("Main Shadow Bind Group"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&shadows.active_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::Sampler(&shadows.sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: wgpu::BindingResource::TextureView(ao),
             },
         ],
     })

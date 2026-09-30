@@ -175,6 +175,7 @@ pub fn default_visual_correction() -> VisualCorrectionComponent {
         tonemap: Tonemap::Aces,
         gamma: 1.0,
         shadows: Default::default(),
+        ssao: Default::default(),
     }
 }
 

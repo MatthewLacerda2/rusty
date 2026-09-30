@@ -3,7 +3,8 @@
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `VisualCorrectionComponent` field by field: the master `active` flag, bloom
 //! (active / intensity / threshold), color grading (exposure / contrast / saturation
-//! / gamma / tonemap), and SSR (active / quality / temporal upsampling), including the
+//! / gamma / tonemap), SSR (active / quality / temporal upsampling), shadows and SSAO
+//! (active / radius / intensity, #436), including the
 //! validation each write owns (the `≥ 0` clamps on bloom intensity/threshold, the
 //! `≥ 0.01` clamp on gamma).
 //!
@@ -14,7 +15,7 @@
 //!
 //! Allowed deps: components (the `VisualCorrectionComponent`/`Tonemap` data). Pure.
 
-use crate::components::{ShadowSettings, Tonemap, VisualCorrectionComponent};
+use crate::components::{ShadowSettings, SsaoSettings, Tonemap, VisualCorrectionComponent};
 
 /// Set the master visual-correction `active` flag.
 pub fn set_active(vc: &mut VisualCorrectionComponent, active: bool) {
@@ -87,6 +88,21 @@ pub fn set_shadow_distance(vc: &mut VisualCorrectionComponent, distance: f32) {
     vc.shadows.distance = distance.max(ShadowSettings::MIN_DISTANCE);
 }
 
+/// Set whether screen-space ambient occlusion runs (#436).
+pub fn set_ssao_active(vc: &mut VisualCorrectionComponent, active: bool) {
+    vc.ssao.active = active;
+}
+
+/// Set the AO search radius in world units, clamped to `≥ 0.01`.
+pub fn set_ssao_radius(vc: &mut VisualCorrectionComponent, radius: f32) {
+    vc.ssao.radius = radius.max(SsaoSettings::MIN_RADIUS);
+}
+
+/// Set the AO strength, clamped to `0..=4`.
+pub fn set_ssao_intensity(vc: &mut VisualCorrectionComponent, intensity: f32) {
+    vc.ssao.intensity = intensity.clamp(0.0, SsaoSettings::MAX_INTENSITY);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -110,6 +126,7 @@ mod tests {
             tonemap: Tonemap::Aces,
             gamma: 1.0,
             shadows: Default::default(),
+            ssao: Default::default(),
         };
         scene.world.set_visual_correction(id, Some(c));
         (scene, id)
@@ -127,6 +144,9 @@ mod tests {
         set_ssr_temporal_upsampling(&mut e, true);
         set_shadow_cascades(&mut e, 9);
         set_shadow_distance(&mut e, -4.0);
+        set_ssao_active(&mut e, false);
+        set_ssao_radius(&mut e, -1.0);
+        set_ssao_intensity(&mut e, 9.0);
         let vc = &*e;
         assert_eq!(vc.bloom_intensity, 0.0);
         assert_eq!(vc.bloom_threshold, 0.0);
@@ -139,5 +159,8 @@ mod tests {
             vc.shadows.distance, 1.0,
             "shadow distance clamps to its floor"
         );
+        assert!(!vc.ssao.active);
+        assert_eq!(vc.ssao.radius, 0.01, "radius clamps to its floor");
+        assert_eq!(vc.ssao.intensity, 4.0, "intensity clamps to its ceiling");
     }
 }

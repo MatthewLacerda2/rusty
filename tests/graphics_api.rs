@@ -31,6 +31,7 @@ fn scene_with_volume() -> Rc<RefCell<Scene>> {
             tonemap: Tonemap::Aces,
             gamma: 1.0,
             shadows: Default::default(),
+            ssao: Default::default(),
         }),
     );
     scene.world.set_camera(

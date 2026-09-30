@@ -5,7 +5,7 @@
 //! passes run and how large the bloom buffers are. Plain data with its per-tier
 //! decisions, no GPU types — the render layer maps it onto its passes (#494).
 
-/// Scalability tier. Gates SSR + motion blur and the bloom buffer size.
+/// Scalability tier. Gates SSR, motion blur and SSAO, and the bloom buffer size.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum QualityPreset {
     /// iGPU floor: SSR off (cubemap only), motion blur off, quarter-res bloom.
@@ -28,6 +28,22 @@ impl QualityPreset {
         !matches!(self, QualityPreset::Low)
     }
 
+    /// How the SSAO pass runs on this tier (#436), or `None` where it is off: Low
+    /// skips it, Medium traces 8 samples at half resolution, High 16 at full.
+    pub fn ssao(self) -> Option<SsaoTier> {
+        match self {
+            QualityPreset::Low => None,
+            QualityPreset::Medium => Some(SsaoTier {
+                divisor: 2,
+                samples: 8,
+            }),
+            QualityPreset::High => Some(SsaoTier {
+                divisor: 1,
+                samples: 16,
+            }),
+        }
+    }
+
     /// Divisor applied to the bloom buffer resolution (smaller = cheaper).
     pub fn bloom_divisor(self) -> u32 {
         match self {
@@ -35,6 +51,15 @@ impl QualityPreset {
             QualityPreset::Medium | QualityPreset::High => 2,
         }
     }
+}
+
+/// The resolution and sample count of the SSAO pass on one tier (#436).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SsaoTier {
+    /// The occlusion target is the view's size divided by this (1 or 2).
+    pub divisor: u32,
+    /// Hemisphere samples traced per occlusion texel.
+    pub samples: u32,
 }
 
 #[cfg(test)]
@@ -75,5 +100,15 @@ mod tests {
         assert!(!QualityPreset::Low.motion_blur());
         assert!(QualityPreset::Medium.motion_blur());
         assert!(QualityPreset::High.motion_blur());
+    }
+
+    /// SSAO (#436): off on Low, half resolution on Medium, full on High.
+    #[test]
+    fn ssao_is_off_on_low_and_sharper_on_high() {
+        assert_eq!(QualityPreset::Low.ssao(), None);
+        let (m, h) = (QualityPreset::Medium.ssao(), QualityPreset::High.ssao());
+        assert_eq!(m.map(|t| t.divisor), Some(2));
+        assert_eq!(h.map(|t| t.divisor), Some(1));
+        assert!(h.unwrap().samples > m.unwrap().samples);
     }
 }

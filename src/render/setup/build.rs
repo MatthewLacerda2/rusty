@@ -13,7 +13,7 @@ use crate::render::gpu::pipelines;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::postfx::HDR_FORMAT;
 use crate::render::setup::textures::{create_textures, Textures};
-use crate::render::{ibl::skybox, passes::shadows};
+use crate::render::{ibl::skybox, passes::shadows, passes::ssao};
 use crate::render::{CameraUniform, GpuTexture, LightingUniform};
 
 /// Camera + lighting uniform buffers and the group(0) bind group.
@@ -39,6 +39,7 @@ pub(crate) struct ForwardPasses {
     pub transparent_pipeline: wgpu::RenderPipeline,
     pub line_pipeline: wgpu::RenderPipeline,
     pub outline_pipeline: wgpu::RenderPipeline,
+    pub prepass_pipeline: wgpu::RenderPipeline,
     pub skybox_renderer: skybox::SkyboxRenderer,
 }
 
@@ -62,6 +63,8 @@ pub(crate) struct GpuResources {
     pub billboards: BillboardPasses,
     /// The in-game UI pass (#418).
     pub ui: crate::render::ui::UiRenderer,
+    /// The SSAO passes (#436).
+    pub ssao: ssao::SsaoRenderer,
     pub quality: QualityPreset,
 }
 
@@ -76,7 +79,8 @@ impl GpuResources {
         let textures = create_textures(device, queue);
         let global =
             create_global_bindings(device, &camera_lighting_layout, &textures.default_texture);
-        let shadows = create_shadow_system(device, &mut registry);
+        let ssao = ssao::SsaoRenderer::new(device, queue, &mut registry);
+        let shadows = create_shadow_system(device, &mut registry, &ssao.no_ao);
         let forward = create_forward_passes(
             device,
             &camera_lighting_layout,
@@ -96,6 +100,7 @@ impl GpuResources {
             forward,
             billboards,
             ui,
+            ssao,
             quality: QualityPreset::default(),
         }
     }
@@ -186,8 +191,12 @@ fn create_global_bindings(
 }
 
 /// Shadow renderer, its cascade uniform buffer, and the main-pass bind group that
-/// samples the active cascade array.
-fn create_shadow_system(device: &wgpu::Device, registry: &mut ShaderRegistry) -> ShadowSystem {
+/// samples the active cascade array — with `no_ao`, the white stand-in for SSAO.
+fn create_shadow_system(
+    device: &wgpu::Device,
+    registry: &mut ShaderRegistry,
+    no_ao: &wgpu::TextureView,
+) -> ShadowSystem {
     let layout = bind_layouts::create_shadow_layout(device);
     let renderer = shadows::ShadowRenderer::new(device, registry);
 
@@ -198,24 +207,8 @@ fn create_shadow_system(device: &wgpu::Device, registry: &mut ShaderRegistry) ->
         mapped_at_creation: false,
     });
 
-    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("Main Shadow Bind Group"),
-        layout: &layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform_buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::TextureView(&renderer.active_view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: wgpu::BindingResource::Sampler(&renderer.sampler),
-            },
-        ],
-    });
+    let bind_group =
+        bind_layouts::create_shadow_bind_group(device, &layout, &uniform_buffer, &renderer, no_ao);
 
     ShadowSystem {
         layout,
@@ -262,6 +255,7 @@ fn create_forward_passes(
         transparent_pipeline: pl.transparent,
         line_pipeline: pl.line,
         outline_pipeline: pl.outline,
+        prepass_pipeline: pl.prepass,
         skybox_renderer,
     }
 }
