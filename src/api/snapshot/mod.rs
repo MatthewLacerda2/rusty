@@ -134,7 +134,7 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -
 /// "component inventory" authoring needs). `Transform` is mandatory and omitted.
 fn inventory(world: &World, id: u32) -> Vec<&'static str> {
     type Probe = fn(&World, u32) -> bool;
-    let probes: [(Probe, &'static str); 22] = [
+    let probes: &[(Probe, &'static str)] = &[
         (World::has_mesh, "Mesh"),
         (World::has_material, "Material"),
         (World::has_light, "Light"),
@@ -162,9 +162,9 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
         ),
     ];
     probes
-        .into_iter()
+        .iter()
         .filter(|(has, _)| has(world, id))
-        .map(|(_, name)| name)
+        .map(|&(_, name)| name)
         .collect()
 }
 
