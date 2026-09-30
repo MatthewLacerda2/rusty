@@ -12,7 +12,7 @@
 //! asserting (matching `material_maps_screenshot.rs`).
 
 use glam::Vec3;
-use rusty::components::{MaterialAsset, MaterialComponent, Tonemap};
+use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
@@ -31,20 +31,11 @@ fn write_png(path: &std::path::Path, rgb: [u8; 3]) {
 
 fn vc() -> VisualCorrectionComponent {
     VisualCorrectionComponent {
-        active: true,
         bloom_active: false,
-        bloom_intensity: 1.0,
         bloom_threshold: 0.6,
-        exposure: 0.0,
-        contrast: 1.0,
-        saturation: 1.0,
         ssr_active: false,
-        ssr_quality: "High".to_string(),
         ssr_temporal_upsampling: false,
-        tonemap: Tonemap::Aces,
-        gamma: 1.0,
-        shadows: Default::default(),
-        ssao: Default::default(),
+        ..rusty::scene::authoring::default_visual_correction()
     }
 }
 

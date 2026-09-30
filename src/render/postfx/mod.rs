@@ -10,6 +10,7 @@
 //! passes run and how big the bloom buffers are so an integrated GPU can hold
 //! ~30fps (Low: no SSR/motion-blur, half-size bloom).
 
+mod custom;
 pub(crate) mod params;
 mod run;
 mod setup;
@@ -71,6 +72,12 @@ pub struct PostFx {
     pub composite_pipeline: wgpu::RenderPipeline,
     /// Final anti-aliasing pass (#360), reading [`PostFx::ldr`] and writing the output.
     pub fxaa_pipeline: wgpu::RenderPipeline,
+    /// Plain copy, landing the authored-effect chain's result in the output when
+    /// FXAA is off (#397).
+    pub copy_pipeline: wgpu::RenderPipeline,
+    /// Authored post-FX effects (#397): their module cache, second LDR target and
+    /// previous-frame history.
+    pub custom: custom::CustomChain,
     pub io_layout: wgpu::BindGroupLayout,
 
     pub params_buffer: wgpu::Buffer,

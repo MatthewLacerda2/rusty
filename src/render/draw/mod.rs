@@ -210,10 +210,7 @@ impl Renderer {
             skybox_view,
             output,
         };
-        let passes = crate::render::postfx::PostPasses {
-            bloom: bloom_enabled,
-            fxaa: crate::render::postfx::params::fxaa_enabled(scene),
-        };
+        let passes = crate::render::postfx::params::post_passes(scene, bloom_enabled);
         view.post_fx
             .run(&self.device, &self.queue, ctx, post_params, passes);
     }

@@ -45,6 +45,7 @@ pub fn draw_visual_correction(
             draw_ssr(ui, world, id, &vc, is_dirty);
             draw_shadows(ui, world, id, &vc, is_dirty);
             draw_ssao(ui, world, id, &vc, is_dirty);
+            super::custom_effects::draw_custom_effects(ui, world, id, &vc, is_dirty);
         },
     );
     if remove {

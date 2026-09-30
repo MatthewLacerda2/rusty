@@ -313,3 +313,11 @@ fn fs_fxaa(in: VsOut) -> @location(0) vec4<f32> {
     }
     return vec4<f32>(rgb_b, 1.0);
 }
+
+// Plain copy (#397): lands the authored-effect chain's result in the output when FXAA
+// is off. The chain ends in an internal target rather than the output so that result
+// can also be kept as next frame's history (binding 3 of an authored effect).
+@fragment
+fn fs_copy(in: VsOut) -> @location(0) vec4<f32> {
+    return vec4<f32>(textureSample(t_color, s_color, in.uv).rgb, 1.0);
+}

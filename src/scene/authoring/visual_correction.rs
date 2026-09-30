@@ -4,7 +4,8 @@
 //! `VisualCorrectionComponent` field by field: the master `active` flag, bloom
 //! (active / intensity / threshold), color grading (exposure / contrast / saturation
 //! / gamma / tonemap), SSR (active / quality / temporal upsampling), shadows and SSAO
-//! (active / radius / intensity, #436), including the
+//! (active / radius / intensity, #436) and the authored post-FX list (#397),
+//! including the
 //! validation each write owns (the `≥ 0` clamps on bloom intensity/threshold, the
 //! `≥ 0.01` clamp on gamma).
 //!
@@ -103,6 +104,30 @@ pub fn set_ssao_intensity(vc: &mut VisualCorrectionComponent, intensity: f32) {
     vc.ssao.intensity = intensity.clamp(0.0, SsaoSettings::MAX_INTENSITY);
 }
 
+/// Replace the ordered list of authored postfx modules the volume runs (#397).
+///
+/// Each entry is a module name as `Shader.Bake` wrote it (`<name>.wgsl`, no
+/// extension). A name that is empty or reaches outside the shader workspace (a path
+/// separator, a leading `.`) is refused by name and nothing is written; a module
+/// that simply isn't baked yet is accepted — the renderer skips it until it is.
+pub fn set_custom_effects(
+    vc: &mut VisualCorrectionComponent,
+    names: Vec<String>,
+) -> Result<(), String> {
+    if let Some(bad) = names.iter().find(|n| !is_module_name(n)) {
+        return Err(format!(
+            "invalid post-FX effect name {bad:?}: want a baked module name, not a path"
+        ));
+    }
+    vc.custom_effects = names;
+    Ok(())
+}
+
+/// A bare module file stem: non-empty, no path separator, not hidden or `..`.
+fn is_module_name(name: &str) -> bool {
+    !name.is_empty() && !name.starts_with('.') && !name.contains(['/', '\\'])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,6 +152,7 @@ mod tests {
             gamma: 1.0,
             shadows: Default::default(),
             ssao: Default::default(),
+            custom_effects: Vec::new(),
         };
         scene.world.set_visual_correction(id, Some(c));
         (scene, id)
@@ -162,5 +188,21 @@ mod tests {
         assert!(!vc.ssao.active);
         assert_eq!(vc.ssao.radius, 0.01, "radius clamps to its floor");
         assert_eq!(vc.ssao.intensity, 4.0, "intensity clamps to its ceiling");
+    }
+
+    #[test]
+    fn custom_effects_keep_order_and_refuse_paths() {
+        let (mut scene, id) = scene_with_vc();
+        let mut e = scene.world.visual_correction_mut(id).unwrap();
+        set_custom_effects(&mut e, vec!["crt".into(), "grain".into()]).unwrap();
+        for bad in ["", "../etc", "a/b", "a\\b", ".hidden"] {
+            let err = set_custom_effects(&mut e, vec!["ok".into(), bad.into()]).unwrap_err();
+            assert!(err.contains(&format!("{bad:?}")), "{err}");
+        }
+        assert_eq!(
+            e.custom_effects,
+            ["crt", "grain"],
+            "a refused write changes nothing"
+        );
     }
 }

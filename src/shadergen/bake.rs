@@ -18,6 +18,8 @@
 //! point a `ShaderRegistry` at `out_dir` (it reads `<base>/<name>.wgsl`); validate
 //! used the engine's `common`, so the file composes there identically.
 
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use super::assemble::assemble;
 use super::recipe::{PassKind, ShaderRecipe};
 use super::validate::validate;
@@ -71,5 +73,16 @@ pub fn bake_recipe(
     std::fs::create_dir_all(out_dir).map_err(|e| BakeError::Write(e.to_string()))?;
     let path = format!("{out_dir}/{}.wgsl", recipe.name);
     std::fs::write(&path, &module).map_err(|e| BakeError::Write(e.to_string()))?;
+    GENERATION.fetch_add(1, Ordering::Relaxed);
     Ok(path)
+}
+
+/// Bumped by every successful bake, so a consumer that caches compiled modules
+/// (the renderer's authored post-FX, #397) knows to drop them and reload.
+static GENERATION: AtomicU64 = AtomicU64::new(0);
+
+/// How many bakes have been written this process — changes whenever a baked module
+/// on disk may have changed. Render-side only: nothing in the sim reads it.
+pub fn bake_generation() -> u64 {
+    GENERATION.load(Ordering::Relaxed)
 }

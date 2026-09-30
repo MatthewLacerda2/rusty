@@ -30,6 +30,7 @@ fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
             gamma: 2.2,
             shadows: Default::default(),
             ssao: Default::default(),
+            custom_effects: Vec::new(),
         }),
     );
     scene.world.set_camera(
