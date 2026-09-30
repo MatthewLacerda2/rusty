@@ -13,6 +13,9 @@ retries = 0
 # comes close (the slowest is seconds), so a kill means a hang — better a named
 # timeout than a CI job silently running to GitHub's six-hour ceiling.
 slow-timeout = { period = "60s", terminate-after = 5 }
+# Print only tests worth reading (slow, retried, failed) plus the summary, not a PASS
+# line per test: ~1,800 lines of passes per `make test` is output an agent pays for.
+status-level = "slow"
 
 # Tests that build a headless renderer. Under nextest every test is its own process,
 # so the in-process budget (src/render/setup/budget.rs, MAX_CONCURRENT_HEADLESS)
