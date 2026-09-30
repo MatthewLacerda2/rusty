@@ -28,9 +28,13 @@ function Group.active()
     end
 end
 
--- Whether `t` may not turn off: it is the only one on and the group needs one.
+-- Whether `t` may not turn off: the group needs one on and no other is.
 function Group.is_locked(t)
-    return not Group.allow_switch_off and Group.active() == t
+    if Group.allow_switch_off then return false end
+    for _, other in ipairs(toggles) do
+        if other ~= t and other.is_on then return false end
+    end
+    return true
 end
 
 -- A member turned on: turn the others off (each announcing its change).

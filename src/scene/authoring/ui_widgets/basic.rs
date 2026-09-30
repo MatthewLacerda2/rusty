@@ -99,6 +99,10 @@ pub fn toggle(scene: &mut Scene, parent: Option<u32>) -> u32 {
         rt.anchored_position.x = 26.0;
         rt.size_delta.x = -52.0;
     }
+    // Clicking the label toggles too, as in Unity.
+    if let Some(mut t) = scene.world.text_mut(l) {
+        t.raycast_target = true;
+    }
     selectable(scene, id, Some(bg));
     script(scene, id, "toggle");
     id
