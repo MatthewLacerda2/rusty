@@ -84,6 +84,8 @@ jobs:
           filters: |
             code:
               - '!**/*.md'
+              # The API-doc drift tests parse it: an edit to it alone is code (#525).
+              - 'docs/scripting-api.md'
             sim:
               - 'src/app/**'
               - 'src/scripting/**'
