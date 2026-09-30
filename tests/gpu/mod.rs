@@ -17,3 +17,5 @@ mod normal_emissive_maps_screenshot;
 mod postfx_screenshot;
 mod preview_api;
 mod transparent_sorting_screenshot;
+mod ui_hud_scene;
+mod ui_hud_screenshot;

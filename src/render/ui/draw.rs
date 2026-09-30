@@ -192,3 +192,7 @@ fn texture_paths(scene: &Scene, layout: &UiLayout) -> Vec<String> {
     paths.dedup();
     paths
 }
+
+#[cfg(test)]
+#[path = "draw_tests.rs"]
+mod draw_tests;

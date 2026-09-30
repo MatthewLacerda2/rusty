@@ -226,6 +226,16 @@ mod tests {
     }
 
     #[test]
+    fn ui_graphics_require_a_rect_transform() {
+        let mut scene = Scene::new();
+        for kind in [ComponentKind::Image, ComponentKind::RectMask] {
+            let id = create_entity(&mut scene, "E", None);
+            assert!(add_with_requirements(&mut scene.world, id, kind));
+            assert!(scene.world.has_rect_transform(id), "{kind:?} brings a rect");
+        }
+    }
+
+    #[test]
     fn add_auto_satisfies_requirement() {
         let mut scene = Scene::new();
         let id = create_entity(&mut scene, "FX", None);
