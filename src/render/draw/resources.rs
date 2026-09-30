@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use super::batch::{BatchKey, DrawItem, FrameDraws};
 use crate::components::MaterialAsset;
-use crate::render::gpu::draw_buffers::{group1, palette_uniform};
+use crate::render::gpu::draw_buffers::{group1, palette_uniform, FrameUpload};
 use crate::render::{transform_aabb, Frustum, GpuTexture, MeshId, Renderer};
 use crate::scene::Scene;
 
@@ -119,9 +119,11 @@ impl Renderer {
             &self.device,
             &self.queue,
             &self.entity_bones_layout,
-            &draws.uniforms(),
-            &palettes,
-            &draws.instances,
+            FrameUpload {
+                uniforms: &draws.uniforms(),
+                palettes: &palettes,
+                instances: &draws.instances,
+            },
         );
         SolidResources { draws, culled }
     }

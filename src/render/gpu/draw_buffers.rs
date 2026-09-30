@@ -18,12 +18,20 @@ use crate::render::{BoneUniform, EntityUniform, InstanceData};
 /// `min_uniform_buffer_offset_alignment`, which the renderer requests.
 pub(crate) const UNIFORM_STRIDE: usize = 256;
 const _: () = assert!(std::mem::size_of::<EntityUniform>() <= UNIFORM_STRIDE);
-const _: () = assert!(std::mem::size_of::<BoneUniform>() % UNIFORM_STRIDE == 0);
+const _: () = assert!(std::mem::size_of::<BoneUniform>().is_multiple_of(UNIFORM_STRIDE));
 
 /// The identity bone palette — slot 0 of the frame's palettes, and the one overlays bind.
 pub(crate) const IDENTITY_BONES: BoneUniform = BoneUniform {
     bones: [glam::Mat4::IDENTITY.to_cols_array(); 64],
 };
+
+/// One camera's draw data: `uniforms` in slot order, the skinned `palettes` (bone slot
+/// `n` is `palettes[n - 1]`; slot 0 is the identity), and the packed `instances`.
+pub(crate) struct FrameUpload<'a> {
+    pub uniforms: &'a [EntityUniform],
+    pub palettes: &'a [BoneUniform],
+    pub instances: &'a [InstanceData],
+}
 
 pub(crate) struct DrawBuffers {
     uniforms: GrowBuffer,
@@ -75,18 +83,20 @@ impl DrawBuffers {
         }
     }
 
-    /// Write one camera's draw data: `uniforms` in slot order, the skinned `palettes`
-    /// (bone slot `n` is `palettes[n - 1]`; slot 0 is the identity), and `instances`.
-    /// Rebuilds the bind group only when a buffer had to grow.
+    /// Write one camera's draw data. Rebuilds the bind group only when a buffer had
+    /// to grow.
     pub(crate) fn upload(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         layout: &wgpu::BindGroupLayout,
-        uniforms: &[EntityUniform],
-        palettes: &[BoneUniform],
-        instances: &[InstanceData],
+        frame: FrameUpload,
     ) {
+        let FrameUpload {
+            uniforms,
+            palettes,
+            instances,
+        } = frame;
         let mut uniform_bytes = vec![0u8; uniforms.len() * UNIFORM_STRIDE];
         for (chunk, u) in uniform_bytes.chunks_mut(UNIFORM_STRIDE).zip(uniforms) {
             chunk[..std::mem::size_of::<EntityUniform>()].copy_from_slice(bytemuck::bytes_of(u));

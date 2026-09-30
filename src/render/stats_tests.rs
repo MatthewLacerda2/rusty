@@ -37,5 +37,5 @@ fn add_draws_counts_calls_and_triangles() {
     // An instanced draw (#470) is one call carrying every instance's triangles.
     c.add_draws([(36, 100)]);
     assert_eq!((c.draw_calls, c.triangles), (3, 1214));
-    assert_eq!(c.pairs()[0], ("draw_calls", 2));
+    assert_eq!(c.pairs()[0], ("draw_calls", 3));
 }
