@@ -13,7 +13,11 @@
 //! into keys and axes the same way, and [`pad_source`] is the one file naming gilrs.
 //!
 //! [`CursorPolicy`] applies the game's cursor request to the OS cursor ([`cursor`]).
+//! The OS clipboard is captured at a boundary and the game's writes applied after
+//! the tick ([`clipboard`]); [`clipboard_source`] is the one file naming its crates.
 
+pub mod clipboard;
+pub mod clipboard_source;
 pub mod cursor;
 pub mod keys;
 pub mod pad_source;

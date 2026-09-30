@@ -41,6 +41,16 @@ only *records* the request; the platform applies it to the OS cursor whenever th
 game has input (a lock uses OS pointer-lock where supported, else confines the
 pointer to the window).
 
+**Clipboard** (#612). `GetClipboard` reads the OS clipboard's text as the platform
+last **captured** it — the sim never touches the OS clipboard itself, so a paste is
+input like a key press and replays identically. The platform captures it at the
+moments a paste can follow: a key going down with Ctrl or Cmd held (the capture is
+seen on that key's tick) and the window regaining focus. Anything else on the
+clipboard (an image) or no clipboard at all reads as `""`. `SetClipboard` is read
+back at once and copied to the OS clipboard after the tick; a bot or the harness
+uses the same call to stage what a paste will get. Headless there is no OS
+clipboard: the text lives in the input state only. Text only — no rich content.
+
 **Who hears input.** The player: the game always does. The editor: only in Play
 with the **Game view focused** — entering Play switches to the Game tab and focuses
 it, a click inside the Game view focuses it, a click elsewhere unfocuses it (except
@@ -60,6 +70,8 @@ focus releases held keys, with their `GetKeyUp` edges.
 | `Input.SetCursorVisible` | `(visible)` | — request a shown or hidden cursor |
 | `Input.IsCursorLocked` | `()` | `bool` — the current request |
 | `Input.IsCursorVisible` | `()` | `bool` — the current request |
+| `Input.GetClipboard` | `()` | the clipboard's text as last captured or set (`""` if none) |
+| `Input.SetClipboard` | `(text)` | — put `text` on the clipboard (readable at once; the OS gets it after the tick) |
 | `Input.Press` | `(key)` | — hold a key or mouse button down |
 | `Input.Release` | `(key)` | — let it go |
 | `Input.MoveMouse` | `(x, y)` | — move the pointer (game-view pixels) |

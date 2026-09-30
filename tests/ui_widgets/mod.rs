@@ -6,6 +6,7 @@ mod button_toggle;
 mod create;
 mod dropdown;
 mod input_field;
+mod input_field_clipboard;
 mod reads;
 mod scroll;
 mod slider;

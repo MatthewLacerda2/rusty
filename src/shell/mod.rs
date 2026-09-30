@@ -59,6 +59,10 @@ pub struct Shell {
     pub pad_source: Option<input::pad_source::GilrsSource>,
     /// Pad slots and the pad state last written into the sim.
     pub pads: input::pads::PadPump,
+    /// The OS clipboard (#612); `None` where there is none.
+    pub clipboard: Option<input::clipboard_source::OsClipboard>,
+    /// The keyboard modifiers held, to spot a Ctrl / Cmd chord that may paste.
+    pub modifiers: winit::keyboard::ModifiersState,
     /// Whether the window has OS focus: raw mouse motion arrives even when it does
     /// not, and must not reach the game then.
     pub window_focused: bool,
@@ -162,11 +166,14 @@ fn handle_window_event<F: Frontend>(
         }
         WindowEvent::Focused(focused) => {
             shell.window_focused = *focused;
-            if !focused {
+            if *focused {
+                capture_clipboard(shell, game); // copied in another app, maybe
+            } else {
                 // Key-ups never arrive for keys released while unfocused.
                 game.input().borrow_mut().release_all();
             }
         }
+        WindowEvent::ModifiersChanged(modifiers) => shell.modifiers = modifiers.state(),
         WindowEvent::KeyboardInput {
             event:
                 KeyEvent {
@@ -179,6 +186,9 @@ fn handle_window_event<F: Frontend>(
         } => {
             let pressed = *state == ElementState::Pressed;
             if frontend.game_has_input(game) {
+                if pressed && input::clipboard::is_shortcut(shell.modifiers) {
+                    capture_clipboard(shell, game);
+                }
                 input::write_key(*key, pressed, game, &shell.keymap);
                 if let (true, Some(text)) = (pressed, text) {
                     input::write_text(text, game);
@@ -216,6 +226,9 @@ fn run_frame<F: Frontend>(
     let pads_live = shell.window_focused && frontend.game_has_input(game);
     pump_pads(shell, game, pads_live);
     let transition = frame::advance_sim(game, delta_time);
+    if let Some(clipboard) = shell.clipboard.as_mut() {
+        input::clipboard::apply_request(clipboard, &mut game.input().borrow_mut());
+    }
     audio::apply_mix(game);
     frontend.on_play_transition(game, transition);
     // The game's cursor request (Play defaults to locked + hidden), while it has input.
@@ -259,6 +272,13 @@ fn pump_pads(shell: &mut Shell, game: &GameWorld, has_input: bool) {
         shell
             .pads
             .pump(source, &mut input, &shell.keymap, has_input);
+    }
+}
+
+/// Snapshot the OS clipboard for the next tick (#612).
+fn capture_clipboard(shell: &mut Shell, game: &GameWorld) {
+    if let Some(clipboard) = shell.clipboard.as_mut() {
+        input::clipboard::capture(clipboard, &mut game.input().borrow_mut());
     }
 }
 

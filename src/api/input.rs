@@ -5,7 +5,9 @@
 //! `MoveMouse`, `AddMouseDelta`, `Scroll`, `TypeText`) extends the same table.
 //! Writable input is what lets a script, bot or the harness play as the user
 //! (Unity-ish `Input` injection); injected input bypasses the keymap. Gamepads (#471)
-//! add named axes, pad connection, dead zones and rumble to both halves.
+//! add named axes, pad connection, dead zones and rumble to both halves. The
+//! clipboard (#612) is one pair in the readable half: a game copies with the same
+//! `SetClipboard` a bot uses to stage a paste.
 
 use std::cell::RefCell;
 
@@ -60,6 +62,7 @@ pub fn register_readable<'lua, 'scope>(
         scope.create_function(|_, ()| Ok(input.borrow().text_input().to_string())),
     )?;
     register_cursor(scope, &table, input)?;
+    register_clipboard(scope, &table, input)?;
     register_pad(scope, &table, input)?;
 
     lua.globals().set("Input", table).map_err(|e| e.to_string())
@@ -96,6 +99,28 @@ fn register_cursor<'lua, 'scope>(
         table,
         "IsCursorVisible",
         scope.create_function(|_, ()| Ok(input.borrow().cursor().visible)),
+    )
+}
+
+/// The clipboard: the text the platform captured (or the game last set), and the
+/// write the platform copies to the OS clipboard after the tick.
+fn register_clipboard<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table<'lua>,
+    input: &'scope RefCell<InputState>,
+) -> Reg {
+    put(
+        table,
+        "GetClipboard",
+        scope.create_function(|_, ()| Ok(input.borrow().clipboard.text().to_string())),
+    )?;
+    put(
+        table,
+        "SetClipboard",
+        scope.create_function(|_, text: String| {
+            input.borrow_mut().clipboard.set(&text);
+            Ok(())
+        }),
     )
 }
 

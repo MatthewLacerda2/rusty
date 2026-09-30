@@ -494,8 +494,12 @@ Each widget's inspector fields (its script's `fields` schema) and owner API:
   the text it had when focused and lets go. `content_type`: `Standard`,
   `Integer`, `Decimal` or `Password` (shown as `*`); `char_limit` 0 is unlimited.
   The text scrolls to keep the caret in view (its position comes from
-  `Text.MeasureString`). Lines break only at `\n` — no word wrap — and there is no
-  clipboard yet.
+  `Text.MeasureString`). Lines break only at `\n` — no word wrap. Ctrl / Cmd+C
+  and Ctrl / Cmd+X copy and cut the selection to the clipboard
+  (`Input.SetClipboard`); Ctrl / Cmd+V pastes `Input.GetClipboard()` over the
+  selection through the same filters as typing, so `content_type` and
+  `char_limit` hold and `SingleLine` drops line breaks. A `Password` field never
+  copies or cuts. A test or bot stages a paste with `Input.SetClipboard`.
 
 ## World-space UI
 

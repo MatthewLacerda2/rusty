@@ -3,7 +3,9 @@
 -- Text entry while focused: typed characters (`Input.GetTextInput`), Backspace,
 -- Delete, Left/Right (Up/Down between lines in MultiLine; to the start/end in
 -- SingleLine), Home/End, Shift to select, Ctrl+A to select all, a click to place
--- the caret and a drag to select. Focusing it selects everything, as in Unity.
+-- the caret and a drag to select. Ctrl+C / Ctrl+X copy / cut the selection and
+-- Ctrl+V pastes through the same filters as typing (`Input.GetClipboard`, #612);
+-- Cmd works for Ctrl on macOS. A Password field never copies or cuts. Focusing it selects everything, as in Unity.
 -- Enter submits a SingleLine field (`on_submit`); in MultiLine it breaks the line.
 -- Escape restores the text it had when focused and lets go. `content_type`:
 -- Standard, Integer, Decimal or Password (shown as `*`). `char_limit` 0 = none.
@@ -131,6 +133,32 @@ local function type_text(s)
         end
     end
     return changed
+end
+
+-- Paste `s` over the selection, one character at a time through `accepts`, so the
+-- content type and char limit hold and SingleLine drops line breaks.
+local function paste(s)
+    local changed = delete_selection()
+    for _, code in utf8.codes(s) do
+        local c = utf8.char(code)
+        if (c ~= "\n" or multiline()) and accepts(c) then
+            table.insert(chars, pos + 1, c)
+            pos, anchor = pos + 1, pos + 1
+            changed = true
+        end
+    end
+    return changed
+end
+
+-- Ctrl/Cmd + C, X or V. Returns whether the text changed.
+local function clipboard_keys()
+    local a, b = math.min(pos, anchor), math.max(pos, anchor)
+    local cut = Input.GetKeyDown("X")
+    if (cut or Input.GetKeyDown("C")) and b > a and Field.content_type ~= "Password" then
+        Input.SetClipboard(table.concat(chars, "", a + 1, b))
+        if cut then return delete_selection() end
+    end
+    return Input.GetKeyDown("V") and paste(Input.GetClipboard())
 end
 
 local function shift() return Input.IsKeyDown("LEFTSHIFT") or Input.IsKeyDown("RIGHTSHIFT") end
@@ -334,6 +362,7 @@ function Field.Update(id)
     if Input.GetKeyDown("HOME") then move_to(line_start(pos), shift()) end
     if Input.GetKeyDown("END") then move_to(line_end(pos), shift()) end
     if ctrl() and Input.GetKeyDown("A") then pos, anchor = #chars, 0 end
+    if ctrl() and clipboard_keys() then changed = true end
     if changed then commit(true) end
     refresh()
 end

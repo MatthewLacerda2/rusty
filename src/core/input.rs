@@ -20,10 +20,12 @@
 //! tick sees is a pure function of what was written before it.
 //!
 //! **The cursor is a request.** `SetCursorLocked`/`SetCursorVisible` only record
-//! [`CursorState`] here; the platform layer applies it to the OS cursor.
+//! [`CursorState`] here; the platform layer applies it to the OS cursor. The
+//! clipboard works the same way ([`clipboard`](crate::core::clipboard), #612).
 
 use std::collections::{HashMap, HashSet};
 
+use crate::core::clipboard::ClipboardRecord;
 use crate::core::gamepad::PadRecords;
 
 /// What the game asks the platform to do with the OS cursor. The sim only records it.
@@ -72,6 +74,8 @@ pub struct InputState {
     current_axes: HashMap<String, f32>,
     /// Connected pads, dead zones and rumble requests (#471).
     pub pads: PadRecords,
+    /// The clipboard text captured at a boundary, and the game's write (#612).
+    pub clipboard: ClipboardRecord,
 }
 
 impl Default for InputState {
@@ -85,6 +89,7 @@ impl Default for InputState {
             pending_axes: HashMap::new(),
             current_axes: HashMap::new(),
             pads: PadRecords::default(),
+            clipboard: ClipboardRecord::default(),
         }
     }
 }
@@ -100,6 +105,7 @@ impl InputState {
     pub fn begin_tick(&mut self) {
         self.current = std::mem::take(&mut self.pending);
         self.current_axes.clone_from(&self.pending_axes);
+        self.clipboard.begin_tick();
     }
 
     /// Set a key (or mouse button) up/down. Only a real change records an edge, so

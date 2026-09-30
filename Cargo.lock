@@ -2614,6 +2614,7 @@ name = "rusty"
 version = "0.1.0"
 dependencies = [
  "ab_glyph",
+ "arboard",
  "bytemuck",
  "egui",
  "egui-phosphor",
@@ -2637,6 +2638,7 @@ dependencies = [
  "scorsese-zimmer",
  "serde",
  "serde_json",
+ "smithay-clipboard",
  "tobj",
  "ttf-parser",
  "wgpu",
