@@ -61,6 +61,8 @@ component_kinds! {
         LayoutElement,
         Joint,
         LodGroup,
+        Trail,
+        Line,
     }
 }
 
@@ -116,6 +118,8 @@ impl ComponentKind {
             "layoutelement" | "contentsizefitter" => Some(Self::LayoutElement),
             "joint" | "fixedjoint" | "hingejoint" | "characterjoint" => Some(Self::Joint),
             "lodgroup" | "lod" => Some(Self::LodGroup),
+            "trail" | "trailrenderer" => Some(Self::Trail),
+            "line" | "linerenderer" => Some(Self::Line),
             _ => None,
         }
     }

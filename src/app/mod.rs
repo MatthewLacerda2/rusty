@@ -35,6 +35,7 @@ mod scene_load;
 mod schedule;
 mod stage;
 mod system;
+mod trails;
 mod ui;
 mod world;
 

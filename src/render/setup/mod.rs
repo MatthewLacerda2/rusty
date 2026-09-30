@@ -191,6 +191,7 @@ impl Renderer {
             shadow_uniform_buffer: shadows.uniform_buffer,
             shadow_bind_group: shadows.bind_group,
             particle_renderer: billboards.particle_renderer,
+            ribbon_renderer: billboards.ribbon_renderer,
             decal_renderer: billboards.decal_renderer,
             ui_renderer: ui,
             quality,

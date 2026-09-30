@@ -29,15 +29,18 @@ pub mod joint;
 pub mod layout_element;
 pub mod layout_group;
 pub mod light;
+pub mod line;
 pub mod lod_group;
 pub mod material;
 pub mod nav_agent;
 pub mod particles;
 pub mod rect_mask;
 pub mod rect_transform;
+pub mod ribbon;
 pub mod rigidbody;
 pub mod selectable;
 pub mod text;
+pub mod trail;
 pub mod ui_widgets;
 pub mod visual_correction;
 

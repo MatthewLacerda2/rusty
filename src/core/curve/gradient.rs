@@ -32,6 +32,23 @@ impl Gradient {
         }
     }
 
+    /// One constant RGBA everywhere.
+    pub fn solid([r, g, b, a]: [f32; 4]) -> Self {
+        Self::linear([r, g, b, a], [r, g, b, a])
+    }
+
+    /// A straight blend from `start` at `t = 0` to `end` at `t = 1`.
+    pub fn linear(start: [f32; 4], end: [f32; 4]) -> Self {
+        let key = |t, c: [f32; 4]| ColorKey {
+            t,
+            color: [c[0], c[1], c[2]],
+        };
+        Self {
+            color_keys: vec![key(0.0, start), key(1.0, end)],
+            alpha: Curve::linear(start[3], end[3]),
+        }
+    }
+
     /// Re-sort both key lists by `t`.
     pub fn sort(&mut self) {
         self.color_keys.sort_by(|a, b| a.t.total_cmp(&b.t));
@@ -84,5 +101,8 @@ mod tests {
         assert_eq!(g.evaluate(0.75), [0.25, 0.0, 0.75, 0.5]);
         assert_eq!(Gradient::default().evaluate(0.4), [1.0; 4]);
         assert_eq!(Gradient::fade_out().evaluate(0.25), [1.0, 1.0, 1.0, 0.75]);
+        let l = Gradient::linear([1.0, 0.0, 0.0, 1.0], [0.0, 0.0, 1.0, 0.0]);
+        assert_eq!(l.evaluate(0.5), [0.5, 0.0, 0.5, 0.5]);
+        assert_eq!(Gradient::solid([0.2; 4]).evaluate(0.7), [0.2; 4]);
     }
 }

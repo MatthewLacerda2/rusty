@@ -21,6 +21,7 @@ pub mod material;
 pub mod mesh;
 pub mod nav_agent;
 pub mod particle;
+pub mod ribbon;
 pub mod rigidbody;
 pub mod script;
 pub mod texture;
@@ -43,6 +44,7 @@ pub use particle::{
     CollisionResponse, EmitFrom, EmitMode, EmitShape, Flipbook, Particle, ParticleBlend,
     ParticleEmitterComponent, ParticleRender, ParticleRenderMode, SubEmitTrigger, SubEmitters,
 };
+pub use ribbon::{LineComponent, RibbonStyle, TextureMode, TrailComponent};
 pub use rigidbody::{CollisionDetection, RigidBodyComponent};
 pub use script::{ScriptComponent, ScriptFieldValue};
 pub use texture::TextureComponent;

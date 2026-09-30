@@ -29,7 +29,7 @@ use crate::components::{
     ParticleEmitterComponent, PrefabLink, RectMaskComponent, RectTransformComponent,
     RigidBodyComponent, SelectableComponent, TextComponent, VisualCorrectionComponent,
 };
-use crate::components::{JointComponent, LodGroupComponent};
+use crate::components::{JointComponent, LineComponent, LodGroupComponent, TrailComponent};
 
 use super::world::{Ref, RefMut, World};
 
@@ -139,5 +139,7 @@ optional_component_accessors! {
     LayoutElementComponent => layout_element, layout_element_mut, has_layout_element, set_layout_element, take_layout_element, ids_with_layout_element;
     JointComponent => joint, joint_mut, has_joint, set_joint, take_joint, ids_with_joint;
     LodGroupComponent => lod_group, lod_group_mut, has_lod_group, set_lod_group, take_lod_group, ids_with_lod_group;
+    TrailComponent => trail, trail_mut, has_trail, set_trail, take_trail, ids_with_trail;
+    LineComponent => line, line_mut, has_line, set_line, take_line, ids_with_line;
     PrefabLink => prefab_link, prefab_link_mut, has_prefab_link, set_prefab_link, take_prefab_link, ids_with_prefab_link;
 }

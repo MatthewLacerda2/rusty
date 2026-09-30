@@ -177,6 +177,8 @@ impl World {
             layout_element: self.layout_element(id).map(|c| (*c).clone()),
             joint: self.joint(id).map(|c| (*c).clone()),
             lod_group: self.lod_group(id).map(|c| (*c).clone()),
+            trail: self.trail(id).map(|c| (*c).clone()),
+            line: self.line(id).map(|c| (*c).clone()),
             prefab_link: self.prefab_link(id).map(|c| (*c).clone()),
             parent_id: core.parent_id,
             children: core.children.clone(),

@@ -13,3 +13,4 @@ mod light;
 mod nav_agent;
 mod particles;
 mod physics;
+mod ribbons;

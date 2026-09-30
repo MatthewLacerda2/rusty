@@ -59,6 +59,7 @@ mod procgen_resolution;
 mod procgen_seams;
 mod proptest_scene;
 mod reflection_probes;
+mod ribbons;
 mod scene_roundtrip;
 mod selectable_api;
 mod sound_api;

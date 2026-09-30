@@ -184,6 +184,9 @@ pub struct Renderer {
     /// Billboard particle pass (draws into the HDR target before post-FX).
     particle_renderer: particles::ParticleRenderer,
 
+    /// Trail + line ribbon pass (#441), drawn just before the particles.
+    ribbon_renderer: passes::ribbons::RibbonRenderer,
+
     /// The in-game UI pass (#418), drawn over the finished frame after post-FX.
     ui_renderer: ui::UiRenderer,
 

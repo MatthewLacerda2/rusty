@@ -30,7 +30,7 @@ use crate::components::{
     CanvasComponent, CanvasGroupComponent, ImageComponent, RectMaskComponent,
     RectTransformComponent, SelectableComponent, TextComponent,
 };
-use crate::components::{JointComponent, LodGroupComponent};
+use crate::components::{JointComponent, LineComponent, LodGroupComponent, TrailComponent};
 use crate::components::{LayoutElementComponent, LayoutGroupComponent};
 use crate::ecs::World;
 use crate::scene::authoring::components::ComponentKind;
@@ -65,6 +65,8 @@ pub(crate) fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::LayoutElement => world.has_layout_element(id),
         ComponentKind::Joint => world.has_joint(id),
         ComponentKind::LodGroup => world.has_lod_group(id),
+        ComponentKind::Trail => world.has_trail(id),
+        ComponentKind::Line => world.has_line(id),
     }
 }
 
@@ -106,6 +108,8 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
         }
         ComponentKind::Joint => world.set_joint(id, Some(JointComponent::default())),
         ComponentKind::LodGroup => world.set_lod_group(id, Some(LodGroupComponent::default())),
+        ComponentKind::Trail => world.set_trail(id, Some(TrailComponent::default())),
+        ComponentKind::Line => world.set_line(id, Some(LineComponent::default())),
     }
 }
 
@@ -135,6 +139,8 @@ pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool
         ComponentKind::LayoutElement => world.set_layout_element(id, None),
         ComponentKind::Joint => world.set_joint(id, None),
         ComponentKind::LodGroup => world.set_lod_group(id, None),
+        ComponentKind::Trail => world.set_trail(id, None),
+        ComponentKind::Line => world.set_line(id, None),
     }
 }
 

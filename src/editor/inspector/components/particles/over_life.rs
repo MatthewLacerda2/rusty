@@ -1,10 +1,9 @@
 //! src/editor/inspector/components/particles/over_life.rs — the over-life curves,
 //! the colour gradient and the sub-emitter pickers of the Particle System card.
 
-use super::widgets::{clamped, curve_editor};
+use super::widgets::{clamped, curve_editor, gradient_editor};
 use super::{apply, Cx};
 use crate::components::{ParticleEmitterComponent, SubEmitTrigger};
-use crate::core::curve::{ColorKey, Gradient};
 use crate::scene::authoring::particles as particle_ops;
 
 /// Size / drag / rotation-speed curves and the colour gradient.
@@ -15,7 +14,7 @@ pub(super) fn draw(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterCompon
         apply(cx, |e| particle_ops::set_size_over_life(e, c));
         changed = true;
     }
-    if let Some(g) = gradient_editor(ui, &p.color_over_life) {
+    if let Some(g) = gradient_editor(ui, "Color (multiplier)", &p.color_over_life) {
         apply(cx, |e| particle_ops::set_color_over_life(e, g));
         changed = true;
     }
@@ -28,44 +27,6 @@ pub(super) fn draw(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterCompon
         changed = true;
     }
     changed
-}
-
-/// Colour keys (t + RGB, removable, addable) and the alpha curve.
-fn gradient_editor(ui: &mut egui::Ui, gradient: &Gradient) -> Option<Gradient> {
-    let mut g = gradient.clone();
-    let mut changed = false;
-    egui::CollapsingHeader::new("Color (multiplier)").show(ui, |ui| {
-        let mut remove = None;
-        for (i, key) in g.color_keys.iter_mut().enumerate() {
-            ui.horizontal(|ui| {
-                ui.label("t");
-                let t = egui::DragValue::new(&mut key.t)
-                    .speed(0.01)
-                    .clamp_range(0.0..=1.0);
-                changed |= ui.add(t).changed();
-                changed |= ui.color_edit_button_rgb(&mut key.color).changed();
-                if ui.small_button("x").clicked() {
-                    remove = Some(i);
-                }
-            });
-        }
-        if let Some(i) = remove {
-            g.color_keys.remove(i);
-            changed = true;
-        }
-        if ui.button("Add color key").clicked() {
-            g.color_keys.push(ColorKey {
-                t: 1.0,
-                color: [1.0; 3],
-            });
-            changed = true;
-        }
-        if let Some(alpha) = curve_editor(ui, "Alpha", &g.alpha) {
-            g.alpha = alpha;
-            changed = true;
-        }
-    });
-    changed.then_some(g)
 }
 
 /// One picker per trigger (any other entity with an emitter, or none), plus the
