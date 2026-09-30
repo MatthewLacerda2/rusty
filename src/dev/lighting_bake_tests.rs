@@ -39,7 +39,7 @@ fn room_scene() -> Scene {
 /// skip without an adapter, but placement has already populated the world — the
 /// "place well + bake right now" acceptance, minus the adapter-bound bake itself.
 #[test]
-fn auto_places_both_sets_on_empty_scene() {
+fn gpu_auto_places_both_sets_on_empty_scene() {
     let dir = std::env::temp_dir().join("rusty_lighting_bake_test");
     let _ = std::fs::create_dir_all(&dir);
     let scene_path = dir.join("room.scene");
@@ -71,7 +71,7 @@ fn auto_places_both_sets_on_empty_scene() {
 /// Manually-authored probes are NOT clobbered: a scene that already carries a probe in
 /// each set is rebaked in place, with no auto-placement (the documented per-set rule).
 #[test]
-fn manual_probes_are_kept_not_replaced() {
+fn gpu_manual_probes_are_kept_not_replaced() {
     let dir = std::env::temp_dir().join("rusty_lighting_bake_test");
     let _ = std::fs::create_dir_all(&dir);
     let scene_path = dir.join("manual.scene");

@@ -143,7 +143,7 @@ fn bleed_room(probe: Vec3) -> Scene {
 /// direct-only capture (`bake_probe`) — bounces ≥2 fed the red wall's reflection back
 /// into the scene. The issue's headline acceptance.
 #[test]
-fn multibounce_increases_color_bleed() {
+fn gpu_multibounce_increases_color_bleed() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return; // No GPU/software adapter — skip, same contract as the screenshots.
     };
@@ -171,7 +171,7 @@ fn multibounce_increases_color_bleed() {
 /// the field stops changing well before the cap — `converged` fires and `bounces` is
 /// short of [`MAX_BOUNCES`].
 #[test]
-fn early_out_on_dark_scene() {
+fn gpu_early_out_on_dark_scene() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
@@ -197,7 +197,7 @@ fn early_out_on_dark_scene() {
 
 /// Determinism: the same scene bakes byte-identical SH across two independent runs.
 #[test]
-fn multibounce_is_deterministic() {
+fn gpu_multibounce_is_deterministic() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };

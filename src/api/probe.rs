@@ -234,7 +234,7 @@ mod tests {
     /// scene + geometry; here we only verify the namespace wiring and the skip contract.
     #[cfg(feature = "dev")]
     #[test]
-    fn bake_returns_bool_and_skips_gracefully() {
+    fn gpu_bake_returns_bool_and_skips_gracefully() {
         let scene = empty_scene();
         let lua = Lua::new();
         lua.scope(|scope| {

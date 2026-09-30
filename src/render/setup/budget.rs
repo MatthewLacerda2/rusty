@@ -135,6 +135,7 @@ impl Drop for Permit {
 
 /// Take a slot in the process-wide headless-renderer budget.
 pub(crate) fn acquire_headless() -> Permit {
+    super::gpu_rule::check_current_thread();
     HEADLESS.acquire()
 }
 

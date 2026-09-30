@@ -52,7 +52,7 @@ Where they actually run is not uniform, and it is worth knowing before you rely 
 | `build-test-cross` (windows) | **WARP** (software) | run, against **system RAM** |
 
 **CI requires an adapter.** Those jobs set `RUSTY_REQUIRE_GPU=1`, which turns one
-canary test (`render::test_gpu::tests::adapter_present_when_required`) from a skip into
+canary test (`render::test_gpu::tests::gpu_adapter_present_when_required`) from a skip into
 a failure when no adapter is found — so a runner image that loses its driver goes red
 instead of quietly skipping every GPU test. Without the variable (any local machine)
 the skip contract above is unchanged.

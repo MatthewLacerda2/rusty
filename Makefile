@@ -10,8 +10,9 @@
 # `make inventory` enforces it, so the gate list cannot drift from its targets.
 
 LINT := cargo run --quiet --manifest-path tools/lint/Cargo.toml
-# The test runner, one variable so #484 (nextest) swaps it in one place.
-TEST := cargo test --locked
+# The test runner (#484): cargo-nextest, configured in .config/nextest.toml.
+# nextest does not run doctests, so the `test` gate runs `cargo test --doc` beside it.
+TEST := cargo nextest run --locked
 
 # The gates, in the order `make gates` runs them. `deny` sits last: its failures
 # are about dependencies (and it needs the network), so a code failure reports first.
@@ -100,9 +101,13 @@ doc: ## [gate] Rustdoc with warnings denied, both feature sets
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked --features dev
 
-test: ## [gate] Engine tests, both feature sets
+test: ## [gate] Engine tests (nextest) and doctests, both feature sets
+	@command -v cargo-nextest >/dev/null 2>&1 || { \
+		echo "test: cargo-nextest is not installed — cargo install --locked cargo-nextest"; exit 1; }
 	$(TEST)
 	$(TEST) --features dev
+	cargo test --doc --locked
+	cargo test --doc --locked --features dev
 
 # The git CLI fetches the advisory DB: cargo-deny's built-in fetcher can't get
 # through the cloud sessions' proxy, and the CLI works everywhere else too.

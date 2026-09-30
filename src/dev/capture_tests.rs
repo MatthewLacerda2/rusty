@@ -71,7 +71,7 @@ fn an_unused_host_builds_nothing() {
 /// concurrent ones exhaust memory mid-suite (#366). Sharing is also the point being
 /// made — the whole test is that sharing works.
 #[test]
-fn one_host_serves_two_scenes_at_two_sizes() {
+fn gpu_one_host_serves_two_scenes_at_two_sizes() {
     let mut host = CaptureHost::new();
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
     let (boxed, empty) = (box_scene(1.0), Scene::new());

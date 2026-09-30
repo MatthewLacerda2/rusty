@@ -74,7 +74,7 @@ fn red_wall_scene() -> Scene {
 /// red-dominant (directional, not a flat grey), and a probe far on the other side of
 /// the room carries less red — the bake is position-dependent, the issue's acceptance.
 #[test]
-fn bake_red_wall_is_directional_and_position_dependent() {
+fn gpu_bake_red_wall_is_directional_and_position_dependent() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return; // No GPU/software adapter — skip, same contract as the screenshots.
     };
@@ -106,7 +106,7 @@ fn bake_red_wall_is_directional_and_position_dependent() {
 
 /// `bake_probes` writes SH onto every probe in place (skips with no adapter).
 #[test]
-fn bake_probes_fills_all_in_place() {
+fn gpu_bake_probes_fills_all_in_place() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };

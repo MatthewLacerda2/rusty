@@ -37,7 +37,7 @@ fn camera() -> Camera {
 
 /// An offscreen view exposes an owned colour target; a targetless one does not.
 #[test]
-fn offscreen_view_owns_a_target_targetless_does_not() {
+fn gpu_offscreen_view_owns_a_target_targetless_does_not() {
     let Some(renderer) = crate::render::test_gpu::headless_or_skip(32, 32) else {
         return;
     };
@@ -64,7 +64,7 @@ fn offscreen_view_owns_a_target_targetless_does_not() {
 /// - **static shadows** — a bare `is_static_cached` bool let scene B skip its own
 ///   bake and sample scene A's shadow map (the phantom shadows on the preview mesh).
 #[test]
-fn two_views_two_scenes_never_clobber_each_other() {
+fn gpu_two_views_two_scenes_never_clobber_each_other() {
     let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(64, 64) else {
         return;
     };
@@ -126,7 +126,7 @@ fn two_views_two_scenes_never_clobber_each_other() {
 /// `resize` reallocates the offscreen target to the new size and is a cheap no-op when
 /// the size and quality divisor are unchanged.
 #[test]
-fn resize_tracks_the_new_size() {
+fn gpu_resize_tracks_the_new_size() {
     let Some(renderer) = crate::render::test_gpu::headless_or_skip(32, 32) else {
         return;
     };
