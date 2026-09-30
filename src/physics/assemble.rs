@@ -151,10 +151,31 @@ impl PhysicsWorld {
         Some((collider, inp.is_trigger || inp.is_static))
     }
 
+    /// Mirror activation onto rapier's enabled flags: each body follows its
+    /// owner entity, each collider (the owner's own included) its own entity. A
+    /// disabled body or collider generates no contacts, and [`super::query::is_live`]
+    /// hides it from every query (#521).
+    pub(super) fn sync_enabled(&mut self, scene: &Scene) {
+        for (&owner, ids) in &self.plan {
+            if let Some(body) = self
+                .id_to_body
+                .get(&owner)
+                .and_then(|&h| self.bodies.get_mut(h))
+            {
+                body.set_enabled(scene.world.is_active(owner));
+            }
+            for &id in ids {
+                let handle = self.id_to_collider.get(&id);
+                if let Some(collider) = handle.and_then(|&h| self.colliders.get_mut(h)) {
+                    collider.set_enabled(scene.world.is_active(id));
+                }
+            }
+        }
+    }
+
     /// Keep each compound collider (one not on its owner entity) at its current
-    /// pose relative to the owner, and enabled only while its own entity is
-    /// active — so a script or the animator moving a child hitbox moves the
-    /// collider with it.
+    /// pose relative to the owner — so a script or the animator moving a child
+    /// hitbox moves the collider with it.
     pub(super) fn sync_compound_parts(&mut self, scene: &Scene, owner: u32, ids: &[u32]) {
         let Some(owner_pose) = world_pose(scene, owner) else {
             return;
@@ -172,7 +193,6 @@ impl PhysicsWorld {
             if collider.position_wrt_parent() != Some(&offset) {
                 collider.set_position_wrt_parent(offset);
             }
-            collider.set_enabled(scene.world.is_active(id));
         }
     }
 }

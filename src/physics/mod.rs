@@ -25,6 +25,8 @@ mod compound;
 mod compound_tests;
 mod convert;
 mod query;
+#[cfg(test)]
+mod query_active_tests;
 mod spatial;
 #[cfg(test)]
 mod spatial_tests;

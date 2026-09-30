@@ -17,6 +17,8 @@
 use rapier3d::control::KinematicCharacterController;
 use rapier3d::prelude::*;
 
+use super::query::is_live;
+
 /// A character controller tuned for the engine's walkers.
 ///
 /// rapier's defaults already give us `slide: true` (collide-and-slide) and
@@ -92,9 +94,12 @@ pub(super) fn corrected_next_pose(
             // Sensors are trigger volumes, not walls: they must never block the
             // move, or a character could not enter the volume whose
             // OnTriggerEnter it is meant to fire (#310).
+            // Deactivated entities are not walls either (#521).
+            let live = |_: ColliderHandle, c: &Collider| is_live(refs.bodies, c);
             let filter = QueryFilter::default()
                 .exclude_sensors()
-                .exclude_rigid_body(body_handle);
+                .exclude_rigid_body(body_handle)
+                .predicate(&live);
             let movement = controller.move_shape(
                 dt,
                 refs.bodies,

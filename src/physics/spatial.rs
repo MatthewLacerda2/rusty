@@ -12,6 +12,7 @@ use rapier3d::parry::query::ShapeCastOptions;
 use rapier3d::prelude::*;
 
 use super::convert::{from_na_point, to_iso, to_na_vec};
+use super::query::is_live;
 use super::world::PhysicsWorld;
 
 impl PhysicsWorld {
@@ -129,21 +130,11 @@ impl PhysicsWorld {
         )
     }
 
-    /// Adapt an entity-id acceptance test to rapier's collider-handle predicate.
-    fn handle_accepts<'a>(
-        &'a self,
-        accept: &'a dyn Fn(u32) -> bool,
-    ) -> impl Fn(ColliderHandle, &Collider) -> bool + 'a {
-        move |handle, _| {
-            self.collider_to_id
-                .get(&handle)
-                .is_some_and(|&id| accept(id))
-        }
-    }
-
     /// The live collider built for entity `id` (the entity that owns the
     /// collider, even when it is a compound part of an ancestor's body), if any.
+    /// A collider that is not [`is_live`] (deactivated entity) counts as absent.
     fn collider_of(&self, id: u32) -> Option<&Collider> {
-        self.colliders.get(*self.id_to_collider.get(&id)?)
+        let collider = self.colliders.get(*self.id_to_collider.get(&id)?)?;
+        is_live(&self.bodies, collider).then_some(collider)
     }
 }
