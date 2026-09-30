@@ -139,8 +139,10 @@ incidents behind each):
   drift tests on exactly that pull request (#525).
 
 It ignores what is not a gate: `main-health` (a `workflow_run` on `main`), `docs`,
-and the coverage and mutation jobs, which show as **skipped** on pull requests by
-design. Its own tests run as `make scripts`, a gate, and in `lint.yml`.
+and the coverage and mutation jobs. `mutants-pr` and `coverage-pr` run *inside*
+the `ci` run but outside `ci-gate`'s `needs:`, so a `ci` run still in progress
+counts as settled once `ci-gate` has concluded — a signal still running or red
+never holds `make mergeable` or `make queue` (#555). Its own tests run as `make scripts`, a gate, and in `lint.yml`.
 
 `gh pr checks N` is **not** a substitute. It has no commit column, so it cannot
 answer "did this run build the head I am about to merge?", and it blends runs — a
