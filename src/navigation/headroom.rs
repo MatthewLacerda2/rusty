@@ -25,6 +25,7 @@
 //! simple scenes (floor + walls, no ceilings) bake byte-identically (back-compat).
 //! Pure grid + AABB math — no RNG/clock — so the determinism guard for `navigation` holds.
 
+use super::bounds::static_aabbs;
 use super::NavigationGraph;
 use crate::scene::Scene;
 use glam::Vec3;
@@ -96,23 +97,11 @@ impl NavigationGraph {
     }
 }
 
-/// Gather every active static collider's AABB (the same gate `bake` uses for the floor).
+/// Gather every active static collider's AABB (the same set `bake` uses for the floor).
 fn collect_overhead(scene: &Scene) -> Vec<Overhead> {
-    let mut out = Vec::new();
-    for id in scene.world.ids_with_collider() {
-        if !scene.world.is_active(id) || !scene.world.is_static(id) {
-            continue;
-        }
-        if let Some(col) = scene.world.collider(id) {
-            if col.active {
-                out.push(Overhead {
-                    min: col.aabb_min,
-                    max: col.aabb_max,
-                });
-            }
-        }
-    }
-    out
+    static_aabbs(scene)
+        .map(|(min, max)| Overhead { min, max })
+        .collect()
 }
 
 /// Whether `center`'s XZ lies within the collider's footprint (cell-center containment,

@@ -979,6 +979,24 @@ second walkable layer.
 | `Navigation.GetGridSpacing` | `()` | grid cell size (world units) |
 | `Navigation.SetGridSpacing` | `(spacing)` | writes `nav_settings.grid_spacing` + re-bakes (re-shapes the grid) |
 
+### Navmesh bounds (#452)
+
+The grid covers an XZ rectangle resolved from the scene **on every bake**. By default it
+is the extent of the static geometry the bake reads (active, static colliders' world
+AABBs), grown by `2.0` plus the agent radius on every side so the radius erosion never
+eats the ground around the outermost geometry. An **empty scene** (no static geometry)
+bakes over a default `±20` box. A scene can instead **author** its bounds (Unity's nav
+volume): they serialize in `nav_settings.bounds` and are editable from the scene
+inspector's **Navmesh** section (editor↔API parity). Either way the bounds snap outward to
+multiples of `GridSpacing`, so cell centres stay on a fixed world lattice. Anything outside
+the bounds is unnavigable; the bake is O(cells), so very large bounds cost bake time.
+
+| Function | Signature | Returns / Effect |
+|---|---|---|
+| `Navigation.GetBounds` | `()` | `minX, maxX, minZ, maxZ, authored` — the bounds the last bake used (snapped), and whether they were authored |
+| `Navigation.SetBounds` | `(minX, maxX, minZ, maxZ)` | writes `nav_settings.bounds` + re-bakes; errors unless finite with `min < max` |
+| `Navigation.ClearBounds` | `()` | clears the authored bounds (back to derived from geometry) + re-bakes |
+
 ## `NavMeshAgent`
 
 Per-entity navmesh agent control.

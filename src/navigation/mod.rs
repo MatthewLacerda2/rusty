@@ -2,6 +2,7 @@
 //! surface-height field, #130) baked from static colliders, A\* search over it,
 //! and the per-frame agent steering tick. Split into focused submodules —
 //! `grid` (the `NavigationGraph` model + world<->grid/height conversions),
+//! `bounds` (the XZ area the grid covers, resolved from the scene, #452),
 //! `bake` (deriving walkability + the height field from colliders, incl. the
 //! agent-radius erosion), `headroom` (the agent-height clearance pass that carves
 //! low-overhang cells, #278), `astar` (the height/step-aware A\* search and path
@@ -21,6 +22,9 @@ mod astar_tests;
 mod bake;
 #[cfg(test)]
 mod bake_tests;
+mod bounds;
+#[cfg(test)]
+mod bounds_tests;
 #[cfg(test)]
 mod erosion_tests;
 mod grid;
@@ -29,5 +33,6 @@ mod headroom;
 mod headroom_tests;
 mod settings;
 
+pub use bounds::{NavBounds, BOUNDS_MARGIN, EMPTY_SCENE_HALF_EXTENT};
 pub use grid::NavigationGraph;
 pub use settings::{NavMeshSettings, DEFAULT_AGENT_HEIGHT, DEFAULT_AGENT_RADIUS};

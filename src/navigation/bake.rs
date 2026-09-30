@@ -1,3 +1,4 @@
+use super::bounds::static_aabbs;
 use super::NavigationGraph;
 use crate::scene::Scene;
 use glam::Vec3;
@@ -17,13 +18,13 @@ impl NavigationGraph {
     /// Deterministic: fixed scene iteration order and an order-independent max-fold.
     pub fn bake(&mut self, scene: &Scene) {
         // Source the per-scene bake tunables (#276) instead of the historical
-        // hardcoded defaults: step/slope are cheap scalar copies; grid_spacing may
-        // re-shape the grid (see `apply_grid_spacing`). `agent_radius` is consumed by
-        // the erosion pass below (#277). Doing the spacing first means the reset below
-        // sizes the freshly-spaced grid.
+        // hardcoded defaults. The grid is re-shaped first — to the scene's resolved
+        // bounds (#452: authored override, else the static geometry's extent) at
+        // `grid_spacing` — so the reset below sizes the fresh grid; step/slope are cheap
+        // scalar copies. `agent_radius` is consumed by the erosion pass below (#277).
+        self.reshape_for(scene);
         self.max_step = scene.nav_settings.max_step;
         self.max_slope = scene.nav_settings.max_slope;
-        self.apply_grid_spacing(scene.nav_settings.grid_spacing);
 
         // A new bake may change cell heights / reachability, so bump the generation:
         // any agent whose cached path was planned against an older bake re-plans (#126).
@@ -34,15 +35,8 @@ impl NavigationGraph {
         self.walkability.fill(true);
         self.heightfield.fill(0.0);
 
-        for id in scene.world.ids_with_collider() {
-            if !scene.world.is_active(id) || !scene.world.is_static(id) {
-                continue;
-            }
-            if let Some(col) = scene.world.collider(id) {
-                if col.active {
-                    self.raise_surface(col.aabb_min, col.aabb_max);
-                }
-            }
+        for (min, max) in static_aabbs(scene) {
+            self.raise_surface(min, max);
         }
 
         // Agent-height clearance (#278): carve cells whose vertical clearance to the
@@ -179,26 +173,6 @@ impl NavigationGraph {
                 }
             }
         }
-    }
-
-    /// Re-shape the grid to a new cell size (#276 `grid_spacing` knob) when it differs
-    /// from the current spacing, keeping the same world bounds. Cell counts are derived
-    /// with the SAME formula as [`NavigationGraph::new`], so a graph created at spacing
-    /// `s` and one re-spaced to `s` are identical. The walkability / height buffers are
-    /// resized and zeroed here; the caller's reset + collider pass then re-fills them,
-    /// so the knob actually changes the baked resolution. A no-op when unchanged (the
-    /// common case), so the cheap step/slope path stays cheap. Out-of-range spacings
-    /// (≤ 0, non-finite) are ignored to keep the bake a total, panic-free function.
-    fn apply_grid_spacing(&mut self, spacing: f32) {
-        if !spacing.is_finite() || spacing <= 0.0 || spacing == self.grid_spacing {
-            return;
-        }
-        self.grid_spacing = spacing;
-        self.width = ((self.max_x - self.min_x) / spacing).ceil() as i32 + 1;
-        self.height = ((self.max_z - self.min_z) / spacing).ceil() as i32 + 1;
-        let cells = (self.width * self.height) as usize;
-        self.walkability = vec![true; cells];
-        self.heightfield = vec![0.0; cells];
     }
 
     /// Raise the surface height of every cell whose center lies under this

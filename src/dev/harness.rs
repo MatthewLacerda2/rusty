@@ -63,12 +63,12 @@ impl Harness {
         let mut scene = Scene::new();
         super::demo_scene::build(&mut scene, bot_script);
 
-        let nav = NavigationGraph::new(-20.0, 20.0, -20.0, 20.0, 1.0);
+        // Baked over the scene's own bounds (#452) — the same path the windowed game takes.
+        let nav = NavigationGraph::from_scene(&scene);
         let scene = Rc::new(RefCell::new(scene));
         let input = Rc::new(RefCell::new(InputState::new()));
         let nav = Rc::new(RefCell::new(nav));
         let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-        nav.borrow_mut().bake(&scene.borrow());
 
         let mut world = GameWorld::new(
             Rc::clone(&scene),

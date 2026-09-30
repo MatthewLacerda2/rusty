@@ -39,6 +39,8 @@ fn add_overhang(scene: &mut Scene, x0: f32, x1: f32, z0: f32, z1: f32, bottom: f
 /// Bake a fresh 0..10 × 0..10 unit-spacing graph for `scene` at the given agent height.
 fn baked(scene: &mut Scene, agent_height: f32) -> NavigationGraph {
     scene.nav_settings.agent_height = agent_height;
+    // Pin the grid (#452) so the cell indices asserted below stay put.
+    scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
     let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     g.bake(scene);
     g

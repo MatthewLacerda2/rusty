@@ -44,6 +44,8 @@ fn corridor_graph(left: i32, right: i32, radius: f32) -> NavigationGraph {
     add_wall_strip(&mut scene, "left", left, 0.0, 10.0);
     add_wall_strip(&mut scene, "right", right, 0.0, 10.0);
     scene.nav_settings.agent_radius = radius;
+    // Pin the grid (#452) so the cell indices asserted below stay put.
+    scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
     let mut graph = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     graph.bake(&scene);
     graph
@@ -103,6 +105,7 @@ fn radius_zero_is_exact_no_op() {
     add_wall_strip(&mut scene, "right", 5, 0.0, 10.0);
 
     scene.nav_settings.agent_radius = 0.0;
+    scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
     let mut zero = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     zero.bake(&scene);
 

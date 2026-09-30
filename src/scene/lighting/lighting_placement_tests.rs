@@ -10,7 +10,7 @@ use glam::Vec3;
 
 use super::{plan_light_probes, plan_reflection_probes, static_scene_aabb};
 use crate::components::{ColliderComponent, ColliderShape};
-use crate::navigation::NavigationGraph;
+use crate::navigation::{NavBounds, NavigationGraph};
 use crate::scene::Scene;
 
 /// Add a static box entity with a box collider of `size`, centred at `pos`.
@@ -140,6 +140,8 @@ fn erosion_tightens_light_probe_bounds() {
     let bake_with = |radius: f32| {
         let mut scene = room_scene();
         scene.nav_settings.agent_radius = radius;
+        // Pin the grid (#452) so the cell indices asserted below stay put.
+        scene.nav_settings.bounds = Some(NavBounds::new(-10.0, 10.0, -10.0, 10.0));
         let mut nav = NavigationGraph::new(-10.0, 10.0, -10.0, 10.0, 1.0);
         nav.bake(&scene);
         plan_light_probes(&scene, Some(&nav), 4.0).expect("a plan from the baked nav")
