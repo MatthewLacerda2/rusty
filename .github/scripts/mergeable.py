@@ -72,6 +72,14 @@ once the gate concludes, its conclusion is the run's, and a signal still
 running or red is named but decides nothing. A gate that has not concluded is
 still a run in flight; a finished run keeps GitHub's own conclusion.
 
+## A head behind `main` is not refused for being behind
+
+A run's verdict is about the tree it built, and nothing here compares the head
+with `main`'s tip: GitHub's squash merge puts the change on the newer `main`
+anyway. Keeping a branch current is `merge-queue.py`'s job, and it leaves a
+head alone when `main` moved only by [`inert`] Markdown (#587) — so a green
+run on such a head is accepted here too, and a test pins that.
+
 ## A commit with no run at all
 
 Two causes, told apart in the output ([`no_run`]): scorsese#153 above, and a
@@ -277,6 +285,13 @@ def ran_something(run: dict, jobs: dict[int, list[dict]], workflow: str) -> bool
 def markdown_only(files: list[str]) -> bool:
     """Whether every changed path is Markdown — CI's own `code` test."""
     return bool(files) and all(f.endswith(".md") for f in files)
+
+
+def inert(files: list[str]) -> bool:
+    """Whether a change to these paths cannot alter what any branch compiles
+    or tests against: Markdown, [`CODE_DOCS`] aside (#587). Nothing changed
+    is inert too."""
+    return all(f.endswith(".md") and f not in CODE_DOCS for f in files)
 
 
 def needs_drift_run(files: list[str]) -> bool:

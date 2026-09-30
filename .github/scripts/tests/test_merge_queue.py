@@ -278,6 +278,7 @@ class Taking(unittest.TestCase):
         moved = {**bot, "headRefOid": "3" * 40}
         opts = queue.parse(["524", "--poll", "0"])
         with mock.patch.object(queue, "on_tip", side_effect=[False, True]), \
+            mock.patch.object(queue, "main_moved_by_docs", return_value=False), \
             mock.patch.object(queue, "look", return_value=moved), \
             mock.patch.object(queue.subprocess, "run", return_value=completed(0)) as called, \
             mock.patch.object(queue.time, "sleep"), mock.patch("builtins.print"):
@@ -298,6 +299,7 @@ class Taking(unittest.TestCase):
     def test_dependabot_in_a_dry_run_is_not_commented_on(self):
         opts = queue.parse(["524", "--dry-run"])
         with mock.patch.object(queue, "on_tip", return_value=False), \
+            mock.patch.object(queue, "main_moved_by_docs", return_value=False), \
             mock.patch.object(queue.subprocess, "run") as called:
             fresh, notes = queue.bot_head(524, SHA, ".", opts)
         called.assert_not_called()
