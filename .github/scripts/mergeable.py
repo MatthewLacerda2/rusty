@@ -54,9 +54,11 @@ passed.** A red run beside a green one refuses.
 a newer run of the same workflow on the same pull request cancels the older
 one, and until #515 a cancelled run leaves a red gate beside the live green
 one — on the *same* commit, when the newer run came from `ready_for_review`.
-A cancelled run with a newer run of its workflow on the same commit is
-therefore dropped ([`superseded`]); a cancelled run that *is* the newest is
-still a refusal, because nothing has answered. A `failure` is never dropped,
+A cancelled run beside a run of its workflow on the same commit that was not
+cancelled and is either still going or no older is therefore dropped
+([`superseded`]); while that run is going the answer is "wait" (#562). A
+cancelled run nothing replaced is still a refusal, because nothing has
+answered. A `failure` is never dropped,
 whatever its age.
 
 ## A run is settled when its gate is, not when its signals are
@@ -163,17 +165,31 @@ def runs_for(runs: list[dict], sha: str, workflow: str) -> list[dict]:
 
 
 def superseded(runs: list[dict]) -> list[dict]:
-    """The cancelled runs a newer run of the same workflow replaced (#482).
+    """The cancelled runs another run of the same workflow replaced (#482).
 
-    Newer by `created_at`, then `id` — both only ever grow. A cancelled run
-    that is itself the newest is kept: nothing has replaced its answer.
+    A cancelled run is dropped when a run that was *not* cancelled either is
+    still going — its answer is the one to wait for — or was created no
+    earlier. "No earlier" is judged on `created_at` alone, and a tie counts:
+    GitHub stamps to the second, and neither the timestamp nor the run id says
+    which of two same-second runs cancelled the other (#562 — on #558 the
+    survivor carried the *lower* id). A cancelled run with no such partner is
+    kept, and refuses: nothing has replaced its answer. Nor does one cancelled
+    run ever supersede another, so a commit whose runs were all cancelled
+    still refuses rather than reading as empty.
     """
 
-    def age(run: dict) -> tuple[str, int]:
-        return (run.get("created_at") or "", run.get("id") or 0)
+    def answers_after(other: dict, run: dict) -> bool:
+        if other is run or other.get("conclusion") == "cancelled":
+            return False
+        if other.get("status") != "completed":
+            return True
+        return (other.get("created_at") or "") >= (run.get("created_at") or "")
 
-    newest = max((age(r) for r in runs), default=None)
-    return [r for r in runs if r.get("conclusion") == "cancelled" and age(r) != newest]
+    return [
+        r
+        for r in runs
+        if r.get("conclusion") == "cancelled" and any(answers_after(o, r) for o in runs)
+    ]
 
 
 def by_gate(run: dict, jobs: dict[int, list[dict]], workflow: str) -> dict:

@@ -264,6 +264,40 @@ class Cancelled(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("in_progress", " ".join(lines))
 
+    def test_558s_run_set_waits_for_the_live_run_not_red(self):
+        # #562, verbatim from #558's head: same workflow, same second, and the
+        # cancelled run carries the *higher* id — id order cannot decide it.
+        at = "2026-09-30T15:44:14Z"
+        live = run("lint", id=36738997580, created_at=at, status="in_progress", conclusion=None)
+        dead = run("lint", id=36738997790, created_at=at, conclusion="cancelled")
+        ci_dead = run("ci", id=36738997830, created_at=at, conclusion="cancelled")
+        ci_live = run("ci", id=36738998031, created_at="2026-09-30T15:44:15Z", status="pending", conclusion=None)
+        jobs = {r["id"]: [] for r in (live, dead, ci_dead, ci_live)}
+        ok, lines = verdict(live, dead, ci_dead, ci_live, jobs=jobs)
+        self.assertFalse(ok)
+        self.assertIn("wait for it", " ".join(lines).lower())
+        self.assertNotIn("beside a red one", " ".join(lines))
+
+    def test_558s_run_set_passes_once_the_live_run_is_green(self):
+        at = "2026-09-30T15:44:14Z"
+        done = run("lint", id=36738997580, created_at=at)
+        dead = run("lint", id=36738997790, created_at=at, conclusion="cancelled")
+        jobs = {1: built("ci"), done["id"]: built("lint"), dead["id"]: []}
+        ok, lines = verdict(run("ci"), done, dead, jobs=jobs)
+        self.assertTrue(ok, lines)
+
+    def test_a_cancelled_run_newer_than_a_green_one_still_refuses(self):
+        green = run("ci", id=1, created_at="2026-09-30T00:00:00Z")
+        dead = run("ci", id=3, conclusion="cancelled")
+        ok, lines = verdict(green, dead, run("lint"), jobs={1: built("ci"), 3: [], 2: built("lint")})
+        self.assertFalse(ok)
+        self.assertIn("cancelled", " ".join(lines))
+
+    def test_cancelled_runs_never_supersede_each_other(self):
+        at = "2026-09-30T00:00:00Z"
+        a, b = (run("ci", id=i, created_at=at, conclusion="cancelled") for i in (1, 3))
+        self.assertEqual(mergeable.superseded([a, b]), [])
+
     def test_only_cancelled_runs_are_ever_superseded(self):
         red = run("ci", id=1, conclusion="failure", created_at="2026-09-30T00:00:00Z")
         self.assertEqual(mergeable.superseded([red, run("ci", id=3)]), [])

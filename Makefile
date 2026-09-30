@@ -164,8 +164,9 @@ mergeable: ## Did CI really run on this PR's head? make mergeable PR=524
 	@python3 .github/scripts/mergeable.py $(PR)
 
 # The same question in a loop, with the rebase and the waiting done for you.
-# Serialized: one branch at a time, in the order given. Never resolves a
-# conflict, builds anything or touches a worktree; it names what to clean up.
+# Serialized: one branch at a time, in the order given. Compile-checks each
+# rebased head before pushing it (#571; ARGS=--no-check skips). Never resolves
+# a conflict or touches a worktree of yours; it names what to clean up.
 # ARGS passes flags through, e.g. ARGS=--dry-run (reads only, writes nothing).
 queue: ## Rebase, wait for CI, squash-merge each in turn. make queue PRS="524 526"
 	@test -n "$(PRS)" || { echo "queue: which pull requests? e.g. make queue PRS=\"524 526\"" >&2; exit 1; }

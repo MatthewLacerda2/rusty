@@ -207,15 +207,21 @@ briefs cloud coders, reviews and merges. Its loop per ready pull request:
 
 1. Read the description. Check the decisions against the issue, and note any
    human-only checks (a window, speakers) as a checklist; don't hold for them.
-2. If the branch is behind `main`, **rebase it here and compile it here** before
-   pushing: `cargo check --all-targets --features dev` and
-   `--no-default-features`. A clean textual rebase still breaks when a merge
-   ahead changed a signature. On #538, for example, #542 removed a
-   `Renderer::render` argument that #538's new tests still passed, and CI caught
-   it one round later than a local check would have.
-3. Push, then merge only when `make mergeable` exits 0. Treat a refusal as final
-   only when no run on the head is still in flight; superseded runs get
-   cancelled and replaced within seconds.
+2. **Use `make queue PRS="N"`** for rebase → check → push → wait → merge; don't
+   hand-roll that loop. The queue rebases in a throwaway worktree, runs
+   `cargo check --locked --all-targets` with `dev` and `--no-default-features`
+   plus the size gate on the rebased tree **before** pushing (#571), and hands
+   the branch back — unpushed — on a conflict or a failed check. A clean
+   textual rebase still breaks when a merge ahead changed a signature: on #538,
+   #542 had removed a `Renderer::render` argument that #538's new tests still
+   passed, and CI caught it ten minutes later; a rebase of #563 onto #558 and
+   #564 pushed a file to 308/300 lines. It then waits for the runs on the
+   rebased head and merges only on `make mergeable`'s verdict, which reads a
+   cancelled run beside its still-running replacement as "wait", not red
+   (#562). The local check is a heavy build on a cold target, so it takes a
+   build slot like any other.
+3. A hand-back is the queue's whole report: fix a conflict or a failed check on
+   the branch (or brief its coder to), then queue it again.
 4. After merging: remove the worktree and its `target/`, re-read the board, and
    start the next piece of work.
 

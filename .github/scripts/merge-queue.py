@@ -5,7 +5,7 @@ Merging stays serialized, one branch at a time, because rusty is one compiled
 crate: two pull requests can each be green alone and break `main` together (a
 rename, a changed signature, a moved module). Nothing here proposes otherwise.
 What this automates is **who sits through the ten minutes** — rebase the
-branch, force-push it, wait for the runs on the rebased head, ask
+branch, compile-check the rebased tree ([`verify`]), force-push it, wait for the runs on the rebased head, ask
 [`mergeable.judge`], squash-merge, take the next one. Without it an agent sits
 through every cold CI run of a batch holding a worktree open. Ported from
 scorsese (#486); its incidents are cited as scorsese#N.
@@ -31,17 +31,42 @@ already on `main`'s tip, the run on record is a run on this exact commit
    back naming the paths. rusty's conflict hot spots — `ComponentKind::ALL`'s
    hard-coded length, `app/registry.rs`'s system order — are exactly the ones
    where keeping both sides is wrong and no textual merge knows it.
-2. **It never merges on a local result.** It builds nothing. `make gates` is
-   the author's job before readying; CI is the cross-platform claim (macOS and
-   Windows runners), and the only thing consulted here is [`mergeable.judge`].
+2. **It never merges on a local result.** A local check may only *refuse* a
+   push, never grant a merge. `make gates` is the author's job before
+   readying; CI is the cross-platform claim (the macOS runner), and the only
+   thing a merge consults is [`mergeable.judge`].
 3. **It never reads the mutation or coverage signal.** Signals never hold a
    merge.
+
+## A clean rebase is not a compiling one
+
+A merge ahead can change a signature the branch still calls, and no textual
+merge sees it. On 2026-09-30 #542 removed a `Renderer::render` argument that
+#538's new tests still passed; the rebase was clean and CI went red ten
+minutes later — a queue round spent on a compile error (#571). A rebase of
+#563 onto #558 and #564 pushed a file to 308 of 300 lines the same night. So
+before pushing a rebase that moved the head, [`verify`] runs [`LOCAL_CHECKS`]
+in the rebased tree: `cargo check --locked --all-targets` with `dev` and with
+`--no-default-features`, then the size gate — a minute or two on a warm
+target, against ten for the CI round it saves. A failure hands the branch
+back unpushed: a head known to be broken is never pushed to find out again.
+Skipped for a Markdown-only branch (nothing compiles differently), a rebase
+that moved nothing, Dependabot, and `--no-check`.
+
+Those builds land in **one target directory owned by the queue**
+(`target/merge-queue` under `--root` by default), never a worktree's own.
+CLAUDE.md's rule against a shared `CARGO_TARGET_DIR` is about worktrees
+building *at the same time* into one directory; the queue is one process
+taking one branch at a time, so its directory is only ever shared with its own
+previous turn — which is what keeps it warm. They get half the cores
+(`CARGO_BUILD_JOBS`, unless already set), because another agent's build may be
+running beside them (#497).
 
 ## What it touches, and what it leaves alone
 
 The rebase happens in a **throwaway, detached worktree this script creates and
 removes** under the system temp dir — never in a worktree somebody is working
-in. It compiles nothing, so it has no `target/`. The push is
+in. The push is
 `--force-with-lease` against the head the pull request had when its turn
 began, so a push from anywhere else refuses rather than being overwritten. The
 merge is `--match-head-commit`, so GitHub refuses it if the head moved after
@@ -85,6 +110,7 @@ network (`make scripts`).
 from __future__ import annotations
 
 import argparse
+import functools
 import importlib.util
 import json
 import os
@@ -134,6 +160,18 @@ TRANSPORT_WORDS = (
 # How `gh pr view --json author` names Dependabot, and the command it obeys.
 BOTS = ("app/dependabot", "dependabot[bot]", "dependabot")
 BOT_REBASE = "@dependabot rebase"
+
+# What a rebased tree must pass before it is pushed ([`verify`], #571),
+# cheapest first. Each mirrors a gate CI blocks on.
+LOCAL_CHECKS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("cargo check (dev)", ("cargo", "check", "--locked", "--all-targets", "--features", "dev")),
+    ("cargo check (no default features)", ("cargo", "check", "--locked", "--all-targets", "--no-default-features")),
+    ("the size gate", ("cargo", "run", "--quiet", "--locked", "--manifest-path", "tools/lint/Cargo.toml")),
+)
+
+# How much of a failed check's output the hand-back quotes: the end, where
+# cargo puts the error and the lint its verdict.
+OUTPUT_TAIL = 15
 
 WAIT, GO, STOP = "wait", "go", "stop"
 
@@ -321,18 +359,49 @@ def confirm(number: int, poll: float) -> tuple[str, list[str]]:
         time.sleep(min(poll, MERGE_SETTLES_SECONDS / 4))
 
 
+def verify(work: str, target: str, runner=subprocess.run) -> list[str]:
+    """Run [`LOCAL_CHECKS`] in the rebased tree `work`; why not to push, or `[]`.
+
+    Stops at the first failure and quotes its tail. `runner` is
+    `subprocess.run`'s shape, injected so the tests need no toolchain.
+    """
+    env = {**os.environ, "CARGO_TARGET_DIR": target}
+    env.setdefault("CARGO_BUILD_JOBS", str(max(1, (os.cpu_count() or 2) // 2)))
+    for name, argv in LOCAL_CHECKS:
+        done = runner(list(argv), cwd=work, env=env, capture_output=True, text=True, check=False)
+        if done.returncode != 0:
+            said = f"{done.stdout or ''}\n{done.stderr or ''}".strip().splitlines()
+            return [
+                f"the rebased head fails {name}; not pushed.",
+                *said[-OUTPUT_TAIL:],
+                "The rebase was textually clean, so a merge ahead changed"
+                " something this branch relies on. Handed back: fix it on the"
+                " branch, then queue it again.",
+            ]
+    return []
+
+
+def needs_check(pull: dict, opts: argparse.Namespace) -> bool:
+    """Whether [`verify`] runs for this pull request's rebase."""
+    return not (opts.no_check or opts.dry_run or mergeable.markdown_only(mergeable.paths(pull)))
+
+
 def on_tip(sha: str, root: str) -> bool:
     """Whether `sha` already contains `origin/main`'s tip (fetched by the caller)."""
     git("fetch", "--quiet", "origin", sha, cwd=root)
     return git("merge-base", "--is-ancestor", "origin/main", sha, cwd=root).returncode == 0
 
 
-def advance(branch: str, head: str, root: str, push: bool) -> tuple[str | None, list[str]]:
+def advance(
+    branch: str, head: str, root: str, push: bool, check=None
+) -> tuple[str | None, list[str]]:
     """Put `branch` on `main`'s tip. Returns the new head, or why not.
 
     In a detached worktree this creates and removes, never one an agent may be
     standing in. The push goes from inside it, leased to `head`. With
-    `push=False` (the dry run) the rebase is only computed.
+    `push=False` (the dry run) the rebase is only computed. `check`, given the
+    rebased tree's path, returns why not to push it ([`verify`]); it runs only
+    when the rebase moved the head.
     """
     with tempfile.TemporaryDirectory(prefix="rusty-queue-") as tmp:
         work = os.path.join(tmp, "wt")
@@ -352,6 +421,10 @@ def advance(branch: str, head: str, root: str, push: bool) -> tuple[str | None, 
                     " code is shaped as it is does not get to pick a side.",
                 ]
             fresh = git("rev-parse", "HEAD", cwd=work).stdout.strip()
+            if check is not None and push_needed(head, fresh):
+                broken = check(work)
+                if broken:
+                    return None, broken
             if push and push_needed(head, fresh):
                 pushed = git(
                     "push", f"--force-with-lease=refs/heads/{branch}:{head}",
@@ -427,7 +500,7 @@ def dry(repo: str, pull: dict, fresh: str, notes: list[str]) -> tuple[int, str, 
         # Dependabot's branch, behind `main`: [`bot_head`] said what it would do.
         moved, notes = notes[0].rstrip("."), notes[1:]
     elif push_needed(head, fresh):
-        moved = f"would push {fresh[:7]}, then wait for CI on it"
+        moved = f"would push {fresh[:7]} once it passes the local checks, then wait for CI on it"
     else:
         moved = "already on `main`; nothing to push"
     runs, jobs = mergeable.evidence(repo, head)
@@ -453,7 +526,11 @@ def take(repo: str, number: int, opts: argparse.Namespace) -> tuple[int, str, st
         fresh, notes = bot_head(number, head, opts.root, opts)
     else:
         say(f"#{number} ({branch}): rebasing {head[:7]} onto origin/main.")
-        fresh, notes = advance(branch, head, opts.root, push=not opts.dry_run)
+        check = None
+        if needs_check(pull, opts):
+            target = os.path.abspath(opts.target_dir or os.path.join(opts.root, "target", "merge-queue"))
+            check = functools.partial(verify, target=target)
+        fresh, notes = advance(branch, head, opts.root, push=not opts.dry_run, check=check)
     if fresh is None:
         say(f"#{number}: {notes[0]}", *notes[1:])
         return number, HANDED_BACK, notes[0]
@@ -513,6 +590,14 @@ def parse(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--poll", type=float, default=POLL_SECONDS, metavar="SECONDS",
         help=f"how often to ask GitHub again (default {POLL_SECONDS})",
+    )
+    parser.add_argument(
+        "--no-check", action="store_true",
+        help="push a rebased head without compile-checking it first (CI still judges it)",
+    )
+    parser.add_argument(
+        "--target-dir", metavar="DIR",
+        help="where the pre-push checks build (default: target/merge-queue under --root; never a worktree's own)",
     )
     parser.add_argument("--root", default=".", metavar="DIR", help="the git checkout to rebase in (default: the current directory)")
     return parser.parse_args(argv)
