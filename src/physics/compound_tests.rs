@@ -113,6 +113,27 @@ fn collider_without_rigidbody_joins_the_ancestor_body() {
 }
 
 #[test]
+fn moving_or_deactivating_a_part_updates_its_collider() {
+    // A part the animator/script moves mid-play drags its collider along the
+    // body; a deactivated part's collider is disabled (no contacts). Queries
+    // don't consult rapier's enabled flag, so assert the flag itself.
+    let mut scene = Scene::new();
+    let body = add(&mut scene, None, Vec3::ZERO, false);
+    rigidbody(&mut scene, body, true, Vec3::ZERO);
+    let part = add(&mut scene, Some(body), Vec3::X * 2.0, true);
+    let mut world = PhysicsWorld::from_scene(&scene);
+    scene.world.transform_mut(part).unwrap().position = Vec3::new(-3.0, 0.0, 0.0);
+    world.step(&mut scene, DT);
+    assert_eq!(hit_below(&world, -3.0, 0.0), Some(part));
+    assert_eq!(hit_below(&world, 2.0, 0.0), None, "left its old offset");
+    assert!(world.colliders[world.id_to_collider[&part]].is_enabled());
+    scene.world.set_active(part, false);
+    world.step(&mut scene, DT);
+    let handle = world.id_to_collider[&part];
+    assert!(!world.colliders[handle].is_enabled(), "inactive part");
+}
+
+#[test]
 fn dynamic_child_writes_back_a_local_pose() {
     let mut scene = Scene::new();
     let parent = add(&mut scene, None, Vec3::new(10.0, 0.0, 0.0), false);
