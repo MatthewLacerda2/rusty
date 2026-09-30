@@ -160,3 +160,17 @@ fn rebake_reshapes_to_new_geometry() {
     assert_eq!((g.width, g.height), (fresh.width, fresh.height));
     assert_eq!(g.walkability.len(), (48 * 8) as usize);
 }
+
+/// A zero, negative or infinite `grid_spacing` keeps the graph's current spacing, so the
+/// bake never divides by zero or sizes an unbounded grid.
+#[test]
+fn invalid_spacing_keeps_the_current_one() {
+    let mut scene = Scene::new();
+    add_box(&mut scene, Vec3::ZERO, Vec3::ONE, true);
+    for bad in [0.0, -1.0, f32::INFINITY, f32::NAN] {
+        scene.nav_settings.grid_spacing = bad;
+        let g = NavigationGraph::from_scene(&scene);
+        assert_eq!(g.grid_spacing, 1.0, "spacing {bad} ignored");
+        assert_eq!((g.width, g.height), (8, 8));
+    }
+}
