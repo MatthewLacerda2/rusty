@@ -209,7 +209,7 @@ impl Renderer {
 fn texture_paths(scene: &Scene, layout: &UiLayout) -> Vec<String> {
     let mut paths: Vec<String> = layout
         .iter()
-        .filter_map(|(id, _)| scene.world.image(id)?.texture.clone())
+        .filter_map(|(id, _)| Some(scene.world.image(id)?.shown_texture()?.to_string()))
         .collect();
     paths.sort();
     paths.dedup();

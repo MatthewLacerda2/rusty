@@ -12,7 +12,8 @@
 //!
 //! One texel is one reference unit (Unity's 100 pixels-per-unit sprite on a
 //! 100 reference-pixels-per-unit canvas). Colours are in display (sRGB-encoded)
-//! space with straight alpha, as a designer picks them. Pure authoring data.
+//! space with straight alpha, as a designer picks them. Authoring data, plus two
+//! runtime-only slots a `Selectable` drives (never serialized).
 
 use glam::Vec4;
 use serde::{Deserialize, Serialize};
@@ -78,6 +79,14 @@ pub struct ImageComponent {
     pub preserve_aspect: bool,
     /// Whether the pointer can hit this graphic (read by #420).
     pub raycast_target: bool,
+    /// Runtime only, never saved: the colour a `Selectable`'s `ColorTint` multiplies
+    /// in (Unity's `CanvasRenderer` colour). Written by the event system (#420).
+    #[serde(skip)]
+    pub state_tint: Vec4,
+    /// Runtime only, never saved: the sprite a `Selectable`'s `SpriteSwap` shows in
+    /// place of `texture` (Unity's `Image.overrideSprite`, #420).
+    #[serde(skip)]
+    pub override_texture: Option<String>,
 }
 
 impl Default for ImageComponent {
@@ -93,6 +102,15 @@ impl Default for ImageComponent {
             fill_clockwise: true,
             preserve_aspect: false,
             raycast_target: true,
+            state_tint: Vec4::ONE,
+            override_texture: None,
         }
+    }
+}
+
+impl ImageComponent {
+    /// The texture this image draws: a `SpriteSwap` override, else its own.
+    pub fn shown_texture(&self) -> Option<&str> {
+        self.override_texture.as_deref().or(self.texture.as_deref())
     }
 }

@@ -9,21 +9,24 @@
 //! - [`layout`] — the pass that turns canvases and rect transforms into rectangles
 //!   in canvas reference units and screen pixels ([`UiLayout`], [`UiRect`]);
 //! - [`text`] — fonts, rich text, measuring, wrapping, overflow and auto-size for
-//!   the `Text` component (#419).
+//!   the `Text` component (#419);
+//! - [`events`] — the event system: hit-testing, pointer and focus callbacks, and
+//!   the `Selectable` states (#420).
 //!
-//! The render pass (#418) draws these; pointer events (#420) and layout groups
-//! (#421) build on them. The model is recorded in `docs/ui.md`.
+//! The render pass (#418) draws these; layout groups (#421) build on them. The model is recorded in `docs/ui.md`.
 //!
-//! Allowed deps: components, ecs, core, glam, ab_glyph / ttf-parser (fonts). Never `render` / `editor` / `wgpu` /
+//! Allowed deps: components, ecs, core, scene (tests), glam, ab_glyph / ttf-parser (fonts). Never `render` / `editor` / `wgpu` /
 //! `egui` — the layout runs headless (the direction guard enforces it).
 
 // Panic-free sim core (#195): bare `.unwrap()` is denied here, as in the other
 // sim modules. See docs/linting.md.
 #![deny(clippy::unwrap_used)]
 
+pub mod events;
 pub mod layout;
 mod screen;
 pub mod text;
 
+pub use events::EventSystem;
 pub use layout::{UiLayout, UiRect};
 pub use screen::ScreenSize;
