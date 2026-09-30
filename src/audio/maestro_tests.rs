@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::audio::introspection::AudioEventKind;
+use crate::audio::mix::Shot;
 use crate::audio::spatial::Listener;
 use glam::{Quat, Vec3};
 
@@ -67,7 +68,11 @@ fn master_volume_is_clamped() {
 #[test]
 fn play_at_logs_a_oneshot_without_an_entity_voice() {
     let mut m = AudioMaestro::default();
-    m.play_at("boom.wav", [4.0, 0.0, -2.0], 0.8, 42, 11);
+    let shot = Shot {
+        volume: 0.8,
+        ..Shot::new("boom.wav", [4.0, 0.0, -2.0])
+    };
+    m.play_at(&shot, 42, 11);
     // One-shot leaves no live entity voice…
     assert!(!m.is_source_playing(42));
     // …but its only trace is the event log.

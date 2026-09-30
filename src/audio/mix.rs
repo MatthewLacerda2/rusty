@@ -11,8 +11,9 @@
 //! held paused while `timeScale == 0` or the loop-level `Time.Pause` is on; it
 //! resumes where it left off. Unscaled voices (music, UI) ignore both.
 //!
-//! One-shots (`Audio.PlayAt`) are diegetic: fully spatial (`spatial_blend = 1`,
-//! the `AudioSource` default rolloff band) and time-scaled.
+//! One-shots (`Audio.PlayAt`) are diegetic: fully spatial (`spatial_blend = 1`) and
+//! time-scaled, with the `AudioSource` default rolloff band unless the caller passes
+//! a [`Rolloff`] (#575 — a gunshot that must carry past 16 m).
 //!
 //! Pure and clock-free — the caller supplies the listener and the time state.
 
@@ -72,12 +73,56 @@ pub fn resolve_voice(
     }
 }
 
+/// A one-shot's linear rolloff band: full volume out to `min_distance`, silent
+/// at/beyond `max_distance` — the `AudioSource` `initial_distance`/`final_distance`
+/// pair, chosen per shot.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Rolloff {
+    pub min_distance: f32,
+    pub max_distance: f32,
+}
+
+impl Default for Rolloff {
+    /// The `AudioSource` default band (1 → 16 m), Unity's `PlayClipAtPoint` reach.
+    fn default() -> Self {
+        let source = AudioSourceComponent::default();
+        Self {
+            min_distance: source.initial_distance,
+            max_distance: source.final_distance,
+        }
+    }
+}
+
+/// One `Audio.PlayAt` call: what to play, where, how loud, and how far it carries.
+#[derive(Clone, Copy, Debug)]
+pub struct Shot<'a> {
+    pub clip: &'a str,
+    pub position: [f32; 3],
+    /// Per-shot linear gain (pre-master).
+    pub volume: f32,
+    pub rolloff: Rolloff,
+}
+
+impl<'a> Shot<'a> {
+    /// `clip` at `position`, full volume, on the default band.
+    pub fn new(clip: &'a str, position: [f32; 3]) -> Self {
+        Self {
+            clip,
+            position,
+            volume: 1.0,
+            rolloff: Rolloff::default(),
+        }
+    }
+}
+
 /// The emitter settings an `Audio.PlayAt` one-shot plays with.
-pub fn oneshot_source(clip: &str) -> AudioSourceComponent {
+pub fn oneshot_source(clip: &str, rolloff: Rolloff) -> AudioSourceComponent {
     AudioSourceComponent {
         clip: clip.to_string(),
         spatial_blend: 1.0,
         is_time_scaled: true,
+        initial_distance: rolloff.min_distance,
+        final_distance: rolloff.max_distance,
         ..Default::default()
     }
 }
@@ -183,3 +228,7 @@ impl AudioMaestro {
 #[cfg(test)]
 #[path = "mix_tests.rs"]
 mod mix_tests;
+
+#[cfg(test)]
+#[path = "oneshot_tests.rs"]
+mod oneshot_tests;

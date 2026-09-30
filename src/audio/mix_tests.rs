@@ -130,7 +130,7 @@ fn a_voice_started_between_frames_uses_the_last_frames_listener() {
 fn play_at_is_spatialized_and_reaped_when_the_backend_finishes_it() {
     let (backend, rec) = RecordingBackend::new();
     let mut m = AudioMaestro::with_backend(backend);
-    m.play_at("boom.wav", [-2.0, 0.0, 0.0], 1.0, 0, 0);
+    m.play_at(&Shot::new("boom.wav", [-2.0, 0.0, 0.0]), 0, 0);
     let voice = rec.borrow().last_voice();
     assert!(rec.borrow().plays[0].1.mix.pan < 0.0);
     m.apply_mix(&env_at(Vec3::ZERO, 0.5, false), |_| None);

@@ -4,6 +4,7 @@
 //! identically with or without hardware — exactly what the harness runs on.
 
 mod global;
+mod oneshot;
 mod voices;
 
 use std::cell::RefCell;
