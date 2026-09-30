@@ -6,7 +6,8 @@
 //! `texture`), shape + per-particle motion (`shape` / `emit_from` / `lifetime` /
 //! `speed` / `direction` / `spread` / `gravity`), start size / rotation / colour
 //! ranges, the over-life curves and gradient, collision (`collision` /
-//! `bounciness`), sub-emitters, and the deterministic `seed`.
+//! `bounciness`), sub-emitters, and the deterministic `seed`. The #440 render
+//! settings (`render.*`: mode, stretch, mesh, flipbook, soft, lit) live in `render`.
 //!
 //! BOTH the editor's Particle System card and the Lua `Particles.*` field-setters
 //! route through these, so the egui panel and the binding share one write (#287). The
@@ -16,6 +17,10 @@
 //! routed here.
 //!
 //! Allowed deps: components (the emitter data + its enums), core (curves). Pure.
+
+mod render;
+
+pub use render::*;
 
 use glam::Vec3;
 

@@ -6,6 +6,7 @@
 //! for everything that issues geometry. The dev layer folds them into `FrameStats`.
 
 use crate::render::draw::resources::SolidResources;
+use crate::render::passes::particles::ParticleDraws;
 use crate::render::{RenderView, Renderer};
 use crate::scene::{LightType, Scene};
 
@@ -42,11 +43,15 @@ pub struct RenderCounters {
     /// samples, summed over the camera stack; `0` with AO off. Its depth prepass is
     /// counted in `draw_calls` and `triangles`.
     pub ssao_samples: u64,
+    /// Particles drawn: sprite instances plus mesh particles, summed over the stack
+    /// (#440). Their draw calls are in `draw_calls` — one per merged sprite batch, and
+    /// one per instanced run of mesh particles.
+    pub particles_drawn: u32,
 }
 
 impl RenderCounters {
     /// Every counter under its `FrameStats` metric name.
-    pub fn pairs(&self) -> [(&'static str, u64); 10] {
+    pub fn pairs(&self) -> [(&'static str, u64); 11] {
         [
             ("draw_calls", self.draw_calls.into()),
             ("triangles", self.triangles),
@@ -58,6 +63,7 @@ impl RenderCounters {
             ("shadow_draws", self.shadow_draws.into()),
             ("ui_draws", self.ui_draws.into()),
             ("ssao_samples", self.ssao_samples),
+            ("particles_drawn", self.particles_drawn.into()),
         ]
     }
 
@@ -83,15 +89,22 @@ impl Renderer {
         self.shadow_renderer.drawn.clear();
     }
 
-    /// Count one camera's solids, decals and particle batches.
-    pub(crate) fn count_camera(&mut self, solids: &SolidResources, decals: usize, particles: u32) {
+    /// Count one camera's solids (mesh particles among them), decals and sprite
+    /// particle batches.
+    pub(crate) fn count_camera(
+        &mut self,
+        solids: &SolidResources,
+        decals: usize,
+        particles: ParticleDraws,
+    ) {
         let c = &mut self.frame_counters;
         let batches = solids.draws.batches();
         c.add_draws(batches.map(|b| (b.num_indices, b.instances.len() as u32)));
-        c.visible_entities += solids.draws.instances.len() as u32;
+        c.visible_entities += solids.draws.instances.len() as u32 - solids.mesh_particles;
         c.culled_entities += solids.culled;
         c.lod_hidden_entities += solids.lod_hidden;
-        c.draw_calls += decals as u32 + particles;
+        c.draw_calls += decals as u32 + particles.draw_calls;
+        c.particles_drawn += particles.instances + solids.mesh_particles;
     }
 
     /// Close the frame's counters: the shadow casters drawn and the UI batches.

@@ -51,7 +51,8 @@ pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::Bind
         label: Some("Camera, Lighting, Skybox & Reflection Layout"),
         entries: &[
             uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT),
-            uniform_entry(1, wgpu::ShaderStages::FRAGMENT),
+            // Vertex-visible too: lit particles shade per vertex (#440).
+            uniform_entry(1, wgpu::ShaderStages::VERTEX_FRAGMENT),
             texture_entry(2, D2),
             sampler_entry(3),
             texture_entry(4, Cube),

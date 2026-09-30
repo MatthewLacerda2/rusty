@@ -48,15 +48,10 @@ fn scene(effect: &str, fog: bool) -> Scene {
                 texture: white_sprite(),
                 ..Default::default()
             };
-            emitter.runtime.particles.push(Particle {
-                position: at,
-                velocity: Vec3::ZERO,
-                age: 0.0,
-                lifetime: 10.0,
-                size: 8.0,
-                rotation: 0.0,
-                color: [1.0, 0.2, 0.2, 1.0],
-            });
+            emitter
+                .runtime
+                .particles
+                .push(Particle::at(at, 8.0, [1.0, 0.2, 0.2, 1.0], 10.0));
             scene.world.set_particles(id, Some(emitter));
         }
     }

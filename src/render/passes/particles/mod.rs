@@ -1,59 +1,39 @@
-//! src/render/particles.rs — billboard particle pass: resources + pipelines.
+//! src/render/passes/particles/ — the particle pass (#13, #440): resources +
+//! pipelines here, per-frame orchestration in `draw`, instance building in
+//! `instance`, and mesh particles (which join the forward solids) in `mesh`.
 //!
-//! Owns the GPU resources for drawing each emitter's live `Vec<Particle>` (from the
-//! decoupled sim in `app::particles`) as camera-facing textured quads in the HDR
-//! scene target, BEFORE the post-FX chain — so bloom/tonemap apply to additive
-//! (emissive) sparks. The per-frame draw orchestration lives in `particles_draw`.
+//! Sprite particles draw into the HDR scene target BEFORE the post-FX chain — so
+//! bloom/tonemap apply to additive (emissive) sparks. Two pipelines share one
+//! shader: alpha-blended (smoke) and additive (sparks/fire). Both read the scene
+//! depth as a read-only attachment (occlusion) *and* a texture (soft particles),
+//! and bind the renderer's group 0 so lit particles read the forward lighting
+//! uniform.
 //!
-//! Two pipelines share one shader: alpha-blended (smoke) and additive (sparks/fire).
 //! The simulation owns particle *state*; this module only reads it — the invariant
 //! that keeps headless play renderer-free.
+
+mod draw;
+pub(crate) use draw::ParticleDraws;
+pub(crate) mod instance;
+mod mesh;
+
+use std::collections::HashMap;
 
 use wgpu::util::DeviceExt;
 
 use crate::components::particle::ParticleBlend;
 use crate::render::gpu::shaders::ShaderRegistry;
-use crate::render::gpu::uniforms::FogUniform;
 use crate::render::postfx::HDR_FORMAT;
+use crate::render::MeshId;
+use instance::{ParticleGlobals, ParticleInstance};
 
-/// Per-particle instance data uploaded to the GPU (matches `InstanceInput`).
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct ParticleInstance {
-    pub(crate) center: [f32; 3],
-    pub(crate) size: f32,
-    /// Sprite rotation about the view axis, radians.
-    pub(crate) rotation: f32,
-    pub(crate) color: [f32; 4],
-}
-
-impl ParticleInstance {
-    const ATTRIBS: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
-        0 => Float32x3, // center
-        1 => Float32,   // size
-        2 => Float32,   // rotation
-        3 => Float32x4, // color
-    ];
-
-    pub(crate) fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<ParticleInstance>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Instance,
-            attributes: &Self::ATTRIBS,
-        }
-    }
-}
-
-/// Globals uniform: view-projection + camera right/up for billboarding, and the
-/// camera position + scene fog (#437) the vertex stage fogs each corner with.
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct ParticleGlobals {
-    pub(crate) view_proj: [f32; 16],
-    pub(crate) cam_right: [f32; 4],
-    pub(crate) cam_up: [f32; 4],
-    pub(crate) cam_pos: [f32; 4],
-    pub(crate) fog: FogUniform,
+/// The layouts the particle pipelines share with other passes: the single-texture
+/// sprite layout, the scene-depth layout (the decal pass's), and the renderer's
+/// camera + lighting group 0.
+pub(crate) struct SharedLayouts<'a> {
+    pub texture: &'a wgpu::BindGroupLayout,
+    pub depth: &'a wgpu::BindGroupLayout,
+    pub camera_lighting: &'a wgpu::BindGroupLayout,
 }
 
 /// Owns every GPU resource for the particle pass. One per `Renderer`.
@@ -63,14 +43,17 @@ pub struct ParticleRenderer {
     pub(crate) globals_buffer: wgpu::Buffer,
     pub(crate) globals_bind_group: wgpu::BindGroup,
     pub(crate) index_buffer: wgpu::Buffer,
+    /// Mesh-particle mesh names resolved to their GPU mesh (`None`: failed to load),
+    /// so a model is read from disk once, not every frame.
+    pub(crate) meshes: HashMap<String, Option<MeshId>>,
 }
 
 impl ParticleRenderer {
-    /// Build the pass: a globals bind group + two blend-variant pipelines that
-    /// reuse the renderer's `texture_layout` for the sprite (group 1).
-    pub fn new(
+    /// Build the pass: a globals bind group + two blend-variant pipelines over
+    /// groups globals (0), sprite (1), scene depth (2) and camera + lighting (3).
+    pub(crate) fn new(
         device: &wgpu::Device,
-        texture_layout: &wgpu::BindGroupLayout,
+        layouts: SharedLayouts,
         registry: &mut ShaderRegistry,
     ) -> Self {
         let shader = registry.load(device, "particles.wgsl", "Particle Shader");
@@ -93,7 +76,12 @@ impl ParticleRenderer {
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Particle Pipeline Layout"),
-            bind_group_layouts: &[&globals_layout, texture_layout],
+            bind_group_layouts: &[
+                &globals_layout,
+                layouts.texture,
+                layouts.depth,
+                layouts.camera_lighting,
+            ],
             push_constant_ranges: &[],
         });
 
@@ -120,6 +108,7 @@ impl ParticleRenderer {
             globals_buffer,
             globals_bind_group,
             index_buffer,
+            meshes: HashMap::new(),
         }
     }
 
@@ -169,7 +158,8 @@ impl ParticleRenderer {
             },
             // Depth-test against the scene depth (so particles are occluded by
             // solids) but DON'T write depth — overlapping transparent sprites must
-            // all blend, not z-fight.
+            // all blend, not z-fight. Read-only, so the same depth can also be bound
+            // as the soft-particle texture.
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth32Float,
                 depth_write_enabled: false,

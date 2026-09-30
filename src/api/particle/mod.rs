@@ -3,16 +3,19 @@
 //! Script/REPL/bot control over an entity's `ParticleEmitterComponent`: fire
 //! one-off emissions (`Emit`/`Burst`), gate the emitter (`SetActive`), retune the
 //! continuous rate (`SetRate`), reshape it per shot (`SetShape`, `SetDirection`,
-//! the start ranges, `SetColor`, `SetSubEmitter` — #439), and read/clear the live
-//! state. Emission goes
+//! the start ranges, `SetColor`, `SetSubEmitter` — #439), choose how it is drawn
+//! (`SetRenderMode`, `SetFlipbook`, `SetSoft`, `SetLit`, … — #440, in `render`), and
+//! read/clear the live state. Emission goes
 //! through the component's own seeded spawn path (`emit_at`), so a scripted burst
 //! stays bit-for-bit reproducible alongside the sim's own emission.
+
+mod render;
 
 use std::cell::RefCell;
 
 use mlua::Lua;
 
-use super::{put, Reg};
+use crate::api::{put, Reg};
 use crate::components::{EmitFrom, EmitShape, SubEmitTrigger};
 use crate::core::curve::{ColorRange, Range};
 use crate::scene::authoring::particles as particle_ops;
@@ -31,6 +34,7 @@ pub fn register<'lua, 'scope>(
     register_shape(scope, &table, scene)?;
     register_start(scope, &table, scene)?;
     register_state(scope, &table, scene)?;
+    render::register(scope, &table, scene)?;
 
     lua.globals()
         .set("Particles", table)
@@ -244,7 +248,7 @@ fn register_state<'lua, 'scope>(
 }
 
 /// Mutate the emitter on entity `id` if it has one (no-op otherwise).
-fn with_emitter(
+pub(super) fn with_emitter(
     scene: &RefCell<Scene>,
     id: u32,
     f: impl FnOnce(&mut crate::scene::ParticleEmitterComponent),

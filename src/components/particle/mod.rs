@@ -22,12 +22,14 @@
 //! [`Random`]: crate::core::random::Random
 
 mod legacy;
+mod render;
 mod runtime;
 mod shape;
 mod spawn;
 mod sub_emitter;
 
 pub use legacy::LegacyEmitter;
+pub use render::{Flipbook, ParticleRender, ParticleRenderMode};
 pub use runtime::{EmitterRuntime, Particle, SubEmitEvent};
 pub use shape::{EmitFrom, EmitShape};
 pub use sub_emitter::{SubEmitTrigger, SubEmitters};
@@ -135,6 +137,10 @@ pub struct ParticleEmitterComponent {
     pub sub_emitters: SubEmitters,
     /// Seed for the deterministic PRNG (reproducible headless replays).
     pub seed: u64,
+    /// How the particles are drawn: billboard / stretched / flat / mesh, flipbook,
+    /// soft and lit (#440).
+    #[serde(default)]
+    pub render: ParticleRender,
 
     /// Live runtime — transient, never serialized.
     #[serde(skip)]
@@ -178,6 +184,7 @@ impl Default for ParticleEmitterComponent {
             bounciness: 0.5,
             sub_emitters: SubEmitters::default(),
             seed: 1,
+            render: ParticleRender::default(),
             runtime: EmitterRuntime::default(),
         }
     }

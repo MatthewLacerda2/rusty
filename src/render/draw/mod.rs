@@ -5,11 +5,13 @@
 mod axis;
 pub(crate) mod batch;
 mod lighting;
+mod materials;
 mod overlays;
 mod pass;
 mod probes;
 pub(crate) mod resources;
-mod uniforms;
+pub(crate) mod sort;
+pub(crate) mod uniforms;
 
 use glam::Vec3;
 
@@ -133,7 +135,8 @@ impl Renderer {
             // World canvases (#429): scene geometry, occluded by it, before particles.
             self.draw_world_ui(view, cam, aspect, FogUniform::from_settings(&scene.fog));
 
-            // Billboard particles for this camera (after solids, before the next pass).
+            // Sprite particles for this camera (after solids, before the next pass),
+            // emitters back to front; mesh particles already drew with the solids.
             let particle_draws = self.draw_particles(view, scene, cam);
             self.count_camera(&solids, scene.decals.len(), particle_draws);
 

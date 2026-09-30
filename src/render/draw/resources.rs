@@ -1,15 +1,15 @@
-//! Per-frame GPU resource pre-creation: the camera's solids as instanced draws (#470),
-//! the material bind groups they share, and the overlay resource-tuple type aliases.
-//! Editor overlays live in `overlays`/`axis`/`probes`. Each block returns owned
-//! resources that outlive the render pass.
-
-use std::rc::Rc;
+//! Per-frame GPU resource pre-creation: the camera's solids (and mesh particles, #440)
+//! as instanced draws (#470), and the overlay resource-tuple type aliases. The
+//! material bind groups they share live in `materials`; editor overlays in
+//! `overlays`/`axis`/`probes`. Each block returns owned resources that outlive the
+//! render pass.
 
 use super::batch::{BatchKey, DrawItem, FrameDraws};
+use super::sort::{back_to_front, view_depth};
 use crate::components::MaterialAsset;
 use crate::render::gpu::draw_buffers::{group1, push_palette, FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
-use crate::render::{transform_aabb, Frustum, GpuTexture, MeshId, Renderer};
+use crate::render::{transform_aabb, Frustum, MeshId, Renderer};
 use crate::scene::Scene;
 
 /// One camera's solids as instanced draws (#470), split into the two passes a frame
@@ -23,6 +23,8 @@ pub(crate) struct SolidResources {
     pub culled: u32,
     /// Mesh entities hidden because their LOD level is not the one shown (#472).
     pub lod_hidden: u32,
+    /// Mesh particles among the instances (#440) — counted as particles, not entities.
+    pub mesh_particles: u32,
 }
 // The overlay resources keep only the buffers they own (the per-overlay entity
 // uniform + any vertex buffer) plus their bind group; the joint array they bind is
@@ -114,14 +116,29 @@ impl Renderer {
                 continue;
             };
             if is_transparent {
-                transparent.push((item, (world_pos - cam_pos).dot(cam_fwd)));
+                transparent.push((item, view_depth(world_pos, cam_pos, cam_fwd)));
             } else {
                 opaque.push(item);
             }
         }
-        // Back-to-front: farthest (largest view-space depth) drawn first so nearer
-        // translucent surfaces blend over what is behind them, draw order regardless.
-        transparent.sort_by(|a, b| b.1.total_cmp(&a.1));
+        let mesh_particles = self.push_mesh_particles(scene, cam, (&mut opaque, &mut transparent));
+        SolidResources {
+            draws: self.upload_solids(opaque, transparent, &joints),
+            culled,
+            lod_hidden,
+            mesh_particles,
+        }
+    }
+
+    /// Sort the translucent items back to front, batch both lists into instanced
+    /// draws (#470) and upload the camera's packed draw data.
+    fn upload_solids(
+        &mut self,
+        opaque: Vec<DrawItem>,
+        mut transparent: Vec<(DrawItem, f32)>,
+        joints: &[JointMatrix],
+    ) -> FrameDraws {
+        back_to_front(&mut transparent);
         let transparent = transparent.into_iter().map(|(item, _)| item).collect();
         let draws = FrameDraws::build(opaque, transparent, self.instancing);
         self.draw_buffers.upload(
@@ -130,15 +147,11 @@ impl Renderer {
             &self.entity_bones_layout,
             FrameUpload {
                 uniforms: &draws.uniforms(),
-                joints: &joints,
+                joints,
                 instances: &draws.instances,
             },
         );
-        SolidResources {
-            draws,
-            culled,
-            lod_hidden,
-        }
+        draws
     }
 
     /// Whether `entity` is fully outside `frustum` and can be skipped this pass (#330).
@@ -207,70 +220,6 @@ impl Renderer {
         Some((item, model_matrix.w_axis.truncate(), transparent))
     }
 
-    /// The material cache index for `material`'s five maps (albedo, metallic,
-    /// roughness, normal, emissive), building the bind group on first use. The key is
-    /// the *resolved* signature, so a late-loaded texture gets a fresh group (#207).
-    fn material_index(&mut self, material: Option<&MaterialAsset>) -> usize {
-        let paths = [
-            material.and_then(|m| m.base_color_map.clone()),
-            material.and_then(|m| m.metallic_map.clone()),
-            material.and_then(|m| m.roughness_map.clone()),
-            material.and_then(|m| m.normal_map.clone()),
-            material.and_then(|m| m.emissive_map.clone()),
-        ];
-        let sig = std::array::from_fn(|i| self.resolved_key(paths[i].as_ref()));
-        if let Some(i) = self.materials.lookup(&sig) {
-            return i;
-        }
-        let maps = std::array::from_fn(|i| self.resolve_map(paths[i].as_ref()));
-        let group = self.material_bind_group(&maps);
-        self.materials.insert(sig, group)
-    }
-
-    /// Resolve a material map path to a resident GPU texture, falling back to the
-    /// default texture when the path is absent or not yet uploaded.
-    fn resolve_map(&self, path: Option<&String>) -> Rc<GpuTexture> {
-        match path {
-            Some(p) => self
-                .gpu_textures
-                .get(p)
-                .cloned()
-                .unwrap_or_else(|| Rc::clone(&self.default_texture)),
-            None => Rc::clone(&self.default_texture),
-        }
-    }
-
-    /// The cache key a map path resolves to: the path when its texture is resident,
-    /// else empty (the default texture). Lets the pool detect a late-loaded map.
-    fn resolved_key(&self, path: Option<&String>) -> String {
-        match path {
-            Some(p) if self.gpu_textures.contains_key(p) => p.clone(),
-            _ => String::new(),
-        }
-    }
-
-    /// Build a group(2) material bind group from the five resolved map textures
-    /// (albedo, metallic, roughness, normal, emissive — that order) + one shared
-    /// sampler, against `material_layout`. Textures bind at 0,2,3,4,5; sampler at 1
-    /// (binding 1 samples all five) (#202, #207).
-    pub(crate) fn material_bind_group(&self, maps: &[Rc<GpuTexture>; 5]) -> wgpu::BindGroup {
-        let mut entries = vec![wgpu::BindGroupEntry {
-            binding: 1,
-            resource: wgpu::BindingResource::Sampler(&self.default_texture.sampler),
-        }];
-        for (map, binding) in maps.iter().zip([0u32, 2, 3, 4, 5]) {
-            entries.push(wgpu::BindGroupEntry {
-                binding,
-                resource: wgpu::BindingResource::TextureView(&map.view),
-            });
-        }
-        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Material Bind Group"),
-            layout: &self.material_layout,
-            entries: &entries,
-        })
-    }
-
     /// Create an overlay's group-1 bind group: its own uniform buffer, a bones buffer,
     /// and the shared one-element identity instance array — an overlay is one draw of
     /// instance 0, its transform carried in the uniform. Bound at offset `[0]`.
@@ -286,12 +235,5 @@ impl Renderer {
             label,
             [entity_buf, bones_buf, self.draw_buffers.identity_instance()],
         )
-    }
-
-    /// Distinct material bind groups built so far — tests prove they are shared and
-    /// do not grow per frame.
-    #[cfg(test)]
-    pub(crate) fn material_group_count(&self) -> usize {
-        self.materials.len()
     }
 }

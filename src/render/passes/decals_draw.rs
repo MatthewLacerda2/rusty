@@ -108,10 +108,10 @@ impl Renderer {
         // depth view only changes on resize, so this bind group is cached on the view
         // and reused across frames/cameras instead of rebuilt every call (#210); the
         // view's resize invalidates it.
-        self.ensure_decal_depth_bind_group(view);
+        self.ensure_scene_depth_bind_group(view);
         let dr = &self.decal_renderer;
         let depth_bg = view
-            .decal_depth_bind_group
+            .scene_depth_bind_group
             .as_ref()
             .expect("decal depth bind group built");
 
@@ -151,15 +151,16 @@ impl Renderer {
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 
-    /// Build the view's cached decal-pass depth bind group if absent (first decal frame
-    /// or after the view's resize invalidated it).
-    fn ensure_decal_depth_bind_group(&self, view: &mut RenderView) {
-        if view.decal_depth_bind_group.is_some() {
+    /// Build the view's cached scene-depth bind group if absent (first frame that
+    /// needs it, or after the view's resize invalidated it). Shared by the decal and
+    /// particle passes (#440), both built against the decal pass's depth layout.
+    pub(crate) fn ensure_scene_depth_bind_group(&self, view: &mut RenderView) {
+        if view.scene_depth_bind_group.is_some() {
             return;
         }
-        view.decal_depth_bind_group =
+        view.scene_depth_bind_group =
             Some(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("Decal Depth Bind Group"),
+                label: Some("Scene Depth Bind Group"),
                 layout: &self.decal_renderer.depth_layout,
                 entries: &[wgpu::BindGroupEntry {
                     binding: 0,

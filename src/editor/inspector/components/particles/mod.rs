@@ -3,7 +3,8 @@
 //! Edits every serde-persisted field of `ParticleEmitterComponent`: emission mode,
 //! blend, collision response, the rate/burst/cap counts, the shape and per-particle
 //! motion, the start ranges (`start.rs`), the over-life curves and gradient and
-//! the sub-emitters (`over_life.rs`), restitution, and the deterministic seed. The live particle count (transient runtime) is shown
+//! the sub-emitters (`over_life.rs`), how the particles are drawn (`render.rs`),
+//! restitution, and the deterministic seed. The live particle count (transient runtime) is shown
 //! read-only so an author can see the emitter working in Play.
 //!
 //! A THIN client (#287): each widget reads its field from a snapshot and routes
@@ -11,6 +12,7 @@
 //! surface's `SetActive` / `SetRate` call the same ops — one shared write.
 
 mod over_life;
+mod render;
 mod start;
 mod widgets;
 
@@ -19,7 +21,7 @@ use widgets::{clamped, combo, drag_u32};
 
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::particles as particle_ops;
-use crate::scene::{CollisionResponse, EmitMode, ParticleBlend, ParticleEmitterComponent};
+use crate::scene::{CollisionResponse, EmitMode, ParticleEmitterComponent};
 
 type Cx<'w> = (&'w mut crate::ecs::World, u32); // world + entity id, as one param
 /// Routes a field write through the shared particle-authoring op; a no-op absent.
@@ -50,7 +52,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
             ui.separator();
             changed |= draw_emission(ui, &mut cx, &p);
             ui.separator();
-            changed |= draw_rendering(ui, &mut cx, &p);
+            changed |= render::draw(ui, &mut cx, &p);
             ui.separator();
             changed |= start::draw_shape(ui, &mut cx, &p);
             ui.separator();
@@ -111,33 +113,6 @@ fn draw_emission(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponen
         apply(cx, |c| particle_ops::set_max_particles(c, cap));
         changed = true;
     }
-    changed
-}
-
-/// Rendering controls: blend mode and the optional texture path.
-fn draw_rendering(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
-    let mut changed = false;
-    let mut blend = p.blend;
-    if combo(
-        ui,
-        "Blend",
-        &mut blend,
-        &[
-            (ParticleBlend::Alpha, "Alpha"),
-            (ParticleBlend::Additive, "Additive"),
-        ],
-    ) {
-        apply(cx, |c| particle_ops::set_blend(c, blend));
-        changed = true;
-    }
-    let mut tex = p.texture.clone().unwrap_or_default();
-    ui.horizontal(|ui| {
-        ui.label("Texture:");
-        if ui.text_edit_singleline(&mut tex).changed() {
-            apply(cx, |c| particle_ops::set_texture(c, tex));
-            changed = true;
-        }
-    });
     changed
 }
 

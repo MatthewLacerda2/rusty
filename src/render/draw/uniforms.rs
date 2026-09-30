@@ -21,11 +21,14 @@ pub(crate) fn solid_entity_uniform(
     id: u32,
     material: Option<&MaterialAsset>,
 ) -> EntityUniform {
-    let is_lit = if scene.world.has_light(id) {
-        0u32
-    } else {
-        1u32
-    };
+    // A light's own gizmo mesh is drawn unlit.
+    material_uniform(!scene.world.has_light(id), material)
+}
+
+/// The per-draw uniform for `material`, lit or not — shared by entity solids and
+/// mesh particles (#440), which have no entity of their own.
+pub(crate) fn material_uniform(lit: bool, material: Option<&MaterialAsset>) -> EntityUniform {
+    let is_lit = u32::from(lit);
     let color_tint = material_color_tint(material);
 
     let (metallic, roughness) = match material {
@@ -117,7 +120,12 @@ fn entity_probe_sh(
     if scene.world.is_static(id) && !light_static_from_probes {
         return (0, [[0.0; 4]; 9]);
     }
-    let position = model_matrix.w_axis.truncate();
+    probe_sh_at(scene, model_matrix.w_axis.truncate())
+}
+
+/// The light-probe SH at `position` in the GPU layout, `(use_sh, coeffs)` — zeroed
+/// with `use_sh == 0` when no probe covers it (#240; mesh particles, #440).
+pub(crate) fn probe_sh_at(scene: &Scene, position: glam::Vec3) -> (u32, [[f32; 4]; 9]) {
     match scene.probes.sample(position) {
         Some(probe) => {
             let mut sh = [[0.0f32; 4]; 9];
