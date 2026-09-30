@@ -73,6 +73,11 @@ fn neutral_volume() -> VisualCorrectionComponent {
         tonemap: Tonemap::None,
         gamma: 1.0,
         shadows: Default::default(),
+        // Neutral means no AO either: the fog tests read exact surface colours.
+        ssao: rusty::components::SsaoSettings {
+            active: false,
+            ..Default::default()
+        },
     }
 }
 

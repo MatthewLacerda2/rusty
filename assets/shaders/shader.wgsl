@@ -158,6 +158,15 @@ var<uniform> shadow: ShadowCascades;
 var t_shadow: texture_depth_2d_array;
 @group(3) @binding(2)
 var s_shadow: sampler_comparison;
+// Screen-space ambient occlusion (#436), one texel per pixel; a 1x1 white texture
+// wherever the SSAO pass did not run (off, Low tier, the transparent pass).
+@group(3) @binding(3)
+var t_ao: texture_2d<f32>;
+
+fn ambient_occlusion(frag: vec2<f32>) -> f32 {
+    let last = textureDimensions(t_ao) - vec2<u32>(1u);
+    return textureLoad(t_ao, min(vec2<u32>(frag), last), 0).r;
+}
 
 
 struct VertexOutput {
@@ -401,6 +410,20 @@ fn parallax_correct(world_pos: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     return normalize(hit - lighting.refl_center.xyz);
 }
 
+// The SSAO depth prepass (#436): depth only, so it writes no colour. Cutout texels
+// are clipped as `fs_main` clips them, and unlit draws (gizmos, grids) are skipped:
+// neither should cast occlusion.
+@fragment
+fn fs_prepass(in: VertexOutput) {
+    var alpha = entity.color_tint.a;
+    if (entity.use_texture == 1u) {
+        alpha *= textureSample(t_diffuse, s_diffuse, in.tex_coords).a;
+    }
+    if (entity.is_lit == 0u || (entity.use_cutout == 1u && alpha < entity.alpha_cutoff)) {
+        discard;
+    }
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var base_color: vec4<f32>;
@@ -457,7 +480,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let ambient_grad = mix(ground_color, sky_color, N.y * 0.5 + 0.5);
         ambient_irradiance = ambient_grad * lighting.ambient.intensity;
     }
-    var lighting_color = ambient_irradiance * albedo * (1.0 - metallic);
+    // SSAO (#436) darkens only the indirect light: ambient here, env reflection below.
+    let ao = ambient_occlusion(in.clip_position.xy);
+    var lighting_color = ambient_irradiance * albedo * (1.0 - metallic) * ao;
 
     // 2. Directional Light
     let L_dir = normalize(-lighting.dir_light.direction);
@@ -525,7 +550,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
         let F_refl = FresnelSchlick(max(dot(N, V), 0.0), F0);
         let reflection_scale = (1.0 - roughness) * (metallic + (1.0 - metallic) * 0.2);
-        lighting_color += env_reflection * F_refl * reflection_scale;
+        lighting_color += env_reflection * F_refl * reflection_scale * ao;
     }
 
     // 6. Emissive (#222 factor, #207 map): self-illumination added on top of the lit

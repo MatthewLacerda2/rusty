@@ -16,11 +16,11 @@ const POINT_LIGHT_SLOTS: u32 = 4;
 /// Counters for one `Renderer::render` call, summed over every camera in the stack.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RenderCounters {
-    /// Geometry draw calls: solids, transparents, shadow casters, decals, particle
-    /// batches and UI batches. Copies of one mesh + material are one instanced draw
+    /// Geometry draw calls: solids, transparents, shadow casters, the SSAO depth
+    /// prepass, decals, particle batches and UI batches. Copies of one mesh + material are one instanced draw
     /// (#470). Fullscreen post-FX and the skybox are not counted.
     pub draw_calls: u32,
-    /// Triangles submitted by the solid, transparent and shadow draws.
+    /// Triangles submitted by the solid, transparent, shadow and SSAO-prepass draws.
     pub triangles: u64,
     /// Mesh entities drawn, summed over the camera stack.
     pub visible_entities: u32,
@@ -35,11 +35,15 @@ pub struct RenderCounters {
     pub shadow_draws: u32,
     /// UI batches drawn.
     pub ui_draws: u32,
+    /// Depth taps the SSAO occlusion pass traced (#436): its texels times the tier's
+    /// samples, summed over the camera stack; `0` with AO off. Its depth prepass is
+    /// counted in `draw_calls` and `triangles`.
+    pub ssao_samples: u64,
 }
 
 impl RenderCounters {
     /// Every counter under its `FrameStats` metric name.
-    pub fn pairs(&self) -> [(&'static str, u64); 8] {
+    pub fn pairs(&self) -> [(&'static str, u64); 9] {
         [
             ("draw_calls", self.draw_calls.into()),
             ("triangles", self.triangles),
@@ -49,6 +53,7 @@ impl RenderCounters {
             ("lights_dropped", self.lights_dropped.into()),
             ("shadow_draws", self.shadow_draws.into()),
             ("ui_draws", self.ui_draws.into()),
+            ("ssao_samples", self.ssao_samples),
         ]
     }
 

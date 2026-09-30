@@ -4,6 +4,7 @@
 use crate::render::draw::batch::DrawBatch;
 use crate::render::draw::resources::{OutlineResource, Overlays};
 use crate::render::gpu::draw_buffers::DrawBuffers;
+use crate::render::passes::ssao::SsaoFrame;
 use crate::render::{RenderView, Renderer};
 use crate::scene::ClearFlags;
 
@@ -47,12 +48,14 @@ impl PassClear {
 pub(crate) struct ScenePassFrame {
     pub editor_mode: bool,
     pub clear: PassClear,
+    /// This camera's SSAO (#436), recorded ahead of the scene pass; `None` when off.
+    pub ssao: Option<SsaoFrame>,
 }
 
 impl Renderer {
     pub(crate) fn execute_scene_pass(
         &mut self,
-        view: &RenderView,
+        view: &mut RenderView,
         frame: ScenePassFrame,
         solid_batches: &[DrawBatch],
         overlays: &Overlays,
@@ -66,6 +69,10 @@ impl Renderer {
         // The shadow maps were rendered once for the frame (`run_shadow_passes`).
         // Bind active skybox view & sampler into the global group for reflections.
         self.update_global_bind_group();
+        // A. SSAO (#436): prepass, occlusion and blur, which the scene pass samples.
+        if let Some(ssao) = &frame.ssao {
+            self.record_ssao(view, &mut encoder, ssao, solid_batches);
+        }
         // B. Main scene + overlay pass.
         self.record_scene_pass(view, &mut encoder, &frame, solid_batches, overlays);
 
@@ -117,7 +124,7 @@ impl Renderer {
         // Set global bindings
         render_pass.set_pipeline(view.forward_pipeline(&self.render_pipeline));
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
-        render_pass.set_bind_group(3, &self.shadow_bind_group, &[]);
+        render_pass.set_bind_group(3, self.scene_group3(view, frame.ssao.is_some()), &[]);
         // Solid entities, then the editor selection outline.
         self.draw_batches(&mut render_pass, solid_batches);
         if editor_mode {

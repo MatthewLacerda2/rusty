@@ -29,6 +29,7 @@ fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
             tonemap: Tonemap::Aces,
             gamma: 2.2,
             shadows: Default::default(),
+            ssao: Default::default(),
         }),
     );
     scene.world.set_camera(
@@ -62,12 +63,34 @@ fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
         vc_ops::set_ssr_quality(&mut vc, "High".to_string());
         vc_ops::set_shadow_cascades(&mut vc, 9); // clamped to 4
         vc_ops::set_shadow_distance(&mut vc, 60.0);
+        vc_ops::set_ssao_radius(&mut vc, -1.0); // clamped to 0.01
+        vc_ops::set_ssao_intensity(&mut vc, 9.0); // clamped to 4
+        vc_ops::set_ssao_active(&mut vc, false);
     }
     let mut cam = sc.world.camera_mut(id).unwrap();
     camera_ops::set_motion_blur_active(&mut cam, true);
     camera_ops::set_motion_blur_samples(&mut cam, 16);
     camera_ops::set_fxaa_active(&mut cam, false);
 }
+
+/// The `Graphics.*` writes the parity test drives, mirrored by `apply_graphics_ops`.
+const GRAPHICS_SCRIPT: &str = r#"
+Graphics.SetBloomActive(true)
+Graphics.SetBloomIntensity(-3.0)
+Graphics.SetGamma(-5.0)
+Graphics.SetTonemap("reinhard")
+Graphics.SetSsrActive(true)
+Graphics.SetSsrQuality("High")
+Graphics.SetShadowCascades(9)
+Graphics.SetShadowDistance(60)
+Graphics.SetSsaoRadius(-1)
+Graphics.SetSsaoIntensity(9)
+Graphics.SetSsaoActive(false)
+assert(Graphics.GetSsaoIntensity() == 4 and not Graphics.GetSsaoActive())
+Graphics.SetMotionBlurActive(true)
+Graphics.SetMotionBlurSamples(16)
+Graphics.SetFxaaActive(false)
+"#;
 
 #[test]
 fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
@@ -81,23 +104,7 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     let lua = Lua::new();
     lua.scope(|s| {
         rusty::api::graphics::register(&lua, s, &lua_scene, &quality).unwrap();
-        lua.load(
-            r#"
-            Graphics.SetBloomActive(true)
-            Graphics.SetBloomIntensity(-3.0)
-            Graphics.SetGamma(-5.0)
-            Graphics.SetTonemap("reinhard")
-            Graphics.SetSsrActive(true)
-            Graphics.SetSsrQuality("High")
-            Graphics.SetShadowCascades(9)
-            Graphics.SetShadowDistance(60)
-            Graphics.SetMotionBlurActive(true)
-            Graphics.SetMotionBlurSamples(16)
-            Graphics.SetFxaaActive(false)
-        "#,
-        )
-        .exec()
-        .unwrap();
+        lua.load(GRAPHICS_SCRIPT).exec().unwrap();
         Ok(())
     })?;
 
@@ -114,6 +121,7 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     assert_eq!(lvc.ssr_active, ovc.ssr_active);
     assert_eq!(lvc.ssr_quality, ovc.ssr_quality);
     assert_eq!(lvc.shadows, ovc.shadows);
+    assert_eq!(lvc.ssao, ovc.ssao);
     assert_eq!(lvc.bloom_intensity, 0.0, "single-sourced clamp");
     assert_eq!(lvc.gamma, 0.01, "single-sourced clamp");
     let lcam = ls.world.camera(lua_id).unwrap().clone();

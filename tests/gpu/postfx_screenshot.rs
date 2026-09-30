@@ -30,6 +30,7 @@ fn vc(exposure: f32) -> VisualCorrectionComponent {
         tonemap: Tonemap::Aces,
         gamma: 1.0,
         shadows: Default::default(),
+        ssao: Default::default(),
     }
 }
 
