@@ -171,6 +171,13 @@ its uncommitted work with it), write decisions and hand-backs into the descripti
 and an issue comment, and mark the PR ready when its gates are green. Watch the
 PR, not the agent.
 
+**Ready means finished.** The batch merges a ready PR the moment its gates are
+green, so a PR must never be readied just to make CI run. On 2026-09-30 #520's session
+readied its PR to get Windows CI on a temporary 200-round test loop, and it merged with
+the loop still in (#559 reverted it). For a proof run on a draft, dispatch the
+workflow on the branch instead: `gh workflow run ci.yml --ref <branch>` runs
+`build-test` and `build-test-cross` without readying anything.
+
 **A cloud session is never woken by its own background work.** A routine session
 that starts a build in the background and ends its turn to wait sits idle forever —
 #485's first session did exactly that for an hour, gates half-run, PR still a draft.
