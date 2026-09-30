@@ -32,9 +32,4 @@ impl GameWorld {
     pub fn set_probe(&mut self, probe: Option<Box<dyn SystemProbe>>) {
         self.resources.probe = probe;
     }
-
-    /// The names of `stage`'s systems, in execution order.
-    pub fn system_names(&self, stage: Stage) -> Vec<&'static str> {
-        self.resources.schedule.system_names(stage)
-    }
 }

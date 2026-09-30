@@ -71,3 +71,10 @@ fn a_probe_does_not_change_the_sim() {
         "same world with and without a probe"
     );
 }
+
+#[test]
+fn a_closure_system_reports_a_generic_name() {
+    let mut sched = super::Schedule::new();
+    sched.add_system(Stage::Update, |_: &mut World, _: &mut Resources| {});
+    assert_eq!(sched.system_names(Stage::Update), ["system"]);
+}
