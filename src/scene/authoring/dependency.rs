@@ -169,7 +169,7 @@ pub fn add_with_requirements(world: &mut World, id: u32, kind: ComponentKind) ->
 /// shipped Camera→VisualCorrection cascade, now driven by [`ComponentKind::requires`].
 /// Returns `false` when the entity is missing.
 pub fn remove_with_cascade(world: &mut World, id: u32, kind: ComponentKind) -> bool {
-    for dependent in ComponentKind::ALL {
+    for &dependent in ComponentKind::ALL {
         if dependent.requires().contains(&kind) && has_kind(world, id, dependent) {
             remove_with_cascade(world, id, dependent);
         }
@@ -186,7 +186,7 @@ pub fn reconcile_requirements(world: &mut World, id: u32) -> bool {
     let mut changed = false;
     loop {
         let mut removed = false;
-        for kind in ComponentKind::ALL {
+        for &kind in ComponentKind::ALL {
             if !has_kind(world, id, kind) {
                 continue;
             }
@@ -209,7 +209,7 @@ pub fn reconcile_requirements(world: &mut World, id: u32) -> bool {
 /// silently violating a dependency.
 pub fn enforce_requirements(world: &mut World, id: u32) -> Vec<(ComponentKind, ComponentKind)> {
     let mut added = Vec::new();
-    for kind in ComponentKind::ALL {
+    for &kind in ComponentKind::ALL {
         if !has_kind(world, id, kind) {
             continue;
         }
