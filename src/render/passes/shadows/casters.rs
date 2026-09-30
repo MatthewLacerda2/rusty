@@ -146,7 +146,7 @@ impl ShadowRenderer {
                 .iter()
                 .filter(|c| {
                     c.bounds
-                        .map_or(true, |(lo, hi)| frustum.intersects_aabb(lo, hi))
+                        .is_none_or(|(lo, hi)| frustum.intersects_aabb(lo, hi))
                 })
                 .map(|c| (c.mesh.clone(), c.num_indices, c.world))
                 .collect();
