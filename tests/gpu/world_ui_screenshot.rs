@@ -9,9 +9,9 @@ use rusty::scene::Camera;
 
 use super::world_ui_scene::{canvas, dark_scene, dominant, emissive_box, fill, image};
 
-const SIZE: u32 = 96;
+pub(super) const SIZE: u32 = 96;
 
-fn shot(scene: &rusty::scene::Scene, name: &str) -> Option<image::RgbImage> {
+pub(super) fn shot(scene: &rusty::scene::Scene, name: &str) -> Option<image::RgbImage> {
     let path = std::env::temp_dir().join(name);
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
     if !capture(scene, &cam, &path, SIZE, SIZE).expect("capture must not error") {

@@ -512,7 +512,7 @@ units — and one question decides the rest: where do those units end up
 **Drawing.** World and camera canvases are scene geometry: after each stacked
 camera's transparent pass, before particles and post-FX, their meshes draw into the
 HDR scene target, depth-tested against the world but never writing depth — so a
-wall occludes a sign, and the canvas is tonemapped and bloomed like
+wall occludes a sign, and the canvas is fogged, tonemapped and bloomed like
 everything around it (it is unlit: its colours are emissive, as in Unity's default
 UI shader). A canvas draws in a camera whose culling mask includes the canvas
 entity's layer; canvases draw back to front, each in hierarchy order, and both

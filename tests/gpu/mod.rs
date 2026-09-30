@@ -30,5 +30,6 @@ mod ui_hud_scene;
 mod ui_hud_screenshot;
 mod ui_marker_screenshot;
 mod ui_text_screenshot;
+mod world_ui_fog_screenshot;
 mod world_ui_scene;
 mod world_ui_screenshot;

@@ -4,7 +4,7 @@
 //! each stacked camera's transparent pass (and before its particles and the post-FX
 //! chain) their cached meshes are drawn into the HDR scene target, depth-tested
 //! against the camera's depth without writing it — so a wall in front occludes a
-//! sign, and the canvas is tonemapped and bloomed like the world around it.
+//! sign, and the canvas is fogged, tonemapped and bloomed like the world around it.
 //! A canvas draws in a camera whose culling mask includes the canvas entity's
 //! layer; canvases draw back to front by distance, each in hierarchy order.
 //!
@@ -20,6 +20,7 @@ use glam::{Mat4, Vec2};
 use super::draw::UiViewCache;
 use super::mesh::UiSource;
 use crate::render::gpu::grow_buffer::GrowBuffer;
+use crate::render::gpu::uniforms::FogUniform;
 use crate::render::postfx::HDR_FORMAT;
 use crate::render::{RenderView, Renderer};
 use crate::scene::Camera;
@@ -31,6 +32,8 @@ use crate::ui::CanvasSpace;
 struct WorldUiUniform {
     view_proj: [f32; 16],
     to_world: [f32; 16],
+    eye: [f32; 4],
+    fog: FogUniform,
 }
 
 /// The world pass's shared GPU state: its uniform layout and pipeline.
@@ -51,7 +54,7 @@ impl WorldUiPipeline {
             label: Some("World UI Layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
+                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: true,
@@ -106,9 +109,15 @@ pub(crate) struct WorldUniforms {
 }
 
 impl Renderer {
-    /// Draw `view`'s world canvases that `cam` sees into its HDR target (see the
-    /// module docs). A no-op without any.
-    pub(crate) fn draw_world_ui(&mut self, view: &mut RenderView, cam: &Camera, aspect: f32) {
+    /// Draw `view`'s world canvases that `cam` sees into its HDR target, fogged by
+    /// `fog` (see the module docs). A no-op without any.
+    pub(crate) fn draw_world_ui(
+        &mut self,
+        view: &mut RenderView,
+        cam: &Camera,
+        aspect: f32,
+        fog: FogUniform,
+    ) {
         let view_proj = cam.build_view_projection(aspect);
         let mut items = world_items(&view.ui, cam);
         if items.is_empty() {
@@ -122,6 +131,8 @@ impl Renderer {
             let u = WorldUiUniform {
                 view_proj: view_proj.to_cols_array(),
                 to_world: to_world.to_cols_array(),
+                eye: cam.position.extend(1.0).to_array(),
+                fog,
             };
             bytes[k * stride..k * stride + slot].copy_from_slice(bytemuck::bytes_of(&u));
         }

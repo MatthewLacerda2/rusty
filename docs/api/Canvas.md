@@ -29,7 +29,7 @@ work); an unrecognized name is ignored.
 - `ScreenSpaceOverlay` — over the finished frame; the HUD and menus.
 - `ScreenSpaceCamera` — laid out exactly like the overlay, but drawn on a plane
   `PlaneDistance` metres in front of the active camera that fills the view there:
-  in the scene (depth-tested and tonemapped like the world), tiltable (`SetTilt`) and swaying
+  in the scene (depth-tested, fogged and tonemapped like the world), tiltable (`SetTilt`) and swaying
   behind camera turns (`SetSway`) — a visor HUD. Without a camera it is the overlay.
 - `WorldSpace` — a quad in the scene: its rect is `ReferenceResolution` reference
   units, `PixelsPerUnit` to the metre, centred on the canvas's Transform and facing

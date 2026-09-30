@@ -127,7 +127,7 @@ impl Renderer {
             // composites over the world behind it.
             self.draw_transparent(view, &solids.draws.transparent);
             // World canvases (#429): scene geometry, occluded by it, before particles.
-            self.draw_world_ui(view, cam, aspect);
+            self.draw_world_ui(view, cam, aspect, FogUniform::from_settings(&scene.fog));
 
             // Billboard particles for this camera (after solids, before the next pass).
             let particle_draws = self.draw_particles(view, scene, cam);
