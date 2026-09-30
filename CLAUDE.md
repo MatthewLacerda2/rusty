@@ -22,8 +22,8 @@ craft — it is the reason the gates below are strict.
 
 ## Start here
 - **README.md** — what the engine is and what you can do with it.
-- **docs/** — `linting.md` (the gate), `testing.md`, `scripting-api.md` (the Lua API
-  game scripts use), `ui.md` (the in-game UI model). The Rust API reference is generated: `cargo doc --no-deps`.
+- **docs/** — `linting.md` (the gate), `testing.md`, `api/` (the Lua API game scripts
+  use: `api/index.md`, then one file per namespace), `ui.md` (the in-game UI model). The Rust API reference is generated: `cargo doc --no-deps`.
 - **auxmd.md** *(gitignored)* — the operator's short-term scratchpad; read it if a
   session points you there.
 
@@ -95,7 +95,7 @@ is wrong.
   it). So merging **cannot be parallelized**: rebase each PR onto the latest `main` →
   CI green on that rebased state → merge → repeat, one PR at a time. The only exception
   is a PR that touches **only** Markdown — CI is skipped for Markdown-only PRs, so they
-  needn't be serialized and can merge freely. **Except `docs/scripting-api.md`:** the
+  needn't be serialized and can merge freely. **Except `docs/api/`:** the
   API-doc drift tests parse it, and a Markdown-only PR skips exactly those tests — so a
   PR touching it is serialized like code.
 - **Coding parallelises; merging does not.** Every branch behind another in the merge
@@ -241,7 +241,7 @@ green to merged.
 ## Architecture — the conceptual model
 A high-level map of how the engine is shaped. It deliberately doesn't enumerate every
 concrete type — that inventory lives in the rustdoc reference (`cargo doc --no-deps`)
-and the script surface in `docs/scripting-api.md`. Everything in the engine is one of
+and the script surface in `docs/api/`. Everything in the engine is one of
 five kinds of moving part (Unity analogs in parentheses):
 
 A **GameObject** is one entity (`Entity` in `components/entity.rs`): a mandatory
@@ -299,7 +299,7 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   scenes — **except pure UI chrome** (collapsing a card, resizing a panel). Every
   user-facing editor capability has an API equivalent.
 - **Keep the API doc in lockstep.** When you add or change an API function, update
-  `docs/scripting-api.md` in the *same* change. That doc is the API reference the agent
+  its namespace's page in `docs/api/` (`docs/api/<Namespace>.md`) in the *same* change. That doc is the API reference the agent
   reads to drive the engine, so it must never lag the bindings. This is no longer just
   convention: a **CI drift gate** (`tests/api_doc_drift.rs`, #280) fails the build when
   the doc and the live Lua surface disagree about *what exists* (existence parity both

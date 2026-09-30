@@ -7,7 +7,7 @@
 //! Pause / step / resume (issue #283) live here too: `Pause()` / `Resume()` /
 //! `Step(n)` set the loop-level control fields on the same `Time` resource that the
 //! windowed frame loop reads each frame. `Pause` is a hard loop halt distinct from
-//! `SetTimeScale(0)` — see the field docs on `time::Time` and `docs/scripting-api.md`.
+//! `SetTimeScale(0)` — see the field docs on `time::Time` and `docs/api/Time.md`.
 
 use std::cell::RefCell;
 

@@ -58,7 +58,7 @@ impl ScriptManager {
     /// Registers the whole `api::` surface into a fresh scope (the namespaces are
     /// scope-tied closures), then walks the Lua globals: every global table that is
     /// not a Lua 5.4 stdlib global contributes its function-valued keys. This is the
-    /// ground truth the doc-drift gate checks `docs/scripting-api.md` against, so it
+    /// ground truth the doc-drift gate checks `docs/api/` against, so it
     /// can never silently lie about *what exists* (#280). Empty when the runtime is
     /// not live. Signatures are out of scope — Lua closures are opaque at runtime.
     pub fn api_surface(&self) -> BTreeMap<String, BTreeSet<String>> {

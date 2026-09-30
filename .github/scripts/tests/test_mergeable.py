@@ -221,7 +221,7 @@ class Signals(unittest.TestCase):
         ok, lines = self.in_flight(skipped)
         self.assertTrue(ok, lines)  # code files: the drift rule does not apply
         ci, lint = both(status="in_progress", conclusion=None)
-        ok, lines = verdict(ci, lint, jobs={1: skipped, 2: built("lint")}, files=["docs/scripting-api.md"])
+        ok, lines = verdict(ci, lint, jobs={1: skipped, 2: built("lint")}, files=["docs/api/Physics.md"])
         self.assertFalse(ok, lines)
         self.assertIn("#525", " ".join(lines))
 
@@ -313,16 +313,16 @@ class Markdown(unittest.TestCase):
         """#525: CI's `code` filter skips the drift tests on this exact PR."""
         ci, lint = both()
         skipped = [job("build-test", "success", [{"name": "Test (engine, dev features)", "conclusion": "skipped"}]), job("ci-gate", "success")]
-        ok, lines = verdict(ci, lint, jobs={1: skipped, 2: built("lint")}, files=["docs/scripting-api.md"])
+        ok, lines = verdict(ci, lint, jobs={1: skipped, 2: built("lint")}, files=["docs/api/Physics.md"])
         self.assertFalse(ok, lines)
         self.assertIn("#525", " ".join(lines))
 
     def test_the_api_doc_passes_once_the_drift_tests_really_ran(self):
-        ok, lines = verdict(*both(), files=["docs/scripting-api.md", "README.md"])
+        ok, lines = verdict(*both(), files=["docs/api/Physics.md", "README.md"])
         self.assertTrue(ok, lines)
 
     def test_the_api_doc_beside_code_is_just_code(self):
-        self.assertFalse(mergeable.needs_drift_run(["docs/scripting-api.md", "src/api/mod.rs"]))
+        self.assertFalse(mergeable.needs_drift_run(["docs/api/Physics.md", "src/api/mod.rs"]))
 
 
 class NoRun(unittest.TestCase):

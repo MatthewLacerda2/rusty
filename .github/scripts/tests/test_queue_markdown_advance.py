@@ -5,7 +5,7 @@ Merging a Markdown-only pull request while another waited on CI used to
 rebase the waiting one and buy it a second CI round. These drive
 [`queue.advance`] over a real throwaway repository, so the `git log` that
 decides is the one the queue runs: a Markdown advance is neither rebased nor
-pushed, a code advance is rebased, and `docs/scripting-api.md` counts as code.
+pushed, a code advance is rebased, and `docs/api/` counts as code.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ class Repo:
     def __init__(self, root: str):
         self.root = root
         self.git("init", "--quiet", "--initial-branch=main")
-        self.commit({"src/lib.rs": "fn a() {}\n", "README.md": "# r\n", "docs/scripting-api.md": "# api\n"})
+        self.commit({"src/lib.rs": "fn a() {}\n", "README.md": "# r\n", "docs/api/Physics.md": "# api\n"})
         self.base = self.sha()
         self.head = self.commit({"src/feature.rs": "fn f() {}\n"})
 
@@ -94,7 +94,7 @@ class Advancing(unittest.TestCase):
         check.assert_called_once()
 
     def test_the_api_doc_advance_is_code(self):
-        moved, _, verbs, _ = self.advance({"docs/scripting-api.md": "# api\nTransform.x\n"})
+        moved, _, verbs, _ = self.advance({"docs/api/Physics.md": "# api\nTransform.x\n"})
         self.assertTrue(moved)
         self.assertIn("rebase", verbs)
 
@@ -118,7 +118,7 @@ class Deciding(unittest.TestCase):
     def test_the_log_is_read_commit_by_commit(self):
         self.assertTrue(queue.docs_advance(">abc\n\nREADME.md\n>def\n\ndocs/ui.md\n"))
         self.assertFalse(queue.docs_advance(">abc\n\nREADME.md\nsrc/app/mod.rs\n"))
-        self.assertFalse(queue.docs_advance(">abc\n\ndocs/scripting-api.md\n"))
+        self.assertFalse(queue.docs_advance(">abc\n\ndocs/api/Physics.md\n"))
         self.assertFalse(queue.docs_advance(""))
 
     def test_an_empty_commit_changes_nothing(self):

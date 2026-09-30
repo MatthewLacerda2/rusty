@@ -169,7 +169,7 @@ rule cannot drift apart.
 
 ## Performance budgets (frame stats, #433)
 A scenario can assert on performance the same way it asserts on behaviour. The harness
-records frame stats every tick (see `Debug.Stats` in `docs/scripting-api.md` for the
+records frame stats every tick (see `Debug.Stats` in `docs/api/Debug.md` for the
 metric list); `Harness.Stats()` returns them and `Harness.AssertBudget` turns limits
 into expectations:
 
@@ -196,7 +196,7 @@ Harness.AssertBudget{ draw_calls = 2000, lights_dropped = 0, fixed_update_ms = 4
 
 ## API-doc drift gate
 `tests/api_doc_drift.rs` (dev-only, #280) is a **hard gate** that keeps
-`docs/scripting-api.md` honest against the **live Lua API surface**. It boots an
+`docs/api/` honest against the **live Lua API surface**. It boots an
 empty `Session`, walks the registered namespaces via
 `ScriptManager::api_surface()` (every non-stdlib global table's function-valued
 keys), and parses the doc's `##` namespace headings and table rows. It then asserts
@@ -213,6 +213,13 @@ The **callback half** of the surface has its own gate: `tests/callback_doc_drift
 "Script lifecycle callbacks" section and `src/scripting/callbacks.rs` — the one
 list dispatch and MonoBehaviour discovery read — so a script callback can neither
 be added undocumented nor advertised when the engine never dispatches it.
+
+Both gates read the reference **assembled**: `docs/api/` is `index.md` plus one file
+per namespace (#569, so branches documenting different namespaces never collide), and
+`build.rs` concatenates it — index first, then the files in the order the index links
+them — into the one document the gates parse and MCP serves. `tests/api_doc_layout.rs`
+keeps the split honest: every `docs/api/<Name>.md` opens with the `` ## `<Name>` ``
+heading and is linked from the index.
 
 ## Example (unit, in-module)
 See `tools/lint/src/size.rs` — a `#[cfg(test)] mod tests` block testing the

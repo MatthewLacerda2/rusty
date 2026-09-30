@@ -108,7 +108,7 @@ class Polling(unittest.TestCase):
     def test_the_api_doc_refusal_is_mergeables_and_stops(self):
         # Whatever `judge` refuses, this refuses: one definition of a pass.
         jobs = {1: [fixtures.job("build-test", "success"), fixtures.job("ci-gate", "success")], 2: built("lint")}
-        state, lines = asked(run("ci"), run("lint"), jobs=jobs, files=["docs/scripting-api.md"])
+        state, lines = asked(run("ci"), run("lint"), jobs=jobs, files=["docs/api/Physics.md"])
         self.assertEqual(state, queue.STOP)
         self.assertIn("#525", " ".join(lines))
 

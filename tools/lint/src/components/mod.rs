@@ -8,7 +8,7 @@
 //!   3. an inspector card (some `src/editor/inspector/components/*.rs`) writing
 //!      through the facade's `_mut`/`set_` accessors,
 //!   4. an API namespace (`src/api/<x>.rs` + registration in `src/api/mod.rs`, and a
-//!      mention in `docs/scripting-api.md`).
+//!      mention in `docs/api/`).
 //!
 //! Components are DISCOVERED from `Entity`'s `Option<…Component>` fields, so a new
 //! component can't dodge the gate. Axis 1 is the discovery source (always present);
@@ -44,13 +44,13 @@ mod axes;
 mod discover;
 mod waivers;
 
-use axes::{api_stems, editor_blob, has_add_menu, has_api, has_inspector, read};
+use axes::{api_stems, editor_blob, has_add_menu, has_api, has_inspector, read, read_md_dir};
 pub(crate) use discover::discover;
 use waivers::waived;
 
 const ADD_MENU: &str = "src/editor/inspector/components/add.rs";
 const API_MOD: &str = "src/api/mod.rs";
-const DOCS: &str = "docs/scripting-api.md";
+const DOCS: &str = "docs/api";
 const BASELINE: &str = "tools/lint/components_baseline.txt";
 const REPORT: &str = ".lint/report.txt";
 
@@ -64,7 +64,7 @@ pub fn run() {
     let editor_blob = editor_blob();
     let api_stems = api_stems();
     let api_mod = read(API_MOD);
-    let docs = read(DOCS).to_lowercase();
+    let docs = read_md_dir(DOCS).to_lowercase();
     let baseline = load_baseline();
 
     let mut violations = Vec::new();

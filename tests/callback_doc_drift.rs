@@ -1,5 +1,5 @@
 //! Callback-doc drift gate (#309): the "Script lifecycle callbacks" section of
-//! `docs/scripting-api.md` must agree with the callbacks the engine actually
+//! `docs/api/index.md` must agree with the callbacks the engine actually
 //! dispatches — the callback sibling of the #280 namespace gate
 //! (`tests/api_doc_drift.rs`). The ground truth is
 //! `scripting::callbacks::LIFECYCLE_CALLBACKS`, the one list dispatch and
@@ -13,12 +13,9 @@ use std::collections::BTreeSet;
 
 use rusty::scripting::callbacks::LIFECYCLE_CALLBACKS;
 
-/// The committed scripting-API doc, embedded at build time so the test reads
-/// exactly what ships in the repo (not a path resolved at runtime).
-const DOC: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/docs/scripting-api.md"
-));
+/// The committed scripting-API doc, `docs/api/` assembled by `build.rs` (#569) and
+/// embedded at build time, so the test reads exactly what ships in the repo.
+const DOC: &str = include_str!(concat!(env!("OUT_DIR"), "/scripting-api.md"));
 
 /// The heading the callback table lives under. Deliberately not backticked, so
 /// the namespace gate's parser never mistakes the section for a namespace.
@@ -30,14 +27,14 @@ fn doc_matches_dispatched_callbacks() {
     let live: BTreeSet<&str> = LIFECYCLE_CALLBACKS.iter().copied().collect();
     assert!(
         !doc.is_empty(),
-        "no callback rows found under `{HEADING}` in docs/scripting-api.md"
+        "no callback rows found under `{HEADING}` in docs/api/index.md"
     );
 
     let doc_only: Vec<&&str> = doc.difference(&live).collect();
     let live_only: Vec<&&str> = live.difference(&doc).collect();
     assert!(
         doc_only.is_empty() && live_only.is_empty(),
-        "scripting-api.md has drifted from the dispatched lifecycle callbacks \
+        "docs/api/index.md has drifted from the dispatched lifecycle callbacks \
          (src/scripting/callbacks.rs is the source of truth for existence):\n  \
          documented but never dispatched: {doc_only:?}\n  \
          dispatched but not documented: {live_only:?}"

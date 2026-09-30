@@ -27,7 +27,7 @@ already on `main`'s tip, the run on record is a run on this exact commit
 
 **And one that could move nothing that compiles.** When every commit `main`
 gained since the branch's base touches only Markdown — [`mergeable.inert`],
-so never `docs/scripting-api.md`, which tests parse — the head is left where
+so never `docs/api/`, which tests parse — the head is left where
 it is: no rebase, no push, and the run on record stands ([`docs_advance`],
 #587). That is not the per-module guess above: those commits cannot change a
 single compiled or tested byte, which is why CLAUDE.md lets them merge

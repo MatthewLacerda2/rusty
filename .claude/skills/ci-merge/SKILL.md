@@ -26,7 +26,7 @@ clippy pass (`--no-default-features`) is the editor-free player build (#431): th
 only compile without egui.
 
 **Some hard gates hide inside `cargo test`.** `tests/api_doc_drift.rs` and
-`tests/callback_doc_drift.rs` fail the build when `docs/scripting-api.md`
+`tests/callback_doc_drift.rs` fail the build when `docs/api/` (the API reference)
 disagrees with the live Lua surface *in either direction* — an undocumented
 binding and a documented-but-absent one both redden CI. They are dev-only, so
 only the `--features dev` run sees them.
@@ -109,9 +109,9 @@ unsatisfied, not as a pass, so skipping the job outright would wedge a docs-only
 pull request. So a docs-only pull request needs no serialization and merges
 freely.
 
-**`docs/scripting-api.md` is not one of those.** Two hard-gate tests parse it, so
+**`docs/api/` is not one of those.** Two hard-gate tests parse it, so
 a Markdown-only edit to it can break `main` on its own. CI's `code` filter lists it
-explicitly (#525), so a pull request touching it runs the drift tests like any code
+explicitly (#525, #569), so a pull request touching it runs the drift tests like any code
 change, and it is serialized like code. Same for `docs/api-faithfulness.md`'s
 catalog if a branch is relying on it: treat it as code.
 
@@ -152,9 +152,9 @@ incidents behind each):
   edit the workflow), versus a pull request readied moments after a push that lost
   its run (force one with an empty commit). An invalid workflow *does* produce a
   run, a `startup_failure`.
-- **A Markdown-only change to `docs/scripting-api.md` is refused** unless
+- **A Markdown-only change to `docs/api/` is refused** unless
   `build-test`'s dev-feature test step really ran. CI's `code` filter includes that
-  file since #525, so on a fresh run it does; the check stays as the guard.
+  directory since #525, so on a fresh run it does; the check stays as the guard.
 
 It ignores what is not a gate: `main-health` (a `workflow_run` on `main`), `docs`,
 and the coverage and mutation jobs. `mutants-pr` and `coverage-pr` run *inside*
@@ -192,7 +192,7 @@ description.
 Expect conflicts wherever every feature appends: `Entity`'s `Option<…Component>`
 fields, `ComponentKind`'s variant list, `api/mod.rs`'s module
 list, `app/registry.rs`'s ordered `register` calls, the Add Component menu,
-`docs/scripting-api.md`'s tables, `scripting/callbacks.rs`, and the burn-down
+`docs/api/index.md`'s namespace list, `scripting/callbacks.rs`, and the burn-down
 baselines where both sides *removed* lines.
 
 `make queue` hands every one of these back rather than resolving it.
@@ -219,9 +219,9 @@ is stale, and citing it is worse than not having run it.
 Four things a branch owes in the *same* change, each backed by a gate that will
 otherwise fail at merge time:
 
-- **A binding change updates `docs/scripting-api.md`.** Existence parity, both
+- **A binding change updates its namespace's page in `docs/api/`.** Existence parity, both
   directions, dev feature set. Signatures are out of scope.
-- **A new lifecycle callback updates the same doc's callback section**, against
+- **A new lifecycle callback updates the callback section of `docs/api/index.md`**, against
   `src/scripting/callbacks.rs`.
 - **A new first-class component satisfies all four axes** — the `Entity` field,
   the Add Component entry, an inspector card, an `src/api/<x>.rs` namespace
