@@ -1,9 +1,9 @@
 //! src/soundgen/bake.rs — the one-call front door: patch + note → `.wav` (#357).
 //!
 //! [`bake_note`] is the verb the API surface drives. It:
-//! 1. renders one note of the patch through [`core::render`](crate::soundgen::core::render)
+//! 1. renders one note of the patch through [`core::render`]
 //!    (source → filter → amp → fx),
-//! 2. runs the mandatory [`limiter`](crate::soundgen::fx::limiter) — a bake must
+//! 2. runs the mandatory [`limiter`] — a bake must
 //!    never clip, and that is not the agent's decision to make, and
 //! 3. writes a mono 16-bit PCM WAV at 44.1 kHz.
 //!

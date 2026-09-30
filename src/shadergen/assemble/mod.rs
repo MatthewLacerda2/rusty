@@ -18,7 +18,7 @@
 //!   shape of the postfx pass.
 //!
 //! Each block contributes a param block (its declared params as WGSL `const`s),
-//! a helper function, and a call spliced into the chain — all via [`emit`].
+//! a helper function, and a call spliced into the chain — all via `emit`.
 
 mod emit;
 

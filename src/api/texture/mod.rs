@@ -3,7 +3,7 @@
 //! Agent-facing surface for procedural texture authoring: compose a recipe of ops and
 //! bake it to a tiling `.png` a material map slot consumes. The recipe is authored as
 //! a Lua table whose shape mirrors the serde document exactly (see
-//! [`from_lua`](crate::api::texture::from_lua)), so the same DAG describes a Lua-built
+//! `from_lua`), so the same DAG describes a Lua-built
 //! recipe and one loaded from `.json` — one surface, three callers.
 //!
 //! Verbs:

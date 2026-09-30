@@ -1,7 +1,7 @@
 //! src/scene/prefab_link.rs — linked prefab instances: live link operations (#216).
 //!
 //! The verbs that act on an already-stamped **linked** instance (one whose entities
-//! carry a [`PrefabLink`]): record its per-instance overrides, list them, revert
+//! carry a [`PrefabLink`](crate::components::PrefabLink)): record its per-instance overrides, list them, revert
 //! them, and re-import (propagate) the source onto it. They are the apply/revert side
 //! of prefabs v2 and the load-time propagation, all sharing one mechanism:
 //!

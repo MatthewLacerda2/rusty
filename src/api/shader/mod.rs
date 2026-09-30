@@ -10,7 +10,7 @@
 //! `ShaderRegistry` pointed at that dir loads `<name>.wgsl`).
 //!
 //! The recipe is authored as a Lua table whose shape mirrors the serde document
-//! exactly (see [`from_lua`]), so the same recipe describes a Lua-built shader and
+//! exactly (see `from_lua`), so the same recipe describes a Lua-built shader and
 //! one loaded from `.json` — one surface, three callers.
 //!
 //! Verbs:

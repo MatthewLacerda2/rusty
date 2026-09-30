@@ -8,7 +8,7 @@
 //! the agent invented is audible in the same script that made it.
 //!
 //! The patch is authored as a Lua table whose shape mirrors the serde document
-//! exactly (see [`from_lua`]), so the same document describes a Lua-built patch and
+//! exactly (see `from_lua`), so the same document describes a Lua-built patch and
 //! one loaded from `.json` — one surface, three callers.
 //!
 //! Verbs:

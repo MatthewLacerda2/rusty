@@ -21,7 +21,7 @@
 //! component), so the editor (which holds only `&mut World`) and the scene-level
 //! `add_component` share one path. Material is the one add that also creates a library
 //! asset; it has no requirements and is required by nothing, so it never flows through
-//! here — [`set_default`]'s Material arm exists only for completeness and stages the
+//! here — `set_default`'s Material arm exists only for completeness and stages the
 //! default asset the same way the editor Add menu does.
 //!
 //! Allowed deps: components, scene, ecs.

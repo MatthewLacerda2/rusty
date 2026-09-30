@@ -26,7 +26,8 @@ use crate::scene::lighting::sh::Sh9;
 
 /// A single light probe: a world position plus the baked SH it carries. The SH is
 /// the heavy part; on disk the position lives in the scene and the SH in the
-/// sidecar (see [`ProbeVolume::split`]/[`ProbeVolume::merge`]).
+/// sidecar (see [`save_lighting_sidecar`](crate::scene::lighting::io::save_lighting_sidecar)/
+/// [`load_lighting_sidecar`](crate::scene::lighting::io::load_lighting_sidecar)).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Probe {
     pub position: Vec3,

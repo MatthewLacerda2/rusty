@@ -18,7 +18,7 @@
 //!
 //! Module layout: [`osc`] (band-limited oscillator stack), [`karplus`] (plucked
 //! string), [`fm`] (2-op FM), [`noise`] (the one seeded RNG), [`source`] (which of
-//! those runs), [`env`] (ADSR), [`filter`] (state-variable filter).
+//! those runs), [`env`](mod@env) (ADSR), [`filter`] (state-variable filter).
 
 pub mod env;
 pub mod filter;

@@ -2,10 +2,10 @@
 //! (#272), the gate that stops a bad shader from shipping.
 //!
 //! Validation reuses the engine's own load path: it builds a `naga_oil`
-//! [`Composer`] pre-loaded with `common.wgsl` (via
-//! [`ShaderRegistry::composer_with_common`]) and runs the assembled module string
+//! [`Composer`](naga_oil::compose::Composer) pre-loaded with `common.wgsl` (via
+//! `ShaderRegistry::composer_with_common`) and runs the assembled module string
 //! through the same `make_naga_module` the engine calls when it *loads* the baked
-//! file (via [`ShaderRegistry::validate_source`]). So "validated at bake" means
+//! file (via `ShaderRegistry::validate_source`). So "validated at bake" means
 //! validated by exactly the code that would later compile it — GPU-free, so it
 //! runs in CI with no adapter. A module that references an undefined binding, has
 //! a syntax error, or drops a required import fails here and the bake is rejected.

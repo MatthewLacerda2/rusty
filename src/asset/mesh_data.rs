@@ -149,7 +149,7 @@ pub struct MaterialData {
     pub normal_map: Option<String>,
     /// Resolved path to the emissive texture, or `None`.
     pub emissive_map: Option<String>,
-    /// glTF `emissiveFactor` (linear RGB, default [0,0,0]).
+    /// glTF `emissiveFactor` (linear RGB, default `[0,0,0]`).
     pub emissive: [f32; 3],
 }
 

@@ -8,12 +8,12 @@
 //!
 //! ## Single-thread constraint
 //! The sim/world lives behind `Rc<RefCell<…>>` and is **not** `Send`. The listener
-//! and per-connection handler threads (in [`transport`]) therefore **never touch the
+//! and per-connection handler threads (in `transport`) therefore **never touch the
 //! world**: they only move command strings to the main loop and read framed responses
 //! back. All evaluation happens on the main loop in [`CommandChannel::drain`], so sim
 //! ordering and determinism are unchanged.
 //!
-//! ## Transport (cross-platform — see [`transport`])
+//! ## Transport (cross-platform — see `transport`)
 //! - **unix:** a `UnixListener` at `$RUSTY_CMD_SOCK`, else `$XDG_RUNTIME_DIR/rusty.sock`,
 //!   else `/tmp/rusty.sock`. A stale socket file is removed before binding and (best
 //!   effort) on drop.
@@ -26,7 +26,7 @@
 //!
 //! ## Protocol
 //! One Lua command per line in; one framed JSON response per command out, in lockstep
-//! and **byte-identical** to the headless session ([`crate::dev::session::response_line`]):
+//! and **byte-identical** to the headless session (`crate::dev::session::response_line`):
 //! `{"ok":true,"result":"…"}` / `{"ok":false,"error":"…"}`. Blank lines are skipped.
 //! A malformed line comes back as `{"ok":false,…}` and tears down neither the
 //! connection nor the engine; EOF / read error ends only that connection's handler.
@@ -86,7 +86,7 @@ impl CommandChannel {
     ///
     /// `try_recv`s all pending `(line, reply_tx)` pairs (never blocks — keeps this a
     /// once-per-frame poll), runs each through [`console::evaluate_line`] against the
-    /// live world, frames the outcome with [`session::response_line`] (identical to
+    /// live world, frames the outcome with `session::response_line` (identical to
     /// the headless session), and sends it back. Send errors are ignored — the client
     /// may have disconnected between sending and our reply.
     pub fn drain(&self, scripts: &ScriptManager, console: &RefCell<ConsoleLogs>) {
