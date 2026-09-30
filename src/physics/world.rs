@@ -25,13 +25,14 @@ use super::character;
 use super::collision_events::CollisionEvents;
 use super::compound::{world_to_local, BodyPlan};
 use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
+use super::joints::JointMap;
 use super::trigger_events::{self, TriggerEvents};
 use super::PhysicsEvents;
 use crate::scene::Scene;
 
 pub struct PhysicsWorld {
     gravity: Vector<Real>,
-    integration_parameters: IntegrationParameters,
+    pub(super) integration_parameters: IntegrationParameters,
     physics_pipeline: PhysicsPipeline,
     pub(super) islands: IslandManager,
     broad_phase: DefaultBroadPhase,
@@ -63,6 +64,10 @@ pub struct PhysicsWorld {
     /// Last tick's touching solid pairs, diffed the same way for the
     /// `OnCollision*` edges (#448).
     prev_collisions: Vec<(u32, u32)>,
+    /// Joint entity id -> its live rapier joint (#449, see `joints`).
+    pub(super) joints: JointMap,
+    /// The fixed body world-anchored joints attach to, made on first use.
+    pub(super) world_body: Option<RigidBodyHandle>,
 }
 
 impl PhysicsWorld {
@@ -89,8 +94,11 @@ impl PhysicsWorld {
             id_to_collider: HashMap::new(),
             prev_triggers: Vec::new(),
             prev_collisions: Vec::new(),
+            joints: JointMap::new(),
+            world_body: None,
         };
         world.build_bodies(scene);
+        world.resync_joints(scene);
         world.sync_enabled(scene);
         // Prime the query pipeline so a raycast works before the first step.
         world.query_pipeline.update(&world.bodies, &world.colliders);
@@ -104,6 +112,7 @@ impl PhysicsWorld {
     /// plan, so the order is deterministic.
     fn sync_to_rapier(&mut self, scene: &Scene, dt: f32) {
         self.resync_topology(scene);
+        self.resync_joints(scene);
         self.sync_enabled(scene);
         self.sync_materials(scene);
         let plan = std::mem::take(&mut self.plan);
@@ -175,8 +184,8 @@ impl PhysicsWorld {
     }
 
     /// Advance the rapier world by `dt` and surface the tick's trigger and
-    /// solid-contact events — enter/stay/exit distinctly (#310, #448), each list
-    /// sorted for deterministic dispatch.
+    /// solid-contact events — enter/stay/exit distinctly (#310, #448) — and the
+    /// joints that broke (#449), each list sorted for deterministic dispatch.
     pub fn step(&mut self, scene: &mut Scene, dt: f32) -> PhysicsEvents {
         self.integration_parameters.dt = dt;
         self.sync_to_rapier(scene, dt);
@@ -205,10 +214,12 @@ impl PhysicsWorld {
         let contacts = self.collect_contact_pairs(&pre_solve);
         let collisions = CollisionEvents::from_contact_sets(&self.prev_collisions, contacts);
         self.prev_collisions = collisions.stayed_keys();
+        let joint_breaks = self.break_joints(scene, dt);
         self.sync_from_rapier(scene);
         PhysicsEvents {
             triggers,
             collisions,
+            joint_breaks,
         }
     }
 

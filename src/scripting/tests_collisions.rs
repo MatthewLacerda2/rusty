@@ -58,6 +58,7 @@ fn collision_callbacks_get_the_receivers_contact() {
             stayed: vec![landing(id)],
             ..Default::default()
         },
+        ..Default::default()
     });
     assert_eq!(m.eval("__log").unwrap(), "TE9:1.0,2.0,3.0,4.5,9S");
 
