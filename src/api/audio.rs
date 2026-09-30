@@ -17,7 +17,10 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 use super::{put, Reg};
+use glam::Vec3;
+
 use crate::audio::{AudioMaestro, Listener};
+use crate::components::AudioSourceComponent;
 use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
@@ -41,9 +44,18 @@ pub fn register<'lua, 'scope>(
 }
 
 /// The listener — the active camera — as the spatial math wants it (position + right).
-fn listener(camera: &RefCell<Camera>) -> Listener {
+pub fn listener(camera: &RefCell<Camera>) -> Listener {
     let cam = camera.borrow();
     Listener::new(cam.position, cam.right())
+}
+
+/// An entity's `AudioSource` and the position it is heard from — the one lookup
+/// behind both `Audio.GetSpatial` and the shell's per-frame mix (#412), so the two
+/// always resolve the same emitter. `None` when the entity has no `AudioSource`.
+pub fn emitter(scene: &Scene, id: u32) -> Option<(AudioSourceComponent, Vec3)> {
+    let src = scene.world.audio(id)?;
+    let pos = scene.world.transform(id)?.position;
+    Some((src.clone(), pos))
 }
 
 /// The current play-mode frame, used as the deterministic event `tick`.
@@ -169,13 +181,7 @@ fn register_spatial<'lua, 'scope>(
         table,
         "GetSpatial",
         scope.create_function(|_, id: u32| {
-            let scene_ref = scene.borrow();
-            let Some((src, pos)) = scene_ref
-                .world
-                .audio(id)
-                .map(|a| a.clone())
-                .zip(scene_ref.world.transform(id).map(|t| t.position))
-            else {
+            let Some((src, pos)) = emitter(&scene.borrow(), id) else {
                 // No source: report silent + centred + not playing.
                 return Ok((0.0_f32, 0.0_f32, false));
             };

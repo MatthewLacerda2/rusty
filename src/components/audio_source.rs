@@ -1,10 +1,9 @@
-//! src/components/audio_source.rs — AudioSource component (2D playback, #212).
+//! src/components/audio_source.rs — AudioSource component (#212, #213, #412).
 //!
-//! Unity's `AudioSource`: a per-entity emitter referencing an audio `clip` to play.
-//! This issue (#212) ships **2D (non-spatialized) playback**; the spatial fields
-//! (`spatial_blend`, `initial_distance`, `final_distance`) are *stored now* and
-//! consumed by the 3D-spatialization follow-up (#213), so a scene authored today
-//! round-trips unchanged when that lands.
+//! Unity's `AudioSource`: a per-entity emitter referencing an audio `clip` to play,
+//! with a linear 3D rolloff (`spatial_blend`, `initial_distance`, `final_distance`)
+//! and a time-scale opt-out. The windowed runtime applies all of it to the device
+//! each frame (`shell/audio.rs`).
 //!
 //! Pure authoring data — every field serde-persists. The component knows nothing
 //! about the audio device: the platform-layer `AudioMaestro` (the resource) owns
@@ -33,13 +32,14 @@ pub struct AudioSourceComponent {
     /// music and UI that should keep playing through a pause/slow-mo.
     pub is_time_scaled: bool,
 
-    // --- Spatial fields: STORED NOW, consumed by #213 (3D spatialization). ---
-    /// 0.0 = fully 2D (no attenuation/panning), 1.0 = fully 3D. Stored only here.
+    // --- Spatial fields (3D spatialization, #213; applied to the device by #412). ---
+    /// 0.0 = fully 2D (no attenuation/panning, stereo image kept), 1.0 = fully 3D
+    /// (a stereo clip is downmixed to mono, then panned).
     pub spatial_blend: f32,
     /// Rolloff: full volume out to this distance (model: flat ≤ initial, linear
-    /// falloff initial→final, silent beyond). Stored now; applied by #213.
+    /// falloff initial→final, silent beyond).
     pub initial_distance: f32,
-    /// Rolloff: silent at/after this distance. Stored now; applied by #213.
+    /// Rolloff: silent at/after this distance.
     pub final_distance: f32,
 }
 

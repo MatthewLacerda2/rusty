@@ -1556,15 +1556,13 @@ play-test can assert *what* played, *where*, and *by whom* — one-shots include
 | `Audio.Play` | `(id)` | `bool` — started the entity's `AudioSource` (logs a Play event) |
 | `Audio.Stop` | `(id)` | — (stops the entity's voice, logs a Stop event) |
 | `Audio.SetVolume` | `(id, v)` | — (retunes the live voice's volume, pre-master; no-op if not playing) |
-| `Audio.PlayAt` | `(path, x, y, z [, vol])` | `bool` — fire-and-forget one-shot at a world position (`vol` defaults to 1.0); leaves no component, logged as a `PlayAt` event |
+| `Audio.PlayAt` | `(path, x, y, z [, vol])` | `bool` — fire-and-forget one-shot at a world position (`vol` defaults to 1.0); fully 3D and time-scaled (see below); leaves no component, logged as a `PlayAt` event |
 | `Audio.GetMasterVolume` | `()` | `number` (linear, `[0, 1]`) |
 | `Audio.SetMasterVolume` | `(v)` | — (clamped to `[0, 1]`; re-folds every live voice) |
 | `Audio.GetSpatial` | `(id)` | `(gain, pan, playing)` — the source's resolved 3D state against the listener (the active camera): `gain` linear pre-master, `pan` `[-1, 1]` (left→right), `playing` bool |
 
-A voice's volume is its per-source `volume` multiplied by the master volume.
-`is_time_scaled` chooses whether the voice follows `Time.timeScale` (gameplay sound)
-or runs at wall-clock rate (music / UI that should play through a pause). The play
-events are also visible in the `Debug.Snapshot` per-entity `audio` block (the
+A voice's volume is its per-source `volume` multiplied by the master volume (and by
+its distance rolloff — see below). The play events are also visible in the `Debug.Snapshot` per-entity `audio` block (the
 component's authoring fields).
 
 ### 3D spatialization
@@ -1584,8 +1582,35 @@ The **listener is the active camera**. Each `AudioSource` resolves to a per-sour
 
 The spatial math is pure and device-free (it resolves the same with or without an
 audio device), so a headless play-test can assert that a gunshot to your left reads
-back quieter and panned left. Only the final mix applies `(gain, pan)` in the platform
-layer.
+back quieter and panned left.
+
+**What reaches the speakers.** Every frame, after the sim advances, the windowed
+runtime (editor and standalone player alike) re-resolves each live voice against the
+active camera and hands the device its gain (× master), pan, rate and pause state.
+`Audio.GetSpatial` and the device mix come from the **same** resolve call, so the
+read-back is what plays. A voice started mid-frame is resolved against the previous
+frame's listener, so its first samples are already spatialized. Pan changes are
+applied in place — a moving source never restarts.
+
+- **Pan law** — balance: the far channel fades linearly to silence, the near one stays
+  at unity (`pan = -1` ⇒ right channel silent). A centred voice plays at full level on
+  both channels.
+- **Stereo clips** — a mono clip is copied to both channels, then panned. A stereo
+  clip is lerped toward its mono downmix `(l + r) / 2` by `spatial_blend`, then
+  panned: fully 3D (`1`) is downmixed then panned, pure 2D (`0`) keeps its stereo
+  image untouched. Clips with more than two channels use their first two as L/R.
+- **`PlayAt` one-shots** are diegetic: `spatial_blend = 1` with the default
+  `AudioSource` rolloff band (`initial_distance = 1`, `final_distance = 16`), and
+  time-scaled.
+
+### Time scale and pause
+
+`is_time_scaled = true` (the default — gameplay sound) makes a voice follow the clock:
+it plays at rate `Time.timeScale` (slow-mo lowers the pitch with the rate — that is
+the intended bullet-time sound), and it is **paused** while `Time.timeScale == 0` or
+`Time.Pause()` is on, resuming where it left off. `is_time_scaled = false` (music, UI)
+ignores both and always plays at normal rate. `Audio.PlayAt` one-shots are
+time-scaled.
 
 ## `Decals`
 

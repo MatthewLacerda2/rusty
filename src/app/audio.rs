@@ -7,9 +7,9 @@
 //!
 //! This is a *bookkeeping* system: on the harness's `NullBackend` it produces no
 //! sound but still records the play events, so a headless play-test can assert that
-//! the right sources auto-started. Per-source continuous playback needs no per-frame
-//! sim work — rodio loops a voice on its own thread — so there is no `FixedUpdate`
-//! audio system to thread a device through the deterministic stage.
+//! the right sources auto-started. The per-frame mix (3D rolloff, pan, time scale)
+//! is not a sim system: the windowed shell applies it after each advance
+//! (`shell/audio.rs`, #412), so no device is threaded through a deterministic stage.
 
 use super::registry::App;
 use super::resources::Resources;

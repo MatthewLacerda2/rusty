@@ -19,6 +19,7 @@
 //! [`Frontend`] is not a plugin trait: it has exactly two compile-time
 //! implementations, one per binary, and exists so the loop is written once.
 
+pub mod audio;
 pub mod boot;
 pub mod frame;
 pub mod input;
@@ -197,8 +198,9 @@ fn handle_window_event<F: Frontend>(
     }
 }
 
-/// One frame: advance the sim, act on play transitions and a quit request, apply
-/// scripted video settings, then let the frontend draw onto the swapchain.
+/// One frame: advance the sim, apply the audio mix, act on play transitions and a
+/// quit request, apply scripted video settings, then let the frontend draw onto the
+/// swapchain.
 fn run_frame<F: Frontend>(
     elwt: &EventLoopWindowTarget<()>,
     shell: &mut Shell,
@@ -207,6 +209,7 @@ fn run_frame<F: Frontend>(
 ) {
     let delta_time = shell.clock.tick(Instant::now());
     let transition = frame::advance_sim(game, delta_time);
+    audio::apply_mix(game);
     frontend.on_play_transition(game, transition);
     // The game's cursor request (Play defaults to locked + hidden), while it has input.
     let requested = game.input().borrow().cursor();

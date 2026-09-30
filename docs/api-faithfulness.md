@@ -278,7 +278,7 @@ dry-run and the block-catalog listing — not setters, so they don't add to the 
 
 `Sound` writes files rather than mutating a component, so its **read-site is the
 engine's own audio decoder**: a baked `.wav` is handed to `Audio.PlayAt` or stored as
-an `AudioSource`'s `clip`, and `audio::decode::ClipCache::get_or_decode` decodes it
+an `AudioSource`'s `clip`, and `audio::device::decode::ClipCache::get_or_decode` decodes it
 into PCM the maestro plays — the identical path an imported `.ogg`/`.wav` takes. The
 bake writes exactly what that decoder expects (mono 16-bit PCM at 44.1 kHz) and
 always passes a limiter, so a baked clip can never arrive clipped. Proven by
