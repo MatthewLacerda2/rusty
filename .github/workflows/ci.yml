@@ -113,6 +113,9 @@ jobs:
       # runner's ~14 GB free disk — recurring "No space left on device" flakes
       # (seen on #329 and #332).
       CARGO_PROFILE_DEV_DEBUG: "0"
+      # A missing adapter fails the canary test instead of skipping every GPU test
+      # (#489): the lavapipe step below is what gives this runner one.
+      RUSTY_REQUIRE_GPU: "1"
     steps:
       - uses: actions/checkout@v4
         if: needs.changes.outputs.code != 'false'
@@ -137,6 +140,12 @@ jobs:
       - name: System libs for winit/wgpu builds
         if: needs.changes.outputs.code != 'false'
         run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+      # Mesa's software Vulkan driver (#489). The runner has no GPU, so without it
+      # wgpu finds no adapter and every GPU test skips — Linux, a ship platform,
+      # had no render coverage at all.
+      - name: Software Vulkan driver (lavapipe)
+        if: needs.changes.outputs.code != 'false'
+        run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
       # No separate `cargo build` steps (#482): `cargo test` already compiles every
       # binary target its feature set enables (Cargo builds them for the
       # integration tests), so a build step first only re-proved the same compile.
@@ -171,6 +180,8 @@ jobs:
       # Same disk guard as build-test: tests never read debuginfo, and the
       # Windows runner has the same ~14 GB free-disk budget as Linux.
       CARGO_PROFILE_DEV_DEBUG: "0"
+      # Metal (macOS) and WARP (Windows) are always there; require them (#489).
+      RUSTY_REQUIRE_GPU: "1"
     steps:
       - uses: actions/checkout@v4
       - name: Toolchain (from rust-toolchain.toml)
@@ -309,6 +320,11 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: System libs for winit/wgpu builds
         run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+      # Lavapipe here too (#489), so the whole-crate summary measures render code
+      # the way build-test now exercises it. coverage-pr skips it: it only scores
+      # changed sim lines, which rendering does not reach.
+      - name: Software Vulkan driver (lavapipe)
+        run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:

@@ -106,9 +106,12 @@ bottleneck (hours-long foundation branches), never when the queue is.
 **Where a branch runs:**
 
 - **Local:** the batch's own session; every merge; any branch whose proof needs a
-  real GPU adapter (render, screenshots, probe bakes — cloud containers have none,
-  and neither does Linux CI); anything that needs files only this machine has.
-- **Cloud:** a branch that needs no GPU to prove **and** sits in modules no other
+  **real** GPU (Metal-specific behaviour, performance, anything a software driver
+  can't stand in for); anything that needs files only this machine has. Ordinary
+  render/screenshot/probe-bake tests run in a cloud container once it installs
+  Mesa's lavapipe (`apt-get install mesa-vulkan-drivers libvulkan1`), exactly as
+  Linux CI does (#489).
+- **Cloud:** a branch that needs no real GPU to prove **and** sits in modules no other
   in-flight branch touches. The collision list above still decides that; cloud
   removes the build-slot limit, not the rebase cost.
 

@@ -7,7 +7,7 @@
 //! are capped at 150 lines; it is the same kind of test, pinning a different knob.
 //!
 //! When no adapter is available `capture` returns `Ok(false)` and the test passes
-//! without asserting — Linux CI has no GPU, so this really runs on macOS/Windows.
+//! without asserting — only a GPU-less machine; every CI job has an adapter (#489).
 
 use glam::Vec3;
 use rusty::components::{CameraComponent, ClearFlags};

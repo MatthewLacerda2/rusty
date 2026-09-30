@@ -23,8 +23,8 @@
 //! shader compile. This is the step-5 proof the shared/per-view/per-scene boundaries are
 //! drawn in the right places: if they weren't, the second shot would come out wrong.
 //!
-//! **No adapter is a skip, not a failure.** The Linux CI job has no GPU at all, so the
-//! host reports `None` and its callers return `Ok(false)` — the same contract
+//! **No adapter is a skip, not a failure.** On a machine with no GPU or software driver
+//! the host reports `None` and its callers return `Ok(false)` — the same contract
 //! `Renderer::new_headless` has always had, kept in one place. The probe is attempted
 //! once; a box with no adapter does not retry per shot.
 //!

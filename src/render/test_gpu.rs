@@ -19,17 +19,40 @@
 
 use crate::render::Renderer;
 
+/// Set to `1` where a missing adapter is a failure, not a skip — CI sets it (#489).
+pub(crate) const REQUIRE_GPU_ENV: &str = "RUSTY_REQUIRE_GPU";
+
 /// A headless renderer, or `None` when this machine has no GPU or software adapter.
 ///
-/// `None` means **skip, don't fail**: the Linux CI job has no adapter at all, so every
-/// GPU test returns early there, while macOS (real Metal) and Windows (WARP) actually
-/// run them. A test that cannot tolerate being skipped does not belong on the GPU —
-/// pin the rule it cares about with an adapter-free unit test as well, so it is
-/// enforced on every platform rather than two of three.
+/// `None` means **skip, don't fail**, so a GPU-less machine still runs the rest of the
+/// suite. CI never relies on that path: every CI job has an adapter (Metal on macOS,
+/// WARP on Windows, Mesa's lavapipe on Linux, #489) and sets [`REQUIRE_GPU_ENV`], so
+/// the canary below fails if the driver ever goes missing instead of letting every GPU
+/// test quietly skip. A test that cannot tolerate being skipped locally does not belong
+/// on the GPU — pin the rule it cares about with an adapter-free unit test as well.
 ///
 /// The returned renderer holds a slot in the headless budget until it is dropped, so
 /// callers should let it fall out of scope promptly rather than parking it in a
 /// long-lived static.
 pub(crate) fn headless_or_skip(width: u32, height: u32) -> Option<Renderer> {
     pollster::block_on(Renderer::new_headless(width, height))
+}
+
+#[cfg(test)]
+mod tests {
+    /// The one GPU test that refuses to skip, and only where asked to. Without it, a
+    /// CI runner that lost its software driver would put every GPU test back on the
+    /// silent `None` path and still report green — the state #489 fixed.
+    #[test]
+    fn adapter_present_when_required() {
+        if std::env::var(super::REQUIRE_GPU_ENV).as_deref() != Ok("1") {
+            return;
+        }
+        assert!(
+            super::headless_or_skip(4, 4).is_some(),
+            "{}=1 but no GPU or software adapter was found: on Linux install Mesa's \
+             lavapipe (`mesa-vulkan-drivers`), or unset the variable to skip GPU tests",
+            super::REQUIRE_GPU_ENV
+        );
+    }
 }

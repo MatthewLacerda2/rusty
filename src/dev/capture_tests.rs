@@ -3,7 +3,7 @@
 //! would have come out at the first's size, or with the first scene's pooled
 //! resources — so these assertions are the step-5 half of the multi-view guard.
 //!
-//! GPU tests skip gracefully when no adapter is present (the Linux CI job), so the
+//! GPU tests skip gracefully when no adapter is present (a GPU-less dev box), so the
 //! size/host-state rules that need no device are pinned separately below.
 
 use glam::Vec3;
@@ -45,7 +45,7 @@ fn tmp(name: &str) -> std::path::PathBuf {
 
 /// An untouched host owns nothing: no device is built until a shot asks for one, so
 /// a harness that never screenshots never pays for a renderer (nor a budget slot).
-/// Adapter-free — this is the rule Linux CI can still enforce.
+/// Adapter-free — this is the rule even a GPU-less machine still enforces.
 #[test]
 fn an_unused_host_builds_nothing() {
     let host = CaptureHost::new();
