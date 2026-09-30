@@ -2,7 +2,7 @@
 //!
 //! The single stable API surface shared by Lua scripts, the console REPL and
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
-//! `Scene`, `Random`, `Timer`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
+//! `Scene`, `Random`, `Timer`, `Tween`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
 //! `Assets`, `Texture`, `Shader`, `Sound`, `Particles`, `Layers`, `Graphics`, `Video`,
 //! `Storage`, `Canvas`, `RectTransform`, `UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Selectable`,
 //! `LayoutGroup`, `LayoutElement`, `Joint`,
@@ -58,6 +58,7 @@ pub mod texture;
 pub mod time;
 pub mod timer;
 pub mod transform;
+pub mod tween;
 pub mod ui;
 pub mod video;
 
@@ -167,6 +168,7 @@ pub fn register<'lua, 'scope>(
     joint::register(lua, scope, ctx.scene)?;
     time::register(lua, scope, ctx.time)?;
     timer::register(lua, scope, ctx.scene, ctx.timers, ctx.console)?;
+    tween::register(lua, scope, ctx.scene, ctx.timers)?;
     random::register(lua, scope, ctx.random)?;
     camera::register(lua, scope, ctx.camera)?;
     light::register(lua, scope, ctx.scene)?;

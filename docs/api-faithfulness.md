@@ -155,6 +155,12 @@ edits and each physics step.)
 | `Resume` | ✅ | platform — same read-site: a cleared `paused` returns the loop to the normal real-time `game.tick(delta_time)` path; also clears `pending_steps` (`tests/pause_step/`) |
 | `Step` | ✅ | platform — while paused, `main::advance_sim` drains `pending_steps` one `FIXED_DELTA_TIME` tick at a time (the harness's fixed-dt step semantics), so windowed and headless stepping are frame-identical (`tests/pause_step/`) |
 
+### `Tween` — over the tweened component's field (#424)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `To` / `Sequence` | ✅ | each tick writes through the property's own authoring op (`Transform` fields directly, with the collider re-sync), so the read-site is that component's setter row above/below — `CanvasGroup.SetAlpha`, `Image.SetColor`, `Light.SetIntensity`, … (`src/scripting/tests_tweens.rs`, `tests/tweens.rs`) |
+
 ### `Camera` — over the shared `scene::Camera`
 
 | Setter | Status | Read-site |
