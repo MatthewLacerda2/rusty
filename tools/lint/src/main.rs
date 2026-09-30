@@ -105,6 +105,10 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
+            // Build output (e.g. `fuzz/target/` after `cargo fuzz`) holds generated code.
+            if path.file_name().is_some_and(|n| n == "target") {
+                continue;
+            }
             walk(&path, out);
         } else if is_rust(&path) {
             out.push(path);
@@ -271,6 +275,9 @@ mod tests {
         let file = root.join("tests").join("too_long.rs");
         fs::create_dir_all(file.parent().unwrap()).unwrap();
         fs::write(&file, "//\n".repeat(MAX_TEST_FILE_LINES + 1)).unwrap();
+        let generated = root.join("tests").join("target").join("gen.rs");
+        fs::create_dir_all(generated.parent().unwrap()).unwrap();
+        fs::write(&generated, "//\n".repeat(MAX_TEST_FILE_LINES + 1)).unwrap();
         let found = scan_dir(&root.join("tests"));
         let flagged = found.iter().filter_map(|p| check_file(p)).count();
         fs::remove_dir_all(&root).ok();
