@@ -24,7 +24,8 @@ fastest first:
     cargo run --quiet --manifest-path tools/lint/Cargo.toml -- --parity
     cargo clippy --all-targets -- -D warnings -D clippy::too_many_lines
     cargo clippy --all-targets --features dev -- -D warnings -D clippy::too_many_lines
-    cargo build --locked && cargo build --features dev --locked
+    RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked
+    RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked --features dev
     cargo test --locked && cargo test --features dev --locked
     cargo test --manifest-path tools/lint/Cargo.toml --locked
     cargo deny check advisories bans sources licenses

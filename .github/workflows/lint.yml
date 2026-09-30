@@ -5,7 +5,18 @@ on:
   # Run on the merge queue's speculative merge so the lint gate validates the
   # state that will actually land (see ci.yml for the same rationale).
   merge_group:
+  # Post-merge on `main` (#482): this is the only run that may save the lint job's
+  # cache (see the cache step), so without it every PR's lint job would start
+  # cold. It also lints the commit that actually landed.
+  push:
+    branches: [main]
   workflow_dispatch:
+
+# Cancel superseded PR runs; every other event keys on its own run id and always
+# finishes. Same shape and rationale as ci.yml's `concurrency` block (#482).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Markdown-only PRs skip the Rust lint/format/clippy *steps*, but the required
@@ -29,10 +40,13 @@ jobs:
   lint:
     needs: changes
     runs-on: ubuntu-latest
+    # Events listed explicitly, as in ci.yml (#480): a bare
+    # `github.event.pull_request.draft == false` also matches `push` (null == false).
     if: >-
+      github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'merge_group' ||
-      github.event.pull_request.draft == false
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
     steps:
       - uses: actions/checkout@v4
         if: needs.changes.outputs.code != 'false'
@@ -41,9 +55,12 @@ jobs:
       - name: Ensure rustfmt + clippy
         if: needs.changes.outputs.code != 'false'
         run: rustup component add rustfmt clippy
+      # Only `main` saves (#482) — see the note on ci.yml's first cache step.
       - name: Cache cargo registry + target
         if: needs.changes.outputs.code != 'false'
         uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Format check (whole crate; rustfmt follows mod tree)
         if: needs.changes.outputs.code != 'false'
         run: |
@@ -76,6 +93,20 @@ jobs:
       - name: Clippy (hard gate, dev features)
         if: needs.changes.outputs.code != 'false'
         run: cargo clippy --all-targets --features dev -- -D warnings -D clippy::too_many_lines
+      # Rustdoc is a HARD gate (#482): `cargo doc` is the Rust API reference agents
+      # are pointed at, so a broken intra-doc link or a doc linking a private item
+      # fails the PR instead of silently publishing a broken reference. Both
+      # feature sets — half the crate (and the dev binaries) is behind `dev`.
+      - name: Rustdoc (hard gate, default features)
+        if: needs.changes.outputs.code != 'false'
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --no-deps --locked
+      - name: Rustdoc (hard gate, dev features)
+        if: needs.changes.outputs.code != 'false'
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --no-deps --locked --features dev
 
   # The single required status check for lint.yml (issue #229) — the lint-workflow
   # analog of ci.yml's `ci-gate`. Branch protection requires this job, not `lint` by
