@@ -60,6 +60,20 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   (not one another file also writes), and never `set_var` / `set_current_dir`.
 - Filtering works by module path: `cargo nextest run -E 'binary(integration)' physics_`.
 
+## Build and test share one dependency graph
+Cargo resolves features for `cargo build` without the dev-dependencies. If a
+dev-dependency switches on a feature that the normal build leaves off, `cargo test`
+compiles its own copy of that crate, of everything above it, and of rusty. proptest
+did this to `getrandom`'s `std` feature, and that doubled ahash, hecs, wgpu and egui
+(#552). `Cargo.toml` now names `getrandom` with `std` directly to close the gap.
+**Don't let a dev-dependency turn on a feature the normal build lacks.** After adding
+or bumping one, compare the two resolutions. Test-only crates (proptest and its
+tree) appear only in the second, which is fine. A crate that appears in **both**
+with a longer feature list in the second is the split:
+
+    cargo tree -e normal,build --features dev -f '{p} [{f}]' --prefix none | sort -u
+    cargo tree -e normal,build,dev --features dev -f '{p} [{f}]' --prefix none | sort -u
+
 ## GPU tests and the headless budget
 Tests that need a real device call `Renderer::new_headless`, which returns `None`
 when no adapter is present — so **every GPU test skips gracefully** rather than
