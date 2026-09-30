@@ -39,7 +39,7 @@ pub(crate) enum Property {
 }
 
 /// `(path, property, arity)` — the whole animatable surface.
-const PROPERTIES: [(&str, Property, usize); 18] = [
+const PROPERTIES: &[(&str, Property, usize)] = &[
     ("Transform.position", Property::Position, 3),
     ("Transform.rotation", Property::Rotation, 3),
     ("Transform.scale", Property::Scale, 3),
@@ -72,7 +72,11 @@ impl Property {
 
     /// Every accepted path, for the error a typo gets.
     pub(crate) fn paths() -> String {
-        PROPERTIES.map(|(p, ..)| p).join(", ")
+        PROPERTIES
+            .iter()
+            .map(|(p, ..)| *p)
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 
     /// The path this property was parsed from.
