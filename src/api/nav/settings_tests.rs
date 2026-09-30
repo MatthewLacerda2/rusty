@@ -12,7 +12,7 @@ use mlua::Lua;
 
 use super::register;
 use crate::components::{ColliderComponent, ColliderShape};
-use crate::navigation::NavigationGraph;
+use crate::navigation::{NavBounds, NavigationGraph};
 use crate::scene::Scene;
 
 /// A scene with one static box collider spanning the given world AABB, plus a freshly
@@ -31,6 +31,8 @@ fn scene_and_nav(min: Vec3, max: Vec3) -> (RefCell<Scene>, RefCell<NavigationGra
             aabb_max: max,
         }),
     );
+    // Pin the grid (#452) so the cell indices asserted below stay put.
+    scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
     let mut nav = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     nav.bake(&scene);
     (RefCell::new(scene), RefCell::new(nav))

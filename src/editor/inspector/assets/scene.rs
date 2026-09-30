@@ -1,5 +1,5 @@
 use crate::editor::EditorUi;
-use crate::navigation::NavigationGraph;
+use crate::navigation::{NavBounds, NavigationGraph};
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 use std::fs;
@@ -46,6 +46,7 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
         .show(ui, |ui| {
             // Edit the settings behind a scoped borrow so it has dropped before the
             // re-bake (which needs `&Scene`) below.
+            let baked = nav.bounds();
             let changed = {
                 let s = &mut scene.nav_settings;
                 let mut changed = false;
@@ -69,7 +70,7 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
                     .add(egui::Slider::new(&mut s.grid_spacing, 0.25..=4.0).text("Grid Spacing"))
                     .on_hover_text("Cell size; smaller = finer grid (re-shapes the grid)")
                     .changed();
-                changed
+                changed | draw_nav_bounds(ui, &mut s.bounds, baked)
             };
             // Re-bake on apply through the shared bake path, so the knobs take effect
             // immediately exactly like an entity's collider/static edit does.
@@ -77,6 +78,37 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
                 nav.bake(scene);
             }
         });
+}
+
+/// The navmesh bounds (#452): the baked area read-out, plus an "Override Bounds" toggle
+/// that authors `nav_settings.bounds` (seeded from the baked area) — the same field
+/// `Navigation.SetBounds`/`ClearBounds` write. Returns whether anything changed.
+fn draw_nav_bounds(ui: &mut egui::Ui, bounds: &mut Option<NavBounds>, baked: NavBounds) -> bool {
+    ui.label(format!(
+        "Baked bounds: x [{}, {}]  z [{}, {}]",
+        baked.min_x, baked.max_x, baked.min_z, baked.max_z
+    ));
+    let mut authored = bounds.is_some();
+    let mut changed = ui
+        .checkbox(&mut authored, "Override Bounds")
+        .on_hover_text("Author the navmesh area instead of deriving it from static geometry")
+        .changed();
+    if changed {
+        *bounds = authored.then_some(baked);
+    }
+    if let Some(b) = bounds {
+        for (label, min, max) in [
+            ("X", &mut b.min_x, &mut b.max_x),
+            ("Z", &mut b.min_z, &mut b.max_z),
+        ] {
+            ui.horizontal(|ui| {
+                ui.label(label);
+                changed |= ui.add(egui::DragValue::new(min).prefix("min ")).changed();
+                changed |= ui.add(egui::DragValue::new(max).prefix("max ")).changed();
+            });
+        }
+    }
+    changed
 }
 
 /// The "Bake Lighting" button (#246): auto-place + bake both probe sets through the

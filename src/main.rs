@@ -207,9 +207,6 @@ fn init_frontend(window: &Arc<winit::window::Window>) -> (Frontend, String) {
 fn init_game(boot_scene_path: String) -> GameWorld {
     let scene = Rc::new(RefCell::new(Scene::new()));
     let input = Rc::new(RefCell::new(InputState::new()));
-    let nav = Rc::new(RefCell::new(NavigationGraph::new(
-        -20.0, 20.0, -20.0, 20.0, 1.0,
-    )));
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
 
     // The procedural bot-chase demo lives in the tracked `default.scene`, seeded
@@ -224,8 +221,9 @@ fn init_game(boot_scene_path: String) -> GameWorld {
                 .borrow_mut()
                 .error(format!("Failed to load default scene: {}", err));
         }
-        nav.borrow_mut().bake(&s);
     }
+    // Baked over the scene's own bounds (#452) — the same path the headless harness takes.
+    let nav = Rc::new(RefCell::new(NavigationGraph::from_scene(&scene.borrow())));
 
     let game = GameWorld::new(scene, input, nav, console);
 

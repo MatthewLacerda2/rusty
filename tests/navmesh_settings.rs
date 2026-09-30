@@ -4,7 +4,7 @@
 //! pre-#276 save file that omits the `nav_settings` block rehydrates with those defaults
 //! (back-compat), and (c) authored settings survive a save→load round-trip.
 
-use rusty::navigation::NavMeshSettings;
+use rusty::navigation::{NavBounds, NavMeshSettings};
 use rusty::scene::Scene;
 
 fn tmp(name: &str) -> String {
@@ -52,6 +52,12 @@ fn nav_settings_survive_round_trip() {
         max_slope: 0.6,
         max_step: 0.3,
         grid_spacing: 1.5,
+        bounds: Some(NavBounds {
+            min_x: -80.0,
+            max_x: 120.0,
+            min_z: -10.0,
+            max_z: 10.0,
+        }),
     };
     let path = tmp("rusty_nav_settings_roundtrip.scene");
     scene.save_to_file(&path).unwrap();
@@ -63,6 +69,7 @@ fn nav_settings_survive_round_trip() {
     assert_eq!(loaded.nav_settings.max_slope, 0.6);
     assert_eq!(loaded.nav_settings.max_step, 0.3);
     assert_eq!(loaded.nav_settings.grid_spacing, 1.5);
+    assert_eq!(loaded.nav_settings.bounds, scene.nav_settings.bounds);
 }
 
 #[test]

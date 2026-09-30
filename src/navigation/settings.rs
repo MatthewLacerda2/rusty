@@ -12,6 +12,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::bounds::NavBounds;
 use super::grid::{DEFAULT_GRID_SPACING, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP};
 
 /// A sensible default agent radius (world units). Consumed at bake time (#277): the bake
@@ -59,6 +60,11 @@ pub struct NavMeshSettings {
     /// differs from the graph's current spacing (see `NavigationGraph::bake`).
     #[serde(default = "default_grid_spacing")]
     pub grid_spacing: f32,
+    /// Authored XZ bounds the grid covers (#452, Unity's nav volume). `None` (the
+    /// default) derives them at bake time from the static geometry's extent plus a
+    /// margin; an invalid override is ignored the same way (see `navigation::bounds`).
+    #[serde(default)]
+    pub bounds: Option<NavBounds>,
 }
 
 fn default_agent_radius() -> f32 {
@@ -85,6 +91,7 @@ impl Default for NavMeshSettings {
             max_slope: DEFAULT_MAX_SLOPE,
             max_step: DEFAULT_MAX_STEP,
             grid_spacing: DEFAULT_GRID_SPACING,
+            bounds: None,
         }
     }
 }
@@ -103,6 +110,7 @@ mod tests {
         assert_eq!(d.grid_spacing, DEFAULT_GRID_SPACING);
         assert_eq!(d.agent_radius, DEFAULT_AGENT_RADIUS);
         assert_eq!(d.agent_height, DEFAULT_AGENT_HEIGHT);
+        assert_eq!(d.bounds, None, "bounds derive from the scene by default");
     }
 
     /// A JSON object missing every field deserializes to the defaults (back-compat).
@@ -130,6 +138,12 @@ mod tests {
             max_slope: 0.5,
             max_step: 0.25,
             grid_spacing: 2.0,
+            bounds: Some(NavBounds {
+                min_x: -60.0,
+                max_x: 80.0,
+                min_z: -5.0,
+                max_z: 5.0,
+            }),
         };
         let json = serde_json::to_string(&s).expect("serialize");
         let back: NavMeshSettings = serde_json::from_str(&json).expect("deserialize");

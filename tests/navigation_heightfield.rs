@@ -3,7 +3,7 @@
 //! only the public `NavigationGraph` surface.
 
 use glam::Vec3;
-use rusty::navigation::NavigationGraph;
+use rusty::navigation::{NavBounds, NavigationGraph};
 use rusty::scene::{ColliderComponent, ColliderShape, NavMeshAgentComponent, Scene};
 
 fn add_box(scene: &mut Scene, name: &str, min: Vec3, max: Vec3) {
@@ -34,6 +34,8 @@ fn ramp_graph() -> NavigationGraph {
             Vec3::new(fx + 0.5, y, 6.0),
         );
     }
+    // Pin the grid (#452) so the cell indices asserted below stay put.
+    scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
     let mut graph = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     graph.bake(&scene);
     graph
@@ -77,6 +79,7 @@ fn tall_step_blocks_path() {
         Vec3::new(4.0, 0.0, 0.0),
         Vec3::new(5.0, 2.0, 10.0),
     );
+    scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
     let mut graph = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     graph.bake(&scene);
     if let Some(p) = graph.find_path(1, 5, 9, 5) {

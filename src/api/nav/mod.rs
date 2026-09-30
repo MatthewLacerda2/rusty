@@ -14,7 +14,7 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::{put, Reg};
-use crate::navigation::{NavMeshSettings, NavigationGraph};
+use crate::navigation::{NavBounds, NavMeshSettings, NavigationGraph};
 use crate::scene::Scene;
 
 /// Register the `Navigation` and `NavMeshAgent` namespaces onto `lua`.
@@ -53,6 +53,7 @@ fn register_navigation<'lua, 'scope>(
 
     register_settings_getters(scope, &table, scene)?;
     register_settings_setters(scope, &table, scene, nav)?;
+    register_bounds(scope, &table, scene, nav)?;
 
     lua.globals()
         .set("Navigation", table)
@@ -129,6 +130,54 @@ fn register_settings_setters<'lua, 'scope>(
         table,
         "SetGridSpacing",
         scope.create_function(move |_, v: f32| set_and_rebake(scene, nav, |s| s.grid_spacing = v)),
+    )
+}
+
+/// The navmesh bounds (#452): the XZ area the grid covers. `GetBounds` reads the live
+/// graph — the bounds the last bake actually used, snapped to the grid spacing — plus
+/// whether they were authored. `SetBounds` authors an override (Unity's nav volume) and
+/// `ClearBounds` returns to deriving them from the static geometry; both re-bake, as the
+/// scene inspector's Navmesh section does (editor↔API parity).
+fn register_bounds<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+    nav: &'scope RefCell<NavigationGraph>,
+) -> Reg {
+    put(
+        table,
+        "GetBounds",
+        scope.create_function(|_, ()| {
+            let b = nav.borrow().bounds();
+            let authored = scene.borrow().nav_settings.bounds.is_some();
+            Ok((b.min_x, b.max_x, b.min_z, b.max_z, authored))
+        }),
+    )?;
+    put(
+        table,
+        "SetBounds",
+        scope.create_function(
+            move |_, (min_x, max_x, min_z, max_z): (f32, f32, f32, f32)| {
+                let b = NavBounds {
+                    min_x,
+                    max_x,
+                    min_z,
+                    max_z,
+                };
+                if !b.is_valid() {
+                    return Err(mlua::Error::RuntimeError(format!(
+                        "Navigation.SetBounds: need finite bounds with min < max, got \
+                         x [{min_x}, {max_x}] z [{min_z}, {max_z}]"
+                    )));
+                }
+                set_and_rebake(scene, nav, |s| s.bounds = Some(b))
+            },
+        ),
+    )?;
+    put(
+        table,
+        "ClearBounds",
+        scope.create_function(move |_, ()| set_and_rebake(scene, nav, |s| s.bounds = None)),
     )
 }
 

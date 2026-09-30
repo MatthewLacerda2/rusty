@@ -36,6 +36,8 @@ fn stair_graph() -> NavigationGraph {
             Vec3::new(fx + 0.25, y, 6.0),
         );
     }
+    // Pin the grid (#452) so the cell indices asserted below stay put.
+    scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
     let mut graph = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     graph.bake(&scene);
     graph
@@ -75,6 +77,7 @@ fn steep_wall_top_is_unreachable() {
         Vec3::new(3.6, 0.0, 3.6),
         Vec3::new(4.4, 3.0, 4.4),
     );
+    scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
     let mut graph = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     graph.bake(&scene);
     assert_eq!(graph.height_at(4, 4), 3.0);
@@ -116,6 +119,7 @@ fn raise_surface_takes_max_of_overlapping_colliders() {
         Vec3::new(3.0, 0.0, 3.0),
         Vec3::new(5.0, 3.0, 5.0),
     );
+    scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
     let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     g.bake(&scene);
     assert_eq!(g.height_at(4, 4), 3.0, "max(1.0, 3.0) = 3.0");
@@ -147,6 +151,7 @@ fn bake_sources_max_step_from_scene_settings() {
         Vec3::new(3.6, 0.0, 3.6),
         Vec3::new(4.4, 1.0, 4.4),
     );
+    scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
     let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     g.bake(&scene);
     assert!(
@@ -171,6 +176,7 @@ fn bake_sources_max_step_from_scene_settings() {
 #[test]
 fn bake_reshapes_grid_from_grid_spacing() {
     let mut scene = Scene::new();
+    scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
     let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     g.bake(&scene);
     let cells_unit = g.walkability.len();
@@ -202,6 +208,7 @@ fn bake_with_custom_settings_is_deterministic() {
         scene.nav_settings.max_step = 0.8;
         scene.nav_settings.max_slope = 0.6;
         scene.nav_settings.grid_spacing = 0.5;
+        scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
         let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
         g.bake(&scene);
         g

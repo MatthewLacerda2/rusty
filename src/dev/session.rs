@@ -47,9 +47,6 @@ impl Session {
 
         let scene = Rc::new(RefCell::new(Scene::new()));
         let input = Rc::new(RefCell::new(InputState::new()));
-        let nav = Rc::new(RefCell::new(NavigationGraph::new(
-            -20.0, 20.0, -20.0, 20.0, 1.0,
-        )));
         let console = Rc::new(RefCell::new(ConsoleLogs::new()));
 
         if !boot_scene.is_empty() {
@@ -59,8 +56,9 @@ impl Session {
                     .borrow_mut()
                     .error(format!("Failed to load scene {}: {}", boot_scene, err));
             }
-            nav.borrow_mut().bake(&s);
         }
+        // Baked over the scene's own bounds (#452), as the windowed boot does.
+        let nav = Rc::new(RefCell::new(NavigationGraph::from_scene(&scene.borrow())));
 
         let mut world = GameWorld::new(scene, input, nav, console);
         // The boot scene is the `Scene.Save()` write-back target, so an
