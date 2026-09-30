@@ -28,7 +28,8 @@ pub fn register<'lua, 'scope>(
 
     register_emission(scope, &table, scene)?;
     register_tuning(scope, &table, scene)?;
-    register_modules(scope, &table, scene)?;
+    register_shape(scope, &table, scene)?;
+    register_start(scope, &table, scene)?;
     register_state(scope, &table, scene)?;
 
     lua.globals()
@@ -110,8 +111,8 @@ fn register_tuning<'lua, 'scope>(
     )
 }
 
-/// The #439 module setters: shape, direction, start ranges, colour, sub-emitters.
-fn register_modules<'lua, 'scope>(
+/// The #439 shape setters: `SetShape` and `SetDirection` (the shape's axis).
+fn register_shape<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
@@ -153,7 +154,15 @@ fn register_modules<'lua, 'scope>(
             with_emitter(scene, id, |p| particle_ops::set_direction(p, dir));
             Ok(())
         }),
-    )?;
+    )
+}
+
+/// The #439 start-value setters: ranges, colour, and sub-emitters.
+fn register_start<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     // `SetLifetime` / `SetSpeed` / `SetSize(id, min, max?)` — `max` omitted is a
     // constant.
     type RangeOp = fn(&mut crate::scene::ParticleEmitterComponent, Range);
