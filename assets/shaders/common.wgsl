@@ -8,7 +8,7 @@ struct CameraUniforms {
 };
 
 // Standard mesh vertex layout — position, normal, UVs, skeletal animation data
-// (joint indices + blend weights, 64 bones max), and the tangent basis for normal
+// (four joint indices + blend weights; no joint cap, #455), and the tangent basis for normal
 // mapping (`xyz` unit tangent, `w` handedness sign).
 struct VertexInput {
     @location(0) position: vec3<f32>,

@@ -106,12 +106,15 @@ pub(crate) struct EntityUniform {
     // WGSL's `vec3` 16-byte-alignment gotcha and keep the struct a 16-byte multiple.
     pub emissive: [f32; 4],
     // Cutout alpha-test (#242). `use_cutout == 1` makes `fs_main` discard fragments
-    // whose final alpha is below `alpha_cutoff` (Cutout materials). The two pads
-    // complete the 16-byte run so the struct stays a 16-byte multiple;
-    // `EntityUniforms` in shader.wgsl mirrors this field order byte-for-byte.
+    // whose final alpha is below `alpha_cutoff` (Cutout materials).
     pub use_cutout: u32,
     pub alpha_cutoff: f32,
-    pub _pad: [u32; 2],
+    // Index of this draw's joint 0 in the frame's bone-palette storage array (#455):
+    // the vertex shader reads `bones[bone_base + joint]`. `0` is the shared identity
+    // matrix every non-skinned draw uses. The pad completes the 16-byte run;
+    // `EntityUniforms` in shader.wgsl mirrors this field order byte-for-byte.
+    pub bone_base: u32,
+    pub _pad: u32,
 }
 
 impl EntityUniform {
@@ -153,10 +156,4 @@ impl InstanceData {
         _pad: [0; 3],
         sh: [[0.0; 4]; 9],
     };
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct BoneUniform {
-    pub bones: [[f32; 16]; 64],
 }

@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use super::batch::{BatchKey, DrawItem, FrameDraws};
 use crate::components::MaterialAsset;
-use crate::render::gpu::draw_buffers::{group1, palette_uniform, FrameUpload};
+use crate::render::gpu::draw_buffers::{group1, push_palette, FrameUpload, JointMatrix};
 use crate::render::{transform_aabb, Frustum, GpuTexture, MeshId, Renderer};
 use crate::scene::Scene;
 
@@ -22,8 +22,8 @@ pub(crate) struct SolidResources {
     pub culled: u32,
 }
 // The overlay resources keep only the buffers they own (the per-overlay entity
-// uniform + any vertex buffer) plus their bind group; the bone palette they bind is
-// the renderer's one shared identity buffer, so no per-overlay palette is allocated
+// uniform + any vertex buffer) plus their bind group; the joint array they bind is
+// the renderer's one shared identity matrix, so no per-overlay palette is allocated
 // (#210).
 pub(crate) type OutlineResource = (u32, MeshId, wgpu::Buffer, wgpu::BindGroup, u32);
 pub(crate) type GridResource = (wgpu::Buffer, wgpu::BindGroup);
@@ -48,8 +48,8 @@ pub(crate) struct Overlays {
 }
 
 impl Renderer {
-    /// The one shared identity bone palette buffer every overlay binds, so none of
-    /// them allocate a per-draw 4 KB palette (#210).
+    /// The one shared identity joint buffer every overlay binds, so none of them
+    /// allocate a per-draw palette (#210).
     pub(crate) fn shared_bones_buffer(&self) -> &wgpu::Buffer {
         self.draw_buffers.default_bones()
     }
@@ -77,7 +77,7 @@ impl Renderer {
         frustum: &Frustum,
     ) -> SolidResources {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
-        let (mut opaque, mut transparent, mut palettes) = (Vec::new(), Vec::new(), Vec::new());
+        let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
         let mut culled = 0;
         for id in scene.world.ids_with_mesh() {
             if !scene.world.is_active(id) {
@@ -100,7 +100,7 @@ impl Renderer {
                 continue;
             }
             let Some((item, world_pos, is_transparent)) =
-                self.solid_draw_item(scene, id, &mut palettes)
+                self.solid_draw_item(scene, id, &mut joints)
             else {
                 continue;
             };
@@ -121,7 +121,7 @@ impl Renderer {
             &self.entity_bones_layout,
             FrameUpload {
                 uniforms: &draws.uniforms(),
-                palettes: &palettes,
+                joints: &joints,
                 instances: &draws.instances,
             },
         );
@@ -152,16 +152,17 @@ impl Renderer {
         !frustum.intersects_aabb(min, max)
     }
 
-    /// One solid's draw item: its batch key (mesh, material group, bone slot, per-draw
+    /// One solid's draw item: its batch key (mesh, material group, per-draw
     /// uniform) and instance, plus its world-space origin (the transparent sort key's
     /// anchor) and whether its material is Transparent. A skinned mesh's palette is
-    /// appended to `palettes`, giving it a bone slot — and so a draw — of its own.
+    /// appended to `joints`, and its uniform's `bone_base` points at it — so it is a
+    /// draw of its own.
     /// `None` if its mesh is not resident on the GPU yet.
     fn solid_draw_item(
         &mut self,
         scene: &Scene,
         id: u32,
-        palettes: &mut Vec<crate::render::BoneUniform>,
+        joints: &mut Vec<JointMatrix>,
     ) -> Option<(DrawItem, glam::Vec3, bool)> {
         let mesh = scene.world.mesh(id)?;
         let mesh_id = MeshId::from_mesh(&mesh);
@@ -170,25 +171,19 @@ impl Renderer {
         let material = scene.material_asset_of(id);
         let transparent = material.is_some_and(MaterialAsset::is_transparent);
         let model_matrix = scene.world_matrix(id);
-        let uniform = super::uniforms::solid_entity_uniform(scene, id, material);
+        let mut uniform = super::uniforms::solid_entity_uniform(scene, id, material);
         let instance =
             super::uniforms::solid_instance(scene, id, model_matrix, self.capture_probe_bounce);
 
         // The active bone palette: the live animated pose when a clip plays (#80),
         // else the bind pose (#79). Primitives/static meshes leave it empty and bind
-        // the shared identity palette in slot 0.
-        let palette = mesh.active_palette();
-        let bones = if palette.is_empty() {
-            0
-        } else {
-            palettes.push(palette_uniform(palette));
-            palettes.len() as u32
-        };
+        // the shared identity joint at element 0. The base lives in the uniform, so
+        // two skinned entities never share a batch.
+        uniform.bone_base = push_palette(joints, mesh.active_palette());
 
         let key = BatchKey {
             mesh: mesh_id,
             material: self.material_index(material),
-            bones,
             uniform: uniform.words(),
         };
         let item = DrawItem {
@@ -265,7 +260,7 @@ impl Renderer {
 
     /// Create an overlay's group-1 bind group: its own uniform buffer, a bones buffer,
     /// and the shared one-element identity instance array — an overlay is one draw of
-    /// instance 0, its transform carried in the uniform. Bound at offsets `[0, 0]`.
+    /// instance 0, its transform carried in the uniform. Bound at offset `[0]`.
     pub(crate) fn entity_bind_group(
         &self,
         label: &str,

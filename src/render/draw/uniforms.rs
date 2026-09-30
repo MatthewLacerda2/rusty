@@ -64,7 +64,8 @@ pub(crate) fn solid_entity_uniform(
         emissive,
         use_cutout,
         alpha_cutoff,
-        _pad: [0; 2],
+        bone_base: 0,
+        _pad: 0,
     }
 }
 

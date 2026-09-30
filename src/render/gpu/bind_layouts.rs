@@ -60,17 +60,18 @@ pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::Bind
     })
 }
 
-/// Group 1 (#470): the per-draw material uniform (0) and bone palette (1), both at a
-/// dynamic offset into the frame's packed buffers, and the instance array (2) the
-/// vertex shader indexes by `instance_index`. One bind group serves every solid draw;
-/// only the two offsets change between batches.
+/// Group 1 (#470): the per-draw material uniform (0) at a dynamic offset into the
+/// frame's packed uniforms, the joint-matrix array (1) the vertex shader indexes from
+/// the uniform's `bone_base` (#455), and the instance array (2) it indexes by
+/// `instance_index`. One bind group serves every solid draw; only the offset changes
+/// between batches.
 pub(crate) fn create_entity_bones_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    use crate::render::{BoneUniform, EntityUniform};
+    use crate::render::EntityUniform;
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Entity & Bones Layout"),
         entries: &[
             dynamic_uniform_entry(0, std::mem::size_of::<EntityUniform>()),
-            dynamic_uniform_entry(1, std::mem::size_of::<BoneUniform>()),
+            storage_entry(1, wgpu::ShaderStages::VERTEX),
             storage_entry(2, wgpu::ShaderStages::VERTEX_FRAGMENT),
         ],
     })

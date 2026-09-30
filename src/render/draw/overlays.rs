@@ -27,7 +27,8 @@ impl Renderer {
             emissive: [0.0; 4],
             use_cutout: 0,
             alpha_cutoff: 0.0,
-            _pad: [0; 2],
+            bone_base: 0,
+            _pad: 0,
         };
         let grid_buf_unif = self
             .device
@@ -98,7 +99,8 @@ impl Renderer {
             emissive: [0.0; 4],
             use_cutout: 0,
             alpha_cutoff: 0.0,
-            _pad: [0; 2],
+            bone_base: 0,
+            _pad: 0,
         };
 
         let entity_buf = self
@@ -172,7 +174,7 @@ impl Renderer {
         if let Some((_grid_buf_unif, grid_bind_group)) = grid_resources {
             if let Some(grid_buf) = &self.grid_vertex_buffer {
                 render_pass.set_vertex_buffer(0, grid_buf.slice(..));
-                render_pass.set_bind_group(1, grid_bind_group, &[0, 0]);
+                render_pass.set_bind_group(1, grid_bind_group, &[0]);
                 render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
                 render_pass.draw(0..self.grid_count, 0..1);
             }
@@ -180,7 +182,7 @@ impl Renderer {
         // B. AABB outlines for active colliders
         for (aabb_wire_buffer, _entity_buf, col_bind_group) in aabb_resources {
             render_pass.set_vertex_buffer(0, aabb_wire_buffer.slice(..));
-            render_pass.set_bind_group(1, col_bind_group, &[0, 0]);
+            render_pass.set_bind_group(1, col_bind_group, &[0]);
             render_pass.draw(0..24, 0..1);
         }
         // C. Axis arrows for the selected entity
@@ -193,7 +195,7 @@ impl Renderer {
             };
             if let Some(buf) = buffer {
                 render_pass.set_vertex_buffer(0, buf.slice(..));
-                render_pass.set_bind_group(1, bind_group, &[0, 0]);
+                render_pass.set_bind_group(1, bind_group, &[0]);
                 render_pass.draw(0..self.axis_count, 0..1);
             }
         }
@@ -217,7 +219,8 @@ fn outline_uniform(model: Mat4) -> EntityUniform {
         emissive: [0.0; 4],
         use_cutout: 0,
         alpha_cutoff: 0.0,
-        _pad: [0; 2],
+        bone_base: 0,
+        _pad: 0,
     }
 }
 
