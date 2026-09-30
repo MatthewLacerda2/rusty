@@ -4,13 +4,15 @@
 //! cursor request are registered first; the WRITABLE half (`Press`/`Release`,
 //! `MoveMouse`, `AddMouseDelta`, `Scroll`, `TypeText`) extends the same table.
 //! Writable input is what lets a script, bot or the harness play as the user
-//! (Unity-ish `Input` injection); injected input bypasses the keymap.
+//! (Unity-ish `Input` injection); injected input bypasses the keymap. Gamepads (#471)
+//! add named axes, pad connection, dead zones and rumble to both halves.
 
 use std::cell::RefCell;
 
 use mlua::Lua;
 
 use super::{global_table, put, Reg};
+use crate::core::gamepad::{DeadZones, Rumble};
 use crate::core::input::InputState;
 
 /// Register the readable half of `Input` and the cursor request onto `lua`,
@@ -58,6 +60,7 @@ pub fn register_readable<'lua, 'scope>(
         scope.create_function(|_, ()| Ok(input.borrow().text_input().to_string())),
     )?;
     register_cursor(scope, &table, input)?;
+    register_pad(scope, &table, input)?;
 
     lua.globals().set("Input", table).map_err(|e| e.to_string())
 }
@@ -93,6 +96,58 @@ fn register_cursor<'lua, 'scope>(
         table,
         "IsCursorVisible",
         scope.create_function(|_, ()| Ok(input.borrow().cursor().visible)),
+    )
+}
+
+/// The gamepad reads, and the one pad *output* (rumble): axes, connection, dead
+/// zones, and rumble requests the platform plays (a record headless).
+fn register_pad<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table<'lua>,
+    input: &'scope RefCell<InputState>,
+) -> Reg {
+    put(
+        table,
+        "GetAxis",
+        scope.create_function(|_, axis: String| Ok(input.borrow().axis(&axis))),
+    )?;
+    put(
+        table,
+        "IsPadConnected",
+        scope.create_function(|_, pad: usize| Ok(input.borrow().pads.is_connected(pad))),
+    )?;
+    put(
+        table,
+        "GetDeadZone",
+        scope.create_function(|_, ()| {
+            let zones = input.borrow().pads.dead_zones;
+            Ok((zones.stick, zones.trigger))
+        }),
+    )?;
+    put(
+        table,
+        "SetDeadZone",
+        scope.create_function(|_, (stick, trigger): (f32, f32)| {
+            input.borrow_mut().pads.dead_zones = DeadZones::clamped(stick, trigger);
+            Ok(())
+        }),
+    )?;
+    put(
+        table,
+        "SetRumble",
+        scope.create_function(|_, (pad, low, high, seconds): (usize, f32, f32, f32)| {
+            let rumble = Rumble::new(low, high, seconds);
+            input.borrow_mut().pads.request_rumble(pad, rumble);
+            Ok(())
+        }),
+    )?;
+    put(
+        table,
+        "GetRumble",
+        scope.create_function(|_, pad: usize| {
+            let rumble = input.borrow().pads.last_rumble(pad);
+            Ok((rumble.low, rumble.high, rumble.seconds))
+        }),
     )
 }
 
@@ -150,6 +205,22 @@ pub fn register_writable<'lua, 'scope>(
         "TypeText",
         scope.create_function(|_, text: String| {
             input.borrow_mut().type_text(&text);
+            Ok(())
+        }),
+    )?;
+    put(
+        &table,
+        "SetAxis",
+        scope.create_function(|_, (axis, value): (String, f32)| {
+            input.borrow_mut().set_axis(&axis, value);
+            Ok(())
+        }),
+    )?;
+    put(
+        &table,
+        "SetPadConnected",
+        scope.create_function(|_, (pad, connected): (usize, bool)| {
+            input.borrow_mut().pads.set_connected(pad, connected);
             Ok(())
         }),
     )

@@ -35,6 +35,8 @@ const SCENARIO: &str = r#"
 local player = Scene.FindEntityByName("Player")
 Input.MoveMouse(100, 50)
 Input.Press("W")
+Input.SetAxis("PadLeftX", 0.5)
+Input.Press("PadA")
 for _ = 1, 30 do
     Input.AddMouseDelta(3, -1)
     Input.Scroll(0.5)
@@ -46,6 +48,7 @@ Input.Press("Mouse0"); Harness.Step(2); Input.Release("Mouse0"); Harness.Step(2)
 local x, y, z = Transform.GetPosition(player)
 Harness.Log(string.format("player %.6f %.6f %.6f", x, y, z))
 Harness.Expect(Harness.Frame() == 34, "stepped 34 ticks")
+Harness.Expect(Input.GetAxis("PadLeftX") == 0.5 and Input.IsKeyDown("PadA"), "pad held")
 "#;
 
 #[test]

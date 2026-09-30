@@ -9,10 +9,15 @@
 //! typed text accumulate until the next sim tick publishes them. Bots and the harness
 //! inject logical input directly and bypass all of this.
 //!
+//! Gamepads are polled once a frame, not evented: [`pads`] turns each pad's snapshot
+//! into keys and axes the same way, and [`pad_source`] is the one file naming gilrs.
+//!
 //! [`CursorPolicy`] applies the game's cursor request to the OS cursor ([`cursor`]).
 
 pub mod cursor;
 pub mod keys;
+pub mod pad_source;
+pub mod pads;
 pub mod view;
 
 use winit::event::{ElementState, MouseButton, MouseScrollDelta};

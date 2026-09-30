@@ -26,6 +26,7 @@ mod audio_api;
 mod callback_doc_drift;
 mod decals_api;
 mod default_ambient;
+mod gamepad_api;
 mod graphics_api;
 mod input_api;
 mod joint_api;

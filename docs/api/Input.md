@@ -1,15 +1,16 @@
 ## `Input`
 
-The full keyboard and mouse (#416): held keys and per-tick edges, the pointer, raw
-mouse motion, the wheel, typed text and the cursor request — plus a writable half
-that injects all of it, so a script, bot-player or the harness can play as the user.
+The full keyboard, mouse (#416) and gamepads (#471): held keys and per-tick edges,
+the pointer, raw mouse motion, the wheel, typed text, pad sticks and triggers, rumble
+and the cursor request — plus a writable half that injects all of it, so a script,
+bot-player or the harness can play as the user.
 
 **Everything is a named key.** Keys are case-insensitive strings (`"W"`, `"space"`);
 mouse buttons are keys too — `"Mouse0"` left, `"Mouse1"` right, `"Mouse2"` middle,
 `"Mouse3"` back, `"Mouse4"` forward — so `IsKeyDown` / `GetKeyDown` / `Press` work on
-them unchanged. Continuous inputs are **axes** (`GetMouseDelta`, `GetScrollDelta`).
-Gamepads (#471) slot into the same model: pad buttons become more key names, sticks
-become more axes.
+them unchanged. Continuous inputs are **axes** (`GetMouseDelta`, `GetScrollDelta`,
+and the named axes `GetAxis` reads). Gamepads slot into the same model: pad buttons
+are more key names, sticks and triggers are named axes (see *Gamepads* below).
 
 **Edges are per sim tick.** Everything written between two ticks — OS events or
 injection — is published at the start of the next tick and holds for exactly that
@@ -65,6 +66,14 @@ focus releases held keys, with their `GetKeyUp` edges.
 | `Input.AddMouseDelta` | `(dx, dy)` | — inject raw motion for the next tick |
 | `Input.Scroll` | `(dy)` | — inject wheel lines for the next tick |
 | `Input.TypeText` | `(text)` | — inject typed characters for the next tick |
+| `Input.GetAxis` | `(axis)` | `number` — a named axis as sampled at this tick's start; `0` if never written |
+| `Input.SetAxis` | `(axis, value)` | — inject an axis value (clamped to `-1..1`), sampled from the next tick |
+| `Input.IsPadConnected` | `(pad)` | `bool` — a pad occupies slot `pad` (0-based) |
+| `Input.SetPadConnected` | `(pad, connected)` | — inject a pad (dis)connecting |
+| `Input.GetDeadZone` | `()` | `stick, trigger` — the dead zones pads are read through |
+| `Input.SetDeadZone` | `(stick, trigger)` | — change them (each clamped to `0..0.95`) |
+| `Input.SetRumble` | `(pad, low, high, seconds)` | — rumble a pad: motor strengths `0..1` for `seconds` of real time; all-zero stops it |
+| `Input.GetRumble` | `(pad)` | `low, high, seconds` — the last request for that pad (zeros if none) |
 
 Injection is **logical**: it bypasses the keybinding remap (below), exactly as the
 harness and bot-players always have.
@@ -108,6 +117,68 @@ Letters and digits are bare (`"A"`…`"Z"`, `"0"`…`"9"`); the rest follow Unit
 | Keypad | `KEYPAD0` … `KEYPAD9`, `KEYPADPLUS`, `KEYPADMINUS`, `KEYPADMULTIPLY`, `KEYPADDIVIDE`, `KEYPADPERIOD`, `KEYPADENTER` |
 | Mouse | `MOUSE0` (left), `MOUSE1` (right), `MOUSE2` (middle), `MOUSE3` (back), `MOUSE4` (forward), `MOUSE<n>` (other buttons) |
 
+| Gamepad | `PADA`, `PADB`, `PADX`, `PADY`, `PADLB`, `PADRB`, `PADLT`, `PADRT`, `PADBACK`, `PADSTART`, `PADGUIDE`, `PADLS`, `PADRS`, `PADUP`, `PADDOWN`, `PADLEFT`, `PADRIGHT` — see *Gamepads* |
+
 Keys outside the table (media keys, IME/language keys) are not forwarded. Physical
-names are what the keybinding remap below maps *from*; mouse buttons are remappable
-the same way.
+names are what the keybinding remap below maps *from*; mouse and pad buttons are
+remappable the same way (`PADA` → `SPACE` makes the pad's A act as Space).
+
+### Gamepads
+
+Pads are read through gilrs, polled once a frame by the platform (editor and
+player alike) and written into the same input state as the keyboard — so pad
+buttons get `GetKeyDown`/`GetKeyUp` edges, `Press`/`Release` injection and keybinding
+remaps exactly like keys. Headless runs never open a real device; bots and the
+harness inject (`Press("PadA")`, `SetAxis("PadLeftX", 1)`).
+
+**Slots.** Up to four pads, indexed from `0`. A pad takes the lowest free slot when
+it connects, so the first pad plugged in is pad `0`; unplugging one releases its
+buttons (with `GetKeyUp` edges), zeroes its axes and frees its slot.
+
+**Names.** Pad `0` is unnumbered; pad `n ≥ 1` puts its index after `PAD`:
+`"PadA"` / `"Pad1A"`, `"PadLeftX"` / `"Pad2LeftX"`. Case-insensitive, like keys.
+Buttons follow the **Xbox layout** on every brand (`A` is the bottom face button,
+Cross on a PlayStation pad):
+
+| Button | Name | | Button | Name |
+|---|---|---|---|---|
+| bottom / right / left / top face | `PADA` `PADB` `PADX` `PADY` | | bumpers | `PADLB` `PADRB` |
+| triggers, as buttons | `PADLT` `PADRT` | | View / Menu / Guide | `PADBACK` `PADSTART` `PADGUIDE` |
+| stick clicks | `PADLS` `PADRS` | | D-pad | `PADUP` `PADDOWN` `PADLEFT` `PADRIGHT` |
+
+| Axis | Range |
+|---|---|
+| `PADLEFTX`, `PADRIGHTX` | `-1` (left) … `1` (right) |
+| `PADLEFTY`, `PADRIGHTY` | `-1` (pulled back) … `1` (pushed forward) — **Y-up** |
+| `PADLEFTTRIGGER`, `PADRIGHTTRIGGER` | `0` (released) … `1` (fully pulled) |
+
+**Axes are levels sampled per tick.** A value holds until written again; each tick
+reads what was last written before it started, so a `SetAxis` inside `Update` is seen
+on the next tick and injected values replay identically. `GetAxis` works on any
+name — a bot may invent its own axes.
+
+**Dead zones** (default stick `0.15`, trigger `0.05`) are applied where the real pad
+enters, like the keybinding remap: sticks use a *radial* dead zone (the stick's
+distance from centre, so diagonals don't snap to the axes), rescaled so output starts
+at `0` just past the zone and reaches `1` at full travel. Injected axes bypass them.
+
+**Rumble** is a request: the sim records it (`GetRumble` reads it back, headless
+included) and the platform plays it on pads that support force feedback. `low` is
+the heavy low-frequency motor, `high` the light buzzy one. A new request replaces
+the pad's current one.
+
+```lua
+-- Twin-stick move + look, fire on the right trigger with a kick.
+local Pad = {}
+
+function Pad.Update(id, dt)
+  local x, z = Input.GetAxis("PadLeftX"), Input.GetAxis("PadLeftY")
+  local px, py, pz = Transform.GetPosition(id)
+  Transform.SetPosition(id, px + x * 5 * dt, py, pz - z * 5 * dt)
+  if Input.GetKeyDown("PadRT") then
+    Input.SetRumble(0, 0.6, 0.3, 0.15)
+  end
+end
+
+return Pad
+```
