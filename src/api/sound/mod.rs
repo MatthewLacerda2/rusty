@@ -12,7 +12,7 @@
 //! pinned to a commit in `Cargo.toml`. zimmer does no I/O, so this adapter owns the
 //! two edges it leaves to its caller — writing the finished WAV to the requested
 //! path, and resolving a song track's patch *reference* by reading that `.json` from
-//! disk ([`load_patch`]). The document shapes (patch, song) are zimmer's serde
+//! disk (`load_patch`). The document shapes (patch, song) are zimmer's serde
 //! derives, so a Lua-authored patch and one loaded from `.json` are the same
 //! document — one surface, three callers.
 //!
