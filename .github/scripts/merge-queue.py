@@ -316,15 +316,27 @@ def head_state(seen: str, pushed: str, before: str, waited: float) -> tuple[str,
     ]
 
 
+def sighted(pull: dict, runs: list[dict]) -> set[str]:
+    """The workflows with a run on the head that GitHub has shown, by the runs
+    listing or by the pull request's own checks ([`mergeable.in_rollup`])."""
+    sha = pull.get("headRefOid", "")
+    return {
+        w for w in mergeable.WORKFLOWS if mergeable.runs_for(runs, sha, w) or mergeable.in_rollup(pull, w)
+    }
+
+
 def progress(
-    pull: dict, runs: list[dict], jobs: dict[int, list[dict]], files: list[str], waited: float
+    pull: dict, runs: list[dict], jobs: dict[int, list[dict]], files: list[str], waited: float,
+    seen: frozenset[str] | set[str] = frozenset(),
 ) -> tuple[str, list[str]]:
     """Whether to wait, merge, or hand this branch back — and why.
 
     The verdict is [`mergeable.judge`]; this adds what a polling loop needs and
     a one-shot check does not: *not yet* against *no*. A failure anywhere stops
     at once — a red run is not eventually consistent. A run in flight waits.
-    An absence — no run, or only runs that built nothing — waits out
+    A workflow in `seen` ([`sighted`] on an earlier poll) that is absent now
+    is the listing flickering, and waits until the deadline (#592). Any other
+    absence — no run, or only runs that built nothing — waits out
     [`RUN_APPEARS_SECONDS`], because the commit was pushed seconds ago and
     scorsese watched the runs listing omit a live run beside a skipped one.
     """
@@ -341,6 +353,13 @@ def progress(
     for state, lines in states:
         if state == mergeable.RUNNING:
             return WAIT, lines
+    for w, (state, _) in zip(mergeable.WORKFLOWS, states):
+        if state == mergeable.ABSENT and w in seen:
+            return WAIT, [
+                f"the `{w}` run seen on {sha[:7]} has dropped out of the runs listing.",
+                "The listing is eventually consistent and flickers; a run seen once"
+                " is not gone (#592). Waiting for it to come back.",
+            ]
     if any(state in (mergeable.ABSENT, mergeable.UNBUILT) for state, _ in states):
         if waited < RUN_APPEARS_SECONDS:
             return WAIT, [f"nothing has built {sha[:7]} yet.", "Ordinary this soon after a push, and not yet an answer."]
@@ -616,9 +635,11 @@ def wait_for(
     """Poll until the runs on `sha` settle, or the deadline says stop.
 
     Never treats an absent check as a settled one — [`progress`] tells them
-    apart, and [`head_state`] does the same one level up.
+    apart, and [`head_state`] does the same one level up. What has been
+    [`sighted`] on `sha` is remembered across polls, so a run the listing
+    drops is waited for rather than declared lost (#592).
     """
-    began = time.monotonic()
+    began, seen = time.monotonic(), set()
     while True:
         pull = look(number)
         waited = time.monotonic() - began
@@ -627,7 +648,8 @@ def wait_for(
             return state, lines
         if state == GO:
             runs, jobs = mergeable.evidence(repo, sha)
-            state, lines = progress(pull, runs, jobs, mergeable.paths(pull), waited)
+            seen |= sighted(pull, runs)
+            state, lines = progress(pull, runs, jobs, mergeable.paths(pull), waited, seen)
             if state != WAIT:
                 return state, lines
         if waited > deadline:

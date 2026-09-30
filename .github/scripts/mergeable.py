@@ -311,12 +311,30 @@ def drift_ran(run: dict, jobs: dict[int, list[dict]]) -> bool:
     return False
 
 
+def in_rollup(pull: dict, workflow: str) -> bool:
+    """Whether the pull request's own checks show `workflow` on its head.
+
+    `statusCheckRollup` is a second witness to the runs listing: when it names
+    the workflow and the listing does not, the listing is lagging (#592).
+    """
+    return any(c.get("workflowName") == workflow for c in pull.get("statusCheckRollup") or [])
+
+
 def no_run(pull: dict, short: str, workflow: str) -> list[str]:
-    """Why this commit has no `workflow` run at all — scorsese#153 or #429.
+    """Why this commit has no `workflow` run at all — a lagging listing (#592),
+    scorsese#153, or #429.
 
     Told apart here, because the reader is already looking at this output.
     """
     state, status = pull.get("mergeable"), pull.get("mergeStateStatus")
+    if in_rollup(pull, workflow):
+        return [
+            f"no `{workflow}` run is listed for the head commit {short} — yet.",
+            f"The pull request's checks show `{workflow}` on this commit, so"
+            " the run exists: the runs listing is eventually consistent and"
+            " is lagging (#592). Ask again in a moment.",
+            "Do not push an empty commit: it would cancel the run that is there.",
+        ]
     head = f"no `{workflow}` run exists for the head commit {short}."
 
     if state in CONFLICTED or status in CONFLICTED:
@@ -485,9 +503,9 @@ def evidence(repo: str, sha: str) -> tuple[list[dict], dict[int, list[dict]]]:
     return runs, jobs
 
 
-# The pull-request fields every caller reads. The last two only matter when
-# there is no run to judge, and they make that answer specific (#429).
-PULL_FIELDS = "isDraft,headRefOid,number,mergeable,mergeStateStatus,files"
+# The pull-request fields every caller reads. The last three only matter when
+# there is no run to judge, and they make that answer specific (#429, #592).
+PULL_FIELDS = "isDraft,headRefOid,number,files,mergeable,mergeStateStatus,statusCheckRollup"
 
 
 def paths(pull: dict) -> list[str]:
