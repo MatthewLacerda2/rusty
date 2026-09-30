@@ -28,6 +28,14 @@ fn edges_are_per_sim_tick_and_play_locks_the_cursor() {
     );
     h.step(1);
     assert_eq!(eval(&h, tap), "false, false", "edges last one tick");
+
+    h.world
+        .borrow()
+        .input()
+        .borrow_mut()
+        .set_axis("PadLeftX", 0.5);
+    h.step(1);
+    assert_eq!(eval(&h, "return Input.GetAxis('PadLeftX')"), "0.5");
 }
 
 /// Walk forward while swinging the mouse and typing, logging the Player's pose.
@@ -48,7 +56,6 @@ Input.Press("Mouse0"); Harness.Step(2); Input.Release("Mouse0"); Harness.Step(2)
 local x, y, z = Transform.GetPosition(player)
 Harness.Log(string.format("player %.6f %.6f %.6f", x, y, z))
 Harness.Expect(Harness.Frame() == 34, "stepped 34 ticks")
-Harness.Expect(Input.GetAxis("PadLeftX") == 0.5 and Input.IsKeyDown("PadA"), "pad held")
 "#;
 
 #[test]

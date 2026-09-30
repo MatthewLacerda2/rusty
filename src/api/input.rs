@@ -208,8 +208,18 @@ pub fn register_writable<'lua, 'scope>(
             Ok(())
         }),
     )?;
+    register_pad_injection(scope, &table, input)
+}
+
+/// Pad injection: axis values and pad (dis)connection, as a bot or the harness drives
+/// them. Logical, like `Press`: no dead zone, no keymap.
+fn register_pad_injection<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table<'lua>,
+    input: &'scope RefCell<InputState>,
+) -> Reg {
     put(
-        &table,
+        table,
         "SetAxis",
         scope.create_function(|_, (axis, value): (String, f32)| {
             input.borrow_mut().set_axis(&axis, value);
@@ -217,7 +227,7 @@ pub fn register_writable<'lua, 'scope>(
         }),
     )?;
     put(
-        &table,
+        table,
         "SetPadConnected",
         scope.create_function(|_, (pad, connected): (usize, bool)| {
             input.borrow_mut().pads.set_connected(pad, connected);

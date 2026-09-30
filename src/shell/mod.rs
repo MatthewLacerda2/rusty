@@ -212,7 +212,9 @@ fn run_frame<F: Frontend>(
     frontend: &mut F,
 ) {
     let delta_time = shell.clock.tick(Instant::now());
-    pump_pads(shell, game, frontend.game_has_input(game));
+    // Like raw mouse motion, pads keep reporting while the window is unfocused.
+    let pads_live = shell.window_focused && frontend.game_has_input(game);
+    pump_pads(shell, game, pads_live);
     let transition = frame::advance_sim(game, delta_time);
     audio::apply_mix(game);
     frontend.on_play_transition(game, transition);

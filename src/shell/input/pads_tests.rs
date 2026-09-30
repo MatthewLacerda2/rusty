@@ -88,8 +88,10 @@ fn a_resting_pad_never_releases_a_shared_keyboard_key() {
 #[test]
 fn unplugging_releases_zeroes_and_frees_the_slot() {
     let (mut pump, mut input, keymap) = (PadPump::default(), InputState::new(), Keymap::new());
-    let mut src = FakePads::default();
-    src.pads = vec![(3, pressing_a(1.0, 0.0)), (9, pressing_a(0.0, 0.0))];
+    let mut src = FakePads {
+        pads: vec![(3, pressing_a(1.0, 0.0)), (9, pressing_a(0.0, 0.0))],
+        ..FakePads::default()
+    };
     frame(&mut pump, &mut src, &mut input, &keymap);
     assert!(input.is_key_down("PADA") && input.is_key_down("PAD1A"));
     src.pads.remove(0);
