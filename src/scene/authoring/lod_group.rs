@@ -22,7 +22,8 @@ pub fn set_size(g: &mut LodGroupComponent, size: f32) {
     }
 }
 
-/// Replace every level, then order the thresholds (see [`normalize`]).
+/// Replace every level, then order the thresholds: each clamped into `0..=1` and to
+/// at most its finer neighbour's.
 pub fn set_levels(g: &mut LodGroupComponent, levels: Vec<LodLevel>) {
     g.levels = levels;
     normalize(g);

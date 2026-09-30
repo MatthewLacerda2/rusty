@@ -4,6 +4,7 @@
 
 use glam::Vec3;
 
+use super::casters::CasterFrame;
 use super::{cascades, CascadeUniform, ShadowRenderer};
 use crate::components::{LightType, ShadowSettings};
 use crate::render::lod::LodSelection;
@@ -38,14 +39,13 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Shadow Encoder"),
             });
-        self.shadow_renderer.render(
-            &self.device,
-            &self.queue,
-            &mut encoder,
+        let frame = CasterFrame {
+            device: &self.device,
+            queue: &self.queue,
             scene,
-            &self.gpu_meshes,
-            lod,
-        );
+            gpu_meshes: &self.gpu_meshes,
+        };
+        self.shadow_renderer.render(&mut encoder, &frame, lod);
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 }
