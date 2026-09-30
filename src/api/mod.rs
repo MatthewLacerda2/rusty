@@ -59,6 +59,7 @@ use mlua::{Function, Lua, Table};
 
 use crate::audio::AudioMaestro;
 use crate::core::application::Application;
+use crate::core::frame_stats::FrameStats;
 use crate::core::input::InputState;
 use crate::core::quality::QualityPreset;
 use crate::core::random::Random;
@@ -116,6 +117,9 @@ pub struct ApiScopedCtx<'scope> {
     /// Build settings + the quit request (#431): `Application.Quit` raises the flag
     /// the host (player / editor / harness) reads after the tick.
     pub application: &'scope RefCell<Application>,
+    /// Frame stats (#433): filled by the dev layer's schedule probe and capture
+    /// path, read by the dev-only `Debug.Stats()`. Never read by the sim.
+    pub stats: &'scope RefCell<FrameStats>,
 }
 
 /// Register every namespace onto `lua` using `scope`-tied closures that borrow

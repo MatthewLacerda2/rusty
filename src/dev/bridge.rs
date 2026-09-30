@@ -4,7 +4,7 @@
 //! from the gameplay scripts inside `GameWorld` — the scenario drives the world from
 //! the outside (Step/StepUntil), it does not run as an entity behaviour.
 //!
-//! Tables: Harness.{Step,StepUntil,Snapshot,Log,Expect,Frame}, plus read helpers
+//! Tables: Harness.{Step,StepUntil,Snapshot,Log,Expect,Frame,Stats,AssertBudget}, plus read helpers
 //! Scene.FindEntityByName / Transform.GetPosition / Animator.GetClip and the
 //! writable Input.{Press,Release}. Shooting is just pressing the SPACE key the
 //! player-controller script edge-detects — there is no separate click/shoot signal.
@@ -109,6 +109,31 @@ fn register_harness_reporting(lua: &Lua, harness: &Shared, t: &mlua::Table) -> L
     t.set(
         "Frame",
         lua.create_function(move |_, ()| Ok(h.borrow().frame()))?,
+    )?;
+    register_harness_stats(lua, harness, t)
+}
+
+/// Stats / AssertBudget — the run's frame stats (#433) and budgets over them.
+fn register_harness_stats(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaResult<()> {
+    let h = Rc::clone(harness);
+    t.set(
+        "Stats",
+        lua.create_function(move |lua, ()| {
+            let stats = Rc::clone(&h.borrow().stats);
+            let stats = stats.borrow();
+            super::stats::to_lua(lua, &stats)
+        })?,
+    )?;
+
+    // AssertBudget{ metric = limit, ... } -> bool. Each budget becomes an
+    // expectation: a metric's worst frame so far must not exceed its limit.
+    let h = Rc::clone(harness);
+    t.set(
+        "AssertBudget",
+        lua.create_function(move |_, budgets: mlua::Table| {
+            let budgets = super::stats::budgets_from_lua(budgets)?;
+            Ok(h.borrow_mut().assert_budget(&budgets))
+        })?,
     )
 }
 

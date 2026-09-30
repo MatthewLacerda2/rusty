@@ -57,7 +57,11 @@ pub fn capture_into(
     };
 
     // Reuse the editor's exact render path (editor_mode = false: no gizmos/grid).
+    // Timed for the frame stats (#433): the dev layer may read the clock.
+    let start = std::time::Instant::now();
     renderer.render(view, scene, camera, &target_view, false);
+    let cpu_ms = start.elapsed().as_secs_f64() * 1000.0;
+    host.last_frame = Some((renderer.frame_counters, cpu_ms));
 
     host.write_png(path)?;
     Ok(true)

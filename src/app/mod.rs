@@ -28,6 +28,7 @@ mod camera_sync;
 pub mod game;
 mod particles;
 mod play;
+mod probe;
 mod registry;
 mod resources;
 mod schedule;
@@ -37,6 +38,7 @@ mod ui;
 mod world;
 
 pub use game::{GameWorld, PlayTransition};
+pub use probe::SystemProbe;
 pub use registry::{build, App};
 pub use resources::Resources;
 pub use schedule::Schedule;
@@ -48,5 +50,7 @@ pub use world::World;
 mod late_update_tests;
 #[cfg(test)]
 mod lifecycle_tests;
+#[cfg(test)]
+mod probe_tests;
 #[cfg(test)]
 mod schedule_tests;

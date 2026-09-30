@@ -54,6 +54,14 @@ pub struct UiViewCache {
 }
 
 impl UiViewCache {
+    /// UI batches (draw calls) the last render of this view issued.
+    pub fn last_batches(&self) -> usize {
+        match self.drawn {
+            0 => 0,
+            _ => self.canvases.iter().map(|c| c.mesh.batches.len()).sum(),
+        }
+    }
+
     /// Canvas buffers (re-)uploaded by the last render of this view.
     pub fn last_uploads(&self) -> usize {
         self.uploads

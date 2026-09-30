@@ -94,6 +94,9 @@ pub struct Resources {
     /// entity referencing the same graph. Cleared on Play enter so per-session
     /// edits to the asset files are picked up.
     pub(super) animation_graphs: GraphCache,
+    /// The schedule's observer (#433) — the dev layer's frame-stats timer. `None`
+    /// unless installed via `GameWorld::set_probe`; it only watches the frame.
+    pub(super) probe: Option<Box<dyn super::SystemProbe>>,
 }
 
 impl Resources {
@@ -149,6 +152,7 @@ impl Resources {
             frame_dt: 0.0,
             schedule: super::build().into_schedule(),
             animation_graphs: GraphCache::default(),
+            probe: None,
         }
     }
 

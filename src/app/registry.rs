@@ -12,9 +12,10 @@
 //!
 //! Allowed deps: app::*.
 
+use super::resources::Resources;
 use super::schedule::Schedule;
 use super::stage::Stage;
-use super::system::System;
+use super::world::World;
 
 /// The application registry. Holds the [`Schedule`] that modules register into.
 #[derive(Default)]
@@ -30,7 +31,10 @@ impl App {
 
     /// Register `system` to run in `stage`. Order within a stage is the order of
     /// these calls (module registration order).
-    pub fn add_system(&mut self, stage: Stage, system: System) -> &mut Self {
+    pub fn add_system<F>(&mut self, stage: Stage, system: F) -> &mut Self
+    where
+        F: Fn(&mut World, &mut Resources) + 'static,
+    {
         self.schedule.add_system(stage, system);
         self
     }

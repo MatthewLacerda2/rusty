@@ -122,6 +122,33 @@ from the budget's acquire). A test in that module also fails if the filter in
 `.config/nextest.toml` stops matching the Rust predicate, so the two copies of the
 rule cannot drift apart.
 
+## Performance budgets (frame stats, #433)
+A scenario can assert on performance the same way it asserts on behaviour. The harness
+records frame stats every tick (see `Debug.Stats` in `docs/scripting-api.md` for the
+metric list); `Harness.Stats()` returns them and `Harness.AssertBudget` turns limits
+into expectations:
+
+```lua
+Harness.Step(300)                      -- 5 s of play
+Harness.Screenshot("out/arena.png")    -- render counters exist only on rendered frames
+Harness.AssertBudget{ draw_calls = 2000, lights_dropped = 0, fixed_update_ms = 4 }
+```
+
+- **What is checked:** each metric's **worst frame** so far must be `<=` its limit. Each
+  budget is one expectation in `results.json`, in metric-name order; a failure names
+  the worst frame and the average (`budget draw_calls <= 2000 exceeded: worst frame
+  2412.000, avg 2398.500 over 1 frames`).
+- **A metric that was never measured fails** and lists the ones that were — a
+  `draw_calls` budget in a run with no `Screenshot` is a mistake, not a pass.
+- **Counts are deterministic, timings are not.** Budget counters (`draw_calls`,
+  `triangles`, `lights_dropped`, `entities`, …) for a regression guard that must hold on
+  every machine. A `_ms` budget measures *this* machine — CI runners are slow software
+  adapters — so keep it generous or for local profiling only.
+- **Where the numbers land:** `results.json` gains a `stats` block with the counts only,
+  so a replay stays byte-identical; `<out_dir>/stats.json` holds everything, per-system
+  timings included.
+- Budgets are **opt-in per scenario**, never a CI gate of their own.
+
 ## API-doc drift gate
 `tests/api_doc_drift.rs` (dev-only, #280) is a **hard gate** that keeps
 `docs/scripting-api.md` honest against the **live Lua API surface**. It boots an

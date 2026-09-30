@@ -55,12 +55,7 @@ impl Renderer {
 
         // Build + write the camera-independent lighting uniform once. The reflection
         // probe is picked relative to the primary camera (#244).
-        let lighting_uniform = self.build_lighting_uniform(scene, camera.position);
-        self.queue.write_buffer(
-            &self.lighting_buffer,
-            0,
-            bytemuck::bytes_of(&lighting_uniform),
-        );
+        self.upload_lighting(scene, camera.position);
 
         // Drop pool slots for entities no longer active, so the persistent forward
         // buffers track the live scene rather than growing without bound (#210).
@@ -120,7 +115,8 @@ impl Renderer {
             self.draw_transparent(view, &solids.transparent);
 
             // Billboard particles for this camera (after solids, before the next pass).
-            self.draw_particles(view, scene, cam);
+            let particle_draws = self.draw_particles(view, scene, cam);
+            self.count_camera(&solids, scene.decals.len(), particle_draws);
 
             // 3. Composite + post-process once, over the final pass's HDR target.
             if idx == last {
@@ -133,6 +129,7 @@ impl Renderer {
         if !editor_mode {
             self.draw_ui(view, scene);
         }
+        self.finish_counters(view);
     }
 
     /// Upload/refresh per-frame GPU assets (meshes, textures, skybox) shared by every
@@ -200,6 +197,18 @@ impl Renderer {
         };
         view.post_fx
             .run(&self.device, &self.queue, ctx, post_params, passes);
+    }
+
+    /// Write the frame's lighting uniform, and start the frame counters (#433) with
+    /// the light counts — which lights got a uniform slot is decided right here.
+    fn upload_lighting(&mut self, scene: &Scene, camera_pos: Vec3) {
+        let lighting_uniform = self.build_lighting_uniform(scene, camera_pos);
+        self.queue.write_buffer(
+            &self.lighting_buffer,
+            0,
+            bytemuck::bytes_of(&lighting_uniform),
+        );
+        self.begin_counters(scene);
     }
 
     /// Builds the per-frame lighting uniform from the scene's lights and SSR settings.

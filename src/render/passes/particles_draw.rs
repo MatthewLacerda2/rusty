@@ -41,11 +41,17 @@ struct ParticleBatch {
 
 impl Renderer {
     /// Draw every emitter's live particles into the HDR scene target. Called from
-    /// the scene pass after solids/skybox, before the post-FX chain runs.
-    pub(crate) fn draw_particles(&mut self, view: &RenderView, scene: &Scene, camera: &Camera) {
+    /// the scene pass after solids/skybox, before the post-FX chain runs. Returns the
+    /// draw calls issued (one per batch) for the frame counters (#433).
+    pub(crate) fn draw_particles(
+        &mut self,
+        view: &RenderView,
+        scene: &Scene,
+        camera: &Camera,
+    ) -> u32 {
         let batches = self.collect_particle_batches(scene, camera.culling_mask);
         if batches.is_empty() {
-            return;
+            return 0;
         }
 
         let aspect = view.aspect();
@@ -79,6 +85,7 @@ impl Renderer {
             });
 
         self.encode_particle_pass(view, &batches, &ranges, &instance_buffer);
+        batches.len() as u32
     }
 
     /// Record the particle render pass: load the existing HDR colour + depth, then

@@ -72,6 +72,8 @@ impl Session {
                 .borrow_mut() = Some(boot_scene.to_string());
         }
         world.init_edit_runtime()?;
+        // Frame stats for `Debug.Stats()` once the agent plays the world (#433).
+        super::stats::install(&mut world);
         Ok(Self { world })
     }
 
