@@ -16,9 +16,9 @@ use glam::{Mat4, Vec2, Vec3};
 use serde_json::{json, Value};
 
 use super::snapshot_components::{
-    animator_value, audio_value, camera_component_value, canvas_value, collider_value, light_value,
-    material_value, mesh_value, nav_agent_value, particle_value, rect_transform_value,
-    rigidbody_value,
+    animator_value, audio_value, camera_component_value, canvas_group_value, canvas_value,
+    collider_value, image_value, light_value, material_value, mesh_value, nav_agent_value,
+    particle_value, rect_mask_value, rect_transform_value, rigidbody_value,
 };
 use crate::components::TransformComponent;
 use crate::ecs::World;
@@ -106,6 +106,9 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, screen: Vec2) ->
         "audio": world.audio(id).map(|a| audio_value(&a)),
         "canvas": world.canvas(id).map(|c| canvas_value(&c)),
         "rect_transform": world.rect_transform(id).map(|r| rect_transform_value(&r)),
+        "image": world.image(id).map(|i| image_value(&i)),
+        "canvas_group": world.canvas_group(id).map(|g| canvas_group_value(&g)),
+        "rect_mask": world.rect_mask(id).map(|m| rect_mask_value(&m)),
         "ui_rect": crate::ui::layout::rect_of(world, id, screen)
             .map(|r| super::ui::rect_value(&r)),
     })
@@ -114,47 +117,33 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, screen: Vec2) ->
 /// Names of the optional first-class components this entity carries (the
 /// "component inventory" authoring needs). `Transform` is mandatory and omitted.
 fn inventory(world: &World, id: u32) -> Vec<&'static str> {
-    let mut names = Vec::new();
-    if world.has_mesh(id) {
-        names.push("Mesh");
-    }
-    if world.has_material(id) {
-        names.push("Material");
-    }
-    if world.has_light(id) {
-        names.push("Light");
-    }
-    if world.has_collider(id) {
-        names.push("Collider");
-    }
-    if world.has_rigidbody(id) {
-        names.push("Rigidbody");
-    }
-    if world.has_camera(id) {
-        names.push("Camera");
-    }
-    if world.has_nav_agent(id) {
-        names.push("NavMeshAgent");
-    }
-    if world.has_particles(id) {
-        names.push("ParticleEmitter");
-    }
-    if world.has_animator(id) {
-        names.push("Animator");
-    }
-    if world.has_audio(id) {
-        names.push("AudioSource");
-    }
-    if world.has_canvas(id) {
-        names.push("Canvas");
-    }
-    if world.has_rect_transform(id) {
-        names.push("RectTransform");
-    }
-    if world.scripts(id).is_some_and(|s| !s.is_empty()) {
-        names.push("Script");
-    }
-    names
+    type Probe = fn(&World, u32) -> bool;
+    let probes: [(Probe, &'static str); 16] = [
+        (World::has_mesh, "Mesh"),
+        (World::has_material, "Material"),
+        (World::has_light, "Light"),
+        (World::has_collider, "Collider"),
+        (World::has_rigidbody, "Rigidbody"),
+        (World::has_camera, "Camera"),
+        (World::has_nav_agent, "NavMeshAgent"),
+        (World::has_particles, "ParticleEmitter"),
+        (World::has_animator, "Animator"),
+        (World::has_audio, "AudioSource"),
+        (World::has_canvas, "Canvas"),
+        (World::has_rect_transform, "RectTransform"),
+        (World::has_image, "Image"),
+        (World::has_canvas_group, "CanvasGroup"),
+        (World::has_rect_mask, "RectMask"),
+        (
+            |w, id| w.scripts(id).is_some_and(|s| !s.is_empty()),
+            "Script",
+        ),
+    ];
+    probes
+        .into_iter()
+        .filter(|(has, _)| has(world, id))
+        .map(|(_, name)| name)
+        .collect()
 }
 
 /// Full transform — position, Euler rotation (degrees), and **scale**.

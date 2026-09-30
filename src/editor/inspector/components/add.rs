@@ -1,6 +1,6 @@
 use egui_phosphor::regular as icon;
 
-use crate::components::{CanvasComponent, RectTransformComponent};
+use crate::components::{CanvasComponent, CanvasGroupComponent, RectTransformComponent};
 use crate::scene::authoring::{self, ComponentKind};
 use crate::scene::{
     AudioSourceComponent, MaterialComponent, ParticleEmitterComponent, ScriptComponent,
@@ -34,9 +34,11 @@ fn add_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
     add_ui_components(ui, world, id);
 }
 
-/// Add-menu entries for the in-game UI (#417): a Canvas makes the entity a UI root;
-/// a RectTransform makes it a UI element laid out inside its parent's rect. Each is
-/// offered only when absent.
+/// Add-menu entries for the in-game UI (#417, #418): a Canvas makes the entity a UI
+/// root; a RectTransform makes it a UI element laid out inside its parent's rect;
+/// an Image draws it; a Canvas Group fades its subtree; a Rect Mask clips it. Each
+/// is offered only when absent. Image and Rect Mask declare `requires(RectTransform)`,
+/// so they go through the shared dependency verb, matching `Scene.AddComponent`.
 fn add_ui_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
     if !world.has_canvas(id) && ui.button(format!("{}  Canvas", icon::MONITOR)).clicked() {
         world.set_canvas(id, Some(CanvasComponent::default()));
@@ -48,6 +50,22 @@ fn add_ui_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) 
             .clicked()
     {
         world.set_rect_transform(id, Some(RectTransformComponent::default()));
+        ui.close_menu();
+    }
+    if !world.has_image(id) && ui.button(format!("{}  Image", icon::IMAGE)).clicked() {
+        authoring::add_with_requirements(world, id, ComponentKind::Image);
+        ui.close_menu();
+    }
+    if !world.has_canvas_group(id)
+        && ui
+            .button(format!("{}  Canvas Group", icon::STACK))
+            .clicked()
+    {
+        world.set_canvas_group(id, Some(CanvasGroupComponent::default()));
+        ui.close_menu();
+    }
+    if !world.has_rect_mask(id) && ui.button(format!("{}  Rect Mask", icon::CROP)).clicked() {
+        authoring::add_with_requirements(world, id, ComponentKind::RectMask);
         ui.close_menu();
     }
 }

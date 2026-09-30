@@ -1661,6 +1661,59 @@ demand from the live scene, so it reflects a change made earlier in the same
 script, in edit mode as well as in Play. The screen size is the game view's pixel
 size in the windowed app and the `Video` resolution headless.
 
+## `Image`
+
+Read and tune an entity's `ImageComponent` (#418) — the UI's rectangle graphic,
+Unity's `Image`. It fills the entity's laid-out rect with a tint colour, optionally
+multiplied by a texture. Colours are **display-space (sRGB) RGBA with straight
+alpha**, each `0..1` — a 50% alpha looks exactly as it does in an image editor.
+Getters return a neutral default (zeros, `"None"`, `false`, `nil`) when the entity
+has no Image; setters are then no-ops. Adding an Image also adds a `RectTransform`.
+How each type draws is in [`docs/ui.md`](ui.md).
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Image.GetColor` / `SetColor` | `(id)` / `(id, r, g, b, a)` | `r, g, b, a` (each clamped to 0..1) |
+| `Image.GetTexture` / `SetTexture` | `(id)` / `(id, path)` | texture path, or `nil` for a solid colour (`nil` / `""` clears it) |
+| `Image.GetType` / `SetType` | `(id)` / `(id, name)` | `"Simple"`, `"Sliced"`, `"Tiled"` or `"Filled"` |
+| `Image.GetBorder` / `SetBorder` | `(id)` / `(id, l, b, r, t)` | `Sliced` 9-slice borders in texels (each ≥ 0) |
+| `Image.GetFillMethod` / `SetFillMethod` | `(id)` / `(id, name)` | `"Horizontal"`, `"Vertical"` or `"Radial360"` |
+| `Image.GetFillOrigin` / `SetFillOrigin` | `(id)` / `(id, name)` | `"Left"`, `"Right"`, `"Bottom"` or `"Top"` — fitted to the method (`Bottom`↔`Left`, `Top`↔`Right`) |
+| `Image.GetFillAmount` / `SetFillAmount` | `(id)` / `(id, amount)` | the visible fraction, clamped to 0..1 |
+| `Image.GetFillClockwise` / `SetFillClockwise` | `(id)` / `(id, bool)` | `Radial360` sweep direction |
+| `Image.GetPreserveAspect` / `SetPreserveAspect` | `(id)` / `(id, bool)` | `Simple`: fit the texture's aspect inside the rect |
+| `Image.GetRaycastTarget` / `SetRaycastTarget` | `(id)` / `(id, bool)` | whether the pointer can hit it (read by #420) |
+
+Name setters are case-insensitive; an unrecognized name is ignored. A health bar
+is `SetType(id, "Filled")` + `SetFillAmount(id, hp / max)`; a cooldown ring is the
+same with `SetFillMethod(id, "Radial360")`.
+
+## `CanvasGroup`
+
+Read and tune an entity's `CanvasGroupComponent` (#418) — Unity's `CanvasGroup`.
+`Alpha` multiplies every graphic on the entity and below it (nested groups
+multiply) — screen fades, greyed-out panels. `Interactable` and `BlocksRaycasts`
+are read by pointer dispatch (#420). Without a CanvasGroup, `GetAlpha` returns `1`
+and the flags `false`; setters are then no-ops.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `CanvasGroup.GetAlpha` / `SetAlpha` | `(id)` / `(id, alpha)` | subtree opacity, clamped to 0..1 |
+| `CanvasGroup.GetInteractable` / `SetInteractable` | `(id)` / `(id, bool)` | whether the subtree's selectables accept input |
+| `CanvasGroup.GetBlocksRaycasts` / `SetBlocksRaycasts` | `(id)` / `(id, bool)` | whether the pointer can hit the subtree |
+
+## `RectMask`
+
+Read and tune an entity's `RectMaskComponent` (#418) — Unity's `RectMask2D`. Every
+graphic on the entity and below it is clipped to the axis-aligned screen bounds of
+its rect, inset by the padding; nested masks intersect. Add or remove the clip with
+`Scene.AddComponent(id, "RectMask")` / `RemoveComponent` (adding also adds a
+`RectTransform`). `GetPadding` returns zeros without one.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `RectMask.GetPadding` / `SetPadding` | `(id)` / `(id, l, b, r, t)` | inset in reference units (negative grows the clip) |
+
 ## `Application`
 
 Unity's `Application`, the subset a shipped game needs (#431): quitting, and the
@@ -1841,6 +1894,12 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
                  "reference_resolution": [1920, 1080], "match_width_or_height": 0.0 },
   "rect_transform": { "anchor_min": [x,y], "anchor_max": [x,y], "pivot": [x,y],
                       "anchored_position": [x,y], "size_delta": [x,y] },
+  "image":     { "color": [r,g,b,a], "texture": null, "type": "Filled",
+                 "border": [l,b,r,t], "fill_method": "Horizontal", "fill_origin": "Left",
+                 "fill_amount": 0.5, "fill_clockwise": true, "preserve_aspect": false,
+                 "raycast_target": true },
+  "canvas_group": { "alpha": 1.0, "interactable": true, "blocks_raycasts": true },
+  "rect_mask": { "padding": [l,b,r,t] },
   "ui_rect":   { "x": .., "y": .., "width": .., "height": ..,      // UI.GetRect's shape
                  "screen": { "x": .., "y": .., "width": .., "height": .. },
                  "corners": [ { "x": .., "y": .. }, ... ], "canvas": 3, "scale_factor": .. }

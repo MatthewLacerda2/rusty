@@ -1,10 +1,22 @@
-//! The in-game UI's inspector cards (#417): the Canvas root and the RectTransform
-//! every UI element carries. Both are thin clients over the shared
-//! `scene::authoring::{canvas, rect_transform}` ops, the same ones the `Canvas` and
-//! `RectTransform` Lua namespaces call.
+//! The in-game UI's inspector cards (#417, #418): the Canvas root, the
+//! RectTransform every UI element carries, the Image graphic, the Canvas Group and
+//! the Rect Mask. Each is a thin client over its shared `scene::authoring` ops, the
+//! same ones the matching Lua namespace calls.
 
 pub mod canvas;
+pub mod canvas_group;
+pub mod image;
+pub mod rect_mask;
 pub mod rect_transform;
+
+/// Draw every UI card the entity carries, in the order Unity's inspector shows them.
+pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool) {
+    canvas::draw(ui, world, id, is_dirty);
+    rect_transform::draw(ui, world, id, is_dirty);
+    canvas_group::draw(ui, world, id, is_dirty);
+    rect_mask::draw(ui, world, id, is_dirty);
+    image::draw(ui, world, id, is_dirty);
+}
 
 /// A labelled `x, y` drag row. Returns the edited pair when either axis changed.
 fn vec2_row(ui: &mut egui::Ui, label: &str, value: glam::Vec2, speed: f32) -> Option<glam::Vec2> {
@@ -18,4 +30,21 @@ fn vec2_row(ui: &mut egui::Ui, label: &str, value: glam::Vec2, speed: f32) -> Op
         })
         .inner;
     changed.then(|| glam::Vec2::new(x, y))
+}
+
+/// A labelled `x, y, z, w` drag row (left, bottom, right, top for borders and
+/// padding). Returns the edited value when any component changed.
+fn vec4_row(ui: &mut egui::Ui, label: &str, value: glam::Vec4) -> Option<glam::Vec4> {
+    let mut v = value.to_array();
+    let changed = ui
+        .horizontal(|ui| {
+            ui.label(label);
+            let mut any = false;
+            for (c, prefix) in v.iter_mut().zip(["l ", "b ", "r ", "t "]) {
+                any |= ui.add(egui::DragValue::new(c).prefix(prefix)).changed();
+            }
+            any
+        })
+        .inner;
+    changed.then(|| glam::Vec4::from_array(v))
 }
