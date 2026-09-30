@@ -35,7 +35,10 @@ impl Frontend for PlayerFrontend {
         let (width, height) = (shell.renderer.config.width, shell.renderer.config.height);
         let bloom = shell.renderer.quality.bloom_divisor();
         // The UI lays out on the game view's pixel size (#417): here, the whole window.
-        game.resources.screen.borrow_mut().set_game_view(width, height);
+        game.resources
+            .screen
+            .borrow_mut()
+            .set_game_view(width, height);
         let view = match &mut self.view {
             Some(view) => {
                 view.resize(device, width, height, bloom);
