@@ -22,7 +22,7 @@ check different things: `ci` builds and tests, `lint` runs clippy, rustdoc and
 the tools/lint gates. A green `ci` beside a missing `lint` is half a check.
 
 **A gate job that passed is not yet evidence anything ran.** Both gates run
-`if: always()` and pass when their gated jobs *succeeded or were skipped*. On a
+unless the run was cancelled (`!cancelled()`, #515) and pass when their gated jobs *succeeded or were skipped*. On a
 draft every gated job skips by design — so a draft's run concludes success,
 gate green, with nothing compiled. That is scorsese#153's shape: push to a
 draft, mark it ready seconds later, and the `ready_for_review` run sometimes
