@@ -20,6 +20,9 @@ mod build_tests;
 #[cfg(test)]
 mod ccd_tests;
 mod character;
+mod collision_events;
+#[cfg(test)]
+mod collision_tests;
 mod compound;
 #[cfg(test)]
 mod compound_tests;
@@ -40,11 +43,20 @@ mod trigger_events;
 mod trigger_tests;
 mod world;
 
+pub use collision_events::{CollisionEvents, CollisionPair, Contact};
 pub use query::RayHit;
 pub use trigger_events::TriggerEvents;
 pub use world::PhysicsWorld;
 
 use crate::scene::Scene;
+
+/// Everything one physics tick surfaces to scripts: the trigger overlaps
+/// (`OnTrigger*`) and the solid contacts (`OnCollision*`, #448).
+#[derive(Debug, Default)]
+pub struct PhysicsEvents {
+    pub triggers: TriggerEvents,
+    pub collisions: CollisionEvents,
+}
 
 /// The hitscan acceptance test shared by the engine hitscan and the Lua
 /// `Physics.Raycast` binding: an entity is hittable iff it exists. The engine

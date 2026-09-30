@@ -60,7 +60,6 @@ impl PhysicsWorld {
             for collider in body.colliders() {
                 if let Some(id) = self.collider_to_id.remove(collider) {
                     self.id_to_collider.remove(&id);
-                    self.id_is_trigger.remove(&id);
                 }
             }
         }
@@ -80,12 +79,9 @@ impl PhysicsWorld {
         let Some(owner_pose) = world_pose(scene, owner) else {
             return;
         };
-        let parts: Vec<(u32, Collider, bool)> = ids
+        let parts: Vec<(u32, Collider)> = ids
             .iter()
-            .filter_map(|&id| {
-                let (collider, is_trigger) = self.build_collider(scene, &owner_pose, id)?;
-                Some((id, collider, is_trigger))
-            })
+            .filter_map(|&id| Some((id, self.build_collider(scene, &owner_pose, id)?)))
             .collect();
         if parts.is_empty() {
             return;
@@ -106,26 +102,19 @@ impl PhysicsWorld {
         .ccd_enabled(ccd_enabled(inp.collision_detection))
         .position(to_iso(owner_pose.pos, owner_pose.rot));
         let body_handle = self.bodies.insert(body_builder.build());
-        for (id, collider, is_trigger) in parts {
+        for (id, collider) in parts {
             let handle = self
                 .colliders
                 .insert_with_parent(collider, body_handle, &mut self.bodies);
             self.collider_to_id.insert(handle, id);
             self.id_to_collider.insert(id, handle);
-            self.id_is_trigger.insert(id, is_trigger);
         }
         self.id_to_body.insert(owner, body_handle);
     }
 
     /// Build collider entity `id`'s rapier collider, positioned relative to its
-    /// owner's pose, plus its trigger-map flag. `None` for a dead entity or a
-    /// degenerate mesh.
-    fn build_collider(
-        &self,
-        scene: &Scene,
-        owner_pose: &WorldPose,
-        id: u32,
-    ) -> Option<(Collider, bool)> {
+    /// owner's pose. `None` for a dead entity or a degenerate mesh.
+    fn build_collider(&self, scene: &Scene, owner_pose: &WorldPose, id: u32) -> Option<Collider> {
         let inp = collider_inputs(&scene.world, id)?;
         let pose = world_pose(scene, id)?;
         let mesh_ref = inp
@@ -150,7 +139,7 @@ impl PhysicsWorld {
         let groups = interaction_groups(inp.layer, scene.collision_matrix.filter_mask(inp.layer));
         collider.set_collision_groups(groups);
         collider.set_solver_groups(groups);
-        Some((collider, inp.is_trigger || inp.is_static))
+        Some(collider)
     }
 
     /// Mirror activation onto rapier's enabled flags: each body follows its

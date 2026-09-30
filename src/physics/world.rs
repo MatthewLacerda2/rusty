@@ -12,7 +12,7 @@
 //!      velocity, and gravity scale; static bodies stay put.
 //!   2. `step`            — advance the rapier world by `dt` under gravity.
 //!   3. `sync_from_rapier`— write the integrated transforms + velocities back onto
-//!      the entities, and return the trigger/collision pairs scripts expect.
+//!      the entities, and return the trigger and collision events scripts expect.
 //!
 //! glam <-> nalgebra conversion is confined to `convert`; the engine stays glam.
 
@@ -22,9 +22,11 @@ use rapier3d::prelude::*;
 
 use super::build::{body_state, gravity_scale, EntityBodyState};
 use super::character;
+use super::collision_events::CollisionEvents;
 use super::compound::{world_to_local, BodyPlan};
 use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
 use super::trigger_events::{self, TriggerEvents};
+use super::PhysicsEvents;
 use crate::scene::Scene;
 
 pub struct PhysicsWorld {
@@ -54,12 +56,13 @@ pub struct PhysicsWorld {
     pub(super) collider_to_id: HashMap<ColliderHandle, u32>,
     /// collider entity id -> its collider handle (inverse of `collider_to_id`).
     pub(super) id_to_collider: HashMap<u32, ColliderHandle>,
-    /// collider entity id -> its trigger flag (sensors surface trigger pairs).
-    pub(super) id_is_trigger: HashMap<u32, bool>,
     /// Last tick's trigger-overlap pairs, diffed each step to recover the
     /// enter/exit edges (#310). Starts empty, so a play session's first
     /// overlapping tick is an "enter".
     prev_triggers: Vec<(u32, u32)>,
+    /// Last tick's touching solid pairs, diffed the same way for the
+    /// `OnCollision*` edges (#448).
+    prev_collisions: Vec<(u32, u32)>,
 }
 
 impl PhysicsWorld {
@@ -84,8 +87,8 @@ impl PhysicsWorld {
             id_to_body: HashMap::new(),
             collider_to_id: HashMap::new(),
             id_to_collider: HashMap::new(),
-            id_is_trigger: HashMap::new(),
             prev_triggers: Vec::new(),
+            prev_collisions: Vec::new(),
         };
         world.build_bodies(scene);
         world.sync_enabled(scene);
@@ -171,12 +174,13 @@ impl PhysicsWorld {
         }
     }
 
-    /// Advance the rapier world by `dt` and surface the tick's trigger events —
-    /// enter/stay/exit distinctly (#310), each list sorted for deterministic
-    /// dispatch.
-    pub fn step(&mut self, scene: &mut Scene, dt: f32) -> TriggerEvents {
+    /// Advance the rapier world by `dt` and surface the tick's trigger and
+    /// solid-contact events — enter/stay/exit distinctly (#310, #448), each list
+    /// sorted for deterministic dispatch.
+    pub fn step(&mut self, scene: &mut Scene, dt: f32) -> PhysicsEvents {
         self.integration_parameters.dt = dt;
         self.sync_to_rapier(scene, dt);
+        let pre_solve = self.snapshot_velocities();
 
         self.physics_pipeline.step(
             &self.gravity,
@@ -194,15 +198,18 @@ impl PhysicsWorld {
             &(),
         );
 
-        let current = trigger_events::collect_overlap_pairs(
-            &self.narrow_phase,
-            &self.collider_to_id,
-            &self.id_is_trigger,
-        );
-        let events = TriggerEvents::from_overlap_sets(&self.prev_triggers, current);
-        self.prev_triggers = events.stayed.clone();
+        let overlaps =
+            trigger_events::collect_overlap_pairs(&self.narrow_phase, &self.collider_to_id);
+        let triggers = TriggerEvents::from_overlap_sets(&self.prev_triggers, overlaps);
+        self.prev_triggers = triggers.stayed.clone();
+        let contacts = self.collect_contact_pairs(&pre_solve);
+        let collisions = CollisionEvents::from_contact_sets(&self.prev_collisions, contacts);
+        self.prev_collisions = collisions.stayed_keys();
         self.sync_from_rapier(scene);
-        events
+        PhysicsEvents {
+            triggers,
+            collisions,
+        }
     }
 
     /// Write integrated poses + velocities back onto the owner entities,

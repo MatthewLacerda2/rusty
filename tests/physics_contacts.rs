@@ -1,8 +1,8 @@
-//! Contact-pair reporting: a *solid* static body still surfaces its contacts.
+//! Solid contacts are collisions, not triggers (#448).
 //!
-//! `collect_triggers` reports a pair when an active contact involves a trigger or a
-//! static body, and only one side needs to qualify. This guards that contract: a
-//! dynamic body resting on a non-trigger static floor must be reported.
+//! Before #448 a static collider counted as a trigger, so a body resting on a
+//! solid floor fired `OnTrigger*`. The stand-in is retired: the resting contact
+//! must surface as a collision pair and never as a trigger pair.
 
 use glam::Vec3;
 use rusty::components::{ColliderComponent, ColliderShape, CollisionDetection, RigidBodyComponent};
@@ -21,7 +21,7 @@ fn box_collider(size: Vec3, is_trigger: bool) -> ColliderComponent {
 }
 
 #[test]
-fn static_floor_contact_is_reported() {
+fn static_floor_contact_is_a_collision_not_a_trigger() {
     let mut scene = Scene::new();
     let floor = scene.add_entity("Floor".to_string());
     scene.world.set_static(floor, true);
@@ -45,19 +45,17 @@ fn static_floor_contact_is_reported() {
             collision_detection: CollisionDetection::Discrete,
         }),
     );
-    // collect_triggers orders each pair (low, high).
     let want = (floor.min(ball), floor.max(ball));
 
     let mut physics = PhysicsWorld::from_scene(&scene);
-    let mut saw = false;
+    let mut touched = false;
     for _ in 0..240 {
-        if physics.step(&mut scene, 1.0 / 60.0).stayed.contains(&want) {
-            saw = true;
-            break;
-        }
+        let ev = physics.step(&mut scene, 1.0 / 60.0);
+        assert!(ev.triggers.is_empty(), "a solid floor is not a trigger");
+        touched |= ev.collisions.stayed.iter().any(|p| p.key() == want);
     }
     assert!(
-        saw,
-        "a body resting on a solid static floor should report the contact pair"
+        touched,
+        "a body resting on a solid floor reports a collision"
     );
 }

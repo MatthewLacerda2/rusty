@@ -50,9 +50,18 @@ function BotAI.Damage(entity_id, amount)
     end
 end
 
--- OnTrigger callback hook triggered when this entity overlaps with a trigger collider
+-- OnTrigger callback hook triggered when this entity overlaps with a trigger
+-- collider (`is_trigger`). Solid walls and floors do not fire it (#448).
 function BotAI.OnTrigger(self_id, other_id)
     print("[Lua] 🟢 OnTrigger overlap event! Entity " .. self_id .. " intersected trigger with entity " .. other_id)
+end
+
+-- OnCollisionEnter fires once when a solid contact begins; `contact` carries the
+-- point, normal, relativeVelocity, impulse and otherBody. The Player is
+-- kinematic, so only dynamic bodies hitting it raise this (a kinematic body
+-- against static walls never collides, as in Unity).
+function BotAI.OnCollisionEnter(self_id, other_id, contact)
+    print("[Lua] 💥 OnCollisionEnter with entity " .. other_id .. ", impulse " .. contact.impulse)
 end
 
 return BotAI

@@ -126,19 +126,18 @@ fn apply_destroys(_world: &mut World, res: &mut Resources) {
     res.script_manager.apply_pending_destroys();
 }
 
-/// Step the rapier world and dispatch any resulting trigger events to scripts.
+/// Step the rapier world and dispatch the resulting trigger and collision
+/// events to scripts.
 fn step_physics(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
     let events = {
         let mut s = world.scene.borrow_mut();
         match res.physics.borrow_mut().as_mut() {
             Some(physics) => physics.step(&mut s, dt),
-            None => crate::physics::TriggerEvents::default(),
+            None => crate::physics::PhysicsEvents::default(),
         }
     };
-    if !events.is_empty() {
-        res.script_manager.dispatch_trigger_events(events);
-    }
+    res.script_manager.dispatch_physics_events(events);
 }
 
 /// Advance the deterministic play-mode frame counter (drives the rebake cadence).

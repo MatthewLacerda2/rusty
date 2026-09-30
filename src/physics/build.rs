@@ -68,7 +68,6 @@ pub(super) struct ColliderInputs {
     pub mesh_geom: Option<(Vec<[f32; 3]>, Vec<u32>)>,
     pub is_trigger: bool,
     pub material: PhysicsMaterial,
-    pub is_static: bool,
     pub layer: u8,
 }
 
@@ -92,7 +91,6 @@ pub(super) fn collider_inputs(world: &World, id: u32) -> Option<ColliderInputs> 
         mesh_geom,
         is_trigger: collider.is_trigger,
         material: collider.material,
-        is_static: world.is_static(id),
         layer: world.layer(id),
     })
 }

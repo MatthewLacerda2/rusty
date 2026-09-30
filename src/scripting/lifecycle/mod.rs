@@ -21,21 +21,19 @@
 //!
 //! The transition-specific dispatch — the `OnDisable` falling-edge sweep and the
 //! deferred-destroy drain (`OnDisable`→`OnDestroy`) — lives in the `transitions`
-//! submodule, the UI callbacks (#420) in `ui`; this file holds the shared dispatch
-//! core and the per-frame hooks.
+//! submodule, the UI callbacks (#420) in `ui`, the trigger and collision callbacks
+//! (#310, #448) in `physics`; this file holds the shared dispatch core and the
+//! per-frame hooks.
 
+mod physics;
 mod transitions;
 mod ui;
 
 use mlua::{Lua, Table};
 
-use crate::api;
-use crate::physics::TriggerEvents;
-
-use super::callbacks::{
-    AWAKE, LATE_UPDATE, ON_ENABLE, ON_TRIGGER, ON_TRIGGER_ENTER, ON_TRIGGER_EXIT, START, UPDATE,
-};
+use super::callbacks::{AWAKE, LATE_UPDATE, ON_ENABLE, START, UPDATE};
 use super::manager::{ScriptInstance, ScriptManager};
+use crate::api;
 
 impl ScriptManager {
     /// Run `body` with the full API surface registered into a live-runtime
@@ -186,35 +184,6 @@ impl ScriptManager {
         self.with_api_scope(|lua| {
             for &key in &keys {
                 self.call_hook(lua, key, LATE_UPDATE, (key.0, delta_time));
-            }
-        });
-    }
-
-    /// Invokes the trigger callbacks on scripts of entities involved in trigger
-    /// overlaps: `OnTriggerEnter` for this tick's new pairs, then `OnTrigger`
-    /// (stay) for every overlapping pair, then `OnTriggerExit` for the pairs
-    /// that ended (#310) — a fixed hook order so replays stay byte-identical.
-    /// Only awoken instances of ACTIVE entities are notified: `Awake` is always
-    /// an instance's first callback, and a disabled entity receives no gameplay
-    /// callbacks (#323) — the same active gate `Update` obeys.
-    pub fn dispatch_trigger_events(&mut self, events: TriggerEvents) {
-        let hooks = [
-            (ON_TRIGGER_ENTER, &events.entered),
-            (ON_TRIGGER, &events.stayed),
-            (ON_TRIGGER_EXIT, &events.exited),
-        ];
-        self.with_api_scope(|lua| {
-            for (hook, pairs) in hooks {
-                for &(id_a, id_b) in pairs {
-                    // Notify each side of the overlap, in order: A about B, then B about A.
-                    for (id, other) in [(id_a, id_b), (id_b, id_a)] {
-                        // An entity may carry many scripts (#83): notify each, in
-                        // ascending script-index order so dispatch stays deterministic.
-                        for key in self.awoken_keys_for(id) {
-                            self.call_hook(lua, key, hook, (id, other));
-                        }
-                    }
-                }
             }
         });
     }
