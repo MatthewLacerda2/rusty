@@ -11,8 +11,6 @@
 //! When no GPU/software adapter is present, `capture` returns `Ok(false)` and the test
 //! passes without asserting (matching `material_maps_screenshot.rs`).
 
-#![cfg(feature = "dev")]
-
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent, Tonemap};
 use rusty::dev::screenshot::capture;

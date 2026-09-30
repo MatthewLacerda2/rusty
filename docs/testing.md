@@ -3,7 +3,7 @@
 | Kind | Lives in | Run with |
 |---|---|---|
 | Unit tests | `#[cfg(test)] mod tests` in the same file | `cargo test` |
-| Integration tests | `tests/*.rs` (crate-level) | `cargo test` |
+| Integration tests | `tests/*.rs`, one binary rooted at `tests/main.rs` | `cargo test` (or `cargo test --test integration <filter>`) |
 | Harness scenarios | `project/scenarios/*.lua` (dev-only) | the headless `play` binary |
 
 ## Rules
@@ -14,6 +14,27 @@
   tick) so harness/scenario tests are reproducible.
 - CI (`.github/workflows/ci.yml`) runs `cargo test` for both the engine and the
   lint xtask.
+
+## One integration-test binary
+Cargo's default builds **each** `tests/*.rs` as its own executable, and each one links
+the whole engine — wgpu/naga, egui, rapier3d, vendored Lua. With dozens of files and two
+feature sets, that multiplied the slowest serial step of the build (linking) by the file
+count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` sets
+`autotests = false` and declares a single `[[test]]` target, `integration`, rooted at
+`tests/main.rs`; every file under `tests/` is a **module** of it.
+
+- **A new test file needs a `mod` line** in `tests/main.rs` (or its folder's `mod.rs`) —
+  Cargo no longer discovers it. `tests/layout.rs` fails the suite, naming the file, if
+  one is forgotten, so a file can't silently never run.
+- **Dev-only files are gated at the declaration**, `#[cfg(feature = "dev")] mod …;`,
+  not by a `#![cfg]` inside the file.
+- **Tests that render live in `tests/gpu/`**, so they share the `gpu::` module path and
+  a runner can identify them by name (see the budget below).
+- **Every module shares one process.** Nothing in `tests/` may rely on having a process
+  to itself: use a temp path unique to the file (not one another file also writes), and
+  never `set_var` / `set_current_dir`. The headless-renderer budget is in-process, so it
+  now bounds the whole suite at once.
+- Filtering works as before, by module path: `cargo test --test integration physics_`.
 
 ## GPU tests and the headless budget
 Tests that need a real device call `Renderer::new_headless`, which returns `None`

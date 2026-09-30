@@ -4,7 +4,6 @@
 //! evaluator: create an entity, add + configure a component, parent it, and save —
 //! then reload the saved file into a fresh scene and assert it round-trips.
 //! Gated on `dev`: a no-op under a plain `cargo test`, real under `--features dev`.
-#![cfg(feature = "dev")]
 
 use rusty::dev::session::Session;
 use rusty::scene::Scene;

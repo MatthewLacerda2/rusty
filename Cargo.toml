@@ -6,6 +6,9 @@ edition = "2021"
 # `publish = false` also lets the cargo-deny license gate skip our own crate
 # (via `[licenses] private.ignore`) while still gating every dependency.
 publish = false
+# Integration tests build as ONE binary, not one per `tests/*.rs` (#483): each of those
+# linked the whole engine (wgpu, egui, rapier, Lua). See the `[[test]]` target below.
+autotests = false
 
 [lib]
 name = "rusty"
@@ -35,6 +38,12 @@ required-features = ["dev"]
 name = "session-mcp"
 path = "src/bin/session_mcp.rs"
 required-features = ["dev"]
+
+# The whole integration suite. `tests/main.rs` declares every test file as a module;
+# `tests/layout.rs` fails if a file is added without its `mod` line (docs/testing.md).
+[[test]]
+name = "integration"
+path = "tests/main.rs"
 
 [features]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.

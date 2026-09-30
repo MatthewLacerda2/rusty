@@ -1,6 +1,5 @@
 //! Headless harness determinism + control-surface smoke (issue #3).
 //! Gated on `dev`: a no-op under a plain `cargo test`, real under `--features dev`.
-#![cfg(feature = "dev")]
 
 use rusty::dev::harness::Harness;
 
