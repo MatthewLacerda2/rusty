@@ -42,7 +42,10 @@ Authored 3D assets come from **Blender** (its native glTF 2.0 export), or are
 anywhere else. The engine reads those standard interchange formats directly — it
 **never parses `.blend` and never shells out to Blender** as a subprocess (the
 fragile Unity-style convenience that breaks the moment Blender isn't installed).
-glTF 2.0 is the first-class path; `.obj` covers static meshes.
+glTF 2.0 is the first-class path; `.obj` covers static meshes. Levels of detail
+follow the Unity / Blender naming convention: objects named `Crate_LOD0`,
+`Crate_LOD1`, … import as one `Crate` carrying an `LODGroup` that shows one level at
+a time by on-screen size (see `docs/api/LODGroup.md`).
 
 ## Built to be played by an agent
 

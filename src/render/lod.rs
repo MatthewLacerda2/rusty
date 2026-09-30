@@ -89,3 +89,7 @@ fn max_scale(world: Mat4) -> f32 {
 #[cfg(test)]
 #[path = "lod_tests.rs"]
 mod lod_tests;
+
+#[cfg(test)]
+#[path = "lod_gpu_tests.rs"]
+mod lod_gpu_tests;

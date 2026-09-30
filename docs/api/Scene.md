@@ -60,7 +60,7 @@ case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `TextMeshPro`), `Selectable`, `LayoutGroup`, `LayoutElement` (alias
 `ContentSizeFitter`), `Joint` (aliases `FixedJoint`, `HingeJoint`,
 `CharacterJoint` — all add a default `Fixed` joint; set its kind with
-`Joint.SetKind`).
+`Joint.SetKind`), `LODGroup` (alias `LOD`).
 Each is added with the inspector's default values; adding an
 existing kind replaces it. (Scripts attach by path, not as a defaulted kind — a
 separate concern.)
@@ -184,6 +184,10 @@ one name and never drift.
   engine default when the glTF names none), and syncs a mesh collider when the asset's
   `.meta` sidecar records one. Returns the new entity's id; errors (without spawning)
   when the reference is malformed, the file fails to import, or the sub-object is absent.
+  A sub-object name that is the **base of a `_LOD<n>` set** (`props.glb::Crate` for
+  objects named `Crate_LOD0`, `Crate_LOD1`) spawns the whole set as one entity carrying
+  an `LODGroup`, one child per level, and returns the group's id — see
+  [`LODGroup`](LODGroup.md).
 
 In every case the geometry is stored only as a reference and rehydrated on the next
 scene load, exactly like a primitive's `primitive_type` — no GPU buffers are inlined.

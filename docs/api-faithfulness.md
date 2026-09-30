@@ -147,6 +147,12 @@ edits and each physics step.)
 | `SetKind` / `SetConnectedBody` / `SetAnchor` / `SetConnectedAnchor` / `SetAutoConfigureConnectedAnchor` / `SetAxis` / `SetUseLimits` / `SetLimits` / `SetSwingLimit` / `SetEnableCollision` | ✅ | sim — `PhysicsWorld::resync_joints` builds the rapier joint from them, rebuilding on a change (`src/physics/joints_tests.rs`); round-trips, the connected body remapped through prefabs (`tests/joint_api.rs`) |
 | `SetBreakForce` / `SetBreakTorque` | ✅ | sim — `PhysicsWorld::break_joints` reads them live after each step (`src/physics/joints_tests.rs`); round-trips |
 
+### `LODGroup` — over `Entity.lod_group` (#472)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetSize` / `SetLevelHeight` / `SetRenderers` / `AddLevel` / `RemoveLevel` | ✅ | render — `render::lod::LodSelection` picks each group's level per camera and the solid pass and shadow sweeps skip the other levels' renderers (`src/render/lod_tests.rs`, `src/render/lod_gpu_tests.rs`); round-trips, renderers remapped through prefabs (`tests/lod_group_api.rs`, `src/scene/lod_instance_tests.rs`) |
+
 ### `Time` — over the `Time` resource
 
 | Setter | Status | Read-site |
