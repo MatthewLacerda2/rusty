@@ -1,4 +1,5 @@
-//! src/shell/settings.rs — platform-layer glue for runtime video + quality settings.
+//! src/shell/settings.rs — platform-layer glue for runtime video, quality and audio
+//! settings.
 //!
 //! Issue #89; shared by both frontends since #431. The settings *surface* (the
 //! `Video` and `Graphics` script namespaces) and the *persistence* (`Storage`) live
@@ -8,7 +9,8 @@
 //! * **Load + apply at startup** ([`load`]) — read the persisted `video` blob and
 //!   the `graphics.quality` tier from `Storage` (a boundary read, like the scene),
 //!   seed the shared cells, and apply them to the renderer/window so the app boots
-//!   at the saved resolution / vsync / fullscreen / tier.
+//!   at the saved resolution / vsync / fullscreen / tier, and the audio maestro in
+//!   the saved speaker mode (#546).
 //! * **Apply per frame** ([`apply_pending`]) — read the cells a script (or the
 //!   editor) may have written this frame and reconfigure the surface (resolution /
 //!   present mode) + window (fullscreen) only for what actually changed.
@@ -21,6 +23,7 @@
 
 use super::Shell;
 use crate::app::GameWorld;
+use crate::audio::SpeakerMode;
 use crate::core::quality::QualityPreset;
 use crate::core::storage::Storage;
 use crate::core::video::{VideoSettings, VIDEO_NAMESPACE};
@@ -37,6 +40,11 @@ const QUALITY_KEY: &str = "quality";
 /// default tier.
 pub fn load(shell: &mut Shell, game: &GameWorld, defaults: VideoSettings) {
     let (video, quality) = read(&game.resources.storage.borrow(), defaults);
+    let speaker_mode = SpeakerMode::load(&game.resources.storage.borrow());
+    game.resources
+        .audio
+        .borrow_mut()
+        .set_speaker_mode(speaker_mode);
 
     // Seed the shared cells so the next script read sees the persisted values.
     *game.script_manager().video_cell().borrow_mut() = video;
@@ -115,6 +123,11 @@ pub fn persist(shell: &Shell, game: &GameWorld) {
     let video = *game.script_manager().video_cell().borrow();
     let quality = shell.renderer.quality;
     let mut storage = game.resources.storage.borrow_mut();
+    game.resources
+        .audio
+        .borrow()
+        .speaker_mode()
+        .store(&mut storage);
     storage.set_namespace(VIDEO_NAMESPACE, video.to_json());
     storage.set(
         QUALITY_NAMESPACE,

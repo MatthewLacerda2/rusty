@@ -5,7 +5,9 @@
 //! after `GameWorld::new`, so the device only ever exists in the windowed process —
 //! never in the harness, which keeps the `NullBackend`.
 //!
-//! One `rodio::Sink` per live voice, playing its clip through a [`PanSource`]. The
+//! One `rodio::Sink` per live voice, playing its clip through a [`PanSource`]. Every
+//! sink feeds one stereo mixer that reaches the device through the [`MasterBus`]
+//! (#546), the mix's single output stage where the speaker mode shapes the total. The
 //! maestro hands over a [`VoiceMix`] per voice each frame (#412): the gain (already
 //! folded with master) and rate go to the sink, pan + `spatial_blend` to the voice's
 //! shared [`PanControl`], and a paused mix pauses the sink so it resumes in place. A
@@ -16,12 +18,19 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use ::rodio::cpal::traits::HostTrait;
+use ::rodio::dynamic_mixer::{self, DynamicMixerController};
 use ::rodio::source::Source;
-use ::rodio::{OutputStream, OutputStreamHandle, Sink};
+use ::rodio::{DeviceTrait, OutputStream, Sink};
 
 use super::decode::ClipCache;
+use super::master::{MasterBus, MasterControl};
 use super::pan::{PanControl, PanSource};
 use crate::audio::backend::{AudioBackend, PlayParams, VoiceId, VoiceMix};
+use crate::audio::SpeakerMode;
+
+/// The bus rate when the device will not say its own (the mixer resamples anyway).
+const FALLBACK_RATE: u32 = 48_000;
 
 /// One live voice: its sink (gain, speed, pause) plus the pan control its
 /// [`PanSource`] reads on the audio thread.
@@ -48,7 +57,9 @@ impl Voice {
 /// the backend — dropping it would silence everything.
 pub struct RodioBackend {
     _stream: OutputStream,
-    handle: OutputStreamHandle,
+    /// The master mixer's input: every voice's sink is added here.
+    bus: Arc<DynamicMixerController<f32>>,
+    master: Arc<MasterControl>,
     voices: HashMap<VoiceId, Voice>,
     cache: ClipCache,
 }
@@ -59,9 +70,15 @@ impl RodioBackend {
     /// `NullBackend` instead of failing the whole app.
     pub fn open() -> Option<Self> {
         let (stream, handle) = OutputStream::try_default().ok()?;
+        let (bus, mixer) = dynamic_mixer::mixer(2, device_rate());
+        let master = MasterControl::new(SpeakerMode::default());
+        handle
+            .play_raw(MasterBus::new(mixer, Arc::clone(&master)))
+            .ok()?;
         Some(Self {
             _stream: stream,
-            handle,
+            bus,
+            master,
             voices: HashMap::new(),
             cache: ClipCache::new(),
         })
@@ -73,9 +90,8 @@ impl AudioBackend for RodioBackend {
         let Some(clip) = self.cache.get_or_decode(&params.clip) else {
             return false;
         };
-        let Ok(sink) = Sink::try_new(&self.handle) else {
-            return false;
-        };
+        let (sink, output) = Sink::new_idle();
+        self.bus.add(output);
         let voice = Voice {
             sink,
             pan: PanControl::new(params.mix.pan, params.mix.spatial_blend),
@@ -121,4 +137,17 @@ impl AudioBackend for RodioBackend {
             voice.sink.stop();
         }
     }
+
+    fn set_speaker_mode(&mut self, mode: SpeakerMode) {
+        self.master.set(mode);
+    }
+}
+
+/// The default output device's sample rate — the one `OutputStream::try_default`
+/// opens at — so the bus runs at the device rate and is not resampled twice.
+fn device_rate() -> u32 {
+    ::rodio::cpal::default_host()
+        .default_output_device()
+        .and_then(|d| d.default_output_config().ok())
+        .map_or(FALLBACK_RATE, |c| c.sample_rate().0)
 }

@@ -103,13 +103,23 @@ fn file_menu(
     });
 }
 
-/// The Config menu — video/quality presets and Scene Settings.
+/// The Config menu — video/quality presets, the speaker mode and Scene Settings.
 fn config_menu(editor: &mut EditorUi, ui: &mut egui::Ui) {
     ui.menu_button(format!("{}  Config", icon::GEAR), |ui| {
         ui.label("Video / Quality");
         ui.selectable_value(&mut editor.quality_preset, QualityPreset::Low, "Low");
         ui.selectable_value(&mut editor.quality_preset, QualityPreset::Medium, "Medium");
         ui.selectable_value(&mut editor.quality_preset, QualityPreset::High, "High");
+        ui.separator();
+        ui.label("Audio / Speaker mode");
+        for mode in crate::audio::SpeakerMode::ALL {
+            if ui
+                .selectable_label(editor.speaker_mode == mode, mode.label())
+                .clicked()
+            {
+                editor.speaker_mode_request = Some(mode);
+            }
+        }
         ui.separator();
         if ui
             .button(format!("{}  Scene Settings", icon::GLOBE))

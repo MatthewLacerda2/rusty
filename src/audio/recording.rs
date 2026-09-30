@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use super::backend::{AudioBackend, PlayParams, VoiceId, VoiceMix};
+use super::speaker::SpeakerMode;
 
 /// Everything a [`RecordingBackend`] was told, in order.
 #[derive(Default)]
@@ -16,6 +17,8 @@ pub struct Recording {
     pub plays: Vec<(VoiceId, PlayParams)>,
     pub mixes: Vec<(VoiceId, VoiceMix)>,
     pub stops: Vec<VoiceId>,
+    /// Every speaker mode the master bus was set to, in order.
+    pub speaker_modes: Vec<SpeakerMode>,
     /// Voices still "sounding" — started voices join, a test removes one to finish it.
     pub live: BTreeSet<VoiceId>,
 }
@@ -65,5 +68,8 @@ impl AudioBackend for RecordingBackend {
     }
     fn stop_all(&mut self) {
         self.0.borrow_mut().live.clear();
+    }
+    fn set_speaker_mode(&mut self, mode: SpeakerMode) {
+        self.0.borrow_mut().speaker_modes.push(mode);
     }
 }

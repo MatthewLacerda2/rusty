@@ -78,6 +78,10 @@ pub struct EditorUi {
     /// Selected post-FX scalability tier. main.rs syncs this onto the renderer
     /// each frame so Low/Medium/High gate which passes run + buffer sizes.
     pub quality_preset: crate::core::quality::QualityPreset,
+    /// The speaker mode shown in Config (#546), mirrored from the audio maestro.
+    pub speaker_mode: crate::audio::SpeakerMode,
+    /// A speaker mode picked in Config this frame, for the shell to apply.
+    pub speaker_mode_request: Option<crate::audio::SpeakerMode>,
 
     /// Which viewport tab is showing — Scene (editor cam + gizmos) or Game (the
     /// active camera's view). Both are reachable in edit and play mode (#183).
@@ -154,6 +158,8 @@ impl EditorUi {
             theme: theme::Theme::dark(),
             fonts_installed: false,
             quality_preset: crate::core::quality::QualityPreset::default(),
+            speaker_mode: crate::audio::SpeakerMode::default(),
+            speaker_mode_request: None,
             viewport_tab: ViewportTab::Scene,
             viewport_image_size: egui::Vec2::ZERO,
             gizmo_drag: None,

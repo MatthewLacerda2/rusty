@@ -196,6 +196,7 @@ edits and each physics step.)
 | `SetVolume` | ✅ | platform — re-folds the live voice's gain (master × per-source) |
 | `PlayAt` | ✅ | platform (`play_at` one-shot) + introspection log — the log entry is the one-shot's only trace |
 | `SetMasterVolume` | ✅ | platform — re-folds every live voice; observable via `GetMasterVolume` |
+| `SetSpeakerMode` | ✅ | platform — re-sends every live voice shaped for the mode (headphones narrows pan) and retunes the device's master bus (TV compression); observable via `GetSpeakerMode`, persisted as `audio.speaker_mode` |
 
 The maestro carries a **no-op backend** on the headless harness, so the *sound* is a
 windowed-only side effect; the **introspection log + playing set** are the

@@ -6,7 +6,8 @@
 //! per-source roster). Each frame the windowed shell re-resolves every live voice
 //! (3D rolloff + pan from #213, `Time.timeScale` / pause) and hands the resulting
 //! [`VoiceMix`] to the backend (`mix.rs`, #412); the real device pans through
-//! `device/pan.rs`.
+//! `device/pan.rs`. The speaker mode (#546, `speaker.rs`) shapes that output for the
+//! listening setup: per voice here, on the summed signal at the device's master bus.
 //!
 //! Layering: the maestro and the backend trait live here so both the windowed app
 //! and the (device-free) harness can construct a maestro. The real `rodio` device
@@ -14,7 +15,8 @@
 //! `shell/boot.rs` after `GameWorld::new`, so the deterministic sim/harness keep the
 //! [`NullBackend`]. Nothing here reads a wall clock or unseeded RNG.
 //!
-//! Allowed deps: components (the `AudioSource` data), rodio (backend only).
+//! Allowed deps: components (the `AudioSource` data), core (`Storage`, for the
+//! persisted speaker mode), rodio (backend only).
 
 pub mod backend;
 pub mod device;
@@ -24,6 +26,7 @@ pub mod mix;
 #[cfg(test)]
 pub mod recording;
 pub mod spatial;
+pub mod speaker;
 
 pub use backend::{AudioBackend, NullBackend, PlayParams, VoiceId, VoiceMix};
 pub use device::RodioBackend;
@@ -31,3 +34,4 @@ pub use introspection::{AudioEvent, AudioEventKind, AudioEventLog, SpatialResult
 pub use maestro::AudioMaestro;
 pub use mix::{MixEnv, Rolloff, Shot};
 pub use spatial::Listener;
+pub use speaker::SpeakerMode;
