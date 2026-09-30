@@ -95,6 +95,48 @@ serialize the rest.
 and remove the worktree. Disposal is what keeps disk from becoming the overnight
 failure.
 
+## Cloud sessions are extra coders, not extra merges
+
+The two-build limit above is this machine's memory, not the workflow's. A **cloud
+session** brings its own CPU, memory and disk, so it lifts the cap on how many
+branches can be *written* at once. It does nothing for merging — that queue is
+still one CI run at a time, here — so reach for cloud when writing is the
+bottleneck (hours-long foundation branches), never when the queue is.
+
+**Where a branch runs:**
+
+- **Local:** the batch's own session; every merge; any branch whose proof needs a
+  real GPU adapter (render, screenshots, probe bakes — cloud containers have none,
+  and neither does Linux CI); anything that needs files only this machine has.
+- **Cloud:** a branch that needs no GPU to prove **and** sits in modules no other
+  in-flight branch touches. The collision list above still decides that; cloud
+  removes the build-slot limit, not the rebase cost.
+
+**How many:** 3–4 branches in flight **in total**, local and cloud together. Each
+one behind another still pays a rebase per merge ahead of it.
+
+**Launching one — and proving it is one.** Use the `Agent` tool with
+`isolation: "remote"`. A session meant to be cloud has silently turned out to be
+local before, so check from both ends:
+
+- The brief's **first instruction**: run `echo "$CLAUDE_CODE_REMOTE"` (the variable
+  `.claude/hooks/session-start.sh` keys on). If it is not `true`, **stop before
+  touching anything** and report that the session is local.
+- From here, after launching: no new worktree under `.claude/worktrees/`, no new
+  local `cargo`/`rustc` process for that branch. Either one means it is local —
+  stop it.
+
+**The pull request is the report.** A cloud session cannot message this one back.
+Brief it to open a draft on its first commit, push often (a dead container takes
+its uncommitted work with it), write decisions and hand-backs into the description
+and an issue comment, and mark the PR ready when its gates are green. Watch the
+PR, not the agent.
+
+**What it costs,** so it is chosen on purpose: every cloud session cold-builds the
+whole dependency tree, with no local compile cache to help. Have it run the full
+gate list before readying — it has the room for both feature sets, which a crowded
+local machine may not.
+
 ## Starting
 
 - Assign the user the moment work begins — unassigned means fair game.
@@ -130,6 +172,8 @@ read cold. Beyond that:
 - Name the **base commit** and what has landed recently that it must respect.
 - Name the **siblings** and which files they are touching.
 - Tell it to invoke the **`ci-merge` skill** rather than restating that protocol.
+- For a **cloud** session: the `CLAUDE_CODE_REMOTE` self-check comes first, and
+  the pull request is its only way to report (see above).
 - Tell it **not** to merge — merging is serialized and belongs to the session
   running the batch.
 - Tell it not to start a heavy build while two siblings are already compiling,

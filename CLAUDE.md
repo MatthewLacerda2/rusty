@@ -101,7 +101,10 @@ is wrong.
   don't propose tooling built for that. Each worktree's `target/` is ~12–16 GB, and
   rustc's linking is where memory and disk run out. Parallelise the work, stagger the
   compiles, and check the machine you are on (`df -h`, free memory) before starting a
-  build — never a figure written down somewhere.
+  build — never a figure written down somewhere. A batch may also hand GPU-free,
+  module-separate branches to **cloud sessions** as extra coders: that lifts the local
+  build limit, never the one-at-a-time merge. The `issue-batch` skill says when, and
+  how to prove a session really is remote.
 - **Infrastructure- then architecture-first (NOT "make it up as we go").** We do **not**
   improvise or pile on features ad hoc. Whenever we find a problem — something that
   already bites or will bite more than once, a pattern worth adopting, or a gold-standard
