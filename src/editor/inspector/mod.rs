@@ -7,6 +7,7 @@ use egui_phosphor::regular as icon;
 use self::components::context::gather_context;
 use self::components::{
     add, audio, camera, gameplay, material, particles, prefab, render, settings, transform,
+    ui as ui_cards,
 };
 use crate::editor::{EditorUi, InspectorTarget};
 use crate::navigation::NavigationGraph;
@@ -287,6 +288,9 @@ fn draw_components(
 
     particles::draw(ui, world, id, &mut editor.is_dirty);
     audio::draw(ui, world, id, &mut editor.is_dirty);
+
+    ui_cards::canvas::draw(ui, world, id, &mut editor.is_dirty);
+    ui_cards::rect_transform::draw(ui, world, id, &mut editor.is_dirty);
 
     add::draw(ui, world, id);
 }

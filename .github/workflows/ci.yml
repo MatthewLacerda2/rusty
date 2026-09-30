@@ -413,7 +413,7 @@ jobs:
         # "inform on quality, never block".
         run: |
           FLOORED='app scripting physics navigation api'
-          UNFLOORED='render|dev|asset|editor|components|core|ecs|scene|time|audio|procgen|shadergen'
+          UNFLOORED='render|dev|asset|editor|components|core|ecs|scene|time|audio|procgen|shadergen|ui'
           {
             echo '### Module coverage ratchet (informational, non-blocking)'
             echo ''

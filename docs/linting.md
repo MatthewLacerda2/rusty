@@ -13,9 +13,9 @@ agent can read exactly what failed.
 | Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]` |
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
-| Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation` |
-| Dependency direction | `tools/lint -- --direction` | sim modules (`app`/`scripting`/`physics`/`navigation`/`scene`/`components`/`ecs`/`core`/`time`/`asset`) never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
-| Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
+| Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation`/`ui` |
+| Dependency direction | `tools/lint -- --direction` | sim modules (`app`/`scripting`/`physics`/`navigation`/`scene`/`components`/`ecs`/`core`/`time`/`asset`/`ui`) never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
+| Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`/`ui`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every *migrated* first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard), minus the burn-down baseline |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
@@ -67,7 +67,7 @@ entries. When the file is empty, the size gate is fully on.
 The sim runs headless with no GPU and no UI, so the dependency arrow points one way:
 `render` and `editor` import sim types, never the reverse. `tools/lint -- --direction`
 scans the sim modules (`app`, `scripting`, `physics`, `navigation`, `scene`,
-`components`, `ecs`, `core`, `time`, `asset`) and fails on any non-comment reference
+`components`, `ecs`, `core`, `time`, `asset`, `ui`) and fails on any non-comment reference
 to `crate::render`, `crate::editor`, `wgpu` or `egui` (whole path segments only).
 Plain data the renderer and the sim share lives sim-side: the mesh `Vertex` and the
 primitive builders in `components::mesh`, `Camera` and `Decal` in `scene`,
@@ -168,7 +168,7 @@ rg 'allow\(clippy::too_many_lines\)' src
 If a function grows past 50 lines, split it — **do not** silence the lint with a
 new `#[allow]`.
 
-## Panic-free sim core (`unwrap_used`)
+The deterministic sim modules (`app`, `scripting`, `physics`, `navigation`, `ui`)
 The four deterministic sim modules (`app`, `scripting`, `physics`, `navigation`)
 carry a module-level `#![deny(clippy::unwrap_used)]`, so a bare `.unwrap()` in
 their **production** code is a hard clippy error (caught by the same `-D warnings`

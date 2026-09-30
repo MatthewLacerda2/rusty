@@ -24,6 +24,7 @@ const SIM_DIRS: &[&str] = &[
     "src/physics",
     "src/navigation",
     "src/soundgen",
+    "src/ui",
 ];
 
 /// Banned call fragments. Matched as substrings on non-comment source.
@@ -136,10 +137,12 @@ mod tests {
 
     #[test]
     fn sim_dirs_are_the_guarded_deterministic_trees() {
-        // The four sim trees, plus `soundgen` — not sim code, but it makes the same
-        // byte-identical promise, so it is held to the same rules.
-        assert_eq!(SIM_DIRS.len(), 5);
+        // The four sim trees and the UI layout (#417), plus `soundgen` — not sim
+        // code, but it makes the same byte-identical promise, so it is held to the
+        // same rules.
+        assert_eq!(SIM_DIRS.len(), 6);
         assert!(SIM_DIRS.contains(&"src/physics"));
+        assert!(SIM_DIRS.contains(&"src/ui"));
         assert!(SIM_DIRS.contains(&"src/soundgen"));
     }
 }

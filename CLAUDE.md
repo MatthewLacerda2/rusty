@@ -326,11 +326,11 @@ Failures from `tools/lint` are written to `.lint/report.txt`. See **docs/linting
   **clippy is a hard gate** (`-D warnings`, both feature sets); the lint policy
   lives in `Cargo.toml`'s `[lints]`, not in flags.
 - **Determinism guard** (`make determinism`) — fails on wall-clock / unseeded RNG
-  in the sim modules (`app`, `scripting`, `physics`, `navigation`); it protects the
+  in the sim modules (`app`, `scripting`, `physics`, `navigation`, `ui`); it protects the
   harness's reproducibility.
 - **Direction guard** (`make direction`) — fails when a sim module (`app`,
   `scripting`, `physics`, `navigation`, `scene`, `components`, `ecs`, `core`, `time`,
-  `asset`) references `crate::render`, `crate::editor`, `wgpu` or `egui`; the arrow is
+  `asset`, `ui`) references `crate::render`, `crate::editor`, `wgpu` or `egui`; the arrow is
   render/editor → sim.
 - `make gates` refuses to run when cargo's target dir is outside the worktree — a
   shared one is a false green.
