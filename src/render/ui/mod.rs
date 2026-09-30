@@ -7,10 +7,10 @@
 //! FXAA-softened. The arrow is render → sim: this reads the layout, never the
 //! reverse.
 //!
-//! - [`geometry`] — one `Image`'s triangles per image type (pure).
-//! - [`mesh`] — the layout → one vertex list per canvas, split into batches on
+//! - `geometry` — one `Image`'s triangles per image type (pure).
+//! - `mesh` — the layout → one vertex list per canvas, split into batches on
 //!   texture / clip changes, with CanvasGroup alpha and RectMask clips (pure).
-//! - [`draw`] — the per-view cache (re-upload only a canvas whose geometry
+//! - `draw` — the per-view cache (re-upload only a canvas whose geometry
 //!   changed) and the pass itself.
 //!
 //! **Colour space.** UI blends in display (sRGB-encoded) space with premultiplied
