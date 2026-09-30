@@ -143,7 +143,8 @@ impl Renderer {
             ui,
             quality,
         } = gpu;
-        let entity_pool = Some(crate::render::gpu::entity_pool::EntityPool::new(&device));
+        let draw_buffers =
+            crate::render::gpu::draw_buffers::DrawBuffers::new(&device, &entity_bones_layout);
         let default_cube = crate::render::ibl::cubemap::fallback_cube(&device);
         Self {
             device,
@@ -166,7 +167,9 @@ impl Renderer {
             lighting_buffer: global.lighting_buffer,
             global_bind_group: global.global_bind_group,
             global_bind_group_dirty: false,
-            entity_pool,
+            draw_buffers,
+            materials: Default::default(),
+            instancing: true,
             shadow_layout: shadows.layout,
             shadow_renderer: shadows.renderer,
             shadow_uniform_buffer: shadows.uniform_buffer,

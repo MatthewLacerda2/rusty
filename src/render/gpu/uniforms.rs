@@ -82,6 +82,8 @@ pub(crate) struct LightingUniform {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct EntityUniform {
+    // The draw's own transform, applied on top of each instance's (#470): identity for
+    // instanced solids, the gizmo's placement for editor overlays.
     pub model_matrix: [f32; 16],
     pub color_tint: [f32; 4],
     pub use_texture: u32,
@@ -103,21 +105,54 @@ pub(crate) struct EntityUniform {
     // values >1.0 glow automatically. Stored as a `vec4` (4th lane unused) to dodge
     // WGSL's `vec3` 16-byte-alignment gotcha and keep the struct a 16-byte multiple.
     pub emissive: [f32; 4],
-    // Light-probe SH (#240). When `use_sh == 1`, the shader reconstructs ambient
-    // irradiance from these 9 L2 SH coefficients — the scene's probe field
-    // interpolated at this entity's position on the CPU — instead of the flat
-    // hemispherical ambient term; non-static lit objects opt in. Each coefficient is
-    // an RGB triple in `xyz` (4th lane unused) so the array stays `vec4`-aligned.
-    pub use_sh: u32,
     // Cutout alpha-test (#242). `use_cutout == 1` makes `fs_main` discard fragments
-    // whose final alpha is below `alpha_cutoff` (Cutout materials). These two scalars
-    // plus `_sh_pad` complete the 16-byte run after `use_sh`, so the `sh` array that
-    // follows stays `vec4`-aligned; `EntityUniforms` in shader.wgsl mirrors this field
-    // order byte-for-byte.
+    // whose final alpha is below `alpha_cutoff` (Cutout materials). The two pads
+    // complete the 16-byte run so the struct stays a 16-byte multiple;
+    // `EntityUniforms` in shader.wgsl mirrors this field order byte-for-byte.
     pub use_cutout: u32,
     pub alpha_cutoff: f32,
-    pub _sh_pad: u32,
+    pub _pad: [u32; 2],
+}
+
+impl EntityUniform {
+    /// The uniform as plain words — the batch key compares these bit-for-bit, so two
+    /// draws share a batch only when every material scalar and flag is identical.
+    pub(crate) fn words(&self) -> [u32; 36] {
+        let mut words = [0u32; 36];
+        words.copy_from_slice(bytemuck::cast_slice(bytemuck::bytes_of(self)));
+        words
+    }
+}
+
+/// One instance of a forward draw (#470), read by `instance_index` from the group-1
+/// storage array: the entity's world matrix, and its light-probe SH (#240).
+///
+/// Only what legitimately differs between copies of one mesh + material lives here.
+/// Everything the fragment shader branches on before sampling a texture stays in the
+/// per-draw [`EntityUniform`], so those branches stay in uniform control flow. The SH
+/// branch samples nothing, so it may vary per instance.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct InstanceData {
+    pub model_matrix: [f32; 16],
+    // When `use_sh == 1`, the shader reconstructs ambient irradiance from these 9 L2
+    // SH coefficients — the probe field interpolated at this entity's position on the
+    // CPU — instead of the flat hemispherical ambient term. Each coefficient is an RGB
+    // triple in `xyz` (4th lane unused) so the array stays `vec4`-aligned.
+    pub use_sh: u32,
+    pub _pad: [u32; 3],
     pub sh: [[f32; 4]; 9],
+}
+
+impl InstanceData {
+    /// An instance that adds nothing: identity transform, no probe SH. Overlays bind
+    /// a one-element array of it and carry their transform in the per-draw uniform.
+    pub(crate) const IDENTITY: Self = Self {
+        model_matrix: glam::Mat4::IDENTITY.to_cols_array(),
+        use_sh: 0,
+        _pad: [0; 3],
+        sh: [[0.0; 4]; 9],
+    };
 }
 
 #[repr(C)]

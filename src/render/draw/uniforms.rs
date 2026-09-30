@@ -1,16 +1,18 @@
-//! Per-entity forward-pass uniform builders: the tint/PBR/cutout `EntityUniform` a
-//! solid mesh draws with, and the light-probe SH lookup that feeds its ambient term.
+//! Per-entity forward-pass data builders: the tint/PBR/cutout `EntityUniform` a solid
+//! mesh's draw binds, and the `InstanceData` (world matrix + light-probe SH) it adds to
+//! that draw's instance array (#470).
 //! Split out of `draw_resources` to keep that file under the size cap; behaviour
 //! unchanged. Free functions (no GPU state), called from `sync_solid_resource`.
 
 use glam::Mat4;
 
 use crate::components::{MaterialAsset, RenderMode};
-use crate::render::EntityUniform;
+use crate::render::{EntityUniform, InstanceData};
 use crate::scene::Scene;
 
-/// Compute the per-entity uniform (tint, lit flag, PBR params, cutout) for a solid
-/// mesh. Tint is driven by components only — never by entity name. A game colours its
+/// Compute the per-draw uniform (tint, lit flag, PBR params, cutout) for a solid
+/// mesh. It carries no transform — that is per instance — so every entity sharing a
+/// material produces the same uniform and can share a draw call (#470). Tint is driven by components only — never by entity name. A game colours its
 /// entities via its referenced material's `base_color`; the engine carries no
 /// per-name colour assumptions. `material` is the entity's resolved library material
 /// (`None` when it references none).
@@ -18,15 +20,12 @@ pub(crate) fn solid_entity_uniform(
     scene: &Scene,
     id: u32,
     material: Option<&MaterialAsset>,
-    model_matrix: Mat4,
-    light_static_from_probes: bool,
 ) -> EntityUniform {
     let is_lit = if scene.world.has_light(id) {
         0u32
     } else {
         1u32
     };
-    let (use_sh, sh) = entity_probe_sh(scene, id, model_matrix, light_static_from_probes);
     let color_tint = material_color_tint(material);
 
     let (metallic, roughness) = match material {
@@ -52,7 +51,7 @@ pub(crate) fn solid_entity_uniform(
     };
 
     EntityUniform {
-        model_matrix: model_matrix.to_cols_array(),
+        model_matrix: Mat4::IDENTITY.to_cols_array(),
         color_tint,
         use_texture,
         is_lit,
@@ -63,10 +62,25 @@ pub(crate) fn solid_entity_uniform(
         use_normal_map,
         use_emissive_map,
         emissive,
-        use_sh,
         use_cutout,
         alpha_cutoff,
-        _sh_pad: 0,
+        _pad: [0; 2],
+    }
+}
+
+/// One solid's instance: its world matrix and, when a light probe covers it, the SH
+/// its ambient term reads (see [`entity_probe_sh`]).
+pub(crate) fn solid_instance(
+    scene: &Scene,
+    id: u32,
+    model_matrix: Mat4,
+    light_static_from_probes: bool,
+) -> InstanceData {
+    let (use_sh, sh) = entity_probe_sh(scene, id, model_matrix, light_static_from_probes);
+    InstanceData {
+        model_matrix: model_matrix.to_cols_array(),
+        use_sh,
+        _pad: [0; 3],
         sh,
     }
 }

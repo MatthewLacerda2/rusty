@@ -3,7 +3,9 @@
 
 use glam::Vec3;
 
-use crate::render::draw::resources::{OutlineResource, Overlays, SolidResource};
+use crate::render::draw::batch::DrawBatch;
+use crate::render::draw::resources::{OutlineResource, Overlays};
+use crate::render::gpu::draw_buffers::DrawBuffers;
 use crate::render::{RenderView, Renderer};
 use crate::scene::{ClearFlags, LightType, Scene};
 
@@ -55,10 +57,9 @@ impl Renderer {
         view: &RenderView,
         scene: &Scene,
         frame: ScenePassFrame,
-        solid_render_resources: &[SolidResource],
+        solid_batches: &[DrawBatch],
         overlays: &Overlays,
     ) {
-        // 4. Render Pass Setup
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -70,7 +71,7 @@ impl Renderer {
         // Bind active skybox view & sampler into the global group for reflections.
         self.update_global_bind_group();
         // B. Main scene + overlay pass.
-        self.record_scene_pass(view, &mut encoder, &frame, solid_render_resources, overlays);
+        self.record_scene_pass(view, &mut encoder, &frame, solid_batches, overlays);
 
         // 6. Submit the scene pass (it filled the HDR target + depth). Particles +
         // post-FX run from the per-camera loop in `draw`.
@@ -83,7 +84,7 @@ impl Renderer {
         view: &RenderView,
         encoder: &mut wgpu::CommandEncoder,
         frame: &ScenePassFrame,
-        solid_render_resources: &[SolidResource],
+        solid_batches: &[DrawBatch],
         overlays: &Overlays,
     ) {
         let editor_mode = frame.editor_mode;
@@ -122,7 +123,7 @@ impl Renderer {
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
         render_pass.set_bind_group(3, &self.shadow_bind_group, &[]);
         // Solid entities, then the editor selection outline.
-        self.draw_solids(&mut render_pass, solid_render_resources);
+        self.draw_batches(&mut render_pass, solid_batches);
         if editor_mode {
             self.draw_outline(&mut render_pass, &overlays.outline);
         }
@@ -169,6 +170,7 @@ impl Renderer {
                 dir_light_dir = (transform.rotation * Vec3::NEG_Z).normalize();
             }
         }
+        self.shadow_renderer.instancing = self.instancing;
         self.shadow_renderer
             .update_light_space(&self.queue, dir_light_dir);
         self.queue.write_buffer(
@@ -245,27 +247,26 @@ impl Renderer {
         });
     }
 
-    fn draw_solids<'a>(
+    /// Record `batches` into `pass`: per batch, the mesh buffers, the frame's group-1
+    /// bind group at the batch's uniform + palette offsets, the shared material group,
+    /// and one instanced draw over its instance range (#470). Shared by the opaque and
+    /// transparent passes, which differ only in pipeline and order.
+    pub(crate) fn draw_batches<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
-        solid_render_resources: &'a [SolidResource],
+        batches: &'a [DrawBatch],
     ) {
-        // Groups 1 (entity) + 2 (material) are the pool's persistent bind groups (#210).
-        let pool = self.entity_pool.as_ref().expect("entity pool present");
-        for (key, mesh_id, num_indices) in solid_render_resources {
-            let (Some(gpu_mesh), Some(entity_bg), Some(material_bg)) = (
-                self.gpu_meshes.get(mesh_id),
-                pool.entity_bind_group(*key),
-                pool.material_bind_group(*key),
-            ) else {
+        for batch in batches {
+            let Some(gpu_mesh) = self.gpu_meshes.get(&batch.key.mesh) else {
                 continue;
             };
+            let offsets = DrawBuffers::offsets(batch.uniform_slot, batch.key.bones);
             render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
             render_pass
                 .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-            render_pass.set_bind_group(1, entity_bg, &[]);
-            render_pass.set_bind_group(2, material_bg, &[]);
-            render_pass.draw_indexed(0..*num_indices, 0, 0..1);
+            render_pass.set_bind_group(1, self.draw_buffers.bind_group(), &offsets);
+            render_pass.set_bind_group(2, self.materials.group(batch.key.material), &[]);
+            render_pass.draw_indexed(0..batch.num_indices, 0, batch.instances.clone());
         }
     }
 
@@ -292,7 +293,7 @@ impl Renderer {
         render_pass.set_pipeline(&self.outline_pipeline);
         render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
         render_pass.set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        render_pass.set_bind_group(1, outline_bind_group, &[]);
+        render_pass.set_bind_group(1, outline_bind_group, &[0, 0]);
         render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
         render_pass.draw_indexed(0..*num_indices, 0, 0..1);
     }

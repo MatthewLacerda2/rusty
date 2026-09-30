@@ -32,7 +32,10 @@ fn lights_past_the_forward_slots_count_as_dropped() {
 #[test]
 fn add_draws_counts_calls_and_triangles() {
     let mut c = RenderCounters::default();
-    c.add_draws([36, 6]);
+    c.add_draws([(36, 1), (6, 1)]);
     assert_eq!((c.draw_calls, c.triangles), (2, 14));
+    // An instanced draw (#470) is one call carrying every instance's triangles.
+    c.add_draws([(36, 100)]);
+    assert_eq!((c.draw_calls, c.triangles), (3, 1214));
     assert_eq!(c.pairs()[0], ("draw_calls", 2));
 }

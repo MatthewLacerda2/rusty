@@ -72,18 +72,26 @@ struct EntityUniforms {
     // Flat emissive factor (#222): rgb glow added after lighting in `fs_main`; the
     // 4th lane is unused. `vec4` to match the Rust `[f32; 4]` byte-for-byte.
     emissive: vec4<f32>,
-    // Light-probe SH (#240). When `use_sh == 1` the ambient term is reconstructed
-    // from the 9 L2 SH coefficients below (xyz = RGB radiance, w unused) instead of
-    // the flat hemispherical gradient.
-    use_sh: u32,
     // Cutout alpha-test (#242): `use_cutout == 1` discards fragments whose final
-    // alpha is below `alpha_cutoff`. These two scalars plus `_sh_pad` complete the
-    // 16-byte run after `use_sh`, so `sh` stays vec4-aligned; mirrors `EntityUniform`
-    // (src/render/uniforms.rs) byte-for-byte. A `vec3<u32>` here would 16-align and
-    // open a 12-byte hole, desyncing the layouts.
+    // alpha is below `alpha_cutoff`. The two pads complete the 16-byte run; mirrors
+    // `EntityUniform` (src/render/gpu/uniforms.rs) byte-for-byte.
     use_cutout: u32,
     alpha_cutoff: f32,
-    _sh_pad: u32,
+    _pad0: u32,
+    _pad1: u32,
+};
+
+// One instance of an instanced draw (#470), indexed by `instance_index`. Mirrors
+// `InstanceData` (src/render/gpu/uniforms.rs) byte-for-byte. Only per-copy data lives
+// here — the world matrix and the light-probe SH (#240: when `use_sh == 1` the ambient
+// term is reconstructed from `sh`, xyz = RGB radiance). Material flags stay in the
+// per-draw `EntityUniforms`, so texture sampling never depends on an instance value.
+struct InstanceData {
+    model_matrix: mat4x4<f32>,
+    use_sh: u32,
+    _ipad0: u32,
+    _ipad1: u32,
+    _ipad2: u32,
     sh: array<vec4<f32>, 9>,
 };
 
@@ -116,6 +124,9 @@ var<uniform> entity: EntityUniforms;
 @group(1) @binding(1)
 var<uniform> bones: BoneUniforms;
 
+@group(1) @binding(2)
+var<storage, read> instances: array<InstanceData>;
+
 @group(2) @binding(0)
 var t_diffuse: texture_2d<f32>;
 @group(2) @binding(1)
@@ -145,11 +156,15 @@ struct VertexOutput {
     // World-space tangent for normal mapping; `w` carries the handedness sign so the
     // fragment shader can reconstruct the bitangent as `w * cross(N, T)`.
     @location(3) world_tangent: vec4<f32>,
+    // Which `instances` entry this fragment belongs to (#470), for its probe SH.
+    @location(4) @interpolate(flat) instance: u32,
 };
 
 @vertex
-fn vs_main(model: VertexInput) -> VertexOutput {
+fn vs_main(model: VertexInput, @builtin(instance_index) instance: u32) -> VertexOutput {
     var out: VertexOutput;
+    // The draw's transform (identity for instanced solids) over the instance's own.
+    let model_matrix = entity.model_matrix * instances[instance].model_matrix;
 
     // Bone skinning transform
     var bone_transform = bones.bones[model.joint_indices.x] * model.joint_weights.x
@@ -169,22 +184,23 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     }
 
     let local_pos = bone_transform * vec4<f32>(model.position, 1.0);
-    let world_pos = entity.model_matrix * local_pos;
+    let world_pos = model_matrix * local_pos;
     
     // Normal transform
     let local_normal = bone_transform * vec4<f32>(model.normal, 0.0);
-    let world_normal = normalize((entity.model_matrix * local_normal).xyz);
+    let world_normal = normalize((model_matrix * local_normal).xyz);
 
     // Tangent rides the same skin + model transform as the normal; its `w`
     // (handedness) passes through untouched.
     let local_tangent = bone_transform * vec4<f32>(model.tangent.xyz, 0.0);
-    let world_tangent = normalize((entity.model_matrix * local_tangent).xyz);
+    let world_tangent = normalize((model_matrix * local_tangent).xyz);
 
     out.world_position = world_pos.xyz;
     out.world_normal = world_normal;
     out.tex_coords = model.tex_coords;
     out.world_tangent = vec4<f32>(world_tangent, model.tangent.w);
     out.clip_position = camera.view_proj * world_pos;
+    out.instance = instance;
     return out;
 }
 
@@ -310,7 +326,7 @@ fn calculate_shadow(world_pos: vec3<f32>, N: vec3<f32>) -> f32 {
 // (#240). Mirrors `Sh9::eval` in src/scene/sh.rs byte-for-byte: the same 9 real-SH
 // basis polynomials and the same cosine-lobe band factors (pi, 2pi/3, pi/4), so the
 // headless analytic path and the GPU agree. Result clamped to non-negative.
-fn eval_sh(N: vec3<f32>) -> vec3<f32> {
+fn eval_sh(N: vec3<f32>, instance: u32) -> vec3<f32> {
     let x = N.x;
     let y = N.y;
     let z = N.z;
@@ -333,7 +349,7 @@ fn eval_sh(N: vec3<f32>) -> vec3<f32> {
     lobe[4] = a2; lobe[5] = a2; lobe[6] = a2; lobe[7] = a2; lobe[8] = a2;
     var out = vec3<f32>(0.0);
     for (var i = 0u; i < 9u; i = i + 1u) {
-        out += entity.sh[i].xyz * b[i] * lobe[i];
+        out += instances[instance].sh[i].xyz * b[i] * lobe[i];
     }
     return max(out, vec3<f32>(0.0));
 }
@@ -403,8 +419,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // SH probe; everything else falls back to the flat Hemispherical Sky-Ground
     // gradient. Both feed the same albedo * (1 - metallic) diffuse response.
     var ambient_irradiance: vec3<f32>;
-    if (entity.use_sh == 1u) {
-        ambient_irradiance = eval_sh(N);
+    if (instances[in.instance].use_sh == 1u) {
+        ambient_irradiance = eval_sh(N, in.instance);
     } else {
         let sky_color = lighting.ambient.color;
         let ground_color = sky_color * 0.25; // ground is darker and cooler/desaturated
