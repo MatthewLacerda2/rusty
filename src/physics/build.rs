@@ -8,7 +8,9 @@
 use glam::{Quat, Vec3};
 use rapier3d::prelude::*;
 
-use crate::components::{ColliderShape, CollisionDetection, RigidBodyComponent};
+use crate::components::{
+    CapsuleAxis, ColliderShape, CollisionDetection, PhysicsMaterial, RigidBodyComponent,
+};
 use crate::ecs::World;
 use crate::scene::Scene;
 
@@ -65,6 +67,7 @@ pub(super) struct ColliderInputs {
     /// captured here so it never enters the scene document.
     pub mesh_geom: Option<(Vec<[f32; 3]>, Vec<u32>)>,
     pub is_trigger: bool,
+    pub material: PhysicsMaterial,
     pub is_static: bool,
     pub layer: u8,
 }
@@ -88,6 +91,7 @@ pub(super) fn collider_inputs(world: &World, id: u32) -> Option<ColliderInputs> 
         shape: collider.shape.clone(),
         mesh_geom,
         is_trigger: collider.is_trigger,
+        material: collider.material,
         is_static: world.is_static(id),
         layer: world.layer(id),
     })
@@ -192,9 +196,33 @@ pub(super) fn build_shape(
             let half_h = (*height * scale.y * 0.5).max(1e-4);
             ColliderBuilder::cylinder(half_h, r).build()
         }
+        ColliderShape::Capsule {
+            radius,
+            height,
+            axis,
+        } => capsule_builder(*radius, *height, *axis, scale).build(),
         ColliderShape::Mesh { convex, .. } => return build_mesh_shape(*convex, scale, mesh?),
     };
     Some(collider)
+}
+
+/// A capsule's rapier builder with the world scale baked in, Unity-style: the
+/// full length scales with the axis' scale, the radius with the larger of the
+/// two cross-axis scales. rapier takes the half-length of the inner segment
+/// (caps excluded), so a full length under `2r` collapses to a sphere.
+fn capsule_builder(radius: f32, height: f32, axis: CapsuleAxis, scale: Vec3) -> ColliderBuilder {
+    let (along, cross) = match axis {
+        CapsuleAxis::X => (scale.x, scale.y.max(scale.z)),
+        CapsuleAxis::Y => (scale.y, scale.x.max(scale.z)),
+        CapsuleAxis::Z => (scale.z, scale.x.max(scale.y)),
+    };
+    let r = (radius * cross).max(1e-4);
+    let half_segment = (height * along * 0.5 - r).max(0.0);
+    match axis {
+        CapsuleAxis::X => ColliderBuilder::capsule_x(half_segment, r),
+        CapsuleAxis::Y => ColliderBuilder::capsule_y(half_segment, r),
+        CapsuleAxis::Z => ColliderBuilder::capsule_z(half_segment, r),
+    }
 }
 
 /// Build a trimesh or convex-hull collider from rest-pose mesh geometry (#77),

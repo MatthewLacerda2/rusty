@@ -1152,6 +1152,10 @@ after `hit` is `0`.
 | `Physics.ClosestPoint` | `(id, x, y, z)` | `found, cx, cy, cz` |
 | `Physics.ContainsPoint` | `(id, x, y, z)` | `bool` |
 | `Physics.GetBounds` | `(id)` | `found, min_x, min_y, min_z, max_x, max_y, max_z` |
+| `Physics.GetColliderShape` | `(id)` | shape table (see below), or `nil` without a collider |
+| `Physics.SetColliderShape` | `(id, shape)` | — (`shape` is the same table; errors on a bad one) |
+| `Physics.GetPhysicsMaterial` | `(id)` | `friction, bounciness, friction_combine, bounce_combine` |
+| `Physics.SetPhysicsMaterial` | `(id, friction, bounciness [, friction_combine [, bounce_combine]])` | — |
 
 The optional trailing `ignore_id` skips one entity in the cast — pass the shooter's
 own id so a shot can't hit its source. The engine has no built-in "don't hit the
@@ -1262,6 +1266,48 @@ kinematic body keeps exactly the vertical motion its scripts set. An entity with
 collider but **no rigidbody** never falls. The flag is honoured at body build and
 each tick, so toggling it (or `Physics.SetKinematic`, which resets any accumulated
 fall speed) at runtime takes effect.
+
+### Collider shape and physics material (#447)
+
+A collider's **shape** is a table with a `kind` and that kind's extents — what
+`GetColliderShape` returns and `SetColliderShape` takes:
+
+| `kind` | Fields |
+|---|---|
+| `"Box"` | `x, y, z` — full size |
+| `"Sphere"` | `radius` |
+| `"Cylinder"` | `radius, height` (along local Y) |
+| `"Capsule"` | `radius, height, axis` — `axis` is `"X"`, `"Y"` (default) or `"Z"` |
+| `"Mesh"` | `convex` — read-only: baked from an imported mesh, never set from script |
+
+**Capsule** (Unity: `CapsuleCollider`) is the character and limb shape: a
+cylinder capped by two hemispheres. As in Unity, `height` is the **full**
+end-to-end length, caps included, so a `radius = 0.5, height = 2` capsule stands
+2 m tall and rests with its centre 1 m above the floor; a height under
+`2 * radius` is a sphere. World scale bakes in Unity's way — the length scales
+with the axis' scale, the radius with the larger of the other two. Every extent
+must be `> 0`. The shape is read when the body is built (entering Play, or a
+hierarchy change); `SetColliderShape` refreshes the bounds (`GetBounds`)
+immediately.
+
+The **physics material** (Unity: `PhysicMaterial`) sets how a collider grips
+and bounces:
+
+- **`friction`** (`>= 0`, default `0.5`): `0` is ice, `1` is rubber on concrete.
+- **`bounciness`** (`0`–`1`, default `0`): `0` absorbs an impact, `1` rebounds at
+  full speed. A ball dropped from `h` rebounds to about `bounciness² · h`.
+- **`friction_combine` / `bounce_combine`** — how two touching colliders'
+  values combine: `"Average"` (default), `"Minimum"`, `"Multiply"` or
+  `"Maximum"`. When the two colliders disagree, the later mode in that list wins
+  (Unity's priority): a `Maximum`-bounce grenade still bounces off an `Average`
+  wall, and a `Minimum`-friction ice floor stays slippery under any boot.
+
+`SetPhysicsMaterial` clamps the coefficients into range, errors on a
+non-finite one or an unknown mode name, and treats an omitted mode as
+`"Average"`. Unlike the shape, a material edit reaches the solver on the next
+physics step, mid-play included. The material is stored **inline** on each
+collider rather than as a shared asset — four numbers, no asset to manage;
+give each collider of a "family" the same values.
 
 ### Colliders and the parent hierarchy (#445)
 
@@ -2109,7 +2155,9 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
   "light":     { "type": "Point", "color": [r,g,b], "intensity": .., "range": ..,
                  "inner_cone": .., "outer_cone": .. },
   "collider":  { "active": true, "is_trigger": false,
-                 "shape": { "kind": "Box", "size": [x,y,z] } },
+                 "shape": { "kind": "Box", "size": [x,y,z] },   // or Capsule: radius, height, axis
+                 "material": { "friction": 0.5, "bounciness": 0.0,
+                               "friction_combine": "Average", "bounce_combine": "Average" } },
   "rigidbody": { "active": true, "is_kinematic": false, "mass": .., "velocity": [x,y,z],
                  "use_gravity": true },
   "camera":    { "active": true, "fov": .., "near": .., "far": .., "culling_mask": ..,

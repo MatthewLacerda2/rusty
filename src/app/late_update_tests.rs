@@ -60,6 +60,7 @@ fn falling_body_world() -> GameWorld {
                 size: Vec3::splat(1.0),
             },
             is_trigger: false,
+            material: Default::default(),
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
         }),

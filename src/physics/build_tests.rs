@@ -12,7 +12,7 @@ use glam::Vec3;
 use rapier3d::prelude::*;
 
 use super::build::{build_shape, collider_inputs, interaction_groups, is_kinematic};
-use crate::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
+use crate::components::{CapsuleAxis, ColliderComponent, ColliderShape, RigidBodyComponent};
 
 /// Local-AABB half-extents `(x, y, z)` of a built collider.
 fn half_extents(c: &Collider) -> [f32; 3] {
@@ -104,6 +104,61 @@ fn cylinder_bakes_radius_x_and_half_height_y() {
     assert!((h[0] - 6.0).abs() < 1e-4, "cylinder radius x {h:?}");
     assert!((h[1] - 20.0).abs() < 1e-4, "cylinder half-height y {h:?}");
     assert!((h[2] - 6.0).abs() < 1e-4, "cylinder radius z {h:?}");
+}
+
+/// A capsule built under `scale`, as `(radius, segment half-length, axis half-extents)`.
+fn capsule(radius: f32, height: f32, axis: CapsuleAxis, scale: Vec3) -> (f32, f32, [f32; 3]) {
+    let shape = ColliderShape::Capsule {
+        radius,
+        height,
+        axis,
+    };
+    let c = build_shape(&shape, scale, None).unwrap();
+    let cap = c.shape().as_capsule().expect("a capsule");
+    (cap.radius, cap.half_height(), half_extents(&c))
+}
+
+#[test]
+fn capsule_height_is_the_full_length_with_scale_baked_in() {
+    // Unscaled: height 2, radius 0.5 ⇒ segment half 1 - 0.5 = 0.5, full reach 1.
+    let (r, half, h) = capsule(0.5, 2.0, CapsuleAxis::Y, Vec3::ONE);
+    assert_eq!((r, half), (0.5, 0.5));
+    assert!(
+        (h[1] - 1.0).abs() < 1e-4 && (h[0] - 0.5).abs() < 1e-4,
+        "{h:?}"
+    );
+    // Scale (2, 3, 1.5): r = 0.5 * max(2, 1.5) = 1; full length 2*3 = 6 ⇒ half 3 - 1.
+    let (r, half, h) = capsule(0.5, 2.0, CapsuleAxis::Y, Vec3::new(2.0, 3.0, 1.5));
+    assert!(
+        (r - 1.0).abs() < 1e-5 && (half - 2.0).abs() < 1e-5,
+        "{r} {half}"
+    );
+    assert!((h[1] - 3.0).abs() < 1e-4, "{h:?}");
+}
+
+#[test]
+fn capsule_axis_picks_the_length_and_cross_scales() {
+    let scale = Vec3::new(4.0, 1.0, 2.0);
+    // X: length 1 * 4 = 4, r = 0.25 * max(1, 2) = 0.5 ⇒ segment half 2 - 0.5.
+    let (r, half, h) = capsule(0.25, 1.0, CapsuleAxis::X, scale);
+    assert!(
+        (r - 0.5).abs() < 1e-5 && (half - 1.5).abs() < 1e-5,
+        "{r} {half}"
+    );
+    assert!(
+        (h[0] - 2.0).abs() < 1e-4 && (h[1] - 0.5).abs() < 1e-4,
+        "{h:?}"
+    );
+    // Z: length 1 * 2 = 2, r = 0.25 * max(4, 1) = 1 ⇒ the caps meet: a sphere.
+    let (r, half, h) = capsule(0.25, 1.0, CapsuleAxis::Z, scale);
+    assert!((r - 1.0).abs() < 1e-5 && half == 0.0, "{r} {half}");
+    assert!((h[2] - 1.0).abs() < 1e-4, "{h:?}");
+    // Y: length 3 * 1, r = 0.25 * max(4, 2) = 1 ⇒ segment half 1.5 - 1.
+    let (r, half, _) = capsule(0.25, 3.0, CapsuleAxis::Y, scale);
+    assert!(
+        (r - 1.0).abs() < 1e-5 && (half - 0.5).abs() < 1e-5,
+        "{r} {half}"
+    );
 }
 
 #[test]
@@ -199,6 +254,7 @@ fn collider_inputs_respects_the_active_flag() {
             active: false,
             shape: ColliderShape::Box { size: Vec3::ONE },
             is_trigger: false,
+            material: Default::default(),
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
         }),

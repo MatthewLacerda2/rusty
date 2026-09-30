@@ -15,6 +15,7 @@ use super::build::{
 };
 use super::compound::{plan, relative_pose, world_pose, BodyPlan, WorldPose};
 use super::convert::{to_iso, to_na_vec};
+use super::material::apply_material;
 use super::world::PhysicsWorld;
 use crate::scene::Scene;
 
@@ -136,6 +137,7 @@ impl PhysicsWorld {
         collider.set_position(to_iso(offset_pos, offset_rot));
         collider.set_enabled(scene.world.is_active(id));
         collider.set_sensor(inp.is_trigger);
+        apply_material(&mut collider, &inp.material);
         collider.set_active_events(ActiveEvents::COLLISION_EVENTS);
         // The demo's bodies are kinematic/static, so the default
         // "only-if-one-is-dynamic" filtering would suppress every player↔wall

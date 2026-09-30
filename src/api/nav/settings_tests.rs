@@ -27,6 +27,7 @@ fn scene_and_nav(min: Vec3, max: Vec3) -> (RefCell<Scene>, RefCell<NavigationGra
             active: true,
             shape: ColliderShape::Box { size: max - min },
             is_trigger: false,
+            material: Default::default(),
             aabb_min: min,
             aabb_max: max,
         }),

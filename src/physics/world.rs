@@ -33,7 +33,7 @@ pub struct PhysicsWorld {
     physics_pipeline: PhysicsPipeline,
     pub(super) islands: IslandManager,
     broad_phase: DefaultBroadPhase,
-    narrow_phase: NarrowPhase,
+    pub(super) narrow_phase: NarrowPhase,
     pub(super) bodies: RigidBodySet,
     pub(super) colliders: ColliderSet,
     pub(super) impulse_joints: ImpulseJointSet,
@@ -102,6 +102,7 @@ impl PhysicsWorld {
     fn sync_to_rapier(&mut self, scene: &Scene, dt: f32) {
         self.resync_topology(scene);
         self.sync_enabled(scene);
+        self.sync_materials(scene);
         let plan = std::mem::take(&mut self.plan);
         for (&owner, ids) in &plan {
             let Some(&handle) = self.id_to_body.get(&owner) else {

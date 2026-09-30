@@ -73,6 +73,16 @@ fn collider_shape_value(shape: &ColliderShape) -> Value {
         ColliderShape::Cylinder { radius, height } => {
             json!({ "kind": "Cylinder", "radius": radius, "height": height })
         }
+        ColliderShape::Capsule {
+            radius,
+            height,
+            axis,
+        } => json!({
+            "kind": "Capsule",
+            "radius": radius,
+            "height": height,
+            "axis": axis.as_str(),
+        }),
         ColliderShape::Mesh {
             convex,
             local_min,
@@ -91,6 +101,12 @@ pub(crate) fn collider_value(c: &ColliderComponent) -> Value {
         "active": c.active,
         "is_trigger": c.is_trigger,
         "shape": collider_shape_value(&c.shape),
+        "material": {
+            "friction": c.material.friction,
+            "bounciness": c.material.bounciness,
+            "friction_combine": c.material.friction_combine.as_str(),
+            "bounce_combine": c.material.bounce_combine.as_str(),
+        },
     })
 }
 
