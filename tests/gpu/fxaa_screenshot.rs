@@ -9,8 +9,6 @@
 //! When no adapter is available `capture` returns `Ok(false)` and the test passes
 //! without asserting — Linux CI has no GPU, so this really runs on macOS/Windows.
 
-#![cfg(feature = "dev")]
-
 use glam::Vec3;
 use rusty::components::{CameraComponent, ClearFlags};
 use rusty::dev::screenshot::capture;

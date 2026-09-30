@@ -220,6 +220,21 @@ mod tests {
     }
 
     #[test]
+    fn one_binary_test_layout_keeps_the_tight_cap() {
+        // `tests/` is one binary (#483): its root, a module folder's `mod.rs`, and the
+        // files inside that folder are all still standalone test files.
+        assert_eq!(limit_for(Path::new("tests/main.rs")), MAX_TEST_FILE_LINES);
+        assert_eq!(
+            limit_for(Path::new("tests/gpu/mod.rs")),
+            MAX_TEST_FILE_LINES
+        );
+        assert_eq!(
+            limit_for(Path::new("tests/gpu/fxaa_screenshot.rs")),
+            MAX_TEST_FILE_LINES
+        );
+    }
+
+    #[test]
     fn tests_sibling_gets_the_source_cap_not_the_tight_one() {
         // A `<x>_tests.rs` sibling is one source's single test home (issue #211), so
         // it shares `<x>.rs`'s source cap — keeping all of a source's tests in one

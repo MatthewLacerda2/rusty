@@ -2,7 +2,6 @@
 //! Drives a known motion (the player walking forward) through the headless
 //! harness and asserts `time_scale` scales the integrated displacement:
 //! `0.0` freezes it, `0.5` halves it. Gated on `dev` (needs the harness).
-#![cfg(feature = "dev")]
 
 use rusty::dev::harness::Harness;
 

@@ -5,8 +5,6 @@
 //! returns `Ok(false)` and the test passes without asserting (GPU verification
 //! simply wasn't possible in this environment).
 
-#![cfg(feature = "dev")]
-
 use glam::Vec3;
 use rusty::components::Tonemap;
 use rusty::dev::screenshot::capture;

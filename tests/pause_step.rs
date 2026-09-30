@@ -13,7 +13,6 @@
 //!    the harness determinism contract, now on the windowed step path.
 //!
 //! Gated on `dev` (needs the harness + the command channel's session).
-#![cfg(feature = "dev")]
 
 use rusty::dev::harness::{Harness, FIXED_DT};
 use rusty::dev::session::Session;

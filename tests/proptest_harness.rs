@@ -3,8 +3,6 @@
 //! `--features dev`. Strengthens the single-case replay/advancement checks into
 //! invariants over generated step counts.
 
-#![cfg(feature = "dev")]
-
 use proptest::prelude::*;
 use rusty::dev::harness::Harness;
 

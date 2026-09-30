@@ -2,7 +2,6 @@
 //! Gated on `dev`: a no-op under a plain `cargo test`, real under `--features dev`.
 //! Drives `rusty::dev::mcp::run` with canned newline-delimited JSON-RPC against a
 //! live `Session`, asserting the response lines on stdout.
-#![cfg(feature = "dev")]
 
 use serde_json::Value;
 

@@ -1,6 +1,5 @@
 //! Bot-player end-to-end session (issue #10).
 //! Gated on `dev`: a no-op under a plain `cargo test`, real under `--features dev`.
-#![cfg(feature = "dev")]
 
 use std::path::Path;
 

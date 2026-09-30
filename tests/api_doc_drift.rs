@@ -6,7 +6,6 @@
 //! runtime; the deferred macro would be needed for types). Gated on `dev` (a `Session`
 //! is dev-only); the session boots an **empty** scene so only the `api::` namespaces
 //! populate `_G` (no entity scripts).
-#![cfg(feature = "dev")]
 
 use std::collections::{BTreeMap, BTreeSet};
 

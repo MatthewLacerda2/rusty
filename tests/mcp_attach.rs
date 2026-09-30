@@ -3,7 +3,6 @@
 //! a *fake engine* — a listener speaking the #282 framed line protocol — asserting that
 //! tool calls are forwarded over the socket and the framed replies are mapped to MCP
 //! results. No real world is booted; the fake engine stands in for a running window.
-#![cfg(feature = "dev")]
 
 use std::io::{BufRead, BufReader, Write};
 use std::thread;

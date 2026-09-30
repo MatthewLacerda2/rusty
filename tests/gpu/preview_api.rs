@@ -6,7 +6,6 @@
 //! test here therefore treats "no adapter" as a skip, exactly as the verb does: it
 //! returns `nil` instead of raising, and the assertions that don't involve pixels
 //! (argument validation) run regardless.
-#![cfg(feature = "dev")]
 
 use rusty::dev::session::Session;
 
