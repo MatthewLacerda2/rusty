@@ -27,6 +27,14 @@ field" is worth more than "the API should be honest". So is a surviving mutant t
 `mutants-pr` comment named, a module sitting on its floor in
 `coverage-baseline.txt`, a line still in `tools/lint/parity_baseline.txt`.
 
+**Point with symbols and paths, not line numbers.** `physics::build::collider_inputs`
+and `Renderer::render` survive the edits that land before the issue is picked up; a
+bare `src/main.rs:210` does not — on 2026-09-30 a batch merged ~50 pull requests in
+a day, `src/main.rs` was split into `src/shell/` in the middle of it, and nearly
+every brief had to warn its coder that the issue's line references were stale.
+A line number is fine as a hint *beside* a symbol (`Renderer::render`, ~l.268), never
+on its own.
+
 **Cite what it relates to.** Sibling issues, the pull request that exposed it, the
 rule in `CLAUDE.md` it turns on, the doc it makes false. A future reader arrives
 with no memory of today.
