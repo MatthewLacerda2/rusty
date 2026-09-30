@@ -128,7 +128,7 @@ mod tests {
             ssr_quality: "High".to_string(),
             ssr_temporal_upsampling: false,
             tonemap: Tonemap::Reinhard,
-            gamma: 1.0,
+            gamma: 1.3,
         }
     }
 
@@ -157,7 +157,7 @@ mod tests {
             Mat4::IDENTITY,
             [0.0; 3],
         );
-        assert_eq!(p.color, [1.5, 1.2, 0.8, 2.2]);
+        assert_eq!(p.color, [1.5, 1.2, 0.8, 1.3]);
         assert_eq!(p.bloom[0], 2.0); // intensity
         assert_eq!(p.bloom[1], 0.7); // threshold
         assert_eq!(p.bloom[2], Tonemap::Reinhard.to_index() as f32);
