@@ -170,8 +170,10 @@ mod tests {
         for s in SelectionState::ALL {
             assert_eq!(SelectionState::parse(&s.name().to_lowercase()), Some(s));
         }
-        let mut sel = SelectableComponent::default();
-        sel.sprites = std::array::from_fn(|i| Some(format!("s{i}.png")));
+        let sel = SelectableComponent {
+            sprites: std::array::from_fn(|i| Some(format!("s{i}.png"))),
+            ..Default::default()
+        };
         assert_eq!(sel.sprite(SelectionState::Normal), None);
         assert_eq!(sel.sprite(SelectionState::Pressed), Some("s2.png"));
         assert_eq!(sel.color(SelectionState::Normal), Vec4::ONE);
