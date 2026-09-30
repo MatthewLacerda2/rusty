@@ -267,6 +267,8 @@ an API a script can reach, and five slots don't need one.
 
 ## Starting
 
+- Run `make blockers ARGS=--fix` once at the start of a batch: it records every
+  "Blocked by #N" an issue body states but GitHub never recorded (#624).
 - Assign the user the moment work begins — unassigned means fair game.
 - **Unassign** if it turns out the issue was never started.
 - Branch `{issue_number}-short-slug` off the latest `main`; an issue-less pull

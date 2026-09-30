@@ -23,7 +23,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue
+.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue blockers
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -171,3 +171,9 @@ mergeable: ## Did CI really run on this PR's head? make mergeable PR=524
 queue: ## Rebase, wait for CI, squash-merge each in turn. make queue PRS="524 526"
 	@test -n "$(PRS)" || { echo "queue: which pull requests? e.g. make queue PRS=\"524 526\"" >&2; exit 1; }
 	@python3 .github/scripts/merge-queue.py $(PRS) $(ARGS)
+
+# "Blocked by #N" written in an issue body but never recorded as a GitHub
+# relationship is invisible to everything that plans from the graph (#624).
+# Lists them and exits 1; ARGS=--fix records them. Run at the start of a batch.
+blockers: ## Prose-only "Blocked by #N" GitHub never recorded. ARGS=--fix records them
+	@python3 .github/scripts/blockers.py $(ARGS)
