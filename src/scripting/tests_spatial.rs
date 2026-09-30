@@ -41,7 +41,7 @@ fn add_box(scene: &mut Scene, name: &str, pos: Vec3, layer: u8) -> u32 {
 
 /// A booted script runtime over a scene with two boxes: `a` at origin (layer 0)
 /// and `b` at z=10 (layer 3), plus the live physics world they were built into.
-fn spatial_runtime() -> (ScriptManager, u32, u32) {
+pub(super) fn spatial_runtime() -> (ScriptManager, u32, u32) {
     let mut raw = Scene::new();
     let a = add_box(&mut raw, "A", Vec3::ZERO, 0);
     let b = add_box(&mut raw, "B", Vec3::new(0.0, 0.0, 10.0), 3);

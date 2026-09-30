@@ -1,9 +1,9 @@
 //! src/physics/query.rs — ray queries over the rapier world.
 //!
 //! Split out of `world` so the step/sync pipeline and the read-only ray casts stay
-//! separately legible. Both the in-engine hitscan and the Lua
-//! `Physics.Raycast` binding go through `cast_ray_filtered`, so a script's
-//! cast and the engine's cast agree for the same ray.
+//! separately legible. The in-engine hitscan, the particles and the Lua
+//! `Physics.Raycast` / `RaycastAll` bindings all go through `raycast_hit` /
+//! `raycast_all`, so a script's cast and the engine's agree for the same ray.
 //!
 //! **Inactive entities are invisible to queries (#521).** rapier's query
 //! pipeline ignores the enabled flag that deactivation sets, so every query in
@@ -14,7 +14,7 @@
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::convert::{from_na_vec, to_na_vec};
+use super::convert::{from_na_point, from_na_vec, to_na_vec};
 use super::world::PhysicsWorld;
 
 /// Whether `collider` takes part in queries: it is enabled (a deactivated
@@ -29,17 +29,36 @@ pub(super) fn is_live(bodies: &RigidBodySet, collider: &Collider) -> bool {
             .is_none_or(RigidBody::is_enabled)
 }
 
+/// One ray hit: the entity struck, how far along the ray, the world-space point,
+/// and the world-space outward surface normal there. A struct rather than a
+/// tuple so later hit data (the hitbox bone, #464) is one more field, not a
+/// signature change at every caller.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RayHit {
+    /// Entity id owning the collider hit — the compound *part*, not its body.
+    pub id: u32,
+    /// Distance from the origin along the normalized direction.
+    pub distance: f32,
+    /// World-space hit point.
+    pub point: Vec3,
+    /// World-space unit surface normal, facing out of the collider hit.
+    pub normal: Vec3,
+}
+
+/// Order hits nearest-first, equal distances broken by entity id, so a
+/// multi-hit answer never leaks parry's traversal order.
+pub(super) fn sort_hits(hits: &mut [RayHit]) {
+    hits.sort_by(|a, b| a.distance.total_cmp(&b.distance).then(a.id.cmp(&b.id)));
+}
+
 impl PhysicsWorld {
     /// Closest collider hit by `ray` within `max_toi`, as (entity id, toi).
     pub fn cast_ray(&self, origin: Vec3, dir: Vec3, max_toi: f32) -> Option<(u32, f32)> {
         self.cast_ray_filtered(origin, dir, max_toi, |_| true)
     }
 
-    /// Like [`Self::cast_ray`], but skips every collider whose entity id is
-    /// rejected by `accept` *during* parry's traversal — so the ray passes through
-    /// excluded colliders and reports the nearest accepted hit instead of stopping
-    /// (and missing) on an excluded one. This is the primitive the engine hitscan
-    /// and the Lua bindings share via [`crate::physics::is_hittable`].
+    /// [`Self::raycast_hit`] reduced to (entity id, distance) — the shape the
+    /// engine hitscan wants.
     pub fn cast_ray_filtered(
         &self,
         origin: Vec3,
@@ -47,41 +66,86 @@ impl PhysicsWorld {
         max_toi: f32,
         accept: impl Fn(u32) -> bool,
     ) -> Option<(u32, f32)> {
-        let ray = Ray::new(to_na_vec(origin).into(), to_na_vec(dir.normalize()));
-        let predicate = self.handle_accepts(&accept);
-        let filter = QueryFilter::default().predicate(&predicate);
-        self.query_pipeline
-            .cast_ray(&self.bodies, &self.colliders, &ray, max_toi, true, filter)
-            .and_then(|(handle, toi)| self.collider_to_id.get(&handle).map(|&id| (id, toi)))
+        self.raycast_hit(origin, dir, max_toi, accept)
+            .map(|hit| (hit.id, hit.distance))
     }
 
-    /// Closest hit by `ray` within `max_toi`, returning the time-of-impact and the
-    /// world-space surface normal at the hit point. Used by the particle system to
-    /// reflect a bouncing particle off the surface it struck. `solid = true` so a
-    /// ray starting inside a collider reports `toi = 0` rather than passing through.
+    /// Closest hit by `ray` within `max_toi`, returning the distance and the
+    /// world-space surface normal. Used by the particle system to reflect a
+    /// bouncing particle off the surface it struck. A ray starting inside a
+    /// collider reports distance 0 rather than passing through.
     pub fn cast_ray_with_normal(
         &self,
         origin: Vec3,
         dir: Vec3,
         max_toi: f32,
     ) -> Option<(f32, Vec3)> {
+        self.raycast_hit(origin, dir, max_toi, |_| true)
+            .map(|hit| (hit.distance, hit.normal))
+    }
+
+    /// The nearest collider hit by the ray within `max_toi`, skipping every
+    /// collider whose entity id `accept` rejects *during* parry's traversal — so
+    /// the ray passes through excluded colliders and reports the nearest accepted
+    /// hit instead of stopping (and missing) on an excluded one. The one ray
+    /// primitive the engine hitscan, the particles and the Lua casts share.
+    /// `solid`: a ray starting inside a collider hits it at distance 0.
+    pub fn raycast_hit(
+        &self,
+        origin: Vec3,
+        dir: Vec3,
+        max_toi: f32,
+        accept: impl Fn(u32) -> bool,
+    ) -> Option<RayHit> {
         let ray = Ray::new(to_na_vec(origin).into(), to_na_vec(dir.normalize()));
-        let predicate = |_: ColliderHandle, c: &Collider| is_live(&self.bodies, c);
+        let predicate = self.handle_accepts(&accept);
+        let filter = QueryFilter::default().predicate(&predicate);
         self.query_pipeline
-            .cast_ray_and_get_normal(
-                &self.bodies,
-                &self.colliders,
-                &ray,
-                max_toi,
-                true,
-                QueryFilter::default().predicate(&predicate),
-            )
-            .map(|(_, intersection)| {
-                (
-                    intersection.time_of_impact,
-                    from_na_vec(intersection.normal),
-                )
-            })
+            .cast_ray_and_get_normal(&self.bodies, &self.colliders, &ray, max_toi, true, filter)
+            .and_then(|(handle, hit)| self.ray_hit(&ray, handle, hit))
+    }
+
+    /// Every accepted collider the ray crosses within `max_toi`, nearest first
+    /// (ties by entity id) — Unity's `Physics.RaycastAll`, the query wallbangs
+    /// walk. Each collider reports its entry point (a ray starting inside one
+    /// hits it at distance 0).
+    pub fn raycast_all(
+        &self,
+        origin: Vec3,
+        dir: Vec3,
+        max_toi: f32,
+        accept: impl Fn(u32) -> bool,
+    ) -> Vec<RayHit> {
+        let ray = Ray::new(to_na_vec(origin).into(), to_na_vec(dir.normalize()));
+        let predicate = self.handle_accepts(&accept);
+        let filter = QueryFilter::default().predicate(&predicate);
+        let mut hits = Vec::new();
+        self.query_pipeline.intersections_with_ray(
+            &self.bodies,
+            &self.colliders,
+            &ray,
+            max_toi,
+            true,
+            filter,
+            |handle, hit| {
+                hits.extend(self.ray_hit(&ray, handle, hit));
+                true
+            },
+        );
+        sort_hits(&mut hits);
+        hits
+    }
+
+    /// Resolve a rapier ray intersection to a [`RayHit`]; `None` when the
+    /// collider belongs to no entity.
+    fn ray_hit(&self, ray: &Ray, handle: ColliderHandle, hit: RayIntersection) -> Option<RayHit> {
+        let &id = self.collider_to_id.get(&handle)?;
+        Some(RayHit {
+            id,
+            distance: hit.time_of_impact,
+            point: from_na_point(ray.point_at(hit.time_of_impact)),
+            normal: from_na_vec(hit.normal),
+        })
     }
 
     /// Adapt an entity-id acceptance test to rapier's collider-handle predicate:

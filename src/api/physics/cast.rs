@@ -1,6 +1,7 @@
-//! src/api/physics/cast.rs — `Physics.Raycast` / `Physics.SphereCast`.
+//! src/api/physics/cast.rs — `Physics.Raycast` / `SphereCast` / `RaycastAll`.
 //!
-//! Query-only line casts through the live rapier world. Both share one
+//! Query-only line casts through the live rapier world. A hit carries the
+//! entity, distance, world point and surface normal (#446). All share one
 //! acceptance test (`accepts`) with the volume and point queries, so every
 //! spatial query honours the same ignore / layer-mask rules (#91, #311).
 
@@ -10,7 +11,7 @@ use glam::Vec3;
 use mlua::Table;
 
 use super::super::{put, Reg};
-use crate::physics::{is_hittable, PhysicsWorld};
+use crate::physics::{is_hittable, PhysicsWorld, RayHit};
 use crate::scene::{layer_in_mask, Scene};
 
 /// The one acceptance test every spatial query filters colliders through: skip
@@ -28,16 +29,44 @@ pub(super) fn accepts(scene: &Scene, id: u32, ignore: Option<u32>, mask: Option<
     }
 }
 
-/// Fold an optional (id, distance) hit into the `(hit, entity_id, distance)`
-/// triple both casts return — hit=false ⇒ id/dist are 0.
-fn cast_result(hit: Option<(u32, f32)>) -> (bool, u32, f32) {
+/// A single cast's Lua returns: `hit, entity_id, distance, px, py, pz, nx, ny, nz`.
+/// Point and normal are appended after the original triple, so three-value
+/// callers are untouched; hit=false ⇒ every other value is 0.
+type CastResult = (bool, u32, f32, f32, f32, f32, f32, f32, f32);
+
+/// Fold an optional hit into the [`CastResult`] both single casts return.
+fn cast_result(hit: Option<RayHit>) -> CastResult {
     match hit {
-        Some((id, t)) => (true, id, t),
-        None => (false, 0u32, 0.0f32),
+        Some(RayHit {
+            id,
+            distance,
+            point: p,
+            normal: n,
+        }) => (true, id, distance, p.x, p.y, p.z, n.x, n.y, n.z),
+        None => (false, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
     }
 }
 
-/// Register `Raycast` and `SphereCast` onto the `Physics` table.
+/// `{x, y, z}` as a Lua table.
+fn vec_table<'lua>(lua: &'lua mlua::Lua, v: Vec3) -> mlua::Result<Table<'lua>> {
+    let t = lua.create_table()?;
+    t.set("x", v.x)?;
+    t.set("y", v.y)?;
+    t.set("z", v.z)?;
+    Ok(t)
+}
+
+/// One `RaycastAll` entry: `{id, distance, point = {x,y,z}, normal = {x,y,z}}`.
+fn hit_table<'lua>(lua: &'lua mlua::Lua, hit: &RayHit) -> mlua::Result<Table<'lua>> {
+    let t = lua.create_table()?;
+    t.set("id", hit.id)?;
+    t.set("distance", hit.distance)?;
+    t.set("point", vec_table(lua, hit.point)?)?;
+    t.set("normal", vec_table(lua, hit.normal)?)?;
+    Ok(t)
+}
+
+/// Register `Raycast`, `SphereCast` and `RaycastAll` onto the `Physics` table.
 pub(super) fn register<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &Table,
@@ -45,10 +74,11 @@ pub(super) fn register<'lua, 'scope>(
     physics: &'scope RefCell<Option<PhysicsWorld>>,
 ) -> Reg {
     register_raycast(scope, table, scene, physics)?;
-    register_spherecast(scope, table, scene, physics)
+    register_spherecast(scope, table, scene, physics)?;
+    register_raycast_all(scope, table, scene, physics)
 }
 
-/// `Raycast` — query-only cast returning `(hit, entity_id, distance)`.
+/// `Raycast` — query-only cast returning a [`CastResult`].
 fn register_raycast<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &Table,
@@ -67,7 +97,7 @@ fn register_raycast<'lua, 'scope>(
             let physics = physics.borrow();
             let scene = scene.borrow();
             Ok(cast_result(physics.as_ref().and_then(|world| {
-                world.cast_ray_filtered(
+                world.raycast_hit(
                     Vec3::new(ox, oy, oz),
                     Vec3::new(dx, dy, dz),
                     f32::MAX,
@@ -80,8 +110,8 @@ fn register_raycast<'lua, 'scope>(
 
 /// `SphereCast` — a raycast with a radius (Unity `Physics.SphereCast`): the
 /// first accepted collider touched by a sphere swept along the ray. Same
-/// `(hit, entity_id, distance)` contract as `Raycast`; distance is how far the
-/// sphere's center traveled before impact.
+/// [`CastResult`] as `Raycast`; distance is how far the sphere's center
+/// traveled before impact, the point is the contact on the struck surface.
 fn register_spherecast<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &Table,
@@ -96,7 +126,7 @@ fn register_spherecast<'lua, 'scope>(
             let physics = physics.borrow();
             let scene = scene.borrow();
             Ok(cast_result(physics.as_ref().and_then(|world| {
-                world.cast_sphere_filtered(
+                world.sphere_cast_hit(
                     Vec3::new(ox, oy, oz),
                     Vec3::new(dx, dy, dz),
                     radius,
@@ -104,6 +134,36 @@ fn register_spherecast<'lua, 'scope>(
                     |id| accepts(&scene, id, ignore, mask),
                 )
             })))
+        }),
+    )
+}
+
+/// `RaycastAll(ox,oy,oz, dx,dy,dz, max_distance [, layer_mask])` — every
+/// accepted collider along the ray, as an array of hit tables sorted by
+/// distance (ties by entity id). Empty with no live physics world.
+fn register_raycast_all<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &Table,
+    scene: &'scope RefCell<Scene>,
+    physics: &'scope RefCell<Option<PhysicsWorld>>,
+) -> Reg {
+    type Args = (f32, f32, f32, f32, f32, f32, f32, Option<u32>);
+    put(
+        table,
+        "RaycastAll",
+        scope.create_function(|lua, (ox, oy, oz, dx, dy, dz, max, mask): Args| {
+            let physics = physics.borrow();
+            let scene = scene.borrow();
+            let hits = physics.as_ref().map_or_else(Vec::new, |world| {
+                world.raycast_all(Vec3::new(ox, oy, oz), Vec3::new(dx, dy, dz), max, |id| {
+                    accepts(&scene, id, None, mask)
+                })
+            });
+            let out = lua.create_table()?;
+            for (i, hit) in hits.iter().enumerate() {
+                out.set(i + 1, hit_table(lua, hit)?)?;
+            }
+            Ok(out)
         }),
     )
 }

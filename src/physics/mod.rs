@@ -27,6 +27,8 @@ mod convert;
 mod query;
 #[cfg(test)]
 mod query_active_tests;
+#[cfg(test)]
+mod raycast_tests;
 mod spatial;
 #[cfg(test)]
 mod spatial_tests;
@@ -35,6 +37,7 @@ mod trigger_events;
 mod trigger_tests;
 mod world;
 
+pub use query::RayHit;
 pub use trigger_events::TriggerEvents;
 pub use world::PhysicsWorld;
 

@@ -11,8 +11,8 @@ use glam::{Quat, Vec3};
 use rapier3d::parry::query::ShapeCastOptions;
 use rapier3d::prelude::*;
 
-use super::convert::{from_na_point, to_iso, to_na_vec};
-use super::query::is_live;
+use super::convert::{from_na_point, from_na_vec, to_iso, to_na_vec};
+use super::query::{is_live, RayHit};
 use super::world::PhysicsWorld;
 
 impl PhysicsWorld {
@@ -76,10 +76,7 @@ impl PhysicsWorld {
         ids
     }
 
-    /// Closest accepted collider touched by a sphere of `radius` swept from
-    /// `origin` along `dir` — Unity's `Physics.SphereCast`, i.e. a thick
-    /// raycast. Returns (entity id, distance traveled along the sweep), the
-    /// volume sibling of [`Self::cast_ray_filtered`].
+    /// [`Self::sphere_cast_hit`] reduced to (entity id, distance traveled).
     pub fn cast_sphere_filtered(
         &self,
         origin: Vec3,
@@ -88,23 +85,45 @@ impl PhysicsWorld {
         max_toi: f32,
         accept: impl Fn(u32) -> bool,
     ) -> Option<(u32, f32)> {
+        self.sphere_cast_hit(origin, dir, radius, max_toi, accept)
+            .map(|hit| (hit.id, hit.distance))
+    }
+
+    /// Closest accepted collider touched by a sphere of `radius` swept from
+    /// `origin` along `dir` — Unity's `Physics.SphereCast`, i.e. a thick
+    /// raycast, the volume sibling of [`Self::raycast_hit`]. `distance` is how
+    /// far the sphere's center traveled; `point` is the contact on the struck
+    /// surface and `normal` that surface's outward normal, both world-space.
+    pub fn sphere_cast_hit(
+        &self,
+        origin: Vec3,
+        dir: Vec3,
+        radius: f32,
+        max_toi: f32,
+        accept: impl Fn(u32) -> bool,
+    ) -> Option<RayHit> {
         let predicate = self.handle_accepts(&accept);
         let filter = QueryFilter::default().predicate(&predicate);
-        self.query_pipeline
-            .cast_shape(
-                &self.bodies,
-                &self.colliders,
-                &to_iso(origin, Quat::IDENTITY),
-                &to_na_vec(dir.normalize()),
-                &Ball::new(radius),
-                ShapeCastOptions::with_max_time_of_impact(max_toi),
-                filter,
-            )
-            .and_then(|(handle, hit)| {
-                self.collider_to_id
-                    .get(&handle)
-                    .map(|&id| (id, hit.time_of_impact))
-            })
+        let (handle, hit) = self.query_pipeline.cast_shape(
+            &self.bodies,
+            &self.colliders,
+            &to_iso(origin, Quat::IDENTITY),
+            &to_na_vec(dir.normalize()),
+            &Ball::new(radius),
+            ShapeCastOptions::with_max_time_of_impact(max_toi),
+            filter,
+        )?;
+        // rapier's normal1 is the struck surface's, in world space. Its witness
+        // point carries GJK slop; for a sphere the contact is exactly one
+        // radius from the impact-time center, against the normal.
+        let normal = from_na_vec(hit.normal1.into_inner());
+        let center = origin + dir.normalize() * hit.time_of_impact;
+        Some(RayHit {
+            id: *self.collider_to_id.get(&handle)?,
+            distance: hit.time_of_impact,
+            point: center - normal * radius,
+            normal,
+        })
     }
 
     /// Nearest point on `id`'s live collider to `point`, solid — a point inside

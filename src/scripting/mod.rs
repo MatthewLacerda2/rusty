@@ -43,6 +43,8 @@ mod tests_manager;
 #[cfg(test)]
 mod tests_physics;
 #[cfg(test)]
+mod tests_raycast;
+#[cfg(test)]
 mod tests_sandbox;
 #[cfg(test)]
 mod tests_spatial;
