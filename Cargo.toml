@@ -123,3 +123,10 @@ debug = "line-tables-only"
 [profile.dev.package."*"]
 opt-level = 2
 debug = false
+
+# rusty splits into ~1600 codegen units (roughly two per module). At the default
+# cap of 256, rustc merges them by size, so an edit that changes one function's size
+# reshuffles the merge and recompiles 4-99 units instead of 2. A cap above the
+# natural count keeps each module in its own unit. docs/testing.md has the numbers (#574).
+[profile.dev.package.rusty]
+codegen-units = 4096

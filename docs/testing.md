@@ -74,6 +74,37 @@ with a longer feature list in the second is the split:
     cargo tree -e normal,build --features dev -f '{p} [{f}]' --prefix none | sort -u
     cargo tree -e normal,build,dev --features dev -f '{p} [{f}]' --prefix none | sort -u
 
+## Incremental rebuilds: one codegen unit per module
+rustc compiles the rusty crate in codegen units (CGUs), roughly two per module, about
+1600 in all. The default dev cap is 256. Above the cap, rustc merges units by size.
+An edit that changes one function's size then reshuffles the merge, and dozens of
+unrelated units recompile. `Cargo.toml` raises the cap for the rusty package to 4096
+so no merging happens (#574). The CGU count is the number of `.o` files in the newest
+session dir under `target/debug/incremental/rusty-*`. Once it nears 4096, raise the cap.
+
+Measured on a 4-core cloud machine with a warm `target/`, `cargo build --features dev`,
+alternating edits in `src/physics/` and `src/editor/`, 8-12 samples each (medians,
+ranges in brackets):
+
+| Edit | Cap | CGUs recompiled | rusty codegen | build wall | then `test --no-run` |
+|---|---|---|---|---|---|
+| a constant's value | 256 | 2 | 0.94 s | 6.2 s | 6.4 s |
+| a constant's value | 4096 | 2-3 | 1.32 s | 6.7 s | n/a |
+| a function's size | 256 | 4-99 | 2.30 s [1.1-3.2] | 8.0 s [6.5-9.1] | 8.9 s [7.1-9.8] |
+| a function's size | 4096 | 2-3 | 1.28 s [1.2-1.9] | 6.7 s [6.3-8.4] | 6.6 s [6.4-7.9] |
+
+The cost is about 0.4 s on an edit that only changes a value, and about 2 s on a
+from-scratch rusty build. Most edits change code, and there the cap saves 1-2 s per
+build and 3 s from edit to test binaries ready.
+
+The 13-19 s codegen spikes #495 measured did not reproduce, either with a build-only
+loop or with #495's own edit-build-test-revert loop. They also cannot be CGU
+invalidation. Codegen for every unit from scratch took 4.5 s on that 8-core machine
+(8.3 s here), and a spike cost 3-4 times that. The likely cause is contention on the
+machine: memory pressure, or another process such as rust-analyzer's check-on-save.
+If they return, count the recompiled `.o` files as above. A spike with few recompiled
+units points to the machine, not the crate.
+
 ## GPU tests and the headless budget
 Tests that need a real device call `Renderer::new_headless`, which returns `None`
 when no adapter is present — so **every GPU test skips gracefully** rather than
