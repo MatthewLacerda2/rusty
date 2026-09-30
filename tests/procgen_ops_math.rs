@@ -123,7 +123,7 @@ fn blur_spreads_a_hard_edge_into_a_gradient() {
                 },
                 &[],
             ),
-            node("b", OpKind::Blur { radius: 1 }, &["k"]),
+            node("b", OpKind::Blur { radius: 0.125 }, &["k"]),
         ],
         "b",
         8,

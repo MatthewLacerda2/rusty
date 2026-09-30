@@ -57,7 +57,7 @@ pub fn eval_node(op: &OpKind, inputs: &[&Image], resolution: u32, seed: u64) -> 
             eval_math(op, inputs, resolution)
         }
         OpKind::Blur { radius } => match inputs.first() {
-            Some(src) => filter::blur(src, *radius),
+            Some(src) => filter::blur(src, filter::pixel_radius(*radius, src.resolution())),
             None => Image::new(resolution),
         },
     }
@@ -72,28 +72,11 @@ fn first_or_black(inputs: &[&Image], resolution: u32) -> Image {
         .unwrap_or_else(|| Image::new(resolution))
 }
 
-/// Dispatch the source ops (no inputs).
+/// Paint a source op (no inputs) by sampling its generator per pixel.
 fn eval_generator(op: &OpKind, resolution: u32, seed: u64) -> Image {
-    match op {
-        OpKind::Constant { color } => generators::constant(resolution, *color),
-        OpKind::Noise {
-            kind,
-            scale,
-            octaves,
-        } => generators::noise(resolution, *kind, *scale, *octaves, seed),
-        OpKind::Voronoi { scale, output } => generators::voronoi(resolution, *scale, *output, seed),
-        OpKind::Gradient { kind } => generators::gradient(resolution, *kind),
-        OpKind::Wave { kind, frequency } => generators::wave(resolution, *kind, *frequency),
-        OpKind::Brick { rows, cols, mortar } => {
-            generators::brick(resolution, *rows, *cols, *mortar)
-        }
-        OpKind::Checker {
-            tiles,
-            color_a,
-            color_b,
-        } => generators::checker(resolution, *tiles, *color_a, *color_b),
-        OpKind::WhiteNoise => generators::white_noise(resolution, seed),
-        _ => Image::new(resolution),
+    match generators::sampler(op, resolution, seed) {
+        Some(f) => Image::fill_uv(resolution, f),
+        None => Image::new(resolution),
     }
 }
 
@@ -125,8 +108,9 @@ fn eval_vector(op: &OpKind, inputs: &[&Image], resolution: u32) -> Image {
             scale,
             rotation,
             translation,
+            tiling,
         } => match inputs.first() {
-            Some(src) => vector::mapping(src, *scale, *rotation, *translation),
+            Some(src) => vector::mapping(src, *scale, *rotation, *translation, *tiling),
             None => Image::new(resolution),
         },
         OpKind::BumpToNormal { strength } => match inputs.first() {

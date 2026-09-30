@@ -1,41 +1,76 @@
 //! src/procgen/ops/generators.rs — source ops (no inputs).
 //!
-//! Every generator paints a whole [`Image`] from its parameters alone, sampling the
-//! **unit domain** `[0, 1)²` per pixel. They are seamless by construction: the
-//! patterns are periodic over the domain (checker/brick/wave use integer cell counts;
-//! noise/Voronoi wrap their lattice through [`super::super::hash`]), so a baked map
-//! tiles without any seam-fix pass.
+//! Every generator is a pure **sampler** `(u, v) -> Rgba` over the unit domain
+//! `[0, 1)²`; [`sampler`] builds one from an [`OpKind`] and the runner paints it per
+//! pixel. They are seamless by construction because every periodic param is a
+//! **count of periods per tile** ([`count`]): noise/Voronoi wrap an integer lattice
+//! through [`super::super::hash`], and wave/brick/checker repeat a whole number of
+//! times (#392). Two generators are the documented exceptions: `gradient linear` is a
+//! one-way ramp (use `linear_tiling` for a seamless one), and the radial shapes
+//! (`gradient radial`, `wave rings`) meet the edge mirror-symmetrically — continuous
+//! across the seam, not periodic beyond it.
 
 use super::super::hash;
-use super::super::image_buf::{Image, Rgba};
-use super::super::recipe::{GradientKind, NoiseKind, VoronoiOutput, WaveKind};
+use super::super::image_buf::Rgba;
+use super::super::recipe::{GradientKind, NoiseKind, OpKind, VoronoiOutput, WaveKind};
 
-const GRAY_A: f32 = 1.0;
+/// A generator's per-point function over the unit domain.
+pub type Sampler = Box<dyn Fn(f32, f32) -> Rgba>;
 
 /// Pack a scalar `v` into an opaque grayscale pixel.
 #[inline]
 fn gray(v: f32) -> Rgba {
-    [v, v, v, GRAY_A]
+    [v, v, v, 1.0]
 }
 
-/// A flat color fill.
-pub fn constant(resolution: u32, color: Rgba) -> Image {
-    Image::filled(resolution, color)
+/// A periodic param as a whole number of periods per tile: rounded, at least 1. A
+/// fractional count cannot close at the wrap, so it is never honoured.
+#[inline]
+pub fn count(x: f32) -> f32 {
+    x.round().max(1.0)
 }
 
-/// Per-pixel uniform white noise, grayscale, seeded by the recipe seed.
-pub fn white_noise(resolution: u32, seed: u64) -> Image {
-    Image::fill_uv(resolution, |u, v| {
-        let x = (u * resolution as f32) as i64;
-        let y = (v * resolution as f32) as i64;
+/// Build the sampler for a generator op, or `None` if `op` takes inputs.
+/// `resolution` only matters to `white_noise`, whose grain is one pixel.
+pub fn sampler(op: &OpKind, resolution: u32, seed: u64) -> Option<Sampler> {
+    Some(match *op {
+        OpKind::Constant { color } => Box::new(move |_, _| color),
+        OpKind::Noise {
+            kind,
+            scale,
+            octaves,
+        } => noise(kind, scale, octaves, seed),
+        OpKind::Voronoi { scale, output } => voronoi(scale, output, seed),
+        OpKind::Gradient { kind } => gradient(kind),
+        OpKind::Wave { kind, frequency } => wave(kind, frequency),
+        OpKind::Brick { rows, cols, mortar } => brick(rows, cols, mortar),
+        OpKind::Checker {
+            tiles,
+            color_a,
+            color_b,
+        } => checker(tiles, color_a, color_b),
+        OpKind::WhiteNoise => white_noise(resolution, seed),
+        _ => return None,
+    })
+}
+
+/// Per-pixel uniform white noise, grayscale. The pixel lattice wraps at `resolution`.
+fn white_noise(resolution: u32, seed: u64) -> Sampler {
+    let r = resolution.max(1) as i64;
+    let res = resolution as f32;
+    Box::new(move |u, v| {
+        let x = ((u * res).floor() as i64).rem_euclid(r);
+        let y = ((v * res).floor() as i64).rem_euclid(r);
         gray(hash::unit2(x, y, 0, seed))
     })
 }
 
-/// Checkerboard: `tiles` squares across each axis; alternating `a`/`b`.
-pub fn checker(resolution: u32, tiles: u32, a: Rgba, b: Rgba) -> Image {
-    let t = tiles.max(1) as f32;
-    Image::fill_uv(resolution, |u, v| {
+/// Checkerboard: `tiles` squares across each axis; alternating `a`/`b`. `tiles`
+/// rounds **up to even**: an odd count would put two same-colour squares side by
+/// side at the wrap.
+fn checker(tiles: u32, a: Rgba, b: Rgba) -> Sampler {
+    let t = tiles.max(1).next_multiple_of(2) as f32;
+    Box::new(move |u, v| {
         let cx = (u * t).floor() as i64;
         let cy = (v * t).floor() as i64;
         if (cx + cy).rem_euclid(2) == 0 {
@@ -46,13 +81,14 @@ pub fn checker(resolution: u32, tiles: u32, a: Rgba, b: Rgba) -> Image {
     })
 }
 
-/// Linear (left→right) or radial (center→edge) grayscale gradient.
-pub fn gradient(resolution: u32, kind: GradientKind) -> Image {
-    Image::fill_uv(resolution, |u, v| match kind {
+/// Linear ramp (left→right, the one non-tiling generator), its seamless 0→1→0
+/// triangle twin, or a radial (center→edge) ramp.
+fn gradient(kind: GradientKind) -> Sampler {
+    Box::new(move |u, v| match kind {
         GradientKind::Linear => gray(u),
+        GradientKind::LinearTiling => gray(1.0 - (2.0 * u.rem_euclid(1.0) - 1.0).abs()),
         GradientKind::Radial => {
-            let dx = u - 0.5;
-            let dy = v - 0.5;
+            let (dx, dy) = (u - 0.5, v - 0.5);
             // Normalize so the corner (the farthest point) reads ~1.0.
             let d = (dx * dx + dy * dy).sqrt() / std::f32::consts::FRAC_1_SQRT_2;
             gray(d.min(1.0))
@@ -60,106 +96,83 @@ pub fn gradient(resolution: u32, kind: GradientKind) -> Image {
     })
 }
 
-/// Bands (parallel) or rings (concentric); `frequency` cycles across the domain.
-/// The result is a `[0, 1]` sine band so it stays smooth and tiling.
-pub fn wave(resolution: u32, kind: WaveKind, frequency: f32) -> Image {
-    let tau = std::f32::consts::TAU;
-    Image::fill_uv(resolution, |u, v| {
+/// Bands (parallel) or rings (concentric): a `[0, 1]` sine with `frequency` whole
+/// cycles across the domain.
+fn wave(kind: WaveKind, frequency: f32) -> Sampler {
+    let f = count(frequency);
+    Box::new(move |u, v| {
         let phase = match kind {
-            WaveKind::Bands => u * frequency,
-            WaveKind::Rings => {
-                let dx = u - 0.5;
-                let dy = v - 0.5;
-                (dx * dx + dy * dy).sqrt() * frequency
-            }
+            WaveKind::Bands => u * f,
+            WaveKind::Rings => (u - 0.5).hypot(v - 0.5) * f,
         };
-        gray(0.5 + 0.5 * (phase * tau).sin())
+        gray(0.5 + 0.5 * (phase * std::f32::consts::TAU).sin())
     })
 }
 
 /// Running-bond brick: `cols`×`rows` bricks, every other row offset half a brick.
-/// Mortar gaps read 0, brick faces read 1 (a mask).
-pub fn brick(resolution: u32, rows: f32, cols: f32, mortar: f32) -> Image {
-    let rows = rows.max(1.0);
-    let cols = cols.max(1.0);
-    Image::fill_uv(resolution, |u, v| {
+/// `rows` rounds to an **even** count so the alternation closes at the wrap. Mortar
+/// gaps read 0, brick faces read 1 (a mask).
+fn brick(rows: f32, cols: f32, mortar: f32) -> Sampler {
+    let rows = count(rows / 2.0) * 2.0;
+    let cols = count(cols);
+    Box::new(move |u, v| {
         let ry = v * rows;
-        let row = ry.floor() as i64;
-        // Offset alternate rows by half a brick for the running bond.
-        let offset = if row.rem_euclid(2) == 0 { 0.0 } else { 0.5 };
-        let cx = (u * cols + offset).fract();
-        let cy = ry.fract();
-        let in_mortar = cx < mortar || cy < mortar;
-        gray(if in_mortar { 0.0 } else { 1.0 })
+        let offset = if (ry.floor() as i64).rem_euclid(2) == 0 {
+            0.0
+        } else {
+            0.5
+        };
+        let cx = (u * cols + offset).rem_euclid(1.0);
+        let cy = ry.rem_euclid(1.0);
+        gray(if cx < mortar || cy < mortar { 0.0 } else { 1.0 })
     })
 }
 
-/// Voronoi / Worley cellular pattern at `scale` cells across the domain. Either F1
+/// Voronoi / Worley cellular pattern with `scale` cells across the domain. Either F1
 /// distance (grayscale) or a flat random color per cell.
-pub fn voronoi(resolution: u32, scale: f32, output: VoronoiOutput, seed: u64) -> Image {
-    let cells = scale.max(1.0);
-    Image::fill_uv(resolution, |u, v| {
-        let px = u * cells;
-        let py = v * cells;
+fn voronoi(scale: f32, output: VoronoiOutput, seed: u64) -> Sampler {
+    let cells = count(scale);
+    let per = cells as i64;
+    Box::new(move |u, v| {
+        let (px, py) = (u * cells, v * cells);
         let (gx, gy) = (px.floor() as i64, py.floor() as i64);
-        let mut best = f32::MAX;
-        let mut best_cell = (gx, gy);
-        for dy in -1..=1 {
-            for dx in -1..=1 {
-                let (cx, cy) = (gx + dx, gy + dy);
-                // Jittered feature point inside the wrapped cell.
-                let jx = hash::unit2(
-                    cx.rem_euclid(cells as i64),
-                    cy.rem_euclid(cells as i64),
-                    1,
-                    seed,
-                );
-                let jy = hash::unit2(
-                    cx.rem_euclid(cells as i64),
-                    cy.rem_euclid(cells as i64),
-                    2,
-                    seed,
-                );
-                let fx = cx as f32 + jx;
-                let fy = cy as f32 + jy;
-                let dist = (fx - px).hypot(fy - py);
-                if dist < best {
-                    best = dist;
-                    best_cell = (cx.rem_euclid(cells as i64), cy.rem_euclid(cells as i64));
-                }
+        let (mut best, mut best_cell) = (f32::MAX, (0, 0));
+        for (dx, dy) in (-1..=1).flat_map(|dy| (-1..=1).map(move |dx| (dx, dy))) {
+            let (cx, cy) = (gx + dx, gy + dy);
+            let cell = (cx.rem_euclid(per), cy.rem_euclid(per));
+            // Jittered feature point inside the wrapped cell.
+            let fx = cx as f32 + hash::unit2(cell.0, cell.1, 1, seed);
+            let fy = cy as f32 + hash::unit2(cell.0, cell.1, 2, seed);
+            let dist = (fx - px).hypot(fy - py);
+            if dist < best {
+                (best, best_cell) = (dist, cell);
             }
         }
         match output {
             VoronoiOutput::Distance => gray(best.min(1.0)),
             VoronoiOutput::Cells => {
-                let r = hash::unit2(best_cell.0, best_cell.1, 3, seed);
-                let g = hash::unit2(best_cell.0, best_cell.1, 4, seed);
-                let b = hash::unit2(best_cell.0, best_cell.1, 5, seed);
-                [r, g, b, 1.0]
+                let c = |ch| hash::unit2(best_cell.0, best_cell.1, ch, seed);
+                [c(3), c(4), c(5), 1.0]
             }
         }
     })
 }
 
 /// Perlin / fBM gradient noise, grayscale, mapped to `[0, 1]`. The lattice wraps at
-/// `scale` so the result tiles.
-pub fn noise(resolution: u32, kind: NoiseKind, scale: f32, octaves: u32, seed: u64) -> Image {
-    let base = scale.max(1.0);
-    Image::fill_uv(resolution, |u, v| {
-        let n = match kind {
-            NoiseKind::Perlin => perlin_tiling(u, v, base, seed),
-            NoiseKind::Fbm => fbm(u, v, base, octaves.max(1), seed),
-        };
-        gray(n * 0.5 + 0.5)
-    })
+/// `scale` (a whole count) so the result tiles; fBM octaves double it, still whole.
+fn noise(kind: NoiseKind, scale: f32, octaves: u32, seed: u64) -> Sampler {
+    let base = count(scale);
+    let octaves = match kind {
+        NoiseKind::Perlin => 1,
+        NoiseKind::Fbm => octaves.max(1),
+    };
+    Box::new(move |u, v| gray(fbm(u, v, base, octaves, seed) * 0.5 + 0.5))
 }
 
-/// Sum several Perlin octaves at doubling frequency / halving amplitude.
+/// Sum `octaves` Perlin octaves at doubling frequency / halving amplitude. One
+/// octave is plain Perlin (octave 0's seed is the recipe seed unchanged).
 fn fbm(u: f32, v: f32, base: f32, octaves: u32, seed: u64) -> f32 {
-    let mut sum = 0.0;
-    let mut amp = 1.0;
-    let mut freq = base;
-    let mut norm = 0.0;
+    let (mut sum, mut amp, mut freq, mut norm) = (0.0, 1.0, base, 0.0);
     for o in 0..octaves {
         sum += amp * perlin_tiling(u, v, freq, seed.wrapping_add(o as u64 * 0x9e37));
         norm += amp;
@@ -169,29 +182,24 @@ fn fbm(u: f32, v: f32, base: f32, octaves: u32, seed: u64) -> f32 {
     sum / norm
 }
 
-/// A single octave of tiling gradient (Perlin) noise in `[-1, 1]`. The integer
-/// lattice is taken modulo `period` so the field is periodic and tiles seamlessly.
+/// A single octave of tiling gradient (Perlin) noise in `[-1, 1]`. `period` is a
+/// whole number; the integer lattice is taken modulo it so the field is periodic.
 fn perlin_tiling(u: f32, v: f32, period: f32, seed: u64) -> f32 {
-    let p = period.max(1.0);
-    let (x, y) = (u * p, v * p);
+    let (x, y) = (u * period, v * period);
     let (x0, y0) = (x.floor() as i64, y.floor() as i64);
     let (fx, fy) = (x - x0 as f32, y - y0 as f32);
-    let per = p as i64;
+    let per = period as i64;
     let corner = |cx: i64, cy: i64, lx: f32, ly: f32| {
         let (wx, wy) = (cx.rem_euclid(per), cy.rem_euclid(per));
         let ang = hash::unit2(wx, wy, 6, seed) * std::f32::consts::TAU;
-        let (gx, gy) = (ang.cos(), ang.sin());
-        gx * lx + gy * ly
+        ang.cos() * lx + ang.sin() * ly
     };
     let n00 = corner(x0, y0, fx, fy);
     let n10 = corner(x0 + 1, y0, fx - 1.0, fy);
     let n01 = corner(x0, y0 + 1, fx, fy - 1.0);
     let n11 = corner(x0 + 1, y0 + 1, fx - 1.0, fy - 1.0);
-    let sx = smoothstep(fx);
-    let sy = smoothstep(fy);
-    let ix0 = lerp(n00, n10, sx);
-    let ix1 = lerp(n01, n11, sx);
-    lerp(ix0, ix1, sy)
+    let (sx, sy) = (smoothstep(fx), smoothstep(fy));
+    lerp(lerp(n00, n10, sx), lerp(n01, n11, sx), sy)
 }
 
 #[inline]
@@ -203,3 +211,7 @@ fn smoothstep(t: f32) -> f32 {
 fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
 }
+
+#[cfg(test)]
+#[path = "generators_tests.rs"]
+mod tests;

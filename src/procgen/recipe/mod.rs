@@ -76,8 +76,11 @@ pub enum WaveKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GradientKind {
-    /// Left→right linear ramp.
+    /// Left→right linear ramp, 0→1 — the one generator that does **not** tile
+    /// (a hard edge at the wrap); use it under a mask or a `mapping { tiling = false }`.
     Linear,
+    /// Left→center→right triangle ramp, 0→1→0: the seamless linear ramp.
+    LinearTiling,
     /// Center→edge radial ramp.
     Radial,
 }
@@ -111,6 +114,8 @@ pub enum OpKind {
     // ---- Generators (no inputs) ----
     /// A flat color fill.
     Constant { color: [f32; 4] },
+    // Periodic params (`scale`, `frequency`, `rows`/`cols`, `tiles`) are whole counts
+    // of periods per tile: fractional values round at evaluation (#392).
     /// Perlin / fBM gradient noise (grayscale, written to RGB, alpha 1).
     Noise {
         kind: NoiseKind,
@@ -128,14 +133,15 @@ pub enum OpKind {
     Gradient { kind: GradientKind },
     /// Bands or rings (grayscale), `frequency` cycles across the domain.
     Wave { kind: WaveKind, frequency: f32 },
-    /// A brick / running-bond pattern; `rows`/`cols` bricks across the domain.
+    /// A brick / running-bond pattern; `rows`/`cols` bricks across the domain
+    /// (`rows` rounds to an even count so the running bond closes at the wrap).
     Brick {
         rows: f32,
         cols: f32,
         #[serde(default = "default_mortar")]
         mortar: f32,
     },
-    /// A 2-color checkerboard; `tiles` squares across each axis.
+    /// A 2-color checkerboard; `tiles` squares across each axis (rounded up to even).
     Checker {
         tiles: u32,
         color_a: [f32; 4],
@@ -159,14 +165,20 @@ pub enum OpKind {
     Gamma { gamma: f32 },
 
     // ---- Vector / normal ----
-    /// Scale / rotate / translate the *domain* of the single input (resampled with
-    /// wrap, so it stays tiling).
+    /// Scale / rotate (turns) / translate the *domain* of the single input, resampled
+    /// bilinearly with wrap. With `tiling` (the default) `scale` rounds to whole
+    /// repeats and `rotation` snaps to quarter turns, so the output tiles; `tiling =
+    /// false` honours free values for decals and one-off maps, at the cost of a seam.
     Mapping {
         scale: [f32; 2],
         rotation: f32,
         translation: [f32; 2],
+        #[serde(default = "yes")]
+        tiling: bool,
     },
     /// Treat the input's red as a height field and bake a tangent-space normal map.
+    /// `strength` scales the slope measured in **tile units** (height change across
+    /// one whole tile), so it bakes the same normals at any resolution (#394).
     BumpToNormal { strength: f32 },
     /// Combine three single-channel inputs into one RGB image (alpha 1).
     CombineRgb,
@@ -189,8 +201,13 @@ pub enum OpKind {
     RgbToBw,
 
     // ---- Filter ----
-    /// A small separable box blur of `radius` pixels (wraps at the edges).
-    Blur { radius: u32 },
+    /// A separable box blur (wraps at the edges). `radius` is a **fraction of the
+    /// tile width** (`0.01` = 1%), so it looks the same at any resolution (#394).
+    Blur { radius: f32 },
+}
+
+fn yes() -> bool {
+    true
 }
 
 fn one_u32() -> u32 {
@@ -229,61 +246,4 @@ impl TextureRecipe {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn sample_recipe() -> TextureRecipe {
-        TextureRecipe {
-            resolution: 64,
-            seed: 7,
-            nodes: vec![
-                Node {
-                    id: "n0".into(),
-                    op: OpKind::Checker {
-                        tiles: 4,
-                        color_a: [0.0, 0.0, 0.0, 1.0],
-                        color_b: [1.0, 1.0, 1.0, 1.0],
-                    },
-                    inputs: vec![],
-                },
-                Node {
-                    id: "n1".into(),
-                    op: OpKind::Invert,
-                    inputs: vec!["n0".into()],
-                },
-            ],
-            output: Some("n1".into()),
-        }
-    }
-
-    #[test]
-    fn recipe_round_trips_through_json_unchanged() {
-        let r = sample_recipe();
-        let json = r.to_json().expect("serialize");
-        let back = TextureRecipe::from_json(&json).expect("deserialize");
-        assert_eq!(r, back);
-    }
-
-    #[test]
-    fn op_tag_is_snake_case() {
-        let json = serde_json::to_string(&OpKind::WhiteNoise).unwrap();
-        assert!(json.contains("\"white_noise\""), "got {json}");
-    }
-
-    #[test]
-    fn voronoi_output_defaults_to_distance_when_absent() {
-        let json = r#"{ "id": "v", "op": "voronoi", "scale": 8.0 }"#;
-        let node: Node = serde_json::from_str(json).expect("parse");
-        match node.op {
-            OpKind::Voronoi { output, .. } => assert_eq!(output, VoronoiOutput::Distance),
-            other => panic!("wrong op: {other:?}"),
-        }
-    }
-
-    #[test]
-    fn an_unknown_recipe_key_is_refused() {
-        let err = TextureRecipe::from_json(r#"{ "resolution": 8, "nodes": [], "seeed": 3 }"#)
-            .unwrap_err();
-        assert!(err.contains("seeed"), "{err}");
-    }
-}
+mod tests;

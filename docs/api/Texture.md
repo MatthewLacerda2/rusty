@@ -7,9 +7,12 @@ op-runner → bake) the material/shader legs build on.
 
 A recipe is authored as a Lua **table** whose shape mirrors the on-disk JSON document
 one-to-one, so the same DAG describes a Lua-built recipe and one loaded from a file.
-Output maps are **seamless by construction** (the procedural domain wraps) and
-**deterministic** — the same recipe + `seed` always bakes a byte-identical PNG (every
-stochastic op draws from a seeded integer hash, never wall-clock or unseeded RNG).
+Output maps are **seamless by construction** (the procedural domain wraps, and every
+periodic param is a whole count of repeats per tile — see *Tiling* below),
+**resolution-independent** (`resolution` only chooses how finely the pattern is
+sampled — see *Units* below) and **deterministic** — the same recipe + `seed` always
+bakes a byte-identical PNG (every stochastic op draws from a seeded integer hash, never
+wall-clock or unseeded RNG).
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -64,19 +67,59 @@ Grouped like Blender's node menus; `op` is the tag string in each node.
 
 - **Generators** (no inputs): `constant {color}`; `noise {kind="perlin"|"fbm", scale,
   octaves}`; `voronoi {scale, output="distance"|"cells"}`; `gradient
-  {kind="linear"|"radial"}`; `wave {kind="bands"|"rings", frequency}`; `brick {rows,
-  cols, mortar}`; `checker {tiles, color_a, color_b}`; `white_noise`.
+  {kind="linear"|"linear_tiling"|"radial"}`; `wave {kind="bands"|"rings", frequency}`;
+  `brick {rows, cols, mortar}`; `checker {tiles, color_a, color_b}`; `white_noise`.
 - **Color** (1 input, 2 for `mix`): `color_ramp {stops}`; `mix {mode, factor}` with
   `mode` ∈ `mix/add/multiply/screen/overlay/subtract/difference`; `invert`;
   `bright_contrast {bright, contrast}`; `hue_sat_value {hue, sat, value}`; `gamma
   {gamma}`.
-- **Vector / normal**: `mapping {scale=[x,y], rotation, translation=[x,y]}`;
-  `bump_to_normal {strength}` (height → tangent-space normal); `combine_rgb` (three
-  grayscale inputs → RGB); `separate_rgb {channel=0..3}`.
+- **Vector / normal**: `mapping {scale=[x,y], rotation, translation=[x,y],
+  tiling=true}` (bilinear, wrapped resample; `rotation` in turns); `bump_to_normal
+  {strength}` (height → tangent-space normal); `combine_rgb` (three grayscale inputs →
+  RGB); `separate_rgb {channel=0..3}`.
 - **Converter / math**: `math {func, value}` with `func` ∈
   `add/subtract/multiply/divide/power/min/max/abs/fract/sqrt`; `map_range {from_min,
   from_max, to_min, to_max}`; `clamp {min, max}`; `rgb_to_bw`.
 - **Filter**: `blur {radius}` (separable box blur; wraps, so it stays tiling).
+
+### Tiling
+
+Every periodic param is a **count of repeats per tile**, rounded at evaluation (the
+field stays a number, so `4.5` is accepted — it bakes as `5`):
+
+| Op | Param | Rounds to |
+|---|---|---|
+| noise, voronoi | `scale` | nearest whole number ≥ 1 |
+| wave | `frequency` | nearest whole number ≥ 1 |
+| brick | `cols` | nearest whole number ≥ 1 |
+| brick | `rows` | nearest **even** number ≥ 2 (the half-brick offset must close at the wrap) |
+| checker | `tiles` | up to **even** (an odd count puts two same-colour squares together at the wrap) |
+| mapping (`tiling = true`) | `scale` | nearest whole number ≥ 1 per axis |
+| mapping (`tiling = true`) | `rotation` | nearest quarter turn |
+
+`mapping { tiling = false }` honours free scale and rotation — for decals and one-off
+maps that are never tiled; it opens a seam. `gradient linear` (0→1 left to right) is
+the one generator that does **not** tile — it has a hard edge at the wrap; use it under
+a mask, or use `linear_tiling` (0→1→0) for a seamless ramp. `gradient radial` and
+`wave rings` meet the edge mirror-symmetrically: continuous across the seam.
+
+### Units
+
+Params are in **tile units**, never pixels, so the same recipe looks the same at 256²
+and 2048² (iterate at a low `resolution`, ship at a high one):
+
+- `blur.radius` is a **fraction of the tile width** — `0.01` is 1% of the texture;
+  the pixel radius is `round(radius × resolution)`, capped at half the tile.
+- `bump_to_normal.strength` scales the slope measured in tile units (height change
+  across one whole tile), not per pixel.
+- `white_noise` is the exception: its grain is one pixel by definition.
+
+**Migration (#392, #394).** Recipes written before these changes bake differently:
+`blur.radius` was whole pixels (`radius = 4` at 512² is now `radius = 0.008`);
+`bump_to_normal.strength` was per pixel (divide an old value by the `resolution` it was
+tuned at, e.g. `4.0` at 512² → `0.0078`); fractional counts in the table above, and odd
+`checker.tiles`, now round; `mapping` now resamples bilinearly and, unless
+`tiling = false`, rounds its scale and snaps its rotation.
 
 Example — a packed metallic-roughness map baked in one shot (red = metallic,
 green = roughness, routed to B/G by the `metallic_roughness` slot):
