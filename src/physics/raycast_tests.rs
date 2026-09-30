@@ -23,6 +23,7 @@ fn add_box(scene: &mut Scene, pos: Vec3, size: Vec3) -> u32 {
             active: true,
             shape,
             is_trigger: false,
+            material: Default::default(),
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
         }),
