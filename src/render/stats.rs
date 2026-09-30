@@ -46,7 +46,7 @@ pub struct RenderCounters {
 
 impl RenderCounters {
     /// Every counter under its `FrameStats` metric name.
-    pub fn pairs(&self) -> [(&'static str, u64); 9] {
+    pub fn pairs(&self) -> [(&'static str, u64); 10] {
         [
             ("draw_calls", self.draw_calls.into()),
             ("triangles", self.triangles),
