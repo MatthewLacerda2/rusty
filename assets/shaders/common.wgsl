@@ -1,10 +1,27 @@
-// assets/shaders/common.wgsl — shared GPU struct definitions imported by the
-// forward, shadow, and skybox passes via `#import "common"`.
+// assets/shaders/common.wgsl — shared GPU struct definitions and helpers imported by
+// the forward, shadow, skybox, particle and decal passes via `#import "common"`.
+
+// The scene's distance + height fog (#437). Mirrors the Rust `FogUniform`
+// byte-for-byte. `mode`: 0 off, 1 linear, 2 exponential, 3 exponential².
+struct Fog {
+    color: vec3<f32>,
+    mode: u32,
+    start: f32,
+    end: f32,
+    density: f32,
+    height_falloff: f32,
+    base_height: f32,
+    _pad_a: f32,
+    _pad_b: f32,
+    _pad_c: f32,
+};
 
 struct CameraUniforms {
     view_proj: mat4x4<f32>,
     camera_pos: vec3<f32>,
     _pad: f32,
+    // Rides with the camera so every pass that already binds it fogs for free.
+    fog: Fog,
 };
 
 // Standard mesh vertex layout — position, normal, UVs, skeletal animation data
@@ -39,4 +56,59 @@ fn blend_joints(
         );
     }
     return j0 * weights.x + j1 * weights.y + j2 * weights.z + j3 * weights.w;
+}
+
+// How far the sky counts as, for fog: past any level's far wall, so the sky is at
+// least as fogged as the farthest geometry in front of it.
+const FOG_SKY_DISTANCE: f32 = 1000.0;
+
+// Mean relative fog thickness along a ray whose heights run `a`..`b` above the base
+// height: full (1) below it, `e^(-k·h)` above it. Exact integral of that profile,
+// so a ray that dips under the base picks up the full layer for that stretch.
+fn fog_height_mean(k: f32, a: f32, b: f32) -> f32 {
+    let lo = min(a, b);
+    let hi = max(a, b);
+    if (k <= 0.0) {
+        return 1.0;
+    }
+    if (hi - lo < 1e-3) {
+        return exp(-k * max(lo, 0.0));
+    }
+    let below = min(hi, 0.0) - min(lo, 0.0);
+    let above = (exp(-k * max(lo, 0.0)) - exp(-k * max(hi, 0.0))) / k;
+    return (below + above) / (hi - lo);
+}
+
+// How fogged (0 clear .. 1 fully fog colour) a point is, seen from `eye`. The one
+// fog formula every pass uses, so surfaces, particles, decals and the sky agree.
+fn fog_factor(fog: Fog, world_pos: vec3<f32>, eye: vec3<f32>) -> f32 {
+    if (fog.mode == 0u) {
+        return 0.0;
+    }
+    let d = max(distance(world_pos, eye) - fog.start, 0.0);
+    let h = fog_height_mean(fog.height_falloff, eye.y - fog.base_height, world_pos.y - fog.base_height);
+    var f: f32;
+    if (fog.mode == 1u) {
+        f = d * h / max(fog.end - fog.start, 1e-3);
+    } else if (fog.mode == 2u) {
+        f = 1.0 - exp(-fog.density * d * h);
+    } else {
+        let x = fog.density * d * h;
+        f = 1.0 - exp(-x * x);
+    }
+    return clamp(f, 0.0, 1.0);
+}
+
+// Fade a lit colour into the fog colour — opaque, transparent and alpha-blended
+// surfaces (the caller keeps its alpha).
+fn apply_fog(fog: Fog, color: vec3<f32>, world_pos: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
+    return mix(color, fog.color, fog_factor(fog, world_pos, eye));
+}
+
+// The sky's fog along view direction `dir`: as fogged as a point at
+// FOG_SKY_DISTANCE, faded out above the horizon so the zenith stays sky.
+fn sky_fog(fog: Fog, color: vec3<f32>, dir: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
+    let f = fog_factor(fog, eye + dir * FOG_SKY_DISTANCE, eye);
+    let horizon = 1.0 - smoothstep(0.0, 0.4, dir.y);
+    return mix(color, fog.color, f * horizon);
 }

@@ -1,4 +1,4 @@
-#import common::{CameraUniforms, VertexInput}
+#import common::{CameraUniforms, VertexInput, sky_fog}
 
 @group(0) @binding(0)
 var<uniform> camera: CameraUniforms;
@@ -37,5 +37,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let theta = acos(dir.y);
     let u = (phi + PI) / (2.0 * PI);
     let v = theta / PI;
-    return textureSample(t_skybox, s_skybox, vec2<f32>(u, v));
+    let sky = textureSample(t_skybox, s_skybox, vec2<f32>(u, v));
+    // Blend toward the scene fog at the horizon (#437) so fogged geometry doesn't
+    // silhouette against a clear sky.
+    return vec4<f32>(sky_fog(camera.fog, sky.rgb, dir, camera.camera_pos), sky.a);
 }

@@ -34,6 +34,8 @@ pub(crate) struct DecalGlobals {
     pub(crate) view_proj: [f32; 16],
     pub(crate) inv_view_proj: [f32; 16],
     pub(crate) camera_pos: [f32; 4],
+    /// The scene fog (#437), applied at the surface the decal lands on.
+    pub(crate) fog: crate::render::gpu::uniforms::FogUniform,
 }
 
 /// Owns every GPU resource for the decal pass. One per `Renderer`.

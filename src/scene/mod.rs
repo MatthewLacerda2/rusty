@@ -23,6 +23,7 @@ pub mod authoring;
 pub mod camera;
 pub mod collision_matrix;
 pub mod decal;
+pub mod fog;
 pub mod identity;
 pub mod io;
 pub mod layers;
@@ -37,6 +38,7 @@ pub mod world_cache;
 
 pub use camera::{game_camera_from_scene, sync_lens_from_scene, Camera};
 pub use collision_matrix::CollisionMatrix;
+pub use fog::{FogMode, FogSettings};
 pub use identity::SceneId;
 pub use io::{
     is_scene_path, load_from_file, read_scene_file, save_to_file, seed_default_scene,

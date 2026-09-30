@@ -113,7 +113,7 @@ pub const BLOCKS: &[Block] = &[
     },
     Block {
         id: "height_fog",
-        desc: "Blend toward a fog color as world-space height drops below a line.",
+        desc: "Per-material look: blend toward a color as world height drops below a line (scene fog is separate, applied after).",
         params: &[
             Param {
                 name: "color",

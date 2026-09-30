@@ -63,6 +63,9 @@ pub struct SceneData {
     /// some knobs authored) fills the rest in too.
     #[serde(default)]
     pub nav_settings: NavMeshSettings,
+    /// Distance + height fog (#437); `#[serde(default)]`: older scenes load it off.
+    #[serde(default)]
+    pub fog: crate::scene::FogSettings,
     /// Project layer names. `#[serde(default)]` so pre-#90 scenes load with the
     /// stock registry ("Default" + 31 unnamed slots).
     #[serde(default)]
@@ -80,14 +83,11 @@ pub struct SceneData {
     /// Light-probe POSITIONS + grid layout (#240). The probes' baked SH is
     /// `#[serde(skip)]` on `Probe`, so this document carries only positions/layout
     /// (references + values, no GPU/heavy data); the SH lives in the
-    /// `<scene>.lighting.json` sidecar. `#[serde(default)]` so pre-#240 scenes load
-    /// with no probes.
+    /// `<scene>.lighting.json` sidecar. `#[serde(default)]` for pre-#240 scenes.
     #[serde(default)]
     pub probes: crate::scene::lighting::probe::ProbeVolume,
-    /// Reflection-probe positions, parallax boxes, and cubemap PATHS (#244). The
-    /// baked cubemaps are referenced files (KTX2), never inlined — exactly like
-    /// `skybox_path`. `#[serde(default)]` so pre-#244 scenes load with no reflection
-    /// probes.
+    /// Reflection-probe positions, parallax boxes, and cubemap PATHS (#244) — KTX2
+    /// files, never inlined, like `skybox_path`. `#[serde(default)]` for pre-#244 scenes.
     #[serde(default)]
     pub reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet,
 }
@@ -102,6 +102,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         ambient_color: scene.ambient_color,
         ambient_intensity: scene.ambient_intensity,
         nav_settings: scene.nav_settings.clone(),
+        fog: scene.fog,
         layers: scene.layers.clone(),
         collision_matrix: scene.collision_matrix.clone(),
         materials: scene.materials.clone(),
@@ -263,6 +264,7 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     scene.ambient_color = data.ambient_color;
     scene.ambient_intensity = data.ambient_intensity;
     scene.nav_settings = data.nav_settings;
+    scene.fog = data.fog;
     data.layers.normalize();
     scene.layers = data.layers;
     scene.collision_matrix = data.collision_matrix;

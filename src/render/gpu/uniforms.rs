@@ -10,6 +10,38 @@ pub(crate) struct CameraUniform {
     pub view_proj: [f32; 16],
     pub camera_pos: [f32; 3],
     pub _pad: f32,
+    pub fog: FogUniform,
+}
+
+/// The scene fog (#437), mirroring `Fog` in `common.wgsl`. Carried by every pass's
+/// camera globals (forward, sky, particles, decals), so one formula fogs them all.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct FogUniform {
+    pub color: [f32; 3],
+    pub mode: u32,
+    pub start: f32,
+    pub end: f32,
+    pub density: f32,
+    pub height_falloff: f32,
+    pub base_height: f32,
+    pub _pad: [f32; 3],
+}
+
+impl FogUniform {
+    /// Pack the scene's fog setting for the GPU.
+    pub fn from_settings(fog: &crate::scene::FogSettings) -> Self {
+        Self {
+            color: fog.color.to_array(),
+            mode: fog.mode.to_index(),
+            start: fog.start,
+            end: fog.end,
+            density: fog.density,
+            height_falloff: fog.height_falloff,
+            base_height: fog.base_height,
+            _pad: [0.0; 3],
+        }
+    }
 }
 
 #[repr(C)]

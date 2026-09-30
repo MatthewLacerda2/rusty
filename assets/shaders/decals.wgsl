@@ -13,12 +13,17 @@
 //      colour. An edge fade on the local Z axis hides the box's hard caps.
 //
 // This is the forward analogue of a deferred decal: it needs no G-buffer, only the
-// depth target the forward pass already wrote.
+// depth target the forward pass already wrote. The stamp is fogged at the surface
+// it lands on (#437), exactly as that surface was, so a far bullet hole fades with
+// its wall instead of floating crisp in the haze.
+
+#import common::{Fog, apply_fog}
 
 struct DecalGlobals {
     view_proj: mat4x4<f32>,
     inv_view_proj: mat4x4<f32>,
     camera_pos: vec4<f32>,
+    fog: Fog,
 };
 
 struct DecalUniform {
@@ -95,5 +100,5 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     if (texel.a <= 0.001) {
         discard;
     }
-    return texel;
+    return vec4<f32>(apply_fog(globals.fog, texel.rgb, surface, globals.camera_pos.xyz), texel.a);
 }

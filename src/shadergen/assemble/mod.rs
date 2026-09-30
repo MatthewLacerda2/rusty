@@ -33,8 +33,9 @@ use super::recipe::{PassKind, ShaderRecipe};
 /// The marker in the surface base shader where the assembler folds the block
 /// chain into the final color. The forward shader's `fs_main` computes
 /// `lighting_color`; the assembler rewrites the final write to apply the blocks
-/// to it. We splice by replacing the exact final-return line.
-const SURFACE_RETURN: &str = "return vec4<f32>(lighting_color, base_color.a);";
+/// to it. We splice by replacing the exact final-return line, which applies the
+/// scene fog (#437) last — so an authored look is fogged like every other surface.
+const SURFACE_RETURN: &str = "return vec4<f32>(apply_fog(camera.fog, lighting_color, in.world_position, camera.camera_pos), base_color.a);";
 
 /// Assemble `recipe` into a complete WGSL module. `surface_base` is the canonical
 /// forward shader source (only consulted for [`PassKind::Surface`]). Returns an
@@ -81,7 +82,7 @@ fn assemble_surface(recipe: &ShaderRecipe, base: &str) -> Result<String, String>
     emit_helpers(&mut additions, &resolved);
 
     let folded = chain(&resolved, "lighting_color");
-    let new_return = format!("return vec4<f32>({folded}, base_color.a);");
+    let new_return = SURFACE_RETURN.replace("lighting_color", &folded);
 
     let header = format!(
         "// {name}.wgsl — authored surface variant (#272), assembled from {n} block(s).\n\
@@ -157,10 +158,10 @@ mod tests {
     use super::super::recipe::{BlockSel, ParamValue};
     use super::*;
 
-    fn surface_base() -> &'static str {
+    fn surface_base() -> String {
         // A minimal stand-in containing the splice point, so assembler unit tests
         // don't read the real asset (the bake/validate tests do that end-to-end).
-        "fn fs_main() -> vec4<f32> {\n    var lighting_color = vec3<f32>(1.0);\n    var base_color = vec4<f32>(1.0);\n    return vec4<f32>(lighting_color, base_color.a);\n}"
+        format!("fn fs_main() -> vec4<f32> {{\n    var lighting_color = vec3<f32>(1.0);\n    var base_color = vec4<f32>(1.0);\n    {SURFACE_RETURN}\n}}")
     }
 
     #[test]
@@ -173,12 +174,14 @@ mod tests {
                 params: BTreeMap::new(),
             }],
         };
-        let wgsl = assemble(&recipe, surface_base()).unwrap();
+        let wgsl = assemble(&recipe, &surface_base()).unwrap();
         assert!(wgsl.contains("const toon_ramp_0_steps: f32 = 4.0;"));
         assert!(wgsl.contains("fn srf_toon_ramp"));
         assert!(wgsl.contains("srf_toon_ramp(lighting_color, in, toon_ramp_0_steps)"));
         // The original flat return is gone (rewritten to apply the chain).
-        assert!(!wgsl.contains("return vec4<f32>(lighting_color, base_color.a);"));
+        assert!(!wgsl.contains(SURFACE_RETURN));
+        // ...and the fog still wraps the folded chain, so authored looks are fogged.
+        assert!(wgsl.contains("apply_fog(camera.fog, srf_toon_ramp("));
     }
 
     #[test]

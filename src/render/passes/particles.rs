@@ -13,6 +13,7 @@ use wgpu::util::DeviceExt;
 
 use crate::components::particle::ParticleBlend;
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::gpu::uniforms::FogUniform;
 use crate::render::postfx::HDR_FORMAT;
 
 /// Per-particle instance data uploaded to the GPU (matches `InstanceInput`).
@@ -40,13 +41,16 @@ impl ParticleInstance {
     }
 }
 
-/// Globals uniform: view-projection + camera right/up for billboarding.
+/// Globals uniform: view-projection + camera right/up for billboarding, and the
+/// camera position + scene fog (#437) the vertex stage fogs each corner with.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct ParticleGlobals {
     pub(crate) view_proj: [f32; 16],
     pub(crate) cam_right: [f32; 4],
     pub(crate) cam_up: [f32; 4],
+    pub(crate) cam_pos: [f32; 4],
+    pub(crate) fog: FogUniform,
 }
 
 /// Owns every GPU resource for the particle pass. One per `Renderer`.
@@ -90,9 +94,14 @@ impl ParticleRenderer {
             push_constant_ranges: &[],
         });
 
-        let alpha_pipeline =
-            Self::pipeline(device, &shader, &layout, wgpu::BlendState::ALPHA_BLENDING);
-        let additive_pipeline = Self::pipeline(device, &shader, &layout, additive_blend());
+        let alpha_pipeline = Self::pipeline(
+            device,
+            &shader,
+            &layout,
+            (wgpu::BlendState::ALPHA_BLENDING, "fs_alpha"),
+        );
+        let additive_pipeline =
+            Self::pipeline(device, &shader, &layout, (additive_blend(), "fs_additive"));
 
         // Two triangles (a quad) shared by every billboard instance.
         let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
@@ -116,7 +125,7 @@ impl ParticleRenderer {
             label: Some("Particle Globals Layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
+                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -131,7 +140,7 @@ impl ParticleRenderer {
         device: &wgpu::Device,
         shader: &wgpu::ShaderModule,
         layout: &wgpu::PipelineLayout,
-        blend: wgpu::BlendState,
+        (blend, fragment_entry): (wgpu::BlendState, &str),
     ) -> wgpu::RenderPipeline {
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Particle Pipeline"),
@@ -143,7 +152,7 @@ impl ParticleRenderer {
             },
             fragment: Some(wgpu::FragmentState {
                 module: shader,
-                entry_point: "fs_main",
+                entry_point: fragment_entry,
                 targets: &[Some(wgpu::ColorTargetState {
                     format: HDR_FORMAT,
                     blend: Some(blend),
