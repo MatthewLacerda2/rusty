@@ -25,6 +25,17 @@ the one sound skip is kept: **a rebase that moves nothing** — the branch is
 already on `main`'s tip, the run on record is a run on this exact commit
 ([`push_needed`]).
 
+**And one that could move nothing that compiles.** When every commit `main`
+gained since the branch's base touches only Markdown — [`mergeable.inert`],
+so never `docs/scripting-api.md`, which tests parse — the head is left where
+it is: no rebase, no push, and the run on record stands ([`docs_advance`],
+#587). That is not the per-module guess above: those commits cannot change a
+single compiled or tested byte, which is why CLAUDE.md lets them merge
+unserialized. On 2026-09-30 merging the Markdown-only #586 cost #584, waiting
+behind it, a rebase and a ten-minute CI round. The squash merge still lands on
+the newer `main`; a branch editing the same `.md` file gets `gh pr merge`'s
+conflict, handed back as any refused merge is.
+
 ## The three things it must not do
 
 1. **It never resolves a conflict.** Empty conflict set, or it hands the branch
@@ -202,6 +213,13 @@ ENVIRONMENT = re.compile(
 # Where the queue should run from instead of a tmpfs.
 QUEUE_ROOT = "a worktree under .claude/worktrees/"
 
+# The commits `main` gained since a branch's base, with every path each touched.
+# `--no-renames`, so a code file renamed to `.md` shows its old path too.
+MAIN_GAINED = ("log", "--no-renames", "--name-only", "--format=>%H", "origin/main")
+
+# What a head left alone by [`docs_advance`] reports instead of a push.
+DOCS_ONLY = "`main` moved only by Markdown; not rebased, the run on record stands (#587)"
+
 WAIT, GO, STOP = "wait", "go", "stop"
 
 # What the summary calls each ending. Merged, green and dry are separate so the
@@ -246,6 +264,26 @@ def push_needed(before: str, after: str) -> bool:
     run on this exact commit; pushing would buy a second cold run of it.
     """
     return before != after
+
+
+def docs_advance(log: str) -> bool:
+    """Whether `main` moved past the head, and only by [`mergeable.inert`] paths.
+
+    `log` is [`MAIN_GAINED`]'s output: a `>sha` line per commit, then its paths.
+    No commit is not an advance — the rebase is a no-op either way.
+    """
+    lines = [line.strip() for line in log.splitlines() if line.strip()]
+    commits = [line for line in lines if line.startswith(">")]
+    return bool(commits) and mergeable.inert([line for line in lines if not line.startswith(">")])
+
+
+def main_moved_by_docs(head: str, root: str) -> bool:
+    """[`docs_advance`] over the commits on `origin/main` that `head` lacks.
+
+    A git failure is *no*: the queue then rebases as it always has.
+    """
+    done = git(*MAIN_GAINED, "--not", head, cwd=root)
+    return done.returncode == 0 and docs_advance(done.stdout)
 
 
 def is_bot(pull: dict) -> bool:
@@ -507,8 +545,11 @@ def advance(
     standing in. The push goes from inside it, leased to `head`. With
     `push=False` (the dry run) the rebase is only computed. `check`, given the
     rebased tree's path, returns why not to push it ([`verify`]); it runs only
-    when the rebase moved the head.
+    when the rebase moved the head. A head `main` passed only by Markdown is
+    returned as it is, with [`DOCS_ONLY`] as its note ([`docs_advance`]).
     """
+    if main_moved_by_docs(head, root):
+        return head, [f"{DOCS_ONLY}."]
     with tempfile.TemporaryDirectory(prefix="rusty-queue-") as tmp:
         work = os.path.join(tmp, "wt")
         made = git("worktree", "add", "--detach", work, head, cwd=root)
@@ -553,7 +594,7 @@ def bot_head(number: int, head: str, root: str, opts: argparse.Namespace) -> tup
     Never force-pushed from here — Dependabot stops maintaining a branch
     somebody else pushed to. Asked once with [`BOT_REBASE`], then polled.
     """
-    if on_tip(head, root):
+    if on_tip(head, root) or main_moved_by_docs(head, root):
         return head, []
     if opts.dry_run:
         return head, [f"would comment `{BOT_REBASE}` and wait for Dependabot's rebase."]
@@ -603,7 +644,8 @@ def dry(repo: str, pull: dict, fresh: str, notes: list[str]) -> tuple[int, str, 
     """The dry run's report: what would happen, and the verdict on today's head."""
     number, head = pull["number"], pull["headRefOid"]
     if notes:
-        # Dependabot's branch, behind `main`: [`bot_head`] said what it would do.
+        # Dependabot's branch, behind `main` ([`bot_head`]), or a head `main`
+        # passed only by Markdown ([`advance`]): the note says what happens.
         moved, notes = notes[0].rstrip("."), notes[1:]
     elif push_needed(head, fresh):
         moved = f"would push {fresh[:7]} once it passes the local checks, then wait for CI on it"
@@ -645,7 +687,7 @@ def take(repo: str, number: int, opts: argparse.Namespace) -> tuple[int, str, st
     if push_needed(head, fresh):
         say(f"#{number}: now at {fresh[:7]}; waiting for CI.")
     else:
-        say(f"#{number}: already on `main`; the run on record is a run on it.")
+        say(f"#{number}: {notes[0] if notes else 'already on `main`; the run on record is a run on it.'}")
 
     state, lines = wait_for(repo, number, fresh, head, opts.deadline * 60, opts.poll)
     say(f"#{number}: {lines[0]}", *lines[1:])
