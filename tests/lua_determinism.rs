@@ -1,7 +1,6 @@
 //! Lua-side determinism (#443): two headless harness runs of a script that draws
 //! from `math.random` and `Random.*` every tick see the same numbers, and the
 //! gameplay VM has no wall clock. Gated on `dev`, like the harness itself.
-#![cfg(feature = "dev")]
 
 use rusty::dev::harness::Harness;
 
