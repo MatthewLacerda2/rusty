@@ -1,22 +1,63 @@
-//! src/app/ui.rs — the UI layout system (#417).
+//! src/app/ui.rs — the UI systems: layout (#417) and events (#420).
 //!
-//! One `LateUpdate` system that recomputes every UI rect into
-//! [`Resources::ui_layout`] from the live scene and the screen size. `LateUpdate`
+//! The layout pass is the first `LateUpdate` system: it recomputes every UI rect
+//! into [`Resources::ui_layout`] from the live scene and the screen size. `LateUpdate`
 //! runs after the whole `FixedUpdate` stage — scripts' `Update` and `LateUpdate`,
 //! physics, animation and the deferred destroys — so a script's RectTransform or
 //! Canvas change shows in the layout the same tick, and the next tick's pointer
-//! dispatch (#420) and this frame's UI draw (#418) read a settled layout. The pass
-//! is a pure function of (scene, screen size); see `ui::layout`.
+//! dispatch and this frame's UI draw (#418) read a settled layout. The pass is a
+//! pure function of (scene, screen size); see `ui::layout`. Right after it, every
+//! Selectable's state is shown on its graphic (`ui::events::transition`).
+//!
+//! [`dispatch_ui_events`] is a `FixedUpdate` system that `play::register` slots
+//! between the scripts' `Start` and `Update`: the event system turns this tick's
+//! input into UI callbacks, fired straight into the scripts.
 
 use super::registry::App;
 use super::resources::Resources;
 use super::stage::Stage;
 use super::world::World;
+use crate::ui::events::{Frame, UiHook};
 
 /// Register the layout pass: the first `LateUpdate` system, after every
 /// `FixedUpdate` system of the tick.
 pub(super) fn register(app: &mut App) {
-    app.add_system(Stage::LateUpdate, layout_ui);
+    app.add_system(Stage::LateUpdate, layout_ui)
+        .add_system(Stage::LateUpdate, show_selectable_states);
+}
+
+/// Turn this tick's input into UI callbacks and fire them (#420). Reads last tick's
+/// settled layout — or computes one on the first tick of Play, before this
+/// session's first `LateUpdate` ran.
+pub(super) fn dispatch_ui_events(world: &mut World, res: &mut Resources) {
+    let screen = res.screen_pixels();
+    if res.play_frame == 0 {
+        res.ui_layout = crate::ui::UiLayout::compute(&world.scene.borrow().world, screen);
+    }
+    let deliveries = {
+        let scene = world.scene.borrow();
+        let input = res.input.borrow();
+        let scripts = &res.script_manager;
+        let handles = |id: u32, hook: UiHook| scripts.has_ui_handler(id, hook);
+        let frame = Frame {
+            world: &scene.world,
+            layout: &res.ui_layout,
+            input: &input,
+            screen,
+            handles: &handles,
+        };
+        res.event_system.borrow_mut().process(&frame)
+    };
+    res.script_manager.dispatch_ui_events(&deliveries);
+}
+
+/// Show every Selectable's state on its graphic, fading on unscaled time.
+fn show_selectable_states(world: &mut World, res: &mut Resources) {
+    let dt = res.time.borrow().unscaled_delta_time;
+    let mut scene = world.scene.borrow_mut();
+    res.event_system
+        .borrow_mut()
+        .apply_transitions(&mut scene.world, dt);
 }
 
 /// Recompute every canvas's layout for this tick.

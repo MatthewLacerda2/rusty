@@ -270,3 +270,14 @@ impl Entity {
         }
     }
 }
+
+impl Entity {
+    /// Rewrite every entity reference a component holds (a Selectable's target
+    /// graphic and navigation targets, #420) through `map` — how the references
+    /// follow the entity when a prefab is saved, stamped or propagated.
+    pub fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
+        if let Some(s) = &mut self.selectable {
+            s.remap_refs(map);
+        }
+    }
+}

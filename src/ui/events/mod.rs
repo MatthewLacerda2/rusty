@@ -43,7 +43,7 @@ use crate::ui::UiLayout;
 
 pub use focus::{nav_actions, NavAction};
 pub use raycast::raycast;
-pub use tree::{is_interactable, is_visible};
+pub use tree::{is_interactable, is_under, is_visible};
 
 /// How far (screen pixels) a held pointer moves before a drag begins — Unity's
 /// `EventSystem.pixelDragThreshold` default.

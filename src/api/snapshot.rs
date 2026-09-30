@@ -18,7 +18,8 @@ use serde_json::{json, Value};
 use super::snapshot_components::{
     animator_value, audio_value, camera_component_value, canvas_group_value, canvas_value,
     collider_value, image_value, light_value, material_value, mesh_value, nav_agent_value,
-    particle_value, rect_mask_value, rect_transform_value, rigidbody_value, text_value,
+    particle_value, rect_mask_value, rect_transform_value, rigidbody_value, selectable_value,
+    text_value,
 };
 use crate::components::TransformComponent;
 use crate::ecs::World;
@@ -110,6 +111,7 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, screen: Vec2) ->
         "canvas_group": world.canvas_group(id).map(|g| canvas_group_value(&g)),
         "rect_mask": world.rect_mask(id).map(|m| rect_mask_value(&m)),
         "text": world.text(id).map(|t| text_value(&t)),
+        "selectable": world.selectable(id).map(|s| selectable_value(&s)),
         "ui_rect": crate::ui::layout::rect_of(world, id, screen)
             .map(|r| super::ui::rect_value(&r)),
     })
@@ -119,7 +121,7 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, screen: Vec2) ->
 /// "component inventory" authoring needs). `Transform` is mandatory and omitted.
 fn inventory(world: &World, id: u32) -> Vec<&'static str> {
     type Probe = fn(&World, u32) -> bool;
-    let probes: [(Probe, &'static str); 17] = [
+    let probes: [(Probe, &'static str); 18] = [
         (World::has_mesh, "Mesh"),
         (World::has_material, "Material"),
         (World::has_light, "Light"),
@@ -136,6 +138,7 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
         (World::has_canvas_group, "CanvasGroup"),
         (World::has_rect_mask, "RectMask"),
         (World::has_text, "Text"),
+        (World::has_selectable, "Selectable"),
         (
             |w, id| w.scripts(id).is_some_and(|s| !s.is_empty()),
             "Script",

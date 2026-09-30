@@ -21,9 +21,11 @@
 //!
 //! The transition-specific dispatch — the `OnDisable` falling-edge sweep and the
 //! deferred-destroy drain (`OnDisable`→`OnDestroy`) — lives in the `transitions`
-//! submodule; this file holds the shared dispatch core and the per-frame hooks.
+//! submodule, the UI callbacks (#420) in `ui`; this file holds the shared dispatch
+//! core and the per-frame hooks.
 
 mod transitions;
+mod ui;
 
 use mlua::{Lua, Table};
 

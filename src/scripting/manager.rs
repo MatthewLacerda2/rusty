@@ -16,7 +16,7 @@ use crate::navigation::NavigationGraph;
 use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
-use crate::ui::ScreenSize;
+use crate::ui::{EventSystem, ScreenSize};
 
 use super::console::ConsoleLogs;
 use super::timers::TimerScheduler;
@@ -99,6 +99,9 @@ pub struct ScriptManager {
     /// Pending script timers and coroutines (#444), behind the `Timer` namespace.
     /// Cleared with every fresh VM: its jobs hold keys into the old one.
     pub(super) timers: Rc<RefCell<TimerScheduler>>,
+    /// The UI event system (#420): selection, hover and press state, shared with
+    /// `Resources` (whose systems drive it) and the `UI` namespace. Reset every Play.
+    pub(super) event_system: Rc<RefCell<EventSystem>>,
 }
 
 impl ScriptManager {
@@ -132,6 +135,7 @@ impl ScriptManager {
             application: Rc::new(RefCell::new(Application::new())),
             stats: Rc::new(RefCell::new(FrameStats::default())),
             timers: Rc::new(RefCell::new(TimerScheduler::default())),
+            event_system: Rc::new(RefCell::new(EventSystem::default())),
         }
     }
 
@@ -152,6 +156,7 @@ impl ScriptManager {
         // seeded RNG — which restarts from its default seed with every fresh VM.
         let lua = super::sandbox::new_sim_vm()?;
         *self.random.borrow_mut() = Random::default();
+        *self.event_system.borrow_mut() = EventSystem::default();
 
         // Override print to write to our console panel. This stays as a
         // `lua.create_function` (static closure) because `print` is in the
@@ -200,6 +205,7 @@ impl ScriptManager {
             application: &self.application,
             stats: &self.stats,
             timers: &self.timers,
+            event_system: &self.event_system,
         }
     }
 

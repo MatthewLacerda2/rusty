@@ -51,6 +51,39 @@ pub const ON_DISABLE: &str = "OnDisable";
 /// documented divergence from Unity's scene-teardown `OnDestroy`.
 pub const ON_DESTROY: &str = "OnDestroy";
 
+// --- UI callbacks (#420). The event system (`ui::events`) decides who receives
+// them: pointer, drag and scroll events bubble from the hit entity to its nearest
+// ancestor-or-self defining the callback; focus events go to the focused entity.
+// Each is dispatched at the head of the script phase, after `Start` and before
+// `Update`. The pointer family is called `(id, event)`, the focus family `(id)`.
+
+/// The pointer entered the entity or one of its descendants (Unity's `IPointerEnterHandler`).
+pub const ON_POINTER_ENTER: &str = "OnPointerEnter";
+/// The pointer left the entity and all its descendants.
+pub const ON_POINTER_EXIT: &str = "OnPointerExit";
+/// A mouse button went down over the entity.
+pub const ON_POINTER_DOWN: &str = "OnPointerDown";
+/// The button pressed over the entity was released (wherever the pointer is).
+pub const ON_POINTER_UP: &str = "OnPointerUp";
+/// A press and release both over the entity.
+pub const ON_POINTER_CLICK: &str = "OnPointerClick";
+/// A held pointer started moving past the drag threshold.
+pub const ON_BEGIN_DRAG: &str = "OnBeginDrag";
+/// The dragged pointer moved this tick.
+pub const ON_DRAG: &str = "OnDrag";
+/// The dragging button was released.
+pub const ON_END_DRAG: &str = "OnEndDrag";
+/// The mouse wheel turned over the entity.
+pub const ON_SCROLL: &str = "OnScroll";
+/// The entity became the focused (selected) one.
+pub const ON_SELECT: &str = "OnSelect";
+/// The entity stopped being the focused one.
+pub const ON_DESELECT: &str = "OnDeselect";
+/// Enter was pressed while the entity is focused.
+pub const ON_SUBMIT: &str = "OnSubmit";
+/// Escape was pressed while the entity is focused.
+pub const ON_CANCEL: &str = "OnCancel";
+
 /// Every callback the engine dispatches — the ground truth the doc gate reads.
 pub const LIFECYCLE_CALLBACKS: &[&str] = &[
     AWAKE,
@@ -61,6 +94,19 @@ pub const LIFECYCLE_CALLBACKS: &[&str] = &[
     ON_TRIGGER_ENTER,
     ON_TRIGGER,
     ON_TRIGGER_EXIT,
+    ON_POINTER_ENTER,
+    ON_POINTER_EXIT,
+    ON_POINTER_DOWN,
+    ON_POINTER_UP,
+    ON_POINTER_CLICK,
+    ON_BEGIN_DRAG,
+    ON_DRAG,
+    ON_END_DRAG,
+    ON_SCROLL,
+    ON_SELECT,
+    ON_DESELECT,
+    ON_SUBMIT,
+    ON_CANCEL,
     ON_DISABLE,
     ON_DESTROY,
 ];

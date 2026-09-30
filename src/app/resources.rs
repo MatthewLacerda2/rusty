@@ -31,7 +31,7 @@ use crate::scene::Camera;
 use crate::scene::{Scene, SceneSnapshot};
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
-use crate::ui::{ScreenSize, UiLayout};
+use crate::ui::{EventSystem, ScreenSize, UiLayout};
 
 use super::animation::graph::GraphCache;
 use super::Schedule;
@@ -69,6 +69,9 @@ pub struct Resources {
     /// written by the `LateUpdate` layout system, read by the UI render pass
     /// (#418) and pointer dispatch (#420). Empty until the first Play tick.
     pub ui_layout: UiLayout,
+    /// The UI event system (#420) — hover, press and focus state — shared with the
+    /// script runtime's `UI` namespace. Reset on every Play.
+    pub event_system: Rc<RefCell<EventSystem>>,
     /// Build settings + the quit request (#431), shared with the script runtime's
     /// `Application` namespace. Unbound by default; the platform layer loads it.
     pub application: Rc<RefCell<Application>>,
@@ -129,6 +132,7 @@ impl Resources {
         script_manager.set_audio_cell(Rc::clone(&audio));
         let screen = Rc::new(RefCell::new(ScreenSize::default()));
         script_manager.set_screen_cell(Rc::clone(&screen));
+        let event_system = script_manager.event_system_cell();
         let application = Rc::new(RefCell::new(Application::new()));
         script_manager.set_application_cell(Rc::clone(&application));
         Self {
@@ -142,6 +146,7 @@ impl Resources {
             storage,
             screen,
             ui_layout: UiLayout::default(),
+            event_system,
             application,
             physics: Rc::new(RefCell::new(None)),
             is_playing: false,

@@ -65,6 +65,24 @@ pub fn set_select_on(s: &mut SelectableComponent, dir: usize, target: Option<u32
     }
 }
 
+/// A transition's name, as `parse_transition` reads it.
+pub fn transition_name(t: SelectableTransition) -> &'static str {
+    match t {
+        SelectableTransition::None => "None",
+        SelectableTransition::ColorTint => "ColorTint",
+        SelectableTransition::SpriteSwap => "SpriteSwap",
+    }
+}
+
+/// A navigation mode's name, as `parse_navigation` reads it.
+pub fn navigation_name(m: NavigationMode) -> &'static str {
+    match m {
+        NavigationMode::None => "None",
+        NavigationMode::Automatic => "Automatic",
+        NavigationMode::Explicit => "Explicit",
+    }
+}
+
 /// Parse a transition name (case-insensitive).
 pub fn parse_transition(name: &str) -> Option<SelectableTransition> {
     match name.to_lowercase().as_str() {

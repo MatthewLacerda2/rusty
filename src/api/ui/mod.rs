@@ -1,30 +1,27 @@
-//! src/api/ui.rs — `UI` namespace: EventSystem-level UI verbs (#417).
+//! src/api/ui/ — `UI` namespace: EventSystem-level UI verbs (#417, #420).
 //!
 //! Reads the in-game UI's computed layout. `UI.GetRect(id)` returns an element's
 //! rect in its canvas's reference units and in screen pixels, computed on demand
 //! from the live scene (so it reflects a change made earlier in the same script, in
 //! edit mode as well as in Play) with the same math as the per-tick layout system.
-//! Pointer and focus verbs join this namespace with #420.
+//! The pointer and focus verbs (#420) are in [`events`].
 
-use std::cell::RefCell;
+mod events;
 
 use glam::Vec2;
 use mlua::{Lua, Table};
 use serde_json::{json, Value};
 
-use super::{put, Reg};
-use crate::core::video::VideoSettings;
-use crate::scene::Scene;
-use crate::ui::{layout, ScreenSize, UiRect};
+use super::{put, ApiScopedCtx, Reg};
+use crate::ui::{layout, UiRect};
 
 /// Register the `UI` namespace onto `lua`.
 pub fn register<'lua, 'scope>(
     lua: &'lua Lua,
     scope: &mlua::Scope<'lua, 'scope>,
-    scene: &'scope RefCell<Scene>,
-    screen: &'scope RefCell<ScreenSize>,
-    video: &'scope RefCell<VideoSettings>,
+    ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
+    let (scene, screen, video) = (ctx.scene, ctx.screen, ctx.video);
     let table = lua.create_table().map_err(|e| e.to_string())?;
     put(
         &table,
@@ -43,6 +40,7 @@ pub fn register<'lua, 'scope>(
             Ok((px.x, px.y))
         }),
     )?;
+    events::register(scope, &table, ctx)?;
     lua.globals().set("UI", table).map_err(|e| e.to_string())
 }
 

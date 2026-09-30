@@ -246,6 +246,36 @@ pub(crate) fn canvas_group_value(g: &CanvasGroupComponent) -> Value {
     })
 }
 
+/// Selectable authoring view (#420): its runtime state is `UI.List` /
+/// `Selectable.GetState`, not part of the component.
+pub(crate) fn selectable_value(s: &crate::components::SelectableComponent) -> Value {
+    use crate::components::SelectionState;
+    use crate::scene::authoring::selectable as ops;
+    let colors: serde_json::Map<String, Value> = SelectionState::ALL
+        .iter()
+        .map(|&st| (st.name().to_string(), json!(s.color(st).to_array())))
+        .collect();
+    let sprites: serde_json::Map<String, Value> = SelectionState::ALL
+        .iter()
+        .map(|&st| (st.name().to_string(), json!(s.sprite(st))))
+        .collect();
+    let select_on: serde_json::Map<String, Value> = ops::DIRECTIONS
+        .iter()
+        .zip(s.select_on)
+        .map(|(d, t)| (d.to_string(), json!(t)))
+        .collect();
+    json!({
+        "interactable": s.interactable,
+        "transition": ops::transition_name(s.transition),
+        "target_graphic": s.target_graphic,
+        "colors": colors,
+        "fade_duration": s.fade_duration,
+        "sprites": sprites,
+        "navigation": ops::navigation_name(s.navigation),
+        "select_on": select_on,
+    })
+}
+
 /// RectMask authoring view (#418): the clip's padding (left, bottom, right, top).
 pub(crate) fn rect_mask_value(m: &RectMaskComponent) -> Value {
     let p = m.padding;
