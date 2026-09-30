@@ -1,0 +1,181 @@
+## `Sound`
+
+Agent-composed **procedural sound authoring** (#357): describe an instrument as a
+*patch* and **bake** one note of it to a stereo `.wav`. That single note is the whole
+one-shot SFX story — a gunshot, an impact, a footstep, a UI blip are each one
+rendered note of a noise / Karplus / FM patch — and the returned path drops straight
+into `Audio.PlayAt` or an `AudioSource`'s `clip`, so a sound the agent invented is
+audible in the same script that made it.
+
+**The synthesiser is zimmer**, from [scorsese](https://github.com/MatthewLacerda2/scorsese)
+(#413) — an external crate, not a module of rusty. It is a git dependency pinned to
+one commit in `Cargo.toml`, so rusty's bakes change only when someone moves that pin
+on purpose (and `zimmer::SYNTH_VERSION` says whether they will). `Sound` is a thin
+adapter over it: rusty turns the Lua table into zimmer's document, zimmer renders,
+rusty writes the file. **The full patch and song vocabulary is zimmer's rustdoc** —
+this page carries worked examples and the fields you reach for first; build the
+reference locally from the pinned rev with `cargo doc -p scorsese-zimmer --open`.
+
+A patch is authored as a Lua **table** whose shape mirrors the on-disk JSON document
+one-to-one, so the same document describes a Lua-built patch and one loaded from a
+file. Every object in it refuses unknown keys, so a misspelled field is an error, not
+a silent default. Bakes are **deterministic**: the same patch + note + `seed` always
+writes a byte-identical WAV (every stochastic source draws from a seeded integer
+hash, never wall-clock or unseeded RNG). Output is always **stereo**, 16-bit PCM,
+44.1 kHz, and always passes a true-peak **limiter**, so a bake can never clip.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Sound.Bake` | `(patch, note, path [, opts])` | the written `path` |
+| `Sound.BakeJson` | `(json, note, path [, opts])` | the written `path` |
+| `Sound.ToJson` | `(patch)` | the patch's canonical JSON string |
+
+`patch` is a table; `json` is its serialized form (from `Sound.ToJson`, or a saved
+`.json`). `note` is either a **name** — a letter `A`–`G`, any accidentals (`#`/`s`
+sharp, `b`/`f` flat), then the octave, e.g. `"C#4"`, `"Bb3"`, `"C-1"` — or a **MIDI
+number** (`60` is middle C, `69` is A4 = 440 Hz; fractions are legal microtones).
+Pitch is equal temperament: `f = 440 × 2^((midi − 69) / 12)`. A rejected patch, note
+or option raises a Lua error naming what was wrong, and writes no file.
+
+`opts` is optional, and so is every field in it; any other key is an error:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `duration` | `0.5` | Gate length in seconds — how long the note is *held*. The amp release rings out **after** it, and an fx chain adds its own tail, so the file is longer than this. |
+| `velocity` | `0.8` | Striking force, `0..1`, scaling the note's peak amplitude. |
+| `timbre` | `0.0` | How far this strike's *brightness* sits from its level, in velocity units: added to `velocity` only for the routings that read velocity as effort (a filter's `vel_octaves`, `fm2`'s `vel_index`), so a note can be brighter without being louder. |
+| `glide` | none | `{ semitones, seconds }` — the note starts `semitones` away from its pitch (positive = above) and slides onto it over `seconds`. Both fields required. |
+| `seed` | `0` | Seed for the stochastic sources (noise, the Karplus pluck, oscillator phases). |
+
+### The patch shape
+
+The signal path is **fixed** — `source → filter → amp envelope → fx`, with an
+optional pitch envelope and one LFO tapping one target. You choose what fills each
+stage, never how they connect; that is what makes a patch playable as a note.
+`source` and `amp` are mandatory, the rest optional.
+
+```lua
+{
+  source = { kind = "osc_stack", oscs = {
+    { wave = "saw",    detune_cents = -7, gain = 0.5, octave = 0 },
+    { wave = "square", detune_cents =  7, gain = 0.5, octave = -1 },
+  } },
+  filter = { kind = "lowpass", cutoff = 1200, resonance = 0.4,
+             env_octaves = 1.4, adsr = { a = 0.01, d = 0.2, s = 0.3, r = 0.2 } },
+  amp    = { a = 0.005, d = 0.1, s = 0.7, r = 0.3 },
+  lfo    = { rate = 5.0, depth = 0.5, target = "pitch" },   -- pitch | cutoff | amp
+  fx     = { { fx = "delay",  time = 0.25, feedback = 0.35, mix = 0.3 },
+             { fx = "reverb", size = 0.6,  damp = 0.5,      mix = 0.2 } },
+}
+```
+
+The stages at a glance (field-level detail is in zimmer's rustdoc, `zimmer::patch`):
+
+- **`source`**, tagged by `kind`: `osc_stack` (up to 4 band-limited oscillators,
+  `sine`/`triangle`/`saw`/`square`, each with optional unison `voices`/`spread`),
+  `karplus` (plucked string), `noise` (`color` = `white`/`pink`/`brown`), `fm2`
+  (2-operator FM), `fm4` (4-operator FM with per-operator envelopes) and `additive`
+  (a series of partials).
+- **`filter`** — `kind` ∈ `lowpass`/`highpass`/`bandpass`/`notch`, `cutoff` in Hz,
+  `resonance`, `slope`, and its own `adsr`. Modulation is in **octaves**: the cutoff
+  is `cutoff × 2^(env_octaves × env + vel_octaves × velocity + lfo)`.
+  *(Before #413 these were `env_amount`/`vel_cutoff` in Hz; an old patch using them
+  is refused by name, not misread.)*
+- **`amp`** — the mandatory ADSR: `a`/`d`/`r` in seconds, `s` a level `0..1`.
+- **`pitch_env`** — a pitch shape the instrument puts on every note (a kick's drop).
+- **`lfo`** — one sine at `rate` Hz on one `target`: `pitch` (semitones), `cutoff`
+  (octaves) or `amp` (tremolo).
+- **`fx`** — applied in list order, tagged by `fx`: `delay`, `reverb` (stereo),
+  `saturate`, `compress`, `chorus`, `eq`. The bake limiter is **not** listed here: it
+  is not a choice.
+
+Example — bake a gunshot and fire it where the shot happened:
+
+```lua
+local clip = Sound.Bake({
+  source = { kind = "noise" },
+  amp    = { a = 0.0, d = 0.09, s = 0.0, r = 0.06 },
+  filter = { kind = "lowpass", cutoff = 300, resonance = 0.5, env_octaves = 4.4,
+             adsr = { a = 0.0, d = 0.05, s = 0.0, r = 0.05 } },
+  fx     = { { fx = "reverb", size = 0.4, damp = 0.6, mix = 0.15 } },
+}, "C2", "project/assets/sounds/gunshot.wav", { duration = 0.12, seed = 9 })
+
+Audio.PlayAt(clip, muzzle.x, muzzle.y, muzzle.z, 0.9)
+```
+
+> **Faithfulness:** the read-site is the engine's own audio decoder — a baked `.wav`
+> is decoded by the same `ClipCache` path an imported clip is. See
+> `docs/api-faithfulness.md`.
+
+### Songs (#358)
+
+A **song** is the same idea one level up: where a patch is one instrument, a song is a
+piece of music — which instruments play (`tracks`), what they play (`patterns` of
+notes), and in what order (`arrangement`). It bakes to a single stereo WAV the audio
+runtime plays like any other clip.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Sound.BakeSong` | `(song, path)` | the written `path` |
+| `Sound.BakeSongJson` | `(json, path)` | the written `path` |
+| `Sound.SongToJson` | `(song)` | the song's canonical JSON string |
+
+The shape is **tracker-style** (the MOD/XM lineage), not a flat piano roll: patterns
+are named blocks you list in the arrangement, so a piece that repeats stays short
+enough to write, diff and iterate on by hand.
+
+```lua
+local theme = {
+  bpm = 120,
+  seed = 7,
+  tracks = {
+    { name = "bass", patch = "project/assets/sounds/bass.json", gain = 0.8 },
+    { name = "lead", patch = { source = { kind = "karplus", damping = 0.996,
+                                          brightness = 0.5 },
+                               amp = { a = 0.001, d = 0.3, s = 0.0, r = 0.2 } },
+      gain = 0.6, pan = 0.3 },
+  },
+  patterns = {
+    verse = { beats = 4, notes = {
+      { track = "bass", note = "E2", start = 0.0, dur = 0.5 },
+      { track = "lead", note = "B3", start = 2.0, dur = 1.0, vel = 0.8 },
+    } },
+  },
+  arrangement = { "verse", "verse" },
+}
+
+local clip = Sound.BakeSong(theme, "project/assets/sounds/theme.wav")
+Audio.PlayAt(clip, 0, 0, 0, 1.0)
+```
+
+The fields you reach for first (the rest — `key` and scale degrees, chords, step
+strings, `swing`, `humanize`, track and song `fx`, `automation`, `tempo` changes,
+`fit`, `fade`, `tail`, arrangement transforms — are in `zimmer::song`'s rustdoc):
+
+| Field | Default | Meaning |
+|---|---|---|
+| `bpm` | — | Tempo. The one place beats become seconds, so retiming a finished song is one number. |
+| `seed` | `0` | Folded into every note's render seed. One number re-rolls every stochastic source in the piece. |
+| `tracks[].patch` | — | Either a **path** to a saved patch `.json` or an **inline patch table** — the same duality `Sound.Bake` / `Sound.BakeJson` have. A path is read as-is, relative to the working directory. |
+| `tracks[].gain` | `1.0` | Linear mix level for that track. A balance control, not a safety one — see the limiter below. |
+| `tracks[].pan` | `0.0` | Stereo position, `-1` (left) to `1` (right). |
+| `patterns[].beats` | — | How long the block occupies in the arrangement. Notes may ring out past it; the next pattern still starts on time. |
+| `notes[].note` | — | A name (`"C#4"`) or a MIDI number, exactly as `Sound.Bake` takes. |
+| `notes[].start` / `dur` | — | Onset and gate length **in beats**, measured from the start of the note's own pattern. |
+| `notes[].vel` | `1.0` | Velocity, `0..1`. |
+
+**Mixing is addition.** Every note is rendered independently through the patch layer
+above and summed into the master at its start offset — no voice limit and no
+voice-stealing, because this is a bake, not a real-time synth. The **master limiter
+always runs** on the sum, so a dense arrangement cannot clip no matter what the track
+gains say.
+
+**Determinism.** Each note's seed is derived from the song seed through the same kind
+of seeded integer hash, so the same song and seed bake a byte-identical WAV in any
+process. A pattern played twice gets two different noise draws — a repeated snare is
+not a photocopy — and both are stable.
+
+Validation happens **before** any samples are produced: an arrangement naming an
+undefined pattern, a note naming an undefined track, a non-positive `bpm` / `beats` /
+`dur`, or an unreadable patch path each raise a message saying exactly which one went
+wrong, rather than rendering silence you would have to listen for.
