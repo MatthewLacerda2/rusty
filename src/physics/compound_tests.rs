@@ -180,6 +180,9 @@ fn reparenting_rebuilds_the_compound() {
 
 #[test]
 fn pose_helpers_invert_each_other_under_a_scaled_rotated_parent() {
+    // Parent and child both rotated/scaled, on different axes, so neither side
+    // of a product can vanish (identity rotation, unit scale) and hide a `*`
+    // turned into `+` or `/`.
     let mut scene = Scene::new();
     let parent = add(&mut scene, None, Vec3::new(1.0, 2.0, 3.0), false);
     let rot = Quat::from_rotation_z(0.5);
@@ -188,15 +191,48 @@ fn pose_helpers_invert_each_other_under_a_scaled_rotated_parent() {
     t.scale = Vec3::splat(2.0);
     drop(t);
     let child = add(&mut scene, Some(parent), Vec3::new(1.0, 0.0, 0.0), false);
+    let child_rot = Quat::from_rotation_y(0.3);
+    let mut t = scene.world.transform_mut(child).unwrap();
+    t.rotation = child_rot;
+    t.scale = Vec3::new(1.0, 3.0, 1.0);
+    drop(t);
     let wp = world_pose(&scene, child).unwrap();
     assert!((wp.pos - (Vec3::new(1.0, 2.0, 3.0) + rot * Vec3::X * 2.0)).length() < 1e-5);
-    assert!((wp.scale - Vec3::splat(2.0)).length() < 1e-5);
+    assert!(
+        (wp.scale - Vec3::new(2.0, 6.0, 2.0)).length() < 1e-5,
+        "{}",
+        wp.scale
+    );
+    assert!(wp.rot.angle_between(rot * child_rot) < 1e-4);
     let (lp, lr) = world_to_local(&scene, child, wp.pos, wp.rot);
-    assert!((lp - Vec3::X).length() < 1e-5 && lr.angle_between(Quat::IDENTITY) < 1e-4);
+    assert!((lp - Vec3::X).length() < 1e-5);
+    assert!(lr.angle_between(child_rot) < 1e-4, "local rot {lr}");
     let owner = world_pose(&scene, parent).unwrap();
-    let (rp, _) = relative_pose(&owner, &wp);
+    let (rp, rr) = relative_pose(&owner, &wp);
     assert!(
         (rp - Vec3::X * 2.0).length() < 1e-5,
         "offset in world units: {rp}"
+    );
+    assert!(rr.angle_between(child_rot) < 1e-4, "relative rot {rr}");
+}
+
+#[test]
+fn kinematic_sweep_starts_from_the_offset_collider() {
+    // A Rigidbody-only kinematic owner whose one collider is a part at +3 x:
+    // moving the owner +1 x drives the part into a wall at x=4..5, so the
+    // sweep must stop it short (from the part's real place, not the origin).
+    let mut scene = Scene::new();
+    let owner = add(&mut scene, None, Vec3::ZERO, false);
+    rigidbody(&mut scene, owner, true, Vec3::ZERO);
+    add(&mut scene, Some(owner), Vec3::X * 3.0, true);
+    let wall = add(&mut scene, None, Vec3::new(4.5, 0.0, 0.0), true);
+    scene.world.set_static(wall, true);
+    let mut world = PhysicsWorld::from_scene(&scene);
+    scene.world.transform_mut(owner).unwrap().position = Vec3::X;
+    world.step(&mut scene, DT);
+    let x = pos(&scene, owner).x;
+    assert!(
+        (0.0..0.9).contains(&x),
+        "owner x {x} should stop at the wall"
     );
 }
