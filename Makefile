@@ -3,7 +3,8 @@
 #   make gates       everything CI blocks on, fastest-failing first
 #   make check       the fast edit loop
 #   make pre-commit  what the commit hook runs (formatting + size gate, staged files)
-#   make setup       once per clone: point git at the committed hooks in .githooks/
+#   make setup       once per clone: point git at the committed hooks in .githooks/,
+#                    and switch the compile cache on when sccache is installed
 #
 # Portable to GNU make 3.81 (what macOS ships): no .ONESHELL, no $(file), no ::=.
 # A target documented `## [gate]` must be listed in GATES and vice versa —
@@ -22,15 +23,42 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue
+.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
-		awk -F':.*## ' '{ printf "  %-12s %s\n", $$1, $$2 }'
+		awk -F':.*## ' '{ printf "  %-14s %s\n", $$1, $$2 }'
 
-setup: ## Once per clone: use the committed git hooks (.githooks/)
+setup: ## Once per clone: the committed git hooks, and the compile cache if sccache is installed
 	git config core.hooksPath .githooks
 	@echo "setup: pre-commit hook active (formatting + size gate)"
+	@$(MAKE) --no-print-directory compile-cache
+
+# The compile cache (#492). sccache stores each dependency compile under a hash of
+# its inputs, so a fresh worktree reuses what an earlier one built instead of
+# cold-compiling ~450 crates. rusty's own crate compiles incrementally, which
+# sccache passes through uncached: the edit loop is unchanged. The config goes in
+# the gitignored worktrees folder (cargo reads config from parent directories), so
+# it reaches every worktree and nothing else: not the user's other projects, not
+# CI. Machines without sccache get nothing written. The path is absolute because
+# cargo did not find a bare `sccache` from a config file. docs/testing.md has the numbers.
+CACHE_CONFIG = $(shell dirname "$$(git rev-parse --path-format=absolute --git-common-dir)")/.claude/worktrees/.cargo/config.toml
+CACHE_SIZE = 2G
+
+compile-cache: ## Switch the worktrees' compile cache on (needs sccache); rerun after installing it
+	@sccache="$$(command -v sccache)"; \
+	if [ -z "$$sccache" ]; then \
+		echo "compile-cache: off, sccache is not installed (cargo install --locked sccache, then make setup)"; \
+		exit 0; \
+	fi; \
+	mkdir -p "$(dir $(CACHE_CONFIG))" && \
+	printf '%s\n' \
+		'# Written by `make setup` (#492): the worktrees share a compile cache.' \
+		'# Delete this file to turn it off. docs/testing.md explains it.' \
+		'[build]' "rustc-wrapper = \"$$sccache\"" '' \
+		'[env]' '# Read when the sccache server starts; it evicts the oldest entries past this.' \
+		'SCCACHE_CACHE_SIZE = "$(CACHE_SIZE)"' > "$(CACHE_CONFIG)" && \
+	echo "compile-cache: on for every worktree ($(CACHE_CONFIG), cap $(CACHE_SIZE))"
 
 gates: $(SELF_CHECKS) $(GATES) ## Everything CI blocks on, fastest-failing first
 	@echo "gates: all green"

@@ -47,6 +47,8 @@ round, so the gate list cannot silently lose a gate.
   and the size gate on the staged `.rs` files — nothing else, so it stays under a
   second. Activate it once per clone with `make setup` (cloud sessions do it in
   `.claude/hooks/session-start.sh`). `git commit --no-verify` skips it; CI doesn't.
+  `make setup` also switches the worktrees' compile cache on when sccache is
+  installed (`docs/testing.md`, *The compile cache*).
 - **Before readying a PR:** `make gates`.
 - **CI:** `.github/workflows/{ci,lint}.yml` — the durable layer; survives `--no-verify`.
 

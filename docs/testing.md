@@ -271,3 +271,44 @@ Policy when driving parallel sub-agents:
 This is an orchestration policy, not a hard gate: the disk ceiling belongs to
 whichever machine the session runs on, so freeing space is the other lever. CI is
 unaffected (each job runs on its own runner).
+
+## The compile cache (sccache)
+
+A worktree's own `target/` means every new worktree compiles all ~450 dependency
+crates before it reaches a line of rusty. [sccache](https://github.com/mozilla/sccache)
+removes most of that (#492). It stores each compile under a hash of its inputs —
+source, flags, compiler, the outputs of its own dependencies — so a later worktree
+gets the same artifact back. That is **not** a shared target dir: a hit is the same
+output by construction, and nothing one worktree does can overwrite another's.
+
+**Switching it on** is opt-in, once per machine: `cargo install --locked sccache`,
+then `make setup` (or `make compile-cache` alone). It writes
+`.claude/worktrees/.cargo/config.toml` in the main clone — gitignored, and read by
+cargo in every worktree beneath it — naming sccache as the `rustc-wrapper` and
+capping the cache at 2 GB (`make setup CACHE_SIZE=4G` to change it; sccache evicts
+the oldest entries past the cap). Nothing else sees it: not the main checkout, not
+the user's other projects, not CI, which keeps `Swatinem/rust-cache`. Without sccache
+installed, `make setup` writes nothing. Delete the file to turn it off. The cache
+lives in sccache's default directory (`~/.cache/sccache` on Linux,
+`~/Library/Caches/Mozilla.sccache` on macOS) and holds a few hundred MB per
+dependency set, compressed — count it when checking `df -h`.
+
+What it does and does not cache, as measured when it was adopted (#492 has the
+numbers):
+
+- **Dependencies are cached**, and so is the C that build scripts compile through
+  the `cc` crate (vendored Lua among it). A fresh worktree hit ~95% of compiles and
+  its cold build took about a third of the uncached time. The misses are the crates
+  whose build scripts generate code into `target/` (serde, thiserror, proc-macro2)
+  and everything built on them (winit, egui-winit, gltf): that path is part of the
+  hash, and every worktree's path is new.
+- **rusty's own crate is never cached and stays incremental.** Cargo compiles
+  workspace crates with `-C incremental`; sccache declines those and runs rustc
+  untouched, so `target/debug/incremental` fills as before and a one-line edit
+  rebuilds as fast as without the wrapper. This was #492's rejection condition: a
+  cache that switched incremental compilation off would have slowed the edit loop,
+  the loop that matters most.
+- **Linked things are not cached**: build scripts, binaries and proc-macros. Linking
+  rusty's own binaries is the floor under a cold build.
+- **Switching the wrapper on or off does not invalidate `target/`**; cargo rebuilds
+  nothing because of it.
