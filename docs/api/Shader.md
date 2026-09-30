@@ -46,7 +46,20 @@ the catalog rather than guess block ids.
 
 Each block has an `id` from the pass's catalog and an optional `params` map (a param
 is a scalar like `0.6` or a small float array like `{1,0.5,0.25}` for a color).
-Unsupplied params fall back to the block's defaults. The assembler templates the
+Unsupplied params fall back to the block's defaults.
+
+**Params are checked, not guessed.** A param the block doesn't declare (`strenght`),
+an array where a number is expected, or a color with the wrong number of components
+is an **error** naming the block, its position (`blocks[i]`), the bad key and the
+params the block declares. The one convenience: a single number for a vector param
+broadcasts to every lane (`color = 0.5` is mid-gray). Unknown keys on the recipe or a
+block entry (`param` for `params`) are errors too.
+
+**A block may appear more than once.** Each entry is its own instance with its own
+params — two tints at different points in the chain, two `fresnel_rim`s in different
+colors, or a second fog band all compose. (In the assembled WGSL each instance's
+params are constants named `<id>_<index>_<param>`, `index` being its position in
+`blocks`, passed into the block's helper function, which is emitted once.) The assembler templates the
 blocks into a complete module **deterministically** — the same recipe always
 assembles byte-identical WGSL.
 

@@ -14,7 +14,7 @@
 //!
 //! Parsing is strict (#395): an unknown key anywhere — on the recipe, a node, or a
 //! ramp stop — is an error naming it, so a typo (`scael = 8`) never bakes silently
-//! with a default. [`Node`]'s check lives in [`node`].
+//! with a default. [`Node`]'s check lives in `recipe/node.rs`.
 
 mod node;
 
