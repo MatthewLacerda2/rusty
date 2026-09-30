@@ -1,45 +1,60 @@
-//! The directional-light shadow pass: a static depth map baked once per scene, copied
-//! into the active map each frame, with the dynamic casters drawn over it. Casters are
-//! drawn instanced, one draw per mesh (#470, `casters`).
+//! The directional-light shadow pass: cascaded shadow maps fitted to the camera (#435).
+//! Each cascade is one layer of a depth-array texture. Static casters are baked into a
+//! cached static array per cascade, re-baked only when that cascade's light volume
+//! moves (#355); each frame the static layers are copied into the active array and the
+//! dynamic casters drawn over them. Casters are drawn instanced, one draw per mesh per
+//! cascade (#470, `casters`).
 
+pub(crate) mod cascades;
 mod casters;
+mod frame;
 mod setup;
+mod uniform;
 
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::{GpuMesh, MeshId};
 use crate::scene::{Scene, SceneId};
+use cascades::{Cascade, MAX_CASCADES};
 use casters::{CasterBuffer, CasterFrame};
-use glam::{Mat4, Vec3};
+use glam::Mat4;
 use std::collections::HashMap;
 
+pub(crate) use uniform::CascadeUniform;
+
+/// Byte stride between the cascades' light-space matrices in the depth pass's uniform
+/// buffer — the dynamic-offset alignment wgpu guarantees on every backend.
+const LIGHT_SPACE_STRIDE: u64 = 256;
+
 pub struct ShadowRenderer {
-    pub static_texture: wgpu::Texture,
-    pub static_view: wgpu::TextureView,
-    pub active_texture: wgpu::Texture,
+    static_texture: wgpu::Texture,
+    active_texture: wgpu::Texture,
+    /// One render-target view per cascade layer, static and active.
+    static_layers: Vec<wgpu::TextureView>,
+    active_layers: Vec<wgpu::TextureView>,
+    /// The whole active array, as the forward shader samples it.
     pub active_view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,
-    pub bind_group_layout: wgpu::BindGroupLayout,
-    pub bind_group: wgpu::BindGroup,
 
     pipeline: wgpu::RenderPipeline,
     light_space_buffer: wgpu::Buffer,
-    pub light_space_matrix: Mat4,
+    /// This frame's cascades, fitted to the camera by [`Self::update_cascades`].
+    pub(crate) cascades: Vec<Cascade>,
 
-    /// Which scene's static casters are currently baked into the static depth map,
-    /// or `None` when it holds nothing usable (#355).
+    /// Per cascade: which scene's static casters are baked into that layer, and under
+    /// which light volume — `None` when it holds nothing usable (#355).
     ///
-    /// This was a bare `bool`, which is the single-scene assumption in its purest
-    /// form: scene A baked its statics and set the flag, then scene B saw "cached",
-    /// skipped its own bake, and sampled **A's** shadows — the phantom shadows the
-    /// Inspector preview showed. Naming the scene makes the cache answer the question
-    /// actually being asked: not "is something baked?" but "is *this* scene baked?"
-    static_cache_scene: Option<SceneId>,
+    /// Naming the scene keeps two scenes rendered in one frame (the editor viewport
+    /// and the Inspector preview) from sampling each other's statics; naming the
+    /// light volume re-bakes a cascade exactly when it moved (the camera crossed its
+    /// snap grid, or the sun turned) and never otherwise.
+    static_cache: [Option<(SceneId, Mat4)>; MAX_CASCADES],
 
     global_bind_group: wgpu::BindGroup,
     entity_layout: wgpu::BindGroupLayout,
 
-    /// The static bake's and the dynamic pass's caster matrices (#470) — two, because
-    /// both sweeps are recorded before one submit.
+    /// The static bake's and the dynamic pass's caster matrices (#470), every cascade
+    /// packed into one array each — two, because both sweeps are recorded before one
+    /// submit.
     static_casters: CasterBuffer,
     dynamic_casters: CasterBuffer,
     /// `(num_indices, instances)` of the caster draws since the renderer last cleared
@@ -50,17 +65,18 @@ pub struct ShadowRenderer {
 }
 
 impl ShadowRenderer {
-    pub const SHADOW_SIZE: u32 = 2048;
+    /// Resolution of each cascade's layer. Four 1024² cascades are the same memory
+    /// as the single 2048² map they replace (Unity's High tier splits one 2048 atlas
+    /// the same way), with the first cascade covering a few metres instead of 60.
+    pub const CASCADE_SIZE: u32 = 1024;
 
     pub fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
-        let (static_texture, static_view, active_texture, active_view) =
-            Self::create_depth_textures(device);
-        let (sampler, bind_group_layout, bind_group) =
-            Self::create_sampler_and_bind_group(device, &active_view);
+        let textures = Self::create_depth_textures(device);
+        let sampler = Self::create_sampler(device);
 
         let light_space_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Shadow Light Space Buffer"),
-            size: 64, // Mat4 size
+            size: LIGHT_SPACE_STRIDE * MAX_CASCADES as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -72,17 +88,16 @@ impl ShadowRenderer {
         let dynamic_casters = CasterBuffer::new(device, &entity_layout);
 
         Self {
-            static_texture,
-            static_view,
-            active_texture,
-            active_view,
+            static_texture: textures.static_texture,
+            active_texture: textures.active_texture,
+            static_layers: textures.static_layers,
+            active_layers: textures.active_layers,
+            active_view: textures.active_view,
             sampler,
-            bind_group_layout,
-            bind_group,
             pipeline,
             light_space_buffer,
-            light_space_matrix: Mat4::IDENTITY,
-            static_cache_scene: None,
+            cascades: Vec::new(),
+            static_cache: [None; MAX_CASCADES],
             global_bind_group,
             entity_layout,
             static_casters,
@@ -92,37 +107,37 @@ impl ShadowRenderer {
         }
     }
 
-    /// Whether the static depth map must be re-baked for `scene`: it holds another
-    /// scene's statics, or nothing at all.
+    /// Whether some cascade's static bake is not `scene`'s: it holds another scene's
+    /// statics, or nothing at all.
     pub fn needs_static_bake(&self, scene: SceneId) -> bool {
-        self.static_cache_scene != Some(scene)
+        let count = self.cascades.len().max(1);
+        self.static_cache[..count]
+            .iter()
+            .any(|baked| baked.map(|(s, _)| s) != Some(scene))
     }
 
-    /// Drop the static bake, so the next render re-bakes it. Called when the editor
-    /// changes something that moves static geometry.
+    /// Drop every static bake, so the next render re-bakes them. Called when the
+    /// editor changes something that moves static geometry.
     pub fn invalidate_static_cache(&mut self) {
-        self.static_cache_scene = None;
+        self.static_cache = [None; MAX_CASCADES];
     }
 
-    pub fn update_light_space(&mut self, queue: &wgpu::Queue, light_dir: Vec3) {
-        let norm_dir = light_dir.normalize();
-        // Position the shadow camera looking at the center of the scene
-        let center = Vec3::ZERO;
-        let shadow_cam_pos = center - norm_dir * 45.0;
-        let view = Mat4::look_at_rh(shadow_cam_pos, center, Vec3::Y);
-
-        // Orthographic projection suitable for typical scenes
-        let proj = Mat4::orthographic_rh(-30.0, 30.0, -30.0, 30.0, 1.0, 100.0);
-        self.light_space_matrix = proj * view;
-
-        queue.write_buffer(
-            &self.light_space_buffer,
-            0,
-            bytemuck::bytes_of(&self.light_space_matrix.to_cols_array()),
-        );
+    /// Adopt this frame's `cascades` and upload their light-space matrices.
+    pub fn update_cascades(&mut self, queue: &wgpu::Queue, cascades: Vec<Cascade>) {
+        for (i, cascade) in cascades.iter().enumerate() {
+            queue.write_buffer(
+                &self.light_space_buffer,
+                i as u64 * LIGHT_SPACE_STRIDE,
+                bytemuck::bytes_of(&cascade.light_space.to_cols_array()),
+            );
+        }
+        self.cascades = cascades;
     }
 
-    pub fn render_static(
+    /// Record the frame's shadow sweeps: re-bake the static layers whose light volume
+    /// moved, copy the static layers into the active array, and draw the dynamic
+    /// casters over each cascade.
+    pub fn render(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -136,85 +151,81 @@ impl ShadowRenderer {
             scene,
             gpu_meshes,
         };
-        let batches = self.prepare_casters(&frame, true);
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Shadow Static Render Pass"),
-                color_attachments: &[],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.static_view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-
-            self.draw_casters(&mut render_pass, gpu_meshes, &batches, true);
+        let key = |c: &Cascade| Some((scene.id(), c.light_space));
+        let stale: Vec<usize> = (0..self.cascades.len())
+            .filter(|&i| self.static_cache[i] != key(&self.cascades[i]))
+            .collect();
+        if !stale.is_empty() {
+            let batches = self.prepare_casters(&frame, true, &stale);
+            for (&i, batches) in stale.iter().zip(&batches) {
+                let view = &self.static_layers[i];
+                let mut pass = depth_pass(encoder, "Shadow Static Pass", view, true);
+                self.draw_casters(&mut pass, gpu_meshes, batches, true, i);
+            }
+            for i in stale {
+                self.static_cache[i] = key(&self.cascades[i]);
+            }
         }
 
-        self.static_cache_scene = Some(scene.id());
+        self.copy_static_layers(encoder);
+
+        let all: Vec<usize> = (0..self.cascades.len()).collect();
+        let batches = self.prepare_casters(&frame, false, &all);
+        for (i, batches) in batches.iter().enumerate() {
+            if batches.is_empty() {
+                continue;
+            }
+            let view = &self.active_layers[i];
+            let mut pass = depth_pass(encoder, "Shadow Dynamic Pass", view, false);
+            self.draw_casters(&mut pass, gpu_meshes, batches, false, i);
+        }
     }
 
-    pub fn render_dynamic(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        encoder: &mut wgpu::CommandEncoder,
-        scene: &Scene,
-        gpu_meshes: &HashMap<MeshId, GpuMesh>,
-    ) {
-        let size = wgpu::Extent3d {
-            width: Self::SHADOW_SIZE,
-            height: Self::SHADOW_SIZE,
-            depth_or_array_layers: 1,
+    /// Copy the frame's cascade layers from the static bake into the active array.
+    fn copy_static_layers(&self, encoder: &mut wgpu::CommandEncoder) {
+        let layer = |texture| wgpu::ImageCopyTexture {
+            texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
         };
-
         encoder.copy_texture_to_texture(
-            wgpu::ImageCopyTexture {
-                texture: &self.static_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
+            layer(&self.static_texture),
+            layer(&self.active_texture),
+            wgpu::Extent3d {
+                width: Self::CASCADE_SIZE,
+                height: Self::CASCADE_SIZE,
+                depth_or_array_layers: self.cascades.len().max(1) as u32,
             },
-            wgpu::ImageCopyTexture {
-                texture: &self.active_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            size,
         );
-
-        let frame = CasterFrame {
-            device,
-            queue,
-            scene,
-            gpu_meshes,
-        };
-        let batches = self.prepare_casters(&frame, false);
-
-        if !batches.is_empty() {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Shadow Dynamic Render Pass"),
-                color_attachments: &[],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.active_view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-
-            self.draw_casters(&mut render_pass, gpu_meshes, &batches, false);
-        }
     }
+}
+
+/// A depth-only pass over one cascade layer: cleared for a bake, loaded for the
+/// dynamic casters drawn over the copied statics.
+fn depth_pass<'a>(
+    encoder: &'a mut wgpu::CommandEncoder,
+    label: &str,
+    view: &'a wgpu::TextureView,
+    clear: bool,
+) -> wgpu::RenderPass<'a> {
+    let load = if clear {
+        wgpu::LoadOp::Clear(1.0)
+    } else {
+        wgpu::LoadOp::Load
+    };
+    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some(label),
+        color_attachments: &[],
+        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+            view,
+            depth_ops: Some(wgpu::Operations {
+                load,
+                store: wgpu::StoreOp::Store,
+            }),
+            stencil_ops: None,
+        }),
+        timestamp_writes: None,
+        occlusion_query_set: None,
+    })
 }

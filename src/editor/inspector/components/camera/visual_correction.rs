@@ -43,6 +43,7 @@ pub fn draw_visual_correction(
             draw_bloom(ui, world, id, &vc, is_dirty);
             draw_color_correction(ui, world, id, &vc, is_dirty);
             draw_ssr(ui, world, id, &vc, is_dirty);
+            draw_shadows(ui, world, id, &vc, is_dirty);
         },
     );
     if remove {
@@ -217,4 +218,38 @@ fn draw_ssr(
             *is_dirty = true;
         }
     }
+}
+
+/// The Shadows section: the sun's cascade count and reach (#435).
+fn draw_shadows(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    vc: &VisualCorrectionComponent,
+    is_dirty: &mut bool,
+) {
+    ui.add_space(3.0);
+    ui.label("Shadows");
+    let mut cascades = vc.shadows.cascades;
+    let max = crate::components::ShadowSettings::MAX_CASCADES;
+    ui.horizontal(|ui| {
+        ui.label("  Cascades:");
+        if ui.add(egui::Slider::new(&mut cascades, 1..=max)).changed() {
+            if let Some(mut c) = world.visual_correction_mut(id) {
+                vc_ops::set_shadow_cascades(&mut c, cascades);
+            }
+            *is_dirty = true;
+        }
+    });
+    let mut distance = vc.shadows.distance;
+    ui.horizontal(|ui| {
+        ui.label("  Distance:");
+        let drag = egui::DragValue::new(&mut distance).speed(1.0).suffix(" m");
+        if ui.add(drag).changed() {
+            if let Some(mut c) = world.visual_correction_mut(id) {
+                vc_ops::set_shadow_distance(&mut c, distance);
+            }
+            *is_dirty = true;
+        }
+    });
 }

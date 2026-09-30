@@ -1,13 +1,11 @@
 //! Shadow depth passes, dynamic global bind-group update, and the main scene
 //! render pass. The per-camera stacking loop + post-FX live in `draw`.
 
-use glam::Vec3;
-
 use crate::render::draw::batch::DrawBatch;
 use crate::render::draw::resources::{OutlineResource, Overlays};
 use crate::render::gpu::draw_buffers::DrawBuffers;
 use crate::render::{RenderView, Renderer};
-use crate::scene::{ClearFlags, LightType, Scene};
+use crate::scene::ClearFlags;
 
 /// The framebuffer clear behavior for one camera in the stack (#93). Derived from the
 /// camera's [`ClearFlags`] and whether it is the first (bottom) pass of the frame.
@@ -55,7 +53,6 @@ impl Renderer {
     pub(crate) fn execute_scene_pass(
         &mut self,
         view: &RenderView,
-        scene: &Scene,
         frame: ScenePassFrame,
         solid_batches: &[DrawBatch],
         overlays: &Overlays,
@@ -66,8 +63,7 @@ impl Renderer {
                 label: Some("Scene Render Encoder"),
             });
 
-        // A. Shadow depth sweep passes
-        self.run_shadow_passes(&mut encoder, scene);
+        // The shadow maps were rendered once for the frame (`run_shadow_passes`).
         // Bind active skybox view & sampler into the global group for reflections.
         self.update_global_bind_group();
         // B. Main scene + overlay pass.
@@ -155,46 +151,6 @@ impl Renderer {
             // editor-only gate. Visualization only — never drawn in a game render.
             self.draw_probe_overlays(&mut render_pass, &o.probes);
         }
-    }
-
-    /// Pick the directional caster, update light space, run static+dynamic shadow sweeps.
-    fn run_shadow_passes(&mut self, encoder: &mut wgpu::CommandEncoder, scene: &Scene) {
-        let mut dir_light_dir = Vec3::new(-0.5, -1.0, -0.3).normalize();
-        for id in scene.world.ids_with_light() {
-            if !scene.world.is_active(id) {
-                continue;
-            }
-            let light = scene.world.light(id).expect("id came from ids_with_light");
-            if light.light_type == LightType::Directional {
-                let transform = scene.world.transform(id).expect("mandatory Transform");
-                dir_light_dir = (transform.rotation * Vec3::NEG_Z).normalize();
-            }
-        }
-        self.shadow_renderer.instancing = self.instancing;
-        self.shadow_renderer
-            .update_light_space(&self.queue, dir_light_dir);
-        self.queue.write_buffer(
-            &self.shadow_uniform_buffer,
-            0,
-            bytemuck::bytes_of(&self.shadow_renderer.light_space_matrix.to_cols_array()),
-        );
-
-        if self.shadow_renderer.needs_static_bake(scene.id()) {
-            self.shadow_renderer.render_static(
-                &self.device,
-                &self.queue,
-                encoder,
-                scene,
-                &self.gpu_meshes,
-            );
-        }
-        self.shadow_renderer.render_dynamic(
-            &self.device,
-            &self.queue,
-            encoder,
-            scene,
-            &self.gpu_meshes,
-        );
     }
 
     /// Rebuild the group-0 bind group with the active skybox, but only when the skybox

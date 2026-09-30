@@ -1,31 +1,34 @@
-//! Construction of the shadow pass's GPU resources: the static + active depth maps, the
-//! comparison sampler the forward shader reads them through, and the depth-only
-//! pipeline. Split out of `shadows/mod.rs` so each file stays under the size cap.
+//! Construction of the shadow pass's GPU resources: the static + active cascade depth
+//! arrays, the comparison sampler the forward shader reads them through, and the
+//! depth-only pipeline. Split out of `shadows/mod.rs` so each file stays under the size
+//! cap.
 
+use super::cascades::MAX_CASCADES;
 use super::ShadowRenderer;
 use crate::render::gpu::bind_layouts::storage_entry;
 use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::shaders::ShaderRegistry;
 
-impl ShadowRenderer {
-    /// Allocate the static + active depth textures (and their default views).
-    pub(super) fn create_depth_textures(
-        device: &wgpu::Device,
-    ) -> (
-        wgpu::Texture,
-        wgpu::TextureView,
-        wgpu::Texture,
-        wgpu::TextureView,
-    ) {
-        let size = wgpu::Extent3d {
-            width: Self::SHADOW_SIZE,
-            height: Self::SHADOW_SIZE,
-            depth_or_array_layers: 1,
-        };
+/// The two cascade depth arrays and their views.
+pub(super) struct DepthTextures {
+    pub static_texture: wgpu::Texture,
+    pub active_texture: wgpu::Texture,
+    pub static_layers: Vec<wgpu::TextureView>,
+    pub active_layers: Vec<wgpu::TextureView>,
+    pub active_view: wgpu::TextureView,
+}
 
+impl ShadowRenderer {
+    /// Allocate the static + active depth arrays, one layer per cascade, with a
+    /// render-target view per layer and the active array's sampled view.
+    pub(super) fn create_depth_textures(device: &wgpu::Device) -> DepthTextures {
         let desc = wgpu::TextureDescriptor {
-            label: Some("Shadow Depth Texture"),
-            size,
+            label: Some("Shadow Cascade Depth Array"),
+            size: wgpu::Extent3d {
+                width: Self::CASCADE_SIZE,
+                height: Self::CASCADE_SIZE,
+                depth_or_array_layers: MAX_CASCADES as u32,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -36,24 +39,37 @@ impl ShadowRenderer {
                 | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         };
+        let layers = |texture: &wgpu::Texture| -> Vec<wgpu::TextureView> {
+            (0..MAX_CASCADES as u32)
+                .map(|layer| {
+                    texture.create_view(&wgpu::TextureViewDescriptor {
+                        dimension: Some(wgpu::TextureViewDimension::D2),
+                        base_array_layer: layer,
+                        array_layer_count: Some(1),
+                        ..Default::default()
+                    })
+                })
+                .collect()
+        };
 
         let static_texture = device.create_texture(&desc);
-        let static_view = static_texture.create_view(&wgpu::TextureViewDescriptor::default());
-
         let active_texture = device.create_texture(&desc);
-        let active_view = active_texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        (static_texture, static_view, active_texture, active_view)
+        let active_view = active_texture.create_view(&wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2Array),
+            ..Default::default()
+        });
+        DepthTextures {
+            static_layers: layers(&static_texture),
+            active_layers: layers(&active_texture),
+            static_texture,
+            active_texture,
+            active_view,
+        }
     }
 
-    /// Comparison sampler plus the layout/group that expose the depth map to the
-    /// main shader.
-    pub(super) fn create_sampler_and_bind_group(
-        device: &wgpu::Device,
-        active_view: &wgpu::TextureView,
-    ) -> (wgpu::Sampler, wgpu::BindGroupLayout, wgpu::BindGroup) {
-        // Sampler with comparison for hardware PCF shadows
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+    /// The comparison sampler the forward shader's PCF reads the cascades through.
+    pub(super) fn create_sampler(device: &wgpu::Device) -> wgpu::Sampler {
+        device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Shadow Sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -63,50 +79,11 @@ impl ShadowRenderer {
             mipmap_filter: wgpu::FilterMode::Nearest,
             compare: Some(wgpu::CompareFunction::LessEqual),
             ..Default::default()
-        });
-
-        // Bind group layout to expose shadow depth map to main shader
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Shadow Map Bind Group Layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Depth,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
-                    count: None,
-                },
-            ],
-        });
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Shadow Map Bind Group"),
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(active_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
-                },
-            ],
-        });
-
-        (sampler, bind_group_layout, bind_group)
+        })
     }
 
-    /// Global (light-space) and per-entity layouts used by the depth-only pass.
+    /// Global (light-space) and per-entity layouts used by the depth-only pass. The
+    /// light-space binding takes a dynamic offset: one matrix per cascade.
     pub(super) fn create_pass_layouts(
         device: &wgpu::Device,
         light_space_buffer: &wgpu::Buffer,
@@ -122,8 +99,8 @@ impl ShadowRenderer {
                 visibility: wgpu::ShaderStages::VERTEX,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+                    has_dynamic_offset: true,
+                    min_binding_size: wgpu::BufferSize::new(64),
                 },
                 count: None,
             }],
@@ -134,7 +111,11 @@ impl ShadowRenderer {
             layout: &global_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: light_space_buffer.as_entire_binding(),
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: light_space_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(64),
+                }),
             }],
         });
 

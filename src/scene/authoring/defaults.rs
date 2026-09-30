@@ -174,6 +174,7 @@ pub fn default_visual_correction() -> VisualCorrectionComponent {
         ssr_temporal_upsampling: true,
         tonemap: Tonemap::Aces,
         gamma: 1.0,
+        shadows: Default::default(),
     }
 }
 

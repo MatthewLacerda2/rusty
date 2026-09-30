@@ -23,8 +23,8 @@ pub(crate) struct GlobalBindings {
     pub global_bind_group: wgpu::BindGroup,
 }
 
-/// Shadow renderer, its light-space uniform buffer, and the main-pass bind group
-/// that samples the active shadow map.
+/// Shadow renderer, its cascade uniform buffer, and the main-pass bind group that
+/// samples the active cascade array.
 pub(crate) struct ShadowSystem {
     pub layout: wgpu::BindGroupLayout,
     pub renderer: shadows::ShadowRenderer,
@@ -185,15 +185,15 @@ fn create_global_bindings(
     }
 }
 
-/// Shadow renderer, its light-space uniform buffer, and the main-pass bind group
-/// that samples the active shadow map.
+/// Shadow renderer, its cascade uniform buffer, and the main-pass bind group that
+/// samples the active cascade array.
 fn create_shadow_system(device: &wgpu::Device, registry: &mut ShaderRegistry) -> ShadowSystem {
     let layout = bind_layouts::create_shadow_layout(device);
     let renderer = shadows::ShadowRenderer::new(device, registry);
 
     let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Shadow Uniform Buffer"),
-        size: 64, // Mat4 size
+        size: std::mem::size_of::<shadows::CascadeUniform>() as u64,
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });

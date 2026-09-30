@@ -14,7 +14,7 @@
 //!
 //! Allowed deps: components (the `VisualCorrectionComponent`/`Tonemap` data). Pure.
 
-use crate::components::{Tonemap, VisualCorrectionComponent};
+use crate::components::{ShadowSettings, Tonemap, VisualCorrectionComponent};
 
 /// Set the master visual-correction `active` flag.
 pub fn set_active(vc: &mut VisualCorrectionComponent, active: bool) {
@@ -77,6 +77,16 @@ pub fn set_ssr_temporal_upsampling(vc: &mut VisualCorrectionComponent, on: bool)
     vc.ssr_temporal_upsampling = on;
 }
 
+/// Set how many shadow cascades split the view, clamped to `1..=4`.
+pub fn set_shadow_cascades(vc: &mut VisualCorrectionComponent, count: u32) {
+    vc.shadows.cascades = count.clamp(1, ShadowSettings::MAX_CASCADES);
+}
+
+/// Set how far from the camera sun shadows reach, clamped to `≥ 1` world unit.
+pub fn set_shadow_distance(vc: &mut VisualCorrectionComponent, distance: f32) {
+    vc.shadows.distance = distance.max(ShadowSettings::MIN_DISTANCE);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -99,6 +109,7 @@ mod tests {
             ssr_temporal_upsampling: false,
             tonemap: Tonemap::Aces,
             gamma: 1.0,
+            shadows: Default::default(),
         };
         scene.world.set_visual_correction(id, Some(c));
         (scene, id)
@@ -114,6 +125,8 @@ mod tests {
         set_tonemap(&mut e, Tonemap::Reinhard);
         set_ssr_quality(&mut e, "High".to_string());
         set_ssr_temporal_upsampling(&mut e, true);
+        set_shadow_cascades(&mut e, 9);
+        set_shadow_distance(&mut e, -4.0);
         let vc = &*e;
         assert_eq!(vc.bloom_intensity, 0.0);
         assert_eq!(vc.bloom_threshold, 0.0);
@@ -121,5 +134,10 @@ mod tests {
         assert_eq!(vc.tonemap, Tonemap::Reinhard);
         assert_eq!(vc.ssr_quality, "High");
         assert!(vc.ssr_temporal_upsampling);
+        assert_eq!(vc.shadows.cascades, 4, "cascades clamp to the map's layers");
+        assert_eq!(
+            vc.shadows.distance, 1.0,
+            "shadow distance clamps to its floor"
+        );
     }
 }
