@@ -166,9 +166,9 @@ nightly workflow if regression pressure is wanted.
 
 The agentic workflow runs issues concurrently in isolated git **worktrees**
 (`.claude/worktrees/`), and each worktree gets its **own** Cargo `target/` —
-~12–16 GB once built. Neither place this runs has much room — a cloud session
-volume is ~38 GB usable, and the local dev machine's disk is usually most of the way
-full — so fanning out N parallel builds needs N × ~15 GB free and hits
+~12–16 GB once built. A cloud session volume is ~38 GB usable, and the local
+dev machine's free space varies — so fanning out N parallel builds needs N × ~15 GB
+free and hits
 `No space left on device` — failing at the **link** step, not compile, which is the
 tell-tale ENOSPC. Memory runs out at the same step: the dev machine's 16 GB carries
 one heavy build comfortably and two at a squeeze.

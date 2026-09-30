@@ -83,9 +83,10 @@ overriding it. Nothing in this repo enforces that — no gate refuses to run und
 an override — so it is on you.
 
 **Disk and memory are the binding constraints, and both fail at the link step.**
-Each worktree's `target/` is ~12–16 GB, and the dev machine's disk is usually most of
-the way full — so **check `df -h` for ~16 GB of headroom before launching a build**,
-and never trust a number written down here over what `df` says today. Running out
+Each worktree's `target/` is ~12–16 GB; a cloud session's volume is ~38 GB, and the
+local machine's free space varies — so **check `df -h` for ~16 GB of headroom before
+launching a build**, and never trust a number written down here over what `df` says
+today. Running out
 shows up as `No space left on device` at the **link** step, not at compile — the
 tell-tale ENOSPC. Memory is the other wall: 8 threads and 16 GB carry one heavy build
 comfortably and two at a squeeze, and rustc's linker is where it runs out. So
