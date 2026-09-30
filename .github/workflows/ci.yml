@@ -28,6 +28,13 @@ on:
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
+    inputs:
+      # The nightly sweep skips a commit a finished sweep already covered (#506);
+      # this forces it anyway (e.g. after changing the sweep itself).
+      force_mutants:
+        description: Run the full mutation sweep even if a finished sweep already covered this commit
+        type: boolean
+        default: false
 
 # Cancel superseded runs (#482): a new push to a PR makes its previous run stale,
 # so that run is cancelled instead of finishing beside the new one. Only
@@ -621,6 +628,56 @@ jobs:
           name: mutants-pr-report
           path: mutants.out/
 
+  # Decides whether tonight's sweep would measure anything new (#506). On a night
+  # with no merges `main` has not moved, and the report of the last *finished*
+  # sweep of this commit is still the current answer — re-running it holds five
+  # runners for ~7 h to reproduce it. "Finished" means `mutants-report` saw every
+  # shard complete and wrote `sweep-complete` into its artifact; a sweep with a
+  # cut-off shard left mutants unmeasured and does not count. Fails open: if the
+  # lookup itself errors, the sweep runs (a wasted night beats a silent gap), and
+  # this job never fails, so a skipped sweep reads as `skipped` — not red — to
+  # main-health. `force_mutants` on a manual dispatch bypasses the lookup.
+  mutants-plan:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      actions: read   # list this workflow's past runs and read their artifacts
+    outputs:
+      sweep: ${{ steps.plan.outputs.sweep }}
+    steps:
+      - name: Look for a finished sweep of this commit
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force_mutants }}
+        run: |
+          decide() {
+            echo "sweep=$1" >> "$GITHUB_OUTPUT"
+            echo "$2" | tee -a "$GITHUB_STEP_SUMMARY"
+          }
+          if [ "$FORCE" = true ]; then
+            decide true "Mutation sweep forced by \`force_mutants\`."; exit 0
+          fi
+          # Newest first; the run in progress is not `completed`, so never matches.
+          if ! runs=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$SHA&status=completed&per_page=100" \
+                --jq '.workflow_runs[] | select(.event == "schedule" or .event == "workflow_dispatch") | "\(.id) \(.html_url)"'); then
+            echo '::warning::could not list past runs; sweeping to be safe'
+            decide true "Mutation sweep runs: the past-run lookup failed."; exit 0
+          fi
+          while read -r id url; do
+            [ -n "$id" ] || continue
+            dir=$(mktemp -d)
+            gh run download "$id" -R "$REPO" -n mutants-report -D "$dir" >/dev/null 2>&1 || continue
+            if [ -f "$dir/sweep-complete" ]; then
+              decide false "Mutation sweep skipped: \`$SHA\` was fully swept by $url — its \`mutants-report\` is still current. Dispatch with \`force_mutants\` to re-run."
+              exit 0
+            fi
+          done <<< "$runs"
+          decide true "Mutation sweep runs: no finished sweep covers \`$SHA\` yet."
+
   # Nightly full-sim mutation sweep — the report-only backstop. Unlike the per-PR
   # diff run, this re-mutates the *entire* deterministic sim (app/scripting/physics/
   # navigation), re-examining untouched code the diff run never touches and
@@ -641,9 +698,12 @@ jobs:
   # `max-parallel` leaves most of the account's concurrent-job allowance free for
   # PR runs of an overnight batch; wall-clock time is irrelevant to a nightly
   # report. `mutants-report` merges the shards into one summary.
+  #
+  # Skipped when `mutants-plan` finds a finished sweep of this very commit (#506).
   mutants:
+    needs: mutants-plan
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: needs.mutants-plan.outputs.sweep == 'true'
     continue-on-error: true
     strategy:
       fail-fast: false
@@ -701,7 +761,9 @@ jobs:
   # silence from it is not a clean bill.
   mutants-report:
     needs: mutants
-    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    # Runs whenever the sweep ran — even if shards failed — but not when
+    # `mutants-plan` skipped it: there is nothing to merge.
+    if: always() && needs.mutants.result != 'skipped'
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -736,6 +798,8 @@ jobs:
               echo "> ⚠️ Shards that did not finish (of $total):$unfinished — their mutants are unmeasured, not clean. \`exit:none\` means the shard was cut off (the 6 h ceiling) or failed before its run; resize the matrix if it recurs."
             else
               echo "> All $total shards finished."
+              # The marker `mutants-plan` looks for (#506): this commit is covered.
+              echo "$total" > mutants.out/sweep-complete
             fi
             if [ -s mutants.out/missed.txt ]; then
               echo ''

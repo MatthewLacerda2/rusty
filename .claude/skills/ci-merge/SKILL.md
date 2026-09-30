@@ -211,7 +211,7 @@ remember to launch.
 
 | | per pull request | the backstop |
 |---|---|---|
-| mutation | `mutants-pr`, `--in-diff`, sticky comment | `mutants`, nightly, full sim in 10 shards, `mutants-report` summary + artifact |
+| mutation | `mutants-pr`, `--in-diff`, sticky comment | `mutants`, nightly, full sim in 10 shards, `mutants-report` summary + artifact; skipped on a night `main` has not moved (the last finished report still stands) |
 | coverage | `coverage-pr`, `diff-cover`, sticky comment | `coverage`, post-merge on `main`, ratchet table |
 
 Three things about their scope, all of which change how a clean report reads:
