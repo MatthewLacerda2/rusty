@@ -6,7 +6,7 @@
 
 use glam::{Quat, Vec3};
 
-use super::compound::{plan, relative_pose, world_pose, world_to_local};
+use super::compound::{plan, relative_pose, world_pose, world_to_local, WorldPose};
 use super::PhysicsWorld;
 use crate::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
 use crate::scene::Scene;
@@ -198,5 +198,76 @@ fn pose_helpers_invert_each_other_under_a_scaled_rotated_parent() {
     assert!(
         (rp - Vec3::X * 2.0).length() < 1e-5,
         "offset in world units: {rp}"
+    );
+}
+
+#[test]
+fn child_scale_multiplies_the_parent_scale() {
+    let mut scene = Scene::new();
+    let parent = add(&mut scene, None, Vec3::ZERO, false);
+    scene.world.transform_mut(parent).unwrap().scale = Vec3::splat(2.0);
+    let child = add(&mut scene, Some(parent), Vec3::X, false);
+    scene.world.transform_mut(child).unwrap().scale = Vec3::splat(3.0);
+    let wp = world_pose(&scene, child).unwrap();
+    assert!(
+        (wp.scale - Vec3::splat(6.0)).length() < 1e-5,
+        "{}",
+        wp.scale
+    );
+}
+
+#[test]
+fn world_to_local_unrotates_by_the_parent() {
+    // A world-identity rotation under a +90° yaw parent is a -90° local yaw,
+    // which maps +x to +z (a +90° yaw would give -z, a half-turn +45° neither).
+    let mut scene = Scene::new();
+    let parent = add(&mut scene, None, Vec3::ZERO, false);
+    scene.world.transform_mut(parent).unwrap().rotation = Quat::from_rotation_y(90f32.to_radians());
+    let child = add(&mut scene, Some(parent), Vec3::X, false);
+    let (_, lr) = world_to_local(&scene, child, Vec3::ZERO, Quat::IDENTITY);
+    assert!((lr * Vec3::X - Vec3::Z).length() < 1e-5, "{}", lr * Vec3::X);
+}
+
+#[test]
+fn relative_pose_carries_the_rotational_offset() {
+    // Owner yawed +90°, part yawed +90° then pitched +90° about x: relative to
+    // the owner the part is only the pitch, which maps +y to +z.
+    let yaw = Quat::from_rotation_y(90f32.to_radians());
+    let pitch = Quat::from_rotation_x(90f32.to_radians());
+    let owner = WorldPose {
+        pos: Vec3::ZERO,
+        rot: yaw,
+        scale: Vec3::ONE,
+    };
+    let part = WorldPose {
+        pos: Vec3::X,
+        rot: yaw * pitch,
+        scale: Vec3::ONE,
+    };
+    let (rp, rr) = relative_pose(&owner, &part);
+    assert!(
+        (rp - Vec3::Z).length() < 1e-5,
+        "+x is +z in the owner frame: {rp}"
+    );
+    assert!((rr * Vec3::Y - Vec3::Z).length() < 1e-5, "{}", rr * Vec3::Y);
+    assert!((rr * Vec3::X - Vec3::X).length() < 1e-5, "{}", rr * Vec3::X);
+}
+
+#[test]
+fn kinematic_sweep_starts_from_the_collider_offset() {
+    // A kinematic body whose only collider is a part 2 m ahead on +x: driven
+    // 3 m toward a wall at x=4.5, the part (not the body origin) hits it.
+    let mut scene = Scene::new();
+    let body = add(&mut scene, None, Vec3::ZERO, false);
+    rigidbody(&mut scene, body, true, Vec3::ZERO);
+    add(&mut scene, Some(body), Vec3::X * 2.0, true);
+    add(&mut scene, None, Vec3::new(4.5, 0.0, 0.0), true); // wall face at x=4
+    let mut world = PhysicsWorld::from_scene(&scene);
+    scene.world.transform_mut(body).unwrap().position = Vec3::X * 3.0;
+    world.step(&mut scene, DT);
+    let x = pos(&scene, body).x;
+    assert!(
+        x > 1.0 && x < 1.6,
+        "part stops at the wall face: body x {x}"
     );
 }
