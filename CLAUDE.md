@@ -23,7 +23,7 @@ craft — it is the reason the gates below are strict.
 ## Start here
 - **README.md** — what the engine is and what you can do with it.
 - **docs/** — `linting.md` (the gate), `testing.md`, `scripting-api.md` (the Lua API
-  game scripts use). The Rust API reference is generated: `cargo doc --no-deps`.
+  game scripts use), `ui.md` (the in-game UI model). The Rust API reference is generated: `cargo doc --no-deps`.
 - **auxmd.md** *(gitignored)* — the operator's short-term scratchpad; read it if a
   session points you there.
 

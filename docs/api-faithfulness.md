@@ -284,6 +284,21 @@ determinism, no file written on a rejected patch).
 | `Bake` / `BakeJson` | ✅ | sim — writes a `.wav` decoded by `ClipCache` and played by the `AudioMaestro` (via `Audio.PlayAt` or an `AudioSource.clip`); limited at bake so it cannot clip |
 | `ToJson` | ✅ | round-trip — the patch's canonical serde form; re-bakes byte-identically |
 
+### `Canvas` — over `Entity.canvas` (#417)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetRenderMode` | ✅ | round-trips; single-valued (`ScreenSpaceOverlay`) until #429 adds the modes the UI render pass (#418) will branch on |
+| `SetSortOrder` | ✅ | sim — `ui::UiLayout::compute` orders root canvases by it (draw / hit order); round-trips |
+| `SetReferenceResolution` | ✅ | sim — `CanvasComponent::scale_factor` / `size` in the layout pass; round-trips (`tests/ui_api.rs`) |
+| `SetMatchWidthOrHeight` | ✅ | sim — same scaler read; round-trips |
+
+### `RectTransform` — over `Entity.rect_transform` (#417)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetAnchorMin` / `SetAnchorMax` / `SetPivot` / `SetAnchoredPosition` / `SetSizeDelta` | ✅ | sim — `RectTransformComponent::layout_in` in the `LateUpdate` layout pass (`Resources::ui_layout`) and `UI.GetRect`; round-trips (`tests/ui_api.rs`) |
+
 ### `Debug` (dev-only) — over `ConsoleLogs`
 
 | Setter | Status | Read-site |
@@ -294,7 +309,7 @@ determinism, no file written on a rejected patch).
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 75 |
+| ✅ faithful | 84 |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 
