@@ -19,6 +19,7 @@ mod eval;
 mod lifecycle;
 mod loader;
 mod manager;
+mod sandbox;
 mod schema;
 
 pub use console::{ConsoleLogs, LogLevel};
@@ -40,6 +41,8 @@ mod tests_lifecycle;
 mod tests_manager;
 #[cfg(test)]
 mod tests_physics;
+#[cfg(test)]
+mod tests_sandbox;
 #[cfg(test)]
 mod tests_spatial;
 #[cfg(test)]

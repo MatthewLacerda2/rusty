@@ -6,6 +6,7 @@ use std::rc::Rc;
 use crate::api::ApiScopedCtx;
 use crate::audio::AudioMaestro;
 use crate::core::input::InputState;
+use crate::core::random::Random;
 use crate::core::storage::Storage;
 use crate::core::video::VideoSettings;
 use crate::navigation::NavigationGraph;
@@ -79,6 +80,10 @@ pub struct ScriptManager {
     /// layer so the `Audio` namespace drives the same maestro the systems do.
     /// Defaults to a maestro with a no-op backend (harness/tests need no device).
     pub(super) audio: Rc<RefCell<AudioMaestro>>,
+    /// The seeded gameplay RNG (#443) behind `Random` and the sandboxed
+    /// `math.random`. Restarted from its fixed default seed by every
+    /// [`ScriptManager::init_runtime`], i.e. on every Play.
+    pub(super) random: Rc<RefCell<Random>>,
 }
 
 impl ScriptManager {
@@ -107,6 +112,7 @@ impl ScriptManager {
             scene_path: Rc::new(RefCell::new(None)),
             is_playing: Rc::new(RefCell::new(false)),
             audio: Rc::new(RefCell::new(AudioMaestro::default())),
+            random: Rc::new(RefCell::new(Random::default())),
         }
     }
 
@@ -188,7 +194,10 @@ impl ScriptManager {
     ) -> Result<(), String> {
         self.physics = Rc::clone(physics);
 
-        let lua = Lua::new();
+        // Deterministic sandbox (#443): no `os`/`io`, `math.random` over the
+        // seeded RNG — which restarts from its default seed with every fresh VM.
+        let lua = super::sandbox::new_sim_vm()?;
+        *self.random.borrow_mut() = Random::default();
 
         // Override print to write to our console panel. This stays as a
         // `lua.create_function` (static closure) because `print` is in the
@@ -231,6 +240,7 @@ impl ScriptManager {
             scene_path: &self.scene_path,
             is_playing: &self.is_playing,
             audio: &self.audio,
+            random: &self.random,
         }
     }
 

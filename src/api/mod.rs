@@ -2,7 +2,7 @@
 //!
 //! The single stable API surface shared by Lua scripts, the console REPL and
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
-//! `Scene`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
+//! `Scene`, `Random`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
 //! `Assets`, `Texture`, `Shader`, `Sound`, `Particles`, `Layers`, `Graphics`, `Video`,
 //! `Storage`, plus the dev-only `Debug`)
 //! is registered from this tree onto the live Lua runtime.
@@ -31,6 +31,7 @@ pub mod nav;
 pub mod particle;
 pub mod physics;
 pub mod probe;
+pub mod random;
 pub mod reflection;
 pub mod scene;
 pub mod scene_prefab;
@@ -50,6 +51,7 @@ use mlua::{Function, Lua, Table};
 
 use crate::audio::AudioMaestro;
 use crate::core::input::InputState;
+use crate::core::random::Random;
 use crate::core::storage::Storage;
 use crate::core::video::VideoSettings;
 use crate::navigation::NavigationGraph;
@@ -95,6 +97,9 @@ pub struct ApiScopedCtx<'scope> {
     /// (Play/Stop/SetVolume/PlayAt + master volume). The same maestro the play-mode
     /// systems use, so a scripted play and `play_on_start` share one device + log.
     pub audio: &'scope RefCell<AudioMaestro>,
+    /// The seeded gameplay RNG (#443): the `Random` namespace and the sandboxed
+    /// `math.random` both draw from it.
+    pub random: &'scope RefCell<Random>,
 }
 
 /// Register every namespace onto `lua` using `scope`-tied closures that borrow
@@ -127,6 +132,7 @@ pub fn register<'lua, 'scope>(
     physics::register(lua, scope, ctx.scene)?;
     physics::register_hitscan(lua, scope, ctx.scene, ctx.physics)?;
     time::register(lua, scope, ctx.time)?;
+    random::register(lua, scope, ctx.random)?;
     camera::register(lua, scope, ctx.camera)?;
     light::register(lua, scope, ctx.scene)?;
     probe::register(lua, scope, ctx.scene)?;

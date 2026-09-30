@@ -295,6 +295,8 @@ is the only difference between an empty marker and a fully-dressed enemy.
 - **Determinism.** The sim is a pure function of (seed, inputs, fixed dt). Wall-clock
   reads and unseeded RNG are banned from the sim modules (`app`, `scripting`,
   `physics`, `navigation`); the platform layer (`main.rs`, `render`, `dev`) is exempt.
+  Scripts run inside the sim too: the gameplay Lua VM has no `os`/`io`, and
+  `math.random` routes to the seeded `Random` resource (`core::random`, #443).
 - **Use `glam`** for all math; keep egui / wgpu / mlua decoupled.
 - **Single crate.**
 - **Ships for macOS and Linux; Windows comes later.** Those two are the platforms rusty
