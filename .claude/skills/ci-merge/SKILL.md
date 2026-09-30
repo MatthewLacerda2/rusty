@@ -66,7 +66,7 @@ if anything was handed back.
 What it leaves to you: it **builds nothing** (`make gates` before readying is the
 author's job), never reads the mutation or coverage signal, and **removes no
 worktree and deletes no branch** — the summary lists the merged ones. Remove each
-worktree (~12–16 GB) and its branch once nobody is standing in it.
+worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standing in it.
 
 - `ARGS=--dry-run` reads everything and computes the rebase locally, but pushes,
   comments and merges nothing — use it to see what a queue *would* do.
