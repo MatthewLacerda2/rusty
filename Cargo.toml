@@ -97,7 +97,7 @@ ab_glyph = "0.2.32"
 # Its OpenType parser, read directly for GPOS pair kerning (ab_glyph reads only the
 # legacy `kern` table). Already in the tree through ab_glyph: same version.
 ttf-parser = "0.25.1"
-rodio = { version = "0.19", default-features = false, features = ["symphonia-vorbis", "symphonia-wav"] }
+rodio = { version = "0.19", default-features = false, features = ["symphonia-vorbis", "symphonia-wav", "symphonia-mp3"] }
 # Not used by rusty's code (#552). proptest turns on getrandom's `std` feature (via
 # rand_core), so without this line `cargo build` and `cargo test` resolve getrandom
 # differently. That split rebuilt ahash, hashbrown, hecs, the wgpu and egui stacks

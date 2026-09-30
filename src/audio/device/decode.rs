@@ -1,6 +1,6 @@
 //! src/audio/device/decode.rs — path-cached PCM decode (#212).
 //!
-//! Decodes `.ogg` / `.wav` files to in-memory PCM **once per path** and caches the
+//! Decodes `.ogg` / `.wav` / `.mp3` files to in-memory PCM **once per path** and caches the
 //! result, so replaying a clip (a footstep fired hundreds of times) re-reads neither
 //! the disk nor the decoder. A cached clip is the raw interleaved `i16` samples plus
 //! the channel count and sample rate — everything `rodio` needs to build a fresh
@@ -50,30 +50,35 @@ impl ClipCache {
 
     /// Decode `path` to PCM, caching the result (including a cached *failure* as
     /// `None`, so a missing/garbage file isn't retried every play). Returns the
-    /// cached clip, or `None` when the file can't be opened/decoded.
+    /// cached clip, or `None` when the file can't be opened/decoded — logged once,
+    /// on the first attempt, so an unplayable clip is never silent *and* unexplained.
     pub fn get_or_decode(&mut self, path: &str) -> Option<CachedClip> {
         if let Some(entry) = self.clips.get(path) {
             return entry.clone();
         }
         let decoded = decode_file(path);
+        if let Err(why) = &decoded {
+            log::warn!("[Audio] clip '{path}' did not decode ({why}); it will play silence");
+        }
+        let decoded = decoded.ok();
         self.clips.insert(path.to_string(), decoded.clone());
         decoded
     }
 }
 
 /// Decode one file to interleaved `i16` PCM. `rodio`'s `Decoder` sniffs the
-/// container (`.ogg` Vorbis / `.wav`) from the stream, so the extension need not be
-/// trusted. Returns `None` on any open/decode error.
-fn decode_file(path: &str) -> Option<CachedClip> {
-    let file = File::open(path).ok()?;
-    let decoder = Decoder::new(BufReader::new(file)).ok()?;
+/// container (`.ogg` Vorbis / `.wav` / `.mp3`) from the stream, so the extension need not be
+/// trusted. Errs with a human-readable reason on any open/decode failure.
+fn decode_file(path: &str) -> Result<CachedClip, String> {
+    let file = File::open(path).map_err(|e| e.to_string())?;
+    let decoder = Decoder::new(BufReader::new(file)).map_err(|e| e.to_string())?;
     let channels = decoder.channels();
     let sample_rate = decoder.sample_rate();
     let samples: Vec<i16> = decoder.collect();
     if samples.is_empty() {
-        return None;
+        return Err("no samples".to_string());
     }
-    Some(CachedClip {
+    Ok(CachedClip {
         channels,
         sample_rate,
         samples: Arc::new(samples),
@@ -91,6 +96,28 @@ mod tests {
         // Second call hits the cached `None` (no re-attempt); still `None`.
         assert!(cache.get_or_decode("does/not/exist.ogg").is_none());
         assert!(cache.clips.contains_key("does/not/exist.ogg"));
+    }
+
+    /// 250 ms of a 440 Hz sine, mono (LAME resamples it to 22.05 kHz at 32 kbps);
+    /// regenerate with
+    /// `fixtures/make_tone_mp3.py`.
+    const TONE_MP3: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/audio/device/fixtures/tone.mp3"
+    );
+
+    #[test]
+    fn mp3_decodes_to_the_tone_it_was_encoded_from() {
+        let clip = ClipCache::new()
+            .get_or_decode(TONE_MP3)
+            .expect("the MP3 decoder is enabled (#545)");
+        assert_eq!((clip.channels, clip.sample_rate), (1, 22_050));
+        // Roughly the encoded 250 ms (the encoder pads a frame or two either side).
+        let secs = clip.samples.len() as f32 / 22_050.0;
+        assert!((0.24..0.35).contains(&secs), "{secs} s decoded");
+        // A real tone, not decoded silence: peaks near the half-scale amplitude.
+        let peak = clip.samples.iter().map(|s| s.unsigned_abs()).max().unwrap();
+        assert!((12_000..20_000).contains(&peak), "peak {peak}");
     }
 
     #[test]

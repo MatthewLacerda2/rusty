@@ -5,7 +5,8 @@ entity carries an `AudioSource` component (`clip`, `volume`, `loop`,
 `play_on_start`, `is_time_scaled`, plus the spatial fields `spatial_blend`,
 `initial_distance`, `final_distance`); these verbs start/stop and retune it, fire
 one-shots, set the single master volume, and read a source's resolved 3D spatial
-state. Decode is `.ogg` / `.wav`, path-cached.
+state. Decode is `.ogg` (Vorbis) / `.wav` / `.mp3`, path-cached; a clip that fails to
+decode logs one warning naming the file and plays nothing.
 
 `Play`/`Stop`/`PlayAt` return a `bool` that is `true` when the maestro accepted the
 voice; on the **headless harness the audio backend is a no-op**, so playback makes no
