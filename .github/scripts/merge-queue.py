@@ -423,7 +423,13 @@ def wait_for(
 def dry(repo: str, pull: dict, fresh: str, notes: list[str]) -> tuple[int, str, str]:
     """The dry run's report: what would happen, and the verdict on today's head."""
     number, head = pull["number"], pull["headRefOid"]
-    moved = f"would push {fresh[:7]}, then wait for CI on it" if push_needed(head, fresh) else "already on `main`; nothing to push"
+    if notes:
+        # Dependabot's branch, behind `main`: [`bot_head`] said what it would do.
+        moved, notes = notes[0].rstrip("."), notes[1:]
+    elif push_needed(head, fresh):
+        moved = f"would push {fresh[:7]}, then wait for CI on it"
+    else:
+        moved = "already on `main`; nothing to push"
     runs, jobs = mergeable.evidence(repo, head)
     ok, lines = mergeable.judge(pull, runs, jobs, mergeable.paths(pull))
     say(f"#{number}: {moved}.", *notes, f"today's head {head[:7]}: {'mergeable' if ok else 'not mergeable'} — {lines[0]}", *lines[1:])

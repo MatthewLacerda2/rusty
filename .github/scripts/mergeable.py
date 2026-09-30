@@ -324,10 +324,12 @@ def assess(
         # report it was written to distrust.
         lines.append(f"Skipped: {', '.join(skipped)}.")
     if len(runs) > 1:
+        # Said out loud: "which run answered" is what scorsese#245 was about.
+        dropped = len(runs) - len(kept)
+        why = f" ({dropped} cancelled and superseded)" if dropped else ""
         lines.append(
-            f"{len(runs)} `{workflow}` runs exist for this commit"
-            f" ({len(runs) - len(kept)} cancelled and superseded); none failed,"
-            " and this is the one that checked it."
+            f"{len(runs)} `{workflow}` runs exist for this commit{why}; none"
+            " failed, and this is the one that checked it."
         )
     return PASSED, lines
 

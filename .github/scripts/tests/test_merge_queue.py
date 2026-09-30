@@ -278,6 +278,16 @@ class Taking(unittest.TestCase):
         self.assertEqual(fresh, "3" * 40)
         self.assertIn(queue.BOT_REBASE, called.call_args.args[0])
 
+    def test_a_dry_run_on_dependabot_behind_main_says_what_it_would_do(self):
+        bot = {**READY, "author": {"login": "app/dependabot"}}
+        with mock.patch.object(queue, "bot_head", return_value=(SHA, ["would comment `@dependabot rebase`."])):
+            (_, state, why), rebased, called, _ = self.take("--dry-run", pull=bot)
+        self.assertEqual(state, queue.DRY)
+        self.assertIn("would comment", why)
+        self.assertNotIn("already on", why)
+        rebased.assert_not_called()
+        called.assert_not_called()
+
     def test_dependabot_in_a_dry_run_is_not_commented_on(self):
         opts = queue.parse(["524", "--dry-run"])
         with mock.patch.object(queue, "on_tip", return_value=False), \
