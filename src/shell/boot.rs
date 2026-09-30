@@ -144,6 +144,7 @@ impl Shell {
     ) -> Self {
         init_audio(game);
         let mut shell = Self {
+            clipboard: super::input::clipboard_source::OsClipboard::open(&window),
             window,
             renderer,
             clock: FrameClock::new(Instant::now()),
@@ -152,6 +153,7 @@ impl Shell {
             cursor: super::input::CursorPolicy::default(),
             pad_source: super::input::pad_source::GilrsSource::open(),
             pads: super::input::pads::PadPump::default(),
+            modifiers: winit::keyboard::ModifiersState::empty(),
             window_focused: true,
             // A bind failure logs to the game's console and leaves the channel `None`.
             #[cfg(feature = "dev")]
