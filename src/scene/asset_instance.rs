@@ -21,6 +21,7 @@ use glam::Vec3;
 use crate::asset::{self, ImportedAsset};
 use crate::components::{ColliderComponent, MaterialComponent};
 use crate::scene::authoring::material_asset_from_import;
+use crate::scene::lod_instance::instantiate_lod_set;
 use crate::scene::Scene;
 
 /// Spawn one entity from a path-based asset reference (`path::sub_object`), placed
@@ -34,6 +35,10 @@ use crate::scene::Scene;
 /// the reference is malformed, the file fails to import, or the sub-object is
 /// absent — the same failures `import_sub_mesh` surfaces, but caught up front so a
 /// bad reference never produces an empty-geometry phantom entity.
+///
+/// A sub-object name that is the base of a `_LOD<n>` set (`crate.glb::Crate` for
+/// `Crate_LOD0`, `Crate_LOD1`) spawns the whole set as one LODGroup entity instead
+/// (#472, `scene::lod_instance`); its id is the group's.
 pub fn instantiate_asset(
     scene: &mut Scene,
     reference: &str,
@@ -44,9 +49,13 @@ pub fn instantiate_asset(
     let asset = asset::import_and_sync_sidecar(std::path::Path::new(&asset_ref.path))
         .map_err(|e| e.to_string())?;
     if asset.sub_mesh(&asset_ref.sub_object).is_none() {
-        return Err(format!(
-            "asset reference '{reference}' has no such sub-object"
-        ));
+        // A `_LOD<n>` set's base name addresses the whole set (#472).
+        return match asset::lod::lod_set(&asset, &asset_ref.sub_object) {
+            Some(set) => instantiate_lod_set(scene, &asset_ref.path, &asset, &set, name, position),
+            None => Err(format!(
+                "asset reference '{reference}' has no such sub-object"
+            )),
+        };
     }
 
     let label = name.unwrap_or(&asset_ref.sub_object);

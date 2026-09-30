@@ -7,12 +7,12 @@
 use serde_json::{json, Value};
 
 use super::vec3;
-use crate::components::JointComponent;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ColliderComponent, ColliderShape,
     LightComponent, LightType, MaterialAsset, MeshComponent, NavMeshAgentComponent,
     ParticleEmitterComponent, RigidBodyComponent,
 };
+use crate::components::{JointComponent, LodGroupComponent};
 
 /// Mesh identity: the primitive kind and, for imported meshes, the
 /// `path::sub_object` asset reference. Never the GPU geometry.
@@ -217,4 +217,15 @@ pub(crate) fn joint_value(j: &JointComponent) -> Value {
         "break_torque": j.break_torque,
         "enable_collision": j.enable_collision,
     })
+}
+
+/// LODGroup (#472): its size and levels, finest first — each level's screen height
+/// and renderer ids.
+pub(crate) fn lod_group_value(g: &LodGroupComponent) -> Value {
+    let levels: Vec<Value> = g
+        .levels
+        .iter()
+        .map(|l| json!({ "screen_height": l.screen_height, "renderers": l.renderers }))
+        .collect();
+    json!({ "size": g.size, "levels": levels })
 }

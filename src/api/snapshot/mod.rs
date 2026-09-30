@@ -22,11 +22,11 @@ use crate::components::TransformComponent;
 use crate::ecs::World;
 use crate::scene::Camera;
 use crate::scene::Scene;
-use components::joint_value;
 use components::{
     animator_value, audio_value, camera_component_value, collider_value, light_value,
     material_value, mesh_value, nav_agent_value, particle_value, rigidbody_value,
 };
+use components::{joint_value, lod_group_value};
 use ui::{
     canvas_group_value, canvas_value, image_value, layout_element_value, layout_group_value,
     rect_mask_value, rect_transform_value, selectable_value, text_value,
@@ -121,6 +121,7 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, screen: Vec2) ->
         "layout_group": world.layout_group(id).map(|g| layout_group_value(&g)),
         "layout_element": world.layout_element(id).map(|e| layout_element_value(&e)),
         "joint": world.joint(id).map(|j| joint_value(&j)),
+        "lod_group": world.lod_group(id).map(|g| lod_group_value(&g)),
         "ui_rect": crate::ui::layout::rect_of(world, id, screen)
             .map(|r| super::ui::rect_value(&r)),
     })
@@ -130,7 +131,7 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, screen: Vec2) ->
 /// "component inventory" authoring needs). `Transform` is mandatory and omitted.
 fn inventory(world: &World, id: u32) -> Vec<&'static str> {
     type Probe = fn(&World, u32) -> bool;
-    let probes: [(Probe, &'static str); 21] = [
+    let probes: [(Probe, &'static str); 22] = [
         (World::has_mesh, "Mesh"),
         (World::has_material, "Material"),
         (World::has_light, "Light"),
@@ -151,6 +152,7 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
         (World::has_layout_group, "LayoutGroup"),
         (World::has_layout_element, "LayoutElement"),
         (World::has_joint, "Joint"),
+        (World::has_lod_group, "LODGroup"),
         (
             |w, id| w.scripts(id).is_some_and(|s| !s.is_empty()),
             "Script",

@@ -191,6 +191,14 @@ fn add_render_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u
         authoring::add_with_requirements(world, id, ComponentKind::VisualCorrection);
         ui.close_menu();
     }
+    if !world.has_lod_group(id)
+        && ui
+            .button(format!("{}  LOD Group", icon::STACK_SIMPLE))
+            .clicked()
+    {
+        authoring::add_with_requirements(world, id, ComponentKind::LodGroup);
+        ui.close_menu();
+    }
 }
 
 /// List the project's MonoBehaviour scripts (any `.lua` exposing a lifecycle
