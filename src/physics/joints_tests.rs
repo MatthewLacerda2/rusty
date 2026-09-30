@@ -182,3 +182,25 @@ fn joints_replay_identically() {
     };
     assert_eq!(once(), once());
 }
+
+#[test]
+fn play_mode_edits_rebuild_only_what_changed() {
+    let mut scene = Scene::new();
+    let id = cube(&mut scene, Vec3::new(0.0, 5.0, 0.0));
+    joint(&mut scene, id, JointComponent::default());
+    let mut world = PhysicsWorld::from_scene(&scene);
+    world.step(&mut scene, DT);
+    let handle = world.joints[&id].handle;
+    scene.world.joint_mut(id).unwrap().break_force = 500.0;
+    world.step(&mut scene, DT);
+    assert_eq!(world.joints[&id].handle, handle, "a threshold is read live");
+    scene.world.joint_mut(id).unwrap().kind = JointKind::Ball;
+    world.step(&mut scene, DT);
+    assert_ne!(world.joints[&id].handle, handle, "a new kind rebuilds");
+    scene.world.set_joint(id, None);
+    for _ in 0..30 {
+        world.step(&mut scene, DT);
+    }
+    assert!(world.joints.is_empty() && world.impulse_joints.is_empty());
+    assert!(pos(&scene, id).y < 4.5, "a removed joint frees the body");
+}

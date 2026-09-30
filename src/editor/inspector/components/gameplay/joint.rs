@@ -32,6 +32,7 @@ pub fn draw_joint(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_
     };
     let mut remove = false;
     component_card(ui, icon::LINK, "Joint", Some(&mut remove), |ui| {
+        draw_kind(ui, world, id, j.kind, is_dirty);
         draw_bodies(ui, world, id, &j, is_dirty);
         if j.kind != JointKind::Fixed {
             draw_limits(ui, world, id, &j, is_dirty);
@@ -44,15 +45,15 @@ pub fn draw_joint(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_
     }
 }
 
-/// Kind, connected body, anchors and the collision flag.
-fn draw_bodies(
+/// The Fixed / Hinge / Ball combo.
+fn draw_kind(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
-    j: &JointComponent,
+    current: JointKind,
     is_dirty: &mut bool,
 ) {
-    let mut kind = j.kind;
+    let mut kind = current;
     egui::ComboBox::from_label("Kind")
         .selected_text(kind.name())
         .show_ui(ui, |ui| {
@@ -60,9 +61,19 @@ fn draw_bodies(
                 ui.selectable_value(&mut kind, k, k.name());
             }
         });
-    if kind != j.kind {
+    if kind != current {
         write(world, id, is_dirty, |c| joint_ops::set_kind(c, kind));
     }
+}
+
+/// Connected body, anchors and the collision flag.
+fn draw_bodies(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    j: &JointComponent,
+    is_dirty: &mut bool,
+) {
     let mut connected = j.connected_body.is_some();
     let mut body = j.connected_body.unwrap_or(0);
     let changed = ui

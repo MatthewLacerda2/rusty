@@ -29,7 +29,7 @@ use glam::{Quat, Vec3};
 use rapier3d::prelude::*;
 
 use super::compound::{body_owner, world_pose};
-use super::convert::{from_iso, to_iso};
+use super::convert::to_iso;
 use super::world::PhysicsWorld;
 use crate::components::{JointComponent, JointKind};
 use crate::scene::Scene;
@@ -145,12 +145,15 @@ impl PhysicsWorld {
                 p.pos + p.rot * (p.scale * j.connected_anchor)
             }
         };
-        let body2 = match key.body2 {
-            Some(h) => h,
-            None => self.world_body(),
+        // Both frames come from the scene's poses (the bodies' owners), not the
+        // rapier bodies, which lag a script's move of a kinematic body by a tick.
+        let owner_pose = |e: u32| world_pose(scene, body_owner(scene, e)).map(|p| (p.pos, p.rot));
+        let frame1 = local_frame(owner_pose(id)?, anchor, rot);
+        let (body2, pose2) = match (key.body2, j.connected_body) {
+            (Some(h), Some(other)) => (h, owner_pose(other)?),
+            _ => (self.world_body(), (Vec3::ZERO, Quat::IDENTITY)),
         };
-        let frame1 = self.local_frame(key.body1, anchor, rot)?;
-        let frame2 = self.local_frame(body2, connected, rot)?;
+        let frame2 = local_frame(pose2, connected, rot);
         let data = joint_builder(j)
             .local_frame1(frame1)
             .local_frame2(frame2)
@@ -158,13 +161,6 @@ impl PhysicsWorld {
             .build();
         let handle = self.impulse_joints.insert(key.body1, body2, data, true);
         Some(BuiltJoint { key, handle })
-    }
-
-    /// The world frame `(pos, rot)` expressed in `body`'s local frame.
-    fn local_frame(&self, body: RigidBodyHandle, pos: Vec3, rot: Quat) -> Option<Isometry<Real>> {
-        let (bpos, brot) = from_iso(self.bodies.get(body)?.position());
-        let inv = brot.inverse();
-        Some(to_iso(inv * (pos - bpos), (inv * rot).normalize()))
     }
 
     /// The shared fixed body joints with no connected body attach to, created on
@@ -208,6 +204,12 @@ impl PhysicsWorld {
         }
         broken
     }
+}
+
+/// The world frame `(pos, rot)` expressed in the frame of a body at `body`.
+fn local_frame((bpos, brot): (Vec3, Quat), pos: Vec3, rot: Quat) -> Isometry<Real> {
+    let inv = brot.inverse();
+    to_iso(inv * (pos - bpos), (inv * rot).normalize())
 }
 
 /// Whether `load` breaks a joint rated `threshold` (`0`: unbreakable).
