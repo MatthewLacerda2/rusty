@@ -166,12 +166,9 @@ nightly workflow if regression pressure is wanted.
 
 The agentic workflow runs issues concurrently in isolated git **worktrees**
 (`.claude/worktrees/`), and each worktree gets its **own** Cargo `target/` —
-~12–16 GB once built. A cloud session volume is ~38 GB usable, and the local
-dev machine's free space varies — so fanning out N parallel builds needs N × ~15 GB
-free and hits
-`No space left on device` — failing at the **link** step, not compile, which is the
-tell-tale ENOSPC. Memory runs out at the same step: the dev machine's 16 GB carries
-one heavy build comfortably and two at a squeeze.
+~12–16 GB once built. Fanning out N parallel builds needs N × ~15 GB free, and
+running short hits `No space left on device` — failing at the **link** step, not
+compile, which is the tell-tale ENOSPC. Memory runs out at the same step.
 
 Policy when driving parallel sub-agents:
 
@@ -183,7 +180,6 @@ Policy when driving parallel sub-agents:
 - **Check headroom first** — if `df -h` shows < ~16 GB free before launching a
   build, clean finished worktree targets first.
 
-This is an orchestration policy, not a hard gate: the disk ceiling is fixed by the
-machine (or, in the cloud, at environment creation), so freeing space is the other
-lever. CI is
+This is an orchestration policy, not a hard gate: the disk ceiling belongs to
+whichever machine the session runs on, so freeing space is the other lever. CI is
 unaffected (each job runs on its own runner).

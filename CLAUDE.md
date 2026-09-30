@@ -96,15 +96,12 @@ is wrong.
   overwrite each other's artifacts and a green gate stops meaning this branch compiled).
   Split issues by responsibility, never by parallelism. The **`issue-batch` skill** has
   the arithmetic and the procedure.
-- **Where this is developed.** One person, mostly on one machine: 8 threads, 16 GB of
-  RAM, an RTX 2060, Arch Linux. Cloud sessions are used when a task needs neither local
-  files nor that hardware, and there the ~38 GB session volume is the tight limit. That
-  is a current fact, not an invariant — it is written down so nobody proposes tooling
-  built for many contributors on many cold machines. What it means in practice:
-  **worktrees are cheap, simultaneous builds are not.** Each worktree's `target/` is
-  ~12–16 GB, and rustc's linking is where memory (locally) and disk (in the cloud) run
-  out. Parallelise the work, stagger the compiles, and check `df -h` before starting a
-  build.
+- **Worktrees are cheap, simultaneous builds are not.** rusty is developed by one person,
+  locally or in a cloud session — not by many contributors on many cold machines, so
+  don't propose tooling built for that. Each worktree's `target/` is ~12–16 GB, and
+  rustc's linking is where memory and disk run out. Parallelise the work, stagger the
+  compiles, and check the machine you are on (`df -h`, free memory) before starting a
+  build — never a figure written down somewhere.
 - **Architecture- then infrastructure-first (NOT "make it up as we go").** We do **not**
   improvise or pile on features ad hoc. Whenever we find a problem — something that
   already bites or will bite more than once, a pattern worth adopting, or a gold-standard
