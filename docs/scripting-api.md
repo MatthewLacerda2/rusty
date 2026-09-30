@@ -1126,8 +1126,10 @@ Per-entity navmesh agent control.
 Rigidbody control plus the spatial query surface over the live rapier world —
 line casts, volume overlaps, and per-collider point queries (#311). Every query
 routes through the same query pipeline the engine uses, so a script's query and
-the engine's agree. Casts return `(hit, entity_id, distance)`; on a miss the id
-and distance are `0`.
+the engine's agree. Casts return `(hit, entity_id, distance, px, py, pz, nx, ny, nz)`
+— the world-space hit point and outward surface normal are appended, so a caller
+that takes only the first three values is unaffected (#446). On a miss every value
+after `hit` is `0`.
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -1139,8 +1141,9 @@ and distance are `0`.
 | `Physics.SetKinematic` | `(id, is_kinematic)` | — |
 | `Physics.GetCollisionDetection` | `(id)` | `"Discrete"` \| `"Continuous"` |
 | `Physics.SetCollisionDetection` | `(id, mode)` | — (`mode` is `"Discrete"` or `"Continuous"`) |
-| `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` |
-| `Physics.SphereCast` | `(ox, oy, oz, dx, dy, dz, radius [, ignore_id [, layer_mask]])` | `hit, entity_id, distance` |
+| `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz` |
+| `Physics.SphereCast` | `(ox, oy, oz, dx, dy, dz, radius [, ignore_id [, layer_mask]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz` |
+| `Physics.RaycastAll` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask])` | array of `{id, distance, point = {x,y,z}, normal = {x,y,z}}`, nearest first |
 | `Physics.OverlapSphere` | `(cx, cy, cz, radius [, layer_mask])` | array of entity ids |
 | `Physics.OverlapBox` | `(cx, cy, cz, hx, hy, hz [, layer_mask])` | array of entity ids |
 | `Physics.OverlapCapsule` | `(x0, y0, z0, x1, y1, z1, radius [, layer_mask])` | array of entity ids |
@@ -1179,7 +1182,23 @@ exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` 
 `Collider.ClosestPoint`, and `Collider.bounds`.
 
 - **`SphereCast`** is a raycast with thickness — the melee-swing / thick-projectile
-  query. `distance` is how far the sphere's *center* traveled before impact.
+  query. `distance` is how far the sphere's *center* traveled before impact; the
+  point is where the sphere touched the struck surface.
+- **`RaycastAll`** reports *every* collider the ray crosses within `max_distance`,
+  sorted by distance (equal distances by entity id, so the order is
+  deterministic). Each entry is where the ray *enters* that collider — the
+  building block for wallbangs / over-penetration, which walk the list in Lua.
+  A ray that starts inside a collider reports it at distance `0` (zero normal).
+  Like the overlaps it takes an optional `layer_mask` but no `ignore_id` — skip
+  the shooter's own id while walking the list.
+
+  ```lua
+  for _, h in ipairs(Physics.RaycastAll(ox,oy,oz, dx,dy,dz, 100)) do
+    if h.id ~= self_id then
+      Decals.Spawn(h.point.x, h.point.y, h.point.z, h.normal.x, h.normal.y, h.normal.z)
+    end
+  end
+  ```
 - **`OverlapSphere` / `OverlapBox` / `OverlapCapsule`** return the ids of every
   entity whose collider intersects the volume *right now* (the grenade-radius /
   zone-check query), as a Lua array sorted ascending. `OverlapBox` takes
@@ -1618,10 +1637,14 @@ time-scaled.
 Stamp **box-projector decals** (bullet holes, scorch, blood splats) onto the
 surface a shot hit. A decal is a projected *volume*, not a flat sticker: the decal
 pass reconstructs the underlying surface from the scene depth and wraps the texture
-onto whatever geometry the box overlaps. Spawn from the world point + surface
-normal a hit already gives you (`Physics.Raycast` returns `(hit, id, distance)`, so
-the point is `origin + dir * distance`; supply the surface normal). The registry is
-a bounded FIFO — oldest decals are evicted past the cap.
+onto whatever geometry the box overlaps. Spawn it from the hit point and surface
+normal the cast already returns. The registry is a bounded FIFO — oldest decals
+are evicted past the cap.
+
+```lua
+local hit, id, dist, px, py, pz, nx, ny, nz = Physics.Raycast(ox,oy,oz, dx,dy,dz, self_id)
+if hit then Decals.Spawn(px, py, pz, nx, ny, nz) end
+```
 
 | Function | Signature | Returns |
 |---|---|---|

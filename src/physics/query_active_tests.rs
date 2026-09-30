@@ -60,13 +60,14 @@ fn hit_below(world: &PhysicsWorld, x: f32) -> Option<u32> {
 
 /// Every query family's answer about a unit box `target` at the origin, as
 /// seen from outside it (casts from -z, volumes and points at its center).
-fn answers(world: &PhysicsWorld, target: u32) -> [bool; 9] {
+fn answers(world: &PhysicsWorld, target: u32) -> [bool; 10] {
     let from = Vec3::new(0.0, 0.0, -5.0);
     let only = |id: u32| id == target;
     [
         world.cast_ray(from, Vec3::Z, 20.0).is_some(),
         world.cast_ray_filtered(from, Vec3::Z, 20.0, only).is_some(),
         world.cast_ray_with_normal(from, Vec3::Z, 20.0).is_some(),
+        world.raycast_all(from, Vec3::Z, 20.0, only).len() == 1,
         world
             .cast_sphere_filtered(from, Vec3::Z, 0.2, 20.0, only)
             .is_some(),
@@ -85,19 +86,19 @@ fn every_query_family_skips_an_inactive_entity_and_sees_it_again() {
     let mut world = PhysicsWorld::from_scene(&scene);
     assert_eq!(
         answers(&world, target),
-        [true; 9],
+        [true; 10],
         "active: every query hits"
     );
     set_active(&mut scene, &mut world, target, false);
     assert_eq!(
         answers(&world, target),
-        [false; 9],
+        [false; 10],
         "inactive: every query misses"
     );
     set_active(&mut scene, &mut world, target, true);
     assert_eq!(
         answers(&world, target),
-        [true; 9],
+        [true; 10],
         "reactivated: hits again"
     );
 }
@@ -108,11 +109,11 @@ fn an_entity_inactive_at_build_is_hidden_until_activated() {
     let target = add_box(&mut scene, None, Vec3::ZERO, Vec3::ONE);
     scene.world.set_active(target, false);
     let mut world = PhysicsWorld::from_scene(&scene);
-    assert_eq!(answers(&world, target), [false; 9], "built inactive");
+    assert_eq!(answers(&world, target), [false; 10], "built inactive");
     set_active(&mut scene, &mut world, target, true);
     assert_eq!(
         answers(&world, target),
-        [true; 9],
+        [true; 10],
         "its own collider re-enabled"
     );
 }
