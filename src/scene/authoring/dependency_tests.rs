@@ -25,6 +25,8 @@ fn ui_graphics_require_a_rect_transform() {
         ComponentKind::Text,
         ComponentKind::RectMask,
         ComponentKind::Selectable,
+        ComponentKind::LayoutGroup,
+        ComponentKind::LayoutElement,
     ] {
         let id = create_entity(&mut scene, "E", None);
         assert!(add_with_requirements(&mut scene.world, id, kind));

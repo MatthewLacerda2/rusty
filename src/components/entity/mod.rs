@@ -10,12 +10,14 @@
 
 use serde::{Deserialize, Serialize};
 
+mod repr;
+
 use super::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
-    CanvasGroupComponent, ColliderComponent, ImageComponent, LightComponent, MaterialAsset,
-    MaterialComponent, MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent,
-    RectMaskComponent, RectTransformComponent, RigidBodyComponent, ScriptComponent,
-    SelectableComponent, TextComponent, TextureComponent, TransformComponent,
+    CanvasGroupComponent, ColliderComponent, ImageComponent, LayoutElementComponent,
+    LayoutGroupComponent, LightComponent, MaterialAsset, MaterialComponent, MeshComponent,
+    NavMeshAgentComponent, ParticleEmitterComponent, RectMaskComponent, RectTransformComponent,
+    RigidBodyComponent, ScriptComponent, SelectableComponent, TextComponent, TransformComponent,
     VisualCorrectionComponent,
 };
 
@@ -49,7 +51,7 @@ pub struct PrefabLink {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(from = "EntityRepr")]
+#[serde(from = "repr::EntityRepr")]
 pub struct Entity {
     pub id: u32,
     pub name: String,
@@ -114,6 +116,14 @@ pub struct Entity {
     /// Interactive UI element (#420). `#[serde(default)]` for pre-#420 scenes.
     #[serde(default)]
     pub selectable: Option<SelectableComponent>,
+    /// Arranges the UI children in a row, column or grid (#421). `#[serde(default)]`
+    /// for pre-#421 scenes.
+    #[serde(default)]
+    pub layout_group: Option<LayoutGroupComponent>,
+    /// Layout sizes and content fitting for a UI element (#421). `#[serde(default)]`
+    /// for pre-#421 scenes.
+    #[serde(default)]
+    pub layout_element: Option<LayoutElementComponent>,
     /// Live link back to the source `.prefab` for a *linked* prefab instance (#216).
     /// `None` on a plain entity or a v1 unpacked copy. Carried on every entity of an
     /// instance. `#[serde(default)]` so pre-#216 scenes load with no link.
@@ -121,118 +131,6 @@ pub struct Entity {
     pub prefab_link: Option<PrefabLink>,
     pub parent_id: Option<u32>,
     pub children: Vec<u32>,
-}
-
-/// On-disk shape used only for deserialization, so old single-`script` scenes
-/// (pre-#83) keep loading. It accepts both the new `scripts: Vec<…>` and the
-/// legacy `script: Option<…>` keys; the `From` impl migrates the singular into
-/// the vec. Serialization always goes through `Entity` directly (new `scripts`
-/// key), so files written today never carry the legacy field.
-#[derive(Deserialize)]
-struct EntityRepr {
-    id: u32,
-    name: String,
-    active: bool,
-    is_static: bool,
-    #[serde(default)]
-    layer: u8,
-    transform: TransformComponent,
-    mesh: Option<MeshComponent>,
-    /// Legacy pre-#201 inline material, migrated into a library material by `From`.
-    #[serde(default)]
-    texture: Option<TextureComponent>,
-    /// New reference-to-library material (post-#201 scenes carry this directly).
-    #[serde(default)]
-    material: Option<MaterialComponent>,
-    #[serde(default)]
-    scripts: Vec<ScriptComponent>,
-    /// Legacy singular field (pre-#83), migrated into `scripts` by `From`.
-    #[serde(default)]
-    script: Option<ScriptComponent>,
-    animator: Option<AnimatorComponent>,
-    light: Option<LightComponent>,
-    collider: Option<ColliderComponent>,
-    rigidbody: Option<RigidBodyComponent>,
-    nav_agent: Option<NavMeshAgentComponent>,
-    camera: Option<CameraComponent>,
-    visual_correction: Option<VisualCorrectionComponent>,
-    #[serde(default)]
-    particles: Option<ParticleEmitterComponent>,
-    #[serde(default)]
-    audio: Option<AudioSourceComponent>,
-    #[serde(default)]
-    canvas: Option<CanvasComponent>,
-    #[serde(default)]
-    rect_transform: Option<RectTransformComponent>,
-    #[serde(default)]
-    image: Option<ImageComponent>,
-    #[serde(default)]
-    canvas_group: Option<CanvasGroupComponent>,
-    #[serde(default)]
-    rect_mask: Option<RectMaskComponent>,
-    #[serde(default)]
-    text: Option<TextComponent>,
-    #[serde(default)]
-    selectable: Option<SelectableComponent>,
-    #[serde(default)]
-    prefab_link: Option<PrefabLink>,
-    parent_id: Option<u32>,
-    children: Vec<u32>,
-}
-
-impl From<EntityRepr> for Entity {
-    fn from(r: EntityRepr) -> Self {
-        let mut scripts = r.scripts;
-        // Migrate a pre-#83 single `script` into the plural vec, ahead of any
-        // (normally empty) new-format scripts, so legacy attachments still run.
-        if let Some(legacy) = r.script {
-            scripts.insert(0, legacy);
-        }
-        // Material migration: a new-format `material` reference is taken verbatim; a
-        // legacy inline `texture` becomes a per-entity library material whose data is
-        // carried in `pending_material` for `apply_scene_data` to insert by name.
-        let (material, pending_material) = match (r.material, r.texture) {
-            (Some(m), _) => (Some(m), None),
-            (None, Some(t)) => (
-                Some(MaterialComponent {
-                    material: format!("entity_{}_material", r.id),
-                }),
-                Some(MaterialAsset::from_legacy(&t)),
-            ),
-            (None, None) => (None, None),
-        };
-        Self {
-            id: r.id,
-            name: r.name,
-            active: r.active,
-            is_static: r.is_static,
-            layer: r.layer,
-            transform: r.transform,
-            mesh: r.mesh,
-            material,
-            pending_material,
-            scripts,
-            animator: r.animator,
-            light: r.light,
-            collider: r.collider,
-            rigidbody: r.rigidbody,
-            nav_agent: r.nav_agent,
-            camera: r.camera,
-            visual_correction: r.visual_correction,
-            particles: r.particles,
-            audio: r.audio,
-            canvas: r.canvas,
-            rect_transform: r.rect_transform,
-            image: r.image,
-            canvas_group: r.canvas_group,
-            rect_mask: r.rect_mask,
-            text: r.text,
-            selectable: r.selectable,
-            prefab_link: r.prefab_link,
-            parent_id: r.parent_id,
-            children: r.children,
-        }
-    }
 }
 
 impl Entity {
@@ -264,6 +162,8 @@ impl Entity {
             rect_mask: None,
             text: None,
             selectable: None,
+            layout_group: None,
+            layout_element: None,
             prefab_link: None,
             parent_id: None,
             children: Vec::new(),

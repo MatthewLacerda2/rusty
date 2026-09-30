@@ -565,7 +565,8 @@ case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `Texture` (alias `Material`), `NavMeshAgent`, `Camera`, `Particles`,
 `VisualCorrection`, `Audio` (alias `AudioSource`), `Canvas`, `RectTransform`,
 `Image`, `CanvasGroup`, `RectMask` (alias `RectMask2D`), `Text` (alias
-`TextMeshPro`), `Selectable`.
+`TextMeshPro`), `Selectable`, `LayoutGroup`, `LayoutElement` (alias
+`ContentSizeFitter`).
 Each is added with the inspector's default values; adding an
 existing kind replaces it. (Scripts attach by path, not as a defaulted kind — a
 separate concern.)
@@ -586,8 +587,9 @@ every surface (editor Add menu, this API, and scene load):
 
 The declared dependencies are **`VisualCorrection` requires `Camera`** (a
 color/bloom/SSR correction stack is inert without a camera to correct) and
-**`Image`, `Text` and `RectMask` require `RectTransform`** (a graphic fills, and a
-mask clips to, its rect — Unity's `Graphic` and `RectMask2D` declare the same).
+**`Image`, `Text`, `RectMask`, `Selectable`, `LayoutGroup` and `LayoutElement`
+require `RectTransform`** (a graphic fills, a mask clips to, and a layout arranges
+a rect — Unity's `Graphic`, `RectMask2D` and layout components declare the same).
 
 **`Scene.Deactivate`** is Unity's deferred `Object.Destroy`: it sets `active =
 false` but leaves the entity in the scene. **`Scene.DestroyEntity`** is the
@@ -2123,6 +2125,58 @@ is ignored. The model is in [`docs/ui.md`](ui.md).
 | `Selectable.GetSprite` / `SetSprite` | `(id, state)` / `(id, state, path)` | `SpriteSwap` texture for `state`, or `nil` (the Image's own; `"Normal"` always is) |
 | `Selectable.GetNavigation` / `SetNavigation` | `(id)` / `(id, name)` | `"None"`, `"Automatic"` or `"Explicit"` |
 | `Selectable.GetSelectOn` / `SetSelectOn` | `(id, dir)` / `(id, dir, targetId)` | the `Explicit` target for `dir`, or `nil` |
+
+## `LayoutGroup`
+
+Read and tune an entity's `LayoutGroupComponent` (#421) — Unity's
+`HorizontalLayoutGroup`, `VerticalLayoutGroup` and `GridLayoutGroup` in one
+component. The group places each **layout child** (active, carrying a
+`RectTransform`, not `LayoutElement.IgnoreLayout`) inside its own rect, overriding
+the child's anchors: a row (`"Horizontal"`), a column (`"Vertical"`) or a grid of
+equal cells (`"Grid"`). Children are sized from their min / preferred / flexible
+sizes — a `Text`'s measured block, an `Image`'s native texture size, a nested
+group, or a `LayoutElement` override. The layout runs every tick in the sim;
+read where a child landed with `UI.GetRect`. The child RectTransforms are never
+rewritten. Adding one also adds a `RectTransform`. Getters return a neutral
+default (zeros, `false`, `""`) without a group; setters are then no-ops. Enum
+values are names, case-insensitive; an unknown name is ignored. The model is in
+[`docs/ui.md`](ui.md#layout-groups).
+
+| Function | Signature | Returns |
+|---|---|---|
+| `LayoutGroup.GetKind` / `SetKind` | `(id)` / `(id, name)` | `"Horizontal"`, `"Vertical"` or `"Grid"` |
+| `LayoutGroup.GetPadding` / `SetPadding` | `(id)` / `(id, l, b, r, t)` | inset of the children from the rect, reference units |
+| `LayoutGroup.GetSpacing` / `SetSpacing` | `(id)` / `(id, x, y)` | gap between columns (`x`, a row's gap) and rows (`y`, a column's gap) |
+| `LayoutGroup.GetChildAlignment` / `SetChildAlignment` | `(id)` / `(id, name)` | where the children sit when they do not fill the rect — a `Text` alignment name (`"TopLeft"` … `"BottomRight"`) |
+| `LayoutGroup.GetControlChildSize` / `SetControlChildSize` | `(id)` / `(id, width, height)` | row / column: whether the group sizes its children (else each keeps its `size_delta`) |
+| `LayoutGroup.GetChildForceExpand` / `SetChildForceExpand` | `(id)` / `(id, width, height)` | row / column: whether every child shares the spare space (flexible ≥ 1) |
+| `LayoutGroup.GetCellSize` / `SetCellSize` | `(id)` / `(id, x, y)` | grid: every cell's size (≥ 0) |
+| `LayoutGroup.GetConstraint` / `SetConstraint` | `(id)` / `(id, name)` | grid: `"Flexible"` (as many columns as fit), `"FixedColumnCount"` or `"FixedRowCount"` |
+| `LayoutGroup.GetConstraintCount` / `SetConstraintCount` | `(id)` / `(id, n)` | grid: the fixed column / row count (≥ 1) |
+| `LayoutGroup.GetStartCorner` / `SetStartCorner` | `(id)` / `(id, name)` | grid: `"UpperLeft"`, `"UpperRight"`, `"LowerLeft"` or `"LowerRight"` |
+| `LayoutGroup.GetStartVertical` / `SetStartVertical` | `(id)` / `(id, bool)` | grid: fill columns first instead of rows |
+
+## `LayoutElement`
+
+Read and tune an entity's `LayoutElementComponent` (#421) — Unity's
+`LayoutElement` and `ContentSizeFitter` in one component. The size overrides
+replace what the element's content reports to its parent `LayoutGroup`, per axis:
+**min** (never smaller), **preferred** (what it asks for) and **flexible** (its
+weight when spare space is shared). Each is a `(width, height)` pair where `nil`
+(or a negative number) means "use the content's size". The **fit** sizes the
+element's *own* rect to its min or preferred size around its pivot — a text box
+that grows with its string, a list that grows with its items; it applies when no
+parent group arranges the element (under a group, the fitted size is the size the
+group keeps for an uncontrolled axis). Adding one also adds a `RectTransform`.
+Getters return a neutral default without one; setters are then no-ops.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `LayoutElement.GetIgnoreLayout` / `SetIgnoreLayout` | `(id)` / `(id, bool)` | whether the parent group skips it (it keeps its own anchors) |
+| `LayoutElement.GetMinSize` / `SetMinSize` | `(id)` / `(id, w, h)` | min size overrides, `nil` where unset |
+| `LayoutElement.GetPreferredSize` / `SetPreferredSize` | `(id)` / `(id, w, h)` | preferred size overrides, `nil` where unset |
+| `LayoutElement.GetFlexibleSize` / `SetFlexibleSize` | `(id)` / `(id, w, h)` | flexible weights, `nil` where unset |
+| `LayoutElement.GetFit` / `SetFit` | `(id)` / `(id, horizontal, vertical)` | the content fitter per axis: `"Unconstrained"`, `"MinSize"` or `"PreferredSize"` (an unknown name leaves both unchanged) |
 
 ## `Text`
 

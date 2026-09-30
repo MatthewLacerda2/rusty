@@ -1,11 +1,14 @@
-//! The in-game UI's inspector cards (#417, #418, #419, #420): the Canvas root, the
+//! The in-game UI's inspector cards (#417–#421): the Canvas root, the
 //! RectTransform every UI element carries, the Image graphic, the Text label, the
-//! Canvas Group, the Rect Mask and the Selectable. Each is a thin client over its shared
+//! Canvas Group, the Rect Mask, the Selectable, and the Layout Group and Layout
+//! Element. Each is a thin client over its shared
 //! `scene::authoring` ops, the same ones the matching Lua namespace calls.
 
 pub mod canvas;
 pub mod canvas_group;
 pub mod image;
+pub mod layout_element;
+pub mod layout_group;
 pub mod rect_mask;
 pub mod rect_transform;
 pub mod selectable;
@@ -20,6 +23,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
     image::draw(ui, world, id, is_dirty);
     text::draw(ui, world, id, is_dirty);
     selectable::draw(ui, world, id, is_dirty);
+    layout_group::draw(ui, world, id, is_dirty);
+    layout_element::draw(ui, world, id, is_dirty);
 }
 
 /// A labelled `x, y` drag row. Returns the edited pair when either axis changed.

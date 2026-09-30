@@ -346,6 +346,20 @@ determinism, no file written on a rejected patch).
 | `SetTransition` / `SetTargetGraphic` / `SetColor` / `SetFadeDuration` / `SetSprite` | ✅ | sim — `EventSystem::apply_transitions` writes the target's runtime `state_tint` / `override_texture`; render — multiplied / preferred in `render::ui::mesh` and `render::ui::text::emit` (`src/ui/events/transition_tests.rs`); round-trips |
 | `SetNavigation` / `SetSelectOn` | ✅ | sim — `ui::events::focus` (arrow-key navigation; `src/ui/events/focus_tests.rs`); round-trips, references remapped through prefabs |
 
+### `LayoutGroup` — over `Entity.layout_group` (#421)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetKind` / `SetPadding` / `SetSpacing` / `SetChildAlignment` / `SetControlChildSize` / `SetChildForceExpand` | ✅ | sim — `ui::layout::group` places the children inside `UiLayout::compute` (`UI.GetRect`; `src/ui/layout/group_tests.rs`); round-trips (`tests/ui_layout_api.rs`) |
+| `SetCellSize` / `SetConstraint` / `SetConstraintCount` / `SetStartCorner` / `SetStartVertical` | ✅ | sim — `ui::layout::grid` (`src/ui/layout/grid_tests.rs`); round-trips |
+
+### `LayoutElement` — over `Entity.layout_element` (#421)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetIgnoreLayout` / `SetMinSize` / `SetPreferredSize` / `SetFlexibleSize` | ✅ | sim — `ui::layout::sizes` (`layout_children`, `element_sizes`) read by the group pass (`src/ui/layout/group_tests.rs`); round-trips (`tests/ui_layout_api.rs`) |
+| `SetFit` | ✅ | sim — `ui::layout::fit` resizes the rect in `UiLayout::compute` (`src/ui/layout/fit_tests.rs`); round-trips |
+
 ### `UI` — the event system (#420)
 
 | Setter | Status | Read-site |

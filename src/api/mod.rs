@@ -5,6 +5,7 @@
 //! `Scene`, `Random`, `Timer`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
 //! `Assets`, `Texture`, `Shader`, `Sound`, `Particles`, `Layers`, `Graphics`, `Video`,
 //! `Storage`, `Canvas`, `RectTransform`, `UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Selectable`,
+//! `LayoutGroup`, `LayoutElement`,
 //! `Application`, plus the dev-only `Debug`)
 //! is registered from this tree onto the live Lua runtime.
 //! `scripting`
@@ -28,6 +29,8 @@ pub mod graphics;
 pub mod image;
 pub mod input;
 pub mod layers;
+pub mod layout_element;
+pub mod layout_group;
 pub mod light;
 pub mod lighting;
 pub(crate) mod lua_json;
@@ -177,6 +180,8 @@ pub fn register<'lua, 'scope>(
     image::register(lua, scope, ctx.scene)?;
     canvas_group::register(lua, scope, ctx.scene)?;
     rect_mask::register(lua, scope, ctx.scene)?;
+    layout_group::register(lua, scope, ctx.scene)?;
+    layout_element::register(lua, scope, ctx.scene)?;
     text::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
     decals::register(lua, scope, ctx.scene)?;
     layers::register(lua, scope, ctx.scene)?;

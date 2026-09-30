@@ -27,8 +27,8 @@ use components::{
     material_value, mesh_value, nav_agent_value, particle_value, rigidbody_value,
 };
 use ui::{
-    canvas_group_value, canvas_value, image_value, rect_mask_value, rect_transform_value,
-    selectable_value, text_value,
+    canvas_group_value, canvas_value, image_value, layout_element_value, layout_group_value,
+    rect_mask_value, rect_transform_value, selectable_value, text_value,
 };
 
 /// A `glam::Vec3` as a `[x, y, z]` JSON array. Shared with the `components` and `ui` builders.
@@ -117,6 +117,8 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, screen: Vec2) ->
         "rect_mask": world.rect_mask(id).map(|m| rect_mask_value(&m)),
         "text": world.text(id).map(|t| text_value(&t)),
         "selectable": world.selectable(id).map(|s| selectable_value(&s)),
+        "layout_group": world.layout_group(id).map(|g| layout_group_value(&g)),
+        "layout_element": world.layout_element(id).map(|e| layout_element_value(&e)),
         "ui_rect": crate::ui::layout::rect_of(world, id, screen)
             .map(|r| super::ui::rect_value(&r)),
     })
@@ -126,7 +128,7 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, screen: Vec2) ->
 /// "component inventory" authoring needs). `Transform` is mandatory and omitted.
 fn inventory(world: &World, id: u32) -> Vec<&'static str> {
     type Probe = fn(&World, u32) -> bool;
-    let probes: [(Probe, &'static str); 18] = [
+    let probes: [(Probe, &'static str); 20] = [
         (World::has_mesh, "Mesh"),
         (World::has_material, "Material"),
         (World::has_light, "Light"),
@@ -144,6 +146,8 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
         (World::has_rect_mask, "RectMask"),
         (World::has_text, "Text"),
         (World::has_selectable, "Selectable"),
+        (World::has_layout_group, "LayoutGroup"),
+        (World::has_layout_element, "LayoutElement"),
         (
             |w, id| w.scripts(id).is_some_and(|s| !s.is_empty()),
             "Script",

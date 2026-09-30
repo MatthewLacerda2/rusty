@@ -24,6 +24,8 @@ pub mod components;
 pub mod defaults;
 pub mod dependency;
 pub mod image;
+pub mod layout_element;
+pub mod layout_group;
 pub mod light;
 pub mod material;
 pub mod nav_agent;

@@ -32,6 +32,7 @@ fn add_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
     add_render_components(ui, world, id);
     add_audio(ui, world, id);
     add_ui_components(ui, world, id);
+    add_layout_components(ui, world, id);
 }
 
 /// Add-menu entries for the in-game UI (#417, #418, #419, #420): a Canvas makes the entity
@@ -79,6 +80,29 @@ fn add_ui_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) 
             .clicked()
     {
         authoring::add_with_requirements(world, id, ComponentKind::Selectable);
+        ui.close_menu();
+    }
+}
+
+/// Add-menu entries for UI auto-layout (#421): a Layout Group arranges the children
+/// in a row, column or grid; a Layout Element overrides an element's layout sizes
+/// and fits it to its content. Both require a RectTransform, via the shared
+/// dependency verb.
+fn add_layout_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
+    if !world.has_layout_group(id)
+        && ui
+            .button(format!("{}  Layout Group", icon::LAYOUT))
+            .clicked()
+    {
+        authoring::add_with_requirements(world, id, ComponentKind::LayoutGroup);
+        ui.close_menu();
+    }
+    if !world.has_layout_element(id)
+        && ui
+            .button(format!("{}  Layout Element", icon::ARROWS_OUT))
+            .clicked()
+    {
+        authoring::add_with_requirements(world, id, ComponentKind::LayoutElement);
         ui.close_menu();
     }
 }
