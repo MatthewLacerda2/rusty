@@ -68,6 +68,8 @@ impl Renderer {
 
         // The ordered camera stack (one entry in edit mode / when no scene camera).
         let stack = build_camera_stack(camera, scene, !editor_mode);
+        // The sun's cascades follow the base camera; every stacked camera samples them.
+        self.run_shadow_passes(scene, &stack[0], aspect);
         let last = stack.len().saturating_sub(1);
         // The base (first) camera drives the shared post-FX history / motion vectors.
         let base_view_proj = stack[0].build_view_projection(aspect);
@@ -98,7 +100,7 @@ impl Renderer {
                 editor_mode,
                 clear: PassClear::for_pass(idx == 0, cam.clear_flags),
             };
-            self.execute_scene_pass(view, scene, frame, &solids.draws.opaque, &overlays);
+            self.execute_scene_pass(view, frame, &solids.draws.opaque, &overlays);
 
             // Project box-decals over this camera's lit surfaces (reads the scene
             // depth to reconstruct geometry), after solids/skybox and before the

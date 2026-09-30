@@ -53,6 +53,43 @@ pub struct VisualCorrectionComponent {
     /// (2.2 was neutral), so it loads as `gamma / 2.2` — see [`LEGACY_NEUTRAL_GAMMA`].
     #[serde(rename = "display_gamma")]
     pub gamma: f32,
+    /// Directional-shadow cascades and reach (#435). `#[serde(default)]` loads older
+    /// scenes with the engine defaults.
+    pub shadows: ShadowSettings,
+}
+
+/// How the sun's cascaded shadow map covers the view (#435) — HDRP's Shadows volume
+/// override: how many cascades split the view, and how far from the camera shadows
+/// reach. Without an active volume the renderer uses [`ShadowSettings::default`].
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ShadowSettings {
+    /// Cascades the view is split into, `1..=4`. More cascades keep near shadows
+    /// sharp over a longer reach, at one more depth pass each.
+    pub cascades: u32,
+    /// Distance from the camera, in world units, past which nothing casts or receives
+    /// a sun shadow (they fade out over its last tenth).
+    pub distance: f32,
+}
+
+impl ShadowSettings {
+    /// The cascade-count range the shadow map supports.
+    pub const MAX_CASCADES: u32 = 4;
+    /// The shortest shadow reach a write accepts.
+    pub const MIN_DISTANCE: f32 = 1.0;
+}
+
+impl Default for ShadowSettings {
+    /// Four cascades over 100 m: the whole of a large room or a street-scale outdoor
+    /// space shadowed, with the first cascade a few metres deep for first-person
+    /// contact shadows. Unity's High tier is 4 cascades over 150 m; 100 m spends the
+    /// same four maps on less ground, since a shooter's fights are closer than that.
+    fn default() -> Self {
+        Self {
+            cascades: Self::MAX_CASCADES,
+            distance: 100.0,
+        }
+    }
 }
 
 /// What the pre-#415 `gamma` field held as its neutral value. Dividing an old
@@ -83,6 +120,8 @@ struct VisualCorrectionFile {
     display_gamma: Option<f32>,
     /// Pre-#415 encode gamma; only read when `display_gamma` is absent.
     gamma: Option<f32>,
+    #[serde(default)]
+    shadows: ShadowSettings,
 }
 
 impl From<VisualCorrectionFile> for VisualCorrectionComponent {
@@ -104,6 +143,7 @@ impl From<VisualCorrectionFile> for VisualCorrectionComponent {
             ssr_temporal_upsampling: f.ssr_temporal_upsampling,
             tonemap: f.tonemap,
             gamma,
+            shadows: f.shadows,
         }
     }
 }
@@ -131,6 +171,13 @@ mod tests {
     fn display_gamma_wins_and_absence_is_neutral() {
         assert_eq!(load(r#", "display_gamma": 1.3, "gamma": 2.2"#).gamma, 1.3);
         assert_eq!(load("").gamma, 1.0);
+    }
+
+    #[test]
+    fn a_scene_without_shadow_settings_loads_the_defaults() {
+        assert_eq!(load("").shadows, super::ShadowSettings::default());
+        let vc = load(r#", "shadows": { "cascades": 2 }"#);
+        assert_eq!((vc.shadows.cascades, vc.shadows.distance), (2, 100.0));
     }
 
     #[test]

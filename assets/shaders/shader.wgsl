@@ -140,10 +140,22 @@ var t_normal: texture_2d<f32>;
 @group(2) @binding(5)
 var t_emissive: texture_2d<f32>;
 
+// The sun's cascaded shadow maps (#435): one light volume per slice of the view,
+// written by `render::passes::shadows::CascadeUniform`.
+struct ShadowCascades {
+    light_space: array<mat4x4<f32>, 4>,
+    splits: vec4<f32>,       // view depth where each cascade ends
+    texels: vec4<f32>,       // world size of one texel, per cascade
+    depth_ranges: vec4<f32>, // world depth each cascade's [0, 1] spans
+    view_pos: vec4<f32>,
+    view_dir: vec4<f32>,
+    params: vec4<f32>,       // x count, y shadow distance, z blend fraction
+};
+
 @group(3) @binding(0)
-var<uniform> light_space: mat4x4<f32>;
+var<uniform> shadow: ShadowCascades;
 @group(3) @binding(1)
-var t_shadow: texture_depth_2d;
+var t_shadow: texture_depth_2d_array;
 @group(3) @binding(2)
 var s_shadow: sampler_comparison;
 
@@ -284,22 +296,24 @@ fn calculate_pbr(
 // shadow filter; bump it for softer edges, drop it for sharper/cheaper shadows.
 const PCF_RADIUS: i32 = 2;
 
-fn calculate_shadow(world_pos: vec3<f32>, N: vec3<f32>) -> f32 {
-    let light_space_pos = light_space * vec4<f32>(world_pos, 1.0);
+// Bias against self-shadowing, in texels of the cascade sampled: the surface is
+// pushed off along its normal (more at grazing light) and its depth pulled toward
+// the light. In texels, so every cascade gets the same relative bias however much
+// ground its texels cover.
+const NORMAL_OFFSET_TEXELS: f32 = 1.5;
+const DEPTH_BIAS_TEXELS: f32 = 1.0;
+
+// PCF over one cascade; 1.0 (lit) outside its volume.
+fn sample_cascade(c: i32, world_pos: vec3<f32>, N: vec3<f32>, NdotL: f32) -> f32 {
+    let texel = shadow.texels[c];
+    let offset_pos = world_pos + N * texel * NORMAL_OFFSET_TEXELS * (1.0 - NdotL);
+    let light_space_pos = shadow.light_space[c] * vec4<f32>(offset_pos, 1.0);
     let proj_coords = light_space_pos.xyz / light_space_pos.w;
-
-    let flip_y = vec3<f32>(
-        proj_coords.x * 0.5 + 0.5,
-        -proj_coords.y * 0.5 + 0.5,
-        proj_coords.z
-    );
-
-    if (flip_y.x < 0.0 || flip_y.x > 1.0 || flip_y.y < 0.0 || flip_y.y > 1.0 || flip_y.z > 1.0) {
+    let uv = vec2<f32>(proj_coords.x * 0.5 + 0.5, -proj_coords.y * 0.5 + 0.5);
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || proj_coords.z > 1.0) {
         return 1.0;
     }
-
-    let bias = max(0.005 * (1.0 - dot(N, normalize(-lighting.dir_light.direction))), 0.0005);
-    let current_depth = flip_y.z - bias;
+    let current_depth = proj_coords.z - texel * DEPTH_BIAS_TEXELS / shadow.depth_ranges[c];
 
     let size = textureDimensions(t_shadow);
     let texel_size = vec2<f32>(1.0 / f32(size.x), 1.0 / f32(size.y));
@@ -307,19 +321,44 @@ fn calculate_shadow(world_pos: vec3<f32>, N: vec3<f32>) -> f32 {
     // NxN PCF: average the hardware depth comparisons over a square texel
     // neighbourhood. Each tap is already bilinearly filtered by the comparison
     // sampler, so this stacks a wider blur on top of hardware PCF for a soft,
-    // FEAR-era shadow edge instead of a single hard step.
-    var shadow = 0.0;
+    // FEAR-era shadow edge instead of a single hard step. `Level` sampling: the
+    // cascade is picked per fragment, so this runs in non-uniform control flow.
+    var lit = 0.0;
     var taps = 0.0;
     for (var x = -PCF_RADIUS; x <= PCF_RADIUS; x = x + 1) {
         for (var y = -PCF_RADIUS; y <= PCF_RADIUS; y = y + 1) {
             let offset = vec2<f32>(f32(x), f32(y)) * texel_size;
-            shadow += textureSampleCompare(t_shadow, s_shadow, flip_y.xy + offset, current_depth);
+            lit += textureSampleCompareLevel(t_shadow, s_shadow, uv + offset, c, current_depth);
             taps += 1.0;
         }
     }
-    shadow /= taps;
+    return lit / taps;
+}
 
-    return shadow;
+// The sun's visibility at `world_pos`: the cascade whose slice holds the fragment's
+// view depth, cross-faded into the next over the last `blend` of its range, and
+// faded out over the last tenth of the shadow distance so the edge never pops.
+fn calculate_shadow(world_pos: vec3<f32>, N: vec3<f32>) -> f32 {
+    let count = i32(shadow.params.x);
+    let distance = shadow.params.y;
+    let depth = dot(world_pos - shadow.view_pos.xyz, shadow.view_dir.xyz);
+    if (count == 0 || depth >= distance) {
+        return 1.0;
+    }
+    var c = 0;
+    while (c < count - 1 && depth > shadow.splits[c]) {
+        c = c + 1;
+    }
+    let NdotL = clamp(dot(N, normalize(-lighting.dir_light.direction)), 0.0, 1.0);
+    var lit = sample_cascade(c, world_pos, N, NdotL);
+
+    let blend_start = shadow.splits[c] * (1.0 - shadow.params.z);
+    if (c < count - 1 && depth > blend_start) {
+        let t = (depth - blend_start) / (shadow.splits[c] - blend_start);
+        lit = mix(lit, sample_cascade(c + 1, world_pos, N, NdotL), t);
+    }
+    let fade = clamp((depth - distance * 0.9) / (distance * 0.1), 0.0, 1.0);
+    return mix(lit, 1.0, fade);
 }
 
 // Reconstruct diffuse irradiance from the entity's L2 SH probe for a surface normal

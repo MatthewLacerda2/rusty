@@ -95,9 +95,11 @@ fn gpu_instanced_props_render_the_same_pixels_as_one_draw_each() {
         after.draw_calls * 3 < before.draw_calls,
         "instancing should collapse the props: {before:?} -> {after:?}"
     );
+    // One caster draw per mesh per cascade (#435): each cascade is its own depth pass.
+    let cascades = crate::render::passes::shadows::cascades::MAX_CASCADES as u32;
     assert!(
-        after.shadow_draws <= 3,
-        "one caster draw per mesh: {after:?}"
+        after.shadow_draws <= 3 * cascades,
+        "one caster draw per mesh per cascade: {after:?}"
     );
 
     // And the image is identical, pixel for pixel.

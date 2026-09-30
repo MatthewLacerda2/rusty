@@ -129,6 +129,7 @@ mod tests {
             ssr_temporal_upsampling: false,
             tonemap: Tonemap::Reinhard,
             gamma: 1.3,
+            shadows: Default::default(),
         }
     }
 

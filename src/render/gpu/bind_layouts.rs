@@ -170,7 +170,8 @@ pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
     })
 }
 
-/// Main shadow bind group layout (uniform + depth texture + comparison sampler)
+/// Main shadow bind group layout: the cascade uniform, the cascade depth array, and
+/// the comparison sampler (#435).
 pub(crate) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Main Shadow Bind Group Layout"),
@@ -190,7 +191,7 @@ pub(crate) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayo
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Texture {
                     sample_type: wgpu::TextureSampleType::Depth,
-                    view_dimension: wgpu::TextureViewDimension::D2,
+                    view_dimension: wgpu::TextureViewDimension::D2Array,
                     multisampled: false,
                 },
                 count: None,

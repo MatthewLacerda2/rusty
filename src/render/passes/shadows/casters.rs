@@ -5,9 +5,11 @@
 //! one mesh is then a single instanced depth draw. The depth pass has no material — it
 //! writes depth only, and `shadow.wgsl` does not skin — so the mesh alone is the key.
 //!
-//! The static bake and the dynamic pass each own a [`CasterBuffer`]: both are recorded
-//! into the same encoder before one submit, so sharing one buffer would let the second
-//! upload overwrite the first's matrices.
+//! Casters are gathered once per sweep and culled per cascade (#435), so a prop inside
+//! two cascades is drawn into both. The static bake and the dynamic pass each own a
+//! [`CasterBuffer`] holding every cascade's matrices: both are recorded into the same
+//! encoder before one submit, so sharing one buffer would let the second upload
+//! overwrite the first's matrices.
 
 use std::collections::HashMap;
 use std::ops::Range;
@@ -122,33 +124,53 @@ pub(super) struct CasterFrame<'a> {
 }
 
 impl ShadowRenderer {
-    /// Gather, batch and upload every active caster whose `is_static` flag matches
-    /// `want_static`, into that sweep's own caster buffer.
+    /// Gather every active caster whose `is_static` flag matches `want_static`, cull
+    /// it against each of `cascades`' light volumes, and upload every cascade's
+    /// batches into that sweep's one caster buffer. Returns the batches per cascade,
+    /// in the order given.
     pub(super) fn prepare_casters(
         &mut self,
         frame: &CasterFrame,
         want_static: bool,
-    ) -> Vec<CasterBatch> {
-        let casters = self.collect_casters(frame, want_static);
-        let (matrices, batches) = batch_casters(casters, self.instancing);
+        cascades: &[usize],
+    ) -> Vec<Vec<CasterBatch>> {
+        let candidates = self.collect_casters(frame, want_static);
+        let mut matrices = Vec::new();
+        let mut per_cascade = Vec::with_capacity(cascades.len());
+        for &i in cascades {
+            // Cull casters against the LIGHT's volume, not the camera's (#330). An
+            // off-screen caster still inside a cascade must keep its shadow — culling
+            // casters by the player camera is the classic pop-a-shadow bug.
+            let frustum = Frustum::from_view_proj(self.cascades[i].light_space);
+            let casters = candidates
+                .iter()
+                .filter(|c| {
+                    c.bounds
+                        .is_none_or(|(lo, hi)| frustum.intersects_aabb(lo, hi))
+                })
+                .map(|c| (c.mesh.clone(), c.num_indices, c.world))
+                .collect();
+            let (packed, mut batches) = batch_casters(casters, self.instancing);
+            let base = matrices.len() as u32;
+            for batch in &mut batches {
+                batch.instances = batch.instances.start + base..batch.instances.end + base;
+            }
+            matrices.extend(packed);
+            self.drawn.extend(batches.iter().map(CasterBatch::counts));
+            per_cascade.push(batches);
+        }
         let buffer = if want_static {
             &mut self.static_casters
         } else {
             &mut self.dynamic_casters
         };
         buffer.upload(frame.device, frame.queue, &self.entity_layout, &matrices);
-        self.drawn.extend(batches.iter().map(CasterBatch::counts));
-        batches
+        per_cascade
     }
 
-    /// Every active caster matching `want_static` inside the light's frustum, as
-    /// `(mesh, index count, world matrix)`.
-    fn collect_casters(&self, frame: &CasterFrame, want_static: bool) -> Vec<(MeshId, u32, Mat4)> {
+    /// Every active caster matching `want_static` that has a GPU mesh.
+    fn collect_casters(&self, frame: &CasterFrame, want_static: bool) -> Vec<Candidate> {
         let scene = frame.scene;
-        // Cull casters against the LIGHT's frustum, not the camera's (#330). An off-screen
-        // caster still inside the light's ortho volume must keep its shadow — culling
-        // casters by the player camera is the classic pop-a-shadow bug.
-        let frustum = Frustum::from_view_proj(self.light_space_matrix);
         let mut casters = Vec::new();
         for id in scene.world.ids_with_mesh() {
             if !scene.world.is_active(id) || scene.world.is_static(id) != want_static {
@@ -162,33 +184,35 @@ impl ShadowRenderer {
             let world = scene.world_matrix(id);
             // Skinned casters are never culled — their AABB is the rest pose, which an
             // animation can exceed; a wrongly-culled caster would drop its shadow (#330).
-            if !mesh.is_skinned() {
-                let (amin, amax) =
-                    transform_aabb(gpu_mesh.local_aabb.0, gpu_mesh.local_aabb.1, world);
-                if !frustum.intersects_aabb(amin, amax) {
-                    continue;
-                }
-            }
-            casters.push((mesh_id, gpu_mesh.num_indices, world));
+            let bounds = (!mesh.is_skinned())
+                .then(|| transform_aabb(gpu_mesh.local_aabb.0, gpu_mesh.local_aabb.1, world));
+            casters.push(Candidate {
+                mesh: mesh_id,
+                num_indices: gpu_mesh.num_indices,
+                world,
+                bounds,
+            });
         }
         casters
     }
 
-    /// Record one sweep's instanced depth draws from its caster buffer.
+    /// Record one sweep's instanced depth draws for `cascade` from its caster buffer.
     pub(super) fn draw_casters<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         gpu_meshes: &'a HashMap<MeshId, GpuMesh>,
         batches: &[CasterBatch],
         want_static: bool,
+        cascade: usize,
     ) {
         let casters = if want_static {
             &self.static_casters
         } else {
             &self.dynamic_casters
         };
+        let offset = (cascade as u64 * super::LIGHT_SPACE_STRIDE) as u32;
         render_pass.set_pipeline(&self.pipeline);
-        render_pass.set_bind_group(0, &self.global_bind_group, &[]);
+        render_pass.set_bind_group(0, &self.global_bind_group, &[offset]);
         render_pass.set_bind_group(1, &casters.bind_group, &[]);
         for batch in batches {
             let Some(gpu_mesh) = gpu_meshes.get(&batch.mesh) else {
@@ -200,6 +224,15 @@ impl ShadowRenderer {
             render_pass.draw_indexed(0..batch.num_indices, 0, batch.instances.clone());
         }
     }
+}
+
+/// One caster before culling: its draw and its world bounds (`None` when skinned —
+/// never culled).
+struct Candidate {
+    mesh: MeshId,
+    num_indices: u32,
+    world: Mat4,
+    bounds: Option<(glam::Vec3, glam::Vec3)>,
 }
 
 #[cfg(test)]

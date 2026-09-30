@@ -43,6 +43,7 @@ fn vc() -> VisualCorrectionComponent {
         ssr_temporal_upsampling: false,
         tonemap: Tonemap::Aces,
         gamma: 1.0,
+        shadows: Default::default(),
     }
 }
 

@@ -1898,6 +1898,8 @@ Getters return a neutral default when no active volume/camera exists.
 | `Graphics.GetMotionBlurSamples` / `SetMotionBlurSamples` | `()` / `(n)` | `number` (clamped 2–32) |
 | `Graphics.GetFxaaActive` / `SetFxaaActive` | `()` / `(bool)` | `bool` (**default `true`**) |
 | `Graphics.GetQuality` / `SetQuality` | `()` / `(name)` | `"Low"` / `"Medium"` / `"High"` |
+| `Graphics.GetShadowCascades` / `SetShadowCascades` | `()` / `(n)` | `number` (clamped 1–4, **default `4`**) |
+| `Graphics.GetShadowDistance` / `SetShadowDistance` | `()` / `(units)` | `number` (world units, clamped ≥ 1, **default `100`**) |
 
 **Gamma** is a display-gamma *tweak*, not the output encode: the render target
 (window, Game view, and headless screenshot alike) is sRGB and encodes linear →
@@ -1905,6 +1907,16 @@ display in hardware, exactly once (#415). `1.0` leaves the image untouched; `> 1
 lifts the midtones, `< 1` darkens them. Scenes saved before #415 stored the
 encode itself (`gamma: 2.2` meant "normal"); they load as `gamma / 2.2`, so an old
 2.2 becomes 1.0 and looks the same.
+
+**Sun shadows** are cascaded (#435): the camera's view, out to the **shadow
+distance**, is split into `1`–`4` slices, each with its own shadow map fitted to it
+and following the camera, so the first few metres get the sharpest shadow and a
+caster anywhere in a level still casts. Past the distance shadows fade out over its
+last tenth. Both knobs live on the active visual-correction volume (the Inspector's
+**Shadows** section edits the same fields) and are saved with the scene, so an
+indoor level can spend its cascades on 40 m and an outdoor one on 150 m; with no
+active volume the defaults above apply. Each cascade costs one more depth pass for
+the moving casters (static casters are re-drawn only when a cascade moves, #355).
 
 **FXAA** is the anti-aliasing pass at the very end of the chain, running on the
 tonemapped image just before it reaches the screen. It is **on by default** — a
