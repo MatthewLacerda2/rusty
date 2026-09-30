@@ -94,11 +94,14 @@ Component menu offers.
 | `Start` | `Start(id)` | Once per script instance, after its `Awake`, immediately before its first `Update` — deferred while the owning entity is inactive, so an object instantiated disabled initializes when first enabled (the spawn-pool pattern). |
 | `Update` | `Update(id, dt)` | Every frame of play while the owning entity is `active`, after the instance's `Start` has run. `dt` is the frame's scaled delta (`Time.deltaTime`); under the headless harness / `Time.Step` it is the fixed step. |
 | `LateUpdate` | `LateUpdate(id, dt)` | Every frame of play while the owning entity is `active`, after **every** script's `Update` and after this tick's physics, animation and particle steps have resolved — the post-physics hook. Same scaled `dt` as `Update` (`Time.deltaTime`) and the same deterministic `(entity, script index)` order, still inside the one `FixedUpdate` sim tick — it is **not** a render-rate callback. Reach for it when a script must read *this* tick's settled transforms: follow-cameras, look-ats, aim, recoil recovery, and other post-move corrections that visibly lag by a step if run in `Update`. |
-| `OnTriggerEnter` | `OnTriggerEnter(id, other)` | Once, on the first frame an overlap involving the entity's trigger/sensor (or static) collider exists — before that frame's `OnTrigger`. |
-| `OnTrigger` | `OnTrigger(id, other)` | After the physics step, once per overlapping pair involving the entity's trigger/sensor (or static) collider. It is the overlap "stay": it repeats every frame the overlap persists, including the frame `OnTriggerEnter` fires. |
+| `OnTriggerEnter` | `OnTriggerEnter(id, other)` | Once, on the first frame an overlap involving a trigger collider (`is_trigger`) exists — before that frame's `OnTrigger`. A solid collider, static or not, never fires the trigger hooks: its contacts are `OnCollision*`. |
+| `OnTrigger` | `OnTrigger(id, other)` | After the physics step, once per overlapping pair involving a trigger collider (`is_trigger`). It is the overlap "stay": it repeats every frame the overlap persists, including the frame `OnTriggerEnter` fires. |
 | `OnTriggerExit` | `OnTriggerExit(id, other)` | Once, on the first frame a previously overlapping pair no longer overlaps — after that frame's `OnTrigger` dispatches (no stay fires for the ended pair). |
+| `OnCollisionEnter` | `OnCollisionEnter(id, other, contact)` | Once, when a solid (non-trigger) contact between the entity's collider and another begins — the tick the solver first pushes the two apart, so `contact.impulse` is the impact. At least one side must be a dynamic body: a kinematic body against static geometry never collides (Unity's rule). Before that tick's `OnCollisionStay`. |
+| `OnCollisionStay` | `OnCollisionStay(id, other, contact)` | After the physics step, once per touching solid pair, every frame the contact persists — including the frame `OnCollisionEnter` fires (the same edge rule as `OnTrigger`). |
+| `OnCollisionExit` | `OnCollisionExit(id, other)` | Once, on the first frame the pair's surfaces no longer touch (or either collider is deactivated) — after that frame's `OnCollisionStay`. No `contact`: nothing is touching any more. |
 | `OnEnable` | `OnEnable(id)` | When the owning entity becomes `active`: on its **first** activation — between `Awake` and `Start`, so the first-tick order is `Awake → OnEnable → Start` — and again on every later inactive→active transition (e.g. a script or `Scene.Activate` re-enabling a pooled object). Detected by diffing the entity's `active` flag against the previous tick, so it fires **exactly once** per rising edge. |
-| `OnDisable` | `OnDisable(id)` | When the owning entity becomes inactive: once on each `active`→inactive transition (e.g. `Scene.Deactivate`), and once more — immediately **before** `OnDestroy` — when an *active* entity is destroyed. Fires **exactly once** per falling edge. While disabled, the entity receives no other gameplay callback (no `Update`/`LateUpdate`/`OnTrigger`). |
+| `OnDisable` | `OnDisable(id)` | When the owning entity becomes inactive: once on each `active`→inactive transition (e.g. `Scene.Deactivate`), and once more — immediately **before** `OnDestroy` — when an *active* entity is destroyed. Fires **exactly once** per falling edge. While disabled, the entity receives no other gameplay callback (no `Update`/`LateUpdate`/`OnTrigger`/`OnCollision*`). |
 | `OnDestroy` | `OnDestroy(id)` | Once, when the entity is removed **during play** via `Scene.DestroyEntity` — after its `OnDisable` if it was active. The entity is still readable during the callback (removal happens just after). See the divergence note: **Stop does not fire `OnDestroy`.** |
 | `OnPointerEnter` | `OnPointerEnter(id, event)` | UI (#420): the pointer moved onto the entity or one of its descendants. Fires on every entity from the hit one up to the root that defines it, deepest first — moving from a button onto its own label does not re-enter the button. |
 | `OnPointerExit` | `OnPointerExit(id, event)` | UI: the pointer left the entity and all its descendants (deepest first). |
@@ -115,7 +118,22 @@ Component menu offers.
 | `OnCancel` | `OnCancel(id)` | UI: Escape was pressed while the entity is focused. |
 
 `id` is always the **owning** entity's id (the entity the script is attached
-to); `other` is the other entity in the overlap.
+to); `other` is the other entity in the overlap or contact. Both name the entity
+that **owns the collider** — the part of a compound body, never its root (see
+[compound colliders](#physics)); the collision callbacks go to scripts on that
+part.
+
+**Collision callbacks (#448).** `contact` is the pair's strongest contact point
+as the receiver sees it (every point per pair is out of scope):
+
+- `point` — `{x, y, z}` world-space contact point.
+- `normal` — `{x, y, z}` unit normal pointing out of `other`, into the receiver — a ball landing on a floor reads `(0, 1, 0)`, the floor reads `(0, -1, 0)`.
+- `relativeVelocity` — `{x, y, z}` `other`'s velocity minus the receiver's at the point, taken before this tick's solve — the closing speed of an impact (a ball falling at 5 m/s onto a floor reads `y = 5`).
+- `impulse` — Total normal impulse (N·s) the solver applied across the pair this tick; divide by `Time.deltaTime` for force.
+- `otherBody` — The entity owning `other`'s rigid body (its compound root; `other` itself when it is its own body).
+
+A contact *touches* once the surfaces are within 5 mm; rapier's speculative
+contacts further apart are not reported.
 
 **UI callbacks (#420).** The pointer family's `event` is a table:
 `button` (`"Left"`, `"Right"` or `"Middle"`), `position = {x, y}` (UI screen
@@ -149,7 +167,10 @@ headless replays stay byte-identical):
   callback never reaches a script whose `Awake` hasn't run).
 - The trigger callbacks dispatch in a fixed per-frame phase order — all
   `OnTriggerEnter`, then all `OnTrigger`, then all `OnTriggerExit` — with each
-  phase's pair list sorted ascending. Every trigger callback notifies both
+  phase's pair list sorted ascending. The collision callbacks follow the same
+  tick's triggers in the same shape — all `OnCollisionEnter`, then all
+  `OnCollisionStay`, then all `OnCollisionExit`, each list sorted ascending by
+  `(low id, high id)`. Every trigger and collision callback notifies both
   sides of its pair — A about B, then B about A — and an entity carrying
   several scripts is notified in ascending script-index order.
 - `OnEnable`/`OnDisable` are detected at the head of the script phase by diffing
@@ -173,7 +194,7 @@ headless replays stay byte-identical):
   timer phase: due [`Timer`](#timer) invokes fire and waiting coroutines resume,
   in ascending `(entity id, handle)` order.
 - **One active gate for every gameplay hook.** A disabled entity receives *no*
-  gameplay callback — not `Update`, `LateUpdate`, or the trigger hooks. Going
+  gameplay callback — not `Update`, `LateUpdate`, or the trigger and collision hooks. Going
   inactive is announced once by `OnDisable`; coming back is announced once by
   `OnEnable`.
 
@@ -747,7 +768,7 @@ way out (case-insensitive, `-`/`_` ignored):
 |---|---|---|
 | `base_color` / `albedo` | **sRGB** | — |
 | `emissive` | **sRGB** | — |
-| `normal` | linear | tangent-space (use a `bump_to_normal` op) |
+- `normal` — linear | tangent-space (use a `bump_to_normal` op)
 | `roughness` | linear | — |
 | `metallic` | linear | — |
 | `metallic_roughness` / `orm` | linear | **metallic → B, roughness → G** (one-shot packed MR) |
@@ -1382,10 +1403,10 @@ world `x = 11`. Unity semantics:
   (script, animator) moves its collider on the body. With no Rigidbody ancestor
   the entity is its own body, as before (static, or an implicit kinematic body).
 - **Hits name the part.** `Raycast`, `SphereCast`, the overlaps, `ClosestPoint`,
-  `ContainsPoint` and trigger events report the entity that **owns the collider**
+  `ContainsPoint`, trigger and collision events report the entity that **owns the collider**
   that was hit, never the body's root — so a script can tell a head hit from a
-  torso hit. A deactivated part's collider stops generating contacts and trigger
-  events and is skipped by every query.
+  torso hit. A deactivated part's collider stops generating contacts, trigger and
+  collision events and is skipped by every query.
 - **A child with its own Rigidbody** is its own body. A **dynamic** one is
   driven by physics: its world pose is what the solver says, and a moving parent
   does **not** carry it — each physics step writes the body's world pose back

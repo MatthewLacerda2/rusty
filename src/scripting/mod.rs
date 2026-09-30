@@ -39,6 +39,8 @@ mod tests_awake;
 #[cfg(test)]
 mod tests_collider;
 #[cfg(test)]
+mod tests_collisions;
+#[cfg(test)]
 mod tests_console;
 #[cfg(test)]
 mod tests_coroutines;

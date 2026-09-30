@@ -35,6 +35,16 @@ pub const ON_TRIGGER: &str = "OnTrigger";
 /// Called once, the tick after a trigger-overlap pair involving the owning
 /// entity ends (#310) — after that tick's `OnTrigger` dispatches.
 pub const ON_TRIGGER_EXIT: &str = "OnTriggerExit";
+/// Called once, the tick a solid (non-trigger) contact involving the owning
+/// entity's collider begins (#448) — `(id, other, contact)`, before that tick's
+/// `OnCollisionStay`.
+pub const ON_COLLISION_ENTER: &str = "OnCollisionEnter";
+/// Called once per touching solid pair involving the owning entity, each tick
+/// the contact persists (including the enter tick) — `(id, other, contact)`.
+pub const ON_COLLISION_STAY: &str = "OnCollisionStay";
+/// Called once, the tick after a solid contact involving the owning entity ends
+/// (#448) — `(id, other)`, after that tick's `OnCollisionStay` dispatches.
+pub const ON_COLLISION_EXIT: &str = "OnCollisionExit";
 /// Called when the owning entity becomes active (#323): on its first activation
 /// — between `Awake` and `Start`, so the first-tick order is
 /// `Awake → OnEnable → Start` — and again on every later inactive→active edge.
@@ -94,6 +104,9 @@ pub const LIFECYCLE_CALLBACKS: &[&str] = &[
     ON_TRIGGER_ENTER,
     ON_TRIGGER,
     ON_TRIGGER_EXIT,
+    ON_COLLISION_ENTER,
+    ON_COLLISION_STAY,
+    ON_COLLISION_EXIT,
     ON_POINTER_ENTER,
     ON_POINTER_EXIT,
     ON_POINTER_DOWN,
