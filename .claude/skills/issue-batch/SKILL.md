@@ -218,7 +218,8 @@ briefs cloud coders, reviews and merges. Its loop per ready pull request:
    rebased head and merges only on `make mergeable`'s verdict, which reads a
    cancelled run beside its still-running replacement as "wait", not red
    (#562). The local check is a heavy build on a cold target, so it takes a
-   build slot like any other.
+   build slot like any other. Run it from a worktree under `.claude/worktrees/`,
+   never the scratchpad (a tmpfs a cold build fills, #580).
 3. A hand-back is the queue's whole report: fix a conflict or a failed check on
    the branch (or brief its coder to), then queue it again.
 4. After merging: remove the worktree and its `target/`, re-read the board, and
