@@ -4,11 +4,12 @@ rusty's in-game UI is **Unity 5's uGUI, adapted** — HUDs, menus and overlays a
 from ordinary GameObjects. This page is the model: what the pieces are, how layout works,
 and the rules that keep it deterministic. The roadmap is the tracking issue #414; the
 script surface is in [`scripting-api.md`](scripting-api.md) (`Canvas`, `RectTransform`,
-`UI`).
+`UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`).
 
 > Status: the model, the `Canvas` and `RectTransform` components and the layout pass
-> (#417); drawing — `Image`, `CanvasGroup`, `RectMask` and the render pass (#418). Text
-> (#419), pointer events and focus (#420) and layout groups (#421) build on it.
+> (#417); drawing — `Image`, `CanvasGroup`, `RectMask` and the render pass (#418);
+> fonts and SDF `Text` (#419). Pointer events and focus (#420) and layout groups
+> (#421) build on it.
 
 ## The model
 
@@ -18,7 +19,7 @@ script surface is in [`scripting-api.md`](scripting-api.md) (`Canvas`, `RectTran
   prefabs, scene save and the Play/Stop snapshot all apply unchanged. There is no separate
   UI document or markup world, and no egui in the game (egui stays the editor's toolkit).
 - **Primitives in Rust, widgets in Lua.** First-class components are the primitives
-  (`Canvas`, `RectTransform`, `Image`, `CanvasGroup`, `RectMask`, and later `Text`, …);
+  (`Canvas`, `RectTransform`, `Image`, `CanvasGroup`, `RectMask`, `Text`, …);
   Button, Slider, Dropdown and the rest ship as engine Lua scripts + prefabs.
 
 ### `Canvas`
@@ -127,6 +128,63 @@ a `Tiled` image caps itself at 1024 tiles by growing the tile.
   masks intersect. The clip is a scissor rect, so a rotated mask clips to its bounding
   box (as in Unity). Soft and shape masks are #428.
 
+### `Text`
+
+The label — TextMeshPro's `TextMeshProUGUI`, trimmed. It draws `text` inside its
+entity's laid-out rect (after rotation and scale). Adding one also adds a
+`RectTransform`.
+
+| Field | Meaning |
+|---|---|
+| `text` | The string. `\n` breaks a line; with `rich_text`, the tag subset below styles runs. |
+| `font`, `font_bold`, `font_italic` | Font asset paths (`.ttf` / `.otf`, like textures). `font: None` is the bundled default; without a bold / italic face, `<b>` / `<i>` are synthesized. |
+| `font_size` | The **em** size in reference units (as in Unity and CSS). |
+| `color` | Fill, display-space RGBA with straight alpha. |
+| `alignment` | Where the block sits in the rect: Unity's nine anchors, `TopLeft` … `BottomRight`. Each line aligns horizontally on its own. |
+| `wrap` | Break lines at word boundaries to fit the rect's width (a word wider than the rect breaks between characters). Off: only `\n` breaks. |
+| `overflow` | `Overflow` spills past the rect. `Truncate` keeps only the lines that fit its height entirely (and, unwrapped, cuts characters past its right edge). `Ellipsis` truncates and ends the last kept line with `…` (`...` if the font lacks it). |
+| `line_spacing` | Line pitch multiplier (1 = the font's ascent + descent + line gap). |
+| `letter_spacing` | Extra advance per character, in ems. |
+| `auto_size`, `auto_size_min`, `auto_size_max` | Pick the largest size in `[min, max]` at which the whole text fits the rect (the minimum when none does; `overflow` then applies). A fixed-step binary search, so the pick is a pure function of the inputs. |
+| `rich_text` | Parse the tag subset. Off draws tags literally (echoing user input). |
+| `raycast_target` | Whether the pointer can hit it (read by #420). |
+| `outline_width`, `outline_color` | An outline grown outward from the glyph edge, in ems. |
+| `shadow_offset`, `shadow_color` | A drop shadow — a copy of the (outlined) glyphs offset in reference units, drawn beneath the whole label. |
+| `glow_size`, `glow_color` | A soft glow fading out past the (outlined) edge over `glow_size` ems — neon labels. |
+
+**Rich text** is a deliberately small subset: `<color=#rrggbb>` / `<color=#rrggbbaa>`,
+`<b>`, `<i>` and `<size=n>` (reference units; under auto-size it scales with the
+picked size), each closed by `</color>`, `</b>`, `</i>`, `</size>`, nesting freely.
+An unknown or malformed tag, or a close with nothing open, draws literally — nothing
+the author typed silently vanishes. There is no layout engine beyond that.
+
+**Fonts.** `.ttf` / `.otf` files referenced by path, parsed with `ab_glyph` and cached
+for the process; a path that does not load falls back to the default with one
+warning. The bundled default is **Instrument Sans** (`assets/fonts/`), under the SIL
+Open Font License 1.1 — its license text ships beside it
+(`assets/fonts/InstrumentSans-OFL.txt`) and must travel with any build that includes
+the font. `cargo deny` checks crate licenses, not assets, so keep font licenses here.
+
+**Shaping: kerning only (Latin).** Glyphs map one-to-one from characters and pairs
+are kerned from the font's GPOS `kern` feature (what modern fonts ship), falling
+back to the legacy `kern` table. Ligatures, combining marks, right-to-left and CJK
+line breaking need full shaping — a later localization concern, not built here.
+
+**Layout is CPU, in the sim's terms.** Measuring, wrapping, overflow and auto-size
+(`src/ui/text/`) never touch the GPU: headless layout is the window's, and
+`Text.GetPreferredSize` (and #421's layout groups) read the same numbers the
+renderer draws. Coordinates are rect-local reference units.
+
+**Drawing: signed distance fields.** Each glyph's field is generated on first use —
+rasterized 4× supersampled at a 48 px em, measured with an exact Euclidean distance
+transform — and packed into its font's single-channel atlas (1024 wide, doubling in
+height up to 4096 as it fills), uploaded only when a new glyph arrived. The field
+reaches 12 atlas pixels (**0.25 em**) past the edge: outline + glow + synthesized
+bold are capped to that. The shader cuts fill, outline and glow from the one
+distance, antialiased over one screen pixel, so text stays sharp at any size or
+scale. Synthesized italic shears the glyph quad; synthesized bold dilates the field
+and widens the advance slightly.
+
 ### The pass
 
 - **When.** Inside `Renderer::render`, **after the whole post-FX chain** (after FXAA):
@@ -151,8 +209,10 @@ a `Tiled` image caps itself at 1024 tiles by growing the tile.
   format — some GL drivers — falls back to blending in linear space: a little off, never
   broken.)
 - **Batching.** One vertex buffer per canvas per view. Consecutive graphics sharing a
-  texture and a clip are one draw call; a texture or clip change starts the next — so a
-  HUD of solid bars is one draw call however many bars it has.
+  source — a texture, or a font's atlas — and a clip are one draw call; a change of
+  either starts the next — so a HUD of solid bars is one draw call however many bars
+  it has, and a label one draw call however many glyphs. An entity with both an
+  `Image` and a `Text` draws the image, then the text.
 - **Dirty.** Each view keeps every canvas's mesh beside its buffer. Rebuilding the CPU
   mesh is a cheap walk; the buffer is re-uploaded only when the canvas's geometry
   changed (a layout or graphic change) and reallocated only when it outgrows its
