@@ -21,6 +21,15 @@ three, four cost six. A rebase buys no correctness.
 So: **one in the merge queue, one being written.** Nothing idles through a
 ten-minute CI run, and nothing rebases twice.
 
+**The merge queue is `make queue PRS="a b c"`** (the `ci-merge` skill has the
+detail): it rebases, pushes, waits for CI on the new head, asks `make mergeable`
+and squash-merges, one at a time, in the order given — so the session running
+the batch is not the one sitting through each run. Hand it the ready pull
+requests in label-priority order; a hand-back (conflict, red, no run) skips that
+entry and the rest carry on, so read its summary rather than assuming the whole
+list landed. It never resolves a conflict: a hand-back naming paths goes back to
+the branch's author. `ARGS=--dry-run` shows what it would do and writes nothing.
+
 ## The real limit is file collision, not count
 
 Two branches adding a variant to `ComponentKind` cost more than four branches in
@@ -189,7 +198,10 @@ a rebase not yet paid for.
 **Dependabot pull requests** (`.github/dependabot.yml`, monthly, one grouped PR per
 ecosystem) have no issue, which is allowed for maintenance. A batch merges them like
 any other ready pull request, through the same serialized queue, at the **lowest
-priority** — after every labelled issue in flight.
+priority** — after every labelled issue in flight. Dependabot rebases its own
+branch when `main` moves and cancels its own runs as it does, so a bot pull
+request often reads *not mergeable* between rebases; `make queue` never
+force-pushes one — it asks `@dependabot rebase` and waits for the new head.
 
 **`planning` is the absolute stop.** It means *not yet*, and no amount of the issue
 looking ready overrides it; `human` is the same in practice. Everything else is
@@ -240,7 +252,8 @@ right away.
 The batch is not done when the last branch merges — it is done when the main
 checkout runs what was merged. Last, once nothing is compiling:
 
-1. **Clean up what is finished.** Remove the worktree and delete the local branch
+1. **Clean up what is finished.** `make queue`'s summary lists what it merged and
+   deliberately removes nothing. Remove the worktree and delete the local branch
    of every pull request that is `MERGED` — ask `gh pr view N --json state`, never
    its exit code, which is 0 for an open one too. `git branch --merged` cannot see
    a squash merge, so it is not the test. A branch with **no commits beyond

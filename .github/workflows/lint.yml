@@ -107,6 +107,12 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --no-deps --locked --features dev
+      # The merge helpers' tests (#486): `make mergeable` is the only thing between
+      # a red PR and `main` while it has no required checks (#491), so a change
+      # that breaks its judgement is a gate failure. Stdlib `unittest`, no build.
+      - name: Merge helper tests (.github/scripts)
+        if: needs.changes.outputs.code != 'false'
+        run: python3 -m unittest discover --start-directory .github/scripts/tests --verbose
 
   # The single required status check for lint.yml (issue #229) — the lint-workflow
   # analog of ci.yml's `ci-gate`. Branch protection requires this job, not `lint` by

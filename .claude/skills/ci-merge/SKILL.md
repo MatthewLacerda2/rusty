@@ -23,10 +23,10 @@ its own gate list is complete before running it.
 session, the MCP bridge, `Debug.*` — and a default-features-only run compiles none
 of it. The two clippy passes and the two test passes are not redundancy.
 
-**Some hard gates hide inside the test run** (`make test`: nextest, then
-doctests). `tests/api_doc_drift.rs` and `tests/callback_doc_drift.rs` fail the
-build when `docs/scripting-api.md` disagrees with the live Lua surface *in either
-direction* — an undocumented binding and a documented-but-absent one both redden CI. They are dev-only, so
+**Some hard gates hide inside `cargo test`.** `tests/api_doc_drift.rs` and
+`tests/callback_doc_drift.rs` fail the build when `docs/scripting-api.md`
+disagrees with the live Lua surface *in either direction* — an undocumented
+binding and a documented-but-absent one both redden CI. They are dev-only, so
 only the `--features dev` run sees them.
 
 **The commit hook is not a substitute.** `.githooks/pre-commit` runs formatting
@@ -42,17 +42,45 @@ to see what it said.
 
 ## The merge, one branch at a time
 
-1. `git fetch origin && git rebase origin/main` in the branch's worktree.
-2. Push with `--force-with-lease`.
-3. Wait for CI **on the rebased head**.
-4. Verify a run actually happened on that head — see the next section.
-5. Merge (squash; the house style is a title carrying `(#N)`). Then remove the
-   worktree and delete the branch — a stale worktree is ~12–16 GB.
+`make queue PRS="a b c"` does the whole loop, one pull request at a time, in the
+order given — so no agent sits through a ten-minute run holding a worktree open:
+
+1. Rebase onto the latest `origin/main`, in a throwaway detached worktree it
+   creates and removes (never one an agent is standing in).
+2. Push with `--force-with-lease` against the head it started from — skipped
+   when the rebase moved nothing, because the run on record is then a run on
+   this exact commit.
+3. Wait for the runs **on the rebased head** to exist and conclude.
+4. Ask `make mergeable`'s judgement of that head — see the next section.
+5. Squash-merge with the house-style title (`Title (#issue) (#pr)`) and
+   `--match-head-commit`, so a push after the verdict makes GitHub refuse.
+
+It **hands back** — skips the entry, names why, carries on with the next — on a
+conflict (naming the paths; it never resolves one), a red run, a run that never
+appears, a head somebody else moved, a draft, or a merge GitHub refused. A 502 on
+the merge call is followed by asking whether it merged. Exit status is non-zero
+if anything was handed back.
+
+What it leaves to you: it **builds nothing** (`make gates` before readying is the
+author's job), never reads the mutation or coverage signal, and **removes no
+worktree and deletes no branch** — the summary lists the merged ones. Remove each
+worktree (~12–16 GB) and its branch once nobody is standing in it.
+
+- `ARGS=--dry-run` reads everything and computes the rebase locally, but pushes,
+  comments and merges nothing — use it to see what a queue *would* do.
+  `ARGS=--no-merge` does the real rebase and wait, and stops at green.
+- **Dependabot branches are never force-pushed** — Dependabot stops maintaining a
+  branch someone else pushed to, and it rebases (and cancels its own runs) by
+  itself. The queue comments `@dependabot rebase` when one is behind, waits for a
+  head on `main`'s tip, and judges that.
+- By hand, the same loop is: rebase in the branch's worktree, push with
+  `--force-with-lease`, wait, `make mergeable PR=N`, squash-merge.
 
 Merging is serialized because rusty is **one compiled crate**: two branches can
 each be green alone and break `main` together. A rename, a changed signature, a
 moved module — no textual conflict catches any of them, and being a single crate
 makes it *more* likely, not less, because everything is in scope of everything.
+The queue does not change that; it only changes who waits.
 
 ### The Markdown exception, and the file it does not cover
 
@@ -71,73 +99,64 @@ code.
 
 ## Verify the run happened on the head commit
 
-No script does this for you, and — **as `main` is configured today** — nothing on
-GitHub does either. Its one ruleset rule is *deletion*: no required status checks,
-no merge queue, so GitHub will happily let a red or entirely unbuilt pull request
-merge. Confirm before trusting otherwise:
+    make mergeable PR=N
+
+Exit 0 means CI genuinely ran on the head commit and passed; anything else prints
+why. It is the last thing before any merge, the queue asks it too, and **on rusty
+it is the only check there is**: `main`'s one ruleset rule is *deletion* — no
+required status checks (#491, a human task), no merge queue — so GitHub will
+happily merge a red or entirely unbuilt pull request. Confirm before trusting
+otherwise:
 
     gh api repos/:owner/:repo/rulesets --jq '.[].id' \
       | xargs -I{} gh api repos/:owner/:repo/rulesets/{} --jq '.name, [.rules[].type]'
 
-Until that says something stricter, the whole check is yours.
+What it asks, so its answers read plainly (`.github/scripts/mergeable.py` has the
+incidents behind each):
 
-`gh pr checks N` is **not** it. It lists the pull request's checks with no commit
-column at all, so it cannot answer "did this run build the head I am about to
-merge?", and it blends runs — a skipped job sits in the same list as a real one.
-Ask about the commit instead:
+- **Both workflows, on the head SHA.** `ci-gate` (from `ci.yml`) and `lint-gate`
+  (from `lint.yml`) each collapse their workflow's gating jobs; a green `ci` beside
+  a missing `lint` is half a check.
+- **A gate that passed is not evidence anything ran.** Both gates run
+  whenever the workflow was not cancelled (`!cancelled()`, #515) and pass over
+  *skipped* jobs, so a draft's run is gate-green with
+  nothing compiled. A run counts only when a gated job itself succeeded.
+  `changes` succeeding proves nothing — it runs on drafts too.
+- **Every run on the commit, not the first listed.** A red run beside a green one
+  refuses. A **cancelled** run is ignored only when a newer run of the same
+  workflow exists on the same commit (#482 cancels superseded runs; before #515
+  that leaves a red gate beside the live one); a cancelled run that is the newest
+  refuses, because nothing has answered.
+- **No run at all** is told apart: a branch that conflicts with `main` gets no run
+  (GitHub cannot build a merge ref, so it creates no run, check or error — do not
+  edit the workflow), versus a pull request readied moments after a push that lost
+  its run (force one with an empty commit). An invalid workflow *does* produce a
+  run, a `startup_failure`.
+- **A Markdown-only change to `docs/scripting-api.md` is refused** unless
+  `build-test`'s dev-feature test step really ran — CI's `code` filter skips the
+  drift tests on exactly that pull request (#525).
+
+It ignores what is not a gate: `main-health` (a `workflow_run` on `main`), `docs`,
+and the coverage and mutation jobs, which show as **skipped** on pull requests by
+design. Its own tests run as `make scripts`, a gate, and in `lint.yml`.
+
+`gh pr checks N` is **not** a substitute. It has no commit column, so it cannot
+answer "did this run build the head I am about to merge?", and it blends runs — a
+skipped job sits in the same list as a real one, and `changes` appears **twice**,
+once per workflow. To look by hand, ask about the commit:
 
     SHA=$(gh pr view N --json headRefOid -q .headRefOid)
     gh api "repos/:owner/:repo/commits/$SHA/check-runs" \
       --jq '.check_runs[] | "\(.name)\t\(.status)\t\(.conclusion)"' | sort
 
-A healthy code branch shows: `build-test`, `build-test-cross (macos-latest)`,
-`build-test-cross (windows-latest)`, `deny`, `ci-gate` from `ci.yml`; `lint` and
-`lint-gate` from `lint.yml`; `changes` **twice**, once per workflow — that
-duplicate is normal and is exactly the shape that makes eyeballing a check list
-unreliable. `coverage`, `mutants` and `mutants-report` appear as **skipped** on
-every pull request by design (they are the post-merge and nightly runs). Skipped is the honest
-answer; never read it as green.
-
-`ci-gate` and `lint-gate` are the two that matter — each collapses its workflow's
-gating jobs into one verdict and passes only when its `changes` job succeeded and
-every gating job succeeded or was legitimately skipped. If those two are `success` on the head SHA, the gates
-are green on the code being merged.
-
-Four failure shapes to expect:
-
-- **A skipped run reading as green.** See above — `coverage`, `mutants`, and every
-  step on a Markdown-only pull request.
-- **Two runs on one head.** A push and `ready_for_review` arriving together start
-  two runs; the older is cancelled (#482), and its jobs read `cancelled`. Its gates
-  are skipped (#515), so the live run's `ci-gate`/`lint-gate` are the only verdict —
-  read the ones that completed, not the first in the list.
-- **No run at all, because the pull request was readied moments after a push.**
-  The checks are not green, they are absent. `ci.yml` triggers on
-  `ready_for_review`, so this usually self-corrects; if it does not, force one with
-  an empty commit.
-- **No run at all, because the branch conflicts with `main`.** GitHub cannot build
-  a merge ref for a conflicted branch, so it creates nothing — no run, no check, no
-  error. This reads exactly like a broken workflow file.
-
-**Telling the last two apart**, three lines:
-
-1. **No run at all on a ready pull request → check whether the branch conflicts
-   with `main`**, before touching a workflow file.
-2. **An invalid workflow produces a run** — a `push`-event `startup_failure`. That
-   is how the two are told apart. No run whatsoever means conflict.
-3. **The fix is a rebase**, and it is the same rebase step 1 asks for anyway — so
-   it costs nothing but doing it now.
-
 **Never hand-roll a "wait for CI" loop that treats zero checks as success.**
 Absent and passing are different states; a loop counting non-completed checks
-finds zero of each. Require checks to **exist** before calling a run settled.
+finds zero of each. `make queue` is that loop, written so it cannot.
 
-*(Two gaps, both real: nothing wraps the query above into a one-line verdict, and
-nothing runs a queue of finished branches, so an agent holds a worktree open
-through every ten-minute run. Both workflows already trigger on `merge_group`, and
-each already exposes a single collapsed gate job built for exactly that — the
-machinery is written and the ruleset simply does not turn a queue on. Enabling it
-is the user's call, not an assumption to work from.)*
+*(GitHub's **native** merge queue would replace `make queue` — both workflows
+already trigger on `merge_group` with collapsed gates — but it needs an
+organization-owned repository, and moving the repo is the user's call, #486.
+`make mergeable` stays useful either way.)*
 
 ## A red ready pull request stays ready
 
@@ -153,6 +172,8 @@ fields, `ComponentKind` and its hard-coded `ALL` length, `api/mod.rs`'s module
 list, `app/registry.rs`'s ordered `register` calls, the Add Component menu,
 `docs/scripting-api.md`'s tables, `scripting/callbacks.rs`, and the burn-down
 baselines where both sides *removed* lines.
+
+`make queue` hands every one of these back rather than resolving it.
 
 **Two authors both being right is the common case**, and the resolution is usually
 to keep both sides, ordered deliberately rather than by merge accident. Two of
