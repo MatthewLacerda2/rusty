@@ -123,7 +123,7 @@ impl AudioMaestro {
     /// Build a [`VoiceInfo`] for entity `id`'s source — the per-source roster row the
     /// agent reads, with the live playing flag folded in and the spatial `(gain, pan)`
     /// resolved against `listener` at the source's world `position` (#213) — by the same
-    /// [`mix::resolve_voice`] call the per-frame mix applies (#412), with the live
+    /// [`resolve_voice`] call the per-frame mix applies (#412), with the live
     /// voice's volume when it is playing. The caller supplies the component, position
     /// and listener (the maestro doesn't hold the scene or the active camera).
     pub fn voice_info(
