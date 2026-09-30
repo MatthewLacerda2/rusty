@@ -2,7 +2,9 @@
 //!
 //! Script/REPL/bot control over an entity's `ParticleEmitterComponent`: fire
 //! one-off emissions (`Emit`/`Burst`), gate the emitter (`SetActive`), retune the
-//! continuous rate (`SetRate`), and read/clear the live state. Emission goes
+//! continuous rate (`SetRate`), reshape it per shot (`SetShape`, `SetDirection`,
+//! the start ranges, `SetColor`, `SetSubEmitter` — #439), and read/clear the live
+//! state. Emission goes
 //! through the component's own seeded spawn path (`emit_at`), so a scripted burst
 //! stays bit-for-bit reproducible alongside the sim's own emission.
 
@@ -11,6 +13,8 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::components::{EmitFrom, EmitShape, SubEmitTrigger};
+use crate::core::curve::{ColorRange, Range};
 use crate::scene::authoring::particles as particle_ops;
 use crate::scene::Scene;
 
@@ -24,6 +28,7 @@ pub fn register<'lua, 'scope>(
 
     register_emission(scope, &table, scene)?;
     register_tuning(scope, &table, scene)?;
+    register_modules(scope, &table, scene)?;
     register_state(scope, &table, scene)?;
 
     lua.globals()
@@ -101,6 +106,94 @@ fn register_tuning<'lua, 'scope>(
                 particle_ops::set_rate(&mut c, rate);
             }
             Ok(())
+        }),
+    )
+}
+
+/// The #439 module setters: shape, direction, start ranges, colour, sub-emitters.
+fn register_modules<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    // `SetShape(id, kind, opts?)` — opts: radius, angle (cone, degrees), x/y/z (box
+    // size), surface. Returns false (and changes nothing) for an unknown kind.
+    put(
+        table,
+        "SetShape",
+        scope.create_function(|_, (id, kind, opts): (u32, String, Option<mlua::Table>)| {
+            let get = |k: &str, d: f32| opts.as_ref().and_then(|o| o.get(k).ok()).unwrap_or(d);
+            let size = glam::Vec3::new(get("x", 1.0), get("y", 1.0), get("z", 1.0));
+            let surface: bool = opts
+                .as_ref()
+                .and_then(|o| o.get("surface").ok())
+                .unwrap_or(false);
+            let from = if surface {
+                EmitFrom::Surface
+            } else {
+                EmitFrom::Volume
+            };
+            let Some(shape) =
+                EmitShape::from_parts(&kind, get("radius", 1.0), get("angle", 25.0), size)
+            else {
+                return Ok(false);
+            };
+            with_emitter(scene, id, |p| {
+                particle_ops::set_shape(p, shape);
+                particle_ops::set_emit_from(p, from);
+            });
+            Ok(true)
+        }),
+    )?;
+    put(
+        table,
+        "SetDirection",
+        scope.create_function(|_, (id, x, y, z): (u32, f32, f32, f32)| {
+            let dir = glam::Vec3::new(x, y, z);
+            with_emitter(scene, id, |p| particle_ops::set_direction(p, dir));
+            Ok(())
+        }),
+    )?;
+    // `SetLifetime` / `SetSpeed` / `SetSize(id, min, max?)` — `max` omitted is a
+    // constant.
+    type RangeOp = fn(&mut crate::scene::ParticleEmitterComponent, Range);
+    let ranges: [(&str, RangeOp); 3] = [
+        ("SetLifetime", particle_ops::set_lifetime),
+        ("SetSpeed", particle_ops::set_speed),
+        ("SetSize", particle_ops::set_size),
+    ];
+    for (name, op) in ranges {
+        put(
+            table,
+            name,
+            scope.create_function(move |_, (id, min, max): (u32, f32, Option<f32>)| {
+                let range = Range::new(min, max.unwrap_or(min));
+                with_emitter(scene, id, |p| op(p, range));
+                Ok(())
+            }),
+        )?;
+    }
+    put(
+        table,
+        "SetColor",
+        scope.create_function(|_, (id, r, g, b, a): (u32, f32, f32, f32, Option<f32>)| {
+            let color = ColorRange::constant([r, g, b, a.unwrap_or(1.0)]);
+            with_emitter(scene, id, |p| particle_ops::set_color(p, color));
+            Ok(())
+        }),
+    )?;
+    // `SetSubEmitter(id, "birth"|"death"|"collision", target?)` — nil clears.
+    put(
+        table,
+        "SetSubEmitter",
+        scope.create_function(|_, (id, trigger, target): (u32, String, Option<u32>)| {
+            let Some(trigger) = SubEmitTrigger::parse(&trigger) else {
+                return Ok(false);
+            };
+            with_emitter(scene, id, |p| {
+                particle_ops::set_sub_emitter(p, trigger, target)
+            });
+            Ok(true)
         }),
     )
 }

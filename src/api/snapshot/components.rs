@@ -157,6 +157,10 @@ pub(crate) fn particle_value(p: &ParticleEmitterComponent) -> Value {
         "speed": p.speed,
         "direction": vec3(p.direction),
         "color": p.color,
+        "shape": p.shape.name(),
+        "emit_from": p.emit_from,
+        "size": p.size,
+        "sub_emitters": p.sub_emitters,
     })
 }
 

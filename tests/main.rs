@@ -44,6 +44,7 @@ mod parity_authoring_ops;
 mod particles_api;
 mod particles_collision;
 mod particles_determinism;
+mod particles_modules;
 mod physics_character;
 mod physics_contacts;
 mod physics_gravity;

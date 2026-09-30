@@ -10,6 +10,7 @@ use std::rc::Rc;
 use glam::Vec3;
 use rusty::app::GameWorld;
 use rusty::components::particle::{EmitMode, ParticleBlend, ParticleEmitterComponent};
+use rusty::core::curve::Range;
 use rusty::core::input::InputState;
 use rusty::navigation::NavigationGraph;
 use rusty::scene::Scene;
@@ -27,8 +28,8 @@ fn run_emitter(seed: u64, frames: u32) -> Vec<(Vec3, f32, f32)> {
             emit_mode: EmitMode::Continuous,
             blend: ParticleBlend::Additive,
             rate: 30.0,
-            lifetime: 2.0,
-            speed: 3.0,
+            lifetime: Range::constant(2.0),
+            speed: Range::constant(3.0),
             direction: Vec3::new(0.2, 1.0, 0.1),
             spread: 0.6,
             gravity: Vec3::new(0.0, -9.81, 0.0),
@@ -53,7 +54,7 @@ fn run_emitter(seed: u64, frames: u32) -> Vec<(Vec3, f32, f32)> {
         .runtime
         .particles
         .iter()
-        .map(|p| (p.position, p.current_size(), p.current_color()[3]))
+        .map(|p| (p.position, particles.size_of(p), particles.color_of(p)[3]))
         .collect()
 }
 
@@ -104,7 +105,7 @@ fn max_particles_cap_is_respected() {
             emit_mode: EmitMode::Continuous,
             rate: 10_000.0,
             max_particles: 50,
-            lifetime: 100.0,
+            lifetime: Range::constant(100.0),
             seed: 7,
             ..Default::default()
         }),
