@@ -38,6 +38,7 @@ fn point(anchor: Vec2, pivot: Vec2, pos: Vec2, size: Vec2) -> RectTransformCompo
         pivot,
         anchored_position: pos,
         size_delta: size,
+        world_anchor: None,
     }
 }
 
@@ -69,6 +70,7 @@ fn anchor_stretch_insets_from_the_parent_edges() {
         pivot: Vec2::splat(0.5),
         anchored_position: Vec2::ZERO,
         size_delta: Vec2::new(-40.0, -20.0),
+        world_anchor: None,
     };
     let id = element(&mut scene, root, rt);
     let r = UiLayout::compute(&scene.world, HD).get(id).copied();

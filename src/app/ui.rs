@@ -6,44 +6,65 @@
 //! physics, animation and the deferred destroys — so a script's RectTransform or
 //! Canvas change shows in the layout the same tick, and the next tick's pointer
 //! dispatch and this frame's UI draw (#418) read a settled layout. The pass is a
-//! pure function of (scene, screen size); see `ui::layout`. Right after it, every
-//! Selectable's state is shown on its graphic (`ui::events::transition`).
+//! pure function of (scene, screen size, camera); see `ui::layout`. Right before it
+//! the `ScreenSpaceCamera` canvases' sway lag advances (`ui::sway`, #429); right
+//! after it, every Selectable's state is shown on its graphic
+//! (`ui::events::transition`).
 //!
 //! [`dispatch_ui_events`] is a `FixedUpdate` system that `play::register` slots
 //! between the scripts' `Start` and `Update`: the event system turns this tick's
-//! input into UI callbacks, fired straight into the scripts.
+//! input into UI callbacks, fired straight into the scripts. Its pointer ray (world
+//! canvases, #429) stops at the first solid collider, so a terminal behind a wall
+//! is not clicked through it.
+
+use glam::Vec3;
 
 use super::registry::App;
 use super::resources::Resources;
 use super::stage::Stage;
 use super::world::World;
-use crate::ui::events::{Frame, UiHook};
+use crate::ui::events::{Frame, UiHook, WALL_RANGE, WALL_TOLERANCE};
+use crate::ui::{UiLayout, UiView};
 
-/// Register the layout pass: the first `LateUpdate` system, after every
-/// `FixedUpdate` system of the tick.
+/// Register the sway and layout passes: the first `LateUpdate` systems, after
+/// every `FixedUpdate` system of the tick.
 pub(super) fn register(app: &mut App) {
-    app.add_system(Stage::LateUpdate, layout_ui)
+    app.add_system(Stage::LateUpdate, sway_ui)
+        .add_system(Stage::LateUpdate, layout_ui)
         .add_system(Stage::LateUpdate, show_selectable_states);
+}
+
+/// The screen and the active camera the UI is computed against this tick.
+fn ui_view(res: &Resources) -> UiView {
+    UiView::with_camera(res.screen_pixels(), res.camera.borrow().clone())
 }
 
 /// Turn this tick's input into UI callbacks and fire them (#420). Reads last tick's
 /// settled layout — or computes one on the first tick of Play, before this
 /// session's first `LateUpdate` ran.
 pub(super) fn dispatch_ui_events(world: &mut World, res: &mut Resources) {
-    let screen = res.screen_pixels();
+    let view = ui_view(res);
     if res.play_frame == 0 {
-        res.ui_layout = crate::ui::UiLayout::compute(&world.scene.borrow().world, screen);
+        res.ui_layout = UiLayout::compute_in(&world.scene.borrow().world, &view);
     }
     let deliveries = {
         let scene = world.scene.borrow();
         let input = res.input.borrow();
+        let physics = res.physics.borrow();
         let scripts = &res.script_manager;
         let handles = |id: u32, hook: UiHook| scripts.has_ui_handler(id, hook);
+        let walls = |origin: Vec3, dir: Vec3| {
+            physics
+                .as_ref()
+                .and_then(|p| p.first_surface_ahead(origin, dir, WALL_RANGE))
+                .map_or(f32::INFINITY, |h| h.distance + WALL_TOLERANCE)
+        };
         let frame = Frame {
             world: &scene.world,
             layout: &res.ui_layout,
             input: &input,
-            screen,
+            view: &view,
+            walls: &walls,
             handles: &handles,
         };
         res.event_system.borrow_mut().process(&frame)
@@ -60,11 +81,18 @@ fn show_selectable_states(world: &mut World, res: &mut Resources) {
         .apply_transitions(&mut scene.world, dt);
 }
 
+/// Advance every `ScreenSpaceCamera` canvas's sway lag by this tick's camera turn.
+fn sway_ui(world: &mut World, res: &mut Resources) {
+    let dt = res.time.borrow().unscaled_delta_time;
+    let camera = res.camera.borrow().clone();
+    crate::ui::sway::update_sway(&mut world.scene.borrow_mut().world, &camera, dt);
+}
+
 /// Recompute every canvas's layout for this tick.
 fn layout_ui(world: &mut World, res: &mut Resources) {
-    let screen = res.screen_pixels();
+    let view = ui_view(res);
     let scene = world.scene.borrow();
-    res.ui_layout = crate::ui::UiLayout::compute(&scene.world, screen);
+    res.ui_layout = UiLayout::compute_in(&scene.world, &view);
 }
 
 #[cfg(test)]

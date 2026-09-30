@@ -11,8 +11,8 @@ use crate::components::{
     CanvasComponent, ImageComponent, RectTransformComponent, SelectableComponent,
 };
 use crate::core::input::InputState;
-use crate::scene::Scene;
-use crate::ui::UiLayout;
+use crate::scene::{Camera, Scene};
+use crate::ui::{UiLayout, UiView};
 
 pub const SCREEN: Vec2 = Vec2::new(1920.0, 1080.0);
 
@@ -35,6 +35,7 @@ pub fn panel(scene: &mut Scene, parent: u32, min: Vec2, size: Vec2) -> u32 {
         pivot: Vec2::ZERO,
         anchored_position: min,
         size_delta: size,
+        world_anchor: None,
     };
     scene.world.set_rect_transform(id, Some(rt));
     scene.world.set_image(id, Some(ImageComponent::default()));
@@ -68,6 +69,10 @@ pub struct Rig {
     pub input: InputState,
     pub events: EventSystem,
     pub handlers: Handlers,
+    /// The view's camera (world canvases); `None` by default.
+    pub camera: Option<Camera>,
+    /// How far the nearest wall is along every ray.
+    pub wall: f32,
 }
 
 impl Rig {
@@ -77,6 +82,8 @@ impl Rig {
             input: InputState::new(),
             events: EventSystem::default(),
             handlers,
+            camera: None,
+            wall: f32::INFINITY,
         }
     }
 
@@ -88,14 +95,20 @@ impl Rig {
     /// Publish the pending input and run one event-system tick.
     pub fn tick(&mut self) -> Vec<Delivery> {
         self.input.begin_tick();
-        let layout = UiLayout::compute(&self.scene.world, SCREEN);
+        let view = match self.camera.clone() {
+            Some(cam) => UiView::with_camera(SCREEN, cam),
+            None => UiView::screen(SCREEN),
+        };
+        let layout = UiLayout::compute_in(&self.scene.world, &view);
         let handlers = &self.handlers.0;
         let handles = |id: u32, hook: UiHook| handlers.contains(&(id, hook));
+        let wall = self.wall;
         let frame = Frame {
             world: &self.scene.world,
             layout: &layout,
             input: &self.input,
-            screen: SCREEN,
+            view: &view,
+            walls: &|_, _| wall,
             handles: &handles,
         };
         self.events.process(&frame)

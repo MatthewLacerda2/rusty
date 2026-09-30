@@ -24,7 +24,7 @@ use glam::Vec2;
 
 use super::tree::{ancestors_or_self, nearest};
 use super::{
-    accepts, raycast, Delivery, EventSystem, Frame, PointerButton, PointerEvent, UiHook,
+    accepts, raycast_pointer, Delivery, EventSystem, Frame, PointerButton, PointerEvent, UiHook,
     DRAG_THRESHOLD,
 };
 use crate::components::NavigationMode;
@@ -56,7 +56,11 @@ impl EventSystem {
             _ => Vec2::ZERO,
         };
         self.pointer = position;
-        let hit = position.and_then(|p| raycast(f.world, f.layout, p));
+        let mut pointer = f.view.pointer(position);
+        if let Some((origin, dir)) = pointer.ray {
+            pointer.ray_limit = (f.walls)(origin, dir);
+        }
+        let hit = raycast_pointer(f.world, f.layout, &pointer);
         let p = Pointer {
             hit,
             position,
@@ -193,13 +197,14 @@ impl EventSystem {
 }
 
 /// The pointer in UI screen pixels (bottom-left, y-up), or `None` while the cursor
-/// is locked. `Input` reports it top-left, y-down.
+/// is locked (its ray then runs through the screen centre). `Input` reports it
+/// top-left, y-down.
 fn pointer_position(f: &Frame) -> Option<Vec2> {
     if f.input.cursor().locked {
         return None;
     }
     let (x, y) = f.input.mouse_position();
-    Some(Vec2::new(x as f32, f.screen.y - y as f32))
+    Some(Vec2::new(x as f32, f.view.screen.y - y as f32))
 }
 
 /// The entity a press on `hit` belongs to: the nearest ancestor-or-self handling

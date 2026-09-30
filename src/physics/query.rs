@@ -136,6 +136,34 @@ impl PhysicsWorld {
         hits
     }
 
+    /// The nearest solid surface *ahead* of the ray within `max_toi`: sensors
+    /// (triggers) are passed through, and a collider the origin starts inside (the
+    /// player's own capsule around the camera) is looked past rather than hit at 0.
+    /// How the UI finds the wall in front of a world canvas (#429).
+    pub fn first_surface_ahead(&self, origin: Vec3, dir: Vec3, max_toi: f32) -> Option<RayHit> {
+        let ray = Ray::new(to_na_vec(origin).into(), to_na_vec(dir.normalize()));
+        let accept = |_: u32| true;
+        let predicate = self.handle_accepts(&accept);
+        let filter = QueryFilter::default()
+            .exclude_sensors()
+            .predicate(&predicate);
+        let mut hits = Vec::new();
+        self.query_pipeline.intersections_with_ray(
+            &self.bodies,
+            &self.colliders,
+            &ray,
+            max_toi,
+            true,
+            filter,
+            |handle, hit| {
+                hits.extend(self.ray_hit(&ray, handle, hit));
+                true
+            },
+        );
+        sort_hits(&mut hits);
+        hits.into_iter().find(|h| h.distance > 1e-3)
+    }
+
     /// Resolve a rapier ray intersection to a [`RayHit`]; `None` when the
     /// collider belongs to no entity.
     fn ray_hit(&self, ray: &Ray, handle: ColliderHandle, hit: RayIntersection) -> Option<RayHit> {

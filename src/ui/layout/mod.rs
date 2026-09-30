@@ -29,6 +29,13 @@
 //! **Order.** [`UiLayout::iter`] yields rects in draw order: root canvases by
 //! `sort_order` (ties keep scene insertion order), then each canvas's hierarchy in
 //! pre-order (a later sibling draws on top), as in Unity.
+//!
+//! **Views (#429).** [`UiLayout::compute_in`] lays out against a [`UiView`] — the
+//! screen and the camera. A `WorldSpace` root spans its reference resolution
+//! whatever the screen; every root's [`CanvasSpace`] (screen, or a world plane) is
+//! recorded beside its rects. With a camera, an element carrying a `WorldAnchor`
+//! is a marker placed by projection (`anchor`); a hidden marker is left out with
+//! its subtree. [`UiLayout::compute`] is the camera-less view.
 
 use std::collections::BTreeMap;
 
@@ -36,62 +43,40 @@ use glam::{Mat4, Vec2, Vec3};
 
 use crate::components::{RectTransformComponent, TransformComponent};
 use crate::ecs::World;
+use crate::ui::space::{canvas_space, CanvasSpace, UiView};
 
+mod anchor;
 mod fit;
 #[cfg(test)]
 mod fixture;
 mod grid;
 mod group;
+mod lookup;
 mod native;
+mod rect;
 mod sizes;
 
+pub use lookup::{rect_in, rect_of};
+pub use rect::UiRect;
 pub use sizes::{element_sizes, Sizes};
-
-/// One laid-out UI element (the canvas root included).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct UiRect {
-    /// The root canvas entity this element lays out under.
-    pub canvas: u32,
-    /// Screen pixels per reference unit for that canvas.
-    pub scale_factor: f32,
-    /// The element's own rect, `(min, size)`, before rotation and scale — in the
-    /// same frame as its parent's rect (Unity's layout rect).
-    pub rect: (Vec2, Vec2),
-    /// The final quad in canvas reference units after the whole rotation / scale
-    /// chain: bottom-left, top-left, top-right, bottom-right (Unity's
-    /// `GetWorldCorners` order).
-    pub corners: [Vec2; 4],
-}
-
-impl UiRect {
-    /// Axis-aligned bounds of the final quad in reference units, `(min, max)`.
-    pub fn bounds(&self) -> (Vec2, Vec2) {
-        let mut lo = self.corners[0];
-        let mut hi = self.corners[0];
-        for c in &self.corners[1..] {
-            lo = lo.min(*c);
-            hi = hi.max(*c);
-        }
-        (lo, hi)
-    }
-
-    /// Axis-aligned bounds of the final quad in screen pixels, `(min, max)`.
-    pub fn screen_bounds(&self) -> (Vec2, Vec2) {
-        let (lo, hi) = self.bounds();
-        (lo * self.scale_factor, hi * self.scale_factor)
-    }
-}
 
 /// Every UI element's computed rect, in draw order (a resource; see the module docs).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UiLayout {
     rects: Vec<(u32, UiRect)>,
     index: BTreeMap<u32, usize>,
+    spaces: BTreeMap<u32, CanvasSpace>,
 }
 
 impl UiLayout {
-    /// Lay out every root canvas in `world` on a `screen`-pixel screen.
+    /// Lay out every root canvas in `world` on a `screen`-pixel screen, with no
+    /// camera (no world planes, no markers).
     pub fn compute(world: &World, screen: Vec2) -> Self {
+        Self::compute_in(world, &UiView::screen(screen))
+    }
+
+    /// Lay out every root canvas in `world` against `view`.
+    pub fn compute_in(world: &World, view: &UiView) -> Self {
         let mut roots: Vec<(i32, u32)> = world
             .ids_with_canvas()
             .into_iter()
@@ -102,11 +87,26 @@ impl UiLayout {
         roots.sort_by_key(|&(order, _)| order);
         let mut layout = Self::default();
         for (_, root) in roots {
-            if let Some(node) = root_node(world, root, screen) {
-                layout.walk(world, root, node);
+            if let Some((node, space)) = root_node(world, root, view) {
+                layout.spaces.insert(root, space);
+                layout.walk(world, view, root, node);
             }
         }
         layout
+    }
+
+    /// Where root canvas `canvas`'s reference units end up (the screen for an
+    /// unknown id).
+    pub fn space(&self, canvas: u32) -> CanvasSpace {
+        self.spaces.get(&canvas).copied().unwrap_or_default()
+    }
+
+    /// Every laid-out root canvas and its space, in draw order.
+    pub fn canvases(&self) -> impl Iterator<Item = (u32, CanvasSpace)> + '_ {
+        self.rects
+            .iter()
+            .filter(|(id, r)| *id == r.canvas)
+            .map(|(id, _)| (*id, self.space(*id)))
     }
 
     /// The rect of `id`, when it was laid out.
@@ -130,7 +130,7 @@ impl UiLayout {
     }
 
     /// Record `id`'s node, then its rect-carrying children in hierarchy order.
-    fn walk(&mut self, world: &World, id: u32, node: Node) {
+    fn walk(&mut self, world: &World, view: &UiView, id: u32, node: Node) {
         self.index.insert(id, self.rects.len());
         self.rects.push((id, node.rect));
         let placed: BTreeMap<u32, _> = group::placements(world, id, node.rect.rect)
@@ -140,34 +140,12 @@ impl UiLayout {
             if self.index.contains_key(&child) {
                 continue; // a malformed hierarchy never loops the walk
             }
-            if let Some(child_node) = child_node(world, child, &node, placed.get(&child).copied()) {
-                self.walk(world, child, child_node);
+            let placed = placed.get(&child).copied();
+            if let Some(child_node) = child_node(world, view, child, &node, placed) {
+                self.walk(world, view, child, child_node);
             }
         }
     }
-}
-
-/// The rect of one entity, computed on demand by walking only its ancestor chain —
-/// identical to what [`UiLayout::compute`] yields for it. `None` when the entity is
-/// not under a canvas, or a link of the chain lacks a `RectTransform`.
-pub fn rect_of(world: &World, id: u32, screen: Vec2) -> Option<UiRect> {
-    let root = root_canvas_of(world, id)?;
-    let mut chain = Vec::new();
-    let mut cur = id;
-    while cur != root {
-        chain.push(cur);
-        cur = world.parent_id(cur)?;
-    }
-    let mut node = root_node(world, root, screen)?;
-    let mut parent = root;
-    for &link in chain.iter().rev() {
-        let placed = group::placements(world, parent, node.rect.rect)
-            .into_iter()
-            .find_map(|(c, r)| (c == link).then_some(r));
-        node = child_node(world, link, &node, placed)?;
-        parent = link;
-    }
-    Some(node.rect)
 }
 
 /// A laid-out element plus the matrix taking its rect's frame to canvas space.
@@ -176,6 +154,9 @@ struct Node {
     /// Maps this element's layout frame (where `rect.rect` lives, and where its
     /// children's rects are laid out) into canvas reference units.
     to_canvas: Mat4,
+    /// The root canvas's size, when markers are placed on it (a screen-space root
+    /// seen through a camera); `None` otherwise.
+    markers: Option<Vec2>,
 }
 
 /// The topmost `Canvas` on `id`'s ancestor chain (`id` itself included) — the root
@@ -194,52 +175,88 @@ fn root_canvas_of(world: &World, id: u32) -> Option<u32> {
     root
 }
 
-/// A root canvas spans the screen in reference units; its Transform is ignored.
-fn root_node(world: &World, id: u32, screen: Vec2) -> Option<Node> {
+/// A root canvas spans the screen (or, `WorldSpace`, its reference resolution) in
+/// reference units; its Transform only places a world canvas's plane.
+fn root_node(world: &World, id: u32, view: &UiView) -> Option<(Node, CanvasSpace)> {
     let canvas = world.canvas(id)?;
-    let size = canvas.size(screen);
+    let size = canvas.size(view.screen);
     let rect = UiRect {
         canvas: id,
-        scale_factor: canvas.scale_factor(screen),
+        scale_factor: canvas.scale_factor(view.screen),
         rect: (Vec2::ZERO, size),
         corners: quad(Mat4::IDENTITY, Vec2::ZERO, size),
     };
-    Some(Node {
+    let markers = (view.camera.is_some() && !canvas.is_world_space()).then_some(size);
+    let node = Node {
         rect,
         to_canvas: Mat4::IDENTITY,
-    })
+        markers,
+    };
+    Some((node, canvas_space(world, id, &canvas, view)))
 }
 
-/// Lay `id` out inside `parent` — at `placed` when the parent's layout group
-/// arranges it, else by its own RectTransform and content fitter — composing its
-/// pivot-centred rotation and scale.
-fn child_node(world: &World, id: u32, parent: &Node, placed: Option<(Vec2, Vec2)>) -> Option<Node> {
+/// Lay `id` out inside `parent` — pinned by its world anchor when it is a marker,
+/// at `placed` when the parent's layout group arranges it, else by its own
+/// RectTransform and content fitter — composing its pivot-centred rotation and
+/// scale. `None` when it is not a UI element, or is a hidden marker.
+fn child_node(
+    world: &World,
+    view: &UiView,
+    id: u32,
+    parent: &Node,
+    placed: Option<(Vec2, Vec2)>,
+) -> Option<Node> {
     let rt = world.rect_transform(id)?;
-    let (min, size) = placed.unwrap_or_else(|| {
+    let own = || {
         let own = rt.layout_in(parent.rect.rect.0, parent.rect.rect.1);
         fit::fit(world, id, &rt, own)
-    });
+    };
+    let marker = rt
+        .world_anchor
+        .as_ref()
+        .zip(parent.markers)
+        .and_then(|(a, size)| anchor::place(world, a, view, size, parent.rect.scale_factor));
+    let ((min, size), spin) = match marker {
+        Some(anchor::Placement::Hidden) => return None,
+        Some(anchor::Placement::At { pivot, angle }) => {
+            let (_, size) = own();
+            let local = parent
+                .to_canvas
+                .inverse()
+                .transform_point3(pivot.extend(0.0));
+            ((local.truncate() - size * rt.pivot, size), angle)
+        }
+        None => (placed.unwrap_or_else(own), 0.0),
+    };
     let transform = world.transform(id)?;
-    let to_canvas = parent.to_canvas * pivot_matrix(&rt, &transform, min, size);
+    let spin = Mat4::from_rotation_z(spin);
+    let to_canvas = parent.to_canvas * pivot_matrix(&rt, &transform, min, size, spin);
     let rect = UiRect {
         canvas: parent.rect.canvas,
         scale_factor: parent.rect.scale_factor,
         rect: (min, size),
         corners: quad(to_canvas, min, size),
     };
-    Some(Node { rect, to_canvas })
+    Some(Node {
+        rect,
+        to_canvas,
+        markers: parent.markers,
+    })
 }
 
-/// Rotation and scale around the pivot point: `T(p) · R · S · T(-p)`. The
-/// Transform's position is deliberately unused — the rect places the element.
+/// Rotation and scale around the pivot point: `T(p) · spin · R · S · T(-p)`, where
+/// `spin` is a marker's turn toward its target. The Transform's position is
+/// deliberately unused — the rect places the element.
 fn pivot_matrix(
     rt: &RectTransformComponent,
     t: &TransformComponent,
     min: Vec2,
     size: Vec2,
+    spin: Mat4,
 ) -> Mat4 {
     let p = (min + size * rt.pivot).extend(0.0);
     Mat4::from_translation(p)
+        * spin
         * Mat4::from_scale_rotation_translation(t.scale, t.rotation, Vec3::ZERO)
         * Mat4::from_translation(-p)
 }

@@ -12,7 +12,8 @@ script surface is in [`api/`](api/index.md) (`Canvas`, `RectTransform`,
 > fonts and SDF `Text` (#419); interaction — hit-testing, pointer and focus callbacks
 > and `Selectable` (#420); layout groups and content fitting — `LayoutGroup` and
 > `LayoutElement` (#421); the widget kit — Button, Toggle, Slider, Scrollbar,
-> Scroll View, Dropdown, Input Field (#422).
+> Scroll View, Dropdown, Input Field (#422); world-space UI — world and camera
+> canvases, world ↔ screen projection and world-anchored markers (#429).
 
 ## The model
 
@@ -31,16 +32,19 @@ The UI root — Unity's `Canvas` and `CanvasScaler` in one component.
 
 | Field | Meaning |
 |---|---|
-| `render_mode` | `ScreenSpaceOverlay` — drawn over the finished frame. `ScreenSpaceCamera` and `WorldSpace` come with #429. |
+| `render_mode` | `ScreenSpaceOverlay` — drawn over the finished frame. `ScreenSpaceCamera` — a plane in front of the camera. `WorldSpace` — a quad in the scene. See *World-space UI*. |
 | `sort_order` | Draw and hit order across canvases: higher is on top and is hit first. |
 | `reference_resolution` | The resolution the UI is authored at (default 1920×1080). Layout runs in these **reference units**. |
 | `match_width_or_height` | Unity's *Scale With Screen Size*: `0` scales to match the screen's width, `1` its height, in between blends the two in log space. |
+| `pixels_per_unit` | `WorldSpace`: reference units per metre (default 100). |
+| `plane_distance`, `tilt`, `sway` | `ScreenSpaceCamera`: the plane's distance (metres), its tilt (degrees) and how much it lags camera turns (0–1). |
 
 The **scale factor** (screen pixels per reference unit) is
 `2^lerp(log2(screen.w / ref.w), log2(screen.h / ref.h), match)`. A root canvas's rect is
 the whole screen: `(0, 0)` to `screen / scale_factor` in reference units — equal to the
 reference resolution only when the screen's aspect matches it. The canvas's own Transform
-(and any RectTransform on it) is ignored, as Unity drives a root canvas.
+(and any RectTransform on it) is ignored, as Unity drives a root canvas — except a
+`WorldSpace` canvas's Transform, which places its quad.
 
 ### `RectTransform`
 
@@ -487,10 +491,77 @@ Each widget's inspector fields (its script's `fields` schema) and owner API:
   `Text.MeasureString`). Lines break only at `\n` — no word wrap — and there is no
   clipboard yet.
 
+## World-space UI
+
+UI that lives in the 3D world (#429): diegetic displays, visor HUDs and markers
+over enemies. Layout is unchanged — every canvas lays out in its own reference
+units — and one question decides the rest: where do those units end up
+(`src/ui/space.rs`)?
+
+- **`WorldSpace`** — a quad in the scene. Its rect is the reference resolution
+  (scale factor 1), `pixels_per_unit` reference units to the metre, centred on the
+  canvas entity's world transform and facing its +Z: a 400×200 canvas at the default
+  100 is a 4×2 m sign, and parenting the canvas to a gun makes an ammo counter.
+- **`ScreenSpaceCamera`** — laid out exactly like the overlay, but drawn on a plane
+  `plane_distance` metres in front of the active camera that fills the view there.
+  `tilt` leans it about its centre (`x`: the top away, `y`: the right edge away);
+  `sway` swings it about the eye behind camera turns — the lag grows by each tick's
+  turn and settles with a 0.15 s time constant, capped at 30° (`ui::sway`, advanced
+  on the fixed tick, so it is deterministic). Without a camera it is the overlay.
+
+**Drawing.** World and camera canvases are scene geometry: after each stacked
+camera's transparent pass, before particles and post-FX, their meshes draw into the
+HDR scene target, depth-tested against the world but never writing depth — so a
+wall occludes a sign, and the canvas is tonemapped and bloomed like
+everything around it (it is unlit: its colours are emissive, as in Unity's default
+UI shader). A canvas draws in a camera whose culling mask includes the canvas
+entity's layer; canvases draw back to front, each in hierarchy order, and both
+faces show. The vertices are the overlay's (one buffer per canvas, re-uploaded only
+when its geometry changes); a per-camera uniform maps them onto the plane, so a
+moving sign or camera uploads nothing. The Scene view shows `WorldSpace` canvases
+but never the HUD or a camera canvas. **`RectMask` does not clip on a world
+canvas** — a scissor cannot follow a plane in perspective — it only culls graphics
+wholly outside the mask.
+
+**Interaction.** The pointer carries the camera ray through it. Screen canvases are
+hit first (they draw over the world); then the world and camera canvases the ray
+crosses, nearest plane first, each hit-tested at the crossing point in its own
+reference units with the ordinary rules. The ray stops at the first solid collider
+(triggers and the collider the camera starts inside are passed through), so a
+terminal behind a wall is not clicked through it. While the cursor is locked the
+ray runs through the screen centre — look at a terminal and click — with the same
+callbacks as screen UI. A world-space health bar should turn its graphics'
+`raycast_target` off, or the crosshair crossing it counts as over the UI.
+
+**World ↔ screen.** `Camera.WorldToScreen` / `ScreenToWorldRay` project through the
+sim's camera and screen size (`scene::camera::projection`), in UI screen pixels or a
+canvas's reference units, with a behind-the-camera flag — the same maths the markers
+and the hit-test use.
+
+### Markers
+
+A `RectTransform` with a **world anchor** is a marker: each layout pass projects its
+target (an entity's world position, or a fixed point, plus an offset in metres) and
+puts the element's **pivot** there; its size still comes from its anchors and
+`size_delta`. Off screen, in order: behind the camera with `hide_when_behind` →
+hidden, with its subtree; `clamp_to_screen_edge` → on the screen edge inset by
+`edge_padding`, along the ray from the centre toward the target (a target behind the
+camera projects mirrored, so its direction is flipped back), turned so its up points
+there with `rotate_toward_target`; otherwise the raw projection. A destroyed target
+hides the marker. Markers apply on screen-space canvases seen through a camera (a
+`ScreenSpaceCamera` canvas treats them as on the overlay, exact at zero tilt); on a
+`WorldSpace` canvas the anchor is ignored. The target is an entity reference: a
+prefab save keeps it when the target is inside the prefab and drops it otherwise.
+Damage numbers are markers spawned on hit and tweened.
+
+The layout is still a pure function — of (scene, screen size, **camera**): the sim
+lays out through its active camera each tick, and `UI.GetRect` does the same on
+demand.
+
 ## Determinism
 
-The layout is a pure function of (scene, **screen size**), so the screen size is a **sim
-input**, like the seed and the player's inputs. The windowed platform writes the game
+The layout is a pure function of (scene, **screen size**, camera), so the screen size is a
+**sim input**, like the seed and the player's inputs (the camera is sim state already). The windowed platform writes the game
 view's pixel size into the `ScreenSize` resource every frame; a headless run never writes
 it, and the `Video` resolution stands in. Same (seed, inputs, dt, screen size) ⇒ same
 layout — and the same hits and UI callbacks. `src/ui` sits under the determinism and

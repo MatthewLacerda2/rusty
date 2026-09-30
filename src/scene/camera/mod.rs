@@ -1,10 +1,14 @@
-//! src/scene/camera.rs — the active view [`Camera`] and its scene reconciliation.
+//! src/scene/camera/ — the active view [`Camera`] and its scene reconciliation.
 //!
 //! The camera the sim drives (scripts move it, `Camera.*` reads it, the audio
 //! listener follows it) is plain glam data, so it lives sim-side; the renderer
 //! only reads it and builds its per-frame camera stack from it (#494).
 
 use glam::{Mat4, Vec3};
+
+mod projection;
+
+pub use projection::ScreenPoint;
 
 use crate::scene::{layer_in_mask, ClearFlags, Scene};
 

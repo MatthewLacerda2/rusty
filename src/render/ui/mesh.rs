@@ -13,6 +13,11 @@
 //! **visibility** (the entity and every ancestor active), **alpha** (the product of
 //! every `CanvasGroup` on the chain) and **clip** (every `RectMask` on the chain,
 //! intersected, as a pixel scissor rect).
+//!
+//! A `WorldSpace` canvas (#429) has no screen: its "screen" is its own reference
+//! rect (scale 1), so its NDC span exactly that rect and the world pass maps them
+//! onto the canvas plane. Its clips are rects in that space too; the world pass
+//! cannot scissor them, so they only cull graphics wholly outside a mask.
 
 use std::collections::HashMap;
 
@@ -106,9 +111,10 @@ pub(crate) fn build_canvas_meshes(
     tex_size: &dyn Fn(&str) -> Option<Vec2>,
     atlases: &mut FontAtlases,
 ) -> Vec<CanvasMesh> {
-    let frame = Frame {
+    let screen = screen.max(Vec2::ONE);
+    let mut frame = Frame {
         world,
-        screen: screen.max(Vec2::ONE),
+        screen,
         tex_size,
     };
     let mut meshes: Vec<CanvasMesh> = Vec::new();
@@ -122,6 +128,7 @@ pub(crate) fn build_canvas_meshes(
         let here = inherit(world, id, rect, parent);
         state.insert(id, here);
         if meshes.last().map(|m| m.canvas) != Some(rect.canvas) {
+            frame.screen = canvas_screen(world, rect.canvas, screen);
             meshes.push(CanvasMesh {
                 canvas: rect.canvas,
                 ..Default::default()
@@ -134,6 +141,15 @@ pub(crate) fn build_canvas_meshes(
     }
     meshes.retain(|m| !m.batches.is_empty());
     meshes
+}
+
+/// The pixel frame canvas `id` draws into: the screen, or a `WorldSpace` canvas's
+/// own reference rect.
+fn canvas_screen(world: &World, id: u32, screen: Vec2) -> Vec2 {
+    match world.canvas(id) {
+        Some(c) if c.is_world_space() => c.size(screen),
+        _ => screen,
+    }
 }
 
 /// A root canvas's starting state: visible only when it and every ancestor are active.

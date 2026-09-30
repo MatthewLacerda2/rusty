@@ -5,7 +5,7 @@
 
 use egui_phosphor::regular as icon;
 
-use super::combo;
+use super::{combo, entity_row};
 use crate::components::{
     NavigationMode, SelectableComponent, SelectableTransition, SelectionState,
 };
@@ -117,26 +117,6 @@ fn draw_navigation(ui: &mut egui::Ui, edit: &mut SelectableComponent) -> bool {
             changed |= entity_row(ui, &format!("Select On {dir}:"), "none", target);
         }
     }
-    changed
-}
-
-/// An entity-id field: `0` reads and writes as `None` (shown as `empty`).
-fn entity_row(ui: &mut egui::Ui, label: &str, empty: &str, value: &mut Option<u32>) -> bool {
-    let mut raw = value.unwrap_or(0);
-    let changed = ui
-        .horizontal(|ui| {
-            ui.label(label);
-            let drag = egui::DragValue::new(&mut raw).custom_formatter(|v, _| {
-                if v == 0.0 {
-                    empty.to_string()
-                } else {
-                    format!("#{v}")
-                }
-            });
-            ui.add(drag).changed()
-        })
-        .inner;
-    *value = (raw != 0).then_some(raw);
     changed
 }
 

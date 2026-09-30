@@ -80,6 +80,9 @@ impl Renderer {
         // The base (first) camera drives the shared post-FX history / motion vectors.
         let base_view_proj = stack[0].build_view_projection(aspect);
         let ssao = SsaoPlan::for_scene(scene, self.quality);
+        // Lay out and mesh the UI through the base camera (#418, #429): world
+        // canvases draw inside each camera's pass below, screen canvases after it.
+        self.prepare_ui(view, scene, &stack[0], editor_mode);
 
         for (idx, cam) in stack.iter().enumerate() {
             // 1. Write this camera's view/projection uniform.
@@ -123,6 +126,8 @@ impl Renderer {
             // drawn back-to-front (already sorted) after opaque + decals so glass
             // composites over the world behind it.
             self.draw_transparent(view, &solids.draws.transparent);
+            // World canvases (#429): scene geometry, occluded by it, before particles.
+            self.draw_world_ui(view, cam, aspect);
 
             // Billboard particles for this camera (after solids, before the next pass).
             let particle_draws = self.draw_particles(view, scene, cam);
@@ -137,7 +142,7 @@ impl Renderer {
         // 4. The in-game UI over the finished frame (#418): after post-FX, so a HUD
         // is never tonemapped, bloomed or FXAA-softened. Not in the Scene view.
         if !editor_mode {
-            self.draw_ui(view, scene);
+            self.draw_ui(view);
         }
         self.finish_counters(view);
     }

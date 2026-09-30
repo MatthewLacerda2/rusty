@@ -3,7 +3,9 @@
 EventSystem-level UI verbs: layout reads (#417), focus, the gameplay-vs-UI guards
 and the agent's pointer verbs (#420). Points are **UI screen pixels**: bottom-left
 origin, y-up — the frame of `GetRect(id).screen`. (`Input.GetMousePosition` is
-top-left: UI `y` = screen height − mouse `y`.)
+top-left: UI `y` = screen height − mouse `y`.) Every verb looks through the active
+camera (#429): markers sit where they draw, and a point also casts the camera ray
+through it, so world and camera canvases are hit, listed and clicked too.
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -14,7 +16,7 @@ top-left: UI `y` = screen height − mouse `y`.)
 | `UI.GetSelected` | `()` | the focused entity's id, or `nil` |
 | `UI.IsPointerOverUI` | `()` | `true` when the pointer is over a raycast target this tick |
 | `UI.IsPointerConsumed` | `()` | `true` when gameplay should leave the pointer alone: it is over the UI, or a press that began over the UI is still held |
-| `UI.Raycast` | `(x, y)` | the top-most raycast target under the point, or `nil` |
+| `UI.Raycast` | `(x, y)` | the top-most raycast target under the point — screen canvases first, then world canvases along the camera ray, nearest first — or `nil` |
 | `UI.FindSelectable` | `(id, direction)` | where keyboard navigation from `id` goes in `direction` (`"Up"`, `"Down"`, `"Left"`, `"Right"`), or `nil` — Unity's `FindSelectableOn*`, for an `OnMove` handler that navigates itself |
 | `UI.Click` | `(id)` | `true` if the click will land on `id` (or its descendant) — see below |
 | `UI.List` | `()` | array of every visible `Selectable`, in draw order — see below |
@@ -44,11 +46,13 @@ pointer to the centre of `id`'s final quad and presses and releases `Mouse0`, so
 on the next tick the pointer enters, presses, releases and clicks exactly as a
 player's would — a modal covering the button eats it, a locked cursor misses the
 UI. It returns whether the top-most hit at that point is `id` or one of its
-descendants (and the cursor is not locked). **`UI.Raycast(x, y)`** and
+descendants. An element on a world canvas is clicked at its projected centre; while
+the cursor is locked the click goes through the screen centre instead (look at the
+terminal, click), landing only if `id` is what the crosshair is on. **`UI.Raycast(x, y)`** and
 **`UI.List()`** compute the layout on demand from the live scene, in edit mode
 too. Each `List` entry is `{ id, name, state, interactable, selected, rect }` —
 `state` as `Selectable.GetState`, `rect = { x, y, width, height }` in screen
-pixels — so a bot can find "Start Game" by name and click it:
+pixels (projected for a world canvas; absent when it is behind the camera) — so a bot can find "Start Game" by name and click it:
 
 ```lua
 for _, b in ipairs(UI.List()) do
@@ -60,7 +64,9 @@ The rect table: `x, y, width, height` — the axis-aligned bounds of the element
 final quad (after rotation / scale) in reference units; `screen = { x, y, width,
 height }` — the same in screen pixels (bottom-left origin, y-up); `corners` — the
 exact quad in reference units, `{ {x, y}, … }` bottom-left, top-left, top-right,
-bottom-right; `canvas` — the root canvas id; `scale_factor`. `GetRect` computes on
+bottom-right; `canvas` — the root canvas id; `scale_factor`; `world` — `true` on a
+`WorldSpace` / `ScreenSpaceCamera` canvas, whose `screen` box is its projected quad
+(absent while any corner is behind the camera). `GetRect` computes on
 demand from the live scene, so it reflects a change made earlier in the same
 script, in edit mode as well as in Play. The screen size is the game view's pixel
 size in the windowed app and the `Video` resolution headless.
