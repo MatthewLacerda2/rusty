@@ -10,9 +10,11 @@
 
 use crate::render::Renderer;
 
-/// The colour format the offscreen target renders into. Non-sRGB so the copied-back
-/// bytes map 1:1 to PNG channel values without a gamma surprise.
-pub const OFFSCREEN_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+/// The colour format the offscreen target renders into. sRGB, like the window
+/// surface: the target format owns the one linear→display encode (#415), so the
+/// copied-back bytes are already display-encoded PNG channel values and a headless
+/// screenshot matches the window.
+pub const OFFSCREEN_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 
 /// The backends a headless renderer may use: Vulkan, Metal and DX12 — never GL.
 ///
@@ -127,3 +129,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "colour_space_tests.rs"]
+mod colour_space_tests;

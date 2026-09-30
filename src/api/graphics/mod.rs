@@ -168,7 +168,7 @@ fn register_saturation_gamma<'lua, 'scope>(
     put(
         table,
         "GetGamma",
-        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.gamma).unwrap_or(2.2))),
+        scope.create_function(|_, ()| Ok(with_vc(scene, |vc| vc.gamma).unwrap_or(1.0))),
     )
 }
 

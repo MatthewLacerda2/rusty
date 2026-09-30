@@ -128,7 +128,7 @@ mod tests {
             ssr_quality: "High".to_string(),
             ssr_temporal_upsampling: false,
             tonemap: Tonemap::Reinhard,
-            gamma: 2.2,
+            gamma: 1.0,
         }
     }
 

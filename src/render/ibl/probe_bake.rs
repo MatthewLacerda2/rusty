@@ -130,7 +130,8 @@ fn texel_solid_angle(u: f32, v: f32, res: u32) -> f32 {
     area / (d2 * d2.sqrt())
 }
 
-/// Decode an LDR sRGB-encoded RGB texel (the tonemapped capture, `Rgba8Unorm`) to
+/// Decode an LDR sRGB-encoded RGB texel (the tonemapped capture, read back from the
+/// sRGB `OFFSCREEN_FORMAT`) to
 /// linear radiance, so a red wall projects as red light rather than its gamma-coded
 /// byte value.
 fn decode_linear(bytes: &[u8]) -> Vec3 {
