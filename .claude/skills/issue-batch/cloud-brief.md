@@ -29,6 +29,13 @@ name more.
 - For a proof run on a draft, dispatch the workflow on the branch instead of
   readying: `gh workflow run ci.yml --ref <branch>` (without `gh`, the GitHub MCP
   `actions_run_trigger` does the same).
+- **Once ready, the branch is the merge queue's.** Don't push to it again, and
+  cancel any `send_later` check-in that would. The queue rebases, pushes and
+  merges it, and it refuses to merge a head it did not watch, so a late push
+  costs a full CI round. The one exception is fixing your own red CI. Anything
+  else you find afterwards — a mutation survivor, a missing test — goes in a
+  comment on the issue, for a follow-up PR off `main`. (#560 on 2026-09-30: a
+  test-only push landed mid-queue and the queue handed the PR back.)
 
 ## The repo's rules that trip cloud coders
 
