@@ -6,10 +6,11 @@
 //! writable API.
 //!
 //! **Everything is a named key.** Keyboard keys, mouse buttons (`"MOUSE0"` left,
-//! `"MOUSE1"` right, `"MOUSE2"` middle, …) and — when gamepads land (#471) — pad
-//! buttons are entries in one keys-down set, so `IsKeyDown` / `GetKeyDown` / `Press`
-//! work on all of them unchanged. Continuous inputs are *axes*: the mouse delta and
-//! the wheel today, pad sticks later. Names are normalized to uppercase.
+//! `"MOUSE1"` right, `"MOUSE2"` middle, …) and gamepad buttons (`"PADA"`, #471) are
+//! entries in one keys-down set, so `IsKeyDown` / `GetKeyDown` / `Press` work on all
+//! of them unchanged. Continuous inputs are *axes*: the mouse delta and the wheel,
+//! and named axes (`"PADLEFTX"`, see [`gamepad`](crate::core::gamepad)) whose value
+//! is sampled per tick like an edge. Names are normalized to uppercase.
 //!
 //! **Edges are per sim tick.** Writes between ticks (window events, `Press`,
 //! `AddMouseDelta`, …) accumulate in a *pending* buffer; [`InputState::begin_tick`]
@@ -21,7 +22,9 @@
 //! **The cursor is a request.** `SetCursorLocked`/`SetCursorVisible` only record
 //! [`CursorState`] here; the platform layer applies it to the OS cursor.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+
+use crate::core::gamepad::PadRecords;
 
 /// What the game asks the platform to do with the OS cursor. The sim only records it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -64,6 +67,11 @@ pub struct InputState {
     pending: TickInput,
     current: TickInput,
     cursor: CursorState,
+    /// Named axes as last written; copied into `current_axes` at the tick boundary.
+    pending_axes: HashMap<String, f32>,
+    current_axes: HashMap<String, f32>,
+    /// Connected pads, dead zones and rumble requests (#471).
+    pub pads: PadRecords,
 }
 
 impl Default for InputState {
@@ -74,6 +82,9 @@ impl Default for InputState {
             pending: TickInput::default(),
             current: TickInput::default(),
             cursor: CursorState::FREE,
+            pending_axes: HashMap::new(),
+            current_axes: HashMap::new(),
+            pads: PadRecords::default(),
         }
     }
 }
@@ -88,6 +99,7 @@ impl InputState {
     /// system runs.
     pub fn begin_tick(&mut self) {
         self.current = std::mem::take(&mut self.pending);
+        self.current_axes.clone_from(&self.pending_axes);
     }
 
     /// Set a key (or mouse button) up/down. Only a real change records an edge, so
@@ -135,6 +147,24 @@ impl InputState {
         for key in std::mem::take(&mut self.keys_down) {
             self.pending.up.insert(key);
         }
+    }
+
+    /// Set a named axis (a pad stick or trigger, or any name a bot invents), clamped
+    /// to `-1..1`. Unlike a key it is a level, not an edge: the value holds until
+    /// written again, and a tick sees what was last written before it.
+    pub fn set_axis(&mut self, axis_name: &str, value: f32) {
+        let value = if value.is_nan() {
+            0.0
+        } else {
+            value.clamp(-1.0, 1.0)
+        };
+        self.pending_axes.insert(axis_name.to_uppercase(), value);
+    }
+
+    /// A named axis as sampled at the start of this tick; `0` if never written.
+    pub fn axis(&self, axis_name: &str) -> f32 {
+        let axis = axis_name.to_uppercase();
+        self.current_axes.get(&axis).copied().unwrap_or(0.0)
     }
 
     /// The pointer in game-view pixels, origin top-left.
