@@ -178,3 +178,36 @@ fn set_radius_and_slope_round_trip() {
         "slope reached the graph via re-bake"
     );
 }
+
+/// `SetBounds` authors the override and re-bakes onto it; `GetBounds` reads the baked
+/// (snapped) bounds plus the authored flag; `ClearBounds` returns to the derived ones
+/// (#452). An inverted box is a Lua error and leaves the scene untouched.
+#[test]
+fn set_get_clear_bounds_round_trip_and_rebake() {
+    let (scene, nav) = scene_and_nav(Vec3::new(3.6, 0.0, 3.6), Vec3::new(4.4, 1.0, 4.4));
+    let lua = Lua::new();
+    lua.scope(|scope| {
+        register(&lua, scope, &scene, &nav).unwrap();
+        let get = || -> (f32, f32, f32, f32, bool) {
+            lua.load("return Navigation.GetBounds()").eval().unwrap()
+        };
+        assert_eq!(get(), (0.0, 10.0, 0.0, 10.0, true), "pinned by the fixture");
+
+        lua.load("Navigation.SetBounds(-60.5, 70, -3, 3.2)")
+            .exec()
+            .unwrap();
+        assert_eq!(get(), (-61.0, 70.0, -3.0, 4.0, true), "snapped outward");
+        assert_eq!((nav.borrow().width, nav.borrow().height), (132, 8));
+
+        let bad = lua.load("Navigation.SetBounds(5, 5, 0, 1)").exec();
+        assert!(bad.is_err(), "empty extent rejected");
+        assert_eq!(get().0, -61.0, "rejected write left the bounds alone");
+
+        lua.load("Navigation.ClearBounds()").exec().unwrap();
+        // Derived: [3.6, 4.4] grown by 2.0 + 0.5 → [1.1, 6.9] → [1, 7].
+        assert_eq!(get(), (1.0, 7.0, 1.0, 7.0, false));
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(scene.borrow().nav_settings.bounds, None);
+}

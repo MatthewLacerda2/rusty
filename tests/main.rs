@@ -70,6 +70,8 @@ mod mcp_attach;
 #[cfg(feature = "dev")]
 mod mcp_bridge;
 #[cfg(feature = "dev")]
+mod nav_bounds_boot;
+#[cfg(feature = "dev")]
 mod pause_step;
 #[cfg(feature = "dev")]
 mod proptest_harness;
