@@ -1,6 +1,7 @@
 //! Unit tests for `Resources` (resources.rs): the per-frame dt accessor, the
 //! play-frame counter, the debug-path accessor, and the storage-flush boundary
-//! (success no-op when pathless, and the error path that logs to the console).
+//! (success no-op when pathless, and the error path that logs to the console), and
+//! the UI screen cell shared with the script runtime (#417).
 //! Determinism contract: no wall-clock, no RNG.
 
 use super::*;
@@ -79,4 +80,16 @@ fn flush_storage_logs_on_write_failure() {
         .any(|(msg, _)| msg.contains("Failed to flush storage"));
     std::fs::remove_file(&blocker).ok();
     assert!(logged, "a failed flush must log to the console");
+}
+
+#[test]
+fn the_ui_api_reads_the_shared_screen_cell() {
+    let mut res = resources();
+    res.screen.borrow_mut().set_game_view(640, 480);
+    res.script_manager
+        .init_runtime(&res.physics)
+        .expect("runtime boots");
+    let size = res.script_manager.eval("UI.GetScreenSize()").unwrap();
+    assert_eq!(size, "640, 480");
+    assert_eq!(res.screen_pixels(), glam::Vec2::new(640.0, 480.0));
 }
