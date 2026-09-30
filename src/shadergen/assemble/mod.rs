@@ -17,17 +17,18 @@
 //!   HDR color then folds the chosen blocks. This matches the fullscreen-fragment
 //!   shape of the postfx pass.
 //!
-//! Each block contributes a param block (its declared params as WGSL `const`s),
-//! a helper function, and a call spliced into the chain — all via `emit`.
+//! Each block instance contributes its params (as per-instance WGSL `const`s) and a
+//! call spliced into the chain; each distinct block contributes its helper once —
+//! all via `emit`.
 
 mod emit;
 
 use std::fmt::Write as _;
 
-use emit::{chain, emit_params};
+use emit::{chain, check_params, emit_helpers, emit_params, Instance};
 
-use super::blocks::{find, Block};
-use super::recipe::{BlockSel, PassKind, ShaderRecipe};
+use super::blocks::find;
+use super::recipe::{PassKind, ShaderRecipe};
 
 /// The marker in the surface base shader where the assembler folds the block
 /// chain into the final color. The forward shader's `fs_main` computes
@@ -46,16 +47,19 @@ pub fn assemble(recipe: &ShaderRecipe, surface_base: &str) -> Result<String, Str
     }
 }
 
-/// Resolve every selected block against the pass catalog, erroring on the first
-/// unknown id (the gate that keeps output bounded to the library).
-fn resolve(recipe: &ShaderRecipe) -> Result<Vec<(&'static Block, &BlockSel)>, String> {
+/// Resolve every selected block against the pass catalog and check its params,
+/// erroring on the first unknown id or bad param (the gate that keeps output
+/// bounded to the library and refuses typos).
+fn resolve(recipe: &ShaderRecipe) -> Result<Vec<Instance<'_>>, String> {
     recipe
         .blocks
         .iter()
-        .map(|sel| {
-            find(recipe.pass, &sel.id)
-                .map(|b| (b, sel))
-                .ok_or_else(|| format!("unknown {} block: {}", recipe.pass.tag(), sel.id))
+        .enumerate()
+        .map(|(index, sel)| {
+            let block = find(recipe.pass, &sel.id)
+                .ok_or_else(|| format!("unknown {} block: {}", recipe.pass.tag(), sel.id))?;
+            check_params(block, sel, index)?;
+            Ok((block, sel))
         })
         .collect()
 }
@@ -73,12 +77,8 @@ fn assemble_surface(recipe: &ShaderRecipe, base: &str) -> Result<String, String>
         "\n// ---- authored surface blocks ({}) ----",
         recipe.name
     );
-    for (block, sel) in &resolved {
-        emit_params(&mut additions, block, sel);
-    }
-    for (block, _) in &resolved {
-        let _ = writeln!(additions, "{}", block.helper);
-    }
+    emit_params(&mut additions, &resolved);
+    emit_helpers(&mut additions, &resolved);
 
     let folded = chain(&resolved, "lighting_color");
     let new_return = format!("return vec4<f32>({folded}, base_color.a);");
@@ -112,12 +112,8 @@ fn assemble_postfx(recipe: &ShaderRecipe) -> Result<String, String> {
     out.push_str(POSTFX_SCAFFOLD);
 
     out.push_str("\n// ---- authored postfx blocks ----\n");
-    for (block, sel) in &resolved {
-        emit_params(&mut out, block, sel);
-    }
-    for (block, _) in &resolved {
-        let _ = writeln!(out, "{}", block.helper);
-    }
+    emit_params(&mut out, &resolved);
+    emit_helpers(&mut out, &resolved);
 
     let folded = chain(&resolved, "color");
     let _ = write!(
@@ -158,7 +154,7 @@ fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> VsOut {
 mod tests {
     use std::collections::BTreeMap;
 
-    use super::super::recipe::ParamValue;
+    use super::super::recipe::{BlockSel, ParamValue};
     use super::*;
 
     fn surface_base() -> &'static str {
@@ -178,9 +174,9 @@ mod tests {
             }],
         };
         let wgsl = assemble(&recipe, surface_base()).unwrap();
-        assert!(wgsl.contains("const toon_ramp_steps: f32 = 4.0;"));
+        assert!(wgsl.contains("const toon_ramp_0_steps: f32 = 4.0;"));
         assert!(wgsl.contains("fn srf_toon_ramp"));
-        assert!(wgsl.contains("srf_toon_ramp(lighting_color, in)"));
+        assert!(wgsl.contains("srf_toon_ramp(lighting_color, in, toon_ramp_0_steps)"));
         // The original flat return is gone (rewritten to apply the chain).
         assert!(!wgsl.contains("return vec4<f32>(lighting_color, base_color.a);"));
     }
@@ -203,8 +199,8 @@ mod tests {
         let wgsl = assemble(&recipe, "").unwrap();
         assert!(wgsl.contains("fn vs_fullscreen"));
         assert!(wgsl.contains("fn fs_main"));
-        assert!(wgsl.contains("const tint_color: vec3<f32> = vec3<f32>(1.0, 0.5, 0.25);"));
-        assert!(wgsl.contains("color = pfx_tint(color, uv);"));
+        assert!(wgsl.contains("const tint_0_color: vec3<f32> = vec3<f32>(1.0, 0.5, 0.25);"));
+        assert!(wgsl.contains("color = pfx_tint(color, uv, tint_0_color);"));
     }
 
     #[test]

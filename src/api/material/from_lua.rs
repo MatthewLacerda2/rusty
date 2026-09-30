@@ -76,8 +76,30 @@ fn asset_from_json_value(
             .and_then(|v| v.as_f64())
             .map(|f| f as f32);
     }
+    refuse_unknown_keys(&value)?;
     let asset: MaterialAsset = serde_json::from_value(value).map_err(|e| e.to_string())?;
     Ok((asset, validated))
+}
+
+/// Refuse a recipe key `MaterialAsset` has no field for (#395), so a typo like
+/// `metalic_map` is an error rather than a silently missing map. The asset's own
+/// serialized form is the list of valid keys. (`MaterialAsset` itself stays
+/// lenient: it is also the scene-file shape, which must tolerate old keys.)
+fn refuse_unknown_keys(value: &serde_json::Value) -> Result<(), String> {
+    let known = serde_json::to_value(MaterialAsset::default()).map_err(|e| e.to_string())?;
+    let (Some(given), Some(known)) = (value.as_object(), known.as_object()) else {
+        return Ok(());
+    };
+    match given.keys().find(|k| !known.contains_key(*k)) {
+        Some(key) => {
+            let valid: Vec<&str> = known.keys().map(String::as_str).collect();
+            Err(format!(
+                "unknown material key {key:?}; expected one of {}",
+                valid.join(", ")
+            ))
+        }
+        None => Ok(()),
+    }
 }
 
 #[cfg(test)]
@@ -150,5 +172,16 @@ mod tests {
         let (asset, v) = asset_from_table(&t).expect("empty recipe parses");
         assert_eq!(asset.base_color, MaterialAsset::default().base_color);
         assert!(v.render_mode.is_none() && v.alpha.is_none());
+    }
+
+    #[test]
+    fn an_unknown_key_is_refused_by_name() {
+        let err = asset_from_json_str(r#"{ "metalic_map": "mr.png" }"#)
+            .err()
+            .expect("typo refused");
+        assert!(
+            err.contains("\"metalic_map\"") && err.contains("metallic_map"),
+            "{err}"
+        );
     }
 }

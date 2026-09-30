@@ -41,18 +41,32 @@ pub enum Slot {
 }
 
 impl Slot {
-    /// Parse a slot name (case-insensitive). Unknown names map to `Data` (linear,
-    /// unpacked) so a typo degrades safely rather than silently sRGB-encoding data.
-    pub fn parse(name: &str) -> Slot {
-        match name.to_ascii_lowercase().replace(['-', '_'], "").as_str() {
-            "basecolor" | "albedo" | "color" => Slot::BaseColor,
-            "emissive" | "emission" => Slot::Emissive,
-            "normal" => Slot::Normal,
-            "roughness" => Slot::Roughness,
-            "metallic" => Slot::Metallic,
-            "metallicroughness" | "mr" | "orm" => Slot::MetallicRoughness,
-            _ => Slot::Data,
-        }
+    /// The canonical slot names, as an unknown-slot error lists them.
+    const NAMES: &'static str =
+        "base_color (albedo), emissive, normal, roughness, metallic, metallic_roughness (orm), data";
+
+    /// Parse a slot name (case-insensitive, `-`/`_` ignored). An unknown name is an
+    /// error listing the valid ones (#395): a typo like `basecolour` must not
+    /// silently bake linear albedo. `data` is the explicit way to get linear,
+    /// unpacked output.
+    pub fn parse(name: &str) -> Result<Slot, String> {
+        Ok(
+            match name.to_ascii_lowercase().replace(['-', '_'], "").as_str() {
+                "basecolor" | "albedo" | "color" => Slot::BaseColor,
+                "emissive" | "emission" => Slot::Emissive,
+                "normal" => Slot::Normal,
+                "roughness" => Slot::Roughness,
+                "metallic" => Slot::Metallic,
+                "metallicroughness" | "mr" | "orm" => Slot::MetallicRoughness,
+                "data" => Slot::Data,
+                _ => {
+                    return Err(format!(
+                        "unknown slot {name:?}; expected one of {}",
+                        Self::NAMES
+                    ))
+                }
+            },
+        )
     }
 
     /// Whether this slot's color channels are sRGB-encoded on bake.
@@ -125,11 +139,21 @@ mod tests {
 
     #[test]
     fn slot_parse_is_case_and_separator_insensitive() {
-        assert_eq!(Slot::parse("BaseColor"), Slot::BaseColor);
-        assert_eq!(Slot::parse("albedo"), Slot::BaseColor);
-        assert_eq!(Slot::parse("metallic-roughness"), Slot::MetallicRoughness);
-        assert_eq!(Slot::parse("orm"), Slot::MetallicRoughness);
-        assert_eq!(Slot::parse("nonsense"), Slot::Data);
+        assert_eq!(Slot::parse("BaseColor"), Ok(Slot::BaseColor));
+        assert_eq!(Slot::parse("albedo"), Ok(Slot::BaseColor));
+        assert_eq!(
+            Slot::parse("metallic-roughness"),
+            Ok(Slot::MetallicRoughness)
+        );
+        assert_eq!(Slot::parse("orm"), Ok(Slot::MetallicRoughness));
+        assert_eq!(Slot::parse("data"), Ok(Slot::Data));
+    }
+
+    #[test]
+    fn an_unknown_slot_is_refused_by_name() {
+        let err = Slot::parse("basecolour").unwrap_err();
+        assert!(err.contains("\"basecolour\""), "{err}");
+        assert!(err.contains("base_color") && err.contains("data"), "{err}");
     }
 
     #[test]

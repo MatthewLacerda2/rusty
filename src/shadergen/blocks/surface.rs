@@ -5,8 +5,8 @@
 //! binds against the forward pipeline unchanged — same `VertexInput`, same
 //! `LightingUniforms`/`EntityUniforms`/group(2) maps, same `vs_main`/`fs_main`).
 //! Each block's `helper` is a pure function
-//! `fn srf_<id>(c: vec3<f32>, in: VertexOutput) -> vec3<f32>` that transforms the
-//! lit color; the assembler folds the chosen blocks (in recipe order) after the
+//! `fn srf_<id>(c: vec3<f32>, in: VertexOutput, <params…>) -> vec3<f32>` that
+//! transforms the lit color; the assembler folds the chosen blocks (in recipe order) after the
 //! standard lighting and before the final write, so they restyle the shaded
 //! result rather than replace the lighting model.
 //!
@@ -27,8 +27,8 @@ pub const BLOCKS: &[Block] = &[
             default: 4.0,
             arity: 1,
         }],
-        helper: "fn srf_toon_ramp(c: vec3<f32>, in: VertexOutput) -> vec3<f32> {\n    let n = max(toon_ramp_steps, 1.0);\n    return floor(c * n + 0.5) / n;\n}",
-        call: "srf_toon_ramp({prev}, in)",
+        helper: "fn srf_toon_ramp(c: vec3<f32>, in: VertexOutput, steps: f32) -> vec3<f32> {\n    let n = max(steps, 1.0);\n    return floor(c * n + 0.5) / n;\n}",
+        call: "srf_toon_ramp({prev}, in{args})",
     },
     Block {
         id: "fresnel_rim",
@@ -50,8 +50,8 @@ pub const BLOCKS: &[Block] = &[
                 arity: 1,
             },
         ],
-        helper: "fn srf_fresnel_rim(c: vec3<f32>, in: VertexOutput) -> vec3<f32> {\n    let n = normalize(in.world_normal);\n    let v = normalize(camera.camera_pos - in.world_position);\n    let rim = pow(1.0 - max(dot(n, v), 0.0), fresnel_rim_power);\n    return c + fresnel_rim_color * (rim * fresnel_rim_strength);\n}",
-        call: "srf_fresnel_rim({prev}, in)",
+        helper: "fn srf_fresnel_rim(c: vec3<f32>, in: VertexOutput, color: vec3<f32>, power: f32, strength: f32) -> vec3<f32> {\n    let n = normalize(in.world_normal);\n    let v = normalize(camera.camera_pos - in.world_position);\n    let rim = pow(1.0 - max(dot(n, v), 0.0), power);\n    return c + color * (rim * strength);\n}",
+        call: "srf_fresnel_rim({prev}, in{args})",
     },
     Block {
         id: "tint",
@@ -61,8 +61,8 @@ pub const BLOCKS: &[Block] = &[
             default: 1.0,
             arity: 3,
         }],
-        helper: "fn srf_tint(c: vec3<f32>, in: VertexOutput) -> vec3<f32> {\n    return c * tint_color;\n}",
-        call: "srf_tint({prev}, in)",
+        helper: "fn srf_tint(c: vec3<f32>, in: VertexOutput, color: vec3<f32>) -> vec3<f32> {\n    return c * color;\n}",
+        call: "srf_tint({prev}, in{args})",
     },
     Block {
         id: "emissive_boost",
@@ -79,8 +79,8 @@ pub const BLOCKS: &[Block] = &[
                 arity: 1,
             },
         ],
-        helper: "fn srf_emissive_boost(c: vec3<f32>, in: VertexOutput) -> vec3<f32> {\n    let mask = textureSample(t_emissive, s_diffuse, in.tex_coords).rgb;\n    return c + emissive_boost_color * mask * emissive_boost_strength;\n}",
-        call: "srf_emissive_boost({prev}, in)",
+        helper: "fn srf_emissive_boost(c: vec3<f32>, in: VertexOutput, color: vec3<f32>, strength: f32) -> vec3<f32> {\n    let mask = textureSample(t_emissive, s_diffuse, in.tex_coords).rgb;\n    return c + color * mask * strength;\n}",
+        call: "srf_emissive_boost({prev}, in{args})",
     },
     Block {
         id: "uv_scroll_stripes",
@@ -97,8 +97,8 @@ pub const BLOCKS: &[Block] = &[
                 arity: 1,
             },
         ],
-        helper: "fn srf_uv_scroll_stripes(c: vec3<f32>, in: VertexOutput) -> vec3<f32> {\n    let s = sin(in.tex_coords.y * uv_scroll_stripes_frequency * 6.2831853);\n    let band = 1.0 - uv_scroll_stripes_strength * (0.5 - 0.5 * s);\n    return c * band;\n}",
-        call: "srf_uv_scroll_stripes({prev}, in)",
+        helper: "fn srf_uv_scroll_stripes(c: vec3<f32>, in: VertexOutput, frequency: f32, strength: f32) -> vec3<f32> {\n    let s = sin(in.tex_coords.y * frequency * 6.2831853);\n    let band = 1.0 - strength * (0.5 - 0.5 * s);\n    return c * band;\n}",
+        call: "srf_uv_scroll_stripes({prev}, in{args})",
     },
     Block {
         id: "desaturate",
@@ -108,8 +108,8 @@ pub const BLOCKS: &[Block] = &[
             default: 0.5,
             arity: 1,
         }],
-        helper: "fn srf_desaturate(c: vec3<f32>, in: VertexOutput) -> vec3<f32> {\n    let l = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));\n    return mix(c, vec3<f32>(l), desaturate_amount);\n}",
-        call: "srf_desaturate({prev}, in)",
+        helper: "fn srf_desaturate(c: vec3<f32>, in: VertexOutput, amount: f32) -> vec3<f32> {\n    let l = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));\n    return mix(c, vec3<f32>(l), amount);\n}",
+        call: "srf_desaturate({prev}, in{args})",
     },
     Block {
         id: "height_fog",
@@ -131,7 +131,7 @@ pub const BLOCKS: &[Block] = &[
                 arity: 1,
             },
         ],
-        helper: "fn srf_height_fog(c: vec3<f32>, in: VertexOutput) -> vec3<f32> {\n    let t = clamp((height_fog_top - in.world_position.y) / max(height_fog_top - height_fog_bottom, 0.001), 0.0, 1.0);\n    return mix(c, height_fog_color, t);\n}",
-        call: "srf_height_fog({prev}, in)",
+        helper: "fn srf_height_fog(c: vec3<f32>, in: VertexOutput, color: vec3<f32>, top: f32, bottom: f32) -> vec3<f32> {\n    let t = clamp((top - in.world_position.y) / max(top - bottom, 0.001), 0.0, 1.0);\n    return mix(c, color, t);\n}",
+        call: "srf_height_fog({prev}, in{args})",
     },
 ];

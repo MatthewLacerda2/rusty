@@ -1,4 +1,4 @@
-//! src/procgen/recipe.rs — the texture recipe: a serde DAG of ops (the source of
+//! src/procgen/recipe/mod.rs — the texture recipe: a serde DAG of ops (the source of
 //! truth).
 //!
 //! A [`TextureRecipe`] is a small **directed acyclic graph**: a flat list of
@@ -11,6 +11,14 @@
 //! handles**, so it round-trips losslessly (save → load → re-bake is byte-identical)
 //! and is the same shape whether it came from a `.json` on disk or a Lua table. This
 //! is the shared spine the material (#271) and shader (#272) authoring legs reuse.
+//!
+//! Parsing is strict (#395): an unknown key anywhere — on the recipe, a node, or a
+//! ramp stop — is an error naming it, so a typo (`scael = 8`) never bakes silently
+//! with a default. [`Node`]'s check lives in [`node`].
+
+mod node;
+
+pub use node::Node;
 
 use serde::{Deserialize, Serialize};
 
@@ -87,6 +95,7 @@ pub enum VoronoiOutput {
 
 /// One stop in a [`ColorRamp`](OpKind::ColorRamp): position in `[0, 1]` and its color.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RampStop {
     pub pos: f32,
     pub color: [f32; 4],
@@ -192,21 +201,11 @@ fn default_mortar() -> f32 {
     0.05
 }
 
-/// One node in the recipe DAG: a stable `id`, the op to run, and the `id`s of the
-/// input nodes feeding it (in order).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Node {
-    pub id: String,
-    #[serde(flatten)]
-    pub op: OpKind,
-    #[serde(default)]
-    pub inputs: Vec<String>,
-}
-
 /// The whole authored texture: the canvas resolution, the RNG seed (folded into
 /// every stochastic op), and the flat node list. The last node in topological order
 /// that nothing else consumes is the recipe's output (or the explicit `output` id).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TextureRecipe {
     pub resolution: u32,
     #[serde(default)]
@@ -279,5 +278,12 @@ mod tests {
             OpKind::Voronoi { output, .. } => assert_eq!(output, VoronoiOutput::Distance),
             other => panic!("wrong op: {other:?}"),
         }
+    }
+
+    #[test]
+    fn an_unknown_recipe_key_is_refused() {
+        let err = TextureRecipe::from_json(r#"{ "resolution": 8, "nodes": [], "seeed": 3 }"#)
+            .unwrap_err();
+        assert!(err.contains("seeed"), "{err}");
     }
 }

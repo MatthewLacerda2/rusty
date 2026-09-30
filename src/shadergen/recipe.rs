@@ -59,8 +59,11 @@ pub enum ParamValue {
 
 /// One selected building block: its `id` in the curated library and the params
 /// it is configured with. Unsupplied params fall back to the block's declared
-/// defaults at assemble time.
+/// defaults at assemble time; a param the block doesn't declare, or one of the
+/// wrong arity, is an assemble error (#395). The same block may appear more than
+/// once in a recipe — each entry is its own instance (#393).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BlockSel {
     /// The block id, e.g. `"toon_ramp"` (surface) or `"vignette"` (postfx). Must
     /// exist in the catalog for the recipe's `pass`.
@@ -73,8 +76,10 @@ pub struct BlockSel {
 
 /// A complete shader recipe: the base pass kind, a stable module `name` (the
 /// baked file becomes `<name>.wgsl`), and the ordered block list. The assembler
-/// produces a contract-conformant module; nothing here carries WGSL text.
+/// produces a contract-conformant module; nothing here carries WGSL text. Unknown
+/// keys are refused (#395), so a misspelled `params` is an error, not ignored.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ShaderRecipe {
     /// The base pass the output conforms to.
     pub pass: PassKind,
@@ -95,29 +100,6 @@ impl ShaderRecipe {
     /// Parse a recipe from its JSON form.
     pub fn from_json(s: &str) -> Result<Self, String> {
         serde_json::from_str(s).map_err(|e| e.to_string())
-    }
-}
-
-impl ParamValue {
-    /// Read this value as a scalar, or `default` if it is a vector (a caller
-    /// asking for a scalar from a vector param is a recipe mistake the assembler
-    /// degrades over rather than failing the whole bake).
-    pub fn scalar(&self, default: f32) -> f32 {
-        match self {
-            ParamValue::Scalar(s) => *s,
-            ParamValue::Vector(_) => default,
-        }
-    }
-
-    /// Read this value as an `n`-component vector, padding with `0.0` (or reading
-    /// a scalar as `[s; n]`) so the assembler always has exactly `n` lanes to emit.
-    pub fn vector(&self, n: usize) -> Vec<f32> {
-        let mut out = match self {
-            ParamValue::Scalar(s) => vec![*s; n],
-            ParamValue::Vector(v) => v.clone(),
-        };
-        out.resize(n, 0.0);
-        out
     }
 }
 
@@ -150,17 +132,6 @@ mod tests {
     fn pass_tag_is_snake_case() {
         let json = serde_json::to_string(&PassKind::Postfx).unwrap();
         assert_eq!(json, "\"postfx\"");
-    }
-
-    #[test]
-    fn param_scalar_and_vector_coerce() {
-        assert_eq!(ParamValue::Scalar(2.0).scalar(0.0), 2.0);
-        assert_eq!(ParamValue::Vector(vec![1.0]).scalar(9.0), 9.0);
-        assert_eq!(ParamValue::Scalar(0.5).vector(3), vec![0.5, 0.5, 0.5]);
-        assert_eq!(
-            ParamValue::Vector(vec![1.0, 2.0]).vector(3),
-            vec![1.0, 2.0, 0.0]
-        );
     }
 
     #[test]
