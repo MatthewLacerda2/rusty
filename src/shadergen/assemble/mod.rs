@@ -14,7 +14,7 @@
 //!   the fragment look — exactly the contract.
 //! - **postfx** — a self-contained fullscreen module: the scene-color bindings,
 //!   the fullscreen-triangle `vs_fullscreen`, and an `fs_main` that samples the
-//!   HDR color then folds the chosen blocks. This matches the fullscreen-fragment
+//!   tonemapped color then folds the chosen blocks. This matches the fullscreen-fragment
 //!   shape of the postfx pass.
 //!
 //! Each block instance contributes its params (as per-instance WGSL `const`s) and a
@@ -104,8 +104,8 @@ fn assemble_postfx(recipe: &ShaderRecipe) -> Result<String, String> {
     let _ = writeln!(
         out,
         "// {name}.wgsl — authored postfx variant (#272), assembled from {n} block(s).\n\
-         // A fullscreen-triangle fragment program over the HDR scene color: samples\n\
-         // group(0) binding(1) then folds the chosen blocks. Matches the postfx\n\
+         // A fullscreen-triangle fragment program over the tonemapped scene color:\n\
+         // samples group(0) binding(1) then folds the chosen blocks. Matches the postfx\n\
          // contract's fullscreen-fragment shape (vs_fullscreen + fs_main).",
         name = recipe.name,
         n = resolved.len()
@@ -130,7 +130,7 @@ fn assemble_postfx(recipe: &ShaderRecipe) -> Result<String, String> {
 
 /// The fixed postfx scaffolding: scene-color bindings and the fullscreen-triangle
 /// vertex stage, matching `postfx.wgsl`'s self-contained fullscreen contract
-/// (group(0) binding 1 = HDR color, binding 2 = its sampler).
+/// (group(0) binding 1 = the colour so far, binding 2 = its sampler).
 const POSTFX_SCAFFOLD: &str = r#"
 @group(0) @binding(1) var t_color: texture_2d<f32>;
 @group(0) @binding(2) var s_color: sampler;

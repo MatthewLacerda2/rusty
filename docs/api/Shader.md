@@ -76,8 +76,11 @@ assembles byte-identical WGSL.
   per-instance `instances` array (world matrix, probe SH). A surface variant baked
   before #470 was written against the old per-entity layout — re-bake it.
 - **`postfx`** — a self-contained **fullscreen-triangle** fragment program over the
-  HDR scene color (`vs_fullscreen` + `fs_main`), the most self-contained pass; each
-  block grades the sampled color per-pixel.
+  **tonemapped** scene color (`vs_fullscreen` + `fs_main`), the most self-contained
+  pass; each block grades the sampled color per-pixel. A baked postfx module runs
+  in a game once a volume lists it: `Graphics.SetCustomEffects({"crt"})` (see
+  `Graphics.md`, *Custom effects*). The renderer loads it from the default output
+  dir, so bake it there (no `out_dir`).
 
 ### The block library (curated)
 
@@ -92,9 +95,12 @@ into the lit color; postfx blocks grade the sampled scene color.
   Every surface variant is also fogged by the **scene fog** (`Graphics.SetFog*`,
   #437), applied after the blocks; `height_fog` is a per-material *look* layered
   under it (a glowing floor mist on one material), not a substitute for scene fog.
-- **Postfx** (fullscreen grades over the HDR color): `tint {color}`; `exposure
-  {stops}`; `saturation {amount}`; `grayscale`; `vignette {strength, radius}`;
-  `scanline {count, strength}`; `posterize {levels}`; `contrast {amount}`.
+- **Postfx** (fullscreen grades over the tonemapped color, `[0, 1]`): `tint
+  {color}`; `grayscale`; `vignette {strength, radius}`; `scanline {count,
+  strength}`; `posterize {levels}`. Exposure, saturation and contrast are **not**
+  blocks: the volume already grades them in HDR (`Graphics.SetExposure`,
+  `SetSaturation`, `SetContrast`), so a recipe naming them is refused as an unknown
+  block (#397).
 
 Example — bake a stylized surface variant and load it by name:
 

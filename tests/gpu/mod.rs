@@ -11,6 +11,7 @@
 //! [`Renderer`]: rusty::render::Renderer
 
 mod cascaded_shadows_screenshot;
+mod custom_postfx_screenshot;
 mod emissive_factor_screenshot;
 mod fog_consistency_screenshot;
 mod fog_modes_screenshot;

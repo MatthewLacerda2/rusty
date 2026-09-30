@@ -10,7 +10,7 @@
 //! - **surface** (`surface`) — vary the *fragment look* of the forward pass; the
 //!   standard `vs_main` + lighting are kept verbatim and each block transforms the
 //!   shaded color (toon ramp, fresnel rim, emissive pulse, UV-scroll tint, …).
-//! - **postfx** (`postfx`) — fullscreen effects over the HDR scene color (tint,
+//! - **postfx** (`postfx`) — fullscreen effects over the tonemapped scene color (tint,
 //!   vignette, scanline, grayscale, …) — the self-contained family.
 //!
 //! Each block's helper is a pure function with a fixed signature per family (see

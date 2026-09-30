@@ -1,6 +1,6 @@
 //! src/shadergen/blocks/postfx.rs — the postfx building-block family (#272).
 //!
-//! Each block is a fullscreen effect over the HDR scene color. Its `helper` is a
+//! Each block is a fullscreen effect over the tonemapped scene color. Its `helper` is a
 //! pure function `fn pfx_<id>(c: vec3<f32>, uv: vec2<f32>, <params…>) -> vec3<f32>`
 //! and its `call` chains the running color (`{prev}`), the fragment `uv` and the
 //! instance's params (`{args}`). The assembler
@@ -13,6 +13,12 @@
 //! Effects are deliberately bounded to per-pixel color grades that need only the
 //! sampled color + uv (tint, vignette, scanline, grayscale, posterize) — no new
 //! bindings, no neighbourhood taps, no new render targets.
+//!
+//! The chain runs authored modules **after tonemapping** (#397), on display-referred
+//! colour in `[0, 1]`. Exposure, saturation and contrast were blocks here too; they
+//! were removed because the volume already owns those knobs (`Graphics.SetExposure`
+//! and friends, applied in HDR where they belong), so this catalog holds only looks
+//! the built-in grade can't make.
 
 use super::{Block, Param};
 
@@ -28,28 +34,6 @@ pub const BLOCKS: &[Block] = &[
         }],
         helper: "fn pfx_tint(c: vec3<f32>, uv: vec2<f32>, color: vec3<f32>) -> vec3<f32> {\n    return c * color;\n}",
         call: "pfx_tint({prev}, uv{args})",
-    },
-    Block {
-        id: "exposure",
-        desc: "Scale brightness by 2^stops (a pre-tonemap exposure nudge).",
-        params: &[Param {
-            name: "stops",
-            default: 0.0,
-            arity: 1,
-        }],
-        helper: "fn pfx_exposure(c: vec3<f32>, uv: vec2<f32>, stops: f32) -> vec3<f32> {\n    return c * exp2(stops);\n}",
-        call: "pfx_exposure({prev}, uv{args})",
-    },
-    Block {
-        id: "saturation",
-        desc: "Push or pull saturation around luminance (0 = grayscale, 1 = unchanged).",
-        params: &[Param {
-            name: "amount",
-            default: 1.0,
-            arity: 1,
-        }],
-        helper: "fn pfx_saturation(c: vec3<f32>, uv: vec2<f32>, amount: f32) -> vec3<f32> {\n    let l = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));\n    return mix(vec3<f32>(l), c, amount);\n}",
-        call: "pfx_saturation({prev}, uv{args})",
     },
     Block {
         id: "grayscale",
@@ -104,16 +88,5 @@ pub const BLOCKS: &[Block] = &[
         }],
         helper: "fn pfx_posterize(c: vec3<f32>, uv: vec2<f32>, levels: f32) -> vec3<f32> {\n    let n = max(levels, 1.0);\n    return floor(c * n + 0.5) / n;\n}",
         call: "pfx_posterize({prev}, uv{args})",
-    },
-    Block {
-        id: "contrast",
-        desc: "Expand or compress contrast around mid-gray (0.5).",
-        params: &[Param {
-            name: "amount",
-            default: 1.0,
-            arity: 1,
-        }],
-        helper: "fn pfx_contrast(c: vec3<f32>, uv: vec2<f32>, amount: f32) -> vec3<f32> {\n    return (c - vec3<f32>(0.5)) * amount + vec3<f32>(0.5);\n}",
-        call: "pfx_contrast({prev}, uv{args})",
     },
 ];

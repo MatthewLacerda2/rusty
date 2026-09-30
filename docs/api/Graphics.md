@@ -2,7 +2,7 @@
 
 Live control over the engine's **existing** post-FX and quality knobs, so a script
 can drive its own settings logic. The per-volume getters/setters target the first
-**active** `VisualCorrectionComponent` (color/bloom/SSR/shadows/SSAO) and the first **active**
+**active** `VisualCorrectionComponent` (color/bloom/SSR/shadows/SSAO/custom effects) and the first **active**
 `CameraComponent` (motion blur) in the scene — the same volume `build_post_params`
 packs into the GPU uniform each frame, so a write here takes effect next frame.
 Getters return a neutral default when no active volume/camera exists.
@@ -35,6 +35,7 @@ Getters return a neutral default when no active volume/camera exists.
 | `Graphics.GetSsaoActive` / `SetSsaoActive` | `()` / `(bool)` | `bool` (**default `true`** on a volume; `false` with no active volume) |
 | `Graphics.GetSsaoRadius` / `SetSsaoRadius` | `()` / `(units)` | `number` (world units, clamped ≥ 0.01, **default `0.5`**) |
 | `Graphics.GetSsaoIntensity` / `SetSsaoIntensity` | `()` / `(value)` | `number` (clamped 0–4, **default `1`**) |
+| `Graphics.GetCustomEffects` / `SetCustomEffects` | `()` / `({names})` | array of baked postfx module names, in run order (**default empty**; empty with no active volume) |
 
 **Gamma** is a display-gamma *tweak*, not the output encode: the render target
 (window, Game view, and headless screenshot alike) is sRGB and encodes linear →
@@ -95,6 +96,43 @@ camera also draws its visible solids once more, depth only (a prepass), and runs
 25-tap blur at full resolution. The frame stats report it (`ssao_samples`, and the
 prepass inside `draw_calls` / `triangles`; see `Debug`). `SetSsaoActive(false)` —
 or intensity `0` — skips every one of those passes.
+
+**Custom effects** (#397) are authored postfx modules — `Shader.Bake` with
+`pass = "postfx"` (`Shader.md`) — run by the post chain, the way Unity's volume
+stack runs custom post effects: damage vignettes, a low-health grayscale, CRT
+scanlines on a menu camera.
+
+```lua
+Shader.Bake({ pass = "postfx", name = "hurt",
+  blocks = { { id = "vignette", params = { strength = 0.8, radius = 0.6 } },
+             { id = "tint", params = { color = {1.0, 0.6, 0.6} } } } })
+Graphics.SetCustomEffects({ "hurt" })   -- next frame: vignetted, reddened
+Graphics.SetCustomEffects({})           -- off again
+```
+
+- **Order and placement.** The list runs in order, **after tonemapping and before
+  FXAA**: on the display-referred image in `[0, 1]` that grades like these are
+  designed for, and before anti-aliasing so an effect's own hard edges (scanlines,
+  posterize bands) are smoothed like the scene's. Each entry is one fullscreen pass;
+  names may repeat.
+- **Names** are what `Shader.Bake` was given (the file is `<name>.wgsl` in the
+  default authored-shader dir, `project/assets/shaders`). `SetCustomEffects` raises
+  an error — and changes nothing — for an empty name or one that is a path (`/`,
+  `\`, a leading `.`). A name not baked yet is accepted.
+- **Fail-safe.** A module that is missing, fails to compile, or doesn't fit the post
+  pass is logged once and **skipped**; the rest of the list still runs and the frame
+  never goes black. Re-baking any module makes the renderer reload the list next
+  frame, so a fixed or edited effect is picked up live.
+- **What a module sees.** Binding 1 is the colour so far (binding 2 its sampler);
+  binding 3 is **the previous frame's** result of this chain (black on the first
+  frame and after a resize) for feedback effects; bindings 0, 4 and 5 are the post
+  params, scene depth and skybox, as for the built-in passes.
+- **Where it lives.** The list is saved with the volume, and the Inspector's
+  **Custom Effects** section (add by name, reorder, remove) edits the same field. No
+  active volume, no custom effects.
+- **Cost.** One fullscreen pass per effect, plus one copy that keeps the history
+  (and, with FXAA off, one more that lands the result on screen). An empty list
+  costs nothing.
 
 **FXAA** is the anti-aliasing pass at the very end of the chain, running on the
 tonemapped image just before it reaches the screen. It is **on by default** — a

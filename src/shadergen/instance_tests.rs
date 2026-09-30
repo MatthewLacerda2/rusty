@@ -87,7 +87,7 @@ fn an_undeclared_param_names_the_block_key_and_declared_params() {
 
 #[test]
 fn a_param_of_the_wrong_arity_is_refused() {
-    let array_for_scalar = sel("exposure", &[("stops", ParamValue::Vector(vec![1.0]))]);
+    let array_for_scalar = sel("posterize", &[("levels", ParamValue::Vector(vec![4.0]))]);
     let short_vector = sel("tint", &[("color", ParamValue::Vector(vec![1.0, 0.5]))]);
     for (block, want) in [
         (array_for_scalar, "expects a number"),
