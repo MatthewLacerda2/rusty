@@ -308,6 +308,26 @@ determinism, no file written on a rejected patch).
 |---|---|---|
 | `SetAnchorMin` / `SetAnchorMax` / `SetPivot` / `SetAnchoredPosition` / `SetSizeDelta` | ✅ | sim — `RectTransformComponent::layout_in` in the `LateUpdate` layout pass (`Resources::ui_layout`) and `UI.GetRect`; round-trips (`tests/ui_api.rs`) |
 
+### `Image` — over `Entity.image` (#418)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetColor` / `SetTexture` / `SetType` / `SetBorder` / `SetFillMethod` / `SetFillOrigin` / `SetFillAmount` / `SetFillClockwise` / `SetPreserveAspect` | ✅ | render — `render::ui::mesh::build_canvas_meshes` + `render::ui::geometry::image_triangles` in the UI pass (`tests/gpu/ui_hud_screenshot.rs`); round-trips (`tests/ui_graphics_api.rs`) |
+| `SetRaycastTarget` | ✅ | round-trips; read by pointer dispatch when #420 lands |
+
+### `CanvasGroup` — over `Entity.canvas_group` (#418)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetAlpha` | ✅ | render — multiplied down the subtree in `render::ui::mesh` (`tests/gpu/ui_hud_screenshot.rs`) |
+| `SetInteractable` / `SetBlocksRaycasts` | ✅ | round-trip; read by pointer dispatch when #420 lands |
+
+### `RectMask` — over `Entity.rect_mask` (#418)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetPadding` | ✅ | render — the subtree's scissor rect in `render::ui::mesh`; round-trips |
+
 ### `Debug` (dev-only) — over `ConsoleLogs`
 
 | Setter | Status | Read-site |
@@ -318,7 +338,7 @@ determinism, no file written on a rejected patch).
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 88 |
+| ✅ faithful | 102 |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 

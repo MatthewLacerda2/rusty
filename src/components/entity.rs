@@ -11,9 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 use super::{
-    AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent, ColliderComponent,
-    LightComponent, MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent,
-    ParticleEmitterComponent, RectTransformComponent, RigidBodyComponent, ScriptComponent,
+    AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
+    CanvasGroupComponent, ColliderComponent, ImageComponent, LightComponent, MaterialAsset,
+    MaterialComponent, MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent,
+    RectMaskComponent, RectTransformComponent, RigidBodyComponent, ScriptComponent,
     TextureComponent, TransformComponent, VisualCorrectionComponent,
 };
 
@@ -95,6 +96,17 @@ pub struct Entity {
     /// `#[serde(default)]` so pre-#417 scenes load without one.
     #[serde(default)]
     pub rect_transform: Option<RectTransformComponent>,
+    /// UI graphic (#418). `#[serde(default)]` so pre-#418 scenes load without one.
+    #[serde(default)]
+    pub image: Option<ImageComponent>,
+    /// UI subtree alpha + interaction flags (#418). `#[serde(default)]` for pre-#418
+    /// scenes.
+    #[serde(default)]
+    pub canvas_group: Option<CanvasGroupComponent>,
+    /// Clips the UI subtree to this rect (#418). `#[serde(default)]` for pre-#418
+    /// scenes.
+    #[serde(default)]
+    pub rect_mask: Option<RectMaskComponent>,
     /// Live link back to the source `.prefab` for a *linked* prefab instance (#216).
     /// `None` on a plain entity or a v1 unpacked copy. Carried on every entity of an
     /// instance. `#[serde(default)]` so pre-#216 scenes load with no link.
@@ -146,6 +158,12 @@ struct EntityRepr {
     #[serde(default)]
     rect_transform: Option<RectTransformComponent>,
     #[serde(default)]
+    image: Option<ImageComponent>,
+    #[serde(default)]
+    canvas_group: Option<CanvasGroupComponent>,
+    #[serde(default)]
+    rect_mask: Option<RectMaskComponent>,
+    #[serde(default)]
     prefab_link: Option<PrefabLink>,
     parent_id: Option<u32>,
     children: Vec<u32>,
@@ -194,6 +212,9 @@ impl From<EntityRepr> for Entity {
             audio: r.audio,
             canvas: r.canvas,
             rect_transform: r.rect_transform,
+            image: r.image,
+            canvas_group: r.canvas_group,
+            rect_mask: r.rect_mask,
             prefab_link: r.prefab_link,
             parent_id: r.parent_id,
             children: r.children,
@@ -225,6 +246,9 @@ impl Entity {
             audio: None,
             canvas: None,
             rect_transform: None,
+            image: None,
+            canvas_group: None,
+            rect_mask: None,
             prefab_link: None,
             parent_id: None,
             children: Vec::new(),

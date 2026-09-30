@@ -60,6 +60,8 @@ pub(crate) struct GpuResources {
     pub shadows: ShadowSystem,
     pub forward: ForwardPasses,
     pub billboards: BillboardPasses,
+    /// The in-game UI pass (#418).
+    pub ui: crate::render::ui::UiRenderer,
     pub quality: QualityPreset,
 }
 
@@ -84,6 +86,7 @@ impl GpuResources {
             &mut registry,
         );
         let billboards = create_billboard_passes(device, &textures.texture_layout, &mut registry);
+        let ui = crate::render::ui::UiRenderer::new(device, queue, &mut registry);
         Self {
             camera_lighting_layout,
             entity_bones_layout,
@@ -92,6 +95,7 @@ impl GpuResources {
             shadows,
             forward,
             billboards,
+            ui,
             quality: QualityPreset::default(),
         }
     }

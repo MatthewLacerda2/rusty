@@ -76,8 +76,16 @@ pub trait Frontend {
     /// A physical key changed state, after the shell wrote it into the sim.
     fn on_key(&mut self, _game: &mut GameWorld, _key: KeyCode, _pressed: bool) {}
 
-    /// Draw this frame into the swapchain `target`.
-    fn draw(&mut self, shell: &mut Shell, game: &mut GameWorld, target: &wgpu::TextureView);
+    /// Draw this frame into the swapchain `target` — the default view of `frame`,
+    /// the swapchain texture itself (for a frontend needing another view of it, like
+    /// the player's UI pass, #418).
+    fn draw(
+        &mut self,
+        shell: &mut Shell,
+        game: &mut GameWorld,
+        frame: &wgpu::Texture,
+        target: &wgpu::TextureView,
+    );
 }
 
 /// Run the event loop until the window closes or the game quits. Persists the
@@ -188,7 +196,7 @@ fn run_frame<F: Frontend>(
     let target = surface
         .texture
         .create_view(&wgpu::TextureViewDescriptor::default());
-    frontend.draw(shell, game, &target);
+    frontend.draw(shell, game, &surface.texture, &target);
     surface.present();
 }
 

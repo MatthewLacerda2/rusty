@@ -4,7 +4,8 @@
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
 //! `Scene`, `Random`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
 //! `Assets`, `Texture`, `Shader`, `Sound`, `Particles`, `Layers`, `Graphics`, `Video`,
-//! `Storage`, `Canvas`, `RectTransform`, `UI`, `Application`, plus the dev-only `Debug`)
+//! `Storage`, `Canvas`, `RectTransform`, `UI`, `Image`, `CanvasGroup`, `RectMask`,
+//! `Application`, plus the dev-only `Debug`)
 //! is registered from this tree onto the live Lua runtime.
 //! `scripting`
 //! owns the runtime and lifecycle; `api` owns the surface. One surface, three
@@ -19,10 +20,12 @@ pub mod assets;
 pub mod audio;
 pub mod camera;
 pub mod canvas;
+pub mod canvas_group;
 #[cfg(feature = "dev")]
 pub mod debug;
 pub mod decals;
 pub mod graphics;
+pub mod image;
 pub mod input;
 pub mod layers;
 pub mod light;
@@ -34,6 +37,7 @@ pub mod particle;
 pub mod physics;
 pub mod probe;
 pub mod random;
+pub mod rect_mask;
 pub mod rect_transform;
 pub mod reflection;
 pub mod scene;
@@ -155,6 +159,9 @@ pub fn register<'lua, 'scope>(
     canvas::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
     rect_transform::register(lua, scope, ctx.scene)?;
     ui::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
+    image::register(lua, scope, ctx.scene)?;
+    canvas_group::register(lua, scope, ctx.scene)?;
+    rect_mask::register(lua, scope, ctx.scene)?;
     decals::register(lua, scope, ctx.scene)?;
     layers::register(lua, scope, ctx.scene)?;
     graphics::register(lua, scope, ctx.scene, ctx.quality)?;

@@ -13,6 +13,7 @@ pub mod gpu;
 pub(crate) mod ibl;
 pub(crate) mod passes;
 pub mod postfx;
+pub mod ui;
 
 // Moved submodules pulled back under short names so this module's body keeps
 // naming them directly (grouped by subfolder — see the convention in CLAUDE.md).
@@ -168,6 +169,9 @@ pub struct Renderer {
 
     /// Billboard particle pass (draws into the HDR target before post-FX).
     particle_renderer: particles::ParticleRenderer,
+
+    /// The in-game UI pass (#418), drawn over the finished frame after post-FX.
+    ui_renderer: ui::UiRenderer,
 
     /// Box-projector decal pass (draws into the HDR target after solids/skybox,
     /// reconstructing the underlying surface from the scene depth target).

@@ -55,6 +55,7 @@ mod starter_materials;
 mod texture_api;
 mod transform_api;
 mod ui_api;
+mod ui_graphics_api;
 mod video_api;
 
 // ── Dev layer only (harness, session, MCP, `Debug.*`) ────────────────────────────

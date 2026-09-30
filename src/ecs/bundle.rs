@@ -70,6 +70,9 @@ pub(in crate::ecs) fn build_bundle(entity: Entity, seq: u64) -> hecs::EntityBuil
         entity.audio,
         entity.canvas,
         entity.rect_transform,
+        entity.image,
+        entity.canvas_group,
+        entity.rect_mask,
         entity.prefab_link,
     );
     b

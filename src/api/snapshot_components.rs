@@ -8,9 +8,10 @@ use serde_json::{json, Value};
 
 use super::snapshot::vec3;
 use crate::components::{
-    AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent, ColliderComponent,
-    ColliderShape, LightComponent, LightType, MaterialAsset, MeshComponent, NavMeshAgentComponent,
-    ParticleEmitterComponent, RectTransformComponent, RigidBodyComponent,
+    AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
+    CanvasGroupComponent, ColliderComponent, ColliderShape, ImageComponent, LightComponent,
+    LightType, MaterialAsset, MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent,
+    RectMaskComponent, RectTransformComponent, RigidBodyComponent,
 };
 
 /// Mesh identity: the primitive kind and, for imported meshes, the
@@ -199,4 +200,38 @@ pub(crate) fn rect_transform_value(r: &RectTransformComponent) -> Value {
         "anchored_position": v(r.anchored_position),
         "size_delta": v(r.size_delta),
     })
+}
+
+/// Image authoring view (#418): tint, texture, type, 9-slice border and the fill.
+/// Enum values are their `Image.*` names.
+pub(crate) fn image_value(i: &ImageComponent) -> Value {
+    use crate::scene::authoring::image as ops;
+    let v4 = |v: glam::Vec4| json!([v.x, v.y, v.z, v.w]);
+    json!({
+        "color": v4(i.color),
+        "texture": i.texture,
+        "type": ops::image_type_name(i.image_type),
+        "border": v4(i.border),
+        "fill_method": ops::fill_method_name(i.fill_method),
+        "fill_origin": ops::fill_origin_name(i.fill_origin),
+        "fill_amount": i.fill_amount,
+        "fill_clockwise": i.fill_clockwise,
+        "preserve_aspect": i.preserve_aspect,
+        "raycast_target": i.raycast_target,
+    })
+}
+
+/// CanvasGroup authoring view (#418): subtree alpha and the interaction flags.
+pub(crate) fn canvas_group_value(g: &CanvasGroupComponent) -> Value {
+    json!({
+        "alpha": g.alpha,
+        "interactable": g.interactable,
+        "blocks_raycasts": g.blocks_raycasts,
+    })
+}
+
+/// RectMask authoring view (#418): the clip's padding (left, bottom, right, top).
+pub(crate) fn rect_mask_value(m: &RectMaskComponent) -> Value {
+    let p = m.padding;
+    json!({ "padding": [p.x, p.y, p.z, p.w] })
 }

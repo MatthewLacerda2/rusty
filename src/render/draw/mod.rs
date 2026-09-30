@@ -127,6 +127,12 @@ impl Renderer {
                 self.run_post_fx(view, scene, output, base_view_proj, cam.position.to_array());
             }
         }
+
+        // 4. The in-game UI over the finished frame (#418): after post-FX, so a HUD
+        // is never tonemapped, bloomed or FXAA-softened. Not in the Scene view.
+        if !editor_mode {
+            self.draw_ui(view, scene);
+        }
     }
 
     /// Upload/refresh per-frame GPU assets (meshes, textures, skybox) shared by every

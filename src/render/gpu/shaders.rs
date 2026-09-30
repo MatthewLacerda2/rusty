@@ -149,6 +149,7 @@ mod tests {
             "particles.wgsl",
             "decals.wgsl",
             "postfx.wgsl",
+            "ui.wgsl",
         ] {
             let module = registry.compose(name);
             assert!(

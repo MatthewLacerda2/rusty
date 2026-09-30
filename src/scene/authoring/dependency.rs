@@ -26,7 +26,10 @@
 //!
 //! Allowed deps: components, scene, ecs.
 
-use crate::components::{CanvasComponent, RectTransformComponent};
+use crate::components::{
+    CanvasComponent, CanvasGroupComponent, ImageComponent, RectMaskComponent,
+    RectTransformComponent,
+};
 use crate::ecs::World;
 use crate::scene::authoring::components::ComponentKind;
 use crate::scene::authoring::defaults::{
@@ -51,6 +54,9 @@ pub(crate) fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::Audio => world.has_audio(id),
         ComponentKind::Canvas => world.has_canvas(id),
         ComponentKind::RectTransform => world.has_rect_transform(id),
+        ComponentKind::Image => world.has_image(id),
+        ComponentKind::CanvasGroup => world.has_canvas_group(id),
+        ComponentKind::RectMask => world.has_rect_mask(id),
     }
 }
 
@@ -77,6 +83,11 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
         ComponentKind::RectTransform => {
             world.set_rect_transform(id, Some(RectTransformComponent::default()))
         }
+        ComponentKind::Image => world.set_image(id, Some(ImageComponent::default())),
+        ComponentKind::CanvasGroup => {
+            world.set_canvas_group(id, Some(CanvasGroupComponent::default()))
+        }
+        ComponentKind::RectMask => world.set_rect_mask(id, Some(RectMaskComponent::default())),
     }
 }
 
@@ -97,6 +108,9 @@ pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool
         ComponentKind::Audio => world.set_audio(id, None),
         ComponentKind::Canvas => world.set_canvas(id, None),
         ComponentKind::RectTransform => world.set_rect_transform(id, None),
+        ComponentKind::Image => world.set_image(id, None),
+        ComponentKind::CanvasGroup => world.set_canvas_group(id, None),
+        ComponentKind::RectMask => world.set_rect_mask(id, None),
     }
 }
 
@@ -208,6 +222,16 @@ mod tests {
             let id = create_entity(&mut scene, "E", None);
             assert!(set_default(&mut scene.world, id, kind), "{kind:?} adds");
             assert!(has_kind(&scene.world, id, kind), "{kind:?} is probeable");
+        }
+    }
+
+    #[test]
+    fn ui_graphics_require_a_rect_transform() {
+        let mut scene = Scene::new();
+        for kind in [ComponentKind::Image, ComponentKind::RectMask] {
+            let id = create_entity(&mut scene, "E", None);
+            assert!(add_with_requirements(&mut scene.world, id, kind));
+            assert!(scene.world.has_rect_transform(id), "{kind:?} brings a rect");
         }
     }
 

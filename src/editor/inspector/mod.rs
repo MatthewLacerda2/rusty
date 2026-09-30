@@ -289,8 +289,7 @@ fn draw_components(
     particles::draw(ui, world, id, &mut editor.is_dirty);
     audio::draw(ui, world, id, &mut editor.is_dirty);
 
-    ui_cards::canvas::draw(ui, world, id, &mut editor.is_dirty);
-    ui_cards::rect_transform::draw(ui, world, id, &mut editor.is_dirty);
+    ui_cards::draw(ui, world, id, &mut editor.is_dirty);
 
     add::draw(ui, world, id);
 }
