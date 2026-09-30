@@ -23,7 +23,7 @@ use passes::{decals, particles, shadows};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub use camera::{build_camera_stack, game_camera_from_scene, sync_lens_from_scene, Camera};
+pub use camera::build_camera_stack;
 pub use frustum::{transform_aabb, Frustum};
 pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
 pub use ibl::probe_bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
@@ -160,7 +160,7 @@ pub struct Renderer {
     /// Active scalability tier; gates which post-FX passes run + buffer sizes. Shared
     /// across views — each view's post-FX chain (owned by its [`RenderView`]) sizes its
     /// bloom buffers from this tier's divisor.
-    pub quality: postfx::QualityPreset,
+    pub quality: crate::core::quality::QualityPreset,
     /// Present modes the surface advertises, captured at construction. Used to
     /// decide whether vsync can be turned off (`Immediate`) without a wgpu panic;
     /// the headless path has no real swapchain so it only ever lists `Fifo`.

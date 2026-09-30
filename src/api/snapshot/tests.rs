@@ -2,8 +2,8 @@
 //! same authoring verbs the API exposes, so the read reflects what create/add did.
 
 use super::*;
-use crate::render::Camera;
 use crate::scene::authoring::{add_component, create_entity, ComponentKind, Primitive};
+use crate::scene::Camera;
 use crate::scene::Scene;
 
 fn cam() -> Camera {

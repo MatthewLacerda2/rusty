@@ -219,11 +219,12 @@ impl crate::render::Renderer {
 
 #[cfg(test)]
 mod tests {
-    use crate::render::{Camera, RenderView, OFFSCREEN_FORMAT};
+    use crate::render::{RenderView, OFFSCREEN_FORMAT};
+    use crate::scene::Camera;
     use crate::scene::{MeshComponent, Scene};
 
     fn box_mesh() -> MeshComponent {
-        let (vertices, indices) = crate::render::gpu::mesh::generate_box(1.0, 1.0, 1.0);
+        let (vertices, indices) = crate::components::mesh::primitives::generate_box(1.0, 1.0, 1.0);
         MeshComponent {
             primitive_type: "Box".to_string(),
             asset_ref: None,

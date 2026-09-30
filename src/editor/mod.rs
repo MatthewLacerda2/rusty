@@ -73,7 +73,7 @@ pub struct EditorUi {
 
     /// Selected post-FX scalability tier. main.rs syncs this onto the renderer
     /// each frame so Low/Medium/High gate which passes run + buffer sizes.
-    pub quality_preset: crate::render::postfx::QualityPreset,
+    pub quality_preset: crate::core::quality::QualityPreset,
 
     /// Which viewport tab is showing — Scene (editor cam + gizmos) or Game (the
     /// active camera's view). Both are reachable in edit and play mode (#183).
@@ -147,7 +147,7 @@ impl EditorUi {
             bottom_open: true,
             theme: theme::Theme::dark(),
             fonts_installed: false,
-            quality_preset: crate::render::postfx::QualityPreset::default(),
+            quality_preset: crate::core::quality::QualityPreset::default(),
             viewport_tab: ViewportTab::Scene,
             viewport_image_size: egui::Vec2::ZERO,
             gizmo_drag: None,

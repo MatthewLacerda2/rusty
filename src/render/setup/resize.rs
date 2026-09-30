@@ -3,7 +3,7 @@
 //! toggling, and quality-tier switching — everything that reacts to the window or
 //! settings changing *after* the renderer exists.
 
-use crate::render::postfx::QualityPreset;
+use crate::core::quality::QualityPreset;
 use crate::render::Renderer;
 
 impl Renderer {

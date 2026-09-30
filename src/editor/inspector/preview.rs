@@ -16,7 +16,7 @@
 pub use crate::preview::{build_preview_scene, OrbitState, PreviewMesh, PreviewSubject};
 
 use crate::editor::{theme::Theme, EditorUi};
-use crate::render::Camera;
+use crate::scene::Camera;
 
 /// The rebuilt isolated scene, kept until the subject or mesh choice changes so a
 /// held Preview tab doesn't re-import a model/texture from disk every frame.

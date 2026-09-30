@@ -19,7 +19,9 @@
 
 pub mod asset_instance;
 pub mod authoring;
+pub mod camera;
 pub mod collision_matrix;
+pub mod decal;
 pub mod destroy_queue;
 pub mod identity;
 pub mod io;
@@ -32,6 +34,7 @@ pub mod serialize;
 pub mod snapshot;
 pub mod world_cache;
 
+pub use camera::{game_camera_from_scene, sync_lens_from_scene, Camera};
 pub use collision_matrix::CollisionMatrix;
 pub use identity::SceneId;
 pub use io::{

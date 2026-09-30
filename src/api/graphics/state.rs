@@ -8,7 +8,7 @@ use std::cell::RefCell;
 
 use super::super::{put, Reg};
 use crate::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
-use crate::render::postfx::QualityPreset;
+use crate::core::quality::QualityPreset;
 use crate::scene::Scene;
 
 /// Global quality preset value get/set over the shared resource cell. Lives here (not

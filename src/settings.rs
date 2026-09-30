@@ -22,9 +22,9 @@
 use std::sync::Arc;
 
 use rusty::app::GameWorld;
+use rusty::core::quality::QualityPreset;
 use rusty::core::storage::Storage;
 use rusty::core::video::{VideoSettings, VIDEO_NAMESPACE};
-use rusty::render::postfx::QualityPreset;
 
 use crate::Frontend;
 

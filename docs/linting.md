@@ -14,6 +14,7 @@ agent can read exactly what failed.
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
 | Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation` |
+| Dependency direction | `tools/lint -- --direction` | sim modules (`app`/`scripting`/`physics`/`navigation`/`scene`/`components`/`ecs`/`core`/`time`/`asset`) never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
 | Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every *migrated* first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard), minus the burn-down baseline |
@@ -61,6 +62,19 @@ has no `[lints]` table: it is not clippy-gated, so one would be dead config.
 `tools/lint/baseline.txt` grandfathers the files that already exceed the cap. It is a
 **TODO list, not a pardon**: as a file is split, remove its entry. Never add new
 entries. When the file is empty, the size gate is fully on.
+
+## Dependency direction (`--direction`)
+The sim runs headless with no GPU and no UI, so the dependency arrow points one way:
+`render` and `editor` import sim types, never the reverse. `tools/lint -- --direction`
+scans the sim modules (`app`, `scripting`, `physics`, `navigation`, `scene`,
+`components`, `ecs`, `core`, `time`, `asset`) and fails on any non-comment reference
+to `crate::render`, `crate::editor`, `wgpu` or `egui` (whole path segments only).
+Plain data the renderer and the sim share lives sim-side: the mesh `Vertex` and the
+primitive builders in `components::mesh`, `Camera` and `Decal` in `scene`,
+`QualityPreset` in `core::quality`; the renderer keeps only the GPU half (e.g.
+`render::gpu::mesh::vertex_layout`). There is no baseline — the guard landed with
+zero violations (#494), and it is the groundwork the crate split (#495) needs.
+`api` is the top-level surface and is deliberately outside the scan.
 
 ## Component completeness (`--components`)
 A first-class component is only "done" when it appears on all four axes that

@@ -1,4 +1,4 @@
-use crate::render::gpu::mesh::Vertex;
+use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::gpu::slot_key::SlotKey;
 use crate::render::{transform_aabb, Frustum};
@@ -252,7 +252,7 @@ impl ShadowRenderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
+                buffers: &[vertex_layout()],
             },
             fragment: None, // Depth only pass
             primitive: wgpu::PrimitiveState {

@@ -17,10 +17,8 @@ use self::lighting::{
 };
 use self::pass::{PassClear, ScenePassFrame};
 use crate::render::postfx::params::build_post_params;
-use crate::render::{
-    build_camera_stack, Camera, CameraUniform, LightingUniform, RenderView, Renderer,
-};
-use crate::scene::Scene;
+use crate::render::{build_camera_stack, CameraUniform, LightingUniform, RenderView, Renderer};
+use crate::scene::{Camera, Scene};
 
 impl Renderer {
     /// Renders the 3D scene into `view` (a per-view target/depth/post-FX bundle, #355),

@@ -51,13 +51,13 @@ use mlua::{Function, Lua, Table};
 
 use crate::audio::AudioMaestro;
 use crate::core::input::InputState;
+use crate::core::quality::QualityPreset;
 use crate::core::random::Random;
 use crate::core::storage::Storage;
 use crate::core::video::VideoSettings;
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
-use crate::render::postfx::QualityPreset;
-use crate::render::Camera;
+use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 use crate::time::Time;

@@ -11,8 +11,10 @@ use std::rc::Rc;
 
 use wgpu::util::DeviceExt;
 
-use crate::render::passes::decals::{Decal, DecalGlobals, DecalUniform};
-use crate::render::{Camera, GpuTexture, RenderView, Renderer};
+use crate::render::passes::decals::{DecalGlobals, DecalUniform};
+use crate::render::{GpuTexture, RenderView, Renderer};
+use crate::scene::decal::Decal;
+use crate::scene::Camera;
 use crate::scene::Scene;
 
 /// One decal resolved for drawing: its uniform bind group + sprite texture.

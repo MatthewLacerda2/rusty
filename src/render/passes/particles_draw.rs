@@ -12,7 +12,8 @@ use wgpu::util::DeviceExt;
 
 use crate::components::particle::ParticleBlend;
 use crate::render::passes::particles::{ParticleGlobals, ParticleInstance};
-use crate::render::{Camera, GpuTexture, RenderView, Renderer};
+use crate::render::{GpuTexture, RenderView, Renderer};
+use crate::scene::Camera;
 use crate::scene::Scene;
 
 /// Camera-facing billboard basis (right, up). Derived from the camera forward, with

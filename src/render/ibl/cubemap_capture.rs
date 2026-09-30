@@ -15,7 +15,9 @@
 
 use glam::Vec3;
 
-use crate::render::{Camera, RenderView, Renderer, OFFSCREEN_FORMAT};
+use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
+
+use crate::scene::Camera;
 use crate::scene::Scene;
 
 /// The six faces of a cubemap, in the conventional +X,-X,+Y,-Y,+Z,-Z order. The

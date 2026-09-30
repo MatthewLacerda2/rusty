@@ -10,7 +10,7 @@ use glam::Vec3;
 
 use super::CaptureHost;
 use crate::dev::screenshot;
-use crate::render::Camera;
+use crate::scene::Camera;
 use crate::scene::{DirtyFlag, MeshComponent, Scene};
 
 /// A scene holding one lit box, at `ambient` ambient intensity — the knob the two
@@ -21,7 +21,7 @@ fn box_scene(ambient: f32) -> Scene {
     scene.skybox_path = String::new();
     scene.ambient_intensity = ambient;
     let id = scene.add_entity("Box".to_string());
-    let (vertices, indices) = crate::render::gpu::mesh::generate_box(2.0, 2.0, 2.0);
+    let (vertices, indices) = crate::components::mesh::primitives::generate_box(2.0, 2.0, 2.0);
     scene.world.set_mesh(
         id,
         Some(MeshComponent {

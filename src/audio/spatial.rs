@@ -36,7 +36,7 @@ pub struct Listener {
 
 impl Listener {
     /// Build a listener from a world position and an already-computed right axis (e.g.
-    /// the active `render::Camera`'s `position` + `right()`). The right vector is
+    /// the active `scene::Camera`'s `position` + `right()`). The right vector is
     /// normalized (falling back to world +X if degenerate).
     pub fn new(position: Vec3, right: Vec3) -> Self {
         let right = right.try_normalize().unwrap_or(Vec3::X);

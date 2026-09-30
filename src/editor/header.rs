@@ -1,8 +1,8 @@
 use egui_phosphor::regular as icon;
 
+use crate::core::quality::QualityPreset;
 use crate::editor::menu_create;
 use crate::editor::EditorUi;
-use crate::render::postfx::QualityPreset;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 

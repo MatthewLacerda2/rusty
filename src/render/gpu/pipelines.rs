@@ -1,7 +1,7 @@
 //! Render-pipeline construction for the main forward renderer. The bind-group
 //! layouts these pipelines reference live in `bind_layouts` (behavior unchanged).
 
-use crate::render::gpu::mesh::Vertex;
+use crate::render::gpu::mesh::vertex_layout;
 
 /// Fixed-function knobs that distinguish the three forward-pass pipelines.
 struct PipelineSpec {
@@ -152,7 +152,7 @@ fn make_pipeline(
         vertex: wgpu::VertexState {
             module: shader,
             entry_point: "vs_main",
-            buffers: &[Vertex::desc()],
+            buffers: &[vertex_layout()],
         },
         fragment: Some(wgpu::FragmentState {
             module: shader,

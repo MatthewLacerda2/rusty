@@ -16,6 +16,7 @@ use std::process::exit;
 
 mod components;
 mod determinism;
+mod direction;
 mod parity;
 
 const MAX_FILE_LINES: usize = 300;
@@ -33,6 +34,13 @@ fn main() {
     // if wall-clock / unseeded-RNG calls leak into the deterministic sim modules.
     if args.iter().any(|a| a == "--determinism") {
         determinism::run();
+        return;
+    }
+
+    // `--direction` runs the dependency-direction guard (#494): sim modules must not
+    // reference `crate::render`, `crate::editor`, `wgpu` or `egui`.
+    if args.iter().any(|a| a == "--direction") {
+        direction::run();
         return;
     }
 

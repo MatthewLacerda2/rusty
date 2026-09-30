@@ -21,7 +21,7 @@ use super::snapshot_components::{
 };
 use crate::components::TransformComponent;
 use crate::ecs::World;
-use crate::render::Camera;
+use crate::scene::Camera;
 use crate::scene::Scene;
 
 /// A `glam::Vec3` as a `[x, y, z]` JSON array. Shared with `snapshot_components`.

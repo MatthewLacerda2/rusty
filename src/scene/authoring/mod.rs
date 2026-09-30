@@ -30,8 +30,8 @@ pub mod visual_correction;
 
 use glam::Vec3;
 
-use crate::render::gpu::mesh as primitives;
-use crate::render::gpu::mesh::Vertex;
+use crate::components::mesh::primitives;
+use crate::components::mesh::Vertex;
 use crate::scene::authoring::defaults::light;
 use crate::scene::{LightComponent, LightType, MeshComponent, Scene};
 

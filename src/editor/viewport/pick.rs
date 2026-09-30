@@ -9,7 +9,7 @@
 
 use glam::{Mat4, Vec3};
 
-use crate::render::Camera;
+use crate::scene::Camera;
 use crate::scene::Scene;
 
 /// A world-space ray: an origin on the near plane and a normalized direction.

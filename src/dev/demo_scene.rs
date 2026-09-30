@@ -6,7 +6,7 @@
 
 use glam::Vec3;
 
-use crate::render::gpu::mesh as primitives;
+use crate::components::mesh::primitives;
 use crate::scene::{
     AnimatorComponent, ColliderComponent, ColliderShape, CollisionDetection, DirtyFlag,
     MaterialAsset, MaterialComponent, MeshComponent, RigidBodyComponent, Scene, ScriptComponent,
@@ -26,7 +26,10 @@ fn box_collider(size: Vec3) -> ColliderComponent {
     }
 }
 
-fn mesh(primitive_type: &str, data: (Vec<primitives::Vertex>, Vec<u32>)) -> MeshComponent {
+fn mesh(
+    primitive_type: &str,
+    data: (Vec<crate::components::mesh::Vertex>, Vec<u32>),
+) -> MeshComponent {
     MeshComponent {
         primitive_type: primitive_type.to_string(),
         asset_ref: None,

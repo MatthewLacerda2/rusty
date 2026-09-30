@@ -10,7 +10,8 @@
 
 use super::gpu::pipelines::create_pipelines;
 use super::gpu::shaders::ShaderRegistry;
-use super::{Camera, RenderView, Renderer};
+use super::{RenderView, Renderer};
+use crate::scene::Camera;
 use crate::scene::Scene;
 
 impl Renderer {

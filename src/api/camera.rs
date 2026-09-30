@@ -1,6 +1,6 @@
 //! src/api/camera.rs — `Camera` namespace.
 //!
-//! Get/Set for position, yaw, pitch and fov over the shared `render::Camera` the
+//! Get/Set for position, yaw, pitch and fov over the shared `scene::Camera` the
 //! simulation drives, plus `GetForward`/`GetRight` basis vectors so a controller
 //! script can move and aim relative to where the camera looks.
 
@@ -10,7 +10,7 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::{put, Reg};
-use crate::render::Camera;
+use crate::scene::Camera;
 
 /// Register the `Camera` namespace onto `lua`.
 pub fn register<'lua, 'scope>(

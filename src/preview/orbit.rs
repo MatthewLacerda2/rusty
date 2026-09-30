@@ -12,7 +12,7 @@
 
 use glam::Vec3;
 
-use crate::render::Camera;
+use crate::scene::Camera;
 
 /// Degrees per point of horizontal/vertical drag.
 const DRAG_SENSITIVITY: f32 = 0.4;

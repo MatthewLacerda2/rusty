@@ -7,7 +7,7 @@ use glam::Vec3;
 
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
-use crate::render::Camera;
+use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
 
