@@ -34,6 +34,10 @@ impl ScriptManager {
     pub(super) fn dispatch_disabled(&mut self) {
         let keys = self.disabled_keys(|i| i.awoken && i.enabled_last);
         self.dispatch_keys(&keys, ON_DISABLE);
+        for &(id, _) in &keys {
+            // Unity: a deactivated object's coroutines stop (#444) — timers too.
+            self.timers.borrow_mut().retain_owners(|owner| owner != id);
+        }
         for key in keys {
             if let Some(inst) = self.entity_scripts.get_mut(&key) {
                 inst.enabled_last = false;
@@ -78,6 +82,10 @@ impl ScriptManager {
         for &id in &ids {
             self.scene.borrow_mut().destroy_entity(id);
         }
+        // Pending timers and coroutines die with their entity (#444).
+        self.timers
+            .borrow_mut()
+            .retain_owners(|owner| !ids.contains(&owner));
         self.entity_scripts
             .retain(|&(eid, _), _| !ids.contains(&eid));
         self.load_attempted.retain(|&(eid, _)| !ids.contains(&eid));

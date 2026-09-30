@@ -90,10 +90,13 @@ pub(super) fn register(app: &mut App) {
 /// The script phase. Its head drains queued script loads — entities spawned
 /// during play get their scripts compiled here, one tick after the spawn — and
 /// runs every pending `Awake` then `Start` (#322), so init always precedes any
-/// `Update` of the tick. Then every started script's `Update` runs.
+/// `Update` of the tick. Then every started script's `Update` runs, and then the
+/// timer phase (#444): due `Timer.Invoke`s fire and waiting coroutines resume,
+/// on the same scaled `dt` — after every `Update`, before physics and `LateUpdate`.
 fn update_scripts(_world: &mut World, res: &mut Resources) {
     res.script_manager.init_scripts();
     res.script_manager.update_scripts(res.frame_dt);
+    res.script_manager.tick_timers(res.frame_dt);
 }
 
 /// The post-physics script phase (#324): once physics, animation and particles

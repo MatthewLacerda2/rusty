@@ -39,7 +39,7 @@ impl ScriptManager {
     /// Run `body` with the full API surface registered into a live-runtime
     /// scope — the shared ceremony around every hook dispatch. No-op when the
     /// runtime is not live.
-    fn with_api_scope(&self, body: impl FnOnce(&Lua)) {
+    pub(super) fn with_api_scope(&self, body: impl FnOnce(&Lua)) {
         let Some(lua) = &self.lua else { return };
         let ctx = self.make_ctx();
         let _ = lua.scope(|scope| -> mlua::Result<()> {
@@ -82,7 +82,7 @@ impl ScriptManager {
     /// `None` when it is gone. Enable/disable edge detection and the
     /// `Update`/`LateUpdate`/trigger dispatch all read it, so no hook can drift
     /// from the rule "a disabled entity receives no callbacks".
-    fn entity_active(&self, id: u32) -> Option<bool> {
+    pub(super) fn entity_active(&self, id: u32) -> Option<bool> {
         let scene = self.scene.borrow();
         scene.world.contains(id).then(|| scene.world.is_active(id))
     }
