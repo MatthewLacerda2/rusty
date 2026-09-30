@@ -93,6 +93,28 @@ impl Default for Rolloff {
     }
 }
 
+/// One `Audio.PlayAt` call: what to play, where, how loud, and how far it carries.
+#[derive(Clone, Copy, Debug)]
+pub struct Shot<'a> {
+    pub clip: &'a str,
+    pub position: [f32; 3],
+    /// Per-shot linear gain (pre-master).
+    pub volume: f32,
+    pub rolloff: Rolloff,
+}
+
+impl<'a> Shot<'a> {
+    /// `clip` at `position`, full volume, on the default band.
+    pub fn new(clip: &'a str, position: [f32; 3]) -> Self {
+        Self {
+            clip,
+            position,
+            volume: 1.0,
+            rolloff: Rolloff::default(),
+        }
+    }
+}
+
 /// The emitter settings an `Audio.PlayAt` one-shot plays with.
 pub fn oneshot_source(clip: &str, rolloff: Rolloff) -> AudioSourceComponent {
     AudioSourceComponent {

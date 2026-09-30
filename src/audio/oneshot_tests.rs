@@ -10,7 +10,11 @@ use crate::audio::recording::RecordingBackend;
 fn shot_gain(distance: f32, rolloff: Rolloff) -> (f32, f32) {
     let (backend, rec) = RecordingBackend::new();
     let mut m = AudioMaestro::with_backend(backend);
-    m.play_at("shot.wav", [distance, 0.0, 0.0], 1.0, rolloff, 0, 0);
+    let shot = Shot {
+        rolloff,
+        ..Shot::new("shot.wav", [distance, 0.0, 0.0])
+    };
+    m.play_at(&shot, 0, 0);
     let voice = rec.borrow().last_voice();
     let started = rec.borrow().plays[0].1.mix.gain;
     let env = MixEnv {

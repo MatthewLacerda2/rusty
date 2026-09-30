@@ -19,7 +19,7 @@ use mlua::Lua;
 use super::{put, Reg};
 use glam::Vec3;
 
-use crate::audio::{AudioMaestro, Listener, Rolloff};
+use crate::audio::{AudioMaestro, Listener, Rolloff, Shot};
 use crate::components::AudioSourceComponent;
 use crate::scene::Camera;
 use crate::scene::Scene;
@@ -164,10 +164,12 @@ fn register_oneshot_and_master<'lua, 'scope>(
             let (path, x, y, z, vol, min, max) = args;
             let rolloff = rolloff_arg(min, max).map_err(mlua::Error::RuntimeError)?;
             let now = tick(time);
-            let volume = vol.unwrap_or(1.0);
-            let played = audio
-                .borrow_mut()
-                .play_at(&path, [x, y, z], volume, rolloff, 0, now);
+            let shot = Shot {
+                volume: vol.unwrap_or(1.0),
+                rolloff,
+                ..Shot::new(&path, [x, y, z])
+            };
+            let played = audio.borrow_mut().play_at(&shot, 0, now);
             Ok(played)
         }),
     )?;
