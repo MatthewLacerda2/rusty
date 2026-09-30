@@ -1,4 +1,4 @@
-#import common::{CameraUniforms, VertexInput}
+#import common::{CameraUniforms, VertexInput, blend_joints}
 
 struct AmbientLight {
     color: vec3<f32>,
@@ -178,23 +178,12 @@ fn vs_main(model: VertexInput, @builtin(instance_index) instance: u32) -> Vertex
     // The draw's transform (identity for instanced solids) over the instance's own.
     let model_matrix = entity.model_matrix * instances[instance].model_matrix;
 
-    // Bone skinning transform
+    // Bone skinning transform: the draw's run of `bones` (#455), blended per vertex.
     let joints = model.joint_indices + vec4<u32>(entity.bone_base);
-    var bone_transform = bones[joints.x] * model.joint_weights.x
-                       + bones[joints.y] * model.joint_weights.y
-                       + bones[joints.z] * model.joint_weights.z
-                       + bones[joints.w] * model.joint_weights.w;
-
-    // If bone weights are zero/uninitialized, default to identity matrix
-    let total_weight = model.joint_weights.x + model.joint_weights.y + model.joint_weights.z + model.joint_weights.w;
-    if (total_weight < 0.01) {
-        bone_transform = mat4x4<f32>(
-            vec4<f32>(1.0, 0.0, 0.0, 0.0),
-            vec4<f32>(0.0, 1.0, 0.0, 0.0),
-            vec4<f32>(0.0, 0.0, 1.0, 0.0),
-            vec4<f32>(0.0, 0.0, 0.0, 1.0)
-        );
-    }
+    let bone_transform = blend_joints(
+        bones[joints.x], bones[joints.y], bones[joints.z], bones[joints.w],
+        model.joint_weights,
+    );
 
     let local_pos = bone_transform * vec4<f32>(model.position, 1.0);
     let world_pos = model_matrix * local_pos;

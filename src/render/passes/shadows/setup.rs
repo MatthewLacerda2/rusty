@@ -119,10 +119,14 @@ impl ShadowRenderer {
             }],
         });
 
-        // Every caster's world matrix as one storage array, indexed per instance (#470).
+        // Every caster as one storage array, indexed per instance (#470), and the joint
+        // matrices its skinned casters are posed with (#599).
         let entity_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Shadow Caster Layout"),
-            entries: &[storage_entry(0, wgpu::ShaderStages::VERTEX)],
+            entries: &[
+                storage_entry(0, wgpu::ShaderStages::VERTEX),
+                storage_entry(1, wgpu::ShaderStages::VERTEX),
+            ],
         });
 
         (global_layout, global_bind_group, entity_layout)

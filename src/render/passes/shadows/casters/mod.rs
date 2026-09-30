@@ -3,23 +3,31 @@
 //! Every caster the light can see is gathered as `(mesh, world matrix)`, sorted by mesh
 //! so copies of one prop are neighbours, and packed into one matrix array; each run of
 //! one mesh is then a single instanced depth draw. The depth pass has no material — it
-//! writes depth only, and `shadow.wgsl` does not skin — so the mesh alone is the key.
+//! writes depth only — so the mesh alone is the key.
+//!
+//! Skinned casters are posed (#599): each sweep packs its skinned casters' palettes
+//! (`MeshComponent::active_palette`, the matrices the forward pass draws) into the
+//! buffer's joint array with the forward pass's own `push_palette`, and each caster
+//! carries its `bone_base` per instance. The base rides the instance, not the draw, so
+//! skinned copies of one mesh still share one instanced draw.
 //!
 //! Casters are gathered once per sweep and culled per cascade (#435), so a prop inside
 //! two cascades is drawn into both. The static bake and the dynamic pass each own a
-//! [`CasterBuffer`] holding every cascade's matrices: both are recorded into the same
+//! [`CasterBuffer`] holding every cascade's casters: both are recorded into the same
 //! encoder before one submit, so sharing one buffer would let the second upload
-//! overwrite the first's matrices.
+//! overwrite the first's casters.
+
+mod buffer;
 
 use std::collections::HashMap;
 use std::ops::Range;
 
-use glam::Mat4;
-
 use super::ShadowRenderer;
-use crate::render::gpu::grow_buffer::GrowBuffer;
+use crate::render::gpu::draw_buffers::{push_palette, JointMatrix};
 use crate::render::{transform_aabb, Frustum, GpuMesh, MeshId};
 use crate::scene::Scene;
+pub(super) use buffer::CasterBuffer;
+use buffer::CasterData;
 
 /// One instanced depth draw: `instances` of `mesh`, `num_indices` each.
 pub(super) struct CasterBatch {
@@ -35,74 +43,22 @@ impl CasterBatch {
     }
 }
 
-/// A caster matrix array and the bind group that exposes it to `shadow.wgsl`.
-pub(super) struct CasterBuffer {
-    matrices: GrowBuffer,
-    bind_group: wgpu::BindGroup,
-}
-
-impl CasterBuffer {
-    pub(super) fn new(device: &wgpu::Device, layout: &wgpu::BindGroupLayout) -> Self {
-        let matrices = GrowBuffer::new(
-            device,
-            "Shadow Caster Matrices",
-            wgpu::BufferUsages::STORAGE,
-        );
-        let bind_group = caster_group(device, layout, matrices.buffer());
-        Self {
-            matrices,
-            bind_group,
-        }
-    }
-
-    /// Upload `matrices`, rebuilding the bind group if the buffer had to grow.
-    fn upload(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        layout: &wgpu::BindGroupLayout,
-        matrices: &[[f32; 16]],
-    ) {
-        if self
-            .matrices
-            .upload(device, queue, bytemuck::cast_slice(matrices))
-        {
-            self.bind_group = caster_group(device, layout, self.matrices.buffer());
-        }
-    }
-}
-
-fn caster_group(
-    device: &wgpu::Device,
-    layout: &wgpu::BindGroupLayout,
-    buffer: &wgpu::Buffer,
-) -> wgpu::BindGroup {
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("Shadow Caster Bind Group"),
-        layout,
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: buffer.as_entire_binding(),
-        }],
-    })
-}
-
-/// Group `casters` into instanced runs of one mesh, returning the packed matrices (in
+/// Group `casters` into instanced runs of one mesh, returning the packed casters (in
 /// draw order) and the batches. Sorted by mesh — stable, so scene order holds within
 /// a run; depth writes make the order between runs irrelevant. With `instancing` off,
 /// one draw per caster in scene order (the pre-#470 path, for comparison).
 pub(super) fn batch_casters(
-    mut casters: Vec<(MeshId, u32, Mat4)>,
+    mut casters: Vec<(MeshId, u32, CasterData)>,
     instancing: bool,
-) -> (Vec<[f32; 16]>, Vec<CasterBatch>) {
+) -> (Vec<CasterData>, Vec<CasterBatch>) {
     if instancing {
         casters.sort_by(|a, b| a.0.cmp(&b.0));
     }
     let mut matrices = Vec::with_capacity(casters.len());
     let mut batches: Vec<CasterBatch> = Vec::new();
-    for (mesh, num_indices, world) in casters {
+    for (mesh, num_indices, caster) in casters {
         let index = matrices.len() as u32;
-        matrices.push(world.to_cols_array());
+        matrices.push(caster);
         match batches.last_mut() {
             Some(run) if instancing && run.mesh == mesh => run.instances.end = index + 1,
             _ => batches.push(CasterBatch {
@@ -134,7 +90,7 @@ impl ShadowRenderer {
         want_static: bool,
         cascades: &[usize],
     ) -> Vec<Vec<CasterBatch>> {
-        let candidates = self.collect_casters(frame, want_static);
+        let (candidates, joints) = self.collect_casters(frame, want_static);
         let mut matrices = Vec::new();
         let mut per_cascade = Vec::with_capacity(cascades.len());
         for &i in cascades {
@@ -148,7 +104,7 @@ impl ShadowRenderer {
                     c.bounds
                         .is_none_or(|(lo, hi)| frustum.intersects_aabb(lo, hi))
                 })
-                .map(|c| (c.mesh.clone(), c.num_indices, c.world))
+                .map(|c| (c.mesh.clone(), c.num_indices, c.caster))
                 .collect();
             let (packed, mut batches) = batch_casters(casters, self.instancing);
             let base = matrices.len() as u32;
@@ -164,14 +120,22 @@ impl ShadowRenderer {
         } else {
             &mut self.dynamic_casters
         };
-        buffer.upload(frame.device, frame.queue, &self.entity_layout, &matrices);
+        let layout = &self.entity_layout;
+        buffer.upload(frame.device, frame.queue, layout, &matrices, &joints);
         per_cascade
     }
 
-    /// Every active caster matching `want_static` that has a GPU mesh.
-    fn collect_casters(&self, frame: &CasterFrame, want_static: bool) -> Vec<Candidate> {
+    /// Every active caster matching `want_static` that has a GPU mesh, and the joint
+    /// matrices its skinned casters' `bone_base`s index — one palette per caster per
+    /// sweep, however many cascades draw it.
+    fn collect_casters(
+        &self,
+        frame: &CasterFrame,
+        want_static: bool,
+    ) -> (Vec<Candidate>, Vec<JointMatrix>) {
         let scene = frame.scene;
         let mut casters = Vec::new();
+        let mut joints = Vec::new();
         for id in scene.world.ids_with_mesh() {
             if !scene.world.is_active(id) || scene.world.is_static(id) != want_static {
                 continue;
@@ -186,14 +150,15 @@ impl ShadowRenderer {
             // animation can exceed; a wrongly-culled caster would drop its shadow (#330).
             let bounds = (!mesh.is_skinned())
                 .then(|| transform_aabb(gpu_mesh.local_aabb.0, gpu_mesh.local_aabb.1, world));
+            let bone_base = push_palette(&mut joints, mesh.active_palette());
             casters.push(Candidate {
                 mesh: mesh_id,
                 num_indices: gpu_mesh.num_indices,
-                world,
+                caster: CasterData::new(world, bone_base),
                 bounds,
             });
         }
-        casters
+        (casters, joints)
     }
 
     /// Record one sweep's instanced depth draws for `cascade` from its caster buffer.
@@ -226,34 +191,14 @@ impl ShadowRenderer {
     }
 }
 
-/// One caster before culling: its draw and its world bounds (`None` when skinned —
+/// One caster before culling: its draw, its instance data and its world bounds (`None` when skinned —
 /// never culled).
 struct Candidate {
     mesh: MeshId,
     num_indices: u32,
-    world: Mat4,
+    caster: CasterData,
     bounds: Option<(glam::Vec3, glam::Vec3)>,
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn casters_of_one_mesh_become_one_instanced_draw() {
-        let at = |x: f32| Mat4::from_translation(glam::Vec3::X * x);
-        let mesh = |m: &str| MeshId(m.to_string());
-        let casters = vec![
-            (mesh("Box"), 36, at(0.0)),
-            (mesh("Pillar"), 96, at(1.0)),
-            (mesh("Box"), 36, at(2.0)),
-        ];
-        let (matrices, batches) = batch_casters(casters.clone(), true);
-        let counts: Vec<_> = batches.iter().map(CasterBatch::counts).collect();
-        assert_eq!(counts, [(36, 2), (96, 1)]);
-        let xs: Vec<f32> = matrices.iter().map(|m| m[12]).collect();
-        assert_eq!(xs, [0.0, 2.0, 1.0], "a run keeps scene order");
-        let (_, solo) = batch_casters(casters, false);
-        assert_eq!(solo.len(), 3, "instancing off: one draw per caster");
-    }
-}
+mod tests;

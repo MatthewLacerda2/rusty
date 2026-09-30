@@ -3,7 +3,7 @@
 //! cached static array per cascade, re-baked only when that cascade's light volume
 //! moves (#355); each frame the static layers are copied into the active array and the
 //! dynamic casters drawn over them. Casters are drawn instanced, one draw per mesh per
-//! cascade (#470, `casters`).
+//! cascade (#470, `casters`), skinned ones in their animated pose (#599).
 
 pub(crate) mod cascades;
 mod casters;
@@ -52,7 +52,7 @@ pub struct ShadowRenderer {
     global_bind_group: wgpu::BindGroup,
     entity_layout: wgpu::BindGroupLayout,
 
-    /// The static bake's and the dynamic pass's caster matrices (#470), every cascade
+    /// The static bake's and the dynamic pass's casters (#470) and joints (#599), every cascade
     /// packed into one array each — two, because both sweeps are recorded before one
     /// submit.
     static_casters: CasterBuffer,
