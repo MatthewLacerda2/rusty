@@ -85,6 +85,7 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `RecordPrefabOverrides` | ✅ | round-trip — records the instance↔source diff into `prefab_link.overrides`; observable via `ListPrefabOverrides` and re-applied by propagation |
 | `RevertPrefabOverrides` / `ReimportPrefab` | ✅ | rebuild each instance entity from a fresh source baseline (re-applying overrides on reimport); the resulting component values feed the same renderer/sim read-sites as any edited entity |
 | `ApplyPrefabToSource` / `ApplyPrefabFieldToSource` | ✅ | write the instance's overrides into the source `.prefab` on disk (reusing the override setter + the one `.prefab` writer), then clear them — other instances pick the edit up on reload/reimport (#268) |
+| `SetActive` | ✅ | sim + renderer — the same `active` flag `DestroyEntity` clears: the script lifecycle's `OnEnable`/`OnDisable` edge sweep, layout groups, UI hit-testing and drawing all read it; round-trips (`tests/ui_widgets/reads.rs`, #422) |
 
 ### `Navigation` — over `Scene.nav_settings`
 
@@ -383,6 +384,7 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 |---|---|---|
 | `SetSelected` | ✅ | sim — `EventSystem::process` announces it (`OnDeselect` / `OnSelect`) and navigation moves from it (`tests/ui_events.rs`); runtime state, not saved |
 | `Click` | ✅ | sim — writes `Input`'s pointer + `Mouse0` edges, read by the next tick's pointer dispatch (`tests/ui_events.rs`) |
+| `Create` | ✅ | builds the widget tree through `ui_widgets::create_ui` (the Create ▸ UI menu's path): ordinary entities and components every UI read-site sees, plus the widget script the next tick loads; round-trips (`tests/ui_widgets/create.rs`, #422) |
 
 ### `Debug` (dev-only) — over `ConsoleLogs`
 
@@ -394,7 +396,7 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 119 |
+| ✅ faithful | 121 |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 

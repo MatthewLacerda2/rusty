@@ -19,7 +19,7 @@ use crate::components::TextComponent;
 use crate::core::video::VideoSettings;
 use crate::scene::authoring::text::{self as ops, FontSlot};
 use crate::scene::Scene;
-use crate::ui::{layout, text as ui_text, ScreenSize};
+use crate::ui::ScreenSize;
 
 type Scoped<'s> = &'s RefCell<Scene>;
 type F32Get = fn(&TextComponent) -> f32;
@@ -192,7 +192,7 @@ pub fn register<'lua, 'scope>(
     }
     super::text_effects::register(scope, &t, scene, &EFFECTS)?;
     super::text_effects::register_auto_size(scope, &t, scene)?;
-    register_layout_reads(scope, &t, scene, screen, video)?;
+    super::text_layout::register(scope, &t, scene, screen, video)?;
     lua.globals().set("Text", t).map_err(|e| e.to_string())
 }
 
@@ -236,49 +236,6 @@ where
                 set(&mut t, value);
             }
             Ok(())
-        }),
-    )
-}
-
-/// `GetPreferredSize(id) -> w, h` (wrapped at the element's current rect width) and
-/// `GetLayout(id) -> { width, height, lines, font_size, truncated }` (what draws).
-fn register_layout_reads<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &Table,
-    scene: Scoped<'scope>,
-    screen: &'scope RefCell<ScreenSize>,
-    video: &'scope RefCell<VideoSettings>,
-) -> Reg {
-    let rect_size = move |id: u32| {
-        let px = screen.borrow().pixels(&video.borrow());
-        layout::rect_of(&scene.borrow().world, id, px).map(|r| r.rect.1)
-    };
-    put(
-        table,
-        "GetPreferredSize",
-        scope.create_function(move |_, id: u32| {
-            let width = rect_size(id).map_or(f32::INFINITY, |s| s.x);
-            let text = scene.borrow().world.text(id).map(|t| t.clone());
-            let size = text.map_or(Vec2::ZERO, |t| ui_text::preferred_size(&t, width));
-            Ok((size.x, size.y))
-        }),
-    )?;
-    put(
-        table,
-        "GetLayout",
-        scope.create_function(move |lua, id: u32| {
-            let text = scene.borrow().world.text(id).map(|t| t.clone());
-            let (Some(text), Some(rect)) = (text, rect_size(id)) else {
-                return Ok(None);
-            };
-            let l = ui_text::layout_text(&text, rect);
-            let t = lua.create_table()?;
-            t.set("width", l.size.x)?;
-            t.set("height", l.size.y)?;
-            t.set("lines", l.lines)?;
-            t.set("font_size", l.font_size)?;
-            t.set("truncated", l.truncated)?;
-            Ok(Some(t))
         }),
     )
 }

@@ -4,7 +4,8 @@
 //! rect in its canvas's reference units and in screen pixels, computed on demand
 //! from the live scene (so it reflects a change made earlier in the same script, in
 //! edit mode as well as in Play) with the same math as the per-tick layout system.
-//! The pointer and focus verbs (#420) are in `events`.
+//! The pointer and focus verbs (#420) are in `events`. `UI.Create(kind, [parent])`
+//! (#422) is the Create ▸ UI menu's API face: the same `create_ui` builds the widget.
 
 mod events;
 
@@ -18,6 +19,7 @@ use serde_json::{json, Value};
 
 use super::{put, Reg};
 use crate::core::video::VideoSettings;
+use crate::scene::authoring::ui_widgets::{create_ui, UiWidget};
 use crate::scene::Scene;
 use crate::ui::{layout, ScreenSize, UiRect};
 
@@ -45,6 +47,20 @@ pub fn register<'lua, 'scope>(
         scope.create_function(|_, ()| {
             let px = screen.borrow().pixels(&video.borrow());
             Ok((px.x, px.y))
+        }),
+    )?;
+    put(
+        &table,
+        "Create",
+        scope.create_function(|_, (kind, parent): (String, Option<u32>)| {
+            let widget = UiWidget::parse(&kind).ok_or_else(|| {
+                let all: Vec<_> = UiWidget::ALL.iter().map(|w| w.label()).collect();
+                mlua::Error::RuntimeError(format!(
+                    "UI.Create: unknown widget '{kind}' (one of: {})",
+                    all.join(", ")
+                ))
+            })?;
+            Ok(create_ui(&mut scene.borrow_mut(), widget, parent))
         }),
     )?;
     lua.globals().set("UI", table).map_err(|e| e.to_string())

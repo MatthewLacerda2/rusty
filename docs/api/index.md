@@ -101,7 +101,7 @@ Component menu offers.
 | `OnCollisionStay` | `OnCollisionStay(id, other, contact)` | After the physics step, once per touching solid pair, every frame the contact persists — including the frame `OnCollisionEnter` fires (the same edge rule as `OnTrigger`). |
 | `OnCollisionExit` | `OnCollisionExit(id, other)` | Once, on the first frame the pair's surfaces no longer touch (or either collider is deactivated) — after that frame's `OnCollisionStay`. No `contact`: nothing is touching any more. |
 | `OnJointBreak` | `OnJointBreak(id, force, torque)` | Once, on the tick the entity's `Joint` carried more than its non-zero `break_force` (newtons) or `break_torque` (newton-metres) — after that tick's collision callbacks. `force` / `torque` are what it carried. The `Joint` component is already destroyed (Unity), so the bodies are free. |
-| `OnEnable` | `OnEnable(id)` | When the owning entity becomes `active`: on its **first** activation — between `Awake` and `Start`, so the first-tick order is `Awake → OnEnable → Start` — and again on every later inactive→active transition (e.g. a script or `Scene.Activate` re-enabling a pooled object). Detected by diffing the entity's `active` flag against the previous tick, so it fires **exactly once** per rising edge. |
+| `OnEnable` | `OnEnable(id)` | When the owning entity becomes `active`: on its **first** activation — between `Awake` and `Start`, so the first-tick order is `Awake → OnEnable → Start` — and again on every later inactive→active transition (e.g. a script's `Scene.SetActive(id, true)` re-enabling a pooled object). Detected by diffing the entity's `active` flag against the previous tick, so it fires **exactly once** per rising edge. |
 | `OnDisable` | `OnDisable(id)` | When the owning entity becomes inactive: once on each `active`→inactive transition (e.g. `Scene.Deactivate`), and once more — immediately **before** `OnDestroy` — when an *active* entity is destroyed. Fires **exactly once** per falling edge. While disabled, the entity receives no other gameplay callback (no `Update`/`LateUpdate`/`OnTrigger`/`OnCollision*`). |
 | `OnDestroy` | `OnDestroy(id)` | Once, when the entity is removed **during play** — by `Scene.DestroyEntity`, or because `Scene.Load` unloaded its scene (unless it was marked `Scene.DontDestroyOnLoad`) — after its `OnDisable` if it was active. The entity is still readable during the callback (removal happens just after). See the divergence note: **Stop does not fire `OnDestroy`.** |
 | `OnPointerEnter` | `OnPointerEnter(id, event)` | UI (#420): the pointer moved onto the entity or one of its descendants. Fires on every entity from the hit one up to the root that defines it, deepest first — moving from a button onto its own label does not re-enter the button. |
@@ -117,6 +117,7 @@ Component menu offers.
 | `OnDeselect` | `OnDeselect(id)` | UI: the entity stopped being focused (fires before the new focus's `OnSelect`). |
 | `OnSubmit` | `OnSubmit(id)` | UI: Enter was pressed while the entity is focused. |
 | `OnCancel` | `OnCancel(id)` | UI: Escape was pressed while the entity is focused. |
+| `OnMove` | `OnMove(id, event)` | UI (#422): an arrow key was pressed while the entity is focused. `event` is `{ direction, x, y }` — `"Up"`, `"Down"`, `"Left"` or `"Right"` and its unit vector (y-up). Defining it **takes the arrows off navigation**: focus stays put, and the script moves it itself with `UI.FindSelectable` when it wants (a slider steps its value on Left / Right and navigates on Up / Down). |
 
 `id` is always the **owning** entity's id (the entity the script is attached
 to); `other` is the other entity in the overlap or contact. Both name the entity
@@ -147,7 +148,7 @@ upward whose scripts define any of the three (or that carries a `Selectable`); a
 drag goes to the nearest defining a drag callback; the wheel to the nearest
 defining `OnScroll`. A `Selectable` that is not interactable cannot *start* an
 interaction — press, drag, scroll, submit and cancel stop at it without firing.
-Focus callbacks (`OnSelect` … `OnCancel`) go to the focused entity itself. How
+Focus callbacks (`OnSelect` … `OnMove`) go to the focused entity itself. How
 hits are found and what a Selectable adds is in [`docs/ui.md`](../ui.md).
 
 **Deterministic dispatch order** (enforced in `src/scripting/lifecycle.rs`, so
@@ -193,8 +194,8 @@ headless replays stay byte-identical):
 - The UI callbacks run in their own phase between the init phase and
   `Update` (so a button reacts the same tick, and gameplay's `Update` already
   sees `UI.IsPointerConsumed()` settled): focus changes a script made last tick
-  (`OnDeselect` → `OnSelect`), then keyboard navigation and `OnSubmit` /
-  `OnCancel`, then the pointer — `OnPointerExit` / `OnPointerEnter`, then each
+  (`OnDeselect` → `OnSelect`), then keyboard navigation (or `OnMove`) and
+  `OnSubmit` / `OnCancel`, then the pointer — `OnPointerExit` / `OnPointerEnter`, then each
   button (left, right, middle) in down → up → click → drag order, then
   `OnScroll`. A pointer that arrives and clicks in one tick reads enter → down
   → up → click.
@@ -284,6 +285,13 @@ One file per namespace, in reference order:
 - [`Application`](Application.md)
 - [`Storage`](Storage.md)
 - [`Debug`](Debug.md)
+
+**The UI widget kit** (#422) — Button, Toggle, Toggle Group, Slider, Scrollbar,
+Scroll View, Dropdown, Input Field — is not a namespace: each widget is an
+engine-shipped Lua **script component**. Build one with `UI.Create` (or
+`Scene.Instantiate` of its prefab) and drive it through its script table,
+`Scene.GetScript(id, "slider").set_value(0.5)`; each widget's fields and owner API
+are in [Widgets in `docs/ui.md`](../ui.md#widgets).
 
 ---
 

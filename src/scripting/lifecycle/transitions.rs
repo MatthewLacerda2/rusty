@@ -112,6 +112,11 @@ impl ScriptManager {
             .borrow_mut()
             .retain_owners(|owner| !gone(&owner));
         self.entity_scripts.retain(|(eid, _), _| !gone(eid));
+        if let Some(lua) = &self.lua {
+            for &id in ids {
+                let _ = crate::scripting::instances::forget(lua, id);
+            }
+        }
         self.load_attempted.retain(|(eid, _)| !gone(eid));
     }
 }

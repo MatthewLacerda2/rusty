@@ -5,13 +5,14 @@ from ordinary GameObjects. This page is the model: what the pieces are, how layo
 and the rules that keep it deterministic. The roadmap is the tracking issue #414; the
 script surface is in [`api/`](api/index.md) (`Canvas`, `RectTransform`,
 `UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Selectable`, `LayoutGroup`,
-`LayoutElement`).
+`LayoutElement`); the widget kit built on them is [*Widgets*](#widgets) below.
 
 > Status: the model, the `Canvas` and `RectTransform` components and the layout pass
 > (#417); drawing — `Image`, `CanvasGroup`, `RectMask` and the render pass (#418);
 > fonts and SDF `Text` (#419); interaction — hit-testing, pointer and focus callbacks
 > and `Selectable` (#420); layout groups and content fitting — `LayoutGroup` and
-> `LayoutElement` (#421).
+> `LayoutElement` (#421); the widget kit — Button, Toggle, Slider, Scrollbar,
+> Scroll View, Dropdown, Input Field (#422).
 
 ## The model
 
@@ -381,6 +382,110 @@ pattern is in [`api/UI.md`](api/UI.md). For bots and tests, `UI.Raycast(x, y)` n
 is under a point, `UI.List()` lists every visible Selectable with its name, state
 and screen rect, and `UI.Click(id)` clicks one **through the real input path** (a
 covering modal or a locked cursor makes it miss, as it would a player).
+
+## Widgets
+
+The standard kit (#422): **Button, Toggle (+ Toggle Group), Slider, Scrollbar,
+Scroll View, Dropdown and Input Field**. Each is a small tree of the primitives above
+plus one engine-shipped Lua **script component** that gives it behaviour — not a
+first-class component, so there is no four-axis gate, and a game restyles a widget
+by editing its components or forks its behaviour by copying its script.
+
+- **Creating one.** The editor's **GameObject ▸ UI** menu (Canvas, Panel, Image,
+  Text and each widget) and `UI.Create(kind, [parent])` build the same tree through
+  one path (`scene::authoring::ui_widgets`): under the selected entity when it is
+  inside a canvas, else under the scene's first root canvas, else under a new
+  `Canvas`. Every widget also ships as a prefab, `project/prefabs/ui/<Kind>.prefab`
+  (`Button.prefab`, `Scroll View.prefab`, …), for `Scene.Instantiate(path, parent)`.
+- **Where they live.** The scripts ship in `assets/scripts/ui/` and are seeded,
+  with the prefabs, on every boot into `project/assets/scripts/ui/` and
+  `project/prefabs/ui/`. **Those two directories are engine-owned and rewritten**
+  so they never go stale: to fork a widget, copy its script (or prefab) elsewhere
+  and point the entity at the copy.
+- **Wiring one up.** A widget raises its events by calling function fields its
+  owner sets — no event bus. The owner reaches the widget's script instance with
+  `Scene.GetScript(id, name)` (Unity's `GetComponent<T>()`, `name` the file stem),
+  in `Start` or later (every `Awake` has run by then):
+
+  ```lua
+  function Menu.Start(id)
+      local volume = Scene.GetScript(Scene.FindChild(id, "Volume"), "slider")
+      volume.on_value_changed = function(_, v) Audio.SetMasterVolume(v) end
+      local quit = Scene.GetScript(Scene.FindChild(id, "Quit"), "button")
+      quit.on_click = function() Application.Quit() end
+  end
+  ```
+
+- **Finding their parts.** A widget script reaches its own children by name with
+  `Scene.FindChild(id, "Handle Slide Area/Handle")`, never a stored id, so a prefab
+  stamp or a duplicate keeps working. Renaming a part detaches it.
+- **Keyboard.** Widgets are `Selectable`s, so Tab, the arrows and Enter reach
+  them. A widget that needs the arrows itself defines `OnMove` (Unity's
+  `IMoveHandler`): the move goes to it instead of navigation, and it navigates on
+  its own with `UI.FindSelectable` — a slider steps on Left / Right and moves the
+  focus on Up / Down.
+- **Time.** Every widget animates and scrolls on **unscaled** time, so a pause
+  menu under `Time.SetTimeScale(0)` still works.
+
+Each widget's inspector fields (its script's `fields` schema) and owner API:
+
+| Widget (script) | Fields | Owner API |
+|---|---|---|
+| **Button** (`button`) | — | `on_click(id)`; `press()` |
+| **Toggle** (`toggle`) | `is_on`, `fade` (checkmark fade, s) | `is_on`; `on_value_changed(id, on)`; `set_is_on(on)`, `set_is_on_without_notify(on)` |
+| **Toggle Group** (`toggle_group`) | `allow_switch_off` | `active()`; `set_all_off()` |
+| **Slider** (`slider`) | `min`, `max`, `value`, `whole_numbers`, `direction` | `value`; `on_value_changed(id, v)`; `set_value(v)`, `set_value_without_notify(v)`; `normalized()` |
+| **Scrollbar** (`scrollbar`) | `value`, `size`, `number_of_steps`, `direction` | `value`, `size`; `on_value_changed(id, v)`; `set_value(v)`, `set_value_without_notify(v)`; `set_size(s)` |
+| **Scroll View** (`scroll_view`) | `horizontal`, `vertical`, `movement_type`, `elasticity`, `inertia`, `deceleration_rate`, `scroll_sensitivity` | `on_value_changed(id, x, y)`; `get_normalized_position()`, `set_normalized_position(x, y)`; `stop_movement()` |
+| **Dropdown** (`dropdown`) | `options` (`\|`-separated), `value` (0-based), `item_height`, `font_size` | `value`; `on_value_changed(id, i, text)`; `set_value(i)`, `set_value_without_notify(i)`; `get_options()`, `set_options(list)`; `show()`, `hide()`, `is_expanded()` |
+| **Input Field** (`input_field`) | `text`, `char_limit`, `content_type`, `line_type`, `caret_blink_rate` | `text`; `on_value_changed(id, t)`, `on_submit(id, t)`, `on_end_edit(id, t)`; `set_text(s)`, `set_text_without_notify(s)` |
+
+`direction` is `LeftToRight`, `RightToLeft`, `BottomToTop` or `TopToBottom`.
+
+- **Button** — clicks with the left button, or Enter while focused. Its state
+  colours are the `Selectable`'s ColorTint on its own Image.
+- **Toggle** — `Background/Checkmark` fades in and out with a `Tween`. Clicking
+  the label toggles too. Under an ancestor carrying `toggle_group.lua` it is a
+  radio button: the group keeps at most one on (exactly one unless
+  `allow_switch_off`; clicking the on one then does nothing). **Toggle Group** in
+  the menu makes such a column with two options.
+- **Slider** — `Fill Area/Fill` stretches from the start to the value;
+  `Handle Slide Area/Handle` sits on it. A press anywhere sets the value; dragging
+  follows the pointer. The arrows along its axis step a tenth of the range (1 with
+  `whole_numbers`).
+- **Scrollbar** — `Sliding Area/Handle` spans `size` of the track at `value`.
+  Drag the handle; press the track beside it to page one handle-length that way.
+- **Scroll View** — `Viewport` (a `RectMask`) over `Content`, which is pinned to
+  the viewport's top-left and fits its height to its children (a vertical
+  `LayoutGroup` + `LayoutElement` preferred-height fit) — so adding items is
+  parenting them to `Content`. Drag (the drag threshold passes a press on a child
+  button to the view) and the wheel scroll it within the content's bounds;
+  `Elastic` rubber-bands past an edge while dragged and springs back over
+  `elasticity` seconds (Unity's `SmoothDamp`), `Clamped` stops at it,
+  `Unrestricted` never stops; `inertia` coasts a released drag, keeping
+  `deceleration_rate` of its speed per second. Its `Scrollbar Horizontal` /
+  `Scrollbar Vertical` children follow the content and drive it (normalized
+  position: `x` 0 = left, `y` 1 = top, as in Unity).
+- **Dropdown** — shows the chosen option on its `Label`. Clicking it (or Enter)
+  opens the list: its inactive `Template` (a scroll view) is lifted onto a popup
+  root canvas at `sort_order` 30000 with the dropdown's canvas scaling, below the
+  dropdown (above it when the screen has no room), over a transparent full-screen
+  `Blocker` — a click outside closes the list and reaches nothing underneath. The
+  list has one `Item` per option (a Selectable, so it highlights; the chosen one
+  carries a checkmark), navigable Up / Down; a click or Enter picks, Escape
+  closes, and focus returns to the dropdown.
+- **Input Field** — a masked `Text Area` holding `Selection` (the highlight
+  rects), `Placeholder` (shown while empty), `Text` and the `Caret`. Focusing it
+  by keyboard selects everything; a click places the caret and a drag selects.
+  While focused it takes typed text (`Input.GetTextInput`), Backspace, Delete,
+  Left / Right, Home / End, Shift to extend a selection and Ctrl / Cmd+A to select
+  all; `SingleLine` sends Up / Down to the start / end and Enter to `on_submit`,
+  `MultiLine` moves between lines and breaks the line on Enter. Escape restores
+  the text it had when focused and lets go. `content_type`: `Standard`,
+  `Integer`, `Decimal` or `Password` (shown as `*`); `char_limit` 0 is unlimited.
+  The text scrolls to keep the caret in view (its position comes from
+  `Text.MeasureString`). Lines break only at `\n` — no word wrap — and there is no
+  clipboard yet.
 
 ## Determinism
 

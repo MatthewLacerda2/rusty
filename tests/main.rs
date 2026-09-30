@@ -69,6 +69,7 @@ mod ui_events;
 mod ui_graphics_api;
 mod ui_layout_api;
 mod ui_text_api;
+mod ui_widgets;
 mod video_api;
 
 // ── Dev layer only (harness, session, MCP, `Debug.*`) ────────────────────────────

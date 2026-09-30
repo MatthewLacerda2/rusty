@@ -7,6 +7,7 @@ top-left: UI `y` = screen height − mouse `y`.)
 
 | Function | Signature | Returns |
 |---|---|---|
+| `UI.Create` | `(kind, [parentId])` | the new widget's root `id` — the Create ▸ UI menu's API face; see below |
 | `UI.GetRect` | `(id)` | rect table, or `nil` when the entity is not laid out under a canvas |
 | `UI.GetScreenSize` | `()` | `width, height` in pixels — the screen the UI lays out on |
 | `UI.SetSelected` | `(id)` | — focus `id` (`nil` clears); `OnDeselect` / `OnSelect` fire at the head of the next tick's script phase |
@@ -14,8 +15,19 @@ top-left: UI `y` = screen height − mouse `y`.)
 | `UI.IsPointerOverUI` | `()` | `true` when the pointer is over a raycast target this tick |
 | `UI.IsPointerConsumed` | `()` | `true` when gameplay should leave the pointer alone: it is over the UI, or a press that began over the UI is still held |
 | `UI.Raycast` | `(x, y)` | the top-most raycast target under the point, or `nil` |
+| `UI.FindSelectable` | `(id, direction)` | where keyboard navigation from `id` goes in `direction` (`"Up"`, `"Down"`, `"Left"`, `"Right"`), or `nil` — Unity's `FindSelectableOn*`, for an `OnMove` handler that navigates itself |
 | `UI.Click` | `(id)` | `true` if the click will land on `id` (or its descendant) — see below |
 | `UI.List` | `()` | array of every visible `Selectable`, in draw order — see below |
+
+**`UI.Create(kind, [parentId])`** builds what the editor's GameObject ▸ UI menu
+builds (#422), through the same code: `kind` is `"Canvas"`, `"Panel"`, `"Image"`,
+`"Text"`, `"Button"`, `"Toggle"`, `"Toggle Group"`, `"Slider"`, `"Scrollbar"`,
+`"Scroll View"`, `"Dropdown"` or `"Input Field"` (case and spaces ignored; an
+unknown kind errors, listing them). The widget goes under `parentId` when that is
+inside a canvas, else under the scene's first root canvas, else under a new
+`Canvas`; a `Canvas` itself is made at the root. During play the widget's script
+loads at the head of the next tick, like any spawn. The widgets and their script
+APIs are in [Widgets in `docs/ui.md`](../ui.md#widgets).
 
 **Gameplay vs UI.** A click on a menu must not also fire the weapon. Guard
 gameplay pointer input with `UI.IsPointerConsumed()` — UI callbacks run before

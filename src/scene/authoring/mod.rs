@@ -37,6 +37,7 @@ pub mod rect_transform;
 pub mod rigidbody;
 pub mod selectable;
 pub mod text;
+pub mod ui_widgets;
 pub mod visual_correction;
 
 use glam::Vec3;

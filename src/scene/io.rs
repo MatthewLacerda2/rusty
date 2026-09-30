@@ -97,7 +97,10 @@ pub fn seed_default_scene() -> String {
 /// Seed the bundled default scripts (`assets/scripts/*.lua`) into the gitignored
 /// `project/assets/scripts/` workspace on boot, the same pattern as the scene and
 /// `bot.lua`. Existing files are left untouched so local edits survive. Idempotent.
+/// The UI widget kit's scripts and prefabs are seeded too — those directories are
+/// engine-owned and rewritten (see `authoring::ui_widgets::seed`).
 pub fn seed_default_scripts() {
+    crate::scene::authoring::ui_widgets::seed();
     std::fs::create_dir_all(DEFAULT_SCRIPTS_DEST_DIR).ok();
     let Ok(entries) = std::fs::read_dir(DEFAULT_SCRIPTS_SOURCE_DIR) else {
         return;

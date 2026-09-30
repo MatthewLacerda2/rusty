@@ -46,6 +46,7 @@ pub fn register<'lua, 'scope>(
     register_save(scope, &table, scene, scene_path)?;
     crate::api::scene_prefab::register(scope, &table, scene)?;
     crate::api::scene_load::register(scope, &table, scene, scene_path, is_playing)?;
+    crate::api::scene_hierarchy::register(scope, &table, scene)?;
 
     lua.globals().set("Scene", table).map_err(|e| e.to_string())
 }
