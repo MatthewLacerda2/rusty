@@ -110,9 +110,10 @@ pull request. So a docs-only pull request needs no serialization and merges
 freely.
 
 **`docs/scripting-api.md` is not one of those.** Two hard-gate tests parse it, so
-a Markdown-only edit to it can break `main` on its own. Same for
-`docs/api-faithfulness.md`'s catalog if a branch is relying on it. Treat either as
-code.
+a Markdown-only edit to it can break `main` on its own. CI's `code` filter lists it
+explicitly (#525), so a pull request touching it runs the drift tests like any code
+change, and it is serialized like code. Same for `docs/api-faithfulness.md`'s
+catalog if a branch is relying on it: treat it as code.
 
 ## Verify the run happened on the head commit
 
@@ -152,8 +153,8 @@ incidents behind each):
   its run (force one with an empty commit). An invalid workflow *does* produce a
   run, a `startup_failure`.
 - **A Markdown-only change to `docs/scripting-api.md` is refused** unless
-  `build-test`'s dev-feature test step really ran — CI's `code` filter skips the
-  drift tests on exactly that pull request (#525).
+  `build-test`'s dev-feature test step really ran. CI's `code` filter includes that
+  file since #525, so on a fresh run it does; the check stays as the guard.
 
 It ignores what is not a gate: `main-health` (a `workflow_run` on `main`), `docs`,
 and the coverage and mutation jobs. `mutants-pr` and `coverage-pr` run *inside*
