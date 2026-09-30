@@ -1,0 +1,10 @@
+# Repo-wide cargo config (#572). Worktrees under .claude/worktrees/ carry this
+# same file and also read the gitignored compile-cache config `make setup` writes
+# one level up; cargo merges the two, and they set different keys.
+
+[net]
+# Fetch git sources with the system `git` rather than cargo's built-in client.
+# cargo-deny's advisory-database fetch reads this too; its built-in fetcher cannot
+# get through the cloud sessions' proxy, and the system git can. Git is present
+# everywhere rusty builds (dev machines, CI runners, the cargo-deny-action image).
+git-fetch-with-cli = true

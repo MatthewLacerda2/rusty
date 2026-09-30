@@ -146,7 +146,7 @@ test: ## [gate] Engine tests (nextest) and doctests, both feature sets
 deny: ## [gate] Advisories, bans, sources, licenses (cargo-deny)
 	@command -v cargo-deny >/dev/null 2>&1 || { \
 		echo "deny: cargo-deny is not installed — cargo install --locked cargo-deny"; exit 1; }
-	CARGO_NET_GIT_FETCH_WITH_CLI=true cargo deny check advisories bans sources licenses
+	cargo deny check advisories bans sources licenses
 
 # ---- merging (#486) --------------------------------------------------------
 
