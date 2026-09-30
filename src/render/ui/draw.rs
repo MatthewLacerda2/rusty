@@ -1,10 +1,14 @@
 //! src/render/ui/draw.rs — the UI pass: per-view vertex buffers + the draw (#418).
 //!
-//! Runs inside `Renderer::render` right after post-FX. The layout is recomputed for
-//! the view's own pixel size (the same pure `UiLayout::compute` the sim's
-//! `LateUpdate` system runs, so in Play it equals `Resources::ui_layout` whenever
-//! the view is the game view), turned into per-canvas meshes, and drawn with
-//! `LoadOp::Load` over the finished frame.
+//! [`Renderer::prepare_ui`] runs inside `Renderer::render` before the camera stack:
+//! the layout is recomputed for the view's own pixel size through its camera (the
+//! same pure `UiLayout::compute_in` the sim's `LateUpdate` system runs, so in Play
+//! it equals `Resources::ui_layout` whenever the view is the game view) and turned
+//! into per-canvas meshes. World canvases then draw inside the stack (`world`,
+//! #429); [`Renderer::draw_ui`] draws the screen canvases right after post-FX, with
+//! `LoadOp::Load` over the finished frame. The Scene view (editor mode) keeps only
+//! `WorldSpace` canvases — signs and terminals are scene geometry; the game's HUD
+//! and a camera canvas glued to the editor's free-fly camera are not.
 //!
 //! **Dirty strategy.** Each view keeps one vertex buffer per canvas plus the mesh it
 //! holds. Rebuilding the CPU mesh is a cheap walk; a canvas's buffer is re-uploaded
@@ -18,9 +22,10 @@ use std::rc::Rc;
 use glam::Vec2;
 
 use super::mesh::{build_canvas_meshes, CanvasMesh, UiSource, UiVertex};
+use super::world::{CanvasPlace, WorldUniforms};
 use crate::render::{RenderView, Renderer};
-use crate::scene::Scene;
-use crate::ui::UiLayout;
+use crate::scene::{Camera, Scene};
+use crate::ui::{CanvasSpace, UiLayout, UiView};
 
 /// The vertex buffer layout matching `ui.wgsl`'s `VertexIn`.
 pub(crate) fn vertex_layout() -> wgpu::VertexBufferLayout<'static> {
@@ -39,10 +44,11 @@ pub(crate) fn vertex_layout() -> wgpu::VertexBufferLayout<'static> {
     }
 }
 
-/// One canvas's GPU copy of its mesh.
-struct CanvasGpu {
-    mesh: CanvasMesh,
-    buffer: wgpu::Buffer,
+/// One canvas's GPU copy of its mesh, and where it draws this frame.
+pub(super) struct CanvasGpu {
+    pub(super) mesh: CanvasMesh,
+    pub(super) buffer: wgpu::Buffer,
+    place: CanvasPlace,
 }
 
 /// A view's UI vertex buffers, one per drawn canvas in draw order (see the module
@@ -52,8 +58,10 @@ pub struct UiViewCache {
     canvases: Vec<CanvasGpu>,
     /// How many canvas buffers the last frame (re-)uploaded — the dirty signal.
     uploads: usize,
-    /// How many canvases the last frame drew.
-    drawn: usize,
+    /// How many canvases the last frame drew (a world canvas once per camera).
+    pub(super) drawn: usize,
+    /// The world canvases' per-camera uniforms (#429), made on first use.
+    pub(super) world: Option<WorldUniforms>,
 }
 
 impl UiViewCache {
@@ -75,27 +83,46 @@ impl UiViewCache {
         self.drawn
     }
 
+    /// Synced canvas `i`, in draw order.
+    pub(super) fn canvas(&self, i: usize) -> &CanvasGpu {
+        &self.canvases[i]
+    }
+
+    /// Every synced canvas's placement, in draw order.
+    pub(super) fn places(&self) -> impl Iterator<Item = CanvasPlace> + '_ {
+        self.canvases.iter().map(|c| c.place)
+    }
+
     /// Adopt this frame's `meshes`, uploading only the ones that changed.
-    fn sync(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, meshes: Vec<CanvasMesh>) {
+    fn sync(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        meshes: Vec<(CanvasMesh, CanvasPlace)>,
+    ) {
         let mut old: HashMap<u32, CanvasGpu> = self
             .canvases
             .drain(..)
             .map(|c| (c.mesh.canvas, c))
             .collect();
         self.uploads = 0;
-        for mesh in meshes {
+        for (mesh, place) in meshes {
             let bytes: &[u8] = bytemuck::cast_slice(&mesh.vertices);
             let gpu = match old.remove(&mesh.canvas) {
-                Some(c) if c.mesh == mesh => c,
+                Some(c) if c.mesh == mesh => CanvasGpu { place, ..c },
                 Some(c) if c.buffer.size() >= bytes.len() as u64 => {
                     queue.write_buffer(&c.buffer, 0, bytes);
                     self.uploads += 1;
-                    CanvasGpu { mesh, ..c }
+                    CanvasGpu { mesh, place, ..c }
                 }
                 _ => {
                     self.uploads += 1;
                     let buffer = create_buffer(device, bytes);
-                    CanvasGpu { mesh, buffer }
+                    CanvasGpu {
+                        mesh,
+                        buffer,
+                        place,
+                    }
                 }
             };
             self.canvases.push(gpu);
@@ -116,17 +143,20 @@ fn create_buffer(device: &wgpu::Device, bytes: &[u8]) -> wgpu::Buffer {
 }
 
 impl Renderer {
-    /// Draw every visible canvas of `scene` over `view`'s finished frame. A no-op
-    /// for a scene without UI and for a view with nowhere to draw it (a targetless
-    /// view given no `set_ui_output`: the cubemap capture).
-    pub(crate) fn draw_ui(&mut self, view: &mut RenderView, scene: &Scene) {
+    /// Lay out and mesh `scene`'s UI for `view` through `camera`, uploading only
+    /// what changed (see the module docs). Runs before the camera stack.
+    pub(crate) fn prepare_ui(
+        &mut self,
+        view: &mut RenderView,
+        scene: &Scene,
+        camera: &Camera,
+        editor_mode: bool,
+    ) {
         (view.ui.uploads, view.ui.drawn) = (0, 0);
-        let Some((target, format)) = view.take_ui_target() else {
-            return;
-        };
         let size = view.size();
         let screen = Vec2::new(size.width as f32, size.height as f32);
-        let layout = UiLayout::compute(&scene.world, screen);
+        let ui_view = UiView::with_camera(screen, camera.clone());
+        let layout = UiLayout::compute_in(&scene.world, &ui_view);
         for path in texture_paths(scene, &layout) {
             let tex = self.load_texture(&path);
             self.ui_renderer
@@ -140,13 +170,37 @@ impl Renderer {
         let atlases = &mut self.ui_renderer.atlases;
         let meshes = build_canvas_meshes(&scene.world, &layout, screen, &tex_size, atlases);
         self.ui_renderer.upload_atlases(&self.device, &self.queue);
+        let world = &scene.world;
+        let meshes = meshes
+            .into_iter()
+            .filter(|m| !editor_mode || world.canvas(m.canvas).is_some_and(|c| c.is_world_space()))
+            .map(|m| {
+                let place = CanvasPlace {
+                    space: layout.space(m.canvas),
+                    size: layout.get(m.canvas).map_or(Vec2::ONE, |r| r.rect.1),
+                    layer: world.layer(m.canvas),
+                };
+                (m, place)
+            })
+            .collect();
         view.ui.sync(&self.device, &self.queue, meshes);
-        view.ui.drawn = view.ui.canvases.len();
-        if view.ui.drawn == 0 {
+    }
+
+    /// Draw the screen canvases [`Renderer::prepare_ui`] synced over `view`'s
+    /// finished frame. A no-op for a view with nowhere to draw them (a targetless
+    /// view given no `set_ui_output`: the cubemap capture).
+    pub(crate) fn draw_ui(&mut self, view: &mut RenderView) {
+        let Some((target, format)) = view.take_ui_target() else {
+            return;
+        };
+        let screen = view.ui.places().filter(|p| p.space == CanvasSpace::Screen);
+        let drawn = screen.count();
+        if drawn == 0 {
             return;
         }
+        view.ui.drawn += drawn;
         self.ui_renderer.ensure_pipeline(&self.device, format);
-        self.encode_ui(&view.ui, &target, format, size);
+        self.encode_ui(&view.ui, &target, format, view.size());
     }
 
     /// Record and submit the UI pass over `target`.
@@ -182,7 +236,11 @@ impl Renderer {
                 occlusion_query_set: None,
             });
             pass.set_pipeline(pipeline);
-            for canvas in &cache.canvases {
+            let screen = cache
+                .canvases
+                .iter()
+                .filter(|c| c.place.space == CanvasSpace::Screen);
+            for canvas in screen {
                 pass.set_vertex_buffer(0, canvas.buffer.slice(..));
                 for batch in &canvas.mesh.batches {
                     let group = match &batch.source {

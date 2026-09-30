@@ -181,13 +181,16 @@ impl Entity {
 
     /// Rewrite every entity reference a component holds (a Selectable's targets,
     /// #420; a Joint's connected body, #449; an emitter's sub-emitters, #439; an LODGroup's
-    /// renderers, #472) through `map` — how the references
+    /// renderers, #472; a marker's target, #429) through `map` — how the references
     /// follow the entity when a prefab is saved, stamped or propagated.
     pub fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
         self.selectable.iter_mut().for_each(|s| s.remap_refs(map));
         self.joint.iter_mut().for_each(|j| j.remap_refs(map));
         self.particles.iter_mut().for_each(|p| p.remap_refs(map));
         self.lod_group.iter_mut().for_each(|g| g.remap_refs(map));
+        self.rect_transform
+            .iter_mut()
+            .for_each(|r| r.remap_refs(map));
     }
 
     /// Whether `pointer` (a JSON pointer into the entity document, as prefab
@@ -204,5 +207,6 @@ impl Entity {
             || pointer
                 .strip_prefix("/lod_group")
                 .is_some_and(LodGroupComponent::is_ref_pointer)
+            || under("/rect_transform", &RectTransformComponent::REF_POINTERS)
     }
 }

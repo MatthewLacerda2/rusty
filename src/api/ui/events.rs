@@ -6,16 +6,18 @@
 //! (where navigation from an element would go — for an `OnMove` handler), `Click` (a real click
 //! at an element's centre, through `Input`) and `List` (every visible Selectable,
 //! with its state and screen rect). Points are UI screen pixels: bottom-left
-//! origin, y-up — the frame of `UI.GetRect(id).screen`.
+//! origin, y-up — the frame of `UI.GetRect(id).screen`. Each point also casts the
+//! camera ray through it, so world canvases answer too (#429).
 
 use glam::Vec2;
 use mlua::{Lua, Table};
 
 use super::super::{global_table, put, ApiScopedCtx, Reg};
+use super::view::{pointer, ui_view};
 use crate::ecs::World;
-use crate::ui::events::{find_selectable, is_interactable, is_under, is_visible, raycast};
-use crate::ui::layout::rect_of;
-use crate::ui::{EventSystem, UiLayout};
+use crate::ui::events::{find_selectable, is_interactable, is_under, is_visible, raycast_pointer};
+use crate::ui::space::{canvas_to_screen, rect_screen_bounds};
+use crate::ui::{EventSystem, UiLayout, UiRect, UiView};
 
 /// Add the event verbs to the `UI` table [`super::register`] created.
 pub fn register_events<'lua, 'scope>(
@@ -25,8 +27,8 @@ pub fn register_events<'lua, 'scope>(
 ) -> Reg {
     let table = &global_table(lua, "UI")?;
     let (scene, input, events) = (ctx.scene, ctx.input, ctx.event_system);
-    let (screen, video) = (ctx.screen, ctx.video);
-    let px = move || screen.borrow().pixels(&video.borrow());
+    let (screen, video, camera, physics) = (ctx.screen, ctx.video, ctx.camera, ctx.physics);
+    let view = move || ui_view(screen, video, camera);
     let f = scope.create_function(move |_, id: Option<u32>| {
         events.borrow_mut().set_selected(id);
         Ok(())
@@ -39,23 +41,27 @@ pub fn register_events<'lua, 'scope>(
     let f = scope.create_function(move |_, ()| Ok(events.borrow().is_pointer_consumed()));
     put(table, "IsPointerConsumed", f)?;
     let f = scope.create_function(move |_, (x, y): (f32, f32)| {
-        let world = &scene.borrow().world;
-        let layout = UiLayout::compute(world, px());
-        Ok(raycast(world, &layout, Vec2::new(x, y)))
+        let (view, world) = (view(), &scene.borrow().world);
+        let layout = UiLayout::compute_in(world, &view);
+        let at = pointer(&view, physics, Some(Vec2::new(x, y)));
+        Ok(raycast_pointer(world, &layout, &at))
     });
     put(table, "Raycast", f)?;
     register_find(scope, table, ctx)?;
     let f = scope.create_function(move |_, id: u32| {
-        let screen = px();
-        let world = &scene.borrow().world;
-        let Some(centre) = rect_of(world, id, screen).map(|r| centre_px(&r)) else {
+        let (view, world) = (view(), &scene.borrow().world);
+        let layout = UiLayout::compute_in(world, &view);
+        let Some(centre) = layout.get(id).and_then(|r| centre_px(&layout, r, &view)) else {
             return Ok(false);
         };
-        let layout = UiLayout::compute(world, screen);
         let mut input = input.borrow_mut();
-        let lands = !input.cursor().locked
-            && raycast(world, &layout, centre).is_some_and(|h| is_under(world, h, id));
-        input.move_mouse(f64::from(centre.x), f64::from(screen.y - centre.y));
+        // A locked cursor clicks through the screen centre (world canvases only).
+        let locked = input.cursor().locked;
+        let at = pointer(&view, physics, (!locked).then_some(centre));
+        let lands = raycast_pointer(world, &layout, &at).is_some_and(|h| is_under(world, h, id));
+        if !locked {
+            input.move_mouse(f64::from(centre.x), f64::from(view.screen.y - centre.y));
+        }
         // Release first, so a held left button still yields a whole click.
         input.release("MOUSE0");
         input.press("MOUSE0");
@@ -64,13 +70,9 @@ pub fn register_events<'lua, 'scope>(
     });
     put(table, "Click", f)?;
     let f = scope.create_function(move |lua, ()| {
-        let world = &scene.borrow().world;
-        list(
-            lua,
-            world,
-            &UiLayout::compute(world, px()),
-            &events.borrow(),
-        )
+        let (view, world) = (view(), &scene.borrow().world);
+        let layout = UiLayout::compute_in(world, &view);
+        list(lua, world, (&layout, &view), &events.borrow())
     });
     put(table, "List", f)
 }
@@ -81,7 +83,7 @@ fn register_find<'lua, 'scope>(
     table: &Table,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
-    let (scene, screen, video) = (ctx.scene, ctx.screen, ctx.video);
+    let (scene, screen, video, camera) = (ctx.scene, ctx.screen, ctx.video, ctx.camera);
     let f = scope.create_function(move |_, (id, dir): (u32, String)| {
         let Some(dir) = direction(&dir) else {
             return Err(mlua::Error::RuntimeError(format!(
@@ -89,7 +91,7 @@ fn register_find<'lua, 'scope>(
             )));
         };
         let world = &scene.borrow().world;
-        let layout = UiLayout::compute(world, screen.borrow().pixels(&video.borrow()));
+        let layout = UiLayout::compute_in(world, &ui_view(screen, video, camera));
         Ok(find_selectable(world, &layout, id, dir))
     });
     put(table, "FindSelectable", f)
@@ -102,17 +104,20 @@ fn direction(name: &str) -> Option<usize> {
         .position(|d| d.eq_ignore_ascii_case(name))
 }
 
-/// The centre of an element's final quad, in screen pixels.
-fn centre_px(r: &crate::ui::UiRect) -> Vec2 {
-    r.corners.iter().copied().sum::<Vec2>() * 0.25 * r.scale_factor
+/// The centre of an element's final quad, in screen pixels (`None`: a world
+/// canvas behind the camera).
+fn centre_px(layout: &UiLayout, r: &UiRect, view: &UiView) -> Option<Vec2> {
+    let centre = r.corners.iter().copied().sum::<Vec2>() * 0.25;
+    canvas_to_screen(layout.space(r.canvas), r.scale_factor, centre, view)
 }
 
 /// `{ {id, name, state, interactable, selected, rect = {x, y, width, height}}, … }`
-/// for every visible Selectable, in draw order; `rect` in screen pixels.
+/// for every visible Selectable, in draw order; `rect` in screen pixels (absent for
+/// a world-canvas Selectable behind the camera).
 fn list<'lua>(
     lua: &'lua Lua,
     world: &World,
-    layout: &UiLayout,
+    (layout, view): (&UiLayout, &UiView),
     events: &EventSystem,
 ) -> mlua::Result<Table<'lua>> {
     let out = lua.create_table()?;
@@ -126,13 +131,14 @@ fn list<'lua>(
         e.set("state", events.state_of(world, id).name())?;
         e.set("interactable", is_interactable(world, id))?;
         e.set("selected", events.selected() == Some(id))?;
-        let (lo, hi) = rect.screen_bounds();
-        let r = lua.create_table()?;
-        r.set("x", lo.x)?;
-        r.set("y", lo.y)?;
-        r.set("width", hi.x - lo.x)?;
-        r.set("height", hi.y - lo.y)?;
-        e.set("rect", r)?;
+        if let Some((lo, hi)) = rect_screen_bounds(layout.space(rect.canvas), rect, view) {
+            let r = lua.create_table()?;
+            r.set("x", lo.x)?;
+            r.set("y", lo.y)?;
+            r.set("width", hi.x - lo.x)?;
+            r.set("height", hi.y - lo.y)?;
+            e.set("rect", r)?;
+        }
         out.push(e)?;
     }
     Ok(out)

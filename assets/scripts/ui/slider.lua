@@ -80,16 +80,17 @@ end
 function Slider.set_value(v) set(v, true) end
 function Slider.set_value_without_notify(v) set(v, false) end
 
--- Set the value from a pointer position (UI screen pixels).
+-- Set the value from the pointer on the canvas (reference units, so it works on
+-- a world canvas too).
 local function from_pointer(event)
     local r = UI.GetRect(area or self_id)
-    if not r then return end
-    local s = r.screen
+    local p = event.canvas_position
+    if not r or not p then return end
     local t
     if vertical then
-        t = s.height > 0 and (event.position.y - s.y) / s.height or 0
+        t = r.height > 0 and (p.y - r.y) / r.height or 0
     else
-        t = s.width > 0 and (event.position.x - s.x) / s.width or 0
+        t = r.width > 0 and (p.x - r.x) / r.width or 0
     end
     t = math.max(0, math.min(1, t))
     if reversed then t = 1 - t end

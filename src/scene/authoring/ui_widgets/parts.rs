@@ -53,6 +53,7 @@ impl Place {
             pivot: self.2,
             anchored_position: self.3,
             size_delta: self.4,
+            world_anchor: None,
         }
     }
 }

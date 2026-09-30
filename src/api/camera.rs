@@ -2,27 +2,30 @@
 //!
 //! Get/Set for position, yaw, pitch and fov over the shared `scene::Camera` the
 //! simulation drives, plus `GetForward`/`GetRight` basis vectors so a controller
-//! script can move and aim relative to where the camera looks.
+//! script can move and aim relative to where the camera looks, and the world ↔
+//! screen projections (`WorldToScreen`, `ScreenToWorldRay`, #429).
 
 use std::cell::RefCell;
 
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 use mlua::Lua;
 
-use super::{put, Reg};
+use super::{put, ApiScopedCtx, Reg};
 use crate::scene::Camera;
 
 /// Register the `Camera` namespace onto `lua`.
 pub fn register<'lua, 'scope>(
     lua: &'lua Lua,
     scope: &mlua::Scope<'lua, 'scope>,
-    camera: &'scope RefCell<Camera>,
+    ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
+    let camera = ctx.camera;
 
     register_position(scope, &table, camera)?;
     register_orientation(scope, &table, camera)?;
     register_fov(scope, &table, camera)?;
+    register_projection(scope, &table, ctx)?;
 
     lua.globals()
         .set("Camera", table)
@@ -127,6 +130,47 @@ fn register_fov<'lua, 'scope>(
         scope.create_function(|_, fov: f32| {
             camera.borrow_mut().fov = fov.clamp(1.0, 179.0);
             Ok(())
+        }),
+    )
+}
+
+/// `WorldToScreen(x, y, z [, canvas])` → `sx, sy, depth, onScreen` — UI screen
+/// pixels (bottom-left, y-up), or the canvas's reference units when a canvas id is
+/// given; `depth` ≤ 0 is behind the camera. `ScreenToWorldRay(x, y)` → the ray's
+/// origin and unit direction through a UI screen pixel.
+fn register_projection<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    ctx: &ApiScopedCtx<'scope>,
+) -> Reg {
+    let (camera, scene, screen, video) = (ctx.camera, ctx.scene, ctx.screen, ctx.video);
+    let px = move || screen.borrow().pixels(&video.borrow());
+    put(
+        table,
+        "WorldToScreen",
+        scope.create_function(move |_, (x, y, z, canvas): (f32, f32, f32, Option<u32>)| {
+            let screen = px();
+            let p = camera.borrow().world_to_screen(Vec3::new(x, y, z), screen);
+            let on_screen = p.is_on_screen(screen);
+            let scale = canvas
+                .and_then(|id| {
+                    scene
+                        .borrow()
+                        .world
+                        .canvas(id)
+                        .map(|c| c.scale_factor(screen))
+                })
+                .unwrap_or(1.0);
+            let at = p.position / scale;
+            Ok((at.x, at.y, p.depth, on_screen))
+        }),
+    )?;
+    put(
+        table,
+        "ScreenToWorldRay",
+        scope.create_function(move |_, (x, y): (f32, f32)| {
+            let (o, d) = camera.borrow().screen_ray(Vec2::new(x, y), px());
+            Ok((o.x, o.y, o.z, d.x, d.y, d.z))
         }),
     )
 }

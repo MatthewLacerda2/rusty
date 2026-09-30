@@ -4,7 +4,9 @@
 -- open the list: the inactive `Template` (a scroll view) is lifted onto a popup
 -- canvas above every other canvas, behind which a transparent `Blocker` covers the
 -- screen — a click there closes the list and reaches nothing underneath, like
--- Unity's. The list holds one `Item` per option (a Selectable, so it highlights);
+-- Unity's. On a world or camera canvas (#429) the list opens on that canvas
+-- instead, as its top-most child, and the blocker covers that canvas.
+-- The list holds one `Item` per option (a Selectable, so it highlights);
 -- click one, or pick it with the arrows and Enter. Escape closes it.
 --
 -- `options` is the list, `|`-separated in the inspector; `value` is 0-based.
@@ -134,12 +136,18 @@ function Dropdown.show()
     local r = UI.GetRect(self_id)
     if not r then return end
     if stale then build_items() end
-    local rw, rh = Canvas.GetReferenceResolution(r.canvas)
-    popup = Scene.CreateEntity("Dropdown List")
-    Scene.AddComponent(popup, "Canvas")
-    Canvas.SetSortOrder(popup, POPUP_ORDER)
-    Canvas.SetReferenceResolution(popup, rw, rh)
-    Canvas.SetMatchWidthOrHeight(popup, Canvas.GetMatchWidthOrHeight(r.canvas))
+    if Canvas.GetRenderMode(r.canvas) == "ScreenSpaceOverlay" then
+        local rw, rh = Canvas.GetReferenceResolution(r.canvas)
+        popup = Scene.CreateEntity("Dropdown List")
+        Scene.AddComponent(popup, "Canvas")
+        Canvas.SetSortOrder(popup, POPUP_ORDER)
+        Canvas.SetReferenceResolution(popup, rw, rh)
+        Canvas.SetMatchWidthOrHeight(popup, Canvas.GetMatchWidthOrHeight(r.canvas))
+    else
+        -- A world or camera canvas: the list opens on that canvas, as its last
+        -- (top-most) child, and the blocker covers that canvas only.
+        popup = child(r.canvas, "Dropdown List", 0, 0)
+    end
     blocker = child(popup, "Blocker", 0, 0)
     Scene.AddComponent(blocker, "Image")
     Image.SetColor(blocker, 0, 0, 0, 0)

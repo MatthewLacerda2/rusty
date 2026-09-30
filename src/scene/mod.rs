@@ -37,7 +37,7 @@ pub mod serialize;
 pub mod snapshot;
 pub mod world_cache;
 
-pub use camera::{game_camera_from_scene, sync_lens_from_scene, Camera};
+pub use camera::{game_camera_from_scene, sync_lens_from_scene, Camera, ScreenPoint};
 pub use collision_matrix::CollisionMatrix;
 pub use fog::{FogMode, FogSettings};
 pub use identity::SceneId;

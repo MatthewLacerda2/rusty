@@ -25,22 +25,10 @@ use crate::render::{build_camera_stack, CameraUniform, LightingUniform, RenderVi
 use crate::scene::{Camera, Scene};
 
 impl Renderer {
-    /// Renders the 3D scene into `view` (a per-view target/depth/post-FX bundle, #355),
-    /// compositing the final image to `output`.
-    ///
-    /// In play mode this composites the camera stack (#93): the scene's active
-    /// `CameraComponent` entities, sorted by `render_order`, each draw with their own
-    /// culling mask / lens / clear flags so a viewmodel or UI camera layers on top of
-    /// the world. In edit mode the free-fly `camera` is the single pass. Post-FX runs
-    /// once over the composited HDR target.
-    pub fn render(
-        &mut self,
-        view: &mut RenderView,
-        scene: &Scene,
-        camera: &Camera,
-        output: &wgpu::TextureView,
-        editor_mode: bool,
-    ) {
+    /// Per-frame work that doesn't depend on the camera stack: the view's post-FX
+    /// buffers, scene assets, the reflection cube, the lighting uniform and the
+    /// world-matrix store.
+    fn prepare_frame(&mut self, view: &mut RenderView, scene: &Scene, camera: &Camera) {
         // Keep this view's post-FX bloom buffers sized to the active quality tier — a
         // cheap no-op unless a live quality switch changed the divisor (#355).
         let size = view.size();
@@ -61,12 +49,28 @@ impl Renderer {
         // probe is picked relative to the primary camera (#244).
         self.upload_lighting(scene, camera.position);
 
-        // Fill the world-matrix store once for the whole frame (#331). The solid pass and
-        // both shadow collects — across every camera in the stack — then read each entity's
-        // world matrix from this one O(N) fill instead of walking the parent chain per
-        // entity per consumer. Nothing mutates transforms during rendering, so one refresh
-        // here serves the entire frame.
+        // Fill the world-matrix store once for the whole frame (#331): every pass and
+        // camera reads it instead of walking parent chains; rendering mutates nothing.
         scene.refresh_world_matrices();
+    }
+
+    /// Renders the 3D scene into `view` (a per-view target/depth/post-FX bundle, #355),
+    /// compositing the final image to `output`.
+    ///
+    /// In play mode this composites the camera stack (#93): the scene's active
+    /// `CameraComponent` entities, sorted by `render_order`, each draw with their own
+    /// culling mask / lens / clear flags so a viewmodel or UI camera layers on top of
+    /// the world. In edit mode the free-fly `camera` is the single pass. Post-FX runs
+    /// once over the composited HDR target.
+    pub fn render(
+        &mut self,
+        view: &mut RenderView,
+        scene: &Scene,
+        camera: &Camera,
+        output: &wgpu::TextureView,
+        editor_mode: bool,
+    ) {
+        self.prepare_frame(view, scene, camera);
         let aspect = view.aspect();
 
         // The ordered camera stack (one entry in edit mode / when no scene camera).
@@ -80,6 +84,9 @@ impl Renderer {
         // The base (first) camera drives the shared post-FX history / motion vectors.
         let base_view_proj = stack[0].build_view_projection(aspect);
         let ssao = SsaoPlan::for_scene(scene, self.quality);
+        // Lay out and mesh the UI through the base camera (#418, #429): world
+        // canvases draw inside each camera's pass below, screen canvases after it.
+        self.prepare_ui(view, scene, &stack[0], editor_mode);
 
         for (idx, cam) in stack.iter().enumerate() {
             // 1. Write this camera's view/projection uniform.
@@ -123,6 +130,8 @@ impl Renderer {
             // drawn back-to-front (already sorted) after opaque + decals so glass
             // composites over the world behind it.
             self.draw_transparent(view, &solids.draws.transparent);
+            // World canvases (#429): scene geometry, occluded by it, before particles.
+            self.draw_world_ui(view, cam, aspect, FogUniform::from_settings(&scene.fog));
 
             // Billboard particles for this camera (after solids, before the next pass).
             let particle_draws = self.draw_particles(view, scene, cam);
@@ -137,7 +146,7 @@ impl Renderer {
         // 4. The in-game UI over the finished frame (#418): after post-FX, so a HUD
         // is never tonemapped, bloomed or FXAA-softened. Not in the Scene view.
         if !editor_mode {
-            self.draw_ui(view, scene);
+            self.draw_ui(view);
         }
         self.finish_counters(view);
     }

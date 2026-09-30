@@ -26,6 +26,7 @@ fn element(
         pivot: Vec2::ZERO,
         anchored_position: pos,
         size_delta: size,
+        world_anchor: None,
     };
     scene.world.set_rect_transform(id, Some(rt));
     scene.world.set_image(id, image);

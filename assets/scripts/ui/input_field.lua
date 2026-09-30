@@ -149,12 +149,12 @@ end
 -- The character position nearest a pointer event.
 local function index_at(event)
     local r = UI.GetRect(text_id)
-    if not r then return pos end
-    local sf = r.scale_factor
-    local x = event.position.x / sf - r.x
+    local at = event.canvas_position
+    if not r or not at then return pos end
+    local x = at.x - r.x
     local line = 0
     if multiline() then
-        line = math.max(0, math.floor(((r.y + r.height) - event.position.y / sf) / pitch()))
+        line = math.max(0, math.floor(((r.y + r.height) - at.y) / pitch()))
     end
     local p, l = 0, 0
     while l < line and p < #chars do

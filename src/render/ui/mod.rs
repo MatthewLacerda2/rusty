@@ -12,7 +12,9 @@
 //!   texture / clip changes, with CanvasGroup alpha and RectMask clips (pure).
 //! - `text` — SDF glyph generation, the per-font atlases and text quads.
 //! - `draw` — the per-view cache (re-upload only a canvas whose geometry
-//!   changed) and the pass itself.
+//!   changed) and the screen pass itself.
+//! - `world` — world canvases (`WorldSpace`, `ScreenSpaceCamera`) drawn in the
+//!   scene, inside each camera's pass (#429).
 //!
 //! **Colour space.** UI blends in display (sRGB-encoded) space with premultiplied
 //! alpha: the pass draws through a non-sRGB *view* of the frame's sRGB colour
@@ -22,6 +24,7 @@ pub(crate) mod draw;
 pub(crate) mod geometry;
 pub(crate) mod mesh;
 pub(crate) mod text;
+pub(crate) mod world;
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -51,6 +54,8 @@ pub struct UiRenderer {
     atlases: text::atlas::FontAtlases,
     /// Each atlas's GPU copy, by font path.
     fonts: HashMap<Option<String>, text::gpu::AtlasGpu>,
+    /// The world-canvas pipeline (#429).
+    world: world::WorldUiPipeline,
 }
 
 impl UiRenderer {
@@ -76,6 +81,7 @@ impl UiRenderer {
         });
         let white = white_texture(device, queue);
         let white = bind(device, &layout, &white, &sampler);
+        let world = world::WorldUiPipeline::new(device, &shader, &layout);
         Self {
             shader,
             layout,
@@ -86,6 +92,7 @@ impl UiRenderer {
             textures: HashMap::new(),
             atlases: Default::default(),
             fonts: HashMap::new(),
+            world,
         }
     }
 

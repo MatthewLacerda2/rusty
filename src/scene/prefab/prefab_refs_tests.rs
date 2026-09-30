@@ -99,3 +99,33 @@ fn applying_a_changed_reference_writes_the_source_in_local_ids() {
     assert_eq!(target(&other, inst), Some(second_inst));
     let _ = std::fs::remove_file(&path);
 }
+
+#[test]
+fn a_markers_world_anchor_target_follows_the_prefab() {
+    use crate::components::{RectTransformComponent, WorldAnchor};
+    let mut scene = Scene::new();
+    let root = create_entity(&mut scene, "Enemy", None);
+    let bar = create_entity(&mut scene, "HealthBar", None);
+    scene.set_parent(bar, Some(root)).expect("parent");
+    let rt = RectTransformComponent {
+        world_anchor: Some(WorldAnchor {
+            target: Some(root),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    scene.world.set_rect_transform(bar, Some(rt));
+    let prefab = extract_prefab(&scene, root).expect("extracts");
+    let mut other = Scene::new();
+    create_entity(&mut other, "Offset", None);
+    let stamped = crate::scene::instantiate_prefab(&mut other, &prefab, None);
+    let bar = other.world.children(stamped)[0];
+    let anchor = other
+        .world
+        .rect_transform(bar)
+        .and_then(|r| r.world_anchor.clone());
+    assert_eq!(anchor.and_then(|a| a.target), Some(stamped));
+    assert!(Entity::is_ref_pointer(
+        "/rect_transform/world_anchor/target"
+    ));
+}

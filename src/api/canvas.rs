@@ -2,7 +2,9 @@
 //!
 //! Get/Set over an entity's `CanvasComponent` — render mode, sort order and the
 //! *Scale With Screen Size* scaler (reference resolution, width/height match) —
-//! plus the scale factor those produce on the current screen. Every setter routes
+//! plus the scale factor those produce on the current screen, and the world /
+//! camera canvas knobs (#429): pixels per unit, plane distance, tilt and sway. Every
+//! setter routes
 //! through the shared `scene::authoring::canvas` ops the inspector card uses.
 //! Getters return a neutral default when the entity has no canvas.
 
@@ -12,6 +14,7 @@ use glam::Vec2;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::components::CanvasComponent;
 use crate::core::video::VideoSettings;
 use crate::scene::authoring::canvas as canvas_ops;
 use crate::scene::Scene;
@@ -28,6 +31,7 @@ pub fn register<'lua, 'scope>(
     let table = lua.create_table().map_err(|e| e.to_string())?;
     register_order_and_mode(scope, &table, scene)?;
     register_scaler(scope, &table, scene)?;
+    register_world(scope, &table, scene)?;
     put(
         &table,
         "GetScaleFactor",
@@ -137,4 +141,58 @@ fn register_scaler<'lua, 'scope>(
             Ok(())
         }),
     )
+}
+
+/// A scalar canvas field: its getter and its authoring setter.
+type Scalar = (fn(&CanvasComponent) -> f32, fn(&mut CanvasComponent, f32));
+
+/// The world / camera canvas knobs: `Get/SetPixelsPerUnit`, `Get/SetPlaneDistance`,
+/// `Get/SetSway` (scalars) and `Get/SetTilt` (an `x, y` pair of degrees).
+fn register_world<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    let scalars: [(&str, Scalar); 3] = [
+        (
+            "PixelsPerUnit",
+            (|c| c.pixels_per_unit, canvas_ops::set_pixels_per_unit),
+        ),
+        (
+            "PlaneDistance",
+            (|c| c.plane_distance, canvas_ops::set_plane_distance),
+        ),
+        ("Sway", (|c| c.sway, canvas_ops::set_sway)),
+    ];
+    for (suffix, (get, set)) in scalars {
+        let f = scope.create_function(move |_, id: u32| {
+            Ok(scene
+                .borrow()
+                .world
+                .canvas(id)
+                .map(|c| get(&c))
+                .unwrap_or(0.0))
+        });
+        put(table, &format!("Get{suffix}"), f)?;
+        let f = scope.create_function(move |_, (id, v): (u32, f32)| {
+            if let Some(mut c) = scene.borrow_mut().world.canvas_mut(id) {
+                set(&mut c, v);
+            }
+            Ok(())
+        });
+        put(table, &format!("Set{suffix}"), f)?;
+    }
+    let f = scope.create_function(move |_, id: u32| {
+        let t = scene.borrow().world.canvas(id).map(|c| c.tilt);
+        let t = t.unwrap_or(Vec2::ZERO);
+        Ok((t.x, t.y))
+    });
+    put(table, "GetTilt", f)?;
+    let f = scope.create_function(move |_, (id, x, y): (u32, f32, f32)| {
+        if let Some(mut c) = scene.borrow_mut().world.canvas_mut(id) {
+            canvas_ops::set_tilt(&mut c, Vec2::new(x, y));
+        }
+        Ok(())
+    });
+    put(table, "SetTilt", f)
 }

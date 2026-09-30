@@ -144,10 +144,8 @@ end
 
 function ScrollView.OnDrag(id, event)
     if not dragging then return end
-    local r = UI.GetRect(id)
-    local sf = r and r.scale_factor or 1
-    drag_sum[1] = drag_sum[1] + event.delta.x / sf
-    drag_sum[2] = drag_sum[2] + event.delta.y / sf
+    drag_sum[1] = drag_sum[1] + event.canvas_delta.x
+    drag_sum[2] = drag_sum[2] + event.canvas_delta.y
     local _, _, vw, vh = bounds()
     local view = { vw, vh }
     for i = 1, 2 do

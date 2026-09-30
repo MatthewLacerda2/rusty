@@ -174,7 +174,7 @@ pub fn register<'lua, 'scope>(
     timer::register(lua, scope, ctx.scene, ctx.timers, ctx.console)?;
     tween::register(lua, scope, ctx.scene, ctx.timers)?;
     random::register(lua, scope, ctx.random)?;
-    camera::register(lua, scope, ctx.camera)?;
+    camera::register(lua, scope, ctx)?;
     light::register(lua, scope, ctx.scene)?;
     probe::register(lua, scope, ctx.scene)?;
     reflection::register(lua, scope, ctx.scene, ctx.scene_path)?;
@@ -183,7 +183,7 @@ pub fn register<'lua, 'scope>(
     audio::register(lua, scope, ctx.scene, ctx.audio, ctx.time, ctx.camera)?;
     canvas::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
     rect_transform::register(lua, scope, ctx.scene)?;
-    ui::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
+    ui::register(lua, scope, ctx.scene, (ctx.screen, ctx.video), ctx.camera)?;
     ui::register_events(lua, scope, ctx)?;
     selectable::register(lua, scope, ctx.scene, ctx.event_system)?;
     image::register(lua, scope, ctx.scene)?;

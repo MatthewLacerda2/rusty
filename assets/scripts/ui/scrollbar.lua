@@ -70,15 +70,16 @@ function Scrollbar.set_size(s)
     place()
 end
 
--- The pointer as a 0..1 position along the track.
+-- The pointer as a 0..1 position along the track (canvas units, so it works on a
+-- world canvas too).
 local function track_t(event)
     local r = UI.GetRect(area or self_id)
-    if not r then return 0 end
-    local s = r.screen
+    local p = event.canvas_position
+    if not r or not p then return 0 end
     if vertical then
-        return s.height > 0 and (event.position.y - s.y) / s.height or 0
+        return r.height > 0 and (p.y - r.y) / r.height or 0
     end
-    return s.width > 0 and (event.position.x - s.x) / s.width or 0
+    return r.width > 0 and (p.x - r.x) / r.width or 0
 end
 
 -- Put the handle's start at track position `lo` (0..1).

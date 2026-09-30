@@ -139,9 +139,14 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
                  "play_on_start": false, "is_time_scaled": true,
                  "spatial_blend": 0.0, "initial_distance": .., "final_distance": .. },
   "canvas":    { "render_mode": "ScreenSpaceOverlay", "sort_order": 0,
-                 "reference_resolution": [1920, 1080], "match_width_or_height": 0.0 },
+                 "reference_resolution": [1920, 1080], "match_width_or_height": 0.0,
+                 "pixels_per_unit": 100.0, "plane_distance": 1.0, "tilt": [x,y],
+                 "sway": 0.0 },
   "rect_transform": { "anchor_min": [x,y], "anchor_max": [x,y], "pivot": [x,y],
-                      "anchored_position": [x,y], "size_delta": [x,y] },
+                      "anchored_position": [x,y], "size_delta": [x,y],
+                      "world_anchor": null },  // or { "target", "offset": [x,y,z],
+                      // "clamp_to_screen_edge", "edge_padding",
+                      // "rotate_toward_target", "hide_when_behind" } on a marker
   "image":     { "color": [r,g,b,a], "texture": null, "type": "Filled",
                  "border": [l,b,r,t], "fill_method": "Horizontal", "fill_origin": "Left",
                  "fill_amount": 0.5, "fill_clockwise": true, "preserve_aspect": false,
@@ -150,7 +155,8 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
   "rect_mask": { "padding": [l,b,r,t] },
   "ui_rect":   { "x": .., "y": .., "width": .., "height": ..,      // UI.GetRect's shape
                  "screen": { "x": .., "y": .., "width": .., "height": .. },
-                 "corners": [ { "x": .., "y": .. }, ... ], "canvas": 3, "scale_factor": .. }
+                 "corners": [ { "x": .., "y": .. }, ... ], "canvas": 3, "scale_factor": ..,
+                 "world": false }
 }
 ```
 

@@ -24,8 +24,11 @@
 //! derived from the same state, in `LateUpdate`.
 //!
 //! **Pointer coordinates** are UI screen pixels: bottom-left origin, y-up, the frame
-//! `UI.GetRect`'s `screen` box is in (Unity's `PointerEventData.position`). While the
-//! cursor is locked (mouse-look) the pointer is off the UI, as in Unity.
+//! `UI.GetRect`'s `screen` box is in (Unity's `PointerEventData.position`). The
+//! pointer also carries the camera ray through it, which hits world canvases
+//! (#429). While the cursor is locked (mouse-look) the pointer is off the screen
+//! canvases, as in Unity, and its ray runs through the screen centre — "look at the
+//! terminal and click".
 
 mod focus;
 mod pointer;
@@ -35,15 +38,25 @@ mod tree;
 
 use std::collections::BTreeMap;
 
-use glam::Vec2;
+use glam::{Vec2, Vec3};
 
 use crate::components::SelectionState;
 use crate::core::input::InputState;
 use crate::ecs::World;
-use crate::ui::UiLayout;
+use crate::ui::{UiLayout, UiPointer, UiView};
 
 pub use focus::{find_selectable, nav_actions, NavAction, DIRECTIONS};
-pub use raycast::raycast;
+pub use raycast::{raycast, raycast_pointer};
+
+/// How far behind a wall's surface a world canvas still counts as in front of it —
+/// a sign authored flush on a wall stays clickable (#429).
+pub const WALL_TOLERANCE: f32 = 0.05;
+/// How far a pointer ray looks for a wall, metres.
+pub const WALL_RANGE: f32 = 1000.0;
+
+/// How far along a ray (origin, unit direction) the nearest wall is — the scene's
+/// blocking geometry, `f32::INFINITY` for none. World canvases behind it are not hit.
+pub type Walls<'a> = &'a dyn Fn(Vec3, Vec3) -> f32;
 pub use tree::{is_interactable, is_under, is_visible};
 
 /// How far (screen pixels) a held pointer moves before a drag begins — Unity's
@@ -104,6 +117,13 @@ pub struct PointerEvent {
     pub delta: Vec2,
     /// The entity the raycast hit this tick (the callback may be an ancestor of it).
     pub target: Option<u32>,
+    /// The pointer on the *receiving* entity's canvas, in its reference units (the
+    /// frame of `UI.GetRect`'s `x, y`): the screen point over the scale factor, or
+    /// where the pointer's ray crosses a world canvas's plane (#429). `None` when it
+    /// is on neither (a locked cursor over a screen canvas, a ray missing the plane).
+    pub canvas_position: Option<Vec2>,
+    /// The pointer's motion on that canvas since last tick, reference units.
+    pub canvas_delta: Vec2,
 }
 
 /// One callback to fire: `hook` on `entity`'s scripts, with `event` for the pointer
@@ -121,8 +141,10 @@ pub struct Frame<'a> {
     pub world: &'a World,
     pub layout: &'a UiLayout,
     pub input: &'a InputState,
-    /// The screen size in pixels the layout was computed for.
-    pub screen: Vec2,
+    /// The screen and camera the layout was computed against.
+    pub view: &'a UiView,
+    /// The walls a world-canvas hit must be in front of.
+    pub walls: Walls<'a>,
     pub handles: &'a dyn Fn(u32, UiHook) -> bool,
 }
 
@@ -151,6 +173,8 @@ pub struct EventSystem {
     hover: Vec<u32>,
     /// Last tick's pointer position.
     pointer: Option<Vec2>,
+    /// Last tick's pointer with its ray, for `canvas_delta` (#429).
+    last_ui: Option<UiPointer>,
     buttons: [ButtonState; 3],
     fades: BTreeMap<u32, transition::Fade>,
 }
@@ -240,3 +264,6 @@ mod pointer_tests;
 #[cfg(test)]
 #[path = "transition_tests.rs"]
 mod transition_tests;
+#[cfg(test)]
+#[path = "world_tests.rs"]
+mod world_tests;

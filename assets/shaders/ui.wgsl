@@ -8,10 +8,19 @@
 // re-encoded here before the tint multiplies them. Output is premultiplied
 // (blend: One, OneMinusSrcAlpha).
 //
+// World canvases (#429: `WorldSpace`, `ScreenSpaceCamera`) use `vs_world` /
+// `fs_world` instead: the same vertices, their NDC mapped onto the canvas plane in
+// the scene (`world_ui.to_world`) and projected by the camera, drawn into the HDR
+// scene target before post-FX, depth-tested against the world and fogged like it
+// (the shared `fog_factor`, #437). The HDR target is linear, so the display-space
+// result is decoded before it fogs and blends.
+//
 // Text vertices (`sdf.x` = 1) sample a single-channel signed distance field
 // instead: 0.5 is the glyph edge and the field reaches SPREAD atlas pixels either
 // side. Fill, outline and glow are all cut from that one distance, antialiased
 // over one screen pixel (fwidth), and composited glow < outline < fill.
+
+#import common::{Fog, fog_factor}
 
 // Must match `render::ui::text::sdf::SPREAD` (a unit test checks it).
 const SPREAD: f32 = 12.0;
@@ -32,21 +41,51 @@ struct VertexOut {
     @location(2) outline: vec4<f32>,
     @location(3) glow: vec4<f32>,
     @location(4) sdf: vec4<f32>,
+    // World canvases only: the fragment's world position, for the fog.
+    @location(5) world: vec3<f32>,
+};
+
+// A world canvas's placement for one camera: canvas NDC → world, world → clip;
+// the camera position and the scene fog.
+struct WorldUi {
+    view_proj: mat4x4<f32>,
+    to_world: mat4x4<f32>,
+    eye: vec4<f32>,
+    fog: Fog,
 };
 
 @group(0) @binding(0) var ui_texture: texture_2d<f32>;
 @group(0) @binding(1) var ui_sampler: sampler;
+@group(1) @binding(0) var<uniform> world_ui: WorldUi;
 
-@vertex
-fn vs_main(in: VertexIn) -> VertexOut {
+fn pass_through(in: VertexIn, clip: vec4<f32>, world: vec3<f32>) -> VertexOut {
     var out: VertexOut;
-    out.clip = vec4<f32>(in.pos, 0.0, 1.0);
+    out.clip = clip;
+    out.world = world;
     out.uv = in.uv;
     out.color = in.color;
     out.outline = in.outline;
     out.glow = in.glow;
     out.sdf = in.sdf;
     return out;
+}
+
+@vertex
+fn vs_main(in: VertexIn) -> VertexOut {
+    return pass_through(in, vec4<f32>(in.pos, 0.0, 1.0), vec3<f32>(0.0));
+}
+
+@vertex
+fn vs_world(in: VertexIn) -> VertexOut {
+    let world = world_ui.to_world * vec4<f32>(in.pos, 0.0, 1.0);
+    return pass_through(in, world_ui.view_proj * world, world.xyz);
+}
+
+// sRGB → linear transfer (IEC 61966-2-1), per channel.
+fn decode_srgb(c: vec3<f32>) -> vec3<f32> {
+    let lo = c / 12.92;
+    let hi = pow((max(c, vec3<f32>(0.0)) + 0.055) / 1.055, vec3<f32>(2.4));
+    return select(hi, lo, c <= vec3<f32>(0.04045));
 }
 
 // Linear → sRGB transfer (IEC 61966-2-1), per channel.
@@ -76,8 +115,8 @@ fn sdf_text(in: VertexOut, d: f32, aa: f32) -> vec4<f32> {
     return c + glow * (1.0 - c.a);
 }
 
-@fragment
-fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
+// The graphic's premultiplied display-space colour.
+fn shade(in: VertexOut) -> vec4<f32> {
     // Sampled and differentiated unconditionally: both stay in uniform control flow.
     let texel = textureSample(ui_texture, ui_sampler, in.uv);
     let d = (texel.r - 0.5) * 2.0 * SPREAD;
@@ -85,4 +124,19 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
     let c = vec4<f32>(encode_srgb(texel.rgb), texel.a) * in.color;
     let image = vec4<f32>(c.rgb * c.a, c.a);
     return select(image, sdf_text(in, d, aa), in.sdf.x > 0.5);
+}
+
+@fragment
+fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
+    return shade(in);
+}
+
+// Into the linear HDR target: un-premultiply, decode, fog, premultiply again.
+@fragment
+fn fs_world(in: VertexOut) -> @location(0) vec4<f32> {
+    let c = shade(in);
+    let rgb = select(c.rgb / max(c.a, 1e-6), vec3<f32>(0.0), c.a <= 0.0);
+    let f = fog_factor(world_ui.fog, in.world, world_ui.eye.xyz);
+    let lit = mix(decode_srgb(rgb), world_ui.fog.color, f);
+    return vec4<f32>(lit * c.a, c.a);
 }

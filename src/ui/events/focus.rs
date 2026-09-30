@@ -138,6 +138,8 @@ fn move_event(id: u32, dir: usize) -> PointerEvent {
         position: Vec2::splat(-1.0),
         delta: DIRECTIONS[dir],
         target: Some(id),
+        canvas_position: None,
+        canvas_delta: Vec2::ZERO,
     }
 }
 

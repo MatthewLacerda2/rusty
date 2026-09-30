@@ -5,11 +5,11 @@
 
 use std::cell::RefCell;
 
-use glam::Vec2;
+use glam::{Vec2, Vec3};
 use mlua::{Lua, Table};
 use rusty::components::{CanvasComponent, RectTransformComponent};
 use rusty::core::video::VideoSettings;
-use rusty::scene::Scene;
+use rusty::scene::{Camera, Scene};
 use rusty::ui::ScreenSize;
 
 /// A canvas with one centred 100×100 child. Returns `(scene, canvas, child)`.
@@ -35,10 +35,12 @@ fn with_ui_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
         height: 1080,
         ..VideoSettings::default()
     });
+    let camera = RefCell::new(Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0));
     lua.scope(|scope| {
         rusty::api::canvas::register(&lua, scope, scene, &screen, &video).unwrap();
         rusty::api::rect_transform::register(&lua, scope, scene).unwrap();
-        rusty::api::ui::register(&lua, scope, scene, &screen, &video).unwrap();
+        let (screen, video) = (&screen, &video);
+        rusty::api::ui::register(&lua, scope, scene, (screen, video), &camera).unwrap();
         f(&lua);
         Ok(())
     })
@@ -87,7 +89,7 @@ fn canvas_setters_validate_and_drive_the_scale_factor() {
             "Canvas.SetReferenceResolution({canvas}, 960, 540)
              Canvas.SetMatchWidthOrHeight({canvas}, 5)
              Canvas.SetSortOrder({canvas}, 3)
-             Canvas.SetRenderMode({canvas}, 'WorldSpace')"
+             Canvas.SetRenderMode({canvas}, 'Holographic')"
         ))
         .exec()
         .unwrap();

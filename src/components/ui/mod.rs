@@ -20,12 +20,12 @@ pub mod rect_transform;
 pub mod selectable;
 pub mod text;
 
-pub use canvas::{CanvasComponent, CanvasRenderMode};
+pub use canvas::{CanvasComponent, CanvasRenderMode, CanvasSway};
 pub use canvas_group::CanvasGroupComponent;
 pub use image::{FillMethod, FillOrigin, ImageComponent, ImageType};
 pub use layout_element::{LayoutAxisFit, LayoutElementComponent};
 pub use layout_group::{LayoutConstraint, LayoutCorner, LayoutGroupComponent, LayoutKind};
 pub use rect_mask::RectMaskComponent;
-pub use rect_transform::RectTransformComponent;
+pub use rect_transform::{RectTransformComponent, WorldAnchor};
 pub use selectable::{NavigationMode, SelectableComponent, SelectableTransition, SelectionState};
 pub use text::{TextAlignment, TextComponent, TextOverflow};

@@ -5,12 +5,13 @@
 //! units (y-up). Every setter routes through the shared
 //! `scene::authoring::rect_transform` ops the inspector card uses, so validation
 //! (anchors clamped to `[0, 1]` and kept ordered) lives once. The computed rect is
-//! read with `UI.GetRect`; the Transform keeps rotation and scale.
+//! read with `UI.GetRect`; the Transform keeps rotation and scale. The world
+//! anchor verbs (#429) make an element a marker pinned to a world point.
 
 use std::cell::RefCell;
 
-use glam::Vec2;
-use mlua::Lua;
+use glam::{Vec2, Vec3};
+use mlua::{Lua, Table};
 
 use super::{put, Reg};
 use crate::components::RectTransformComponent;
@@ -43,6 +44,7 @@ pub fn register<'lua, 'scope>(
     for (suffix, get, set) in PAIRS {
         register_pair(scope, &table, scene, suffix, get, set)?;
     }
+    register_world_anchor(scope, &table, scene)?;
     lua.globals()
         .set("RectTransform", table)
         .map_err(|e| e.to_string())
@@ -79,4 +81,88 @@ fn register_pair<'lua, 'scope>(
             Ok(())
         }),
     )
+}
+
+/// A one-flag marker option setter (a no-op on a non-marker).
+type AnchorFlag = fn(&mut RectTransformComponent, bool);
+
+/// The world anchor: `SetWorldAnchor(id, target|nil, ox, oy, oz)`,
+/// `ClearWorldAnchor(id)`, `GetWorldAnchor(id)` (a table, or `nil` for a
+/// non-marker), and the options `SetWorldAnchorClamp(id, clamp, padding)`,
+/// `SetWorldAnchorRotate(id, on)`, `SetWorldAnchorHideWhenBehind(id, on)`.
+fn register_world_anchor<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    let edit = move |id: u32, f: &dyn Fn(&mut RectTransformComponent)| {
+        if let Some(mut r) = scene.borrow_mut().world.rect_transform_mut(id) {
+            f(&mut r);
+        }
+    };
+    type Args = (u32, Option<u32>, Option<f32>, Option<f32>, Option<f32>);
+    let f = scope.create_function(move |_, (id, target, x, y, z): Args| {
+        let offset = Vec3::new(x.unwrap_or(0.0), y.unwrap_or(0.0), z.unwrap_or(0.0));
+        edit(id, &|r| rect_ops::set_world_anchor(r, target, offset));
+        Ok(())
+    });
+    put(table, "SetWorldAnchor", f)?;
+    let f = scope.create_function(move |_, id: u32| {
+        edit(id, &rect_ops::clear_world_anchor);
+        Ok(())
+    });
+    put(table, "ClearWorldAnchor", f)?;
+    let f = scope.create_function(move |_, (id, clamp, pad): (u32, bool, Option<f32>)| {
+        edit(id, &|r| {
+            rect_ops::set_anchor_clamp(r, clamp, pad.unwrap_or(0.0))
+        });
+        Ok(())
+    });
+    put(table, "SetWorldAnchorClamp", f)?;
+    let flags: [(&str, AnchorFlag); 2] = [
+        ("SetWorldAnchorRotate", rect_ops::set_anchor_rotate),
+        (
+            "SetWorldAnchorHideWhenBehind",
+            rect_ops::set_anchor_hide_when_behind,
+        ),
+    ];
+    for (name, set) in flags {
+        let f = scope.create_function(move |_, (id, on): (u32, bool)| {
+            edit(id, &|r| set(r, on));
+            Ok(())
+        });
+        put(table, name, f)?;
+    }
+    register_get_world_anchor(scope, table, scene)
+}
+
+/// `GetWorldAnchor(id)`: the marker's anchor as a table, or `nil` for a non-marker.
+fn register_get_world_anchor<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    let f = scope.create_function(move |lua, id: u32| {
+        let scene = scene.borrow();
+        let anchor = scene
+            .world
+            .rect_transform(id)
+            .and_then(|r| r.world_anchor.clone());
+        let Some(a) = anchor else {
+            return Ok(None);
+        };
+        let t = lua.create_table()?;
+        t.set("target", a.target)?;
+        let offset = lua.create_table()?;
+        offset.set("x", a.offset.x)?;
+        offset.set("y", a.offset.y)?;
+        offset.set("z", a.offset.z)?;
+        t.set("offset", offset)?;
+        t.set("clamp_to_screen_edge", a.clamp_to_screen_edge)?;
+        t.set("edge_padding", a.edge_padding)?;
+        t.set("rotate_toward_target", a.rotate_toward_target)?;
+        t.set("hide_when_behind", a.hide_when_behind)?;
+        Ok(Some(t))
+    });
+    put(table, "GetWorldAnchor", f)
 }
