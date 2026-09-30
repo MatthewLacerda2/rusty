@@ -96,8 +96,14 @@ pub struct Scene {
     /// skybox. The cubemaps themselves are baked by a later issue (#245).
     pub reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet,
     /// Ids queued for deferred destruction by play-mode `Scene.DestroyEntity`
-    /// (#323); drained in `destroy_queue`. Transient, never serialized.
+    /// (#323); drained in `runtime::destroy_queue`. Transient, never serialized.
     pub pending_destroy: Vec<u32>,
+    /// The scene file a play-mode `Scene.Load` asked for (#432); swapped in at the
+    /// tick's tail by the scene-load phase (`scene_load`). Transient, never serialized.
+    pub pending_load: Option<String>,
+    /// Entities marked `Scene.DontDestroyOnLoad` (#432): they and their descendants
+    /// survive a scene swap. Transient runtime state, never serialized.
+    pub persistent: std::collections::BTreeSet<u32>,
     /// Authoritative per-frame world-matrix store (#331): filled O(N) once per frame in
     /// hierarchy order, then read by every render-frame consumer (the forward pass, both
     /// shadow collects, and #330's frustum culling) instead of each walking the parent
@@ -123,6 +129,8 @@ impl Default for Scene {
             probes: crate::scene::lighting::probe::ProbeVolume::new(),
             reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet::new(),
             pending_destroy: Vec::new(),
+            pending_load: None,
+            persistent: std::collections::BTreeSet::new(),
             world_cache: WorldMatrixCache::default(),
         }
     }
@@ -137,6 +145,12 @@ impl Scene {
     /// distinct from every other live scene's.
     pub fn id(&self) -> SceneId {
         self.id
+    }
+
+    /// Mint a fresh runtime identity (#355): the World now holds a different scene
+    /// (a load replaced it), so GPU caches keyed by the old identity must not apply.
+    pub fn renew_id(&mut self) {
+        self.id = SceneId::next();
     }
 
     /// Spawn a box-projector decal at a surface hit (the point + outward normal

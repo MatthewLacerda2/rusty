@@ -73,7 +73,9 @@ const REBAKE_INTERVAL_FRAMES: u64 = 60;
 /// particles have resolved this tick's state, so scripts can react to settled
 /// transforms. `apply_destroys` (#323) is the tick's tail: it drains the
 /// deferred-destroy queue (firing `OnDisable`/`OnDestroy`) after every other
-/// system has seen the entity, and right before `advance_frame`.
+/// system has seen the entity. The scene-load phase (#432) follows it, so a
+/// `Scene.Load` swaps the World only once the whole tick is done with it, right
+/// before `advance_frame`.
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::FixedUpdate, rebake_nav)
         .add_system(Stage::FixedUpdate, init_scripts)
@@ -86,6 +88,7 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, super::particles::tick_particles)
         .add_system(Stage::FixedUpdate, late_update_scripts)
         .add_system(Stage::FixedUpdate, apply_destroys)
+        .add_system(Stage::FixedUpdate, super::scene_load::apply_scene_load)
         .add_system(Stage::FixedUpdate, advance_frame);
 }
 

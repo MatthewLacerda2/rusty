@@ -45,6 +45,7 @@ pub mod rect_mask;
 pub mod rect_transform;
 pub mod reflection;
 pub mod scene;
+pub mod scene_load;
 pub mod scene_prefab;
 pub mod selectable;
 pub mod shader;

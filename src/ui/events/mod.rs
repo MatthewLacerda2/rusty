@@ -173,6 +173,21 @@ impl EventSystem {
         self.selected = id;
     }
 
+    /// Forget every entity failing `keep` — a scene load (#432) unloaded them, and
+    /// the incoming scene may reuse their ids. Survivors (`DontDestroyOnLoad`) keep
+    /// their focus, hover and press state.
+    pub fn retain_entities(&mut self, keep: impl Fn(u32) -> bool) {
+        let kept = |id: Option<u32>| id.filter(|&id| keep(id));
+        self.selected = kept(self.selected);
+        self.announced = kept(self.announced);
+        self.hover.retain(|&id| keep(id));
+        for button in &mut self.buttons {
+            button.press = kept(button.press);
+            button.drag = kept(button.drag);
+        }
+        self.fades.retain(|&id, _| keep(id));
+    }
+
     /// Whether the pointer is over a raycast target this tick (Unity's
     /// `EventSystem.IsPointerOverGameObject`).
     pub fn is_pointer_over_ui(&self) -> bool {

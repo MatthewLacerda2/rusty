@@ -13,6 +13,8 @@
 //!   - `SetParent(id, parent)` / `ClearParent(id)` — parenting (`parent_id`).
 //!   - `Save([path])` — persist the live world (write-back to the current scene
 //!     path when no path is given).
+//!   - `Load` / `GetActivePath` / `DontDestroyOnLoad` — scene loading (#432), in
+//!     `api::scene_load`.
 //!
 //! These verbs deliberately do not touch the `ConsoleLogs` cell: when the REPL /
 //! headless session drives them, `console::evaluate_line` already holds that cell
@@ -43,6 +45,7 @@ pub fn register<'lua, 'scope>(
     register_parenting(scope, &table, scene)?;
     register_save(scope, &table, scene, scene_path)?;
     crate::api::scene_prefab::register(scope, &table, scene)?;
+    crate::api::scene_load::register(scope, &table, scene, scene_path, is_playing)?;
 
     lua.globals().set("Scene", table).map_err(|e| e.to_string())
 }

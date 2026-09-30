@@ -25,6 +25,12 @@ pub(super) fn register(app: &mut App) {
 
 /// Start every `play_on_start` AudioSource in the freshly-entered Play session.
 fn start_play_on_start(world: &mut World, res: &mut Resources) {
+    start_sources(world, res, |_| true);
+}
+
+/// Start every active `play_on_start` AudioSource whose entity passes `admit` — the
+/// whole scene at Play, only the incoming entities after a scene load (#432).
+pub(super) fn start_sources(world: &World, res: &Resources, admit: impl Fn(u32) -> bool) {
     // Collect the auto-start sources first so the scene borrow doesn't overlap the
     // maestro mutation.
     type Row = (u32, crate::components::AudioSourceComponent, [f32; 3]);
@@ -34,7 +40,7 @@ fn start_play_on_start(world: &mut World, res: &mut Resources) {
             .world
             .ids_with_audio()
             .into_iter()
-            .filter(|&id| scene.world.is_active(id))
+            .filter(|&id| admit(id) && scene.world.is_active(id))
             .filter_map(|id| {
                 let src = scene.world.audio(id)?;
                 if !src.play_on_start {

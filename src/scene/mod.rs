@@ -16,18 +16,19 @@
 //!   serialize — World <-> SceneData
 //!   io        — save/load, path + extension, default-scene seeding
 //!   snapshot  — edit-mode snapshot/restore around Play
+//!   runtime   — play-mode requests drained at the tick tail: destroys, scene loads
 
 pub mod asset_instance;
 pub mod authoring;
 pub mod camera;
 pub mod collision_matrix;
 pub mod decal;
-pub mod destroy_queue;
 pub mod identity;
 pub mod io;
 pub mod layers;
 pub mod lighting;
 pub mod prefab;
+pub mod runtime;
 #[allow(clippy::module_inception)]
 pub mod scene;
 pub mod serialize;
@@ -38,8 +39,9 @@ pub use camera::{game_camera_from_scene, sync_lens_from_scene, Camera};
 pub use collision_matrix::CollisionMatrix;
 pub use identity::SceneId;
 pub use io::{
-    is_scene_path, load_from_file, save_to_file, seed_default_scene, seed_default_scripts,
-    DEFAULT_SCENE_PATH, DEFAULT_SCENE_SOURCE, DEFAULT_SCRIPTS_DEST_DIR, SCENE_EXTENSION,
+    is_scene_path, load_from_file, read_scene_file, save_to_file, seed_default_scene,
+    seed_default_scripts, DEFAULT_SCENE_PATH, DEFAULT_SCENE_SOURCE, DEFAULT_SCRIPTS_DEST_DIR,
+    SCENE_EXTENSION,
 };
 pub use layers::{layer_in_mask, LayerRegistry, LAYER_COUNT};
 pub use lighting::io::{

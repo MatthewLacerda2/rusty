@@ -8,6 +8,8 @@
 //!   - `OnDestroy` (preceded by `OnDisable` for still-active instances) on the
 //!     deferred-destroy drain: `Scene.DestroyEntity` queued ids this tick, and
 //!     `apply_pending_destroys` fires teardown then removes the entities.
+//!   - The same teardown for a whole outgoing scene on `Scene.Load` (#432):
+//!     `unload_entities` fires it for every non-surviving entity.
 //!
 //! Both reuse the shared dispatch core (`dispatch_keys`, `call_hook`,
 //! `entity_active`) so they stay loops, not copies.
@@ -46,23 +48,40 @@ impl ScriptManager {
     }
 
     /// Drain the scene's deferred-destroy queue (filled by play-mode
-    /// `Scene.DestroyEntity`) and dispatch each doomed entity's teardown (#323):
-    /// `OnDisable` for every still-enabled instance, then `OnDestroy` for every
-    /// awoken instance — the whole batch in ascending `(entity, script index)`
-    /// order, matching Unity's "OnDisable immediately before OnDestroy". The
-    /// entities stay live through dispatch (so an `OnDestroy` can read its own
-    /// transform), then are removed along with their script instances. Cascading
-    /// destroys requested from within an `OnDestroy` fall to the next tick's drain,
-    /// since the queue was taken up front.
+    /// `Scene.DestroyEntity`) and dispatch each doomed entity's teardown (#323),
+    /// then remove the entities along with their script instances. The entities stay
+    /// live through dispatch (so an `OnDestroy` can read its own transform).
+    /// Cascading destroys requested from within an `OnDestroy` fall to the next
+    /// tick's drain, since the queue was taken up front.
     pub fn apply_pending_destroys(&mut self) {
         let ids = self.scene.borrow_mut().take_pending_destroys();
         if ids.is_empty() {
             return;
         }
+        self.dispatch_teardown(&ids);
+        for &id in &ids {
+            self.scene.borrow_mut().destroy_entity(id);
+        }
+        self.forget_entities(&ids);
+    }
+
+    /// A scene unload (#432): the same teardown as a destroy for every entity in
+    /// `ids` (ascending), and their instances, timers and coroutines forgotten — but
+    /// no per-entity removal, because the scene swap that follows replaces the World.
+    pub fn unload_entities(&mut self, ids: &[u32]) {
+        self.dispatch_teardown(ids);
+        self.forget_entities(ids);
+    }
+
+    /// Fire the teardown of the entities in `ids` (sorted ascending): `OnDisable` for
+    /// every still-enabled instance, then `OnDestroy` for every awoken instance — the
+    /// whole batch in ascending `(entity, script index)` order, matching Unity's
+    /// "OnDisable immediately before OnDestroy".
+    fn dispatch_teardown(&self, ids: &[u32]) {
         let mut disable_keys = Vec::new();
         let mut destroy_keys = Vec::new();
         for (&key, inst) in &self.entity_scripts {
-            if ids.contains(&key.0) {
+            if ids.binary_search(&key.0).is_ok() {
                 if inst.enabled_last {
                     disable_keys.push(key);
                 }
@@ -70,6 +89,9 @@ impl ScriptManager {
                     destroy_keys.push(key);
                 }
             }
+        }
+        if disable_keys.is_empty() && destroy_keys.is_empty() {
+            return;
         }
         self.with_api_scope(|lua| {
             for &key in &disable_keys {
@@ -79,15 +101,17 @@ impl ScriptManager {
                 self.call_hook(lua, key, ON_DESTROY, key.0);
             }
         });
-        for &id in &ids {
-            self.scene.borrow_mut().destroy_entity(id);
-        }
-        // Pending timers and coroutines die with their entity (#444).
+    }
+
+    /// Drop every trace of the entities in `ids` (sorted ascending): their script
+    /// instances and load attempts, and their pending timers and coroutines (#444),
+    /// so a later entity reusing an id starts clean.
+    fn forget_entities(&mut self, ids: &[u32]) {
+        let gone = |id: &u32| ids.binary_search(id).is_ok();
         self.timers
             .borrow_mut()
-            .retain_owners(|owner| !ids.contains(&owner));
-        self.entity_scripts
-            .retain(|&(eid, _), _| !ids.contains(&eid));
-        self.load_attempted.retain(|&(eid, _)| !ids.contains(&eid));
+            .retain_owners(|owner| !gone(&owner));
+        self.entity_scripts.retain(|(eid, _), _| !gone(eid));
+        self.load_attempted.retain(|(eid, _)| !gone(eid));
     }
 }
