@@ -56,6 +56,10 @@ pub struct RenderView {
     /// invisible at the call site. Ownership by the view says the same thing
     /// declaratively — *this* view shades this way — and cannot leak to another.
     forward_override: Option<wgpu::RenderPipeline>,
+    /// The UI pass's format for the colour target (#418); see `create_color_target`.
+    ui_format: Option<wgpu::TextureFormat>,
+    /// The UI pass's per-canvas vertex buffers for this view (#418).
+    pub(crate) ui: crate::render::ui::UiViewCache,
 }
 
 impl RenderView {
@@ -114,7 +118,8 @@ impl RenderView {
         let mut registry = ShaderRegistry::new("assets/shaders");
         let post_fx = PostFx::new(device, width, height, format, bloom_divisor, &mut registry);
         let (depth_texture, depth_view) = create_depth(device, width, height);
-        let color_target = owns_target.then(|| create_color_target(device, format, width, height));
+        let target = owns_target.then(|| create_color_target(device, format, width, height));
+        let (color_target, ui_format) = target.unzip();
         Self {
             size: winit::dpi::PhysicalSize::new(width, height),
             format,
@@ -125,6 +130,8 @@ impl RenderView {
             decal_depth_bind_group: None,
             color_target,
             forward_override: None,
+            ui_format,
+            ui: Default::default(),
         }
     }
 
@@ -150,7 +157,8 @@ impl RenderView {
         self.decal_depth_bind_group = None;
         self.post_fx.resize(device, width, height, bloom_divisor);
         if self.color_target.is_some() {
-            self.color_target = Some(create_color_target(device, self.format, width, height));
+            let (target, ui_format) = create_color_target(device, self.format, width, height);
+            (self.color_target, self.ui_format) = (Some(target), Some(ui_format));
         }
     }
 
@@ -172,6 +180,18 @@ impl RenderView {
         self.color_target
             .as_ref()
             .map(|t| t.create_view(&wgpu::TextureViewDescriptor::default()))
+    }
+
+    /// The view + format the UI pass draws through (#418) — see `create_color_target`.
+    /// `None` for a targetless view: its caller-owned output (the cubemap capture)
+    /// never shows UI.
+    pub(crate) fn ui_target(&self) -> Option<(wgpu::TextureView, wgpu::TextureFormat)> {
+        let (target, format) = (self.color_target.as_ref()?, self.ui_format?);
+        let view = target.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(format),
+            ..Default::default()
+        });
+        Some((view, format))
     }
 
     /// The offscreen colour target itself, or `None` for a targetless view. Borrowed
@@ -236,13 +256,20 @@ fn create_depth(
 /// Allocate the offscreen colour target: sampled by egui (`TEXTURE_BINDING`) and
 /// readable back to the CPU (`COPY_SRC`), so one owned target serves both the editor's
 /// `egui::Image` and the dev layer's PNG capture instead of each allocating its own.
+///
+/// Also returns the UI pass's format (#418): an sRGB target is made viewable as its
+/// non-sRGB twin so the UI blends in display space. A device without view-format
+/// support (some GL drivers) rejects that; it is caught and answered with a plain
+/// target, where the UI blends in linear space — slightly off, never broken.
 fn create_color_target(
     device: &wgpu::Device,
     format: wgpu::TextureFormat,
     width: u32,
     height: u32,
-) -> wgpu::Texture {
-    device.create_texture(&wgpu::TextureDescriptor {
+) -> (wgpu::Texture, wgpu::TextureFormat) {
+    let alias = format.remove_srgb_suffix();
+    let (aliased, plain) = ([alias], []);
+    let desc = |view_formats| wgpu::TextureDescriptor {
         label: Some("View Colour Target"),
         size: wgpu::Extent3d {
             width,
@@ -256,8 +283,16 @@ fn create_color_target(
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT
             | wgpu::TextureUsages::TEXTURE_BINDING
             | wgpu::TextureUsages::COPY_SRC,
-        view_formats: &[],
-    })
+        view_formats,
+    };
+    if alias != format {
+        device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let texture = device.create_texture(&desc(&aliased));
+        if pollster::block_on(device.pop_error_scope()).is_none() {
+            return (texture, alias);
+        }
+    }
+    (device.create_texture(&desc(&plain)), format)
 }
 
 #[cfg(test)]

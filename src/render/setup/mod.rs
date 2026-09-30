@@ -133,6 +133,7 @@ impl Renderer {
             shadows,
             forward,
             billboards,
+            ui,
             quality,
         } = gpu;
         let entity_pool = Some(crate::render::gpu::entity_pool::EntityPool::new(&device));
@@ -165,6 +166,7 @@ impl Renderer {
             shadow_bind_group: shadows.bind_group,
             particle_renderer: billboards.particle_renderer,
             decal_renderer: billboards.decal_renderer,
+            ui_renderer: ui,
             quality,
             gpu_meshes: HashMap::new(),
             gpu_textures: HashMap::new(),
