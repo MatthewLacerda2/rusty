@@ -101,8 +101,8 @@ impl Compressor {
         (limit(l * gain), limit(r * gain))
     }
 }
-<<<<<<< HEAD
->>>>>>> 1f81f2a (Soft limiter test: saturation reaches 1.0 in f32, never past it (#546))
+
+/// Soft limiter: identity up to 0.9, then a `tanh` ease that never passes 1.
 pub fn limit(x: f32) -> f32 {
     let a = x.abs();
     if a <= LIMIT_KNEE {
