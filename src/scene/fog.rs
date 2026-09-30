@@ -112,6 +112,18 @@ mod tests {
     }
 
     #[test]
+    fn fog_saves_and_loads_with_the_scene() {
+        use crate::scene::{apply_scene_data, to_scene_data, Scene, SceneData};
+        let mut scene = Scene::new();
+        scene.fog.mode = FogMode::Linear;
+        scene.fog.end = 42.0;
+        let json = serde_json::to_string(&to_scene_data(&scene)).unwrap();
+        let mut back = Scene::new();
+        apply_scene_data(&mut back, serde_json::from_str::<SceneData>(&json).unwrap());
+        assert_eq!(back.fog, scene.fog);
+    }
+
+    #[test]
     fn names_round_trip_and_indices_are_stable() {
         for (i, m) in FogMode::ALL.into_iter().enumerate() {
             assert_eq!(FogMode::parse(m.name()), Some(m));

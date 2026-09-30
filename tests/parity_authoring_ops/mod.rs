@@ -7,6 +7,7 @@
 //! surface can never drift (mirrors `material_library::api_parity::lua_material_api_and_shared_op_converge`).
 
 mod animator;
+mod fog;
 mod graphics;
 mod light;
 mod nav_agent;

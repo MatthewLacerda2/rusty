@@ -10,6 +10,8 @@
 //!   here takes effect next frame for free — no GPU pipeline is touched from script.
 //!   The same volume carries the sun's shadow cascades (`shadows`, #435), which the
 //!   shadow pass re-fits from every frame.
+//! * The scene's fog (`fog`, #437) — scene-level, not per-volume, so it needs no
+//!   volume; the renderer packs it into every pass's camera globals each frame.
 //! * The global `QualityPreset` resource (Low/Medium/High), gating SSR + motion
 //!   blur. A plain value get/set (`register_quality`, in `state`); the platform layer
 //!   reads the shared cell each frame and hands it to `renderer.set_quality`.
@@ -22,6 +24,7 @@
 use std::cell::RefCell;
 
 mod camera;
+mod fog;
 mod shadows;
 mod state;
 
@@ -51,6 +54,7 @@ pub fn register<'lua, 'scope>(
     camera::register_fxaa(scope, &table, scene)?;
     register_quality(scope, &table, quality)?;
     shadows::register_shadows(scope, &table, scene)?;
+    fog::register_fog(scope, &table, scene)?;
 
     lua.globals()
         .set("Graphics", table)

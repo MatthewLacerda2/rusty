@@ -12,6 +12,9 @@
 
 mod cascaded_shadows_screenshot;
 mod emissive_factor_screenshot;
+mod fog_consistency_screenshot;
+mod fog_modes_screenshot;
+mod fog_scene;
 mod frame_stats_render;
 mod fxaa_screenshot;
 mod instancing_budget;

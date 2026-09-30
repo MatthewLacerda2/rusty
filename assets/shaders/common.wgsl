@@ -11,9 +11,9 @@ struct Fog {
     density: f32,
     height_falloff: f32,
     base_height: f32,
-    _pad0: f32,
-    _pad1: f32,
-    _pad2: f32,
+    _pad_a: f32,
+    _pad_b: f32,
+    _pad_c: f32,
 };
 
 struct CameraUniforms {

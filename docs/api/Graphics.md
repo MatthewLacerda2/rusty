@@ -25,6 +25,13 @@ Getters return a neutral default when no active volume/camera exists.
 | `Graphics.GetQuality` / `SetQuality` | `()` / `(name)` | `"Low"` / `"Medium"` / `"High"` |
 | `Graphics.GetShadowCascades` / `SetShadowCascades` | `()` / `(n)` | `number` (clamped 1–4, **default `4`**) |
 | `Graphics.GetShadowDistance` / `SetShadowDistance` | `()` / `(units)` | `number` (world units, clamped ≥ 1, **default `100`**) |
+| `Graphics.GetFogMode` / `SetFogMode` | `()` / `(name)` | `"Off"` / `"Linear"` / `"Exponential"` / `"ExponentialSquared"` (**default `"Off"`**) |
+| `Graphics.GetFogColor` / `SetFogColor` | `()` / `(r, g, b)` | `r, g, b` (linear, each clamped ≥ 0) |
+| `Graphics.GetFogDensity` / `SetFogDensity` | `()` / `(value)` | `number` (per world unit, clamped ≥ 0, **default `0.02`**) |
+| `Graphics.GetFogStart` / `SetFogStart` | `()` / `(units)` | `number` (clamped ≥ 0, **default `10`**) |
+| `Graphics.GetFogEnd` / `SetFogEnd` | `()` / `(units)` | `number` (clamped ≥ 0, **default `100`**; linear mode only) |
+| `Graphics.GetFogHeightFalloff` / `SetFogHeightFalloff` | `()` / `(value)` | `number` (clamped ≥ 0, **default `0`** = uniform) |
+| `Graphics.GetFogBaseHeight` / `SetFogBaseHeight` | `()` / `(y)` | `number` (world height, **default `0`**) |
 
 **Gamma** is a display-gamma *tweak*, not the output encode: the render target
 (window, Game view, and headless screenshot alike) is sRGB and encodes linear →
@@ -42,6 +49,29 @@ last tenth. Both knobs live on the active visual-correction volume (the Inspecto
 indoor level can spend its cascades on 40 m and an outdoor one on 150 m; with no
 active volume the defaults above apply. Each cascade costs one more depth pass for
 the moving casters (static casters are re-drawn only when a cascade moves, #355).
+
+**Fog** (#437) is a **scene setting**, not a volume knob: it is saved with the
+scene, edited in the Inspector's **Scene Settings → Fog** section (the same fields),
+and the `Fog*` functions work whether or not the scene has a visual-correction
+volume. One shared shader function applies it to **every world-space pass** —
+opaque and transparent surfaces, unlit surfaces, alpha-blended and additive
+particles, decals — so smoke and bullet holes fade exactly like the wall behind
+them, and the sky blends to the fog colour at the horizon (fading out toward the
+zenith) so fogged geometry never silhouettes against a clear sky. It runs in linear
+HDR before post-FX; the in-game UI is never fogged.
+
+- **Mode** sets how fog grows with distance past **start**: `Linear` ramps from
+  none at `start` to full at `end`; `Exponential` is `1 − e^(−density·d)`;
+  `ExponentialSquared` is `1 − e^(−(density·d)²)` (clear up close, then closing in
+  fast). `Off` disables it everywhere.
+- **Height**: below **base height** fog is at full thickness; above it, it thins
+  by `e^(−falloff·h)`. A falloff of `0` is uniform fog; `0.2`–`1` pools it low, like
+  smoke on a warehouse floor. The thickness is averaged along each view ray, so
+  looking down into a fogged pit from above reads right.
+
+The shader-authoring block `height_fog` (`Shader.md`) is a separate, per-material
+*look*; every authored surface variant is fogged by the scene fog on top of it.
+Fog is render-only, so it cannot affect the deterministic sim.
 
 **FXAA** is the anti-aliasing pass at the very end of the chain, running on the
 tonemapped image just before it reaches the screen. It is **on by default** — a
