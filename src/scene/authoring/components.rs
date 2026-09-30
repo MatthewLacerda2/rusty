@@ -59,6 +59,7 @@ component_kinds! {
         Selectable,
         LayoutGroup,
         LayoutElement,
+        Joint,
     }
 }
 
@@ -72,7 +73,8 @@ impl ComponentKind {
     /// or clip to, a Selectable a rect to be hit in, and the layout pair a rect to
     /// arrange or size (`Image` / `Text` / `RectMask` / `Selectable` / `LayoutGroup` /
     /// `LayoutElement → RectTransform`, as Unity's `Graphic`, `RectMask2D` and
-    /// layout components require one). A new dependency is one line here, enforced
+    /// layout components require one), and a Joint the Rigidbody it constrains
+    /// (`Joint → RigidBody`, as Unity's `Joint`). A new dependency is one line here, enforced
     /// everywhere by construction.
     pub fn requires(self) -> &'static [ComponentKind] {
         match self {
@@ -83,6 +85,7 @@ impl ComponentKind {
             | ComponentKind::Selectable
             | ComponentKind::LayoutGroup
             | ComponentKind::LayoutElement => &[ComponentKind::RectTransform],
+            ComponentKind::Joint => &[ComponentKind::RigidBody],
             _ => &[],
         }
     }
@@ -110,6 +113,7 @@ impl ComponentKind {
             "selectable" => Some(Self::Selectable),
             "layoutgroup" => Some(Self::LayoutGroup),
             "layoutelement" | "contentsizefitter" => Some(Self::LayoutElement),
+            "joint" | "fixedjoint" | "hingejoint" | "characterjoint" => Some(Self::Joint),
             _ => None,
         }
     }

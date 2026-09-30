@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 mod repr;
 
+use super::JointComponent;
 use super::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, ColliderComponent, ImageComponent, LayoutElementComponent,
@@ -124,6 +125,8 @@ pub struct Entity {
     /// for pre-#421 scenes.
     #[serde(default)]
     pub layout_element: Option<LayoutElementComponent>,
+    #[serde(default)]
+    pub joint: Option<JointComponent>,
     /// Live link back to the source `.prefab` for a *linked* prefab instance (#216).
     /// `None` on a plain entity or a v1 unpacked copy. Carried on every entity of an
     /// instance. `#[serde(default)]` so pre-#216 scenes load with no link.
@@ -164,28 +167,30 @@ impl Entity {
             selectable: None,
             layout_group: None,
             layout_element: None,
+            joint: None,
             prefab_link: None,
             parent_id: None,
             children: Vec::new(),
         }
     }
-}
 
-impl Entity {
-    /// Rewrite every entity reference a component holds (a Selectable's target
-    /// graphic and navigation targets, #420) through `map` — how the references
+    /// Rewrite every entity reference a component holds (a Selectable's targets,
+    /// #420; a Joint's connected body, #449) through `map` — how the references
     /// follow the entity when a prefab is saved, stamped or propagated.
     pub fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
-        if let Some(s) = &mut self.selectable {
-            s.remap_refs(map);
-        }
+        self.selectable.iter_mut().for_each(|s| s.remap_refs(map));
+        self.joint.iter_mut().for_each(|j| j.remap_refs(map));
     }
 
     /// Whether `pointer` (a JSON pointer into the entity document, as prefab
     /// overrides key their leaves) names one of those entity references.
     pub fn is_ref_pointer(pointer: &str) -> bool {
-        pointer
-            .strip_prefix("/selectable")
-            .is_some_and(|rest| SelectableComponent::REF_POINTERS.contains(&rest))
+        let under = |prefix: &str, refs: &[&str]| {
+            pointer
+                .strip_prefix(prefix)
+                .is_some_and(|rest| refs.contains(&rest))
+        };
+        under("/selectable", &SelectableComponent::REF_POINTERS)
+            || under("/joint", &JointComponent::REF_POINTERS)
     }
 }

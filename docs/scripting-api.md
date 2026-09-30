@@ -100,6 +100,7 @@ Component menu offers.
 | `OnCollisionEnter` | `OnCollisionEnter(id, other, contact)` | Once, when a solid (non-trigger) contact between the entity's collider and another begins — the tick the solver first pushes the two apart, so `contact.impulse` is the impact. At least one side must be a dynamic body: a kinematic body against static geometry never collides (Unity's rule). Before that tick's `OnCollisionStay`. |
 | `OnCollisionStay` | `OnCollisionStay(id, other, contact)` | After the physics step, once per touching solid pair, every frame the contact persists — including the frame `OnCollisionEnter` fires (the same edge rule as `OnTrigger`). |
 | `OnCollisionExit` | `OnCollisionExit(id, other)` | Once, on the first frame the pair's surfaces no longer touch (or either collider is deactivated) — after that frame's `OnCollisionStay`. No `contact`: nothing is touching any more. |
+| `OnJointBreak` | `OnJointBreak(id, force, torque)` | Once, on the tick the entity's `Joint` carried more than its non-zero `break_force` (newtons) or `break_torque` (newton-metres) — after that tick's collision callbacks. `force` / `torque` are what it carried. The `Joint` component is already destroyed (Unity), so the bodies are free. |
 | `OnEnable` | `OnEnable(id)` | When the owning entity becomes `active`: on its **first** activation — between `Awake` and `Start`, so the first-tick order is `Awake → OnEnable → Start` — and again on every later inactive→active transition (e.g. a script or `Scene.Activate` re-enabling a pooled object). Detected by diffing the entity's `active` flag against the previous tick, so it fires **exactly once** per rising edge. |
 | `OnDisable` | `OnDisable(id)` | When the owning entity becomes inactive: once on each `active`→inactive transition (e.g. `Scene.Deactivate`), and once more — immediately **before** `OnDestroy` — when an *active* entity is destroyed. Fires **exactly once** per falling edge. While disabled, the entity receives no other gameplay callback (no `Update`/`LateUpdate`/`OnTrigger`/`OnCollision*`). |
 | `OnDestroy` | `OnDestroy(id)` | Once, when the entity is removed **during play** via `Scene.DestroyEntity` — after its `OnDisable` if it was active. The entity is still readable during the callback (removal happens just after). See the divergence note: **Stop does not fire `OnDestroy`.** |
@@ -172,7 +173,8 @@ headless replays stay byte-identical):
   `OnCollisionStay`, then all `OnCollisionExit`, each list sorted ascending by
   `(low id, high id)`. Every trigger and collision callback notifies both
   sides of its pair — A about B, then B about A — and an entity carrying
-  several scripts is notified in ascending script-index order.
+  several scripts is notified in ascending script-index order. The tick's
+  `OnJointBreak`s come last, ascending by joint entity id.
 - `OnEnable`/`OnDisable` are detected at the head of the script phase by diffing
   each instance's `active` state against the previous tick, in the order
   `OnDisable` (falling edges) → `Awake` → `OnEnable` (rising edges) → `Start` —
@@ -566,7 +568,9 @@ case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `VisualCorrection`, `Audio` (alias `AudioSource`), `Canvas`, `RectTransform`,
 `Image`, `CanvasGroup`, `RectMask` (alias `RectMask2D`), `Text` (alias
 `TextMeshPro`), `Selectable`, `LayoutGroup`, `LayoutElement` (alias
-`ContentSizeFitter`).
+`ContentSizeFitter`), `Joint` (aliases `FixedJoint`, `HingeJoint`,
+`CharacterJoint` — all add a default `Fixed` joint; set its kind with
+`Joint.SetKind`).
 Each is added with the inspector's default values; adding an
 existing kind replaces it. (Scripts attach by path, not as a defaulted kind — a
 separate concern.)
@@ -589,7 +593,8 @@ The declared dependencies are **`VisualCorrection` requires `Camera`** (a
 color/bloom/SSR correction stack is inert without a camera to correct) and
 **`Image`, `Text`, `RectMask`, `Selectable`, `LayoutGroup` and `LayoutElement`
 require `RectTransform`** (a graphic fills, a mask clips to, and a layout arranges
-a rect — Unity's `Graphic`, `RectMask2D` and layout components declare the same).
+a rect — Unity's `Graphic`, `RectMask2D` and layout components declare the same),
+and **`Joint` requires `RigidBody`** (a joint constrains a body — Unity's `Joint` too).
 
 **`Scene.Deactivate`** is Unity's deferred `Object.Destroy`: it sets `active =
 false` but leaves the entity in the scene. **`Scene.DestroyEntity`** is the
@@ -1422,6 +1427,70 @@ world `x = 11`. Unity semantics:
 - **Hierarchy changes apply on the next physics step.** Reparenting, adding or
   removing a Collider or Rigidbody, or activating/deactivating a collider
   rebuilds just the affected bodies at the start of the next fixed tick.
+
+## `Joint`
+
+Read and tune an entity's `JointComponent` (#449) — Unity's `FixedJoint`,
+`HingeJoint` and `CharacterJoint` as one component with a **kind**. It ties the
+entity's Rigidbody to the **connected body**'s, or to a fixed point in the world
+when there is none:
+
+- `"Fixed"` welds the two bodies (breakable debris, a gun in a ragdoll's hand).
+- `"Hinge"` leaves one rotation free, about the **axis** (doors, elbows, knees);
+  with limits on, it turns only between `min` and `max` degrees.
+- `"Ball"` leaves all three free (shoulders, hips, a hanging lamp); with limits
+  on, it twists about the axis between `min` and `max` degrees and swings up to
+  the **swing limit** away from it on each perpendicular axis.
+
+The **anchor** (the pivot) and the **axis** are in the entity's local space. The
+**connected anchor** is in the connected entity's local space — world space with no
+connected body — and is used only with auto-configure off; auto-configure (the
+default) puts it wherever the anchor sits. **The pose the bodies are in when the
+joint is built is its rest pose** — at play-enter, or when its shape (kind, body,
+anchors, axis, limits, collision flag) changes during play; the limits are
+measured from it. **Both bodies need a collider**: a body without one does not
+exist in the physics world, and a joint missing a body does nothing. A deactivated
+joint entity's joint is removed until it is active again. `enable_collision` (off
+by default, as in Unity) lets the two joined bodies still collide.
+
+**Breaking.** A non-zero break force (newtons) or torque (newton-metres) breaks the
+joint on the first tick it carries more: the joint and its `Joint` component are
+destroyed and `OnJointBreak(id, force, torque)` fires on the entity's scripts. A
+hanging 1 kg body carries ~9.81 N. `0` never breaks. Break thresholds are read
+live, so changing them never rebuilds the joint.
+
+Getters return a neutral default (`nil`, `false`, zeros) without a Joint; setters
+are then no-ops. Add or remove one with `Scene.AddComponent(id, "Joint")` /
+`RemoveComponent` (adding also adds a `RigidBody`). Anchors and axes travel as
+`x, y, z`.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Joint.GetKind` / `SetKind` | `(id)` / `(id, name)` | `"Fixed"`, `"Hinge"` or `"Ball"` (case-insensitive; unknown names are ignored) |
+| `Joint.GetConnectedBody` / `SetConnectedBody` | `(id)` / `(id, otherId)` | the joined entity, or `nil` for the world |
+| `Joint.GetAnchor` / `SetAnchor` | `(id)` / `(id, x, y, z)` | the pivot, local to the entity |
+| `Joint.GetConnectedAnchor` / `SetConnectedAnchor` | `(id)` / `(id, x, y, z)` | the pivot on the connected body (world space with none) |
+| `Joint.GetAutoConfigureConnectedAnchor` / `SetAutoConfigureConnectedAnchor` | `(id)` / `(id, bool)` | whether the connected anchor follows the anchor |
+| `Joint.GetAxis` / `SetAxis` | `(id)` / `(id, x, y, z)` | the hinge / twist axis (normalized; a zero axis is ignored) |
+| `Joint.GetUseLimits` / `SetUseLimits` | `(id)` / `(id, bool)` | whether the angle limits apply |
+| `Joint.GetLimits` / `SetLimits` | `(id)` / `(id, min, max)` | the hinge / twist range in degrees (within ±179, ordered) |
+| `Joint.GetSwingLimit` / `SetSwingLimit` | `(id)` / `(id, degrees)` | a Ball's swing (0..179) |
+| `Joint.GetBreakForce` / `SetBreakForce` | `(id)` / `(id, newtons)` | the breaking force (`0` = never, ≥ 0) |
+| `Joint.GetBreakTorque` / `SetBreakTorque` | `(id)` / `(id, newtonMetres)` | the breaking torque (`0` = never, ≥ 0) |
+| `Joint.GetEnableCollision` / `SetEnableCollision` | `(id)` / `(id, bool)` | whether the joined bodies collide |
+
+```lua
+-- A door: hinged to the world about its left edge, swinging 0..110 degrees.
+Scene.AddComponent(door, "Joint")
+Joint.SetKind(door, "Hinge")
+Joint.SetAnchor(door, -0.5, 0, 0)
+Joint.SetAxis(door, 0, 1, 0)
+Joint.SetUseLimits(door, true)
+Joint.SetLimits(door, 0, 110)
+
+-- A lamp that falls when shot hard enough.
+Joint.SetBreakForce(lamp, 200)
+```
 
 ## `Time`
 

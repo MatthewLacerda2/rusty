@@ -7,6 +7,7 @@
 use serde_json::{json, Value};
 
 use super::vec3;
+use crate::components::JointComponent;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ColliderComponent, ColliderShape,
     LightComponent, LightType, MaterialAsset, MeshComponent, NavMeshAgentComponent,
@@ -192,5 +193,24 @@ pub(crate) fn audio_value(a: &AudioSourceComponent) -> Value {
         "spatial_blend": a.spatial_blend,
         "initial_distance": a.initial_distance,
         "final_distance": a.final_distance,
+    })
+}
+
+/// Joint (#449): its kind, connected body (`null`: the world), anchors, axis,
+/// limits (degrees), break thresholds and collision flag.
+pub(crate) fn joint_value(j: &JointComponent) -> Value {
+    json!({
+        "kind": j.kind.name(),
+        "connected_body": j.connected_body,
+        "anchor": vec3(j.anchor),
+        "connected_anchor": vec3(j.connected_anchor),
+        "auto_configure_connected_anchor": j.auto_configure_connected_anchor,
+        "axis": vec3(j.axis),
+        "use_limits": j.use_limits,
+        "limits": [j.limits.x, j.limits.y],
+        "swing_limit": j.swing_limit,
+        "break_force": j.break_force,
+        "break_torque": j.break_torque,
+        "enable_collision": j.enable_collision,
     })
 }

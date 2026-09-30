@@ -1,25 +1,29 @@
 //! src/scripting/lifecycle/physics.rs — dispatch the physics-step callbacks: the
 //! trigger overlaps (`OnTriggerEnter` / `OnTrigger` / `OnTriggerExit`, #310) and
 //! the solid contacts (`OnCollisionEnter` / `OnCollisionStay` / `OnCollisionExit`,
-//! #448), both fed by `PhysicsWorld::step`'s sorted pair lists.
+//! #448), both fed by `PhysicsWorld::step`'s sorted pair lists, then the broken
+//! joints (`OnJointBreak`, #449).
 //!
 //! Order is fixed so replays stay byte-identical: all trigger phases, then all
 //! collision phases, each enter → stay → exit, each pair list ascending, and
-//! every pair notifies A about B then B about A. Only awoken instances of active
+//! every pair notifies A about B then B about A; then the joint breaks, ascending
+//! by joint entity. Only awoken instances of active
 //! entities are called — the one active gate every gameplay hook obeys (#323).
 
 use glam::Vec3;
 use mlua::{Lua, Table};
 
+use super::super::callbacks::ON_JOINT_BREAK;
 use super::super::callbacks::{
     ON_COLLISION_ENTER, ON_COLLISION_EXIT, ON_COLLISION_STAY, ON_TRIGGER, ON_TRIGGER_ENTER,
     ON_TRIGGER_EXIT,
 };
 use super::super::manager::ScriptManager;
-use crate::physics::{CollisionEvents, Contact, PhysicsEvents, TriggerEvents};
+use crate::physics::{CollisionEvents, Contact, JointBreak, PhysicsEvents, TriggerEvents};
 
 impl ScriptManager {
-    /// Dispatch one physics tick's events: triggers first, then collisions.
+    /// Dispatch one physics tick's events: triggers, then collisions, then the
+    /// broken joints.
     pub fn dispatch_physics_events(&mut self, events: PhysicsEvents) {
         if !events.triggers.is_empty() {
             self.dispatch_trigger_events(events.triggers);
@@ -27,6 +31,21 @@ impl ScriptManager {
         if !events.collisions.is_empty() {
             self.dispatch_collision_events(events.collisions);
         }
+        if !events.joint_breaks.is_empty() {
+            self.dispatch_joint_breaks(&events.joint_breaks);
+        }
+    }
+
+    /// `OnJointBreak(id, force, torque)` on the scripts of each entity whose
+    /// joint broke this tick (#449), in the list's ascending order.
+    pub fn dispatch_joint_breaks(&mut self, breaks: &[JointBreak]) {
+        self.with_api_scope(|lua| {
+            for b in breaks {
+                for key in self.awoken_keys_for(b.id) {
+                    self.call_hook(lua, key, ON_JOINT_BREAK, (b.id, b.force, b.torque));
+                }
+            }
+        });
     }
 
     /// Invokes the trigger callbacks on scripts of entities involved in trigger

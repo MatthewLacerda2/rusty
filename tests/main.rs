@@ -27,6 +27,7 @@ mod decals_api;
 mod default_ambient;
 mod graphics_api;
 mod input_api;
+mod joint_api;
 mod kinematic_gravity;
 mod layers_api;
 mod light_probes;

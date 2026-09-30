@@ -139,6 +139,13 @@ including the #91 layer-mask filter). `GetBounds` reads the collider's cached
 world AABB — the `calculate_world_aabb` value the scene recomputes on transform
 edits and each physics step.)
 
+### `Joint` — over `Entity.joint` (#449)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetKind` / `SetConnectedBody` / `SetAnchor` / `SetConnectedAnchor` / `SetAutoConfigureConnectedAnchor` / `SetAxis` / `SetUseLimits` / `SetLimits` / `SetSwingLimit` / `SetEnableCollision` | ✅ | sim — `PhysicsWorld::resync_joints` builds the rapier joint from them, rebuilding on a change (`src/physics/joints_tests.rs`); round-trips, the connected body remapped through prefabs (`tests/joint_api.rs`) |
+| `SetBreakForce` / `SetBreakTorque` | ✅ | sim — `PhysicsWorld::break_joints` reads them live after each step (`src/physics/joints_tests.rs`); round-trips |
+
 ### `Time` — over the `Time` resource
 
 | Setter | Status | Read-site |

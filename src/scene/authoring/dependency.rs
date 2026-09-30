@@ -26,6 +26,7 @@
 //!
 //! Allowed deps: components, scene, ecs.
 
+use crate::components::JointComponent;
 use crate::components::{
     CanvasComponent, CanvasGroupComponent, ImageComponent, RectMaskComponent,
     RectTransformComponent, SelectableComponent, TextComponent,
@@ -62,6 +63,7 @@ pub(crate) fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::Selectable => world.has_selectable(id),
         ComponentKind::LayoutGroup => world.has_layout_group(id),
         ComponentKind::LayoutElement => world.has_layout_element(id),
+        ComponentKind::Joint => world.has_joint(id),
     }
 }
 
@@ -101,6 +103,7 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
         ComponentKind::LayoutElement => {
             world.set_layout_element(id, Some(LayoutElementComponent::default()))
         }
+        ComponentKind::Joint => world.set_joint(id, Some(JointComponent::default())),
     }
 }
 
@@ -128,6 +131,7 @@ pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool
         ComponentKind::Selectable => world.set_selectable(id, None),
         ComponentKind::LayoutGroup => world.set_layout_group(id, None),
         ComponentKind::LayoutElement => world.set_layout_element(id, None),
+        ComponentKind::Joint => world.set_joint(id, None),
     }
 }
 

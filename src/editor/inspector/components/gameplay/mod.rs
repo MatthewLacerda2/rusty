@@ -1,16 +1,19 @@
 //! src/editor/inspector/components/gameplay/ — the gameplay inspector cards. This
 //! `mod.rs` holds the Lua Script and Animator cards; the physics-flavoured cards
 //! live apart to stay under the size cap: the Collider card in `collider`, the
-//! RigidBody card in `physics`, the NavMesh Agent card in `nav_agent`.
+//! RigidBody card in `physics`, the NavMesh Agent card in `nav_agent`, the Joint
+//! card in `joint`.
 
 use egui_phosphor::regular as icon;
 use std::path::Path;
 
 mod collider;
+mod joint;
 mod nav_agent;
 mod physics;
 
 pub use collider::draw_collider;
+pub use joint::draw_joint;
 pub use nav_agent::draw_nav_agent;
 pub use physics::draw_rigidbody;
 

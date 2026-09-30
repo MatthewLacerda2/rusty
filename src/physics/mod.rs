@@ -27,6 +27,9 @@ mod compound;
 #[cfg(test)]
 mod compound_tests;
 mod convert;
+mod joints;
+#[cfg(test)]
+mod joints_tests;
 mod material;
 #[cfg(test)]
 mod material_tests;
@@ -44,6 +47,7 @@ mod trigger_tests;
 mod world;
 
 pub use collision_events::{CollisionEvents, CollisionPair, Contact};
+pub use joints::JointBreak;
 pub use query::RayHit;
 pub use trigger_events::TriggerEvents;
 pub use world::PhysicsWorld;
@@ -51,11 +55,13 @@ pub use world::PhysicsWorld;
 use crate::scene::Scene;
 
 /// Everything one physics tick surfaces to scripts: the trigger overlaps
-/// (`OnTrigger*`) and the solid contacts (`OnCollision*`, #448).
+/// (`OnTrigger*`), the solid contacts (`OnCollision*`, #448) and the joints that
+/// broke (`OnJointBreak`, #449), ascending by joint entity.
 #[derive(Debug, Default)]
 pub struct PhysicsEvents {
     pub triggers: TriggerEvents,
     pub collisions: CollisionEvents,
+    pub joint_breaks: Vec<JointBreak>,
 }
 
 /// The hitscan acceptance test shared by the engine hitscan and the Lua

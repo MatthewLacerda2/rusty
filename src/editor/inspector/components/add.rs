@@ -137,8 +137,9 @@ fn add_lighting_combat(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32
     }
 }
 
-/// Add-menu entries for rigidbody, material/texture and nav-agent. Each entry is
-/// offered only when absent.
+/// Add-menu entries for rigidbody, material/texture, nav-agent and joint. Each entry
+/// is offered only when absent. A Joint declares `requires(RigidBody)` (#449), so it
+/// goes through the shared dependency verb, matching `Scene.AddComponent`.
 fn add_physics_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
     if !world.has_rigidbody(id) && ui.button("RigidBody Component").clicked() {
         world.set_rigidbody(id, Some(authoring::default_rigidbody()));
@@ -150,6 +151,10 @@ fn add_physics_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: 
     }
     if !world.has_nav_agent(id) && ui.button("NavMesh Agent Component").clicked() {
         world.set_nav_agent(id, Some(authoring::default_nav_agent()));
+        ui.close_menu();
+    }
+    if !world.has_joint(id) && ui.button(format!("{}  Joint", icon::LINK)).clicked() {
+        authoring::add_with_requirements(world, id, ComponentKind::Joint);
         ui.close_menu();
     }
 }
