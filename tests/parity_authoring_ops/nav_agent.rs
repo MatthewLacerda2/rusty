@@ -36,6 +36,8 @@ fn nav_agent_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Erro
             NavMeshAgent.SetStoppingDistance({via_lua}, 0.5)
             NavMeshAgent.SetRadius({via_lua}, 0.4)
             NavMeshAgent.SetTarget({via_lua}, 1.0, 0.0, 2.0)
+            NavMeshAgent.SetAvoidancePriority({via_lua}, 17)
+            NavMeshAgent.SetAvoidanceEnabled({via_lua}, false)
         "#
         ))
         .exec()
@@ -52,6 +54,8 @@ fn nav_agent_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Erro
         nav_ops::set_stopping_distance(&mut e, 0.5);
         nav_ops::set_radius(&mut e, 0.4);
         nav_ops::set_target(&mut e, Vec3::new(1.0, 0.0, 2.0));
+        nav_ops::set_avoidance_priority(&mut e, 17.0);
+        nav_ops::set_avoidance_enabled(&mut e, false);
     }
 
     let sc = scene.borrow();
@@ -63,5 +67,8 @@ fn nav_agent_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Erro
     assert_eq!(a.stopping_distance, b.stopping_distance);
     assert_eq!(a.radius, b.radius);
     assert_eq!(a.target, b.target);
+    assert_eq!((a.avoidance_priority, a.avoidance_enabled), (17, false));
+    assert_eq!(a.avoidance_priority, b.avoidance_priority);
+    assert_eq!(a.avoidance_enabled, b.avoidance_enabled);
     Ok(())
 }

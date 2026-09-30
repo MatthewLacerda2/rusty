@@ -1,5 +1,7 @@
+mod tick;
+
 use super::NavigationGraph;
-use crate::scene::{NavMeshAgentComponent, Scene};
+use crate::scene::NavMeshAgentComponent;
 use glam::Vec3;
 
 /// Squared world-distance the target may drift before a cached agent path is
@@ -83,101 +85,6 @@ impl NavigationGraph {
             Some(wp) => *wp,
             None => agent.target,
         }
-    }
-
-    /// Steers and updates positions of active NavMesh agents in the scene,
-    /// constraining them strictly to walkable NavMesh cells using a 2D sliding projection check.
-    pub fn tick_nav_agents(&self, scene: &mut Scene, delta_time: f32) {
-        for id in scene.world.ids_with_nav_agent() {
-            if !scene.world.is_active(id) {
-                continue;
-            }
-            // Take the agent out, steer, write it back — the same idiom as the
-            // particle tick, so the transform borrow never aliases the agent's.
-            let Some(mut agent) = scene.world.take_nav_agent(id) else {
-                continue;
-            };
-            let current_pos = scene.world.transform(id).map(|t| t.position);
-            if let (true, Some(current_pos)) = (agent.active, current_pos) {
-                let dist = (agent.target - current_pos).length();
-
-                if dist > agent.stopping_distance {
-                    let new_pos = self.steer_agent(&mut agent, current_pos, delta_time);
-                    if let Some(mut t) = scene.world.transform_mut(id) {
-                        t.position = new_pos;
-                    }
-                } else {
-                    // Decelerate to zero velocity when close
-                    agent.velocity -= agent.velocity * (agent.acceleration * delta_time).min(1.0);
-                    if agent.velocity.length_squared() < 0.001 {
-                        agent.velocity = Vec3::ZERO;
-                    }
-                }
-
-                // Keep entity's collider bounds aligned with transform positioning
-                // (local matrix only — the legacy path never resolved the parent here).
-                let local = scene.world.transform(id).map(|t| t.to_matrix());
-                if let (Some(local), Some(mut col)) = (local, scene.world.collider_mut(id)) {
-                    let (min, max) = col.calculate_world_aabb(local);
-                    col.aabb_min = min;
-                    col.aabb_max = max;
-                }
-            }
-            scene.world.set_nav_agent(id, Some(agent));
-        }
-    }
-
-    /// Accelerate the agent toward its next waypoint and return the new, slide-
-    /// constrained position. Steering velocity is planar (XZ): horizontal speed is
-    /// unaffected by climbing, and the agent snaps to the baked surface height of
-    /// the cell it ends on (#130) — `y` follows ramps/stairs instead of preserved.
-    fn steer_agent(
-        &self,
-        agent: &mut NavMeshAgentComponent,
-        current_pos: Vec3,
-        delta_time: f32,
-    ) -> Vec3 {
-        // Query the next waypoint from the agent's cached path,
-        // re-planning with A* only when the cache is invalid (#126).
-        let next_step = self.cached_next_step(agent, current_pos);
-        // Steer on the XZ plane so a tall step doesn't inflate the move distance.
-        let mut to_next_dir = next_step - current_pos;
-        to_next_dir.y = 0.0;
-        let to_next_dir = to_next_dir.normalize_or_zero();
-
-        // Accelerate steering velocity (kept planar; y is snapped, not integrated).
-        let desired_vel = to_next_dir * agent.speed;
-        let diff_vel = desired_vel - agent.velocity;
-        agent.velocity += diff_vel * (agent.acceleration * delta_time).min(1.0);
-        agent.velocity.y = 0.0;
-
-        let (cx, cz) = self.world_to_grid(current_pos);
-        let mut final_pos = current_pos;
-
-        // Test X movement slide: only step onto a cell reachable from the current
-        // one (walkable AND within the step/slope limit), so agents climb ramps and
-        // stairs but never slide up a wall face (#130).
-        let proposed_pos_x = current_pos + Vec3::new(agent.velocity.x * delta_time, 0.0, 0.0);
-        let (gx, gz) = self.world_to_grid(proposed_pos_x);
-        if self.step_connected(cx, cz, gx, gz) {
-            final_pos.x = proposed_pos_x.x;
-        } else {
-            agent.velocity.x = 0.0;
-        }
-
-        // Test Z movement slide
-        let proposed_pos_z = final_pos + Vec3::new(0.0, 0.0, agent.velocity.z * delta_time);
-        let (gx, gz) = self.world_to_grid(proposed_pos_z);
-        if self.step_connected(cx, cz, gx, gz) {
-            final_pos.z = proposed_pos_z.z;
-        } else {
-            agent.velocity.z = 0.0;
-        }
-
-        // Snap Y to the baked surface under the new XZ — the agent rides the ramp.
-        let (gx, gz) = self.world_to_grid(final_pos);
-        final_pos.y = self.height_at(gx, gz);
-        final_pos
     }
 }
 

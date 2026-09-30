@@ -1,7 +1,6 @@
 //! Value-asserting agent steering tests for #161 mutation burn-down.
 //!
-//! `agents.rs` is already at the 300-line cap, so these tests exercise the
-//! public `tick_nav_agents` interface to kill arithmetic and comparison mutants
+//! These tests exercise the public `tick_nav_agents` interface to kill arithmetic and comparison mutants
 //! that the coverage-only tests miss.
 
 use glam::Vec3;

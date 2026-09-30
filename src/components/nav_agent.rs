@@ -6,7 +6,12 @@
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+/// Unity's default `avoidancePriority`: the middle of the 0–99 range.
+pub const DEFAULT_AVOIDANCE_PRIORITY: u8 = 50;
+/// The highest (least important) avoidance priority, as in Unity.
+pub const MAX_AVOIDANCE_PRIORITY: u8 = 99;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NavMeshAgentComponent {
     pub active: bool,
     pub radius: f32,
@@ -15,6 +20,17 @@ pub struct NavMeshAgentComponent {
     pub acceleration: f32,
     pub stopping_distance: f32,
     pub velocity: Vec3,
+    /// Local-avoidance importance, 0–99 (Unity's `avoidancePriority`): the
+    /// **lower** the number, the more important the agent. An agent ignores
+    /// neighbours with a higher number (they yield to it), splits the dodge
+    /// with equals, and fully yields to lower numbers (#463).
+    #[serde(default = "default_avoidance_priority")]
+    pub avoidance_priority: u8,
+    /// Whether this agent steers around other agents (Unity's
+    /// `obstacleAvoidanceType != None`). A non-avoiding agent is still a
+    /// neighbour the others steer around; it just never dodges itself.
+    #[serde(default = "default_true")]
+    pub avoidance_enabled: bool,
 
     // --- Cached pathfinding state (#126) ---
     //
@@ -40,4 +56,33 @@ pub struct NavMeshAgentComponent {
     /// (frame-count based, never wall-clock, so the sim stays deterministic).
     #[serde(skip)]
     pub frames_since_replan: u32,
+}
+
+fn default_avoidance_priority() -> u8 {
+    DEFAULT_AVOIDANCE_PRIORITY
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for NavMeshAgentComponent {
+    fn default() -> Self {
+        Self {
+            active: false,
+            radius: 0.0,
+            target: Vec3::ZERO,
+            speed: 0.0,
+            acceleration: 0.0,
+            stopping_distance: 0.0,
+            velocity: Vec3::ZERO,
+            avoidance_priority: DEFAULT_AVOIDANCE_PRIORITY,
+            avoidance_enabled: true,
+            cached_path: Vec::new(),
+            path_cursor: 0,
+            planned_target: Vec3::ZERO,
+            path_generation: 0,
+            frames_since_replan: 0,
+        }
+    }
 }

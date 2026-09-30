@@ -141,6 +141,8 @@ pub(crate) fn nav_agent_value(n: &NavMeshAgentComponent) -> Value {
         "acceleration": n.acceleration,
         "stopping_distance": n.stopping_distance,
         "velocity": vec3(n.velocity),
+        "avoidance_priority": n.avoidance_priority,
+        "avoidance_enabled": n.avoidance_enabled,
     })
 }
 
