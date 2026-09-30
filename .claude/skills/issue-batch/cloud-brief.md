@@ -5,9 +5,13 @@ carries only step 0 (which runs before this file is read), a pointer here, and w
 is specific to its issue. When a lesson changes how cloud coders must work, change
 it **here**, once, not in the next prompt.
 
-**Nobody can talk to you; the pull request is your only report.** Use the GitHub
+**Nobody can talk to you; the pull request is your only report.** Never send the operator a push notification: a hand-back or a decision goes in the PR description and an issue comment, where the orchestrator reads it and decides. Most "needs your call" questions are the orchestrator's to answer, and a phone alert at night is not how the batch works. Use the GitHub
 MCP tools (`issue_read`, `create_pull_request`, `update_pull_request`,
 `add_issue_comment`); load them with ToolSearch.
+
+## Check the issue's blockers yourself
+
+Before writing code, read the issue body for "Blocked by" and check each blocker's state on GitHub. The orchestrator checks GitHub's recorded relationships, and a blocker that exists only in prose slips past it. If a blocker is still open, stand down as the ~3-attempts rule says (comment on the issue, no branch) and say which issue should go first. (#399 on 2026-09-30.)
 
 ## Read first
 
