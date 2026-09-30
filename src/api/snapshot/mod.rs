@@ -22,6 +22,7 @@ use crate::components::TransformComponent;
 use crate::ecs::World;
 use crate::scene::Camera;
 use crate::scene::Scene;
+use crate::ui::UiView;
 use components::{
     animator_value, audio_value, camera_component_value, collider_value, light_value,
     material_value, mesh_value, nav_agent_value, particle_value, rigidbody_value,
@@ -46,6 +47,8 @@ pub fn world_value(
     playing: bool,
     screen: Vec2,
 ) -> Value {
+    // Markers are placed through the camera, as the UI lays them out (#429).
+    let view = UiView::with_camera(screen, camera.clone());
     // Collect ids first so the per-entity accessor borrows below don't overlap
     // any iterator-held guard.
     let ids = scene.entity_ids();
@@ -54,7 +57,7 @@ pub fn world_value(
         .filter(|&&id| scene.world.contains(id))
         .map(|&id| {
             let world_matrix = scene.compute_world_matrix(id);
-            entity_value(scene, id, world_matrix, screen)
+            entity_value(scene, id, world_matrix, &view)
         })
         .collect();
     json!({
@@ -76,11 +79,11 @@ fn camera_value(cam: &Camera) -> Value {
 }
 
 /// One entity in the stable authoring shape. `world_matrix` is the entity's
-/// parent-aware world transform, used for the world-space bounds; `screen` is the
-/// UI's screen size in pixels, used for the computed `ui_rect`. Reads route
+/// parent-aware world transform, used for the world-space bounds; `view` is the
+/// UI's screen and camera, used for the computed `ui_rect` (markers included). Reads route
 /// through the `World` component accessors (#344) instead of projecting fields
 /// out of a whole-`Entity` borrow, so heavy fields (meshes) are never cloned.
-pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, screen: Vec2) -> Value {
+pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -> Value {
     let world = &scene.world;
     let material = scene.material_asset_of(id);
     json!({
@@ -122,8 +125,8 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, screen: Vec2) ->
         "layout_element": world.layout_element(id).map(|e| layout_element_value(&e)),
         "joint": world.joint(id).map(|j| joint_value(&j)),
         "lod_group": world.lod_group(id).map(|g| lod_group_value(&g)),
-        "ui_rect": crate::ui::layout::rect_of(world, id, screen)
-            .map(|r| super::ui::rect_value(&r)),
+        "ui_rect": crate::ui::layout::rect_in(world, id, view)
+            .map(|r| super::ui::rect_value(world, &r, view)),
     })
 }
 

@@ -18,6 +18,10 @@ pub(crate) fn canvas_value(c: &CanvasComponent) -> Value {
         "sort_order": c.sort_order,
         "reference_resolution": [c.reference_resolution.x, c.reference_resolution.y],
         "match_width_or_height": c.match_width_or_height,
+        "pixels_per_unit": c.pixels_per_unit,
+        "plane_distance": c.plane_distance,
+        "tilt": [c.tilt.x, c.tilt.y],
+        "sway": c.sway,
     })
 }
 
@@ -31,6 +35,14 @@ pub(crate) fn rect_transform_value(r: &RectTransformComponent) -> Value {
         "pivot": v(r.pivot),
         "anchored_position": v(r.anchored_position),
         "size_delta": v(r.size_delta),
+        "world_anchor": r.world_anchor.as_ref().map(|a| json!({
+            "target": a.target,
+            "offset": [a.offset.x, a.offset.y, a.offset.z],
+            "clamp_to_screen_edge": a.clamp_to_screen_edge,
+            "edge_padding": a.edge_padding,
+            "rotate_toward_target": a.rotate_toward_target,
+            "hide_when_behind": a.hide_when_behind,
+        })),
     })
 }
 

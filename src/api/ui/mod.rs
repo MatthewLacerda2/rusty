@@ -25,7 +25,7 @@ use crate::core::video::VideoSettings;
 use crate::scene::authoring::ui_widgets::{create_ui, UiWidget};
 use crate::scene::{Camera, Scene};
 use crate::ui::space::{rect_screen_bounds, space_of, CanvasSpace};
-use crate::ui::{layout, ScreenSize, UiRect};
+use crate::ui::{layout, ScreenSize, UiRect, UiView};
 
 /// Register the `UI` namespace onto `lua`.
 pub fn register<'lua, 'scope>(
@@ -113,10 +113,14 @@ fn rect_table<'lua>(
 
 /// The JSON shape of a rect, for `Debug.Snapshot`'s `ui_rect`: the same keys as
 /// `UI.GetRect`'s table.
-pub(crate) fn rect_value(r: &UiRect) -> Value {
+pub(crate) fn rect_value(world: &crate::ecs::World, r: &UiRect, view: &UiView) -> Value {
     let boxed = |(lo, hi): (Vec2, Vec2)| json!({ "x": lo.x, "y": lo.y, "width": hi.x - lo.x, "height": hi.y - lo.y });
+    let space = space_of(world, r.canvas, view);
     let mut v = boxed(r.bounds());
-    v["screen"] = boxed(r.screen_bounds());
+    if let Some(screen) = rect_screen_bounds(space, r, view) {
+        v["screen"] = boxed(screen);
+    }
+    v["world"] = json!(matches!(space, CanvasSpace::World(_)));
     v["corners"] = json!(r.corners.map(|c| json!({ "x": c.x, "y": c.y })));
     v["canvas"] = json!(r.canvas);
     v["scale_factor"] = json!(r.scale_factor);

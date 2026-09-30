@@ -12,6 +12,7 @@ use mlua::{Lua, Table};
 use super::{put, snapshot, ApiScopedCtx, Reg};
 use crate::dev::preview::{capture_asset, PreviewOptions};
 use crate::preview::PreviewMesh;
+use crate::ui::UiView;
 
 /// Register the `Debug` namespace onto `lua` (dev builds only).
 pub fn register<'lua, 'scope>(
@@ -168,7 +169,8 @@ fn register_snapshot<'lua, 'scope>(
             let scene = scene.borrow();
             let world_matrix = scene.compute_world_matrix(id);
             let value = if scene.world.contains(id) {
-                snapshot::entity_value(&scene, id, world_matrix, pixels())
+                let view = UiView::with_camera(pixels(), camera.borrow().clone());
+                snapshot::entity_value(&scene, id, world_matrix, &view)
             } else {
                 serde_json::Value::Null
             };
