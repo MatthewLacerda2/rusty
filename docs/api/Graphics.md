@@ -2,7 +2,7 @@
 
 Live control over the engine's **existing** post-FX and quality knobs, so a script
 can drive its own settings logic. The per-volume getters/setters target the first
-**active** `VisualCorrectionComponent` (color/bloom/SSR) and the first **active**
+**active** `VisualCorrectionComponent` (color/bloom/SSR/shadows/SSAO) and the first **active**
 `CameraComponent` (motion blur) in the scene — the same volume `build_post_params`
 packs into the GPU uniform each frame, so a write here takes effect next frame.
 Getters return a neutral default when no active volume/camera exists.
@@ -32,6 +32,9 @@ Getters return a neutral default when no active volume/camera exists.
 | `Graphics.GetFogEnd` / `SetFogEnd` | `()` / `(units)` | `number` (clamped ≥ 0, **default `100`**; linear mode only) |
 | `Graphics.GetFogHeightFalloff` / `SetFogHeightFalloff` | `()` / `(value)` | `number` (clamped ≥ 0, **default `0`** = uniform) |
 | `Graphics.GetFogBaseHeight` / `SetFogBaseHeight` | `()` / `(y)` | `number` (world height, **default `0`**) |
+| `Graphics.GetSsaoActive` / `SetSsaoActive` | `()` / `(bool)` | `bool` (**default `true`** on a volume; `false` with no active volume) |
+| `Graphics.GetSsaoRadius` / `SetSsaoRadius` | `()` / `(units)` | `number` (world units, clamped ≥ 0.01, **default `0.5`**) |
+| `Graphics.GetSsaoIntensity` / `SetSsaoIntensity` | `()` / `(value)` | `number` (clamped 0–4, **default `1`**) |
 
 **Gamma** is a display-gamma *tweak*, not the output encode: the render target
 (window, Game view, and headless screenshot alike) is sRGB and encodes linear →
@@ -73,6 +76,26 @@ The shader-authoring block `height_fog` (`Shader.md`) is a separate, per-materia
 *look*; every authored surface variant is fogged by the scene fog on top of it.
 Fog is render-only, so it cannot affect the deterministic sim.
 
+**SSAO** (screen-space ambient occlusion, #436) darkens the *ambient* light where
+geometry crowds a point — the strip of floor at a crate's foot, the inside corner of
+a room, the gap behind a door frame — which probes are too sparse to see. It touches
+only the ambient term and the environment reflection, never the sun, a lamp or a
+spotlight, so a lit wall stays lit; it is computed before the forward pass, not over
+the finished image, so fog (applied after lighting) fogs the occluded colour rather
+than AO darkening the fog. **Radius** is how far (world units) another surface can be and
+still shade a point; **intensity** is the strength (`0` none, `1` natural, up to `4`
+exaggerated). The knobs live on the active visual-correction volume (the Inspector's
+**Ambient Occlusion** section edits the same fields) and are saved with the scene;
+scenes saved before the knob existed load with it on. Without an active volume AO
+does not run.
+
+Its cost is gated by the quality preset: **off on Low**; on **Medium** 8 samples
+per texel at half resolution; on **High** 16 at full resolution. Either way each
+camera also draws its visible solids once more, depth only (a prepass), and runs a
+25-tap blur at full resolution. The frame stats report it (`ssao_samples`, and the
+prepass inside `draw_calls` / `triangles`; see `Debug`). `SetSsaoActive(false)` —
+or intensity `0` — skips every one of those passes.
+
 **FXAA** is the anti-aliasing pass at the very end of the chain, running on the
 tonemapped image just before it reaches the screen. It is **on by default** — a
 scene saved before the knob existed loads with it on, and so does a scene with no
@@ -83,7 +106,8 @@ anti-aliasing an integrated GPU wants. Turning it off restores raw, stair-steppe
 edges — useful for a pixel-art look, or for diffing screenshots.
 
 The global **quality preset** gates the heavier passes (SSR is High-tier only;
-motion blur is off on Low; FXAA runs on all of them). `SetQuality` writes a shared
+motion blur and SSAO are off on Low, SSAO is half-resolution on Medium; FXAA runs
+on all of them). `SetQuality` writes a shared
 resource cell that the platform layer reads each frame and hands to the renderer,
 which reallocates its bloom buffers when the tier actually changes. Unrecognized
 tonemap/quality names are ignored (the current value is kept).

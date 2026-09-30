@@ -24,6 +24,7 @@ mod postfx_screenshot;
 mod preview_api;
 mod skinned_shadows_screenshot;
 mod skinning_joint_cap;
+mod ssao_screenshot;
 mod transparent_sorting_screenshot;
 mod ui_hud_scene;
 mod ui_hud_screenshot;

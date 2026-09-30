@@ -63,6 +63,9 @@ fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
         vc_ops::set_ssr_quality(&mut vc, "High".to_string());
         vc_ops::set_shadow_cascades(&mut vc, 9); // clamped to 4
         vc_ops::set_shadow_distance(&mut vc, 60.0);
+        vc_ops::set_ssao_radius(&mut vc, -1.0); // clamped to 0.01
+        vc_ops::set_ssao_intensity(&mut vc, 9.0); // clamped to 4
+        vc_ops::set_ssao_active(&mut vc, false);
     }
     let mut cam = sc.world.camera_mut(id).unwrap();
     camera_ops::set_motion_blur_active(&mut cam, true);
@@ -92,6 +95,10 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
             Graphics.SetSsrQuality("High")
             Graphics.SetShadowCascades(9)
             Graphics.SetShadowDistance(60)
+            Graphics.SetSsaoRadius(-1)
+            Graphics.SetSsaoIntensity(9)
+            Graphics.SetSsaoActive(false)
+            assert(Graphics.GetSsaoIntensity() == 4 and not Graphics.GetSsaoActive())
             Graphics.SetMotionBlurActive(true)
             Graphics.SetMotionBlurSamples(16)
             Graphics.SetFxaaActive(false)
@@ -115,6 +122,7 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     assert_eq!(lvc.ssr_active, ovc.ssr_active);
     assert_eq!(lvc.ssr_quality, ovc.ssr_quality);
     assert_eq!(lvc.shadows, ovc.shadows);
+    assert_eq!(lvc.ssao, ovc.ssao);
     assert_eq!(lvc.bloom_intensity, 0.0, "single-sourced clamp");
     assert_eq!(lvc.gamma, 0.01, "single-sourced clamp");
     let lcam = ls.world.camera(lua_id).unwrap().clone();

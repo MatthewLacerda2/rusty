@@ -68,6 +68,15 @@ fn flatter(back: vec3<f32>, fwd: vec3<f32>) -> vec3<f32> {
     return back;
 }
 
+// How many pixels a `radius` offset at `P`, across the view, spans on screen.
+fn radius_in_pixels(P: vec3<f32>, radius: f32, dims: vec2<f32>) -> f32 {
+    let f = p.camera_fwd.xyz;
+    let side = normalize(cross(f, select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), abs(f.y) > 0.9)));
+    let a = p.view_proj * vec4<f32>(P, 1.0);
+    let b = p.view_proj * vec4<f32>(P + side * radius, 1.0);
+    return length((b.xy / b.w - a.xy / a.w) * 0.5 * dims);
+}
+
 @fragment
 fn fs_ao(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let step = i32(p.params.w);
@@ -97,6 +106,12 @@ fn fs_ao(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let jitter = ign(frag.yx + 17.0);
     let dims = vec2<f32>(textureDimensions(t_depth));
     let depth_p = view_depth(P);
+    // Slope-scaled bias: a sample is snapped to a pixel centre, and at a grazing
+    // angle one pixel spans a long stretch of the same surface, so allow one
+    // pixel's worth of depth change along it before calling anything an occluder.
+    let r_px = radius_in_pixels(P, radius, dims);
+    let grazing = max(abs(dot(N, normalize(p.camera_pos.xyz - P))), 0.1);
+    let bias = 0.02 * radius + radius / max(r_px, 1e-3) / grazing;
     var occlusion = 0.0;
     for (var i = 0u; i < n; i = i + 1u) {
         // Cosine-weighted hemisphere direction on a golden-angle spiral; the reach
@@ -119,11 +134,14 @@ fn fs_ao(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
         let scene_d = view_depth(world_px(vec2<i32>(uv * dims)));
         // Fade occluders far outside the radius (a wall metres behind a pillar).
         let range = smoothstep(0.0, 1.0, radius / max(abs(depth_p - scene_d), 1e-4));
-        if (scene_d < view_depth(S) - 0.02 * radius) {
+        if (scene_d < view_depth(S) - bias) {
             occlusion += range;
         }
     }
-    let ao = 1.0 - occlusion / f32(max(n, 1u));
+    // Where the radius covers under a couple of pixels (the far floor, the horizon)
+    // pixel quantization alone reads as occlusion; fade AO out there.
+    let fade = smoothstep(1.0, 3.0, r_px);
+    let ao = 1.0 - fade * occlusion / f32(max(n, 1u));
     return vec4<f32>(pow(ao, p.params.y), 0.0, 0.0, 1.0);
 }
 
