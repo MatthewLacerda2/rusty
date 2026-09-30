@@ -83,6 +83,9 @@ pub struct Resources {
     /// Edit-mode scene captured on Play and restored on Stop, so play-mode mutations
     /// never leak back into the authoritative edit scene (Unity-style).
     pub(super) edit_snapshot: Option<SceneSnapshot>,
+    /// The scene file and identity editor Play started in, put back on Stop after a
+    /// play-mode `Scene.Load` (#432). Taken with `edit_snapshot`.
+    pub(super) play_origin: Option<super::scene_load::PlayOrigin>,
     /// A standalone run (the player, #431) has no edit mode to return to, so Play
     /// takes no edit snapshot. Set once by `GameWorld::boot_standalone`.
     pub(super) standalone: bool,
@@ -153,6 +156,7 @@ impl Resources {
             was_playing: false,
             play_frame: 0,
             edit_snapshot: None,
+            play_origin: None,
             standalone: false,
             frame_dt: 0.0,
             schedule: super::build().into_schedule(),

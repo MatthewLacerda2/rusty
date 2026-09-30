@@ -90,7 +90,7 @@ Component menu offers.
 
 | Callback | Signature | When it runs |
 |---|---|---|
-| `Awake` | `Awake(id)` | Once per script instance, when it first participates in the sim while its entity is `active`: at play-enter for active scene entities, at the head of the next tick's script phase for entities spawned during play (see the divergence note below), or on the entity's first active tick when it is loaded/spawned disabled. Always the instance's first callback. |
+| `Awake` | `Awake(id)` | Once per script instance, when it first participates in the sim while its entity is `active`: at play-enter for active scene entities, at the head of the next tick's script phase for entities spawned during play (see the divergence note below) or loaded by `Scene.Load`, or on the entity's first active tick when it is loaded/spawned disabled. Always the instance's first callback. |
 | `Start` | `Start(id)` | Once per script instance, after its `Awake`, immediately before its first `Update` — deferred while the owning entity is inactive, so an object instantiated disabled initializes when first enabled (the spawn-pool pattern). |
 | `Update` | `Update(id, dt)` | Every frame of play while the owning entity is `active`, after the instance's `Start` has run. `dt` is the frame's scaled delta (`Time.deltaTime`); under the headless harness / `Time.Step` it is the fixed step. |
 | `LateUpdate` | `LateUpdate(id, dt)` | Every frame of play while the owning entity is `active`, after **every** script's `Update` and after this tick's physics, animation and particle steps have resolved — the post-physics hook. Same scaled `dt` as `Update` (`Time.deltaTime`) and the same deterministic `(entity, script index)` order, still inside the one `FixedUpdate` sim tick — it is **not** a render-rate callback. Reach for it when a script must read *this* tick's settled transforms: follow-cameras, look-ats, aim, recoil recovery, and other post-move corrections that visibly lag by a step if run in `Update`. |
@@ -103,7 +103,7 @@ Component menu offers.
 | `OnJointBreak` | `OnJointBreak(id, force, torque)` | Once, on the tick the entity's `Joint` carried more than its non-zero `break_force` (newtons) or `break_torque` (newton-metres) — after that tick's collision callbacks. `force` / `torque` are what it carried. The `Joint` component is already destroyed (Unity), so the bodies are free. |
 | `OnEnable` | `OnEnable(id)` | When the owning entity becomes `active`: on its **first** activation — between `Awake` and `Start`, so the first-tick order is `Awake → OnEnable → Start` — and again on every later inactive→active transition (e.g. a script or `Scene.Activate` re-enabling a pooled object). Detected by diffing the entity's `active` flag against the previous tick, so it fires **exactly once** per rising edge. |
 | `OnDisable` | `OnDisable(id)` | When the owning entity becomes inactive: once on each `active`→inactive transition (e.g. `Scene.Deactivate`), and once more — immediately **before** `OnDestroy` — when an *active* entity is destroyed. Fires **exactly once** per falling edge. While disabled, the entity receives no other gameplay callback (no `Update`/`LateUpdate`/`OnTrigger`/`OnCollision*`). |
-| `OnDestroy` | `OnDestroy(id)` | Once, when the entity is removed **during play** via `Scene.DestroyEntity` — after its `OnDisable` if it was active. The entity is still readable during the callback (removal happens just after). See the divergence note: **Stop does not fire `OnDestroy`.** |
+| `OnDestroy` | `OnDestroy(id)` | Once, when the entity is removed **during play** — by `Scene.DestroyEntity`, or because `Scene.Load` unloaded its scene (unless it was marked `Scene.DontDestroyOnLoad`) — after its `OnDisable` if it was active. The entity is still readable during the callback (removal happens just after). See the divergence note: **Stop does not fire `OnDestroy`.** |
 | `OnPointerEnter` | `OnPointerEnter(id, event)` | UI (#420): the pointer moved onto the entity or one of its descendants. Fires on every entity from the hit one up to the root that defines it, deepest first — moving from a button onto its own label does not re-enter the button. |
 | `OnPointerExit` | `OnPointerExit(id, event)` | UI: the pointer left the entity and all its descendants (deepest first). |
 | `OnPointerDown` | `OnPointerDown(id, event)` | UI: a mouse button went down over the entity. Bubbles — see below. |
@@ -184,6 +184,12 @@ headless replays stay byte-identical):
   tick: all `OnDisable`s first, then all `OnDestroy`s, in ascending
   `(entity id, script index)` order, before the entities are removed. Every
   edge fires exactly once, so replays stay byte-identical.
+- The scene-load phase follows the destroy phase, still at the tick's tail: a
+  `Scene.Load` requested this tick unloads the outgoing scene — the same
+  teardown, all `OnDisable`s then all `OnDestroy`s in ascending
+  `(entity id, script index)` order, for every entity that does not survive —
+  and swaps the new scene in. Its scripts `Awake` / `OnEnable` / `Start` at
+  the head of the next tick, like spawns.
 - The UI callbacks run in their own phase between the init phase and
   `Update` (so a button reacts the same tick, and gameplay's `Update` already
   sees `UI.IsPointerConsumed()` settled): focus changes a script made last tick
@@ -213,12 +219,14 @@ headless replays stay byte-identical):
 > enabling it when ready defers init the same way).
 
 > **Divergence from Unity — Stop does not fire `OnDestroy`.** Unity calls
-> `OnDestroy` on every object when a scene is torn down. In rusty, leaving Play
-> (Stop) **restores the edit-mode snapshot** — it discards all play-mode state
-> and rewinds to the authored scene, a reset rather than gameplay. Scripts must
-> not observe it, so no `OnDisable`/`OnDestroy` fires on Stop. `OnDestroy` fires
-> **only** for an entity removed *during* play via `Scene.DestroyEntity` (the
-> destructive verb) — that is real gameplay. `Scene.Deactivate` (Unity's
+> `OnDestroy` on every object when a scene is torn down. rusty does so when
+> *gameplay* tears a scene down — `Scene.Load` unloads the outgoing scene with
+> `OnDisable` then `OnDestroy`, as Unity does. But leaving Play (Stop)
+> **restores the edit-mode snapshot** — it discards all play-mode state and
+> rewinds to the authored scene, a reset rather than gameplay. Scripts must not
+> observe it, so no `OnDisable`/`OnDestroy` fires on Stop. `OnDestroy` fires
+> **only** for an entity removed *during* play, via `Scene.DestroyEntity` (the
+> destructive verb) or a `Scene.Load` unload — that is real gameplay. `Scene.Deactivate` (Unity's
 > deferred destroy) never fires `OnDestroy`; it flips `active`, so it fires
 > `OnDisable` instead.
 
@@ -547,6 +555,9 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.SetParent` | `(id, parent_id)` | — (errors on a parenting cycle) |
 | `Scene.ClearParent` | `(id)` | — |
 | `Scene.Save` | `([path])` | the written path |
+| `Scene.Load` | `(path)` | — (errors, naming `path`, if there is no file there) |
+| `Scene.GetActivePath` | `()` | the current scene file, or `nil` |
+| `Scene.DontDestroyOnLoad` | `(id)` | `true` if an entity existed at `id` (errors outside play) |
 | `Scene.SavePrefab` | `(rootId, path)` | the written path |
 | `Scene.Instantiate` | `(path, …)` — see below | new entity `id` |
 | `Scene.InstantiateUnpacked` | `(prefabPath, [parentId])` | new entity `id` (an unlinked copy) |
@@ -604,6 +615,47 @@ editor's Destroy button: it actually removes the entity.
 the current scene file (the file the editor/session loaded); an explicit path
 writes there and becomes the new current file (Save As). It errors if no path is
 given and no current scene file is set.
+
+### Loading scenes (#432)
+
+**`Scene.Load(path)`** is Unity's `SceneManager.LoadScene`: it replaces the one
+active scene with the scene file at `path`. There is always exactly one active
+scene — additive loading is not supported.
+
+- **During play it is deferred to the tick's tail.** The call only records the
+  request (a second call in the same tick replaces the first); the swap happens
+  in the scene-load phase after the destroy phase, so it never happens in the
+  middle of a callback and a replay swaps on the same tick every time. Code after
+  the call still sees the old scene, and `Scene.GetActivePath()` still names the
+  old file until the swap.
+- **Unload lifecycle.** Every script of the outgoing scene gets `OnDisable` (if
+  its entity was active) then `OnDestroy`, exactly as `Scene.DestroyEntity`
+  would. Its timers and coroutines stop, its sounds stop, and UI focus, hover
+  and press state on it is dropped. Physics and the navmesh are rebuilt from the
+  new scene. The new scene's scripts `Awake` / `OnEnable` / `Start` at the head
+  of the next tick, before any `Update` — like spawned entities.
+- **`Scene.DontDestroyOnLoad(id)`** keeps the entity **and its children** alive
+  across loads — the music player, the game manager, the persistent HUD canvas.
+  Survivors keep their **ids**, components and running scripts, timers and
+  coroutines; their scripts do not re-run `Awake`. A new-scene entity whose id a
+  survivor already holds gets a fresh id instead. A survivor whose parent does
+  not survive becomes a root, and the materials it uses come along unless the
+  new scene defines one of the same name. Physics state (velocities) restarts
+  from the survivor's transform, since the physics world is rebuilt. The mark
+  lasts until the entity is destroyed or play stops; it is an error in edit mode.
+- **Edit mode:** `Scene.Load` is the API face of the editor's File ▸ Open — the
+  scene loads immediately (no callbacks: no scripts run in edit mode) and becomes
+  the current scene file that `Scene.Save()` writes back to.
+- **Editor Play:** a `Scene.Load` swaps the running world, and **Stop restores
+  the scene Play was pressed in** (and its scene file), not the one play ended in
+  — Stop rewinds to the edit snapshot, as always. The standalone player has no
+  Stop; it simply keeps running the loaded scene.
+- **Errors:** a path with no file errors at the call, naming the path. A file that
+  exists but fails to parse at the swap is reported to the console, and the
+  current scene keeps running.
+- **Loading screens:** the load is synchronous at the tick's tail — there is no
+  async/streamed loading. For a one-frame "Loading…" screen, activate a loading
+  canvas, then call `Scene.Load` on the next tick.
 
 ### Prefabs
 

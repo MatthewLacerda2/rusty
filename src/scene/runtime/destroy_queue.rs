@@ -1,4 +1,4 @@
-//! src/scene/destroy_queue.rs — the deferred-destroy command buffer (#323).
+//! src/scene/runtime/destroy_queue.rs — the deferred-destroy command buffer (#323).
 //!
 //! Play-mode `Scene.DestroyEntity` doesn't remove an entity on the spot: it runs
 //! *mid-dispatch* inside a script's callback, where the script runtime can't be

@@ -60,16 +60,23 @@ pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
 
 /// Load `path` into `scene`, REPLACING the current World (single active scene).
 /// Meshes are rehydrated from their `primitive_type` on the way in.
+/// A load is a new scene, so it earns a new runtime identity (#355).
 pub fn load_from_file(scene: &mut Scene, path: &str) -> Result<(), String> {
-    let json =
-        std::fs::read_to_string(path).map_err(|e| format!("Failed to read scene file: {}", e))?;
-    let data: SceneData =
-        serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize scene: {}", e))?;
+    let data = read_scene_file(path)?;
     apply_scene_data(scene, data);
+    scene.renew_id();
     // Merge the baked SH back onto the just-loaded probe positions (#240). A missing
     // sidecar is fine — probes load with zero SH (positions placed, never baked).
     crate::scene::lighting::io::load_lighting_sidecar(scene, path)?;
     Ok(())
+}
+
+/// Read and parse the scene document at `path` without touching any live scene — so
+/// a caller can fail cleanly before tearing the current one down (#432).
+pub fn read_scene_file(path: &str) -> Result<SceneData, String> {
+    let json = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read scene file {}: {}", path, e))?;
+    serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize scene {}: {}", path, e))
 }
 
 /// Seed the tracked default scene into the gitignored project workspace on boot,

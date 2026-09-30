@@ -234,6 +234,7 @@ impl GameWorld {
         // A standalone run has no edit mode to return to (#431).
         if !self.resources.standalone {
             self.resources.edit_snapshot = Some(SceneSnapshot::capture(&self.world.scene.borrow()));
+            self.capture_play_origin();
         }
         self.resources
             .console
@@ -282,6 +283,7 @@ impl GameWorld {
                 .borrow_mut()
                 .bake(&self.world.scene.borrow());
         }
+        self.restore_play_origin();
     }
 }
 

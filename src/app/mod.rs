@@ -31,6 +31,7 @@ mod play;
 mod probe;
 mod registry;
 mod resources;
+mod scene_load;
 mod schedule;
 mod stage;
 mod system;

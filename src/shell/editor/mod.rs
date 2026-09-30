@@ -21,6 +21,7 @@ use crate::core::application::BUILD_SETTINGS_PATH;
 use crate::core::video::VideoSettings;
 use crate::editor::{EditorUi, ViewportInteraction, ViewportTab};
 use crate::render::RenderView;
+use crate::scene::SceneId;
 use crate::shell::input::GameViewRect;
 
 /// The editor's frontend state: egui, the editor UI, and its two offscreen views.
@@ -45,6 +46,9 @@ pub struct EditorFrontend {
     /// Where the Game view sat last frame, for mapping the pointer; `None` while the
     /// Scene tab is showing.
     game_view: Option<GameViewRect>,
+    /// The scene identity the editor last drew, so a scene swapped in under it — a
+    /// scripted `Scene.Load` (#432), Stop after one — drops the stale selection.
+    scene_id: Option<SceneId>,
 }
 
 impl EditorFrontend {
@@ -78,12 +82,14 @@ impl EditorFrontend {
             preview_view: None,
             game_focused: false,
             game_view: None,
+            scene_id: None,
         }
     }
 
     /// Run the editor UI for one frame and apply its post-FX quality selection.
     /// Returns the viewport panel's pointer interaction for picking/dragging (#183).
     fn draw_dashboard(&mut self, shell: &mut Shell, game: &mut GameWorld) -> ViewportInteraction {
+        self.follow_scene_swap(game);
         let interaction = {
             let mut s = game.world.scene.borrow_mut();
             let mut c = game.resources.console.borrow_mut();
@@ -130,9 +136,21 @@ impl EditorFrontend {
         shell.renderer.set_quality(self.editor_ui.quality_preset);
     }
 
+    /// A different scene now sits in the World (its identity changed without the
+    /// editor opening it): as File ▸ Open does, drop the selection, which names an
+    /// entity of the old scene.
+    fn follow_scene_swap(&mut self, game: &GameWorld) {
+        let id = game.scene().borrow().id();
+        if self.scene_id.is_some_and(|last| last != id) {
+            self.editor_ui.selected_entity_id = None;
+        }
+        self.scene_id = Some(id);
+    }
+
     /// Keep the script-side `Scene.Save()` write-back target in lockstep with the
-    /// editor's current scene file. A scripted Save-with-path updates the cell (Save
-    /// As); reflect that back into the editor so both agree on the file.
+    /// editor's current scene file. A scripted Save-with-path (Save As) or
+    /// `Scene.Load` (#432) updates the cell; reflect that back into the editor so
+    /// both agree on the file.
     fn sync_scene_path(&mut self, game: &GameWorld) {
         let path_cell = game.script_manager().scene_path_cell();
         let scripted_path = path_cell.borrow().clone();
