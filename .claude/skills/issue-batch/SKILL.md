@@ -197,6 +197,51 @@ whole dependency tree, with no local compile cache to help. Have it run the full
 gate list before readying — it has the room for both feature sets, which a crowded
 local machine may not.
 
+## Running a mixed batch: one orchestrator, cloud coders, a local slot
+
+This is the shape that ran the 2026-09-30 batch (≈40 pull requests merged in one
+day). Each role does what only it can do.
+
+**The orchestrator (this session, local)** writes no feature code. It picks work,
+briefs cloud coders, reviews and merges. Its loop per ready pull request:
+
+1. Read the description. Check the decisions against the issue, and note any
+   human-only checks (a window, speakers) as a checklist; don't hold for them.
+2. If the branch is behind `main`, **rebase it here and compile it here** before
+   pushing: `cargo check --all-targets --features dev` and
+   `--no-default-features`. A clean textual rebase still breaks when a merge
+   ahead changed a signature. On #538, for example, #542 removed a
+   `Renderer::render` argument that #538's new tests still passed, and CI caught
+   it one round later than a local check would have.
+3. Push, then merge only when `make mergeable` exits 0. Treat a refusal as final
+   only when no run on the head is still in flight; superseded runs get
+   cancelled and replaced within seconds.
+4. After merging: remove the worktree and its `target/`, re-read the board, and
+   start the next piece of work.
+
+**Cloud coders write the branches.** Pick an issue for the cloud when it needs no
+real GPU and **no in-flight branch works in the same module**. Run one branch per
+module at a time: tonight physics went #445 → #521 → #446 → #447, and UI went
+#417 → #418 → #419 → #420, each started when the previous one merged. Parallelism
+comes from spreading across modules (physics, UI, navigation, audio, scripting,
+CI) at once, not from stacking work in one.
+
+**The local slot takes what only this machine can do:** measurements that decide
+something (#487, #492, #497, #552 each put a before/after table in their pull
+request), fixes that need its real GPU (#518's driver race), and the
+orchestrator's own compile checks. Don't let the orchestrator compile while a
+local agent is timing builds; it skews the numbers.
+
+**Every cloud brief carries:**
+
+- step 0, the `CLAUDE_CODE_REMOTE` self-check;
+- builds in the foreground, `send_later` for waits, and "ready means finished";
+- **what merged tonight that it must build on**, since line numbers in issues go
+  stale within hours, and which siblings are in flight in which files;
+- the repo's current rules (one test binary, size caps, GPU test naming,
+  lavapipe for render tests, `CARGO_NET_GIT_FETCH_WITH_CLI=true` for `deny`);
+- "do not merge".
+
 ## Starting
 
 - Assign the user the moment work begins — unassigned means fair game.
