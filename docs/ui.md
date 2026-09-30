@@ -7,8 +7,8 @@ script surface is in [`scripting-api.md`](scripting-api.md) (`Canvas`, `RectTran
 `UI`).
 
 > Status: the model, the `Canvas` and `RectTransform` components and the layout pass
-> (#417). Drawing (#418), text (#419), pointer events and focus (#420) and layout groups
-> (#421) build on it.
+> (#417); drawing — `Image`, `CanvasGroup`, `RectMask` and the render pass (#418). Text
+> (#419), pointer events and focus (#420) and layout groups (#421) build on it.
 
 ## The model
 
@@ -18,8 +18,8 @@ script surface is in [`scripting-api.md`](scripting-api.md) (`Canvas`, `RectTran
   prefabs, scene save and the Play/Stop snapshot all apply unchanged. There is no separate
   UI document or markup world, and no egui in the game (egui stays the editor's toolkit).
 - **Primitives in Rust, widgets in Lua.** First-class components are the primitives
-  (`Canvas`, `RectTransform`, and later `Image`, `Text`, …); Button, Slider, Dropdown and
-  the rest ship as engine Lua scripts + prefabs.
+  (`Canvas`, `RectTransform`, `Image`, `CanvasGroup`, `RectMask`, and later `Text`, …);
+  Button, Slider, Dropdown and the rest ship as engine Lua scripts + prefabs.
 
 ### `Canvas`
 
@@ -90,6 +90,71 @@ headless harness has exactly the window's layout and a bot can reason about — 
   `Debug.Snapshot` carries it per entity as `ui_rect` — the agent can reason about layout
   without a screenshot. Each reports the final quad's bounds in reference units and in
   screen pixels, the exact corners, the canvas and the scale factor.
+
+## Drawing
+
+### `Image`
+
+The rectangle graphic — Unity's `Image`. It fills its entity's laid-out rect (after
+rotation and scale) with `color`, optionally multiplied by `texture`. Adding one also
+adds a `RectTransform`.
+
+| Field | Meaning |
+|---|---|
+| `color` | RGBA tint, **display-space (sRGB) values, straight alpha** — what a colour picker shows. |
+| `texture` | A path, like material maps; `None` draws a solid colour. |
+| `image_type` | `Simple` (stretched), `Sliced` (9-slice), `Tiled` (repeated) or `Filled` (partial). |
+| `border` | `Sliced`: the frame in texels — left, bottom, right, top. |
+| `fill_method`, `fill_origin`, `fill_amount`, `fill_clockwise` | `Filled`: `Horizontal` / `Vertical` bars from an edge, or a `Radial360` sweep from an edge (health bars, cooldown rings, reload circles). |
+| `preserve_aspect` | `Simple`: letterbox the texture inside the rect instead of stretching it. |
+| `raycast_target` | Whether the pointer can hit it (read by #420). |
+
+**UI sprites.** One texel is one reference unit — Unity's 100-pixels-per-unit sprite on
+a 100-reference-pixels-per-unit canvas — so a `Sliced` border or a `Tiled` tile keeps its
+authored size whatever the rect's size, and scales with the canvas. Author sprites at the
+reference resolution (1920×1080 by default) and export PNGs with straight alpha. UI
+textures are sampled with linear filtering at their base level (no mips — UI draws near
+1:1, where mips only blur). A `Sliced`/`Tiled` image without a texture draws as `Simple`;
+a `Tiled` image caps itself at 1024 tiles by growing the tile.
+
+### `CanvasGroup` and `RectMask`
+
+- **`CanvasGroup`** — `alpha` multiplies every graphic on the entity and below it;
+  nested groups multiply (screen fades, disabled panels). `interactable` and
+  `blocks_raycasts` are read by pointer dispatch (#420).
+- **`RectMask`** — Unity's `RectMask2D`: the entity's own graphic and its whole subtree
+  are clipped to the axis-aligned screen bounds of its rect, inset by `padding`; nested
+  masks intersect. The clip is a scissor rect, so a rotated mask clips to its bounding
+  box (as in Unity). Soft and shape masks are #428.
+
+### The pass
+
+- **When.** Inside `Renderer::render`, **after the whole post-FX chain** (after FXAA):
+  a HUD is never tonemapped, bloomed, motion-blurred or FXAA-softened. It draws onto
+  the view's own colour target — the frame the editor's Game view, headless screenshots
+  and the player present. The Scene view (edit-mode camera) does not draw the game's UI,
+  nor does a view without its own target (the reflection-probe cubemap capture).
+- **What.** The layout is recomputed for the view's pixel size with the same pure
+  `UiLayout::compute` the sim runs, then walked in draw order. A graphic draws when it
+  and every ancestor are `active`.
+- **Colour space.** UI blends in **display (sRGB-encoded) space with premultiplied
+  alpha**, the way designers author it: 50% white over black is mid-grey `128`, as in
+  an image editor, not the `188` a linear-space blend gives. The frame's target is sRGB
+  (the one gamma encode, #415), so the pass draws through a **non-sRGB view** of it: the
+  hardware then blends the encoded values directly. An in-shader encode cannot do this
+  — on an sRGB target the blend unit decodes the destination to linear before blending,
+  whatever the shader wrote — so the aliased view is the only way to get the authored
+  look without giving up the sRGB target. Textures are sRGB and sampled to linear, so
+  the shader re-encodes them before tinting. (A GPU that cannot alias a texture's view
+  format — some GL drivers — falls back to blending in linear space: a little off, never
+  broken.)
+- **Batching.** One vertex buffer per canvas per view. Consecutive graphics sharing a
+  texture and a clip are one draw call; a texture or clip change starts the next — so a
+  HUD of solid bars is one draw call however many bars it has.
+- **Dirty.** Each view keeps every canvas's mesh beside its buffer. Rebuilding the CPU
+  mesh is a cheap walk; the buffer is re-uploaded only when the canvas's geometry
+  changed (a layout or graphic change) and reallocated only when it outgrows its
+  capacity, so a static HUD uploads nothing per frame.
 
 ## Determinism
 
