@@ -401,7 +401,8 @@ entity carrying only its mandatory `Transform` — the menu's **Create Empty**.
 **`kind`** is one of the Add Component menu's first-class components,
 case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `Texture` (alias `Material`), `NavMeshAgent`, `Camera`, `Particles`,
-`VisualCorrection`, `Audio` (alias `AudioSource`), `Canvas`, `RectTransform`.
+`VisualCorrection`, `Audio` (alias `AudioSource`), `Canvas`, `RectTransform`,
+`Image`, `CanvasGroup`, `RectMask` (alias `RectMask2D`).
 Each is added with the inspector's default values; adding an
 existing kind replaces it. (Scripts attach by path, not as a defaulted kind — a
 separate concern.)
@@ -420,8 +421,10 @@ every surface (editor Add menu, this API, and scene load):
   dependent but no requirement gets the requirement auto-added (with a console
   warning), so old scenes keep loading.
 
-The only declared dependency today is **`VisualCorrection` requires `Camera`** (a
-color/bloom/SSR correction stack is inert without a camera to correct).
+The declared dependencies are **`VisualCorrection` requires `Camera`** (a
+color/bloom/SSR correction stack is inert without a camera to correct) and
+**`Image` and `RectMask` require `RectTransform`** (a graphic fills, and a mask
+clips to, its rect — Unity's `Graphic` and `RectMask2D` declare the same).
 
 **`Scene.Deactivate`** is Unity's deferred `Object.Destroy`: it sets `active =
 false` but leaves the entity in the scene. **`Scene.DestroyEntity`** is the

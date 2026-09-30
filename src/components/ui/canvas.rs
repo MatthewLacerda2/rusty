@@ -1,8 +1,8 @@
-//! src/components/canvas.rs — Canvas component: the root of an in-game UI (#417).
+//! src/components/ui/canvas.rs — Canvas component: the root of an in-game UI (#417).
 //!
 //! Unity uGUI's `Canvas` + `CanvasScaler` (Scale With Screen Size) folded into one
 //! first-class component. An entity carrying a `CanvasComponent` is a UI root: its
-//! descendants carrying a [`RectTransformComponent`](super::RectTransformComponent)
+//! descendants carrying a [`RectTransformComponent`](crate::components::RectTransformComponent)
 //! are laid out inside the canvas rect by the `ui::layout` system. The canvas's own
 //! rect is always the whole screen, expressed in *reference units* (see
 //! [`CanvasComponent::scale_factor`]); its Transform and any RectTransform it carries

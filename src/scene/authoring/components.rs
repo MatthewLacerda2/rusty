@@ -30,6 +30,9 @@ pub enum ComponentKind {
     Audio,
     Canvas,
     RectTransform,
+    Image,
+    CanvasGroup,
+    RectMask,
 }
 
 impl ComponentKind {
@@ -37,7 +40,7 @@ impl ComponentKind {
     /// finding a removed kind's dependents ([`dependency::remove_with_cascade`]) and
     /// reconciling/enforcing unmet requirements. The per-kind matches in `dependency`
     /// are compiler-checked exhaustive; a test guards this list against drift.
-    pub const ALL: [ComponentKind; 12] = [
+    pub const ALL: [ComponentKind; 15] = [
         Self::Light,
         Self::Animator,
         Self::Collider,
@@ -50,18 +53,24 @@ impl ComponentKind {
         Self::Audio,
         Self::Canvas,
         Self::RectTransform,
+        Self::Image,
+        Self::CanvasGroup,
+        Self::RectMask,
     ];
 
     /// The first-class components this kind depends on — rusty's `RequireComponent`
     /// (Unity's `[RequireComponent(typeof(T))]`). The single declaration every
     /// add/remove/load surface consults: adding a kind auto-adds these if missing,
     /// removing one of these cascades to the dependents that declare it. Flat
-    /// `kind → [kinds]`; `VisualCorrection → Camera` (a correction stack is inert
-    /// without a camera to correct) is the sole entry today — a new dependency is one
-    /// line here, enforced everywhere by construction.
+    /// `kind → [kinds]`: `VisualCorrection → Camera` (a correction stack is inert
+    /// without a camera to correct), and the UI graphic and clip need a rect to fill
+    /// or clip to (`Image` / `RectMask → RectTransform`, as Unity's `Graphic` and
+    /// `RectMask2D` require one). A new dependency is one line here, enforced
+    /// everywhere by construction.
     pub fn requires(self) -> &'static [ComponentKind] {
         match self {
             ComponentKind::VisualCorrection => &[ComponentKind::Camera],
+            ComponentKind::Image | ComponentKind::RectMask => &[ComponentKind::RectTransform],
             _ => &[],
         }
     }
@@ -82,6 +91,9 @@ impl ComponentKind {
             "audio" | "audiosource" => Some(Self::Audio),
             "canvas" => Some(Self::Canvas),
             "recttransform" => Some(Self::RectTransform),
+            "image" => Some(Self::Image),
+            "canvasgroup" => Some(Self::CanvasGroup),
+            "rectmask" | "rectmask2d" => Some(Self::RectMask),
             _ => None,
         }
     }

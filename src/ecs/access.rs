@@ -23,10 +23,10 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::components::{
-    AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent, ColliderComponent,
-    LightComponent, MaterialComponent, MeshComponent, NavMeshAgentComponent,
-    ParticleEmitterComponent, PrefabLink, RectTransformComponent, RigidBodyComponent,
-    VisualCorrectionComponent,
+    AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
+    CanvasGroupComponent, ColliderComponent, ImageComponent, LightComponent, MaterialComponent,
+    MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent, PrefabLink, RectMaskComponent,
+    RectTransformComponent, RigidBodyComponent, VisualCorrectionComponent,
 };
 
 use super::world::{Ref, RefMut, World};
@@ -128,5 +128,8 @@ optional_component_accessors! {
     AudioSourceComponent => audio, audio_mut, has_audio, set_audio, take_audio, ids_with_audio;
     CanvasComponent => canvas, canvas_mut, has_canvas, set_canvas, take_canvas, ids_with_canvas;
     RectTransformComponent => rect_transform, rect_transform_mut, has_rect_transform, set_rect_transform, take_rect_transform, ids_with_rect_transform;
+    ImageComponent => image, image_mut, has_image, set_image, take_image, ids_with_image;
+    CanvasGroupComponent => canvas_group, canvas_group_mut, has_canvas_group, set_canvas_group, take_canvas_group, ids_with_canvas_group;
+    RectMaskComponent => rect_mask, rect_mask_mut, has_rect_mask, set_rect_mask, take_rect_mask, ids_with_rect_mask;
     PrefabLink => prefab_link, prefab_link_mut, has_prefab_link, set_prefab_link, take_prefab_link, ids_with_prefab_link;
 }

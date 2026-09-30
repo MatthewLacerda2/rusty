@@ -1,4 +1,4 @@
-//! src/components/rect_transform.rs — RectTransform: 2D placement inside a parent rect (#417).
+//! src/components/ui/rect_transform.rs — RectTransform: 2D placement inside a parent rect (#417).
 //!
 //! Unity's `RectTransform`, beside (never instead of) the mandatory Transform. It
 //! places a UI element relative to its parent's rect with Unity's exact semantics:
