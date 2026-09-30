@@ -24,6 +24,7 @@ use std::ops::Range;
 
 use super::ShadowRenderer;
 use crate::render::gpu::draw_buffers::{push_palette, JointMatrix};
+use crate::render::lod::LodSelection;
 use crate::render::{transform_aabb, Frustum, GpuMesh, MeshId};
 use crate::scene::Scene;
 pub(super) use buffer::CasterBuffer;
@@ -80,17 +81,19 @@ pub(super) struct CasterFrame<'a> {
 }
 
 impl ShadowRenderer {
-    /// Gather every active caster whose `is_static` flag matches `want_static`, cull
+    /// Gather every active caster whose `is_static` flag matches `want_static` and whose
+    /// LOD level `lod` shows, cull
     /// it against each of `cascades`' light volumes, and upload every cascade's
     /// batches into that sweep's one caster buffer. Returns the batches per cascade,
     /// in the order given.
     pub(super) fn prepare_casters(
         &mut self,
         frame: &CasterFrame,
+        lod: &LodSelection,
         want_static: bool,
         cascades: &[usize],
     ) -> Vec<Vec<CasterBatch>> {
-        let (candidates, joints) = self.collect_casters(frame, want_static);
+        let (candidates, joints) = self.collect_casters(frame, lod, want_static);
         let mut matrices = Vec::new();
         let mut per_cascade = Vec::with_capacity(cascades.len());
         for &i in cascades {
@@ -131,6 +134,7 @@ impl ShadowRenderer {
     fn collect_casters(
         &self,
         frame: &CasterFrame,
+        lod: &LodSelection,
         want_static: bool,
     ) -> (Vec<Candidate>, Vec<JointMatrix>) {
         let scene = frame.scene;
@@ -138,6 +142,10 @@ impl ShadowRenderer {
         let mut joints = Vec::new();
         for id in scene.world.ids_with_mesh() {
             if !scene.world.is_active(id) || scene.world.is_static(id) != want_static {
+                continue;
+            }
+            // A level of detail this sweep does not draw (#472).
+            if lod.hides(id) {
                 continue;
             }
             let mesh = scene.world.mesh(id).expect("id came from ids_with_mesh");

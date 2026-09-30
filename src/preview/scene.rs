@@ -183,10 +183,7 @@ fn spawn_model(scene: &mut Scene, path: &str) {
         return;
     };
     let origin = -bounds_centre(&asset.sub_meshes);
-    for sub in &asset.sub_meshes {
-        let reference = format!("{path}{}{}", asset::REF_SEPARATOR, sub.id);
-        let _ = authoring::instantiate_asset(scene, &reference, Some(&sub.id), origin);
-    }
+    authoring::instantiate_model(scene, path, &asset, origin);
 }
 
 /// The centre of the union of `subs`' local bounds (`Vec3::ZERO` when they have no

@@ -36,12 +36,14 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
     let sub_meshes = document
         .meshes()
         .map(|mesh| {
-            sub_mesh_from_gltf(
+            let mut sub = sub_mesh_from_gltf(
                 &mesh,
                 &buffers,
                 skins.get(&mesh.index()).cloned(),
                 &document,
-            )
+            );
+            sub.node_name = node_name(&document, mesh.index());
+            sub
         })
         .collect();
 
@@ -49,6 +51,14 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
         sub_meshes,
         materials,
     })
+}
+
+/// The name of the first node (document order) that places mesh `mesh`, if named.
+fn node_name(document: &gltf::Document, mesh: usize) -> Option<String> {
+    document
+        .nodes()
+        .find(|n| n.mesh().is_some_and(|m| m.index() == mesh))
+        .and_then(|n| n.name().map(str::to_string))
 }
 
 /// Read one glTF material into the pure-data [`MaterialData`]: the metallic-roughness
@@ -129,6 +139,7 @@ fn sub_mesh_from_gltf(
         material,
         skin,
         clips,
+        node_name: None,
     }
 }
 

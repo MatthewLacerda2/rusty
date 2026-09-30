@@ -71,6 +71,7 @@ print(s.frames, s.fixed_update_ms.avg, s.systems.update_scripts.max, s.entities.
 | `draw_calls` | geometry draw calls: solids, transparents, shadow casters, the SSAO depth prepass, decals, particle batches, UI batches (post-FX and skybox excluded). Copies of one mesh + material are **one instanced call** (#470), so this tracks distinct looks, not entity count |
 | `triangles` | triangles submitted by the solid, transparent, shadow and SSAO-prepass draws, every instance counted |
 | `visible_entities` / `culled_entities` | mesh entities drawn / skipped by the frustum cull, summed over the camera stack |
+| `lod_hidden_entities` | mesh entities skipped because their `LODGroup` showed another level (#472), summed over the camera stack |
 | `lights` / `lights_dropped` | active lights, and those the forward uniform had no slot for (past 4 point lights, or a 2nd directional/spot/ambient) — silently unlit |
 | `shadow_draws` / `ui_draws` | shadow-caster draw calls (one per caster mesh, instanced, #470) / UI batches |
 | `ssao_samples` | depth taps the SSAO pass traced (occlusion texels × the tier's samples, #436); `0` when AO is off or on the Low tier |

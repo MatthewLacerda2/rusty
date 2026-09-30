@@ -190,6 +190,10 @@ pub struct SubMesh {
     /// (#80). Empty for a static mesh or a skinned mesh the source never animates;
     /// each clip's tracks are keyed by the `skin`'s joint slots.
     pub clips: Vec<AnimationClip>,
+    /// The name of the first glTF node that places this mesh, when it has one — the
+    /// Blender *object* name, where `id` is the mesh-data name. The `_LOD<n>` import
+    /// convention reads it (`asset::lod`, #472). `None` for `.obj`.
+    pub node_name: Option<String>,
 }
 
 impl SubMesh {

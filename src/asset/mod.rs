@@ -21,6 +21,7 @@ pub mod animation_graph;
 pub mod gltf_anim;
 pub mod gltf_import;
 pub mod gltf_skin;
+pub mod lod;
 pub mod manifest;
 pub mod mesh_data;
 pub mod obj_import;

@@ -178,28 +178,18 @@ fn sub_object_row(
 }
 
 /// Import the source file and instantiate each addressable sub-object as its own
-/// entity carrying a path-based `"Asset"` mesh reference (`path::sub_object`).
-/// Routes every sub-object through the shared `authoring::instantiate_asset` verb —
-/// the same path `Scene.Instantiate` drives — so editor and API never drift. The
+/// entity carrying a path-based `"Asset"` mesh reference (`path::sub_object`) — a
+/// `_LOD<n>` set as one LODGroup entity (#472). Routes through the shared
+/// `authoring::instantiate_model` / `instantiate_asset` verbs — the same path
+/// `Scene.Instantiate` drives — so editor and API never drift. The
 /// geometry is re-imported on every scene load; no GPU buffers are persisted.
 fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     let asset = match crate::asset::import_and_sync_sidecar(Path::new(path)) {
         Ok(a) => a,
         Err(_) => return,
     };
-    let mut last = None;
-    for id in asset.sub_mesh_ids() {
-        let reference = format!("{}{}{}", path, crate::asset::REF_SEPARATOR, id);
-        if let Ok(ent_id) = crate::scene::authoring::instantiate_asset(
-            scene,
-            &reference,
-            Some(&id),
-            glam::Vec3::ZERO,
-        ) {
-            last = Some(ent_id);
-        }
-    }
-    if let Some(ent_id) = last {
+    let spawned = crate::scene::authoring::instantiate_model(scene, path, &asset, glam::Vec3::ZERO);
+    if let Some(&ent_id) = spawned.last() {
         editor.is_dirty = true;
         editor.selected_entity_id = Some(ent_id);
         editor.selected_asset_path = None;

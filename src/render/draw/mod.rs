@@ -18,6 +18,7 @@ use self::lighting::{
 };
 use self::pass::{PassClear, ScenePassFrame};
 use crate::render::gpu::uniforms::FogUniform;
+use crate::render::lod::LodSelection;
 use crate::render::passes::ssao::{SsaoFrame, SsaoPlan};
 use crate::render::postfx::params::build_post_params;
 use crate::render::{build_camera_stack, CameraUniform, LightingUniform, RenderView, Renderer};
@@ -71,7 +72,10 @@ impl Renderer {
         // The ordered camera stack (one entry in edit mode / when no scene camera).
         let stack = build_camera_stack(camera, scene, !editor_mode);
         // The sun's cascades follow the base camera; every stacked camera samples them.
-        self.run_shadow_passes(scene, &stack[0], aspect);
+        // So do the dynamic casters' LOD levels (#472): a shadow shows the level its
+        // caster shows in the main view.
+        let base_lod = LodSelection::for_camera(scene, &stack[0]);
+        self.run_shadow_passes(scene, &stack[0], aspect, &base_lod);
         let last = stack.len().saturating_sub(1);
         // The base (first) camera drives the shared post-FX history / motion vectors.
         let base_view_proj = stack[0].build_view_projection(aspect);
@@ -97,7 +101,10 @@ impl Renderer {
             // instanced draws and upload their packed data (#470). The split separates
             // opaque/cutout (the solids pass) from transparent (the sorted
             // alpha-blended pass below) (#242).
-            let solids = self.precreate_solid_resources(scene, cam, &frustum);
+            // Each camera picks its own LOD levels (#472), before batching so one level
+            // of one prop is still one instanced draw.
+            let lod = LodSelection::for_camera(scene, cam);
+            let solids = self.precreate_solid_resources(scene, cam, &frustum, &lod);
             let overlays = self.precreate_overlays(scene, editor_mode);
 
             let frame = ScenePassFrame {

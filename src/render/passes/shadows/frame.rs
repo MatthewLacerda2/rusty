@@ -4,14 +4,23 @@
 
 use glam::Vec3;
 
+use super::casters::CasterFrame;
 use super::{cascades, CascadeUniform, ShadowRenderer};
 use crate::components::{LightType, ShadowSettings};
+use crate::render::lod::LodSelection;
 use crate::render::Renderer;
 use crate::scene::{Camera, Scene};
 
 impl Renderer {
-    /// Fit the cascades to `camera` (at `aspect`) and render the shadow maps.
-    pub(crate) fn run_shadow_passes(&mut self, scene: &Scene, camera: &Camera, aspect: f32) {
+    /// Fit the cascades to `camera` (at `aspect`) and render the shadow maps, the
+    /// dynamic casters at the LOD levels `lod` (the base camera's) shows (#472).
+    pub(crate) fn run_shadow_passes(
+        &mut self,
+        scene: &Scene,
+        camera: &Camera,
+        aspect: f32,
+        lod: &LodSelection,
+    ) {
         let fitted = cascades::fit(
             camera,
             aspect,
@@ -30,13 +39,13 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Shadow Encoder"),
             });
-        self.shadow_renderer.render(
-            &self.device,
-            &self.queue,
-            &mut encoder,
+        let frame = CasterFrame {
+            device: &self.device,
+            queue: &self.queue,
             scene,
-            &self.gpu_meshes,
-        );
+            gpu_meshes: &self.gpu_meshes,
+        };
+        self.shadow_renderer.render(&mut encoder, &frame, lod);
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 }

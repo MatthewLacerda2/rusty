@@ -60,6 +60,7 @@ component_kinds! {
         LayoutGroup,
         LayoutElement,
         Joint,
+        LodGroup,
     }
 }
 
@@ -114,6 +115,7 @@ impl ComponentKind {
             "layoutgroup" => Some(Self::LayoutGroup),
             "layoutelement" | "contentsizefitter" => Some(Self::LayoutElement),
             "joint" | "fixedjoint" | "hingejoint" | "characterjoint" => Some(Self::Joint),
+            "lodgroup" | "lod" => Some(Self::LodGroup),
             _ => None,
         }
     }

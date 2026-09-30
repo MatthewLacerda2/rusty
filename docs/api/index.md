@@ -263,6 +263,7 @@ One file per namespace, in reference order:
 - [`Tween`](Tween.md)
 - [`Camera`](Camera.md)
 - [`Light`](Light.md)
+- [`LODGroup`](LODGroup.md)
 - [`Probe`](Probe.md)
 - [`Reflection`](Reflection.md)
 - [`Lighting`](Lighting.md)

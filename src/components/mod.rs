@@ -16,6 +16,7 @@ pub mod collider;
 pub mod entity;
 pub mod joint;
 pub mod light;
+pub mod lod_group;
 pub mod material;
 pub mod mesh;
 pub mod nav_agent;
@@ -34,6 +35,7 @@ pub use collider::{CapsuleAxis, ColliderComponent, ColliderShape, CombineMode, P
 pub use entity::{Entity, PrefabLink};
 pub use joint::{JointComponent, JointKind};
 pub use light::{LightComponent, LightType};
+pub use lod_group::{LodGroupComponent, LodLevel};
 pub use material::{MaterialAsset, MaterialComponent, RenderMode};
 pub use mesh::{DirtyFlag, MeshComponent};
 pub use nav_agent::{NavMeshAgentComponent, DEFAULT_AVOIDANCE_PRIORITY, MAX_AVOIDANCE_PRIORITY};

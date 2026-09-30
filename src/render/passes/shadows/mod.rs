@@ -12,12 +12,11 @@ mod setup;
 mod uniform;
 
 use crate::render::gpu::shaders::ShaderRegistry;
-use crate::render::{GpuMesh, MeshId};
-use crate::scene::{Scene, SceneId};
+use crate::render::lod::LodSelection;
+use crate::scene::SceneId;
 use cascades::{Cascade, MAX_CASCADES};
 use casters::{CasterBuffer, CasterFrame};
 use glam::Mat4;
-use std::collections::HashMap;
 
 pub(crate) use uniform::CascadeUniform;
 
@@ -136,27 +135,23 @@ impl ShadowRenderer {
 
     /// Record the frame's shadow sweeps: re-bake the static layers whose light volume
     /// moved, copy the static layers into the active array, and draw the dynamic
-    /// casters over each cascade.
-    pub fn render(
+    /// casters over each cascade — skipping the LOD levels `lod` hides (#472).
+    fn render(
         &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
-        scene: &Scene,
-        gpu_meshes: &HashMap<MeshId, GpuMesh>,
+        frame: &CasterFrame,
+        lod: &LodSelection,
     ) {
-        let frame = CasterFrame {
-            device,
-            queue,
-            scene,
-            gpu_meshes,
-        };
+        let (scene, gpu_meshes) = (frame.scene, frame.gpu_meshes);
         let key = |c: &Cascade| Some((scene.id(), c.light_space));
         let stale: Vec<usize> = (0..self.cascades.len())
             .filter(|&i| self.static_cache[i] != key(&self.cascades[i]))
             .collect();
         if !stale.is_empty() {
-            let batches = self.prepare_casters(&frame, true, &stale);
+            // The bake outlives the frame, so it cannot follow the camera's LOD
+            // choice: it bakes every group at LOD0 (#472).
+            let finest = LodSelection::finest(scene);
+            let batches = self.prepare_casters(frame, &finest, true, &stale);
             for (&i, batches) in stale.iter().zip(&batches) {
                 let view = &self.static_layers[i];
                 let mut pass = depth_pass(encoder, "Shadow Static Pass", view, true);
@@ -170,7 +165,7 @@ impl ShadowRenderer {
         self.copy_static_layers(encoder);
 
         let all: Vec<usize> = (0..self.cascades.len()).collect();
-        let batches = self.prepare_casters(&frame, false, &all);
+        let batches = self.prepare_casters(frame, lod, false, &all);
         for (i, batches) in batches.iter().enumerate() {
             if batches.is_empty() {
                 continue;

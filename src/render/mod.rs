@@ -2,6 +2,7 @@ mod camera;
 mod debug_meshes;
 mod draw;
 mod frustum;
+pub(crate) mod lod;
 mod preview;
 pub mod readback;
 mod setup;

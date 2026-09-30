@@ -33,6 +33,7 @@ mod joint_api;
 mod kinematic_gravity;
 mod layers_api;
 mod light_probes;
+mod lod_group_api;
 mod material_authoring;
 mod material_library;
 mod nav_agents_values;

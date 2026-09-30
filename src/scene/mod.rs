@@ -28,6 +28,7 @@ pub mod identity;
 pub mod io;
 pub mod layers;
 pub mod lighting;
+pub mod lod_instance;
 pub mod prefab;
 pub mod runtime;
 #[allow(clippy::module_inception)]

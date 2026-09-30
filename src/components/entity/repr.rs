@@ -10,10 +10,11 @@ use crate::components::particle::LegacyEmitter;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, ColliderComponent, ImageComponent, JointComponent,
-    LayoutElementComponent, LayoutGroupComponent, LightComponent, MaterialAsset, MaterialComponent,
-    MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent, RectMaskComponent,
-    RectTransformComponent, RigidBodyComponent, ScriptComponent, SelectableComponent,
-    TextComponent, TextureComponent, TransformComponent, VisualCorrectionComponent,
+    LayoutElementComponent, LayoutGroupComponent, LightComponent, LodGroupComponent, MaterialAsset,
+    MaterialComponent, MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent,
+    RectMaskComponent, RectTransformComponent, RigidBodyComponent, ScriptComponent,
+    SelectableComponent, TextComponent, TextureComponent, TransformComponent,
+    VisualCorrectionComponent,
 };
 
 /// On-disk shape used only for deserialization, so old single-`script` scenes
@@ -75,6 +76,8 @@ pub(super) struct EntityRepr {
     #[serde(default)]
     joint: Option<JointComponent>,
     #[serde(default)]
+    lod_group: Option<LodGroupComponent>,
+    #[serde(default)]
     prefab_link: Option<PrefabLink>,
     parent_id: Option<u32>,
     children: Vec<u32>,
@@ -131,6 +134,7 @@ impl From<EntityRepr> for Entity {
             layout_group: r.layout_group,
             layout_element: r.layout_element,
             joint: r.joint,
+            lod_group: r.lod_group,
             prefab_link: r.prefab_link,
             parent_id: r.parent_id,
             children: r.children,

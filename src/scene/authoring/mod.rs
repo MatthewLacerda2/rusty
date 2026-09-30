@@ -29,6 +29,7 @@ pub mod joint;
 pub mod layout_element;
 pub mod layout_group;
 pub mod light;
+pub mod lod_group;
 pub mod material;
 pub mod nav_agent;
 pub mod particles;
@@ -199,6 +200,7 @@ pub use crate::scene::prefab::{extract_prefab, instantiate_prefab, instantiate_p
 // split); re-exported here so the editor's model inspector and the `Scene.Instantiate`
 // asset branch both spawn imported sub-objects through this one shared entry point.
 pub use crate::scene::asset_instance::instantiate_asset;
+pub use crate::scene::lod_instance::{instantiate_lod_set, instantiate_model};
 
 // The per-field material-mutation ops (#287) live in `material`; the editor card and
 // the Lua `Material.*` API are siblings over them, so the field write + validation
