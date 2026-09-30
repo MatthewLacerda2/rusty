@@ -2,8 +2,10 @@ use super::*;
 
 #[test]
 fn stats_table_has_frames_metrics_and_systems() {
-    let mut stats = FrameStats::default();
-    stats.frames = 2;
+    let mut stats = FrameStats {
+        frames: 2,
+        ..Default::default()
+    };
     stats.record("draw_calls", 7.0);
     stats.record_system("tick_nav", 0.25);
     let lua = mlua::Lua::new();

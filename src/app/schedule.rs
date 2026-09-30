@@ -18,10 +18,14 @@ use super::resources::Resources;
 use super::stage::Stage;
 use super::world::World;
 
+/// A registered system, boxed so a named fn item keeps its type (and so its name)
+/// up to registration.
+type BoxedSystem = Box<dyn Fn(&mut World, &mut Resources)>;
+
 /// One registered system: its short function name and the function itself.
 struct Entry {
     name: &'static str,
-    run: Box<dyn Fn(&mut World, &mut Resources)>,
+    run: BoxedSystem,
 }
 
 /// The ordered set of systems per stage. Built once via [`super::App`]'s

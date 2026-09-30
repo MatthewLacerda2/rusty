@@ -48,7 +48,6 @@ impl Renderer {
         );
 
         self.upload_scene_assets(scene);
-        self.begin_counters(scene);
 
         // Load the active reflection probe's baked cubemap for the primary camera (#245),
         // so the forward pass reflects that prefiltered cube instead of the skybox.
@@ -56,12 +55,7 @@ impl Renderer {
 
         // Build + write the camera-independent lighting uniform once. The reflection
         // probe is picked relative to the primary camera (#244).
-        let lighting_uniform = self.build_lighting_uniform(scene, camera.position);
-        self.queue.write_buffer(
-            &self.lighting_buffer,
-            0,
-            bytemuck::bytes_of(&lighting_uniform),
-        );
+        self.upload_lighting(scene, camera.position);
 
         // Drop pool slots for entities no longer active, so the persistent forward
         // buffers track the live scene rather than growing without bound (#210).
@@ -203,6 +197,18 @@ impl Renderer {
         };
         view.post_fx
             .run(&self.device, &self.queue, ctx, post_params, passes);
+    }
+
+    /// Write the frame's lighting uniform, and start the frame counters (#433) with
+    /// the light counts — which lights got a uniform slot is decided right here.
+    fn upload_lighting(&mut self, scene: &Scene, camera_pos: Vec3) {
+        let lighting_uniform = self.build_lighting_uniform(scene, camera_pos);
+        self.queue.write_buffer(
+            &self.lighting_buffer,
+            0,
+            bytemuck::bytes_of(&lighting_uniform),
+        );
+        self.begin_counters(scene);
     }
 
     /// Builds the per-frame lighting uniform from the scene's lights and SSR settings.
