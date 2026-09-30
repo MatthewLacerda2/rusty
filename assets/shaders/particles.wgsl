@@ -2,10 +2,11 @@
 //
 // Each particle is one instance; the vertex shader expands it into a quad that
 // always faces the camera by offsetting the world-space center along the camera's
-// right/up axes (passed in the uniform). Per-particle size and RGBA tint come from
-// the instance buffer. The fragment shader samples the sprite texture and
-// multiplies by the tint; alpha/additive blending is selected by the pipeline,
-// which also picks the matching fragment entry point for the scene fog (#437).
+// right/up axes (passed in the uniform). Per-particle size, rotation (about the
+// view axis) and RGBA tint come from the instance buffer. The fragment shader
+// samples the sprite texture and multiplies by the tint; alpha/additive blending is
+// selected by the pipeline, which also picks the matching fragment entry point for
+// the scene fog (#437).
 
 #import common::{Fog, fog_factor}
 
@@ -24,7 +25,8 @@ struct ParticleGlobals {
 struct InstanceInput {
     @location(0) center: vec3<f32>,
     @location(1) size: f32,
-    @location(2) color: vec4<f32>,
+    @location(2) rotation: f32,
+    @location(3) color: vec4<f32>,
 };
 
 struct VsOut {
@@ -53,9 +55,13 @@ fn vs_main(@builtin(vertex_index) vid: u32, inst: InstanceInput) -> VsOut {
     let uv = vec2<f32>(corner.x + 0.5, 0.5 - corner.y);
     let right = globals.cam_right.xyz;
     let up = globals.cam_up.xyz;
+    // Spin the quad corner in the billboard plane (UVs stay with the corner).
+    let c = cos(inst.rotation);
+    let s = sin(inst.rotation);
+    let spun = vec2<f32>(corner.x * c - corner.y * s, corner.x * s + corner.y * c);
     let world = inst.center
-        + right * (corner.x * inst.size)
-        + up * (corner.y * inst.size);
+        + right * (spun.x * inst.size)
+        + up * (spun.y * inst.size);
 
     var out: VsOut;
     out.clip_position = globals.view_proj * vec4<f32>(world, 1.0);

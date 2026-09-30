@@ -1,16 +1,21 @@
-//! src/editor/inspector_particles.rs — the Particle System inspector card.
+//! src/editor/inspector/components/particles/ — the Particle System inspector card.
 //!
 //! Edits every serde-persisted field of `ParticleEmitterComponent`: emission mode,
-//! blend, collision response, the rate/burst/cap counts, the per-particle motion
-//! (lifetime/speed/direction/spread/gravity), size + colour over life, restitution,
-//! and the deterministic seed. The live particle count (transient runtime) is shown
+//! blend, collision response, the rate/burst/cap counts, the shape and per-particle
+//! motion, the start ranges (`start.rs`), the over-life curves and gradient and
+//! the sub-emitters (`over_life.rs`), restitution, and the deterministic seed. The live particle count (transient runtime) is shown
 //! read-only so an author can see the emitter working in Play.
 //!
 //! A THIN client (#287): each widget reads its field from a snapshot and routes
 //! the write through a shared `authoring::particles::*` op. The `Particles.*` Lua
 //! surface's `SetActive` / `SetRate` call the same ops — one shared write.
 
+mod over_life;
+mod start;
+mod widgets;
+
 use egui_phosphor::regular as icon;
+use widgets::{clamped, combo, drag_u32};
 
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::particles as particle_ops;
@@ -47,9 +52,15 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
             ui.separator();
             changed |= draw_rendering(ui, &mut cx, &p);
             ui.separator();
-            changed |= draw_motion(ui, &mut cx, &p);
+            changed |= start::draw_shape(ui, &mut cx, &p);
             ui.separator();
-            changed |= draw_size_color(ui, &mut cx, &p);
+            changed |= start::draw_motion(ui, &mut cx, &p);
+            ui.separator();
+            changed |= start::draw_start(ui, &mut cx, &p);
+            ui.separator();
+            changed |= over_life::draw(ui, &mut cx, &p);
+            ui.separator();
+            changed |= over_life::draw_sub_emitters(ui, &mut cx, &p, id);
             ui.separator();
             changed |= draw_collision(ui, &mut cx, &p);
             ui.separator();
@@ -130,61 +141,6 @@ fn draw_rendering(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterCompone
     changed
 }
 
-/// Per-particle motion: lifetime, speed, direction, spread and gravity.
-fn draw_motion(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
-    let mut changed = false;
-    let mut lifetime = p.lifetime;
-    if clamped(ui, "Lifetime (sec):", &mut lifetime, 0.0..=60.0) {
-        apply(cx, |c| particle_ops::set_lifetime(c, lifetime));
-        changed = true;
-    }
-    let mut speed = p.speed;
-    if clamped(ui, "Speed:", &mut speed, 0.0..=100.0) {
-        apply(cx, |c| particle_ops::set_speed(c, speed));
-        changed = true;
-    }
-    let mut direction = p.direction;
-    if vec3(ui, "Direction:", &mut direction, 0.05) {
-        apply(cx, |c| particle_ops::set_direction(c, direction));
-        changed = true;
-    }
-    let mut spread = p.spread;
-    if clamped(ui, "Spread:", &mut spread, 0.0..=1.0) {
-        apply(cx, |c| particle_ops::set_spread(c, spread));
-        changed = true;
-    }
-    let mut gravity = p.gravity;
-    if vec3(ui, "Gravity:", &mut gravity, 0.1) {
-        apply(cx, |c| particle_ops::set_gravity(c, gravity));
-        changed = true;
-    }
-    changed
-}
-
-/// Size-over-life and colour controls.
-fn draw_size_color(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
-    let mut changed = false;
-    let mut size_start = p.size_start;
-    if clamped(ui, "Size Start:", &mut size_start, 0.0..=50.0) {
-        apply(cx, |c| particle_ops::set_size_start(c, size_start));
-        changed = true;
-    }
-    let mut size_end = p.size_end;
-    if clamped(ui, "Size End:", &mut size_end, 0.0..=50.0) {
-        apply(cx, |c| particle_ops::set_size_end(c, size_end));
-        changed = true;
-    }
-    let mut color = p.color;
-    ui.horizontal(|ui| {
-        ui.label("Color (RGBA):");
-        if ui.color_edit_button_rgba_unmultiplied(&mut color).changed() {
-            apply(cx, |c| particle_ops::set_color(c, color));
-            changed = true;
-        }
-    });
-    changed
-}
-
 /// Collision response and bounciness controls.
 fn draw_collision(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
     let mut changed = false;
@@ -222,79 +178,5 @@ fn draw_determinism(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterCompo
     if changed {
         apply(cx, |c| particle_ops::set_seed(c, seed));
     }
-    changed
-}
-
-/// A labelled, clamped `f32` drag row. Returns whether the value changed.
-fn clamped(
-    ui: &mut egui::Ui,
-    label: &str,
-    value: &mut f32,
-    range: std::ops::RangeInclusive<f32>,
-) -> bool {
-    ui.horizontal(|ui| {
-        ui.label(label);
-        ui.add(egui::DragValue::new(value).speed(0.05).clamp_range(range))
-            .changed()
-    })
-    .inner
-}
-
-/// A labelled, clamped `u32` drag row. Returns whether the value changed.
-fn drag_u32(
-    ui: &mut egui::Ui,
-    label: &str,
-    value: &mut u32,
-    range: std::ops::RangeInclusive<u32>,
-) -> bool {
-    ui.horizontal(|ui| {
-        ui.label(label);
-        ui.add(egui::DragValue::new(value).speed(1.0).clamp_range(range))
-            .changed()
-    })
-    .inner
-}
-
-/// A labelled x/y/z drag row over a `Vec3`. Returns whether any axis changed.
-fn vec3(ui: &mut egui::Ui, label: &str, value: &mut glam::Vec3, speed: f32) -> bool {
-    ui.horizontal(|ui| {
-        ui.label(label);
-        let mut c = ui
-            .add(egui::DragValue::new(&mut value.x).speed(speed))
-            .changed();
-        c |= ui
-            .add(egui::DragValue::new(&mut value.y).speed(speed))
-            .changed();
-        c |= ui
-            .add(egui::DragValue::new(&mut value.z).speed(speed))
-            .changed();
-        c
-    })
-    .inner
-}
-
-/// A combo box over a small set of `Copy + PartialEq` enum variants; returns whether it changed.
-fn combo<T: Copy + PartialEq>(
-    ui: &mut egui::Ui,
-    label: &str,
-    value: &mut T,
-    options: &[(T, &str)],
-) -> bool {
-    let selected = options
-        .iter()
-        .find(|(v, _)| *v == *value)
-        .map(|(_, name)| *name)
-        .unwrap_or("");
-    let mut changed = false;
-    egui::ComboBox::from_label(label)
-        .selected_text(selected)
-        .show_ui(ui, |ui| {
-            for (variant, name) in options {
-                if ui.selectable_label(*value == *variant, *name).clicked() {
-                    *value = *variant;
-                    changed = true;
-                }
-            }
-        });
     changed
 }

@@ -8,6 +8,7 @@ use std::rc::Rc;
 use glam::Vec3;
 use rusty::app::GameWorld;
 use rusty::components::particle::{CollisionResponse, EmitMode, ParticleEmitterComponent};
+use rusty::core::curve::Range;
 use rusty::core::input::InputState;
 use rusty::navigation::NavigationGraph;
 use rusty::scene::{ColliderComponent, ColliderShape, Scene};
@@ -46,8 +47,8 @@ fn scene_with_wall(response: CollisionResponse) -> (Scene, u32) {
             looping: false,
             collision: response,
             rate: 0.0,
-            lifetime: 5.0,
-            speed: 8.0,
+            lifetime: Range::constant(5.0),
+            speed: Range::constant(8.0),
             direction: Vec3::X,
             spread: 0.0,
             gravity: Vec3::ZERO,

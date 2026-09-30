@@ -5,6 +5,7 @@
 
 use glam::{Quat, Vec3};
 use rusty::components::particle::{Particle, ParticleBlend, ParticleEmitterComponent};
+use rusty::core::curve::ColorRange;
 use rusty::dev::capture::CaptureHost;
 use rusty::scene::decal::Decal;
 use rusty::scene::{FogMode, Scene};
@@ -43,7 +44,7 @@ fn scene(effect: &str, fog: bool) -> Scene {
                 } else {
                     ParticleBlend::Alpha
                 },
-                color: [1.0, 0.2, 0.2, 1.0],
+                color: ColorRange::constant([1.0, 0.2, 0.2, 1.0]),
                 texture: white_sprite(),
                 ..Default::default()
             };
@@ -52,8 +53,8 @@ fn scene(effect: &str, fog: bool) -> Scene {
                 velocity: Vec3::ZERO,
                 age: 0.0,
                 lifetime: 10.0,
-                size_start: 8.0,
-                size_end: 8.0,
+                size: 8.0,
+                rotation: 0.0,
                 color: [1.0, 0.2, 0.2, 1.0],
             });
             scene.world.set_particles(id, Some(emitter));

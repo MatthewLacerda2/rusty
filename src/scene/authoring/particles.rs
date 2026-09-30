@@ -3,22 +3,27 @@
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `ParticleEmitterComponent` field by field: emission (`active` / `emit_mode` /
 //! `looping` / `rate` / `burst_count` / `max_particles`), rendering (`blend` /
-//! `texture`), per-particle motion (`lifetime` / `speed` / `direction` / `spread` /
-//! `gravity`), size + colour over life, collision (`collision` / `bounciness`), and
-//! the deterministic `seed`.
+//! `texture`), shape + per-particle motion (`shape` / `emit_from` / `lifetime` /
+//! `speed` / `direction` / `spread` / `gravity`), start size / rotation / colour
+//! ranges, the over-life curves and gradient, collision (`collision` /
+//! `bounciness`), sub-emitters, and the deterministic `seed`.
 //!
 //! BOTH the editor's Particle System card and the Lua `Particles.*` field-setters
 //! route through these, so the egui panel and the binding share one write (#287). The
 //! `Particles` surface's `Emit`/`Burst`/`Clear` are emission *operations* (they call
-//! the component's seeded spawn path), not field writes, so they stay in the API; only
-//! `SetActive` ([`set_active`]) and `SetRate` ([`set_rate`], with its `≥ 0` clamp) are
-//! field writes routed here.
+//! the component's seeded spawn path), not field writes, so they stay in the API; its
+//! setters (`SetActive`, `SetRate`, `SetShape`, `SetLifetime`, …) are field writes
+//! routed here.
 //!
-//! Allowed deps: components (the emitter data + its enums). Pure.
+//! Allowed deps: components (the emitter data + its enums), core (curves). Pure.
 
 use glam::Vec3;
 
-use crate::components::{CollisionResponse, EmitMode, ParticleBlend, ParticleEmitterComponent};
+use crate::components::{
+    CollisionResponse, EmitFrom, EmitMode, EmitShape, ParticleBlend, ParticleEmitterComponent,
+    SubEmitTrigger,
+};
+use crate::core::curve::{ColorRange, Curve, Gradient, Range};
 
 /// Set the emitter's `active` gate.
 pub fn set_active(p: &mut ParticleEmitterComponent, active: bool) {
@@ -60,17 +65,17 @@ pub fn set_texture(p: &mut ParticleEmitterComponent, texture: String) {
     p.texture = (!texture.is_empty()).then_some(texture);
 }
 
-/// Set the per-particle lifetime (seconds).
-pub fn set_lifetime(p: &mut ParticleEmitterComponent, lifetime: f32) {
-    p.lifetime = lifetime;
+/// Set the per-particle lifetime range (seconds), each bound clamped to `≥ 0`.
+pub fn set_lifetime(p: &mut ParticleEmitterComponent, lifetime: Range) {
+    p.lifetime = Range::new(lifetime.min.max(0.0), lifetime.max.max(0.0));
 }
 
-/// Set the per-particle launch speed.
-pub fn set_speed(p: &mut ParticleEmitterComponent, speed: f32) {
+/// Set the per-particle launch speed range.
+pub fn set_speed(p: &mut ParticleEmitterComponent, speed: Range) {
     p.speed = speed;
 }
 
-/// Set the emission direction.
+/// Set the emission direction (the shape's axis).
 pub fn set_direction(p: &mut ParticleEmitterComponent, direction: Vec3) {
     p.direction = direction;
 }
@@ -85,19 +90,67 @@ pub fn set_gravity(p: &mut ParticleEmitterComponent, gravity: Vec3) {
     p.gravity = gravity;
 }
 
-/// Set the start size.
-pub fn set_size_start(p: &mut ParticleEmitterComponent, size_start: f32) {
-    p.size_start = size_start;
+/// Set the emission shape.
+pub fn set_shape(p: &mut ParticleEmitterComponent, shape: EmitShape) {
+    p.shape = shape;
 }
 
-/// Set the end size.
-pub fn set_size_end(p: &mut ParticleEmitterComponent, size_end: f32) {
-    p.size_end = size_end;
+/// Set whether the shape emits from its volume or its surface / edge.
+pub fn set_emit_from(p: &mut ParticleEmitterComponent, from: EmitFrom) {
+    p.emit_from = from;
 }
 
-/// Set the particle colour (RGBA, unmultiplied).
-pub fn set_color(p: &mut ParticleEmitterComponent, color: [f32; 4]) {
+/// Set the start size range, each bound clamped to `≥ 0`.
+pub fn set_size(p: &mut ParticleEmitterComponent, size: Range) {
+    p.size = Range::new(size.min.max(0.0), size.max.max(0.0));
+}
+
+/// Set the start rotation range (degrees).
+pub fn set_rotation(p: &mut ParticleEmitterComponent, rotation: Range) {
+    p.rotation = rotation;
+}
+
+/// Set the start colour range (RGBA, unmultiplied).
+pub fn set_color(p: &mut ParticleEmitterComponent, color: ColorRange) {
     p.color = color;
+}
+
+/// Set the size-over-life multiplier curve (keys re-sorted by `t`).
+pub fn set_size_over_life(p: &mut ParticleEmitterComponent, mut curve: Curve) {
+    curve.sort();
+    p.size_over_life = curve;
+}
+
+/// Set the colour-over-life gradient (keys re-sorted by `t`).
+pub fn set_color_over_life(p: &mut ParticleEmitterComponent, mut gradient: Gradient) {
+    gradient.sort();
+    p.color_over_life = gradient;
+}
+
+/// Set the drag-over-life curve (fraction of velocity lost per second).
+pub fn set_drag(p: &mut ParticleEmitterComponent, mut curve: Curve) {
+    curve.sort();
+    p.drag = curve;
+}
+
+/// Set the rotation-speed-over-life curve (degrees/second).
+pub fn set_rotation_speed(p: &mut ParticleEmitterComponent, mut curve: Curve) {
+    curve.sort();
+    p.rotation_speed = curve;
+}
+
+/// Set (or, with `None`, clear) the sub-emitter fired at `trigger`.
+pub fn set_sub_emitter(
+    p: &mut ParticleEmitterComponent,
+    trigger: SubEmitTrigger,
+    target: Option<u32>,
+) {
+    p.sub_emitters.set(trigger, target);
+}
+
+/// Set the fraction of a parent particle's velocity sub-particles inherit.
+pub fn set_inherit_velocity(p: &mut ParticleEmitterComponent, fraction: f32) {
+    p.sub_emitters.inherit_velocity = fraction;
 }
 
 /// Set the collision response (none / die / bounce).
@@ -138,7 +191,8 @@ mod tests {
         set_rate(&mut e, -5.0);
         set_emit_mode(&mut e, EmitMode::Burst);
         set_texture(&mut e, "smoke.png".to_string());
-        set_color(&mut e, [0.1, 0.2, 0.3, 0.4]);
+        set_color(&mut e, ColorRange::constant([0.1, 0.2, 0.3, 0.4]));
+        set_size(&mut e, Range::new(-1.0, 2.0));
         set_seed(&mut e, 42);
         {
             let p = &*e;
@@ -146,7 +200,8 @@ mod tests {
             assert_eq!(p.rate, 0.0, "rate clamps to 0");
             assert_eq!(p.emit_mode, EmitMode::Burst);
             assert_eq!(p.texture.as_deref(), Some("smoke.png"));
-            assert_eq!(p.color, [0.1, 0.2, 0.3, 0.4]);
+            assert_eq!(p.color.min, [0.1, 0.2, 0.3, 0.4]);
+            assert_eq!(p.size, Range::new(0.0, 2.0), "size clamps to 0");
             assert_eq!(p.seed, 42);
         }
         set_texture(&mut e, String::new()); // empty clears

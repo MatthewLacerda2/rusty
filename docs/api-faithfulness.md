@@ -186,6 +186,11 @@ edits and each physics step.)
 | `Emit` / `Burst` | ✅ | sim/renderer — `emit_at` spawns into the runtime buffer `app/particles.rs` advances and the renderer draws |
 | `SetActive` | ✅ | sim — gates continuous emission |
 | `SetRate` | ✅ | sim — continuous spawn cadence |
+| `SetShape` | ✅ | sim — `EmitShape::sample` picks each spawn's offset + launch direction in `spawn_particle`; unknown kinds return `false` and change nothing |
+| `SetDirection` | ✅ | sim — the shape's axis in `spawn_particle` |
+| `SetLifetime` / `SetSpeed` / `SetSize` | ✅ | sim/renderer — sampled per spawn in `spawn_particle`; size reaches the renderer via `size_of` |
+| `SetColor` | ✅ | renderer — start tint, scaled by the gradient in `color_of` |
+| `SetSubEmitter` | ✅ | sim — `app/particles.rs` queues and dispatches the target's burst on birth/death/collision; unknown triggers return `false` |
 | `Clear` | ✅ | renderer — empties the live buffer that's drawn |
 
 ### `Audio` — over the `AudioMaestro` resource (+ `Entity.audio`)

@@ -6,6 +6,7 @@
 use serde::Deserialize;
 
 use super::{Entity, PrefabLink};
+use crate::components::particle::LegacyEmitter;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, ColliderComponent, ImageComponent, JointComponent,
@@ -48,8 +49,9 @@ pub(super) struct EntityRepr {
     nav_agent: Option<NavMeshAgentComponent>,
     camera: Option<CameraComponent>,
     visual_correction: Option<VisualCorrectionComponent>,
+    /// Read through the pre-#439 `size_end` migration.
     #[serde(default)]
-    particles: Option<ParticleEmitterComponent>,
+    particles: Option<LegacyEmitter>,
     #[serde(default)]
     audio: Option<AudioSourceComponent>,
     #[serde(default)]
@@ -117,7 +119,7 @@ impl From<EntityRepr> for Entity {
             nav_agent: r.nav_agent,
             camera: r.camera,
             visual_correction: r.visual_correction,
-            particles: r.particles,
+            particles: r.particles.map(ParticleEmitterComponent::from),
             audio: r.audio,
             canvas: r.canvas,
             rect_transform: r.rect_transform,
