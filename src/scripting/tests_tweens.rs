@@ -121,3 +121,13 @@ fn bad_arguments_are_errors_not_silent_no_ops() {
     ))
     .contains("endless"));
 }
+
+#[test]
+fn a_scene_unload_drops_the_unloaded_entitys_tweens() {
+    let body = "Tween.To(id, 'Transform.position', {1, 0, 0}, 1)";
+    let (mut m, id) = rig("tween_unload", &counted(body));
+    tick(&mut m, 1);
+    assert!(!m.timers.borrow().is_empty());
+    m.unload_entities(&[id]);
+    assert!(m.timers.borrow().is_empty());
+}

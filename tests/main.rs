@@ -99,6 +99,8 @@ mod script_timers;
 mod structural_authoring;
 #[cfg(feature = "dev")]
 mod time_scale;
+#[cfg(feature = "dev")]
+mod tweens;
 
 // ── Needs a GPU or software adapter (skips without one); all dev-only ────────────
 // Kept under one `gpu::` path so a runner can tell them apart by name alone.

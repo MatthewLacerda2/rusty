@@ -199,8 +199,9 @@ headless replays stay byte-identical):
   `OnScroll`. A pointer that arrives and clicks in one tick reads enter → down
   → up → click.
 - Right after **all** `Update`s (before nav/physics and `LateUpdate`) comes the
-  timer phase: due [`Timer`](Timer.md) invokes fire and waiting coroutines resume,
-  in ascending `(entity id, handle)` order.
+  timer phase: due [`Timer`](Timer.md) invokes fire, waiting coroutines resume
+  and running [`Tween`](Tween.md)s write their properties, in ascending
+  `(entity id, handle)` order.
 - **One active gate for every gameplay hook.** A disabled entity receives *no*
   gameplay callback — not `Update`, `LateUpdate`, or the trigger and collision hooks. Going
   inactive is announced once by `OnDisable`; coming back is announced once by
@@ -258,6 +259,7 @@ One file per namespace, in reference order:
 - [`Time`](Time.md)
 - [`Random`](Random.md)
 - [`Timer`](Timer.md)
+- [`Tween`](Tween.md)
 - [`Camera`](Camera.md)
 - [`Light`](Light.md)
 - [`Probe`](Probe.md)
