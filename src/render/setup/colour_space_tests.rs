@@ -69,7 +69,7 @@ fn centre_pixel(
     let mut view = RenderView::offscreen(&renderer.device, format, 16, 16, 2);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 0.0, 12.0), -90.0, 0.0);
-    renderer.render(&mut view, scene, &cam, &out, false, &[]);
+    renderer.render(&mut view, scene, &cam, &out, false);
     let texture = view.color_target().unwrap();
     let px = readback::read_texture_rgba8(&renderer.device, &renderer.queue, texture, 16, 16);
     let i = (8 * 16 + 8) * 4;

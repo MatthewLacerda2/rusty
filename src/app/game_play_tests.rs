@@ -81,13 +81,11 @@ fn exiting_play_clears_runtime_state() {
     gw.set_playing(true);
     gw.tick(DT); // Entered: builds physics, sets play_frame
     assert!(gw.resources.physics.borrow().is_some());
-    gw.resources.pathfinding_points = vec![Vec3::ZERO];
     gw.set_playing(false);
     let t = gw.tick(DT);
     assert!(t == PlayTransition::Exited);
-    // exit_play tore physics down, cleared the debug path, reset the counter.
+    // exit_play tore physics down and reset the counter.
     assert!(gw.resources.physics.borrow().is_none());
-    assert!(gw.pathfinding_points().is_empty());
     assert_eq!(gw.play_frame(), 0);
 }
 
@@ -268,18 +266,4 @@ fn graph_driven_animator_transitions_through_the_play_loop() {
     assert_eq!(anim.current_node.as_deref(), Some("Run"));
     assert_eq!(anim.previous_clip.as_deref(), Some("IdleClip"));
     assert_eq!(anim.crossfade_duration, 0.25);
-}
-
-#[test]
-fn snap_camera_to_player_positions_behind_player() {
-    let mut s = Scene::new();
-    let id = s.add_entity("Player".to_string());
-    s.world.transform_mut(id).unwrap().position = Vec3::new(2.0, 0.0, 3.0);
-    let mut gw = world_with(Rc::new(RefCell::new(s)));
-    gw.set_playing(true);
-    gw.tick(DT); // enter_play calls snap_camera_to_player
-    let cam = gw.camera().borrow();
-    assert!(cam.position.abs_diff_eq(Vec3::new(2.0, 1.5, -1.5), 1e-5));
-    assert!((cam.yaw - 90.0).abs() < 1e-5);
-    assert!((cam.pitch + 10.0).abs() < 1e-5);
 }

@@ -38,14 +38,6 @@ fn play_frame_reads_the_counter() {
 }
 
 #[test]
-fn pathfinding_points_reads_the_debug_path() {
-    let mut res = resources();
-    assert!(res.pathfinding_points().is_empty());
-    res.pathfinding_points = vec![glam::Vec3::X, glam::Vec3::Y];
-    assert_eq!(res.pathfinding_points(), &[glam::Vec3::X, glam::Vec3::Y]);
-}
-
-#[test]
 fn flush_storage_is_a_noop_when_pathless() {
     let res = resources();
     // The default store is pathless (harness/tests), so flush succeeds silently.

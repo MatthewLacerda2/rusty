@@ -96,7 +96,7 @@ pub fn capture_asset_into(
         PreviewSubject::Shader(path) => {
             renderer.render_preview_with_shader(view, &scene, &camera, &target_view, path);
         }
-        _ => renderer.render(view, &scene, &camera, &target_view, false, &[]),
+        _ => renderer.render(view, &scene, &camera, &target_view, false),
     }
 
     host.write_png(out_png)?;

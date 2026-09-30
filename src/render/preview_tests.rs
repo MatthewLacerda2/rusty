@@ -84,7 +84,6 @@ fn gpu_plain_render_into_the_preview_target_does_not_panic() {
         &looking_at_origin_from_z(),
         &target,
         false,
-        &[],
     );
 }
 
@@ -127,5 +126,5 @@ fn gpu_a_shader_override_renders_and_stays_on_its_own_view() {
     // A different view of the same renderer is untouched by that override.
     let mut plain = preview_view(&renderer);
     let target = plain.color_target_view().unwrap();
-    renderer.render(&mut plain, &scene, &camera, &target, false, &[]);
+    renderer.render(&mut plain, &scene, &camera, &target, false);
 }

@@ -79,7 +79,7 @@ fn gpu_two_views_two_scenes_never_clobber_each_other() {
     // Render both views in the same frame, interleaved, as the editor viewport + the
     // Inspector preview do.
     let out_a = wide.color_target_view().unwrap();
-    renderer.render(&mut wide, &scene_a, &cam, &out_a, false, &[]);
+    renderer.render(&mut wide, &scene_a, &cam, &out_a, false);
     assert_eq!(renderer.scene_slot_count(scene_a.id()), 1);
     assert!(
         !renderer.shadow_renderer.needs_static_bake(scene_a.id()),
@@ -91,7 +91,7 @@ fn gpu_two_views_two_scenes_never_clobber_each_other() {
     );
 
     let out_b = tall.color_target_view().unwrap();
-    renderer.render(&mut tall, &scene_b, &cam, &out_b, false, &[]);
+    renderer.render(&mut tall, &scene_b, &cam, &out_b, false);
 
     // Sizes: each view kept its own.
     assert_eq!((wide.size().width, wide.size().height), (96, 48));
@@ -116,9 +116,9 @@ fn gpu_two_views_two_scenes_never_clobber_each_other() {
 
     // A second frame settles rather than thrashing: same sizes, same slot count.
     let out_a = wide.color_target_view().unwrap();
-    renderer.render(&mut wide, &scene_a, &cam, &out_a, false, &[]);
+    renderer.render(&mut wide, &scene_a, &cam, &out_a, false);
     let out_b = tall.color_target_view().unwrap();
-    renderer.render(&mut tall, &scene_b, &cam, &out_b, false, &[]);
+    renderer.render(&mut tall, &scene_b, &cam, &out_b, false);
     assert_eq!((wide.size().width, wide.size().height), (96, 48));
     assert_eq!((tall.size().width, tall.size().height), (40, 80));
     assert_eq!(renderer.entity_slot_count(), 2);

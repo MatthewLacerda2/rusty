@@ -37,7 +37,6 @@ fn accessors_expose_shared_handles() {
     assert!(Rc::ptr_eq(gw.time(), &gw.resources.time));
     assert!(!gw.is_playing());
     assert_eq!(gw.play_frame(), 0);
-    assert!(gw.pathfinding_points().is_empty());
     let _ = gw.script_manager();
 }
 
