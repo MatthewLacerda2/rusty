@@ -152,3 +152,12 @@ fn a_pair_enters_on_impulse_and_stays_while_touching() {
         "once in, touch keeps it"
     );
 }
+
+#[test]
+fn swapping_a_pair_rekeys_it_from_the_other_side() {
+    let mut p = pair(1.0);
+    p.body_a = 7;
+    let s = p.swapped();
+    assert_eq!((s.a, s.b, s.body_a), (2, 1, 2));
+    assert_eq!((s.contact.normal, s.contact.other_body), (-Vec3::Y, 7));
+}

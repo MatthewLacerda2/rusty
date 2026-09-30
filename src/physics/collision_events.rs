@@ -53,7 +53,7 @@ impl CollisionPair {
     }
 
     /// The same pair keyed from `b`'s side.
-    fn swapped(&self) -> Self {
+    pub(super) fn swapped(&self) -> Self {
         let [_, (a, b, contact)] = self.sides();
         Self {
             a,
