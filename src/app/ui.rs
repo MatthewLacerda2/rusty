@@ -75,10 +75,10 @@ mod tests {
     use glam::Vec2;
 
     use crate::app::GameWorld;
-    use crate::components::{CanvasComponent, RectTransformComponent};
+    use crate::components::{CanvasComponent, ImageComponent, RectTransformComponent};
     use crate::core::input::InputState;
     use crate::navigation::NavigationGraph;
-    use crate::scene::Scene;
+    use crate::scene::{Scene, ScriptComponent};
     use crate::scripting::ConsoleLogs;
 
     #[test]
@@ -109,5 +109,47 @@ mod tests {
         let r = layout.get(hud).expect("laid out");
         assert!((r.scale_factor - 1280.0 / 1920.0).abs() < 1e-5);
         assert!((r.rect.0 - Vec2::new(910.0, 490.0)).abs().max_element() < 1e-3);
+    }
+
+    #[test]
+    fn the_first_play_tick_hit_tests_before_any_late_update_ran() {
+        // A script frees the cursor in `Start`; the pointer already rests on a
+        // panel. The first tick's dispatch runs before its `LateUpdate` layout, so
+        // it must lay out on its own to see the panel.
+        let script = std::env::temp_dir().join("rusty_420_first_tick.lua");
+        std::fs::write(
+            &script,
+            "return { Start = function() Input.SetCursorLocked(false) end }",
+        )
+        .expect("write script");
+        let mut scene = Scene::new();
+        let root = scene.add_entity("Canvas".to_string());
+        scene
+            .world
+            .set_canvas(root, Some(CanvasComponent::default()));
+        let panel = scene.add_entity("Panel".to_string());
+        let rt = RectTransformComponent::default();
+        scene.world.set_rect_transform(panel, Some(rt));
+        scene
+            .world
+            .set_image(panel, Some(ImageComponent::default()));
+        *scene.world.scripts_mut(panel).expect("scripts") = vec![ScriptComponent {
+            path: script.to_string_lossy().replace('\\', "/"),
+            ..Default::default()
+        }];
+        scene.set_parent(panel, Some(root)).expect("parent exists");
+        let input = Rc::new(RefCell::new(InputState::new()));
+        input.borrow_mut().move_mouse(960.0, 540.0);
+        let nav = NavigationGraph::new(-1.0, 1.0, -1.0, 1.0, 1.0);
+        let mut game = GameWorld::new(
+            Rc::new(RefCell::new(scene)),
+            input,
+            Rc::new(RefCell::new(nav)),
+            Rc::new(RefCell::new(ConsoleLogs::new())),
+        );
+        game.resources.screen.borrow_mut().set_game_view(1920, 1080);
+        game.set_playing(true);
+        game.tick(crate::time::FIXED_DELTA_TIME);
+        assert!(game.resources.event_system.borrow().is_pointer_over_ui());
     }
 }
