@@ -209,7 +209,7 @@ otherwise fail at merge time:
 - **A new first-class component satisfies all four axes** — the `Entity` field,
   the Add Component entry, an inspector card, an `src/api/<x>.rs` namespace
   registered and documented — or gets a `WAIVERS` row in
-  `tools/lint/src/components.rs` with a written rationale. `--components`
+  `tools/lint/src/components/waivers.rs` with a written rationale. `--components`
   discovers it from `Entity` itself, so it cannot be slipped past.
 - **A migrated inspector card keeps routing through `scene::authoring`.**
   `--parity` fails on a direct field write, *and* on a stale baseline line for a

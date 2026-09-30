@@ -30,11 +30,12 @@ from *two* places. To keep cohesion, a `<x>_tests.rs` **sibling** shares its sou
 (singular), `tests/`, and `fixtures/` forms keep the tight 150-line cap (#211).
 
 ## What the size gate scans
-The full scan (`make size`, CI's `lint` job) walks `src/`, `tests/` and `fuzz/`
-(`SCAN_ROOTS` in `tools/lint/src/main.rs`); until #535 it walked only `src/`, so
-oversized integration-test files passed unseen. `tools/` is not scanned yet: it is a
-separate dev-tool crate and still holds a file over the source cap. The commit hook
-checks whatever `.rs` files are staged, wherever they live.
+The full scan (`make size`, CI's `lint` job) walks `src/`, `tests/`, `fuzz/` and
+`tools/` (`SCAN_ROOTS` in `tools/lint/src/size.rs`); until #535 it walked only `src/`,
+so oversized integration-test files passed unseen, and until #541 it skipped `tools/`,
+so the lint crate itself could drift past the cap. Any `target/` directory (cargo
+build output, e.g. `tools/lint/target/` or `fuzz/target/`) is never descended into.
+The commit hook checks whatever `.rs` files are staged, wherever they live.
 
 ## Run it
 ```
@@ -106,7 +107,7 @@ An axis can be satisfied in two ways:
 - **Waived** — a documented decision *not* to add a per-component artifact, because
   the axis is already served by a shared namespace or a content-driven workflow, and
   doing it standalone would fragment the one stable API surface. Waivers live in the
-  `WAIVERS` table in `tools/lint/src/components.rs` as `(component, axis, rationale)`
+  `WAIVERS` table in `tools/lint/src/components/waivers.rs` as `(component, axis, rationale)`
   rows: `mesh add_menu`/`mesh api` (mesh is content-grid/glTF-driven),
   `texture api` (→ `Material`), `collider api` + `rigidbody api` (→ `Physics`),
   `nav_agent api` (→ `NavMeshAgent`), `visual_correction api` (→ `Graphics`).
