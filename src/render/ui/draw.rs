@@ -17,17 +17,20 @@ use std::rc::Rc;
 
 use glam::Vec2;
 
-use super::mesh::{build_canvas_meshes, CanvasMesh, UiVertex};
+use super::mesh::{build_canvas_meshes, CanvasMesh, UiSource, UiVertex};
 use crate::render::{RenderView, Renderer};
 use crate::scene::Scene;
 use crate::ui::UiLayout;
 
 /// The vertex buffer layout matching `ui.wgsl`'s `VertexIn`.
 pub(crate) fn vertex_layout() -> wgpu::VertexBufferLayout<'static> {
-    const ATTRIBS: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+    const ATTRIBS: [wgpu::VertexAttribute; 6] = wgpu::vertex_attr_array![
         0 => Float32x2, // pos (NDC)
         1 => Float32x2, // uv
         2 => Float32x4, // color
+        3 => Float32x4, // outline colour (text)
+        4 => Float32x4, // glow colour (text)
+        5 => Float32x4, // sdf: [is text, dilate, outline, glow]
     ];
     wgpu::VertexBufferLayout {
         array_stride: std::mem::size_of::<UiVertex>() as wgpu::BufferAddress,
@@ -134,7 +137,9 @@ impl Renderer {
             let s = textures.get(p)?.texture.size();
             Some(Vec2::new(s.width as f32, s.height as f32))
         };
-        let meshes = build_canvas_meshes(&scene.world, &layout, screen, &tex_size);
+        let atlases = &mut self.ui_renderer.atlases;
+        let meshes = build_canvas_meshes(&scene.world, &layout, screen, &tex_size, atlases);
+        self.ui_renderer.upload_atlases(&self.device, &self.queue);
         view.ui.sync(&self.device, &self.queue, meshes);
         view.ui.drawn = view.ui.canvases.len();
         if view.ui.drawn == 0 {
@@ -180,11 +185,12 @@ impl Renderer {
             for canvas in &cache.canvases {
                 pass.set_vertex_buffer(0, canvas.buffer.slice(..));
                 for batch in &canvas.mesh.batches {
-                    let group = batch
-                        .texture
-                        .as_ref()
-                        .and_then(|p| ui.textures.get(p))
-                        .map_or(&ui.white, |(_, g)| g);
+                    let group = match &batch.source {
+                        UiSource::Solid => None,
+                        UiSource::Texture(p) => ui.textures.get(p).map(|(_, g)| g),
+                        UiSource::Font(f) => ui.fonts.get(f).map(|a| &a.group),
+                    };
+                    let group = group.unwrap_or(&ui.white);
                     pass.set_bind_group(0, group, &[]);
                     let s = batch
                         .clip
