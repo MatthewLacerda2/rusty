@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 /// `AudioMaestro` reads them when (re)starting a voice for this entity.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AudioSourceComponent {
-    /// Asset path to the clip (`.ogg` / `.wav`). Empty means "no clip assigned".
+    /// Asset path to the clip (`.ogg` / `.wav` / `.mp3`). Empty means "no clip assigned".
     pub clip: String,
     /// Per-source linear gain in `[0, 1]`, multiplied by the master volume.
     pub volume: f32,

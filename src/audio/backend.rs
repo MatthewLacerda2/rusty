@@ -60,7 +60,7 @@ impl VoiceMix {
 /// How a voice should be started.
 #[derive(Clone, Debug)]
 pub struct PlayParams {
-    /// Path to the decoded clip (`.ogg` / `.wav`).
+    /// Path to the decoded clip (`.ogg` / `.wav` / `.mp3`).
     pub clip: String,
     /// Whether the voice loops.
     pub looping: bool,
