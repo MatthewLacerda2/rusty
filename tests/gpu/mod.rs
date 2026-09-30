@@ -20,3 +20,4 @@ mod preview_api;
 mod transparent_sorting_screenshot;
 mod ui_hud_scene;
 mod ui_hud_screenshot;
+mod ui_text_screenshot;
