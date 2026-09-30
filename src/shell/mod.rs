@@ -55,6 +55,10 @@ pub struct Shell {
     pub applied_video: VideoSettings,
     /// What the OS cursor was last set to (#416).
     pub cursor: input::CursorPolicy,
+    /// The OS gamepad backend (#471); `None` where the platform has none.
+    pub pad_source: Option<input::pad_source::GilrsSource>,
+    /// Pad slots and the pad state last written into the sim.
+    pub pads: input::pads::PadPump,
     /// Whether the window has OS focus: raw mouse motion arrives even when it does
     /// not, and must not reach the game then.
     pub window_focused: bool,
@@ -208,6 +212,9 @@ fn run_frame<F: Frontend>(
     frontend: &mut F,
 ) {
     let delta_time = shell.clock.tick(Instant::now());
+    // Like raw mouse motion, pads keep reporting while the window is unfocused.
+    let pads_live = shell.window_focused && frontend.game_has_input(game);
+    pump_pads(shell, game, pads_live);
     let transition = frame::advance_sim(game, delta_time);
     audio::apply_mix(game);
     frontend.on_play_transition(game, transition);
@@ -243,6 +250,16 @@ fn run_frame<F: Frontend>(
         .create_view(&wgpu::TextureViewDescriptor::default());
     frontend.draw(shell, game, &surface.texture, &target);
     surface.present();
+}
+
+/// Write this frame's gamepad snapshot into the sim, before it ticks.
+fn pump_pads(shell: &mut Shell, game: &GameWorld, has_input: bool) {
+    if let Some(source) = shell.pad_source.as_mut() {
+        let mut input = game.input().borrow_mut();
+        shell
+            .pads
+            .pump(source, &mut input, &shell.keymap, has_input);
+    }
 }
 
 /// Drain socket-delivered commands (#282) through the one live evaluator, so a

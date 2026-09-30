@@ -150,6 +150,8 @@ impl Shell {
             keymap: load_keymap(game),
             applied_video: VideoSettings::default(),
             cursor: super::input::CursorPolicy::default(),
+            pad_source: super::input::pad_source::GilrsSource::open(),
+            pads: super::input::pads::PadPump::default(),
             window_focused: true,
             // A bind failure logs to the game's console and leaves the channel `None`.
             #[cfg(feature = "dev")]

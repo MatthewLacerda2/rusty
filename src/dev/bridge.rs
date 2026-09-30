@@ -7,7 +7,7 @@
 //! Tables: Harness.{Step,StepUntil,Snapshot,Log,Expect,Frame,Stats,AssertBudget}, plus read helpers
 //! Scene.FindEntityByName / Transform.GetPosition / Animator.GetClip and the
 //! writable Input injection (Press/Release, MoveMouse, AddMouseDelta, Scroll,
-//! TypeText). Shooting is just pressing the SPACE key the
+//! TypeText, SetAxis, SetPadConnected). Shooting is just pressing the SPACE key the
 //! player-controller script edge-detects — there is no separate click/shoot signal.
 
 use std::cell::RefCell;
@@ -240,6 +240,16 @@ fn register_input(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     inject(lua, &t, harness, "Scroll", |i, dy: f64| i.scroll(dy))?;
     inject(lua, &t, harness, "TypeText", |i, text: String| {
         i.type_text(&text)
+    })?;
+    inject(
+        lua,
+        &t,
+        harness,
+        "SetAxis",
+        |i, (axis, v): (String, f32)| i.set_axis(&axis, v),
+    )?;
+    inject(lua, &t, harness, "SetPadConnected", |i, (pad, on)| {
+        i.pads.set_connected(pad, on)
     })?;
     lua.globals().set("Input", t)
 }

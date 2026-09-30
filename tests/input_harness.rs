@@ -28,6 +28,14 @@ fn edges_are_per_sim_tick_and_play_locks_the_cursor() {
     );
     h.step(1);
     assert_eq!(eval(&h, tap), "false, false", "edges last one tick");
+
+    h.world
+        .borrow()
+        .input()
+        .borrow_mut()
+        .set_axis("PadLeftX", 0.5);
+    h.step(1);
+    assert_eq!(eval(&h, "return Input.GetAxis('PadLeftX')"), "0.5");
 }
 
 /// Walk forward while swinging the mouse and typing, logging the Player's pose.
@@ -35,6 +43,8 @@ const SCENARIO: &str = r#"
 local player = Scene.FindEntityByName("Player")
 Input.MoveMouse(100, 50)
 Input.Press("W")
+Input.SetAxis("PadLeftX", 0.5)
+Input.Press("PadA")
 for _ = 1, 30 do
     Input.AddMouseDelta(3, -1)
     Input.Scroll(0.5)
