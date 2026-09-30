@@ -26,11 +26,11 @@
 //!
 //! Allowed deps: components, scene, ecs.
 
-use crate::components::JointComponent;
 use crate::components::{
     CanvasComponent, CanvasGroupComponent, ImageComponent, RectMaskComponent,
     RectTransformComponent, SelectableComponent, TextComponent,
 };
+use crate::components::{JointComponent, LodGroupComponent};
 use crate::components::{LayoutElementComponent, LayoutGroupComponent};
 use crate::ecs::World;
 use crate::scene::authoring::components::ComponentKind;
@@ -64,6 +64,7 @@ pub(crate) fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::LayoutGroup => world.has_layout_group(id),
         ComponentKind::LayoutElement => world.has_layout_element(id),
         ComponentKind::Joint => world.has_joint(id),
+        ComponentKind::LodGroup => world.has_lod_group(id),
     }
 }
 
@@ -104,6 +105,7 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
             world.set_layout_element(id, Some(LayoutElementComponent::default()))
         }
         ComponentKind::Joint => world.set_joint(id, Some(JointComponent::default())),
+        ComponentKind::LodGroup => world.set_lod_group(id, Some(LodGroupComponent::default())),
     }
 }
 
@@ -132,6 +134,7 @@ pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool
         ComponentKind::LayoutGroup => world.set_layout_group(id, None),
         ComponentKind::LayoutElement => world.set_layout_element(id, None),
         ComponentKind::Joint => world.set_joint(id, None),
+        ComponentKind::LodGroup => world.set_lod_group(id, None),
     }
 }
 

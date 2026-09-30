@@ -8,6 +8,7 @@ use std::rc::Rc;
 use super::batch::{BatchKey, DrawItem, FrameDraws};
 use crate::components::MaterialAsset;
 use crate::render::gpu::draw_buffers::{group1, push_palette, FrameUpload, JointMatrix};
+use crate::render::lod::LodSelection;
 use crate::render::{transform_aabb, Frustum, GpuTexture, MeshId, Renderer};
 use crate::scene::Scene;
 
@@ -20,6 +21,8 @@ pub(crate) struct SolidResources {
     pub draws: FrameDraws,
     /// Mesh entities the frustum cull skipped for this camera (#433's counters).
     pub culled: u32,
+    /// Mesh entities hidden because their LOD level is not the one shown (#472).
+    pub lod_hidden: u32,
 }
 // The overlay resources keep only the buffers they own (the per-overlay entity
 // uniform + any vertex buffer) plus their bind group; the joint array they bind is
@@ -68,17 +71,18 @@ impl Renderer {
         }
     }
 
-    /// Collect this camera's visible solids, batch repeated mesh + material pairs into
+    /// Collect this camera's visible solids (skipping the LOD levels `lod` hides), batch repeated mesh + material pairs into
     /// instanced draws (#470), and upload the camera's packed draw data.
     pub(crate) fn precreate_solid_resources(
         &mut self,
         scene: &Scene,
         cam: &crate::scene::Camera,
         frustum: &Frustum,
+        lod: &LodSelection,
     ) -> SolidResources {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
         let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
-        let mut culled = 0;
+        let (mut culled, mut lod_hidden) = (0, 0);
         for id in scene.world.ids_with_mesh() {
             if !scene.world.is_active(id) {
                 continue;
@@ -91,6 +95,11 @@ impl Renderer {
             }
             // Skip meshes the active camera's culling mask excludes (#92).
             if !crate::scene::layer_in_mask(scene.world.layer(id), cam.culling_mask) {
+                continue;
+            }
+            // A level of detail this camera does not show (#472).
+            if lod.hides(id) {
+                lod_hidden += 1;
                 continue;
             }
             // View-frustum cull (#330): skip the uniform sync, binds, and draw for any
@@ -125,7 +134,11 @@ impl Renderer {
                 instances: &draws.instances,
             },
         );
-        SolidResources { draws, culled }
+        SolidResources {
+            draws,
+            culled,
+            lod_hidden,
+        }
     }
 
     /// Whether `entity` is fully outside `frustum` and can be skipped this pass (#330).

@@ -26,6 +26,9 @@ pub struct RenderCounters {
     pub visible_entities: u32,
     /// Mesh entities the frustum cull skipped, summed over the camera stack.
     pub culled_entities: u32,
+    /// Mesh entities hidden because their LODGroup showed another level (#472),
+    /// summed over the camera stack.
+    pub lod_hidden_entities: u32,
     /// Active lights in the scene.
     pub lights: u32,
     /// Active lights the forward uniform had no slot for — silently unlit today.
@@ -49,6 +52,7 @@ impl RenderCounters {
             ("triangles", self.triangles),
             ("visible_entities", self.visible_entities.into()),
             ("culled_entities", self.culled_entities.into()),
+            ("lod_hidden_entities", self.lod_hidden_entities.into()),
             ("lights", self.lights.into()),
             ("lights_dropped", self.lights_dropped.into()),
             ("shadow_draws", self.shadow_draws.into()),
@@ -86,6 +90,7 @@ impl Renderer {
         c.add_draws(batches.map(|b| (b.num_indices, b.instances.len() as u32)));
         c.visible_entities += solids.draws.instances.len() as u32;
         c.culled_entities += solids.culled;
+        c.lod_hidden_entities += solids.lod_hidden;
         c.draw_calls += decals as u32 + particles;
     }
 

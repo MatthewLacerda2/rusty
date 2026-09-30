@@ -29,6 +29,7 @@ pub mod joint;
 pub mod layout_element;
 pub mod layout_group;
 pub mod light;
+pub mod lod_group;
 pub mod material;
 pub mod nav_agent;
 pub mod particles;

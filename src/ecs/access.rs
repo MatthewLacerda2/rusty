@@ -22,7 +22,6 @@
 
 use std::ops::{Deref, DerefMut};
 
-use crate::components::JointComponent;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, ColliderComponent, ImageComponent, LayoutElementComponent,
@@ -30,6 +29,7 @@ use crate::components::{
     ParticleEmitterComponent, PrefabLink, RectMaskComponent, RectTransformComponent,
     RigidBodyComponent, SelectableComponent, TextComponent, VisualCorrectionComponent,
 };
+use crate::components::{JointComponent, LodGroupComponent};
 
 use super::world::{Ref, RefMut, World};
 
@@ -138,5 +138,6 @@ optional_component_accessors! {
     LayoutGroupComponent => layout_group, layout_group_mut, has_layout_group, set_layout_group, take_layout_group, ids_with_layout_group;
     LayoutElementComponent => layout_element, layout_element_mut, has_layout_element, set_layout_element, take_layout_element, ids_with_layout_element;
     JointComponent => joint, joint_mut, has_joint, set_joint, take_joint, ids_with_joint;
+    LodGroupComponent => lod_group, lod_group_mut, has_lod_group, set_lod_group, take_lod_group, ids_with_lod_group;
     PrefabLink => prefab_link, prefab_link_mut, has_prefab_link, set_prefab_link, take_prefab_link, ids_with_prefab_link;
 }

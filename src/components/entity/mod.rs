@@ -20,7 +20,7 @@ use super::{
     RigidBodyComponent, ScriptComponent, SelectableComponent, TextComponent, TransformComponent,
     VisualCorrectionComponent,
 };
-use super::{JointComponent, SubEmitters};
+use super::{JointComponent, LodGroupComponent, SubEmitters};
 
 /// The live link from an instance entity back to the `.prefab` it was stamped from
 /// (#216). Set on EVERY entity of a linked instance — not just the root — so that
@@ -127,6 +127,10 @@ pub struct Entity {
     pub layout_element: Option<LayoutElementComponent>,
     #[serde(default)]
     pub joint: Option<JointComponent>,
+    /// Level-of-detail group over renderer entities (#472). `#[serde(default)]` for
+    /// pre-#472 scenes.
+    #[serde(default)]
+    pub lod_group: Option<LodGroupComponent>,
     /// Live link back to the source `.prefab` for a *linked* prefab instance (#216).
     /// `None` on a plain entity or a v1 unpacked copy. Carried on every entity of an
     /// instance. `#[serde(default)]` so pre-#216 scenes load with no link.
@@ -168,6 +172,7 @@ impl Entity {
             layout_group: None,
             layout_element: None,
             joint: None,
+            lod_group: None,
             prefab_link: None,
             parent_id: None,
             children: Vec::new(),
@@ -175,12 +180,14 @@ impl Entity {
     }
 
     /// Rewrite every entity reference a component holds (a Selectable's targets,
-    /// #420; a Joint's connected body, #449; an emitter's sub-emitters, #439) through `map` — how the references
+    /// #420; a Joint's connected body, #449; an emitter's sub-emitters, #439; an LODGroup's
+    /// renderers, #472) through `map` — how the references
     /// follow the entity when a prefab is saved, stamped or propagated.
     pub fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
         self.selectable.iter_mut().for_each(|s| s.remap_refs(map));
         self.joint.iter_mut().for_each(|j| j.remap_refs(map));
         self.particles.iter_mut().for_each(|p| p.remap_refs(map));
+        self.lod_group.iter_mut().for_each(|g| g.remap_refs(map));
     }
 
     /// Whether `pointer` (a JSON pointer into the entity document, as prefab
@@ -194,5 +201,8 @@ impl Entity {
         under("/selectable", &SelectableComponent::REF_POINTERS)
             || under("/joint", &JointComponent::REF_POINTERS)
             || under("/particles", &SubEmitters::REF_POINTERS)
+            || pointer
+                .strip_prefix("/lod_group")
+                .is_some_and(LodGroupComponent::is_ref_pointer)
     }
 }
