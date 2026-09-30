@@ -294,7 +294,9 @@ flagging a drop without ever exiting non-zero. Raise a floor as coverage improve
 **never lower one silently to make a table green** — that is the one move it
 exists to make visible.
 
-The platform layer (`main.rs`, `render`, `dev`) is deliberately unfloored, and
-headless Linux CI **skips every GPU test** (`Renderer::new_headless` returns
-`None` with no adapter). A render change proven only on Linux CI is not proven;
-macOS and Windows in `build-test-cross` are where it is really exercised.
+The platform layer (`main.rs`, `render`, `dev`) is deliberately unfloored. GPU
+tests run on all three CI OSes — Linux through Mesa's **lavapipe** software
+Vulkan driver (#489) — and `RUSTY_REQUIRE_GPU=1` fails the run if an adapter
+ever goes missing, so a green run means they rendered. Two of the three
+adapters are software (lavapipe, WARP): a change that depends on real-GPU
+behaviour is proven on macOS's Metal, not by a green Linux job alone.

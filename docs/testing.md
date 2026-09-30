@@ -47,13 +47,24 @@ Where they actually run is not uniform, and it is worth knowing before you rely 
 
 | CI job | Adapter | GPU tests |
 |---|---|---|
-| `build-test` (ubuntu) | none installed | **skip** — the `None` path, ~0.00s |
+| `build-test` (ubuntu) | Mesa **lavapipe** (software Vulkan, #489) | run, on the CPU |
 | `build-test-cross` (macos) | real Metal GPU | run, against real VRAM |
 | `build-test-cross` (windows) | **WARP** (software) | run, against **system RAM** |
 
-Because Linux skips them, a GPU test passing locally in a container proves nothing;
-macOS and Windows CI are where it is really exercised. Pair anything load-bearing with
-an adapter-free unit test on the underlying predicate so the rule is pinned everywhere.
+**CI requires an adapter.** Those jobs set `RUSTY_REQUIRE_GPU=1`, which turns one
+canary test (`render::test_gpu::tests::adapter_present_when_required`) from a skip into
+a failure when no adapter is found — so a runner image that loses its driver goes red
+instead of quietly skipping every GPU test. Without the variable (any local machine)
+the skip contract above is unchanged.
+
+**Running them on a GPU-less Linux box** (a container, a cloud session): install
+lavapipe — `sudo apt-get install -y mesa-vulkan-drivers libvulkan1` — and the same
+tests render there as in Linux CI. Set `RUSTY_REQUIRE_GPU=1` to be sure they did.
+
+Two of the three CI adapters are software renderers, so a green run proves the render
+path is correct on a conformant driver, not that it performs or behaves identically on
+real hardware — Metal on macOS is the one real GPU. Pair anything load-bearing with an
+adapter-free unit test on the underlying predicate so the rule is pinned everywhere.
 
 **Concurrency is capped.** A `Renderer` is a device, the full pipeline set and shadow
 maps, and Windows CI's WARP allocates all of that in system RAM shared with rustc — so

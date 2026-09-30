@@ -5,7 +5,7 @@
 //! sharing a counter with them would make any exact assertion race.
 //!
 //! Adapter-free by construction: the guard is pure synchronization, so these run on
-//! every platform including the Linux CI job where GPU tests skip entirely.
+//! every machine, including a GPU-less one where the real GPU tests skip entirely.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Barrier;
