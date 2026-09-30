@@ -98,9 +98,9 @@ is wrong.
   the arithmetic and the procedure.
 - **Worktrees are cheap, simultaneous builds are not.** rusty is developed by one person,
   locally or in a cloud session — not by many contributors on many cold machines, so
-  don't propose tooling built for that. Each worktree's `target/` is ~12–16 GB, and
-  rustc's linking is where memory and disk run out. Parallelise the work, stagger the
-  compiles, and check the machine you are on (`df -h`, free memory) before starting a
+  don't propose tooling built for that. Each worktree compiles into its own `target/`,
+  and one cold build fills every core and several GB of memory. Parallelise the work,
+  stagger the compiles, and check the machine you are on (`df -h`, free memory) before starting a
   build — never a figure written down somewhere. A batch may also hand GPU-free,
   module-separate branches to **cloud sessions** as extra coders: that lifts the local
   build limit, never the one-at-a-time merge. The `issue-batch` skill says when, and

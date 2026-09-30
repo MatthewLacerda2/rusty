@@ -91,13 +91,25 @@ pull request makes. Cargo's default is already right, so the rule is to stop
 overriding it. Nothing in this repo enforces that — no gate refuses to run under
 an override — so it is on you.
 
-**Disk and memory are the binding constraints, and both fail at the link step.**
-Each worktree's `target/` is ~12–16 GB, so **check `df -h` for ~16 GB of headroom
-before launching a build** — on the machine you are on, today. Running out shows up
-as `No space left on device` at the **link** step, not at compile — the tell-tale
-ENOSPC. Memory is the other wall, and rustc's linker is where it runs out. So
-**at most two heavy builds at once**, staggered, fewer when the machine says so;
-serialize the rest.
+**Cores and memory bound the builds now, not disk.** The limits, measured on the
+operator's 8-core / 15 GB machine on 2026-09-30 (#497 has the raw numbers; on a
+different machine, re-measure rather than trust them):
+
+- **Three local agents at most, and at most two heavy builds at once.** A heavy
+  build is a cold build of a fresh `target/` or a `make gates` run; an incremental
+  rebuild after an edit (seconds, about 1 GB) is not one. A third heavy build fits
+  in memory but buys nothing: one cold build already fills 8 cores, so two side by
+  side take exactly as long as the same two back to back. The second slot exists
+  so an agent is not queued behind another's build, not for throughput.
+- **Give each heavy build half the cores** (`CARGO_BUILD_JOBS=4` on 8 cores)
+  whenever another may overlap it. Two capped builds finished as fast as two
+  uncapped ones and peaked about 2 GB lower. A build alone runs uncapped.
+- **Check before a heavy build**, on the machine you are on, today: `free -g`
+  shows about 5 GB available (one build adds about 3 GB, the rest is margin), and
+  `df -h` about 10 GB free. A built worktree is ~2.5–4.5 GB, no longer 12–16.
+  Running out of disk still shows up as `No space left on device` at the link
+  step — the tell-tale ENOSPC.
+
 `docs/testing.md` has the arithmetic.
 
 **Reclaim the moment a branch merges** — `rm -rf .claude/worktrees/<dir>/target`
@@ -106,7 +118,7 @@ failure.
 
 ## Cloud sessions are extra coders, not extra merges
 
-The two-build limit above is this machine's memory, not the workflow's. A **cloud
+The build limits above are this machine's cores and memory, not the workflow's. A **cloud
 session** brings its own CPU, memory and disk, so it lifts the cap on how many
 branches can be *written* at once. It does nothing for merging — that queue is
 still one CI run at a time, here — so reach for cloud when writing is the
@@ -124,8 +136,12 @@ bottleneck (hours-long foundation branches), never when the queue is.
   in-flight branch touches. The collision list above still decides that; cloud
   removes the build-slot limit, not the rebase cost.
 
-**How many:** 3–4 branches in flight **in total**, local and cloud together. Each
-one behind another still pays a rebase per merge ahead of it.
+**How many:** at most **four branches in flight in total**, local and cloud
+together, no more than three of them local. Each one behind another still pays a
+rebase per merge ahead of it, and a full queue drains about one pull request per
+10–15 minutes (one CI run each, seen 2026-09-30): four finishing together leave the
+last waiting most of an hour with three rebases paid. Past four, the queue is the
+bottleneck and more coders only lengthen it.
 
 **Launching one — and proving it is one.** Not with the `Agent` tool's
 `isolation: "remote"`: in a local session that silently falls back to a local
@@ -223,6 +239,7 @@ read cold. Beyond that:
 - Tell it **not** to merge — merging is serialized and belongs to the session
   running the batch.
 - Tell it not to start a heavy build while two siblings are already compiling,
+  to give it half the cores (`CARGO_BUILD_JOBS`) while one is,
   and not to run `cargo mutants` locally at all during a batch — CI runs it
   diff-scoped per pull request anyway.
 - **Scratch filenames must carry the issue number.** The scratchpad is shared

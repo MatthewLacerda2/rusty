@@ -253,20 +253,39 @@ nightly workflow if regression pressure is wanted.
 ## Parallel agent builds & disk
 
 The agentic workflow runs issues concurrently in isolated git **worktrees**
-(`.claude/worktrees/`), and each worktree gets its **own** Cargo `target/` —
-~12–16 GB once built. Fanning out N parallel builds needs N × ~15 GB free, and
-running short hits `No space left on device` — failing at the **link** step, not
-compile, which is the tell-tale ENOSPC. Memory runs out at the same step.
+(`.claude/worktrees/`), and each worktree gets its **own** Cargo `target/`. Since
+#483 (one test binary) and #487 (the dev profile) that is ~2.5 GB after a dev build
+and test compile and ~4.5 GB once `make gates` has built every feature set — it
+used to be 12–16 GB. Disk still fails loudest, as `No space left on device` at the
+**link** step (the tell-tale ENOSPC), but it is rarely what runs out now.
+
+**Cores and memory are.** Memory now peaks mid-build, not at the final link,
+while the optimised dependencies (wgpu/naga, rapier, image) compile side by side.
+And one cold build already fills the cores: two side by side take as long as the
+same two back to back, three as long as three. Running more at once buys no
+throughput — it spreads the same CPU across more builds and spends the memory
+headroom, about 3 GB per uncapped cold build. An incremental rebuild after an edit
+takes seconds and about 1 GB; a fresh worktree with a warm compile cache (below)
+builds in well under half the uncached time.
+
+The policy below was set from measurements on the operator's 8-core / 15 GB Linux
+machine on 2026-09-30 — #497 has the raw numbers. On a different machine,
+re-measure rather than trust them.
 
 Policy when driving parallel sub-agents:
 
-- **Cap concurrent heavy builds** — at most ~2 worktree builds at once, fewer when
-  `df -h` says so; serialize the rest. (A PR that shares files with another
-  in-flight PR must wait anyway — see the serialized-merge rule in `CLAUDE.md`.)
+- **At most two heavy builds at once** — a cold build of a fresh `target/` or a
+  `make gates` run; incremental rebuilds don't count. Serialize the rest. (A PR that
+  shares files with another in-flight PR must wait anyway — see the
+  serialized-merge rule in `CLAUDE.md`.)
+- **Half the cores each when two may overlap** — `CARGO_BUILD_JOBS=4` on 8 cores
+  costs the pair nothing and saves ~2 GB; a build alone runs uncapped (capped, it
+  takes ~25% longer).
+- **Check headroom first** — before a heavy build, `free -g` should show ~5 GB
+  available and `df -h` ~10 GB free; if not, wait for a sibling's build or clean
+  finished worktree targets first.
 - **Reclaim finished targets** — once a worktree's branch is pushed/merged,
-  `rm -rf .claude/worktrees/<agent-dir>/target` frees ~12–16 GB.
-- **Check headroom first** — if `df -h` shows < ~16 GB free before launching a
-  build, clean finished worktree targets first.
+  `rm -rf .claude/worktrees/<agent-dir>/target`.
 
 This is an orchestration policy, not a hard gate: the disk ceiling belongs to
 whichever machine the session runs on, so freeing space is the other lever. CI is
