@@ -69,6 +69,14 @@ appears, a head somebody else moved, a draft, or a merge GitHub refused. A 502 o
 the merge call is followed by asking whether it merged. Exit status is non-zero
 if anything was handed back.
 
+It **stops the whole queue** — one message, the rest named *not taken* — when a
+check fails for the machine's reasons: out of disk or memory, or rustc or the
+linker killed (#580). Nothing is known to be wrong with that branch, and every
+later one would fail the same way. **Run the queue from a worktree under
+`.claude/worktrees/`, never the scratchpad**: the scratchpad is a tmpfs, a cold
+`target/merge-queue` build filled it and three healthy branches came back as
+broken. The queue refuses to start when its target directory is on a tmpfs.
+
 What it leaves to you: its local check only ever *refuses* a push, never grants
 a merge (`make gates` before readying is the author's job), it never reads the mutation or coverage signal, and **removes no
 worktree and deletes no branch** — the summary lists the merged ones. Remove each
