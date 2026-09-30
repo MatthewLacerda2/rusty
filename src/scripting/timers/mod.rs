@@ -15,9 +15,11 @@
 //! `N + max(1, ceil(d / dt))`, and a bare `coroutine.yield()` resumes next tick.
 //!
 //! Split: this file holds the data and the bookkeeping; `wait.rs` the yield
-//! instructions; `run.rs` the per-tick phase that calls into Lua.
+//! instructions; `run.rs` the per-tick phase that calls into Lua; `tween/` the
+//! property tweens (#424), which are one more kind of job.
 
 mod run;
+pub(crate) mod tween;
 pub(crate) mod wait;
 
 use std::collections::BTreeMap;
@@ -55,6 +57,8 @@ pub(crate) enum Work {
     },
     /// A started coroutine: resume the Lua thread.
     Coroutine { thread: RegistryKey },
+    /// A property tween (#424): due every tick once its delay (the wait) is over.
+    Tween(Box<tween::Tween>),
 }
 
 /// One pending timer or suspended coroutine.

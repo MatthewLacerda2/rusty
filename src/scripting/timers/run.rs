@@ -23,6 +23,8 @@ enum Step<'lua> {
         thread: Thread<'lua>,
         until: Option<Function<'lua>>,
     },
+    /// A tween: sample and write its property (`tween/step.rs`).
+    Tween,
 }
 
 impl ScriptManager {
@@ -69,6 +71,7 @@ impl ScriptManager {
                 self.fire_invoke(handle, owner, func.ok_or(name), interval);
             }
             Step::Resume { thread, until } => self.resume(lua, handle, owner, thread, until),
+            Step::Tween => self.step_tween(lua, handle, owner),
         }
     }
 
@@ -94,6 +97,7 @@ impl ScriptManager {
                     Wait::Elapsed { .. } => None,
                 },
             },
+            Work::Tween(_) => Step::Tween,
         };
         Some((job.owner, step))
     }
@@ -176,7 +180,7 @@ impl ScriptManager {
         self.log_error(owner, "Coroutine", err);
     }
 
-    fn log_error(&self, owner: u32, what: &str, err: &str) {
+    pub(super) fn log_error(&self, owner: u32, what: &str, err: &str) {
         self.console.borrow_mut().error(format!(
             "[Lua Error] {what} on entity {owner} failed: {err}"
         ));

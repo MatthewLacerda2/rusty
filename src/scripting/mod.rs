@@ -30,7 +30,7 @@ pub use discovery::{monobehaviour_scripts, script_label};
 pub use manager::ScriptManager;
 pub use schema::{parse_fields, FieldKind, ScriptField};
 pub use timers::TimerScheduler;
-pub(crate) use timers::{wait, Target, Wait, Work};
+pub(crate) use timers::{tween, wait, Clock, Target, Wait, Work};
 
 #[cfg(test)]
 mod tests;
@@ -64,3 +64,5 @@ mod tests_timers;
 mod tests_transitions;
 #[cfg(test)]
 mod tests_triggers;
+#[cfg(test)]
+mod tests_tweens;

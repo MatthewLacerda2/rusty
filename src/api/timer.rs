@@ -43,7 +43,7 @@ fn register_invoke<'lua, 'scope>(
     timers: &'scope RefCell<TimerScheduler>,
 ) -> Reg {
     let schedule = move |lua: &Lua, id: u32, target: Value, delay: f64, interval: Option<f64>| {
-        require_active(scene, id)?;
+        require_active(&scene.borrow(), id)?;
         let target = to_target(lua, target)?;
         let mut t = timers.borrow_mut();
         let handle = t.alloc();
@@ -122,7 +122,7 @@ fn register_coroutines<'lua, 'scope>(
         table,
         "StartCoroutine",
         scope.create_function(move |lua, (id, f, args): (u32, Function, MultiValue)| {
-            require_active(scene, id)?;
+            require_active(&scene.borrow(), id)?;
             let thread = lua.create_thread(f)?;
             let handle = timers.borrow_mut().alloc();
             let mut call = args.into_vec();
@@ -182,8 +182,7 @@ fn register_waits(lua: &Lua, table: &Table) -> Reg {
 
 /// Timers and coroutines only start on an existing, active entity (Unity refuses
 /// to start a coroutine on an inactive GameObject; rusty applies it to invokes too).
-fn require_active(scene: &RefCell<Scene>, id: u32) -> mlua::Result<()> {
-    let scene = scene.borrow();
+pub(super) fn require_active(scene: &Scene, id: u32) -> mlua::Result<()> {
     if !scene.world.contains(id) {
         return Err(runtime(&format!("no entity {id}")));
     }
@@ -205,6 +204,6 @@ fn to_target(lua: &Lua, value: Value) -> mlua::Result<Target> {
     }
 }
 
-fn runtime(msg: &str) -> mlua::Error {
+pub(super) fn runtime(msg: &str) -> mlua::Error {
     mlua::Error::RuntimeError(msg.to_string())
 }
