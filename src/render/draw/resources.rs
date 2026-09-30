@@ -207,7 +207,9 @@ impl Renderer {
         // two skinned entities never share a batch.
         uniform.bone_base = push_palette(joints, mesh.active_palette());
 
+        let shader = material.and_then(|m| m.shader.as_deref());
         let key = BatchKey {
+            pipeline: self.surface_shaders.pipeline_id(&self.device, shader),
             mesh: mesh_id,
             material: self.material_index(material),
             uniform: uniform.words(),

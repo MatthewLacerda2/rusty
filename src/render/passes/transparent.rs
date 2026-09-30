@@ -13,6 +13,7 @@
 //! surfaces all blend rather than z-cull each other).
 
 use crate::render::draw::batch::DrawBatch;
+use crate::render::gpu::pipelines::surface::SolidPass;
 use crate::render::{RenderView, Renderer};
 
 impl Renderer {
@@ -58,13 +59,16 @@ impl Renderer {
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 
-    /// Record the back-to-front transparent draws into `pass`: the transparent
-    /// pipeline + global/shadow bind groups, then the same batch recording the opaque
-    /// pass uses.
+    /// Record the back-to-front transparent draws into `pass`: the global/shadow bind
+    /// groups, then the same batch recording the opaque pass uses — each batch binding
+    /// the transparent pipeline of its material's shader (#396).
     fn record_transparent<'a>(&'a self, pass: &mut wgpu::RenderPass<'a>, items: &'a [DrawBatch]) {
-        pass.set_pipeline(&self.transparent_pipeline);
         pass.set_bind_group(0, &self.global_bind_group, &[]);
         pass.set_bind_group(3, &self.shadow_bind_group, &[]);
-        self.draw_batches(pass, items);
+        self.draw_batches(
+            pass,
+            items,
+            SolidPass::Transparent(&self.transparent_pipeline),
+        );
     }
 }

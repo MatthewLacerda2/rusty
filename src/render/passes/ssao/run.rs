@@ -3,6 +3,7 @@
 
 use super::{SsaoFrame, SsaoTargets};
 use crate::render::draw::batch::DrawBatch;
+use crate::render::gpu::pipelines::surface::SolidPass;
 use crate::render::{RenderView, Renderer};
 
 impl Renderer {
@@ -81,6 +82,6 @@ impl Renderer {
         pass.set_bind_group(0, &self.global_bind_group, &[]);
         // The prepass reads nothing from group 3; the no-AO group satisfies the layout.
         pass.set_bind_group(3, &self.shadow_bind_group, &[]);
-        self.draw_batches(&mut pass, solids);
+        self.draw_batches(&mut pass, solids, SolidPass::Prepass);
     }
 }

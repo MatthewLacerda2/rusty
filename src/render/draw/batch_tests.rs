@@ -13,6 +13,7 @@ fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem {
     instance.model_matrix[12] = tag;
     DrawItem {
         key: BatchKey {
+            pipeline: 0,
             mesh: MeshId(mesh.to_string()),
             material: 0,
             uniform,

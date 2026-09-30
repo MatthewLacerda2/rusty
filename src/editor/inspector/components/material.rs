@@ -78,6 +78,18 @@ fn draw_material(
         optional_map(ui, "Use Emissive Map", materials, key, MapKind::Emissive);
 
         draw_material_transparency(ui, materials, key, is_dirty);
+
+        // The authored surface shader (#396) — `Material.SetShader`'s twin.
+        let mut shader = materials[key].shader.clone().unwrap_or_default();
+        ui.horizontal(|ui| {
+            ui.label("Shader:");
+            if ui.text_edit_singleline(&mut shader).changed() {
+                mat_ops::set_shader(materials, key, shader);
+                *is_dirty = true;
+            }
+        })
+        .response
+        .on_hover_text("An authored surface shader's name; empty = the standard shader");
     });
     if remove {
         *is_dirty = true;

@@ -147,6 +147,18 @@ impl Renderer {
         let draw_buffers =
             crate::render::gpu::draw_buffers::DrawBuffers::new(&device, &entity_bones_layout);
         let default_cube = crate::render::ibl::cubemap::fallback_cube(&device);
+        let surface_shaders = crate::render::gpu::pipelines::surface::SurfaceShaders::new(
+            crate::render::gpu::pipelines::forward_layout(
+                &device,
+                [
+                    &camera_lighting_layout,
+                    &entity_bones_layout,
+                    &textures.material_layout,
+                    &shadows.layout,
+                ],
+            ),
+            crate::render::postfx::HDR_FORMAT,
+        );
         Self {
             device,
             queue,
@@ -172,6 +184,7 @@ impl Renderer {
             global_bind_group_dirty: false,
             draw_buffers,
             materials: Default::default(),
+            surface_shaders,
             instancing: true,
             shadow_layout: shadows.layout,
             shadow_renderer: shadows.renderer,

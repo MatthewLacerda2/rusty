@@ -3,6 +3,8 @@
 
 use crate::render::gpu::mesh::vertex_layout;
 
+pub(crate) mod surface;
+
 /// Fixed-function knobs that distinguish the three forward-pass pipelines.
 struct PipelineSpec {
     label: &'static str,
@@ -58,6 +60,32 @@ pub(crate) fn create_pipelines(
         outline: p(&render_layout, &outline_spec()),
         prepass: make_prepass(device, shader, &render_layout),
     }
+}
+
+/// An authored surface variant's opaque + transparent pipelines (#396): the forward
+/// and transparent specs over `shader`, through the forward pipeline `layout`.
+pub(crate) fn surface_pipelines(
+    device: &wgpu::Device,
+    shader: &wgpu::ShaderModule,
+    format: wgpu::TextureFormat,
+    layout: &wgpu::PipelineLayout,
+) -> surface::SurfacePipelines {
+    surface::SurfacePipelines {
+        forward: make_pipeline(device, shader, format, layout, &forward_spec()),
+        transparent: make_pipeline(device, shader, format, layout, &transparent_spec()),
+    }
+}
+
+/// The forward passes' pipeline layout — groups 0–3 — for a surface variant (#396).
+pub(crate) fn forward_layout(
+    device: &wgpu::Device,
+    layouts: [&wgpu::BindGroupLayout; 4],
+) -> wgpu::PipelineLayout {
+    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("Surface Variant Pipeline Layout"),
+        bind_group_layouts: &layouts,
+        push_constant_ranges: &[],
+    })
 }
 
 /// Opaque/cutout forward pass: REPLACE, depth write on. No culling so primitives can

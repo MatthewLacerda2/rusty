@@ -11,6 +11,7 @@
 //!   normal_map = "n.png",
 //!   emissive = {0.0, 0.0, 0.0}, emissive_map = "e.png",
 //!   render_mode = "Cutout", alpha = 1.0, alpha_cutoff = 0.5,
+//!   shader = "enemy_toon",
 //! }
 //! ```
 //!
@@ -40,6 +41,9 @@ pub struct Validated {
     pub alpha: Option<f32>,
     /// The raw `alpha_cutoff`, clamped to `[0,1]` by the shared `set_alpha_cutoff` op.
     pub alpha_cutoff: Option<f32>,
+    /// The raw `shader` name (#396), applied by the shared `set_shader` op so `""`
+    /// clears it exactly as `Material.SetShader` does.
+    pub shader: Option<String>,
 }
 
 /// Parse a Lua material recipe `table` into a base [`MaterialAsset`] (factors + map
@@ -75,6 +79,9 @@ fn asset_from_json_value(
             .remove("alpha_cutoff")
             .and_then(|v| v.as_f64())
             .map(|f| f as f32);
+        validated.shader = obj
+            .remove("shader")
+            .and_then(|v| v.as_str().map(str::to_string));
     }
     refuse_unknown_keys(&value)?;
     let asset: MaterialAsset = serde_json::from_value(value).map_err(|e| e.to_string())?;

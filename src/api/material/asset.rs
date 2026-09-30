@@ -97,6 +97,9 @@ fn define(scene: &RefCell<Scene>, name: &str, asset: MaterialAsset, validated: V
     if let Some(cutoff) = validated.alpha_cutoff {
         mat_ops::set_alpha_cutoff(materials, name, cutoff);
     }
+    if let Some(shader) = validated.shader {
+        mat_ops::set_shader(materials, name, shader);
+    }
 }
 
 #[cfg(test)]

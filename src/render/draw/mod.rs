@@ -161,6 +161,8 @@ impl Renderer {
         for path in active_material_map_paths(scene) {
             self.load_texture(&path);
         }
+        // A re-baked surface shader rebuilds the next time a material names it (#396).
+        self.surface_shaders.refresh();
 
         // Update skybox texture if path changed, marking the global bind group dirty
         // so it is rebuilt once (next frame) rather than every camera every frame —

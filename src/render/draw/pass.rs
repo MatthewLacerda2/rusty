@@ -4,6 +4,7 @@
 use crate::render::draw::batch::DrawBatch;
 use crate::render::draw::resources::{OutlineResource, Overlays};
 use crate::render::gpu::draw_buffers::DrawBuffers;
+use crate::render::gpu::pipelines::surface::SolidPass;
 use crate::render::passes::ssao::SsaoFrame;
 use crate::render::{RenderView, Renderer};
 use crate::scene::ClearFlags;
@@ -122,11 +123,11 @@ impl Renderer {
         });
 
         // Set global bindings
-        render_pass.set_pipeline(view.forward_pipeline(&self.render_pipeline));
+        let forward = view.forward_pipeline(&self.render_pipeline);
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
         render_pass.set_bind_group(3, self.scene_group3(view, frame.ssao.is_some()), &[]);
-        // Solid entities, then the editor selection outline.
-        self.draw_batches(&mut render_pass, solid_batches);
+        // Solid entities (each batch binds its shader's pipeline), then the outline.
+        self.draw_batches(&mut render_pass, solid_batches, SolidPass::Opaque(forward));
         if editor_mode {
             self.draw_outline(&mut render_pass, &overlays.outline);
         }
@@ -210,19 +211,28 @@ impl Renderer {
         });
     }
 
-    /// Record `batches` into `pass`: per batch, the mesh buffers, the frame's group-1
-    /// bind group at the batch's uniform offset, the shared material group,
-    /// and one instanced draw over its instance range (#470). Shared by the opaque and
-    /// transparent passes, which differ only in pipeline and order.
+    /// Record `batches` into `pass`: per batch, its pipeline when it differs from the
+    /// last one (see [`SolidPass`]), the mesh buffers, the frame's group-1 bind group
+    /// at the batch's uniform offset, the shared material group, and one instanced
+    /// draw over its instance range (#470). Shared by the prepass, opaque and
+    /// transparent passes.
     pub(crate) fn draw_batches<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         batches: &'a [DrawBatch],
+        solid_pass: SolidPass<'a>,
     ) {
+        let mut bound = None;
         for batch in batches {
             let Some(gpu_mesh) = self.gpu_meshes.get(&batch.key.mesh) else {
                 continue;
             };
+            if bound != Some(batch.key.pipeline) {
+                if let Some(pipeline) = self.surface_shaders.pick(solid_pass, batch.key.pipeline) {
+                    render_pass.set_pipeline(pipeline);
+                }
+                bound = Some(batch.key.pipeline);
+            }
             let offsets = DrawBuffers::offsets(batch.uniform_slot);
             render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
             render_pass

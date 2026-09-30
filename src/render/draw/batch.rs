@@ -19,6 +19,9 @@ use crate::render::{EntityUniform, InstanceData, MeshId};
 /// What two solids must share to be drawn by one instanced call.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct BatchKey {
+    /// The pipeline: the standard forward shader (0) or a material's authored surface
+    /// shader (#396). First, so opaque draws sort into one run of state per shader.
+    pub pipeline: usize,
     /// The geometry (vertex + index buffers), by asset identity (#127).
     pub mesh: MeshId,
     /// The group-2 material bind group (the resolved texture maps), by cache index.
