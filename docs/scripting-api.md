@@ -1805,6 +1805,7 @@ because the namespace is absent.
 | `Debug.Snapshot` | `()` | a pretty **JSON string**: the whole live world (below) |
 | `Debug.SnapshotEntity` | `(id)` | a pretty **JSON string**: one entity (below), or `null` if absent |
 | `Debug.Preview` | `(asset_path, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
+| `Debug.Stats` | `()` | a **table**: the frame stats — timings and counters (below) |
 
 ### The preview — eyes on an authored asset (#353)
 
@@ -1841,6 +1842,42 @@ Errors are raised for a caller mistake (a path that doesn't exist, an extension 
 preview story, an unknown `mesh` name) so a typo can't quietly return a picture of an
 empty sky. The one non-error miss is a machine with no GPU or software adapter, where
 the call **returns `nil`** after a warning rather than failing the run.
+
+### The frame stats — performance you can read and assert (#433)
+
+`Debug.Stats()` is the perf read: the numbers an agent needs to prove a rendering or
+gameplay change is cheaper, since it never *feels* the frame rate. Each metric is a
+`{ last, min, avg, max, samples }` table summarising every frame of the **current Play
+session** (the stats restart when Play starts):
+
+```lua
+local s = Debug.Stats()
+print(s.frames, s.fixed_update_ms.avg, s.systems.update_scripts.max, s.entities.last)
+```
+
+| Metric | What it counts |
+|---|---|
+| `frame_ms` | CPU ms of the whole per-frame schedule (the four stages below) |
+| `fixed_update_ms` / `update_ms` / `late_update_ms` / `render_stage_ms` | CPU ms per schedule stage. `render_stage_ms` is the `Render` *stage* (draw-data prep), not the GPU |
+| `systems.<name>` | CPU ms per registered system (`update_scripts`, `step_physics`, `tick_nav`, …) |
+| `entities` / `rigid_bodies` / `nav_agents` / `particles` / `scripts` | world counters: live entities, RigidBody components, NavMeshAgents, live particles, loaded script instances |
+| `draw_calls` | geometry draw calls: solids, transparents, shadow casters, decals, particle batches, UI batches (post-FX and skybox excluded) |
+| `triangles` | triangles submitted by the solid, transparent and shadow draws |
+| `visible_entities` / `culled_entities` | mesh entities drawn / skipped by the frustum cull, summed over the camera stack |
+| `lights` / `lights_dropped` | active lights, and those the forward uniform had no slot for (past 4 point lights, or a 2nd directional/spot/ambient) — silently unlit |
+| `shadow_draws` / `ui_draws` | shadow-caster draws / UI batches |
+| `renderer_ms` | CPU ms `Renderer::render` took to record the frame |
+
+Keys ending in `_ms` are **wall-clock** and differ run to run; everything else is a
+count and is deterministic for a deterministic run. The timings are measured *around*
+the sim by the dev layer and never fed back into it, so reading them cannot change a
+replay. Render counters appear only on frames something rendered through the headless
+renderer (a harness `Harness.Screenshot`); a run that never renders reports timings and
+world counters only. Before any Play frame, `frames` is `0` and no metric is present.
+
+Scenarios get the same table as `Harness.Stats()` and can turn it into pass/fail with
+`Harness.AssertBudget{ draw_calls = 2000, fixed_update_ms = 4 }` — see *Performance
+budgets* in `docs/testing.md`.
 
 ### The snapshot — the structured scene-read (#180)
 

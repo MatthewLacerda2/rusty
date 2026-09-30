@@ -75,3 +75,30 @@ fn debug_stats_reads_the_same_numbers() {
     assert_eq!(frames, "4");
     let _ = std::fs::remove_dir_all(out);
 }
+
+#[test]
+fn a_scenario_asserts_budgets_through_the_harness_table() {
+    let dir = std::env::temp_dir().join(format!("rusty_stats_lua_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let scenario = dir.join("budget.lua");
+    std::fs::write(
+        &scenario,
+        "Harness.Step(10)\n\
+         Harness.Expect(Harness.Stats().frames == 10, 'stats count frames')\n\
+         Harness.AssertBudget{ entities = 1000, scripts = 1000 }\n\
+         Harness.AssertBudget{ entities = 0 }\n",
+    )
+    .unwrap();
+    let report = rusty::dev::scenario::run(&scenario, &dir).unwrap();
+    assert!(!report.passed, "the zero-entity budget must fail the run");
+    let results: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(report.results_path).unwrap()).unwrap();
+    let passed: Vec<bool> = results["expectations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["passed"].as_bool().unwrap())
+        .collect();
+    assert_eq!(passed, [true, true, true, false]);
+    let _ = std::fs::remove_dir_all(dir);
+}
