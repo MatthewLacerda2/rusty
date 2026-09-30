@@ -1045,7 +1045,17 @@ and distance are `0`.
 
 The optional trailing `ignore_id` skips one entity in the cast — pass the shooter's
 own id so a shot can't hit its source. The engine has no built-in "don't hit the
-player" rule; an entity is hittable simply if it exists.
+player" rule; an entity is hittable simply if it exists **and is active**.
+
+**Inactive entities are invisible to queries (#521).** A deactivated entity
+(`SetActive(false)`) is skipped by every query — `Raycast`, `SphereCast`, the
+`Overlap*`/`Check*` family, and the engine's own hitscan pass through it, and
+`ClosestPoint`/`ContainsPoint` answer as if it had no collider — and a walking
+(kinematic) character moves through it instead of being blocked. Deactivating a
+Rigidbody's entity hides its whole body, compound parts included; deactivating
+one part hides just that part. Like the rest of the query world, activation is
+picked up at the next physics tick, so a query in the same frame as the
+`SetActive` still sees the old state. Reactivating makes it hittable again.
 
 The optional `layer_mask` is a Unity-style bitmask (one bit per layer): the query
 only reports entities whose layer's bit is set, ignoring all others. Build one from
@@ -1145,7 +1155,8 @@ world `x = 11`. Unity semantics:
 - **Hits name the part.** `Raycast`, `SphereCast`, the overlaps, `ClosestPoint`,
   `ContainsPoint` and trigger events report the entity that **owns the collider**
   that was hit, never the body's root — so a script can tell a head hit from a
-  torso hit. A deactivated part's collider stops generating contacts and trigger events.
+  torso hit. A deactivated part's collider stops generating contacts and trigger
+  events and is skipped by every query.
 - **A child with its own Rigidbody** is its own body. A **dynamic** one is
   driven by physics: its world pose is what the solver says, and a moving parent
   does **not** carry it — each physics step writes the body's world pose back

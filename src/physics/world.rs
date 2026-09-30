@@ -88,17 +88,20 @@ impl PhysicsWorld {
             prev_triggers: Vec::new(),
         };
         world.build_bodies(scene);
+        world.sync_enabled(scene);
         // Prime the query pipeline so a raycast works before the first step.
         world.query_pipeline.update(&world.bodies, &world.colliders);
         world
     }
 
     /// Push current component state into rapier before stepping: first rebuild
-    /// any body whose collider set changed, then each owner's world pose and
-    /// velocities, then each compound collider's offset. Walks the sorted plan,
-    /// so the order is deterministic.
+    /// any body whose collider set changed, then every enabled flag (before any
+    /// character sweep, so no sweep sees a stale one), then each owner's world
+    /// pose and velocities and each compound collider's offset. Walks the sorted
+    /// plan, so the order is deterministic.
     fn sync_to_rapier(&mut self, scene: &Scene, dt: f32) {
         self.resync_topology(scene);
+        self.sync_enabled(scene);
         let plan = std::mem::take(&mut self.plan);
         for (&owner, ids) in &plan {
             let Some(&handle) = self.id_to_body.get(&owner) else {
@@ -143,7 +146,6 @@ impl PhysicsWorld {
             );
             self.fall_speeds.insert(id, fall_speed);
             let body = &mut self.bodies[handle];
-            body.set_enabled(snap.active);
             body.enable_ccd(snap.ccd_enabled);
             body.set_next_kinematic_position(next);
             return;
@@ -152,7 +154,6 @@ impl PhysicsWorld {
         // fall speed, so toggling back later starts a fresh fall.
         self.fall_speeds.remove(&id);
         let body = &mut self.bodies[handle];
-        body.set_enabled(snap.active);
         // Re-apply the CCD mode each tick so `Physics.SetCollisionDetection`
         // toggled mid-play takes effect (mirrors the `gravity_scale` re-apply).
         body.enable_ccd(snap.ccd_enabled);

@@ -115,8 +115,8 @@ fn collider_without_rigidbody_joins_the_ancestor_body() {
 #[test]
 fn moving_or_deactivating_a_part_updates_its_collider() {
     // A part the animator/script moves mid-play drags its collider along the
-    // body; a deactivated part's collider is disabled (no contacts). Queries
-    // don't consult rapier's enabled flag, so assert the flag itself.
+    // body; a deactivated part's collider is disabled (no contacts; queries
+    // skip it too, see `query_active_tests`).
     let mut scene = Scene::new();
     let body = add(&mut scene, None, Vec3::ZERO, false);
     rigidbody(&mut scene, body, true, Vec3::ZERO);
