@@ -1,11 +1,11 @@
 ---
 name: issue-batch
-description: Run a set of issues from board to merged — how many branches at once, which ones can safely run together, worktrees, and re-reading the board. Use when starting work on one or more issues, when deciding what to start next, or when told to "do the issues".
+description: Run a set of issues from board to merged — how many branches at once, which ones can safely run together, worktrees, re-reading the board, and the cleanup and local rebuild that finish a batch. Use when starting work on one or more issues, when deciding what to start next, or when told to "do the issues".
 ---
 
 # Working a batch of issues
 
-The user rarely has one issue. He writes plenty of them and then asks for them in
+The user rarely has one issue. They write plenty of them and then ask for them in
 batches, leaving how many and in what order to you. This is how a set of them gets
 worked without the batch costing more than the work.
 
@@ -82,12 +82,15 @@ pull request makes. Cargo's default is already right, so the rule is to stop
 overriding it. Nothing in this repo enforces that — no gate refuses to run under
 an override — so it is on you.
 
-**Disk is the binding constraint, and it fails as a link error.** Each worktree's
-`target/` is ~12–16 GB and the session volume is ~38 GB usable, so **at most ~2
-heavy builds at once**; serialize the rest. Check `df -h` for ~16 GB of headroom
-before launching one. Running out shows up as `No space left on device` at the
-**link** step, not at compile — the tell-tale ENOSPC. `docs/testing.md` has the
-arithmetic.
+**Disk and memory are the binding constraints, and both fail at the link step.**
+Each worktree's `target/` is ~12–16 GB, and the dev machine's disk is usually most of
+the way full — so **check `df -h` for ~16 GB of headroom before launching a build**,
+and never trust a number written down here over what `df` says today. Running out
+shows up as `No space left on device` at the **link** step, not at compile — the
+tell-tale ENOSPC. Memory is the other wall: 8 threads and 16 GB carry one heavy build
+comfortably and two at a squeeze, and rustc's linker is where it runs out. So
+**at most two heavy builds at once**, staggered; serialize the rest.
+`docs/testing.md` has the arithmetic.
 
 **Reclaim the moment a branch merges** — `rm -rf .claude/worktrees/<dir>/target`
 and remove the worktree. Disposal is what keeps disk from becoming the overnight
@@ -154,6 +157,25 @@ sessions on a branch are the second kind. The line is not crisp, so err upwards.
 When working unattended, prefer leaving a comment on the issue and continuing
 over stalling the night on a question. Questions asked *while planning* are asked
 right away.
+
+## Finishing a batch
+
+The batch is not done when the last branch merges — it is done when the main
+checkout runs what was merged. Last, once nothing is compiling:
+
+1. **Clean up what is finished.** Remove the worktree and delete the local branch
+   of every pull request that is `MERGED` — ask `gh pr view N --json state`, never
+   its exit code, which is 0 for an open one too. `git branch --merged` cannot see
+   a squash merge, so it is not the test. A branch with **no commits beyond
+   `main`** (`git rev-list --count origin/main..BRANCH` is 0) goes too, once its
+   worktree has nothing uncommitted and no agent is still standing in it. Anything
+   else stays: unmerged work is only ever deleted by the user.
+2. **Bring the main checkout up to date** — `git pull --ff-only` on `main`.
+3. **Rebuild the MCP bridge, and launch nothing.** A local client is pointed at
+   `target/debug/session-mcp` (`docs/mcp.md`), so until
+   `cargo build --bin session-mcp --features dev` runs in the main checkout, every
+   session drives the old engine. Never beside a sibling's build. A client already
+   connected keeps the old process until it reconnects; say so in the report.
 
 ## Reporting back
 

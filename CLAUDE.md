@@ -68,6 +68,10 @@ is wrong.
   it's needed to understand the diff) — and carries the PR↔issue link when there is one.
   That description, the commit history, and that link are how we see what a branch adds in
   value and whether it still earns its place.
+  **A ready PR claims it passes; a draft makes no such claim.** CI's gating jobs skip
+  drafts, so readying a PR is the moment anything gets checked — run the gates first. A
+  red ready PR **stays ready** and is fixed forward; draft is for unfinished, blocked or
+  handed-back work, never for hiding a red run.
 - **Branch naming.** A PR that closes an issue uses `{issue_number}-short-slug` (e.g.
   `163-fix-coverage-scope`). An issue-less PR uses a readable short slug of its subject
   (e.g. `document-ai-parity`). Lowercase-hyphenated, brief.
@@ -80,7 +84,25 @@ is wrong.
   it). So merging **cannot be parallelized**: rebase each PR onto the latest `main` →
   CI green on that rebased state → merge → repeat, one PR at a time. The only exception
   is a PR that touches **only** Markdown — CI is skipped for Markdown-only PRs, so they
-  needn't be serialized and can merge freely.
+  needn't be serialized and can merge freely. **Except `docs/scripting-api.md`:** the
+  API-doc drift tests parse it, and a Markdown-only PR skips exactly those tests — so a
+  PR touching it is serialized like code.
+- **Coding parallelises; merging does not.** Every branch behind another in the merge
+  queue pays a rebase per merge ahead of it, so the shape is **two branches in flight** —
+  one merging, one being written. The binding limit is **file collision**, not branch
+  count: two branches appending to the same enum or registry cost more than four in
+  separate modules. **One worktree per branch** under `.claude/worktrees/`, off the latest
+  `main`, removed the moment it merges, and **never a shared `CARGO_TARGET_DIR`** (worktrees
+  overwrite each other's artifacts and a green gate stops meaning this branch compiled).
+  Split issues by responsibility, never by parallelism. The **`issue-batch` skill** has
+  the arithmetic and the procedure.
+- **Where this is developed.** One machine, one person: 8 threads, 16 GB of RAM, an RTX
+  2060, Arch Linux, and a disk that is usually most of the way full. That is a current
+  fact, not an invariant — it is written down so nobody proposes tooling built for many
+  contributors on many cold machines. What it means in practice: **worktrees are cheap,
+  simultaneous builds are not.** Each worktree's `target/` is ~12–16 GB, and rustc's
+  linking is where both memory and disk run out. Parallelise the work, stagger the
+  compiles, and check `df -h` before starting a build.
 - **Architecture- then infrastructure-first (NOT "make it up as we go").** We do **not**
   improvise or pile on features ad hoc. Whenever we find a problem — something that
   already bites or will bite more than once, a pattern worth adopting, or a gold-standard
@@ -138,6 +160,14 @@ is wrong.
   defeats planning: an idea still being shaped has to settle before anyone codes it.
 - **Issue-less PRs are allowed only** for documentation updates or bug fixes; everything
   else starts as an issue.
+- **File what you notice.** Claude may open an issue unprompted for anything that will
+  recur, or that a tool would solve more than once — when the benefit outweighs the cost
+  of building it. The strongest issues come out of doing the work. **A bug is always
+  filable**: that test is about whether something is worth *building*, never whether a
+  defect is worth *recording*. If the bug questions a decision or exposes a foundational
+  crack, tell the user; otherwise keep it brief and carry on. Found outside the branch in
+  hand? **File it rather than fix it** — a branch that grows to cover everything it
+  noticed is a branch nobody can review.
 - **Priority by label.** When choosing what to do next, the order is
   **architecture → infrastructure → bug → foundation → feature.** It encodes how the whole
   project is built, in three stages:
