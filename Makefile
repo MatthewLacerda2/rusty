@@ -15,7 +15,7 @@ TEST := cargo test --locked
 
 # The gates, in the order `make gates` runs them. `deny` sits last: its failures
 # are about dependencies (and it needs the network), so a code failure reports first.
-GATES := fmt size determinism components parity test-lint clippy build test deny
+GATES := fmt size determinism components parity test-lint clippy doc test deny
 # Checks on the gate runner itself, run before any gate.
 SELF_CHECKS := target-dir inventory
 
@@ -94,15 +94,19 @@ clippy: ## [gate] Clippy, both feature sets; the lint policy is Cargo.toml [lint
 	cargo clippy --all-targets -- -D warnings
 	cargo clippy --all-targets --features dev -- -D warnings
 
-build: ## [gate] Build, both feature sets
-	cargo build --locked
-	cargo build --features dev --locked
+# No separate build gate: `cargo test` compiles every binary its feature set
+# enables, exactly as CI relies on (#482).
+doc: ## [gate] Rustdoc with warnings denied, both feature sets
+	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked
+	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked --features dev
 
 test: ## [gate] Engine tests, both feature sets
 	$(TEST)
 	$(TEST) --features dev
 
+# The git CLI fetches the advisory DB: cargo-deny's built-in fetcher can't get
+# through the cloud sessions' proxy, and the CLI works everywhere else too.
 deny: ## [gate] Advisories, bans, sources, licenses (cargo-deny)
 	@command -v cargo-deny >/dev/null 2>&1 || { \
 		echo "deny: cargo-deny is not installed — cargo install --locked cargo-deny"; exit 1; }
-	cargo deny check advisories bans sources licenses
+	CARGO_NET_GIT_FETCH_WITH_CLI=true cargo deny check advisories bans sources licenses
