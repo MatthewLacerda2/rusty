@@ -317,14 +317,19 @@ is the only difference between an empty marker and a fully-dressed enemy.
   dependency. glTF 2.0 is first-class; `.obj` is static-mesh only.
 
 ## Commit gate (programmatic — no AI needed)
-Commits are blocked unless the checks pass; failures are written to
-`.lint/report.txt`. See **docs/linting.md**.
-- Size gate: `cargo run --manifest-path tools/lint/Cargo.toml` (files ≤ 300 lines,
-  test/fixture files ≤ 150). Style is rustfmt; **clippy is a hard gate** in CI (`-D
-  warnings`, both feature sets).
-- **Determinism guard:** `cargo run --manifest-path tools/lint/Cargo.toml --
-  --determinism` — fails on wall-clock / unseeded RNG in the sim modules (`app`,
-  `scripting`, `physics`, `navigation`); it protects the harness's reproducibility.
+`make gates` runs everything CI blocks on, fastest-failing first; run it before
+readying a PR (`make help` lists the verbs, `make check` is the fast edit loop).
+Failures from `tools/lint` are written to `.lint/report.txt`. See **docs/linting.md**.
+- **The commit hook** (`.githooks/pre-commit`, activated once per clone by `make
+  setup`) runs formatting and the size gate only, so it stays under a second.
+- Size gate: files ≤ 300 lines, test/fixture files ≤ 150. Style is rustfmt;
+  **clippy is a hard gate** (`-D warnings`, both feature sets); the lint policy
+  lives in `Cargo.toml`'s `[lints]`, not in flags.
+- **Determinism guard** (`make determinism`) — fails on wall-clock / unseeded RNG
+  in the sim modules (`app`, `scripting`, `physics`, `navigation`); it protects the
+  harness's reproducibility.
+- `make gates` refuses to run when cargo's target dir is outside the worktree — a
+  shared one is a false green.
 - `tools/lint/baseline.txt` grandfathers the files that currently exceed the size
   cap. It's a **burn-down list** — remove entries as you split them, never add to it.
 

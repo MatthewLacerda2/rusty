@@ -1,0 +1,6 @@
+#!/bin/sh
+# rusty's commit hook (#485). Activate once per clone with `make setup`.
+# Kept under a second on purpose — formatting and the size gate only; the heavy
+# checks (clippy, build, tests, deny) are `make gates`, run before readying a PR.
+# CI re-runs everything, so `git commit --no-verify` is a safe escape hatch.
+exec make --no-print-directory pre-commit

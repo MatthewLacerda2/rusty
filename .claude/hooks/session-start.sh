@@ -30,4 +30,20 @@ cargo fetch --quiet || true
 # Prebuild the zero-dep size-gate tool so `cargo run -p lint` is instant.
 cargo build --quiet --manifest-path tools/lint/Cargo.toml || true
 
+# Activate the committed commit hook (formatting + size gate), the same one-time
+# step `make setup` is locally (#485).
+git config core.hooksPath .githooks || true
+
+# `make gates` ends on cargo-deny. Fetch its prebuilt Linux binary (seconds) rather
+# than compile it (minutes); best-effort — the gate names the install if it's missing.
+if ! command -v cargo-deny >/dev/null 2>&1 && [ "$(uname -sm)" = "Linux x86_64" ]; then
+  # 0.20+: older releases cannot parse the advisory DB's CVSS 4.0 entries.
+  deny_ver=0.20.2
+  deny_tmp="$(mktemp -d)"
+  curl -sSfL "https://github.com/EmbarkStudios/cargo-deny/releases/download/${deny_ver}/cargo-deny-${deny_ver}-x86_64-unknown-linux-musl.tar.gz" \
+    | tar xz -C "$deny_tmp" 2>/dev/null \
+    && install -m 755 "$deny_tmp"/cargo-deny-*/cargo-deny "$HOME/.cargo/bin/" 2>/dev/null || true
+  rm -rf "$deny_tmp"
+fi
+
 echo "session-start: rust toolchain, components, and crate cache ready"
