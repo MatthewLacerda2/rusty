@@ -108,8 +108,7 @@ impl DrawBuffers {
         for (chunk, u) in uniform_bytes.chunks_mut(UNIFORM_STRIDE).zip(uniforms) {
             chunk[..std::mem::size_of::<EntityUniform>()].copy_from_slice(bytemuck::bytes_of(u));
         }
-        let mut bone_bytes = bytemuck::bytes_of(&IDENTITY_JOINT).to_vec();
-        bone_bytes.extend_from_slice(bytemuck::cast_slice(joints));
+        let bone_bytes = joint_array_bytes(joints);
 
         let grew = [
             self.uniforms.upload(device, queue, &uniform_bytes),
@@ -184,6 +183,15 @@ pub(crate) fn group1(
             },
         ],
     })
+}
+
+/// The joint storage array as uploaded: the shared identity at element 0, then
+/// `joints` — the layout every `bone_base` from [`push_palette`] indexes. The shadow
+/// pass (#599) uploads its casters' palettes through this too.
+pub(crate) fn joint_array_bytes(joints: &[JointMatrix]) -> Vec<u8> {
+    let mut bytes = bytemuck::bytes_of(&IDENTITY_JOINT).to_vec();
+    bytes.extend_from_slice(bytemuck::cast_slice(joints));
+    bytes
 }
 
 /// Append a draw's joint `palette` to the frame's `joints` and return its `bone_base`
