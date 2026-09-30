@@ -20,7 +20,9 @@ struct Fog {
 struct CameraUniforms {
     view_proj: mat4x4<f32>,
     camera_pos: vec3<f32>,
-    _pad: f32,
+    // The sim's game time in seconds (#398): scaled by the time scale, frozen while
+    // paused, 0 in edit mode and previews. Fills vec3 padding, so no layout change.
+    time: f32,
     // Rides with the camera so every pass that already binds it fogs for free.
     fog: Fog,
 };

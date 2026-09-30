@@ -81,3 +81,7 @@ impl Renderer {
 #[cfg(test)]
 #[path = "preview_tests.rs"]
 mod preview_tests;
+
+#[cfg(test)]
+#[path = "shader_time_tests.rs"]
+mod shader_time_tests;

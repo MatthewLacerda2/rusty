@@ -81,6 +81,22 @@ assembles byte-identical WGSL.
   `Graphics.md`, *Custom effects*). The renderer loads it from the default output
   dir, so bake it there (no `out_dir`).
 
+### Shader inputs
+
+What a block's helper can read (#398). Surface blocks get the forward contract:
+
+- `in` — the interpolated `VertexOutput`: `world_position`, `world_normal`,
+  `tex_coords`.
+- `camera` — the `CameraUniforms`: `view_proj`, `camera_pos`, `fog`, and
+  **`camera.time`**, the sim's game time in seconds (the same clock as Lua's
+  `Time.time`). It is scaled by `Time.SetTimeScale`, freezes while the game is paused,
+  and is **0 in edit mode and `Debug.Preview`**, so previews stay pixel-comparable and
+  a replay renders the same frames. Pulses, scrolling, flicker: drive them off this.
+- `entity` — the per-draw `EntityUniforms`; the material maps (`t_diffuse`,
+  `t_emissive`, … with `s_diffuse`).
+
+Postfx blocks see only the sampled color `c` and the fragment `uv` — no time yet.
+
 ### The block library (curated)
 
 `pass` selects which catalog is valid; `op` is each block's `id`. Surface blocks fold
@@ -89,7 +105,8 @@ into the lit color; postfx blocks grade the sampled scene color.
 - **Surface** (forward-pass fragment looks): `toon_ramp {steps}` (cel banding);
   `fresnel_rim {color, power, strength}` (view-dependent rim glow); `tint {color}`;
   `emissive_boost {color, strength}` (glow masked by the emissive map);
-  `uv_scroll_stripes {frequency, strength}` (UV-driven banding); `desaturate
+  `uv_scroll_stripes {frequency, strength, speed}` (stripes scrolling along V at
+  `speed` stripes per game second); `desaturate
   {amount}`; `height_fog {color, top, bottom}` (world-height fog blend).
   Every surface variant is also fogged by the **scene fog** (`Graphics.SetFog*`,
   #437), applied after the blocks; `height_fog` is a per-material *look* layered
