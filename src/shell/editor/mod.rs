@@ -6,6 +6,7 @@
 //! swapchain (#183). Built only with the `editor` Cargo feature, which is what keeps
 //! egui out of a shipped player.
 
+mod game_focus;
 mod paint;
 mod viewport;
 
@@ -15,11 +16,12 @@ use winit::keyboard::KeyCode;
 
 use super::frame::Host;
 use super::{boot, Frontend, Shell};
-use crate::app::GameWorld;
+use crate::app::{GameWorld, PlayTransition};
 use crate::core::application::BUILD_SETTINGS_PATH;
 use crate::core::video::VideoSettings;
-use crate::editor::{EditorUi, ViewportInteraction};
+use crate::editor::{EditorUi, ViewportInteraction, ViewportTab};
 use crate::render::RenderView;
+use crate::shell::input::GameViewRect;
 
 /// The editor's frontend state: egui, the editor UI, and its two offscreen views.
 pub struct EditorFrontend {
@@ -38,6 +40,11 @@ pub struct EditorFrontend {
     preview_texture_id: Option<egui::TextureId>,
     /// The Inspector preview's own render state, independent of the viewport's (#355).
     preview_view: Option<RenderView>,
+    /// Whether the Game view has input focus (#416; see `game_focus`).
+    game_focused: bool,
+    /// Where the Game view sat last frame, for mapping the pointer; `None` while the
+    /// Scene tab is showing.
+    game_view: Option<GameViewRect>,
 }
 
 impl EditorFrontend {
@@ -69,6 +76,8 @@ impl EditorFrontend {
             viewport_view: None,
             preview_texture_id: None,
             preview_view: None,
+            game_focused: false,
+            game_view: None,
         }
     }
 
@@ -142,6 +151,22 @@ impl Frontend for EditorFrontend {
         let _ = self.egui_winit.on_window_event(&shell.window, event);
     }
 
+    /// The game hears input only while playing with the Game view focused.
+    fn game_has_input(&self, game: &GameWorld) -> bool {
+        game.is_playing() && self.game_focused
+    }
+
+    fn game_view(&self, shell: &Shell) -> GameViewRect {
+        self.game_view.unwrap_or_else(|| {
+            let config = &shell.renderer.config;
+            GameViewRect::full_window(config.width, config.height)
+        })
+    }
+
+    fn on_play_transition(&mut self, _game: &mut GameWorld, transition: PlayTransition) {
+        self.focus_on_transition(transition);
+    }
+
     /// ESC in Play stops it — the editor's way back to edit mode.
     fn on_key(&mut self, game: &mut GameWorld, key: KeyCode, pressed: bool) {
         if key == KeyCode::Escape && pressed && game.is_playing() {
@@ -169,6 +194,11 @@ impl Frontend for EditorFrontend {
         // Render the scene into the viewport target now (after the panel rect is
         // known, before egui paints) so the `egui::Image` samples this frame's render.
         let ppp = shell.window.scale_factor() as f32;
+        self.update_game_focus(game, &interaction);
+        self.game_view = (interaction.tab == ViewportTab::Game)
+            .then(|| viewport::target_size(interaction.size, ppp))
+            .flatten()
+            .map(|render| game_focus::game_view_rect(&interaction, ppp, render));
         self.render_viewport_scene(shell, game, &interaction, ppp);
         self.handle_viewport_interaction(game, &interaction);
         // Only when the Inspector's Preview tab requested one this frame (#352).

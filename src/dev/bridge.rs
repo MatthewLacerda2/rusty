@@ -6,7 +6,8 @@
 //!
 //! Tables: Harness.{Step,StepUntil,Snapshot,Log,Expect,Frame,Stats,AssertBudget}, plus read helpers
 //! Scene.FindEntityByName / Transform.GetPosition / Animator.GetClip and the
-//! writable Input.{Press,Release}. Shooting is just pressing the SPACE key the
+//! writable Input injection (Press/Release, MoveMouse, AddMouseDelta, Scroll,
+//! TypeText). Shooting is just pressing the SPACE key the
 //! player-controller script edge-detects — there is no separate click/shoot signal.
 
 use std::cell::RefCell;
@@ -17,6 +18,7 @@ use mlua::{Function, Lua, Result as LuaResult};
 
 use super::harness::{tick_unless_quit, Harness};
 use crate::app::GameWorld;
+use crate::core::input::InputState;
 
 type Shared = Rc<RefCell<Harness>>;
 
@@ -221,26 +223,44 @@ fn register_scene_animator(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     lua.globals().set("Animator", anim_t)
 }
 
+/// The scenario's writable `Input`: the same injection verbs gameplay scripts get
+/// (`api::input`), bound to the harness world. Injection bypasses the keymap.
 fn register_input(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     let t = lua.create_table()?;
-
-    let world = world_of(harness);
-    t.set(
-        "Press",
-        lua.create_function(move |_, key: String| {
-            world.borrow().input().borrow_mut().press(&key);
-            Ok(())
-        })?,
-    )?;
-
-    let world = world_of(harness);
-    t.set(
-        "Release",
-        lua.create_function(move |_, key: String| {
-            world.borrow().input().borrow_mut().release(&key);
-            Ok(())
-        })?,
-    )?;
-
+    inject(lua, &t, harness, "Press", |i, key: String| i.press(&key))?;
+    inject(lua, &t, harness, "Release", |i, key: String| {
+        i.release(&key)
+    })?;
+    inject(lua, &t, harness, "MoveMouse", |i, (x, y)| {
+        i.move_mouse(x, y)
+    })?;
+    inject(lua, &t, harness, "AddMouseDelta", |i, (dx, dy)| {
+        i.add_mouse_delta(dx, dy)
+    })?;
+    inject(lua, &t, harness, "Scroll", |i, dy: f64| i.scroll(dy))?;
+    inject(lua, &t, harness, "TypeText", |i, text: String| {
+        i.type_text(&text)
+    })?;
     lua.globals().set("Input", t)
+}
+
+/// Bind one injection verb: `f` writes the decoded Lua arguments into the world's input.
+fn inject<A>(
+    lua: &Lua,
+    t: &mlua::Table,
+    harness: &Shared,
+    name: &str,
+    f: impl Fn(&mut InputState, A) + 'static,
+) -> LuaResult<()>
+where
+    A: for<'lua> mlua::FromLuaMulti<'lua>,
+{
+    let world = world_of(harness);
+    t.set(
+        name,
+        lua.create_function(move |_, args: A| {
+            f(&mut world.borrow().input().borrow_mut(), args);
+            Ok(())
+        })?,
+    )
 }

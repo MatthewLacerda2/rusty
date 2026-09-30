@@ -26,6 +26,7 @@ mod callback_doc_drift;
 mod decals_api;
 mod default_ambient;
 mod graphics_api;
+mod input_api;
 mod kinematic_gravity;
 mod layers_api;
 mod light_probes;
@@ -69,6 +70,8 @@ mod bot_player_session;
 mod frame_stats;
 #[cfg(feature = "dev")]
 mod harness_determinism;
+#[cfg(feature = "dev")]
+mod input_harness;
 #[cfg(feature = "dev")]
 mod lua_determinism;
 #[cfg(feature = "dev")]

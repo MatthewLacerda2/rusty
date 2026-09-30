@@ -18,7 +18,7 @@ use std::rc::Rc;
 
 use glam::Vec3;
 
-use crate::core::input::InputState;
+use crate::core::input::{CursorState, InputState};
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
 use crate::scene::Camera;
@@ -148,6 +148,8 @@ impl GameWorld {
     /// the caller can handle platform-only concerns (cursor grab/visibility).
     pub fn tick(&mut self, dt: f32) -> PlayTransition {
         let transition = self.handle_transition();
+        // Publish input written since the last tick as this tick's edges (#416).
+        self.resources.input.borrow_mut().begin_tick();
         // `advance` records raw `dt` (unscaled) and the scaled `delta_time`.
         // The game sim integrates the scaled value; the editor camera uses raw.
         let scaled_dt = {
@@ -194,9 +196,18 @@ impl GameWorld {
 
     fn handle_transition(&mut self) -> PlayTransition {
         let transition = if self.resources.is_playing && !self.resources.was_playing {
+            // Before `Start`, so a script can override the locked+hidden default.
+            self.resources
+                .input
+                .borrow_mut()
+                .reset_cursor(CursorState::PLAY);
             self.enter_play();
             PlayTransition::Entered
         } else if !self.resources.is_playing && self.resources.was_playing {
+            self.resources
+                .input
+                .borrow_mut()
+                .reset_cursor(CursorState::FREE);
             self.exit_play();
             PlayTransition::Exited
         } else {
