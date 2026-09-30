@@ -18,6 +18,14 @@
 //! `Canvas` below a root is laid out like any other rect. Inactive entities are
 //! still laid out; drawing and hit-testing filter on `active`.
 //!
+//! **Layout groups (#421).** A `LayoutGroup` on an element overrides where its
+//! layout children go: the walk places each at the group's computed rect instead
+//! of its anchors (`group`, `grid`), from the min / preferred / flexible sizes
+//! its content reports (`sizes`). Any other element with a `LayoutElement`
+//! content fitter is resized to its content around its pivot (`fit`). The scene's
+//! RectTransforms are never rewritten — the pass stays a pure function, recomputed
+//! whole each tick.
+//!
 //! **Order.** [`UiLayout::iter`] yields rects in draw order: root canvases by
 //! `sort_order` (ties keep scene insertion order), then each canvas's hierarchy in
 //! pre-order (a later sibling draws on top), as in Unity.
@@ -28,6 +36,16 @@ use glam::{Mat4, Vec2, Vec3};
 
 use crate::components::{RectTransformComponent, TransformComponent};
 use crate::ecs::World;
+
+mod fit;
+#[cfg(test)]
+mod fixture;
+mod grid;
+mod group;
+mod native;
+mod sizes;
+
+pub use sizes::{element_sizes, Sizes};
 
 /// One laid-out UI element (the canvas root included).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -115,11 +133,14 @@ impl UiLayout {
     fn walk(&mut self, world: &World, id: u32, node: Node) {
         self.index.insert(id, self.rects.len());
         self.rects.push((id, node.rect));
+        let placed: BTreeMap<u32, _> = group::placements(world, id, node.rect.rect)
+            .into_iter()
+            .collect();
         for child in world.children(id) {
             if self.index.contains_key(&child) {
                 continue; // a malformed hierarchy never loops the walk
             }
-            if let Some(child_node) = child_node(world, child, &node) {
+            if let Some(child_node) = child_node(world, child, &node, placed.get(&child).copied()) {
                 self.walk(world, child, child_node);
             }
         }
@@ -138,8 +159,13 @@ pub fn rect_of(world: &World, id: u32, screen: Vec2) -> Option<UiRect> {
         cur = world.parent_id(cur)?;
     }
     let mut node = root_node(world, root, screen)?;
+    let mut parent = root;
     for &link in chain.iter().rev() {
-        node = child_node(world, link, &node)?;
+        let placed = group::placements(world, parent, node.rect.rect)
+            .into_iter()
+            .find_map(|(c, r)| (c == link).then_some(r));
+        node = child_node(world, link, &node, placed)?;
+        parent = link;
     }
     Some(node.rect)
 }
@@ -184,10 +210,15 @@ fn root_node(world: &World, id: u32, screen: Vec2) -> Option<Node> {
     })
 }
 
-/// Lay `id` out inside `parent`, composing its pivot-centred rotation and scale.
-fn child_node(world: &World, id: u32, parent: &Node) -> Option<Node> {
+/// Lay `id` out inside `parent` — at `placed` when the parent's layout group
+/// arranges it, else by its own RectTransform and content fitter — composing its
+/// pivot-centred rotation and scale.
+fn child_node(world: &World, id: u32, parent: &Node, placed: Option<(Vec2, Vec2)>) -> Option<Node> {
     let rt = world.rect_transform(id)?;
-    let (min, size) = rt.layout_in(parent.rect.rect.0, parent.rect.rect.1);
+    let (min, size) = placed.unwrap_or_else(|| {
+        let own = rt.layout_in(parent.rect.rect.0, parent.rect.rect.1);
+        fit::fit(world, id, &rt, own)
+    });
     let transform = world.transform(id)?;
     let to_canvas = parent.to_canvas * pivot_matrix(&rt, &transform, min, size);
     let rect = UiRect {
@@ -227,5 +258,4 @@ fn quad(m: Mat4, min: Vec2, size: Vec2) -> [Vec2; 4] {
 }
 
 #[cfg(test)]
-#[path = "layout_tests.rs"]
-mod layout_tests;
+mod tests;

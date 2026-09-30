@@ -30,6 +30,7 @@ use crate::components::{
     CanvasComponent, CanvasGroupComponent, ImageComponent, RectMaskComponent,
     RectTransformComponent, SelectableComponent, TextComponent,
 };
+use crate::components::{LayoutElementComponent, LayoutGroupComponent};
 use crate::ecs::World;
 use crate::scene::authoring::components::ComponentKind;
 use crate::scene::authoring::defaults::{
@@ -59,6 +60,8 @@ pub(crate) fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::RectMask => world.has_rect_mask(id),
         ComponentKind::Text => world.has_text(id),
         ComponentKind::Selectable => world.has_selectable(id),
+        ComponentKind::LayoutGroup => world.has_layout_group(id),
+        ComponentKind::LayoutElement => world.has_layout_element(id),
     }
 }
 
@@ -92,6 +95,12 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
         ComponentKind::RectMask => world.set_rect_mask(id, Some(RectMaskComponent::default())),
         ComponentKind::Text => world.set_text(id, Some(TextComponent::default())),
         ComponentKind::Selectable => world.set_selectable(id, Some(SelectableComponent::default())),
+        ComponentKind::LayoutGroup => {
+            world.set_layout_group(id, Some(LayoutGroupComponent::default()))
+        }
+        ComponentKind::LayoutElement => {
+            world.set_layout_element(id, Some(LayoutElementComponent::default()))
+        }
     }
 }
 
@@ -117,6 +126,8 @@ pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool
         ComponentKind::RectMask => world.set_rect_mask(id, None),
         ComponentKind::Text => world.set_text(id, None),
         ComponentKind::Selectable => world.set_selectable(id, None),
+        ComponentKind::LayoutGroup => world.set_layout_group(id, None),
+        ComponentKind::LayoutElement => world.set_layout_element(id, None),
     }
 }
 

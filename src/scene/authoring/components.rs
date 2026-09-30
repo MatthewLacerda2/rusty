@@ -35,6 +35,8 @@ pub enum ComponentKind {
     RectMask,
     Text,
     Selectable,
+    LayoutGroup,
+    LayoutElement,
 }
 
 impl ComponentKind {
@@ -42,7 +44,7 @@ impl ComponentKind {
     /// finding a removed kind's dependents ([`dependency::remove_with_cascade`]) and
     /// reconciling/enforcing unmet requirements. The per-kind matches in `dependency`
     /// are compiler-checked exhaustive; a test guards this list against drift.
-    pub const ALL: [ComponentKind; 17] = [
+    pub const ALL: [ComponentKind; 19] = [
         Self::Light,
         Self::Animator,
         Self::Collider,
@@ -60,6 +62,8 @@ impl ComponentKind {
         Self::RectMask,
         Self::Text,
         Self::Selectable,
+        Self::LayoutGroup,
+        Self::LayoutElement,
     ];
 
     /// The first-class components this kind depends on — rusty's `RequireComponent`
@@ -68,9 +72,10 @@ impl ComponentKind {
     /// removing one of these cascades to the dependents that declare it. Flat
     /// `kind → [kinds]`: `VisualCorrection → Camera` (a correction stack is inert
     /// without a camera to correct), and the UI graphic and clip need a rect to fill
-    /// or clip to, and a Selectable a rect to be hit in (`Image` / `Text` / `RectMask` /
-    /// `Selectable → RectTransform`, as Unity's `Graphic` and
-    /// `RectMask2D` require one). A new dependency is one line here, enforced
+    /// or clip to, a Selectable a rect to be hit in, and the layout pair a rect to
+    /// arrange or size (`Image` / `Text` / `RectMask` / `Selectable` / `LayoutGroup` /
+    /// `LayoutElement → RectTransform`, as Unity's `Graphic`, `RectMask2D` and
+    /// layout components require one). A new dependency is one line here, enforced
     /// everywhere by construction.
     pub fn requires(self) -> &'static [ComponentKind] {
         match self {
@@ -78,7 +83,9 @@ impl ComponentKind {
             ComponentKind::Image
             | ComponentKind::Text
             | ComponentKind::RectMask
-            | ComponentKind::Selectable => &[ComponentKind::RectTransform],
+            | ComponentKind::Selectable
+            | ComponentKind::LayoutGroup
+            | ComponentKind::LayoutElement => &[ComponentKind::RectTransform],
             _ => &[],
         }
     }
@@ -104,6 +111,8 @@ impl ComponentKind {
             "rectmask" | "rectmask2d" => Some(Self::RectMask),
             "text" | "textmeshpro" | "textmeshprougui" => Some(Self::Text),
             "selectable" => Some(Self::Selectable),
+            "layoutgroup" => Some(Self::LayoutGroup),
+            "layoutelement" | "contentsizefitter" => Some(Self::LayoutElement),
             _ => None,
         }
     }
