@@ -25,7 +25,6 @@ pub mod scene;
 pub mod scripting;
 pub mod shadergen;
 pub mod shell;
-pub mod soundgen;
 pub mod time;
 pub mod ui;
 

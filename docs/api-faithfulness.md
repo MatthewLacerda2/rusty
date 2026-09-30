@@ -282,13 +282,16 @@ dry-run and the block-catalog listing — not setters, so they don't add to the 
 engine's own audio decoder**: a baked `.wav` is handed to `Audio.PlayAt` or stored as
 an `AudioSource`'s `clip`, and `audio::device::decode::ClipCache::get_or_decode` decodes it
 into PCM the maestro plays — the identical path an imported `.ogg`/`.wav` takes. The
-bake writes exactly what that decoder expects (mono 16-bit PCM at 44.1 kHz) and
-always passes a limiter, so a baked clip can never arrive clipped. Proven by
+bake — rendered by scorsese's zimmer crate (#413) and written by the adapter —
+is exactly what that decoder expects (stereo 16-bit PCM at 44.1 kHz) and always
+passes a limiter, so a baked clip can never arrive clipped. Proven by
 `tests/sound_api.rs` (a baked one-shot fired through `Audio.PlayAt` shows up in the
-maestro's event log under its baked path; a saved patch re-bakes byte-for-byte) and
-the module tests (`src/api/sound/bake_tests.rs`: the engine's own `ClipCache`
-decodes the bake as mono at 44.1 kHz; `src/soundgen/bake.rs`: byte-identical
-determinism, no file written on a rejected patch).
+maestro's event log under its baked path; a saved patch re-bakes byte-for-byte),
+`tests/sound_song_api.rs` (a song track naming its patch by path resolves to the
+same mix as the inline patch; an unreadable path fails and writes nothing) and the
+module tests (`src/api/sound/bake_tests.rs`: the engine's own `ClipCache` decodes
+the bake as stereo at 44.1 kHz; byte-identical determinism; no file written on a
+rejected patch, note or option). zimmer's own render tests live in scorsese.
 
 | Setter | Status | Read-site |
 |---|---|---|

@@ -47,3 +47,21 @@ confidence-threshold = 0.8
 # Skip our own unpublished crate (`publish = false`); it has no license field and
 # we never ship it to a registry. Dependencies are still fully gated.
 private = { ignore = true }
+# `midly` (Standard MIDI File parsing, pulled in by zimmer, #413) is released under
+# the Unlicense — an OSI-approved public-domain dedication. Allowed for that one
+# crate rather than added to the list above, so a new Unlicense dependency is still
+# a reviewed decision.
+exceptions = [
+  { crate = "midly", allow = ["Unlicense"] },
+]
+
+[sources]
+# Crates come from crates.io, plus exactly one git repository: scorsese, for the
+# `zimmer` synthesiser behind `Sound.*` (#413), pinned to a commit in Cargo.toml.
+# Any other git source or registry fails the deny job — add one here only as a
+# reviewed, deliberate decision. scorsese is licensed `MIT OR Apache-2.0`
+# (scorsese#591), which the allow-list above already covers; it is public, so CI
+# fetches it without credentials (if it ever goes private, CI needs a token).
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-git = ["https://github.com/MatthewLacerda2/scorsese"]
