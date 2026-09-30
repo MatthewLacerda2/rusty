@@ -73,14 +73,9 @@ pub fn register<'lua, 'scope>(
 ) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     for (suffix, get, set) in NAMES {
-        pair(
-            scope,
-            &t,
-            scene,
-            suffix,
-            move |g| get(g),
-            move |g, n: String| set(g, &n),
-        )?;
+        pair(scope, &t, scene, suffix, get, move |g, n: String| {
+            set(g, &n)
+        })?;
     }
     register_numbers(scope, &t, scene)?;
     register_flags(scope, &t, scene)?;

@@ -23,6 +23,15 @@ use crate::ecs::World;
 /// A child's `(position from the leading edge, size)` along one axis.
 type Slot = (f32, f32);
 
+/// A row or column group being laid out: the world, the group and its layout
+/// children, and the size-query nesting depth.
+struct Linear<'a> {
+    world: &'a World,
+    g: &'a LayoutGroupComponent,
+    children: &'a [u32],
+    depth: u32,
+}
+
 /// Where the group on `id` puts each of its layout children inside `rect`
 /// (`(min, size)`, y-up): `(child, (min, size))` in hierarchy order. Empty when
 /// `id` has no group.
@@ -34,7 +43,13 @@ pub(super) fn placements(world: &World, id: u32, rect: (Vec2, Vec2)) -> Vec<(u32
     let (min, size) = rect;
     let cells = match g.kind {
         LayoutKind::Grid => grid::place(&g, children.len(), size),
-        LayoutKind::Horizontal | LayoutKind::Vertical => linear_place(world, &g, &children, size),
+        LayoutKind::Horizontal | LayoutKind::Vertical => Linear {
+            world,
+            g: &g,
+            children: &children,
+            depth: 0,
+        }
+        .place(size),
     };
     children
         .into_iter()
@@ -59,58 +74,103 @@ pub(super) fn group_sizes(
     if g.kind == LayoutKind::Grid {
         return grid::sizes(g, children.len(), axis, width);
     }
+    let group = Linear {
+        world,
+        g,
+        children: &children,
+        depth,
+    };
     let widths = if axis == 1 {
-        slots(world, g, &children, 0, width, &[], depth)
-            .into_iter()
-            .map(|s| s.1)
-            .collect()
+        group.widths(width)
     } else {
         Vec::new()
     };
-    let entries = child_entries(world, g, &children, axis, &widths, depth);
-    totals(g, axis, &entries)
+    totals(g, axis, &group.entries(axis, &widths))
 }
 
-/// Lay a row or column out in a `size` rect: widths first, then heights.
-fn linear_place(
-    world: &World,
-    g: &LayoutGroupComponent,
-    children: &[u32],
-    size: Vec2,
-) -> Vec<(Vec2, Vec2)> {
-    let xs = slots(world, g, children, 0, size.x, &[], 0);
-    let widths: Vec<f32> = xs.iter().map(|s| s.1).collect();
-    let ys = slots(world, g, children, 1, size.y, &widths, 0);
-    xs.into_iter()
-        .zip(ys)
-        .map(|(x, y)| (Vec2::new(x.0, y.0), Vec2::new(x.1, y.1)))
-        .collect()
-}
+impl Linear<'_> {
+    /// Lay the children out in a `size` rect: widths first, then heights.
+    fn place(&self, size: Vec2) -> Vec<(Vec2, Vec2)> {
+        let xs = self.slots(0, size.x, &[]);
+        let widths: Vec<f32> = xs.iter().map(|s| s.1).collect();
+        let ys = self.slots(1, size.y, &widths);
+        xs.into_iter()
+            .zip(ys)
+            .map(|(x, y)| (Vec2::new(x.0, y.0), Vec2::new(x.1, y.1)))
+            .collect()
+    }
 
-/// Each child's sizes along `axis` as this group sees them: its layout sizes when
-/// the group controls the axis, else its own fixed size; force-expand makes it at
-/// least flexible 1.
-fn child_entries(
-    world: &World,
-    g: &LayoutGroupComponent,
-    children: &[u32],
-    axis: usize,
-    widths: &[f32],
-    depth: u32,
-) -> Vec<Sizes> {
-    let entry = |(i, &c): (usize, &u32)| {
-        let w = widths.get(i).copied().unwrap_or(0.0);
-        let mut s = if g.controls(axis) {
-            element_sizes(world, c, axis, w, depth)
-        } else {
-            Sizes::fixed(own_size(world, c, axis, w, depth))
+    /// Each child's width in a `width`-wide group.
+    fn widths(&self, width: f32) -> Vec<f32> {
+        self.slots(0, width, &[]).into_iter().map(|s| s.1).collect()
+    }
+
+    /// Each child's sizes along `axis` as this group sees them: its layout sizes
+    /// when the group controls the axis, else its own fixed size; force-expand
+    /// makes it at least flexible 1.
+    fn entries(&self, axis: usize, widths: &[f32]) -> Vec<Sizes> {
+        let (world, g, depth) = (self.world, self.g, self.depth);
+        let entry = |(i, &c): (usize, &u32)| {
+            let w = widths.get(i).copied().unwrap_or(0.0);
+            let mut s = if g.controls(axis) {
+                element_sizes(world, c, axis, w, depth)
+            } else {
+                Sizes::fixed(own_size(world, c, axis, w, depth))
+            };
+            if g.force_expands(axis) {
+                s.flexible = s.flexible.max(1.0);
+            }
+            s
         };
-        if g.force_expands(axis) {
-            s.flexible = s.flexible.max(1.0);
+        self.children.iter().enumerate().map(entry).collect()
+    }
+
+    /// Every child's slot along `axis` in a rect `size` long (Unity's
+    /// `SetChildrenAlongAxis`).
+    fn slots(&self, axis: usize, size: f32, widths: &[f32]) -> Vec<Slot> {
+        let g = self.g;
+        let entries = self.entries(axis, widths);
+        let align = alignment(g, axis);
+        let place = |pos: f32, space: f32, e: &Sizes| -> Slot {
+            if g.controls(axis) {
+                (pos, space)
+            } else {
+                (pos + (space - e.preferred) * align, e.preferred)
+            }
+        };
+        let (lead, pad) = padding(g.padding, axis);
+        if !is_main(g, axis) {
+            let inner = size - pad;
+            let cross = |e: &Sizes| {
+                let max = if e.flexible > 0.0 { size } else { e.preferred };
+                let space = clamp(inner, e.min, max);
+                place(start_offset(g, axis, size, space), space, e)
+            };
+            return entries.iter().map(cross).collect();
         }
-        s
-    };
-    children.iter().enumerate().map(entry).collect()
+        let total = totals(g, axis, &entries);
+        let (mut pos, mut per_flex) = (lead, 0.0);
+        let surplus = size - total.preferred;
+        if surplus > 0.0 {
+            if total.flexible == 0.0 {
+                pos = start_offset(g, axis, size, total.preferred - pad);
+            } else {
+                per_flex = surplus / total.flexible;
+            }
+        }
+        let lerp = if total.min == total.preferred {
+            0.0
+        } else {
+            ((size - total.min) / (total.preferred - total.min)).clamp(0.0, 1.0)
+        };
+        let mut out = Vec::with_capacity(entries.len());
+        for e in &entries {
+            let space = e.min + (e.preferred - e.min) * lerp + e.flexible * per_flex;
+            out.push(place(pos, space, e));
+            pos += space + g.spacing[axis];
+        }
+        out
+    }
 }
 
 /// The group's totals from its children's entries (Unity's `CalcAlongAxis`).
@@ -137,60 +197,6 @@ fn totals(g: &LayoutGroupComponent, axis: usize, entries: &[Sizes]) -> Sizes {
     }
     t.preferred = t.preferred.max(t.min);
     t
-}
-
-/// Every child's slot along `axis` in a rect `size` long (Unity's
-/// `SetChildrenAlongAxis`).
-fn slots(
-    world: &World,
-    g: &LayoutGroupComponent,
-    children: &[u32],
-    axis: usize,
-    size: f32,
-    widths: &[f32],
-    depth: u32,
-) -> Vec<Slot> {
-    let entries = child_entries(world, g, children, axis, widths, depth);
-    let align = alignment(g, axis);
-    let place = |pos: f32, space: f32, e: &Sizes| -> Slot {
-        if g.controls(axis) {
-            (pos, space)
-        } else {
-            (pos + (space - e.preferred) * align, e.preferred)
-        }
-    };
-    let (lead, pad) = padding(g.padding, axis);
-    if !is_main(g, axis) {
-        let inner = size - pad;
-        let cross = |e: &Sizes| {
-            let max = if e.flexible > 0.0 { size } else { e.preferred };
-            let space = clamp(inner, e.min, max);
-            place(start_offset(g, axis, size, space), space, e)
-        };
-        return entries.iter().map(cross).collect();
-    }
-    let total = totals(g, axis, &entries);
-    let (mut pos, mut per_flex) = (lead, 0.0);
-    let surplus = size - total.preferred;
-    if surplus > 0.0 {
-        if total.flexible == 0.0 {
-            pos = start_offset(g, axis, size, total.preferred - pad);
-        } else {
-            per_flex = surplus / total.flexible;
-        }
-    }
-    let lerp = if total.min == total.preferred {
-        0.0
-    } else {
-        ((size - total.min) / (total.preferred - total.min)).clamp(0.0, 1.0)
-    };
-    let mut out = Vec::with_capacity(entries.len());
-    for e in &entries {
-        let space = e.min + (e.preferred - e.min) * lerp + e.flexible * per_flex;
-        out.push(place(pos, space, e));
-        pos += space + g.spacing[axis];
-    }
-    out
 }
 
 /// Whether `axis` is the group's main (stacking) axis.
