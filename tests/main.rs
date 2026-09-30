@@ -11,7 +11,8 @@
 //!
 //! Every module now shares one process, so a test must not rely on having a process to
 //! itself: no fixed temp paths shared with another file, no `set_var`/`set_current_dir`.
-//! Filter as before: `cargo test --test integration physics_` runs the physics files.
+//! Filter by module path: `cargo nextest run -E 'binary(integration)' physics_` runs the
+//! physics files (`cargo test --test integration physics_` works too).
 
 mod layout;
 
