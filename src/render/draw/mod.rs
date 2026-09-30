@@ -152,17 +152,15 @@ impl Renderer {
     }
 
     /// Upload/refresh per-frame GPU assets (meshes, textures, skybox) shared by every
-    /// camera in the stack. Borrow-splits cleanly before the render passes begin.
+    /// camera in the stack, and mark re-baked surface shaders for a rebuild (#396).
     fn upload_scene_assets(&mut self, scene: &Scene) {
         self.upload_scene_meshes(scene);
-
+        self.surface_shaders.refresh();
         // The material maps the shader samples (albedo #201, metallic/roughness #202),
         // collected paths-only first to end the scene borrow before uploading.
         for path in active_material_map_paths(scene) {
             self.load_texture(&path);
         }
-        // A re-baked surface shader rebuilds the next time a material names it (#396).
-        self.surface_shaders.refresh();
 
         // Update skybox texture if path changed, marking the global bind group dirty
         // so it is rebuilt once (next frame) rather than every camera every frame —
