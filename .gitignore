@@ -56,3 +56,6 @@ out/
 # cargo-mutants run output
 /mutants.out/
 /mutants.out.old/
+
+# Python bytecode from the merge helpers in .github/scripts (#486)
+__pycache__/

@@ -16,13 +16,13 @@ TEST := cargo nextest run --locked
 
 # The gates, in the order `make gates` runs them. `deny` sits last: its failures
 # are about dependencies (and it needs the network), so a code failure reports first.
-GATES := fmt size determinism components parity test-lint clippy doc test deny
+GATES := fmt size determinism components parity test-lint scripts clippy doc test deny
 # Checks on the gate runner itself, run before any gate.
 SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup check gates pre-commit $(SELF_CHECKS) $(GATES)
+.PHONY: help setup check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -115,3 +115,26 @@ deny: ## [gate] Advisories, bans, sources, licenses (cargo-deny)
 	@command -v cargo-deny >/dev/null 2>&1 || { \
 		echo "deny: cargo-deny is not installed — cargo install --locked cargo-deny"; exit 1; }
 	CARGO_NET_GIT_FETCH_WITH_CLI=true cargo deny check advisories bans sources licenses
+
+# ---- merging (#486) --------------------------------------------------------
+
+# The merge helpers' own tests: stdlib `unittest`, no build, well under a
+# second — and a gate, because `mergeable` is the only thing between a red PR
+# and `main` while it has no required checks (#491).
+scripts: ## [gate] Tests of the merge helpers in .github/scripts
+	python3 -m unittest discover --start-directory .github/scripts/tests --quiet
+
+# Did CI really run, and pass, on this PR's head commit? Both workflows' gates,
+# a gated job that genuinely ran, and no red run beside a green one. The last
+# check before any merge; the script's docstring has the incidents behind it.
+mergeable: ## Did CI really run on this PR's head? make mergeable PR=524
+	@test -n "$(PR)" || { echo "mergeable: which pull request? e.g. make mergeable PR=524" >&2; exit 1; }
+	@python3 .github/scripts/mergeable.py $(PR)
+
+# The same question in a loop, with the rebase and the waiting done for you.
+# Serialized: one branch at a time, in the order given. Never resolves a
+# conflict, builds anything or touches a worktree; it names what to clean up.
+# ARGS passes flags through, e.g. ARGS=--dry-run (reads only, writes nothing).
+queue: ## Rebase, wait for CI, squash-merge each in turn. make queue PRS="524 526"
+	@test -n "$(PRS)" || { echo "queue: which pull requests? e.g. make queue PRS=\"524 526\"" >&2; exit 1; }
+	@python3 .github/scripts/merge-queue.py $(PRS) $(ARGS)
