@@ -13,12 +13,16 @@
 // documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
 #![deny(clippy::unwrap_used)]
 
+mod assemble;
 mod build;
 #[cfg(test)]
 mod build_tests;
 #[cfg(test)]
 mod ccd_tests;
 mod character;
+mod compound;
+#[cfg(test)]
+mod compound_tests;
 mod convert;
 mod query;
 mod spatial;

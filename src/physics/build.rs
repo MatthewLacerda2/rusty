@@ -10,6 +10,9 @@ use rapier3d::prelude::*;
 
 use crate::components::{ColliderShape, CollisionDetection, RigidBodyComponent};
 use crate::ecs::World;
+use crate::scene::Scene;
+
+use super::compound::world_pose;
 
 /// Body class derived from the entity flags. Mirrors the legacy solver's encoding:
 /// static (fixed), kinematic (position-driven), or dynamic (gravity + solver).
@@ -53,28 +56,16 @@ pub(super) fn ccd_enabled(mode: CollisionDetection) -> bool {
     matches!(mode, CollisionDetection::Continuous)
 }
 
-/// The per-entity inputs needed to build one rapier body + collider, captured in a
-/// single borrow of the entity so `world.rs` can release it before touching `self`.
+/// The per-entity inputs needed to build one rapier collider, captured in a
+/// single borrow of the entity so `assemble` can release it before touching
+/// `self`. The pose is not here: it comes from the hierarchy (`compound`).
 pub(super) struct ColliderInputs {
-    pub pos: Vec3,
-    pub rot: Quat,
-    pub scale: Vec3,
     pub shape: ColliderShape,
     /// Live rest-pose geometry for a mesh collider (positions + triangle indices),
     /// captured here so it never enters the scene document.
     pub mesh_geom: Option<(Vec<[f32; 3]>, Vec<u32>)>,
     pub is_trigger: bool,
     pub is_static: bool,
-    pub class: BodyClass,
-    pub velocity: Vec3,
-    /// Initial angular velocity (radians/sec per axis) seeded onto a dynamic body
-    /// at build (#319); rapier integrates rotation from it thereafter.
-    pub angular_velocity: Vec3,
-    /// Whether a dynamic body is pulled by world gravity (Unity: `useGravity`).
-    /// Maps to rapier's `gravity_scale` (1.0 when true, 0.0 when false).
-    pub use_gravity: bool,
-    /// Discrete vs. Continuous (CCD) contact detection for this body (#321).
-    pub collision_detection: CollisionDetection,
     pub layer: u8,
 }
 
@@ -93,29 +84,48 @@ pub(super) fn collider_inputs(world: &World, id: u32) -> Option<ColliderInputs> 
     } else {
         None
     };
-    let transform = world.transform(id)?;
-    let is_static = world.is_static(id);
-    let rb = world.rigidbody(id);
-    let rb = rb.as_deref();
     Some(ColliderInputs {
-        pos: transform.position,
-        rot: transform.rotation,
-        scale: transform.scale,
         shape: collider.shape.clone(),
         mesh_geom,
         is_trigger: collider.is_trigger,
-        is_static,
+        is_static: world.is_static(id),
+        layer: world.layer(id),
+    })
+}
+
+/// The inputs needed to build one rapier body, read off its owner entity (the
+/// entity with the Rigidbody, or the lone collider entity — see `compound`).
+pub(super) struct BodyInputs {
+    pub class: BodyClass,
+    pub velocity: Vec3,
+    /// Initial angular velocity (radians/sec per axis) seeded onto a dynamic body
+    /// at build (#319); rapier integrates rotation from it thereafter.
+    pub angular_velocity: Vec3,
+    /// Whether a dynamic body is pulled by world gravity (Unity: `useGravity`).
+    /// Maps to rapier's `gravity_scale` (1.0 when true, 0.0 when false).
+    pub use_gravity: bool,
+    /// Discrete vs. Continuous (CCD) contact detection for this body (#321).
+    pub collision_detection: CollisionDetection,
+}
+
+/// Snapshot the body-level inputs of owner `id`.
+pub(super) fn body_inputs(world: &World, id: u32) -> BodyInputs {
+    let is_static = world.is_static(id);
+    let rb = world.rigidbody(id);
+    let rb = rb.as_deref();
+    BodyInputs {
         class: classify(is_static, rb),
         velocity: rb.map(|r| r.velocity).unwrap_or(Vec3::ZERO),
         angular_velocity: rb.map(|r| r.angular_velocity).unwrap_or(Vec3::ZERO),
         use_gravity: rb.is_none_or(|r| r.use_gravity),
         collision_detection: rb.map(|r| r.collision_detection).unwrap_or_default(),
-        layer: world.layer(id),
-    })
+    }
 }
 
 /// The per-entity component state `sync_to_rapier` pushes into a body each tick.
 pub(super) struct EntityBodyState {
+    /// World-space pose (#445): the owner's local `Transform` resolved through
+    /// its parents.
     pub pos: Vec3,
     pub rot: Quat,
     pub vel: Vec3,
@@ -129,22 +139,23 @@ pub(super) struct EntityBodyState {
     pub ccd_enabled: bool,
 }
 
-/// Snapshot an entity's transform/velocity/body-class state for one tick
+/// Snapshot an owner's world pose/velocity/body-class state for one tick
 /// (`None` when the entity is dead).
-pub(super) fn body_state(world: &World, id: u32) -> Option<EntityBodyState> {
-    let transform = world.transform(id)?;
+pub(super) fn body_state(scene: &Scene, id: u32) -> Option<EntityBodyState> {
+    let pose = world_pose(scene, id)?;
+    let world = &scene.world;
     // Gravity needs an authored rigidbody opting in: a collider-only entity
     // (kinematic by default) is script-driven scenery and must never fall (#318),
     // so a missing rigidbody reads as `use_gravity = false` here. Dynamic bodies
-    // always have one, so this matches `collider_inputs` for them.
+    // always have one, so this matches `body_inputs` for them.
     let rb = world.rigidbody(id);
     let rb = rb.as_deref();
     let is_static = world.is_static(id);
     let use_gravity = rb.is_some_and(|r| r.use_gravity);
     let collision_detection = rb.map(|r| r.collision_detection).unwrap_or_default();
     Some(EntityBodyState {
-        pos: transform.position,
-        rot: transform.rotation,
+        pos: pose.pos,
+        rot: pose.rot,
         vel: rb.map(|r| r.velocity).unwrap_or(Vec3::ZERO),
         angular_velocity: rb.map(|r| r.angular_velocity).unwrap_or(Vec3::ZERO),
         active: world.is_active(id),
