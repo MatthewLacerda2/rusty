@@ -171,6 +171,7 @@ impl World {
             image: self.image(id).map(|c| (*c).clone()),
             canvas_group: self.canvas_group(id).map(|c| (*c).clone()),
             rect_mask: self.rect_mask(id).map(|c| (*c).clone()),
+            text: self.text(id).map(|c| (*c).clone()),
             prefab_link: self.prefab_link(id).map(|c| (*c).clone()),
             parent_id: core.parent_id,
             children: core.children.clone(),

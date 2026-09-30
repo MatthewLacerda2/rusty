@@ -26,7 +26,7 @@ use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, ColliderComponent, ImageComponent, LightComponent, MaterialComponent,
     MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent, PrefabLink, RectMaskComponent,
-    RectTransformComponent, RigidBodyComponent, VisualCorrectionComponent,
+    RectTransformComponent, RigidBodyComponent, TextComponent, VisualCorrectionComponent,
 };
 
 use super::world::{Ref, RefMut, World};
@@ -131,5 +131,6 @@ optional_component_accessors! {
     ImageComponent => image, image_mut, has_image, set_image, take_image, ids_with_image;
     CanvasGroupComponent => canvas_group, canvas_group_mut, has_canvas_group, set_canvas_group, take_canvas_group, ids_with_canvas_group;
     RectMaskComponent => rect_mask, rect_mask_mut, has_rect_mask, set_rect_mask, take_rect_mask, ids_with_rect_mask;
+    TextComponent => text, text_mut, has_text, set_text, take_text, ids_with_text;
     PrefabLink => prefab_link, prefab_link_mut, has_prefab_link, set_prefab_link, take_prefab_link, ids_with_prefab_link;
 }

@@ -44,6 +44,7 @@ pub use texture::TextureComponent;
 pub use transform::TransformComponent;
 pub use ui::{
     CanvasComponent, CanvasGroupComponent, CanvasRenderMode, FillMethod, FillOrigin,
-    ImageComponent, ImageType, RectMaskComponent, RectTransformComponent,
+    ImageComponent, ImageType, RectMaskComponent, RectTransformComponent, TextAlignment,
+    TextComponent, TextOverflow,
 };
 pub use visual_correction::{Tonemap, VisualCorrectionComponent};

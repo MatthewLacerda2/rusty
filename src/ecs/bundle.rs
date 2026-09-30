@@ -73,6 +73,7 @@ pub(in crate::ecs) fn build_bundle(entity: Entity, seq: u64) -> hecs::EntityBuil
         entity.image,
         entity.canvas_group,
         entity.rect_mask,
+        entity.text,
         entity.prefab_link,
     );
     b
