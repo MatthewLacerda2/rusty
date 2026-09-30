@@ -1,7 +1,7 @@
 //! src/api/random.rs — `Random` namespace (#443).
 //!
 //! Unity's `UnityEngine.Random` subset, backed by the seeded
-//! [`Random`](crate::core::random::Random) resource the script runtime owns.
+//! [`Random`] resource the script runtime owns.
 //! `Value` / `Range` / `InsideUnitSphere` / `OnUnitSphere` / `InsideUnitCircle` /
 //! `SetSeed`. The sandboxed `math.random` / `math.randomseed` (installed by the
 //! scripting layer) route through this namespace, so there is exactly one stream.
