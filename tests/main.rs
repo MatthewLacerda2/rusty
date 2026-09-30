@@ -33,6 +33,8 @@ mod light_probes;
 mod material_authoring;
 mod material_library;
 mod nav_agents_values;
+mod nav_avoidance;
+mod nav_avoidance_door;
 mod navigation_heightfield;
 mod navmesh_settings;
 mod parity_authoring_ops;

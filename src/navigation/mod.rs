@@ -6,7 +6,8 @@
 //! `bake` (deriving walkability + the height field from colliders, incl. the
 //! agent-radius erosion), `headroom` (the agent-height clearance pass that carves
 //! low-overhang cells, #278), `astar` (the height/step-aware A\* search and path
-//! queries), and `agents` (cached-path planning + the steering tick) — all hanging
+//! queries), `agents` (cached-path planning + the steering tick), and `avoidance`
+//! (ORCA local avoidance between agents, #463) — all hanging
 //! off the single re-exported [`NavigationGraph`] type. Agents follow the real baked
 //! `y` of the surface (ramps, stairs, multi-level terrain), not a preserved-constant
 //! height.
@@ -19,6 +20,7 @@ mod agents;
 mod astar;
 #[cfg(test)]
 mod astar_tests;
+mod avoidance;
 mod bake;
 #[cfg(test)]
 mod bake_tests;

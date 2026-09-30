@@ -108,12 +108,14 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetTarget` | ✅ | sim — `navigation/agents.rs` steers toward `target` |
-| `SetSpeed` | ✅ | sim — `navigation/agents.rs` clamps velocity to `speed` |
-| `SetAcceleration` | ✅ | sim — `navigation/agents.rs` lerps velocity by `acceleration` |
-| `SetStoppingDistance` | ✅ | sim — `navigation/agents.rs` arrival test |
-| `SetRadius` | ✅ | sim — agent footprint; round-trips |
+| `SetTarget` | ✅ | sim — `navigation/agents/tick.rs` steers toward `target` |
+| `SetSpeed` | ✅ | sim — `navigation/agents/tick.rs` clamps velocity to `speed` |
+| `SetAcceleration` | ✅ | sim — `navigation/agents/tick.rs` lerps velocity by `acceleration` |
+| `SetStoppingDistance` | ✅ | sim — `navigation/agents/tick.rs` arrival test |
+| `SetRadius` | ✅ | sim — agent footprint; ORCA keeps agents `radius` apart (#463); round-trips |
 | `SetActive` | ✅ | sim — gates agent stepping |
+| `SetAvoidancePriority` | ✅ | sim — `navigation/avoidance` picks each pair's dodge share by priority (#463); round-trips |
+| `SetAvoidanceEnabled` | ✅ | sim — `navigation/agents/tick.rs` only runs ORCA for agents with it on; round-trips |
 
 ### `Physics` — over `Entity.rigidbody`
 

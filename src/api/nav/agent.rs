@@ -24,6 +24,7 @@ pub fn register<'lua, 'scope>(
     register_agent_motion(scope, &table, scene)?;
     register_agent_size(scope, &table, scene)?;
     register_agent_queries(scope, &table, scene)?;
+    register_agent_avoidance(scope, &table, scene)?;
 
     lua.globals()
         .set("NavMeshAgent", table)
@@ -174,6 +175,37 @@ fn register_agent_queries<'lua, 'scope>(
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
                 nav_ops::set_active(&mut c, active);
+            }
+            Ok(())
+        }),
+    )
+}
+
+/// Local avoidance (#463): `SetAvoidancePriority` / `SetAvoidanceEnabled`.
+fn register_agent_avoidance<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "SetAvoidancePriority",
+        scope.create_function(|_, (id, priority): (u32, f64)| {
+            let mut scene = scene.borrow_mut();
+            if let Some(mut c) = scene.world.nav_agent_mut(id) {
+                nav_ops::set_avoidance_priority(&mut c, priority);
+            }
+            Ok(())
+        }),
+    )?;
+
+    put(
+        table,
+        "SetAvoidanceEnabled",
+        scope.create_function(|_, (id, enabled): (u32, bool)| {
+            let mut scene = scene.borrow_mut();
+            if let Some(mut c) = scene.world.nav_agent_mut(id) {
+                nav_ops::set_avoidance_enabled(&mut c, enabled);
             }
             Ok(())
         }),

@@ -34,7 +34,7 @@ pub use entity::{Entity, PrefabLink};
 pub use light::{LightComponent, LightType};
 pub use material::{MaterialAsset, MaterialComponent, RenderMode};
 pub use mesh::{DirtyFlag, MeshComponent};
-pub use nav_agent::NavMeshAgentComponent;
+pub use nav_agent::{NavMeshAgentComponent, DEFAULT_AVOIDANCE_PRIORITY, MAX_AVOIDANCE_PRIORITY};
 pub use particle::{
     CollisionResponse, EmitMode, Particle, ParticleBlend, ParticleEmitterComponent,
 };

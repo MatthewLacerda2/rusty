@@ -2,8 +2,8 @@
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `NavMeshAgentComponent` field by field: the `active` flag, the motion tuning
-//! (`speed` / `acceleration` / `stopping_distance`), the footprint `radius`, and the
-//! `target` destination.
+//! (`speed` / `acceleration` / `stopping_distance`), the footprint `radius`, the
+//! `target` destination, and the local-avoidance settings (#463).
 //!
 //! BOTH the editor's NavMesh Agent card and the Lua `NavMeshAgent.*` setters route
 //! through these, so the egui panel and the binding share one write (#287). The ops
@@ -15,7 +15,7 @@
 
 use glam::Vec3;
 
-use crate::components::NavMeshAgentComponent;
+use crate::components::{NavMeshAgentComponent, MAX_AVOIDANCE_PRIORITY};
 
 /// Set the agent's `active` flag.
 pub fn set_active(a: &mut NavMeshAgentComponent, active: bool) {
@@ -47,6 +47,18 @@ pub fn set_target(a: &mut NavMeshAgentComponent, target: Vec3) {
     a.target = target;
 }
 
+/// Set the agent's avoidance priority (Unity's `avoidancePriority`: lower is more
+/// important). The one clamp among these ops: the field is `u8` and the range is
+/// 0–99, so anything outside lands on the nearest end (fractions truncate).
+pub fn set_avoidance_priority(a: &mut NavMeshAgentComponent, priority: f64) {
+    a.avoidance_priority = priority.clamp(0.0, f64::from(MAX_AVOIDANCE_PRIORITY)) as u8;
+}
+
+/// Set whether the agent steers around other agents.
+pub fn set_avoidance_enabled(a: &mut NavMeshAgentComponent, enabled: bool) {
+    a.avoidance_enabled = enabled;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -72,6 +84,8 @@ mod tests {
         set_stopping_distance(&mut e, 0.5);
         set_radius(&mut e, 0.4);
         set_target(&mut e, Vec3::new(1.0, 0.0, 2.0));
+        set_avoidance_priority(&mut e, 12.0);
+        set_avoidance_enabled(&mut e, false);
         let a = &*e;
         assert!(a.active);
         assert_eq!(a.speed, 3.5);
@@ -79,5 +93,18 @@ mod tests {
         assert_eq!(a.stopping_distance, 0.5);
         assert_eq!(a.radius, 0.4);
         assert_eq!(a.target, Vec3::new(1.0, 0.0, 2.0));
+        assert_eq!(a.avoidance_priority, 12);
+        assert!(!a.avoidance_enabled);
+    }
+
+    #[test]
+    fn avoidance_priority_clamps_to_unity_range() {
+        let mut a = NavMeshAgentComponent::default();
+        set_avoidance_priority(&mut a, 250.0);
+        assert_eq!(a.avoidance_priority, 99);
+        set_avoidance_priority(&mut a, -3.0);
+        assert_eq!(a.avoidance_priority, 0);
+        set_avoidance_priority(&mut a, 42.9);
+        assert_eq!(a.avoidance_priority, 42);
     }
 }
