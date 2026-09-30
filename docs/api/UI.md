@@ -14,6 +14,7 @@ top-left: UI `y` = screen height − mouse `y`.)
 | `UI.IsPointerOverUI` | `()` | `true` when the pointer is over a raycast target this tick |
 | `UI.IsPointerConsumed` | `()` | `true` when gameplay should leave the pointer alone: it is over the UI, or a press that began over the UI is still held |
 | `UI.Raycast` | `(x, y)` | the top-most raycast target under the point, or `nil` |
+| `UI.FindSelectable` | `(id, direction)` | where keyboard navigation from `id` goes in `direction` (`"Up"`, `"Down"`, `"Left"`, `"Right"`), or `nil` — Unity's `FindSelectableOn*`, for an `OnMove` handler that navigates itself |
 | `UI.Click` | `(id)` | `true` if the click will land on `id` (or its descendant) — see below |
 | `UI.List` | `()` | array of every visible `Selectable`, in draw order — see below |
 

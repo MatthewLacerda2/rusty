@@ -2,7 +2,8 @@
 //!
 //! Focus (`SetSelected` / `GetSelected`), the gameplay-vs-UI guards
 //! (`IsPointerOverUI` / `IsPointerConsumed`), and the agent verbs: `Raycast` (what
-//! is under a point, computed on demand from the live scene), `Click` (a real click
+//! is under a point, computed on demand from the live scene), `FindSelectable`
+//! (where navigation from an element would go — for an `OnMove` handler), `Click` (a real click
 //! at an element's centre, through `Input`) and `List` (every visible Selectable,
 //! with its state and screen rect). Points are UI screen pixels: bottom-left
 //! origin, y-up — the frame of `UI.GetRect(id).screen`.
@@ -12,7 +13,7 @@ use mlua::{Lua, Table};
 
 use super::super::{global_table, put, ApiScopedCtx, Reg};
 use crate::ecs::World;
-use crate::ui::events::{is_interactable, is_under, is_visible, raycast};
+use crate::ui::events::{find_selectable, is_interactable, is_under, is_visible, raycast};
 use crate::ui::layout::rect_of;
 use crate::ui::{EventSystem, UiLayout};
 
@@ -43,6 +44,17 @@ pub fn register_events<'lua, 'scope>(
         Ok(raycast(world, &layout, Vec2::new(x, y)))
     });
     put(table, "Raycast", f)?;
+    let f = scope.create_function(move |_, (id, dir): (u32, String)| {
+        let Some(dir) = direction(&dir) else {
+            return Err(mlua::Error::RuntimeError(format!(
+                "UI.FindSelectable: unknown direction '{dir}' (Up, Down, Left, Right)"
+            )));
+        };
+        let world = &scene.borrow().world;
+        let layout = UiLayout::compute(world, px());
+        Ok(find_selectable(world, &layout, id, dir))
+    });
+    put(table, "FindSelectable", f)?;
     let f = scope.create_function(move |_, id: u32| {
         let screen = px();
         let world = &scene.borrow().world;
@@ -71,6 +83,13 @@ pub fn register_events<'lua, 'scope>(
         )
     });
     put(table, "List", f)
+}
+
+/// A direction name as its `select_on` index (case-insensitive).
+fn direction(name: &str) -> Option<usize> {
+    ["up", "down", "left", "right"]
+        .iter()
+        .position(|d| d.eq_ignore_ascii_case(name))
 }
 
 /// The centre of an element's final quad, in screen pixels.

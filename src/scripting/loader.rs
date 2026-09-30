@@ -57,6 +57,16 @@ impl ScriptManager {
         super::schema::apply_field_values(&table, &script_code, field_values)
             .map_err(|e| format!("Failed to apply script fields for {}: {}", script_path, e))?;
 
+        // Index it by entity, so `Scene.GetScript` can hand it to other scripts.
+        super::instances::record(
+            lua,
+            entity_id,
+            script_index,
+            &super::script_label(script_path),
+            &table,
+        )
+        .map_err(|e| format!("Failed to index script {}: {}", script_path, e))?;
+
         // Cache the returned lifecycle table in the Lua registry
         let reg_key = lua
             .create_registry_value(table)

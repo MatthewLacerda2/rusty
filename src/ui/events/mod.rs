@@ -9,7 +9,8 @@
 //! 1. **Selection** a script changed since last tick is announced (`OnDeselect`,
 //!    `OnSelect`), and a selection that went inactive or was destroyed is dropped.
 //! 2. **Keyboard navigation** (`focus`): arrows move focus, Tab / Shift+Tab cycle
-//!    it, Enter submits (`OnSubmit`), Escape cancels (`OnCancel`).
+//!    it, Enter submits (`OnSubmit`), Escape cancels (`OnCancel`); a focused entity
+//!    defining `OnMove` takes the arrows itself.
 //! 3. **Pointer** (`pointer`): the top-most raycast target under the mouse
 //!    ([`raycast()`]) drives `OnPointerEnter` / `OnPointerExit`; each mouse button's
 //!    edges drive `OnPointerDown` / `OnPointerUp` / `OnPointerClick` and the drag
@@ -41,7 +42,7 @@ use crate::core::input::InputState;
 use crate::ecs::World;
 use crate::ui::UiLayout;
 
-pub use focus::{nav_actions, NavAction};
+pub use focus::{find_selectable, nav_actions, NavAction, DIRECTIONS};
 pub use raycast::raycast;
 pub use tree::{is_interactable, is_under, is_visible};
 
@@ -65,6 +66,8 @@ pub enum UiHook {
     Deselect,
     Submit,
     Cancel,
+    /// An arrow key a focused entity's `OnMove` takes instead of navigation.
+    Move,
 }
 
 /// A mouse button the pointer events track (Unity's `InputButton`).

@@ -18,6 +18,7 @@ mod cells;
 mod console;
 mod discovery;
 mod eval;
+pub mod instances;
 mod lifecycle;
 mod loader;
 mod manager;

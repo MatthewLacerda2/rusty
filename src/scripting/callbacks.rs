@@ -97,6 +97,10 @@ pub const ON_DESELECT: &str = "OnDeselect";
 pub const ON_SUBMIT: &str = "OnSubmit";
 /// Escape was pressed while the entity is focused.
 pub const ON_CANCEL: &str = "OnCancel";
+/// An arrow key was pressed while the entity is focused (Unity's `IMoveHandler`):
+/// `(id, { direction, x, y })`. Defining it takes the arrows off navigation — focus
+/// stays put and the script moves it itself (`UI.FindSelectable`) if it wants.
+pub const ON_MOVE: &str = "OnMove";
 
 /// Every callback the engine dispatches — the ground truth the doc gate reads.
 pub const LIFECYCLE_CALLBACKS: &[&str] = &[
@@ -125,6 +129,7 @@ pub const LIFECYCLE_CALLBACKS: &[&str] = &[
     ON_DESELECT,
     ON_SUBMIT,
     ON_CANCEL,
+    ON_MOVE,
     ON_DISABLE,
     ON_DESTROY,
 ];

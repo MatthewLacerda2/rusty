@@ -42,6 +42,11 @@ impl Line {
         })
     }
 
+    /// The full advance, trailing spaces included — where a caret after the line sits.
+    pub fn advance(&self) -> f32 {
+        self.pens().last().map_or(0.0, |(x, it)| x + it.advance)
+    }
+
     /// The visible width: up to the end of the last non-whitespace item.
     pub fn width(&self) -> f32 {
         self.pens()

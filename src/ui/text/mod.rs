@@ -13,4 +13,4 @@ mod lines;
 mod measure;
 pub mod rich;
 
-pub use layout::{layout_text, preferred_size, PlacedGlyph, TextLayout};
+pub use layout::{layout_text, measure_string, preferred_size, PlacedGlyph, TextLayout};

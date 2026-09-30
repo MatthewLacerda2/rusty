@@ -2,7 +2,9 @@
 //!
 //! The single, discoverable home for creating objects, mirroring Unity's
 //! `GameObject` menu: **Create Empty**, **3D Object ▸** (Cube / Sphere / Plane /
-//! Cylinder) and **Light ▸** (Directional / Point / Spot). Object creation used to
+//! Cylinder), **UI ▸** (Canvas, Panel, Image, Text and the widget kit, #422 — via
+//! `ui_widgets::create_ui`, the path `UI.Create` takes) and **Light ▸**
+//! (Directional / Point / Spot). Object creation used to
 //! live in the Hierarchy toolbar (#255); it moved here so the Hierarchy does one
 //! job (show + select the tree).
 //!
@@ -14,6 +16,7 @@
 use egui_phosphor::regular as icon;
 
 use crate::editor::EditorUi;
+use crate::scene::authoring::ui_widgets::{self, UiWidget};
 use crate::scene::authoring::{self, Primitive};
 use crate::scene::Scene;
 
@@ -42,6 +45,17 @@ pub fn game_object_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
             }
         });
 
+        ui.menu_button(format!("{}  UI", icon::CURSOR_CLICK), |ui| {
+            for kind in UiWidget::ALL {
+                if ui.button(kind.label()).clicked() {
+                    let parent = editor.selected_entity_id;
+                    let id = ui_widgets::create_ui(scene, kind, parent);
+                    select_new(editor, id);
+                    ui.close_menu();
+                }
+            }
+        });
+
         ui.menu_button(format!("{}  Light", icon::LIGHTBULB), |ui| {
             for (label, glyph, primitive) in [
                 ("Directional Light", icon::SUN, Primitive::DirectionalLight),
@@ -61,6 +75,11 @@ pub fn game_object_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
 /// scene dirty — the exact effect the old Hierarchy "Create" button had.
 fn spawn(editor: &mut EditorUi, scene: &mut Scene, name: &str, primitive: Option<Primitive>) {
     let new_id = authoring::create_entity(scene, name, primitive);
+    select_new(editor, new_id);
+}
+
+/// Select a just-created entity and mark the scene dirty.
+fn select_new(editor: &mut EditorUi, new_id: u32) {
     editor.selected_entity_id = Some(new_id);
     editor.selected_asset_path = None; // entity selection is exclusive of asset selection
     editor.is_dirty = true;

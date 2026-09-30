@@ -11,6 +11,11 @@
 //!   focused rect's edge, scored `dot / distance²`), `None` stays put.
 //! - **Next / Previous** (Tab / Shift+Tab) cycle the candidates in draw order,
 //!   starting from the first (last) when nothing is focused.
+//! - A focused entity whose scripts define `OnMove` **takes the Move itself**
+//!   (Unity's `IMoveHandler` overriding `Selectable.OnMove`): it gets
+//!   `OnMove(id, event)` and focus stays put — a slider turns Left / Right into
+//!   value steps, an input field into caret moves. It navigates on its own with
+//!   `UI.FindSelectable` (the same [`find_selectable`] rule).
 //! - **Submit / Cancel** (Enter / Escape) fire `OnSubmit` / `OnCancel` on the
 //!   focused entity itself — they do not bubble, as in Unity.
 //!
@@ -22,9 +27,13 @@ use glam::Vec2;
 
 use super::pointer::emit;
 use super::tree::is_visible;
-use super::{accepts, is_interactable, Delivery, EventSystem, Frame, UiHook};
+use super::{
+    accepts, is_interactable, Delivery, EventSystem, Frame, PointerButton, PointerEvent, UiHook,
+};
 use crate::components::NavigationMode;
 use crate::core::input::InputState;
+use crate::ecs::World;
+use crate::ui::UiLayout;
 
 /// A logical navigation action.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -38,7 +47,7 @@ pub enum NavAction {
 }
 
 /// Unit directions in `select_on` order, y-up.
-const DIRECTIONS: [Vec2; 4] = [Vec2::Y, Vec2::NEG_Y, Vec2::NEG_X, Vec2::X];
+pub const DIRECTIONS: [Vec2; 4] = [Vec2::Y, Vec2::NEG_Y, Vec2::NEG_X, Vec2::X];
 
 /// This tick's navigation actions from the keyboard, in a fixed order.
 pub fn nav_actions(input: &InputState) -> Vec<NavAction> {
@@ -93,7 +102,12 @@ impl EventSystem {
         for action in nav_actions(f.input) {
             match action {
                 NavAction::Move(dir) => {
-                    if let Some(to) = self.selected.and_then(|s| move_target(f, s, dir)) {
+                    let Some(s) = self.selected else { continue };
+                    if (f.handles)(s, UiHook::Move) {
+                        if accepts(f.world, s) {
+                            emit(f, out, s, UiHook::Move, Some(move_event(s, dir)));
+                        }
+                    } else if let Some(to) = find_selectable(f.world, f.layout, s, dir) {
                         self.select(f, Some(to), out);
                     }
                 }
@@ -117,42 +131,56 @@ impl EventSystem {
     }
 }
 
+/// The `OnMove` event: the direction as a unit `delta` (Unity's `AxisEventData`).
+fn move_event(id: u32, dir: usize) -> PointerEvent {
+    PointerEvent {
+        button: PointerButton::Left,
+        position: Vec2::splat(-1.0),
+        delta: DIRECTIONS[dir],
+        target: Some(id),
+    }
+}
+
 /// Visible, interactable, navigable Selectables, in draw order.
-fn candidates(f: &Frame) -> Vec<u32> {
-    f.layout
+fn candidates(world: &World, layout: &UiLayout) -> Vec<u32> {
+    layout
         .iter()
         .map(|(id, _)| id)
         .filter(|&id| {
-            f.world
+            world
                 .selectable(id)
                 .is_some_and(|s| s.navigation != NavigationMode::None)
-                && is_visible(f.world, id)
-                && is_interactable(f.world, id)
+                && is_visible(world, id)
+                && is_interactable(world, id)
         })
         .collect()
 }
 
-/// Where a Move in `dir` from `from` lands, per `from`'s navigation mode.
-fn move_target(f: &Frame, from: u32, dir: usize) -> Option<u32> {
-    let mode = f.world.selectable(from)?.navigation;
+/// Where a Move in `dir` (`select_on` order) from `from` lands, per `from`'s
+/// navigation mode — Unity's `Selectable.FindSelectableOn*`.
+pub fn find_selectable(world: &World, layout: &UiLayout, from: u32, dir: usize) -> Option<u32> {
+    let mode = world.selectable(from)?.navigation;
     match mode {
         NavigationMode::None => None,
         NavigationMode::Explicit => {
-            let to = f.world.selectable(from)?.select_on[dir]?;
-            is_visible(f.world, to).then_some(to)
+            let to = world.selectable(from)?.select_on[dir]?;
+            is_visible(world, to).then_some(to)
         }
-        NavigationMode::Automatic => by_geometry(f, from, DIRECTIONS[dir]),
+        NavigationMode::Automatic => by_geometry(world, layout, from, DIRECTIONS[dir]),
     }
 }
 
 /// Unity's automatic navigation: from the focused rect's edge in `dir`, the
 /// candidate centre maximizing `dot(dir, v) / |v|²` among those in front of it.
-fn by_geometry(f: &Frame, from: u32, dir: Vec2) -> Option<u32> {
-    let (lo, hi) = f.layout.get(from)?.screen_bounds();
+fn by_geometry(world: &World, layout: &UiLayout, from: u32, dir: Vec2) -> Option<u32> {
+    let (lo, hi) = layout.get(from)?.screen_bounds();
     let origin = (lo + hi) * 0.5 + dir * (hi - lo) * 0.5;
     let mut best: Option<(f32, u32)> = None;
-    for id in candidates(f).into_iter().filter(|&id| id != from) {
-        let Some(rect) = f.layout.get(id) else {
+    for id in candidates(world, layout)
+        .into_iter()
+        .filter(|&id| id != from)
+    {
+        let Some(rect) = layout.get(id) else {
             continue;
         };
         let (clo, chi) = rect.screen_bounds();
@@ -171,7 +199,7 @@ fn by_geometry(f: &Frame, from: u32, dir: Vec2) -> Option<u32> {
 
 /// The next (or previous) candidate after `from` in draw order, wrapping.
 fn cycle(f: &Frame, from: Option<u32>, forward: bool) -> Option<u32> {
-    let all = candidates(f);
+    let all = candidates(f.world, f.layout);
     let n = all.len();
     if n == 0 {
         return None;

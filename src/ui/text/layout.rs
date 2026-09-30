@@ -91,6 +91,18 @@ pub fn preferred_size(text: &TextComponent, width: f32) -> Vec2 {
     Vec2::new(w, block_height(&lines, text.line_spacing))
 }
 
+/// `s` in `text`'s font and size, unwrapped and plain: `x` the widest line's full
+/// advance (trailing spaces count — a caret goes after them), `y` the block height.
+pub fn measure_string(text: &TextComponent, s: &str) -> Vec2 {
+    let mut plain = text.clone();
+    plain.text = s.to_string();
+    plain.rich_text = false;
+    let measurer = Measurer::new(&plain, plain.font_size);
+    let lines = break_lines(&measurer.items(), None, measurer.base_metrics());
+    let w = lines.iter().map(Line::advance).fold(0.0, f32::max);
+    Vec2::new(w, block_height(&lines, plain.line_spacing))
+}
+
 fn wrap(text: &TextComponent, measurer: &Measurer, width: f32) -> Vec<Line> {
     let max = text.wrap.then_some(width);
     break_lines(&measurer.items(), max, measurer.base_metrics())

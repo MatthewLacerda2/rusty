@@ -15,6 +15,12 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.RemoveComponent` | `(id, kind)` | `true` if the entity exists |
 | `Scene.SetParent` | `(id, parent_id)` | — (errors on a parenting cycle) |
 | `Scene.ClearParent` | `(id)` | — |
+| `Scene.SetActive` | `(id, active)` | `true` if an entity existed at `id` — Unity's `SetActive`; its callbacks follow the edge (`OnEnable` / `OnDisable`) |
+| `Scene.IsActive` | `(id)` | the entity's own `active` flag (`false` for a missing id; an inactive ancestor still hides it) |
+| `Scene.GetParent` | `(id)` | the parent's `id`, or `nil` |
+| `Scene.GetChildren` | `(id)` | array of child ids, in hierarchy order |
+| `Scene.FindChild` | `(id, path)` | the descendant at name path `path` (`"Viewport/Content"`), or `nil` |
+| `Scene.GetScript` | `(id, name)` | the entity's live script instance named `name`, or `nil` — see below |
 | `Scene.Save` | `([path])` | the written path |
 | `Scene.Load` | `(path)` | — (errors, naming `path`, if there is no file there) |
 | `Scene.GetActivePath` | `()` | the current scene file, or `nil` |
@@ -28,6 +34,18 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.ApplyPrefabToSource` | `(instanceRootId)` | count of entities written back into the `.prefab` |
 | `Scene.ApplyPrefabFieldToSource` | `(entityId, jsonPointer)` | — (writes one leaf to the `.prefab`) |
 | `Scene.ListPrefabOverrides` | `(instanceRootId)` | array of `"localId:json-pointer"` strings |
+
+**Hierarchy reads (#422).** `FindChild` walks one level per `/`-separated
+segment, taking the first child with that name in hierarchy order — Unity's
+`transform.Find`. A widget script finds its own parts this way (a slider's
+`"Handle Slide Area/Handle"`), so nothing stores an id a prefab stamp would
+invalidate. `GetScript(id, name)` is Unity's `GetComponent<T>()` for script
+components: `name` is the script's file stem (`"button"` for `button.lua`), and the
+result is the very table the script's callbacks run on — so an owning script reads
+a widget's state and hands it callbacks (`Scene.GetScript(b, "button").on_click =
+function(id) … end`). It is `nil` outside play, and for an entity spawned this tick
+until its scripts load at the head of the next (see the spawn note in
+[`index.md`](index.md)).
 
 **`primitive`** (optional) is one of the GameObject menu's primitives,
 case-insensitive: `Box`, `Sphere`, `Plane`, `Cylinder` (meshes) or `PointLight`,
