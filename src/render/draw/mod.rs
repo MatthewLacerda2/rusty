@@ -103,12 +103,7 @@ impl Renderer {
             let frame = ScenePassFrame {
                 editor_mode,
                 clear: PassClear::for_pass(idx == 0, cam.clear_flags),
-                ssao: ssao.map(|plan| SsaoFrame {
-                    plan,
-                    view_proj,
-                    camera_pos: cam.position,
-                    camera_forward: cam.forward(),
-                }),
+                ssao: ssao.map(|plan| SsaoFrame::for_camera(plan, view_proj, cam)),
             };
             self.execute_scene_pass(view, frame, &solids.draws.opaque, &overlays);
 

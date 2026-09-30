@@ -124,12 +124,7 @@ impl Renderer {
         // Set global bindings
         render_pass.set_pipeline(view.forward_pipeline(&self.render_pipeline));
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
-        // Group 3 carries this view's AO when the SSAO passes ran, else the white one.
-        let group3 = match (&frame.ssao, &view.ssao) {
-            (Some(_), Some(targets)) => &targets.forward_group,
-            _ => &self.shadow_bind_group,
-        };
-        render_pass.set_bind_group(3, group3, &[]);
+        render_pass.set_bind_group(3, self.scene_group3(view, frame.ssao.is_some()), &[]);
         // Solid entities, then the editor selection outline.
         self.draw_batches(&mut render_pass, solid_batches);
         if editor_mode {

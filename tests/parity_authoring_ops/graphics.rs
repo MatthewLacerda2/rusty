@@ -73,6 +73,25 @@ fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
     camera_ops::set_fxaa_active(&mut cam, false);
 }
 
+/// The `Graphics.*` writes the parity test drives, mirrored by `apply_graphics_ops`.
+const GRAPHICS_SCRIPT: &str = r#"
+Graphics.SetBloomActive(true)
+Graphics.SetBloomIntensity(-3.0)
+Graphics.SetGamma(-5.0)
+Graphics.SetTonemap("reinhard")
+Graphics.SetSsrActive(true)
+Graphics.SetSsrQuality("High")
+Graphics.SetShadowCascades(9)
+Graphics.SetShadowDistance(60)
+Graphics.SetSsaoRadius(-1)
+Graphics.SetSsaoIntensity(9)
+Graphics.SetSsaoActive(false)
+assert(Graphics.GetSsaoIntensity() == 4 and not Graphics.GetSsaoActive())
+Graphics.SetMotionBlurActive(true)
+Graphics.SetMotionBlurSamples(16)
+Graphics.SetFxaaActive(false)
+"#;
+
 #[test]
 fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
     // `Graphics.*` drives the active entity's visual-correction + camera-motion-blur
@@ -85,27 +104,7 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     let lua = Lua::new();
     lua.scope(|s| {
         rusty::api::graphics::register(&lua, s, &lua_scene, &quality).unwrap();
-        lua.load(
-            r#"
-            Graphics.SetBloomActive(true)
-            Graphics.SetBloomIntensity(-3.0)
-            Graphics.SetGamma(-5.0)
-            Graphics.SetTonemap("reinhard")
-            Graphics.SetSsrActive(true)
-            Graphics.SetSsrQuality("High")
-            Graphics.SetShadowCascades(9)
-            Graphics.SetShadowDistance(60)
-            Graphics.SetSsaoRadius(-1)
-            Graphics.SetSsaoIntensity(9)
-            Graphics.SetSsaoActive(false)
-            assert(Graphics.GetSsaoIntensity() == 4 and not Graphics.GetSsaoActive())
-            Graphics.SetMotionBlurActive(true)
-            Graphics.SetMotionBlurSamples(16)
-            Graphics.SetFxaaActive(false)
-        "#,
-        )
-        .exec()
-        .unwrap();
+        lua.load(GRAPHICS_SCRIPT).exec().unwrap();
         Ok(())
     })?;
 

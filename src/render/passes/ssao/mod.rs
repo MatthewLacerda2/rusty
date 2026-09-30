@@ -29,7 +29,7 @@ use glam::{Mat4, Vec3};
 
 use crate::components::SsaoSettings;
 use crate::core::quality::{QualityPreset, SsaoTier};
-use crate::scene::Scene;
+use crate::scene::{Camera, Scene};
 
 /// The occlusion and blur targets' format: one unorm channel is all AO needs.
 pub(crate) const AO_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R8Unorm;
@@ -94,6 +94,16 @@ pub(crate) struct SsaoFrame {
 }
 
 impl SsaoFrame {
+    /// `plan` for `camera`, drawn with `view_proj`.
+    pub(crate) fn for_camera(plan: SsaoPlan, view_proj: Mat4, camera: &Camera) -> Self {
+        Self {
+            plan,
+            view_proj,
+            camera_pos: camera.position,
+            camera_forward: camera.forward(),
+        }
+    }
+
     /// The uniform the occlusion and blur passes read.
     pub(crate) fn uniform(&self) -> SsaoUniform {
         let s = self.plan.settings;

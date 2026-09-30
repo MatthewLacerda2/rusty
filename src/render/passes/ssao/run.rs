@@ -43,6 +43,19 @@ impl Renderer {
         c.ssao_samples += u64::from(w) * u64::from(h) * u64::from(frame.plan.tier.samples);
     }
 
+    /// The forward pass's group 3 for `view`: its AO when the SSAO passes ran this
+    /// camera (`ran`), else the white no-AO group.
+    pub(crate) fn scene_group3<'a>(
+        &'a self,
+        view: &'a RenderView,
+        ran: bool,
+    ) -> &'a wgpu::BindGroup {
+        match (ran, &view.ssao) {
+            (true, Some(targets)) => &targets.forward_group,
+            _ => &self.shadow_bind_group,
+        }
+    }
+
     /// The solids' depth alone into `depth`, through the forward vertex stage.
     fn record_prepass(
         &self,
