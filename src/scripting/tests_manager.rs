@@ -122,3 +122,15 @@ fn play_state_cell_drives_debug_snapshot_play_state() {
         "the cell handle must alias the flag the snapshot reads"
     );
 }
+
+#[test]
+fn injected_cells_are_the_ones_handed_back() {
+    let mut mgr = make_manager();
+    let path = Rc::new(RefCell::new(Some("a.scene".to_string())));
+    mgr.set_scene_path_cell(Rc::clone(&path));
+    assert!(Rc::ptr_eq(&mgr.scene_path_cell(), &path));
+    let audio = Rc::new(RefCell::new(crate::audio::AudioMaestro::default()));
+    mgr.set_audio_cell(Rc::clone(&audio));
+    assert!(Rc::ptr_eq(&mgr.audio_cell(), &audio));
+    assert_eq!(mgr.live_script_count(), 0, "no runtime, no scripts");
+}

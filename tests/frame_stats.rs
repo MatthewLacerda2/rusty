@@ -102,3 +102,14 @@ fn a_scenario_asserts_budgets_through_the_harness_table() {
     assert_eq!(passed, [true, true, true, false]);
     let _ = std::fs::remove_dir_all(dir);
 }
+
+#[test]
+fn scripts_counts_every_live_script_instance() {
+    let out = std::env::temp_dir().join(format!("rusty_stats_scripts_{}", std::process::id()));
+    let h = Harness::new(&out, rusty::dev::scenario::DEFAULT_BOT_SCRIPT);
+    h.step(2);
+    // The demo scene's player controller plus the enemy brain.
+    let scripts = h.stats.borrow().get("scripts").map(|s| s.last);
+    assert_eq!(scripts, Some(2.0));
+    let _ = std::fs::remove_dir_all(out);
+}
