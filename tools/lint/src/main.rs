@@ -5,7 +5,7 @@
 //! the per-file / per-test-file size rules. Dependency-free, std-only.
 //!
 //! Usage:
-//!   cargo run --manifest-path tools/lint/Cargo.toml            # scan src/, minus baseline
+//!   cargo run --manifest-path tools/lint/Cargo.toml            # scan SCAN_ROOTS, minus baseline
 //!   cargo run --manifest-path tools/lint/Cargo.toml -- a.rs b.rs   # check just these files
 //!
 //! Output: result to stdout and `.lint/report.txt`; exit code 1 on any violation.
@@ -24,6 +24,9 @@ const MAX_FILE_LINES: usize = 300;
 /// bundle several `#[test]` fns plus fixtures, and over-splitting them hurts
 /// readability more than it helps.
 const MAX_TEST_FILE_LINES: usize = 150;
+/// The directories the full scan walks: the engine, its integration suite, and the
+/// fuzz targets (#535). `tools/` is a separate dev-tool crate and is not scanned yet.
+const SCAN_ROOTS: &[&str] = &["src", "tests", "fuzz"];
 const BASELINE: &str = "tools/lint/baseline.txt";
 const REPORT: &str = ".lint/report.txt";
 
@@ -61,8 +64,11 @@ fn main() {
         return;
     }
 
-    let files = if args.is_empty() {
-        scan_dir(Path::new("src"))
+    let files: Vec<PathBuf> = if args.is_empty() {
+        SCAN_ROOTS
+            .iter()
+            .flat_map(|root| scan_dir(Path::new(root)))
+            .collect()
     } else {
         args.iter().map(PathBuf::from).collect()
     };
@@ -253,6 +259,23 @@ mod tests {
         );
         // The standalone `_test.rs` (singular) form still gets the tight cap.
         assert_eq!(limit_for(Path::new("src/bar_test.rs")), MAX_TEST_FILE_LINES);
+    }
+
+    #[test]
+    fn full_scan_flags_an_oversized_integration_test() {
+        // #535: the full scan once walked only `src/`, so `tests/` files over the
+        // tight cap passed unseen. Pin that `tests/` is a root and that a scanned
+        // file there over [`MAX_TEST_FILE_LINES`] is a violation.
+        assert!(SCAN_ROOTS.contains(&"tests"));
+        let root = std::env::temp_dir().join(format!("rusty-lint-535-{}", std::process::id()));
+        let file = root.join("tests").join("too_long.rs");
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(&file, "//\n".repeat(MAX_TEST_FILE_LINES + 1)).unwrap();
+        let found = scan_dir(&root.join("tests"));
+        let flagged = found.iter().filter_map(|p| check_file(p)).count();
+        fs::remove_dir_all(&root).ok();
+        assert_eq!(found, vec![file]);
+        assert_eq!(flagged, 1, "a tests/ file over the cap must fail the scan");
     }
 
     #[test]

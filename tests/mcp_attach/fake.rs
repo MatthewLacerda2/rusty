@@ -1,8 +1,4 @@
-//! MCP attach-mode bridge end-to-end (#307).
-//! Gated on `dev`. Drives `rusty::dev::mcp::run` with the `SocketClient` backend against
-//! a *fake engine* — a listener speaking the #282 framed line protocol — asserting that
-//! tool calls are forwarded over the socket and the framed replies are mapped to MCP
-//! results. No real world is booted; the fake engine stands in for a running window.
+//! The fake engine: a listener speaking the #282 framed line protocol, plus the driver.
 
 use std::io::{BufRead, BufReader, Write};
 use std::thread;
@@ -54,7 +50,7 @@ fn serve<S: Dup>(stream: S) {
 /// `SocketClient::new`. The accept loop handles one connection at a time — all the
 /// per-call-connecting client needs.
 #[cfg(unix)]
-fn fake_engine() -> String {
+pub(super) fn fake_engine() -> String {
     use std::os::unix::net::UnixListener;
     use std::sync::atomic::{AtomicU32, Ordering};
     // Cargo runs the tests in one process, so a process-id path would collide between
@@ -73,7 +69,7 @@ fn fake_engine() -> String {
     path.display().to_string()
 }
 #[cfg(windows)]
-fn fake_engine() -> String {
+pub(super) fn fake_engine() -> String {
     use std::net::TcpListener;
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind fake engine");
     let addr = listener.local_addr().unwrap().to_string();
@@ -87,7 +83,7 @@ fn fake_engine() -> String {
 
 /// Drive JSON-RPC lines through the attach backend against `addr` and parse the
 /// response lines.
-fn drive(addr: String, lines: &[&str]) -> Vec<Value> {
+pub(super) fn drive(addr: String, lines: &[&str]) -> Vec<Value> {
     let backend = SocketClient::new(Some(addr));
     let input = lines.join("\n").into_bytes();
     let mut out = Vec::new();
@@ -97,56 +93,4 @@ fn drive(addr: String, lines: &[&str]) -> Vec<Value> {
         .lines()
         .map(|l| serde_json::from_str(l).expect("each response line is JSON"))
         .collect()
-}
-
-#[test]
-fn eval_is_forwarded_over_the_socket_and_the_reply_is_mapped() {
-    let out = drive(
-        fake_engine(),
-        &[
-            r#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"eval","arguments":{"line":"Scene.CreateEntity(\"Widget\",\"Box\")"}}}"#,
-        ],
-    );
-    assert_eq!(out[0]["result"]["isError"], false);
-    // The fake engine echoes the forwarded line back, proving the exact Lua line
-    // crossed the socket.
-    assert_eq!(
-        out[0]["result"]["content"][0]["text"],
-        "Scene.CreateEntity(\"Widget\",\"Box\")"
-    );
-}
-
-#[test]
-fn multiple_calls_each_reconnect_and_succeed() {
-    let out = drive(
-        fake_engine(),
-        &[
-            r#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"eval","arguments":{"line":"a"}}}"#,
-            r#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"eval","arguments":{"line":"b"}}}"#,
-        ],
-    );
-    assert_eq!(out[0]["result"]["content"][0]["text"], "a");
-    assert_eq!(out[1]["result"]["content"][0]["text"], "b");
-}
-
-#[test]
-fn resources_read_works_without_any_engine() {
-    // The scripting-API resource is embedded, so attach mode serves it even with no
-    // window running — you can read the API doc before opening the engine.
-    let bogus = if cfg!(windows) {
-        "127.0.0.1:1".to_string()
-    } else {
-        std::env::temp_dir()
-            .join("rusty-attach-noengine.sock")
-            .display()
-            .to_string()
-    };
-    let out = drive(
-        bogus,
-        &[
-            r#"{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"rusty://scripting-api.md"}}"#,
-        ],
-    );
-    let text = out[0]["result"]["contents"][0]["text"].as_str().unwrap();
-    assert!(text.contains("# Scripting API reference"));
 }

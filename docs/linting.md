@@ -29,6 +29,13 @@ from *two* places. To keep cohesion, a `<x>_tests.rs` **sibling** shares its sou
 300-line cap (source + sibling read as one logical unit); the standalone `*_test.rs`
 (singular), `tests/`, and `fixtures/` forms keep the tight 150-line cap (#211).
 
+## What the size gate scans
+The full scan (`make size`, CI's `lint` job) walks `src/`, `tests/` and `fuzz/`
+(`SCAN_ROOTS` in `tools/lint/src/main.rs`); until #535 it walked only `src/`, so
+oversized integration-test files passed unseen. `tools/` is not scanned yet: it is a
+separate dev-tool crate and still holds a file over the source cap. The commit hook
+checks whatever `.rs` files are staged, wherever they live.
+
 ## Run it
 ```
 make gates     # everything CI blocks on, fastest-failing first
