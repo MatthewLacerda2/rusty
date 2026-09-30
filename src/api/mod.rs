@@ -4,7 +4,7 @@
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
 //! `Scene`, `Random`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
 //! `Assets`, `Texture`, `Shader`, `Sound`, `Particles`, `Layers`, `Graphics`, `Video`,
-//! `Storage`, `Canvas`, `RectTransform`, `UI`, plus the dev-only `Debug`)
+//! `Storage`, `Canvas`, `RectTransform`, `UI`, `Application`, plus the dev-only `Debug`)
 //! is registered from this tree onto the live Lua runtime.
 //! `scripting`
 //! owns the runtime and lifecycle; `api` owns the surface. One surface, three
@@ -14,6 +14,7 @@
 //! asset (for the `Assets` manifest).
 
 pub mod animator;
+pub mod application;
 pub mod assets;
 pub mod audio;
 pub mod camera;
@@ -53,6 +54,7 @@ use std::cell::RefCell;
 use mlua::{Function, Lua, Table};
 
 use crate::audio::AudioMaestro;
+use crate::core::application::Application;
 use crate::core::input::InputState;
 use crate::core::quality::QualityPreset;
 use crate::core::random::Random;
@@ -107,6 +109,9 @@ pub struct ApiScopedCtx<'scope> {
     /// The screen the UI lays out on (#417); resolved against `video` when no
     /// platform reported a game-view size (headless).
     pub screen: &'scope RefCell<ScreenSize>,
+    /// Build settings + the quit request (#431): `Application.Quit` raises the flag
+    /// the host (player / editor / harness) reads after the tick.
+    pub application: &'scope RefCell<Application>,
 }
 
 /// Register every namespace onto `lua` using `scope`-tied closures that borrow
@@ -156,6 +161,7 @@ pub fn register<'lua, 'scope>(
     video::register(lua, scope, ctx.video)?;
     storage::register(lua, scope, ctx.storage)?;
     input::register_writable(lua, scope, ctx.input)?;
+    application::register(lua, scope, ctx.application)?;
     #[cfg(feature = "dev")]
     debug::register(lua, scope, ctx)?;
     Ok(())

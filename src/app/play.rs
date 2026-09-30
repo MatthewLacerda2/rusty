@@ -47,6 +47,27 @@ impl GameWorld {
         }
     }
 
+    /// Boot straight into Play, the way the standalone player runs a game (#431):
+    /// no edit snapshot is taken (there is no edit mode to return to) and Play is
+    /// requested at once, so the next `tick` enters it and reports
+    /// [`PlayTransition::Entered`](super::PlayTransition::Entered) like the editor's
+    /// Play button would.
+    pub fn boot_standalone(&mut self) {
+        self.resources.standalone = true;
+        self.set_playing(true);
+    }
+
+    /// Whether the game called `Application.Quit()` and no host has consumed it yet.
+    pub fn quit_requested(&self) -> bool {
+        self.resources.application.borrow().quit_requested()
+    }
+
+    /// Consume a pending `Application.Quit()`: `true` exactly once per call. The host
+    /// decides what it means (the player exits, the editor stops Play).
+    pub fn take_quit_request(&mut self) -> bool {
+        self.resources.application.borrow_mut().take_quit_request()
+    }
+
     /// Run the one-shot `Startup` stage now that the Play session is fully set
     /// up. No built-in module registers Startup systems yet; this is the wired
     /// hook modules will register into (Unity's `Start`).
@@ -191,3 +212,7 @@ fn animate(world: &mut World, res: &mut Resources) {
         });
     }
 }
+
+#[cfg(test)]
+#[path = "standalone_tests.rs"]
+mod standalone_tests;

@@ -61,6 +61,8 @@ mod video_api;
 #[cfg(feature = "dev")]
 mod api_doc_drift;
 #[cfg(feature = "dev")]
+mod application_quit;
+#[cfg(feature = "dev")]
 mod bot_player_session;
 #[cfg(feature = "dev")]
 mod harness_determinism;

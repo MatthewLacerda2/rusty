@@ -1,0 +1,5 @@
+{
+  "startup_scene": "project/scenes/default.scene",
+  "product_name": "rusty game",
+  "window_mode": "Windowed"
+}

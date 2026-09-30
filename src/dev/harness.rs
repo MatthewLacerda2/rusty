@@ -37,6 +37,19 @@ pub struct Expectation {
     pub frame: u64,
 }
 
+/// Advance `world` one fixed tick unless the game has called `Application.Quit()`.
+///
+/// Quit **ends a headless run** (#431): once requested, every further step is a no-op,
+/// so a scenario's remaining observations read the state the game quit in and
+/// `results.json` records `"quit": true`. Returns whether a tick ran.
+pub fn tick_unless_quit(world: &mut GameWorld) -> bool {
+    if world.quit_requested() {
+        return false;
+    }
+    world.tick(FIXED_DT);
+    true
+}
+
 /// The headless harness: owns the world and the run record.
 pub struct Harness {
     pub world: Rc<RefCell<GameWorld>>,
@@ -89,11 +102,13 @@ impl Harness {
         }
     }
 
-    /// Advance the simulation by exactly `n` fixed ticks.
+    /// Advance the simulation by exactly `n` fixed ticks, or fewer if the game quits.
     pub fn step(&self, n: u32) {
         let mut world = self.world.borrow_mut();
         for _ in 0..n {
-            world.tick(FIXED_DT);
+            if !tick_unless_quit(&mut world) {
+                break;
+            }
         }
     }
 
@@ -175,6 +190,7 @@ impl Harness {
             .collect();
         let results = json!({
             "frames": self.frame(),
+            "quit": self.world.borrow().quit_requested(),
             "passed": self.all_passed(),
             "expectations": expects,
             "logs": self.logs,

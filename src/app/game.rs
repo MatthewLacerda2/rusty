@@ -224,7 +224,10 @@ impl GameWorld {
             audio.clear_log();
         }
         // Snapshot the edit scene so Stop can restore it, discarding play-mode mutations.
-        self.resources.edit_snapshot = Some(SceneSnapshot::capture(&self.world.scene.borrow()));
+        // A standalone run has no edit mode to return to (#431).
+        if !self.resources.standalone {
+            self.resources.edit_snapshot = Some(SceneSnapshot::capture(&self.world.scene.borrow()));
+        }
         self.snap_camera_to_player();
         self.resources
             .console

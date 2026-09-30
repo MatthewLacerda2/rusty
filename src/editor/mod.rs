@@ -1,6 +1,7 @@
 use std::fs;
 
 pub mod bottom_panel;
+pub mod build_settings;
 mod content_browser;
 mod content_grid;
 pub mod header;
@@ -57,6 +58,9 @@ pub struct EditorUi {
 
     /// Whether the About dialog (File-bar → About) is currently open.
     pub show_about: bool,
+    /// Whether the File → Build Settings window is open, and its unsaved draft (#431).
+    pub show_build_settings: bool,
+    pub build_settings_draft: Option<crate::core::application::BuildSettings>,
 
     /// Whether each dockable panel is expanded. Collapsing shrinks the panel to a
     /// thin rail with a caret that brings it back. Pure runtime UI state.
@@ -142,6 +146,8 @@ impl EditorUi {
             active_bottom_tab: "assets".to_string(),
             asset_search: String::new(),
             show_about: false,
+            show_build_settings: false,
+            build_settings_draft: None,
             hierarchy_open: true,
             inspector_open: true,
             bottom_open: true,

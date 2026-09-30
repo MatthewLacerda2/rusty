@@ -59,7 +59,7 @@ fn draw_menu_bar(
     });
 }
 
-/// The File menu — scene lifecycle (new / reset / load / save).
+/// The File menu — scene lifecycle (new / reset / load / save) and Build Settings.
 fn file_menu(
     editor: &mut EditorUi,
     ui: &mut egui::Ui,
@@ -90,6 +90,14 @@ fn file_menu(
             .clicked()
         {
             save_scene(editor, scene, console);
+            ui.close_menu();
+        }
+        ui.separator();
+        if ui
+            .button(format!("{}  Build Settings", icon::PACKAGE))
+            .clicked()
+        {
+            editor.show_build_settings = true;
             ui.close_menu();
         }
     });
