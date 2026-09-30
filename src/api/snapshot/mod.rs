@@ -1,4 +1,4 @@
-//! src/api/snapshot.rs — the structured scene-read ("what the agent sees").
+//! src/api/snapshot/mod.rs — the structured scene-read ("what the agent sees").
 //!
 //! The read half of the editor↔API parity surface (#180, epic #176). It turns the
 //! **live** world into a stable, diffable JSON document rich enough to *author*
@@ -15,18 +15,23 @@
 use glam::{Mat4, Vec2, Vec3};
 use serde_json::{json, Value};
 
-use super::snapshot_components::{
-    animator_value, audio_value, camera_component_value, canvas_group_value, canvas_value,
-    collider_value, image_value, light_value, material_value, mesh_value, nav_agent_value,
-    particle_value, rect_mask_value, rect_transform_value, rigidbody_value, selectable_value,
-    text_value,
-};
+mod components;
+mod ui;
+
 use crate::components::TransformComponent;
 use crate::ecs::World;
 use crate::scene::Camera;
 use crate::scene::Scene;
+use components::{
+    animator_value, audio_value, camera_component_value, collider_value, light_value,
+    material_value, mesh_value, nav_agent_value, particle_value, rigidbody_value,
+};
+use ui::{
+    canvas_group_value, canvas_value, image_value, rect_mask_value, rect_transform_value,
+    selectable_value, text_value,
+};
 
-/// A `glam::Vec3` as a `[x, y, z]` JSON array. Shared with `snapshot_components`.
+/// A `glam::Vec3` as a `[x, y, z]` JSON array. Shared with the `components` and `ui` builders.
 pub(crate) fn vec3(v: Vec3) -> Value {
     json!([v.x, v.y, v.z])
 }

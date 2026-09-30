@@ -45,7 +45,6 @@ pub mod scene_prefab;
 pub mod selectable;
 pub mod shader;
 pub mod snapshot;
-mod snapshot_components;
 pub mod sound;
 pub mod storage;
 pub mod text;
