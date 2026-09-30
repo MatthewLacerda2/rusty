@@ -54,6 +54,23 @@ impl ParticleEmitterComponent {
         } else {
             self.color.sample(rng.value() as f32)
         };
+        // Render extras (#440) draw only when the settings use them, so an emitter
+        // that doesn't keeps its seeded stream — and its replays — unchanged.
+        let start_frame = if self.render.wants_start_frame() {
+            let frames = self.render.flipbook.frames();
+            ((rng.value() * f64::from(frames)) as u32).min(frames - 1)
+        } else {
+            0
+        };
+        let axis = if self.render.wants_axis() {
+            // Uniform on the sphere: z uniform in [-1, 1], azimuth uniform.
+            let z = signed(rng);
+            let phi = rng.value() as f32 * std::f32::consts::TAU;
+            let r = (1.0 - z * z).max(0.0).sqrt();
+            Vec3::new(r * phi.cos(), r * phi.sin(), z)
+        } else {
+            Vec3::Y
+        };
         Particle {
             position: origin + offset,
             velocity: dir * speed,
@@ -62,6 +79,8 @@ impl ParticleEmitterComponent {
             size,
             rotation,
             color,
+            start_frame,
+            axis,
         }
     }
 

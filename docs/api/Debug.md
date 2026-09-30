@@ -68,13 +68,14 @@ print(s.frames, s.fixed_update_ms.avg, s.systems.update_scripts.max, s.entities.
 | `fixed_update_ms` / `update_ms` / `late_update_ms` / `render_stage_ms` | CPU ms per schedule stage. `render_stage_ms` is the `Render` *stage* (draw-data prep), not the GPU |
 | `systems.<name>` | CPU ms per registered system (`update_scripts`, `step_physics`, `tick_nav`, …) |
 | `entities` / `rigid_bodies` / `nav_agents` / `particles` / `scripts` | world counters: live entities, RigidBody components, NavMeshAgents, live particles, loaded script instances |
-| `draw_calls` | geometry draw calls: solids, transparents, shadow casters, the SSAO depth prepass, decals, particle batches, UI batches (post-FX and skybox excluded). Copies of one mesh + material are **one instanced call** (#470), so this tracks distinct looks, not entity count |
+| `draw_calls` | geometry draw calls: solids (mesh particles among them), transparents, shadow casters, the SSAO depth prepass, decals, sprite-particle batches, UI batches (post-FX and skybox excluded). Copies of one mesh + material are **one instanced call** (#470), so this tracks distinct looks, not entity count |
 | `triangles` | triangles submitted by the solid, transparent, shadow and SSAO-prepass draws, every instance counted |
 | `visible_entities` / `culled_entities` | mesh entities drawn / skipped by the frustum cull, summed over the camera stack |
 | `lod_hidden_entities` | mesh entities skipped because their `LODGroup` showed another level (#472), summed over the camera stack |
 | `lights` / `lights_dropped` | active lights, and those the forward uniform had no slot for (past 4 point lights, or a 2nd directional/spot/ambient) — silently unlit |
 | `shadow_draws` / `ui_draws` | shadow-caster draw calls (one per caster mesh, instanced, #470) / UI batches |
 | `ssao_samples` | depth taps the SSAO pass traced (occlusion texels × the tier's samples, #436); `0` when AO is off or on the Low tier |
+| `particles_drawn` | particles the renderer drew — sprite instances plus mesh particles, summed over the camera stack (#440). Their draws are in `draw_calls`: one per merged sprite batch, one per instanced run of mesh particles |
 | `renderer_ms` | CPU ms `Renderer::render` took to record the frame |
 
 Keys ending in `_ms` are **wall-clock** and differ run to run; everything else is a

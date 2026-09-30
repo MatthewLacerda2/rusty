@@ -2,7 +2,8 @@
 // the forward, shadow, skybox, particle and decal passes via `#import "common"`.
 
 // The scene's distance + height fog (#437). Mirrors the Rust `FogUniform`
-// byte-for-byte. `mode`: 0 off, 1 linear, 2 exponential, 3 exponential².
+// byte-for-byte (naga_oil rejects imported names ending `_<digit>`, hence `_pad_a`).
+// `mode`: 0 off, 1 linear, 2 exponential, 3 exponential².
 struct Fog {
     color: vec3<f32>,
     mode: u32,
@@ -22,6 +23,63 @@ struct CameraUniforms {
     _pad: f32,
     // Rides with the camera so every pass that already binds it fogs for free.
     fog: Fog,
+};
+
+// The forward lighting uniform (group 0, binding 1) and its light records. Shared
+// so every pass that shades against the scene lights — the forward pass and lit
+// particles (#440) — reads the one layout. Mirrors the Rust `LightingUniform`.
+struct AmbientLight {
+    color: vec3<f32>,
+    intensity: f32,
+};
+
+struct DirectionalLight {
+    direction: vec3<f32>,
+    color: vec3<f32>,
+    intensity: f32,
+    _pad: f32,
+};
+
+struct PointLight {
+    position: vec3<f32>,
+    color: vec3<f32>,
+    intensity: f32,
+    range: f32,
+};
+
+struct Spotlight {
+    position: vec3<f32>,
+    direction: vec3<f32>,
+    color: vec3<f32>,
+    intensity: f32,
+    range: f32,
+    inner_cone: f32, // Cosine of inner angle
+    outer_cone: f32, // Cosine of outer angle
+};
+
+struct LightingUniforms {
+    ambient: AmbientLight,
+    dir_light: DirectionalLight,
+    point_lights: array<PointLight, 4>,
+    spot_light: Spotlight,
+    num_point_lights: u32,
+    ssr_active: f32,
+    ssr_quality: f32,
+    ssr_temporal_upsampling: f32,
+    // Active reflection probe (#244): when `refl_active > 0.5` the env reflection is
+    // box-projected (Lagarde parallax) against this probe's box around `refl_center`
+    // instead of sampled as an infinitely-distant skybox. Mirrors the Rust
+    // `LightingUniform` byte-for-byte; the `.w` lanes are padding.
+    refl_active: f32,
+    // 1.0 when the active probe has a baked, prefiltered cubemap bound at binding 4 (#245):
+    // the env reflection samples THAT cube (roughness -> mip) with parallax correction
+    // instead of the 2D skybox. 0.0 falls back to the skybox. Mirrors the Rust uniform.
+    refl_has_cubemap: f32,
+    _refl_pad_a: f32,
+    _refl_pad_b: f32,
+    refl_center: vec4<f32>,
+    refl_box_min: vec4<f32>,
+    refl_box_max: vec4<f32>,
 };
 
 // Standard mesh vertex layout — position, normal, UVs, skeletal animation data

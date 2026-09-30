@@ -5,23 +5,22 @@
 mod axis;
 pub(crate) mod batch;
 mod lighting;
+mod materials;
 mod overlays;
 mod pass;
 mod probes;
 pub(crate) mod resources;
-mod uniforms;
+pub(crate) mod sort;
+pub(crate) mod uniforms;
 
 use glam::Vec3;
 
-use self::lighting::{
-    apply_reflection_probe, apply_scene_lights, apply_ssr_settings, default_lighting_uniform,
-};
 use self::pass::{PassClear, ScenePassFrame};
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::lod::LodSelection;
 use crate::render::passes::ssao::{SsaoFrame, SsaoPlan};
 use crate::render::postfx::params::build_post_params;
-use crate::render::{build_camera_stack, CameraUniform, LightingUniform, RenderView, Renderer};
+use crate::render::{build_camera_stack, CameraUniform, RenderView, Renderer};
 use crate::scene::{Camera, Scene};
 
 impl Renderer {
@@ -133,7 +132,8 @@ impl Renderer {
             // World canvases (#429): scene geometry, occluded by it, before particles.
             self.draw_world_ui(view, cam, aspect, FogUniform::from_settings(&scene.fog));
 
-            // Billboard particles for this camera (after solids, before the next pass).
+            // Sprite particles for this camera (after solids, before the next pass),
+            // emitters back to front; mesh particles already drew with the solids.
             let particle_draws = self.draw_particles(view, scene, cam);
             self.count_camera(&solids, scene.decals.len(), particle_draws);
 
@@ -216,32 +216,6 @@ impl Renderer {
         };
         view.post_fx
             .run(&self.device, &self.queue, ctx, post_params, passes);
-    }
-
-    /// Write the frame's lighting uniform, and start the frame counters (#433) with
-    /// the light counts — which lights got a uniform slot is decided right here.
-    fn upload_lighting(&mut self, scene: &Scene, camera_pos: Vec3) {
-        let lighting_uniform = self.build_lighting_uniform(scene, camera_pos);
-        self.queue.write_buffer(
-            &self.lighting_buffer,
-            0,
-            bytemuck::bytes_of(&lighting_uniform),
-        );
-        self.begin_counters(scene);
-    }
-
-    /// Builds the per-frame lighting uniform from the scene's lights and SSR settings.
-    /// `refl_has_cubemap` is set only when a baked cube is actually loaded for the active
-    /// probe (`self.reflection_cube`), so the shader never samples the black fallback cube.
-    fn build_lighting_uniform(&self, scene: &Scene, camera_pos: Vec3) -> LightingUniform {
-        let mut lighting_uniform = default_lighting_uniform(scene);
-        apply_scene_lights(&mut lighting_uniform, scene);
-        apply_ssr_settings(&mut lighting_uniform, scene);
-        apply_reflection_probe(&mut lighting_uniform, scene, camera_pos);
-        if self.reflection_cube.is_some() {
-            lighting_uniform.refl_has_cubemap = 1.0;
-        }
-        lighting_uniform
     }
 
     /// Bind (or clear) the active reflection probe's baked cubemap for `camera_pos` (#245):

@@ -38,9 +38,10 @@ pub struct RenderView {
     /// history. Per view, so one view's previous frame is never another's motion-blur
     /// reference.
     pub(crate) post_fx: PostFx,
-    /// Cached decal-pass depth bind group; references this view's depth view, so it is
-    /// invalidated (set `None`) whenever the depth target is reallocated on resize.
-    pub(crate) decal_depth_bind_group: Option<wgpu::BindGroup>,
+    /// Cached scene-depth bind group the decal and soft-particle passes sample (#440);
+    /// references this view's depth view, so it is invalidated (set `None`) whenever
+    /// the depth target is reallocated on resize.
+    pub(crate) scene_depth_bind_group: Option<wgpu::BindGroup>,
     /// SSAO targets (#436), allocated the first frame this view runs AO; they check
     /// their own size, so `resize` leaves them alone.
     pub(crate) ssao: Option<crate::render::passes::ssao::SsaoTargets>,
@@ -132,7 +133,7 @@ impl RenderView {
             depth_texture,
             depth_view,
             post_fx,
-            decal_depth_bind_group: None,
+            scene_depth_bind_group: None,
             ssao: None,
             color_target,
             forward_override: None,
@@ -160,8 +161,8 @@ impl RenderView {
         let (depth_texture, depth_view) = create_depth(device, width, height);
         self.depth_texture = depth_texture;
         self.depth_view = depth_view;
-        // The cached decal depth bind group references the freed depth view.
-        self.decal_depth_bind_group = None;
+        // The cached scene-depth bind group references the freed depth view.
+        self.scene_depth_bind_group = None;
         self.post_fx.resize(device, width, height, bloom_divisor);
         if self.color_target.is_some() {
             let (target, ui_format) = create_color_target(device, self.format, width, height);

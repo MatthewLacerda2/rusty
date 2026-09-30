@@ -174,3 +174,31 @@ pub(crate) fn apply_ssr_settings(lighting_uniform: &mut LightingUniform, scene: 
     lighting_uniform.ssr_quality = ssr_quality;
     lighting_uniform.ssr_temporal_upsampling = ssr_temporal;
 }
+
+impl crate::render::Renderer {
+    /// Write the frame's lighting uniform, and start the frame counters (#433) with
+    /// the light counts — which lights got a uniform slot is decided right here.
+    pub(super) fn upload_lighting(&mut self, scene: &Scene, camera_pos: Vec3) {
+        let lighting_uniform = self.build_lighting_uniform(scene, camera_pos);
+        self.queue.write_buffer(
+            &self.lighting_buffer,
+            0,
+            bytemuck::bytes_of(&lighting_uniform),
+        );
+        self.begin_counters(scene);
+    }
+
+    /// Builds the per-frame lighting uniform from the scene's lights and SSR settings.
+    /// `refl_has_cubemap` is set only when a baked cube is actually loaded for the active
+    /// probe (`self.reflection_cube`), so the shader never samples the black fallback cube.
+    fn build_lighting_uniform(&self, scene: &Scene, camera_pos: Vec3) -> LightingUniform {
+        let mut lighting_uniform = default_lighting_uniform(scene);
+        apply_scene_lights(&mut lighting_uniform, scene);
+        apply_ssr_settings(&mut lighting_uniform, scene);
+        apply_reflection_probe(&mut lighting_uniform, scene, camera_pos);
+        if self.reflection_cube.is_some() {
+            lighting_uniform.refl_has_cubemap = 1.0;
+        }
+        lighting_uniform
+    }
+}

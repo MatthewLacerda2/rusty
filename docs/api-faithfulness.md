@@ -198,6 +198,12 @@ edits and each physics step.)
 | `SetColor` | ✅ | renderer — start tint, scaled by the gradient in `color_of` |
 | `SetSubEmitter` | ✅ | sim — `app/particles.rs` queues and dispatches the target's burst on birth/death/collision; unknown triggers return `false` |
 | `Clear` | ✅ | renderer — empties the live buffer that's drawn |
+| `SetRenderMode` / `GetRenderMode` | ✅ | renderer — `render.mode` picks the sprite quad in `particles.wgsl` (`corner_offset`), or routes the emitter to the forward solids (`passes/particles/mesh.rs`); unknown modes return `false` |
+| `SetStretch` | ✅ | renderer — `stretch_length` → the instance's `stretch.w` |
+| `SetMesh` | ✅ | renderer — `push_mesh_particles` loads the mesh once and draws it with the named scene material |
+| `SetFlipbook` | ✅ | renderer — `Flipbook::frame_of` → the instance's `sheet`, `sheet_uv` in the shader; `random_start` draws each spawn's `start_frame` |
+| `SetSoft` | ✅ | renderer — `soft_fade` against the read-only scene depth |
+| `SetLit` | ✅ | renderer — `emitter_light` (probe DC or flat ambient) + `particle_light` over the lighting uniform |
 
 ### `Audio` — over the `AudioMaestro` resource (+ `Entity.audio`)
 

@@ -5,7 +5,6 @@
 pub(crate) mod decals;
 pub(crate) mod decals_draw;
 pub(crate) mod particles;
-pub(crate) mod particles_draw;
 pub(crate) mod shadows;
 pub(crate) mod ssao;
 pub(crate) mod transparent;

@@ -89,7 +89,12 @@ impl GpuResources {
             &shadows.layout,
             &mut registry,
         );
-        let billboards = create_billboard_passes(device, &textures.texture_layout, &mut registry);
+        let billboards = create_billboard_passes(
+            device,
+            &textures.texture_layout,
+            &camera_lighting_layout,
+            &mut registry,
+        );
         let ui = crate::render::ui::UiRenderer::new(device, queue, &mut registry);
         Self {
             camera_lighting_layout,
@@ -107,23 +112,25 @@ impl GpuResources {
 }
 
 /// Billboard particle + box-projector decal passes; both reuse the renderer's
-/// `texture_layout` (group 1 / group 3 respectively).
+/// `texture_layout` (group 1 / group 3 respectively), and the particles also share
+/// the decal pass's scene-depth layout and the camera + lighting group 0 (#440).
 fn create_billboard_passes(
     device: &wgpu::Device,
     texture_layout: &wgpu::BindGroupLayout,
+    camera_lighting_layout: &wgpu::BindGroupLayout,
     registry: &mut ShaderRegistry,
 ) -> BillboardPasses {
+    use crate::render::passes::particles::{ParticleRenderer, SharedLayouts};
+    let decal_renderer =
+        crate::render::passes::decals::DecalRenderer::new(device, texture_layout, registry);
+    let layouts = SharedLayouts {
+        texture: texture_layout,
+        depth: &decal_renderer.depth_layout,
+        camera_lighting: camera_lighting_layout,
+    };
     BillboardPasses {
-        particle_renderer: crate::render::passes::particles::ParticleRenderer::new(
-            device,
-            texture_layout,
-            registry,
-        ),
-        decal_renderer: crate::render::passes::decals::DecalRenderer::new(
-            device,
-            texture_layout,
-            registry,
-        ),
+        particle_renderer: ParticleRenderer::new(device, layouts, registry),
+        decal_renderer,
     }
 }
 

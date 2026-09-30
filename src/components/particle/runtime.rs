@@ -22,9 +22,29 @@ pub struct Particle {
     pub rotation: f32,
     /// RGBA tint at birth; the emitter's colour gradient scales it over life.
     pub color: [f32; 4],
+    /// Flipbook frame the particle starts on (random-start sheets, #440; else 0).
+    pub start_frame: u32,
+    /// Unit axis a mesh particle tumbles about by `rotation` (#440; else `Y`).
+    pub axis: Vec3,
 }
 
 impl Particle {
+    /// A particle at `position` with the render-only extras at their defaults — for
+    /// tests and tools that place particles by hand.
+    pub fn at(position: Vec3, size: f32, color: [f32; 4], lifetime: f32) -> Self {
+        Self {
+            position,
+            velocity: Vec3::ZERO,
+            age: 0.0,
+            lifetime,
+            size,
+            rotation: 0.0,
+            color,
+            start_frame: 0,
+            axis: Vec3::Y,
+        }
+    }
+
     /// Normalised life in `[0, 1]` (0 at birth, 1 at death).
     pub fn life_t(&self) -> f32 {
         if self.lifetime <= 0.0 {
