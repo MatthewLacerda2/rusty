@@ -126,13 +126,11 @@ part.
 **Collision callbacks (#448).** `contact` is the pair's strongest contact point
 as the receiver sees it (every point per pair is out of scope):
 
-| Field | Meaning |
-|---|---|
-| `contact.point` | `{x, y, z}` world-space contact point. |
-| `contact.normal` | `{x, y, z}` unit normal pointing out of `other`, into the receiver — a ball landing on a floor reads `(0, 1, 0)`, the floor reads `(0, -1, 0)`. |
-| `contact.relativeVelocity` | `{x, y, z}` `other`'s velocity minus the receiver's at the point, taken before this tick's solve — the closing speed of an impact (a ball falling at 5 m/s onto a floor reads `y = 5`). |
-| `contact.impulse` | Total normal impulse (N·s) the solver applied across the pair this tick; divide by `Time.deltaTime` for force. |
-| `contact.otherBody` | The entity owning `other`'s rigid body (its compound root; `other` itself when it is its own body). |
+- `point` — `{x, y, z}` world-space contact point.
+- `normal` — `{x, y, z}` unit normal pointing out of `other`, into the receiver — a ball landing on a floor reads `(0, 1, 0)`, the floor reads `(0, -1, 0)`.
+- `relativeVelocity` — `{x, y, z}` `other`'s velocity minus the receiver's at the point, taken before this tick's solve — the closing speed of an impact (a ball falling at 5 m/s onto a floor reads `y = 5`).
+- `impulse` — Total normal impulse (N·s) the solver applied across the pair this tick; divide by `Time.deltaTime` for force.
+- `otherBody` — The entity owning `other`'s rigid body (its compound root; `other` itself when it is its own body).
 
 A contact *touches* once the surfaces are within 5 mm; rapier's speculative
 contacts further apart are not reported.
@@ -770,7 +768,7 @@ way out (case-insensitive, `-`/`_` ignored):
 |---|---|---|
 | `base_color` / `albedo` | **sRGB** | — |
 | `emissive` | **sRGB** | — |
-| `contact.normal` | linear | tangent-space (use a `bump_to_normal` op) |
+- `normal` — linear | tangent-space (use a `bump_to_normal` op)
 | `roughness` | linear | — |
 | `metallic` | linear | — |
 | `metallic_roughness` / `orm` | linear | **metallic → B, roughness → G** (one-shot packed MR) |
