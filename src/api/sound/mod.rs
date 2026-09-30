@@ -19,15 +19,16 @@
 //! Verbs:
 //! - `Sound.Bake(patch, note, path [, opts])` — render + write; returns the path
 //!   and how loud it came out (#378, `level.rs`).
-//! - `Sound.BakeJson(json, note, path [, opts])` — same, from a patch JSON string,
-//!   so a saved patch re-bakes without a round-trip through Lua.
-//! - `Sound.ToJson(patch)` — serialize a patch table to canonical JSON for saving
-//!   or diffing.
+//! - `Sound.ToJson(patch)` — serialize a patch to canonical JSON for saving or
+//!   diffing.
 //!
-//! And the song verbs (#358), the same three shapes one level up — a *song* names
+//! And the song verbs (#358), the same shapes one level up — a *song* names
 //! tracks, patterns and an arrangement, and bakes to one mixed WAV:
-//! - `Sound.BakeSong(song, path)` / `Sound.BakeSongJson(json, path)` — render + write.
+//! - `Sound.BakeSong(song, path)` — render + write.
 //! - `Sound.SongToJson(song)` — canonical JSON for saving or diffing.
+//!
+//! A `patch` or `song` is a Lua table **or** its JSON string (#410), so a saved
+//! document re-bakes through the same verb without a round-trip through Lua.
 //!
 //! Every bake verb returns `path, level`: the path first, because callers feed it
 //! straight to `Audio.PlayAt`, and the level table second, so the figures are never
@@ -47,7 +48,7 @@ mod level;
 use mlua::{Lua, Table, Value};
 
 use super::{put, Reg};
-use from_lua::{note_from_value, opts_from_table, patch_from_table, song_from_table};
+use from_lua::{note_from_value, opts_from_table, patch_from_lua, song_from_lua};
 use level::{level_table, measure_file};
 use zimmer::{Bake, Patch, Song};
 
@@ -59,19 +60,8 @@ pub fn register(lua: &Lua) -> Reg {
         &table,
         "Bake",
         lua.create_function(
-            |lua, (patch, note, path, opts): (Table, Value, String, Option<Table>)| {
-                let patch = patch_from_table(&patch).map_err(mlua::Error::RuntimeError)?;
-                bake(lua, &patch, &note, &path, opts.as_ref())
-            },
-        ),
-    )?;
-
-    put(
-        &table,
-        "BakeJson",
-        lua.create_function(
-            |lua, (json, note, path, opts): (String, Value, String, Option<Table>)| {
-                let patch = Patch::from_json(&json).map_err(lua_err)?;
+            |lua, (patch, note, path, opts): (Value, Value, String, Option<Table>)| {
+                let patch = patch_from_lua(&patch).map_err(mlua::Error::RuntimeError)?;
                 bake(lua, &patch, &note, &path, opts.as_ref())
             },
         ),
@@ -80,8 +70,8 @@ pub fn register(lua: &Lua) -> Reg {
     put(
         &table,
         "ToJson",
-        lua.create_function(|_, patch: Table| {
-            let patch = patch_from_table(&patch).map_err(mlua::Error::RuntimeError)?;
+        lua.create_function(|_, patch: Value| {
+            let patch = patch_from_lua(&patch).map_err(mlua::Error::RuntimeError)?;
             patch.to_json().map_err(lua_err)
         }),
     )?;
@@ -102,24 +92,15 @@ pub fn register(lua: &Lua) -> Reg {
     lua.globals().set("Sound", table).map_err(|e| e.to_string())
 }
 
-/// The song verbs (#358): the same three shapes as the patch verbs above — from a
-/// table, from JSON, and back to JSON — so a song is authored, saved and re-baked
+/// The song verbs (#358): the same shapes as the patch verbs above — bake from a
+/// table or JSON, and back to JSON — so a song is authored, saved and re-baked
 /// exactly the way a patch is.
 fn register_song(lua: &Lua, table: &Table) -> Reg {
     put(
         table,
         "BakeSong",
-        lua.create_function(|lua, (song, path): (Table, String)| {
-            let song = song_from_table(&song).map_err(mlua::Error::RuntimeError)?;
-            bake_song(lua, &song, &path)
-        }),
-    )?;
-
-    put(
-        table,
-        "BakeSongJson",
-        lua.create_function(|lua, (json, path): (String, String)| {
-            let song = Song::from_json(&json).map_err(lua_err)?;
+        lua.create_function(|lua, (song, path): (Value, String)| {
+            let song = song_from_lua(&song).map_err(mlua::Error::RuntimeError)?;
             bake_song(lua, &song, &path)
         }),
     )?;
@@ -127,8 +108,8 @@ fn register_song(lua: &Lua, table: &Table) -> Reg {
     put(
         table,
         "SongToJson",
-        lua.create_function(|_, song: Table| {
-            let song = song_from_table(&song).map_err(mlua::Error::RuntimeError)?;
+        lua.create_function(|_, song: Value| {
+            let song = song_from_lua(&song).map_err(mlua::Error::RuntimeError)?;
             song.to_json().map_err(lua_err)
         }),
     )

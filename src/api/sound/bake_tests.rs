@@ -86,7 +86,7 @@ fn bake_json_matches_bake_table() {
         r#"
         local patch = {IMPACT_PATCH}
         Sound.Bake(patch, "C4", "{from_table}", {{ seed = 5 }})
-        Sound.BakeJson(Sound.ToJson(patch), "C4", "{from_json}", {{ seed = 5 }})
+        Sound.Bake(Sound.ToJson(patch), "C4", "{from_json}", {{ seed = 5 }})
     "#
     ))
     .exec()
@@ -131,7 +131,7 @@ fn a_bad_patch_note_or_option_surfaces_the_reason_to_the_script() {
         format!(r#"Sound.Bake({{ source = {{ kind = "theremin" }} }}, "C4", "{path}")"#),
         format!(r#"Sound.Bake({IMPACT_PATCH}, "H4", "{path}")"#),
         format!(r#"Sound.Bake({IMPACT_PATCH}, "C4", "{path}", {{ duration = -1 }})"#),
-        format!(r#"Sound.BakeJson("not json", "C4", "{path}")"#),
+        format!(r#"Sound.Bake("not json", "C4", "{path}")"#),
     ];
     for call in calls {
         let err = lua.load(&call).exec().expect_err("must be rejected");

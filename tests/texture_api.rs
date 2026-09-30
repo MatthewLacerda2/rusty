@@ -71,7 +71,7 @@ fn bake_json_matches_bake_table() {
         }}
         Texture.Bake(recipe, "{from_table}", "data")
         local json = Texture.ToJson(recipe)
-        Texture.BakeJson(json, "{from_json}", "data")
+        Texture.Bake(json, "{from_json}", "data")
     "#
     );
     lua.load(&script).exec().unwrap();

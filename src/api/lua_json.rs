@@ -11,8 +11,38 @@
 //! integer sequence (so `inputs` / `color_a` / `base_color` ride as arrays), else a
 //! JSON **object** keyed by its string keys (node/op/material fields). That matches how
 //! a recipe authored in Lua and one loaded from `.json` describe the same document.
+//!
+//! Every recipe verb (`Texture.Bake`, `Shader.Bake`, `Sound.Bake`,
+//! `Material.DefineAsset`, …) takes its recipe through [`recipe_from_lua`], which
+//! accepts **either** form — a Lua table or the recipe's JSON string (#410) — so
+//! there is one verb per operation, not a table verb plus a `*Json` twin.
 
 use mlua::{Table, Value};
+use serde::de::DeserializeOwned;
+
+/// Decode a recipe argument into `T`: a Lua **table** (marshalled through
+/// [`table_to_json`]) or a **JSON string** (the on-disk form). Both forms reach
+/// `T`'s serde derive through the same `from_value` call, so a bad key produces
+/// the same error whichever form carried it.
+pub fn recipe_from_lua<T: DeserializeOwned>(value: &Value) -> Result<T, String> {
+    serde_json::from_value(recipe_json(value)?).map_err(|e| e.to_string())
+}
+
+/// The recipe argument as a `serde_json::Value`, for a caller that must inspect
+/// the document before decoding it (`Material.DefineAsset` lifts its validated
+/// fields out first). Anything but a table or a string is an error naming both.
+pub fn recipe_json(value: &Value) -> Result<serde_json::Value, String> {
+    match value {
+        Value::Table(t) => table_to_json(t),
+        Value::String(s) => {
+            serde_json::from_str(s.to_str().map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+        }
+        other => Err(format!(
+            "recipe must be a table or a JSON string, got {}",
+            other.type_name()
+        )),
+    }
+}
 
 /// Convert a Lua `table` into a `serde_json::Value`. Errors carry a message the
 /// REPL/script surfaces verbatim.
@@ -103,6 +133,34 @@ mod tests {
         let t: Table = lua.load(r#"return {0.1, 0.2, 0.3}"#).eval().unwrap();
         let json = table_to_json(&t).unwrap();
         assert_eq!(json, serde_json::json!([0.1, 0.2, 0.3]));
+    }
+
+    #[test]
+    fn a_table_and_its_json_string_decode_alike() {
+        #[derive(serde::Deserialize, Debug, PartialEq)]
+        #[serde(deny_unknown_fields)]
+        struct R {
+            a: f32,
+            b: Vec<u8>,
+        }
+        let lua = Lua::new();
+        let table: Value = lua.load("return { a = 0.5, b = {1, 2} }").eval().unwrap();
+        let json: Value = lua.load(r#"return '{"a":0.5,"b":[1,2]}'"#).eval().unwrap();
+        let from_table: R = recipe_from_lua(&table).unwrap();
+        assert_eq!(from_table, recipe_from_lua::<R>(&json).unwrap());
+
+        let bad_table: Value = lua.load("return { a = 1, bb = {} }").eval().unwrap();
+        let bad_json: Value = lua.load(r#"return '{"a":1,"bb":[]}'"#).eval().unwrap();
+        let (e1, e2) = (
+            recipe_from_lua::<R>(&bad_table).unwrap_err(),
+            recipe_from_lua::<R>(&bad_json).unwrap_err(),
+        );
+        assert_eq!(e1, e2, "both forms name the bad key the same way");
+        assert!(e1.contains("bb"), "{e1}");
+
+        let num: Value = lua.load("return 3").eval().unwrap();
+        let err = recipe_from_lua::<R>(&num).unwrap_err();
+        assert!(err.contains("table or a JSON string"), "{err}");
     }
 
     #[test]

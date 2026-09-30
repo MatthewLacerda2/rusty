@@ -35,11 +35,10 @@ like any library material (no engine special-casing).
 | Function | Signature | Returns |
 |---|---|---|
 | `Material.DefineAsset` | `(name, recipe)` | — (inserts/overwrites the library asset under `name`) |
-| `Material.DefineAssetJson` | `(name, json)` | — (same, from the recipe's JSON string) |
 | `Material.GetAsset` | `(name)` | the asset's canonical JSON string, or `nil` if absent |
 | `Material.HasAsset` | `(name)` | `bool` |
 
-The **recipe** is a table whose shape mirrors the `MaterialAsset` document one-to-one
+The **recipe** is a table (or that table's JSON string — both decode alike) whose shape mirrors the `MaterialAsset` document one-to-one
 (every field optional — omit one to take its default), bounded to exactly what the
 renderer samples:
 

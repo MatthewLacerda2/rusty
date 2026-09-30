@@ -4,14 +4,15 @@
 //! Four conversions, all of them tiny, kept out of the registrar so the namespace
 //! file reads as a list of verbs:
 //!
-//! - a **patch table** → [`Patch`], via the shared [`crate::api::lua_json`]
-//!   converter, so the field decoding lives ONCE in the patch's serde derive and a
-//!   Lua-authored patch is the same document as one loaded from `.json`;
+//! - a **patch** (a table or its JSON string, #410) → [`Patch`], via the shared
+//!   [`crate::api::lua_json`] converter, so the field decoding lives ONCE in the
+//!   patch's serde derive and a Lua-authored patch is the same document as one
+//!   loaded from `.json`;
 //! - a **note** → a MIDI number, accepting either the name a score would use
 //!   (`"C#4"`) or a raw number;
 //! - an **opts table** → [`NoteOpts`], every field optional and every unknown key
 //!   refused by name;
-//! - a **song table** → [`Song`], the same way (#358).
+//! - a **song** (table or JSON string) → [`Song`], the same way (#358).
 //!
 //! The document types are zimmer's (#413); the Lua patch shape mirrors its JSON
 //! one-to-one:
@@ -27,21 +28,21 @@
 
 use mlua::{Table, Value};
 
-use crate::api::lua_json::table_to_json;
+use crate::api::lua_json::recipe_from_lua;
 use zimmer::{parse_note, Glide, NoteOpts, Patch, Song};
 
-/// Parse a Lua patch `table` into a [`Patch`].
-pub fn patch_from_table(table: &Table) -> Result<Patch, String> {
-    serde_json::from_value(table_to_json(table)?).map_err(|e| e.to_string())
+/// Parse a patch argument — a Lua table or its JSON string — into a [`Patch`].
+pub fn patch_from_lua(value: &Value) -> Result<Patch, String> {
+    recipe_from_lua(value)
 }
 
-/// Parse a Lua song `table` into a [`Song`] (#358).
+/// Parse a song argument — a Lua table or its JSON string — into a [`Song`] (#358).
 ///
-/// Same one-liner as [`patch_from_table`] and for the same reason: the field decoding
+/// Same one-liner as [`patch_from_lua`] and for the same reason: the field decoding
 /// lives once, in the song's serde derive, so a Lua-authored song and one loaded from
 /// `.json` are the same document.
-pub fn song_from_table(table: &Table) -> Result<Song, String> {
-    serde_json::from_value(table_to_json(table)?).map_err(|e| e.to_string())
+pub fn song_from_lua(value: &Value) -> Result<Song, String> {
+    recipe_from_lua(value)
 }
 
 /// Resolve a `note` argument to a MIDI number: a name (`"C#4"`, `"Bb3"`) or the
@@ -151,7 +152,7 @@ mod tests {
                 fx = { { fx = "delay", time = 0.25, feedback = 0.35, mix = 0.3 } },
             }"#,
         );
-        let patch = patch_from_table(&table).expect("patch parses");
+        let patch = patch_from_lua(&Value::Table(table)).expect("patch parses");
         match &patch.source {
             Source::OscStack { oscs } => assert_eq!(oscs.len(), 2),
             other => panic!("wrong source: {other:?}"),
@@ -165,9 +166,12 @@ mod tests {
     fn reports_an_unknown_or_missing_tag() {
         let lua = Lua::new();
         let bogus = eval_table(&lua, r#"return { source = { kind = "theremin" } }"#);
-        assert!(patch_from_table(&bogus).is_err());
+        assert!(patch_from_lua(&Value::Table(bogus)).is_err());
         let no_amp = eval_table(&lua, r#"return { source = { kind = "noise" } }"#);
-        assert!(patch_from_table(&no_amp).is_err(), "amp is mandatory");
+        assert!(
+            patch_from_lua(&Value::Table(no_amp)).is_err(),
+            "amp is mandatory"
+        );
     }
 
     #[test]

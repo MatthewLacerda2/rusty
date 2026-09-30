@@ -11,16 +11,16 @@
 //!
 //! The recipe is authored as a Lua table whose shape mirrors the serde document
 //! exactly (see `from_lua`), so the same recipe describes a Lua-built shader and
-//! one loaded from `.json` — one surface, three callers.
+//! one loaded from `.json` — one surface, three callers. Every verb taking a
+//! `recipe` accepts either form: the table or its JSON string (#410).
 //!
 //! Verbs:
 //! - `Shader.Bake(recipe [, out_dir])` — assemble + validate + write; returns the
 //!   written path. `out_dir` defaults to the project shader workspace.
-//! - `Shader.BakeJson(json [, out_dir])` — same, from a recipe JSON string.
 //! - `Shader.Validate(recipe)` — assemble + compose-check **without writing**;
 //!   returns the composed entry-point names (the dry-run gate the agent checks a
 //!   recipe with before baking).
-//! - `Shader.ToJson(recipe)` — serialize a recipe table to canonical JSON.
+//! - `Shader.ToJson(recipe)` — serialize a recipe to canonical JSON.
 //! - `Shader.Blocks(pass)` — list the curated block ids for a pass (introspection
 //!   so the agent composes from the actual catalog, not guesswork).
 //!
@@ -29,7 +29,7 @@
 
 mod from_lua;
 
-use mlua::{Lua, Table};
+use mlua::{Lua, Value};
 
 use super::{put, Reg};
 use crate::shadergen::assemble::assemble;
@@ -37,7 +37,7 @@ use crate::shadergen::blocks::catalog;
 use crate::shadergen::recipe::PassKind;
 use crate::shadergen::validate::validate;
 use crate::shadergen::{bake_recipe, ShaderRecipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
-use from_lua::recipe_from_table;
+use from_lua::parse_recipe;
 
 /// Register the `Shader` namespace onto `lua`.
 pub fn register(lua: &Lua) -> Reg {
@@ -46,17 +46,8 @@ pub fn register(lua: &Lua) -> Reg {
     put(
         &table,
         "Bake",
-        lua.create_function(|_, (recipe, out_dir): (Table, Option<String>)| {
-            let recipe = recipe_from_table(&recipe).map_err(mlua::Error::RuntimeError)?;
-            bake(&recipe, out_dir)
-        }),
-    )?;
-
-    put(
-        &table,
-        "BakeJson",
-        lua.create_function(|_, (json, out_dir): (String, Option<String>)| {
-            let recipe = ShaderRecipe::from_json(&json).map_err(mlua::Error::RuntimeError)?;
+        lua.create_function(|_, (recipe, out_dir): (Value, Option<String>)| {
+            let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
             bake(&recipe, out_dir)
         }),
     )?;
@@ -64,8 +55,8 @@ pub fn register(lua: &Lua) -> Reg {
     put(
         &table,
         "Validate",
-        lua.create_function(|lua, recipe: Table| {
-            let recipe = recipe_from_table(&recipe).map_err(mlua::Error::RuntimeError)?;
+        lua.create_function(|lua, recipe: Value| {
+            let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
             let entries = dry_run(&recipe).map_err(mlua::Error::RuntimeError)?;
             lua.create_sequence_from(entries)
         }),
@@ -74,8 +65,8 @@ pub fn register(lua: &Lua) -> Reg {
     put(
         &table,
         "ToJson",
-        lua.create_function(|_, recipe: Table| {
-            let recipe = recipe_from_table(&recipe).map_err(mlua::Error::RuntimeError)?;
+        lua.create_function(|_, recipe: Value| {
+            let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
             recipe.to_json().map_err(mlua::Error::RuntimeError)
         }),
     )?;

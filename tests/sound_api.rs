@@ -96,7 +96,7 @@ fn a_saved_patch_re_bakes_byte_for_byte() {
     let saved = std::fs::read_to_string(&patch_json).expect("the patch was saved");
     lua.globals().set("SAVED", saved).unwrap();
     lua.load(format!(
-        r#"Sound.BakeJson(SAVED, 36, "{rebaked}", {{ seed = 4 }})"#
+        r#"Sound.Bake(SAVED, 36, "{rebaked}", {{ seed = 4 }})"#
     ))
     .exec()
     .expect("re-bake from the saved JSON");
@@ -134,7 +134,7 @@ fn a_saved_song_re_bakes_the_identical_mix() {
           arrangement = {{ "riff", "riff" }},
         }}
         Sound.BakeSong(song, "{authored}")
-        Sound.BakeSongJson(Sound.SongToJson(song), "{rebaked}")
+        Sound.BakeSong(Sound.SongToJson(song), "{rebaked}")
     "#
     );
     lua.load(&script).exec().unwrap();

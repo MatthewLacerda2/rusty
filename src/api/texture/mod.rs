@@ -7,14 +7,15 @@
 //! recipe and one loaded from `.json` — one surface, three callers.
 //!
 //! Verbs:
-//! - `Texture.Bake(recipe, path, slot)` — evaluate a recipe **table** and write the
-//!   PNG, encoded for the named `slot` (base_color / emissive = sRGB; normal /
+//! - `Texture.Bake(recipe, path, slot)` — evaluate a recipe and write the PNG,
+//!   encoded for the named `slot` (base_color / emissive = sRGB; normal /
 //!   roughness / metallic / data = linear; `metallic_roughness` packs metallic→B,
 //!   roughness→G). Returns the written path.
-//! - `Texture.BakeJson(json, path, slot)` — same, from a recipe JSON string (the
-//!   on-disk form), so a saved recipe re-bakes without a round-trip through Lua.
-//! - `Texture.ToJson(recipe)` — serialize a recipe table to its canonical JSON for
+//! - `Texture.ToJson(recipe)` — serialize a recipe to its canonical JSON for
 //!   saving / diffing.
+//!
+//! A `recipe` is a Lua table **or** its JSON string (the on-disk form, #410), so a
+//! saved recipe re-bakes through the same verb without a round-trip through Lua.
 //!
 //! An unknown `slot`, or an unknown key anywhere in a recipe, is an error naming it
 //! (#395) — a typo never bakes a silently wrong map.
@@ -24,11 +25,11 @@
 
 mod from_lua;
 
-use mlua::{Lua, Table};
+use mlua::{Lua, Value};
 
 use super::{put, Reg};
 use crate::procgen::{bake_recipe, Slot, TextureRecipe};
-use from_lua::recipe_from_table;
+use from_lua::parse_recipe;
 
 /// Register the `Texture` namespace onto `lua`.
 pub fn register(lua: &Lua) -> Reg {
@@ -37,17 +38,8 @@ pub fn register(lua: &Lua) -> Reg {
     put(
         &table,
         "Bake",
-        lua.create_function(|_, (recipe, path, slot): (Table, String, String)| {
-            let recipe = recipe_from_table(&recipe).map_err(mlua::Error::RuntimeError)?;
-            bake(&recipe, &path, &slot)
-        }),
-    )?;
-
-    put(
-        &table,
-        "BakeJson",
-        lua.create_function(|_, (json, path, slot): (String, String, String)| {
-            let recipe = TextureRecipe::from_json(&json).map_err(mlua::Error::RuntimeError)?;
+        lua.create_function(|_, (recipe, path, slot): (Value, String, String)| {
+            let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
             bake(&recipe, &path, &slot)
         }),
     )?;
@@ -55,8 +47,8 @@ pub fn register(lua: &Lua) -> Reg {
     put(
         &table,
         "ToJson",
-        lua.create_function(|_, recipe: Table| {
-            let recipe = recipe_from_table(&recipe).map_err(mlua::Error::RuntimeError)?;
+        lua.create_function(|_, recipe: Value| {
+            let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
             recipe.to_json().map_err(mlua::Error::RuntimeError)
         }),
     )?;
