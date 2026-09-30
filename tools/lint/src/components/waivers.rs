@@ -35,7 +35,9 @@ pub(super) const WAIVERS: &[(&str, &str, &str)] = &[
         "Served by the `Physics` namespace: the collider is queried via \
          Physics.Raycast plus the #311 spatial surface (Overlap*/Check*, \
          SphereCast, ClosestPoint/ContainsPoint, GetBounds) — the same rapier \
-         world the engine casts against. A separate `Collider` namespace would \
+         world the engine casts against — and its shape and physics material \
+         are authored through Physics.Get/SetColliderShape and \
+         Physics.Get/SetPhysicsMaterial (#447). A separate `Collider` namespace would \
          split physics across two surfaces.",
     ),
     (

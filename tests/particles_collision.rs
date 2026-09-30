@@ -29,6 +29,7 @@ fn scene_with_wall(response: CollisionResponse) -> (Scene, u32) {
                 size: Vec3::new(1.0, 4.0, 4.0),
             },
             is_trigger: false,
+            material: Default::default(),
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
         }),

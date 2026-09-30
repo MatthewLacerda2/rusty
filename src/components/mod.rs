@@ -29,7 +29,7 @@ pub mod visual_correction;
 pub use animator::{AnimatorComponent, AnimatorParameter, AnimatorParameters};
 pub use audio_source::AudioSourceComponent;
 pub use camera::{CameraComponent, ClearFlags};
-pub use collider::{ColliderComponent, ColliderShape};
+pub use collider::{CapsuleAxis, ColliderComponent, ColliderShape, CombineMode, PhysicsMaterial};
 pub use entity::{Entity, PrefabLink};
 pub use light::{LightComponent, LightType};
 pub use material::{MaterialAsset, MaterialComponent, RenderMode};

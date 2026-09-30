@@ -27,6 +27,7 @@ fn room_scene() -> Scene {
                 size: Vec3::new(20.0, 6.0, 20.0),
             },
             is_trigger: false,
+            material: Default::default(),
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
         }),

@@ -24,6 +24,9 @@ mod compound;
 #[cfg(test)]
 mod compound_tests;
 mod convert;
+mod material;
+#[cfg(test)]
+mod material_tests;
 mod query;
 #[cfg(test)]
 mod query_active_tests;

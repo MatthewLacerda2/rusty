@@ -27,6 +27,7 @@ fn add(scene: &mut Scene, parent: Option<u32>, pos: Vec3, collider: bool) -> u32
             active: true,
             shape,
             is_trigger: false,
+            material: Default::default(),
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
         };

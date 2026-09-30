@@ -29,6 +29,7 @@ fn raycast_matches_engine_cast_through_rapier() {
                 size: Vec3::splat(2.0),
             },
             is_trigger: false,
+            material: Default::default(),
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
         }),

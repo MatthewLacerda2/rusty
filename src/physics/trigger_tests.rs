@@ -17,6 +17,7 @@ fn box_collider(size: f32, is_trigger: bool) -> ColliderComponent {
             size: Vec3::splat(size),
         },
         is_trigger,
+        material: Default::default(),
         aabb_min: Vec3::ZERO,
         aabb_max: Vec3::ZERO,
     }

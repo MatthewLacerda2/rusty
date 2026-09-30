@@ -18,6 +18,7 @@ fn add_box(scene: &mut Scene, name: &str, min: Vec3, max: Vec3) {
             active: true,
             shape: ColliderShape::Box { size: max - min },
             is_trigger: false,
+            material: Default::default(),
             aabb_min: min,
             aabb_max: max,
         }),

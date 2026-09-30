@@ -1,18 +1,18 @@
 //! src/scene/authoring/collider.rs — Shared collider-authoring ops.
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
-//! `ColliderComponent` field by field: the `active` / `is_trigger` flags and the
-//! collider `shape` (its variant + extents). The editor's Collider card routes every
-//! write through these (#287); there is no Lua `*.Set*` collider field-setter today
-//! (`Physics.*` exposes rigidbody + raycast only), so this op set is the single
-//! source for the card alone, with unit tests standing in for a convergence test.
+//! `ColliderComponent` field by field: the `active` / `is_trigger` flags, the
+//! collider `shape` (its variant + extents) and its physics `material` (#447). The
+//! editor's Collider card routes every write through these (#287), and so do the
+//! `Physics.SetColliderShape` / `Physics.SetPhysicsMaterial` bindings — one write
+//! for both surfaces.
 //!
 //! Each op takes `&mut ColliderComponent`; the caller's accessor
 //! (`world.collider_mut(id)`) carries the no-op-when-absent semantics (#344).
 //!
 //! Allowed deps: components (the `ColliderComponent`/`ColliderShape` data). Pure.
 
-use crate::components::{ColliderComponent, ColliderShape};
+use crate::components::{ColliderComponent, ColliderShape, PhysicsMaterial};
 
 /// Set the collider's `active` flag.
 pub fn set_active(c: &mut ColliderComponent, active: bool) {
@@ -31,6 +31,17 @@ pub fn set_shape(c: &mut ColliderComponent, shape: ColliderShape) {
     c.shape = shape;
 }
 
+/// Replace the collider's physics material, clamping its coefficients into range
+/// (friction `>= 0`, bounciness `[0, 1]`) so neither surface can author an
+/// out-of-range value.
+pub fn set_material(c: &mut ColliderComponent, material: PhysicsMaterial) {
+    c.material = PhysicsMaterial {
+        friction_combine: material.friction_combine,
+        bounce_combine: material.bounce_combine,
+        ..PhysicsMaterial::new(material.friction, material.bounciness)
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -45,6 +56,7 @@ mod tests {
             active: true,
             shape: ColliderShape::Box { size: Vec3::ONE },
             is_trigger: false,
+            material: PhysicsMaterial::default(),
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
         };
@@ -63,6 +75,30 @@ mod tests {
         assert!(!c.active);
         assert!(c.is_trigger);
         assert_eq!(c.shape, ColliderShape::Sphere { radius: 2.0 });
+    }
+
+    #[test]
+    fn set_material_writes_modes_and_clamps_coefficients() {
+        use crate::components::CombineMode;
+        let (mut scene, id) = scene_with_collider();
+        let mut e = scene.world.collider_mut(id).unwrap();
+        let wanted = PhysicsMaterial {
+            friction: -1.0,
+            bounciness: 2.0,
+            friction_combine: CombineMode::Minimum,
+            bounce_combine: CombineMode::Maximum,
+        };
+        set_material(&mut e, wanted);
+        assert_eq!(
+            e.material,
+            PhysicsMaterial {
+                friction: 0.0,
+                bounciness: 1.0,
+                ..wanted
+            }
+        );
+        set_material(&mut e, PhysicsMaterial::new(0.7, 0.25));
+        assert_eq!((e.material.friction, e.material.bounciness), (0.7, 0.25));
     }
 
     #[test]

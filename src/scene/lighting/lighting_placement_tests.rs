@@ -26,6 +26,7 @@ fn add_static_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3) {
             active: true,
             shape: ColliderShape::Box { size },
             is_trigger: false,
+            material: Default::default(),
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
         }),

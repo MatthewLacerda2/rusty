@@ -5,11 +5,13 @@
 //! engine uses, so script and engine queries agree (#31, #311). The queries
 //! split by shape: line casts (`Raycast`/`SphereCast`) in `cast`, volume
 //! overlaps (`Overlap*`/`Check*`) in `volume`, per-collider point queries
-//! (`ClosestPoint`/`ContainsPoint`/`GetBounds`) in `point`.
+//! (`ClosestPoint`/`ContainsPoint`/`GetBounds`) in `point`, and the collider's
+//! authorable shape + physics material (#447) in `collider`.
 //! `register` creates the `Physics` table; `register_hitscan` extends it once
 //! the live physics handle is available.
 
 mod cast;
+mod collider;
 mod point;
 mod volume;
 
@@ -38,6 +40,7 @@ pub fn register<'lua, 'scope>(
     register_angular(scope, &table, scene)?;
     register_force(scope, &table, scene)?;
     register_collision_detection(scope, &table, scene)?;
+    collider::register(scope, &table, scene)?;
 
     lua.globals()
         .set("Physics", table)

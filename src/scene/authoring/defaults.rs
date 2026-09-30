@@ -53,6 +53,7 @@ pub fn default_collider() -> ColliderComponent {
         active: true,
         shape: ColliderShape::Box { size: Vec3::ONE },
         is_trigger: false,
+        material: Default::default(),
         aabb_min: Vec3::ZERO,
         aabb_max: Vec3::ZERO,
     }
