@@ -45,6 +45,10 @@ name more.
   (integration). Install lavapipe to run them:
   `sudo apt-get install -y mesa-vulkan-drivers libvulkan1`.
 - `make gates` (foreground) before readying.
+- If `cargo nextest` is missing in the container, install the prebuilt binary
+  (`curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ~/.cargo/bin`)
+  rather than falling back to `cargo test`: CI runs nextest, and its per-test
+  process isolation and the `gpu` test group are what the gate measures.
 - Rebase onto the latest `origin/main` before readying.
 - Don't run `cargo mutants`.
 
