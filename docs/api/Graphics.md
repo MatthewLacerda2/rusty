@@ -124,8 +124,9 @@ Graphics.SetCustomEffects({})           -- off again
   never goes black. Re-baking any module makes the renderer reload the list next
   frame, so a fixed or edited effect is picked up live.
 - **What a module sees.** Binding 1 is the colour so far (binding 2 its sampler);
-  binding 3 is **the previous frame's** result of this chain (black on the first
-  frame and after a resize) for feedback effects; bindings 0, 4 and 5 are the post
+  binding 3 is **the previous frame's** result of this chain, for feedback effects
+  (black on the first frame and after a resize; after the list was empty for a
+  while, the last frame it ran); bindings 0, 4 and 5 are the post
   params, scene depth and skybox, as for the built-in passes.
 - **Where it lives.** The list is saved with the volume, and the Inspector's
   **Custom Effects** section (add by name, reorder, remove) edits the same field. No
