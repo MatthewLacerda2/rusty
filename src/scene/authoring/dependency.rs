@@ -28,7 +28,7 @@
 
 use crate::components::{
     CanvasComponent, CanvasGroupComponent, ImageComponent, RectMaskComponent,
-    RectTransformComponent, TextComponent,
+    RectTransformComponent, SelectableComponent, TextComponent,
 };
 use crate::ecs::World;
 use crate::scene::authoring::components::ComponentKind;
@@ -58,6 +58,7 @@ pub(crate) fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::CanvasGroup => world.has_canvas_group(id),
         ComponentKind::RectMask => world.has_rect_mask(id),
         ComponentKind::Text => world.has_text(id),
+        ComponentKind::Selectable => world.has_selectable(id),
     }
 }
 
@@ -90,6 +91,7 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
         }
         ComponentKind::RectMask => world.set_rect_mask(id, Some(RectMaskComponent::default())),
         ComponentKind::Text => world.set_text(id, Some(TextComponent::default())),
+        ComponentKind::Selectable => world.set_selectable(id, Some(SelectableComponent::default())),
     }
 }
 
@@ -114,6 +116,7 @@ pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool
         ComponentKind::CanvasGroup => world.set_canvas_group(id, None),
         ComponentKind::RectMask => world.set_rect_mask(id, None),
         ComponentKind::Text => world.set_text(id, None),
+        ComponentKind::Selectable => world.set_selectable(id, None),
     }
 }
 
@@ -210,91 +213,5 @@ pub fn enforce_requirements(world: &mut World, id: u32) -> Vec<(ComponentKind, C
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::scene::authoring::create_entity;
-    use crate::scene::Scene;
-
-    #[test]
-    fn all_kinds_are_addable_and_probeable() {
-        // Guards `ComponentKind::ALL` against drift: every listed kind adds a default
-        // and is then seen by the presence probe (the compiler already forces the
-        // per-kind match arms to be exhaustive).
-        let mut scene = Scene::new();
-        for kind in ComponentKind::ALL {
-            let id = create_entity(&mut scene, "E", None);
-            assert!(set_default(&mut scene.world, id, kind), "{kind:?} adds");
-            assert!(has_kind(&scene.world, id, kind), "{kind:?} is probeable");
-        }
-    }
-
-    #[test]
-    fn ui_graphics_require_a_rect_transform() {
-        let mut scene = Scene::new();
-        for kind in [
-            ComponentKind::Image,
-            ComponentKind::Text,
-            ComponentKind::RectMask,
-        ] {
-            let id = create_entity(&mut scene, "E", None);
-            assert!(add_with_requirements(&mut scene.world, id, kind));
-            assert!(scene.world.has_rect_transform(id), "{kind:?} brings a rect");
-        }
-    }
-
-    #[test]
-    fn add_auto_satisfies_requirement() {
-        let mut scene = Scene::new();
-        let id = create_entity(&mut scene, "FX", None);
-        assert!(add_with_requirements(
-            &mut scene.world,
-            id,
-            ComponentKind::VisualCorrection
-        ));
-        assert!(scene.world.has_visual_correction(id));
-        assert!(scene.world.has_camera(id), "requirement auto-added");
-    }
-
-    #[test]
-    fn remove_cascades_to_dependents() {
-        let mut scene = Scene::new();
-        let id = create_entity(&mut scene, "FX", None);
-        add_with_requirements(&mut scene.world, id, ComponentKind::VisualCorrection);
-        assert!(remove_with_cascade(
-            &mut scene.world,
-            id,
-            ComponentKind::Camera
-        ));
-        assert!(!scene.world.has_camera(id));
-        assert!(!scene.world.has_visual_correction(id), "dependent cascaded");
-    }
-
-    #[test]
-    fn reconcile_drops_orphaned_dependent() {
-        let mut scene = Scene::new();
-        let id = create_entity(&mut scene, "FX", None);
-        add_with_requirements(&mut scene.world, id, ComponentKind::VisualCorrection);
-        // Clear the requirement out from under the dependent (as another card might).
-        scene.world.set_camera(id, None);
-        assert!(reconcile_requirements(&mut scene.world, id));
-        assert!(!scene.world.has_visual_correction(id));
-    }
-
-    #[test]
-    fn enforce_on_load_auto_adds_missing_requirement() {
-        let mut scene = Scene::new();
-        let id = create_entity(&mut scene, "FX", None);
-        // Simulate a hand-edited scene: a dependent with no requirement.
-        scene
-            .world
-            .set_visual_correction(id, Some(default_visual_correction()));
-        let added = enforce_requirements(&mut scene.world, id);
-        assert_eq!(
-            added,
-            vec![(ComponentKind::VisualCorrection, ComponentKind::Camera)]
-        );
-        assert!(scene.world.has_camera(id));
-        // Idempotent: a second pass finds nothing to add.
-        assert!(enforce_requirements(&mut scene.world, id).is_empty());
-    }
-}
+#[path = "dependency_tests.rs"]
+mod tests;

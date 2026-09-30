@@ -14,8 +14,9 @@ use super::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, ColliderComponent, ImageComponent, LightComponent, MaterialAsset,
     MaterialComponent, MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent,
-    RectMaskComponent, RectTransformComponent, RigidBodyComponent, ScriptComponent, TextComponent,
-    TextureComponent, TransformComponent, VisualCorrectionComponent,
+    RectMaskComponent, RectTransformComponent, RigidBodyComponent, ScriptComponent,
+    SelectableComponent, TextComponent, TextureComponent, TransformComponent,
+    VisualCorrectionComponent,
 };
 
 /// The live link from an instance entity back to the `.prefab` it was stamped from
@@ -110,6 +111,9 @@ pub struct Entity {
     /// UI text label (#419). `#[serde(default)]` for pre-#419 scenes.
     #[serde(default)]
     pub text: Option<TextComponent>,
+    /// Interactive UI element (#420). `#[serde(default)]` for pre-#420 scenes.
+    #[serde(default)]
+    pub selectable: Option<SelectableComponent>,
     /// Live link back to the source `.prefab` for a *linked* prefab instance (#216).
     /// `None` on a plain entity or a v1 unpacked copy. Carried on every entity of an
     /// instance. `#[serde(default)]` so pre-#216 scenes load with no link.
@@ -169,6 +173,8 @@ struct EntityRepr {
     #[serde(default)]
     text: Option<TextComponent>,
     #[serde(default)]
+    selectable: Option<SelectableComponent>,
+    #[serde(default)]
     prefab_link: Option<PrefabLink>,
     parent_id: Option<u32>,
     children: Vec<u32>,
@@ -221,6 +227,7 @@ impl From<EntityRepr> for Entity {
             canvas_group: r.canvas_group,
             rect_mask: r.rect_mask,
             text: r.text,
+            selectable: r.selectable,
             prefab_link: r.prefab_link,
             parent_id: r.parent_id,
             children: r.children,
@@ -256,9 +263,29 @@ impl Entity {
             canvas_group: None,
             rect_mask: None,
             text: None,
+            selectable: None,
             prefab_link: None,
             parent_id: None,
             children: Vec::new(),
         }
+    }
+}
+
+impl Entity {
+    /// Rewrite every entity reference a component holds (a Selectable's target
+    /// graphic and navigation targets, #420) through `map` — how the references
+    /// follow the entity when a prefab is saved, stamped or propagated.
+    pub fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
+        if let Some(s) = &mut self.selectable {
+            s.remap_refs(map);
+        }
+    }
+
+    /// Whether `pointer` (a JSON pointer into the entity document, as prefab
+    /// overrides key their leaves) names one of those entity references.
+    pub fn is_ref_pointer(pointer: &str) -> bool {
+        pointer
+            .strip_prefix("/selectable")
+            .is_some_and(|rest| SelectableComponent::REF_POINTERS.contains(&rest))
     }
 }

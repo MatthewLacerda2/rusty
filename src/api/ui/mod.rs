@@ -1,10 +1,14 @@
-//! src/api/ui.rs — `UI` namespace: EventSystem-level UI verbs (#417).
+//! src/api/ui/ — `UI` namespace: EventSystem-level UI verbs (#417, #420).
 //!
 //! Reads the in-game UI's computed layout. `UI.GetRect(id)` returns an element's
 //! rect in its canvas's reference units and in screen pixels, computed on demand
 //! from the live scene (so it reflects a change made earlier in the same script, in
 //! edit mode as well as in Play) with the same math as the per-tick layout system.
-//! Pointer and focus verbs join this namespace with #420.
+//! The pointer and focus verbs (#420) are in `events`.
+
+mod events;
+
+pub use events::register_events;
 
 use std::cell::RefCell;
 

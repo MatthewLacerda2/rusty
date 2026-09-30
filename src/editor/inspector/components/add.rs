@@ -34,11 +34,11 @@ fn add_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
     add_ui_components(ui, world, id);
 }
 
-/// Add-menu entries for the in-game UI (#417, #418, #419): a Canvas makes the entity
+/// Add-menu entries for the in-game UI (#417, #418, #419, #420): a Canvas makes the entity
 /// a UI root; a RectTransform makes it a UI element laid out inside its parent's
 /// rect; an Image draws it; a Text labels it; a Canvas Group fades its subtree; a
-/// Rect Mask clips it. Each is offered only when absent. Image, Text and Rect Mask
-/// declare `requires(RectTransform)`, so they go through the shared dependency
+/// Rect Mask clips it; a Selectable makes it interactive (#420). Each is offered only
+/// when absent. Image, Text, Rect Mask and Selectable declare `requires(RectTransform)`, so they go through the shared dependency
 /// verb, matching `Scene.AddComponent`.
 fn add_ui_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
     if !world.has_canvas(id) && ui.button(format!("{}  Canvas", icon::MONITOR)).clicked() {
@@ -71,6 +71,14 @@ fn add_ui_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) 
     }
     if !world.has_rect_mask(id) && ui.button(format!("{}  Rect Mask", icon::CROP)).clicked() {
         authoring::add_with_requirements(world, id, ComponentKind::RectMask);
+        ui.close_menu();
+    }
+    if !world.has_selectable(id)
+        && ui
+            .button(format!("{}  Selectable", icon::CURSOR_CLICK))
+            .clicked()
+    {
+        authoring::add_with_requirements(world, id, ComponentKind::Selectable);
         ui.close_menu();
     }
 }

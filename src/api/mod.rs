@@ -4,7 +4,7 @@
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
 //! `Scene`, `Random`, `Timer`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
 //! `Assets`, `Texture`, `Shader`, `Sound`, `Particles`, `Layers`, `Graphics`, `Video`,
-//! `Storage`, `Canvas`, `RectTransform`, `UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`,
+//! `Storage`, `Canvas`, `RectTransform`, `UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Selectable`,
 //! `Application`, plus the dev-only `Debug`)
 //! is registered from this tree onto the live Lua runtime.
 //! `scripting`
@@ -42,9 +42,9 @@ pub mod rect_transform;
 pub mod reflection;
 pub mod scene;
 pub mod scene_prefab;
+pub mod selectable;
 pub mod shader;
 pub mod snapshot;
-mod snapshot_components;
 pub mod sound;
 pub mod storage;
 pub mod text;
@@ -74,7 +74,7 @@ use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::scripting::{ConsoleLogs, TimerScheduler};
 use crate::time::Time;
-use crate::ui::ScreenSize;
+use crate::ui::{EventSystem, ScreenSize};
 
 /// Result alias every namespace registrar returns.
 pub type Reg = Result<(), String>;
@@ -125,6 +125,9 @@ pub struct ApiScopedCtx<'scope> {
     pub stats: &'scope RefCell<FrameStats>,
     /// Pending script timers and coroutines (#444), behind the `Timer` namespace.
     pub timers: &'scope RefCell<TimerScheduler>,
+    /// The UI event system (#420): selection, hover and press state behind the `UI`
+    /// namespace's pointer and focus verbs.
+    pub event_system: &'scope RefCell<EventSystem>,
 }
 
 /// Register every namespace onto `lua` using `scope`-tied closures that borrow
@@ -169,6 +172,8 @@ pub fn register<'lua, 'scope>(
     canvas::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
     rect_transform::register(lua, scope, ctx.scene)?;
     ui::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
+    ui::register_events(lua, scope, ctx)?;
+    selectable::register(lua, scope, ctx.scene, ctx.event_system)?;
     image::register(lua, scope, ctx.scene)?;
     canvas_group::register(lua, scope, ctx.scene)?;
     rect_mask::register(lua, scope, ctx.scene)?;

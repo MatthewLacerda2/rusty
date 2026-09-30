@@ -1,4 +1,4 @@
-//! src/api/snapshot.rs — the structured scene-read ("what the agent sees").
+//! src/api/snapshot/mod.rs — the structured scene-read ("what the agent sees").
 //!
 //! The read half of the editor↔API parity surface (#180, epic #176). It turns the
 //! **live** world into a stable, diffable JSON document rich enough to *author*
@@ -15,17 +15,23 @@
 use glam::{Mat4, Vec2, Vec3};
 use serde_json::{json, Value};
 
-use super::snapshot_components::{
-    animator_value, audio_value, camera_component_value, canvas_group_value, canvas_value,
-    collider_value, image_value, light_value, material_value, mesh_value, nav_agent_value,
-    particle_value, rect_mask_value, rect_transform_value, rigidbody_value, text_value,
-};
+mod components;
+mod ui;
+
 use crate::components::TransformComponent;
 use crate::ecs::World;
 use crate::scene::Camera;
 use crate::scene::Scene;
+use components::{
+    animator_value, audio_value, camera_component_value, collider_value, light_value,
+    material_value, mesh_value, nav_agent_value, particle_value, rigidbody_value,
+};
+use ui::{
+    canvas_group_value, canvas_value, image_value, rect_mask_value, rect_transform_value,
+    selectable_value, text_value,
+};
 
-/// A `glam::Vec3` as a `[x, y, z]` JSON array. Shared with `snapshot_components`.
+/// A `glam::Vec3` as a `[x, y, z]` JSON array. Shared with the `components` and `ui` builders.
 pub(crate) fn vec3(v: Vec3) -> Value {
     json!([v.x, v.y, v.z])
 }
@@ -110,6 +116,7 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, screen: Vec2) ->
         "canvas_group": world.canvas_group(id).map(|g| canvas_group_value(&g)),
         "rect_mask": world.rect_mask(id).map(|m| rect_mask_value(&m)),
         "text": world.text(id).map(|t| text_value(&t)),
+        "selectable": world.selectable(id).map(|s| selectable_value(&s)),
         "ui_rect": crate::ui::layout::rect_of(world, id, screen)
             .map(|r| super::ui::rect_value(&r)),
     })
@@ -119,7 +126,7 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, screen: Vec2) ->
 /// "component inventory" authoring needs). `Transform` is mandatory and omitted.
 fn inventory(world: &World, id: u32) -> Vec<&'static str> {
     type Probe = fn(&World, u32) -> bool;
-    let probes: [(Probe, &'static str); 17] = [
+    let probes: [(Probe, &'static str); 18] = [
         (World::has_mesh, "Mesh"),
         (World::has_material, "Material"),
         (World::has_light, "Light"),
@@ -136,6 +143,7 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
         (World::has_canvas_group, "CanvasGroup"),
         (World::has_rect_mask, "RectMask"),
         (World::has_text, "Text"),
+        (World::has_selectable, "Selectable"),
         (
             |w, id| w.scripts(id).is_some_and(|s| !s.is_empty()),
             "Script",

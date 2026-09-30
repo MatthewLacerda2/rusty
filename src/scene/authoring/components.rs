@@ -34,6 +34,7 @@ pub enum ComponentKind {
     CanvasGroup,
     RectMask,
     Text,
+    Selectable,
 }
 
 impl ComponentKind {
@@ -41,7 +42,7 @@ impl ComponentKind {
     /// finding a removed kind's dependents ([`dependency::remove_with_cascade`]) and
     /// reconciling/enforcing unmet requirements. The per-kind matches in `dependency`
     /// are compiler-checked exhaustive; a test guards this list against drift.
-    pub const ALL: [ComponentKind; 16] = [
+    pub const ALL: [ComponentKind; 17] = [
         Self::Light,
         Self::Animator,
         Self::Collider,
@@ -58,6 +59,7 @@ impl ComponentKind {
         Self::CanvasGroup,
         Self::RectMask,
         Self::Text,
+        Self::Selectable,
     ];
 
     /// The first-class components this kind depends on — rusty's `RequireComponent`
@@ -66,15 +68,17 @@ impl ComponentKind {
     /// removing one of these cascades to the dependents that declare it. Flat
     /// `kind → [kinds]`: `VisualCorrection → Camera` (a correction stack is inert
     /// without a camera to correct), and the UI graphic and clip need a rect to fill
-    /// or clip to (`Image` / `Text` / `RectMask → RectTransform`, as Unity's `Graphic` and
+    /// or clip to, and a Selectable a rect to be hit in (`Image` / `Text` / `RectMask` /
+    /// `Selectable → RectTransform`, as Unity's `Graphic` and
     /// `RectMask2D` require one). A new dependency is one line here, enforced
     /// everywhere by construction.
     pub fn requires(self) -> &'static [ComponentKind] {
         match self {
             ComponentKind::VisualCorrection => &[ComponentKind::Camera],
-            ComponentKind::Image | ComponentKind::Text | ComponentKind::RectMask => {
-                &[ComponentKind::RectTransform]
-            }
+            ComponentKind::Image
+            | ComponentKind::Text
+            | ComponentKind::RectMask
+            | ComponentKind::Selectable => &[ComponentKind::RectTransform],
             _ => &[],
         }
     }
@@ -99,6 +103,7 @@ impl ComponentKind {
             "canvasgroup" => Some(Self::CanvasGroup),
             "rectmask" | "rectmask2d" => Some(Self::RectMask),
             "text" | "textmeshpro" | "textmeshprougui" => Some(Self::Text),
+            "selectable" => Some(Self::Selectable),
             _ => None,
         }
     }

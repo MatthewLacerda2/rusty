@@ -37,7 +37,8 @@ pub(in crate::render::ui) fn push_text(
         axis(br - bl, size.x, Vec2::X),
         axis(tl - bl, size.y, Vec2::Y),
     );
-    let alpha = Vec4::new(1.0, 1.0, 1.0, state.alpha);
+    // A Selectable's ColorTint (#420) multiplies every colour, like the group alpha.
+    let alpha = text.state_tint * Vec4::new(1.0, 1.0, 1.0, state.alpha);
     for quad in text_quads(&text, size, atlases) {
         let start = mesh.vertices.len() as u32;
         let TextQuad { corners, uv, .. } = &quad;

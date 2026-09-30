@@ -181,11 +181,12 @@ fn push_image(mesh: &mut CanvasMesh, frame: &Frame, id: u32, rect: &UiRect, stat
     let Some(image) = frame.world.image(id) else {
         return;
     };
-    let color = image.color * Vec4::new(1.0, 1.0, 1.0, state.alpha);
+    // A Selectable's ColorTint (#420) multiplies in, like the group alpha.
+    let color = image.color * image.state_tint * Vec4::new(1.0, 1.0, 1.0, state.alpha);
     let Some(clip) = visible_clip(state, color.w, frame.screen) else {
         return;
     };
-    let tex = image.texture.as_deref().and_then(frame.tex_size);
+    let tex = image.shown_texture().and_then(frame.tex_size);
     let tris = image_triangles(&image, rect.rect.1, tex);
     let [bl, tl, _, br] = rect.corners;
     let start = mesh.vertices.len() as u32;
@@ -196,9 +197,8 @@ fn push_image(mesh: &mut CanvasMesh, frame: &Frame, id: u32, rect: &UiRect, stat
         ..Zeroable::zeroed()
     }));
     let source = image
-        .texture
-        .clone()
-        .map_or(UiSource::Solid, UiSource::Texture);
+        .shown_texture()
+        .map_or(UiSource::Solid, |t| UiSource::Texture(t.to_string()));
     close_batch(mesh, source, clip, start);
 }
 

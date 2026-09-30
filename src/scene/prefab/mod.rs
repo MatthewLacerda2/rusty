@@ -36,8 +36,7 @@ pub fn is_prefab_path(path: &str) -> bool {
     Path::new(path)
         .extension()
         .and_then(|e| e.to_str())
-        .map(|e| e.eq_ignore_ascii_case(PREFAB_EXTENSION))
-        .unwrap_or(false)
+        .is_some_and(|e| e.eq_ignore_ascii_case(PREFAB_EXTENSION))
 }
 
 /// A saved GameObject subtree: the root's local id, the root + descendants with
@@ -108,8 +107,8 @@ fn collect_subtree(scene: &Scene, root_id: u32) -> Vec<u32> {
 }
 
 /// Rewrite one entity's identity into the local id space: its own `id`, its
-/// `children`, and its `parent_id` (cleared for the root, which detaches from the
-/// scene it was extracted from). The `pending_material` migration carrier is never
+/// `children`, its component references (dropped when outside the subtree), and its
+/// `parent_id` (cleared for the root, which detaches from its scene). The `pending_material` migration carrier is never
 /// part of a freshly cloned runtime entity, so nothing to scrub there. Any
 /// `prefab_link` is **dropped**: extracting an already-linked instance bakes it down
 /// into a fresh flat prefab — the new `.prefab` is a plain subtree with no nested
@@ -117,6 +116,7 @@ fn collect_subtree(scene: &Scene, root_id: u32) -> Vec<u32> {
 fn remap_entity(entity: &mut Entity, local: &BTreeMap<u32, u32>, is_root: bool) {
     entity.id = local[&entity.id];
     entity.prefab_link = None;
+    entity.remap_refs(&|r| local.get(&r).copied());
     entity.children = entity
         .children
         .iter()
@@ -174,6 +174,7 @@ fn stamp_prefab(
         entity.id += base;
         entity.parent_id = entity.parent_id.map(|p| base + p);
         entity.children = entity.children.iter().map(|c| base + c).collect();
+        entity.remap_refs(&|r| Some(base + r));
         rename_entity_material(&mut entity, &renames);
         rehydrate_entity_mesh(&mut entity);
         if let Some(source) = link_source {

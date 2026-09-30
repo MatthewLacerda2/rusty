@@ -12,7 +12,7 @@ use crate::core::frame_stats::FrameStats;
 use crate::core::quality::QualityPreset;
 use crate::core::storage::Storage;
 use crate::core::video::VideoSettings;
-use crate::ui::ScreenSize;
+use crate::ui::{EventSystem, ScreenSize};
 
 use super::ScriptManager;
 
@@ -34,6 +34,12 @@ impl ScriptManager {
     /// `UI` namespace and the layout system read the same screen.
     pub fn set_screen_cell(&mut self, screen: Rc<RefCell<ScreenSize>>) {
         self.screen = screen;
+    }
+
+    /// Handle to the UI event system (#420), so `Resources` drives the same state
+    /// the `UI` namespace reads.
+    pub fn event_system_cell(&self) -> Rc<RefCell<EventSystem>> {
+        Rc::clone(&self.event_system)
     }
 
     /// Inject the shared `Application` cell (build settings + quit request), so the

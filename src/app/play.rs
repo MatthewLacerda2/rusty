@@ -76,6 +76,8 @@ const REBAKE_INTERVAL_FRAMES: u64 = 60;
 /// system has seen the entity, and right before `advance_frame`.
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::FixedUpdate, rebake_nav)
+        .add_system(Stage::FixedUpdate, init_scripts)
+        .add_system(Stage::FixedUpdate, super::ui::dispatch_ui_events)
         .add_system(Stage::FixedUpdate, update_scripts)
         .add_system(Stage::FixedUpdate, tick_nav)
         .add_system(Stage::FixedUpdate, step_physics)
@@ -87,14 +89,19 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, advance_frame);
 }
 
-/// The script phase. Its head drains queued script loads — entities spawned
-/// during play get their scripts compiled here, one tick after the spawn — and
-/// runs every pending `Awake` then `Start` (#322), so init always precedes any
-/// `Update` of the tick. Then every started script's `Update` runs, and then the
-/// timer phase (#444): due `Timer.Invoke`s fire and waiting coroutines resume,
+/// The script phase's head: drain queued script loads — entities spawned during
+/// play get their scripts compiled here, one tick after the spawn — and run every
+/// pending `Awake` then `Start` (#322), so init always precedes the tick's UI
+/// callbacks (#420) and any `Update`.
+fn init_scripts(_world: &mut World, res: &mut Resources) {
+    res.script_manager.init_scripts();
+}
+
+/// The script phase's body: every started script's `Update`, after this tick's
+/// UI callbacks, so gameplay reads `UI.IsPointerConsumed` already settled. Then
+/// the timer phase (#444): due `Timer.Invoke`s fire and waiting coroutines resume,
 /// on the same scaled `dt` — after every `Update`, before physics and `LateUpdate`.
 fn update_scripts(_world: &mut World, res: &mut Resources) {
-    res.script_manager.init_scripts();
     res.script_manager.update_scripts(res.frame_dt);
     res.script_manager.tick_timers(res.frame_dt);
 }

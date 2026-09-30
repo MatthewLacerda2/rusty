@@ -51,7 +51,8 @@ fn instance_entity_ids(scene: &Scene, root_id: u32) -> Option<Vec<u32>> {
 /// material library, so the merge reuses identical entries and rewrites references to
 /// the very same library keys the instance uses — then folds any newly-introduced
 /// materials back into `scene`. The returned entities are mesh-rehydrated and carry
-/// their LOCAL ids (caller overwrites identity/structure from the live instance).
+/// their LOCAL ids, component references included (callers move those into the
+/// instance's ids with [`in_instance_space`] and overwrite identity/structure).
 fn fresh_baselines(scene: &mut Scene, prefab: &PrefabData) -> BTreeMap<u32, Entity> {
     let mut scratch = Scene::new();
     scratch.materials = scene.materials.clone();
@@ -63,7 +64,8 @@ fn fresh_baselines(scene: &mut Scene, prefab: &PrefabData) -> BTreeMap<u32, Enti
     let base = root.wrapping_sub(prefab.root);
     let mut out = BTreeMap::new();
     for id in scratch.entity_ids() {
-        if let Some(entity) = scratch.world.entity_document(id) {
+        if let Some(mut entity) = scratch.world.entity_document(id) {
+            entity.remap_refs(&|r| Some(r.wrapping_sub(base)));
             out.insert(id.wrapping_sub(base), entity);
         }
     }
@@ -71,6 +73,24 @@ fn fresh_baselines(scene: &mut Scene, prefab: &PrefabData) -> BTreeMap<u32, Enti
     // Carry back any materials the merge added (a brand-new key, or a uniquified one).
     scene.materials = scratch.materials;
     out
+}
+
+/// `baselines` (keyed by local id) with their component references moved from
+/// local ids to the ids of the instance entities `ids`, so an untouched reference
+/// diffs clean and a rebuilt one points inside its own instance.
+fn in_instance_space(
+    scene: &Scene,
+    ids: &[u32],
+    mut baselines: BTreeMap<u32, Entity>,
+) -> BTreeMap<u32, Entity> {
+    let map: BTreeMap<u32, u32> = ids
+        .iter()
+        .filter_map(|&id| Some((local_id_of(scene, id)?, id)))
+        .collect();
+    for entity in baselines.values_mut() {
+        entity.remap_refs(&|l| map.get(&l).copied());
+    }
+    baselines
 }
 
 /// Recompute and store each instance entity's overrides as the diff against its fresh
@@ -81,6 +101,7 @@ pub fn record_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<usiz
     let ids = require_instance(scene, root_id)?;
     let prefab = load_instance_source(scene, root_id)?;
     let baselines = fresh_baselines(scene, &prefab);
+    let baselines = in_instance_space(scene, &ids, baselines);
     let mut recorded = 0;
     for id in ids {
         let Some(local_id) = local_id_of(scene, id) else {
@@ -111,6 +132,7 @@ pub fn reimport_instance(scene: &mut Scene, root_id: u32) -> Result<(), String> 
     let ids = require_instance(scene, root_id)?;
     let prefab = load_instance_source(scene, root_id)?;
     let baselines = fresh_baselines(scene, &prefab);
+    let baselines = in_instance_space(scene, &ids, baselines);
     for id in ids {
         rebuild_entity(scene, id, &baselines, true);
     }
@@ -124,6 +146,7 @@ pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), 
     let ids = require_instance(scene, root_id)?;
     let prefab = load_instance_source(scene, root_id)?;
     let baselines = fresh_baselines(scene, &prefab);
+    let baselines = in_instance_space(scene, &ids, baselines);
     for id in ids {
         if let Some(mut link) = scene.world.prefab_link_mut(id) {
             link.overrides.clear();
@@ -224,3 +247,6 @@ fn link_source(scene: &Scene, root_id: u32) -> Result<String, String> {
 #[cfg(test)]
 #[path = "prefab_link_tests.rs"]
 mod prefab_link_tests;
+#[cfg(test)]
+#[path = "prefab_refs_tests.rs"]
+mod prefab_refs_tests;
