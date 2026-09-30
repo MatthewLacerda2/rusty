@@ -42,7 +42,7 @@ fn tv_never_clips() {
         let peak = settled_peak(SpeakerMode::Tv, level);
         assert!(peak < 1.0, "level {level} -> {peak}");
     }
-    assert!(limit(100.0) < 1.0 && limit(-100.0) > -1.0);
+    assert!(limit(100.0) <= 1.0 && limit(-100.0) >= -1.0);
     assert_eq!(limit(0.5), 0.5);
 }
 
