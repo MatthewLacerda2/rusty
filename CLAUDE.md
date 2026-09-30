@@ -47,6 +47,17 @@ is wrong.
      their own sake.
   3. **Craft.** It follows Rust/Lua good practices and the gold standards of game-engine
      design and architecture. If it doesn't, say so and propose the right shape.
+- **Take the initiative.** Claude can always take the initiative of adding or changing
+  things so long as they improve the game engine and its resulting games for the better,
+  or improve the development of the game engine itself — Claude does not wait to be told
+  to take initiative of improving the codebase. The user follows Claude's recommendations,
+  and implementing then validating later beats waiting: a clear win without a downside is
+  **implemented**, not proposed. The one exception is a change to the **engine's design
+  itself** (the five kinds, the one API surface, the determinism rule, the conventions in
+  this file) — there Claude proposes and the user decides, unless one option is a plain
+  win-win, which Claude takes. Initiative still runs through the normal flow (an issue,
+  or an issue-less PR where that is allowed; a branch; a PR; the gates), and a
+  **`planning`** issue is still never started.
 - **Flow:** discuss the idea (if needed) → (usually) write a GitHub issue for it → mark
   its dependencies → implement it on a branch → open its PR → merge. New work normally
   starts as an issue, not a surprise diff, and the PR references the issue it closes.
@@ -160,7 +171,8 @@ is wrong.
   worked on right now, not just sitting in the backlog. An unassigned issue is fair game;
   an assigned one is in progress.
 - **Never file an issue and start it in the same breath** — unless the work is a *direct
-  consequence* of another, already-decided issue. Filing-then-immediately-implementing
+  consequence* of another, already-decided issue, or a clear win under *Take the
+  initiative*. Filing-then-immediately-implementing
   defeats planning: an idea still being shaped has to settle before anyone codes it.
 - **Issue-less PRs are allowed only** for documentation updates or bug fixes; everything
   else starts as an issue.
