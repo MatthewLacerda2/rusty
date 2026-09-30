@@ -1,4 +1,4 @@
-//! src/render/setup_headless.rs — Offscreen (no-window) renderer construction.
+//! src/render/setup/headless.rs — Offscreen (no-window) renderer construction.
 //!
 //! Builds a fully functional `Renderer` with NO window surface, for the dev-layer
 //! screenshot path. Reuses `Renderer::from_parts` so the offscreen renderer is
@@ -13,6 +13,18 @@ use crate::render::Renderer;
 /// The colour format the offscreen target renders into. Non-sRGB so the copied-back
 /// bytes map 1:1 to PNG channel values without a gamma surprise.
 pub const OFFSCREEN_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+
+/// The backends a headless renderer may use: Vulkan, Metal and DX12 — never GL.
+///
+/// Every headless renderer creates its own `wgpu::Instance`, and several live at
+/// once (parallel tests, a bake beside a preview). On Linux, `Backends::all()` also
+/// brings up wgpu-hal's GLES/EGL backend, whose EGL display is shared process-wide:
+/// dropping one instance terminates it under another thread's `make_current`, a
+/// `NotInitialized` panic (#518). Every adapter a headless render runs on — a real
+/// GPU, lavapipe on Linux CI, Metal on macOS, WARP on Windows — is a primary
+/// backend, so leaving GL out costs no coverage. The windowed renderer keeps
+/// `all()`: it owns one instance per process, and GL-only machines need it.
+pub(crate) const HEADLESS_BACKENDS: wgpu::Backends = wgpu::Backends::PRIMARY;
 
 impl Renderer {
     /// Build a headless renderer at `width` x `height`. Returns `None` (after a
@@ -32,7 +44,7 @@ impl Renderer {
         let permit = super::budget::acquire_headless();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
+            backends: HEADLESS_BACKENDS,
             ..Default::default()
         });
 
@@ -94,5 +106,24 @@ fn offscreen_config(width: u32, height: u32) -> wgpu::SurfaceConfiguration {
         alpha_mode: wgpu::CompositeAlphaMode::Auto,
         view_formats: vec![],
         desired_maximum_frame_latency: 2,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::HEADLESS_BACKENDS;
+
+    #[test]
+    fn headless_renderers_never_bring_up_the_gl_backend() {
+        // GL's shared EGL display is what several headless instances race on (#518).
+        assert!(!HEADLESS_BACKENDS.contains(wgpu::Backends::GL));
+        // …and every adapter headless renders actually run on stays reachable.
+        for backend in [
+            wgpu::Backends::VULKAN,
+            wgpu::Backends::METAL,
+            wgpu::Backends::DX12,
+        ] {
+            assert!(HEADLESS_BACKENDS.contains(backend), "{backend:?}");
+        }
     }
 }
