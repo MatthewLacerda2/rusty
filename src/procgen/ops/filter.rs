@@ -8,7 +8,20 @@
 
 use super::super::image_buf::{Image, Rgba};
 
-/// Separable box blur of `radius` pixels. `radius == 0` returns the input unchanged.
+/// A blur radius given as a fraction of the tile width, in pixels at `resolution`:
+/// `round(radius * resolution)`, at most half the tile (a wider window just wraps
+/// back over pixels it already averaged). Negative or NaN reads as no blur.
+pub fn pixel_radius(radius: f32, resolution: u32) -> u32 {
+    let px = (radius * resolution as f32).round();
+    if px >= 1.0 {
+        (px as u32).min(resolution / 2)
+    } else {
+        0
+    }
+}
+
+/// Separable box blur of `radius` **pixels** (see [`pixel_radius`] for the recipe's
+/// tile-fraction unit). `radius == 0` returns the input unchanged.
 pub fn blur(img: &Image, radius: u32) -> Image {
     if radius == 0 {
         return img.clone();

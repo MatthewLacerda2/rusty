@@ -67,6 +67,27 @@ impl Image {
         self.pixels[yi * self.resolution as usize + xi]
     }
 
+    /// Sample at a continuous domain point `(u, v)` (1.0 = one tile) with bilinear
+    /// filtering between the four nearest pixel centers, wrapping at the edges — the
+    /// resampler a domain transform uses so it is neither blocky nor seamed.
+    pub fn sample_bilinear_wrapped(&self, u: f32, v: f32) -> Rgba {
+        let res = self.resolution as f32;
+        let (x, y) = (u * res - 0.5, v * res - 0.5);
+        let (x0, y0) = (x.floor(), y.floor());
+        let (tx, ty) = (x - x0, y - y0);
+        let (xi, yi) = (x0 as i64, y0 as i64);
+        let (p00, p10) = (self.get_wrapped(xi, yi), self.get_wrapped(xi + 1, yi));
+        let (p01, p11) = (
+            self.get_wrapped(xi, yi + 1),
+            self.get_wrapped(xi + 1, yi + 1),
+        );
+        std::array::from_fn(|c| {
+            let top = p00[c] + (p10[c] - p00[c]) * tx;
+            let bottom = p01[c] + (p11[c] - p01[c]) * tx;
+            top + (bottom - top) * ty
+        })
+    }
+
     /// Apply `f(u, v) -> Rgba` over the unit domain, where `u`/`v` are pixel-center
     /// coordinates in `[0, 1)`. This is the generator entry point: an op that has no
     /// inputs paints itself by sampling its parametric function per pixel.
@@ -112,6 +133,22 @@ mod tests {
         assert_eq!(img.get_wrapped(0, 0), img.get_wrapped(2, 2));
         assert_eq!(img.get_wrapped(0, 0), img.get_wrapped(-2, -2));
         assert_eq!(img.get_wrapped(1, 1), img.get_wrapped(-1, -1));
+    }
+
+    #[test]
+    fn bilinear_sample_blends_neighbours_and_wraps() {
+        let mut img = Image::new(2);
+        img.pixels_mut()[0] = [1.0, 1.0, 1.0, 1.0]; // (0,0) white, (1,0) black
+                                                    // A pixel center reads exactly its pixel.
+        assert_eq!(
+            img.sample_bilinear_wrapped(0.25, 0.25),
+            [1.0, 1.0, 1.0, 1.0]
+        );
+        // Halfway between (0,0) and (1,0) on row 0 reads the average...
+        assert_eq!(img.sample_bilinear_wrapped(0.5, 0.25)[0], 0.5);
+        // ...and so does the wrap between (1,0) and (0,0).
+        assert_eq!(img.sample_bilinear_wrapped(1.0, 0.25)[0], 0.5);
+        assert_eq!(img.sample_bilinear_wrapped(0.0, 0.25)[0], 0.5);
     }
 
     #[test]

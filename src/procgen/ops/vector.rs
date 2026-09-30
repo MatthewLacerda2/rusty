@@ -6,51 +6,72 @@
 //! combine/separate pair shuttle between grayscale channels and an RGB image.
 
 use super::super::image_buf::{Image, Rgba};
+use super::generators::count;
 use super::math::luminance;
 
 /// Resample `img` under an affine domain transform: translate, rotate (turns) about
-/// the domain center, then scale. Sampling wraps (nearest, modular), so the output
-/// still tiles. A `scale > 1` packs more repeats into the canvas.
-pub fn mapping(img: &Image, scale: [f32; 2], rotation: f32, translation: [f32; 2]) -> Image {
-    let res = img.resolution();
-    let (sx, sy) = (scale[0].abs().max(1e-4), scale[1].abs().max(1e-4));
-    let ang = rotation * std::f32::consts::TAU;
-    let (ca, sa) = (ang.cos(), ang.sin());
-    Image::fill_uv(res, |u, v| {
+/// the domain center, then scale; a `scale > 1` packs more repeats into the canvas.
+/// Sampling is bilinear and wraps. With `tiling`, `scale` rounds to whole repeats and
+/// `rotation` snaps to quarter turns — the only transforms that map the unit tile's
+/// lattice onto itself, so the output still tiles (#392).
+pub fn mapping(
+    img: &Image,
+    scale: [f32; 2],
+    rotation: f32,
+    translation: [f32; 2],
+    tiling: bool,
+) -> Image {
+    let [su, sv] = scale.map(|s| s.abs().max(1e-4));
+    let (sx, sy, (ca, sa)) = if tiling {
+        (count(su), count(sv), quarter_turn(rotation))
+    } else {
+        let ang = rotation * std::f32::consts::TAU;
+        (su, sv, (ang.cos(), ang.sin()))
+    };
+    Image::fill_uv(img.resolution(), |u, v| {
         // Center the domain so rotation/scale pivot at (0.5, 0.5).
         let (cx, cy) = (u - 0.5, v - 0.5);
         let rx = cx * ca - cy * sa;
         let ry = cx * sa + cy * ca;
-        let su = rx * sx + 0.5 + translation[0];
-        let sv = ry * sy + 0.5 + translation[1];
-        // Wrapped nearest fetch keeps the result seamless.
-        let px = (su * res as f32).floor() as i64;
-        let py = (sv * res as f32).floor() as i64;
-        img.get_wrapped(px, py)
+        img.sample_bilinear_wrapped(
+            rx * sx + 0.5 + translation[0],
+            ry * sy + 0.5 + translation[1],
+        )
     })
 }
 
+/// `(cos, sin)` of `turns` snapped to the nearest quarter turn — exact, not via
+/// `f32` trig, so a snapped rotation adds no rounding drift at the wrap.
+fn quarter_turn(turns: f32) -> (f32, f32) {
+    match ((turns * 4.0).round() as i64).rem_euclid(4) {
+        0 => (1.0, 0.0),
+        1 => (0.0, 1.0),
+        2 => (-1.0, 0.0),
+        _ => (0.0, -1.0),
+    }
+}
+
 /// Bake a tangent-space normal map from `img`'s red channel as a height field. Uses
-/// central differences (wrapped, so the normals tile) and packs the unit normal into
-/// `[0, 1]` RGB the renderer's `2*n - 1` decode expects, with B≈1 for a flat surface.
+/// central differences (wrapped, so the normals tile) converted to **tile units** —
+/// the per-pixel delta times the resolution — so `strength` means the same slope at
+/// any resolution (#394). Packs the unit normal into `[0, 1]` RGB the renderer's
+/// `2*n - 1` decode expects, with B≈1 for a flat surface.
 pub fn bump_to_normal(img: &Image, strength: f32) -> Image {
     let res = img.resolution();
     let h = |x: i64, y: i64| img.get_wrapped(x, y)[0];
+    // Central difference spans two pixels = 2/res of a tile.
+    let k = 0.5 * res as f32 * strength;
     Image::fill_uv(res, |u, v| {
         let x = (u * res as f32) as i64;
         let y = (v * res as f32) as i64;
-        // dz/dx and dz/dy via central differences; strength scales the slope.
-        let dx = (h(x + 1, y) - h(x - 1, y)) * 0.5 * strength;
-        let dy = (h(x, y + 1) - h(x, y - 1)) * 0.5 * strength;
+        let dx = (h(x + 1, y) - h(x - 1, y)) * k;
+        let dy = (h(x, y + 1) - h(x, y - 1)) * k;
         // Tangent-space normal of the height surface: (-dx, -dy, 1) normalized.
-        let nx = -dx;
-        let ny = -dy;
-        let nz = 1.0;
-        let inv = 1.0 / (nx * nx + ny * ny + nz * nz).sqrt();
+        let inv = 1.0 / (dx * dx + dy * dy + 1.0).sqrt();
         [
-            nx * inv * 0.5 + 0.5,
-            ny * inv * 0.5 + 0.5,
-            nz * inv * 0.5 + 0.5,
+            -dx * inv * 0.5 + 0.5,
+            -dy * inv * 0.5 + 0.5,
+            inv * 0.5 + 0.5,
             1.0,
         ]
     })
