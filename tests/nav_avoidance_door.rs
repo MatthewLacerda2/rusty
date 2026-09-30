@@ -19,6 +19,7 @@ fn add_wall(scene: &mut Scene, min: Vec3, max: Vec3) {
             is_trigger: false,
             aabb_min: min,
             aabb_max: max,
+            material: Default::default(),
         }),
     );
 }
