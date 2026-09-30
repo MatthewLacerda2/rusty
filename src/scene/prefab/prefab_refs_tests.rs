@@ -70,3 +70,32 @@ fn a_linked_instance_diffs_clean_and_propagates_in_its_own_ids() {
     assert_eq!(target(&other, inst), Some(child));
     let _ = std::fs::remove_file(&path);
 }
+
+#[test]
+fn applying_a_changed_reference_writes_the_source_in_local_ids() {
+    let (mut scene, root) = authored();
+    let second = create_entity(&mut scene, "Second", None);
+    scene.set_parent(second, Some(root)).expect("parent");
+    let path = std::env::temp_dir()
+        .join("rusty_420_refs_apply.prefab")
+        .to_string_lossy()
+        .into_owned();
+    save_prefab(&scene, root, &path).expect("saves");
+    let prefab = read_prefab_file(&path).expect("reads");
+    let mut other = Scene::new();
+    create_entity(&mut other, "Offset", None);
+    let inst = instantiate_prefab_linked(&mut other, &prefab, None, &path);
+    let second_inst = other.world.children(inst)[1];
+    other
+        .world
+        .selectable_mut(inst)
+        .expect("sel")
+        .target_graphic = Some(second_inst);
+    record_instance_overrides(&mut other, inst).expect("records");
+    crate::scene::prefab::apply::apply_instance_to_source(&mut other, inst).expect("applies");
+    let source = read_prefab_file(&path).expect("reads");
+    let sel = source.entities[0].selectable.clone().expect("selectable");
+    assert_eq!(sel.target_graphic, Some(2), "the second child's local id");
+    assert_eq!(target(&other, inst), Some(second_inst));
+    let _ = std::fs::remove_file(&path);
+}

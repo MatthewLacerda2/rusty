@@ -19,6 +19,7 @@ use std::collections::BTreeMap;
 
 use serde_json::Value;
 
+use crate::components::Entity;
 use crate::scene::prefab::overrides::apply_overrides;
 use crate::scene::prefab::{read_prefab_file, write_prefab_file};
 use crate::scene::{reimport_instance, revert_instance_overrides, PrefabData, Scene};
@@ -38,6 +39,7 @@ pub fn apply_instance_to_source(scene: &mut Scene, root_id: u32) -> Result<usize
             continue;
         }
         if let Some(local_id) = local_id_of(scene, id) {
+            let overrides = to_local_refs(scene, root_id, &overrides);
             if write_onto_source(&mut prefab, local_id, &overrides) {
                 applied += 1;
             }
@@ -69,7 +71,7 @@ pub fn apply_instance_field_to_source(
         .cloned()
         .ok_or_else(|| format!("entity {entity_id} has no override at {path}"))?;
     let mut prefab = read_prefab_file(&source)?;
-    let one = BTreeMap::from([(path.to_string(), leaf)]);
+    let one = to_local_refs(scene, root, &BTreeMap::from([(path.to_string(), leaf)]));
     if !write_onto_source(&mut prefab, local_id, &one) {
         return Err(format!("source has no entity with local id {local_id}"));
     }
@@ -93,6 +95,33 @@ fn write_onto_source(
         }
         None => false,
     }
+}
+
+/// `overrides` with every entity-reference leaf (a Selectable's target, #420) moved
+/// from the instance's ids to the source's local ids — a reference outside the
+/// instance becomes `null`, as prefab extraction drops it.
+fn to_local_refs(
+    scene: &Scene,
+    root_id: u32,
+    overrides: &BTreeMap<String, Value>,
+) -> BTreeMap<String, Value> {
+    let local: BTreeMap<u32, u32> = instance_ids(scene, root_id)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|id| Some((id, local_id_of(scene, id)?)))
+        .collect();
+    let to_local = |v: &Value| {
+        let id = v.as_u64().and_then(|n| u32::try_from(n).ok());
+        id.and_then(|id| local.get(&id))
+            .map_or(Value::Null, |&l| Value::from(l))
+    };
+    overrides
+        .iter()
+        .map(|(path, v)| match Entity::is_ref_pointer(path) {
+            true => (path.clone(), to_local(v)),
+            false => (path.clone(), v.clone()),
+        })
+        .collect()
 }
 
 /// The entity ids of the instance rooted at `root_id` (root + descendants sharing its

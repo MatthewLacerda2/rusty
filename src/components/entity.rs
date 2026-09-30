@@ -280,4 +280,12 @@ impl Entity {
             s.remap_refs(map);
         }
     }
+
+    /// Whether `pointer` (a JSON pointer into the entity document, as prefab
+    /// overrides key their leaves) names one of those entity references.
+    pub fn is_ref_pointer(pointer: &str) -> bool {
+        pointer
+            .strip_prefix("/selectable")
+            .is_some_and(|rest| SelectableComponent::REF_POINTERS.contains(&rest))
+    }
 }

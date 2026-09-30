@@ -133,6 +133,16 @@ impl Default for SelectableComponent {
 }
 
 impl SelectableComponent {
+    /// The JSON pointers (inside the component) of its entity references — how
+    /// prefab write-back finds the override leaves holding entity ids.
+    pub const REF_POINTERS: [&'static str; 5] = [
+        "/target_graphic",
+        "/select_on/0",
+        "/select_on/1",
+        "/select_on/2",
+        "/select_on/3",
+    ];
+
     /// The colour for `state`.
     pub fn color(&self, state: SelectionState) -> Vec4 {
         self.colors[state as usize]
