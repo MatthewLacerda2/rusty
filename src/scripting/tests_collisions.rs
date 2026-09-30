@@ -1,6 +1,7 @@
 //! Tests for the collision callbacks (#448): `OnCollisionEnter` / `OnCollisionStay`
 //! get `(id, other, contact)` as the receiver sees it, `OnCollisionExit` gets
-//! `(id, other)`, and they dispatch after the trigger callbacks of the same tick.
+//! `(id, other)`, and they dispatch after the trigger callbacks of the same tick;
+//! `OnJointBreak` (#449) follows them.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -93,4 +94,34 @@ fn the_other_side_sees_the_contact_flipped() {
     });
     let want = format!("-1.0,-3.0,{}", id + 100);
     assert_eq!(m.eval("__n").unwrap(), want);
+}
+
+#[test]
+fn joint_breaks_dispatch_after_collisions() {
+    let (mut m, id) = manager_with_entity();
+    m.init_runtime(&Rc::new(RefCell::new(None))).unwrap();
+    let path = write_script(
+        "snaps",
+        "_G.__log = ''\nreturn {\n\
+         OnCollisionExit = function(id, other) __log = __log .. 'X' end,\n\
+         OnJointBreak = function(id, f, t) __log = __log .. 'B' .. f .. ',' .. t end,\n\
+         }",
+    );
+    m.load_entity_script(id, 0, &path, &BTreeMap::new())
+        .unwrap();
+    m.init_scripts();
+    let joint_breaks = vec![crate::physics::JointBreak {
+        id,
+        force: 12.5,
+        torque: 0.5,
+    }];
+    m.dispatch_physics_events(PhysicsEvents {
+        collisions: CollisionEvents {
+            exited: vec![(id, 9)],
+            ..Default::default()
+        },
+        joint_breaks,
+        ..Default::default()
+    });
+    assert_eq!(m.eval("__log").unwrap(), "XB12.5,0.5");
 }

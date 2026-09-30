@@ -45,6 +45,10 @@ pub const ON_COLLISION_STAY: &str = "OnCollisionStay";
 /// Called once, the tick after a solid contact involving the owning entity ends
 /// (#448) — `(id, other)`, after that tick's `OnCollisionStay` dispatches.
 pub const ON_COLLISION_EXIT: &str = "OnCollisionExit";
+/// Called once, the tick the owning entity's `Joint` breaks past its
+/// `break_force` / `break_torque` (#449) — `(id, force, torque)`, after that
+/// tick's collision callbacks. The component is already gone.
+pub const ON_JOINT_BREAK: &str = "OnJointBreak";
 /// Called when the owning entity becomes active (#323): on its first activation
 /// — between `Awake` and `Start`, so the first-tick order is
 /// `Awake → OnEnable → Start` — and again on every later inactive→active edge.
@@ -107,6 +111,7 @@ pub const LIFECYCLE_CALLBACKS: &[&str] = &[
     ON_COLLISION_ENTER,
     ON_COLLISION_STAY,
     ON_COLLISION_EXIT,
+    ON_JOINT_BREAK,
     ON_POINTER_ENTER,
     ON_POINTER_EXIT,
     ON_POINTER_DOWN,

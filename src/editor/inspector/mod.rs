@@ -281,6 +281,7 @@ fn draw_components(
     gameplay::draw_animator(ui, world, id, &mut editor.is_dirty);
     gameplay::draw_collider(ui, world, id, &mut editor.is_dirty, pending_nav_bake);
     gameplay::draw_rigidbody(ui, world, id, &mut editor.is_dirty);
+    gameplay::draw_joint(ui, world, id, &mut editor.is_dirty);
     gameplay::draw_nav_agent(ui, world, id, &mut editor.is_dirty);
 
     camera::draw_camera(ui, world, id, named_layers, &mut editor.is_dirty);
