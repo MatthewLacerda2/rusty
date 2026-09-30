@@ -1,4 +1,4 @@
-#import common::{CameraUniforms, VertexInput, blend_joints}
+#import common::{CameraUniforms, VertexInput, apply_fog, blend_joints}
 
 struct AmbientLight {
     color: vec3<f32>,
@@ -418,9 +418,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     }
 
-    // Unlit rendering (e.g. grids, path highlights, light gizmos)
+    // Unlit rendering (e.g. grids, path highlights, light gizmos). Still fogged: an
+    // unlit sign down a smoky corridor fades like the wall it hangs on (#437).
     if (entity.is_lit == 0u) {
-        return base_color;
+        return vec4<f32>(apply_fog(camera.fog, base_color.rgb, in.world_position, camera.camera_pos), base_color.a);
     }
 
     // Geometric normal, optionally perturbed by a tangent-space normal map (#207).
@@ -537,5 +538,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
     lighting_color += emissive;
 
-    return vec4<f32>(lighting_color, base_color.a);
+    // 7. Scene fog (#437), last, in linear HDR before post-FX. Authored surface
+    // blocks fold into `lighting_color` here, so they are fogged too.
+    return vec4<f32>(apply_fog(camera.fog, lighting_color, in.world_position, camera.camera_pos), base_color.a);
 }

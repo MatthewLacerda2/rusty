@@ -11,7 +11,7 @@
 // — the very term the surface shader uses for hemisphere ambient — so the background
 // and the lighting always agree (no second source of colour to drift out of sync).
 
-#import common::{CameraUniforms, VertexInput}
+#import common::{CameraUniforms, VertexInput, sky_fog}
 
 @group(0) @binding(0)
 var<uniform> camera: CameraUniforms;
@@ -118,5 +118,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         color = mix(color, cloud_color, cloud);
     }
 
-    return vec4<f32>(color, 1.0);
+    // Blend toward the scene fog at the horizon (#437), as the panorama sky does.
+    return vec4<f32>(sky_fog(camera.fog, color, dir, camera.camera_pos), 1.0);
 }

@@ -17,6 +17,7 @@ use self::lighting::{
     apply_reflection_probe, apply_scene_lights, apply_ssr_settings, default_lighting_uniform,
 };
 use self::pass::{PassClear, ScenePassFrame};
+use crate::render::gpu::uniforms::FogUniform;
 use crate::render::postfx::params::build_post_params;
 use crate::render::{build_camera_stack, CameraUniform, LightingUniform, RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -85,6 +86,7 @@ impl Renderer {
                 view_proj: view_proj.to_cols_array(),
                 camera_pos: cam.position.to_array(),
                 _pad: 0.0,
+                fog: FogUniform::from_settings(&scene.fog),
             };
             self.queue
                 .write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&camera_uniform));

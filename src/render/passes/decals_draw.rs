@@ -41,6 +41,7 @@ impl Renderer {
             view_proj: view_proj.to_cols_array(),
             inv_view_proj: inv_view_proj.to_cols_array(),
             camera_pos: [camera.position.x, camera.position.y, camera.position.z, 0.0],
+            fog: crate::render::gpu::uniforms::FogUniform::from_settings(&scene.fog),
         };
         self.queue.write_buffer(
             &self.decal_renderer.globals_buffer,

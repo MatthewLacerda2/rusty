@@ -23,6 +23,7 @@ pub mod collider;
 pub mod components;
 pub mod defaults;
 pub mod dependency;
+pub mod fog;
 pub mod image;
 pub mod joint;
 pub mod layout_element;

@@ -11,6 +11,7 @@ use glam::Vec3;
 use wgpu::util::DeviceExt;
 
 use crate::components::particle::ParticleBlend;
+use crate::render::gpu::uniforms::FogUniform;
 use crate::render::passes::particles::{ParticleGlobals, ParticleInstance};
 use crate::render::{GpuTexture, RenderView, Renderer};
 use crate::scene::Camera;
@@ -61,6 +62,8 @@ impl Renderer {
             view_proj: view_proj.to_cols_array(),
             cam_right: [right.x, right.y, right.z, 0.0],
             cam_up: [up.x, up.y, up.z, 0.0],
+            cam_pos: camera.position.extend(0.0).to_array(),
+            fog: FogUniform::from_settings(&scene.fog),
         };
         self.queue.write_buffer(
             &self.particle_renderer.globals_buffer,

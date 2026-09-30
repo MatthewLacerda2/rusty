@@ -87,6 +87,9 @@ into the lit color; postfx blocks grade the sampled scene color.
   `emissive_boost {color, strength}` (glow masked by the emissive map);
   `uv_scroll_stripes {frequency, strength}` (UV-driven banding); `desaturate
   {amount}`; `height_fog {color, top, bottom}` (world-height fog blend).
+  Every surface variant is also fogged by the **scene fog** (`Graphics.SetFog*`,
+  #437), applied after the blocks; `height_fog` is a per-material *look* layered
+  under it (a glowing floor mist on one material), not a substitute for scene fog.
 - **Postfx** (fullscreen grades over the HDR color): `tint {color}`; `exposure
   {stops}`; `saturation {amount}`; `grayscale`; `vignette {strength, radius}`;
   `scanline {count, strength}`; `posterize {levels}`; `contrast {amount}`.
