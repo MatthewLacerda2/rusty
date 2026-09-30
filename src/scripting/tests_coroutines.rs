@@ -106,6 +106,34 @@ fn coroutine_errors_surface_on_the_console() {
     assert!(m.timers.borrow().is_empty(), "failed coroutines retire");
 }
 
+#[test]
+fn a_failing_invoke_keeps_repeating_and_a_failing_predicate_retires() {
+    let pred = "coroutine.yield(Timer.WaitUntil(function() error('pred') end))";
+    let (mut m, id) = rig("co_errs", &co(pred));
+    let rep = "function() __log = __log .. 'r' error('x') end";
+    m.eval(&format!("Timer.InvokeRepeating({id}, {rep}, 0, 1 / 60)"))
+        .unwrap();
+    tick(&mut m, 4);
+    assert_eq!(log(&m), "rrr", "an erroring repeat keeps its schedule");
+    let logs: Vec<String> = m
+        .console
+        .borrow()
+        .messages
+        .iter()
+        .map(|l| l.0.clone())
+        .collect();
+    assert!(
+        logs.iter()
+            .any(|l| l.contains("Coroutine") && l.contains("pred")),
+        "{logs:?}"
+    );
+    assert!(
+        logs.iter().any(|l| l.contains("Invoke on entity")),
+        "{logs:?}"
+    );
+    assert_eq!(m.eval(&format!("Timer.IsInvoking({id})")).unwrap(), "true");
+}
+
 /// The run as a string: two runtimes, same script, same ticks → same bytes.
 fn replay() -> String {
     let body = "for i = 1, 4 do coroutine.yield(Timer.WaitForSeconds(i / 60)) M.Beat(id) end";

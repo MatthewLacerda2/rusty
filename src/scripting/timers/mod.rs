@@ -193,11 +193,6 @@ impl TimerScheduler {
         }
     }
 
-    /// Pending jobs, for tests and diagnostics.
-    pub fn len(&self) -> usize {
-        self.jobs.len()
-    }
-
     /// Whether nothing is pending.
     pub fn is_empty(&self) -> bool {
         self.jobs.is_empty()

@@ -73,7 +73,6 @@ pub(crate) fn parse(lua: &Lua, value: Value) -> Result<Wait, String> {
     let arg: Value = table.get("arg").map_err(|e| e.to_string())?;
     let secs = |arg: &Value| match arg {
         Value::Number(n) => Ok(n.max(0.0)),
-        Value::Integer(i) => Ok((*i as f64).max(0.0)),
         _ => Err("wait duration must be a number".to_string()),
     };
     match (kind.as_deref(), arg) {
