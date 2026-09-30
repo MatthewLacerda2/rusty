@@ -49,22 +49,28 @@ order given — so no agent sits through a ten-minute run holding a worktree ope
 
 1. Rebase onto the latest `origin/main`, in a throwaway detached worktree it
    creates and removes (never one an agent is standing in).
-2. Push with `--force-with-lease` against the head it started from — skipped
-   when the rebase moved nothing, because the run on record is then a run on
-   this exact commit.
-3. Wait for the runs **on the rebased head** to exist and conclude.
-4. Ask `make mergeable`'s judgement of that head — see the next section.
-5. Squash-merge with the house-style title (`Title (#issue) (#pr)`) and
+2. Compile-check the rebased tree before pushing it (#571): `cargo check
+   --locked --all-targets` with `dev` and with `--no-default-features`, then
+   the size gate, building into the queue's own `target/merge-queue`. A clean
+   textual rebase still breaks when a merge ahead changed a signature. Skipped
+   for a Markdown-only branch, Dependabot, and `ARGS=--no-check`.
+3. Push with `--force-with-lease` against the head it started from — both
+   skipped when the rebase moved nothing, because the run on record is then a
+   run on this exact commit.
+4. Wait for the runs **on the rebased head** to exist and conclude.
+5. Ask `make mergeable`'s judgement of that head — see the next section.
+6. Squash-merge with the house-style title (`Title (#issue) (#pr)`) and
    `--match-head-commit`, so a push after the verdict makes GitHub refuse.
 
 It **hands back** — skips the entry, names why, carries on with the next — on a
-conflict (naming the paths; it never resolves one), a red run, a run that never
+conflict (naming the paths; it never resolves one), a rebased head that fails
+the local check (never pushed), a red run, a run that never
 appears, a head somebody else moved, a draft, or a merge GitHub refused. A 502 on
 the merge call is followed by asking whether it merged. Exit status is non-zero
 if anything was handed back.
 
-What it leaves to you: it **builds nothing** (`make gates` before readying is the
-author's job), never reads the mutation or coverage signal, and **removes no
+What it leaves to you: its local check only ever *refuses* a push, never grants
+a merge (`make gates` before readying is the author's job), it never reads the mutation or coverage signal, and **removes no
 worktree and deletes no branch** — the summary lists the merged ones. Remove each
 worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standing in it.
 
@@ -75,8 +81,9 @@ worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standin
   branch someone else pushed to, and it rebases (and cancels its own runs) by
   itself. The queue comments `@dependabot rebase` when one is behind, waits for a
   head on `main`'s tip, and judges that.
-- By hand, the same loop is: rebase in the branch's worktree, push with
-  `--force-with-lease`, wait, `make mergeable PR=N`, squash-merge.
+- By hand, the same loop is: rebase in the branch's worktree, `cargo check`
+  both feature sets and `make size`, push with `--force-with-lease`, wait,
+  `make mergeable PR=N`, squash-merge. Prefer the queue.
 
 Merging is serialized because rusty is **one compiled crate**: two branches can
 each be green alone and break `main` together. A rename, a changed signature, a
@@ -125,10 +132,12 @@ incidents behind each):
   nothing compiled. A run counts only when a gated job itself succeeded.
   `changes` succeeding proves nothing — it runs on drafts too.
 - **Every run on the commit, not the first listed.** A red run beside a green one
-  refuses. A **cancelled** run is ignored only when a newer run of the same
-  workflow exists on the same commit (#482 cancels superseded runs; before #515
-  that leaves a red gate beside the live one); a cancelled run that is the newest
-  refuses, because nothing has answered.
+  refuses. A **cancelled** run is ignored only when a run of the same workflow
+  on the same commit that was *not* cancelled is still going (then the answer is
+  "wait") or was created no earlier — same second included, since neither
+  timestamp nor run id orders two same-second runs (#562; #482 cancels
+  superseded runs). A cancelled run nothing replaced refuses, because nothing
+  has answered.
 - **No run at all** is told apart: a branch that conflicts with `main` gets no run
   (GitHub cannot build a merge ref, so it creates no run, check or error — do not
   edit the workflow), versus a pull request readied moments after a push that lost
