@@ -37,8 +37,8 @@ pub use view::RenderView;
 // GPU uniform memory layouts live in `gpu/uniforms.rs` (split out to keep files under
 // the size cap); re-imported here so the render module body still names them directly.
 pub(crate) use gpu::uniforms::{
-    AmbientLightUniform, BoneUniform, CameraUniform, DirectionalLightUniform, EntityUniform,
-    InstanceData, LightingUniform, PointLightUniform, SpotlightUniform,
+    AmbientLightUniform, CameraUniform, DirectionalLightUniform, EntityUniform, InstanceData,
+    LightingUniform, PointLightUniform, SpotlightUniform,
 };
 
 // Stores GPU Buffer handlers for meshes

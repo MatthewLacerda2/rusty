@@ -73,12 +73,14 @@ struct EntityUniforms {
     // 4th lane is unused. `vec4` to match the Rust `[f32; 4]` byte-for-byte.
     emissive: vec4<f32>,
     // Cutout alpha-test (#242): `use_cutout == 1` discards fragments whose final
-    // alpha is below `alpha_cutoff`. The two pads complete the 16-byte run; mirrors
-    // `EntityUniform` (src/render/gpu/uniforms.rs) byte-for-byte.
+    // alpha is below `alpha_cutoff`.
     use_cutout: u32,
     alpha_cutoff: f32,
+    // Where this draw's joint 0 sits in `bones` (#455); 0 is the shared identity.
+    // The pad completes the 16-byte run; mirrors `EntityUniform`
+    // (src/render/gpu/uniforms.rs) byte-for-byte.
+    bone_base: u32,
     _pad0: u32,
-    _pad1: u32,
 };
 
 // One instance of an instanced draw (#470), indexed by `instance_index`. Mirrors
@@ -93,10 +95,6 @@ struct InstanceData {
     _ipad1: u32,
     _ipad2: u32,
     sh: array<vec4<f32>, 9>,
-};
-
-struct BoneUniforms {
-    bones: array<mat4x4<f32>, 64>,
 };
 
 @group(0) @binding(0)
@@ -121,8 +119,10 @@ var s_refl_cube: sampler;
 @group(1) @binding(0)
 var<uniform> entity: EntityUniforms;
 
+// Every skinned draw's joint matrices back to back (#455), sized per skin — no joint
+// cap. A draw reads its run from `entity.bone_base`; element 0 is the identity.
 @group(1) @binding(1)
-var<uniform> bones: BoneUniforms;
+var<storage, read> bones: array<mat4x4<f32>>;
 
 @group(1) @binding(2)
 var<storage, read> instances: array<InstanceData>;
@@ -179,10 +179,11 @@ fn vs_main(model: VertexInput, @builtin(instance_index) instance: u32) -> Vertex
     let model_matrix = entity.model_matrix * instances[instance].model_matrix;
 
     // Bone skinning transform
-    var bone_transform = bones.bones[model.joint_indices.x] * model.joint_weights.x
-                       + bones.bones[model.joint_indices.y] * model.joint_weights.y
-                       + bones.bones[model.joint_indices.z] * model.joint_weights.z
-                       + bones.bones[model.joint_indices.w] * model.joint_weights.w;
+    let joints = model.joint_indices + vec4<u32>(entity.bone_base);
+    var bone_transform = bones[joints.x] * model.joint_weights.x
+                       + bones[joints.y] * model.joint_weights.y
+                       + bones[joints.z] * model.joint_weights.z
+                       + bones[joints.w] * model.joint_weights.w;
 
     // If bone weights are zero/uninitialized, default to identity matrix
     let total_weight = model.joint_weights.x + model.joint_weights.y + model.joint_weights.z + model.joint_weights.w;

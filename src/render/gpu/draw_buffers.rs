@@ -3,33 +3,40 @@
 //!
 //! This replaces the per-entity pool of #210 (one uniform buffer, bone buffer and two
 //! bind groups kept alive per entity). A camera's solids are now three packed arrays —
-//! per-draw uniforms at a 256-byte stride, bone palettes, and instances — written with
-//! three `write_buffer` calls, behind **one** bind group whose dynamic offsets pick a
-//! batch's uniform and palette. Nothing is keyed by entity, so two scenes rendered in
-//! one frame (#355) cannot evict each other: each render simply rewrites the arrays
-//! before its own submit.
+//! per-draw uniforms at a 256-byte stride, joint matrices, and instances — written with
+//! three `write_buffer` calls, behind **one** bind group whose dynamic offset picks a
+//! batch's uniform. Nothing is keyed by entity, so two scenes rendered in one frame
+//! (#355) cannot evict each other: each render simply rewrites the arrays before its
+//! own submit.
+//!
+//! The joint matrices are one storage array (#455), not a fixed 64-matrix uniform: a
+//! skinned draw's palette is its run of the array, as long as its skin, and the draw's
+//! uniform carries where that run starts (`bone_base`). Element 0 is one identity
+//! matrix, which every non-skinned draw and overlay points at.
 
 use wgpu::util::DeviceExt;
 
 use super::grow_buffer::GrowBuffer;
-use crate::render::{BoneUniform, EntityUniform, InstanceData};
+use crate::render::{EntityUniform, InstanceData};
 
 /// Byte distance between per-draw uniforms: wgpu's default
 /// `min_uniform_buffer_offset_alignment`, which the renderer requests.
 pub(crate) const UNIFORM_STRIDE: usize = 256;
 const _: () = assert!(std::mem::size_of::<EntityUniform>() <= UNIFORM_STRIDE);
-const _: () = assert!(std::mem::size_of::<BoneUniform>().is_multiple_of(UNIFORM_STRIDE));
 
-/// The identity bone palette — slot 0 of the frame's palettes, and the one overlays bind.
-pub(crate) const IDENTITY_BONES: BoneUniform = BoneUniform {
-    bones: [glam::Mat4::IDENTITY.to_cols_array(); 64],
-};
+/// The shared identity joint: element 0 of the frame's joint array, and the whole of
+/// the array overlays bind.
+const IDENTITY_JOINT: [f32; 16] = glam::Mat4::IDENTITY.to_cols_array();
 
-/// One camera's draw data: `uniforms` in slot order, the skinned `palettes` (bone slot
-/// `n` is `palettes[n - 1]`; slot 0 is the identity), and the packed `instances`.
+/// One joint matrix, as the storage array packs it.
+pub(crate) type JointMatrix = [f32; 16];
+
+/// One camera's draw data: `uniforms` in slot order, the skinned draws' `joints`
+/// back to back (a draw whose `bone_base` is `n` starts at `joints[n - 1]`; element 0
+/// of the uploaded array is the identity), and the packed `instances`.
 pub(crate) struct FrameUpload<'a> {
     pub uniforms: &'a [EntityUniform],
-    pub palettes: &'a [BoneUniform],
+    pub joints: &'a [JointMatrix],
     pub instances: &'a [InstanceData],
 }
 
@@ -38,7 +45,7 @@ pub(crate) struct DrawBuffers {
     bones: GrowBuffer,
     instances: GrowBuffer,
     bind_group: wgpu::BindGroup,
-    /// The identity palette alone, for overlays (they bind their own uniform).
+    /// The identity joint alone, for overlays (they bind their own uniform).
     default_bones: wgpu::Buffer,
     /// A one-element instance array holding [`InstanceData::IDENTITY`], for overlays.
     identity_instance: wgpu::Buffer,
@@ -48,7 +55,7 @@ impl DrawBuffers {
     pub(crate) fn new(device: &wgpu::Device, layout: &wgpu::BindGroupLayout) -> Self {
         use wgpu::BufferUsages as U;
         let uniforms = GrowBuffer::new(device, "Frame Draw Uniforms", U::UNIFORM);
-        let bones = GrowBuffer::new(device, "Frame Bone Palettes", U::UNIFORM);
+        let bones = GrowBuffer::new(device, "Frame Joint Matrices", U::STORAGE);
         let instances = GrowBuffer::new(device, "Frame Instances", U::STORAGE);
         let init = |label, contents: &[u8], usage| {
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -59,8 +66,8 @@ impl DrawBuffers {
         };
         let default_bones = init(
             "Shared Default Bones",
-            bytemuck::bytes_of(&IDENTITY_BONES),
-            U::UNIFORM,
+            bytemuck::bytes_of(&IDENTITY_JOINT),
+            U::STORAGE,
         );
         let identity_instance = init(
             "Identity Instance",
@@ -94,15 +101,15 @@ impl DrawBuffers {
     ) {
         let FrameUpload {
             uniforms,
-            palettes,
+            joints,
             instances,
         } = frame;
         let mut uniform_bytes = vec![0u8; uniforms.len() * UNIFORM_STRIDE];
         for (chunk, u) in uniform_bytes.chunks_mut(UNIFORM_STRIDE).zip(uniforms) {
             chunk[..std::mem::size_of::<EntityUniform>()].copy_from_slice(bytemuck::bytes_of(u));
         }
-        let mut bone_bytes = bytemuck::bytes_of(&IDENTITY_BONES).to_vec();
-        bone_bytes.extend_from_slice(bytemuck::cast_slice(palettes));
+        let mut bone_bytes = bytemuck::bytes_of(&IDENTITY_JOINT).to_vec();
+        bone_bytes.extend_from_slice(bytemuck::cast_slice(joints));
 
         let grew = [
             self.uniforms.upload(device, queue, &uniform_bytes),
@@ -129,10 +136,9 @@ impl DrawBuffers {
         &self.bind_group
     }
 
-    /// Dynamic offsets selecting uniform `slot` and bone palette `bones`.
-    pub(crate) fn offsets(slot: u32, bones: u32) -> [u32; 2] {
-        let palette = std::mem::size_of::<BoneUniform>() as u32;
-        [slot * UNIFORM_STRIDE as u32, bones * palette]
+    /// The dynamic offset selecting uniform `slot`.
+    pub(crate) fn offsets(slot: u32) -> [u32; 1] {
+        [slot * UNIFORM_STRIDE as u32]
     }
 
     pub(crate) fn default_bones(&self) -> &wgpu::Buffer {
@@ -144,8 +150,9 @@ impl DrawBuffers {
     }
 }
 
-/// A group-1 bind group over `[uniform, bones, instances]`. The two uniforms bind
-/// one element's width, so a dynamic offset can slide across the packed array.
+/// A group-1 bind group over `[uniform, bones, instances]`. The uniform binds one
+/// element's width, so a dynamic offset can slide across the packed array; the joint
+/// and instance arrays bind whole, and the shader indexes them.
 pub(crate) fn group1(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
@@ -169,7 +176,7 @@ pub(crate) fn group1(
             },
             wgpu::BindGroupEntry {
                 binding: 1,
-                resource: sized(bones, std::mem::size_of::<BoneUniform>()),
+                resource: bones.as_entire_binding(),
             },
             wgpu::BindGroupEntry {
                 binding: 2,
@@ -179,11 +186,39 @@ pub(crate) fn group1(
     })
 }
 
-/// A skinned mesh's palette: its first ≤64 matrices, the rest identity.
-pub(crate) fn palette_uniform(palette: &[glam::Mat4]) -> BoneUniform {
-    let mut bones = IDENTITY_BONES;
-    for (dst, src) in bones.bones.iter_mut().zip(palette.iter().take(64)) {
-        *dst = src.to_cols_array();
+/// Append a draw's joint `palette` to the frame's `joints` and return its `bone_base`
+/// — every joint kept, however many (#455). An empty palette (a non-skinned mesh)
+/// appends nothing and returns `0`, the shared identity.
+pub(crate) fn push_palette(joints: &mut Vec<JointMatrix>, palette: &[glam::Mat4]) -> u32 {
+    if palette.is_empty() {
+        return 0;
     }
-    bones
+    // Element 0 of the uploaded array is the identity, so this run starts one later.
+    let base = joints.len() as u32 + 1;
+    joints.extend(palette.iter().map(glam::Mat4::to_cols_array));
+    base
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use glam::{Mat4, Vec3};
+
+    #[test]
+    fn every_joint_of_a_large_skin_is_kept_past_64() {
+        let rig: Vec<Mat4> = (0..100)
+            .map(|j| Mat4::from_translation(Vec3::X * j as f32))
+            .collect();
+        let mut joints = Vec::new();
+        assert_eq!(push_palette(&mut joints, &[]), 0, "non-skinned: identity");
+        assert!(joints.is_empty(), "non-skinned draws allocate no palette");
+        assert_eq!(push_palette(&mut joints, &rig), 1);
+        assert_eq!(
+            push_palette(&mut joints, &rig[..3]),
+            101,
+            "packed back to back"
+        );
+        assert_eq!(joints.len(), 103);
+        assert_eq!(joints[99][12], 99.0, "joint 99 is posed, not identity");
+    }
 }

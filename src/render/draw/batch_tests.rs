@@ -3,18 +3,18 @@
 use super::{BatchKey, DrawItem, FrameDraws};
 use crate::render::{InstanceData, MeshId};
 
-/// An item of mesh `mesh`, bone slot `bones`, tint `tint`, tagged by `tag` in its
+/// An item of mesh `mesh`, palette `bone_base`, tint `tint`, tagged by `tag` in its
 /// instance's translation so a test can read back the order instances were packed in.
-fn item(mesh: &str, bones: u32, tint: f32, tag: f32) -> DrawItem {
+fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem {
     let mut uniform = [0u32; 36];
     uniform[16] = tint.to_bits();
+    uniform[34] = bone_base;
     let mut instance = InstanceData::IDENTITY;
     instance.model_matrix[12] = tag;
     DrawItem {
         key: BatchKey {
             mesh: MeshId(mesh.to_string()),
             material: 0,
-            bones,
             uniform,
         },
         num_indices: 36,

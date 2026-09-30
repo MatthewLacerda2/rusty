@@ -204,7 +204,7 @@ impl Renderer {
     }
 
     /// Record `batches` into `pass`: per batch, the mesh buffers, the frame's group-1
-    /// bind group at the batch's uniform + palette offsets, the shared material group,
+    /// bind group at the batch's uniform offset, the shared material group,
     /// and one instanced draw over its instance range (#470). Shared by the opaque and
     /// transparent passes, which differ only in pipeline and order.
     pub(crate) fn draw_batches<'a>(
@@ -216,7 +216,7 @@ impl Renderer {
             let Some(gpu_mesh) = self.gpu_meshes.get(&batch.key.mesh) else {
                 continue;
             };
-            let offsets = DrawBuffers::offsets(batch.uniform_slot, batch.key.bones);
+            let offsets = DrawBuffers::offsets(batch.uniform_slot);
             render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
             render_pass
                 .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
@@ -249,7 +249,7 @@ impl Renderer {
         render_pass.set_pipeline(&self.outline_pipeline);
         render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
         render_pass.set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        render_pass.set_bind_group(1, outline_bind_group, &[0, 0]);
+        render_pass.set_bind_group(1, outline_bind_group, &[0]);
         render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
         render_pass.draw_indexed(0..*num_indices, 0, 0..1);
     }

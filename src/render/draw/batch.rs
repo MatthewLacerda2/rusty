@@ -23,11 +23,9 @@ pub(crate) struct BatchKey {
     pub mesh: MeshId,
     /// The group-2 material bind group (the resolved texture maps), by cache index.
     pub material: usize,
-    /// The bone-palette slot: `0` is the shared identity palette every non-skinned mesh
-    /// binds; a skinned entity gets a slot of its own, so it never shares a draw.
-    pub bones: u32,
-    /// The per-draw uniform's words (tint, PBR scalars, map and cutout flags),
-    /// compared bit-for-bit.
+    /// The per-draw uniform's words (tint, PBR scalars, map and cutout flags, and the
+    /// skinned palette's `bone_base`), compared bit-for-bit — so each skinned entity,
+    /// with a palette of its own, is a draw of its own.
     pub uniform: [u32; 36],
 }
 
