@@ -1,4 +1,5 @@
 pub mod application;
+pub mod curve;
 pub mod frame_stats;
 pub mod gamepad;
 pub mod input;

@@ -22,14 +22,17 @@ use crate::render::postfx::HDR_FORMAT;
 pub(crate) struct ParticleInstance {
     pub(crate) center: [f32; 3],
     pub(crate) size: f32,
+    /// Sprite rotation about the view axis, radians.
+    pub(crate) rotation: f32,
     pub(crate) color: [f32; 4],
 }
 
 impl ParticleInstance {
-    const ATTRIBS: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+    const ATTRIBS: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
         0 => Float32x3, // center
         1 => Float32,   // size
-        2 => Float32x4, // color
+        2 => Float32,   // rotation
+        3 => Float32x4, // color
     ];
 
     pub(crate) fn desc() -> wgpu::VertexBufferLayout<'static> {

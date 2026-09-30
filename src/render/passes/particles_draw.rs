@@ -171,8 +171,9 @@ impl Renderer {
                 .iter()
                 .map(|p| ParticleInstance {
                     center: p.position.to_array(),
-                    size: p.current_size(),
-                    color: p.current_color(),
+                    size: emitter.size_of(p),
+                    rotation: p.rotation,
+                    color: emitter.color_of(p),
                 })
                 .collect();
             specs.push((emitter.blend, emitter.texture.clone(), instances));

@@ -38,7 +38,8 @@ pub use material::{MaterialAsset, MaterialComponent, RenderMode};
 pub use mesh::{DirtyFlag, MeshComponent};
 pub use nav_agent::{NavMeshAgentComponent, DEFAULT_AVOIDANCE_PRIORITY, MAX_AVOIDANCE_PRIORITY};
 pub use particle::{
-    CollisionResponse, EmitMode, Particle, ParticleBlend, ParticleEmitterComponent,
+    CollisionResponse, EmitFrom, EmitMode, EmitShape, Particle, ParticleBlend,
+    ParticleEmitterComponent, SubEmitTrigger, SubEmitters,
 };
 pub use rigidbody::{CollisionDetection, RigidBodyComponent};
 pub use script::{ScriptComponent, ScriptFieldValue};

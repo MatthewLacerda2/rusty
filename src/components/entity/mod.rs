@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 
 mod repr;
 
-use super::JointComponent;
 use super::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, ColliderComponent, ImageComponent, LayoutElementComponent,
@@ -21,6 +20,7 @@ use super::{
     RigidBodyComponent, ScriptComponent, SelectableComponent, TextComponent, TransformComponent,
     VisualCorrectionComponent,
 };
+use super::{JointComponent, SubEmitters};
 
 /// The live link from an instance entity back to the `.prefab` it was stamped from
 /// (#216). Set on EVERY entity of a linked instance — not just the root — so that
@@ -175,11 +175,12 @@ impl Entity {
     }
 
     /// Rewrite every entity reference a component holds (a Selectable's targets,
-    /// #420; a Joint's connected body, #449) through `map` — how the references
+    /// #420; a Joint's connected body, #449; an emitter's sub-emitters, #439) through `map` — how the references
     /// follow the entity when a prefab is saved, stamped or propagated.
     pub fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
         self.selectable.iter_mut().for_each(|s| s.remap_refs(map));
         self.joint.iter_mut().for_each(|j| j.remap_refs(map));
+        self.particles.iter_mut().for_each(|p| p.remap_refs(map));
     }
 
     /// Whether `pointer` (a JSON pointer into the entity document, as prefab
@@ -192,5 +193,6 @@ impl Entity {
         };
         under("/selectable", &SelectableComponent::REF_POINTERS)
             || under("/joint", &JointComponent::REF_POINTERS)
+            || under("/particles", &SubEmitters::REF_POINTERS)
     }
 }
