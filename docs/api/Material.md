@@ -22,6 +22,7 @@ map; an empty path clears it.
 | `Material.SetRenderMode` | `(id, mode)` — `"Opaque"` (default), `"Cutout"`, or `"Transparent"` (case-insensitive; an unknown name falls back to Opaque) |
 | `Material.SetAlpha` | `(id, a)` — base-color alpha in `[0,1]`; the blend factor for a `Transparent` material (ignored by Opaque/Cutout) |
 | `Material.SetAlphaCutoff` | `(id, c)` — alpha-test threshold in `[0,1]` for `Cutout`: fragments below it are discarded (default 0.5) |
+| `Material.SetShader` | `(id, name)` — render with the authored surface shader `name` (see *Surface shaders* below); `""` clears it back to the standard shader |
 
 ### Standalone material assets
 
@@ -56,6 +57,7 @@ Material.DefineAsset("brick", {
   render_mode  = "Cutout",             -- "Opaque" (default) / "Cutout" / "Transparent"
   alpha        = 1.0,                  -- base-color alpha in [0,1]
   alpha_cutoff = 0.4,                  -- alpha-test threshold in [0,1]
+  shader       = "brick_toon",         -- authored surface shader ("" / omitted = standard)
 })
 
 -- An entity uses the asset by referencing its name:
@@ -124,3 +126,28 @@ visible fallback.
 > `Emissive`); point any entity's `MaterialComponent` at one of those keys to reuse it,
 > or copy its factors as the starting point for your own. No external textures — the
 > factors stand alone, so the set stays tiny and license-clean.
+
+### Surface shaders
+
+A material **names the shader it renders with** — Unity's Material → Shader. The
+name is a surface module baked by `Shader.Bake` (see `Shader.md`): `"enemy_toon"`
+resolves to `project/assets/shaders/enemy_toon.wgsl` (where bakes land), else
+`assets/shaders/enemy_toon.wgsl`. No name (the default) is the standard forward
+shader.
+
+```lua
+Shader.Bake({ pass = "surface", name = "enemy_toon",
+              blocks = { { id = "toon_ramp", params = { steps = 3 } } } })
+Material.SetShader(enemy, "enemy_toon")   -- or `shader = "enemy_toon"` in a recipe
+```
+
+- Every entity sharing the material draws with the shader, opaque and transparent
+  alike; the shadow and depth passes are unchanged (a surface shader only restyles
+  colour).
+- The module is compiled the first frame a material uses it. A name that is not
+  there, a module that fails to compile, or a `postfx` module logs one warning and
+  **renders with the standard shader** — a bad shader never crashes the game. A
+  shader baked *after* the material names it is picked up on the next frame.
+- **Re-baking** a shader in a running session rebuilds it: the bake → look →
+  iterate loop needs no restart.
+- `Debug.Snapshot`'s `material` block reports it as `shader` (`null` = standard).

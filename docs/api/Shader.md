@@ -10,7 +10,9 @@ The bake **validates the assembled module by composing it through `naga_oil`** �
 registered) — and **rejects a module that won't compile, writing no file**. So a bad
 shader is caught at authoring time and never ships. On success the module is written
 to the authored-shader workspace (`project/assets/shaders/<name>.wgsl` by default),
-registered by name; a `ShaderRegistry` pointed at that dir loads it.
+registered by name. A **surface** module is then used by naming it on a material —
+`Material.SetShader(id, "enemy_toon")` or a recipe's `shader` key (see `Material.md`);
+re-baking it in a running session rebuilds it on the next frame.
 
 This is authoring shaders that **fit the engine**, not a general-purpose shader
 compiler: the agent composes only from the curated block library — there is no
@@ -104,6 +106,7 @@ Shader.Bake({
     { id = "fresnel_rim", params = { color = {1.0, 0.2, 0.1}, power = 4.0 } },
   },
 })  -- → "project/assets/shaders/enemy_toon.wgsl" (validated, ready to load)
+Material.SetShader(enemy, "enemy_toon")  -- the enemy's material now renders with it
 ```
 
 > **Faithfulness:** the read-site is the engine's `ShaderRegistry` — the same loader

@@ -152,6 +152,15 @@ pub fn set_alpha_cutoff(materials: &mut MaterialLibrary, key: &str, value: f32) 
     }
 }
 
+/// Set the authored surface shader by module name (#396); an empty name clears it
+/// back to the standard forward shader. Whether the module exists is the renderer's
+/// call (it falls back, logging once), so a shader baked later still binds.
+pub fn set_shader(materials: &mut MaterialLibrary, key: &str, name: String) {
+    if let Some(m) = materials.get_mut(key) {
+        m.shader = (!name.is_empty()).then_some(name);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,6 +197,15 @@ mod tests {
         assert_eq!(m.base_color_map, None);
         assert_eq!(m.metallic_map.as_deref(), Some("m.png"));
         assert_eq!(m.normal_map, None);
+    }
+
+    #[test]
+    fn shader_op_sets_and_empty_clears() {
+        let mut materials = one();
+        set_shader(&mut materials, "k", "enemy_toon".to_string());
+        assert_eq!(materials["k"].shader.as_deref(), Some("enemy_toon"));
+        set_shader(&mut materials, "k", String::new());
+        assert_eq!(materials["k"].shader, None);
     }
 
     #[test]

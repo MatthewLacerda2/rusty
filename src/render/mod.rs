@@ -118,6 +118,8 @@ pub struct Renderer {
     draw_buffers: gpu::draw_buffers::DrawBuffers,
     /// One group-2 material bind group per distinct set of resolved maps (#470).
     materials: gpu::material_cache::MaterialCache,
+    /// The pipelines materials' authored surface shaders draw with, by name (#396).
+    pub(crate) surface_shaders: gpu::pipelines::surface::SurfaceShaders,
     /// Group repeated mesh + material pairs into instanced draws (#470). Always on in
     /// the engine; tests turn it off to compare against one-draw-per-entity.
     pub(crate) instancing: bool,

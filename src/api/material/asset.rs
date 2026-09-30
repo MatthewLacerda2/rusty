@@ -97,6 +97,9 @@ fn define(scene: &RefCell<Scene>, name: &str, asset: MaterialAsset, validated: V
     if let Some(cutoff) = validated.alpha_cutoff {
         mat_ops::set_alpha_cutoff(materials, name, cutoff);
     }
+    if let Some(shader) = validated.shader {
+        mat_ops::set_shader(materials, name, shader);
+    }
 }
 
 #[cfg(test)]
@@ -115,6 +118,31 @@ mod tests {
             Ok(())
         })
         .unwrap();
+    }
+
+    #[test]
+    fn a_recipe_shader_and_set_shader_name_the_surface_shader() {
+        let scene = RefCell::new(Scene::new());
+        let id = scene.borrow_mut().add_entity("E".into());
+        run(
+            &scene,
+            &format!(
+                r#"Material.DefineAsset("toon", {{ shader = "enemy_toon" }})
+                   Material.DefineAsset("plain", {{ shader = "" }})
+                   Material.SetShader({id}, "holo")"#
+            ),
+        );
+        let scene = scene.borrow();
+        assert_eq!(
+            scene.materials["toon"].shader.as_deref(),
+            Some("enemy_toon")
+        );
+        assert_eq!(
+            scene.materials["plain"].shader, None,
+            "\"\" is the standard one"
+        );
+        let key = &scene.world.material(id).unwrap().material;
+        assert_eq!(scene.materials[key].shader.as_deref(), Some("holo"));
     }
 
     #[test]

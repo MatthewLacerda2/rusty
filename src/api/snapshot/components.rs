@@ -27,7 +27,8 @@ pub(crate) fn mesh_value(m: &MeshComponent) -> Value {
 /// `MaterialAsset`. The albedo map is surfaced under the legacy `"texture"` key
 /// (empty string when unset, preserving the prior shape). `render_mode`/`alpha`/
 /// `alpha_cutoff` expose the transparency story (#242) so a script can read back what
-/// `Material.SetRenderMode`/`SetAlpha`/`SetAlphaCutoff` wrote.
+/// `Material.SetRenderMode`/`SetAlpha`/`SetAlphaCutoff` wrote; `shader` is the
+/// authored surface shader's name (#396), `null` for the standard one.
 pub(crate) fn material_value(m: &MaterialAsset) -> Value {
     json!({
         "color": m.base_color,
@@ -41,6 +42,7 @@ pub(crate) fn material_value(m: &MaterialAsset) -> Value {
         "render_mode": format!("{:?}", m.render_mode),
         "alpha": m.alpha,
         "alpha_cutoff": m.alpha_cutoff,
+        "shader": m.shader,
     })
 }
 

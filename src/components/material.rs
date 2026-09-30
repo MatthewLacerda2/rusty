@@ -91,6 +91,12 @@ pub struct MaterialAsset {
     /// is below this are discarded. Defaults to 0.5 (Unity's default).
     #[serde(default = "default_alpha_cutoff")]
     pub alpha_cutoff: f32,
+    /// The authored surface shader this material renders with (#396): a module name
+    /// resolved as `<name>.wgsl` in `project/assets/shaders` (where `Shader.Bake`
+    /// writes), then `assets/shaders`. `None` is the standard forward shader.
+    /// `#[serde(default)]`, so pre-#396 scenes load unchanged.
+    #[serde(default)]
+    pub shader: Option<String>,
 }
 
 impl Default for MaterialAsset {
@@ -108,6 +114,7 @@ impl Default for MaterialAsset {
             render_mode: RenderMode::Opaque,
             alpha: default_alpha(),
             alpha_cutoff: default_alpha_cutoff(),
+            shader: None,
         }
     }
 }
@@ -131,6 +138,7 @@ impl MaterialAsset {
             render_mode: RenderMode::Opaque,
             alpha: default_alpha(),
             alpha_cutoff: default_alpha_cutoff(),
+            shader: None,
         }
     }
 

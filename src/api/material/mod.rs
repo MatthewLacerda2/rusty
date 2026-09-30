@@ -45,6 +45,14 @@ pub fn register<'lua, 'scope>(
     register_maps(scope, &table, scene)?;
     register_transparency(scope, &table, scene)?;
     asset::register(scope, &table, scene)?;
+    put(
+        &table,
+        "SetShader",
+        scope.create_function(|_, (id, name): (u32, String)| {
+            with_material(scene, id, |m, key| mat_ops::set_shader(m, key, name));
+            Ok(())
+        }),
+    )?;
 
     lua.globals()
         .set("Material", table)

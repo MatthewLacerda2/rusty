@@ -60,6 +60,7 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `SetEmissiveMap` | ✅ | renderer — same upload/bind path; `shader.wgsl` samples `t_emissive` and modulates the emissive factor (`factor × map.rgb`) (#207) |
 | `DefineAsset` / `DefineAssetJson` | ✅ | renderer + round-trip (#271) — writes a `MaterialAsset` into `scene.materials` under a chosen name; an entity referencing that name via its `MaterialComponent` is sampled by the renderer through the SAME per-entity material path as every row above (`draw_resources::build_solid_resource` + `shader.wgsl`). The asset is part of `SceneData` (`materials` map), so it survives save→load. Proven by `tests/material_authoring.rs` (round-trip; entity-uses-asset; clamps/unknown-mode degrade; packed map slots) |
 | `GetAsset` / `HasAsset` | ✅ | round-trip — read-back of the named library asset (canonical JSON / presence), so the authored asset is observable through the same surface |
+| `SetShader` (+ the recipe's `shader` key) | ✅ | renderer (#396) — `draw_resources::solid_draw_item` resolves `MaterialAsset::shader` to a pipeline id through `gpu::pipelines::surface::SurfaceShaders` (lazy, cached by name, log-once fallback to the standard shader, rebuilt on re-bake); `draw_batches` binds that variant's opaque/transparent pipeline. Proven by `surface_tests.rs` (a baked variant renders differently; missing/postfx modules fall back pixel-identically; a re-bake rebuilds) |
 
 ### `Animator` — over `Entity.animator`
 
@@ -302,7 +303,7 @@ assembles byte-identical WGSL) and the API tests (`src/api/shader/mod.rs`).
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `Bake` / `BakeJson` | ✅ | renderer — writes a `.wgsl` the `ShaderRegistry` loads + compiles by name; **validated through the same `naga_oil` compose path at bake** (a non-composing module is rejected, never written) |
+| `Bake` / `BakeJson` | ✅ | renderer — writes a `.wgsl` a material naming it renders with (`Material.SetShader`, #396), composed through the `ShaderRegistry` path; **validated through the same `naga_oil` compose path at bake** (a non-composing module is rejected, never written) |
 | `ToJson` | ✅ | round-trip — the recipe's canonical serde form; re-assembles byte-identically |
 
 (`Shader.Validate` and `Shader.Blocks` are read-only introspection — a compose
