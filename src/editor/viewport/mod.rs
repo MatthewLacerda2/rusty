@@ -4,7 +4,7 @@
 //! shown here inside an `egui::Image` in the central panel, with two tabs over it:
 //! **Scene** (the free-fly editor camera, with click-to-select + the move gizmo) and
 //! **Game** (the active `CameraComponent`'s view — what the player sees). The panel
-//! owns no GPU state; `main.rs` registers the texture and feeds the [`egui::TextureId`]
+//! owns no GPU state; the shell's editor frontend registers the texture and feeds the [`egui::TextureId`]
 //! in, and reads the returned [`ViewportInteraction`] back to drive picking/gizmo.
 
 pub mod gizmo;
@@ -25,6 +25,9 @@ pub enum ViewportTab {
 /// with origin at the image's top-left.
 pub struct ViewportInteraction {
     pub tab: ViewportTab,
+    /// The image rect's top-left in window points — where the game view sits, so the
+    /// shell can map the OS pointer into game-view pixels (#416).
+    pub origin: egui::Pos2,
     /// The image rect's size in points (egui logical units).
     pub size: egui::Vec2,
     /// Pointer position relative to the image's top-left, if hovering.
@@ -37,6 +40,9 @@ pub struct ViewportInteraction {
     pub drag_delta: egui::Vec2,
     /// The drag started this frame (pointer pressed inside the image).
     pub drag_started: bool,
+    /// A pointer button went down anywhere in the window this frame — with
+    /// `hover_local` it tells a click into the Game view from a click elsewhere.
+    pub pointer_pressed: bool,
 }
 
 /// Draw the central viewport panel: the Scene/Game tab strip and the scene image.
@@ -122,11 +128,13 @@ fn build_interaction(tab: ViewportTab, response: &egui::Response) -> ViewportInt
         .or_else(|| response.interact_pointer_pos().map(|p| p - origin));
     ViewportInteraction {
         tab,
+        origin,
         size: response.rect.size(),
         hover_local,
         clicked: response.clicked(),
         dragging: response.dragged(),
         drag_delta: response.drag_delta(),
         drag_started: response.drag_started(),
+        pointer_pressed: response.ctx.input(|i| i.pointer.any_pressed()),
     }
 }

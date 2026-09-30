@@ -34,7 +34,7 @@ fn rebind_egui_texture(
 }
 
 /// Points → physical pixels for an offscreen target; `None` for a degenerate rect.
-fn target_size(size: egui::Vec2, pixels_per_point: f32) -> Option<(u32, u32)> {
+pub(super) fn target_size(size: egui::Vec2, pixels_per_point: f32) -> Option<(u32, u32)> {
     let px = (size.x * pixels_per_point).round() as u32;
     let py = (size.y * pixels_per_point).round() as u32;
     (px > 0 && py > 0).then_some((px, py))

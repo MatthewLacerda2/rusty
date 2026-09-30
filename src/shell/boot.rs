@@ -149,6 +149,8 @@ impl Shell {
             clock: FrameClock::new(Instant::now()),
             keymap: load_keymap(game),
             applied_video: VideoSettings::default(),
+            cursor: super::input::CursorPolicy::default(),
+            window_focused: true,
             // A bind failure logs to the game's console and leaves the channel `None`.
             #[cfg(feature = "dev")]
             cmd_channel: crate::dev::command_channel::CommandChannel::start(game.console()),

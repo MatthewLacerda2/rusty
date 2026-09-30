@@ -31,11 +31,11 @@ pub mod editor;
 use std::sync::Arc;
 use std::time::Instant;
 
-use winit::event::{ElementState, Event, KeyEvent, WindowEvent};
+use winit::event::{DeviceEvent, ElementState, Event, KeyEvent, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget};
 use winit::keyboard::{KeyCode, PhysicalKey};
 
-use crate::app::GameWorld;
+use crate::app::{GameWorld, PlayTransition};
 use crate::core::keymap::Keymap;
 use crate::core::video::VideoSettings;
 use crate::render::Renderer;
@@ -52,6 +52,11 @@ pub struct Shell {
     /// Video settings currently in effect on the surface/window, so the per-frame
     /// apply ([`settings::apply_pending`]) reconfigures only what a script changed.
     pub applied_video: VideoSettings,
+    /// What the OS cursor was last set to (#416).
+    pub cursor: input::CursorPolicy,
+    /// Whether the window has OS focus: raw mouse motion arrives even when it does
+    /// not, and must not reach the game then.
+    pub window_focused: bool,
     /// Dev-only socket command channel (#282): an external process drives this
     /// running playtest through the same evaluator the console uses. `None` if the
     /// socket failed to bind — the window keeps running without it.
@@ -67,11 +72,21 @@ pub trait Frontend {
     /// See every window event before the shell routes it (the editor feeds egui).
     fn on_window_event(&mut self, _shell: &Shell, _event: &WindowEvent) {}
 
-    /// Whether keyboard input reaches the game right now. The seam for per-frontend
-    /// input routing (#416: the editor will route only while the Game view has focus).
+    /// Whether input (keys, mouse, text, the cursor request) reaches the game right
+    /// now. The player: always. The editor: only in Play with the Game view focused.
     fn game_has_input(&self, _game: &GameWorld) -> bool {
         true
     }
+
+    /// Where the game view sits in the window, for mapping the pointer into
+    /// game-view pixels. Default: the whole window.
+    fn game_view(&self, shell: &Shell) -> input::GameViewRect {
+        let config = &shell.renderer.config;
+        input::GameViewRect::full_window(config.width, config.height)
+    }
+
+    /// The sim entered or left Play this frame (the editor focuses the Game view).
+    fn on_play_transition(&mut self, _game: &mut GameWorld, _transition: PlayTransition) {}
 
     /// A physical key changed state, after the shell wrote it into the sim.
     fn on_key(&mut self, _game: &mut GameWorld, _key: KeyCode, _pressed: bool) {}
@@ -106,6 +121,12 @@ pub fn run<F: Frontend + 'static>(
                 frontend.on_window_event(&shell, event);
                 handle_window_event(event, elwt, &mut shell, &mut game, &mut frontend);
             }
+            Event::DeviceEvent {
+                event: DeviceEvent::MouseMotion { delta },
+                ..
+            } if shell.window_focused && frontend.game_has_input(&game) => {
+                input::write_mouse_motion(delta, &game);
+            }
             Event::AboutToWait => shell.window.request_redraw(),
             // Quit boundary: persist the store however the loop is exiting (window
             // close, `Application.Quit`, surface OOM). A no-op when the store is pathless.
@@ -134,11 +155,19 @@ fn handle_window_event<F: Frontend>(
         WindowEvent::ScaleFactorChanged { .. } => {
             shell.renderer.resize(shell.window.inner_size());
         }
+        WindowEvent::Focused(focused) => {
+            shell.window_focused = *focused;
+            if !focused {
+                // Key-ups never arrive for keys released while unfocused.
+                game.input().borrow_mut().release_all();
+            }
+        }
         WindowEvent::KeyboardInput {
             event:
                 KeyEvent {
                     physical_key: PhysicalKey::Code(key),
                     state,
+                    text,
                     ..
                 },
             ..
@@ -146,11 +175,22 @@ fn handle_window_event<F: Frontend>(
             let pressed = *state == ElementState::Pressed;
             if frontend.game_has_input(game) {
                 input::write_key(*key, pressed, game, &shell.keymap);
+                if let (true, Some(text)) = (pressed, text) {
+                    input::write_text(text, game);
+                }
             }
             frontend.on_key(game, *key, pressed);
         }
+        // Tracked even without input, so the pointer is right the moment it arrives.
         WindowEvent::CursorMoved { position, .. } => {
-            game.input().borrow_mut().mouse_position = (position.x, position.y);
+            let view = frontend.game_view(shell);
+            input::write_cursor_moved((position.x, position.y), &view, game);
+        }
+        WindowEvent::MouseInput { state, button, .. } if frontend.game_has_input(game) => {
+            input::write_mouse_button(*button, *state, game, &shell.keymap);
+        }
+        WindowEvent::MouseWheel { delta, .. } if frontend.game_has_input(game) => {
+            input::write_wheel(*delta, game);
         }
         WindowEvent::RedrawRequested => run_frame(elwt, shell, game, frontend),
         _ => {}
@@ -167,9 +207,11 @@ fn run_frame<F: Frontend>(
 ) {
     let delta_time = shell.clock.tick(Instant::now());
     let transition = frame::advance_sim(game, delta_time);
-    if let Some(policy) = input::CursorPolicy::for_transition(transition) {
-        policy.apply(&shell.window);
-    }
+    frontend.on_play_transition(game, transition);
+    // The game's cursor request (Play defaults to locked + hidden), while it has input.
+    let requested = game.input().borrow().cursor();
+    let cursor = input::CursorPolicy::effective(requested, frontend.game_has_input(game));
+    shell.cursor.sync(cursor, &shell.window);
 
     match frame::quit_action(F::HOST, game.take_quit_request(), game.is_playing()) {
         QuitAction::Exit => {
