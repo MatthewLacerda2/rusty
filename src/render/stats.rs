@@ -17,7 +17,8 @@ const POINT_LIGHT_SLOTS: u32 = 4;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RenderCounters {
     /// Geometry draw calls: solids, transparents, shadow casters, decals, particle
-    /// batches and UI batches. Fullscreen post-FX and the skybox are not counted.
+    /// batches and UI batches. Copies of one mesh + material are one instanced draw
+    /// (#470). Fullscreen post-FX and the skybox are not counted.
     pub draw_calls: u32,
     /// Triangles submitted by the solid, transparent and shadow draws.
     pub triangles: u64,
@@ -29,7 +30,8 @@ pub struct RenderCounters {
     pub lights: u32,
     /// Active lights the forward uniform had no slot for — silently unlit today.
     pub lights_dropped: u32,
-    /// Shadow-caster draws (static bake + dynamic).
+    /// Shadow-caster draw calls (static bake + dynamic); an instanced run of casters
+    /// sharing a mesh is one draw (#470).
     pub shadow_draws: u32,
     /// UI batches drawn.
     pub ui_draws: u32,
@@ -50,11 +52,12 @@ impl RenderCounters {
         ]
     }
 
-    /// Add a set of indexed draws (`num_indices` per draw) to the counts.
-    pub(crate) fn add_draws(&mut self, indices: impl IntoIterator<Item = u32>) {
-        for n in indices {
+    /// Add a set of indexed draws — `(num_indices, instances)` per draw call — to the
+    /// counts. An instanced draw is one call but submits every instance's triangles.
+    pub(crate) fn add_draws(&mut self, draws: impl IntoIterator<Item = (u32, u32)>) {
+        for (indices, instances) in draws {
             self.draw_calls += 1;
-            self.triangles += u64::from(n / 3);
+            self.triangles += u64::from(indices / 3) * u64::from(instances);
         }
     }
 }
@@ -74,9 +77,9 @@ impl Renderer {
     /// Count one camera's solids, decals and particle batches.
     pub(crate) fn count_camera(&mut self, solids: &SolidResources, decals: usize, particles: u32) {
         let c = &mut self.frame_counters;
-        let transparent = solids.transparent.iter().map(|(r, _)| r);
-        c.add_draws(solids.opaque.iter().chain(transparent).map(|r| r.2));
-        c.visible_entities += (solids.opaque.len() + solids.transparent.len()) as u32;
+        let batches = solids.draws.batches();
+        c.add_draws(batches.map(|b| (b.num_indices, b.instances.len() as u32)));
+        c.visible_entities += solids.draws.instances.len() as u32;
         c.culled_entities += solids.culled;
         c.draw_calls += decals as u32 + particles;
     }

@@ -3,6 +3,7 @@
 //! from the original monolithic `Renderer::render` (behavior unchanged).
 
 mod axis;
+pub(crate) mod batch;
 mod lighting;
 mod overlays;
 mod pass;
@@ -57,10 +58,6 @@ impl Renderer {
         // probe is picked relative to the primary camera (#244).
         self.upload_lighting(scene, camera.position);
 
-        // Drop pool slots for entities no longer active, so the persistent forward
-        // buffers track the live scene rather than growing without bound (#210).
-        self.prune_entity_pool(scene);
-
         // Fill the world-matrix store once for the whole frame (#331). The solid pass and
         // both shadow collects — across every camera in the stack — then read each entity's
         // world matrix from this one O(N) fill instead of walking the parent chain per
@@ -90,11 +87,10 @@ impl Renderer {
             self.queue
                 .write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&camera_uniform));
 
-            // 2. Sync per-camera resources (the culling mask differs per camera). The
-            // forward entity buffers/bind groups persist in the pool; this only
-            // rewrites their contents and returns lightweight draw items (#210). The
-            // split separates opaque/cutout (the solids pass) from transparent (the
-            // sorted alpha-blended pass below) (#242).
+            // 2. Batch this camera's solids (the culling mask differs per camera) into
+            // instanced draws and upload their packed data (#470). The split separates
+            // opaque/cutout (the solids pass) from transparent (the sorted
+            // alpha-blended pass below) (#242).
             let solids = self.precreate_solid_resources(scene, cam, &frustum);
             let overlays = self.precreate_overlays(scene, editor_mode);
 
@@ -102,7 +98,7 @@ impl Renderer {
                 editor_mode,
                 clear: PassClear::for_pass(idx == 0, cam.clear_flags),
             };
-            self.execute_scene_pass(view, scene, frame, &solids.opaque, &overlays);
+            self.execute_scene_pass(view, scene, frame, &solids.draws.opaque, &overlays);
 
             // Project box-decals over this camera's lit surfaces (reads the scene
             // depth to reconstruct geometry), after solids/skybox and before the
@@ -112,7 +108,7 @@ impl Renderer {
             // Translucent solids (#242): alpha-blended, depth-tested against opaque,
             // drawn back-to-front (already sorted) after opaque + decals so glass
             // composites over the world behind it.
-            self.draw_transparent(view, &solids.transparent);
+            self.draw_transparent(view, &solids.draws.transparent);
 
             // Billboard particles for this camera (after solids, before the next pass).
             let particle_draws = self.draw_particles(view, scene, cam);
@@ -251,21 +247,6 @@ impl Renderer {
         };
         self.global_bind_group_dirty = true;
     }
-
-    /// Evict `scene`'s persistent forward-pass slots for entities no longer active
-    /// in it, keeping the pool bounded to the live set (#210). Scoped to this scene's
-    /// own slots, so rendering a second scene never evicts the first's (#355).
-    fn prune_entity_pool(&mut self, scene: &Scene) {
-        let live: std::collections::HashSet<u32> = scene
-            .entity_ids()
-            .into_iter()
-            .filter(|&id| scene.world.is_active(id))
-            .collect();
-        if let Some(pool) = self.entity_pool.as_mut() {
-            pool.retain(scene.id(), &live);
-        }
-        self.shadow_renderer.retain_entities(scene.id(), &live);
-    }
 }
 
 /// Every active entity's resolved material map paths (albedo, metallic, roughness,
@@ -290,3 +271,7 @@ fn active_material_map_paths(scene: &Scene) -> Vec<String> {
         .flatten()
         .collect()
 }
+
+#[cfg(test)]
+#[path = "instancing_tests.rs"]
+mod instancing_tests;

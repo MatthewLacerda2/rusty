@@ -5,21 +5,21 @@
 //! `precreate_solid_resources` split, so `ALPHA_BLENDING` composites correctly (nearer
 //! glass over farther glass over the opaque world).
 //!
-//! It reuses the same per-entity pool bind groups the opaque pass uses (group 1
-//! entity, group 2 material) and the same shader; only the pipeline differs
+//! It reuses the camera's instanced draw data the opaque pass binds (group 1 frame
+//! buffers, group 2 shared material, #470) and the same shader; only the pipeline differs
 //! (`transparent_pipeline`: alpha blend, depth test on / write off). It LOADs the
 //! existing HDR colour + depth — never clears — so it layers onto the opaque image and
 //! is occluded by opaque depth without writing depth itself (overlapping translucent
 //! surfaces all blend rather than z-cull each other).
 
-use crate::render::draw::resources::TransparentResource;
+use crate::render::draw::batch::DrawBatch;
 use crate::render::{RenderView, Renderer};
 
 impl Renderer {
     /// Draw the camera's translucent solids into `view`'s HDR target. `items` is already
-    /// sorted back-to-front (farthest first). No-op when there is nothing translucent,
+    /// back-to-front (farthest first); only neighbouring copies were merged (#470). No-op when there is nothing translucent,
     /// so opaque-only scenes pay nothing (#242).
-    pub(crate) fn draw_transparent(&self, view: &RenderView, items: &[TransparentResource]) {
+    pub(crate) fn draw_transparent(&self, view: &RenderView, items: &[DrawBatch]) {
         if items.is_empty() {
             return;
         }
@@ -59,30 +59,12 @@ impl Renderer {
     }
 
     /// Record the back-to-front transparent draws into `pass`: the transparent
-    /// pipeline + global/shadow bind groups, then each entity's pooled entity/material
-    /// bind groups and geometry (the same resources the opaque pass binds).
-    fn record_transparent<'a>(
-        &'a self,
-        pass: &mut wgpu::RenderPass<'a>,
-        items: &'a [TransparentResource],
-    ) {
-        let pool = self.entity_pool.as_ref().expect("entity pool present");
+    /// pipeline + global/shadow bind groups, then the same batch recording the opaque
+    /// pass uses.
+    fn record_transparent<'a>(&'a self, pass: &mut wgpu::RenderPass<'a>, items: &'a [DrawBatch]) {
         pass.set_pipeline(&self.transparent_pipeline);
         pass.set_bind_group(0, &self.global_bind_group, &[]);
         pass.set_bind_group(3, &self.shadow_bind_group, &[]);
-        for ((key, mesh_id, num_indices), _depth) in items {
-            let (Some(gpu_mesh), Some(entity_bg), Some(material_bg)) = (
-                self.gpu_meshes.get(mesh_id),
-                pool.entity_bind_group(*key),
-                pool.material_bind_group(*key),
-            ) else {
-                continue;
-            };
-            pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
-            pass.set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-            pass.set_bind_group(1, entity_bg, &[]);
-            pass.set_bind_group(2, material_bg, &[]);
-            pass.draw_indexed(0..*num_indices, 0, 0..1);
-        }
+        self.draw_batches(pass, items);
     }
 }

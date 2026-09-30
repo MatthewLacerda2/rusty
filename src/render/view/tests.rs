@@ -60,8 +60,10 @@ fn gpu_offscreen_view_owns_a_target_targetless_does_not() {
 /// - **size** — the two views' resize guards defeated each other, reallocating both
 ///   targets twice per frame;
 /// - **pooled entity resources** — both scenes call their entity 1, so keyed by
-///   entity id alone each render evicted the other's slot and rebuilt it next frame,
-///   re-introducing the churn #210 removed;
+///   entity id alone each render evicted the other's slot and rebuilt it next frame.
+///   Since #470 nothing is pooled per entity: draw data is packed per render, and the
+///   one cached resource — the material bind group — is keyed by the maps it binds,
+///   so both scenes' default-material boxes share one;
 /// - **static shadows** — a bare `is_static_cached` bool let scene B skip its own
 ///   bake and sample scene A's shadow map (the phantom shadows on the preview mesh).
 #[test]
@@ -80,7 +82,7 @@ fn gpu_two_views_two_scenes_never_clobber_each_other() {
     // Inspector preview do.
     let out_a = wide.color_target_view().unwrap();
     renderer.render(&mut wide, &scene_a, &cam, &out_a, false);
-    assert_eq!(renderer.scene_slot_count(scene_a.id()), 1);
+    assert_eq!(renderer.material_group_count(), 1);
     assert!(
         !renderer.shadow_renderer.needs_static_bake(scene_a.id()),
         "scene A's statics are baked after its render"
@@ -97,17 +99,11 @@ fn gpu_two_views_two_scenes_never_clobber_each_other() {
     assert_eq!((wide.size().width, wide.size().height), (96, 48));
     assert_eq!((tall.size().width, tall.size().height), (40, 80));
 
-    // Pooled resources: A's survived B's render, and two entity-1s are two slots.
+    // Cached resources: B's render reused A's material group rather than rebuilding.
     assert_eq!(
-        renderer.scene_slot_count(scene_a.id()),
+        renderer.material_group_count(),
         1,
-        "scene A's pooled resources survived scene B's render"
-    );
-    assert_eq!(renderer.scene_slot_count(scene_b.id()), 1);
-    assert_eq!(
-        renderer.entity_slot_count(),
-        2,
-        "two scenes' entity 1s are two slots, not one collided one"
+        "two scenes with one material look share one material bind group"
     );
 
     // Static shadows: the map now holds B's statics, so A must re-bake.
@@ -121,7 +117,7 @@ fn gpu_two_views_two_scenes_never_clobber_each_other() {
     renderer.render(&mut tall, &scene_b, &cam, &out_b, false);
     assert_eq!((wide.size().width, wide.size().height), (96, 48));
     assert_eq!((tall.size().width, tall.size().height), (40, 80));
-    assert_eq!(renderer.entity_slot_count(), 2);
+    assert_eq!(renderer.material_group_count(), 1, "no per-frame growth");
 }
 
 /// `resize` reallocates the offscreen target to the new size and is a cheap no-op when

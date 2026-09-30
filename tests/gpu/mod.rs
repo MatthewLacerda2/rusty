@@ -13,6 +13,7 @@
 mod emissive_factor_screenshot;
 mod frame_stats_render;
 mod fxaa_screenshot;
+mod instancing_budget;
 mod material_maps_screenshot;
 mod normal_emissive_maps_screenshot;
 mod postfx_screenshot;

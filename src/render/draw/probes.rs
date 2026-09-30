@@ -88,7 +88,7 @@ impl Renderer {
         render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
         for (vertex_buffer, _entity_buf, bind_group, count) in probe_resources {
             render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-            render_pass.set_bind_group(1, bind_group, &[]);
+            render_pass.set_bind_group(1, bind_group, &[0, 0]);
             render_pass.draw(0..*count, 0..1);
         }
     }
@@ -110,11 +110,9 @@ fn flat_overlay_uniform(tint: [f32; 4]) -> EntityUniform {
         use_normal_map: 0,
         use_emissive_map: 0,
         emissive: [0.0; 4],
-        use_sh: 0,
         use_cutout: 0,
         alpha_cutoff: 0.0,
-        _sh_pad: 0,
-        sh: [[0.0; 4]; 9],
+        _pad: [0; 2],
     }
 }
 

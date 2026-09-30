@@ -19,6 +19,8 @@ fn a_screenshot_records_render_counters() {
     // The demo scene has meshes but no light entities (light counting is unit-tested).
     assert!(max("visible_entities") > 0.0 && stats.get("lights").is_some());
     assert!(stats.get("renderer_ms").is_some());
-    assert!(max("draw_calls") >= max("visible_entities") + max("shadow_draws"));
+    // Instancing (#470) folds copies of a mesh into one call, so draws no longer bound
+    // entities from above — but every caster draw is still a draw.
+    assert!(max("draw_calls") >= max("shadow_draws") + 1.0);
     let _ = std::fs::remove_dir_all(out);
 }

@@ -60,33 +60,51 @@ pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::Bind
     })
 }
 
-/// Group 1: Entity model matrix + color tint (0) & Bone Matrices (1)
+/// Group 1 (#470): the per-draw material uniform (0) and bone palette (1), both at a
+/// dynamic offset into the frame's packed buffers, and the instance array (2) the
+/// vertex shader indexes by `instance_index`. One bind group serves every solid draw;
+/// only the two offsets change between batches.
 pub(crate) fn create_entity_bones_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    use crate::render::{BoneUniform, EntityUniform};
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Entity & Bones Layout"),
         entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
+            dynamic_uniform_entry(0, std::mem::size_of::<EntityUniform>()),
+            dynamic_uniform_entry(1, std::mem::size_of::<BoneUniform>()),
+            storage_entry(2, wgpu::ShaderStages::VERTEX_FRAGMENT),
         ],
     })
+}
+
+/// A vertex+fragment uniform entry bound at a dynamic offset, `size` bytes wide.
+fn dynamic_uniform_entry(binding: u32, size: usize) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Uniform,
+            has_dynamic_offset: true,
+            min_binding_size: wgpu::BufferSize::new(size as u64),
+        },
+        count: None,
+    }
+}
+
+/// A read-only storage-buffer entry at `binding` (an instance array, #470).
+pub(crate) fn storage_entry(
+    binding: u32,
+    visibility: wgpu::ShaderStages,
+) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Storage { read_only: true },
+            has_dynamic_offset: false,
+            min_binding_size: None,
+        },
+        count: None,
+    }
 }
 
 /// Group 2 (single-texture): Texture (0) & Sampler (1). Kept for `GpuTexture`'s own

@@ -18,7 +18,6 @@ pub mod ui;
 
 // Moved submodules pulled back under short names so this module's body keeps
 // naming them directly (grouped by subfolder — see the convention in CLAUDE.md).
-use gpu::entity_pool;
 use ibl::{cubemap, skybox};
 use passes::{decals, particles, shadows};
 
@@ -39,7 +38,7 @@ pub use view::RenderView;
 // the size cap); re-imported here so the render module body still names them directly.
 pub(crate) use gpu::uniforms::{
     AmbientLightUniform, BoneUniform, CameraUniform, DirectionalLightUniform, EntityUniform,
-    LightingUniform, PointLightUniform, SpotlightUniform,
+    InstanceData, LightingUniform, PointLightUniform, SpotlightUniform,
 };
 
 // Stores GPU Buffer handlers for meshes
@@ -60,7 +59,7 @@ pub struct GpuMesh {
 /// single `MeshId` and share one vertex/index buffer pair instead of allocating
 /// N copies. The string form keeps a future runtime-mutated mesh expressible with
 /// its own unique key (e.g. by entity id) without colliding with the shared ones.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct MeshId(pub String);
 
 impl MeshId {
@@ -113,10 +112,14 @@ pub struct Renderer {
     /// Rebuild the group-0 bind group only when the skybox it binds changed, not every
     /// camera every frame — its camera/lighting buffers are persistent (#210).
     global_bind_group_dirty: bool,
-    /// Persistent per-entity forward buffers + bind groups, written in place each frame
-    /// instead of reallocated per camera per entity (#210). `Option` so a slot can be
-    /// borrowed out mutably while other renderer fields are read.
-    entity_pool: Option<entity_pool::EntityPool>,
+    /// The packed per-frame draw data every solid draw binds as group 1 (#470): per-draw
+    /// uniforms, bone palettes and instances, rewritten per camera.
+    draw_buffers: gpu::draw_buffers::DrawBuffers,
+    /// One group-2 material bind group per distinct set of resolved maps (#470).
+    materials: gpu::material_cache::MaterialCache,
+    /// Group repeated mesh + material pairs into instanced draws (#470). Always on in
+    /// the engine; tests turn it off to compare against one-draw-per-entity.
+    pub(crate) instancing: bool,
 
     // Asset cache keyed by mesh-asset identity (#127): identical geometry shared
     // across entities resolves to one buffer pair, not one per entity.

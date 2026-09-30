@@ -870,6 +870,9 @@ assembles byte-identical WGSL.
   binds against the forward pipeline unchanged — same `VertexInput`, the
   `LightingUniforms`/`EntityUniforms`/group(2) material maps, and `vs_main`/`fs_main`
   entry points); each block restyles the shaded color before the final write.
+  Group 1 is the instanced layout (#470): the per-draw `EntityUniforms` plus a
+  per-instance `instances` array (world matrix, probe SH). A surface variant baked
+  before #470 was written against the old per-entity layout — re-bake it.
 - **`postfx`** — a self-contained **fullscreen-triangle** fragment program over the
   HDR scene color (`vs_fullscreen` + `fs_main`), the most self-contained pass; each
   block grades the sampled color per-pixel.
@@ -2274,11 +2277,11 @@ print(s.frames, s.fixed_update_ms.avg, s.systems.update_scripts.max, s.entities.
 | `fixed_update_ms` / `update_ms` / `late_update_ms` / `render_stage_ms` | CPU ms per schedule stage. `render_stage_ms` is the `Render` *stage* (draw-data prep), not the GPU |
 | `systems.<name>` | CPU ms per registered system (`update_scripts`, `step_physics`, `tick_nav`, …) |
 | `entities` / `rigid_bodies` / `nav_agents` / `particles` / `scripts` | world counters: live entities, RigidBody components, NavMeshAgents, live particles, loaded script instances |
-| `draw_calls` | geometry draw calls: solids, transparents, shadow casters, decals, particle batches, UI batches (post-FX and skybox excluded) |
-| `triangles` | triangles submitted by the solid, transparent and shadow draws |
+| `draw_calls` | geometry draw calls: solids, transparents, shadow casters, decals, particle batches, UI batches (post-FX and skybox excluded). Copies of one mesh + material are **one instanced call** (#470), so this tracks distinct looks, not entity count |
+| `triangles` | triangles submitted by the solid, transparent and shadow draws, every instance counted |
 | `visible_entities` / `culled_entities` | mesh entities drawn / skipped by the frustum cull, summed over the camera stack |
 | `lights` / `lights_dropped` | active lights, and those the forward uniform had no slot for (past 4 point lights, or a 2nd directional/spot/ambient) — silently unlit |
-| `shadow_draws` / `ui_draws` | shadow-caster draws / UI batches |
+| `shadow_draws` / `ui_draws` | shadow-caster draw calls (one per caster mesh, instanced, #470) / UI batches |
 | `renderer_ms` | CPU ms `Renderer::render` took to record the frame |
 
 Keys ending in `_ms` are **wall-clock** and differ run to run; everything else is a
