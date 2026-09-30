@@ -1,4 +1,4 @@
-//! src/scene/authoring_components.rs — Add/Remove first-class components.
+//! src/scene/authoring/components.rs — Add/Remove first-class components.
 //!
 //! The `ComponentKind` enum (the Add-Component menu's first-class kinds) plus the
 //! shared `add_component` / `remove_component` verbs both the editor add-menu and
@@ -13,59 +13,56 @@ use crate::scene::authoring::defaults::attach_default_material;
 use crate::scene::authoring::dependency;
 use crate::scene::Scene;
 
-/// The first-class components the inspector's "Add Component" menu can attach /
-/// detach. `Script` is excluded: a script attachment carries a path (it is "add
-/// *which* script"), so it has its own API verb rather than a defaulted add.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ComponentKind {
-    Light,
-    Animator,
-    Collider,
-    RigidBody,
-    Texture,
-    NavMeshAgent,
-    Camera,
-    Particles,
-    VisualCorrection,
-    Audio,
-    Canvas,
-    RectTransform,
-    Image,
-    CanvasGroup,
-    RectMask,
-    Text,
-    Selectable,
-    LayoutGroup,
-    LayoutElement,
+/// Declares `ComponentKind` and `ComponentKind::ALL` from one list, so a new kind is
+/// one line and `ALL` can never miss a variant, carry a stale length, or drift out of
+/// declaration order (#570).
+macro_rules! component_kinds {
+    ($(#[$meta:meta])* $vis:vis enum $name:ident { $($variant:ident),+ $(,)? }) => {
+        $(#[$meta])*
+        $vis enum $name {
+            $($variant),+
+        }
+
+        impl $name {
+            /// Every first-class kind, in declaration order (the Add Component menu
+            /// and inspector order) — for the dependency machinery's reverse lookups:
+            /// finding a removed kind's dependents ([`dependency::remove_with_cascade`])
+            /// and reconciling/enforcing unmet requirements. Generated with the enum,
+            /// so it is complete by construction.
+            pub const ALL: &'static [$name] = &[$(Self::$variant),+];
+        }
+    };
+}
+
+component_kinds! {
+    /// The first-class components the inspector's "Add Component" menu can attach /
+    /// detach. `Script` is excluded: a script attachment carries a path (it is "add
+    /// *which* script"), so it has its own API verb rather than a defaulted add.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum ComponentKind {
+        Light,
+        Animator,
+        Collider,
+        RigidBody,
+        Texture,
+        NavMeshAgent,
+        Camera,
+        Particles,
+        VisualCorrection,
+        Audio,
+        Canvas,
+        RectTransform,
+        Image,
+        CanvasGroup,
+        RectMask,
+        Text,
+        Selectable,
+        LayoutGroup,
+        LayoutElement,
+    }
 }
 
 impl ComponentKind {
-    /// Every first-class kind, for the dependency machinery's reverse lookups —
-    /// finding a removed kind's dependents ([`dependency::remove_with_cascade`]) and
-    /// reconciling/enforcing unmet requirements. The per-kind matches in `dependency`
-    /// are compiler-checked exhaustive; a test guards this list against drift.
-    pub const ALL: [ComponentKind; 19] = [
-        Self::Light,
-        Self::Animator,
-        Self::Collider,
-        Self::RigidBody,
-        Self::Texture,
-        Self::NavMeshAgent,
-        Self::Camera,
-        Self::Particles,
-        Self::VisualCorrection,
-        Self::Audio,
-        Self::Canvas,
-        Self::RectTransform,
-        Self::Image,
-        Self::CanvasGroup,
-        Self::RectMask,
-        Self::Text,
-        Self::Selectable,
-        Self::LayoutGroup,
-        Self::LayoutElement,
-    ];
-
     /// The first-class components this kind depends on — rusty's `RequireComponent`
     /// (Unity's `[RequireComponent(typeof(T))]`). The single declaration every
     /// add/remove/load surface consults: adding a kind auto-adds these if missing,
@@ -175,6 +172,16 @@ mod tests {
         assert!(scene.world.has_audio(id));
         assert!(remove_component(&mut scene, id, ComponentKind::Audio));
         assert!(!scene.world.has_audio(id));
+    }
+
+    #[test]
+    fn all_lists_every_kind_once_in_declaration_order() {
+        // `ALL[i]`'s discriminant is `i`: no gap, duplicate or reorder. Every kind also
+        // parses from its own name, so `parse` cannot miss a variant either.
+        for (i, &kind) in ComponentKind::ALL.iter().enumerate() {
+            assert_eq!(kind as usize, i, "{kind:?} out of place in ALL");
+            assert_eq!(ComponentKind::parse(&format!("{kind:?}")), Some(kind));
+        }
     }
 
     #[test]

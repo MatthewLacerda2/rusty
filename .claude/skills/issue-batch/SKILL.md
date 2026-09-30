@@ -45,8 +45,8 @@ The files where everything collides are the ones every feature appends to:
 
 - `src/components/entity.rs` — the `Option<…Component>` fields, twice over (the
   live struct and its serde mirror).
-- `src/scene/authoring/components.rs` — `ComponentKind`, and `ALL` with its
-  hard-coded `[ComponentKind; 10]` length, which neither side's diff gets right.
+- `src/scene/authoring/components.rs` — the `ComponentKind` variant list (`ALL`
+  is generated from it, so keeping both sides' variants is the whole resolution).
 - `src/api/mod.rs` — the `pub mod` list, the namespace roll-call in the crate doc,
   and the registration body.
 - `src/app/registry.rs`'s `build()` — where order *is* the per-frame execution

@@ -190,7 +190,7 @@ description.
 ## Rebasing
 
 Expect conflicts wherever every feature appends: `Entity`'s `Option<…Component>`
-fields, `ComponentKind` and its hard-coded `ALL` length, `api/mod.rs`'s module
+fields, `ComponentKind`'s variant list, `api/mod.rs`'s module
 list, `app/registry.rs`'s ordered `register` calls, the Add Component menu,
 `docs/scripting-api.md`'s tables, `scripting/callbacks.rs`, and the burn-down
 baselines where both sides *removed* lines.
@@ -198,13 +198,10 @@ baselines where both sides *removed* lines.
 `make queue` hands every one of these back rather than resolving it.
 
 **Two authors both being right is the common case**, and the resolution is usually
-to keep both sides, ordered deliberately rather than by merge accident. Two of
-those need more than that:
-
-- `ComponentKind::ALL` is `[ComponentKind; 10]`. Keeping both sides' variants
-  leaves the length wrong, and neither diff contains the right number.
-- `app/registry.rs`'s `build()` is the **only** place per-frame system order is
-  defined. Merging it by textual proximity silently reorders the schedule.
+to keep both sides, ordered deliberately rather than by merge accident. One of
+those needs more than that: `app/registry.rs`'s `build()` is the **only** place
+per-frame system order is defined. Merging it by textual proximity silently
+reorders the schedule.
 
 Mechanical resolutions (a `mod` list, an import) are fine to do directly. Hand a
 rebase back to the branch's author when resolving it needs to know *why* the code

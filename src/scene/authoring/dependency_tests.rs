@@ -10,7 +10,7 @@ fn all_kinds_are_addable_and_probeable() {
     // and is then seen by the presence probe (the compiler already forces the
     // per-kind match arms to be exhaustive).
     let mut scene = Scene::new();
-    for kind in ComponentKind::ALL {
+    for &kind in ComponentKind::ALL {
         let id = create_entity(&mut scene, "E", None);
         assert!(set_default(&mut scene.world, id, kind), "{kind:?} adds");
         assert!(has_kind(&scene.world, id, kind), "{kind:?} is probeable");
