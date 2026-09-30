@@ -1,4 +1,4 @@
-//! Tests for the sidecar rename retry (#520). Windows can't run here, so the retry
+//! Tests for the sidecar's Windows retry (#520). Windows can't run here, so the retry
 //! decision and loop are exercised by injecting the errors Windows would return.
 
 use super::{is_transient, retry};

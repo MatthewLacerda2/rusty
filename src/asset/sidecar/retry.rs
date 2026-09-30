@@ -1,16 +1,17 @@
-//! src/asset/sidecar/replace.rs — rename a temp file over its target, riding out
-//! Windows' transient refusals (#520).
+//! src/asset/sidecar/retry.rs — ride out Windows' transient refusals on the
+//! sidecar's replace-and-read race (#520).
 //!
-//! On Unix, `rename` replaces the destination even while other threads hold it
-//! open. On Windows it fails — access denied or a sharing violation — whenever
-//! another handle has the destination open without `FILE_SHARE_DELETE`, and
-//! `std::fs::File::open` never asks for that flag. So a writer's rename can lose to
-//! a concurrent reader of the same sidecar. The reader closes within microseconds,
-//! so the Windows idiom is to retry the rename briefly. Unix never retries: there a
-//! `PermissionDenied` is a real permissions problem, not a race.
+//! The sidecar is saved by renaming a temp file over it. On Unix that rename
+//! replaces the destination even while other threads hold it open, and a reader
+//! opening it meanwhile just gets the old or the new file. On Windows both sides
+//! can be refused for a moment: the rename fails (access denied or a sharing
+//! violation) while another handle has the destination open without
+//! `FILE_SHARE_DELETE` — which `std::fs::File::open` never asks for — and an open
+//! can be denied while the replaced file is still pending deletion. Both clear
+//! within microseconds, so the Windows idiom is to retry briefly. Unix never
+//! retries: there a `PermissionDenied` is a real permissions problem, not a race.
 
 use std::io;
-use std::path::Path;
 use std::time::Duration;
 
 /// `ERROR_SHARING_VIOLATION`: another handle has the file open without sharing.
@@ -18,18 +19,18 @@ const WINDOWS_SHARING_VIOLATION: i32 = 32;
 /// `ERROR_LOCK_VIOLATION`: another process holds a lock on part of the file.
 const WINDOWS_LOCK_VIOLATION: i32 = 33;
 
-/// How many times the rename is attempted before its error is reported.
+/// How many times an operation is attempted before its error is reported.
 const ATTEMPTS: u32 = 20;
 /// Backoff grows linearly by this step (1 ms, 2 ms, …): ~190 ms worst case in total.
 const BACKOFF_STEP: Duration = Duration::from_millis(1);
 
-/// Rename `from` over `to`, retrying the transient Windows refusals.
-pub(super) fn replace(from: &Path, to: &Path) -> io::Result<()> {
+/// Run a sidecar file operation, retrying the transient Windows refusals.
+pub(super) fn retry_transient<T>(op: impl FnMut() -> io::Result<T>) -> io::Result<T> {
     retry(
         ATTEMPTS,
         BACKOFF_STEP,
         |e| is_transient(e, cfg!(windows)),
-        || std::fs::rename(from, to),
+        op,
     )
 }
 
@@ -66,5 +67,5 @@ pub(super) fn retry<T>(
 }
 
 #[cfg(test)]
-#[path = "replace_tests.rs"]
+#[path = "retry_tests.rs"]
 mod tests;
