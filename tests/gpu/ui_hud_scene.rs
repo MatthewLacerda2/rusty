@@ -65,13 +65,20 @@ pub fn hud() -> Scene {
     };
     scene.world.set_canvas(root, Some(canvas));
     // An opaque black backdrop, so every blend below is against a known colour.
-    element(
+    let full = SIZE as f32;
+    at(
         &mut scene,
         root,
-        Vec2::ZERO,
-        Vec2::splat(SIZE as f32),
+        [0.0, 0.0, full, full],
         solid(0.0, 0.0, 0.0),
     );
+    add_bar_and_panel(&mut scene, root);
+    add_group_and_mask(&mut scene, root);
+    scene
+}
+
+/// A red bar filled to 50% and a 9-sliced green-framed blue panel.
+fn add_bar_and_panel(scene: &mut Scene, root: u32) {
     let bar = ImageComponent {
         color: Vec4::new(1.0, 0.0, 0.0, 1.0),
         image_type: ImageType::Filled,
@@ -79,61 +86,38 @@ pub fn hud() -> Scene {
         fill_amount: 0.5,
         ..Default::default()
     };
-    element(
-        &mut scene,
-        root,
-        Vec2::new(16.0, 16.0),
-        Vec2::new(96.0, 16.0),
-        Some(bar),
-    );
+    at(scene, root, [16.0, 16.0, 96.0, 16.0], Some(bar));
     let panel = ImageComponent {
         texture: Some(frame_texture()),
         image_type: ImageType::Sliced,
         border: Vec4::splat(8.0),
         ..Default::default()
     };
-    element(
-        &mut scene,
-        root,
-        Vec2::new(128.0, 16.0),
-        Vec2::new(112.0, 96.0),
-        Some(panel),
-    );
-    let group = element(
-        &mut scene,
-        root,
-        Vec2::new(16.0, 128.0),
-        Vec2::splat(96.0),
-        None,
-    );
+    at(scene, root, [128.0, 16.0, 112.0, 96.0], Some(panel));
+}
+
+/// A white square under a 50% CanvasGroup, and a yellow child overflowing a mask.
+fn add_group_and_mask(scene: &mut Scene, root: u32) {
+    let group = at(scene, root, [16.0, 128.0, 96.0, 96.0], None);
     let faded = CanvasGroupComponent {
         alpha: 0.5,
         ..Default::default()
     };
     scene.world.set_canvas_group(group, Some(faded));
+    at(scene, group, [0.0, 0.0, 96.0, 96.0], solid(1.0, 1.0, 1.0));
+    let mask = at(scene, root, [128.0, 128.0, 64.0, 64.0], None);
+    let clip = Some(RectMaskComponent::default());
+    scene.world.set_rect_mask(mask, clip);
+    at(scene, mask, [32.0, 32.0, 96.0, 96.0], solid(1.0, 1.0, 0.0));
+}
+
+/// [`element`] with its rect as `[x, y, width, height]`.
+fn at(scene: &mut Scene, parent: u32, r: [f32; 4], image: Option<ImageComponent>) -> u32 {
     element(
-        &mut scene,
-        group,
-        Vec2::ZERO,
-        Vec2::splat(96.0),
-        solid(1.0, 1.0, 1.0),
-    );
-    let mask = element(
-        &mut scene,
-        root,
-        Vec2::new(128.0, 128.0),
-        Vec2::splat(64.0),
-        None,
-    );
-    scene
-        .world
-        .set_rect_mask(mask, Some(RectMaskComponent::default()));
-    element(
-        &mut scene,
-        mask,
-        Vec2::splat(32.0),
-        Vec2::splat(96.0),
-        solid(1.0, 1.0, 0.0),
-    );
-    scene
+        scene,
+        parent,
+        Vec2::new(r[0], r[1]),
+        Vec2::new(r[2], r[3]),
+        image,
+    )
 }
