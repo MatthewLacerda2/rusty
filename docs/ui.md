@@ -4,12 +4,14 @@ rusty's in-game UI is **Unity 5's uGUI, adapted** — HUDs, menus and overlays a
 from ordinary GameObjects. This page is the model: what the pieces are, how layout works,
 and the rules that keep it deterministic. The roadmap is the tracking issue #414; the
 script surface is in [`scripting-api.md`](scripting-api.md) (`Canvas`, `RectTransform`,
-`UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Selectable`).
+`UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Selectable`, `LayoutGroup`,
+`LayoutElement`).
 
 > Status: the model, the `Canvas` and `RectTransform` components and the layout pass
 > (#417); drawing — `Image`, `CanvasGroup`, `RectMask` and the render pass (#418);
 > fonts and SDF `Text` (#419); interaction — hit-testing, pointer and focus callbacks
-> and `Selectable` (#420). Layout groups (#421) build on it.
+> and `Selectable` (#420); layout groups and content fitting — `LayoutGroup` and
+> `LayoutElement` (#421).
 
 ## The model
 
@@ -71,7 +73,7 @@ Screen pixels are the same frame multiplied by the scale factor — also bottom-
 
 ## Layout
 
-Layout **runs in the sim, on the CPU** (`src/ui/layout.rs`). No GPU is involved, so the
+Layout **runs in the sim, on the CPU** (`src/ui/layout/`). No GPU is involved, so the
 headless harness has exactly the window's layout and a bot can reason about — and, with
 #420, click — the UI.
 
@@ -91,6 +93,56 @@ headless harness has exactly the window's layout and a bot can reason about — 
   `Debug.Snapshot` carries it per entity as `ui_rect` — the agent can reason about layout
   without a screenshot. Each reports the final quad's bounds in reference units and in
   screen pixels, the exact corners, the canvas and the scale factor.
+
+### Layout groups
+
+Menus, inventories, scoreboards and tab bars are lists and grids, so their children
+are arranged automatically instead of hand-placed. This is Unity's auto-layout model,
+ported faithfully:
+
+- **`LayoutGroup`** on an element arranges its **layout children** — the direct children
+  that are active, carry a `RectTransform`, and are not `LayoutElement.ignore_layout`.
+  `kind` picks a row (`Horizontal`, left to right), a column (`Vertical`, top to bottom)
+  or a `Grid` of equal `cell_size` cells. `padding` (left, bottom, right, top) insets
+  them; `spacing` is the gap between columns (`x`) and rows (`y`); `child_alignment`
+  places them when they do not fill the rect. Every other child keeps its own anchors.
+- **Three sizes per axis.** Each child reports a **min** (it never shrinks below it), a
+  **preferred** (what it asks for) and a **flexible** weight (its share of leftover
+  space). They come from its content — its own group (from *its* children), its `Text`
+  (unwrapped width; height wrapped at the width it will get), its `Image` (the texture's
+  native size, or for `Sliced` / `Tiled` the sum of its borders) — the largest of
+  several wins, and zeros when there is no content.
+- **`LayoutElement`** overrides any of those six numbers (`None` keeps the content's),
+  and `ignore_layout` takes the element out of its parent's group.
+- **Row / column placement** (Unity's `HorizontalOrVerticalLayoutGroup`). Along the main
+  axis each child gets its min; as the rect grows it lerps toward preferred; past the
+  total preferred, the surplus is shared by flexible weight — or, with nothing flexible,
+  the block is aligned. Across, each child fills the inner rect clamped between its min
+  and (unless flexible) its preferred, and is aligned. `control_child_size` (width /
+  height) lets the group size the children; off, each keeps its `size_delta` and is only
+  positioned. `child_force_expand` (width / height) makes every child flexible ≥ 1.
+- **Grid placement** (Unity's `GridLayoutGroup`). `constraint`: `Flexible` fits as many
+  columns as the width allows, `FixedColumnCount` / `FixedRowCount` use
+  `constraint_count`. Cells fill rows first (columns first with `start_vertical`) from
+  `start_corner`; the block is aligned by `child_alignment`. A grid is never flexible and
+  ignores the control / force-expand flags.
+- **Content size fitting.** `LayoutElement.horizontal_fit` / `vertical_fit`
+  (`Unconstrained`, `MinSize`, `PreferredSize`) size the element's *own* rect to its
+  content around its pivot — a text box that grows downward as it wraps, a list that
+  grows with its items (a scroll view's content, #422). The fitter lives on
+  `LayoutElement` rather than a third component because it reads the same sizes, and
+  keeping it there keeps the component count down. It applies when no parent group
+  arranges the element; under a group, the fitted size is what the group keeps on an
+  axis it does not control (Unity writes `sizeDelta`, which the group then reads).
+- **How it runs.** Inside the same `UiLayout::compute` pass: when the walk reaches a
+  group it computes its children's sizes bottom-up — widths first, then heights at the
+  resolved widths, since wrapped text and nested grids are taller when narrower — and
+  places them top-down. **The scene's RectTransforms are never rewritten**: a group
+  overrides the child's rect in the computed layout only, so the pass stays a pure
+  function of (scene, screen size), recomputed whole each tick with no dirty flags to go
+  stale, and scripts and saved scenes keep the authored values. (Unity marks driven
+  properties instead; there is no second source of truth here to drive.) `UI.GetRect` and
+  `Debug.Snapshot`'s `ui_rect` report the placed rect.
 
 ## Drawing
 
@@ -173,7 +225,7 @@ line breaking need full shaping — a later localization concern, not built here
 
 **Layout is CPU, in the sim's terms.** Measuring, wrapping, overflow and auto-size
 (`src/ui/text/`) never touch the GPU: headless layout is the window's, and
-`Text.GetPreferredSize` (and #421's layout groups) read the same numbers the
+`Text.GetPreferredSize` and the layout groups read the same numbers the
 renderer draws. Coordinates are rect-local reference units.
 
 **Drawing: signed distance fields.** Each glyph's field is generated on first use —

@@ -61,6 +61,7 @@ mod transform_api;
 mod ui_api;
 mod ui_events;
 mod ui_graphics_api;
+mod ui_layout_api;
 mod ui_text_api;
 mod video_api;
 
