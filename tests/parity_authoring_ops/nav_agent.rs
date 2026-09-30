@@ -1,0 +1,67 @@
+//! `NavMeshAgent.*` bindings vs `authoring::nav_agent`.
+
+use std::cell::RefCell;
+
+use glam::Vec3;
+use mlua::Lua;
+use rusty::components::NavMeshAgentComponent;
+use rusty::navigation::NavigationGraph;
+use rusty::scene::authoring::nav_agent as nav_ops;
+use rusty::scene::Scene;
+
+/// Attach a default nav-agent to a fresh entity; returns its id.
+fn entity_with_agent(scene: &mut Scene, name: &str) -> u32 {
+    let id = scene.add_entity(name.to_string());
+    scene
+        .world
+        .set_nav_agent(id, Some(NavMeshAgentComponent::default()));
+    id
+}
+
+#[test]
+fn nav_agent_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
+    let scene = RefCell::new(Scene::new());
+    let via_lua = entity_with_agent(&mut scene.borrow_mut(), "ViaLua");
+    let via_op = entity_with_agent(&mut scene.borrow_mut(), "ViaOp");
+    let nav = RefCell::new(NavigationGraph::new(0.0, 20.0, 0.0, 20.0, 1.0));
+
+    let lua = Lua::new();
+    lua.scope(|s| {
+        rusty::api::nav::register(&lua, s, &scene, &nav).unwrap();
+        lua.load(format!(
+            r#"
+            NavMeshAgent.SetActive({via_lua}, true)
+            NavMeshAgent.SetSpeed({via_lua}, 3.5)
+            NavMeshAgent.SetAcceleration({via_lua}, 8.0)
+            NavMeshAgent.SetStoppingDistance({via_lua}, 0.5)
+            NavMeshAgent.SetRadius({via_lua}, 0.4)
+            NavMeshAgent.SetTarget({via_lua}, 1.0, 0.0, 2.0)
+        "#
+        ))
+        .exec()
+        .unwrap();
+        Ok(())
+    })?;
+
+    {
+        let mut sc = scene.borrow_mut();
+        let mut e = sc.world.nav_agent_mut(via_op).unwrap();
+        nav_ops::set_active(&mut e, true);
+        nav_ops::set_speed(&mut e, 3.5);
+        nav_ops::set_acceleration(&mut e, 8.0);
+        nav_ops::set_stopping_distance(&mut e, 0.5);
+        nav_ops::set_radius(&mut e, 0.4);
+        nav_ops::set_target(&mut e, Vec3::new(1.0, 0.0, 2.0));
+    }
+
+    let sc = scene.borrow();
+    let a = sc.world.nav_agent(via_lua).unwrap().clone();
+    let b = sc.world.nav_agent(via_op).unwrap().clone();
+    assert_eq!(a.active, b.active);
+    assert_eq!(a.speed, b.speed);
+    assert_eq!(a.acceleration, b.acceleration);
+    assert_eq!(a.stopping_distance, b.stopping_distance);
+    assert_eq!(a.radius, b.radius);
+    assert_eq!(a.target, b.target);
+    Ok(())
+}
