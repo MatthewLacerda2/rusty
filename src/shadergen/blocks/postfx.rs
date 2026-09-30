@@ -1,8 +1,9 @@
 //! src/shadergen/blocks/postfx.rs — the postfx building-block family (#272).
 //!
 //! Each block is a fullscreen effect over the HDR scene color. Its `helper` is a
-//! pure function `fn pfx_<id>(c: vec3<f32>, uv: vec2<f32>) -> vec3<f32>` and its
-//! `call` chains the running color (`{prev}`) and the fragment `uv`. The assembler
+//! pure function `fn pfx_<id>(c: vec3<f32>, uv: vec2<f32>, <params…>) -> vec3<f32>`
+//! and its `call` chains the running color (`{prev}`), the fragment `uv` and the
+//! instance's params (`{args}`). The assembler
 //! emits the postfx scaffolding (the fullscreen-triangle `vs_fullscreen`, the
 //! `t_color`/`s_color` bindings, an `fs_main` that samples the scene then folds
 //! every block) so a baked postfx module has the self-contained fullscreen shape
@@ -25,8 +26,8 @@ pub const BLOCKS: &[Block] = &[
             default: 1.0,
             arity: 3,
         }],
-        helper: "fn pfx_tint(c: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {\n    return c * tint_color;\n}",
-        call: "pfx_tint({prev}, uv)",
+        helper: "fn pfx_tint(c: vec3<f32>, uv: vec2<f32>, color: vec3<f32>) -> vec3<f32> {\n    return c * color;\n}",
+        call: "pfx_tint({prev}, uv{args})",
     },
     Block {
         id: "exposure",
@@ -36,8 +37,8 @@ pub const BLOCKS: &[Block] = &[
             default: 0.0,
             arity: 1,
         }],
-        helper: "fn pfx_exposure(c: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {\n    return c * exp2(exposure_stops);\n}",
-        call: "pfx_exposure({prev}, uv)",
+        helper: "fn pfx_exposure(c: vec3<f32>, uv: vec2<f32>, stops: f32) -> vec3<f32> {\n    return c * exp2(stops);\n}",
+        call: "pfx_exposure({prev}, uv{args})",
     },
     Block {
         id: "saturation",
@@ -47,15 +48,15 @@ pub const BLOCKS: &[Block] = &[
             default: 1.0,
             arity: 1,
         }],
-        helper: "fn pfx_saturation(c: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {\n    let l = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));\n    return mix(vec3<f32>(l), c, saturation_amount);\n}",
-        call: "pfx_saturation({prev}, uv)",
+        helper: "fn pfx_saturation(c: vec3<f32>, uv: vec2<f32>, amount: f32) -> vec3<f32> {\n    let l = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));\n    return mix(vec3<f32>(l), c, amount);\n}",
+        call: "pfx_saturation({prev}, uv{args})",
     },
     Block {
         id: "grayscale",
         desc: "Collapse to Rec.709 luminance.",
         params: &[],
         helper: "fn pfx_grayscale(c: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {\n    let l = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));\n    return vec3<f32>(l);\n}",
-        call: "pfx_grayscale({prev}, uv)",
+        call: "pfx_grayscale({prev}, uv{args})",
     },
     Block {
         id: "vignette",
@@ -72,8 +73,8 @@ pub const BLOCKS: &[Block] = &[
                 arity: 1,
             },
         ],
-        helper: "fn pfx_vignette(c: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {\n    let d = distance(uv, vec2<f32>(0.5));\n    let v = smoothstep(vignette_radius, vignette_radius * 0.5, d);\n    return c * mix(1.0, v, vignette_strength);\n}",
-        call: "pfx_vignette({prev}, uv)",
+        helper: "fn pfx_vignette(c: vec3<f32>, uv: vec2<f32>, strength: f32, radius: f32) -> vec3<f32> {\n    let d = distance(uv, vec2<f32>(0.5));\n    let v = smoothstep(radius, radius * 0.5, d);\n    return c * mix(1.0, v, strength);\n}",
+        call: "pfx_vignette({prev}, uv{args})",
     },
     Block {
         id: "scanline",
@@ -90,8 +91,8 @@ pub const BLOCKS: &[Block] = &[
                 arity: 1,
             },
         ],
-        helper: "fn pfx_scanline(c: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {\n    let s = sin(uv.y * scanline_count * 3.14159265);\n    let line = 1.0 - scanline_strength * (0.5 - 0.5 * s);\n    return c * line;\n}",
-        call: "pfx_scanline({prev}, uv)",
+        helper: "fn pfx_scanline(c: vec3<f32>, uv: vec2<f32>, count: f32, strength: f32) -> vec3<f32> {\n    let s = sin(uv.y * count * 3.14159265);\n    let line = 1.0 - strength * (0.5 - 0.5 * s);\n    return c * line;\n}",
+        call: "pfx_scanline({prev}, uv{args})",
     },
     Block {
         id: "posterize",
@@ -101,8 +102,8 @@ pub const BLOCKS: &[Block] = &[
             default: 6.0,
             arity: 1,
         }],
-        helper: "fn pfx_posterize(c: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {\n    let n = max(posterize_levels, 1.0);\n    return floor(c * n + 0.5) / n;\n}",
-        call: "pfx_posterize({prev}, uv)",
+        helper: "fn pfx_posterize(c: vec3<f32>, uv: vec2<f32>, levels: f32) -> vec3<f32> {\n    let n = max(levels, 1.0);\n    return floor(c * n + 0.5) / n;\n}",
+        call: "pfx_posterize({prev}, uv{args})",
     },
     Block {
         id: "contrast",
@@ -112,7 +113,7 @@ pub const BLOCKS: &[Block] = &[
             default: 1.0,
             arity: 1,
         }],
-        helper: "fn pfx_contrast(c: vec3<f32>, uv: vec2<f32>) -> vec3<f32> {\n    return (c - vec3<f32>(0.5)) * contrast_amount + vec3<f32>(0.5);\n}",
-        call: "pfx_contrast({prev}, uv)",
+        helper: "fn pfx_contrast(c: vec3<f32>, uv: vec2<f32>, amount: f32) -> vec3<f32> {\n    return (c - vec3<f32>(0.5)) * amount + vec3<f32>(0.5);\n}",
+        call: "pfx_contrast({prev}, uv{args})",
     },
 ];

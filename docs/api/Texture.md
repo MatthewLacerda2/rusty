@@ -19,17 +19,18 @@ stochastic op draws from a seeded integer hash, never wall-clock or unseeded RNG
 
 `recipe` is a table; `json` is its serialized form (from `Texture.ToJson`, or a saved
 `.json`). `slot` names the target map and selects the **glTF encoding** applied on the
-way out (case-insensitive, `-`/`_` ignored):
+way out (case-insensitive, `-`/`_` ignored). An unknown slot name is an **error** that
+lists the valid ones — a typo like `"basecolour"` never silently bakes linear albedo:
 
 | `slot` | Encoding | Channel packing |
 |---|---|---|
 | `base_color` / `albedo` | **sRGB** | — |
 | `emissive` | **sRGB** | — |
-- `normal` — linear | tangent-space (use a `bump_to_normal` op)
+| `normal` | linear | tangent-space (use a `bump_to_normal` op) |
 | `roughness` | linear | — |
 | `metallic` | linear | — |
 | `metallic_roughness` / `orm` | linear | **metallic → B, roughness → G** (one-shot packed MR) |
-| `data` | linear | — (height/masks/anything raw; the safe default) |
+| `data` | linear | — (height/masks/anything raw; the explicit way to get unencoded output) |
 
 The returned `path` drops straight into a material slot, e.g.
 `Material.SetTexture(id, Texture.Bake(recipe, "out/albedo.png", "base_color"))`.
@@ -51,7 +52,10 @@ The returned `path` drops straight into a material slot, e.g.
 ```
 
 Each node has a stable `id`, an `op` tag, the op's params as sibling fields, and an
-optional `inputs` array of upstream node ids (in order). The runner evaluates the DAG
+optional `inputs` array of upstream node ids (in order). **Unknown keys are errors**
+everywhere in a recipe — on the recipe itself, on a node, on a ramp stop: `{ op =
+"noise", scael = 8 }` is refused with a message naming `scael` and the params `noise`
+takes, rather than baking with the default scale. The runner evaluates the DAG
 in dependency order in linear `[f32]` RGBA, then the bake encodes/packs per `slot`.
 
 ### The op-set (curated "Blender-lite")

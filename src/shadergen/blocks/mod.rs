@@ -14,8 +14,10 @@
 //!   vignette, scanline, grayscale, …) — the self-contained family.
 //!
 //! Each block's helper is a pure function with a fixed signature per family (see
-//! the family modules); the assembler emits the params as named WGSL constants and
-//! a call into the chain, so blocks compose order-independently in text.
+//! the family modules) followed by the block's params as arguments, in catalog
+//! order. The assembler emits the helper once per block id, each *instance's*
+//! params as named WGSL constants, and a call per instance passing them in — so
+//! the same block can appear twice in one recipe (#393).
 
 mod postfx;
 mod surface;
@@ -23,8 +25,9 @@ mod surface;
 use super::recipe::PassKind;
 
 /// One declared parameter of a block: its name, default value, and arity (1 for a
-/// scalar, 2/3/4 for a vector). The assembler emits it as a WGSL constant named
-/// `<block_id>_<name>` the block's snippet references.
+/// scalar, 2/3/4 for a vector). The assembler emits it per instance as a WGSL
+/// constant named `<block_id>_<index>_<name>` and passes it to the helper as the
+/// argument named `<name>`.
 #[derive(Clone, Copy, Debug)]
 pub struct Param {
     /// Param name (the recipe key and the suffix of the emitted WGSL constant).
@@ -40,7 +43,7 @@ pub struct Param {
 /// fragments the assembler weaves in — a `helper` (a top-level function
 /// definition) and a `call` (an expression that applies it in the fragment
 /// chain). The `call` and `helper` are fixed strings; the only thing the recipe
-/// varies is the param constants.
+/// varies is the param constants the call passes in.
 #[derive(Clone, Copy, Debug)]
 pub struct Block {
     /// Stable id, the recipe's `BlockSel::id`.
@@ -49,11 +52,13 @@ pub struct Block {
     pub desc: &'static str,
     /// Declared params, in catalog order.
     pub params: &'static [Param],
-    /// Top-level WGSL function definition this block contributes. References its
-    /// own params by the `<id>_<param>` constants the assembler emits.
+    /// Top-level WGSL function definition this block contributes, emitted once
+    /// per recipe however many instances use it. Takes the block's params as
+    /// trailing arguments named after them, in [`Block::params`] order.
     pub helper: &'static str,
     /// The expression the assembler substitutes into the fragment chain. Uses
-    /// `{prev}` for the incoming color so blocks chain in recipe order; surface
+    /// `{prev}` for the incoming color so blocks chain in recipe order, and
+    /// `{args}` for the instance's param constants (`, a, b`, or empty); surface
     /// blocks may also reference `in` (the `VertexOutput`), postfx blocks `uv`.
     pub call: &'static str,
 }

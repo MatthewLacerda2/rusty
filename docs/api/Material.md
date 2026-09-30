@@ -73,6 +73,12 @@ to `[0,1]`, and an unknown `render_mode` string degrades to `Opaque` — so vali
 single-sourced, not re-implemented. `Material.DefineAsset` **overwrites** any existing
 asset of that name.
 
+An **unknown recipe key** (`metalic_map`) is an error naming it and listing the valid
+keys, like every authoring recipe (`Texture`, `Shader`, `Sound`). The **deliberate
+exception** is `render_mode`'s *value*: an unrecognized mode degrades to `Opaque`
+rather than erroring, matching `Material.SetRenderMode` — opaque is the safe, always
+visible fallback.
+
 > **Rendering modes (transparency).** A material's `render_mode` controls how its
 > surface composites (#242), mirroring Unity's rendering modes:
 > - **Opaque** *(default)* — fully solid, the fast path. `alpha`/`alpha_cutoff` are

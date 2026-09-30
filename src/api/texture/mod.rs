@@ -16,6 +16,9 @@
 //! - `Texture.ToJson(recipe)` — serialize a recipe table to its canonical JSON for
 //!   saving / diffing.
 //!
+//! An unknown `slot`, or an unknown key anywhere in a recipe, is an error naming it
+//! (#395) — a typo never bakes a silently wrong map.
+//!
 //! `Texture` borrows no engine state — it reads a recipe and writes a file — so it
 //! registers as a plain static namespace, like `Assets`.
 
@@ -65,7 +68,8 @@ pub fn register(lua: &Lua) -> Reg {
 
 /// Evaluate + bake a parsed recipe for the named slot, surfacing any error to Lua.
 fn bake(recipe: &TextureRecipe, path: &str, slot: &str) -> mlua::Result<String> {
-    bake_recipe(recipe, Slot::parse(slot), path).map_err(mlua::Error::RuntimeError)
+    let slot = Slot::parse(slot).map_err(mlua::Error::RuntimeError)?;
+    bake_recipe(recipe, slot, path).map_err(mlua::Error::RuntimeError)
 }
 
 #[cfg(test)]
@@ -116,5 +120,21 @@ mod tests {
         let recipe = TextureRecipe::from_json(&json).expect("json parses");
         assert_eq!(recipe.resolution, 8);
         assert_eq!(recipe.seed, 2);
+    }
+
+    #[test]
+    fn an_unknown_slot_fails_the_bake_before_writing() {
+        let lua = Lua::new();
+        register(&lua).unwrap();
+        let path = std::env::temp_dir().join("rusty_texture_api_bad_slot.png");
+        std::fs::remove_file(&path).ok();
+        lua.globals().set("OUT", path.to_str().unwrap()).unwrap();
+        let script = r#"
+            return Texture.Bake({ resolution = 8, nodes = { { id = "w", op = "white_noise" } } },
+              OUT, "basecolour")
+        "#;
+        let err = lua.load(script).eval::<String>().unwrap_err().to_string();
+        assert!(err.contains("unknown slot \"basecolour\""), "{err}");
+        assert!(!path.exists(), "a refused bake writes nothing");
     }
 }

@@ -51,4 +51,6 @@ pub const ENGINE_SHADER_DIR: &str = "assets/shaders";
 pub const DEFAULT_OUT_DIR: &str = "project/assets/shaders";
 
 #[cfg(test)]
+mod instance_tests;
+#[cfg(test)]
 mod tests;
