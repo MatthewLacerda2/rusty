@@ -229,3 +229,6 @@ fn depth_pass<'a>(
         occlusion_query_set: None,
     })
 }
+
+#[cfg(test)]
+mod cache_tests;

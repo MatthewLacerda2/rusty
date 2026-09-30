@@ -10,6 +10,7 @@
 //!
 //! [`Renderer`]: rusty::render::Renderer
 
+mod cascaded_shadows_screenshot;
 mod emissive_factor_screenshot;
 mod frame_stats_render;
 mod fxaa_screenshot;
