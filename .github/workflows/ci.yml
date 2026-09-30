@@ -421,7 +421,10 @@ jobs:
   # post-merge run until #480 (`changes` failed, `ci-gate` said success).
   ci-gate:
     needs: [changes, build-test, build-test-cross, deny]
-    if: always()
+    # `!cancelled()`, not `always()` (#515): a failed or skipped gating job still
+    # reaches this gate and fails it, but a run cancelled because a newer push
+    # superseded it (#482) leaves no red `ci-gate` beside the live one.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - name: Gate on the correctness jobs (success or skipped passes)

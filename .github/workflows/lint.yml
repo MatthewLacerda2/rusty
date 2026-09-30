@@ -117,7 +117,8 @@ jobs:
   # passes" alone would report a run where nothing was checked as green.
   lint-gate:
     needs: [changes, lint]
-    if: always()
+    # `!cancelled()`, not `always()` (#515): see `ci-gate` in ci.yml.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - name: Gate on the lint job (success or skipped passes)
