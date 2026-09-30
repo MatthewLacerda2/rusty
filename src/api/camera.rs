@@ -1,6 +1,6 @@
 //! src/api/camera.rs — `Camera` namespace.
 //!
-//! Get/Set for position, yaw, pitch and fov over the shared `render::Camera` the
+//! Get/Set for position, yaw, pitch and fov over the shared `scene::Camera` the
 //! simulation drives, plus `GetForward`/`GetRight` basis vectors so a controller
 //! script can move and aim relative to where the camera looks.
 
