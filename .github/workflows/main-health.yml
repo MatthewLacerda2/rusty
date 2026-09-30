@@ -1,0 +1,63 @@
+name: main-health
+# A red run on `main` files itself as an issue on the board (#481), so it enters
+# the queue `issue-batch` re-reads after every merge instead of reaching only an
+# email. The logic — which failures count, the dedupe marker, when to comment —
+# lives in .github/scripts/main-health.sh.
+#
+# Watched: `ci` and `lint`, the two workflows whose gates guard `main`. Not
+# `docs`: its only failure today is the Pages deploy (Pages is not enabled —
+# #509, a human task), which would re-file on every merge, and the rustdoc build
+# it runs is already proven by lint.yml's rustdoc gate. Once #509 lands, adding
+# `docs` here and to WATCHED in the script is the whole change.
+#
+# Its own file rather than a job in ci.yml: `workflow_run` sees the *finished*
+# run, so it can read every job's conclusion (a job inside the run cannot see
+# the jobs that finish after it), and it keeps this off the files other CI work
+# edits.
+on:
+  workflow_run:
+    workflows: [ci, lint]
+    types: [completed]
+    branches: [main]
+  # Replay any past run to see what this would file. Dry-run by default, so a
+  # manual check never writes to the board.
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Id of a completed ci/lint run on main to evaluate
+        required: true
+      dry_run:
+        description: Print the issue/comment instead of writing it
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  actions: read   # read the run's jobs and the mutation shards' artifacts
+  issues: write   # open / comment on the tracking issue
+
+# One report per workflow at a time, so two runs racing on the same tracking
+# issue cannot each open one. A third arrival replaces the *pending* one (GitHub
+# keeps one pending run per group); the newer run reports the newer state.
+concurrency:
+  group: main-health-${{ github.event.workflow_run.name || inputs.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    # PR runs are out of scope — their author already sees them. The script
+    # re-checks branch and event, so a dispatched run id gets the same filter.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.event == 'push' ||
+      github.event.workflow_run.event == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - name: File or update the red-main issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: .github/scripts/main-health.sh
