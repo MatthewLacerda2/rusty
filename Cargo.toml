@@ -49,6 +49,13 @@ path = "tests/main.rs"
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
 dev = []
 
+# The crate's lint policy lives here, not in command-line flags, so a plain
+# `cargo clippy`, rust-analyzer and CI all read the same rules (#485). The
+# threshold is `too-many-lines-threshold` in clippy.toml. CI adds `-D warnings`;
+# the sim modules' `#![deny(clippy::unwrap_used)]` stays module-scoped (#195).
+[lints.clippy]
+too_many_lines = "deny"
+
 [dependencies]
 winit = { version = "0.29.10" }
 wgpu = { version = "0.19.4", features = ["naga-ir"] }

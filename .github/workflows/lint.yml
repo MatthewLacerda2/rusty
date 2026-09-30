@@ -80,7 +80,7 @@ jobs:
         run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- --parity
       # Clippy is a HARD gate: every warning fails CI, for both feature sets.
       # The 50-line function cap (clippy::too_many_lines, threshold in clippy.toml)
-      # is enforced crate-wide via `-D clippy::too_many_lines`. The legacy burn-down
+      # is denied crate-wide in Cargo.toml's [lints] table (#485). The legacy burn-down
       # is complete (#124): no `#[allow(clippy::too_many_lines)]` remain in src/.
       # Split a function that grows past the cap — never add a new allow.
       # See docs/linting.md.
@@ -89,10 +89,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       - name: Clippy (hard gate, default features)
         if: needs.changes.outputs.code != 'false'
-        run: cargo clippy --all-targets -- -D warnings -D clippy::too_many_lines
+        run: cargo clippy --all-targets -- -D warnings
       - name: Clippy (hard gate, dev features)
         if: needs.changes.outputs.code != 'false'
-        run: cargo clippy --all-targets --features dev -- -D warnings -D clippy::too_many_lines
+        run: cargo clippy --all-targets --features dev -- -D warnings
       # Rustdoc is a HARD gate (#482): `cargo doc` is the Rust API reference agents
       # are pointed at, so a broken intra-doc link or a doc linking a private item
       # fails the PR instead of silently publishing a broken reference. Both
