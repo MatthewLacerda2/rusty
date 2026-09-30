@@ -86,6 +86,8 @@ mod pause_step;
 #[cfg(feature = "dev")]
 mod proptest_harness;
 #[cfg(feature = "dev")]
+mod script_timers;
+#[cfg(feature = "dev")]
 mod structural_authoring;
 #[cfg(feature = "dev")]
 mod time_scale;

@@ -19,6 +19,7 @@ use crate::time::Time;
 use crate::ui::ScreenSize;
 
 use super::console::ConsoleLogs;
+use super::timers::TimerScheduler;
 
 /// One live script instance: the Lua registry key of its lifecycle table plus
 /// the per-instance lifecycle flags. `awoken` / `started` record that `Awake` /
@@ -95,6 +96,9 @@ pub struct ScriptManager {
     pub(super) application: Rc<RefCell<Application>>,
     /// Frame stats (#433), filled by the dev layer and read by `Debug.Stats()`.
     pub(super) stats: Rc<RefCell<FrameStats>>,
+    /// Pending script timers and coroutines (#444), behind the `Timer` namespace.
+    /// Cleared with every fresh VM: its jobs hold keys into the old one.
+    pub(super) timers: Rc<RefCell<TimerScheduler>>,
 }
 
 impl ScriptManager {
@@ -127,6 +131,7 @@ impl ScriptManager {
             screen: Rc::new(RefCell::new(ScreenSize::default())),
             application: Rc::new(RefCell::new(Application::new())),
             stats: Rc::new(RefCell::new(FrameStats::default())),
+            timers: Rc::new(RefCell::new(TimerScheduler::default())),
         }
     }
 
@@ -165,6 +170,7 @@ impl ScriptManager {
         self.lua = Some(lua);
         self.entity_scripts.clear();
         self.load_attempted.clear();
+        self.timers.borrow_mut().clear();
 
         Ok(())
     }
@@ -193,6 +199,7 @@ impl ScriptManager {
             screen: &self.screen,
             application: &self.application,
             stats: &self.stats,
+            timers: &self.timers,
         }
     }
 
@@ -200,6 +207,7 @@ impl ScriptManager {
     pub fn shutdown(&mut self) {
         self.entity_scripts.clear();
         self.load_attempted.clear();
+        self.timers.borrow_mut().clear();
         self.lua = None;
     }
 

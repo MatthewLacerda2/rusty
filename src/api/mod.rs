@@ -2,7 +2,7 @@
 //!
 //! The single stable API surface shared by Lua scripts, the console REPL and
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
-//! `Scene`, `Random`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
+//! `Scene`, `Random`, `Timer`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
 //! `Assets`, `Texture`, `Shader`, `Sound`, `Particles`, `Layers`, `Graphics`, `Video`,
 //! `Storage`, `Canvas`, `RectTransform`, `UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`,
 //! `Application`, plus the dev-only `Debug`)
@@ -51,6 +51,7 @@ pub mod text;
 mod text_effects;
 pub mod texture;
 pub mod time;
+pub mod timer;
 pub mod transform;
 pub mod ui;
 pub mod video;
@@ -71,7 +72,7 @@ use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
 use crate::scene::Camera;
 use crate::scene::Scene;
-use crate::scripting::ConsoleLogs;
+use crate::scripting::{ConsoleLogs, TimerScheduler};
 use crate::time::Time;
 use crate::ui::ScreenSize;
 
@@ -122,6 +123,8 @@ pub struct ApiScopedCtx<'scope> {
     /// Frame stats (#433): filled by the dev layer's schedule probe and capture
     /// path, read by the dev-only `Debug.Stats()`. Never read by the sim.
     pub stats: &'scope RefCell<FrameStats>,
+    /// Pending script timers and coroutines (#444), behind the `Timer` namespace.
+    pub timers: &'scope RefCell<TimerScheduler>,
 }
 
 /// Register every namespace onto `lua` using `scope`-tied closures that borrow
@@ -154,6 +157,7 @@ pub fn register<'lua, 'scope>(
     physics::register(lua, scope, ctx.scene)?;
     physics::register_hitscan(lua, scope, ctx.scene, ctx.physics)?;
     time::register(lua, scope, ctx.time)?;
+    timer::register(lua, scope, ctx.scene, ctx.timers, ctx.console)?;
     random::register(lua, scope, ctx.random)?;
     camera::register(lua, scope, ctx.camera)?;
     light::register(lua, scope, ctx.scene)?;
