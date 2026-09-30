@@ -224,7 +224,10 @@ mod tests {
         // `tests/` is one binary (#483): its root, a module folder's `mod.rs`, and the
         // files inside that folder are all still standalone test files.
         assert_eq!(limit_for(Path::new("tests/main.rs")), MAX_TEST_FILE_LINES);
-        assert_eq!(limit_for(Path::new("tests/gpu/mod.rs")), MAX_TEST_FILE_LINES);
+        assert_eq!(
+            limit_for(Path::new("tests/gpu/mod.rs")),
+            MAX_TEST_FILE_LINES
+        );
         assert_eq!(
             limit_for(Path::new("tests/gpu/fxaa_screenshot.rs")),
             MAX_TEST_FILE_LINES
