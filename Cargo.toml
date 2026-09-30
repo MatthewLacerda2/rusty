@@ -84,3 +84,16 @@ rodio = { version = "0.19", default-features = false, features = ["symphonia-vor
 # Property-based testing for the deterministic sim (#123): generators are seeded
 # by proptest itself (no wall-clock), so the determinism guard is respected.
 proptest = "1"
+
+# Dev builds (#487). `cargo test` builds with this profile too (`test` inherits `dev`).
+# rusty's own crate stays at opt-level 0 so editing it rebuilds fast; it keeps only
+# line tables, so a backtrace still names file:line. Dependencies are built once per
+# `target/` and rarely rebuilt, so they are optimised and carry no debuginfo: rapier,
+# wgpu/naga, image decoding and the vendored Lua VM run near release speed in every
+# test, and full debuginfo — most of `target/`'s size and link time — is gone.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 2
+debug = false
