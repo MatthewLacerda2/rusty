@@ -26,8 +26,8 @@ hash, never wall-clock or unseeded RNG). Output is always **stereo**, 16-bit PCM
 
 | Function | Signature | Returns |
 |---|---|---|
-| `Sound.Bake` | `(patch, note, path [, opts])` | the written `path` |
-| `Sound.BakeJson` | `(json, note, path [, opts])` | the written `path` |
+| `Sound.Bake` | `(patch, note, path [, opts])` | the written `path`, then its [level](#how-loud-it-came-out-378) |
+| `Sound.BakeJson` | `(json, note, path [, opts])` | the written `path`, then its level |
 | `Sound.ToJson` | `(patch)` | the patch's canonical JSON string |
 
 `patch` is a table; `json` is its serialized form (from `Sound.ToJson`, or a saved
@@ -116,8 +116,8 @@ runtime plays like any other clip.
 
 | Function | Signature | Returns |
 |---|---|---|
-| `Sound.BakeSong` | `(song, path)` | the written `path` |
-| `Sound.BakeSongJson` | `(json, path)` | the written `path` |
+| `Sound.BakeSong` | `(song, path)` | the written `path`, then its level |
+| `Sound.BakeSongJson` | `(json, path)` | the written `path`, then its level |
 | `Sound.SongToJson` | `(song)` | the song's canonical JSON string |
 
 The shape is **tracker-style** (the MOD/XM lineage), not a flat piano roll: patterns
@@ -179,3 +179,43 @@ Validation happens **before** any samples are produced: an arrangement naming an
 undefined pattern, a note naming an undefined track, a non-positive `bpm` / `beats` /
 `dur`, or an unreadable patch path each raise a message saying exactly which one went
 wrong, rather than rendering silence you would have to listen for.
+
+### How loud it came out (#378)
+
+**The agent cannot hear**, so every bake says how loud it came out. Each bake verb
+returns a **level table** as its second value — the path stays first, so
+`local clip = Sound.Bake(...)` is unchanged — and `Sound.Level` measures any clip on
+disk the same way: an imported `.wav` / `.ogg` / `.mp3`, or an earlier bake you are
+comparing against.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Sound.Level` | `(path)` | the level table of the clip at `path`; an error naming the path if it does not decode |
+
+| Field | Meaning |
+|---|---|
+| `mean` | RMS level in dBFS — how loud it actually is. |
+| `peak` | The loudest single sample, in dBFS. |
+| `true_peak` | The loudest point *between* samples (dBFS) — what a resampler or encoder must reproduce; can exceed `peak`. |
+| `crest` | `peak − mean` in dB: a large crest has dynamics, a small one is a wall. |
+| `seconds` | Length of the clip. |
+| `silent` | `true` when it makes no sound at all. `mean`/`peak`/`true_peak`/`crest` are then `nil`. |
+| `clipping` | `true` when the true peak reaches or passes 0 dBFS. |
+
+```lua
+local clip, level = Sound.Bake(pistol, "C2", "project/assets/sounds/pistol.wav")
+local step = Sound.Level("project/assets/sounds/footstep.wav")
+print(("pistol %.1f dBFS, footstep %.1f dBFS"):format(level.mean, step.mean))
+```
+
+**A signal, never a gate.** There is no correct loudness — a gunshot is meant to be
+hot, a distant ambience far down — so nothing here refuses or fails; `silent` and
+`clipping` are notes, not errors. What it is for: two one-shots baked at the same
+`velocity` can land 20 dB apart because their sources have different crest factors,
+and this is how you find that out without listening. It does **not** judge taste —
+no number here says a gunshot is satisfying — and it is not LUFS.
+
+The measurement is zimmer's (`zimmer::level`), taken on the samples before they are
+encoded, so it costs nothing extra. `Sound.Level` decodes with the engine's own clip
+decoder and feeds the same meter, so a bake and `Sound.Level` of its file agree (up
+to the 16-bit rounding the WAV adds).
