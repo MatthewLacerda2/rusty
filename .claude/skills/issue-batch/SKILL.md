@@ -146,6 +146,20 @@ its uncommitted work with it), write decisions and hand-backs into the descripti
 and an issue comment, and mark the PR ready when its gates are green. Watch the
 PR, not the agent.
 
+**A cloud session is never woken by its own background work.** A routine session
+that starts a build in the background and ends its turn to wait sits idle forever —
+#485's first session did exactly that for an hour, gates half-run, PR still a draft.
+Brief every cloud session to run builds and gates in the **foreground** (long
+timeouts, split across calls), and to schedule its own check-in with `send_later`
+(the `Claude_Code_Remote` MCP tool) before ending a turn to wait on CI. From here,
+`worker_status: idle` on `list_runs` with a draft PR is the stall's signature; the
+fix is a fresh routine briefed to finish the pushed branch.
+
+**Two environment quirks every brief should carry:** `cargo deny` cannot fetch its
+advisory database through the cloud proxy with its built-in fetcher — set
+`CARGO_NET_GIT_FETCH_WITH_CLI=true`. And the container's disk is finite too: before
+#483 folded `tests/` into one binary, the dev-feature test pass filled it.
+
 **What it costs,** so it is chosen on purpose: every cloud session cold-builds the
 whole dependency tree, with no local compile cache to help. Have it run the full
 gate list before readying — it has the room for both feature sets, which a crowded
