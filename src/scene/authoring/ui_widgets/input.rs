@@ -19,6 +19,14 @@ pub fn input_field(scene: &mut Scene, parent: Option<u32>) -> u32 {
         Place::centred(Vec2::new(320.0, 60.0)),
     );
     image(scene, id, WHITE);
+    text_area(scene, id);
+    selectable(scene, id, None);
+    script(scene, id, "input_field");
+    id
+}
+
+/// The masked `Text Area` and its four layers, under `id`.
+fn text_area(scene: &mut Scene, id: u32) {
     let area = node(
         scene,
         "Text Area",
@@ -65,7 +73,4 @@ pub fn input_field(scene: &mut Scene, parent: Option<u32>) -> u32 {
         img.color.w = 0.0;
         img.raycast_target = false;
     }
-    selectable(scene, id, None);
-    script(scene, id, "input_field");
-    id
 }

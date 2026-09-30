@@ -286,6 +286,13 @@ One file per namespace, in reference order:
 - [`Storage`](Storage.md)
 - [`Debug`](Debug.md)
 
+**The UI widget kit** (#422) — Button, Toggle, Toggle Group, Slider, Scrollbar,
+Scroll View, Dropdown, Input Field — is not a namespace: each widget is an
+engine-shipped Lua **script component**. Build one with `UI.Create` (or
+`Scene.Instantiate` of its prefab) and drive it through its script table,
+`Scene.GetScript(id, "slider").set_value(0.5)`; each widget's fields and owner API
+are in [Widgets in `docs/ui.md`](../ui.md#widgets).
+
 ---
 
 ## Script field schema (inspector decorators)

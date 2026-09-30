@@ -38,59 +38,51 @@ fn a_widget_without_a_canvas_gets_one_and_reuses_it() {
     );
 }
 
+/// `kind` runs `script` and has every part in `parts` somewhere below it.
+fn assert_widget(scene: &mut Scene, kind: UiWidget, script: &str, parts: &[&str]) {
+    let id = create_ui(scene, kind, None);
+    let scripts = scene.world.scripts(id).expect("scripts");
+    assert!(
+        scripts
+            .iter()
+            .any(|s| s.path.ends_with(&format!("ui/{script}.lua"))),
+        "{kind:?} runs {script}.lua"
+    );
+    drop(scripts);
+    let names = parts_of(scene, id);
+    for p in parts {
+        assert!(
+            names.iter().any(|n| n == p),
+            "{kind:?} has a {p}: {names:?}"
+        );
+    }
+}
+
 #[test]
 fn widgets_carry_their_script_and_named_parts() {
-    let mut scene = Scene::new();
-    for (kind, script, parts) in [
-        (UiWidget::Button, "button", &["Label"][..]),
-        (
-            UiWidget::Toggle,
-            "toggle",
-            &["Background", "Checkmark", "Label"],
-        ),
-        (
-            UiWidget::Slider,
-            "slider",
-            &["Fill Area", "Fill", "Handle Slide Area", "Handle"],
-        ),
-        (
-            UiWidget::Scrollbar,
-            "scrollbar",
-            &["Sliding Area", "Handle"],
-        ),
-        (
-            UiWidget::ScrollView,
-            "scroll_view",
-            &["Viewport", "Content", "Scrollbar Vertical"],
-        ),
-        (
-            UiWidget::Dropdown,
-            "dropdown",
-            &["Label", "Arrow", "Template", "Viewport"],
-        ),
-        (
-            UiWidget::InputField,
-            "input_field",
-            &["Text Area", "Placeholder", "Text", "Caret"],
-        ),
-    ] {
-        let id = create_ui(&mut scene, kind, None);
-        let scripts = scene.world.scripts(id).expect("scripts");
-        assert!(
-            scripts
-                .iter()
-                .any(|s| s.path.ends_with(&format!("ui/{script}.lua"))),
-            "{kind:?} runs {script}.lua"
-        );
-        drop(scripts);
-        let names = parts_of(&scene, id);
-        for p in parts {
-            assert!(
-                names.iter().any(|n| n == p),
-                "{kind:?} has a {p}: {names:?}"
-            );
-        }
-    }
+    let mut s = Scene::new();
+    assert_widget(&mut s, UiWidget::Button, "button", &["Label"]);
+    let toggle = ["Background", "Checkmark", "Label"];
+    assert_widget(&mut s, UiWidget::Toggle, "toggle", &toggle);
+    let slider = ["Fill Area", "Fill", "Handle Slide Area", "Handle"];
+    assert_widget(&mut s, UiWidget::Slider, "slider", &slider);
+    assert_widget(
+        &mut s,
+        UiWidget::Scrollbar,
+        "scrollbar",
+        &["Sliding Area", "Handle"],
+    );
+    let view = [
+        "Viewport",
+        "Content",
+        "Scrollbar Vertical",
+        "Scrollbar Horizontal",
+    ];
+    assert_widget(&mut s, UiWidget::ScrollView, "scroll_view", &view);
+    let drop_down = ["Label", "Arrow", "Template", "Viewport"];
+    assert_widget(&mut s, UiWidget::Dropdown, "dropdown", &drop_down);
+    let field = ["Text Area", "Selection", "Placeholder", "Text", "Caret"];
+    assert_widget(&mut s, UiWidget::InputField, "input_field", &field);
 }
 
 #[test]

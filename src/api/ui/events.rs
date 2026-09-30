@@ -44,17 +44,7 @@ pub fn register_events<'lua, 'scope>(
         Ok(raycast(world, &layout, Vec2::new(x, y)))
     });
     put(table, "Raycast", f)?;
-    let f = scope.create_function(move |_, (id, dir): (u32, String)| {
-        let Some(dir) = direction(&dir) else {
-            return Err(mlua::Error::RuntimeError(format!(
-                "UI.FindSelectable: unknown direction '{dir}' (Up, Down, Left, Right)"
-            )));
-        };
-        let world = &scene.borrow().world;
-        let layout = UiLayout::compute(world, px());
-        Ok(find_selectable(world, &layout, id, dir))
-    });
-    put(table, "FindSelectable", f)?;
+    register_find(scope, table, ctx)?;
     let f = scope.create_function(move |_, id: u32| {
         let screen = px();
         let world = &scene.borrow().world;
@@ -83,6 +73,26 @@ pub fn register_events<'lua, 'scope>(
         )
     });
     put(table, "List", f)
+}
+
+/// `FindSelectable(id, direction)` — where navigation from `id` would go.
+fn register_find<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &Table,
+    ctx: &ApiScopedCtx<'scope>,
+) -> Reg {
+    let (scene, screen, video) = (ctx.scene, ctx.screen, ctx.video);
+    let f = scope.create_function(move |_, (id, dir): (u32, String)| {
+        let Some(dir) = direction(&dir) else {
+            return Err(mlua::Error::RuntimeError(format!(
+                "UI.FindSelectable: unknown direction '{dir}' (Up, Down, Left, Right)"
+            )));
+        };
+        let world = &scene.borrow().world;
+        let layout = UiLayout::compute(world, screen.borrow().pixels(&video.borrow()));
+        Ok(find_selectable(world, &layout, id, dir))
+    });
+    put(table, "FindSelectable", f)
 }
 
 /// A direction name as its `select_on` index (case-insensitive).

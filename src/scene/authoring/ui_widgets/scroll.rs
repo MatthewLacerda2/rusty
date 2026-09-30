@@ -65,6 +65,13 @@ pub fn build_into(scene: &mut Scene, id: u32, horizontal: bool) -> u32 {
             Vec2::new(0.0, 300.0),
         ),
     );
+    fit_content(scene, content);
+    bars(scene, id, horizontal);
+    content
+}
+
+/// `Content` lists its children top to bottom and fits its height to them.
+fn fit_content(scene: &mut Scene, content: u32) {
     let group = LayoutGroupComponent {
         kind: LayoutKind::Vertical,
         control_child_width: true,
@@ -79,6 +86,11 @@ pub fn build_into(scene: &mut Scene, id: u32, horizontal: bool) -> u32 {
         ..Default::default()
     };
     scene.world.set_layout_element(content, Some(fit));
+}
+
+/// The vertical bar down the right and (with `horizontal`) one along the bottom.
+fn bars(scene: &mut Scene, id: u32, horizontal: bool) {
+    let bottom_bar = if horizontal { BAR } else { 0.0 };
     if horizontal {
         let bottom = Place(
             Vec2::ZERO,
@@ -99,5 +111,4 @@ pub fn build_into(scene: &mut Scene, id: u32, horizontal: bool) -> u32 {
     );
     let v = scrollbar_sized(scene, Some(id), right, Some("BottomToTop"));
     scene.world.set_name(v, "Scrollbar Vertical".to_string());
-    content
 }

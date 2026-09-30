@@ -47,6 +47,14 @@ pub fn dropdown(scene: &mut Scene, parent: Option<u32>) -> u32 {
         ),
     );
     image(scene, arrow, DARK);
+    template(scene, id);
+    selectable(scene, id, None);
+    script(scene, id, "dropdown");
+    id
+}
+
+/// The inactive list template: a vertical-only scroll view hung below `id`.
+fn template(scene: &mut Scene, id: u32) {
     let template = node(
         scene,
         "Template",
@@ -63,7 +71,4 @@ pub fn dropdown(scene: &mut Scene, parent: Option<u32>) -> u32 {
     build_into(scene, template, false);
     script(scene, template, "scroll_view");
     scene.world.set_active(template, false);
-    selectable(scene, id, None);
-    script(scene, id, "dropdown");
-    id
 }
