@@ -85,15 +85,14 @@ fn outlined_glowing_text_layers_fill_outline_and_glow() {
         panic!("glow, outline and fill all appear left of centre: {row:?}");
     };
     assert!(g < r && r < w, "glow {g} < outline {r} < fill {w}");
-    let brighter_inwards = row[g..r].windows(2).all(|p| p[1][1] + 2 >= p[0][1]);
+    // The glow run up to the outline's antialiased edge (whose blended pixel is
+    // neither glow nor outline) brightens inwards and reaches well out.
+    let run: Vec<[u8; 3]> = row[g..r].iter().copied().take_while(|p| glow(p)).collect();
+    let brighter = run.windows(2).all(|p| p[1][1] + 2 >= p[0][1]);
+    assert!(brighter, "the glow brightens towards the glyph: {run:?}");
     assert!(
-        brighter_inwards,
-        "the glow brightens towards the glyph: {:?}",
-        &row[g..r]
-    );
-    assert!(
-        r - g >= 8,
-        "the glow reaches well past the outline ({} px)",
-        r - g
+        run.len() >= 8,
+        "the glow reaches past the outline ({} px)",
+        run.len()
     );
 }
