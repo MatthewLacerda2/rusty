@@ -16,6 +16,19 @@ pub(super) fn register_fog<'lua, 'scope>(
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
+    register_mode_color(scope, table, scene)?;
+    for (name, get, set) in SCALARS {
+        scalar(scope, table, scene, name, get, set)?;
+    }
+    Ok(())
+}
+
+/// `{Get,Set}FogMode` (by name) and `{Get,Set}FogColor` (`r, g, b`).
+fn register_mode_color<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "GetFogMode",
@@ -48,40 +61,24 @@ pub(super) fn register_fog<'lua, 'scope>(
             Ok(())
         }),
     )?;
-    scalar(
-        scope,
-        table,
-        scene,
-        "Density",
-        |f| f.density,
-        fog_ops::set_density,
-    )?;
-    scalar(
-        scope,
-        table,
-        scene,
-        "Start",
-        |f| f.start,
-        fog_ops::set_start,
-    )?;
-    scalar(scope, table, scene, "End", |f| f.end, fog_ops::set_end)?;
-    scalar(
-        scope,
-        table,
-        scene,
+    Ok(())
+}
+
+type Get = fn(&FogSettings) -> f32;
+type Set = fn(&mut FogSettings, f32);
+
+/// The five scalar knobs, `GetFog<name>` / `SetFog<name>` each.
+const SCALARS: [(&str, Get, Set); 5] = [
+    ("Density", |f| f.density, fog_ops::set_density),
+    ("Start", |f| f.start, fog_ops::set_start),
+    ("End", |f| f.end, fog_ops::set_end),
+    (
         "HeightFalloff",
         |f| f.height_falloff,
         fog_ops::set_height_falloff,
-    )?;
-    scalar(
-        scope,
-        table,
-        scene,
-        "BaseHeight",
-        |f| f.base_height,
-        fog_ops::set_base_height,
-    )
-}
+    ),
+    ("BaseHeight", |f| f.base_height, fog_ops::set_base_height),
+];
 
 /// Register `GetFog<name>` / `SetFog<name>` over one scalar field.
 fn scalar<'lua, 'scope>(
@@ -89,8 +86,8 @@ fn scalar<'lua, 'scope>(
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     name: &str,
-    get: fn(&FogSettings) -> f32,
-    set: fn(&mut FogSettings, f32),
+    get: Get,
+    set: Set,
 ) -> Reg {
     put(
         table,

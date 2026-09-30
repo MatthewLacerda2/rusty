@@ -175,33 +175,41 @@ fn draw_fog(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
                 changed = true;
             }
         });
-        type Op = fn(&mut FogSettings, f32);
-        let sliders: [(&str, f32, std::ops::RangeInclusive<f32>, Op); 5] = [
-            ("Density", f.density, 0.0..=0.5, fog_ops::set_density),
-            ("Start", f.start, 0.0..=500.0, fog_ops::set_start),
-            ("End", f.end, 0.0..=1000.0, fog_ops::set_end),
-            (
-                "Height Falloff",
-                f.height_falloff,
-                0.0..=2.0,
-                fog_ops::set_height_falloff,
-            ),
-            (
-                "Base Height",
-                f.base_height,
-                -50.0..=50.0,
-                fog_ops::set_base_height,
-            ),
-        ];
-        for (label, mut value, range, op) in sliders {
-            if ui
-                .add(egui::Slider::new(&mut value, range).text(label))
-                .changed()
-            {
-                op(fog, value);
-                changed = true;
-            }
-        }
+        changed |= draw_fog_sliders(ui, fog, &f);
     });
     editor.is_dirty |= changed;
+}
+
+/// The fog's five scalar sliders, each through its shared op. Returns whether any
+/// changed.
+fn draw_fog_sliders(ui: &mut egui::Ui, fog: &mut FogSettings, f: &FogSettings) -> bool {
+    type Op = fn(&mut FogSettings, f32);
+    let sliders: [(&str, f32, std::ops::RangeInclusive<f32>, Op); 5] = [
+        ("Density", f.density, 0.0..=0.5, fog_ops::set_density),
+        ("Start", f.start, 0.0..=500.0, fog_ops::set_start),
+        ("End", f.end, 0.0..=1000.0, fog_ops::set_end),
+        (
+            "Height Falloff",
+            f.height_falloff,
+            0.0..=2.0,
+            fog_ops::set_height_falloff,
+        ),
+        (
+            "Base Height",
+            f.base_height,
+            -50.0..=50.0,
+            fog_ops::set_base_height,
+        ),
+    ];
+    let mut changed = false;
+    for (label, mut value, range, op) in sliders {
+        if ui
+            .add(egui::Slider::new(&mut value, range).text(label))
+            .changed()
+        {
+            op(fog, value);
+            changed = true;
+        }
+    }
+    changed
 }
