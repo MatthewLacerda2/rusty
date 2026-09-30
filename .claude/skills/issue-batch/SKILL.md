@@ -187,10 +187,9 @@ timeouts, split across calls), and to schedule its own check-in with `send_later
 `worker_status: idle` on `list_runs` with a draft PR is the stall's signature; the
 fix is a fresh routine briefed to finish the pushed branch.
 
-**Two environment quirks every brief should carry:** `cargo deny` cannot fetch its
-advisory database through the cloud proxy with its built-in fetcher — set
-`CARGO_NET_GIT_FETCH_WITH_CLI=true`. And the container's disk is finite too: before
-#483 folded `tests/` into one binary, the dev-feature test pass filled it.
+**The container's disk is finite too:** before #483 folded `tests/` into one binary,
+the dev-feature test pass filled it. (`cargo deny`'s proxy trap needs no brief
+line any more: the repo's `.cargo/config.toml` fetches with the system git, #572.)
 
 **What it costs,** so it is chosen on purpose: every cloud session cold-builds the
 whole dependency tree, with no local compile cache to help. Have it run the full
@@ -238,15 +237,31 @@ request), fixes that need its real GPU (#518's driver race), and the
 orchestrator's own compile checks. Don't let the orchestrator compile while a
 local agent is timing builds; it skews the numbers.
 
-**Every cloud brief carries:**
+**Every cloud brief carries** step 0 inline, then a pointer to
+[`cloud-brief.md`](cloud-brief.md) — the standing rules (foreground builds,
+`send_later`, ready means finished, the repo's rules, the PR protocol, "do not
+merge") live there, versioned with this skill (#568) — and only what is specific
+to its issue. `RemoteTrigger` echoes a prompt back three times, so standing text
+copied into each one fills the orchestrator's context; a change to the rules goes
+in the file, once. The prompt:
 
-- step 0, the `CLAUDE_CODE_REMOTE` self-check;
-- builds in the foreground, `send_later` for waits, and "ready means finished";
-- **what merged tonight that it must build on**, since line numbers in issues go
-  stale within hours, and which siblings are in flight in which files;
-- the repo's current rules (one test binary, size caps, GPU test naming,
-  lavapipe for render tests, `CARGO_NET_GIT_FETCH_WITH_CLI=true` for `deny`);
-- "do not merge".
+```text
+STEP 0 — before anything else, prove you are a cloud session. Run
+`echo "CLAUDE_CODE_REMOTE=$CLAUDE_CODE_REMOTE"; pwd; uname -a`. If it is not
+exactly `true`, or the path is under the operator's home, STOP: touch nothing,
+end with "LOCAL — aborted" and that output.
+
+Then read `.claude/skills/issue-batch/cloud-brief.md` and follow it.
+
+Issue(s): #N — <one line>. Branch: `N-short-slug`.
+Builds on: <what merged that it must build on; line numbers in issues go stale
+within hours>.
+Siblings in flight: <branch/issue → the files it edits; stay out of them>.
+Decisions: <anything already settled, or "none">.
+```
+
+No helper script fills it: `RemoteTrigger` is a tool the orchestrator calls, not
+an API a script can reach, and five slots don't need one.
 
 ## Starting
 
