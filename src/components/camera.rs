@@ -60,7 +60,7 @@ pub struct CameraComponent {
     pub motion_blur_active: bool,
     pub motion_blur_samples: u32,
     /// Run the FXAA pass at the end of the post-FX chain (#360). Defaults to `true`
-    /// (see [`default_fxaa_active`]) — the same default-on posture as motion blur,
+    /// (see `default_fxaa_active`) — the same default-on posture as motion blur,
     /// because both are cheap whole-image effects a game wants unless it says
     /// otherwise. Unlike motion blur this is *not* gated by the quality preset: FXAA
     /// runs on every tier including Low, where it is exactly the anti-aliasing an

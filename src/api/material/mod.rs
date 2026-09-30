@@ -8,7 +8,7 @@
 //!    its `MaterialComponent`. These verbs resolve the entity's material (creating a
 //!    default one if it has none yet) and mutate the asset, so every entity sharing it
 //!    sees the change.
-//! 2. **Standalone named-asset authoring** ([`asset`], #271) — `DefineAsset` /
+//! 2. **Standalone named-asset authoring** (`asset`, #271) — `DefineAsset` /
 //!    `DefineAssetJson` / `GetAsset` / `HasAsset`: author a reusable `MaterialAsset`
 //!    into the library under a chosen *name*, decoupled from any entity. An entity then
 //!    uses it by pointing its `MaterialComponent.material` at that name. Round-trips

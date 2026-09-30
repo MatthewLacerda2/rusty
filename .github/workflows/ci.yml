@@ -29,6 +29,16 @@ on:
     - cron: '0 3 * * *'
   workflow_dispatch:
 
+# Cancel superseded runs (#482): a new push to a PR makes its previous run stale,
+# so that run is cancelled instead of finishing beside the new one. Only
+# `pull_request` runs share a group; every other event (push to `main`, the
+# nightly schedule, merge_group, manual) is keyed on its own run id, so each of
+# those runs finishes — a shared group would still let a newer run replace a
+# *pending* one, even with cancel-in-progress off.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Detect whether the PR changes anything other than Markdown. On a Markdown-only
   # PR the heavy Rust *steps* below are skipped, but the required job still RUNS and
@@ -114,18 +124,22 @@ jobs:
       - name: Toolchain (from rust-toolchain.toml)
         if: needs.changes.outputs.code != 'false'
         run: rustup show
+      # Only `main` writes caches (#482); PR runs restore the latest one `main`
+      # saved. When every PR also saved, a batch of PRs evicted `main`'s warm
+      # caches from the repo's 10 GB budget — and a PR's cache is visible only to
+      # that PR anyway. Every rust-cache step in these workflows does the same;
+      # a job that never runs on `main` borrows a `shared-key` with one that does.
       - name: Cache cargo registry + target
         if: needs.changes.outputs.code != 'false'
         uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: System libs for winit/wgpu builds
         if: needs.changes.outputs.code != 'false'
         run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
-      - name: Build (default)
-        if: needs.changes.outputs.code != 'false'
-        run: cargo build --locked
-      - name: Build (dev features)
-        if: needs.changes.outputs.code != 'false'
-        run: cargo build --features dev --locked
+      # No separate `cargo build` steps (#482): `cargo test` already compiles every
+      # binary target its feature set enables (Cargo builds them for the
+      # integration tests), so a build step first only re-proved the same compile.
       - name: Test (engine, default)
         if: needs.changes.outputs.code != 'false'
         run: cargo test --locked
@@ -163,12 +177,10 @@ jobs:
         run: rustup show
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       # macOS/Windows use their native backends and need no extra system libs; the
       # apt step is Linux-only and lives on the `build-test` job above.
-      - name: Build (default)
-        run: cargo build --locked
-      - name: Build (dev features)
-        run: cargo build --features dev --locked
       - name: Test (engine, default)
         run: cargo test --locked
       - name: Test (engine, dev features)
@@ -205,6 +217,9 @@ jobs:
         run: rustup component add llvm-tools-preview
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: coverage
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: System libs for winit/wgpu builds
         run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       - name: Install cargo-llvm-cov
@@ -289,6 +304,9 @@ jobs:
         run: rustup component add llvm-tools-preview
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: coverage
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: System libs for winit/wgpu builds
         run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       - name: Install cargo-llvm-cov
@@ -435,6 +453,9 @@ jobs:
         run: rustup show
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: mutants
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: System libs for winit/wgpu builds
         run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       - name: Install cargo-mutants
@@ -444,6 +465,7 @@ jobs:
       - name: Build the PR diff (changed lines vs. merge-base)
         run: git diff ${{ github.event.pull_request.base.sha }}...HEAD > pr.diff
       - name: Mutation test (changed sim lines only, informational)
+        id: mutate
         # --in-diff restricts mutants to the lines this PR changed; the --file sim
         # globs keep it from mutating anything outside the deterministic sim even
         # if the diff strays. Same dev-feature build + timeout guard as the sweep.
@@ -460,8 +482,22 @@ jobs:
         # cargo-mutants exits non-zero when mutants survive, so this and the steps
         # below run with `if: always()`. Build the same block for the run summary
         # and the sticky comment; flag whether there were any survivors.
+        # "Nothing was in scope" must never read as "everything was caught" (#482):
+        # the tested count comes from `outcomes.json`, and a zero is only reported as
+        # "no mutants in scope" when the mutation step itself succeeded.
+        env:
+          MUTATE: ${{ steps.mutate.outcome }}
         run: |
           MISSED=mutants.out/missed.txt
+          OUTCOMES=mutants.out/outcomes.json
+          total=0
+          if [ -f "$OUTCOMES" ]; then
+            total=$(jq '.total_mutants // 0' "$OUTCOMES")
+            caught=$(jq '.caught // 0' "$OUTCOMES")
+            missed=$(jq '.missed // 0' "$OUTCOMES")
+            timeout=$(jq '.timeout // 0' "$OUTCOMES")
+            unviable=$(jq '.unviable // 0' "$OUTCOMES")
+          fi
           {
             echo '### Mutation testing — diff-scoped (informational, non-blocking)'
             echo ''
@@ -471,8 +507,18 @@ jobs:
               echo '```'
               cat "$MISSED"
               echo '```'
+            elif [ "$MUTATE" != success ] && [ "${timeout:-0}" -eq 0 ]; then
+              # A failure that no survivor or timeout explains: the build or the
+              # unmutated baseline broke, so whatever count exists was not measured.
+              echo "⚠️ cargo-mutants failed without a survivor or timeout to explain it (step: \`$MUTATE\`) — nothing was measured. See the job log."
+            elif [ "$total" -eq 0 ]; then
+              echo 'No mutants in scope: this PR changes no mutable sim lines, so nothing was tested. ➖'
             else
-              echo 'No surviving mutants in the changed sim lines. ✅'
+              echo "No surviving mutants in the changed sim lines: $total tested — $caught caught, $timeout timed out, $unviable unviable. ✅"
+            fi
+            if [ -s "$MISSED" ] && [ -f "$OUTCOMES" ]; then
+              echo ''
+              echo "$total tested — $caught caught, $missed missed, $timeout timed out, $unviable unviable."
             fi
           } | tee comment.md >> "$GITHUB_STEP_SUMMARY"
           if [ -s "$MISSED" ]; then
@@ -536,6 +582,9 @@ jobs:
         run: rustup show
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: mutants
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: System libs for winit/wgpu builds
         run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       - name: Install cargo-mutants

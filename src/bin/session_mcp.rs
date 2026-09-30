@@ -15,6 +15,7 @@
 //!   window that closes and reopens is picked up transparently.
 //!
 //! Usage:
+//! ```text
 //!   cargo run --bin session-mcp --features dev               # embed: default scene
 //!   cargo run --bin session-mcp --features dev -- <scene>    # embed: a specific scene
 //!   cargo run --bin session-mcp --features dev -- --empty    # embed: an empty scene
@@ -23,6 +24,7 @@
 //!   cargo run --bin session-mcp --features dev -- --attach   # attach: default socket
 //!   cargo run --bin session-mcp --features dev -- --attach <addr>
 //!                                                            # attach: explicit socket
+//! ```
 //!
 //! stdout carries ONLY JSON-RPC messages (one per line); engine logs go to stderr or
 //! the in-memory console, never stdout. See `docs/mcp.md` for the tools/resources and

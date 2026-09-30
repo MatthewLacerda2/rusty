@@ -142,7 +142,7 @@ pub fn instantiate_prefab(scene: &mut Scene, prefab: &PrefabData, parent: Option
 }
 
 /// Clone a prefab into `scene` as a **linked** instance (#216): identical to
-/// [`instantiate_prefab`], but every entity is stamped with a [`PrefabLink`] back to
+/// [`instantiate_prefab`], but every entity is stamped with a [`PrefabLink`](crate::components::PrefabLink) back to
 /// `source` (the `.prefab` path) carrying its source `local_id` and an empty override
 /// set. The link is what lets a later scene-load / reimport re-baseline the instance
 /// against the source and re-apply the instance's recorded overrides on top.

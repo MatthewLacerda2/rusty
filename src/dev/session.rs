@@ -3,7 +3,7 @@
 //! The keystone (#177). A single process that holds a live [`GameWorld`] in **edit
 //! mode** and exposes a line-oriented command channel: each input line is one Lua
 //! command, evaluated against the live world through the *one* existing evaluator
-//! ([`ScriptManager::eval`], reached via [`console::evaluate_line`]). The same
+//! ([`ScriptManager::eval`](crate::scripting::ScriptManager::eval), reached via [`console::evaluate_line`]). The same
 //! evaluator backs the in-editor console — so the headless agent and the editor can
 //! never drift apart (the two-VM split the harness used is gone here).
 //!

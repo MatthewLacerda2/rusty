@@ -15,7 +15,7 @@
 //! recorded map on top".
 //!
 //! Leaves are compared on the entity's serde JSON form with the volatile/identity
-//! fields masked out (see [`STRIPPED_KEYS`]), so ids, parenting, rehydrated GPU
+//! fields masked out (see `STRIPPED_KEYS`), so ids, parenting, rehydrated GPU
 //! geometry, and the link itself never count as overrides.
 
 use std::collections::BTreeMap;

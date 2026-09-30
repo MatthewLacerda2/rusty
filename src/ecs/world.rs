@@ -1,7 +1,7 @@
 //! src/ecs/world.rs — World wrapper over `hecs::World`.
 //!
 //! Storage flip (#345): each game object is now a hecs entity carrying real
-//! per-component hecs columns — a slim mandatory [`Core`] (identity/hierarchy
+//! per-component hecs columns — a slim mandatory `Core` (identity/hierarchy
 //! facts), the mandatory `name: String` and `TransformComponent`, the mandatory
 //! `Vec<ScriptComponent>`, and every optional first-class component attached
 //! only when present. hecs itself enforces one-per-type storage. This wrapper

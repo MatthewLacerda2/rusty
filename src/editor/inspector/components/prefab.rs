@@ -1,7 +1,7 @@
 //! src/editor/inspector_prefab.rs — the linked-prefab-instance override card (#263).
 //!
 //! The editor half of prefab instances (#216 / #260 / #268): for an entity that carries
-//! a [`crate::scene::PrefabLink`], it surfaces — Unity-style — which fields diverge from
+//! a [`crate::components::PrefabLink`], it surfaces — Unity-style — which fields diverge from
 //! the linked source and lets the author Record / Revert them on the instance, or Apply
 //! them back into the source `.prefab`. Every button maps onto the SAME verbs the
 //! `Scene.*` API and console drive (`record_instance_overrides` /

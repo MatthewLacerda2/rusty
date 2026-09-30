@@ -1,14 +1,14 @@
 //! src/dev/command_channel/client.rs — the **dial-in** half of the windowed command
 //! channel (#307).
 //!
-//! The listener half ([`super::transport`]) lets a running window *accept* line-Lua
+//! The listener half (`super::transport`) lets a running window *accept* line-Lua
 //! commands; this is the half an external driver uses to *send* them. The MCP attach
 //! backend ([`crate::dev::mcp::attach`]) uses it to forward `eval` calls to a live
 //! windowed engine, but it is a plain line client: one Lua line out, one framed JSON
 //! reply line back, byte-identical to [`super::super::session::run`].
 //!
 //! Address resolution is shared with the listener (same env vars, same defaults via
-//! [`super::transport`]) so a client and the window it dials never disagree about
+//! `super::transport`) so a client and the window it dials never disagree about
 //! where the socket is.
 
 use std::io::{self, BufRead, BufReader, Write};
@@ -60,7 +60,7 @@ impl Client {
 }
 
 /// Resolve the address label *without* connecting — for diagnostics naming where we
-/// looked. Mirrors [`dial`]'s resolution exactly.
+/// looked. Mirrors `dial`'s resolution exactly.
 pub fn address_label(explicit: Option<&str>) -> String {
     match explicit {
         Some(addr) => addr.to_string(),

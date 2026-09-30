@@ -20,7 +20,7 @@ const ATTACK: f32 = 0.002;
 /// Recovery, in seconds. Slower than the attack, or the gain pumps audibly.
 const RELEASE: f32 = 0.06;
 
-/// Limit `buf` in place so no sample exceeds [`CEILING`]. Non-finite samples (from
+/// Limit `buf` in place so no sample exceeds `CEILING`. Non-finite samples (from
 /// a pathological patch) are flushed to silence rather than written to the file.
 pub fn apply(buf: &mut [f32], rate: f32) {
     let mut gain = required_gain(buf);

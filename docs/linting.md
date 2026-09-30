@@ -15,6 +15,7 @@ result is written to `.lint/report.txt` so an agent can read exactly what failed
 | Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every *migrated* first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard), minus the burn-down baseline |
+| Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
 
 ## The `*_tests.rs` sibling rule
 The tight test cap exists to discourage over-splitting a bundle of `#[test]`s. But a

@@ -17,7 +17,7 @@ impl Renderer {
     /// Render `scene` with the forward pipeline temporarily rebuilt from
     /// `shader_path`'s compiled module instead of `assets/shaders/shader.wgsl` — the
     /// Preview tab's Shader-asset arm ("the chosen preview mesh... shaded by the
-    /// selected module", #352). Reuses [`create_pipelines`] verbatim (same bind-group
+    /// selected module", #352). Reuses `create_pipelines` verbatim (same bind-group
     /// layouts, same vertex/fragment entry points as every other forward pipeline) so
     /// this is a swapped shader module, not a new pipeline shape. Falls back to the
     /// engine's default shader — rather than panicking — when `shader_path` can't be

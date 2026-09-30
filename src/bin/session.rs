@@ -3,11 +3,13 @@
 //! The keystone (#177): a long-lived engine process an external agent can talk to.
 //!
 //! Usage:
+//! ```text
 //!   cargo run --bin session --features dev               # boot the default scene
 //!   cargo run --bin session --features dev -- <scene>    # boot a specific scene
 //!   cargo run --bin session --features dev -- --empty    # start from empty scene
 //!   cargo run --bin session --features dev -- --project <dir> [<scene>|--empty]
 //!                                                        # chdir into a project first
+//! ```
 //!
 //! Holds a live `GameWorld` in **edit mode** (not forced play) and reads commands
 //! from stdin, one Lua line per command, evaluating each against the live world
