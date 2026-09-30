@@ -34,6 +34,22 @@ impl CachedClip {
     pub fn source(&self) -> SamplesBuffer<i16> {
         SamplesBuffer::new(self.channels, self.sample_rate, (*self.samples).clone())
     }
+
+    /// Interleaved channel count.
+    pub fn channels(&self) -> u16 {
+        self.channels
+    }
+
+    /// Frames per second.
+    pub fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    /// The decoded interleaved samples — what `Sound.Level` (#378) measures, so a
+    /// file is metered exactly as the engine will play it.
+    pub fn samples(&self) -> &[i16] {
+        &self.samples
+    }
 }
 
 /// A path → decoded-PCM cache. One lives in the `RodioBackend`; clips decode lazily
@@ -69,7 +85,7 @@ impl ClipCache {
 /// Decode one file to interleaved `i16` PCM. `rodio`'s `Decoder` sniffs the
 /// container (`.ogg` Vorbis / `.wav` / `.mp3`) from the stream, so the extension need not be
 /// trusted. Errs with a human-readable reason on any open/decode failure.
-fn decode_file(path: &str) -> Result<CachedClip, String> {
+pub fn decode_file(path: &str) -> Result<CachedClip, String> {
     let file = File::open(path).map_err(|e| e.to_string())?;
     let decoder = Decoder::new(BufReader::new(file)).map_err(|e| e.to_string())?;
     let channels = decoder.channels();
