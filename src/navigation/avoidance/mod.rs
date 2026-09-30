@@ -27,6 +27,8 @@
 
 mod lp;
 #[cfg(test)]
+mod orca_tests;
+#[cfg(test)]
 mod tests;
 
 use std::collections::HashMap;
