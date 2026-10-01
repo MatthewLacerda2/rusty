@@ -206,18 +206,20 @@ mod tests {
     fn blocks_list_runtime_params_and_the_texture_slots_they_sample() {
         let lua = Lua::new();
         register(&lua).unwrap();
-        let (slot, runtime, none): (String, bool, usize) = lua
+        let (slot, runtime, none, stages): (String, bool, usize, String) = lua
             .load(
-                r#"local d, t
+                r#"local d, t, u
                    for _, b in ipairs(Shader.Blocks("surface")) do
                      if b.id == "dissolve" then d = b end
                      if b.id == "tint" then t = b end
+                     if b.id == "uv_scroll" then u = b end
                    end
-                   return d.textures[1], d.params[1].runtime, #t.textures"#,
+                   return d.textures[1], d.params[1].runtime, #t.textures, t.stage .. u.stage"#,
             )
             .eval()
             .unwrap();
         assert_eq!((slot.as_str(), runtime, none), ("mask", true, 0));
+        assert_eq!(stages, "coloruv");
     }
 
     #[test]

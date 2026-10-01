@@ -7,12 +7,13 @@
 
 use mlua::{Lua, Table, Value};
 
-use crate::shadergen::blocks::{catalog, Block, Param};
+use crate::shadergen::blocks::{catalog, Block, Param, Stage};
 use crate::shadergen::recipe::PassKind;
 
-/// `{ {id, desc, params = { {name, default, arity, runtime} }, textures = {slot…} }, … }`
+/// `{ {id, desc, params = { {name, default, arity, runtime} }, textures = {slot…}, stage }, … }`
 /// for `pass`. `textures` lists the extra texture slots the block samples (#400) —
-/// the `shader_textures` keys a material using it should name.
+/// the `shader_textures` keys a material using it should name. `stage` is `"color"`
+/// or `"uv"` (#401): a uv block moves the UVs before any map is sampled.
 pub fn blocks_table(lua: &Lua, pass: PassKind) -> mlua::Result<Table<'_>> {
     lua.create_sequence_from(
         catalog(pass)
@@ -36,6 +37,11 @@ fn block_table<'lua>(lua: &'lua Lua, b: &Block) -> mlua::Result<Table<'lua>> {
         "textures",
         lua.create_sequence_from(b.textures.iter().copied())?,
     )?;
+    let stage = match b.stage {
+        Stage::Color => "color",
+        Stage::Uv => "uv",
+    };
+    t.set("stage", stage)?;
     Ok(t)
 }
 

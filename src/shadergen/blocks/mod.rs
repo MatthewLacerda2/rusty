@@ -45,6 +45,40 @@ pub struct Param {
     pub runtime: bool,
 }
 
+impl Param {
+    /// A param baked into the module as a `const`.
+    pub const fn baked(name: &'static str, default: f32, arity: usize) -> Self {
+        Self {
+            name,
+            default,
+            arity,
+            runtime: false,
+        }
+    }
+
+    /// A [`Param::runtime`] param: read from the material's param uniform (#399).
+    pub const fn live(name: &'static str, default: f32, arity: usize) -> Self {
+        Self {
+            name,
+            default,
+            arity,
+            runtime: true,
+        }
+    }
+}
+
+/// Where in the fragment a block's call is folded.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Stage {
+    /// Transforms the shaded color — every postfx block and most surface ones.
+    Color,
+    /// Transforms the surface's UVs **before** any map is sampled (#401), so the
+    /// diffuse, normal, metallic/roughness and mask lookups all move together. Its
+    /// helper is `fn uv_<id>(uv: vec2<f32>, in: VertexOutput, <params…>) -> vec2<f32>`
+    /// and its `call` wraps `{prev}`, the incoming UV. Surface only.
+    Uv,
+}
+
 /// A curated building block: an `id`, its declared params, and the two WGSL
 /// fragments the assembler weaves in — a `helper` (a top-level function
 /// definition) and a `call` (an expression that applies it in the fragment
@@ -71,6 +105,8 @@ pub struct Block {
     /// samples, as `t_<slot>`. The assembler declares a slot only when some block
     /// in the recipe lists it. Empty for most blocks, and always for postfx.
     pub textures: &'static [&'static str],
+    /// Which fold the call joins: the color chain or the UV chain.
+    pub stage: Stage,
 }
 
 /// The catalog of blocks valid for `pass`, in stable order.
@@ -112,6 +148,16 @@ mod tests {
             .flat_map(|b| b.params)
             .any(|p| p.runtime);
         assert!(!runtime, "a postfx pass has no material to hold the value");
+    }
+
+    #[test]
+    fn uv_stage_blocks_are_surface_only() {
+        assert!(catalog(PassKind::Postfx)
+            .iter()
+            .all(|b| b.stage == Stage::Color));
+        assert!(catalog(PassKind::Surface)
+            .iter()
+            .any(|b| b.stage == Stage::Uv));
     }
 
     #[test]

@@ -26,12 +26,13 @@
 //! all via `emit`.
 
 mod emit;
+mod uv;
 
 use std::fmt::Write as _;
 
 use emit::{chain, check_params, emit_helpers, emit_params, Instance};
 
-use super::blocks::find;
+use super::blocks::{find, Stage};
 use super::params::{ParamLayout, UNIFORM_DECL};
 use super::recipe::{PassKind, ShaderRecipe};
 use super::textures;
@@ -114,7 +115,7 @@ fn assemble_surface(
     emit_params(&mut additions, resolved, layout);
     emit_helpers(&mut additions, resolved);
 
-    let folded = chain(resolved, "lighting_color", layout);
+    let folded = chain(resolved, "lighting_color", layout, Stage::Color);
     let new_return = SURFACE_RETURN.replace("lighting_color", &folded);
 
     let header = format!(
@@ -125,7 +126,7 @@ fn assemble_surface(
         n = resolved.len()
     );
 
-    let body = base.replace(SURFACE_RETURN, &new_return);
+    let body = uv::splice(&base.replace(SURFACE_RETURN, &new_return), resolved, layout)?;
     Ok(format!("{header}{additions}\n{body}"))
 }
 
@@ -148,7 +149,7 @@ fn assemble_postfx(recipe: &ShaderRecipe, resolved: &[Instance], layout: &ParamL
     emit_params(&mut out, resolved, layout);
     emit_helpers(&mut out, resolved);
 
-    let folded = chain(resolved, "color", layout);
+    let folded = chain(resolved, "color", layout, Stage::Color);
     let _ = write!(
         out,
         "\n@fragment\nfn fs_main(in: VsOut) -> @location(0) vec4<f32> {{\n    \
