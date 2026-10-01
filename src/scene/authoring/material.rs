@@ -162,6 +162,26 @@ pub fn set_shader(materials: &mut MaterialLibrary, key: &str, name: String) {
     }
 }
 
+/// Point material `key`'s extra shader texture `slot` (#400) at `path`; `None` or
+/// `""` clears it back to white. An unknown slot is an error naming it and the
+/// slots there are (#395). The path is not checked: a missing file samples white,
+/// and a texture made later binds when it appears.
+pub fn set_shader_texture(
+    materials: &mut MaterialLibrary,
+    key: &str,
+    slot: &str,
+    path: Option<String>,
+) -> Result<(), String> {
+    crate::shadergen::textures::slot(slot)?;
+    if let Some(m) = materials.get_mut(key) {
+        match path.filter(|p| !p.is_empty()) {
+            Some(p) => m.shader_textures.insert(slot.to_owned(), p),
+            None => m.shader_textures.remove(slot),
+        };
+    }
+    Ok(())
+}
+
 /// The runtime-param layout of material `key`'s shader (#399), read from the
 /// shader's `<name>.params.json` where the renderer resolves the module. Errors
 /// when the material is missing, names no shader, or the shader is not baked.

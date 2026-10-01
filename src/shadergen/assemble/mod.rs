@@ -17,6 +17,10 @@
 //!   tonemapped color then folds the chosen blocks. This matches the fullscreen-fragment
 //!   shape of the postfx pass.
 //!
+//! A surface block that samples an extra texture slot (#400) makes the variant
+//! declare that slot's binding — once, however many blocks read it; a variant with
+//! no such block declares none.
+//!
 //! Each block instance contributes its params (as per-instance WGSL `const`s) and a
 //! call spliced into the chain; each distinct block contributes its helper once —
 //! all via `emit`.
@@ -30,6 +34,7 @@ use emit::{chain, check_params, emit_helpers, emit_params, Instance};
 use super::blocks::find;
 use super::params::{ParamLayout, UNIFORM_DECL};
 use super::recipe::{PassKind, ShaderRecipe};
+use super::textures;
 
 /// The marker in the surface base shader where the assembler folds the block
 /// chain into the final color. The forward shader's `fs_main` computes
@@ -97,6 +102,14 @@ fn assemble_surface(
     );
     if !layout.params.is_empty() {
         additions.push_str(UNIFORM_DECL);
+    }
+    for slot in textures::SLOTS {
+        if resolved
+            .iter()
+            .any(|(b, _)| b.textures.contains(&slot.name))
+        {
+            additions.push_str(&textures::decl(slot));
+        }
     }
     emit_params(&mut additions, resolved, layout);
     emit_helpers(&mut additions, resolved);

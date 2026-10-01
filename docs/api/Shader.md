@@ -24,7 +24,7 @@ passes, bindings, or render features).
 | `Shader.Bake` | `(recipe [, out_dir])` | the written `<out_dir>/<name>.wgsl` path |
 | `Shader.Validate` | `(recipe)` | array of the composed module's entry-point names (dry-run; **writes nothing**) |
 | `Shader.ToJson` | `(recipe)` | the recipe's canonical JSON string |
-| `Shader.Blocks` | `(pass)` | the curated blocks for `pass` (`"surface"` \| `"postfx"`): `{ {id, desc, params = { {name, default, arity, runtime} } }, … }` |
+| `Shader.Blocks` | `(pass)` | the curated blocks for `pass` (`"surface"` \| `"postfx"`): `{ {id, desc, params = { {name, default, arity, runtime} }, textures = {slot…} }, … }` |
 
 `recipe` is a table **or** its serialized JSON string (from `Shader.ToJson`, or a
 saved `.json`) — both forms decode alike, with the same errors. `out_dir` defaults to `project/assets/shaders`. Use `Shader.Validate` to
@@ -36,7 +36,9 @@ always current (#411). Each block has its `id`, a one-line `desc`, and its `para
 in the order the block declares them: `name`, `default` (a number, or for a vector
 param an array of `arity` numbers — the broadcast default, ready to paste), `arity`
 (1 scalar, 2–4 vector) and `runtime` (whether the param can be changed per material
-without a re-bake; `false` for every param until runtime shader params land, #399).
+without a re-bake, #399). `textures` lists the extra texture slots the block
+samples (`{"mask"}` for `dissolve`, empty for most) — the `shader_textures` keys a
+material using it should name (#400).
 
 ```lua
 for _, b in ipairs(Shader.Blocks("postfx")) do
@@ -109,6 +111,11 @@ What a block's helper can read (#398). Surface blocks get the forward contract:
   a replay renders the same frames. Pulses, scrolling, flicker: drive them off this.
 - `entity` — the per-draw `EntityUniforms`; the material maps (`t_diffuse`,
   `t_emissive`, … with `s_diffuse`).
+- **`t_mask`** — the material's extra *mask* texture (#400), sampled with
+  `s_diffuse`: whatever texture the material names under `shader_textures.mask`,
+  **white** when it names none or the file is missing. Only blocks that list
+  `mask` in their `textures` read it, and a module declares it only when one of
+  its blocks does.
 
 Postfx blocks see the sampled color `c`, the fragment `uv`, and **`game_time()`** —
 the same game clock (it reads the post params' `camera_pos.w`, bound at binding 0).
@@ -134,6 +141,14 @@ into the lit color; postfx blocks grade the sampled scene color.
   {amount*}`; `height_fog {color, top, bottom}` (world-height fog blend);
   `hit_flash {color*, amount*}` (blend toward a flash color; `amount` 0 = off, 1 =
   solid, default 0 — hit feedback driven from a script).
+  Sampling the material's **mask** texture (see *Extra textures* below):
+  `dissolve {amount*, edge_width = 0.05, edge_color* = 1, tiling = 1}` (fragments
+  whose mask is below `amount` are cut away, a band `edge_width` wide above it
+  glows `edge_color`; `amount` 0 = whole, 1 = gone — dissolve-on-death);
+  `detail_overlay {tiling = 4, strength* = 1, scroll = 0}` (the mask tiled
+  `tiling` times as an overlay: 0.5 gray is neutral, darker darkens, lighter
+  brightens; `scroll` is uv per game second, so a non-zero `scroll` is a moving
+  energy pattern).
   Params marked `*` are **runtime**: see below.
   Every surface variant is also fogged by the **scene fog** (`Graphics.SetFog*`,
   #437), applied after the blocks; `height_fog` is a per-material *look* layered
@@ -164,6 +179,33 @@ material starts from. A bake also writes `<name>.params.json` beside the module,
 recording each runtime param's name and slot, so the engine resolves names without
 reading WGSL. One shader holds at most 16 runtime params; more is a bake error.
 Postfx params are never runtime (a postfx pass has no material).
+
+### Extra textures (surface)
+
+Some surface effects need a *pattern* — a noise to dissolve along, a grime map
+to overlay. A material names one per **slot** in `shader_textures` (see
+`Material.md`); v1 has one slot, `mask`. Blocks that read it list it in
+`Shader.Blocks`' `textures`. A material with no mask samples white, so
+`dissolve` stays whole and `detail_overlay` brightens. Slot names are strict: an
+unknown slot is an error naming it.
+
+The natural producer is `Texture.Bake` (see `Texture.md`): bake a tiling noise and
+point the mask at the PNG it wrote — or name an `rt:<name>` render texture. Bake
+it with slot `base_color`: the renderer currently sRGB-decodes every map it samples
+(#647), so a `data` bake would read darker than authored.
+
+```lua
+Shader.Bake({ pass = "surface", name = "enemy_die",
+              blocks = { { id = "dissolve", params = { edge_color = {1, 0.4, 0.1} } } } })
+Material.SetShader(enemy, "enemy_die")
+Material.SetShaderTexture(enemy, "mask", "project/assets/textures/noise.png")
+-- each frame while dying:
+Material.SetShaderParam(enemy, "dissolve.amount", t)   -- 0 → 1
+```
+
+A dissolved fragment is cut from the colour pass only: the **shadow** and the
+SSAO depth prepass still see the whole mesh (#648), so hide the entity once
+`amount` reaches 1.
 
 Example — bake a stylized surface variant and load it by name:
 

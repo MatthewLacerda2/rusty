@@ -11,7 +11,7 @@
 //!   normal_map = "n.png",
 //!   emissive = {0.0, 0.0, 0.0}, emissive_map = "e.png",
 //!   render_mode = "Cutout", alpha = 1.0, alpha_cutoff = 0.5,
-//!   shader = "enemy_toon",
+//!   shader = "enemy_toon", shader_textures = { mask = "noise.png" },
 //! }
 //! ```
 //!
@@ -44,6 +44,9 @@ pub struct Validated {
     /// The raw `shader` name (#396), applied by the shared `set_shader` op so `""`
     /// clears it exactly as `Material.SetShader` does.
     pub shader: Option<String>,
+    /// The raw `shader_textures` slot → path map (#400), applied by the shared
+    /// `set_shader_texture` op so an unknown slot is refused by name.
+    pub shader_textures: Vec<(String, String)>,
 }
 
 /// Parse a material recipe — a Lua table or its JSON string (#410) — into a base
@@ -76,10 +79,26 @@ fn asset_from_json_value(
         validated.shader = obj
             .remove("shader")
             .and_then(|v| v.as_str().map(str::to_string));
+        validated.shader_textures = shader_textures(obj.remove("shader_textures"))?;
     }
     refuse_unknown_keys(&value)?;
     let asset: MaterialAsset = serde_json::from_value(value).map_err(|e| e.to_string())?;
     Ok((asset, validated))
+}
+
+/// The recipe's `shader_textures` table (`{ mask = "noise.png" }`) as slot → path
+/// pairs; an absent table is none. An unknown slot is refused here, before the
+/// asset is defined, so a bad recipe leaves the library untouched.
+fn shader_textures(value: Option<serde_json::Value>) -> Result<Vec<(String, String)>, String> {
+    let Some(value) = value else {
+        return Ok(Vec::new());
+    };
+    let map: std::collections::BTreeMap<String, String> = serde_json::from_value(value)
+        .map_err(|e| format!("shader_textures maps slot names to texture paths: {e}"))?;
+    for slot in map.keys() {
+        crate::shadergen::textures::slot(slot)?;
+    }
+    Ok(map.into_iter().collect())
 }
 
 /// Refuse a recipe key `MaterialAsset` has no field for (#395), so a typo like

@@ -41,8 +41,7 @@ pub fn register<'lua, 'scope>(
         "DefineAsset",
         scope.create_function(|_, (name, recipe): (String, mlua::Value)| {
             let (asset, validated) = asset_from_lua(&recipe).map_err(mlua::Error::RuntimeError)?;
-            define(scene, &name, asset, validated);
-            Ok(())
+            define(scene, &name, asset, validated).map_err(mlua::Error::RuntimeError)
         }),
     )?;
 
@@ -72,7 +71,12 @@ pub fn register<'lua, 'scope>(
 /// through the shared `authoring::material::set_*` ops so their parse/clamp stays
 /// single-sourced. We insert the base asset first (so the per-field ops have a target),
 /// then route each authored validated field through its shared op.
-fn define(scene: &RefCell<Scene>, name: &str, asset: MaterialAsset, validated: Validated) {
+fn define(
+    scene: &RefCell<Scene>,
+    name: &str,
+    asset: MaterialAsset,
+    validated: Validated,
+) -> Result<(), String> {
     let mut scene = scene.borrow_mut();
     let materials = &mut scene.materials;
     mat_ops::define_asset(materials, name, asset);
@@ -88,6 +92,10 @@ fn define(scene: &RefCell<Scene>, name: &str, asset: MaterialAsset, validated: V
     if let Some(shader) = validated.shader {
         mat_ops::set_shader(materials, name, shader);
     }
+    for (slot, path) in validated.shader_textures {
+        mat_ops::set_shader_texture(materials, name, &slot, Some(path))?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -28,6 +28,7 @@ picture whatever the lighting.
 | `Material.SetShader` | `(id, name)` — render with the authored surface shader `name` (see *Surface shaders* below); `""` clears it back to the standard shader |
 | `Material.SetShaderParam` | `(id, name, value)` — set a runtime param of the material's surface shader (`"hit_flash.amount"`, see *Runtime shader params* below); `value` is a number or an array of numbers; errors on a param the shader does not expose at runtime |
 | `Material.GetShaderParam` | `(id, name)` → the param's current value (a number, or an array for a vector param): the one set, else the shader's baked default |
+| `Material.SetShaderTexture` | `(id, slot, path)` — point an extra texture slot of the material's surface shader (`"mask"`, see *Shader textures* below) at a texture path (a PNG or an `rt:<name>` render texture); `nil` or `""` clears it back to white; errors on an unknown slot |
 
 ### Standalone material assets
 
@@ -146,8 +147,8 @@ Material.SetShader(enemy, "enemy_toon")   -- or `shader = "enemy_toon"` in a rec
 ```
 
 - Every entity sharing the material draws with the shader, opaque and transparent
-  alike; the shadow and depth passes are unchanged (a surface shader only restyles
-  colour).
+  alike; the shadow and depth passes are unchanged (a surface shader restyles
+  colour — even `dissolve`'s cut is colour-pass only, #648).
 - The module is compiled the first frame a material uses it. A name that is not
   there, a module that fails to compile, or a `postfx` module logs one warning and
   **renders with the standard shader** — a bad shader never crashes the game. A
@@ -155,7 +156,8 @@ Material.SetShader(enemy, "enemy_toon")   -- or `shader = "enemy_toon"` in a rec
 - **Re-baking** a shader in a running session rebuilds it: the bake → look →
   iterate loop needs no restart.
 - `Debug.Snapshot`'s `material` block reports it as `shader` (`null` = standard),
-  and the runtime param values set on it as `shader_params`.
+  the runtime param values set on it as `shader_params`, and its shader textures as
+  `shader_textures`.
 
 ### Runtime shader params
 
@@ -192,3 +194,26 @@ Material.SetShaderParam(enemy, "hit_flash.amount", math.max(a - Time.deltaTime()
   re-baked or recompiled.
 - A param you never set draws with its baked default (the recipe's value, else the
   block's). The inspector's Material card lists the runtime params under *Shader*.
+
+### Shader textures
+
+A surface shader's blocks may sample an **extra texture** the material names — a
+noise for `dissolve`, a grime map for `detail_overlay` (see `Shader.md`, *Extra
+textures*): Unity's `material.SetTexture("_Mask", …)`.
+
+```lua
+Material.SetShaderTexture(enemy, "mask", "project/assets/textures/noise.png")
+-- or in a recipe:
+Material.DefineAsset("enemy_die", { shader = "enemy_die",
+                                    shader_textures = { mask = "noise.png" } })
+```
+
+- **Slots.** v1 has one, `mask`. An unknown slot (`"detail"`) is an error naming
+  it, from `SetShaderTexture` and `DefineAsset` alike (a bad recipe defines
+  nothing).
+- **Never a crash.** A slot left unset, or a file that is missing, samples **1×1
+  white**. The path is not checked when set, so a texture made later binds when it
+  appears; an `rt:<name>` render texture works like any other map.
+- **Per material**, saved with the scene as `shader_textures`; `Material.GetAsset`
+  returns it. The inspector's Material card shows one path field per slot once
+  the material names a shader.

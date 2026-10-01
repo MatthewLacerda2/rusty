@@ -153,17 +153,8 @@ impl Renderer {
 
 /// The texture maps `material` samples, to upload before its bind group is built.
 fn material_maps(material: Option<&MaterialAsset>) -> Vec<String> {
-    material.map_or_else(Vec::new, |m| {
-        [
-            &m.base_color_map,
-            &m.metallic_map,
-            &m.roughness_map,
-            &m.normal_map,
-            &m.emissive_map,
-        ]
+    crate::render::draw::materials::material_texture_paths(material)
         .into_iter()
         .flatten()
-        .cloned()
         .collect()
-    })
 }

@@ -23,8 +23,12 @@ use std::collections::HashMap;
 
 use crate::shadergen::params::PackedParams;
 
-/// Albedo, metallic, roughness, normal and emissive map keys, in that order.
-pub(crate) type MapSignature = [String; 5];
+/// Group-2 textures: the five maps plus one per extra shader texture slot (#400).
+pub(crate) const MATERIAL_TEXTURES: usize = 5 + crate::shadergen::textures::SLOTS.len();
+
+/// Albedo, metallic, roughness, normal and emissive map keys, then the extra shader
+/// texture slots (`mask`), in that order.
+pub(crate) type MapSignature = [String; MATERIAL_TEXTURES];
 
 /// A group's identity: its maps, and the material owning its param buffer (if any).
 pub(crate) type GroupKey = (MapSignature, Option<String>);

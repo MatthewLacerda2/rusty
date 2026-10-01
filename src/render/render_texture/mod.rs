@@ -134,7 +134,8 @@ impl Renderer {
 }
 
 /// Every `"rt:<name>"` path an active UI `Image` or an active entity's material
-/// maps reference this frame — the textures worth drawing.
+/// maps (and extra shader texture slots, #400) reference this frame — the textures
+/// worth drawing.
 pub(crate) fn referenced_render_textures(scene: &Scene) -> HashSet<String> {
     let images = scene
         .world

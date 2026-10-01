@@ -34,12 +34,15 @@
 //! - [`params`] — a surface shader's runtime params (#399): which block params a
 //!   material sets from scripts, their uniform slots, and the `<name>.params.json`
 //!   sidecar that records them.
+//! - [`textures`] — the extra texture slots a surface block may sample (#400): a
+//!   material-named pattern such as a baked noise map.
 
 pub mod assemble;
 pub mod bake;
 pub mod blocks;
 pub mod params;
 pub mod recipe;
+pub mod textures;
 pub mod validate;
 
 pub use bake::{bake_generation, bake_recipe, BakeError};
@@ -62,3 +65,5 @@ mod params_tests;
 mod sampling_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod texture_tests;

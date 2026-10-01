@@ -78,7 +78,7 @@ fn every_mesh_choice_spawns_a_mesh_entity() {
 fn scene_has_no_baked_skybox_and_one_directional_light() {
     let scene = build_preview_scene(
         PreviewMesh::Sphere,
-        &PreviewSubject::Material(MaterialAsset::default()),
+        &PreviewSubject::Material(Box::default()),
     );
     assert!(
         scene.skybox_path.is_empty(),
@@ -115,7 +115,10 @@ fn material_subject_is_applied_verbatim() {
         metallic: 0.7,
         ..MaterialAsset::default()
     };
-    let scene = build_preview_scene(PreviewMesh::Cube, &PreviewSubject::Material(custom.clone()));
+    let scene = build_preview_scene(
+        PreviewMesh::Cube,
+        &PreviewSubject::Material(Box::new(custom.clone())),
+    );
     let material = scene.materials.get("preview::material").unwrap();
     assert_eq!(material.base_color, custom.base_color);
     assert_eq!(material.metallic, custom.metallic);

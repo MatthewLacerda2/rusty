@@ -10,7 +10,9 @@ use mlua::{Lua, Table, Value};
 use crate::shadergen::blocks::{catalog, Block, Param};
 use crate::shadergen::recipe::PassKind;
 
-/// `{ {id, desc, params = { {name, default, arity, runtime} } }, … }` for `pass`.
+/// `{ {id, desc, params = { {name, default, arity, runtime} }, textures = {slot…} }, … }`
+/// for `pass`. `textures` lists the extra texture slots the block samples (#400) —
+/// the `shader_textures` keys a material using it should name.
 pub fn blocks_table(lua: &Lua, pass: PassKind) -> mlua::Result<Table<'_>> {
     lua.create_sequence_from(
         catalog(pass)
@@ -30,6 +32,10 @@ fn block_table<'lua>(lua: &'lua Lua, b: &Block) -> mlua::Result<Table<'lua>> {
         .map(|p| param_table(lua, p))
         .collect::<mlua::Result<Vec<_>>>()?;
     t.set("params", lua.create_sequence_from(params)?)?;
+    t.set(
+        "textures",
+        lua.create_sequence_from(b.textures.iter().copied())?,
+    )?;
     Ok(t)
 }
 
@@ -38,8 +44,7 @@ fn param_table<'lua>(lua: &'lua Lua, p: &Param) -> mlua::Result<Table<'lua>> {
     t.set("name", p.name)?;
     t.set("arity", p.arity)?;
     t.set("default", default(lua, p)?)?;
-    // Runtime-tunable params land with #399; until then every param is baked in.
-    t.set("runtime", false)?;
+    t.set("runtime", p.runtime)?;
     Ok(t)
 }
 

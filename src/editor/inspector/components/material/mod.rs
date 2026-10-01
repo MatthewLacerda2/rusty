@@ -50,7 +50,7 @@ pub fn draw_material_card(
         preview::draw(
             ui,
             editor,
-            PreviewSubject::Material(materials[&key].clone()),
+            PreviewSubject::Material(Box::new(materials[&key].clone())),
         );
         return;
     }
@@ -93,6 +93,7 @@ fn draw_material(
         .response
         .on_hover_text("An authored surface shader's name; empty = the standard shader");
         shader_params::draw_shader_params(ui, materials, key, is_dirty);
+        shader_params::draw_shader_textures(ui, materials, key, is_dirty);
     });
     if remove {
         *is_dirty = true;

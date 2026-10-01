@@ -3,12 +3,15 @@
 //! per distinct signature (#202, #207, #470). Used by the entity solids and by mesh
 //! particles (#440), so the same material always binds the same group. A material
 //! whose surface shader has runtime params (#399) gets its own group over its own
-//! param buffer, rewritten here when its values change.
+//! param buffer, rewritten here when its values change. The extra shader texture
+//! slots (`mask`, #400) bind after the maps, white when a material names none.
 
 use std::rc::Rc;
 
 use crate::components::MaterialAsset;
+use crate::render::gpu::material_cache::MATERIAL_TEXTURES;
 use crate::render::{GpuTexture, Renderer};
+use crate::shadergen::textures;
 
 impl Renderer {
     /// The material cache index for `material` — `(library key, asset)` — drawn with
@@ -29,14 +32,7 @@ impl Renderer {
                 .write_params(&self.device, &self.queue, key, values);
             Some(key.to_owned())
         });
-        let material = material.map(|(_, asset)| asset);
-        let paths = [
-            material.and_then(|m| m.base_color_map.clone()),
-            material.and_then(|m| m.metallic_map.clone()),
-            material.and_then(|m| m.roughness_map.clone()),
-            material.and_then(|m| m.normal_map.clone()),
-            material.and_then(|m| m.emissive_map.clone()),
-        ];
+        let paths = material_texture_paths(material.map(|(_, asset)| asset));
         let key = (
             std::array::from_fn(|i| self.resolved_key(paths[i].as_ref())),
             owner,
@@ -44,7 +40,15 @@ impl Renderer {
         if let Some(i) = self.materials.lookup(&key) {
             return i;
         }
-        let maps = std::array::from_fn(|i| self.resolve_map(paths[i].as_ref()));
+        let maps = std::array::from_fn(|i| {
+            let map = self.resolve_map(paths[i].as_ref());
+            // An extra slot with no texture of its own is a neutral white mask,
+            // not the checker a missing map shows (#400).
+            match i >= 5 && Rc::ptr_eq(&map, &self.default_texture) {
+                true => Rc::clone(&self.white_texture),
+                false => map,
+            }
+        });
         let group = self.material_bind_group(&maps, key.1.as_deref());
         self.materials.insert(key, group)
     }
@@ -74,21 +78,22 @@ impl Renderer {
         }
     }
 
-    /// Build a group(2) material bind group from the five resolved map textures
-    /// (albedo, metallic, roughness, normal, emissive — that order) + one shared
-    /// sampler, against `material_layout`. Textures bind at 0,2,3,4,5; sampler at 1
-    /// (binding 1 samples all five) (#202, #207); `owner`'s param buffer (or the
-    /// shared zero one) at 6 (#399).
+    /// Build a group(2) material bind group from the resolved textures (albedo,
+    /// metallic, roughness, normal, emissive, then the extra slots — that order) +
+    /// one shared sampler, against `material_layout`. Maps bind at 0,2,3,4,5; sampler
+    /// at 1 (binding 1 samples them all) (#202, #207); `owner`'s param buffer (or the
+    /// shared zero one) at 6 (#399); each extra slot at its own binding (7, #400).
     pub(crate) fn material_bind_group(
         &self,
-        maps: &[Rc<GpuTexture>; 5],
+        maps: &[Rc<GpuTexture>; MATERIAL_TEXTURES],
         owner: Option<&str>,
     ) -> wgpu::BindGroup {
         let mut entries = vec![wgpu::BindGroupEntry {
             binding: 1,
             resource: wgpu::BindingResource::Sampler(&self.default_texture.sampler),
         }];
-        for (map, binding) in maps.iter().zip([0u32, 2, 3, 4, 5]) {
+        let slots = textures::SLOTS.iter().map(|slot| slot.binding);
+        for (map, binding) in maps.iter().zip([0u32, 2, 3, 4, 5].into_iter().chain(slots)) {
             entries.push(wgpu::BindGroupEntry {
                 binding,
                 resource: wgpu::BindingResource::TextureView(&map.view),
@@ -111,4 +116,29 @@ impl Renderer {
     pub(crate) fn material_group_count(&self) -> usize {
         self.materials.len()
     }
+}
+
+/// Every texture path `material`'s group 2 binds, in [`MapSignature`] order: the
+/// five maps, then the texture each extra shader slot names (#400). Also the list
+/// of textures to upload before the group is built.
+///
+/// [`MapSignature`]: crate::render::gpu::material_cache::MapSignature
+pub(crate) fn material_texture_paths(
+    material: Option<&MaterialAsset>,
+) -> [Option<String>; MATERIAL_TEXTURES] {
+    let Some(m) = material else {
+        return Default::default();
+    };
+    let maps = [
+        &m.base_color_map,
+        &m.metallic_map,
+        &m.roughness_map,
+        &m.normal_map,
+        &m.emissive_map,
+    ];
+    let slots = textures::SLOTS
+        .iter()
+        .map(|s| m.shader_textures.get(s.name).cloned());
+    let mut paths = maps.into_iter().cloned().chain(slots);
+    std::array::from_fn(|_| paths.next().flatten())
 }

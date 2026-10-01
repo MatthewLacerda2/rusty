@@ -105,6 +105,12 @@ pub struct MaterialAsset {
     /// does not have is ignored. Empty — and absent from the scene file — by default.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub shader_params: BTreeMap<String, Vec<f32>>,
+    /// The textures the shader's extra slots sample (#400), by slot name
+    /// (`"mask"`, see `shadergen::textures`) → texture path (a PNG, or an
+    /// `rt:<name>` render texture). A slot not named — or whose file is missing —
+    /// samples white. Empty — and absent from the scene file — by default.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub shader_textures: BTreeMap<String, String>,
 }
 
 impl Default for MaterialAsset {
@@ -124,6 +130,7 @@ impl Default for MaterialAsset {
             alpha_cutoff: default_alpha_cutoff(),
             shader: None,
             shader_params: BTreeMap::new(),
+            shader_textures: BTreeMap::new(),
         }
     }
 }
@@ -149,6 +156,7 @@ impl MaterialAsset {
             alpha_cutoff: default_alpha_cutoff(),
             shader: None,
             shader_params: BTreeMap::new(),
+            shader_textures: BTreeMap::new(),
         }
     }
 
@@ -218,16 +226,19 @@ mod tests {
     }
 
     #[test]
-    fn shader_params_round_trip_and_are_omitted_when_empty() {
+    fn shader_params_and_textures_round_trip_and_are_omitted_when_empty() {
         let m = MaterialAsset {
             shader: Some("enemy_hit".into()),
             shader_params: BTreeMap::from([("hit_flash.amount".into(), vec![0.5])]),
+            shader_textures: BTreeMap::from([("mask".into(), "noise.png".into())]),
             ..MaterialAsset::default()
         };
         let back: MaterialAsset =
             serde_json::from_str(&serde_json::to_string(&m).unwrap()).unwrap();
         assert_eq!(back.shader_params, m.shader_params);
+        assert_eq!(back.shader_textures, m.shader_textures);
         let plain = serde_json::to_string(&MaterialAsset::default()).unwrap();
         assert!(!plain.contains("shader_params"), "{plain}");
+        assert!(!plain.contains("shader_textures"), "{plain}");
     }
 }

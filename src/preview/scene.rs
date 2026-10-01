@@ -68,7 +68,7 @@ pub enum PreviewSubject {
     Shader(String),
     /// An already-resolved material asset (from the entity's `MaterialComponent`
     /// card, since materials have no on-disk file to dispatch on).
-    Material(MaterialAsset),
+    Material(Box<MaterialAsset>),
 }
 
 impl PreviewSubject {
@@ -110,7 +110,7 @@ pub fn build_preview_scene(mesh: PreviewMesh, subject: &PreviewSubject) -> Scene
         }
         PreviewSubject::Material(material) => {
             let id = spawn_preview_mesh(&mut scene, mesh);
-            attach_material(&mut scene, id, material.clone());
+            attach_material(&mut scene, id, (**material).clone());
         }
     }
 
