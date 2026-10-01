@@ -11,9 +11,9 @@
 //! result rather than replace the lighting model.
 //!
 //! Blocks read only what the forward contract already exposes — the interpolated
-//! `VertexOutput` (`world_position`/`world_normal`/`tex_coords`), the `camera` and
-//! `entity` uniforms, and `Time` is not available in the sim-free render path, so
-//! "animation" blocks drive off UV/position, not wall-clock. No new bindings.
+//! `VertexOutput` (`world_position`/`world_normal`/`tex_coords`) and the `camera`
+//! and `entity` uniforms. Animated blocks read `camera.time`, the sim's game time
+//! (#398): it freezes with the game and is 0 in edit mode. No new bindings.
 
 use super::{Block, Param};
 
@@ -84,7 +84,7 @@ pub const BLOCKS: &[Block] = &[
     },
     Block {
         id: "uv_scroll_stripes",
-        desc: "Modulate brightness with UV-scrolled stripes (a static scanline-like band over the surface).",
+        desc: "Modulate brightness with stripes that scroll along V over game time (scanlines, energy fields).",
         params: &[
             Param {
                 name: "frequency",
@@ -96,8 +96,13 @@ pub const BLOCKS: &[Block] = &[
                 default: 0.25,
                 arity: 1,
             },
+            Param {
+                name: "speed",
+                default: 1.0,
+                arity: 1,
+            },
         ],
-        helper: "fn srf_uv_scroll_stripes(c: vec3<f32>, in: VertexOutput, frequency: f32, strength: f32) -> vec3<f32> {\n    let s = sin(in.tex_coords.y * frequency * 6.2831853);\n    let band = 1.0 - strength * (0.5 - 0.5 * s);\n    return c * band;\n}",
+        helper: "fn srf_uv_scroll_stripes(c: vec3<f32>, in: VertexOutput, frequency: f32, strength: f32, speed: f32) -> vec3<f32> {\n    let s = sin((in.tex_coords.y * frequency + camera.time * speed) * 6.2831853);\n    let band = 1.0 - strength * (0.5 - 0.5 * s);\n    return c * band;\n}",
         call: "srf_uv_scroll_stripes({prev}, in{args})",
     },
     Block {

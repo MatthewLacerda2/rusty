@@ -97,7 +97,7 @@ impl Renderer {
             let camera_uniform = CameraUniform {
                 view_proj: view_proj.to_cols_array(),
                 camera_pos: cam.position.to_array(),
-                _pad: 0.0,
+                time: scene.shader_time,
                 fog: FogUniform::from_settings(&scene.fog),
             };
             self.queue

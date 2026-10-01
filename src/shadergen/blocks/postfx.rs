@@ -11,8 +11,9 @@
 //! like `postfx.wgsl`'s prefilter passes.
 //!
 //! Effects are deliberately bounded to per-pixel color grades that need only the
-//! sampled color + uv (tint, vignette, scanline, grayscale, posterize) — no new
-//! bindings, no neighbourhood taps, no new render targets.
+//! sampled color + uv, plus `game_time()` (#398) for animation (tint, vignette,
+//! scanline, grayscale, posterize) — no new bindings, no neighbourhood taps, no new
+//! render targets.
 //!
 //! The chain runs authored modules **after tonemapping** (#397), on display-referred
 //! colour in `[0, 1]`. Exposure, saturation and contrast were blocks here too; they

@@ -168,6 +168,7 @@ impl GameWorld {
             self.editor_fly(dt);
         }
         self.sync_render_camera();
+        self.sync_shader_time();
         transition
     }
 

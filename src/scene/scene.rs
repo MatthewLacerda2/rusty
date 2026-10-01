@@ -107,6 +107,9 @@ pub struct Scene {
     /// Entities marked `Scene.DontDestroyOnLoad` (#432): they and their descendants
     /// survive a scene swap. Transient runtime state, never serialized.
     pub persistent: std::collections::BTreeSet<u32>,
+    /// The sim's game time (`Time::time`) the renderer uploads as the shaders'
+    /// `camera.time` (#398). Written by the tick; `0` outside Play. Never serialized.
+    pub shader_time: f32,
     /// Authoritative per-frame world-matrix store (#331): filled O(N) once per frame in
     /// hierarchy order, then read by every render-frame consumer (the forward pass, both
     /// shadow collects, and #330's frustum culling) instead of each walking the parent
@@ -135,6 +138,7 @@ impl Default for Scene {
             pending_destroy: Vec::new(),
             pending_load: None,
             persistent: std::collections::BTreeSet::new(),
+            shader_time: 0.0,
             world_cache: WorldMatrixCache::default(),
         }
     }

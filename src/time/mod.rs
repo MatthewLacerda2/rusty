@@ -24,6 +24,11 @@ pub struct Time {
     pub fixed_delta_time: f32,
     /// Number of frames advanced since the clock started.
     pub frame_count: u64,
+    /// Game time in seconds since the clock started (Unity: `Time.time`): the sum of
+    /// the **scaled** `delta_time`, so it slows with `time_scale` and stops while
+    /// paused. Shaders read it as `camera.time` (#398). `f64` so hours of play keep
+    /// sub-millisecond precision.
+    pub time: f64,
     /// Global simulation time scale (Unity: `Time.timeScale`). `1.0` = realtime,
     /// `0.0` = paused, `0.5` = slow-mo, `2.0` = fast. Never negative.
     pub time_scale: f32,
@@ -48,6 +53,7 @@ impl Default for Time {
             unscaled_delta_time: 0.0,
             fixed_delta_time: FIXED_DELTA_TIME,
             frame_count: 0,
+            time: 0.0,
             time_scale: 1.0,
             paused: false,
             pending_steps: 0,
@@ -66,6 +72,7 @@ impl Time {
         self.unscaled_delta_time = raw_dt;
         self.delta_time = raw_dt * self.time_scale;
         self.frame_count += 1;
+        self.time += f64::from(self.delta_time);
     }
 
     /// Set the global time scale, clamping negatives to `0.0`.
@@ -118,6 +125,7 @@ impl Time {
         self.delta_time = 0.0;
         self.unscaled_delta_time = 0.0;
         self.frame_count = 0;
+        self.time = 0.0;
     }
 }
 
@@ -152,6 +160,8 @@ mod tests {
         t.advance(0.5);
         assert_eq!(t.delta_time, 0.25);
         assert_eq!(t.unscaled_delta_time, 0.5);
+        // Game time sums the scaled deltas: the paused frame added nothing (#398).
+        assert_eq!(t.time, 0.25);
 
         // fixed step never scales.
         assert_eq!(t.fixed_delta_time, FIXED_DELTA_TIME);
@@ -179,6 +189,7 @@ mod tests {
         t.reset();
         assert_eq!(t.frame_count, 0);
         assert_eq!(t.delta_time, 0.0);
+        assert_eq!(t.time, 0.0);
     }
 
     // --- Pause / step / resume control state machine (issue #283) ---

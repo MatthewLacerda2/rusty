@@ -9,7 +9,8 @@
 pub(crate) struct CameraUniform {
     pub view_proj: [f32; 16],
     pub camera_pos: [f32; 3],
-    pub _pad: f32,
+    /// Game time for shader animation (#398), `camera.time` in WGSL — the vec3 pad slot.
+    pub time: f32,
     pub fog: FogUniform,
 }
 
