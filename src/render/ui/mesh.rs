@@ -17,7 +17,8 @@
 //! A `WorldSpace` canvas (#429) has no screen: its "screen" is its own reference
 //! rect (scale 1), so its NDC span exactly that rect and the world pass maps them
 //! onto the canvas plane. Its clips are rects in that space too; the world pass
-//! cannot scissor them, so they only cull graphics wholly outside a mask.
+//! cannot scissor a plane in perspective, so it clips them per fragment against
+//! [`Scissor::ndc`] instead (#619).
 
 use std::collections::HashMap;
 
@@ -65,6 +66,18 @@ pub(crate) struct Scissor {
     pub(crate) h: u32,
 }
 
+impl Scissor {
+    /// This rect on a `frame`-pixel target as NDC bounds `[min.x, min.y, max.x,
+    /// max.y]` — the space the canvas's vertices are in.
+    pub(crate) fn ndc(self, frame: Vec2) -> [f32; 4] {
+        let frame = frame.max(Vec2::ONE);
+        let lo = Vec2::new(self.x as f32, frame.y - (self.y + self.h) as f32);
+        let hi = lo + Vec2::new(self.w as f32, self.h as f32);
+        let (lo, hi) = (lo / frame * 2.0 - Vec2::ONE, hi / frame * 2.0 - Vec2::ONE);
+        [lo.x, lo.y, hi.x, hi.y]
+    }
+}
+
 /// A run of vertices drawn with one source and one clip.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct UiBatch {
@@ -80,6 +93,9 @@ pub(crate) struct UiBatch {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct CanvasMesh {
     pub(crate) canvas: u32,
+    /// The pixel frame it was meshed into: the screen, or a `WorldSpace` canvas's
+    /// own reference rect — what its NDC and scissors are relative to.
+    pub(crate) frame: Vec2,
     pub(crate) vertices: Vec<UiVertex>,
     pub(crate) batches: Vec<UiBatch>,
 }
@@ -131,6 +147,7 @@ pub(crate) fn build_canvas_meshes(
             frame.screen = canvas_screen(world, rect.canvas, screen);
             meshes.push(CanvasMesh {
                 canvas: rect.canvas,
+                frame: frame.screen,
                 ..Default::default()
             });
         }

@@ -13,7 +13,9 @@
 // the scene (`world_ui.to_world`) and projected by the camera, drawn into the HDR
 // scene target before post-FX, depth-tested against the world and fogged like it
 // (the shared `fog_factor`, #437). The HDR target is linear, so the display-space
-// result is decoded before it fogs and blends.
+// result is decoded before it fogs and blends. A scissor cannot follow a plane in
+// perspective, so a RectMask clips here instead (#619): each batch's clip arrives
+// as canvas-NDC bounds and a fragment outside them draws nothing.
 //
 // Text vertices (`sdf.x` = 1) sample a single-channel signed distance field
 // instead: 0.5 is the glyph edge and the field reaches SPREAD atlas pixels either
@@ -41,16 +43,20 @@ struct VertexOut {
     @location(2) outline: vec4<f32>,
     @location(3) glow: vec4<f32>,
     @location(4) sdf: vec4<f32>,
-    // World canvases only: the fragment's world position, for the fog.
+    // World canvases only: the fragment's world position, for the fog, and its
+    // canvas NDC, for the RectMask clip.
     @location(5) world: vec3<f32>,
+    @location(6) canvas: vec2<f32>,
 };
 
 // A world canvas's placement for one camera: canvas NDC → world, world → clip;
-// the camera position and the scene fog.
+// the camera position, the batch's clip (canvas NDC: min.xy, max.xy) and the
+// scene fog.
 struct WorldUi {
     view_proj: mat4x4<f32>,
     to_world: mat4x4<f32>,
     eye: vec4<f32>,
+    clip_rect: vec4<f32>,
     fog: Fog,
 };
 
@@ -62,6 +68,7 @@ fn pass_through(in: VertexIn, clip: vec4<f32>, world: vec3<f32>) -> VertexOut {
     var out: VertexOut;
     out.clip = clip;
     out.world = world;
+    out.canvas = in.pos;
     out.uv = in.uv;
     out.color = in.color;
     out.outline = in.outline;
@@ -134,7 +141,9 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
 // Into the linear HDR target: un-premultiply, decode, fog, premultiply again.
 @fragment
 fn fs_world(in: VertexOut) -> @location(0) vec4<f32> {
-    let c = shade(in);
+    let r = world_ui.clip_rect;
+    let inside = all(in.canvas >= r.xy) && all(in.canvas <= r.zw);
+    let c = shade(in) * select(0.0, 1.0, inside);
     let rgb = select(c.rgb / max(c.a, 1e-6), vec3<f32>(0.0), c.a <= 0.0);
     let f = fog_factor(world_ui.fog, in.world, world_ui.eye.xyz);
     let lit = mix(decode_srgb(rgb), world_ui.fog.color, f);
