@@ -73,7 +73,9 @@ impl Renderer {
         let front = Self::finalize_texture(
             &self.device,
             &self.texture_layout,
-            texture,
+            // A rendered picture: a data slot reads its decoded (linear) values,
+            // the same the camera shaded, so both views decode (#647).
+            (texture, OFFSCREEN_FORMAT),
             sampler,
             Some("Render Texture Bind Group"),
         );

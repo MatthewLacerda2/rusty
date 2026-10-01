@@ -4,6 +4,13 @@ use image::GenericImageView;
 
 use crate::render::{GpuTexture, Renderer};
 
+/// The storage format of every image the renderer uploads: colour is authored in
+/// sRGB, so the colour view decodes it on sample.
+const IMAGE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+/// The format an uploaded image's data view reinterprets it as: the same bytes, no
+/// decode — a data map stores its values raw (glTF 2.0, `Texture.Bake`) (#647).
+const DATA_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+
 impl Renderer {
     /// Generates a standard checkerboard texture for meshes that don't have texture files assigned
     pub(crate) fn create_default_checkerboard_texture(
@@ -47,9 +54,9 @@ impl Renderer {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            format: IMAGE_FORMAT,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
+            view_formats: &[DATA_FORMAT],
         });
 
         queue.write_texture(
@@ -76,18 +83,25 @@ impl Renderer {
             ..Default::default()
         });
 
-        Self::finalize_texture(device, layout, texture, sampler, Some(label))
+        Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
     }
 
-    /// Create the texture view + bind group and assemble the final `GpuTexture`.
+    /// Create the colour and data views + bind group and assemble the final
+    /// `GpuTexture`. `data_format` is the format the data view reads the texels as:
+    /// the storage format itself for a texture that holds linear values, or a
+    /// format listed in the texture's `view_formats`.
     pub(crate) fn finalize_texture(
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,
-        texture: wgpu::Texture,
+        (texture, data_format): (wgpu::Texture, wgpu::TextureFormat),
         sampler: wgpu::Sampler,
         label: Option<&str>,
     ) -> GpuTexture {
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let data_view = texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(data_format),
+            ..Default::default()
+        });
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label,
             layout,
@@ -106,6 +120,7 @@ impl Renderer {
         GpuTexture {
             texture,
             view,
+            data_view,
             sampler,
             bind_group,
         }
@@ -171,9 +186,9 @@ impl Renderer {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            format: IMAGE_FORMAT,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
+            view_formats: &[DATA_FORMAT],
         });
 
         self.queue.write_texture(
@@ -205,7 +220,7 @@ impl Renderer {
         Rc::new(Self::finalize_texture(
             &self.device,
             &self.texture_layout,
-            texture,
+            (texture, DATA_FORMAT),
             sampler,
             Some(path_str),
         ))

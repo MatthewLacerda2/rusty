@@ -73,7 +73,11 @@ Scene.AddComponent(id, "Material")   -- attaches a MaterialComponent
 
 The map slots point at any PNG — typically one baked by `Texture.Bake` (e.g.
 `Material.DefineAsset("brick", { metallic_map = Texture.Bake(recipe,
-"out/brick_mr.png", "metallic_roughness"), ... })`), but any PNG works. The factors +
+"out/brick_mr.png", "metallic_roughness"), ... })`), but any PNG works. As in glTF
+2.0, `base_color_map` and `emissive_map` are colour and decode as **sRGB**; the
+metallic, roughness and normal maps and every `shader_textures` slot hold data and are
+sampled **raw** (#647) — so bake those with their linear `Texture.Bake` slot. One PNG
+named in both roles is uploaded once and read each way. The factors +
 maps decode through the asset's serde derive, while the validated fields are applied
 through the *same* shared ops the per-entity setters use: `alpha`/`alpha_cutoff` clamp
 to `[0,1]`, and an unknown `render_mode` string degrades to `Opaque` — so validation is

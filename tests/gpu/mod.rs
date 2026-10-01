@@ -19,6 +19,7 @@ mod fog_scene;
 mod frame_stats_render;
 mod fxaa_screenshot;
 mod instancing_budget;
+mod linear_data_maps_screenshot;
 mod material_maps_screenshot;
 mod normal_emissive_maps_screenshot;
 mod particle_modes_screenshot;
