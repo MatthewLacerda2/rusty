@@ -197,3 +197,7 @@ mod level_tests;
 #[cfg(test)]
 #[path = "report_tests.rs"]
 mod report_tests;
+
+#[cfg(test)]
+#[path = "tail_tests.rs"]
+mod tail_tests;
