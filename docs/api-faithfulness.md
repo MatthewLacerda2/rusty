@@ -346,6 +346,7 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 | `Bake` | ✅ | sim — writes a `.wav` decoded by `ClipCache` and played by the `AudioMaestro` (via `Audio.PlayAt` or an `AudioSource.clip`); limited at bake so it cannot clip |
 | `ToJson` | ✅ | round-trip — the patch's canonical serde form; re-bakes byte-identically |
 | `Level` (and every bake's second return) | ✅ | read-only report (#378) — zimmer's meter over the bake's own samples, or over the PCM `ClipCache`'s decoder produces for a file; proven by `src/api/sound/level_tests.rs` (a full-scale sine reads −3.01 / 0 dBFS; silence reads silent; an inter-sample overshoot reads a true peak over its sample peak; a bake's figures match `Sound.Level` of its file) |
+| `Survey` | ✅ | read-only report (#380) — counts over the patch/song documents themselves (zimmer's `SongSurvey` for songs, rusty's rows for one-shot patches); no bake, no decode, no write. Proven by `src/api/sound/survey/tests.rs` (a set of impacts rolls up to one kind and its cutoff span; the loudest track is gain × duty, not the highest gain; a set of one has no rollup; an unreadable document is skipped, an unresolved patch leaves its columns absent) |
 
 ### `Canvas` — over `Entity.canvas` (#417)
 

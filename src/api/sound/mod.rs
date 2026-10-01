@@ -35,6 +35,10 @@
 //! one forgotten call away. `Sound.Level(path)` measures any clip on disk the same
 //! way — an import, or an earlier bake being compared against (#378).
 //!
+//! `Sound.Survey(paths)` reads a *set* of patch and song documents and counts what
+//! they are made of — source kinds, cutoffs, sustains, registers, tempos — with no
+//! bake at all (#380, `survey/`).
+//!
 //! `note` is a name (`"C#4"`) or a MIDI number; `opts` is
 //! `{ duration, velocity, timbre, glide = { semitones, seconds }, seed }`, each
 //! field optional. Same patch + note + seed ⇒ byte-identical WAV.
@@ -44,6 +48,7 @@
 
 mod from_lua;
 mod level;
+mod survey;
 
 use mlua::{Lua, Table, Value};
 
@@ -85,6 +90,12 @@ pub fn register(lua: &Lua) -> Reg {
                 &measure_file(&path).map_err(mlua::Error::RuntimeError)?,
             )
         }),
+    )?;
+
+    put(
+        &table,
+        "Survey",
+        lua.create_function(|lua, set: Table| survey::survey(lua, set)),
     )?;
 
     register_song(lua, &table)?;
