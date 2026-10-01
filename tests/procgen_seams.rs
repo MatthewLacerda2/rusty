@@ -3,9 +3,8 @@
 //! biggest jump between two neighbouring pixels inside the tile. Params deliberately
 //! include fractional counts, the values that used to open a seam.
 
-use rusty::procgen::recipe::{BrickOutput, GradientKind, Node, NoiseKind, OpKind};
+use rusty::procgen::recipe::{GradientKind, Node, NoiseKind, OpKind, TextureRecipe};
 use rusty::procgen::recipe::{NoiseKind::*, VoronoiOutput::*, WaveKind};
-use rusty::procgen::recipe::{ShapeKind, TextureRecipe};
 use rusty::procgen::{evaluate, Image};
 
 const RES: u32 = 64;
@@ -94,24 +93,6 @@ fn generators() -> Vec<(String, OpKind)> {
                 OpKind::Wave { kind, frequency: s },
             ));
         }
-    }
-    for output in [BrickOutput::Mask, BrickOutput::Random, BrickOutput::Bevel] {
-        let op = OpKind::Brick {
-            rows: 5.0,
-            cols: 2.6,
-            mortar: 0.1,
-            output,
-        };
-        ops.push((format!("brick {output:?}"), op));
-    }
-    for kind in [ShapeKind::Circle, ShapeKind::RoundedRect, ShapeKind::Line] {
-        let op = OpKind::Shape {
-            kind,
-            size: [1.3, 0.4],
-            roundness: 0.5,
-            softness: 0.1,
-        };
-        ops.push((format!("shape {kind:?}"), op));
     }
     for kind in [GradientKind::Radial, GradientKind::LinearTiling] {
         ops.push((format!("gradient {kind:?}"), OpKind::Gradient { kind }));

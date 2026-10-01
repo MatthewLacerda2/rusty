@@ -49,6 +49,37 @@ fn bake_seeded(nodes: &[Node], seed: u64) -> Image {
     evaluate(&recipe).expect("recipe evaluates")
 }
 
+/// #407's brick outputs and shapes, at sizes that clip at the tile edge.
+fn hard_surface() -> Vec<(String, OpKind)> {
+    let mut ops = Vec::new();
+    for output in [BrickOutput::Mask, BrickOutput::Random, BrickOutput::Bevel] {
+        let op = OpKind::Brick {
+            rows: 5.0,
+            cols: 2.6,
+            mortar: 0.1,
+            output,
+        };
+        ops.push((format!("brick {output:?}"), op));
+    }
+    for kind in [ShapeKind::Circle, ShapeKind::RoundedRect, ShapeKind::Line] {
+        let op = OpKind::Shape {
+            kind,
+            size: [1.3, 0.4],
+            roundness: 0.5,
+            softness: 0.1,
+        };
+        ops.push((format!("shape {kind:?}"), op));
+    }
+    ops
+}
+
+#[test]
+fn hard_surface_generators_bake_without_a_seam() {
+    for (label, op) in hard_surface() {
+        assert_seamless(&label, &bake(vec![node("g", op, &[])]));
+    }
+}
+
 #[test]
 fn tile_scatter_stays_seamless_at_every_jitter() {
     for (j, r, s) in [

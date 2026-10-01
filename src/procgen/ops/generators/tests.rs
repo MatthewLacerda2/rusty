@@ -54,24 +54,7 @@ fn lattice_ops() -> Vec<OpKind> {
             kind: WaveKind::Bands,
             frequency: s,
         });
-        for output in [BrickOutput::Mask, BrickOutput::Random, BrickOutput::Bevel] {
-            let (rows, cols, mortar) = (s, s + 0.7, 0.05);
-            ops.push(OpKind::Brick {
-                rows,
-                cols,
-                mortar,
-                output,
-            });
-        }
-        for kind in [Circle, Rect, RoundedRect, Line] {
-            let (size, roundness, softness) = ([s / 6.0, 0.3], 0.5, s / 20.0);
-            ops.push(OpKind::Shape {
-                kind,
-                size,
-                roundness,
-                softness,
-            });
-        }
+        ops.extend(hard_surface_ops(s));
         ops.push(OpKind::Checker {
             tiles: s as u32,
             color_a: [0.0; 4],
@@ -81,6 +64,30 @@ fn lattice_ops() -> Vec<OpKind> {
     ops.push(OpKind::Gradient {
         kind: GradientKind::LinearTiling,
     });
+    ops
+}
+
+/// #407's brick outputs and shapes at fractional `s`.
+fn hard_surface_ops(s: f32) -> Vec<OpKind> {
+    let mut ops = Vec::new();
+    for output in [BrickOutput::Mask, BrickOutput::Random, BrickOutput::Bevel] {
+        let (rows, cols, mortar) = (s, s + 0.7, 0.05);
+        ops.push(OpKind::Brick {
+            rows,
+            cols,
+            mortar,
+            output,
+        });
+    }
+    for kind in [Circle, Rect, RoundedRect, Line] {
+        let (size, roundness, softness) = ([s / 6.0, 0.3], 0.5, s / 20.0);
+        ops.push(OpKind::Shape {
+            kind,
+            size,
+            roundness,
+            softness,
+        });
+    }
     ops
 }
 
