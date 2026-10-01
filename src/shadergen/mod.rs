@@ -59,4 +59,6 @@ mod instance_tests;
 #[cfg(test)]
 mod params_tests;
 #[cfg(test)]
+mod sampling_tests;
+#[cfg(test)]
 mod tests;
