@@ -24,7 +24,7 @@ passes, bindings, or render features).
 | `Shader.Bake` | `(recipe [, out_dir])` | the written `<out_dir>/<name>.wgsl` path |
 | `Shader.Validate` | `(recipe)` | array of the composed module's entry-point names (dry-run; **writes nothing**) |
 | `Shader.ToJson` | `(recipe)` | the recipe's canonical JSON string |
-| `Shader.Blocks` | `(pass)` | the curated blocks for `pass` (`"surface"` \| `"postfx"`): `{ {id, desc, params = { {name, default, arity, runtime} }, textures = {slot…} }, … }` |
+| `Shader.Blocks` | `(pass)` | the curated blocks for `pass` (`"surface"` \| `"postfx"`): `{ {id, desc, params = { {name, default, arity, runtime} }, textures = {slot…}, stage }, … }` — `stage` is `"color"` or `"uv"` |
 
 `recipe` is a table **or** its serialized JSON string (from `Shader.ToJson`, or a
 saved `.json`) — both forms decode alike, with the same errors. `out_dir` defaults to `project/assets/shaders`. Use `Shader.Validate` to
@@ -140,7 +140,18 @@ into the lit color; postfx blocks grade the sampled scene color.
   `speed` stripes per game second); `desaturate
   {amount*}`; `height_fog {color, top, bottom}` (world-height fog blend);
   `hit_flash {color*, amount*}` (blend toward a flash color; `amount` 0 = off, 1 =
-  solid, default 0 — hit feedback driven from a script).
+  solid, default 0 — hit feedback driven from a script);
+  `pulse_glow {color* = 1, speed = 1, strength* = 1}` (emissive that breathes
+  between 0 and `strength`, `speed` pulses per game second — pickups, objectives);
+  `hologram {color* = 1, line_freq = 20, flicker = 0.15}` (scanlines along world
+  height, `line_freq` per unit, rolling with game time, plus a Fresnel rim and a
+  stepped flicker, in `color` over a faint copy of the surface — set `color`, e.g.
+  `{0.3, 0.8, 1}`; pair it with a Transparent material for see-through);
+  `uv_scroll {speed = 0.25}` (a **uv-stage** block: offsets the UVs by `speed`
+  — a 2-vector, uv per game second — *before* any map is sampled, so the base,
+  normal, metallic/roughness and mask maps all move together: conveyors, flowing
+  energy, water. Its place in the recipe doesn't matter; every color block sees the
+  moved UVs).
   Sampling the material's **mask** texture (see *Extra textures* below):
   `dissolve {amount*, edge_width = 0.05, edge_color* = 1, tiling = 1}` (fragments
   whose mask is below `amount` are cut away, a band `edge_width` wide above it
@@ -148,7 +159,10 @@ into the lit color; postfx blocks grade the sampled scene color.
   `detail_overlay {tiling = 4, strength* = 1, scroll = 0}` (the mask tiled
   `tiling` times as an overlay: 0.5 gray is neutral, darker darkens, lighter
   brightens; `scroll` is uv per game second, so a non-zero `scroll` is a moving
-  energy pattern).
+  energy pattern); `triplanar_detail {scale = 0.5, strength* = 1}` (the mask
+  projected in **world space** from the three axes and blended by the normal, so
+  it tiles evenly across level geometry with no UV stretching or seams; `scale`
+  is tiles per world unit, 0.5 gray neutral like `detail_overlay`).
   Params marked `*` are **runtime**: see below.
   Every surface variant is also fogged by the **scene fog** (`Graphics.SetFog*`,
   #437), applied after the blocks; `height_fog` is a per-material *look* layered
@@ -205,7 +219,8 @@ Material.SetShaderParam(enemy, "dissolve.amount", t)   -- 0 → 1
 
 A dissolved fragment is cut from the colour pass only: the **shadow** and the
 SSAO depth prepass still see the whole mesh (#648), so hide the entity once
-`amount` reaches 1.
+`amount` reaches 1. Likewise `uv_scroll` moves the colour pass's UVs only: a
+Cutout material's alpha-tested shadow keeps the unscrolled cut-out.
 
 Example — bake a stylized surface variant and load it by name:
 

@@ -12,7 +12,7 @@
 
 use std::fmt::Write as _;
 
-use crate::shadergen::blocks::{Block, Param};
+use crate::shadergen::blocks::{Block, Param, Stage};
 use crate::shadergen::params::ParamLayout;
 use crate::shadergen::recipe::{BlockSel, ParamValue};
 
@@ -138,12 +138,17 @@ pub fn fmt_f32(v: f32) -> String {
     }
 }
 
-/// Build the chained fold expression: starting from `seed`, wrap each instance's
-/// `call` around the previous via its `{prev}` placeholder, in recipe order, with
-/// `{args}` filled by that instance's param constants or uniform slots.
-pub fn chain(instances: &[Instance], seed: &str, layout: &ParamLayout) -> String {
+/// Build the chained fold expression for `stage`: starting from `seed`, wrap each
+/// of that stage's instances' `call` around the previous via its `{prev}`
+/// placeholder, in recipe order, with `{args}` filled by that instance's param
+/// constants or uniform slots. Instances of the other stage are skipped but keep
+/// their recipe index, so param names and slots stay stable.
+pub fn chain(instances: &[Instance], seed: &str, layout: &ParamLayout, stage: Stage) -> String {
     let mut expr = seed.to_string();
     for (index, (block, _)) in instances.iter().enumerate() {
+        if block.stage != stage {
+            continue;
+        }
         let args: String = block
             .params
             .iter()
