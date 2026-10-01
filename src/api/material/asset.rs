@@ -8,11 +8,11 @@
 //! asset round-trips through `SceneData` like any library material — no special-casing.
 //!
 //! Verbs:
-//! - `Material.DefineAsset(name, recipe)` — build a `MaterialAsset` from a Lua recipe
-//!   **table** (factors + map-slot paths + render mode + alpha/cutoff) and write it into
-//!   `scene.materials` under `name`, overwriting any existing asset of that name.
-//! - `Material.DefineAssetJson(name, json)` — same, from the recipe's JSON string (the
-//!   on-disk form), so a saved recipe re-defines without a round-trip through Lua.
+//! - `Material.DefineAsset(name, recipe)` — build a `MaterialAsset` from a recipe
+//!   (factors + map-slot paths + render mode + alpha/cutoff) and write it into
+//!   `scene.materials` under `name`, overwriting any existing asset of that name. The
+//!   recipe is a Lua table **or** its JSON string (the on-disk form, #410), so a saved
+//!   recipe re-defines through the same verb without a round-trip through Lua.
 //! - `Material.GetAsset(name)` — the named asset's canonical JSON (or `nil` if absent),
 //!   so the authored asset is observable through the same surface.
 //! - `Material.HasAsset(name)` — whether the library holds an asset under `name`.
@@ -24,7 +24,7 @@
 
 use std::cell::RefCell;
 
-use super::from_lua::{asset_from_json_str, asset_from_table, Validated};
+use super::from_lua::{asset_from_lua, Validated};
 use super::{parse_render_mode, put, Reg};
 use crate::components::MaterialAsset;
 use crate::scene::authoring::material as mat_ops;
@@ -39,20 +39,8 @@ pub fn register<'lua, 'scope>(
     put(
         table,
         "DefineAsset",
-        scope.create_function(|_, (name, recipe): (String, mlua::Table)| {
-            let (asset, validated) =
-                asset_from_table(&recipe).map_err(mlua::Error::RuntimeError)?;
-            define(scene, &name, asset, validated);
-            Ok(())
-        }),
-    )?;
-
-    put(
-        table,
-        "DefineAssetJson",
-        scope.create_function(|_, (name, json): (String, String)| {
-            let (asset, validated) =
-                asset_from_json_str(&json).map_err(mlua::Error::RuntimeError)?;
+        scope.create_function(|_, (name, recipe): (String, mlua::Value)| {
+            let (asset, validated) = asset_from_lua(&recipe).map_err(mlua::Error::RuntimeError)?;
             define(scene, &name, asset, validated);
             Ok(())
         }),
@@ -228,11 +216,11 @@ mod tests {
     }
 
     #[test]
-    fn define_asset_json_matches_the_table_form() {
+    fn define_asset_accepts_a_json_string() {
         let scene = RefCell::new(Scene::new());
         run(
             &scene,
-            r#"Material.DefineAssetJson("steel",
+            r#"Material.DefineAsset("steel",
                 '{ "metallic": 1.0, "roughness": 0.1, "render_mode": "Opaque" }')"#,
         );
         let scene = scene.borrow();

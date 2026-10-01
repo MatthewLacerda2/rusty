@@ -58,7 +58,7 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `SetEmissive` | ✅ | renderer — `draw_resources::solid_entity_uniform` packs `emissive` into `EntityUniform`; `shader.wgsl` adds it after lighting (blooms when >1.0) (#222) |
 | `SetNormalMap` | ✅ | renderer — `draw::upload_scene_assets` loads the map, `build_solid_resource` binds `t_normal` to the group(2) material bind group, and `shader.wgsl` perturbs the shading normal in tangent space (per-vertex tangents + TBN) (#207) |
 | `SetEmissiveMap` | ✅ | renderer — same upload/bind path; `shader.wgsl` samples `t_emissive` and modulates the emissive factor (`factor × map.rgb`) (#207) |
-| `DefineAsset` / `DefineAssetJson` | ✅ | renderer + round-trip (#271) — writes a `MaterialAsset` into `scene.materials` under a chosen name; an entity referencing that name via its `MaterialComponent` is sampled by the renderer through the SAME per-entity material path as every row above (`draw_resources::build_solid_resource` + `shader.wgsl`). The asset is part of `SceneData` (`materials` map), so it survives save→load. Proven by `tests/material_authoring.rs` (round-trip; entity-uses-asset; clamps/unknown-mode degrade; packed map slots) |
+| `DefineAsset` | ✅ | renderer + round-trip (#271) — writes a `MaterialAsset` into `scene.materials` under a chosen name; an entity referencing that name via its `MaterialComponent` is sampled by the renderer through the SAME per-entity material path as every row above (`draw_resources::build_solid_resource` + `shader.wgsl`). The asset is part of `SceneData` (`materials` map), so it survives save→load. Proven by `tests/material_authoring.rs` (round-trip; entity-uses-asset; clamps/unknown-mode degrade; packed map slots) |
 | `GetAsset` / `HasAsset` | ✅ | round-trip — read-back of the named library asset (canonical JSON / presence), so the authored asset is observable through the same surface |
 | `SetShader` (+ the recipe's `shader` key) | ✅ | renderer (#396) — `draw_resources::solid_draw_item` resolves `MaterialAsset::shader` to a pipeline id through `gpu::pipelines::surface::SurfaceShaders` (lazy, cached by name, log-once fallback to the standard shader, rebuilt on re-bake); `draw_batches` binds that variant's opaque/transparent pipeline. Proven by `surface_tests.rs` (a baked variant renders differently; missing/postfx modules fall back pixel-identically; a re-bake rebuilds) |
 
@@ -283,7 +283,7 @@ metallic→B/roughness→G packing, seamless tiling).
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `Bake` / `BakeJson` | ✅ | renderer — writes a `.png` consumed by `load_texture` via the material map slots; per-slot glTF encoding applied on bake |
+| `Bake` | ✅ | renderer — writes a `.png` consumed by `load_texture` via the material map slots; per-slot glTF encoding applied on bake |
 | `ToJson` | ✅ | round-trip — the recipe's canonical serde form; re-bakes byte-identically |
 
 ### `Shader` — writes a `.wgsl` the `ShaderRegistry` loads (over the pass contract)
@@ -303,7 +303,7 @@ assembles byte-identical WGSL) and the API tests (`src/api/shader/mod.rs`).
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `Bake` / `BakeJson` | ✅ | renderer — writes a `.wgsl` a material naming it renders with (`Material.SetShader`, #396), composed through the `ShaderRegistry` path; **validated through the same `naga_oil` compose path at bake** (a non-composing module is rejected, never written) |
+| `Bake` | ✅ | renderer — writes a `.wgsl` a material naming it renders with (`Material.SetShader`, #396), composed through the `ShaderRegistry` path; **validated through the same `naga_oil` compose path at bake** (a non-composing module is rejected, never written) |
 | `ToJson` | ✅ | round-trip — the recipe's canonical serde form; re-assembles byte-identically |
 
 (`Shader.Validate` and `Shader.Blocks` are read-only introspection — a compose
@@ -328,7 +328,7 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `Bake` / `BakeJson` | ✅ | sim — writes a `.wav` decoded by `ClipCache` and played by the `AudioMaestro` (via `Audio.PlayAt` or an `AudioSource.clip`); limited at bake so it cannot clip |
+| `Bake` | ✅ | sim — writes a `.wav` decoded by `ClipCache` and played by the `AudioMaestro` (via `Audio.PlayAt` or an `AudioSource.clip`); limited at bake so it cannot clip |
 | `ToJson` | ✅ | round-trip — the patch's canonical serde form; re-bakes byte-identically |
 | `Level` (and every bake's second return) | ✅ | read-only report (#378) — zimmer's meter over the bake's own samples, or over the PCM `ClipCache`'s decoder produces for a file; proven by `src/api/sound/level_tests.rs` (a full-scale sine reads −3.01 / 0 dBFS; silence reads silent; an inter-sample overshoot reads a true peak over its sample peak; a bake's figures match `Sound.Level` of its file) |
 
@@ -468,3 +468,9 @@ switch (`ccd_enabled` at build, `enable_ccd` re-applied per tick), whose effect 
 the simulation is proven by `physics/ccd_tests.rs` — a fast sphere tunnels through a
 thin wall under Discrete and is stopped by it under Continuous. The one write verb
 takes the faithful count from 73 to 74.
+
+**#410** folded every `*Json` twin into its verb: `Texture.Bake`, `Shader.Bake`,
+`Sound.Bake` / `BakeSong` and `Material.DefineAsset` (and every other verb taking a
+recipe) accept either the Lua table or its JSON string, decoded by the one shared
+`lua_json::recipe_from_lua`. `BakeJson` / `BakeSongJson` / `DefineAssetJson` are
+gone; no read-site changed, so every row above keeps its status.

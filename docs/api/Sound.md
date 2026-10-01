@@ -27,11 +27,10 @@ hash, never wall-clock or unseeded RNG). Output is always **stereo**, 16-bit PCM
 | Function | Signature | Returns |
 |---|---|---|
 | `Sound.Bake` | `(patch, note, path [, opts])` | the written `path`, then its [level](#how-loud-it-came-out-378) |
-| `Sound.BakeJson` | `(json, note, path [, opts])` | the written `path`, then its level |
 | `Sound.ToJson` | `(patch)` | the patch's canonical JSON string |
 
-`patch` is a table; `json` is its serialized form (from `Sound.ToJson`, or a saved
-`.json`). `note` is either a **name** — a letter `A`–`G`, any accidentals (`#`/`s`
+`patch` is a table **or** its serialized JSON string (from `Sound.ToJson`, or a saved
+`.json`) — both forms decode alike, with the same errors. `note` is either a **name** — a letter `A`–`G`, any accidentals (`#`/`s`
 sharp, `b`/`f` flat), then the octave, e.g. `"C#4"`, `"Bb3"`, `"C-1"` — or a **MIDI
 number** (`60` is middle C, `69` is A4 = 440 Hz; fractions are legal microtones).
 Pitch is equal temperament: `f = 440 × 2^((midi − 69) / 12)`. A rejected patch, note
@@ -117,8 +116,9 @@ runtime plays like any other clip.
 | Function | Signature | Returns |
 |---|---|---|
 | `Sound.BakeSong` | `(song, path)` | the written `path`, then its level |
-| `Sound.BakeSongJson` | `(json, path)` | the written `path`, then its level |
 | `Sound.SongToJson` | `(song)` | the song's canonical JSON string |
+
+`song`, like `patch`, is a table **or** its JSON string (from `Sound.SongToJson`).
 
 The shape is **tracker-style** (the MOD/XM lineage), not a flat piano roll: patterns
 are named blocks you list in the arrangement, so a piece that repeats stays short
@@ -156,7 +156,7 @@ strings, `swing`, `humanize`, track and song `fx`, `automation`, `tempo` changes
 |---|---|---|
 | `bpm` | — | Tempo. The one place beats become seconds, so retiming a finished song is one number. |
 | `seed` | `0` | Folded into every note's render seed. One number re-rolls every stochastic source in the piece. |
-| `tracks[].patch` | — | Either a **path** to a saved patch `.json` or an **inline patch table** — the same duality `Sound.Bake` / `Sound.BakeJson` have. A path is read as-is, relative to the working directory. |
+| `tracks[].patch` | — | Either a **path** to a saved patch `.json` or an **inline patch table** — the same duality `Sound.Bake`'s `patch` argument has (table or JSON string). A path is read as-is, relative to the working directory. |
 | `tracks[].gain` | `1.0` | Linear mix level for that track. A balance control, not a safety one — see the limiter below. |
 | `tracks[].pan` | `0.0` | Stereo position, `-1` (left) to `1` (right). |
 | `patterns[].beats` | — | How long the block occupies in the arrangement. Notes may ring out past it; the next pattern still starts on time. |

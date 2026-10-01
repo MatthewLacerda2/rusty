@@ -21,16 +21,15 @@
 //! Each block table carries an `id` and an optional `params` map; a param is a
 //! scalar or a small float array.
 
-use mlua::Table;
+use mlua::Value;
 
-use crate::api::lua_json::table_to_json;
+use crate::api::lua_json::recipe_from_lua;
 use crate::shadergen::ShaderRecipe;
 
-/// Parse a Lua recipe `table` into a [`ShaderRecipe`]. Errors carry a message the
-/// REPL/script surfaces verbatim.
-pub fn recipe_from_table(table: &Table) -> Result<ShaderRecipe, String> {
-    let json = table_to_json(table)?;
-    ShaderRecipe::from_json(&serde_json::to_string(&json).map_err(|e| e.to_string())?)
+/// Parse a recipe argument — a Lua table or its JSON string (#410) — into a
+/// [`ShaderRecipe`]. Errors carry a message the REPL/script surfaces verbatim.
+pub fn parse_recipe(value: &Value) -> Result<ShaderRecipe, String> {
+    recipe_from_lua(value)
 }
 
 #[cfg(test)]
@@ -43,7 +42,7 @@ mod tests {
     #[test]
     fn parses_a_postfx_recipe_table() {
         let lua = Lua::new();
-        let table: Table = lua
+        let table: Value = lua
             .load(
                 r#"
                 return {
@@ -57,7 +56,7 @@ mod tests {
             )
             .eval()
             .unwrap();
-        let recipe = recipe_from_table(&table).expect("recipe parses");
+        let recipe = parse_recipe(&table).expect("recipe parses");
         assert_eq!(recipe.pass, PassKind::Postfx);
         assert_eq!(recipe.name, "warm");
         assert_eq!(recipe.blocks.len(), 2);
@@ -67,10 +66,10 @@ mod tests {
     #[test]
     fn reports_unknown_pass_kind() {
         let lua = Lua::new();
-        let table: Table = lua
+        let table: Value = lua
             .load(r#"return { pass = "bogus", name = "x", blocks = {} }"#)
             .eval()
             .unwrap();
-        assert!(recipe_from_table(&table).is_err());
+        assert!(parse_recipe(&table).is_err());
     }
 }

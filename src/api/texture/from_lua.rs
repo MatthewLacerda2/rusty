@@ -20,16 +20,15 @@
 //! Each node table carries `id`, an `op` tag string, the op's params as fields, and an
 //! optional `inputs` array — exactly the internally-tagged serde form.
 
-use mlua::Table;
+use mlua::Value;
 
-use crate::api::lua_json::table_to_json;
+use crate::api::lua_json::recipe_from_lua;
 use crate::procgen::TextureRecipe;
 
-/// Parse a Lua recipe `table` into a [`TextureRecipe`]. Errors carry a message the
-/// REPL/script surfaces verbatim.
-pub fn recipe_from_table(table: &Table) -> Result<TextureRecipe, String> {
-    let json = table_to_json(table)?;
-    TextureRecipe::from_json(&serde_json::to_string(&json).map_err(|e| e.to_string())?)
+/// Parse a recipe argument — a Lua table or its JSON string (#410) — into a
+/// [`TextureRecipe`]. Errors carry a message the REPL/script surfaces verbatim.
+pub fn parse_recipe(value: &Value) -> Result<TextureRecipe, String> {
+    recipe_from_lua(value)
 }
 
 #[cfg(test)]
@@ -41,7 +40,7 @@ mod tests {
     #[test]
     fn parses_a_two_node_recipe_table() {
         let lua = Lua::new();
-        let table: Table = lua
+        let table: Value = lua
             .load(
                 r#"
                 return {
@@ -56,7 +55,7 @@ mod tests {
             )
             .eval()
             .unwrap();
-        let recipe = recipe_from_table(&table).expect("recipe parses");
+        let recipe = parse_recipe(&table).expect("recipe parses");
         assert_eq!(recipe.resolution, 32);
         assert_eq!(recipe.seed, 5);
         assert_eq!(recipe.nodes.len(), 2);
@@ -67,10 +66,10 @@ mod tests {
     #[test]
     fn reports_unknown_op_tag() {
         let lua = Lua::new();
-        let table: Table = lua
+        let table: Value = lua
             .load(r#"return { resolution = 8, nodes = { { id = "x", op = "bogus" } } }"#)
             .eval()
             .unwrap();
-        assert!(recipe_from_table(&table).is_err());
+        assert!(parse_recipe(&table).is_err());
     }
 }

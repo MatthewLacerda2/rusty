@@ -22,13 +22,12 @@ passes, bindings, or render features).
 | Function | Signature | Returns |
 |---|---|---|
 | `Shader.Bake` | `(recipe [, out_dir])` | the written `<out_dir>/<name>.wgsl` path |
-| `Shader.BakeJson` | `(json [, out_dir])` | the written path |
 | `Shader.Validate` | `(recipe)` | array of the composed module's entry-point names (dry-run; **writes nothing**) |
 | `Shader.ToJson` | `(recipe)` | the recipe's canonical JSON string |
 | `Shader.Blocks` | `(pass)` | array of the curated block ids for `pass` (`"surface"` \| `"postfx"`) |
 
-`recipe` is a table; `json` is its serialized form (from `Shader.ToJson`, or a saved
-`.json`). `out_dir` defaults to `project/assets/shaders`. Use `Shader.Validate` to
+`recipe` is a table **or** its serialized JSON string (from `Shader.ToJson`, or a
+saved `.json`) — both forms decode alike, with the same errors. `out_dir` defaults to `project/assets/shaders`. Use `Shader.Validate` to
 compose-check a recipe before committing to a bake, and `Shader.Blocks` to discover
 the catalog rather than guess block ids.
 

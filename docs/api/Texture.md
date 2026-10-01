@@ -17,11 +17,10 @@ wall-clock or unseeded RNG).
 | Function | Signature | Returns |
 |---|---|---|
 | `Texture.Bake` | `(recipe, path, slot)` | the written `path` |
-| `Texture.BakeJson` | `(json, path, slot)` | the written `path` |
 | `Texture.ToJson` | `(recipe)` | the recipe's canonical JSON string |
 
-`recipe` is a table; `json` is its serialized form (from `Texture.ToJson`, or a saved
-`.json`). `slot` names the target map and selects the **glTF encoding** applied on the
+`recipe` is a table **or** its serialized JSON string (from `Texture.ToJson`, or a
+saved `.json`) — both forms decode alike, with the same errors. `slot` names the target map and selects the **glTF encoding** applied on the
 way out (case-insensitive, `-`/`_` ignored). An unknown slot name is an **error** that
 lists the valid ones — a typo like `"basecolour"` never silently bakes linear albedo:
 

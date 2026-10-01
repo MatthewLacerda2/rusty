@@ -15,7 +15,7 @@
 //! }
 //! ```
 //!
-//! Marshaling goes Lua table → `serde_json::Value` (via the shared
+//! Marshaling goes Lua table or JSON string → `serde_json::Value` (via the shared
 //! [`crate::api::lua_json`] converter) → `MaterialAsset`, so the factor/map decoding
 //! lives ONCE in `MaterialAsset`'s serde derive. The THREE validation-bearing fields —
 //! `render_mode` (string parse), `alpha` and `alpha_cutoff` (`[0,1]` clamps) — are split
@@ -24,9 +24,9 @@
 //! validation single-sourced: an unknown `render_mode` degrades to `Opaque` and an
 //! out-of-range alpha clamps, exactly as the per-entity setters do.
 
-use mlua::Table;
+use mlua::Value;
 
-use crate::api::lua_json::table_to_json;
+use crate::api::lua_json::recipe_json;
 use crate::components::MaterialAsset;
 
 /// The validation-bearing fields lifted out of the recipe so the caller applies them
@@ -46,18 +46,12 @@ pub struct Validated {
     pub shader: Option<String>,
 }
 
-/// Parse a Lua material recipe `table` into a base [`MaterialAsset`] (factors + map
-/// slots) plus the [`Validated`] fields the caller must apply through the shared ops.
-/// Errors carry a message the REPL/script surfaces verbatim.
-pub fn asset_from_table(table: &Table) -> Result<(MaterialAsset, Validated), String> {
-    let json = table_to_json(table)?;
-    asset_from_json_value(json)
-}
-
-/// Same as [`asset_from_table`] but from a JSON string (the `DefineAssetJson` form).
-pub fn asset_from_json_str(json: &str) -> Result<(MaterialAsset, Validated), String> {
-    let value: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
-    asset_from_json_value(value)
+/// Parse a material recipe — a Lua table or its JSON string (#410) — into a base
+/// [`MaterialAsset`] (factors + map slots) plus the [`Validated`] fields the caller
+/// must apply through the shared ops. Errors carry a message the REPL/script
+/// surfaces verbatim.
+pub fn asset_from_lua(value: &Value) -> Result<(MaterialAsset, Validated), String> {
+    asset_from_json_value(recipe_json(value)?)
 }
 
 /// Split a recipe JSON object into the serde-decoded base asset and the validated
@@ -118,7 +112,7 @@ mod tests {
     #[test]
     fn factors_and_maps_decode_through_serde() {
         let lua = Lua::new();
-        let t: Table = lua
+        let t: Value = lua
             .load(
                 r#"return {
                     base_color = {0.5, 0.25, 0.125}, base_color_map = "albedo.png",
@@ -130,7 +124,7 @@ mod tests {
             )
             .eval()
             .unwrap();
-        let (asset, _) = asset_from_table(&t).expect("recipe parses");
+        let (asset, _) = asset_from_lua(&t).expect("recipe parses");
         assert_eq!(asset.base_color, [0.5, 0.25, 0.125]);
         assert_eq!(asset.base_color_map.as_deref(), Some("albedo.png"));
         assert_eq!(asset.metallic, 0.7);
@@ -145,11 +139,11 @@ mod tests {
     #[test]
     fn validated_fields_are_lifted_out_not_serde_decoded() {
         let lua = Lua::new();
-        let t: Table = lua
+        let t: Value = lua
             .load(r#"return { render_mode = "Cutout", alpha = 0.25, alpha_cutoff = 0.7 }"#)
             .eval()
             .unwrap();
-        let (asset, v) = asset_from_table(&t).expect("recipe parses");
+        let (asset, v) = asset_from_lua(&t).expect("recipe parses");
         // The base asset keeps the serde defaults for the lifted fields...
         assert_eq!(asset.alpha, MaterialAsset::default().alpha);
         // ...and the raw values ride in `Validated` for the caller's shared ops.
@@ -163,11 +157,11 @@ mod tests {
         // An unknown render_mode is lifted out as a raw string (degraded later by the
         // shared parser), so it never trips serde's enum decoding.
         let lua = Lua::new();
-        let t: Table = lua
+        let t: Value = lua
             .load(r#"return { render_mode = "glass", metallic = 0.1 }"#)
             .eval()
             .unwrap();
-        let (asset, v) = asset_from_table(&t).expect("unknown mode does not error");
+        let (asset, v) = asset_from_lua(&t).expect("unknown mode does not error");
         assert_eq!(asset.metallic, 0.1);
         assert_eq!(v.render_mode.as_deref(), Some("glass"));
     }
@@ -175,17 +169,20 @@ mod tests {
     #[test]
     fn empty_recipe_yields_a_default_asset() {
         let lua = Lua::new();
-        let t: Table = lua.load(r#"return {}"#).eval().unwrap();
-        let (asset, v) = asset_from_table(&t).expect("empty recipe parses");
+        let t: Value = lua.load(r#"return {}"#).eval().unwrap();
+        let (asset, v) = asset_from_lua(&t).expect("empty recipe parses");
         assert_eq!(asset.base_color, MaterialAsset::default().base_color);
         assert!(v.render_mode.is_none() && v.alpha.is_none());
     }
 
     #[test]
     fn an_unknown_key_is_refused_by_name() {
-        let err = asset_from_json_str(r#"{ "metalic_map": "mr.png" }"#)
-            .err()
-            .expect("typo refused");
+        let lua = Lua::new();
+        let json: Value = lua
+            .load(r#"return '{ "metalic_map": "mr.png" }'"#)
+            .eval()
+            .unwrap();
+        let err = asset_from_lua(&json).err().expect("typo refused");
         assert!(
             err.contains("\"metalic_map\"") && err.contains("metallic_map"),
             "{err}"
