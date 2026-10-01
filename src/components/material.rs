@@ -11,6 +11,8 @@
 //! deserialization of pre-#201 scenes that stored the material inline per entity;
 //! `MaterialAsset::from_legacy` migrates one across.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use super::TextureComponent;
@@ -97,6 +99,12 @@ pub struct MaterialAsset {
     /// `#[serde(default)]`, so pre-#396 scenes load unchanged.
     #[serde(default)]
     pub shader: Option<String>,
+    /// The shader's runtime param values (#399), by canonical name
+    /// (`"hit_flash.amount"`, see `shadergen::params`): Unity's `material.SetFloat`.
+    /// A param not listed draws with its baked default; a name the current shader
+    /// does not have is ignored. Empty — and absent from the scene file — by default.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub shader_params: BTreeMap<String, Vec<f32>>,
 }
 
 impl Default for MaterialAsset {
@@ -115,6 +123,7 @@ impl Default for MaterialAsset {
             alpha: default_alpha(),
             alpha_cutoff: default_alpha_cutoff(),
             shader: None,
+            shader_params: BTreeMap::new(),
         }
     }
 }
@@ -139,6 +148,7 @@ impl MaterialAsset {
             alpha: default_alpha(),
             alpha_cutoff: default_alpha_cutoff(),
             shader: None,
+            shader_params: BTreeMap::new(),
         }
     }
 
