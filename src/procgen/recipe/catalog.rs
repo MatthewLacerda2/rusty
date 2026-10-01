@@ -28,7 +28,8 @@ pub struct OpParam {
     pub default: Option<Lit>,
 }
 
-/// One op: its `op` tag, menu category, how many inputs it consumes, and its params.
+/// One op: its `op` tag, menu category, how many inputs it consumes at most (`mix`'s
+/// third, the mask, is optional), and its params.
 #[derive(Clone, Copy, Debug)]
 pub struct OpInfo {
     pub op: &'static str,
@@ -175,8 +176,11 @@ pub const OPS: &[OpInfo] = &[
     op(
         "mix",
         "color",
-        2,
-        &[choice("mode", BLEND), req("factor", "number")],
+        3,
+        &[
+            choice("mode", BLEND),
+            opt("factor", "number", Lit::Number(1.0)),
+        ],
     ),
     op("invert", "color", 1, &[]),
     op(
@@ -247,6 +251,16 @@ pub const OPS: &[OpInfo] = &[
     ),
     op("rgb_to_bw", "math", 1, &[]),
     op("blur", "filter", 1, &[req("radius", "number")]),
+    op("cavity", "filter", 1, &[req("radius", "number")]),
+    op(
+        "curvature",
+        "filter",
+        1,
+        &[
+            req("radius", "number"),
+            opt("strength", "number", Lit::Number(1.0)),
+        ],
+    ),
 ];
 
 #[cfg(test)]

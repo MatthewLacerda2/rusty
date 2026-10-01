@@ -12,7 +12,8 @@
 //! - [`vector`] — domain mapping, domain warp, bump→normal, combine/separate RGB;
 //!   [`tile`] — the seeded grid scatter.
 //! - [`math`] — math, map range, clamp, RGB→BW.
-//! - [`filter`] — separable blur.
+//! - [`filter`] — neighbourhood ops: separable blur, and the height-derived masks
+//!   cavity and curvature.
 //!
 //! [`eval_node`] dispatches one [`OpKind`] given its inputs (already evaluated by the
 //! runner). It is the single place op semantics live, so the Lua surface, a `.json`
@@ -73,10 +74,9 @@ pub fn eval_node(op: &OpKind, inputs: &[&Image], resolution: u32, seed: u64) -> 
             }
             None => Image::new(resolution),
         },
-        OpKind::Blur { radius } => match inputs.first() {
-            Some(src) => filter::blur(src, filter::pixel_radius(*radius, src.resolution())),
-            None => Image::new(resolution),
-        },
+        OpKind::Blur { .. } | OpKind::Cavity { .. } | OpKind::Curvature { .. } => {
+            eval_filter(op, inputs, resolution)
+        }
     }
 }
 
@@ -102,7 +102,9 @@ fn eval_color(op: &OpKind, inputs: &[&Image], resolution: u32) -> Image {
     match op {
         OpKind::ColorRamp { stops } => color::color_ramp(first_or_black(inputs, resolution), stops),
         OpKind::Mix { mode, factor } => match (inputs.first(), inputs.get(1)) {
-            (Some(a), Some(b)) => color::mix((*a).clone(), b, *mode, *factor),
+            (Some(a), Some(b)) => {
+                color::mix((*a).clone(), b, inputs.get(2).copied(), *mode, *factor)
+            }
             (Some(a), None) => (*a).clone(),
             _ => Image::new(resolution),
         },
@@ -143,6 +145,20 @@ fn eval_vector(op: &OpKind, inputs: &[&Image], resolution: u32) -> Image {
         OpKind::SeparateRgb { channel } => {
             vector::separate_rgb(first_or_black(inputs, resolution), *channel)
         }
+        _ => Image::new(resolution),
+    }
+}
+
+/// Dispatch the neighbourhood ops. Each reads its input's red as the field.
+fn eval_filter(op: &OpKind, inputs: &[&Image], resolution: u32) -> Image {
+    let Some(src) = inputs.first() else {
+        return Image::new(resolution);
+    };
+    let px = |radius: f32| filter::pixel_radius(radius, src.resolution());
+    match op {
+        OpKind::Blur { radius } => filter::blur(src, px(*radius)),
+        OpKind::Cavity { radius } => filter::cavity(src, px(*radius)),
+        OpKind::Curvature { radius, strength } => filter::curvature(src, *radius, *strength),
         _ => Image::new(resolution),
     }
 }

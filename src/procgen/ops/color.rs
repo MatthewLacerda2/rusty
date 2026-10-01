@@ -1,7 +1,8 @@
 //! src/procgen/ops/color.rs — color-grading ops (one input, or two for Mix).
 //!
 //! These map pixel→pixel (no neighbourhood), so they run through
-//! [`Image::map_in_place`] — except [`mix`], which combines two equal-sized inputs.
+//! [`Image::map_in_place`] — except [`mix`], which combines two equal-sized inputs
+//! (optionally through a third, the per-pixel mask).
 //! All work in unclamped linear float; the bake clamps once at the end.
 
 use super::super::image_buf::{Image, Rgba};
@@ -85,14 +86,16 @@ pub fn hue_sat_value(mut img: Image, hue: f32, sat: f32, value: f32) -> Image {
     img
 }
 
-/// Blend two equal-sized inputs by `factor` under `mode`. Differing sizes are a
-/// recipe error caught upstream; here `b` is sampled positionally.
-pub fn mix(a: Image, b: &Image, mode: BlendMode, factor: f32) -> Image {
+/// Blend two equal-sized inputs by `factor` under `mode`. With a `mask`, each
+/// pixel's factor is `factor × mask.red` — Blender's Mix with Factor wired to a
+/// socket (#405). Differing sizes are a recipe error caught upstream; here `b` and
+/// `mask` are sampled positionally.
+pub fn mix(a: Image, b: &Image, mask: Option<&Image>, mode: BlendMode, factor: f32) -> Image {
     let mut out = a;
     let bp = b.pixels();
     for (i, p) in out.pixels_mut().iter_mut().enumerate() {
-        let q = bp[i];
-        *p = blend_pixel(*p, q, mode, factor);
+        let f = mask.map_or(factor, |m| factor * m.pixels()[i][0]);
+        *p = blend_pixel(*p, bp[i], mode, f);
     }
     out
 }

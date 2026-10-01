@@ -109,8 +109,13 @@ pub enum OpKind {
     // ---- Color (1 input, or 2 for Mix) ----
     /// Map the input's red channel through a gradient of stops.
     ColorRamp { stops: Vec<RampStop> },
-    /// Blend two inputs by `factor` under a [`BlendMode`].
-    Mix { mode: BlendMode, factor: f32 },
+    /// Blend inputs `a`, `b` by `factor` under a [`BlendMode`]; an optional third
+    /// input is a per-pixel mask whose red multiplies `factor` (#405).
+    Mix {
+        mode: BlendMode,
+        #[serde(default = "one_f32")]
+        factor: f32,
+    },
     /// Invert RGB (`1 - c`), alpha untouched.
     Invert,
     /// Brightness offset then contrast about 0.5.
@@ -176,6 +181,16 @@ pub enum OpKind {
     /// A separable box blur (wraps at the edges). `radius` is a **fraction of the
     /// tile width** (`0.01` = 1%), so it looks the same at any resolution (#394).
     Blur { radius: f32 },
+    /// Height → cavity mask: `1 − max(blur(h) − h, 0)` with a `radius` blur (tile
+    /// fraction, as `blur`). White on flat and raised ground, dark in crevices (#408).
+    Cavity { radius: f32 },
+    /// Height → curvature: `0.5 + strength × (h − mean of h on a ring of `radius`)`
+    /// (tile units). Above 0.5 convex (edge wear), below concave (grime) (#408).
+    Curvature {
+        radius: f32,
+        #[serde(default = "one_f32")]
+        strength: f32,
+    },
 }
 
 fn yes() -> bool {
