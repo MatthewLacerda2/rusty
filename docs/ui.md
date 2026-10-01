@@ -529,9 +529,11 @@ entity's layer; canvases draw back to front, each in hierarchy order, and both
 faces show. The vertices are the overlay's (one buffer per canvas, re-uploaded only
 when its geometry changes); a per-camera uniform maps them onto the plane, so a
 moving sign or camera uploads nothing. The Scene view shows `WorldSpace` canvases
-but never the HUD or a camera canvas. **`RectMask` does not clip on a world
-canvas** — a scissor cannot follow a plane in perspective — it only culls graphics
-wholly outside the mask.
+but never the HUD or a camera canvas. **`RectMask` clips on world canvases too**,
+to the same axis-aligned bounds in canvas units: a scissor cannot follow a plane in
+perspective, so the fragment shader cuts each graphic at its mask's edge instead —
+the same space the hit-test checks masks in, so a world-space Scroll View or
+Dropdown draws exactly what it hits.
 
 **Interaction.** The pointer carries the camera ray through it. Screen canvases are
 hit first (they draw over the world); then the world and camera canvases the ray

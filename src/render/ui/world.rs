@@ -12,13 +12,14 @@
 //! own rect, `mesh`); one uniform per canvas maps them onto its plane
 //! ([`CanvasSpace::World`]) and through the camera. They are rewritten per camera,
 //! never the vertex buffers, so a static sign uploads nothing while the view moves.
-//! `RectMask` cannot scissor a plane in perspective: on a world canvas a mask only
-//! culls graphics wholly outside it.
+//! A scissor cannot follow a plane in perspective, so `RectMask` clips in canvas
+//! space instead (#619): each batch gets its own uniform slot carrying its clip as
+//! NDC bounds, and the fragment shader drops what falls outside — the same space
+//! the hit-test checks masks in, so what draws is what is hit.
 
 use glam::{Mat4, Vec2};
 
 use super::draw::UiViewCache;
-use super::mesh::UiSource;
 use crate::render::gpu::grow_buffer::GrowBuffer;
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::postfx::HDR_FORMAT;
@@ -33,8 +34,13 @@ struct WorldUiUniform {
     view_proj: [f32; 16],
     to_world: [f32; 16],
     eye: [f32; 4],
+    /// The batch's clip, canvas NDC `[min.x, min.y, max.x, max.y]`.
+    clip: [f32; 4],
     fog: FogUniform,
 }
+
+/// Bounds that clip nothing (a graphic may overflow its canvas's rect).
+const NO_CLIP: [f32; 4] = [-f32::MAX, -f32::MAX, f32::MAX, f32::MAX];
 
 /// The world pass's shared GPU state: its uniform layout and pipeline.
 pub(crate) struct WorldUiPipeline {
@@ -102,7 +108,8 @@ impl WorldUiPipeline {
     }
 }
 
-/// A view's world-canvas uniforms: one aligned slot per canvas, rewritten per camera.
+/// A view's world-canvas uniforms: one aligned slot per canvas batch, rewritten
+/// per camera.
 pub(crate) struct WorldUniforms {
     buffer: GrowBuffer,
     group: wgpu::BindGroup,
@@ -124,26 +131,29 @@ impl Renderer {
             return;
         }
         items.sort_by(|a, b| b.0.total_cmp(&a.0));
-        let stride = self.device.limits().min_uniform_buffer_offset_alignment as usize;
+        let align = self.device.limits().min_uniform_buffer_offset_alignment as usize;
         let slot = std::mem::size_of::<WorldUiUniform>();
-        let mut bytes = vec![0u8; stride * items.len()];
-        for (k, (_, _, to_world)) in items.iter().enumerate() {
-            let u = WorldUiUniform {
-                view_proj: view_proj.to_cols_array(),
-                to_world: to_world.to_cols_array(),
-                eye: cam.position.extend(1.0).to_array(),
-                fog,
-            };
-            bytes[k * stride..k * stride + slot].copy_from_slice(bytemuck::bytes_of(&u));
+        let stride = slot.next_multiple_of(align);
+        let mut bytes = Vec::new();
+        let mut draws = Vec::new();
+        for &(_, i, to_world) in &items {
+            let mesh = &view.ui.canvas(i).mesh;
+            for (b, batch) in mesh.batches.iter().enumerate() {
+                let u = WorldUiUniform {
+                    view_proj: view_proj.to_cols_array(),
+                    to_world: to_world.to_cols_array(),
+                    eye: cam.position.extend(1.0).to_array(),
+                    clip: batch.clip.map_or(NO_CLIP, |c| c.ndc(mesh.frame)),
+                    fog,
+                };
+                draws.push((i, b, bytes.len() as u32));
+                bytes.extend_from_slice(bytemuck::bytes_of(&u));
+                bytes.resize(bytes.len() + stride - slot, 0);
+            }
         }
         self.upload_world_uniforms(view, &bytes);
         view.ui.drawn += items.len();
-        let offsets: Vec<(usize, u32)> = items
-            .iter()
-            .enumerate()
-            .map(|(k, &(_, i, _))| (i, (k * stride) as u32))
-            .collect();
-        self.encode_world_ui(view, &offsets);
+        self.encode_world_ui(view, &draws);
     }
 
     /// Write `bytes` into the view's uniform buffer, (re)building its bind group
@@ -181,8 +191,9 @@ impl Renderer {
         }
     }
 
-    /// Record and submit the world pass: `(canvas index, uniform offset)` in draw order.
-    fn encode_world_ui(&self, view: &RenderView, offsets: &[(usize, u32)]) {
+    /// Record and submit the world pass: `(canvas index, batch index, uniform
+    /// offset)` in draw order.
+    fn encode_world_ui(&self, view: &RenderView, draws: &[(usize, usize, u32)]) {
         let ui = &self.ui_renderer;
         let Some(uniforms) = view.ui.world.as_ref() else {
             return;
@@ -215,19 +226,17 @@ impl Renderer {
                 occlusion_query_set: None,
             });
             pass.set_pipeline(&ui.world.pipeline);
-            for &(i, offset) in offsets {
+            let mut bound = None;
+            for &(i, b, offset) in draws {
                 let canvas = view.ui.canvas(i);
-                pass.set_bind_group(1, &uniforms.group, &[offset]);
-                pass.set_vertex_buffer(0, canvas.buffer.slice(..));
-                for batch in &canvas.mesh.batches {
-                    let group = match &batch.source {
-                        UiSource::Solid => None,
-                        UiSource::Texture(p) => ui.textures.get(p).map(|(_, g)| g),
-                        UiSource::Font(f) => ui.fonts.get(f).map(|a| &a.group),
-                    };
-                    pass.set_bind_group(0, group.unwrap_or(&ui.white), &[]);
-                    pass.draw(batch.range.clone(), 0..1);
+                if bound != Some(i) {
+                    pass.set_vertex_buffer(0, canvas.buffer.slice(..));
+                    bound = Some(i);
                 }
+                let batch = &canvas.mesh.batches[b];
+                pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
+                pass.set_bind_group(1, &uniforms.group, &[offset]);
+                pass.draw(batch.range.clone(), 0..1);
             }
         }
         self.queue.submit(Some(encoder.finish()));
@@ -266,3 +275,7 @@ pub(crate) struct CanvasPlace {
     /// The canvas entity's layer (camera culling).
     pub(crate) layer: u8,
 }
+
+#[cfg(test)]
+#[path = "world_tests.rs"]
+mod world_tests;
