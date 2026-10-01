@@ -21,19 +21,20 @@
 //!   returns the composed entry-point names (the dry-run gate the agent checks a
 //!   recipe with before baking).
 //! - `Shader.ToJson(recipe)` — serialize a recipe to canonical JSON.
-//! - `Shader.Blocks(pass)` — list the curated block ids for a pass (introspection
-//!   so the agent composes from the actual catalog, not guesswork).
+//! - `Shader.Blocks(pass)` — list the curated blocks for a pass with their
+//!   descriptions and params (name, default, arity, runtime) — introspection so the
+//!   agent composes from the actual catalog, not guesswork (#411).
 //!
 //! `Shader` borrows no engine state — it reads a recipe and writes a file — so it
 //! registers as a plain static namespace, like `Texture`.
 
+mod blocks;
 mod from_lua;
 
 use mlua::{Lua, Value};
 
 use super::{put, Reg};
 use crate::shadergen::assemble::assemble;
-use crate::shadergen::blocks::catalog;
 use crate::shadergen::recipe::PassKind;
 use crate::shadergen::validate::validate;
 use crate::shadergen::{bake_recipe, ShaderRecipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
@@ -76,8 +77,7 @@ pub fn register(lua: &Lua) -> Reg {
         "Blocks",
         lua.create_function(|lua, pass: String| {
             let pass = parse_pass(&pass).map_err(mlua::Error::RuntimeError)?;
-            let ids: Vec<String> = catalog(pass).iter().map(|b| b.id.to_string()).collect();
-            lua.create_sequence_from(ids)
+            blocks::blocks_table(lua, pass)
         }),
     )?;
 
@@ -162,14 +162,44 @@ mod tests {
     }
 
     #[test]
-    fn blocks_lists_the_catalog_for_a_pass() {
+    fn blocks_describes_each_block_and_its_params() {
         let lua = Lua::new();
         register(&lua).unwrap();
-        let ids: Vec<String> = lua
-            .load(r#"return Shader.Blocks("postfx")"#)
+        let (id, name, default, arity, runtime): (String, String, f32, usize, bool) = lua
+            .load(
+                r#"for _, b in ipairs(Shader.Blocks("postfx")) do
+                     if b.id == "vignette" then
+                       local p = b.params[1]
+                       return b.id, p.name, p.default, p.arity, p.runtime
+                     end
+                   end"#,
+            )
             .eval()
             .unwrap();
-        assert!(ids.iter().any(|i| i == "vignette"), "{ids:?}");
+        let block = crate::shadergen::blocks::find(PassKind::Postfx, "vignette").unwrap();
+        assert_eq!(
+            (id.as_str(), name.as_str()),
+            ("vignette", block.params[0].name)
+        );
+        assert_eq!(
+            (default, arity, runtime),
+            (block.params[0].default, 1, false)
+        );
+    }
+
+    #[test]
+    fn a_vector_default_comes_back_as_an_array_of_its_arity() {
+        let lua = Lua::new();
+        register(&lua).unwrap();
+        let lanes: usize = lua
+            .load(
+                r#"for _, b in ipairs(Shader.Blocks("surface")) do
+                     if b.id == "tint" then return #b.params[1].default end
+                   end"#,
+            )
+            .eval()
+            .unwrap();
+        assert_eq!(lanes, 3);
     }
 
     #[test]

@@ -13,6 +13,9 @@
 //!   roughness→G). Returns the written path.
 //! - `Texture.ToJson(recipe)` — serialize a recipe to its canonical JSON for
 //!   saving / diffing.
+//! - `Texture.Ops()` — the op catalog: each op's tag, category, input count and
+//!   params with their types and defaults (#411), so the agent discovers the op-set
+//!   from the engine rather than the docs.
 //!
 //! A `recipe` is a Lua table **or** its JSON string (the on-disk form, #410), so a
 //! saved recipe re-bakes through the same verb without a round-trip through Lua.
@@ -24,6 +27,7 @@
 //! registers as a plain static namespace, like `Assets`.
 
 mod from_lua;
+mod ops;
 
 use mlua::{Lua, Value};
 
@@ -51,6 +55,12 @@ pub fn register(lua: &Lua) -> Reg {
             let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
             recipe.to_json().map_err(mlua::Error::RuntimeError)
         }),
+    )?;
+
+    put(
+        &table,
+        "Ops",
+        lua.create_function(|lua, ()| ops::ops_table(lua)),
     )?;
 
     lua.globals()

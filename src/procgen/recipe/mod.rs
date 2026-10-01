@@ -16,8 +16,10 @@
 //! ramp stop — is an error naming it, so a typo (`scael = 8`) never bakes silently
 //! with a default. [`Node`]'s check lives in `recipe/node.rs`.
 
+mod catalog;
 mod node;
 
+pub use catalog::{Lit, OpInfo, OpParam, OPS};
 pub use node::Node;
 
 use serde::{Deserialize, Serialize};
