@@ -58,13 +58,14 @@ fn a_repeated_block_keeps_per_instance_params_and_one_helper() {
 
 #[test]
 fn every_catalogued_block_twice_composes() {
+    // One recipe per block: the whole catalog twice outgrows the 16 runtime slots.
     for pass in [PassKind::Surface, PassKind::Postfx] {
-        let blocks = catalog(pass)
-            .iter()
-            .flat_map(|b| [sel(b.id, &[]), sel(b.id, &[])]);
-        let wgsl = assemble_real(&recipe(pass, blocks.collect())).unwrap();
-        validate(ENGINE_SHADERS, &wgsl)
-            .unwrap_or_else(|e| panic!("{} with every block twice: {e}", pass.tag()));
+        for b in catalog(pass) {
+            let twice = vec![sel(b.id, &[]), sel(b.id, &[])];
+            let wgsl = assemble_real(&recipe(pass, twice)).unwrap();
+            validate(ENGINE_SHADERS, &wgsl)
+                .unwrap_or_else(|e| panic!("{} {} twice: {e}", pass.tag(), b.id));
+        }
     }
 }
 

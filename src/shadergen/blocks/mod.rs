@@ -67,6 +67,10 @@ pub struct Block {
     /// `{args}` for the instance's param constants (`, a, b`, or empty); surface
     /// blocks may also reference `in` (the `VertexOutput`), postfx blocks `uv`.
     pub call: &'static str,
+    /// The extra texture slots (#400, [`crate::shadergen::textures`]) the helper
+    /// samples, as `t_<slot>`. The assembler declares a slot only when some block
+    /// in the recipe lists it. Empty for most blocks, and always for postfx.
+    pub textures: &'static [&'static str],
 }
 
 /// The catalog of blocks valid for `pass`, in stable order.
@@ -108,6 +112,18 @@ mod tests {
             .flat_map(|b| b.params)
             .any(|p| p.runtime);
         assert!(!runtime, "a postfx pass has no material to hold the value");
+    }
+
+    #[test]
+    fn block_textures_name_real_slots_and_only_surface_blocks_have_any() {
+        for b in catalog(PassKind::Surface) {
+            for t in b.textures {
+                assert!(crate::shadergen::textures::slot(t).is_ok(), "{}: {t}", b.id);
+            }
+        }
+        assert!(catalog(PassKind::Postfx)
+            .iter()
+            .all(|b| b.textures.is_empty()));
     }
 
     #[test]
