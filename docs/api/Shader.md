@@ -218,10 +218,15 @@ Material.SetShaderTexture(enemy, "mask", "project/assets/textures/noise.png")
 Material.SetShaderParam(enemy, "dissolve.amount", t)   -- 0 → 1
 ```
 
-A dissolved fragment is cut from the colour pass only: the **shadow** and the
-SSAO depth prepass still see the whole mesh (#648), so hide the entity once
-`amount` reaches 1. Likewise `uv_scroll` moves the colour pass's UVs only: a
-Cutout material's alpha-tested shadow keeps the unscrolled cut-out.
+The cut reaches every pass that draws the mesh (#648): a dissolved fragment casts
+no **shadow** and leaves no ambient occlusion, reading the same `amount` and mask
+as the colour pass. At `amount = 1` the entity is invisible, shadow and all — no
+need to hide it to finish the effect. Behind a UV-stage block (`uv_scroll`) the
+cut samples the moved UVs in every pass.
+
+Only a shader with a cutting block pays for this; every other shader keeps the
+shared depth pipelines. So without one, `uv_scroll` moves the colour pass's UVs
+only: a Cutout material's alpha-tested shadow keeps the unscrolled cut-out.
 
 Example — bake a stylized surface variant and load it by name:
 

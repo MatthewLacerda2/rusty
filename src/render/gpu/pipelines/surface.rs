@@ -104,8 +104,8 @@ pub(crate) struct SurfaceShaders {
 }
 
 impl SurfaceShaders {
-    /// An empty cache whose variants render into `format` through `layout` (the
-    /// forward pipeline layout), and cast clipped shadows through `shadow_layout`.
+    /// An empty cache: variants render into `format` through `layout` (the forward
+    /// layout), and cast clipped shadows through `shadow_layout`.
     pub(crate) fn new(
         layout: wgpu::PipelineLayout,
         shadow_layout: wgpu::PipelineLayout,
@@ -175,8 +175,7 @@ impl SurfaceShaders {
         self.slots.get(id.checked_sub(1)?)?.pipelines.as_ref()
     }
 
-    /// The pipeline pipeline `id` draws with in `pass`: its variant's, else the pass's
-    /// standard one.
+    /// What pipeline `id` draws with in `pass`: its variant's, else the standard one.
     pub(crate) fn pick<'a>(&'a self, pass: SolidPass<'a>, id: usize) -> &'a wgpu::RenderPipeline {
         let variant = self.get(id);
         match pass {
@@ -295,3 +294,7 @@ mod mask_tests;
 #[cfg(test)]
 #[path = "gameplay_blocks_tests.rs"]
 mod gameplay_blocks_tests;
+
+#[cfg(test)]
+#[path = "cut_depth_tests.rs"]
+pub(crate) mod cut_depth_tests;

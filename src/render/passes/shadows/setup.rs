@@ -7,7 +7,6 @@ use super::cascades::MAX_CASCADES;
 use super::ShadowRenderer;
 use crate::render::gpu::bind_layouts::storage_entry;
 use crate::render::gpu::mesh::vertex_layout;
-use crate::render::gpu::shaders::ShaderRegistry;
 
 /// The two cascade depth arrays and their views.
 pub(super) struct DepthTextures {
@@ -158,15 +157,14 @@ impl ShadowRenderer {
         (global_layout, global_bind_group, entity_layout)
     }
 
-    /// The plain depth-only pipeline and the clipping one (#648), both from
-    /// `shader.wgsl`'s shadow stage, and the clip pipeline's layout: the two shadow
-    /// groups plus the forward pass's group-2 material layout.
+    /// The plain depth-only pipeline and the clipping one (#648), both from the
+    /// forward `shader`'s shadow stage; the clip pipeline's layout adds the forward
+    /// pass's group-2 material layout to the two shadow groups.
     pub(super) fn create_pipelines(
         device: &wgpu::Device,
         [global, entity, material]: [&wgpu::BindGroupLayout; 3],
-        registry: &mut ShaderRegistry,
+        shader: &wgpu::ShaderModule,
     ) -> [wgpu::RenderPipeline; 2] {
-        let shader = registry.load(device, "shader.wgsl", "Shadow Shader");
         let plain = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Shadow Pipeline Layout"),
             bind_group_layouts: &[global, entity],
@@ -174,8 +172,8 @@ impl ShadowRenderer {
         });
         let clip = clip_layout(device, [global, entity, material]);
         [
-            depth_pipeline(device, &shader, &plain, None),
-            depth_pipeline(device, &shader, &clip, Some("fs_shadow")),
+            depth_pipeline(device, shader, &plain, None),
+            depth_pipeline(device, shader, &clip, Some("fs_shadow")),
         ]
     }
 }

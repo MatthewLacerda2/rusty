@@ -15,7 +15,6 @@ mod setup;
 mod uniform;
 
 use crate::render::gpu::pipelines::surface::SurfaceShaders;
-use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::lod::LodSelection;
 use crate::render::CameraUniform;
 use crate::scene::SceneId;
@@ -82,11 +81,12 @@ impl ShadowRenderer {
     /// the same way), with the first cascade covering a few metres instead of 60.
     pub const CASCADE_SIZE: u32 = 1024;
 
-    /// The pass and its pipelines; `material_layout` is the forward pass's group 2,
-    /// which a clipped caster binds (#648).
+    /// The pass and its pipelines, over the forward `shader`'s shadow stage;
+    /// `material_layout` is the forward pass's group 2, which a clipped caster binds
+    /// (#648).
     pub fn new(
         device: &wgpu::Device,
-        registry: &mut ShaderRegistry,
+        shader: &wgpu::ShaderModule,
         material_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let textures = Self::create_depth_textures(device);
@@ -108,7 +108,7 @@ impl ShadowRenderer {
         let (global_layout, global_bind_group, entity_layout) =
             Self::create_pass_layouts(device, [&light_space_buffer, &time_buffer]);
         let layouts = [&global_layout, &entity_layout, material_layout];
-        let [pipeline, clip_pipeline] = Self::create_pipelines(device, layouts, registry);
+        let [pipeline, clip_pipeline] = Self::create_pipelines(device, layouts, shader);
         let static_casters = CasterBuffer::new(device, &entity_layout);
         let dynamic_casters = CasterBuffer::new(device, &entity_layout);
 
@@ -291,3 +291,6 @@ fn depth_pass<'a>(
 
 #[cfg(test)]
 mod cache_tests;
+
+#[cfg(test)]
+mod cutout_tests;
