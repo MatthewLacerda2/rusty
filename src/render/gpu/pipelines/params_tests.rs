@@ -13,7 +13,7 @@ use crate::scene::{Camera, Scene};
 use crate::shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use crate::shadergen::{bake_recipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
 
-const RES: u32 = 32;
+pub(super) const RES: u32 = 32;
 
 /// A red hit-flash surface shader baked where scripts and the renderer resolve it,
 /// under a name unique to this run; removed on drop.
@@ -45,7 +45,7 @@ impl Drop for Flash {
 }
 
 /// A lit white sphere at `x` whose own material names `shader`; returns its id.
-fn sphere(scene: &mut Scene, x: f32, shader: &str) -> u32 {
+pub(super) fn sphere(scene: &mut Scene, x: f32, shader: &str) -> u32 {
     let id = create_entity(scene, "Ball", Some(Primitive::Sphere));
     scene.world.transform_mut(id).unwrap().position = Vec3::new(x, 0.0, 0.0);
     let key = mat_ops::ensure_material_key(scene, id).unwrap();
@@ -53,7 +53,7 @@ fn sphere(scene: &mut Scene, x: f32, shader: &str) -> u32 {
     id
 }
 
-fn lua(scene: &RefCell<Scene>, script: &str) {
+pub(super) fn lua(scene: &RefCell<Scene>, script: &str) {
     let lua = Lua::new();
     lua.scope(|s| {
         crate::api::material::register(&lua, s, scene).unwrap();
@@ -63,7 +63,7 @@ fn lua(scene: &RefCell<Scene>, script: &str) {
 }
 
 /// The summed (red, blue) of the centre row's left and right halves.
-fn halves(renderer: &mut Renderer, scene: &Scene) -> [(u32, u32); 2] {
+pub(super) fn halves(renderer: &mut Renderer, scene: &Scene) -> [(u32, u32); 2] {
     let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES, 2);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 0.0, 6.0), -90.0, 0.0);

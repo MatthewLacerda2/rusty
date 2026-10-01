@@ -13,6 +13,9 @@ pub(crate) struct Textures {
     pub texture_layout: wgpu::BindGroupLayout,
     pub material_layout: wgpu::BindGroupLayout,
     pub default_texture: Rc<GpuTexture>,
+    /// The 1×1 white an extra shader texture slot samples when a material names
+    /// none, or its file is missing (#400): a neutral mask.
+    pub white_texture: Rc<GpuTexture>,
     pub default_material_bind_group: wgpu::BindGroup,
     /// All-zero runtime shader params (#399), bound by every material whose shader
     /// has none — the standard shader never reads them.
@@ -29,6 +32,11 @@ pub(crate) fn create_textures(device: &wgpu::Device, queue: &wgpu::Queue) -> Tex
         queue,
         &texture_layout,
     ));
+    let white_texture = Rc::new(Renderer::create_white_texture(
+        device,
+        queue,
+        &texture_layout,
+    ));
     let zero_params = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Zero Shader Params"),
         size: bind_layouts::PARAMS_SIZE,
@@ -38,26 +46,28 @@ pub(crate) fn create_textures(device: &wgpu::Device, queue: &wgpu::Queue) -> Tex
     let default_material_bind_group = create_default_material_bind_group(
         device,
         &material_layout,
-        &default_texture,
+        [&default_texture, &white_texture],
         &zero_params,
     );
     Textures {
         texture_layout,
         material_layout,
         default_texture,
+        white_texture,
         default_material_bind_group,
         zero_params,
     }
 }
 
 /// A group(2) material bind group with all five texture slots (albedo, metallic,
-/// roughness, normal, emissive) pointing at the default texture (one shared sampler).
+/// roughness, normal, emissive) pointing at the default texture (one shared sampler)
+/// and every extra shader texture slot at white (#400).
 /// Bound by passes that need group(2) but never sample the maps (outline, editor
 /// grid) (#202, #207).
 fn create_default_material_bind_group(
     device: &wgpu::Device,
     material_layout: &wgpu::BindGroupLayout,
-    default_texture: &GpuTexture,
+    [default_texture, white_texture]: [&GpuTexture; 2],
     zero_params: &wgpu::Buffer,
 ) -> wgpu::BindGroup {
     let view = wgpu::BindingResource::TextureView(&default_texture.view);
@@ -76,6 +86,12 @@ fn create_default_material_bind_group(
         binding: crate::shadergen::params::PARAM_BINDING,
         resource: zero_params.as_entire_binding(),
     });
+    for slot in crate::shadergen::textures::SLOTS {
+        entries.push(wgpu::BindGroupEntry {
+            binding: slot.binding,
+            resource: wgpu::BindingResource::TextureView(&white_texture.view),
+        });
+    }
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Default Material Bind Group"),
         layout: material_layout,

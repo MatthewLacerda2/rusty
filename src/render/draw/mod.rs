@@ -6,7 +6,7 @@ mod axis;
 pub(crate) mod batch;
 mod camera;
 mod lighting;
-mod materials;
+pub(crate) mod materials;
 mod overlays;
 mod pass;
 mod probes;
@@ -158,7 +158,7 @@ impl Renderer {
 }
 
 /// Every active entity's resolved material map paths (albedo, metallic, roughness,
-/// normal, emissive) the forward shader samples — gathered as owned strings so the
+/// normal, emissive, then the extra shader texture slots, #400) the forward shader samples — gathered as owned strings so the
 /// scene borrow ends before the textures are uploaded (#202, #207).
 pub(crate) fn active_material_map_paths(scene: &Scene) -> Vec<String> {
     scene
@@ -167,15 +167,7 @@ pub(crate) fn active_material_map_paths(scene: &Scene) -> Vec<String> {
         .into_iter()
         .filter(|&id| scene.world.is_active(id))
         .filter_map(|id| scene.material_asset_of(id).cloned())
-        .flat_map(|m| {
-            [
-                m.base_color_map,
-                m.metallic_map,
-                m.roughness_map,
-                m.normal_map,
-                m.emissive_map,
-            ]
-        })
+        .flat_map(|m| materials::material_texture_paths(Some(&m)))
         .flatten()
         .collect()
 }

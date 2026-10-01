@@ -15,7 +15,8 @@
 //!    through `SceneData` like any library asset.
 //! 3. **Surface shader** (#396, #399) — `SetShader` names the material's authored
 //!    surface shader; `SetShaderParam` / `GetShaderParam` (`shader_params`) drive the
-//!    params it exposes at runtime.
+//!    params it exposes at runtime; `SetShaderTexture` (`shader_textures`, #400) names
+//!    the texture an extra shader slot (`mask`) samples.
 //!
 //! Both are THIN adapters (#287): each setter resolves a library key (the entity's via
 //! `authoring::material::ensure_material_key`, or the chosen name via
@@ -27,6 +28,7 @@
 mod asset;
 mod from_lua;
 mod shader_params;
+mod shader_textures;
 
 use std::cell::RefCell;
 
@@ -50,6 +52,7 @@ pub fn register<'lua, 'scope>(
     register_transparency(scope, &table, scene)?;
     asset::register(scope, &table, scene)?;
     shader_params::register(scope, &table, scene)?;
+    shader_textures::register(scope, &table, scene)?;
     put(
         &table,
         "SetShader",

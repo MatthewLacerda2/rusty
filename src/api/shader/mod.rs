@@ -203,6 +203,24 @@ mod tests {
     }
 
     #[test]
+    fn blocks_list_runtime_params_and_the_texture_slots_they_sample() {
+        let lua = Lua::new();
+        register(&lua).unwrap();
+        let (slot, runtime, none): (String, bool, usize) = lua
+            .load(
+                r#"local d, t
+                   for _, b in ipairs(Shader.Blocks("surface")) do
+                     if b.id == "dissolve" then d = b end
+                     if b.id == "tint" then t = b end
+                   end
+                   return d.textures[1], d.params[1].runtime, #t.textures"#,
+            )
+            .eval()
+            .unwrap();
+        assert_eq!((slot.as_str(), runtime, none), ("mask", true, 0));
+    }
+
+    #[test]
     fn to_json_round_trips_back_to_a_recipe() {
         let lua = Lua::new();
         register(&lua).unwrap();

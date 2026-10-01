@@ -177,6 +177,7 @@ impl Renderer {
             texture_layout: textures.texture_layout,
             material_layout: textures.material_layout,
             default_texture: textures.default_texture,
+            white_texture: textures.white_texture,
             default_material_bind_group: textures.default_material_bind_group,
             camera_buffer: global.camera_buffer,
             lighting_buffer: global.lighting_buffer,

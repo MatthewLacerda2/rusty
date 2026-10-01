@@ -130,6 +130,8 @@ pub struct Renderer {
     pub gpu_meshes: HashMap<MeshId, GpuMesh>,
     pub gpu_textures: HashMap<String, Rc<GpuTexture>>,
     pub default_texture: Rc<GpuTexture>,
+    /// What an extra shader texture slot samples with no texture of its own (#400).
+    pub white_texture: Rc<GpuTexture>,
     /// A group(2) material bind group whose three texture slots all point at
     /// `default_texture` — used by the outline and editor-grid passes, which never
     /// sample the maps (they render unlit / use the default checker) but still must

@@ -259,3 +259,7 @@ mod surface_tests;
 #[cfg(test)]
 #[path = "params_tests.rs"]
 mod params_tests;
+
+#[cfg(test)]
+#[path = "mask_tests.rs"]
+mod mask_tests;
