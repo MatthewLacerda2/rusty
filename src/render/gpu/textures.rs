@@ -80,7 +80,7 @@ impl Renderer {
     }
 
     /// Create the texture view + bind group and assemble the final `GpuTexture`.
-    fn finalize_texture(
+    pub(crate) fn finalize_texture(
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,
         texture: wgpu::Texture,
@@ -135,6 +135,12 @@ impl Renderer {
     pub fn load_texture(&mut self, path_str: &str) -> Rc<GpuTexture> {
         if let Some(tex) = self.gpu_textures.get(path_str) {
             return Rc::clone(tex);
+        }
+        // A render texture (#430) is never on disk: it is registered by the frame
+        // that draws it, and until then shows the default — uncached, so it appears
+        // the moment its camera exists.
+        if crate::render::render_texture::is_render_texture(path_str) {
+            return Rc::clone(&self.default_texture);
         }
 
         // Try load texture, falling back to the default on failure.

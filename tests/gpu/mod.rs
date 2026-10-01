@@ -27,6 +27,8 @@ mod particle_soft_lit_screenshot;
 mod postfx_blocks_screenshot;
 mod postfx_screenshot;
 mod preview_api;
+mod render_texture_scene;
+mod render_texture_screenshot;
 mod ribbons_screenshot;
 mod skinned_shadows_screenshot;
 mod skinning_joint_cap;

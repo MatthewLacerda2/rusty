@@ -11,7 +11,7 @@ How each type draws is in [`docs/ui.md`](../ui.md).
 | Function | Signature | Returns |
 |---|---|---|
 | `Image.GetColor` / `SetColor` | `(id)` / `(id, r, g, b, a)` | `r, g, b, a` (each clamped to 0..1) |
-| `Image.GetTexture` / `SetTexture` | `(id)` / `(id, path)` | texture path, or `nil` for a solid colour (`nil` / `""` clears it) |
+| `Image.GetTexture` / `SetTexture` | `(id)` / `(id, path)` | texture path, or `nil` for a solid colour (`nil` / `""` clears it). `"rt:<name>"` shows a camera's render texture (see [`Camera`](Camera.md#camera-entities-projection-and-render-textures-430)) |
 | `Image.GetType` / `SetType` | `(id)` / `(id, name)` | `"Simple"`, `"Sliced"`, `"Tiled"` or `"Filled"` |
 | `Image.GetBorder` / `SetBorder` | `(id)` / `(id, l, b, r, t)` | `Sliced` 9-slice borders in texels (each ≥ 0) |
 | `Image.GetFillMethod` / `SetFillMethod` | `(id)` / `(id, name)` | `"Horizontal"`, `"Vertical"` or `"Radial360"` |

@@ -66,6 +66,9 @@ pub struct RenderView {
     ui_output: Option<(wgpu::TextureView, wgpu::TextureFormat)>,
     /// The UI pass's per-canvas vertex buffers for this view (#418).
     pub(crate) ui: crate::render::ui::UiViewCache,
+    /// The render textures this view's scene draws (#430); see
+    /// `crate::render::render_texture`.
+    pub(crate) render_textures: crate::render::render_texture::RenderTextures,
 }
 
 impl RenderView {
@@ -140,6 +143,7 @@ impl RenderView {
             ui_format,
             ui_output: None,
             ui: Default::default(),
+            render_textures: Default::default(),
         }
     }
 

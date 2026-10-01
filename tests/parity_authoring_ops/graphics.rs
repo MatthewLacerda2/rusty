@@ -46,6 +46,8 @@ fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
             motion_blur_active: false,
             motion_blur_samples: 8,
             fxaa_active: true,
+            projection: Default::default(),
+            target_texture: None,
         }),
     );
     (Rc::new(RefCell::new(scene)), id)

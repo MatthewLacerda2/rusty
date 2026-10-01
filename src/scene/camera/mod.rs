@@ -10,6 +10,7 @@ mod projection;
 
 pub use projection::ScreenPoint;
 
+use crate::components::Projection;
 use crate::scene::{layer_in_mask, ClearFlags, Scene};
 
 /// The engine's active view camera — a World resource (Unity's `Camera.main`):
@@ -31,6 +32,8 @@ pub struct Camera {
     /// base camera (free-fly editor cam / world cam) clears the skybox; stacked
     /// cameras may clear depth-only to composite on top (#93).
     pub clear_flags: ClearFlags,
+    /// Perspective (through `fov`) or orthographic (#430).
+    pub projection: Projection,
 }
 
 /// Default vertical field of view, in degrees.
@@ -51,6 +54,7 @@ impl Camera {
             far: DEFAULT_FAR,
             culling_mask: u32::MAX,
             clear_flags: ClearFlags::Skybox,
+            projection: Projection::Perspective,
         }
     }
 
@@ -76,7 +80,15 @@ impl Camera {
         // Guard against a degenerate range (e.g. far <= near from hand-edited values),
         // which would otherwise produce a NaN projection.
         let far = self.far.max(self.near + 0.001);
-        let proj = Mat4::perspective_rh(self.fov.to_radians(), aspect, self.near, far);
+        let proj = match self.projection {
+            Projection::Perspective => {
+                Mat4::perspective_rh(self.fov.to_radians(), aspect, self.near, far)
+            }
+            Projection::Orthographic { size } => {
+                let (h, w) = (size.max(0.001), size.max(0.001) * aspect);
+                Mat4::orthographic_rh(-w, w, -h, h, self.near, far)
+            }
+        };
         proj * view
     }
 
@@ -104,21 +116,25 @@ pub fn sync_lens_from_scene(camera: &mut Camera, scene: &Scene, is_playing: bool
                 .world
                 .camera(id)
                 .expect("id came from ids_with_camera");
-            if scene.world.is_active(id) && c.active && c.render_order <= best_order {
+            // A render-texture camera (#430) is not the screen's camera.
+            let screen = c.active && c.target_texture.is_none();
+            if scene.world.is_active(id) && screen && c.render_order <= best_order {
                 best_order = c.render_order;
-                lens = Some((c.fov, c.near, c.far, c.culling_mask));
+                lens = Some((c.fov, c.near, c.far, c.culling_mask, c.projection));
             }
         }
     }
 
     match lens {
-        Some((fov, near, far, mask)) => {
+        Some((fov, near, far, mask, projection)) => {
+            camera.projection = projection;
             camera.fov = fov;
             camera.near = near;
             camera.far = far;
             camera.culling_mask = mask;
         }
         None => {
+            camera.projection = Projection::Perspective;
             camera.near = DEFAULT_NEAR;
             camera.far = DEFAULT_FAR;
             camera.culling_mask = u32::MAX;
@@ -136,28 +152,44 @@ pub fn game_camera_from_scene(base: &Camera, scene: &Scene) -> Camera {
     let mut best_order = i32::MAX;
     let mut chosen: Option<Camera> = None;
     for id in scene.world.ids_with_camera() {
-        let c = scene
-            .world
-            .camera(id)
-            .expect("id came from ids_with_camera");
-        if !scene.world.is_active(id) || !c.active || c.render_order > best_order {
-            continue;
+        let order = match scene.world.camera(id) {
+            Some(c) if scene.world.is_active(id) && c.active && c.target_texture.is_none() => {
+                c.render_order
+            }
+            _ => continue,
+        };
+        if order <= best_order {
+            best_order = order;
+            chosen = camera_for_entity(base, scene, id);
         }
-        best_order = c.render_order;
-        let world = scene.compute_world_matrix(id);
-        let (yaw, pitch) = yaw_pitch_from_matrix(world);
-        let mut cam = base.clone();
-        cam.position = world.col(3).truncate();
-        cam.yaw = yaw;
-        cam.pitch = pitch;
-        cam.fov = c.fov;
-        cam.near = c.near;
-        cam.far = c.far;
-        cam.culling_mask = c.culling_mask;
-        cam.clear_flags = c.clear_flags;
-        chosen = Some(cam);
     }
     chosen.unwrap_or_else(|| base.clone())
+}
+
+/// The render [`Camera`] a `CameraComponent` entity sees through: its world
+/// transform's position and orientation plus the component's lens, mask, clear
+/// flags and projection. `base` supplies the rest. `None` without a camera.
+pub fn camera_for_entity(base: &Camera, scene: &Scene, id: u32) -> Option<Camera> {
+    let c = scene.world.camera(id)?;
+    let world = scene.compute_world_matrix(id);
+    let (yaw, pitch) = yaw_pitch_from_matrix(world);
+    let mut cam = base.clone();
+    cam.position = world.col(3).truncate();
+    cam.yaw = yaw;
+    cam.pitch = pitch;
+    apply_lens(&mut cam, &c);
+    Some(cam)
+}
+
+/// Layer `c`'s lens (fov/near/far/projection), culling mask and clear flags onto
+/// `cam`, keeping its pose.
+pub fn apply_lens(cam: &mut Camera, c: &crate::components::CameraComponent) {
+    cam.fov = c.fov;
+    cam.near = c.near;
+    cam.far = c.far;
+    cam.projection = c.projection;
+    cam.culling_mask = c.culling_mask;
+    cam.clear_flags = c.clear_flags;
 }
 
 /// Yaw/pitch (degrees) of a world matrix's forward (-Z) axis, the inverse of

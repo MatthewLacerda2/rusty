@@ -160,7 +160,7 @@ adds a `RectTransform`.
 | Field | Meaning |
 |---|---|
 | `color` | RGBA tint, **display-space (sRGB) values, straight alpha** — what a colour picker shows. |
-| `texture` | A path, like material maps; `None` draws a solid colour. |
+| `texture` | A path, like material maps; `None` draws a solid colour. `"rt:<name>"` shows a camera's render texture (#430) — a minimap, a scope, a character preview. |
 | `image_type` | `Simple` (stretched), `Sliced` (9-slice), `Tiled` (repeated) or `Filled` (partial). |
 | `border` | `Sliced`: the frame in texels — left, bottom, right, top. |
 | `fill_method`, `fill_origin`, `fill_amount`, `fill_clockwise` | `Filled`: `Horizontal` / `Vertical` bars from an edge, or a `Radial360` sweep from an edge (health bars, cooldown rings, reload circles). |

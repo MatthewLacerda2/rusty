@@ -153,6 +153,8 @@ pub fn default_camera() -> CameraComponent {
         motion_blur_active: true,
         motion_blur_samples: 64,
         fxaa_active: true,
+        projection: Default::default(),
+        target_texture: None,
     }
 }
 

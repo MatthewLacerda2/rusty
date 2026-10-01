@@ -76,6 +76,7 @@ print(s.frames, s.fixed_update_ms.avg, s.systems.update_scripts.max, s.entities.
 | `shadow_draws` / `ui_draws` | shadow-caster draw calls (one per caster mesh, instanced, #470) / UI batches |
 | `ssao_samples` | depth taps the SSAO pass traced (occlusion texels × the tier's samples, #436); `0` when AO is off or on the Low tier |
 | `particles_drawn` | particles the renderer drew — sprite instances plus mesh particles, summed over the camera stack (#440). Their draws are in `draw_calls`: one per merged sprite batch, one per instanced run of mesh particles |
+| `render_texture_draws` | cameras drawn into render textures this frame (#430) — their geometry is already in `draw_calls` / `triangles`; a camera skipped (unreferenced, or between its `update_every` frames) is not counted |
 | `renderer_ms` | CPU ms `Renderer::render` took to record the frame |
 
 Keys ending in `_ms` are **wall-clock** and differ run to run; everything else is a
@@ -130,7 +131,8 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
   "rigidbody": { "active": true, "is_kinematic": false, "mass": .., "velocity": [x,y,z],
                  "use_gravity": true },
   "camera":    { "active": true, "fov": .., "near": .., "far": .., "culling_mask": ..,
-                 "render_order": 0 },
+                 "render_order": 0, "projection": "Perspective",
+                 "target_texture": null },                      // or "rt:<name>" (#430)
   "nav_agent": { "active": true, "radius": .., "target": [x,y,z], "speed": .., .. },
   "particles": { "active": true, "texture": null, "rate": .., "lifetime": .., .. },
   "animator":  { "clip": "Idle", "time": .., "speed": .., "playing": true,

@@ -58,7 +58,9 @@ impl Camera {
         let ndc = clip.truncate().truncate() / w;
         ScreenPoint {
             position: (ndc * 0.5 + 0.5) * screen,
-            depth: clip.w,
+            // Distance along the view axis: equals a perspective clip `w`, and stays
+            // right for an orthographic camera, whose `w` is always 1 (#430).
+            depth: (p - self.position).dot(self.forward()),
         }
     }
 

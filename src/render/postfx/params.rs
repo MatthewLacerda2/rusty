@@ -178,6 +178,8 @@ mod tests {
             motion_blur_active: true,
             motion_blur_samples: 16,
             fxaa_active: true,
+            projection: Default::default(),
+            target_texture: None,
         }
     }
 
