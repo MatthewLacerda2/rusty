@@ -41,7 +41,7 @@ impl Slot {
 
 /// See [`Slot::is_due`]; `every` below 1 means every frame.
 pub(super) fn is_due(drawn_on: Option<u64>, frame: u64, every: u32) -> bool {
-    drawn_on.map_or(true, |f| frame.saturating_sub(f) >= u64::from(every.max(1)))
+    drawn_on.is_none_or(|f| frame.saturating_sub(f) >= u64::from(every.max(1)))
 }
 
 impl Renderer {

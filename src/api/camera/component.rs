@@ -49,7 +49,7 @@ pub fn register<'lua, 'scope>(
     register_target(scope, table, scene)
 }
 
-/// `Get/SetTargetTexture`, `Get/SetTargetPostFx`, `Get/SetTargetUpdateEvery`.
+/// `Get/SetTargetTexture`, then the target's settings.
 fn register_target<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,
@@ -82,6 +82,15 @@ fn register_target<'lua, 'scope>(
             },
         ),
     )?;
+    register_target_settings(scope, table, scene)
+}
+
+/// `Get/SetTargetPostFx`, `Get/SetTargetUpdateEvery`.
+fn register_target_settings<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
     put(
         table,
         "GetTargetPostFx",
