@@ -4,6 +4,7 @@
 
 mod axis;
 pub(crate) mod batch;
+mod camera;
 mod lighting;
 mod materials;
 mod overlays;
