@@ -216,4 +216,18 @@ mod tests {
         assert_eq!(m.alpha, 1.0);
         assert_eq!(m.alpha_cutoff, 0.5);
     }
+
+    #[test]
+    fn shader_params_round_trip_and_are_omitted_when_empty() {
+        let m = MaterialAsset {
+            shader: Some("enemy_hit".into()),
+            shader_params: BTreeMap::from([("hit_flash.amount".into(), vec![0.5])]),
+            ..MaterialAsset::default()
+        };
+        let back: MaterialAsset =
+            serde_json::from_str(&serde_json::to_string(&m).unwrap()).unwrap();
+        assert_eq!(back.shader_params, m.shader_params);
+        let plain = serde_json::to_string(&MaterialAsset::default()).unwrap();
+        assert!(!plain.contains("shader_params"), "{plain}");
+    }
 }

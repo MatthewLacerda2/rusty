@@ -1,4 +1,4 @@
-//! src/editor/inspector_material.rs — the Material inspector card.
+//! src/editor/inspector/components/material/mod.rs — the Material inspector card.
 //!
 //! Edits the shared library `MaterialAsset` an entity references (PBR factors, the
 //! glTF-PBR map paths, and the transparency story — render mode + alpha + cutoff,
@@ -10,6 +10,8 @@
 //! plus the resolved key — never mutating `MaterialAsset` fields directly. The field
 //! write and its validation live once in that shared module, which the Lua
 //! `Material.*` API calls too, so the panel and the binding are siblings over one op.
+
+mod shader_params;
 
 use std::collections::BTreeMap;
 
@@ -90,6 +92,7 @@ fn draw_material(
         })
         .response
         .on_hover_text("An authored surface shader's name; empty = the standard shader");
+        shader_params::draw_shader_params(ui, materials, key, is_dirty);
     });
     if remove {
         *is_dirty = true;

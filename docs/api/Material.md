@@ -23,6 +23,8 @@ map; an empty path clears it.
 | `Material.SetAlpha` | `(id, a)` — base-color alpha in `[0,1]`; the blend factor for a `Transparent` material (ignored by Opaque/Cutout) |
 | `Material.SetAlphaCutoff` | `(id, c)` — alpha-test threshold in `[0,1]` for `Cutout`: fragments below it are discarded (default 0.5) |
 | `Material.SetShader` | `(id, name)` — render with the authored surface shader `name` (see *Surface shaders* below); `""` clears it back to the standard shader |
+| `Material.SetShaderParam` | `(id, name, value)` — set a runtime param of the material's surface shader (`"hit_flash.amount"`, see *Runtime shader params* below); `value` is a number or an array of numbers; errors on a param the shader does not expose at runtime |
+| `Material.GetShaderParam` | `(id, name)` → the param's current value (a number, or an array for a vector param): the one set, else the shader's baked default |
 
 ### Standalone material assets
 
@@ -149,4 +151,41 @@ Material.SetShader(enemy, "enemy_toon")   -- or `shader = "enemy_toon"` in a rec
   shader baked *after* the material names it is picked up on the next frame.
 - **Re-baking** a shader in a running session rebuilds it: the bake → look →
   iterate loop needs no restart.
-- `Debug.Snapshot`'s `material` block reports it as `shader` (`null` = standard).
+- `Debug.Snapshot`'s `material` block reports it as `shader` (`null` = standard),
+  and the runtime param values set on it as `shader_params`.
+
+### Runtime shader params
+
+Some surface block params are **runtime** (see `Shader.md`): instead of being baked
+into the shader, they are read from the material, so a script drives them every
+frame — Unity's `material.SetFloat`. A hit flash that fades, a rim that glows with a
+shield's charge:
+
+```lua
+Shader.Bake({ pass = "surface", name = "enemy_hit",
+              blocks = { { id = "toon_ramp" },
+                         { id = "hit_flash", params = { color = {1, 0.2, 0.1} } } } })
+Material.SetShader(enemy, "enemy_hit")
+
+-- on hit:
+Material.SetShaderParam(enemy, "hit_flash.amount", 1)
+-- each frame:
+local a = Material.GetShaderParam(enemy, "hit_flash.amount")
+Material.SetShaderParam(enemy, "hit_flash.amount", math.max(a - Time.deltaTime() * 10, 0))
+```
+
+- **Names** are `"<block>.<param>"`, or `"<block>.<index>.<param>"` (the block's
+  position in the recipe's `blocks`), which is required when the recipe uses that
+  block more than once. Both forms set the same value.
+- **Strict.** A param the shader bakes (`toon_ramp.steps`), a typo, or the wrong
+  number of values is an error naming it and listing the runtime params the shader
+  has. A single number fills every lane of a vector param (`color = 0.5`). The
+  material must name a baked surface shader first.
+- **Per material.** The value lives on the material asset (`shader_params`), so it
+  saves with the scene and every entity sharing the material sees it. Play mode
+  changes the play copy, so a flash in play never leaks into the edit scene. To flash
+  one enemy alone, give it its own material.
+- **Cheap.** A change is a small buffer write the next frame draws with. Nothing is
+  re-baked or recompiled.
+- A param you never set draws with its baked default (the recipe's value, else the
+  block's). The inspector's Material card lists the runtime params under *Shader*.

@@ -104,11 +104,14 @@ the same game clock (it reads the post params' `camera_pos.w`, bound at binding 
 into the lit color; postfx blocks grade the sampled scene color.
 
 - **Surface** (forward-pass fragment looks): `toon_ramp {steps}` (cel banding);
-  `fresnel_rim {color, power, strength}` (view-dependent rim glow); `tint {color}`;
-  `emissive_boost {color, strength}` (glow masked by the emissive map);
+  `fresnel_rim {color*, power, strength*}` (view-dependent rim glow); `tint
+  {color*}`; `emissive_boost {color*, strength*}` (glow masked by the emissive map);
   `uv_scroll_stripes {frequency, strength, speed}` (stripes scrolling along V at
   `speed` stripes per game second); `desaturate
-  {amount}`; `height_fog {color, top, bottom}` (world-height fog blend).
+  {amount*}`; `height_fog {color, top, bottom}` (world-height fog blend);
+  `hit_flash {color*, amount*}` (blend toward a flash color; `amount` 0 = off, 1 =
+  solid, default 0 — hit feedback driven from a script).
+  Params marked `*` are **runtime**: see below.
   Every surface variant is also fogged by the **scene fog** (`Graphics.SetFog*`,
   #437), applied after the blocks; `height_fog` is a per-material *look* layered
   under it (a glowing floor mist on one material), not a substitute for scene fog.
@@ -118,6 +121,16 @@ into the lit color; postfx blocks grade the sampled scene color.
   blocks: the volume already grades them in HDR (`Graphics.SetExposure`,
   `SetSaturation`, `SetContrast`), so a recipe naming them is refused as an unknown
   block (#397).
+
+### Runtime params (surface)
+
+A surface param marked **runtime** above is not baked as a constant: the shader
+reads it from the material, and `Material.SetShaderParam(id, "hit_flash.amount", 1)`
+changes it with no re-bake (see `Material.md`). Its recipe value is the default a
+material starts from. A bake also writes `<name>.params.json` beside the module,
+recording each runtime param's name and slot, so the engine resolves names without
+reading WGSL. One shader holds at most 16 runtime params; more is a bake error.
+Postfx params are never runtime (a postfx pass has no material).
 
 Example — bake a stylized surface variant and load it by name:
 

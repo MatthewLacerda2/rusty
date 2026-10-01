@@ -111,6 +111,7 @@ pub const BLOCKS: &[Block] = &[
                 name: "speed",
                 default: 1.0,
                 arity: 1,
+                runtime: false,
             },
         ],
         helper: "fn srf_uv_scroll_stripes(c: vec3<f32>, in: VertexOutput, frequency: f32, strength: f32, speed: f32) -> vec3<f32> {\n    let s = sin((in.tex_coords.y * frequency + camera.time * speed) * 6.2831853);\n    let band = 1.0 - strength * (0.5 - 0.5 * s);\n    return c * band;\n}",
