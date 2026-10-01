@@ -19,6 +19,11 @@ The north star is a game on par with **F.E.A.R.** (2005) or **Trepang2** — vis
 first-person combat carried by reactive enemy AI. The engine is "done enough" when an
 agent could build a shooter of that caliber on it.
 
+The second yardstick is an **offline Counter-Strike: Global Offensive** — bots,
+bomb/defuse rounds, a buy menu and HUD, raycast gunplay with spread, recoil and
+wallbangs, grenades, and multi-floor maps with jump spots, drops and ladders. rusty is
+**offline only: no multiplayer, no networking, no online services — ever.**
+
 ## What it is
 
 - **Unity-shaped.** Entities each have a `Transform` plus optional components (`Mesh`,

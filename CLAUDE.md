@@ -20,6 +20,13 @@ every decision serves: the engine is "good enough" when an agent could build a s
 of that caliber on it. Keep this goal in mind when weighing features, architecture, and
 craft — it is the reason the gates below are strict.
 
+The second yardstick is an **offline CS:GO**: bots, bomb/defuse rounds, a buy menu and
+HUD, raycast gunplay with spread, recoil and wallbangs, grenades (smoke, flash, HE,
+molotov), and multi-floor maps with jump spots, drops and ladders. Trepang2 stays the
+quality bar; CS:GO is the tight, mechanical bar beside it. Both are **single-player and
+offline: no multiplayer, no networking, no online services — ever.** Netcode and
+replication never qualify as foundation work.
+
 ## Start here
 - **README.md** — what the engine is and what you can do with it.
 - **docs/** — `linting.md` (the gate), `testing.md`, `api/` (the Lua API game scripts
