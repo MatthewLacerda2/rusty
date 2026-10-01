@@ -21,28 +21,11 @@ use std::rc::Rc;
 
 use glam::Vec2;
 
-use super::mesh::{build_canvas_meshes, CanvasMesh, UiVertex};
+use super::mesh::{build_canvas_meshes, CanvasMesh};
 use super::world::{CanvasPlace, WorldUniforms};
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
 use crate::ui::{CanvasSpace, UiLayout, UiView};
-
-/// The vertex buffer layout matching `ui.wgsl`'s `VertexIn`.
-pub(crate) fn vertex_layout() -> wgpu::VertexBufferLayout<'static> {
-    const ATTRIBS: [wgpu::VertexAttribute; 6] = wgpu::vertex_attr_array![
-        0 => Float32x2, // pos (NDC)
-        1 => Float32x2, // uv
-        2 => Float32x4, // color
-        3 => Float32x4, // outline colour (text)
-        4 => Float32x4, // glow colour (text)
-        5 => Float32x4, // sdf: [is text, dilate, outline, glow]
-    ];
-    wgpu::VertexBufferLayout {
-        array_stride: std::mem::size_of::<UiVertex>() as wgpu::BufferAddress,
-        step_mode: wgpu::VertexStepMode::Vertex,
-        attributes: &ATTRIBS,
-    }
-}
 
 /// One canvas's GPU copy of its mesh, and where it draws this frame.
 pub(super) struct CanvasGpu {
@@ -221,9 +204,6 @@ impl Renderer {
         size: winit::dpi::PhysicalSize<u32>,
     ) {
         let ui = &self.ui_renderer;
-        let Some(pipeline) = ui.pipelines.get(&format) else {
-            return;
-        };
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -244,7 +224,7 @@ impl Renderer {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            pass.set_pipeline(pipeline);
+            let mut bound = None;
             let screen = cache
                 .canvases
                 .iter()
@@ -252,6 +232,13 @@ impl Renderer {
             for canvas in screen {
                 pass.set_vertex_buffer(0, canvas.buffer.slice(..));
                 for batch in &canvas.mesh.batches {
+                    if bound != Some(batch.blend) {
+                        let Some(pipeline) = ui.pipelines.get(&(format, batch.blend)) else {
+                            continue;
+                        };
+                        pass.set_pipeline(pipeline);
+                        bound = Some(batch.blend);
+                    }
                     pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
                     let s = batch
                         .clip

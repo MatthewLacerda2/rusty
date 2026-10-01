@@ -10,6 +10,9 @@
 //! - `geometry` — one `Image`'s triangles per image type (pure).
 //! - `mesh` — the layout → one vertex list per canvas, split into batches on
 //!   texture / clip changes, with CanvasGroup alpha and RectMask clips (pure).
+//! - `vertex` — the one vertex format every graphic shares, and fill/gradient encoding.
+//! - `shape` — a `Shape`'s SDF quads: shadow, glow, body (#425).
+//! - `blend` — the blend modes as GPU blend state (#425).
 //! - `text` — SDF glyph generation, the per-font atlases and text quads.
 //! - `draw` — the per-view cache (re-upload only a canvas whose geometry
 //!   changed) and the screen pass itself.
@@ -20,15 +23,19 @@
 //! alpha: the pass draws through a non-sRGB *view* of the frame's sRGB colour
 //! target (see `docs/ui.md` for why this beats an in-shader encode).
 
+pub(crate) mod blend;
 pub(crate) mod draw;
 pub(crate) mod geometry;
 pub(crate) mod mesh;
+pub(crate) mod shape;
 pub(crate) mod text;
+pub(crate) mod vertex;
 pub(crate) mod world;
 
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::components::UiBlend;
 use crate::render::gpu::bind_layouts;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::GpuTexture;
@@ -41,7 +48,8 @@ pub struct UiRenderer {
     shader: wgpu::ShaderModule,
     layout: wgpu::BindGroupLayout,
     pipeline_layout: wgpu::PipelineLayout,
-    pipelines: HashMap<wgpu::TextureFormat, wgpu::RenderPipeline>,
+    /// One pipeline per (target format, blend mode).
+    pipelines: HashMap<(wgpu::TextureFormat, UiBlend), wgpu::RenderPipeline>,
     /// Linear, clamped, base-level-only: UI sprites are drawn near 1:1, so mips
     /// would only blur them.
     sampler: wgpu::Sampler,
@@ -96,26 +104,38 @@ impl UiRenderer {
         }
     }
 
-    /// Build the pipeline for `format` if absent: premultiplied-alpha blending, no
-    /// depth, no culling (a clockwise radial fill winds the other way).
+    /// Build the pipelines for `format` if absent, one per blend mode: premultiplied
+    /// colour, no depth, no culling (a clockwise radial fill winds the other way).
     fn ensure_pipeline(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat) {
-        if self.pipelines.contains_key(&format) {
-            return;
+        for mode in UiBlend::ALL {
+            if !self.pipelines.contains_key(&(format, mode)) {
+                let pipeline = self.build_pipeline(device, format, mode);
+                self.pipelines.insert((format, mode), pipeline);
+            }
         }
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+    }
+
+    /// The screen pipeline drawing into `format` with `mode`.
+    fn build_pipeline(
+        &self,
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        mode: UiBlend,
+    ) -> wgpu::RenderPipeline {
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("UI Pipeline"),
             layout: Some(&self.pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &self.shader,
                 entry_point: "vs_main",
-                buffers: &[draw::vertex_layout()],
+                buffers: &[vertex::vertex_layout()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &self.shader,
                 entry_point: "fs_main",
                 targets: &[Some(wgpu::ColorTargetState {
                     format,
-                    blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+                    blend: Some(blend::blend_state(mode)),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
@@ -123,8 +143,7 @@ impl UiRenderer {
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
-        });
-        self.pipelines.insert(format, pipeline);
+        })
     }
 
     /// The bind group a batch drawing `source` samples (white when it is not loaded).

@@ -13,6 +13,7 @@ use glam::{Vec2, Vec4};
 use super::atlas::FontAtlases;
 use super::sdf::{BASE_SIZE, SPREAD};
 use crate::components::TextComponent;
+use crate::render::ui::vertex::MODE_TEXT;
 use crate::ui::text::{layout_text, PlacedGlyph};
 
 /// Synthesized italic's shear (x per unit of height above the baseline, ≈ 11°).
@@ -114,7 +115,7 @@ fn effects(text: &TextComponent, g: &PlacedGlyph) -> [f32; 4] {
     };
     let outline = (text.outline_width * BASE_SIZE).min(reach - dilate);
     let glow = (text.glow_size * BASE_SIZE).min(reach - dilate - outline);
-    [1.0, dilate, outline, glow]
+    [MODE_TEXT, dilate, outline, glow]
 }
 
 #[cfg(test)]

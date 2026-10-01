@@ -20,6 +20,7 @@
 use glam::{Mat4, Vec2};
 
 use super::draw::UiViewCache;
+use crate::components::UiBlend;
 use crate::render::gpu::grow_buffer::GrowBuffer;
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::postfx::HDR_FORMAT;
@@ -45,11 +46,12 @@ const NO_CLIP: [f32; 4] = [-f32::MAX, -f32::MAX, f32::MAX, f32::MAX];
 /// The world pass's shared GPU state: its uniform layout and pipeline.
 pub(crate) struct WorldUiPipeline {
     layout: wgpu::BindGroupLayout,
-    pipeline: wgpu::RenderPipeline,
+    /// One per blend mode, in `UiBlend::ALL` order (#425).
+    pipelines: Vec<wgpu::RenderPipeline>,
 }
 
 impl WorldUiPipeline {
-    /// Build the pipeline: premultiplied alpha into the HDR target, depth-tested
+    /// Build the pipelines, one per blend mode: into the HDR target, depth-tested
     /// (`LessEqual`) but never written, no culling (a canvas reads from both sides).
     pub(crate) fn new(
         device: &wgpu::Device,
@@ -76,35 +78,38 @@ impl WorldUiPipeline {
             bind_group_layouts: &[texture_layout, &layout],
             push_constant_ranges: &[],
         });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("World UI Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: shader,
-                entry_point: "vs_world",
-                buffers: &[super::draw::vertex_layout()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: shader,
-                entry_point: "fs_world",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: HDR_FORMAT,
-                    blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::LessEqual,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-        });
-        Self { layout, pipeline }
+        let build = |mode| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("World UI Pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: shader,
+                    entry_point: "vs_world",
+                    buffers: &[super::vertex::vertex_layout()],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: shader,
+                    entry_point: "fs_world",
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: HDR_FORMAT,
+                        blend: Some(super::blend::blend_state(mode)),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState::default(),
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: false,
+                    depth_compare: wgpu::CompareFunction::LessEqual,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+            })
+        };
+        let pipelines = UiBlend::ALL.into_iter().map(build).collect();
+        Self { layout, pipelines }
     }
 }
 
@@ -225,8 +230,7 @@ impl Renderer {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            pass.set_pipeline(&ui.world.pipeline);
-            let mut bound = None;
+            let (mut bound, mut blend) = (None, None);
             for &(i, b, offset) in draws {
                 let canvas = view.ui.canvas(i);
                 if bound != Some(i) {
@@ -234,6 +238,10 @@ impl Renderer {
                     bound = Some(i);
                 }
                 let batch = &canvas.mesh.batches[b];
+                if blend != Some(batch.blend) {
+                    pass.set_pipeline(&ui.world.pipelines[super::blend::index(batch.blend)]);
+                    blend = Some(batch.blend);
+                }
                 pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
                 pass.set_bind_group(1, &uniforms.group, &[offset]);
                 pass.draw(batch.range.clone(), 0..1);

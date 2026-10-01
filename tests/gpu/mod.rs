@@ -38,6 +38,8 @@ mod transparent_sorting_screenshot;
 mod ui_hud_scene;
 mod ui_hud_screenshot;
 mod ui_marker_screenshot;
+mod ui_shapes_scene;
+mod ui_shapes_screenshot;
 mod ui_text_screenshot;
 mod world_ui_fog_screenshot;
 mod world_ui_mask_screenshot;

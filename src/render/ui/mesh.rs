@@ -2,11 +2,11 @@
 //!
 //! GPU-free: [`build_canvas_meshes`] walks the layout in draw order (canvas
 //! `sort_order`, then hierarchy pre-order) and emits every visible `Image` and
-//! `Text` (an entity with both draws the image, then the text) as triangles in
+//! `Shape` and `Text` (an entity with several draws them in that order) as triangles in
 //! normalized device coordinates, tagged with what it samples and how it is
 //! clipped. Consecutive graphics sharing a source (solid, a texture, a font's
-//! atlas) and a clip merge into one [`UiBatch`]; a change of either starts a new
-//! one — so a HUD of solid bars is one draw call per canvas however many bars it
+//! atlas), a blend mode (#425) and a clip merge into one [`UiBatch`]; a change of
+//! any starts a new one — so a HUD of solid bars is one draw call per canvas however many bars it
 //! has, and a label is one draw call however many glyphs it has.
 //!
 //! Inherited state rides down the walk (parents precede children in the layout):
@@ -22,29 +22,17 @@
 
 use std::collections::HashMap;
 
-use bytemuck::Zeroable;
 use glam::{Vec2, Vec4};
 
 use super::geometry::image_triangles;
+use super::shape::push_shape;
 use super::text::atlas::FontAtlases;
 use super::text::emit::push_text;
+pub(crate) use super::vertex::UiVertex;
+use super::vertex::{Fill, MODE_IMAGE};
+use crate::components::UiBlend;
 use crate::ecs::World;
 use crate::ui::{UiLayout, UiRect};
-
-/// One UI vertex: NDC position, texture coordinate (v down, as the GPU samples) and
-/// the straight-alpha display-space tint (group alpha folded in). Text vertices
-/// also carry their outline and glow colours and the SDF parameters
-/// (`[1, dilate, outline, glow]` in atlas pixels); an image's are zero.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct UiVertex {
-    pub(crate) pos: [f32; 2],
-    pub(crate) uv: [f32; 2],
-    pub(crate) color: [f32; 4],
-    pub(crate) outline: [f32; 4],
-    pub(crate) glow: [f32; 4],
-    pub(crate) sdf: [f32; 4],
-}
 
 /// What a batch samples.
 #[derive(Clone, Debug, PartialEq)]
@@ -78,11 +66,13 @@ impl Scissor {
     }
 }
 
-/// A run of vertices drawn with one source and one clip.
+/// A run of vertices drawn with one source, one blend mode and one clip.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct UiBatch {
     /// What it samples.
     pub(crate) source: UiSource,
+    /// How it composites (#425): each mode is its own pipeline.
+    pub(crate) blend: UiBlend,
     /// The scissor, or `None` for the whole target.
     pub(crate) clip: Option<Scissor>,
     /// The vertex range in the canvas's vertex list.
@@ -153,6 +143,7 @@ pub(crate) fn build_canvas_meshes(
         }
         if let Some(mesh) = meshes.last_mut() {
             push_image(mesh, &frame, id, rect, here);
+            push_shape(mesh, &frame, id, rect, here);
             push_text(mesh, &frame, id, rect, here, atlases);
         }
     }
@@ -215,24 +206,29 @@ fn push_image(mesh: &mut CanvasMesh, frame: &Frame, id: u32, rect: &UiRect, stat
         return;
     };
     // A Selectable's ColorTint (#420) multiplies in, like the group alpha.
-    let color = image.color * image.state_tint * Vec4::new(1.0, 1.0, 1.0, state.alpha);
-    let Some(clip) = visible_clip(state, color.w, frame.screen) else {
+    let tint = image.state_tint * Vec4::new(1.0, 1.0, 1.0, state.alpha);
+    let flat = image.gradient.is_none().then_some(image.color);
+    let fill = Fill::new(image.gradient.as_ref(), flat.unwrap_or(Vec4::ONE) * tint);
+    let Some(clip) = visible_clip(state, fill.max_alpha(), frame.screen) else {
         return;
     };
+    let size = rect.rect.1;
     let tex = image.shown_texture().and_then(frame.tex_size);
-    let tris = image_triangles(&image, rect.rect.1, tex);
+    let tris = image_triangles(&image, size, tex);
     let [bl, tl, _, br] = rect.corners;
     let start = mesh.vertices.len() as u32;
-    mesh.vertices.extend(tris.iter().map(|&(p, uv)| UiVertex {
-        pos: to_ndc(bl + (br - bl) * p.x + (tl - bl) * p.y, rect, frame.screen),
-        uv: [uv.x, 1.0 - uv.y],
-        color: color.to_array(),
-        ..Zeroable::zeroed()
+    let half = size * 0.5;
+    mesh.vertices.extend(tris.iter().map(|&(p, uv)| {
+        let pos = to_ndc(bl + (br - bl) * p.x + (tl - bl) * p.y, rect, frame.screen);
+        let local = ((p - 0.5) * size).extend(half.x).extend(half.y);
+        let mut v = fill.vertex(pos, [uv.x, 1.0 - uv.y], local.to_array());
+        v.sdf[0] = MODE_IMAGE;
+        v
     }));
     let source = image
         .shown_texture()
         .map_or(UiSource::Solid, |t| UiSource::Texture(t.to_string()));
-    close_batch(mesh, source, clip, start);
+    close_batch(mesh, (source, image.blend), clip, start);
 }
 
 /// The clip a graphic draws under, or `None` when it draws nothing (hidden, fully
@@ -252,21 +248,24 @@ pub(super) fn to_ndc(canvas: Vec2, rect: &UiRect, screen: Vec2) -> [f32; 2] {
     (canvas * rect.scale_factor / screen * 2.0 - Vec2::ONE).to_array()
 }
 
-/// Close the vertices from `start` on into the last batch when it shares `source`
-/// and `clip`, else into a new one.
+/// Close the vertices from `start` on into the last batch when it shares `source`,
+/// blend mode and `clip`, else into a new one.
 pub(super) fn close_batch(
     mesh: &mut CanvasMesh,
-    source: UiSource,
+    (source, blend): (UiSource, UiBlend),
     clip: Option<Scissor>,
     start: u32,
 ) {
     let end = mesh.vertices.len() as u32;
     match mesh.batches.last_mut() {
-        Some(b) if b.source == source && b.clip == clip && b.range.end == start => {
+        Some(b)
+            if b.source == source && b.blend == blend && b.clip == clip && b.range.end == start =>
+        {
             b.range.end = end
         }
         _ if end > start => mesh.batches.push(UiBatch {
             source,
+            blend,
             clip,
             range: start..end,
         }),
