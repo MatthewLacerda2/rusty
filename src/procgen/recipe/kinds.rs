@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// A blend mode for the [`OpKind::Mix`] op — the common Blender / Photoshop set.
+/// A blend mode for the [`super::OpKind::Mix`] op — the common Blender / Photoshop set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BlendMode {
@@ -18,7 +18,7 @@ pub enum BlendMode {
     Difference,
 }
 
-/// A scalar math operation for [`OpKind::Math`].
+/// A scalar math operation for [`super::OpKind::Math`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MathOp {
@@ -34,7 +34,7 @@ pub enum MathOp {
     Sqrt,
 }
 
-/// Which kind of noise [`OpKind::Noise`] produces.
+/// Which kind of noise [`super::OpKind::Noise`] produces.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NoiseKind {
@@ -48,7 +48,7 @@ pub enum NoiseKind {
     Turbulence,
 }
 
-/// Which kind of wave [`OpKind::Wave`] produces.
+/// Which kind of wave [`super::OpKind::Wave`] produces.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WaveKind {
@@ -58,7 +58,7 @@ pub enum WaveKind {
     Rings,
 }
 
-/// Which kind of gradient [`OpKind::Gradient`] produces.
+/// Which kind of gradient [`super::OpKind::Gradient`] produces.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GradientKind {
