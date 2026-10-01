@@ -100,9 +100,11 @@ pub const OPS: &[OpInfo] = &[
         "generator",
         0,
         &[
-            choice("kind", &["perlin", "fbm"]),
+            choice("kind", &["perlin", "fbm", "ridged", "turbulence"]),
             req("scale", "number"),
             opt("octaves", "integer", Lit::Integer(1)),
+            opt("lacunarity", "number", Lit::Number(2.0)),
+            opt("gain", "number", Lit::Number(0.5)),
         ],
     ),
     op(
@@ -113,8 +115,9 @@ pub const OPS: &[OpInfo] = &[
             req("scale", "number"),
             OpParam {
                 default: Some(Lit::Text("distance")),
-                ..choice("output", &["distance", "cells"])
+                ..choice("output", &["distance", "cells", "f2", "edges"])
             },
+            opt("randomness", "number", Lit::Number(1.0)),
         ],
     ),
     op(
@@ -192,6 +195,7 @@ pub const OPS: &[OpInfo] = &[
     op("bump_to_normal", "vector", 1, &[req("strength", "number")]),
     op("combine_rgb", "vector", 3, &[]),
     op("separate_rgb", "vector", 1, &[req("channel", "integer")]),
+    op("warp", "vector", 2, &[req("strength", "number")]),
     op(
         "math",
         "math",

@@ -6,7 +6,7 @@
 use rusty::procgen::recipe::{Node, NoiseKind, OpKind, TextureRecipe};
 use rusty::procgen::{evaluate, Image};
 
-fn node(id: &str, op: OpKind, inputs: &[&str]) -> Node {
+pub fn node(id: &str, op: OpKind, inputs: &[&str]) -> Node {
     let inputs = inputs.iter().map(|s| s.to_string()).collect();
     Node {
         id: id.into(),
@@ -54,7 +54,7 @@ fn mean_diff(a: &Image, b: &Image) -> f32 {
     sum / (a.pixels().len() * 3) as f32
 }
 
-fn assert_resolution_independent(label: &str, nodes: &[Node], tolerance: f32) {
+pub fn assert_resolution_independent(label: &str, nodes: &[Node], tolerance: f32) {
     let low = bake(nodes, 128);
     let high = downsample(&bake(nodes, 512), 4);
     let d = mean_diff(&low, &high);
@@ -71,6 +71,8 @@ fn perlin(scale: f32) -> Node {
             kind: NoiseKind::Perlin,
             scale,
             octaves: 1,
+            lacunarity: 2.0,
+            gain: 0.5,
         },
         &[],
     )

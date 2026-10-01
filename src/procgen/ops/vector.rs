@@ -2,7 +2,7 @@
 //!
 //! These reshape the *domain* or reinterpret channels: [`mapping`] resamples the
 //! input under an affine domain transform (with wrap, so it stays tiling),
-//! [`bump_to_normal`] bakes a tangent-space normal map from a height field, and the
+//! [`warp`] displaces one input's domain by another's, [`bump_to_normal`] bakes a tangent-space normal map from a height field, and the
 //! combine/separate pair shuttle between grayscale channels and an RGB image.
 
 use super::super::image_buf::{Image, Rgba};
@@ -37,6 +37,18 @@ pub fn mapping(
             rx * sx + 0.5 + translation[0],
             ry * sy + 0.5 + translation[1],
         )
+    })
+}
+
+/// Domain warp: sample `a` at each point displaced by `by`'s red/green (centred on
+/// 0.5, so mid-grey moves nothing) times `strength` in tile units. Both reads are
+/// bilinear and wrapped, so two tiling inputs give a tiling, resolution-independent
+/// result (#406). A grayscale `by` (R = G) can only push along the diagonal: feed it
+/// `combine_rgb` of two independent noises for an isotropic warp.
+pub fn warp(a: &Image, by: &Image, strength: f32) -> Image {
+    Image::fill_uv(a.resolution(), |u, v| {
+        let d = by.sample_bilinear_wrapped(u, v);
+        a.sample_bilinear_wrapped(u + strength * (d[0] - 0.5), v + strength * (d[1] - 0.5))
     })
 }
 

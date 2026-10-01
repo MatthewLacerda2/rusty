@@ -62,6 +62,10 @@ pub enum NoiseKind {
     Perlin,
     /// Fractional Brownian motion: several Perlin octaves summed.
     Fbm,
+    /// `1 − |n|`, squared, summed over octaves: sharp crests (rock veins, scratches).
+    Ridged,
+    /// `|n|` summed over octaves: billowy creases (smoke, grime).
+    Turbulence,
 }
 
 /// Which kind of wave [`OpKind::Wave`] produces.
@@ -96,6 +100,10 @@ pub enum VoronoiOutput {
     Distance,
     /// A flat random color per cell.
     Cells,
+    /// Distance to the second-nearest cell point (F2).
+    F2,
+    /// `F2 − F1`: ~0 on cell borders — cracks, dried mud, cobble outlines.
+    Edges,
 }
 
 /// One stop in a [`ColorRamp`](OpKind::ColorRamp): position in `[0, 1]` and its color.
@@ -118,18 +126,28 @@ pub enum OpKind {
     Constant { color: [f32; 4] },
     // Periodic params (`scale`, `frequency`, `rows`/`cols`, `tiles`) are whole counts
     // of periods per tile: fractional values round at evaluation (#392).
-    /// Perlin / fBM gradient noise (grayscale, written to RGB, alpha 1).
+    /// Gradient noise (grayscale, written to RGB, alpha 1). The fBM family (`fbm`,
+    /// `ridged`, `turbulence`) sums `octaves`, each `lacunarity`× the previous
+    /// frequency (rounded to a whole count, so every octave tiles) and `gain`× its
+    /// amplitude; `perlin` is one octave.
     Noise {
         kind: NoiseKind,
         scale: f32,
         #[serde(default = "one_u32")]
         octaves: u32,
+        #[serde(default = "two")]
+        lacunarity: f32,
+        #[serde(default = "half")]
+        gain: f32,
     },
-    /// Voronoi / Worley cellular pattern.
+    /// Voronoi / Worley cellular pattern; `randomness` jitters each cell's point
+    /// (0 = a regular grid, 1 = anywhere in its cell).
     Voronoi {
         scale: f32,
         #[serde(default)]
         output: VoronoiOutput,
+        #[serde(default = "one_f32")]
+        randomness: f32,
     },
     /// Linear or radial gradient ramp (grayscale).
     Gradient { kind: GradientKind },
@@ -186,6 +204,9 @@ pub enum OpKind {
     CombineRgb,
     /// Pull one channel of the input out as grayscale. `channel` 0=R,1=G,2=B,3=A.
     SeparateRgb { channel: u8 },
+    /// Domain warp (2 inputs): sample input A displaced by input B's R/G, centred
+    /// on 0.5 and scaled by `strength` in **tile units**; wrapped, so it tiles.
+    Warp { strength: f32 },
 
     // ---- Converter / math ----
     /// Per-channel scalar math, RHS is the constant `value`.
@@ -214,6 +235,18 @@ fn yes() -> bool {
 
 fn one_u32() -> u32 {
     1
+}
+
+fn one_f32() -> f32 {
+    1.0
+}
+
+fn two() -> f32 {
+    2.0
+}
+
+fn half() -> f32 {
+    0.5
 }
 
 fn default_mortar() -> f32 {

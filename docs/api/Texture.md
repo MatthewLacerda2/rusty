@@ -83,8 +83,14 @@ for _, o in ipairs(Texture.Ops()) do
 end  -- rows number nil / cols number nil / mortar number 0.05
 ```
 
-- **Generators** (no inputs): `constant {color}`; `noise {kind="perlin"|"fbm", scale,
-  octaves}`; `voronoi {scale, output="distance"|"cells"}`; `gradient
+- **Generators** (no inputs): `constant {color}`; `noise
+  {kind="perlin"|"fbm"|"ridged"|"turbulence", scale, octaves=1, lacunarity=2, gain=0.5}`
+  (`ridged` is `1 − |n|` squared — rock veins, scratches; `turbulence` is `|n|` —
+  smoke, grime; the fBM family stacks `octaves`, each `lacunarity`× the frequency and
+  `gain`× the amplitude of the last; `perlin` is one octave); `voronoi {scale,
+  output="distance"|"cells"|"f2"|"edges", randomness=1}` (`f2` is the distance to the
+  second-nearest point, `edges` is F2 − F1 — ~0 on cell borders: cracks, dried mud,
+  cobble outlines; `randomness` 0 is a regular grid, 1 full jitter); `gradient
   {kind="linear"|"linear_tiling"|"radial"}`; `wave {kind="bands"|"rings", frequency}`;
   `brick {rows, cols, mortar}`; `checker {tiles, color_a, color_b}`; `white_noise`.
 - **Color** (1 input, 2 for `mix`): `color_ramp {stops}`; `mix {mode, factor}` with
@@ -94,7 +100,10 @@ end  -- rows number nil / cols number nil / mortar number 0.05
 - **Vector / normal**: `mapping {scale=[x,y], rotation, translation=[x,y],
   tiling=true}` (bilinear, wrapped resample; `rotation` in turns); `bump_to_normal
   {strength}` (height → tangent-space normal); `combine_rgb` (three grayscale inputs →
-  RGB); `separate_rgb {channel=0..3}`.
+  RGB); `separate_rgb {channel=0..3}`; `warp {strength}` (2 inputs: samples input 1
+  displaced by input 2's R/G, centred on 0.5 so mid-grey moves nothing; `strength` is in
+  tile units; feed input 2 a `combine_rgb` of two different noises — a grayscale one has
+  R = G and only pushes along the diagonal).
 - **Converter / math**: `math {func, value}` with `func` ∈
   `add/subtract/multiply/divide/power/min/max/abs/fract/sqrt`; `map_range {from_min,
   from_max, to_min, to_max}`; `clamp {min, max}`; `rgb_to_bw`.
@@ -108,6 +117,7 @@ field stays a number, so `4.5` is accepted — it bakes as `5`):
 | Op | Param | Rounds to |
 |---|---|---|
 | noise, voronoi | `scale` | nearest whole number ≥ 1 |
+| noise (fBM family) | each octave's `scale × lacunarity^octave` | nearest whole number ≥ 1 (so a fractional `lacunarity` still tiles) |
 | wave | `frequency` | nearest whole number ≥ 1 |
 | brick | `cols` | nearest whole number ≥ 1 |
 | brick | `rows` | nearest **even** number ≥ 2 (the half-brick offset must close at the wrap) |
@@ -128,6 +138,8 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
 
 - `blur.radius` is a **fraction of the tile width** — `0.01` is 1% of the texture;
   the pixel radius is `round(radius × resolution)`, capped at half the tile.
+- `warp.strength` is a displacement in tiles: a channel at 1.0 pushes the read
+  `strength / 2` of a tile.
 - `bump_to_normal.strength` scales the slope measured in tile units (height change
   across one whole tile), not per pixel.
 - `white_noise` is the exception: its grain is one pixel by definition.

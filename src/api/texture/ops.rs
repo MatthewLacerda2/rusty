@@ -87,6 +87,9 @@ mod tests {
             .unwrap();
         assert_eq!(count, crate::procgen::recipe::OPS.len());
         assert_eq!((category.as_str(), inputs), ("generator", 0));
-        assert_eq!((octaves, required, kinds.as_str()), (1, true, "perlin|fbm"));
+        assert_eq!(
+            (octaves, required, kinds.as_str()),
+            (1, true, "perlin|fbm|ridged|turbulence")
+        );
     }
 }
