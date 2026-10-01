@@ -33,17 +33,23 @@ impl Renderer {
             .write_buffer(&self.shadow_uniform_buffer, 0, bytemuck::bytes_of(&uniform));
         self.shadow_renderer.instancing = self.instancing;
         self.shadow_renderer.update_cascades(&self.queue, fitted);
+        self.shadow_renderer
+            .set_time(&self.queue, scene.shader_time);
 
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Shadow Encoder"),
             });
+        let clips = self.shadow_clips(scene);
         let frame = CasterFrame {
             device: &self.device,
             queue: &self.queue,
             scene,
             gpu_meshes: &self.gpu_meshes,
+            clips: &clips,
+            materials: &self.materials,
+            surfaces: &self.surface_shaders,
         };
         self.shadow_renderer.render(&mut encoder, &frame, lod);
         self.queue.submit(std::iter::once(encoder.finish()));

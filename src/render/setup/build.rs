@@ -81,7 +81,7 @@ impl GpuResources {
         let global =
             create_global_bindings(device, &camera_lighting_layout, &textures.default_texture);
         let ssao = ssao::SsaoRenderer::new(device, queue, &mut registry);
-        let shadows = create_shadow_system(device, &mut registry, &ssao.no_ao);
+        let shadows = create_shadow_system(device, &mut registry, &ssao.no_ao, &textures);
         let forward = create_forward_passes(
             device,
             &camera_lighting_layout,
@@ -212,9 +212,10 @@ fn create_shadow_system(
     device: &wgpu::Device,
     registry: &mut ShaderRegistry,
     no_ao: &wgpu::TextureView,
+    textures: &Textures,
 ) -> ShadowSystem {
     let layout = bind_layouts::create_shadow_layout(device);
-    let renderer = shadows::ShadowRenderer::new(device, registry);
+    let renderer = shadows::ShadowRenderer::new(device, registry, &textures.material_layout);
 
     let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Shadow Uniform Buffer"),

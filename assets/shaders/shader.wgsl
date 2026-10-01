@@ -358,9 +358,9 @@ fn parallax_correct(world_pos: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
 
 // The SSAO depth prepass (#436): depth only, so it writes no colour. Cutout texels
 // are clipped as `fs_main` clips them, and unlit draws (gizmos, grids) are skipped:
-// neither should cast occlusion.
-@fragment
-fn fs_prepass(in: VertexOutput) {
+// neither should cast occlusion. A surface variant whose blocks cut fragments
+// (`dissolve`) adds `fs_prepass_cut`, which runs its cuts and then this (#648).
+fn prepass_clip(in: VertexOutput) {
     var alpha = entity.color_tint.a;
     if (entity.use_texture == 1u) {
         alpha *= textureSample(t_diffuse, s_diffuse, in.tex_coords).a;
@@ -368,6 +368,79 @@ fn fs_prepass(in: VertexOutput) {
     if (entity.is_lit == 0u || (entity.use_cutout == 1u && alpha < entity.alpha_cutoff)) {
         discard;
     }
+}
+
+@fragment
+fn fs_prepass(in: VertexOutput) {
+    prepass_clip(in);
+}
+
+// ---- The shadow pass (#435, #648) ----
+// The cascades' depth is drawn from this module too, so a surface variant carries
+// its own shadow entry points. Its resources sit at bindings the forward pass leaves
+// free — group 0 binding 6, group 1 binding 3 — and share `bones` (group 1 binding 1)
+// with it, so one module holds both without a clash. Group 2 is the material's, as
+// in the forward pass: only the clipping pipelines bind it.
+
+struct ShadowLight {
+    light_space: mat4x4<f32>,
+};
+
+// The cascade being drawn: one matrix per cascade, picked by dynamic offset.
+@group(0) @binding(6)
+var<uniform> shadow_light: ShadowLight;
+
+// One caster (#470): its world matrix, where its joint palette starts in `bones`
+// (#599; 0, the shared identity, for a mesh with no skin), and its cutout alpha test
+// (#648): the albedo map's alpha when `use_texture == 1` (a cutout's tint alpha is
+// always 1), clipped below `alpha_cutoff` (0 for a material that does not clip).
+// Mirrors `CasterData` (src/render/passes/shadows/casters/buffer.rs) byte-for-byte.
+struct Caster {
+    model: mat4x4<f32>,
+    bone_base: u32,
+    alpha_cutoff: f32,
+    use_texture: u32,
+    _pad0: u32,
+};
+
+// Every caster, one per instance: a draw covers a run of casters sharing one mesh
+// (and material, when it clips), indexed by `instance_index`.
+@group(1) @binding(3)
+var<storage, read> casters: array<Caster>;
+
+// A caster's vertex in the cascade's light space. Only what a clip reads is filled:
+// the UVs and world position; the normal and tangent stay zero.
+@vertex
+fn vs_shadow(model: VertexInput, @builtin(instance_index) instance: u32) -> VertexOutput {
+    let caster = casters[instance];
+    let joints = model.joint_indices + vec4<u32>(caster.bone_base);
+    let skin = blend_joints(
+        bones[joints.x], bones[joints.y], bones[joints.z], bones[joints.w],
+        model.joint_weights,
+    );
+    let world = caster.model * skin * vec4<f32>(model.position, 1.0);
+    var out: VertexOutput;
+    out.clip_position = shadow_light.light_space * world;
+    out.world_position = world.xyz;
+    out.tex_coords = model.tex_coords;
+    out.instance = instance;
+    return out;
+}
+
+// A cutout caster's shadow is clipped as its surface is (#648). The albedo is sampled
+// unconditionally: `use_texture` is per instance, so a branch on it is not uniform.
+fn shadow_clip(in: VertexOutput) {
+    let caster = casters[in.instance];
+    let texel = textureSample(t_diffuse, s_diffuse, in.tex_coords).a;
+    let alpha = select(1.0, texel, caster.use_texture == 1u);
+    if (alpha < caster.alpha_cutoff) {
+        discard;
+    }
+}
+
+@fragment
+fn fs_shadow(in: VertexOutput) {
+    shadow_clip(in);
 }
 
 @fragment

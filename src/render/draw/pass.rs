@@ -228,9 +228,7 @@ impl Renderer {
                 continue;
             };
             if bound != Some(batch.key.pipeline) {
-                if let Some(pipeline) = self.surface_shaders.pick(solid_pass, batch.key.pipeline) {
-                    render_pass.set_pipeline(pipeline);
-                }
+                render_pass.set_pipeline(self.surface_shaders.pick(solid_pass, batch.key.pipeline));
                 bound = Some(batch.key.pipeline);
             }
             let offsets = DrawBuffers::offsets(batch.uniform_slot);

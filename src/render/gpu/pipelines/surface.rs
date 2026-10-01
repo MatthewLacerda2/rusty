@@ -25,16 +25,19 @@
 //! the slot stale, and the next draw that names it rebuilds — the agent's bake → look
 //! → iterate loop works in a live session.
 //!
-//! **Depth prepass.** Variants ride the standard SSAO prepass (#436): their `vs_main`
-//! is the forward one verbatim and blocks only restyle colour, so depth is identical.
-//! The shadow pass is likewise unaffected. A block that `discard`s (`dissolve`, #400)
-//! cuts the colour pass only; the depth passes still see the whole mesh (#648).
+//! **Depth passes.** A variant's `vs_main` is the forward one verbatim, so one whose
+//! blocks only restyle colour rides the standard SSAO prepass (#436) and shadow
+//! pipelines. One whose blocks `discard` (`dissolve`, #400) also builds
+//! [`CutPipelines`] from its own `fs_prepass_cut` / `fs_shadow_cut` (#648): the same
+//! cut, reading the same runtime params and mask, so a dissolved fragment casts no
+//! shadow and fills no SSAO depth. Only those variants pay for a depth fragment.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::shadergen::assemble::{CUT_PREPASS, CUT_SHADOW};
 use crate::shadergen::params::ParamLayout;
 use crate::shadergen::{DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
 
@@ -47,14 +50,25 @@ pub(crate) struct SurfacePipelines {
     pub forward: wgpu::RenderPipeline,
     /// Alpha-blended solids (the transparent spec).
     pub transparent: wgpu::RenderPipeline,
+    /// The depth passes of a variant whose blocks cut fragments (#648); `None` draws
+    /// its depth with the standard pipelines.
+    pub cut: Option<CutPipelines>,
+}
+
+/// A cutting variant's depth-only pipelines (#648).
+pub(crate) struct CutPipelines {
+    /// The SSAO prepass, through the forward layout.
+    pub prepass: wgpu::RenderPipeline,
+    /// The shadow cascades, through the shadow pass's clip layout.
+    pub shadow: wgpu::RenderPipeline,
 }
 
 /// Which solids pass a batch is drawn in, carrying that pass's standard pipeline, so
 /// [`SurfaceShaders::pick`] can swap in a material's surface variant (#396).
 #[derive(Clone, Copy)]
 pub(crate) enum SolidPass<'a> {
-    /// The SSAO depth prepass: one pipeline for every batch (variants share depth).
-    Prepass,
+    /// The SSAO depth prepass; the standard pipeline unless a variant cuts (#648).
+    Prepass(&'a wgpu::RenderPipeline),
     /// Opaque solids; the standard pipeline is the view's (the preview may swap it).
     Opaque(&'a wgpu::RenderPipeline),
     /// Alpha-blended solids.
@@ -78,6 +92,8 @@ struct Slot {
 /// The pipeline cache, keyed by shader name.
 pub(crate) struct SurfaceShaders {
     layout: wgpu::PipelineLayout,
+    /// The shadow pass's clip layout (light, casters, material), for cut variants.
+    shadow_layout: wgpu::PipelineLayout,
     format: wgpu::TextureFormat,
     /// Where a name resolves, searched in order (authored workspace first).
     dirs: Vec<String>,
@@ -89,10 +105,15 @@ pub(crate) struct SurfaceShaders {
 
 impl SurfaceShaders {
     /// An empty cache whose variants render into `format` through `layout` (the
-    /// forward pipeline layout).
-    pub(crate) fn new(layout: wgpu::PipelineLayout, format: wgpu::TextureFormat) -> Self {
+    /// forward pipeline layout), and cast clipped shadows through `shadow_layout`.
+    pub(crate) fn new(
+        layout: wgpu::PipelineLayout,
+        shadow_layout: wgpu::PipelineLayout,
+        format: wgpu::TextureFormat,
+    ) -> Self {
         Self {
             layout,
+            shadow_layout,
             format,
             dirs: vec![DEFAULT_OUT_DIR.into(), ENGINE_SHADER_DIR.into()],
             index: HashMap::new(),
@@ -155,18 +176,19 @@ impl SurfaceShaders {
     }
 
     /// The pipeline pipeline `id` draws with in `pass`: its variant's, else the pass's
-    /// standard one. `None` keeps the bound pipeline (the prepass).
-    pub(crate) fn pick<'a>(
-        &'a self,
-        pass: SolidPass<'a>,
-        id: usize,
-    ) -> Option<&'a wgpu::RenderPipeline> {
+    /// standard one.
+    pub(crate) fn pick<'a>(&'a self, pass: SolidPass<'a>, id: usize) -> &'a wgpu::RenderPipeline {
         let variant = self.get(id);
         match pass {
-            SolidPass::Prepass => None,
-            SolidPass::Opaque(standard) => Some(variant.map_or(standard, |v| &v.forward)),
-            SolidPass::Transparent(standard) => Some(variant.map_or(standard, |v| &v.transparent)),
+            SolidPass::Prepass(standard) => self.cut(id).map_or(standard, |c| &c.prepass),
+            SolidPass::Opaque(standard) => variant.map_or(standard, |v| &v.forward),
+            SolidPass::Transparent(standard) => variant.map_or(standard, |v| &v.transparent),
         }
+    }
+
+    /// The depth pipelines of pipeline `id`, if its variant cuts fragments (#648).
+    pub(crate) fn cut(&self, id: usize) -> Option<&CutPipelines> {
+        self.get(id)?.cut.as_ref()
     }
 
     /// Mark every slot whose file changed (re-baked, appeared, vanished) stale.
@@ -228,24 +250,29 @@ impl SurfaceShaders {
         let source = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
         let mut composer = ShaderRegistry::composer_with_common(ENGINE_SHADER_DIR)?;
         let module = ShaderRegistry::validate_source(&mut composer, &source)?;
+        let has = |entry: &str, stage| {
+            module
+                .entry_points
+                .iter()
+                .any(|e| e.name == entry && e.stage == stage)
+        };
         for (entry, stage) in [
             ("vs_main", wgpu::naga::ShaderStage::Vertex),
             ("fs_main", wgpu::naga::ShaderStage::Fragment),
         ] {
-            if !module
-                .entry_points
-                .iter()
-                .any(|e| e.name == entry && e.stage == stage)
-            {
+            if !has(entry, stage) {
                 return Err(format!("not a surface shader (no {entry})"));
             }
         }
+        let fragment = wgpu::naga::ShaderStage::Fragment;
+        let cuts = has(CUT_PREPASS, fragment) && has(CUT_SHADOW, fragment);
         device.push_error_scope(wgpu::ErrorFilter::Validation);
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Surface Variant Shader"),
             source: wgpu::ShaderSource::Naga(std::borrow::Cow::Owned(module)),
         });
-        let pipelines = super::surface_pipelines(device, &shader, self.format, &self.layout);
+        let layouts = [&self.layout, &self.shadow_layout];
+        let pipelines = super::surface_pipelines(device, &shader, self.format, layouts, cuts);
         match pollster::block_on(device.pop_error_scope()) {
             Some(e) => Err(e.to_string()),
             None => Ok(pipelines),
