@@ -222,7 +222,15 @@ briefs cloud coders, reviews and merges. Its loop per ready pull request:
    build slot like any other. Run it from a worktree under `.claude/worktrees/`,
    never the scratchpad (a tmpfs a cold build fills, #580).
 3. A hand-back is the queue's whole report: fix a conflict or a failed check on
-   the branch (or brief its coder to), then queue it again.
+   the branch (or brief its coder to), then queue it again. A one-line semantic
+   break (a field a merge ahead added) is quickest fixed here. A many-hunk
+   conflict goes back to **the session that wrote the branch**, which still holds
+   its design: the coder's `send_later` check-in is a routine bound to its
+   persistent session, so `update` that routine's prompt with the rebase request
+   (paths, what merged, "force-push authorised"), `run` it, then disable it so its
+   scheduled fire does not repeat the request. #660 came back that way after #659,
+   27 hunks resolved in one pass with a new test for the interaction. No check-in
+   routine left: a fresh routine briefed to rebase the pushed branch.
 4. After merging: remove the worktree and its `target/`, re-read the board, and
    start the next piece of work.
 
