@@ -4,6 +4,7 @@
 
 use glam::{Vec2, Vec4};
 
+use super::super::driven_by_group;
 use super::super::fixture::{assert_rect, preferred, Fixture};
 use crate::components::{LayoutElementComponent, LayoutGroupComponent, LayoutKind, TextAlignment};
 
@@ -127,6 +128,14 @@ fn ignored_and_inactive_children_keep_their_own_anchors() {
     // Centred by their own point anchors, 10×10.
     assert_rect(f.rect(ignored), [95.0, 45.0], [10.0, 10.0]);
     assert_rect(f.rect(hidden), [95.0, 45.0], [10.0, 10.0]);
+    // Only the arranged child is driven (the editor shows it read-only, #423).
+    let w = &f.scene.world;
+    assert!(driven_by_group(w, only));
+    assert!(!driven_by_group(w, ignored) && !driven_by_group(w, hidden));
+    assert!(
+        !driven_by_group(w, f.panel),
+        "the panel's parent has no group"
+    );
 }
 
 #[test]

@@ -187,7 +187,7 @@ pub fn register<'lua, 'scope>(
     line::register(lua, scope, ctx.scene)?;
     audio::register(lua, scope, ctx.scene, ctx.audio, ctx.time, ctx.camera)?;
     canvas::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
-    rect_transform::register(lua, scope, ctx.scene)?;
+    rect_transform::register(lua, scope, ctx.scene, (ctx.screen, ctx.video))?;
     ui::register(lua, scope, ctx.scene, (ctx.screen, ctx.video), ctx.camera)?;
     ui::register_events(lua, scope, ctx)?;
     selectable::register(lua, scope, ctx.scene, ctx.event_system)?;

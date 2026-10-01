@@ -56,7 +56,7 @@ mod native;
 mod rect;
 mod sizes;
 
-pub use lookup::{rect_in, rect_of};
+pub use lookup::{driven_by_group, rect_in, rect_of};
 pub use rect::UiRect;
 pub use sizes::{element_sizes, Sizes};
 

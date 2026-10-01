@@ -4,6 +4,7 @@
 //! Element. Each is a thin client over its shared
 //! `scene::authoring` ops, the same ones the matching Lua namespace calls.
 
+pub mod anchor_presets;
 pub mod canvas;
 pub mod canvas_group;
 pub mod image;
@@ -15,9 +16,18 @@ pub mod selectable;
 pub mod text;
 
 /// Draw every UI card the entity carries, in the order Unity's inspector shows them.
-pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool) {
+/// `view` is the viewport image's size in points (the UI lays out on its pixels).
+pub fn draw(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    view: egui::Vec2,
+    is_dirty: &mut bool,
+) {
+    let px = view * ui.ctx().pixels_per_point();
+    let screen = glam::Vec2::new(px.x, px.y).round();
     canvas::draw(ui, world, id, is_dirty);
-    rect_transform::draw(ui, world, id, is_dirty);
+    rect_transform::draw(ui, world, id, screen, is_dirty);
     canvas_group::draw(ui, world, id, is_dirty);
     rect_mask::draw(ui, world, id, is_dirty);
     image::draw(ui, world, id, is_dirty);

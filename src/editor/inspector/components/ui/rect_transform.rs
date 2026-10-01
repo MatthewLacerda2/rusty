@@ -2,23 +2,33 @@
 //! size delta. Every write routes through `scene::authoring::rect_transform`. The
 //! Transform card above it keeps rotation and scale; its position is ignored for a
 //! rect-laid-out entity. The *World Anchor* section (#429) makes the element a
-//! marker pinned to a world point.
+//! marker pinned to a world point. The anchor-preset picker (#423) sits on top;
+//! an element its parent's layout group places is shown read-only, as in Unity.
 
 use egui_phosphor::regular as icon;
 
-use super::{entity_row, vec2_row};
+use super::{anchor_presets, entity_row, vec2_row};
 use crate::components::{RectTransformComponent, WorldAnchor};
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::rect_transform as rect_ops;
+use crate::ui::layout::{driven_by_group, rect_of};
 
 type Setter = fn(&mut RectTransformComponent, glam::Vec2);
 
 /// RectTransform card. A THIN client (#287): widgets read a snapshot and route
-/// each write through a shared op; remove detaches the component.
-pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool) {
+/// each write through a shared op; remove detaches the component. `screen` is the
+/// game view's pixel size, which a preset needs to keep the rect in place.
+pub fn draw(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    screen: glam::Vec2,
+    is_dirty: &mut bool,
+) {
     let Some(r) = world.rect_transform(id).map(|r| r.clone()) else {
         return;
     };
+    let driven = driven_by_group(world, id);
     let rows: [(&str, glam::Vec2, f32, Setter); 5] = [
         ("Anchor Min:", r.anchor_min, 0.01, rect_ops::set_anchor_min),
         ("Anchor Max:", r.anchor_max, 0.01, rect_ops::set_anchor_max),
@@ -39,14 +49,27 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         "Rect Transform",
         Some(&mut remove),
         |ui| {
-            for (label, value, speed, set) in rows {
-                if let Some(v) = vec2_row(ui, label, value, speed) {
+            if driven {
+                ui.label("Driven by the parent's Layout Group.");
+            }
+            ui.add_enabled_ui(!driven, |ui| {
+                if let Some(preset) = anchor_presets::picker(ui, &r) {
+                    let parent = world.parent_id(id).and_then(|p| rect_of(world, p, screen));
+                    let size = parent.map_or(glam::Vec2::ZERO, |p| p.rect.1);
                     if let Some(mut c) = world.rect_transform_mut(id) {
-                        set(&mut c, v);
+                        rect_ops::apply_anchor_preset(&mut c, preset, size);
                     }
                     changed = true;
                 }
-            }
+                for (label, value, speed, set) in rows {
+                    if let Some(v) = vec2_row(ui, label, value, speed) {
+                        if let Some(mut c) = world.rect_transform_mut(id) {
+                            set(&mut c, v);
+                        }
+                        changed = true;
+                    }
+                }
+            });
             ui.separator();
             if let Some(edit) = draw_world_anchor(ui, r.world_anchor.clone()) {
                 if let Some(mut c) = world.rect_transform_mut(id) {

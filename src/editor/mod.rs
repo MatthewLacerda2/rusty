@@ -91,6 +91,10 @@ pub struct EditorUi {
     pub viewport_image_size: egui::Vec2,
     /// Live move-gizmo drag, if an axis handle is currently grabbed (#183).
     pub gizmo_drag: Option<viewport::gizmo::GizmoDrag>,
+    /// The Scene tab's UI overlay: screen canvases drawn, the rect tool live (#423).
+    pub ui_overlay: bool,
+    /// Live rect-tool drag on a UI element's handle (#423).
+    pub rect_drag: Option<viewport::rect_tool::RectDrag>,
 
     /// Whether the Inspector's asset/material cards show "Details" or "Preview"
     /// (#352). One shared flag: entity and asset selection are mutually exclusive,
@@ -163,6 +167,8 @@ impl EditorUi {
             viewport_tab: ViewportTab::Scene,
             viewport_image_size: egui::Vec2::ZERO,
             gizmo_drag: None,
+            ui_overlay: true,
+            rect_drag: None,
 
             preview_tab_active: false,
             preview_mesh: PreviewMesh::default(),
@@ -276,6 +282,6 @@ impl EditorUi {
         // 5. CENTRAL VIEWPORT: the Scene/Game tabbed scene image. Drawn last so it
         // fills the space the docked panels leave. Returns the pointer interaction the
         // front-end uses for click-to-select and the move gizmo on the Scene tab.
-        viewport::draw(self, ctx, viewport_texture)
+        viewport::draw(self, ctx, viewport_texture, &scene.world)
     }
 }

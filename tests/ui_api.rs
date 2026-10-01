@@ -13,7 +13,7 @@ use rusty::scene::{Camera, Scene};
 use rusty::ui::ScreenSize;
 
 /// A canvas with one centred 100×100 child. Returns `(scene, canvas, child)`.
-fn ui_scene() -> (Scene, u32, u32) {
+pub(crate) fn ui_scene() -> (Scene, u32, u32) {
     let mut scene = Scene::new();
     let canvas = scene.add_entity("Canvas".to_string());
     let c = Some(CanvasComponent::default());
@@ -27,7 +27,7 @@ fn ui_scene() -> (Scene, u32, u32) {
 
 /// Run `f` with the three UI namespaces registered over `scene` on a 1920×1080
 /// headless screen (the video resolution stands in for the game view).
-fn with_ui_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
+pub(crate) fn with_ui_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
     let screen = RefCell::new(ScreenSize::default());
     let video = RefCell::new(VideoSettings {
@@ -38,8 +38,8 @@ fn with_ui_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
     let camera = RefCell::new(Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0));
     lua.scope(|scope| {
         rusty::api::canvas::register(&lua, scope, scene, &screen, &video).unwrap();
-        rusty::api::rect_transform::register(&lua, scope, scene).unwrap();
         let (screen, video) = (&screen, &video);
+        rusty::api::rect_transform::register(&lua, scope, scene, (screen, video)).unwrap();
         rusty::api::ui::register(&lua, scope, scene, (screen, video), &camera).unwrap();
         f(&lua);
         Ok(())

@@ -17,6 +17,7 @@ In `Debug.Snapshot` the component appears as `rect_transform`.
 | `RectTransform.GetPivot` / `SetPivot` | `(id)` / `(id, x, y)` | `x, y` (fraction of the element's own rect) |
 | `RectTransform.GetAnchoredPosition` / `SetAnchoredPosition` | `(id)` / `(id, x, y)` | `x, y` |
 | `RectTransform.GetSizeDelta` / `SetSizeDelta` | `(id)` / `(id, x, y)` | `x, y` |
+| `RectTransform.SetAnchorPreset` | `(id, x, y, setPivot?, setPosition?)` | — the editor's anchor-preset grid: `x` is `"left"`/`"center"`/`"right"`/`"stretch"`, `y` is `"bottom"`/`"middle"`/`"top"`/`"stretch"`. Re-anchors **without moving** the element (position and size delta re-derived against the parent's rect); `setPivot` also moves the pivot to the preset point (centre on a stretched axis); `setPosition` also snaps the element onto its anchors (a stretched axis fills the parent). An unknown name is an error |
 | `RectTransform.SetWorldAnchor` | `(id, target, ox, oy, oz)` | — makes the element a **marker** pinned to entity `target` + offset (metres); `target = nil` pins it to the world point `(ox, oy, oz)` |
 | `RectTransform.ClearWorldAnchor` | `(id)` | — back to ordinary anchors |
 | `RectTransform.GetWorldAnchor` | `(id)` | `{ target, offset = {x, y, z}, clamp_to_screen_edge, edge_padding, rotate_toward_target, hide_when_behind }`, or `nil` for a non-marker |

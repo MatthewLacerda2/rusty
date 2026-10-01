@@ -250,8 +250,9 @@ and widens the advance slightly.
   the frame each consumer presents: the view's own colour target for the editor's Game
   view and headless screenshots, and the swapchain frame the standalone player hands
   its targetless view (`RenderView::set_ui_output`). The Scene view (edit-mode camera)
-  does not draw the game's UI, nor does a targetless view given no output (the
-  reflection-probe cubemap capture).
+  draws the game's screen UI only while its **UI** overlay toggle is on (see
+  *Authoring in the editor*); a targetless view given no output (the
+  reflection-probe cubemap capture) never does.
 - **What.** The layout is recomputed for the view's pixel size with the same pure
   `UiLayout::compute` the sim runs, then walked in draw order. A graphic draws when it
   and every ancestor are `active`.
@@ -528,8 +529,8 @@ UI shader). A canvas draws in a camera whose culling mask includes the canvas
 entity's layer; canvases draw back to front, each in hierarchy order, and both
 faces show. The vertices are the overlay's (one buffer per canvas, re-uploaded only
 when its geometry changes); a per-camera uniform maps them onto the plane, so a
-moving sign or camera uploads nothing. The Scene view shows `WorldSpace` canvases
-but never the HUD or a camera canvas. **`RectMask` clips on world canvases too**,
+moving sign or camera uploads nothing. The Scene view always shows `WorldSpace`
+canvases; the HUD and camera canvases only with its UI overlay on. **`RectMask` clips on world canvases too**,
 to the same axis-aligned bounds in canvas units: a scissor cannot follow a plane in
 perspective, so the fragment shader cuts each graphic at its mask's edge instead —
 the same space the hit-test checks masks in, so a world-space Scroll View or
@@ -569,6 +570,32 @@ Damage numbers are markers spawned on hit and tweened.
 The layout is still a pure function — of (scene, screen size, **camera**): the sim
 lays out through its active camera each tick, and `UI.GetRect` does the same on
 demand.
+
+## Authoring in the editor
+
+Everything below has an API equivalent — the editor writes through the same
+`scene::authoring::rect_transform` ops as `RectTransform.*` (#423).
+
+- **UI overlay.** The Scene tab's **UI** toggle (on by default) draws the screen-space
+  canvases (`ScreenSpaceOverlay`, and `ScreenSpaceCamera` — its plane fills the view)
+  over the scene, laid out on the viewport's pixel size, each canvas outlined.
+- **Click-select.** A click in the Scene tab selects the top-most UI element under
+  it with `UI.Raycast`'s own hit-test — the overlay canvases (while shown), then
+  world canvases along the camera ray in front of the nearest mesh — before falling
+  back to mesh picking. Only raycast targets are click-selectable; pick anything
+  else in the hierarchy.
+- **Rect tool.** On a selected element of a screen canvas: drag inside it to move it
+  (`AnchoredPosition`); drag an edge or corner to resize it (`SizeDelta`, the opposite
+  side held — along the element's own axes when it or a parent is rotated); drag the
+  pivot disc to move the pivot without moving the rect. The anchors show as four
+  triangles. An element a layout group places, a world-anchored marker and a root
+  canvas are drawn read-only (no handles), as in Unity; so is the RectTransform card
+  of a driven element. World canvases are selected, not dragged — edit their numbers
+  on the card.
+- **Anchor presets.** The RectTransform card's *Anchors* button opens Unity's 4×4
+  grid. A click re-anchors without moving the element; **Shift** also sets the
+  pivot, **Alt** also snaps the element onto its anchors (`RectTransform.SetAnchorPreset`).
+- No snapping yet.
 
 ## Determinism
 

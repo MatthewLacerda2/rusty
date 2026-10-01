@@ -1,4 +1,4 @@
-//! src/scene/authoring/rect_transform.rs — Shared RectTransform-authoring ops (#417).
+//! src/scene/authoring/rect_transform/mod.rs — Shared RectTransform-authoring ops (#417).
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `RectTransformComponent` field by field. The editor's RectTransform card and the
@@ -7,13 +7,18 @@
 //! one anchor past the other drags the other along, as Unity's inspector does);
 //! the pivot, position and size are free (a pivot outside 0..1 is legal in Unity).
 //! A marker's world anchor (#429) is set whole and tuned option by option; the
-//! option setters do nothing to an element that is not a marker.
+//! option setters do nothing to an element that is not a marker. Anchor presets
+//! (#423) re-anchor an element without moving it (`preset`).
 //!
 //! Allowed deps: components (the `RectTransformComponent` data). Pure.
 
 use glam::{Vec2, Vec3};
 
 use crate::components::{RectTransformComponent, WorldAnchor};
+
+mod preset;
+
+pub use preset::{apply_anchor_preset, AnchorPreset, AxisPreset};
 
 /// Set the lower-left anchor, clamped to `[0, 1]`; `anchor_max` is raised to stay ≥ it.
 pub fn set_anchor_min(r: &mut RectTransformComponent, anchor: Vec2) {
