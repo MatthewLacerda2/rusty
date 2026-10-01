@@ -60,7 +60,7 @@ fn text_survives_save_and_load() {
         ..Default::default()
     };
     scene.world.set_text(id, Some(text.clone()));
-    let path = std::env::temp_dir()
+    let path = crate::temp::dir()
         .join(format!("rusty_ui_text_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();

@@ -7,7 +7,7 @@ use proptest::prelude::*;
 use rusty::dev::harness::Harness;
 
 fn dir(tag: u64) -> std::path::PathBuf {
-    std::env::temp_dir().join(format!("rusty_proptest_harness_{tag}"))
+    crate::temp::dir().join(format!("rusty_proptest_harness_{tag}"))
 }
 
 proptest! {

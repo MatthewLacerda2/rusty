@@ -19,7 +19,7 @@ fn session() -> Session {
 
 /// Render `asset` to `name` under a scratch dir; `None` when the box has no adapter.
 fn preview(sess: &Session, asset: &str, name: &str, opts: &str) -> Option<std::path::PathBuf> {
-    let out = std::env::temp_dir().join("rusty-preview-api").join(name);
+    let out = crate::temp::dir().join("rusty-preview-api").join(name);
     let _ = std::fs::remove_file(&out);
     let call = format!(
         "return Debug.Preview({:?}, {:?}{})",

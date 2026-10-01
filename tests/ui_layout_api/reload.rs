@@ -60,7 +60,7 @@ fn layout_components_round_trip_and_lay_out_identically_after_reload() {
     let list = before.get(ids[0]).unwrap().rect;
     assert!((list.1 - Vec2::new(400.0, 114.0)).abs().max_element() < 1e-3);
     assert!((before.get(ids[3]).unwrap().rect.1.x - 384.0).abs() < 1e-3);
-    let path = std::env::temp_dir()
+    let path = crate::temp::dir()
         .join(format!("rusty_ui_layout_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();

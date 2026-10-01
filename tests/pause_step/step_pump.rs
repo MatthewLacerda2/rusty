@@ -16,7 +16,7 @@ fn windowed_step_uses_the_harness_fixed_dt() {
 
 #[test]
 fn step_pump_advances_exactly_n_fixed_frames_then_halts() {
-    let h = Harness::new(std::env::temp_dir().join("rusty_pause_step_a"), "");
+    let h = Harness::new(crate::temp::dir().join("rusty_pause_step_a"), "");
     let start = h.frame();
 
     // Pause, queue 5 steps, drain them: exactly 5 fixed ticks run, then the pump halts.
@@ -48,7 +48,7 @@ fn the_same_n_steps_from_the_same_state_are_deterministic() {
     // N fixed steps from state S must yield an identical S′ — the determinism the
     // windowed step path inherits from the fixed-dt harness semantics.
     let run = || {
-        let h = Harness::new(std::env::temp_dir().join("rusty_pause_step_det"), "");
+        let h = Harness::new(crate::temp::dir().join("rusty_pause_step_det"), "");
         // Drive a known motion so the snapshot is non-trivial, then step deterministically.
         h.world
             .borrow()
@@ -71,7 +71,7 @@ fn the_same_n_steps_from_the_same_state_are_deterministic() {
 fn paused_world_does_not_move_until_stepped() {
     // A paused world with no queued steps is frozen: the pump runs nothing and the
     // frame count does not advance (rendering would still run in the real loop).
-    let h = Harness::new(std::env::temp_dir().join("rusty_pause_step_frozen"), "");
+    let h = Harness::new(crate::temp::dir().join("rusty_pause_step_frozen"), "");
     h.world
         .borrow()
         .input()

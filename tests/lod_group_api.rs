@@ -85,7 +85,7 @@ fn an_lod_group_survives_save_and_load() {
         size: 3.0,
     };
     scene.world.set_lod_group(group, Some(lod.clone()));
-    let path = std::env::temp_dir()
+    let path = crate::temp::dir()
         .join(format!("rusty_lod_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();

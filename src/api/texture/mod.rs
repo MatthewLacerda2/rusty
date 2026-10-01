@@ -84,7 +84,7 @@ mod tests {
     fn bake_writes_a_loadable_png() {
         let lua = Lua::new();
         register(&lua).unwrap();
-        let path = std::env::temp_dir().join("rusty_texture_api_bake.png");
+        let path = crate::test_temp::dir().join("rusty_texture_api_bake.png");
         let p = path.to_str().unwrap();
         // Pass the path as a Lua global *value*, not interpolated into the Lua source:
         // a Windows path (`C:\Users\…`) embedded in a Lua string literal trips Lua's
@@ -128,7 +128,7 @@ mod tests {
     fn an_unknown_slot_fails_the_bake_before_writing() {
         let lua = Lua::new();
         register(&lua).unwrap();
-        let path = std::env::temp_dir().join("rusty_texture_api_bad_slot.png");
+        let path = crate::test_temp::dir().join("rusty_texture_api_bad_slot.png");
         std::fs::remove_file(&path).ok();
         lua.globals().set("OUT", path.to_str().unwrap()).unwrap();
         let script = r#"

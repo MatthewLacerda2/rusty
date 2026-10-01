@@ -26,7 +26,7 @@ const DT: f32 = 1.0 / 60.0;
 /// samples its own height in both `Update` (pre-physics) and `LateUpdate`
 /// (post-physics).
 fn falling_body_world() -> GameWorld {
-    let script = std::env::temp_dir().join("rusty_324_fall.lua");
+    let script = crate::test_temp::dir().join("rusty_324_fall.lua");
     std::fs::write(
         &script,
         "_G.__u = 0\n_G.__l = 0\nreturn {\n\

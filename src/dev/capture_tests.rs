@@ -40,7 +40,7 @@ fn box_scene(ambient: f32) -> Scene {
 }
 
 fn tmp(name: &str) -> std::path::PathBuf {
-    std::env::temp_dir().join(name)
+    crate::test_temp::dir().join(name)
 }
 
 /// An untouched host owns nothing: no device is built until a shot asks for one, so

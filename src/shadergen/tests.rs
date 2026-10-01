@@ -19,7 +19,7 @@ const ENGINE_SHADERS: &str = "assets/shaders";
 
 /// A unique temp dir per test name, so parallel test runs never collide.
 fn temp_out(tag: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("rusty_shadergen_{tag}"));
+    let dir = crate::test_temp::dir().join(format!("rusty_shadergen_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }

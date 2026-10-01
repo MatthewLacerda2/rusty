@@ -27,7 +27,7 @@ const GUNSHOT: &str = r#"{
 fn tmp(name: &str) -> String {
     // Forward slashes: a Windows temp path (`C:\Users\…`) interpolated into a Lua
     // string literal trips Lua's escape parser (`\U`).
-    std::env::temp_dir()
+    crate::temp::dir()
         .join(name)
         .to_str()
         .unwrap()

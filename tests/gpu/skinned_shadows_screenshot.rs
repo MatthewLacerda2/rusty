@@ -61,7 +61,7 @@ fn yard(pose: Mat4) -> Scene {
 fn ground_brightness(scene: &Scene, x: f32, name: &str) -> Option<f32> {
     // The sun leans the shadow ~0.8 units toward -Z; look where it lands.
     let cam = Camera::new(Vec3::new(x, 1.5, -0.8), -90.0, -89.0);
-    let path = std::env::temp_dir().join(format!("rusty_{name}_{}.png", std::process::id()));
+    let path = crate::temp::dir().join(format!("rusty_{name}_{}.png", std::process::id()));
     if !capture(scene, &cam, &path, 32, 32).expect("capture") {
         return None;
     }

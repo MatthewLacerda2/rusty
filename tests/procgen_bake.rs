@@ -24,11 +24,7 @@ fn noise_recipe(resolution: u32, seed: u64) -> TextureRecipe {
 }
 
 fn tmp(name: &str) -> String {
-    std::env::temp_dir()
-        .join(name)
-        .to_str()
-        .unwrap()
-        .to_string()
+    crate::temp::dir().join(name).to_str().unwrap().to_string()
 }
 
 #[test]

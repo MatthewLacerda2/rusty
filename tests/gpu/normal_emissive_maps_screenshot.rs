@@ -18,7 +18,7 @@ use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
 
 fn tmp(name: &str) -> std::path::PathBuf {
-    std::env::temp_dir().join(name)
+    crate::temp::dir().join(name)
 }
 /// Write a 2x2 solid-RGB PNG (alpha 255).
 fn write_png(path: &std::path::Path, rgb: [u8; 3]) {

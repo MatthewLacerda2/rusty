@@ -53,7 +53,7 @@ fn flush_storage_logs_on_write_failure() {
     let res = resources();
     // Bind the store to a path whose parent is a regular file, so create_dir_all and
     // the write both fail — exercising the error branch that logs to the console.
-    let dir = std::env::temp_dir();
+    let dir = crate::test_temp::dir();
     let blocker = dir.join(format!("rusty_flush_block_{}", std::process::id()));
     std::fs::write(&blocker, b"x").unwrap();
     let bad_path = blocker.join("nested").join("store.json");

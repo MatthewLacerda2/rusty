@@ -45,7 +45,7 @@ fn extract_and_stamp_remap_references() {
 #[test]
 fn a_linked_instance_diffs_clean_and_propagates_in_its_own_ids() {
     let (scene, root) = authored();
-    let path = std::env::temp_dir()
+    let path = crate::test_temp::dir()
         .join("rusty_420_refs.prefab")
         .to_string_lossy()
         .into_owned();
@@ -76,7 +76,7 @@ fn applying_a_changed_reference_writes_the_source_in_local_ids() {
     let (mut scene, root) = authored();
     let second = create_entity(&mut scene, "Second", None);
     scene.set_parent(second, Some(root)).expect("parent");
-    let path = std::env::temp_dir()
+    let path = crate::test_temp::dir()
         .join("rusty_420_refs_apply.prefab")
         .to_string_lossy()
         .into_owned();

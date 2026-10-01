@@ -95,7 +95,7 @@ fn a_selectable_survives_save_and_load_but_the_runtime_tint_does_not() {
         ..Default::default()
     };
     scene.world.set_image(id, Some(image));
-    let path = std::env::temp_dir()
+    let path = crate::temp::dir()
         .join(format!("rusty_selectable_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();

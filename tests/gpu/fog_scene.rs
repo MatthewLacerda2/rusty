@@ -84,7 +84,7 @@ fn neutral_volume() -> VisualCorrectionComponent {
 
 /// Render `scene`, or `None` when no adapter exists.
 pub fn shot(host: &mut CaptureHost, scene: &Scene, name: &str) -> Option<image::RgbImage> {
-    let path = std::env::temp_dir().join(format!("rusty_fog_{name}.png"));
+    let path = crate::temp::dir().join(format!("rusty_fog_{name}.png"));
     if !capture_into(host, scene, &camera(), &path, 64, 64).expect("capture") {
         eprintln!("[fog] no GPU/software adapter — skipping visual assertion");
         return None;

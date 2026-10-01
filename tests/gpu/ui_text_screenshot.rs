@@ -57,7 +57,7 @@ fn neon_label() -> Scene {
 
 #[test]
 fn outlined_glowing_text_layers_fill_outline_and_glow() {
-    let path = std::env::temp_dir().join("rusty_ui_text.png");
+    let path = crate::temp::dir().join("rusty_ui_text.png");
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
     if !capture(&neon_label(), &cam, &path, SIZE, SIZE).expect("capture must not error") {
         eprintln!("[ui] no GPU/software adapter — skipping visual assertion");

@@ -10,7 +10,7 @@ use rusty::scene::Scene;
 
 #[test]
 fn harness_graph_is_the_from_scene_bake_of_its_scene() {
-    let h = Harness::new(std::env::temp_dir().join("rusty_test_nav_bounds"), "");
+    let h = Harness::new(crate::temp::dir().join("rusty_test_nav_bounds"), "");
     let world = h.world.borrow();
     let nav = world.nav().borrow();
 

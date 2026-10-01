@@ -43,7 +43,7 @@ fn solid(r: f32, g: f32, b: f32) -> Option<ImageComponent> {
 
 /// A 32×32 texture: an 8-texel green frame around a blue centre.
 fn frame_texture() -> String {
-    let path = std::env::temp_dir().join("rusty_ui_frame.png");
+    let path = crate::temp::dir().join("rusty_ui_frame.png");
     let img = image::RgbaImage::from_fn(32, 32, |x, y| {
         let edge = x < 8 || y < 8 || x >= 24 || y >= 24;
         image::Rgba(if edge {

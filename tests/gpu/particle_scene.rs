@@ -15,7 +15,7 @@ pub const RED: [f32; 4] = [1.0, 0.1, 0.1, 1.0];
 /// An 8 × 4 PNG in the temp dir, left half red and right half green: a two-frame
 /// (2 × 1) flipbook. Returns its path.
 pub fn sheet_sprite() -> String {
-    let path = std::env::temp_dir().join("rusty_particle_sheet.png");
+    let path = crate::temp::dir().join("rusty_particle_sheet.png");
     let img = image::RgbaImage::from_fn(8, 4, |x, _| {
         if x < 4 {
             image::Rgba([255, 0, 0, 255])
@@ -29,7 +29,7 @@ pub fn sheet_sprite() -> String {
 
 /// A plain white sprite, so a particle's colour is its tint alone.
 pub fn white_sprite() -> String {
-    let path = std::env::temp_dir().join("rusty_particle_white.png");
+    let path = crate::temp::dir().join("rusty_particle_white.png");
     image::RgbaImage::from_pixel(4, 4, image::Rgba([255; 4]))
         .save(&path)
         .expect("write sprite");

@@ -17,7 +17,7 @@ const DISTANCE: f32 = 20.0;
 /// A plain white sprite, so the effect's colour is its tint alone (the default
 /// checker would leave the centre pixel on whichever square it lands).
 fn white_sprite() -> Option<String> {
-    let path = std::env::temp_dir().join("rusty_fog_white.png");
+    let path = crate::temp::dir().join("rusty_fog_white.png");
     image::RgbaImage::from_pixel(4, 4, image::Rgba([255; 4]))
         .save(&path)
         .expect("write sprite");

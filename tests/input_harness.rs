@@ -13,7 +13,7 @@ fn eval(h: &Harness, line: &str) -> String {
 
 #[test]
 fn edges_are_per_sim_tick_and_play_locks_the_cursor() {
-    let h = Harness::new(std::env::temp_dir().join("rusty_input_edges"), "");
+    let h = Harness::new(crate::temp::dir().join("rusty_input_edges"), "");
     h.step(1); // enter Play
     assert_eq!(eval(&h, "return Input.IsCursorLocked()"), "true");
 
@@ -60,7 +60,7 @@ Harness.Expect(Harness.Frame() == 34, "stepped 34 ticks")
 
 #[test]
 fn injected_input_replays_identically() {
-    let dir = std::env::temp_dir().join("rusty_input_replay");
+    let dir = crate::temp::dir().join("rusty_input_replay");
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("scenario.lua");
     std::fs::write(&path, SCENARIO).unwrap();

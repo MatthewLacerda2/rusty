@@ -13,7 +13,7 @@ fn tmp(name: &str) -> String {
     // string literal trips Lua's escape parser (`\U`). Windows accepts `/` for std/
     // `image` file I/O, and the same normalized string is used in the assertions, so
     // the round-trip still matches on every platform.
-    std::env::temp_dir()
+    crate::temp::dir()
         .join(name)
         .to_str()
         .unwrap()

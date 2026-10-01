@@ -144,7 +144,7 @@ mod tests {
         // A script frees the cursor in `Start`; the pointer already rests on a
         // panel. The first tick's dispatch runs before its `LateUpdate` layout, so
         // it must lay out on its own to see the panel.
-        let script = std::env::temp_dir().join("rusty_420_first_tick.lua");
+        let script = crate::test_temp::dir().join("rusty_420_first_tick.lua");
         std::fs::write(
             &script,
             "return { Start = function() Input.SetCursorLocked(false) end }",

@@ -54,7 +54,7 @@ fn saved_graph() -> String {
         edges: Vec::new(),
         entry: "Run".to_string(),
     };
-    let path = std::env::temp_dir().join("rusty_316_api.animgraph");
+    let path = crate::temp::dir().join("rusty_316_api.animgraph");
     animation_graph::save(&path, &graph).unwrap();
     path.to_string_lossy().replace('\\', "/")
 }

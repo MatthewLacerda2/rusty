@@ -9,7 +9,7 @@ use rusty::dev::scenario;
 
 #[test]
 fn attach_player_bot_tags_the_player() {
-    let h = Harness::new(std::env::temp_dir().join("rusty_bot_attach"), "");
+    let h = Harness::new(crate::temp::dir().join("rusty_bot_attach"), "");
     let attached = attach_player_bot(
         &mut h.world.borrow().scene().borrow_mut(),
         PLAYER_BOT_SCRIPT,
@@ -21,7 +21,7 @@ fn attach_player_bot_tags_the_player() {
 fn play_session_scenario_wins_and_is_deterministic() {
     let scenario = Path::new("project/scenarios/play_session.lua");
     let run = |dir: &str| {
-        let out = std::env::temp_dir().join(dir);
+        let out = crate::temp::dir().join(dir);
         let report = scenario::run(scenario, &out).expect("scenario runs");
         let json = std::fs::read_to_string(report.results_path).expect("results written");
         (report.passed, json)

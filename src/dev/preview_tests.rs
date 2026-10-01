@@ -57,7 +57,7 @@ fn resolution_is_clamped_to_a_sane_range() {
 
 #[test]
 fn gpu_capture_writes_a_square_png_at_the_requested_resolution() {
-    let out = std::env::temp_dir().join("rusty-preview-test/shader.png");
+    let out = crate::test_temp::dir().join("rusty-preview-test/shader.png");
     let _ = std::fs::remove_file(&out);
 
     let options = PreviewOptions {

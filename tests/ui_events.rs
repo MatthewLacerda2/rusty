@@ -34,7 +34,7 @@ return B
 /// A 1920×1080 Play session with a 200×80 button centred on screen, carrying the
 /// script above and a child label. Returns the world, its console and the ids.
 fn session(tag: &str) -> (GameWorld, Rc<RefCell<ConsoleLogs>>, u32, u32) {
-    let script = std::env::temp_dir().join(format!("rusty_420_button_{tag}.lua"));
+    let script = crate::temp::dir().join(format!("rusty_420_button_{tag}.lua"));
     std::fs::write(&script, BUTTON).expect("write script");
     let mut s = Scene::new();
     let canvas = s.add_entity("Canvas".to_string());

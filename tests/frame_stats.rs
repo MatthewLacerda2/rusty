@@ -6,7 +6,7 @@
 use rusty::dev::harness::Harness;
 
 fn harness(tag: &str) -> (Harness, std::path::PathBuf) {
-    let out = std::env::temp_dir().join(format!("rusty_stats_{tag}_{}", std::process::id()));
+    let out = crate::temp::dir().join(format!("rusty_stats_{tag}_{}", std::process::id()));
     (Harness::new(&out, ""), out)
 }
 
@@ -78,7 +78,7 @@ fn debug_stats_reads_the_same_numbers() {
 
 #[test]
 fn a_scenario_asserts_budgets_through_the_harness_table() {
-    let dir = std::env::temp_dir().join(format!("rusty_stats_lua_{}", std::process::id()));
+    let dir = crate::temp::dir().join(format!("rusty_stats_lua_{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let scenario = dir.join("budget.lua");
     std::fs::write(

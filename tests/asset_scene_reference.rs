@@ -16,7 +16,7 @@ f 1//1 3//1 4//1
 ";
 
 fn tmp(name: &str) -> std::path::PathBuf {
-    let mut p = std::env::temp_dir();
+    let mut p = crate::temp::dir();
     p.push(name);
     p
 }

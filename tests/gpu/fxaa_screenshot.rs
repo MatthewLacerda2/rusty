@@ -16,7 +16,7 @@ use rusty::scene::Camera;
 use rusty::scene::{DirtyFlag, MeshComponent, Scene};
 
 fn tmp(name: &str) -> std::path::PathBuf {
-    std::env::temp_dir().join(name)
+    crate::temp::dir().join(name)
 }
 
 /// A lit box plus a camera carrying the FXAA knob. No `VisualCorrection` volume at

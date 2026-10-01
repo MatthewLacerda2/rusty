@@ -65,7 +65,7 @@ mod tests {
 
     #[test]
     fn same_recipe_and_seed_bakes_identical_bytes() {
-        let dir = std::env::temp_dir();
+        let dir = crate::test_temp::dir();
         let a = dir.join("rusty_procgen_det_a.png");
         let b = dir.join("rusty_procgen_det_b.png");
         let recipe = TextureRecipe {

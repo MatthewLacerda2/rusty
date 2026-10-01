@@ -13,7 +13,7 @@ const SIZE: u32 = 128;
 
 /// Render `scene` from the origin looking down -Z; `None` without an adapter.
 fn shot(scene: &Scene, name: &str) -> Option<std::path::PathBuf> {
-    let path = std::env::temp_dir().join(name);
+    let path = crate::temp::dir().join(name);
     let cam = Camera::new(Vec3::ZERO, -90.0, 0.0);
     capture(scene, &cam, &path, SIZE, SIZE)
         .expect("capture must not error")

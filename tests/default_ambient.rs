@@ -8,10 +8,7 @@
 use rusty::scene::{Scene, DEFAULT_AMBIENT_COLOR, DEFAULT_AMBIENT_INTENSITY};
 
 fn tmp(name: &str) -> String {
-    std::env::temp_dir()
-        .join(name)
-        .to_string_lossy()
-        .into_owned()
+    crate::temp::dir().join(name).to_string_lossy().into_owned()
 }
 
 #[test]

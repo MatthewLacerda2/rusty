@@ -26,7 +26,7 @@ const DT: f32 = 1.0 / 60.0;
 
 /// Platform-safe temp path (the Windows runner has no `/tmp`).
 fn temp_path(name: &str) -> String {
-    std::env::temp_dir()
+    crate::test_temp::dir()
         .join(name)
         .to_string_lossy()
         .into_owned()
@@ -228,7 +228,7 @@ fn play_tick_advances_the_animator_through_the_loop() {
 #[test]
 fn graph_driven_animator_transitions_through_the_play_loop() {
     use crate::asset::animation_graph::{self, AnimationGraph};
-    let path = std::env::temp_dir().join("rusty_316_loop.animgraph");
+    let path = crate::test_temp::dir().join("rusty_316_loop.animgraph");
     let graph: AnimationGraph = serde_json::from_value(serde_json::json!({
         "parameters": { "speed": { "Float": 0.0 } },
         "nodes": [

@@ -142,7 +142,7 @@ fn gpu_bake_writes_file_and_sets_path() {
     };
     let mut scene = colored_room();
     scene.reflection_probes.add(Vec3::ZERO, Vec3::splat(5.0));
-    let dir = std::env::temp_dir().join(format!("rusty_refl_bake_{}", std::process::id()));
+    let dir = crate::test_temp::dir().join(format!("rusty_refl_bake_{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
 
     let n = renderer.bake_reflections(&mut scene, &dir, RES).unwrap();

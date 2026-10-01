@@ -65,7 +65,7 @@ fn centre_redness(path: &std::path::Path) -> i32 {
 #[test]
 fn gpu_joint_99_of_a_100_joint_rig_is_posed_not_identity() {
     let cam = Camera::new(Vec3::new(0.0, 0.0, 6.0), -90.0, 0.0);
-    let dir = std::env::temp_dir();
+    let dir = crate::temp::dir();
     let (rest, posed) = (
         dir.join("rusty_skin_rest.png"),
         dir.join("rusty_skin_j99.png"),
