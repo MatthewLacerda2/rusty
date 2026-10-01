@@ -16,6 +16,8 @@ fn noise_recipe(resolution: u32, seed: u64) -> TextureRecipe {
                 kind: NoiseKind::Perlin,
                 scale: 8.0,
                 octaves: 1,
+                lacunarity: 2.0,
+                gain: 0.5,
             },
             inputs: vec![],
         }],

@@ -4,12 +4,12 @@
 //! include fractional counts, the values that used to open a seam.
 
 use rusty::procgen::recipe::{GradientKind, Node, NoiseKind, OpKind, TextureRecipe};
-use rusty::procgen::recipe::{VoronoiOutput, WaveKind};
+use rusty::procgen::recipe::{NoiseKind::*, VoronoiOutput::*, WaveKind};
 use rusty::procgen::{evaluate, Image};
 
 const RES: u32 = 64;
 
-fn node(id: &str, op: OpKind, inputs: &[&str]) -> Node {
+pub fn node(id: &str, op: OpKind, inputs: &[&str]) -> Node {
     let inputs = inputs.iter().map(|s| s.to_string()).collect();
     Node {
         id: id.into(),
@@ -18,7 +18,7 @@ fn node(id: &str, op: OpKind, inputs: &[&str]) -> Node {
     }
 }
 
-fn bake(nodes: Vec<Node>) -> Image {
+pub fn bake(nodes: Vec<Node>) -> Image {
     let recipe = TextureRecipe {
         resolution: RES,
         seed: 7,
@@ -53,7 +53,7 @@ fn seam_and_interior(img: &Image, horizontal: bool) -> (f32, f32) {
     (seam, interior)
 }
 
-fn assert_seamless(label: &str, img: &Image) {
+pub fn assert_seamless(label: &str, img: &Image) {
     for horizontal in [true, false] {
         let (seam, interior) = seam_and_interior(img, horizontal);
         assert!(
@@ -66,18 +66,27 @@ fn assert_seamless(label: &str, img: &Image) {
 fn generators() -> Vec<(String, OpKind)> {
     let mut ops = Vec::new();
     for s in [1.0, 3.0, 4.5, 5.5, 7.3] {
-        for kind in [NoiseKind::Perlin, NoiseKind::Fbm] {
+        for kind in [Perlin, Fbm, Ridged, Turbulence] {
             ops.push((
                 format!("noise {kind:?} {s}"),
                 OpKind::Noise {
                     kind,
                     scale: s,
                     octaves: 3,
+                    lacunarity: s,
+                    gain: 0.5,
                 },
             ));
         }
-        let output = VoronoiOutput::Distance;
-        ops.push((format!("voronoi {s}"), OpKind::Voronoi { scale: s, output }));
+        for output in [Distance, F2, Edges] {
+            let randomness = s / 8.0;
+            let op = OpKind::Voronoi {
+                scale: s,
+                output,
+                randomness,
+            };
+            ops.push((format!("voronoi {output:?} {s}"), op));
+        }
         for kind in [WaveKind::Bands, WaveKind::Rings] {
             ops.push((
                 format!("wave {kind:?} {s}"),
@@ -105,6 +114,8 @@ fn mapping_keeps_a_seamless_input_seamless() {
             kind: NoiseKind::Perlin,
             scale: 3.0,
             octaves: 1,
+            lacunarity: 2.0,
+            gain: 0.5,
         };
         let map = OpKind::Mapping {
             scale,

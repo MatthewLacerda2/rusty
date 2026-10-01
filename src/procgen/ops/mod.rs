@@ -5,10 +5,11 @@
 //! nodes — enough to author the maps a PBR material needs, not a Substance clone. Ops
 //! are grouped like Blender's node menus:
 //!
-//! - [`generators`] — sources with no input (constant, noise, Voronoi, gradient,
+//! - [`generators`] — sources with no input (constant, noise and its fBM / ridged /
+//!   turbulence family, Voronoi F1 / F2 / edges, gradient,
 //!   wave, brick, checker, white noise).
 //! - [`color`] — color ramp, mix (blend modes), invert, bright/contrast, HSV, gamma.
-//! - [`vector`] — domain mapping, bump→normal, combine/separate RGB.
+//! - [`vector`] — domain mapping, domain warp, bump→normal, combine/separate RGB.
 //! - [`math`] — math, map range, clamp, RGB→BW.
 //! - [`filter`] — separable blur.
 //!
@@ -52,7 +53,8 @@ pub fn eval_node(op: &OpKind, inputs: &[&Image], resolution: u32, seed: u64) -> 
         OpKind::Mapping { .. }
         | OpKind::BumpToNormal { .. }
         | OpKind::CombineRgb
-        | OpKind::SeparateRgb { .. } => eval_vector(op, inputs, resolution),
+        | OpKind::SeparateRgb { .. }
+        | OpKind::Warp { .. } => eval_vector(op, inputs, resolution),
         OpKind::Math { .. } | OpKind::MapRange { .. } | OpKind::Clamp { .. } | OpKind::RgbToBw => {
             eval_math(op, inputs, resolution)
         }
@@ -118,6 +120,11 @@ fn eval_vector(op: &OpKind, inputs: &[&Image], resolution: u32) -> Image {
             None => Image::filled(resolution, [0.5, 0.5, 1.0, 1.0]),
         },
         OpKind::CombineRgb => vector::combine_rgb(inputs, resolution),
+        OpKind::Warp { strength } => match (inputs.first(), inputs.get(1)) {
+            (Some(a), Some(by)) => vector::warp(a, by, *strength),
+            (Some(a), None) => (*a).clone(),
+            _ => Image::new(resolution),
+        },
         OpKind::SeparateRgb { channel } => {
             vector::separate_rgb(first_or_black(inputs, resolution), *channel)
         }

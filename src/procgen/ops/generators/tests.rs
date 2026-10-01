@@ -3,6 +3,7 @@
 //! whole tile away, for fractional params too (they round to whole counts).
 
 use super::*;
+use crate::procgen::recipe::{NoiseKind, VoronoiOutput};
 
 /// A spread of sample points, deterministic and off every lattice line.
 fn points() -> impl Iterator<Item = (f32, f32)> {
@@ -22,15 +23,31 @@ fn close(a: Rgba, b: Rgba) -> bool {
 fn lattice_ops() -> Vec<OpKind> {
     let mut ops = vec![OpKind::WhiteNoise];
     for s in [0.4, 1.0, 2.5, 4.5, 5.5, 7.3] {
-        for kind in [NoiseKind::Perlin, NoiseKind::Fbm] {
+        for kind in [
+            NoiseKind::Perlin,
+            NoiseKind::Fbm,
+            NoiseKind::Ridged,
+            NoiseKind::Turbulence,
+        ] {
             ops.push(OpKind::Noise {
                 kind,
                 scale: s,
                 octaves: 3,
+                lacunarity: s,
+                gain: 0.6,
             });
         }
-        for output in [VoronoiOutput::Distance, VoronoiOutput::Cells] {
-            ops.push(OpKind::Voronoi { scale: s, output });
+        for output in [
+            VoronoiOutput::Distance,
+            VoronoiOutput::Cells,
+            VoronoiOutput::F2,
+            VoronoiOutput::Edges,
+        ] {
+            ops.push(OpKind::Voronoi {
+                scale: s,
+                output,
+                randomness: s / 8.0,
+            });
         }
         ops.push(OpKind::Wave {
             kind: WaveKind::Bands,
@@ -142,4 +159,55 @@ fn linear_tiling_gradient_is_a_triangle() {
     assert_eq!(f(0.5, 0.3)[0], 1.0);
     assert!((f(0.25, 0.3)[0] - 0.5).abs() < 1e-6);
     assert!((f(0.75, 0.3)[0] - 0.5).abs() < 1e-6);
+}
+
+fn grid_voronoi(output: VoronoiOutput) -> Sampler {
+    let op = OpKind::Voronoi {
+        scale: 4.0,
+        output,
+        randomness: 0.0,
+    };
+    sampler(&op, 64, 5).expect("generator")
+}
+
+#[test]
+fn voronoi_randomness_zero_is_a_regular_grid() {
+    let f1 = grid_voronoi(VoronoiOutput::Distance);
+    for (u, v) in [(0.125, 0.125), (0.375, 0.625), (0.875, 0.375)] {
+        assert!(f1(u, v)[0] < 1e-5, "cell centre ({u},{v}) is its own point");
+    }
+}
+
+#[test]
+fn voronoi_edges_are_dark_on_cell_borders_and_bright_at_centres() {
+    let edges = grid_voronoi(VoronoiOutput::Edges);
+    let f2 = grid_voronoi(VoronoiOutput::F2);
+    // u = 0.25 is equidistant from the centres at 0.125 and 0.375: F1 = F2.
+    assert!(edges(0.25, 0.125)[0] < 1e-5);
+    // At a centre F1 = 0 and the nearest other point is one cell away.
+    assert!((f2(0.125, 0.125)[0] - 1.0).abs() < 1e-5);
+    assert!((edges(0.125, 0.125)[0] - 1.0).abs() < 1e-5);
+}
+
+#[test]
+fn ridged_and_turbulence_span_the_unit_range() {
+    for kind in [NoiseKind::Ridged, NoiseKind::Turbulence] {
+        let op = OpKind::Noise {
+            kind,
+            scale: 4.0,
+            octaves: 4,
+            lacunarity: 2.0,
+            gain: 0.5,
+        };
+        let f = sampler(&op, 64, 1).expect("generator");
+        let values: Vec<f32> = points().map(|(u, v)| f(u, v)[0]).collect();
+        let (lo, hi) = values
+            .iter()
+            .fold((1.0f32, 0.0f32), |(a, b), &x| (a.min(x), b.max(x)));
+        assert!(
+            lo >= 0.0 && hi <= 1.0,
+            "{kind:?}: [{lo}, {hi}] escapes [0, 1]"
+        );
+        assert!(hi - lo > 0.3, "{kind:?}: [{lo}, {hi}] is nearly flat");
+    }
 }

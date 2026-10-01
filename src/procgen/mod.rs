@@ -77,6 +77,8 @@ mod tests {
                     kind: recipe::NoiseKind::Fbm,
                     scale: 8.0,
                     octaves: 4,
+                    lacunarity: 2.0,
+                    gain: 0.5,
                 },
                 inputs: vec![],
             }],

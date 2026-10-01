@@ -57,6 +57,7 @@ mod prefab_api;
 mod procgen_bake;
 mod procgen_ops;
 mod procgen_ops_math;
+mod procgen_organic;
 mod procgen_resolution;
 mod procgen_seams;
 mod proptest_scene;
