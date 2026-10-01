@@ -201,6 +201,10 @@ comparing against.
 | `seconds` | Length of the clip. |
 | `silent` | `true` when it makes no sound at all. `mean`/`peak`/`true_peak`/`crest` are then `nil`. |
 | `clipping` | `true` when the true peak reaches or passes 0 dBFS. |
+| `bands` | `{ low, mid, high }` — where the energy sits, as whole percentages summing to 100: below 250 Hz, 250 Hz–4 kHz, above 4 kHz. `nil` for a silence. |
+| `correlation` | `-1..1`, how much of the signal both channels share: `1` is mono in a stereo file, **negative** cancels when folded to mono. `nil` for a mono clip or a silent channel. |
+| `sections` | The clip **over time** — a list of rows with the fields above plus `label`, `from`, `to` (seconds). |
+| `tracks` | The mix **track by track** — a list of rows with the fields above plus `name` and that track's own `sections`. |
 
 ```lua
 local clip, level = Sound.Bake(pistol, "C2", "project/assets/sounds/pistol.wav")
@@ -219,6 +223,54 @@ The measurement is zimmer's (`zimmer::level`), taken on the samples before they 
 encoded, so it costs nothing extra. `Sound.Level` decodes with the engine's own clip
 decoder and feeds the same meter, so a bake and `Sound.Level` of its file agree (up
 to the 16-bit rounding the WAV adds).
+
+### Over time, across the spectrum, track by track (#379)
+
+One number for a whole bake hides three things, and the report carries each:
+
+- **`sections` — when.** A song's rows are its **arrangement's** patterns, labelled
+  with the pattern name, so a row reads "the second `combat` is the quiet one";
+  anything without an arrangement (a one-shot, a file) is cut on an 8-second grid,
+  `label = nil`. Empty when there would be only one row — that row is the summary
+  said twice.
+- **`bands` — muddy or thin.** A shooter's mix is a frequency-allocation problem
+  before it is a level problem: a weapon and the music both owning the mids reads
+  muffled at every volume, and no level meter can see it.
+- **`tracks` — who.** For a song of more than one track, one row per track,
+  measured **post-gain** where the mixer sums them (what each track contributes, not
+  what it sounds like alone). A track that never plays is a `silent` row, not a
+  missing one. Each carries `sections` cut where the song's are, so the n-th entry
+  and the n-th section row are the same stretch. Empty for a one-shot.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Sound.Diff` | `(a, b)` | how clip `a` differs from clip `b`, both paths measured as `Sound.Level` does |
+
+| Field | Meaning |
+|---|---|
+| `mean` / `peak` / `crest` | `a − b` in dB: negative means `a` is quieter (or flatter, for `crest`). |
+| `bands` | `{ low, mid, high }` in percentage **points** — 10% → 20% is +10 points. |
+| `correlation` | `a − b`; **positive means `a` is narrower** (the one field whose sign reads backwards). |
+| `seconds` | `a − b` length. |
+| `same` | `true` when nothing measurably moved — "is this the same audio", not "close enough". |
+
+A field is `nil` when either side had nothing to compare (a silence has no level and
+no balance); `nil` is not zero.
+
+```lua
+local _, level = Sound.BakeSong(theme, "project/assets/sounds/theme.wav")
+for _, t in ipairs(level.tracks) do
+  print(("%-6s mean %.1f  low %d%%  mid %d%%  high %d%%"):format(
+    t.name, t.mean or -math.huge, t.bands and t.bands.low or 0,
+    t.bands and t.bands.mid or 0, t.bands and t.bands.high or 0))
+end
+local d = Sound.Diff("project/assets/sounds/theme.wav", "project/assets/sounds/theme.prev.wav")
+print(("%.1f dB vs the previous bake"):format(d.mean))
+```
+
+All of it is the same **signal, never a gate** as the level above: nothing here
+refuses a bake or fails a build. The figures are zimmer's (`zimmer::level`:
+`Profile`, `Bands`, `Layer`, `Difference`); rusty only shapes them into tables.
 
 ### What a set is made of (#380)
 

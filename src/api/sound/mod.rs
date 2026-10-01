@@ -33,7 +33,10 @@
 //! Every bake verb returns `path, level`: the path first, because callers feed it
 //! straight to `Audio.PlayAt`, and the level table second, so the figures are never
 //! one forgotten call away. `Sound.Level(path)` measures any clip on disk the same
-//! way — an import, or an earlier bake being compared against (#378).
+//! way — an import, or an earlier bake being compared against (#378). The table
+//! also carries the bake over time (`sections`), across the spectrum (`bands`) and
+//! track by track (`tracks`), and `Sound.Diff(a, b)` compares two clips field by
+//! field (#379, `diff.rs`).
 //!
 //! `Sound.Survey(paths)` reads a *set* of patch and song documents and counts what
 //! they are made of — source kinds, cutoffs, sustains, registers, tempos — with no
@@ -46,6 +49,7 @@
 //! `Sound` borrows no engine state — it reads a patch and writes a file — so it
 //! registers as a plain static namespace, like `Texture` and `Shader`.
 
+mod diff;
 mod from_lua;
 mod level;
 mod survey;
@@ -54,7 +58,7 @@ use mlua::{Lua, Table, Value};
 
 use super::{put, Reg};
 use from_lua::{note_from_value, opts_from_table, patch_from_lua, song_from_lua};
-use level::{level_table, measure_file};
+use level::{measure_file, report_table};
 use zimmer::{Bake, Patch, Song};
 
 /// Register the `Sound` namespace onto `lua`.
@@ -85,11 +89,15 @@ pub fn register(lua: &Lua) -> Reg {
         &table,
         "Level",
         lua.create_function(|lua, path: String| {
-            level_table(
-                lua,
-                &measure_file(&path).map_err(mlua::Error::RuntimeError)?,
-            )
+            let profile = measure_file(&path).map_err(mlua::Error::RuntimeError)?;
+            report_table(lua, &profile, &[])
         }),
+    )?;
+
+    put(
+        &table,
+        "Diff",
+        lua.create_function(|lua, (a, b): (String, String)| diff::diff(lua, &a, &b)),
     )?;
 
     put(
@@ -166,7 +174,10 @@ fn write_bake<'lua>(lua: &'lua Lua, bake: Bake, path: &str) -> Baked<'lua> {
         std::fs::create_dir_all(dir).map_err(lua_err)?;
     }
     std::fs::write(path, &bake.wav).map_err(lua_err)?;
-    Ok((path.to_string(), level_table(lua, &bake.profile.whole)?))
+    Ok((
+        path.to_string(),
+        report_table(lua, &bake.profile, &bake.tracks)?,
+    ))
 }
 
 /// Any displayable error (zimmer's `SynthError`, serde, I/O) as the Lua error the
@@ -182,3 +193,7 @@ mod bake_tests;
 #[cfg(test)]
 #[path = "level_tests.rs"]
 mod level_tests;
+
+#[cfg(test)]
+#[path = "report_tests.rs"]
+mod report_tests;
