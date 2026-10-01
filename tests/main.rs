@@ -15,6 +15,7 @@
 //! physics files (`cargo test --test integration physics_` works too).
 
 mod layout;
+mod temp;
 
 // ── Both feature sets ────────────────────────────────────────────────────────────
 mod animation_runtime;

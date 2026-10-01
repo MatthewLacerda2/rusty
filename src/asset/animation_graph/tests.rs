@@ -106,7 +106,7 @@ fn absent_optional_fields_default() {
 
 #[test]
 fn save_then_load_round_trips_and_load_rejects_bad_files() {
-    let dir = std::env::temp_dir().join("rusty_animgraph_io");
+    let dir = crate::test_temp::dir().join("rusty_animgraph_io");
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(format!("guard.{GRAPH_EXTENSION}"));
     let graph = sample_graph();
@@ -125,7 +125,7 @@ fn save_then_load_round_trips_and_load_rejects_bad_files() {
 
 #[test]
 fn io_validates_both_directions() {
-    let dir = std::env::temp_dir().join("rusty_animgraph_invalid");
+    let dir = crate::test_temp::dir().join("rusty_animgraph_invalid");
     std::fs::create_dir_all(&dir).unwrap();
     let mut graph = sample_graph();
     graph.entry = "nope".into();

@@ -26,7 +26,7 @@ return { OnPointerClick = function(id, e) print("[ui] terminal " .. e.button) en
 /// terminal canvas 5 m ahead whose screen carries the script above. The camera
 /// sits at the origin looking down -Z. Returns the world, console and ids.
 fn session() -> (GameWorld, Rc<RefCell<ConsoleLogs>>, [u32; 4]) {
-    let script = std::env::temp_dir().join("rusty_429_terminal.lua");
+    let script = crate::temp::dir().join("rusty_429_terminal.lua");
     std::fs::write(&script, TERMINAL).expect("write script");
     let mut s = Scene::new();
     let hud = s.add_entity("Hud".to_string());

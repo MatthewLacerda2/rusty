@@ -26,7 +26,7 @@ const DRAW_CALL_BUDGET: f64 = 100.0;
 
 #[test]
 fn a_prop_heavy_level_renders_in_few_draw_calls() {
-    let out = std::env::temp_dir().join(format!("rusty_instancing_{}", std::process::id()));
+    let out = crate::temp::dir().join(format!("rusty_instancing_{}", std::process::id()));
     let mut h = Harness::new(&out, "");
     h.step(1); // the Lua runtime exists once play has begun
     h.world

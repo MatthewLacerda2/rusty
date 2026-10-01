@@ -41,7 +41,7 @@ fn room_scene() -> Scene {
 /// "place well + bake right now" acceptance, minus the adapter-bound bake itself.
 #[test]
 fn gpu_auto_places_both_sets_on_empty_scene() {
-    let dir = std::env::temp_dir().join("rusty_lighting_bake_test");
+    let dir = crate::test_temp::dir().join("rusty_lighting_bake_test");
     let _ = std::fs::create_dir_all(&dir);
     let scene_path = dir.join("room.scene");
     let scene_path = scene_path.to_str().unwrap();
@@ -73,7 +73,7 @@ fn gpu_auto_places_both_sets_on_empty_scene() {
 /// each set is rebaked in place, with no auto-placement (the documented per-set rule).
 #[test]
 fn gpu_manual_probes_are_kept_not_replaced() {
-    let dir = std::env::temp_dir().join("rusty_lighting_bake_test");
+    let dir = crate::test_temp::dir().join("rusty_lighting_bake_test");
     let _ = std::fs::create_dir_all(&dir);
     let scene_path = dir.join("manual.scene");
     let scene_path = scene_path.to_str().unwrap();

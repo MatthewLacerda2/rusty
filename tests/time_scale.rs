@@ -7,7 +7,7 @@ use rusty::dev::harness::Harness;
 
 /// Hold "W", run `frames` ticks at `scale`, return the player's forward travel.
 fn travel_at_scale(scale: f32, frames: u32) -> f32 {
-    let h = Harness::new(std::env::temp_dir().join("rusty_time_scale"), "");
+    let h = Harness::new(crate::temp::dir().join("rusty_time_scale"), "");
 
     let (player_id, start) = {
         let world = h.world.borrow();

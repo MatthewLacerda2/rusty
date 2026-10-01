@@ -124,7 +124,7 @@ fn more_runtime_params_than_slots_is_an_error() {
 
 #[test]
 fn a_surface_bake_writes_the_layout_beside_the_module() {
-    let dir = std::env::temp_dir().join(format!("rusty_params_{}", std::process::id()));
+    let dir = crate::test_temp::dir().join(format!("rusty_params_{}", std::process::id()));
     let out = dir.to_str().unwrap();
     let mut r = surface(&[("hit_flash", &[])]);
     r.name = "flash".into();

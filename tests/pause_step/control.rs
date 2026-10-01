@@ -43,7 +43,7 @@ fn pause_keeps_play_state_unlike_stop() {
     // Mutate the world in play mode, then pause: the mutation must survive (pause is a
     // freeze, not a reset). This is the exact behaviour Stop does NOT have — Stop runs
     // `exit_play` and restores the edit snapshot, discarding the mutation.
-    let h = Harness::new(std::env::temp_dir().join("rusty_pause_not_stop"), "");
+    let h = Harness::new(crate::temp::dir().join("rusty_pause_not_stop"), "");
     let player = player_id(&h);
     // Step once so play mode is fully entered, then mutate.
     h.step(1);

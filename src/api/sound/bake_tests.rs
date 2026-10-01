@@ -10,7 +10,7 @@ use super::*;
 /// into a Lua string literal trips Lua's escape parser (`\U`), and Windows accepts
 /// `/` for file I/O, so the round-trip matches on every platform.
 pub(super) fn tmp(name: &str) -> String {
-    std::env::temp_dir()
+    crate::test_temp::dir()
         .join(name)
         .to_str()
         .expect("utf-8 temp path")

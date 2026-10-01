@@ -16,7 +16,7 @@ return Brain
 
 /// Run `frames` ticks with the RNG script as the enemy brain; return its prints.
 fn rng_lines(dir: &str, frames: u32) -> Vec<String> {
-    let out = std::env::temp_dir().join(dir);
+    let out = crate::temp::dir().join(dir);
     std::fs::create_dir_all(&out).expect("temp dir");
     let script = out.join("rng_brain.lua");
     std::fs::write(&script, SCRIPT).expect("write script");

@@ -129,7 +129,7 @@ fn canvas_and_rect_transform_survive_save_and_load() {
     if let Some(mut c) = scene.world.canvas_mut(canvas) {
         c.sort_order = -2;
     }
-    let path = std::env::temp_dir()
+    let path = crate::temp::dir()
         .join(format!("rusty_ui_api_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();

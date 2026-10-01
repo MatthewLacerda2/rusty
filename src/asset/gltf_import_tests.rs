@@ -18,7 +18,7 @@ const TRIANGLE_FAN: u32 = 6;
 /// Write the [`quad_mode_gltf`] fixture pair into its own temp dir and import
 /// the one `Quad` sub-mesh.
 fn import_quad(name: &str, mode: u32, indices: &[u16]) -> SubMesh {
-    let dir = std::env::temp_dir().join(format!("rusty_mode_{name}"));
+    let dir = crate::test_temp::dir().join(format!("rusty_mode_{name}"));
     std::fs::create_dir_all(&dir).unwrap();
     let (json, bin) = quad_mode_gltf(mode, indices);
     std::fs::write(dir.join("quad.bin"), bin).unwrap();

@@ -2,7 +2,8 @@ use super::*;
 
 /// A per-test temp file, unique to this process so parallel runs never collide.
 fn temp_path(name: &str) -> PathBuf {
-    let path = std::env::temp_dir().join(format!("rusty_build_{}_{name}.json", std::process::id()));
+    let path =
+        crate::test_temp::dir().join(format!("rusty_build_{}_{name}.json", std::process::id()));
     let _ = std::fs::remove_file(&path);
     path
 }

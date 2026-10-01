@@ -31,7 +31,7 @@ fn entity_spec() -> impl Strategy<Value = EntitySpec> {
 }
 
 fn tmp(tag: u64) -> String {
-    std::env::temp_dir()
+    crate::temp::dir()
         .join(format!("rusty_proptest_scene_{tag}.scene"))
         .to_string_lossy()
         .into_owned()

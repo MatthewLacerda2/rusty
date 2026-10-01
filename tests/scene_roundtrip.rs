@@ -5,10 +5,7 @@ use rusty::scene::Scene;
 use rusty::scene::SceneSnapshot;
 
 fn tmp(name: &str) -> String {
-    std::env::temp_dir()
-        .join(name)
-        .to_string_lossy()
-        .into_owned()
+    crate::temp::dir().join(name).to_string_lossy().into_owned()
 }
 
 #[test]

@@ -14,7 +14,7 @@ fn write_prefab(tag: &str) -> String {
     let root = create_entity(&mut scene, "Root", Some(Primitive::Box));
     let child = create_entity(&mut scene, "Child", Some(Primitive::Sphere));
     scene.set_parent(child, Some(root)).unwrap();
-    let path = std::env::temp_dir()
+    let path = crate::test_temp::dir()
         .join(format!("rusty_268_{tag}.prefab"))
         .to_string_lossy()
         .into_owned();

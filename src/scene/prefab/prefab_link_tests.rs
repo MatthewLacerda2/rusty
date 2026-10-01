@@ -23,7 +23,7 @@ fn write_prefab(tag: &str) -> String {
             material: "Stone".into(),
         }),
     );
-    let path = std::env::temp_dir()
+    let path = crate::test_temp::dir()
         .join(format!("rusty_216_{tag}.prefab"))
         .to_string_lossy()
         .into_owned();

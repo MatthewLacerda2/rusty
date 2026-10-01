@@ -61,7 +61,7 @@ fn a_label_fits_its_unwrapped_string() {
 
 #[test]
 fn an_image_fits_its_native_texture_size() {
-    let path = std::env::temp_dir().join("rusty_421_native_64x32.png");
+    let path = crate::test_temp::dir().join("rusty_421_native_64x32.png");
     image::RgbaImage::new(64, 32)
         .save(&path)
         .expect("write png");

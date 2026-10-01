@@ -12,7 +12,7 @@ use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
 
 fn tmp(name: &str) -> std::path::PathBuf {
-    std::env::temp_dir().join(name)
+    crate::temp::dir().join(name)
 }
 
 fn vc(exposure: f32) -> VisualCorrectionComponent {

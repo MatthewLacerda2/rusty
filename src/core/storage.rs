@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn open_flush_roundtrips_through_a_file() {
-        let path = std::env::temp_dir().join("rusty_storage_roundtrip.json");
+        let path = crate::test_temp::dir().join("rusty_storage_roundtrip.json");
         let _ = std::fs::remove_file(&path);
 
         let mut s = Storage::new();
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn missing_file_is_not_an_error() {
-        let path = std::env::temp_dir().join("rusty_storage_absent_xyz.json");
+        let path = crate::test_temp::dir().join("rusty_storage_absent_xyz.json");
         let _ = std::fs::remove_file(&path);
         let mut s = Storage::new();
         assert!(s.open(&path).is_ok());

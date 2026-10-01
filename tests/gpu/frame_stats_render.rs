@@ -6,7 +6,7 @@ use rusty::dev::harness::Harness;
 
 #[test]
 fn a_screenshot_records_render_counters() {
-    let out = std::env::temp_dir().join(format!("rusty_stats_gpu_{}", std::process::id()));
+    let out = crate::temp::dir().join(format!("rusty_stats_gpu_{}", std::process::id()));
     let mut h = Harness::new(&out, "");
     h.step(2);
     if !h.screenshot(out.join("shot.png")) {

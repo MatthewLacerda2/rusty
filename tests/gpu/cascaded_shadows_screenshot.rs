@@ -53,7 +53,7 @@ fn darkened_pixels(shadowed: &std::path::Path, unshadowed: &std::path::Path) -> 
 #[test]
 fn a_caster_far_from_the_origin_still_casts() {
     let cam = Camera::new(FAR_OUT + Vec3::new(0.0, 12.0, 12.0), -90.0, -45.0);
-    let dir = std::env::temp_dir();
+    let dir = crate::temp::dir();
     let shadowed = dir.join(format!("rusty_csm_on_{}.png", std::process::id()));
     let unshadowed = dir.join(format!("rusty_csm_off_{}.png", std::process::id()));
     let on = capture(&yard(100.0), &cam, &shadowed, 96, 96).expect("capture");

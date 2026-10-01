@@ -89,7 +89,7 @@ fn a_joint_survives_save_and_load() {
         ..Default::default()
     };
     scene.world.set_joint(body, Some(joint.clone()));
-    let path = std::env::temp_dir()
+    let path = crate::temp::dir()
         .join(format!("rusty_joint_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();

@@ -11,7 +11,7 @@ use super::ui_hud_scene::{hud, SIZE};
 
 #[test]
 fn hud_draws_fill_slices_fades_and_clips() {
-    let path = std::env::temp_dir().join("rusty_ui_hud.png");
+    let path = crate::temp::dir().join("rusty_ui_hud.png");
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
     if !capture(&hud(), &cam, &path, SIZE, SIZE).expect("capture must not error") {
         eprintln!("[ui] no GPU/software adapter — skipping visual assertion");

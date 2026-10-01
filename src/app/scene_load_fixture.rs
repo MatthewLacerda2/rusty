@@ -16,7 +16,7 @@ use super::super::GameWorld;
 /// Update loads the level, and a `Music` that marks itself `DontDestroyOnLoad`) and
 /// `level.scene` (one `Level`). Returns `(menu path, level path)`.
 pub(super) fn write_scenes(tag: &str) -> (String, String) {
-    let dir = std::env::temp_dir().join(format!("rusty_432_{tag}"));
+    let dir = crate::test_temp::dir().join(format!("rusty_432_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
     let path = |name: &str| dir.join(name).to_string_lossy().replace('\\', "/");
     let level = path("level.scene");

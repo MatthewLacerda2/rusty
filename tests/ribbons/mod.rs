@@ -30,7 +30,7 @@ fn eval(lua: &Lua, code: &str) -> String {
 
 /// Save `scene` to a temp file and load it back.
 fn round_trip(scene: &Scene, name: &str) -> Scene {
-    let path = std::env::temp_dir()
+    let path = crate::temp::dir()
         .join(format!("rusty_{name}_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();

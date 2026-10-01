@@ -5,7 +5,7 @@ use super::*;
 use std::path::PathBuf;
 
 fn tmp(name: &str) -> PathBuf {
-    let mut p = std::env::temp_dir();
+    let mut p = crate::test_temp::dir();
     p.push(format!("rusty_asset_{name}"));
     p
 }
@@ -49,7 +49,7 @@ fn gltf_reads_full_metallic_roughness_material() {
     // The fixture lives in its own dir so the resolved texture path is predictable.
     // `gltf::import` eagerly decodes external images, so the referenced PNG must exist
     // on disk — write a 1x1 PNG at the URI the fixture points at.
-    let dir = std::env::temp_dir().join("rusty_textured_fixture");
+    let dir = crate::test_temp::dir().join("rusty_textured_fixture");
     std::fs::create_dir_all(dir.join("tex")).unwrap();
     std::fs::write(dir.join("tex/brick wall.png"), ONE_PX_PNG).unwrap();
     let gltf_path = dir.join("model.gltf");
@@ -90,7 +90,7 @@ fn gltf_embedded_material_uses_spec_defaults() {
 #[test]
 fn gltf_imports_skin_and_bind_pose_palette() {
     // The skinned glTF references a sibling `model.bin`; write both, then import.
-    let dir = std::env::temp_dir().join("rusty_skin_fixture");
+    let dir = crate::test_temp::dir().join("rusty_skin_fixture");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("model.bin"), super::fixtures::skinned_buffer()).unwrap();
     let gltf_path = dir.join("model.gltf");
@@ -127,7 +127,7 @@ fn gltf_imports_skin_and_bind_pose_palette() {
 #[test]
 fn gltf_imports_named_animation_clip() {
     use super::fixtures_anim::{animated_buffer, ANIMATED_GLTF};
-    let dir = std::env::temp_dir().join("rusty_anim_fixture");
+    let dir = crate::test_temp::dir().join("rusty_anim_fixture");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("anim.bin"), animated_buffer()).unwrap();
     let gltf_path = dir.join("model.gltf");

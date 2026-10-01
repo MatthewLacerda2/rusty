@@ -23,7 +23,7 @@ use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
 
 fn tmp(name: &str) -> std::path::PathBuf {
-    std::env::temp_dir().join(name)
+    crate::temp::dir().join(name)
 }
 
 /// 2x2 black RGBA PNG. Metallic reads the BLUE channel (glTF convention), so

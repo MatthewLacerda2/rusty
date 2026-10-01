@@ -127,7 +127,7 @@ mod tests {
     fn bake_writes_a_composing_postfx_module() {
         let lua = Lua::new();
         register(&lua).unwrap();
-        let dir = std::env::temp_dir().join("rusty_shader_api_bake");
+        let dir = crate::test_temp::dir().join("rusty_shader_api_bake");
         // Pass the path as a Lua global *value*, not interpolated into the Lua
         // source: a Windows path embedded in a string literal trips Lua's escape
         // parser (`\U`). As a global it's a plain string, safe on every platform.

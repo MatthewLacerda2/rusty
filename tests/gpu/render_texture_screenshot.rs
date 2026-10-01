@@ -14,7 +14,7 @@ fn is_red(px: [u8; 3]) -> bool {
 
 #[test]
 fn an_image_shows_what_a_second_camera_sees() {
-    let path = std::env::temp_dir().join("rusty_render_texture.png");
+    let path = crate::temp::dir().join("rusty_render_texture.png");
     let mut host = CaptureHost::new();
     let scene = pip_scene(Some(RenderTarget::new("pip", 64, 128)));
     let shot = capture_into(&mut host, &scene, &screen_camera(), &path, SIZE, SIZE);
@@ -38,7 +38,7 @@ fn an_image_shows_what_a_second_camera_sees() {
 
 #[test]
 fn without_its_camera_the_image_shows_no_picture() {
-    let path = std::env::temp_dir().join("rusty_render_texture_none.png");
+    let path = crate::temp::dir().join("rusty_render_texture_none.png");
     let mut host = CaptureHost::new();
     let shot = capture_into(
         &mut host,
@@ -59,7 +59,7 @@ fn without_its_camera_the_image_shows_no_picture() {
 
 #[test]
 fn update_every_skips_frames_between_draws() {
-    let path = std::env::temp_dir().join("rusty_render_texture_every.png");
+    let path = crate::temp::dir().join("rusty_render_texture_every.png");
     let mut host = CaptureHost::new();
     let mut target = RenderTarget::new("pip", 64, 128);
     target.update_every = 2;
@@ -80,7 +80,7 @@ fn update_every_skips_frames_between_draws() {
 
 #[test]
 fn a_material_map_shows_it_on_an_in_world_monitor() {
-    let path = std::env::temp_dir().join("rusty_render_texture_monitor.png");
+    let path = crate::temp::dir().join("rusty_render_texture_monitor.png");
     let mut host = CaptureHost::new();
     // Two frames: the second also samples a texture the camera drew the frame before.
     for _ in 0..2 {

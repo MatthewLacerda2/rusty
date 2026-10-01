@@ -10,10 +10,7 @@ use glam::Vec3;
 use rusty::scene::{analytic_fill, sidecar_path, Scene};
 
 fn tmp(name: &str) -> String {
-    std::env::temp_dir()
-        .join(name)
-        .to_string_lossy()
-        .into_owned()
+    crate::temp::dir().join(name).to_string_lossy().into_owned()
 }
 
 /// The whole-path acceptance: a height-varying analytic fill makes the sampled

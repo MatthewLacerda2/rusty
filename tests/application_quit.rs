@@ -5,7 +5,7 @@ use rusty::dev::harness::Harness;
 
 #[test]
 fn quit_ends_a_headless_run() {
-    let out = std::env::temp_dir().join(format!("rusty_quit_{}", std::process::id()));
+    let out = crate::temp::dir().join(format!("rusty_quit_{}", std::process::id()));
     let h = Harness::new(&out, "");
     h.step(5);
     assert_eq!(h.frame(), 5);
@@ -27,7 +27,7 @@ fn quit_ends_a_headless_run() {
 
 #[test]
 fn a_run_that_never_quits_reports_quit_false() {
-    let out = std::env::temp_dir().join(format!("rusty_noquit_{}", std::process::id()));
+    let out = crate::temp::dir().join(format!("rusty_noquit_{}", std::process::id()));
     let h = Harness::new(&out, "");
     h.step(3);
     let results = std::fs::read_to_string(h.write_results().unwrap()).unwrap();

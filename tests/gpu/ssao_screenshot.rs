@@ -39,7 +39,7 @@ fn yard(with_crate: bool, ssao: bool) -> Scene {
 /// Pixels clearly darker in `on` than in `off`, or `None` when no adapter rendered.
 fn darkened(with_crate: bool, tag: &str) -> Option<usize> {
     let cam = Camera::new(Vec3::new(0.0, 2.5, 5.0), -90.0, -20.0);
-    let dir = std::env::temp_dir();
+    let dir = crate::temp::dir();
     let id = std::process::id();
     let on_path = dir.join(format!("rusty_ssao_{tag}_on_{id}.png"));
     let off_path = dir.join(format!("rusty_ssao_{tag}_off_{id}.png"));

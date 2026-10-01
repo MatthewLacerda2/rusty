@@ -52,7 +52,7 @@ const NO_MATERIAL_GLTF: &str = r#"{
 "#;
 
 fn write_gltf(name: &str, body: &str) -> String {
-    let path = std::env::temp_dir().join(name);
+    let path = crate::test_temp::dir().join(name);
     std::fs::write(&path, body).unwrap();
     path.to_string_lossy().into_owned()
 }

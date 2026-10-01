@@ -7,7 +7,7 @@ use super::{import_sub_mesh, AssetRef};
 
 /// A fresh, unique temp dir to act as an isolated asset root per test.
 fn tmp_root(name: &str) -> std::path::PathBuf {
-    let mut p = std::env::temp_dir();
+    let mut p = crate::test_temp::dir();
     p.push(format!("rusty_manifest_{name}_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&p);
     std::fs::create_dir_all(&p).unwrap();
@@ -81,7 +81,7 @@ fn gltf_material_count_is_one() {
 
 #[test]
 fn missing_root_yields_empty_manifest() {
-    let root = std::env::temp_dir().join("rusty_manifest_does_not_exist_xyz");
+    let root = crate::test_temp::dir().join("rusty_manifest_does_not_exist_xyz");
     let _ = std::fs::remove_dir_all(&root);
     let manifest = build_manifest(&root);
     assert!(manifest.assets.is_empty());

@@ -130,7 +130,7 @@ fn graphics_components_survive_save_and_load() {
         padding: Vec4::splat(2.0),
     };
     scene.world.set_rect_mask(id, Some(mask.clone()));
-    let path = std::env::temp_dir()
+    let path = crate::temp::dir()
         .join(format!("rusty_ui_graphics_{}.json", std::process::id()))
         .to_string_lossy()
         .into_owned();

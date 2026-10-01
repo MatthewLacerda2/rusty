@@ -24,7 +24,7 @@ const DT: f32 = 1.0 / 60.0;
 /// each test's temp script file distinct — the tests run in parallel threads,
 /// and a shared path is a write/load race.
 fn world_with_script(tag: &str, code: &str) -> (GameWorld, Rc<RefCell<ConsoleLogs>>, u32) {
-    let script = std::env::temp_dir().join(format!("rusty_323_lifecycle_{tag}.lua"));
+    let script = crate::test_temp::dir().join(format!("rusty_323_lifecycle_{tag}.lua"));
     std::fs::write(&script, code).unwrap();
 
     let mut s = Scene::new();
