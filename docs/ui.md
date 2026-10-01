@@ -4,7 +4,7 @@ rusty's in-game UI is **Unity 5's uGUI, adapted** — HUDs, menus and overlays a
 from ordinary GameObjects. This page is the model: what the pieces are, how layout works,
 and the rules that keep it deterministic. The roadmap is the tracking issue #414; the
 script surface is in [`api/`](api/index.md) (`Canvas`, `RectTransform`,
-`UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Selectable`, `LayoutGroup`,
+`UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Shape`, `Selectable`, `LayoutGroup`,
 `LayoutElement`); the widget kit built on them is [*Widgets*](#widgets) below.
 
 > Status: the model, the `Canvas` and `RectTransform` components and the layout pass
@@ -13,7 +13,8 @@ script surface is in [`api/`](api/index.md) (`Canvas`, `RectTransform`,
 > and `Selectable` (#420); layout groups and content fitting — `LayoutGroup` and
 > `LayoutElement` (#421); the widget kit — Button, Toggle, Slider, Scrollbar,
 > Scroll View, Dropdown, Input Field (#422); world-space UI — world and camera
-> canvases, world ↔ screen projection and world-anchored markers (#429).
+> canvases, world ↔ screen projection and world-anchored markers (#429); the look —
+> `Shape`, gradients, glow / shadow and blend modes (#425).
 
 ## The model
 
@@ -23,7 +24,7 @@ script surface is in [`api/`](api/index.md) (`Canvas`, `RectTransform`,
   prefabs, scene save and the Play/Stop snapshot all apply unchanged. There is no separate
   UI document or markup world, and no egui in the game (egui stays the editor's toolkit).
 - **Primitives in Rust, widgets in Lua.** First-class components are the primitives
-  (`Canvas`, `RectTransform`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Selectable`, …);
+  (`Canvas`, `RectTransform`, `Image`, `Shape`, `CanvasGroup`, `RectMask`, `Text`, `Selectable`, …);
   Button, Slider, Dropdown and the rest ship as engine Lua scripts + prefabs.
 
 ### `Canvas`
@@ -243,6 +244,91 @@ distance, antialiased over one screen pixel, so text stays sharp at any size or
 scale. Synthesized italic shears the glyph quad; synthesized bold dilates the field
 and widens the advance slightly.
 
+### Look: shapes, gradients, effects and blend modes
+
+The vocabulary that makes a HUD look designed rather than debug (#425): most of a
+Cyberpunk-style interface is thin cut-corner frames, additive neon lines, soft glows
+and gradients — built here from parameters, not bitmaps.
+
+**`Shape`** is a texture-free graphic drawn from a **signed distance field**, so it
+stays crisp at any scale and costs one quad. It fills its entity's laid-out rect
+(rotation and scale included; adding one also adds a `RectTransform`):
+
+| Field | Meaning |
+|---|---|
+| `kind` | `Rect`, `Ellipse` (inscribed), `Ring` (a circle of the rect's smaller half-extent) or `Line` (along the rect's horizontal centre line — rotate the RectTransform to aim it). |
+| `corner`, `radius` | `Rect`: per-corner size (top-left, top-right, bottom-right, bottom-left) that either rounds (`Round`) or cuts at 45° (`Chamfer`). |
+| `inner_radius`, `arc_start`, `arc_end` | `Ring`: the hole (0 = disc or pie) and the arc, degrees clockwise from 12 o'clock — crosshair arcs, radial progress. A sweep ≥ 360° is the whole ring. |
+| `thickness`, `dash`, `gap` | `Line`: thickness and dash pattern (dash 0 = solid), starting at the rect's left edge. |
+| `color` / `gradient` | The fill: a colour, or a gradient (below). |
+| `border_width`, `border_color` | The outline: a band inside the edge. |
+| `shadow` | `offset`, `blur`, `color` — a soft copy under the shape (alpha 0 = off). |
+| `glow` | `size`, `intensity`, `color` — a halo fading out from the edge over `size` (quadratic falloff); `intensity` > 1 runs hotter, best with `Additive`. |
+| `blend`, `raycast_target` | As on every graphic. A `Selectable`'s `ColorTint` tints a Shape like an Image, so a Button can be skinned entirely with shapes. |
+
+**Gradients** replace an `Image`'s tint (multiplying its texture) or a `Shape`'s fill:
+2–4 colour stops swept `Linear`ly at an `angle` (corner to corner) or `Radial`ly from a
+`center` out to a `radius`, all in fractions of the rect so they scale with it. Stops
+interpolate in display space, like everything else the UI blends.
+
+**Blend modes** — `Normal`, `Additive`, `Multiply`, `Screen` — are on every graphic
+(`Image`, `Text`, `Shape`). They act in display space on premultiplied colour, so they
+read as an image editor's layer modes: `Additive` brightens (neon, glows, hit
+flashes), `Multiply` darkens (white leaves the backdrop unchanged), `Screen` lightens
+(black leaves it unchanged).
+
+**Effects by graphic.** Shape and Text are both SDF graphics, and both cut their
+effects from their own field: a Shape has `shadow` and `glow` (its `border` is the
+outline), a Text has `outline`, `shadow` and `glow` (above). A textured `Image` has
+none yet: its effects need a blurred-alpha pass of the texture, deferred to a
+follow-up — put a `Shape` behind it for a frame, glow or shadow.
+
+**Recipe — a Cyberpunk panel.** Dark glass with cut corners, a neon edge and glow, a
+gradient header strip and an additive dashed scan line (`hud` is a canvas; this exact
+script is exercised by `tests/ui_look_api.rs`):
+
+```lua
+-- A Cyberpunk panel: dark glass with cut corners, a neon edge and glow, a
+-- gradient header strip and an additive dashed scan line. `hud` is a canvas.
+local function element(name, parent, x, y, w, h)
+  local id = Scene.CreateEntity(name)
+  Scene.SetParent(id, parent)
+  Scene.AddComponent(id, "Shape") -- also adds a RectTransform
+  RectTransform.SetAnchorMin(id, 0, 0)
+  RectTransform.SetAnchorMax(id, 0, 0)
+  RectTransform.SetPivot(id, 0, 0)
+  RectTransform.SetAnchoredPosition(id, x, y)
+  RectTransform.SetSizeDelta(id, w, h)
+  return id
+end
+
+local panel = element("Panel", hud, 64, 64, 480, 220)
+Shape.SetCorner(panel, "Chamfer")
+Shape.SetRadius(panel, 24, 0, 24, 0)            -- cut top-left and bottom-right
+Shape.SetColor(panel, 0.02, 0.05, 0.08, 0.85)   -- dark glass
+Shape.SetBorder(panel, 2, 0.0, 0.95, 1.0, 1.0)  -- neon cyan edge
+Shape.SetGlow(panel, 14, 0.8, 0.0, 0.95, 1.0, 1.0)
+Shape.SetShadow(panel, 6, -6, 8, 0, 0, 0, 0.6)
+
+local header = element("Header", panel, 24, 180, 432, 24)
+Shape.SetCorner(header, "Chamfer")
+Shape.SetRadius(header, 0, 12, 0, 0)
+Shape.SetGradient(header, { angle = 0, stops = {
+  { t = 0, color = { 1.0, 0.1, 0.4, 0.9 } },
+  { t = 1, color = { 1.0, 0.1, 0.4, 0.0 } },
+} })
+
+local scan = element("ScanLine", panel, 24, 160, 432, 4)
+Shape.SetKind(scan, "Line")
+Shape.SetThickness(scan, 2)
+Shape.SetDash(scan, 12, 6)
+Shape.SetColor(scan, 0.0, 0.95, 1.0, 0.6)
+Shape.SetBlend(scan, "Additive")
+```
+
+It costs **two draw calls**: the panel (its shadow, glow and body) and the header
+batch together as `Normal` solid geometry; the scan line's `Additive` is a new batch.
+
 ### The pass
 
 - **When.** Inside `Renderer::render`, **after the whole post-FX chain** (after FXAA):
@@ -268,10 +354,13 @@ and widens the advance slightly.
   format — some GL drivers — falls back to blending in linear space: a little off, never
   broken.)
 - **Batching.** One vertex buffer per canvas per view. Consecutive graphics sharing a
-  source — a texture, or a font's atlas — and a clip are one draw call; a change of
-  either starts the next — so a HUD of solid bars is one draw call however many bars
-  it has, and a label one draw call however many glyphs. An entity with both an
-  `Image` and a `Text` draws the image, then the text.
+  source — a texture, or a font's atlas — a blend mode and a clip are one draw call;
+  a change of any starts the next — so a HUD of solid bars is one draw call however
+  many bars it has, and a label one draw call however many glyphs. Shapes are solid,
+  so they batch with solid images. Each blend mode is its own pipeline, so a HUD
+  alternating `Normal` and `Additive` graphics pays a draw per switch: keep additive
+  elements adjacent in hierarchy order (`RenderCounters::ui_draws` reports the count).
+  An entity with several graphics draws its `Image`, then its `Shape`, then its `Text`.
 - **Dirty.** Each view keeps every canvas's mesh beside its buffer. Rebuilding the CPU
   mesh is a cheap walk; the buffer is re-uploaded only when the canvas's geometry
   changed (a layout or graphic change) and reallocated only when it outgrows its

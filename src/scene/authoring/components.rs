@@ -63,6 +63,7 @@ component_kinds! {
         LodGroup,
         Trail,
         Line,
+        Shape,
     }
 }
 
@@ -74,7 +75,7 @@ impl ComponentKind {
     /// `kind → [kinds]`: `VisualCorrection → Camera` (a correction stack is inert
     /// without a camera to correct), and the UI graphic and clip need a rect to fill
     /// or clip to, a Selectable a rect to be hit in, and the layout pair a rect to
-    /// arrange or size (`Image` / `Text` / `RectMask` / `Selectable` / `LayoutGroup` /
+    /// arrange or size (`Image` / `Text` / `Shape` / `RectMask` / `Selectable` / `LayoutGroup` /
     /// `LayoutElement → RectTransform`, as Unity's `Graphic`, `RectMask2D` and
     /// layout components require one), and a Joint the Rigidbody it constrains
     /// (`Joint → RigidBody`, as Unity's `Joint`). A new dependency is one line here, enforced
@@ -84,6 +85,7 @@ impl ComponentKind {
             ComponentKind::VisualCorrection => &[ComponentKind::Camera],
             ComponentKind::Image
             | ComponentKind::Text
+            | ComponentKind::Shape
             | ComponentKind::RectMask
             | ComponentKind::Selectable
             | ComponentKind::LayoutGroup
@@ -120,6 +122,7 @@ impl ComponentKind {
             "lodgroup" | "lod" => Some(Self::LodGroup),
             "trail" | "trailrenderer" => Some(Self::Trail),
             "line" | "linerenderer" => Some(Self::Line),
+            "shape" => Some(Self::Shape),
             _ => None,
         }
     }

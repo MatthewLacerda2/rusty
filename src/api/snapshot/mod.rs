@@ -30,7 +30,7 @@ use components::{
 use components::{joint_value, line_value, lod_group_value, trail_value};
 use ui::{
     canvas_group_value, canvas_value, image_value, layout_element_value, layout_group_value,
-    rect_mask_value, rect_transform_value, selectable_value, text_value,
+    rect_mask_value, rect_transform_value, selectable_value, shape_value, text_value,
 };
 
 /// A `glam::Vec3` as a `[x, y, z]` JSON array. Shared with the `components` and `ui` builders.
@@ -120,6 +120,7 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -
         "canvas_group": world.canvas_group(id).map(|g| canvas_group_value(&g)),
         "rect_mask": world.rect_mask(id).map(|m| rect_mask_value(&m)),
         "text": world.text(id).map(|t| text_value(&t)),
+        "shape": world.shape(id).map(|s| shape_value(&s)),
         "selectable": world.selectable(id).map(|s| selectable_value(&s)),
         "layout_group": world.layout_group(id).map(|g| layout_group_value(&g)),
         "layout_element": world.layout_element(id).map(|e| layout_element_value(&e)),
@@ -153,6 +154,7 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
         (World::has_canvas_group, "CanvasGroup"),
         (World::has_rect_mask, "RectMask"),
         (World::has_text, "Text"),
+        (World::has_shape, "Shape"),
         (World::has_selectable, "Selectable"),
         (World::has_layout_group, "LayoutGroup"),
         (World::has_layout_element, "LayoutElement"),

@@ -4,7 +4,7 @@
 //! ([`EventSystem::state_of`]) is shown on its target graphic — the Selectable's
 //! `target_graphic`, or its own entity:
 //!
-//! - `ColorTint` fades the target's `state_tint` (on its Image and its Text) to the
+//! - `ColorTint` fades the target's `state_tint` (on its Image, Shape and Text) to the
 //!   state's colour, linearly over `fade_duration` seconds of **unscaled** time, so a
 //!   menu under `Time.SetTimeScale(0)` still animates. A Selectable seen for the first
 //!   time starts at its colour, without a fade.
@@ -56,6 +56,9 @@ impl EventSystem {
                 if image.override_texture != sprite {
                     image.override_texture = sprite;
                 }
+            }
+            if let Some(mut shape) = world.shape_mut(target) {
+                shape.state_tint = tint;
             }
             if let Some(mut text) = world.text_mut(target) {
                 text.state_tint = tint;

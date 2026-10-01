@@ -15,6 +15,8 @@
 use glam::{Vec2, Vec4};
 use serde::{Deserialize, Serialize};
 
+use super::look::UiBlend;
+
 /// Where the text block sits in its rect — Unity's nine `TextAnchor`s.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TextAlignment {
@@ -113,6 +115,8 @@ pub struct TextComponent {
     pub glow_size: f32,
     /// Glow colour, display space, straight alpha.
     pub glow_color: Vec4,
+    /// How it composites onto the frame (#425).
+    pub blend: UiBlend,
     /// Runtime only, never saved: the colour a `Selectable`'s `ColorTint` multiplies
     /// into every text colour (Unity's `CanvasRenderer` colour). Written by the event
     /// system (#420).
@@ -145,6 +149,7 @@ impl Default for TextComponent {
             shadow_color: Vec4::new(0.0, 0.0, 0.0, 0.5),
             glow_size: 0.0,
             glow_color: Vec4::new(0.0, 1.0, 1.0, 0.75),
+            blend: UiBlend::Normal,
             state_tint: Vec4::ONE,
         }
     }

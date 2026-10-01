@@ -92,6 +92,11 @@ pub fn set_raycast_target(t: &mut TextComponent, target: bool) {
     t.raycast_target = target;
 }
 
+/// Set how it composites onto the frame (#425).
+pub fn set_blend(t: &mut TextComponent, blend: crate::components::UiBlend) {
+    t.blend = blend;
+}
+
 /// Set the outline: thickness in ems (≥ 0) and colour.
 pub fn set_outline(t: &mut TextComponent, width: f32, color: Vec4) {
     t.outline_width = width.max(0.0);

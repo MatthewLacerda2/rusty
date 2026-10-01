@@ -292,6 +292,7 @@ One file per namespace, in reference order:
 - [`LayoutGroup`](LayoutGroup.md)
 - [`LayoutElement`](LayoutElement.md)
 - [`Text`](Text.md)
+- [`Shape`](Shape.md)
 - [`Application`](Application.md)
 - [`Storage`](Storage.md)
 - [`Debug`](Debug.md)

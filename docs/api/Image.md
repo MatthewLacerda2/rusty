@@ -20,6 +20,8 @@ How each type draws is in [`docs/ui.md`](../ui.md).
 | `Image.GetFillClockwise` / `SetFillClockwise` | `(id)` / `(id, bool)` | `Radial360` sweep direction |
 | `Image.GetPreserveAspect` / `SetPreserveAspect` | `(id)` / `(id, bool)` | `Simple`: fit the texture's aspect inside the rect |
 | `Image.GetRaycastTarget` / `SetRaycastTarget` | `(id)` / `(id, bool)` | whether the pointer can hit it |
+| `Image.GetGradient` / `SetGradient` | `(id)` / `(id, gradient)` | a gradient tint in place of the colour (the table in [`Shape`](Shape.md)), or `nil`; `nil` clears it (#425) |
+| `Image.GetBlend` / `SetBlend` | `(id)` / `(id, name)` | `"Normal"`, `"Additive"`, `"Multiply"` or `"Screen"` (#425) |
 
 Name setters are case-insensitive; an unrecognized name is ignored. A health bar
 is `SetType(id, "Filled")` + `SetFillAmount(id, hp / max)`; a cooldown ring is the

@@ -6,6 +6,7 @@
 //! under the element's inherited clip, with its CanvasGroup alpha folded into the
 //! fill, outline and glow colours.
 
+use bytemuck::Zeroable;
 use glam::{Vec2, Vec4};
 
 use super::atlas::FontAtlases;
@@ -59,7 +60,8 @@ pub(in crate::render::ui) fn push_text(
             outline: (quad.outline * alpha).to_array(),
             glow: (quad.glow * alpha).to_array(),
             sdf: quad.sdf,
+            ..Zeroable::zeroed()
         }));
-        close_batch(mesh, UiSource::Font(quad.font), clip, start);
+        close_batch(mesh, (UiSource::Font(quad.font), text.blend), clip, start);
     }
 }

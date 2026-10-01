@@ -11,7 +11,8 @@
 
 use glam::Vec4;
 
-use crate::components::{FillMethod, FillOrigin, ImageComponent, ImageType};
+use super::ui_look::sanitize_gradient;
+use crate::components::{FillMethod, FillOrigin, ImageComponent, ImageType, UiBlend, UiGradient};
 
 /// Set the RGBA tint (display space, straight alpha), each channel clamped to `[0, 1]`.
 pub fn set_color(i: &mut ImageComponent, color: Vec4) {
@@ -63,6 +64,16 @@ pub fn set_preserve_aspect(i: &mut ImageComponent, preserve: bool) {
 /// Set whether the pointer can hit this graphic.
 pub fn set_raycast_target(i: &mut ImageComponent, target: bool) {
     i.raycast_target = target;
+}
+
+/// Set (or clear, `None`) the gradient tint; one with fewer than two stops clears it.
+pub fn set_gradient(i: &mut ImageComponent, g: Option<UiGradient>) {
+    i.gradient = g.and_then(sanitize_gradient);
+}
+
+/// Set how it composites onto the frame.
+pub fn set_blend(i: &mut ImageComponent, blend: UiBlend) {
+    i.blend = blend;
 }
 
 /// The origin `method` uses in place of `origin`.

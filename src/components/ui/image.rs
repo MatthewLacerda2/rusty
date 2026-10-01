@@ -12,11 +12,14 @@
 //!
 //! One texel is one reference unit (Unity's 100 pixels-per-unit sprite on a
 //! 100 reference-pixels-per-unit canvas). Colours are in display (sRGB-encoded)
-//! space with straight alpha, as a designer picks them. Authoring data, plus two
+//! space with straight alpha, as a designer picks them. A `gradient` replaces the
+//! flat tint and `blend` picks the compositing mode (#425, `look`). Authoring data, plus two
 //! runtime-only slots a `Selectable` drives (never serialized).
 
 use glam::Vec4;
 use serde::{Deserialize, Serialize};
+
+use super::look::{UiBlend, UiGradient};
 
 /// How the texture maps onto the rect. See the module docs.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,6 +82,10 @@ pub struct ImageComponent {
     pub preserve_aspect: bool,
     /// Whether the pointer can hit this graphic (read by #420).
     pub raycast_target: bool,
+    /// A gradient tint in place of `color` (#425), multiplying the texture.
+    pub gradient: Option<UiGradient>,
+    /// How it composites onto the frame (#425).
+    pub blend: UiBlend,
     /// Runtime only, never saved: the colour a `Selectable`'s `ColorTint` multiplies
     /// in (Unity's `CanvasRenderer` colour). Written by the event system (#420).
     #[serde(skip)]
@@ -102,6 +109,8 @@ impl Default for ImageComponent {
             fill_clockwise: true,
             preserve_aspect: false,
             raycast_target: true,
+            gradient: None,
+            blend: UiBlend::Normal,
             state_tint: Vec4::ONE,
             override_texture: None,
         }

@@ -1,11 +1,11 @@
 //! The Text inspector card (#419): the string, fonts, size, colour, alignment,
 //! wrapping, overflow, spacing, auto-size, rich text and raycast target, plus the
-//! SDF effects (outline, shadow, glow). Widgets edit a snapshot; every write
+//! SDF effects (outline, shadow, glow) and the blend mode (#425). Widgets edit a snapshot; every write
 //! routes through `scene::authoring::text`.
 
 use egui_phosphor::regular as icon;
-use glam::Vec4;
 
+use super::look::{blend_row, color_row, drag_row};
 use super::{combo, vec2_row};
 use crate::components::{TextAlignment, TextComponent};
 use crate::editor::inspector::components::card::component_card;
@@ -48,28 +48,6 @@ fn path_row(ui: &mut egui::Ui, label: &str, path: &mut Option<String>) -> bool {
         .inner;
     *path = Some(s);
     changed
-}
-
-/// A labelled colour button (straight alpha).
-fn color_row(ui: &mut egui::Ui, label: &str, color: &mut Vec4) -> bool {
-    let mut c = color.to_array();
-    let changed = ui
-        .horizontal(|ui| {
-            ui.label(label);
-            ui.color_edit_button_rgba_unmultiplied(&mut c).changed()
-        })
-        .inner;
-    *color = Vec4::from_array(c);
-    changed
-}
-
-/// A labelled drag value.
-fn drag_row(ui: &mut egui::Ui, label: &str, value: &mut f32, speed: f32) -> bool {
-    ui.horizontal(|ui| {
-        ui.label(label);
-        ui.add(egui::DragValue::new(value).speed(speed)).changed()
-    })
-    .inner
 }
 
 /// Fonts, size and colour.
@@ -125,6 +103,7 @@ fn draw_effects(ui: &mut egui::Ui, t: &mut TextComponent) -> bool {
     changed |= color_row(ui, "Shadow Color:", &mut t.shadow_color);
     changed |= drag_row(ui, "Glow (em):", &mut t.glow_size, 0.005);
     changed |= color_row(ui, "Glow Color:", &mut t.glow_color);
+    changed |= blend_row(ui, &mut t.blend);
     changed
 }
 
@@ -147,4 +126,5 @@ fn write_back(t: &mut TextComponent, e: TextComponent) {
     ops::set_outline(t, e.outline_width, e.outline_color);
     ops::set_shadow(t, e.shadow_offset, e.shadow_color);
     ops::set_glow(t, e.glow_size, e.glow_color);
+    ops::set_blend(t, e.blend);
 }

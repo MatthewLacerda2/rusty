@@ -1,9 +1,11 @@
 //! The Image inspector card (#418): tint, texture, image type and the per-type
-//! fields (9-slice border, fill, preserve aspect), plus the raycast target. Widgets
+//! fields (9-slice border, fill, preserve aspect), the raycast target, and the
+//! look (#425): a gradient tint and the blend mode. Widgets
 //! edit a snapshot; every write routes through `scene::authoring::image`.
 
 use egui_phosphor::regular as icon;
 
+use super::look::{blend_row, gradient_editor};
 use super::{combo, vec4_row};
 use crate::components::{FillMethod, FillOrigin, ImageComponent, ImageType};
 use crate::editor::inspector::components::card::component_card;
@@ -32,6 +34,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         changed |= ui
             .checkbox(&mut edit.raycast_target, "Raycast Target")
             .changed();
+        changed |= gradient_editor(ui, &mut edit.gradient);
+        changed |= blend_row(ui, &mut edit.blend);
     });
     if changed {
         if let Some(mut i) = world.image_mut(id) {
@@ -119,4 +123,6 @@ fn write_back(i: &mut ImageComponent, edit: ImageComponent) {
     image_ops::set_fill_clockwise(i, edit.fill_clockwise);
     image_ops::set_preserve_aspect(i, edit.preserve_aspect);
     image_ops::set_raycast_target(i, edit.raycast_target);
+    image_ops::set_gradient(i, edit.gradient);
+    image_ops::set_blend(i, edit.blend);
 }

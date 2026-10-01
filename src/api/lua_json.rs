@@ -109,6 +109,39 @@ fn is_pure_sequence(table: &Table, len: usize) -> bool {
         .all(|(k, _)| matches!(k, Value::Integer(i) if (1..=len).contains(&i)))
 }
 
+/// The reverse of [`table_to_json`]: a JSON value as a Lua value (arrays become
+/// `1..=n` sequences, objects string-keyed tables, `null` nil).
+pub fn json_to_lua<'lua>(
+    lua: &'lua mlua::Lua,
+    value: &serde_json::Value,
+) -> mlua::Result<Value<'lua>> {
+    use serde_json::Value as JsonValue;
+    use Value as LuaValue;
+    Ok(match value {
+        JsonValue::Null => LuaValue::Nil,
+        JsonValue::Bool(b) => LuaValue::Boolean(*b),
+        JsonValue::Number(n) => match n.as_i64() {
+            Some(i) => LuaValue::Integer(i),
+            None => LuaValue::Number(n.as_f64().unwrap_or(0.0)),
+        },
+        JsonValue::String(s) => LuaValue::String(lua.create_string(s)?),
+        JsonValue::Array(items) => {
+            let t = lua.create_table()?;
+            for (i, item) in items.iter().enumerate() {
+                t.raw_set(i + 1, json_to_lua(lua, item)?)?;
+            }
+            LuaValue::Table(t)
+        }
+        JsonValue::Object(map) => {
+            let t = lua.create_table()?;
+            for (k, v) in map {
+                t.raw_set(k.as_str(), json_to_lua(lua, v)?)?;
+            }
+            LuaValue::Table(t)
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use mlua::Lua;

@@ -56,4 +56,8 @@ pub use ui::{
     RectTransformComponent, SelectableComponent, SelectableTransition, SelectionState,
     TextAlignment, TextComponent, TextOverflow, WorldAnchor,
 };
+pub use ui::{
+    GradientKind, GradientStop, ShapeComponent, ShapeCorner, ShapeGlow, ShapeKind, ShapeShadow,
+    UiBlend, UiGradient, MAX_GRADIENT_STOPS,
+};
 pub use visual_correction::{ShadowSettings, SsaoSettings, Tonemap, VisualCorrectionComponent};

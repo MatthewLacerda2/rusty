@@ -39,8 +39,10 @@ pub mod rect_transform;
 pub mod ribbon;
 pub mod rigidbody;
 pub mod selectable;
+pub mod shape;
 pub mod text;
 pub mod trail;
+pub mod ui_look;
 pub mod ui_widgets;
 pub mod visual_correction;
 

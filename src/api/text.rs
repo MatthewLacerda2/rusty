@@ -2,7 +2,7 @@
 //!
 //! Get/Set over an entity's `TextComponent` — the string, fonts, size, colour,
 //! alignment, wrapping, overflow, spacing, auto-size, rich text, raycast target
-//! and the SDF effects (outline, shadow, glow) — plus two reads of the CPU layout:
+//! the SDF effects (outline, shadow, glow) and the blend mode (#425) — plus two reads of the CPU layout:
 //! `GetPreferredSize` (what the text wants, for layout) and `GetLayout` (what it
 //! drew: size, lines, the auto-sized font size, whether it was cut). Every setter
 //! routes through the shared `scene::authoring::text` ops the inspector card uses.
@@ -193,6 +193,15 @@ pub fn register<'lua, 'scope>(
     super::text_effects::register(scope, &t, scene, &EFFECTS)?;
     super::text_effects::register_auto_size(scope, &t, scene)?;
     super::text_layout::register(scope, &t, scene, screen, video)?;
+    let blend = super::ui_look::BlendAccess {
+        get: |s, id| s.world.text(id).map(|t| t.blend),
+        set: |s, id, b| {
+            if let Some(mut t) = s.world.text_mut(id) {
+                ops::set_blend(&mut t, b);
+            }
+        },
+    };
+    super::ui_look::register_blend(scope, &t, scene, blend)?;
     lua.globals().set("Text", t).map_err(|e| e.to_string())
 }
 

@@ -1,5 +1,6 @@
 //! The in-game UI's inspector cards (#417–#421): the Canvas root, the
-//! RectTransform every UI element carries, the Image graphic, the Text label, the
+//! RectTransform every UI element carries, the Image graphic, the Shape graphic
+//! (#425), the Text label, the
 //! Canvas Group, the Rect Mask, the Selectable, and the Layout Group and Layout
 //! Element. Each is a thin client over its shared
 //! `scene::authoring` ops, the same ones the matching Lua namespace calls.
@@ -10,9 +11,11 @@ pub mod canvas_group;
 pub mod image;
 pub mod layout_element;
 pub mod layout_group;
+mod look;
 pub mod rect_mask;
 pub mod rect_transform;
 pub mod selectable;
+pub mod shape;
 pub mod text;
 
 /// Draw every UI card the entity carries, in the order Unity's inspector shows them.
@@ -31,6 +34,7 @@ pub fn draw(
     canvas_group::draw(ui, world, id, is_dirty);
     rect_mask::draw(ui, world, id, is_dirty);
     image::draw(ui, world, id, is_dirty);
+    shape::draw(ui, world, id, is_dirty);
     text::draw(ui, world, id, is_dirty);
     selectable::draw(ui, world, id, is_dirty);
     layout_group::draw(ui, world, id, is_dirty);
