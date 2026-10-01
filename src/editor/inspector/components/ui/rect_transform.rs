@@ -28,19 +28,6 @@ pub fn draw(
     let Some(r) = world.rect_transform(id).map(|r| r.clone()) else {
         return;
     };
-    let driven = driven_by_group(world, id);
-    let rows: [(&str, glam::Vec2, f32, Setter); 5] = [
-        ("Anchor Min:", r.anchor_min, 0.01, rect_ops::set_anchor_min),
-        ("Anchor Max:", r.anchor_max, 0.01, rect_ops::set_anchor_max),
-        ("Pivot:", r.pivot, 0.01, rect_ops::set_pivot),
-        (
-            "Position:",
-            r.anchored_position,
-            1.0,
-            rect_ops::set_anchored_position,
-        ),
-        ("Size Delta:", r.size_delta, 1.0, rect_ops::set_size_delta),
-    ];
     let mut remove = false;
     let mut changed = false;
     component_card(
@@ -49,27 +36,7 @@ pub fn draw(
         "Rect Transform",
         Some(&mut remove),
         |ui| {
-            if driven {
-                ui.label("Driven by the parent's Layout Group.");
-            }
-            ui.add_enabled_ui(!driven, |ui| {
-                if let Some(preset) = anchor_presets::picker(ui, &r) {
-                    let parent = world.parent_id(id).and_then(|p| rect_of(world, p, screen));
-                    let size = parent.map_or(glam::Vec2::ZERO, |p| p.rect.1);
-                    if let Some(mut c) = world.rect_transform_mut(id) {
-                        rect_ops::apply_anchor_preset(&mut c, preset, size);
-                    }
-                    changed = true;
-                }
-                for (label, value, speed, set) in rows {
-                    if let Some(v) = vec2_row(ui, label, value, speed) {
-                        if let Some(mut c) = world.rect_transform_mut(id) {
-                            set(&mut c, v);
-                        }
-                        changed = true;
-                    }
-                }
-            });
+            changed |= draw_placement(ui, world, id, &r, screen);
             ui.separator();
             if let Some(edit) = draw_world_anchor(ui, r.world_anchor.clone()) {
                 if let Some(mut c) = world.rect_transform_mut(id) {
@@ -83,6 +50,53 @@ pub fn draw(
         world.set_rect_transform(id, None);
     }
     *is_dirty |= remove || changed;
+}
+
+/// The anchor preset picker and the five placement rows over the snapshot `r`,
+/// read-only while a layout group drives the element. Returns whether any changed.
+fn draw_placement(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    r: &RectTransformComponent,
+    screen: glam::Vec2,
+) -> bool {
+    let driven = driven_by_group(world, id);
+    let rows: [(&str, glam::Vec2, f32, Setter); 5] = [
+        ("Anchor Min:", r.anchor_min, 0.01, rect_ops::set_anchor_min),
+        ("Anchor Max:", r.anchor_max, 0.01, rect_ops::set_anchor_max),
+        ("Pivot:", r.pivot, 0.01, rect_ops::set_pivot),
+        (
+            "Position:",
+            r.anchored_position,
+            1.0,
+            rect_ops::set_anchored_position,
+        ),
+        ("Size Delta:", r.size_delta, 1.0, rect_ops::set_size_delta),
+    ];
+    if driven {
+        ui.label("Driven by the parent's Layout Group.");
+    }
+    let mut changed = false;
+    ui.add_enabled_ui(!driven, |ui| {
+        if let Some(preset) = anchor_presets::picker(ui, r) {
+            let parent = world.parent_id(id).and_then(|p| rect_of(world, p, screen));
+            let size = parent.map_or(glam::Vec2::ZERO, |p| p.rect.1);
+            if let Some(mut c) = world.rect_transform_mut(id) {
+                rect_ops::apply_anchor_preset(&mut c, preset, size);
+            }
+            changed = true;
+        }
+        for (label, value, speed, set) in rows {
+            if let Some(v) = vec2_row(ui, label, value, speed) {
+                if let Some(mut c) = world.rect_transform_mut(id) {
+                    set(&mut c, v);
+                }
+                changed = true;
+            }
+        }
+    });
+    changed
 }
 
 /// The world anchor section over a snapshot. Returns the edited anchor (`None`

@@ -7,10 +7,11 @@ const PARENT: Vec2 = Vec2::new(800.0, 600.0);
 /// A 200×100 box with its pivot at the centre, anchored at the parent's centre and
 /// offset up-right — the default element, moved.
 fn element() -> RectTransformComponent {
-    let mut r = RectTransformComponent::default();
-    r.size_delta = Vec2::new(200.0, 100.0);
-    r.anchored_position = Vec2::new(50.0, 20.0);
-    r
+    RectTransformComponent {
+        size_delta: Vec2::new(200.0, 100.0),
+        anchored_position: Vec2::new(50.0, 20.0),
+        ..RectTransformComponent::default()
+    }
 }
 
 fn preset(x: AxisPreset, y: AxisPreset, set_pivot: bool, set_position: bool) -> AnchorPreset {
