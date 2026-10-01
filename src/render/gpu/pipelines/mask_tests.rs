@@ -31,7 +31,7 @@ impl Dissolve {
             }],
         };
         bake_recipe(&recipe, ENGINE_SHADER_DIR, DEFAULT_OUT_DIR).expect("bake succeeds");
-        let mask = std::env::temp_dir().join(format!("{shader}_mask.png"));
+        let mask = crate::test_temp::dir().join(format!("{shader}_mask.png"));
         image::RgbaImage::from_pixel(4, 4, image::Rgba([128, 128, 128, 255]))
             .save(&mask)
             .expect("mask written");
