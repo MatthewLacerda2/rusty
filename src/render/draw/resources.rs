@@ -194,7 +194,8 @@ impl Renderer {
         let mesh_id = MeshId::from_mesh(&mesh);
         let num_indices = self.gpu_meshes.get(&mesh_id)?.num_indices;
 
-        let material = scene.material_asset_of(id);
+        let entry = scene.material_entry_of(id);
+        let material = entry.map(|(_, asset)| asset);
         let transparent = material.is_some_and(MaterialAsset::is_transparent);
         let model_matrix = scene.world_matrix(id);
         let mut uniform = super::uniforms::solid_entity_uniform(scene, id, material);
@@ -208,10 +209,11 @@ impl Renderer {
         uniform.bone_base = push_palette(joints, mesh.active_palette());
 
         let shader = material.and_then(|m| m.shader.as_deref());
+        let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
         let key = BatchKey {
-            pipeline: self.surface_shaders.pipeline_id(&self.device, shader),
+            pipeline,
             mesh: mesh_id,
-            material: self.material_index(material),
+            material: self.material_index(entry, pipeline),
             uniform: uniform.words(),
         };
         let item = DrawItem {

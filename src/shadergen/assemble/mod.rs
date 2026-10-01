@@ -28,6 +28,7 @@ use std::fmt::Write as _;
 use emit::{chain, check_params, emit_helpers, emit_params, Instance};
 
 use super::blocks::find;
+use super::params::{ParamLayout, UNIFORM_DECL};
 use super::recipe::{PassKind, ShaderRecipe};
 
 /// The marker in the surface base shader where the assembler folds the block
@@ -42,10 +43,22 @@ const SURFACE_RETURN: &str = "return vec4<f32>(apply_fog(camera.fog, lighting_co
 /// error if a selected block is unknown for the pass, or the surface base lacks
 /// the expected splice point.
 pub fn assemble(recipe: &ShaderRecipe, surface_base: &str) -> Result<String, String> {
-    match recipe.pass {
-        PassKind::Surface => assemble_surface(recipe, surface_base),
-        PassKind::Postfx => assemble_postfx(recipe),
-    }
+    assemble_with_params(recipe, surface_base).map(|(wgsl, _)| wgsl)
+}
+
+/// [`assemble`], also returning the module's runtime-param layout (#399) — the
+/// sidecar a bake writes beside it. Empty for postfx.
+pub fn assemble_with_params(
+    recipe: &ShaderRecipe,
+    surface_base: &str,
+) -> Result<(String, ParamLayout), String> {
+    let resolved = resolve(recipe)?;
+    let layout = ParamLayout::from_instances(recipe.pass, &resolved)?;
+    let wgsl = match recipe.pass {
+        PassKind::Surface => assemble_surface(recipe, &resolved, &layout, surface_base)?,
+        PassKind::Postfx => assemble_postfx(recipe, &resolved, &layout),
+    };
+    Ok((wgsl, layout))
 }
 
 /// Resolve every selected block against the pass catalog and check its params,
@@ -66,11 +79,15 @@ fn resolve(recipe: &ShaderRecipe) -> Result<Vec<Instance<'_>>, String> {
 }
 
 /// Assemble a surface variant by splicing the block chain into the forward base.
-fn assemble_surface(recipe: &ShaderRecipe, base: &str) -> Result<String, String> {
+fn assemble_surface(
+    recipe: &ShaderRecipe,
+    resolved: &[Instance],
+    layout: &ParamLayout,
+    base: &str,
+) -> Result<String, String> {
     if !base.contains(SURFACE_RETURN) {
         return Err("surface base shader is missing the expected final-return splice point".into());
     }
-    let resolved = resolve(recipe)?;
 
     let mut additions = String::new();
     let _ = writeln!(
@@ -78,10 +95,13 @@ fn assemble_surface(recipe: &ShaderRecipe, base: &str) -> Result<String, String>
         "\n// ---- authored surface blocks ({}) ----",
         recipe.name
     );
-    emit_params(&mut additions, &resolved);
-    emit_helpers(&mut additions, &resolved);
+    if !layout.params.is_empty() {
+        additions.push_str(UNIFORM_DECL);
+    }
+    emit_params(&mut additions, resolved, layout);
+    emit_helpers(&mut additions, resolved);
 
-    let folded = chain(&resolved, "lighting_color");
+    let folded = chain(resolved, "lighting_color", layout);
     let new_return = SURFACE_RETURN.replace("lighting_color", &folded);
 
     let header = format!(
@@ -97,8 +117,7 @@ fn assemble_surface(recipe: &ShaderRecipe, base: &str) -> Result<String, String>
 }
 
 /// Assemble a self-contained postfx fullscreen module from the recipe.
-fn assemble_postfx(recipe: &ShaderRecipe) -> Result<String, String> {
-    let resolved = resolve(recipe)?;
+fn assemble_postfx(recipe: &ShaderRecipe, resolved: &[Instance], layout: &ParamLayout) -> String {
     let mut out = String::new();
 
     let _ = writeln!(
@@ -113,10 +132,10 @@ fn assemble_postfx(recipe: &ShaderRecipe) -> Result<String, String> {
     out.push_str(POSTFX_SCAFFOLD);
 
     out.push_str("\n// ---- authored postfx blocks ----\n");
-    emit_params(&mut out, &resolved);
-    emit_helpers(&mut out, &resolved);
+    emit_params(&mut out, resolved, layout);
+    emit_helpers(&mut out, resolved);
 
-    let folded = chain(&resolved, "color");
+    let folded = chain(resolved, "color", layout);
     let _ = write!(
         out,
         "\n@fragment\nfn fs_main(in: VsOut) -> @location(0) vec4<f32> {{\n    \
@@ -125,7 +144,7 @@ fn assemble_postfx(recipe: &ShaderRecipe) -> Result<String, String> {
          color = {folded};\n    \
          return vec4<f32>(color, 1.0);\n}}\n"
     );
-    Ok(out)
+    out
 }
 
 /// The fixed postfx scaffolding: scene-color bindings and the fullscreen-triangle

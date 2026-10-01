@@ -101,19 +101,22 @@ impl Renderer {
         emitter: &ParticleEmitterComponent,
     ) -> Option<(BatchKey, u32, bool)> {
         let (mesh, num_indices) = self.particle_mesh(emitter)?;
-        let material = emitter
+        let entry = emitter
             .render
             .material
             .as_ref()
-            .and_then(|m| scene.materials.get(m));
+            .and_then(|m| scene.materials.get_key_value(m))
+            .map(|(key, asset)| (key.as_str(), asset));
+        let material = entry.map(|(_, asset)| asset);
         for path in material_maps(material) {
             self.load_texture(&path);
         }
         let shader = material.and_then(|m| m.shader.as_deref());
+        let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
         let key = BatchKey {
-            pipeline: self.surface_shaders.pipeline_id(&self.device, shader),
+            pipeline,
             mesh,
-            material: self.material_index(material),
+            material: self.material_index(entry, pipeline),
             uniform: material_uniform(true, material).words(),
         };
         let glass = material.is_some_and(MaterialAsset::is_transparent);

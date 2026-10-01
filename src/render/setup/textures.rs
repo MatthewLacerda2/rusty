@@ -14,6 +14,9 @@ pub(crate) struct Textures {
     pub material_layout: wgpu::BindGroupLayout,
     pub default_texture: Rc<GpuTexture>,
     pub default_material_bind_group: wgpu::BindGroup,
+    /// All-zero runtime shader params (#399), bound by every material whose shader
+    /// has none — the standard shader never reads them.
+    pub zero_params: wgpu::Buffer,
 }
 
 /// Build the single-texture + expanded-material group(2) layouts, the default
@@ -26,13 +29,24 @@ pub(crate) fn create_textures(device: &wgpu::Device, queue: &wgpu::Queue) -> Tex
         queue,
         &texture_layout,
     ));
-    let default_material_bind_group =
-        create_default_material_bind_group(device, &material_layout, &default_texture);
+    let zero_params = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Zero Shader Params"),
+        size: bind_layouts::PARAMS_SIZE,
+        usage: wgpu::BufferUsages::UNIFORM,
+        mapped_at_creation: false,
+    });
+    let default_material_bind_group = create_default_material_bind_group(
+        device,
+        &material_layout,
+        &default_texture,
+        &zero_params,
+    );
     Textures {
         texture_layout,
         material_layout,
         default_texture,
         default_material_bind_group,
+        zero_params,
     }
 }
 
@@ -44,6 +58,7 @@ fn create_default_material_bind_group(
     device: &wgpu::Device,
     material_layout: &wgpu::BindGroupLayout,
     default_texture: &GpuTexture,
+    zero_params: &wgpu::Buffer,
 ) -> wgpu::BindGroup {
     let view = wgpu::BindingResource::TextureView(&default_texture.view);
     // Textures at 0,2,3,4,5; sampler at 1.
@@ -57,6 +72,10 @@ fn create_default_material_bind_group(
             resource: view.clone(),
         });
     }
+    entries.push(wgpu::BindGroupEntry {
+        binding: crate::shadergen::params::PARAM_BINDING,
+        resource: zero_params.as_entire_binding(),
+    });
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Default Material Bind Group"),
         layout: material_layout,

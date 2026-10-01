@@ -26,7 +26,8 @@ use super::recipe::PassKind;
 
 /// One declared parameter of a block: its name, default value, and arity (1 for a
 /// scalar, 2/3/4 for a vector). The assembler emits it per instance as a WGSL
-/// constant named `<block_id>_<index>_<name>` and passes it to the helper as the
+/// constant named `<block_id>_<index>_<name>` — or, for a [`Param::runtime`] one, a
+/// slot of the material's param uniform (#399) — and passes it to the helper as the
 /// argument named `<name>`.
 #[derive(Clone, Copy, Debug)]
 pub struct Param {
@@ -37,6 +38,11 @@ pub struct Param {
     pub default: f32,
     /// Component count: 1 scalar, or 2/3/4 for a vector literal.
     pub arity: usize,
+    /// Settable per material at runtime (#399): a surface param read from the
+    /// material's param uniform instead of a baked `const`, so a script can drive it
+    /// (a hit flash fading, a rim glowing with shield charge). Postfx params are never
+    /// runtime — a postfx pass has no material.
+    pub runtime: bool,
 }
 
 /// A curated building block: an `id`, its declared params, and the two WGSL
@@ -93,6 +99,15 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn postfx_params_are_never_runtime() {
+        let runtime = catalog(PassKind::Postfx)
+            .iter()
+            .flat_map(|b| b.params)
+            .any(|p| p.runtime);
+        assert!(!runtime, "a postfx pass has no material to hold the value");
     }
 
     #[test]

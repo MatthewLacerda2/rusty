@@ -13,7 +13,9 @@
 //! Blocks read only what the forward contract already exposes — the interpolated
 //! `VertexOutput` (`world_position`/`world_normal`/`tex_coords`) and the `camera`
 //! and `entity` uniforms. Animated blocks read `camera.time`, the sim's game time
-//! (#398): it freezes with the game and is 0 in edit mode. No new bindings.
+//! (#398): it freezes with the game and is 0 in edit mode. The one binding they
+//! add is the material's param uniform (#399): a param marked `runtime` is read from
+//! it, so gameplay drives it (`hit_flash.amount` from a script) with no re-bake.
 
 use super::{Block, Param};
 
@@ -26,6 +28,7 @@ pub const BLOCKS: &[Block] = &[
             name: "steps",
             default: 4.0,
             arity: 1,
+            runtime: false,
         }],
         helper: "fn srf_toon_ramp(c: vec3<f32>, in: VertexOutput, steps: f32) -> vec3<f32> {\n    let n = max(steps, 1.0);\n    return floor(c * n + 0.5) / n;\n}",
         call: "srf_toon_ramp({prev}, in{args})",
@@ -38,16 +41,19 @@ pub const BLOCKS: &[Block] = &[
                 name: "color",
                 default: 1.0,
                 arity: 3,
+                runtime: true,
             },
             Param {
                 name: "power",
                 default: 3.0,
                 arity: 1,
+                runtime: false,
             },
             Param {
                 name: "strength",
                 default: 1.0,
                 arity: 1,
+                runtime: true,
             },
         ],
         helper: "fn srf_fresnel_rim(c: vec3<f32>, in: VertexOutput, color: vec3<f32>, power: f32, strength: f32) -> vec3<f32> {\n    let n = normalize(in.world_normal);\n    let v = normalize(camera.camera_pos - in.world_position);\n    let rim = pow(1.0 - max(dot(n, v), 0.0), power);\n    return c + color * (rim * strength);\n}",
@@ -60,6 +66,7 @@ pub const BLOCKS: &[Block] = &[
             name: "color",
             default: 1.0,
             arity: 3,
+            runtime: true,
         }],
         helper: "fn srf_tint(c: vec3<f32>, in: VertexOutput, color: vec3<f32>) -> vec3<f32> {\n    return c * color;\n}",
         call: "srf_tint({prev}, in{args})",
@@ -72,11 +79,13 @@ pub const BLOCKS: &[Block] = &[
                 name: "color",
                 default: 1.0,
                 arity: 3,
+                runtime: true,
             },
             Param {
                 name: "strength",
                 default: 1.0,
                 arity: 1,
+                runtime: true,
             },
         ],
         helper: "fn srf_emissive_boost(c: vec3<f32>, in: VertexOutput, color: vec3<f32>, strength: f32) -> vec3<f32> {\n    let mask = textureSample(t_emissive, s_diffuse, in.tex_coords).rgb;\n    return c + color * mask * strength;\n}",
@@ -90,16 +99,19 @@ pub const BLOCKS: &[Block] = &[
                 name: "frequency",
                 default: 16.0,
                 arity: 1,
+                runtime: false,
             },
             Param {
                 name: "strength",
                 default: 0.25,
                 arity: 1,
+                runtime: false,
             },
             Param {
                 name: "speed",
                 default: 1.0,
                 arity: 1,
+                runtime: false,
             },
         ],
         helper: "fn srf_uv_scroll_stripes(c: vec3<f32>, in: VertexOutput, frequency: f32, strength: f32, speed: f32) -> vec3<f32> {\n    let s = sin((in.tex_coords.y * frequency + camera.time * speed) * 6.2831853);\n    let band = 1.0 - strength * (0.5 - 0.5 * s);\n    return c * band;\n}",
@@ -112,6 +124,7 @@ pub const BLOCKS: &[Block] = &[
             name: "amount",
             default: 0.5,
             arity: 1,
+            runtime: true,
         }],
         helper: "fn srf_desaturate(c: vec3<f32>, in: VertexOutput, amount: f32) -> vec3<f32> {\n    let l = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));\n    return mix(c, vec3<f32>(l), amount);\n}",
         call: "srf_desaturate({prev}, in{args})",
@@ -124,19 +137,42 @@ pub const BLOCKS: &[Block] = &[
                 name: "color",
                 default: 0.5,
                 arity: 3,
+                runtime: false,
             },
             Param {
                 name: "top",
                 default: 5.0,
                 arity: 1,
+                runtime: false,
             },
             Param {
                 name: "bottom",
                 default: 0.0,
                 arity: 1,
+                runtime: false,
             },
         ],
         helper: "fn srf_height_fog(c: vec3<f32>, in: VertexOutput, color: vec3<f32>, top: f32, bottom: f32) -> vec3<f32> {\n    let t = clamp((top - in.world_position.y) / max(top - bottom, 0.001), 0.0, 1.0);\n    return mix(c, color, t);\n}",
         call: "srf_height_fog({prev}, in{args})",
+    },
+    Block {
+        id: "hit_flash",
+        desc: "Blend the lit color toward a flash color by `amount` (0 = off, 1 = solid) — hit feedback, driven at runtime.",
+        params: &[
+            Param {
+                name: "color",
+                default: 1.0,
+                arity: 3,
+                runtime: true,
+            },
+            Param {
+                name: "amount",
+                default: 0.0,
+                arity: 1,
+                runtime: true,
+            },
+        ],
+        helper: "fn srf_hit_flash(c: vec3<f32>, in: VertexOutput, color: vec3<f32>, amount: f32) -> vec3<f32> {\n    return mix(c, color, clamp(amount, 0.0, 1.0));\n}",
+        call: "srf_hit_flash({prev}, in{args})",
     },
 ];

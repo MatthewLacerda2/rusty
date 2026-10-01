@@ -31,10 +31,14 @@
 //! - [`validate`] — module string → composed naga module via `naga_oil`, reusing
 //!   the engine's `ShaderRegistry` compose path; the gate that stops bad shaders.
 //! - [`bake`] — assemble + validate, then write `<dir>/<name>.wgsl`.
+//! - [`params`] — a surface shader's runtime params (#399): which block params a
+//!   material sets from scripts, their uniform slots, and the `<name>.params.json`
+//!   sidecar that records them.
 
 pub mod assemble;
 pub mod bake;
 pub mod blocks;
+pub mod params;
 pub mod recipe;
 pub mod validate;
 
@@ -52,5 +56,7 @@ pub const DEFAULT_OUT_DIR: &str = "project/assets/shaders";
 
 #[cfg(test)]
 mod instance_tests;
+#[cfg(test)]
+mod params_tests;
 #[cfg(test)]
 mod tests;

@@ -7,7 +7,9 @@
 //! variant keeps the forward contract by construction (#272: same `VertexInput`, bind
 //! groups and entry points), so only the shader module differs: its pipelines reuse
 //! the forward pipeline layout, and a variant is two pipelines — opaque and
-//! transparent — that a per-material group-2 uniform (#399) can later ride unchanged.
+//! transparent. A variant's runtime params (#399) ride the material's group-2 param
+//! uniform; the slot keeps the variant's [`ParamLayout`] (its `<name>.params.json`)
+//! so the material cache can pack a material's values into it.
 //!
 //! **Pipeline ids.** Every draw carries a `usize` pipeline id: [`STANDARD`] (0) is the
 //! renderer's own forward/transparent pair; `n > 0` is cache slot `n - 1`. The id is
@@ -32,6 +34,7 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::shadergen::params::ParamLayout;
 use crate::shadergen::{DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
 
 /// The pipeline id of the renderer's standard forward shader.
@@ -65,6 +68,8 @@ struct Slot {
     stamp: Stamp,
     /// `None` when the module failed (it was logged; draws fall back to [`STANDARD`]).
     pipelines: Option<SurfacePipelines>,
+    /// The module's runtime params (#399); empty when it has none.
+    params: ParamLayout,
     /// The file changed since the build; rebuild on the next lookup.
     stale: bool,
 }
@@ -77,6 +82,8 @@ pub(crate) struct SurfaceShaders {
     dirs: Vec<String>,
     index: HashMap<String, usize>,
     slots: Vec<Slot>,
+    /// Modules built so far — a runtime param change must never add one (#399).
+    builds: usize,
 }
 
 impl SurfaceShaders {
@@ -89,6 +96,7 @@ impl SurfaceShaders {
             dirs: vec![DEFAULT_OUT_DIR.into(), ENGINE_SHADER_DIR.into()],
             index: HashMap::new(),
             slots: Vec::new(),
+            builds: 0,
         }
     }
 
@@ -111,6 +119,7 @@ impl SurfaceShaders {
                     name: name.to_owned(),
                     stamp: None,
                     pipelines: None,
+                    params: ParamLayout::default(),
                     stale: true,
                 });
                 self.index.insert(name.to_owned(), self.slots.len() - 1);
@@ -124,6 +133,19 @@ impl SurfaceShaders {
             Some(_) => slot + 1,
             None => STANDARD,
         }
+    }
+
+    /// The runtime params of pipeline `id`'s module (#399): `None` for the standard
+    /// shader or a module with none.
+    pub(crate) fn params(&self, id: usize) -> Option<&ParamLayout> {
+        let slot = self.slots.get(id.checked_sub(1)?)?;
+        (!slot.params.params.is_empty()).then_some(&slot.params)
+    }
+
+    /// Modules built so far (each build or rebuild of a slot counts one).
+    #[cfg(test)]
+    pub(crate) fn builds(&self) -> usize {
+        self.builds
     }
 
     /// The pipelines behind a non-standard id from [`Self::pipeline_id`] this frame.
@@ -158,8 +180,11 @@ impl SurfaceShaders {
     /// Rebuild slot `i` from its current file, logging once per failed version.
     fn rebuild(&mut self, device: &wgpu::Device, i: usize) {
         let stamp = self.stamp(&self.slots[i].name);
+        self.builds += 1;
         let built = match &stamp {
-            Some((path, ..)) => self.build(device, path),
+            Some((path, ..)) => self
+                .build(device, path)
+                .and_then(|pipelines| Ok((pipelines, ParamLayout::read_beside(path)?))),
             None => Err(format!(
                 "no `{}.wgsl` in {}",
                 self.slots[i].name,
@@ -167,7 +192,7 @@ impl SurfaceShaders {
             )),
         };
         let slot = &mut self.slots[i];
-        slot.pipelines = built
+        let built = built
             .map_err(|e| {
                 log::warn!(
                     "surface shader {:?}: {e}; using the standard shader",
@@ -175,6 +200,10 @@ impl SurfaceShaders {
                 );
             })
             .ok();
+        (slot.pipelines, slot.params) = match built {
+            Some((pipelines, params)) => (Some(pipelines), params),
+            None => (None, ParamLayout::default()),
+        };
         slot.stamp = stamp;
         slot.stale = false;
     }
@@ -226,3 +255,7 @@ impl SurfaceShaders {
 #[cfg(test)]
 #[path = "surface_tests.rs"]
 mod surface_tests;
+
+#[cfg(test)]
+#[path = "params_tests.rs"]
+mod params_tests;
