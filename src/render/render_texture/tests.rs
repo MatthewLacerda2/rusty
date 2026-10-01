@@ -57,6 +57,8 @@ fn referenced_textures_come_from_active_images_and_material_maps() {
     scene.world.set_material(monitor, Some(material));
     let asset = MaterialAsset {
         emissive_map: Some("rt:security".to_string()),
+        // An extra shader texture slot (#400) may name one too.
+        shader_textures: [("mask".to_string(), "rt:scanner".to_string())].into(),
         ..Default::default()
     };
     scene.materials.insert("screen".to_string(), asset);
@@ -64,5 +66,5 @@ fn referenced_textures_come_from_active_images_and_material_maps() {
     let shown = referenced_render_textures(&scene);
     let mut shown: Vec<_> = shown.into_iter().collect();
     shown.sort();
-    assert_eq!(shown, ["rt:minimap", "rt:security"]);
+    assert_eq!(shown, ["rt:minimap", "rt:scanner", "rt:security"]);
 }

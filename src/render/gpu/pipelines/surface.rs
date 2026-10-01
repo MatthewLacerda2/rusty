@@ -27,7 +27,8 @@
 //!
 //! **Depth prepass.** Variants ride the standard SSAO prepass (#436): their `vs_main`
 //! is the forward one verbatim and blocks only restyle colour, so depth is identical.
-//! The shadow pass is likewise unaffected.
+//! The shadow pass is likewise unaffected. A block that `discard`s (`dissolve`, #400)
+//! cuts the colour pass only; the depth passes still see the whole mesh (#648).
 
 use std::collections::HashMap;
 use std::path::PathBuf;
