@@ -5,7 +5,7 @@
 //! parent's bottom-left corner.
 
 use glam::Vec4;
-use rusty::components::{ImageComponent, RectMaskComponent};
+use rusty::components::{ImageComponent, RectMaskComponent, ShapeComponent, ShapeKind};
 use rusty::scene::Scene;
 
 use super::render_texture_scene::screen_camera;
@@ -120,4 +120,24 @@ fn nested_masks_multiply() {
     assert!(!lit(124, 64), "in the rect, outside the circle");
     assert!(!lit(70, 122), "in the rect, above the circle");
     assert_eq!(counters.ui_mask_passes, 2);
+}
+
+#[test]
+fn a_shape_ellipse_masks_without_a_sprite() {
+    let (mut scene, root) = black_canvas();
+    let frame = element(&mut scene, root, [16.0, 16.0, 96.0, 96.0], WHITE);
+    scene.world.set_image(frame, None);
+    let ellipse = ShapeComponent {
+        kind: ShapeKind::Ellipse,
+        ..Default::default()
+    };
+    scene.world.set_shape(frame, Some(ellipse));
+    hidden_mask(&mut scene, frame);
+    element(&mut scene, frame, [0.0, 0.0, 96.0, 96.0], WHITE);
+    let Some((img, _)) = shoot(&scene, &screen_camera(), "rusty_ui_shape_mask.png") else {
+        return;
+    };
+    assert!(px(&img, 64, 64)[0] > 240, "centre");
+    assert!(px(&img, 64, 108)[0] > 200, "inside the top of the ellipse");
+    assert!(px(&img, 22, 22)[0] < 16, "the frame's corner is outside it");
 }

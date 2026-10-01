@@ -3,7 +3,8 @@
 Read and tune an entity's `BackdropFilterComponent` (#426) — frosted glass, CSS's
 `backdrop-filter`. The game frame behind the entity's graphic is blurred,
 desaturated, brightened and tinted, and shown through the graphic's shape (its
-`Image`'s texture alpha, or the rect without one), under the graphic itself. The
+`Image`'s texture alpha, else its `Shape`, else its rect), under the graphic itself
+— always composited "over", whatever the graphic's blend mode. The
 graphic's colour alpha does not hide the backdrop, so an `Image` with alpha `0` is
 pure glass and a dark, half-transparent one darkens it further. The backdrop is the
 finished 3D frame (graded, tonemapped, bloomed), not UI drawn before it.

@@ -2,8 +2,8 @@
 //!
 //! CSS's `backdrop-filter`, for a UI panel: the 3D frame behind this entity's
 //! graphic is blurred, desaturated, brightened and tinted, and shown through the
-//! graphic's shape (its `Image`'s texture alpha, or its rect without one) under the
-//! graphic itself — so a pause menu sits on a blurred, darkened game. The graphic's
+//! graphic's shape (its `Image`'s texture alpha, else its `Shape`, else its rect)
+//! under the graphic itself — so a pause menu sits on a blurred, darkened game. The graphic's
 //! own colour alpha does not hide the backdrop: an `Image` with alpha 0 is pure
 //! frosted glass. Screen-space (overlay) canvases only; `docs/ui.md` says why.
 //! Pure authoring data.

@@ -1,10 +1,12 @@
 //! RectMask on a world canvas (#619): a graphic overflowing its mask is cut at
 //! the mask's edge, per fragment, though the canvas is a plane in perspective —
-//! and so a world-space Scroll View clips its content to its viewport.
+//! and so a world-space Scroll View clips its content to its viewport. A graphic
+//! `Mask` (#428) clips there too, through the same coverage texture as on screen.
 
 use glam::{Vec2, Vec4};
 use rusty::components::{
-    CanvasComponent, CanvasRenderMode, LayoutElementComponent, RectMaskComponent,
+    CanvasComponent, CanvasRenderMode, LayoutElementComponent, MaskComponent, RectMaskComponent,
+    ShapeComponent, ShapeKind,
 };
 use rusty::scene::authoring::ui_widgets::{create_ui, UiWidget};
 use rusty::scene::Scene;
@@ -71,4 +73,34 @@ fn a_world_space_scroll_view_clips_its_content_to_the_viewport() {
     let px = |x: u32, y: u32| img.get_pixel(x, y).0;
     assert!(dominant(px(36, 48), 0), "in the viewport: {:?}", px(36, 48));
     assert!(!dominant(px(36, 85), 0), "below the sign: {:?}", px(36, 85));
+}
+
+#[test]
+fn a_shape_mask_rounds_a_world_canvas() {
+    let mut scene = dark_scene();
+    let sign = sign(&mut scene);
+    // The whole sign is an ellipse Mask (its graphic hidden) over a red fill.
+    let frame = image(&mut scene, sign, fill(), Vec4::ZERO);
+    scene.world.set_image(frame, None);
+    let ellipse = ShapeComponent {
+        kind: ShapeKind::Ellipse,
+        ..Default::default()
+    };
+    scene.world.set_shape(frame, Some(ellipse));
+    let hidden = MaskComponent {
+        show_mask_graphic: false,
+    };
+    scene.world.set_mask(frame, Some(hidden));
+    image(&mut scene, frame, fill(), RED);
+    let Some(img) = shot(&scene, "rusty_world_ui_shape_mask.png") else {
+        return;
+    };
+    let px = |x: u32, y: u32| img.get_pixel(x, y).0;
+    assert!(dominant(px(48, 48), 0), "the centre: {:?}", px(48, 48));
+    assert!(dominant(px(48, 30), 0), "inside the top: {:?}", px(48, 30));
+    assert!(
+        !dominant(px(28, 28), 0),
+        "the sign's corner: {:?}",
+        px(28, 28)
+    );
 }

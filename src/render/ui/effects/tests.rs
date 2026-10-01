@@ -13,7 +13,7 @@ use crate::ui::UiLayout;
 
 const SCREEN: Vec2 = Vec2::new(200.0, 100.0);
 
-/// A `size` element at `pos` (bottom-left anchored) under `parent`, with an Image.
+/// A `size` Image at `pos` (bottom-left anchored) under `parent`.
 fn element(scene: &mut Scene, parent: u32, pos: Vec2, size: Vec2) -> u32 {
     let id = scene.add_entity("E".to_string());
     let rt = RectTransformComponent {
@@ -30,7 +30,6 @@ fn element(scene: &mut Scene, parent: u32, pos: Vec2, size: Vec2) -> u32 {
     id
 }
 
-/// A scene with a canvas at scale 1 on [`SCREEN`].
 fn canvas() -> (Scene, u32) {
     let mut scene = Scene::new();
     let root = scene.add_entity("Canvas".to_string());
@@ -61,16 +60,12 @@ fn nested_masks_chain_and_hidden_graphics_only_shape_the_clip() {
     };
     scene.world.set_mask(inner, Some(hidden));
     scene.world.image_mut(inner).expect("image").color.w = 0.5;
-    let leaf = element(&mut scene, inner, Vec2::ZERO, Vec2::splat(500.0));
-    let _ = leaf;
+    element(&mut scene, inner, Vec2::ZERO, Vec2::splat(500.0));
     let mesh = build(&scene);
-    // Two mask graphics recorded: the outer under no mask, the inner under it.
     let masks: Vec<_> = mesh.masks.iter().map(|m| (m.id, m.clip.mask)).collect();
     assert_eq!(masks, [(outer, None), (inner, Some(outer))]);
-    // The inner graphic's coverage is its colour alpha.
     let first = mesh.masks[1].range.start as usize;
     assert_eq!(mesh.vertices[first].color[3], 0.5);
-    // Drawn: the outer graphic (unmasked) and the leaf (inner mask, cut to its rect).
     let drawn: Vec<UiClip> = mesh.batches.iter().map(|b| b.clip).collect();
     assert_eq!(drawn.len(), 2, "the hidden inner graphic draws nothing");
     assert_eq!(drawn[0].mask, None);
@@ -95,7 +90,6 @@ fn a_backdrop_batch_precedes_its_graphic_on_overlay_canvases_only() {
     };
     scene.world.set_canvas_group(panel, Some(fade));
     let mesh = build(&scene);
-    // The glass shows though the panel's own colour is fully transparent.
     assert_eq!(mesh.batches.len(), 1);
     let backdrop = mesh.batches[0].backdrop.expect("a backdrop batch");
     assert_eq!(backdrop.radius, 12.0);
@@ -113,6 +107,25 @@ fn a_backdrop_batch_precedes_its_graphic_on_overlay_canvases_only() {
     scene.world.image_mut(panel).expect("image").color.w = 1.0;
     let mesh = build(&scene);
     assert!(mesh.batches.iter().all(|b| b.backdrop.is_none()));
+}
+
+#[test]
+fn a_shape_is_a_mask_graphic_without_an_image() {
+    let (mut scene, root) = canvas();
+    let frame = element(&mut scene, root, Vec2::ZERO, Vec2::splat(40.0));
+    scene.world.set_image(frame, None);
+    let shape = crate::components::ShapeComponent::default();
+    scene.world.set_shape(frame, Some(shape));
+    scene.world.set_mask(frame, Some(MaskComponent::default()));
+    element(&mut scene, frame, Vec2::ZERO, Vec2::splat(40.0));
+    let mesh = build(&scene);
+    let draw = &mesh.masks[0];
+    let v = mesh.vertices[draw.range.start as usize];
+    assert_eq!(
+        v.sdf[0],
+        crate::render::ui::vertex::MODE_SHAPE,
+        "the SDF body"
+    );
 }
 
 #[test]

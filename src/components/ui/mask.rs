@@ -2,8 +2,8 @@
 //!
 //! Unity's `Mask`. Every graphic *below* this entity is clipped to the coverage of
 //! this entity's own graphic — its `Image`'s texture alpha times its colour alpha,
-//! so a circle sprite makes a round minimap and a soft-edged sprite a feathered
-//! one. Without an `Image` the mask is its rect. Nested masks multiply. The mask
+//! else its `Shape`'s coverage, else its rect — so an ellipse or a circle sprite
+//! makes a round minimap and a soft-edged sprite a feathered one. Nested masks multiply. The mask
 //! graphic itself draws only when `show_mask_graphic` is on. The renderer applies
 //! it as a mask texture sampled per fragment (`docs/ui.md`). Pure authoring data.
 

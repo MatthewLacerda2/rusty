@@ -190,20 +190,20 @@ a `Tiled` image caps itself at 1024 tiles by growing the tile.
   masks nest, each edge of the intersection keeps the feather of the mask it came
   from, so a soft list inside a hard panel fades only at the list's own edges.
 - **`Mask`** (#428) — Unity's `Mask`: the subtree *below* the entity is clipped to
-  the entity's own graphic — its `Image`'s texture alpha times its colour alpha (an
-  entity without an `Image` masks to its rect). A circle sprite makes a round
-  minimap — an `Image` showing `"rt:minimap"` under a circle-sprite Mask — a
-  soft-edged sprite a feathered one, a `Filled` radial image a radial wipe.
+  the entity's own graphic — its `Image` (texture alpha times colour alpha), else
+  its `Shape` (#425: the SDF's antialiased coverage), else its rect. An `Ellipse`
+  Shape or a circle sprite makes a round minimap — an `Image` showing
+  `"rt:minimap"` under it — a soft-edged sprite a feathered one, a `Filled` radial
+  image or a `Ring` arc a radial wipe.
   `show_mask_graphic` (Unity's `showMaskGraphic`) says whether the mask's graphic
   also draws; off, it only shapes the clip. Masks nest to any depth (they multiply)
   and combine with every `RectMask` above. Hit-testing clips to the mask's rect —
   Unity's rule — not its alpha: a click in a round minimap's corner still reaches it.
-  `Shape` graphics (#425) become mask graphics the same way once they land.
 - **`BackdropFilter`** (#426) — frosted glass, CSS's `backdrop-filter`: the frame
   behind the entity's graphic is blurred by `blur_radius` (reference units), then
   desaturated (`saturation`, 1 unchanged), multiplied by `brightness` and mixed
   toward `tint` by its alpha, and shown through the graphic's shape (its `Image`'s
-  texture alpha, or its rect) *under* the graphic. The graphic's colour alpha does
+  texture alpha, else its `Shape`, else its rect) *under* the graphic. The graphic's colour alpha does
   not hide it — an `Image` with alpha 0 is pure glass, a dark half-transparent one
   darkens it further — while a `CanvasGroup` fades it like any graphic. The pause
   screen of a modern shooter: a full-screen panel with a 24-unit blur and a 0.25
@@ -212,8 +212,9 @@ a `Tiled` image caps itself at 1024 tiles by growing the tile.
 
 A separate `BackdropFilter` component rather than fields on `Image` keeps the cost
 visible where it is paid (one more batch, and the blur) and leaves `Image` the plain
-uGUI graphic; it works on any graphic that shapes it, `Shape` included once #425
-lands.
+uGUI graphic; it works on any graphic that shapes it, `Shape` included. A backdrop
+batch always composites "over", whatever the graphic's blend mode — the mode
+applies to the graphic drawn on top.
 
 ### `Text`
 
