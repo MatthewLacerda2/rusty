@@ -150,7 +150,8 @@ Audio.PlayAt(clip, 0, 0, 0, 1.0)
 
 The fields you reach for first (the rest — `key` and scale degrees, chords, step
 strings, `swing`, `humanize`, track and song `fx`, `automation`, `tempo` changes,
-`fit`, `fade`, `tail`, arrangement transforms — are in `zimmer::song`'s rustdoc):
+arrangement transforms — are in `zimmer::song`'s rustdoc; `tail`, `fit` and `fade` have
+their own section below):
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -179,6 +180,34 @@ Validation happens **before** any samples are produced: an arrangement naming an
 undefined pattern, a note naming an undefined track, a non-positive `bpm` / `beats` /
 `dur`, or an unreadable patch path each raise a message saying exactly which one went
 wrong, rather than rendering silence you would have to listen for.
+
+### How a song ends: `tail`, `fit`, `fade` (#377)
+
+A song's natural length is its arrangement **plus** however long the last note and the
+reverb take to stop ringing. That is right for a sting played once and wrong for a
+**music bed**: `AudioSource.loop` jumps back to sample 0 when the file ends, so the
+ring-out either sits there as a gap every pass or, cut short, clicks at the loop point.
+Three optional song fields say how the piece ends; all absent bakes exactly what it
+always did.
+
+```lua
+Sound.BakeSong({ bpm = 96, tail = "wrap", --[[ tracks, patterns, arrangement ]] },
+               "project/assets/sounds/combat_bed.wav")
+```
+
+| Field | Values | Effect |
+|---|---|---|
+| `tail` | `"ring"` *(default)* | The file grows to fit the release and fx tail. For one-shots. |
+| | `"exact"` | The file is exactly the arrangement's length; the tail is faded into the last beat. For music that butts against something. |
+| | **`"wrap"`** | The file is exactly the arrangement's length and the ring-out is **summed back onto the start** — the last bar's reverb rings over the first, so the loop point is seamless by construction. **What a looping bed wants.** |
+| `fit` | `{ seconds, mode }` | Makes the file exactly `seconds` long. `mode = "loop"` *(default)* repeats the arrangement, cutting mid-pass; `"once"` plays through and pads with silence; `"stretch"` moves `bpm` so a whole number of passes lands on it, refusing past a quarter either way (the error names the tempo it would have needed). |
+| `fade` | `{ in_seconds, out_seconds }` | Level moves on the finished piece, after the master limiter. For a fade that belongs to the *music*; ducking one use of it stays the `AudioSource`'s job. |
+
+`exact` and `wrap` lengths are exact to the sample: 64 beats at 96 bpm is 1,764,000
+frames. `wrap` is **refused** — before anything is written — when the tail is longer
+than the loop (it would still be ringing next time round), alongside any `fade` (a dip
+every pass), and alongside a `fit` other than `stretch` (only `stretch` lands on a whole
+number of passes, so only it has a loop point).
 
 ### How loud it came out (#378)
 
