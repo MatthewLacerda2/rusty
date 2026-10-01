@@ -9,6 +9,7 @@ Clock accessors, the time-scale control, and the windowed pause / step / resume 
 | `Time.fixedDeltaTime` | `()` | fixed-step seconds (never scaled) |
 | `Time.frameCount` | `()` | frames since start |
 | `Time.time` | `()` | game seconds since Play started: the sum of the **scaled** `deltaTime`, so it slows with `SetTimeScale` and stops while paused. Shaders read the same clock as `camera.time` (see `Shader.md`). |
+| `Time.unscaledTime` | `()` | seconds since Play started, ignoring `time_scale`: the sum of `unscaledDeltaTime`, so it keeps running at time scale 0. Custom UI shaders animate on this clock (see `Shader.md`, *The `ui` pass*), so a paused menu still flickers. |
 | `Time.GetTimeScale` | `()` | current time scale (`1.0` = real time) |
 | `Time.SetTimeScale` | `(scale)` — set the global time scale; clamped to `≥ 0`. `0` pauses the sim (`deltaTime` → 0), `0.5` is half-speed slow-mo, `2.0` double-speed. `fixedDeltaTime` is unaffected. Persists across play-mode reset (it's deterministic game state). |
 | `Time.Pause` | `()` — freeze the windowed runtime (issue #283): the frame loop stops advancing the sim with wall-clock dt, but the world keeps its exact state and stays inspectable/mutable through the whole API. Rendering continues. Idempotent. |

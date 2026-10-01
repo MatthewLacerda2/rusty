@@ -10,6 +10,7 @@ use std::collections::HashMap;
 
 use glam::Vec2;
 
+use super::custom::ShadeUniforms;
 use super::effects::UiEffects;
 use super::mesh::CanvasMesh;
 use super::world::WorldUniforms;
@@ -39,6 +40,8 @@ pub struct UiViewCache {
     pub screen_in_editor: bool,
     /// Clip slots, Mask textures and the backdrop blur (#426, #428).
     pub(super) effects: UiEffects,
+    /// Custom-shaded batches' uniforms this frame (#427), made on first use.
+    pub(super) shades: Option<ShadeUniforms>,
 }
 
 impl UiViewCache {

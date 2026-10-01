@@ -1,7 +1,7 @@
 //! src/api/time.rs — `Time` namespace.
 //!
 //! `deltaTime` (scaled) / `unscaledDeltaTime` (raw) / `fixedDeltaTime` /
-//! `frameCount` / `time` accessors plus `SetTimeScale` / `GetTimeScale`, backed by the
+//! `frameCount` / `time` / `unscaledTime` accessors plus `SetTimeScale` / `GetTimeScale`, backed by the
 //! `time::Time` resource the `GameWorld` advances once per tick.
 //!
 //! Pause / step / resume (issue #283) live here too: `Pause()` / `Resume()` /
@@ -59,6 +59,12 @@ fn register_clock<'lua, 'scope>(
         table,
         "time",
         scope.create_function(|_, ()| Ok(time.borrow().time)),
+    )?;
+    // Unscaled time (#427) — the clock custom UI shaders read.
+    put(
+        table,
+        "unscaledTime",
+        scope.create_function(|_, ()| Ok(time.borrow().unscaled_time)),
     )?;
     put(
         table,

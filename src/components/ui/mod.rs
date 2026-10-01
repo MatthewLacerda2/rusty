@@ -8,7 +8,8 @@
 //! [`RectMaskComponent`] clip and [`MaskComponent`] graphic clip (#428), the
 //! [`BackdropFilterComponent`] frosted glass (#426), the [`SelectableComponent`] (an interactive
 //! element, #420), and the [`LayoutGroupComponent`] / [`LayoutElementComponent`]
-//! pair that arranges children automatically (#421). Computed state — rects,
+//! pair that arranges children automatically (#421). An Image, Shape or Text may name a
+//! custom [`UiShader`] (#427). Computed state — rects,
 //! batches — lives in `ui::UiLayout` and the renderer, never here. The model is
 //! recorded in `docs/ui.md`.
 
@@ -23,6 +24,7 @@ pub mod mask;
 pub mod rect_mask;
 pub mod rect_transform;
 pub mod selectable;
+pub mod shader;
 pub mod shape;
 pub mod text;
 
@@ -37,5 +39,6 @@ pub use mask::MaskComponent;
 pub use rect_mask::RectMaskComponent;
 pub use rect_transform::{RectTransformComponent, WorldAnchor};
 pub use selectable::{NavigationMode, SelectableComponent, SelectableTransition, SelectionState};
+pub use shader::UiShader;
 pub use shape::{ShapeComponent, ShapeCorner, ShapeGlow, ShapeKind, ShapeShadow};
 pub use text::{TextAlignment, TextComponent, TextOverflow};

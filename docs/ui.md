@@ -383,8 +383,8 @@ batch together as `Normal` solid geometry; the scan line's `Additive` is a new b
   format — some GL drivers — falls back to blending in linear space: a little off, never
   broken.)
 - **Batching.** One vertex buffer per canvas per view. Consecutive graphics sharing a
-  source — a texture, or a font's atlas — a blend mode and a clip are one draw call;
-  a change of any starts the next — so a HUD of solid bars is one draw call however
+  source — a texture, or a font's atlas — a blend mode, a clip and a custom shader
+  (below) are one draw call; a change of any starts the next — so a HUD of solid bars is one draw call however
   many bars it has, and a label one draw call however many glyphs. Shapes are solid,
   so they batch with solid images. Each blend mode is its own pipeline, so a HUD
   alternating `Normal` and `Additive` graphics pays a draw per switch: keep additive
@@ -436,6 +436,45 @@ change of clip.
   in the world would need a mid-stack copy of the HDR target per camera. On those
   canvases a `BackdropFilter` is ignored and the graphic draws as it would without
   one.
+
+### Custom shaders
+
+An `Image`, a `Shape` or a `Text` can draw through an authored **ui shader** instead of the
+standard one — Unity's `Graphic.material`: the glitch, scanlines, RGB split,
+hologram flicker, dissolve and wipes of a Cyberpunk-style HUD. The agent bakes one
+with `Shader.Bake` and `pass = "ui"` (blocks and params in
+[`api/Shader.md`](api/Shader.md#the-ui-pass)), names it on the graphic, and drives its
+runtime params from a script:
+
+```lua
+Shader.Bake({ pass = "ui", name = "hud_damage",
+              blocks = { { id = "rgb_split" }, { id = "glitch_slices", params = { amount = 0 } } } })
+UI.SetShader(healthBar, "hud_damage")                          -- Image, Shape and Text alike
+UI.SetShaderParam(healthBar, "glitch_slices.amount", 16)       -- on hit; ease it back to 0
+```
+
+- **What it changes.** A ui shader is the standard UI shader with one function
+  replaced: the graphic's own shaded colour — texture, tint or gradient, a Shape's SDF
+  with its shadow and glow, SDF text with outline and glow, CanvasGroup alpha — goes
+  through the blocks before it blends. Everything else is the standard pass:
+  display-space premultiplied blending, the blend mode, the RectMask clip and
+  feather, the `Mask` coverage (see *Masks and backdrops*), and on world canvases the
+  depth test and fog. A custom-shaded graphic is clipped and masked exactly like any
+  other. A shader restyles what a graphic *draws*, not what it *cuts*: a `Mask`'s
+  coverage and a `BackdropFilter`'s shape come from the graphic's standard shading.
+- **Per graphic.** Each shaded graphic is its own draw with its own small uniform: its
+  rect (rotation included, so `uv` is rect-local), the UI clock and its runtime param
+  values — two Images naming the same shader keep their own `dissolve.amount`. A
+  graphic's glyphs share it, so a shaded label is still one draw call.
+- **The clock is unscaled.** UI shaders animate on unscaled time (`Time.unscaledTime`):
+  a pause menu at `Time.SetTimeScale(0)` keeps flickering, as its tweens and fades do.
+  It is `0` in edit mode, like the scene shaders' clock, so edit-mode shots stay
+  pixel-comparable; `Time.Pause` (the agent's loop freeze) stops it with everything else.
+- **Fail-safe.** A missing shader, one that does not compile, or one baked for another
+  pass is logged once and the graphic draws with the standard shader. A re-bake is
+  picked up next frame.
+- **Saved with the scene** on the graphic (`shader: { name, params }`); the inspector's
+  Image, Shape and Text cards edit the name (*UI Shader*). Runtime params are a script's job.
 
 ## Interaction
 

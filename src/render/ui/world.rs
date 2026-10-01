@@ -23,10 +23,10 @@ use glam::Mat4;
 
 use super::cache::UiViewCache;
 use super::effects::GroupKey;
+use super::pipeline::{self, UiPass};
 use crate::components::UiBlend;
 use crate::render::gpu::grow_buffer::GrowBuffer;
 use crate::render::gpu::uniforms::FogUniform;
-use crate::render::postfx::HDR_FORMAT;
 use crate::render::{RenderView, Renderer};
 use crate::scene::Camera;
 use crate::ui::CanvasSpace;
@@ -43,9 +43,9 @@ struct WorldUiUniform {
 
 /// The world pass's shared GPU state: its uniform layout and pipeline.
 pub(crate) struct WorldUiPipeline {
-    layout: wgpu::BindGroupLayout,
+    pub(super) layout: wgpu::BindGroupLayout,
     /// One per blend mode, in `UiBlend::ALL` order (#425).
-    pipelines: Vec<wgpu::RenderPipeline>,
+    pub(super) pipelines: Vec<wgpu::RenderPipeline>,
 }
 
 impl WorldUiPipeline {
@@ -77,47 +77,11 @@ impl WorldUiPipeline {
             bind_group_layouts: &[shared[0], shared[1], &layout],
             push_constant_ranges: &[],
         });
-        let build = |mode| build_pipeline(device, shader, &pipeline_layout, mode);
+        let shader = ("World UI Pipeline", shader, &pipeline_layout);
+        let build = |mode| pipeline::build(device, shader, UiPass::World, mode);
         let pipelines = UiBlend::ALL.into_iter().map(build).collect();
         Self { layout, pipelines }
     }
-}
-
-/// The world pipeline drawing with `mode` (see [`WorldUiPipeline::new`]).
-fn build_pipeline(
-    device: &wgpu::Device,
-    shader: &wgpu::ShaderModule,
-    layout: &wgpu::PipelineLayout,
-    mode: UiBlend,
-) -> wgpu::RenderPipeline {
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("World UI Pipeline"),
-        layout: Some(layout),
-        vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: "vs_world",
-            buffers: &[super::vertex::vertex_layout()],
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: "fs_world",
-            targets: &[Some(wgpu::ColorTargetState {
-                format: HDR_FORMAT,
-                blend: Some(super::blend::blend_state(mode)),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: Some(wgpu::DepthStencilState {
-            format: wgpu::TextureFormat::Depth32Float,
-            depth_write_enabled: false,
-            depth_compare: wgpu::CompareFunction::LessEqual,
-            stencil: wgpu::StencilState::default(),
-            bias: wgpu::DepthBiasState::default(),
-        }),
-        multisample: wgpu::MultisampleState::default(),
-        multiview: None,
-    })
 }
 
 /// A view's world-canvas uniforms: one aligned slot per canvas, rewritten per
@@ -224,10 +188,8 @@ impl Renderer {
                 pass.set_vertex_buffer(0, canvas.buffer.slice(..));
                 pass.set_bind_group(2, &uniforms.group, &[offset]);
                 for (b, batch) in canvas.mesh.batches.iter().enumerate() {
-                    if blend != Some(batch.blend) {
-                        pass.set_pipeline(&ui.world.pipelines[super::blend::index(batch.blend)]);
-                        blend = Some(batch.blend);
-                    }
+                    // A custom ui shader (#427) swaps the pipeline and adds its uniform.
+                    ui.bind_batch(&mut pass, (&view.ui, i, b), UiPass::World, &mut blend);
                     let slot = view.ui.effects.batch_offset(i, b);
                     pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
                     pass.set_bind_group(1, &groups[&GroupKey::of(batch, None)], &[slot]);

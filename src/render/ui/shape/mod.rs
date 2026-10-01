@@ -17,6 +17,7 @@
 
 use glam::{Vec2, Vec4};
 
+use super::custom::shaded::shade;
 use super::mesh::{close_batch, to_ndc, visible_clip, CanvasMesh, Frame, Inherited, UiSource};
 use super::vertex::{Fill, MODE_SHAPE};
 use crate::components::{ShapeComponent, ShapeCorner, ShapeKind};
@@ -70,7 +71,8 @@ pub(in crate::render::ui) fn push_shape(
         Layer::Body,
         Paint { fill, border },
     );
-    close_batch(mesh, (UiSource::Solid, shape.blend), clip, start);
+    let shade = shade(&shape.shader, rect, frame.screen);
+    close_batch(mesh, (UiSource::Solid, shape.blend, &shade), clip, start);
 }
 
 /// Just `shape`'s body over `rect`, painted `fill` border included — the shape a

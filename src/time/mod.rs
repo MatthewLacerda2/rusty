@@ -29,6 +29,11 @@ pub struct Time {
     /// paused. Shaders read it as `camera.time` (#398). `f64` so hours of play keep
     /// sub-millisecond precision.
     pub time: f64,
+    /// Seconds since the clock started, ignoring `time_scale` (Unity:
+    /// `Time.unscaledTime`): the sum of `unscaled_delta_time`, so it keeps running
+    /// at time scale 0. Custom UI shaders animate on it (#427), so a paused menu
+    /// still flickers.
+    pub unscaled_time: f64,
     /// Global simulation time scale (Unity: `Time.timeScale`). `1.0` = realtime,
     /// `0.0` = paused, `0.5` = slow-mo, `2.0` = fast. Never negative.
     pub time_scale: f32,
@@ -54,6 +59,7 @@ impl Default for Time {
             fixed_delta_time: FIXED_DELTA_TIME,
             frame_count: 0,
             time: 0.0,
+            unscaled_time: 0.0,
             time_scale: 1.0,
             paused: false,
             pending_steps: 0,
@@ -73,6 +79,7 @@ impl Time {
         self.delta_time = raw_dt * self.time_scale;
         self.frame_count += 1;
         self.time += f64::from(self.delta_time);
+        self.unscaled_time += f64::from(raw_dt);
     }
 
     /// Set the global time scale, clamping negatives to `0.0`.
@@ -126,6 +133,7 @@ impl Time {
         self.unscaled_delta_time = 0.0;
         self.frame_count = 0;
         self.time = 0.0;
+        self.unscaled_time = 0.0;
     }
 }
 

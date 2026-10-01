@@ -16,6 +16,7 @@ mod look;
 pub mod rect_mask;
 pub mod rect_transform;
 pub mod selectable;
+pub mod shader;
 pub mod shape;
 pub mod text;
 

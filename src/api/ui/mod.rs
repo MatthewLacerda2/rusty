@@ -7,9 +7,11 @@
 //! through the active camera, so markers sit where they draw (#429). The pointer
 //! and focus verbs (#420) are in `events`; `view` builds the screen + camera they
 //! all compute against. `UI.Create(kind, [parent])` (#422) is the Create ▸ UI
-//! menu's API face: the same `create_ui` builds the widget.
+//! menu's API face: the same `create_ui` builds the widget. A graphic's custom ui
+//! shader and its runtime params (#427) are in `shader`.
 
 mod events;
+mod shader;
 mod view;
 
 pub use events::register_events;
@@ -74,6 +76,7 @@ pub fn register<'lua, 'scope>(
             Ok(create_ui(&mut scene.borrow_mut(), widget, parent))
         }),
     )?;
+    shader::register(scope, &table, scene)?;
     lua.globals().set("UI", table).map_err(|e| e.to_string())
 }
 

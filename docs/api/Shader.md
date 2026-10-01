@@ -12,7 +12,9 @@ shader is caught at authoring time and never ships. On success the module is wri
 to the authored-shader workspace (`project/assets/shaders/<name>.wgsl` by default),
 registered by name. A **surface** module is then used by naming it on a material —
 `Material.SetShader(id, "enemy_toon")` or a recipe's `shader` key (see `Material.md`);
-re-baking it in a running session rebuilds it on the next frame.
+re-baking it in a running session rebuilds it on the next frame. A **ui** module is
+used by naming it on a UI graphic — `UI.SetShader(id, "hud_glitch")` (see
+[*The `ui` pass*](#the-ui-pass)).
 
 This is authoring shaders that **fit the engine**, not a general-purpose shader
 compiler: the agent composes only from the curated block library — there is no
@@ -24,7 +26,7 @@ passes, bindings, or render features).
 | `Shader.Bake` | `(recipe [, out_dir])` | the written `<out_dir>/<name>.wgsl` path |
 | `Shader.Validate` | `(recipe)` | array of the composed module's entry-point names (dry-run; **writes nothing**) |
 | `Shader.ToJson` | `(recipe)` | the recipe's canonical JSON string |
-| `Shader.Blocks` | `(pass)` | the curated blocks for `pass` (`"surface"` \| `"postfx"`): `{ {id, desc, params = { {name, default, arity, runtime} }, textures = {slot…}, stage }, … }` — `stage` is `"color"` or `"uv"` |
+| `Shader.Blocks` | `(pass)` | the curated blocks for `pass` (`"surface"` \| `"postfx"` \| `"ui"`): `{ {id, desc, params = { {name, default, arity, runtime} }, textures = {slot…}, stage }, … }` — `stage` is `"color"` or `"uv"` |
 
 `recipe` is a table **or** its serialized JSON string (from `Shader.ToJson`, or a
 saved `.json`) — both forms decode alike, with the same errors. `out_dir` defaults to `project/assets/shaders`. Use `Shader.Validate` to
@@ -51,7 +53,7 @@ end
 
 ```lua
 {
-  pass = "postfx",          -- "surface" | "postfx" (the contract the output honours)
+  pass = "postfx",          -- "surface" | "postfx" | "ui" (the contract the output honours)
   name = "warm_grade",      -- baked file becomes <name>.wgsl, registered by this name
   blocks = {                -- applied in order; each transforms the running color
     { id = "tint", params = { color = {1.0, 0.85, 0.6} } },
@@ -97,6 +99,14 @@ assembles byte-identical WGSL.
   in a game once a volume lists it: `Graphics.SetCustomEffects({"crt"})` (see
   `Graphics.md`, *Custom effects*). The renderer loads it from the default output
   dir, so bake it there (no `out_dir`).
+
+- **`ui`** (#427) — restyles **one UI graphic** (an `Image`, a `Shape` or a `Text`). The module
+  is the engine's UI shader (`ui.wgsl`) kept verbatim — both entry-point pairs,
+  `vs_main`/`fs_main` (screen canvases) and `vs_world`/`fs_world` (world canvases),
+  with their sRGB handling, SDF text, fog, RectMask clip and Mask coverage — except
+  `graphic()`, the function both fragment entry points take a graphic's colour from,
+  which folds the blocks over it (clips and masks apply after it). It adds one
+  binding: group 3, the per-graphic uniform (rect, clock, runtime params). See [*The `ui` pass*](#the-ui-pass).
 
 ### Shader inputs
 
@@ -184,6 +194,57 @@ into the lit color; postfx blocks grade the sampled scene color.
   `SetSaturation`, `SetContrast`), so a recipe naming them is refused as an unknown
   block (#397).
 
+### The `ui` pass
+
+Bake with `pass = "ui"`, then `UI.SetShader(id, name)` (see `UI.md`); the model —
+batching, the clock, fallback — is in [`docs/ui.md`](../ui.md#custom-shaders). Every
+ui block's helper is
+`fn ui_<id>(c: vec4<f32>, in: VertexOut, f: UiFrag, <params…>) -> vec4<f32>`, where:
+
+- `c` — the graphic's colour so far, **premultiplied, display space** (what the UI
+  pass blends): the texture × tint (or gradient), a Shape's SDF, or the SDF text with its outline and glow, with
+  CanvasGroup alpha folded in. Colour beyond alpha *adds* light over what is under
+  the graphic (the hologram's glow).
+- `f.uv` — **rect-local**, `(0, 0)` at the graphic's bottom-left to `(1, 1)` at its
+  top-right, following its rotation; `f.size` — the rect in pixels (target pixels
+  on a screen canvas, reference units on a world one); `f.pixel` — the fragment's
+  position in target pixels; `f.time` — the **UI clock**: unscaled seconds
+  (`Time.unscaledTime`), so a paused menu (time scale 0) keeps animating; 0 in edit
+  mode.
+- Sampling blocks re-shade the graphic at a rect-local offset (`ui_shift`): the
+  tap's difference from the centre is added to the running colour, and a tap off
+  the rect is transparent — so a slice that jumps sideways leaves a gap.
+
+The blocks (`*` = runtime, settable per graphic with `UI.SetShaderParam`):
+
+- `scanlines {spacing = 4, strength* = 0.35, speed = 0}` — horizontal lines
+  `spacing` px apart fade the graphic; `speed` scrolls them (px per second).
+- `rgb_split {offset* = 3, angle = 0}` — red and blue re-sampled `offset` px apart
+  along `angle` degrees: a cyan/yellow fringe at the edges.
+- `glitch_slices {bands = 8, amount* = 12, density = 0.35, rate = 12}` — the rect cut
+  into `bands` horizontal bands; a `density` fraction of them jumps sideways up to
+  `amount` px, re-rolled `rate` times a second. `amount` 0 is off — drive it on a hit.
+- `noise_flicker {strength* = 0.35, rate = 24}` — the whole graphic dims by up to
+  `strength`, re-rolled `rate` times a second.
+- `hologram {hue = 190, strength* = 1, spacing = 3, speed = 30, flicker = 0.12}` —
+  luminance recoloured to `hue` degrees (190 cyan, 0 red, 120 green, 240 blue),
+  glowing additively, with scan bands scrolling up at `speed` px/s and a flicker.
+- `dissolve {amount* = 0, scale = 12, edge = 0.08, edge_color = 1}` — value noise
+  (`scale` cells across the rect's height) eats the graphic: `amount` 0 whole, 1
+  gone; the burning edge, `edge` wide, glows `edge_color`.
+- `wipe {progress* = 1, angle = 0, softness = 0.05}` — reveal sweeping toward
+  `angle` degrees (0: left → right, 90: bottom → top): `progress` 0 hidden, 1 shown.
+- `radial_wipe {progress* = 1, start = 90, clockwise = 1, softness = 0.01}` — a
+  clock sweep around the rect's centre from `start` degrees (90: twelve o'clock),
+  clockwise unless `clockwise` is 0.
+
+```lua
+Shader.Bake({ pass = "ui", name = "holo_call",
+              blocks = { { id = "hologram", params = { hue = 185 } }, { id = "scanlines" } } })
+UI.SetShader(callScreen, "holo_call")
+UI.SetShaderParam(callScreen, "hologram.strength", 0.6)
+```
+
 ### Runtime params (surface)
 
 A surface param marked **runtime** above is not baked as a constant: the shader
@@ -192,7 +253,9 @@ changes it with no re-bake (see `Material.md`). Its recipe value is the default 
 material starts from. A bake also writes `<name>.params.json` beside the module,
 recording each runtime param's name and slot, so the engine resolves names without
 reading WGSL. One shader holds at most 16 runtime params; more is a bake error.
-Postfx params are never runtime (a postfx pass has no material).
+Postfx params are never runtime (a postfx pass has no material). A **ui** shader's
+runtime params work the same way, per graphic: `UI.SetShaderParam(id,
+"dissolve.amount", 0.5)` (see `UI.md`).
 
 ### Extra textures (surface)
 

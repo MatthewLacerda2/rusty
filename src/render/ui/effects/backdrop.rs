@@ -62,5 +62,10 @@ pub(in crate::render::ui) fn push_backdrop(
     };
     let start = mesh.vertices.len() as u32;
     let source = push_graphic(mesh, frame, id, rect, Coverage::Flat(state.alpha));
-    close_run(mesh, (source, UiBlend::Normal, Some(backdrop)), clip, start);
+    close_run(
+        mesh,
+        (source, UiBlend::Normal, Some(backdrop), None),
+        clip,
+        start,
+    );
 }

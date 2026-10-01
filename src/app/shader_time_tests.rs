@@ -44,13 +44,16 @@ fn play_mode_shader_time_is_scaled_game_time() {
     gw.tick(DT);
     assert_eq!(shader_time(&gw), 0.5);
 
-    // Time scale 0 freezes shader animation with the game.
+    // Time scale 0 freezes shader animation with the game; the UI clock (#427)
+    // keeps running, so a paused menu still animates.
     gw.time().borrow_mut().set_time_scale(0.0);
     gw.tick(DT);
     assert_eq!(shader_time(&gw), 0.5);
+    assert_eq!(gw.scene().borrow().ui_time, 0.75);
 
     gw.time().borrow_mut().set_time_scale(1.0);
     gw.set_playing(false);
     gw.tick(DT);
     assert_eq!(shader_time(&gw), 0.0, "Stop returns to the edit-mode time");
+    assert_eq!(gw.scene().borrow().ui_time, 0.0);
 }

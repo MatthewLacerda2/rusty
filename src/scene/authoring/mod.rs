@@ -44,6 +44,7 @@ pub mod shape;
 pub mod text;
 pub mod trail;
 pub mod ui_look;
+pub mod ui_shader;
 pub mod ui_widgets;
 pub mod visual_correction;
 

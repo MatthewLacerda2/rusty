@@ -10,8 +10,8 @@
 //!
 //! This is the third and heaviest of the #174 authoring legs. It reuses the
 //! shared-spine *spirit* of #270 (recipe → assemble → validate → bake) but works
-//! in **text**, not pixels: a shader recipe selects a base pass kind (surface or
-//! postfx) and a list of blocks/params, and the assembler concatenates their WGSL
+//! in **text**, not pixels: a shader recipe selects a base pass kind (surface,
+//! postfx or ui) and a list of blocks/params, and the assembler concatenates their WGSL
 //! snippets into a module. It is distinct from [`crate::procgen`] (textures) and
 //! [`crate::scene::authoring`] (entities/components); this authors *shaders*.
 //!
@@ -69,3 +69,5 @@ mod sampling_tests;
 mod tests;
 #[cfg(test)]
 mod texture_tests;
+#[cfg(test)]
+mod ui_tests;

@@ -36,6 +36,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
             .changed();
         changed |= gradient_editor(ui, &mut edit.gradient);
         changed |= blend_row(ui, &mut edit.blend);
+        changed |= super::shader::row(ui, &mut edit.shader);
     });
     if changed {
         if let Some(mut i) = world.image_mut(id) {
@@ -125,4 +126,5 @@ fn write_back(i: &mut ImageComponent, edit: ImageComponent) {
     image_ops::set_raycast_target(i, edit.raycast_target);
     image_ops::set_gradient(i, edit.gradient);
     image_ops::set_blend(i, edit.blend);
+    super::shader::write_back(&mut i.shader, edit.shader);
 }

@@ -6,12 +6,14 @@
 //! never writes WGSL — it picks blocks by `id` and sets their params; the snippet
 //! text is fixed library data, so what ships is bounded to this catalog.
 //!
-//! Two families, one per [`PassKind`]:
+//! Three families, one per [`PassKind`]:
 //! - **surface** (`surface`) — vary the *fragment look* of the forward pass; the
 //!   standard `vs_main` + lighting are kept verbatim and each block transforms the
 //!   shaded color (toon ramp, fresnel rim, emissive pulse, UV-scroll tint, …).
 //! - **postfx** (`postfx`) — fullscreen effects over the tonemapped scene color (tint,
 //!   vignette, scanline, grayscale, …) — the self-contained family.
+//! - **ui** (`ui`, #427) — restyle one UI graphic's premultiplied colour (scanlines,
+//!   glitch slices, hologram, dissolve, wipes); the rest of `ui.wgsl` is kept.
 //!
 //! Each block's helper is a pure function with a fixed signature per family (see
 //! the family modules) followed by the block's params as arguments, in catalog
@@ -21,6 +23,7 @@
 
 mod postfx;
 mod surface;
+mod ui;
 
 use super::recipe::PassKind;
 
@@ -40,8 +43,9 @@ pub struct Param {
     pub arity: usize,
     /// Settable per material at runtime (#399): a surface param read from the
     /// material's param uniform instead of a baked `const`, so a script can drive it
-    /// (a hit flash fading, a rim glowing with shield charge). Postfx params are never
-    /// runtime — a postfx pass has no material.
+    /// (a hit flash fading, a rim glowing with shield charge). A ui param is set per
+    /// graphic the same way (#427). Postfx params are never runtime — a postfx pass
+    /// has no material.
     pub runtime: bool,
 }
 
@@ -99,7 +103,8 @@ pub struct Block {
     /// The expression the assembler substitutes into the fragment chain. Uses
     /// `{prev}` for the incoming color so blocks chain in recipe order, and
     /// `{args}` for the instance's param constants (`, a, b`, or empty); surface
-    /// blocks may also reference `in` (the `VertexOutput`), postfx blocks `uv`.
+    /// blocks may also reference `in` (the `VertexOutput`), postfx blocks `uv`, ui
+    /// blocks `in` (the `VertexOut`) and `f` (the `UiFrag`).
     pub call: &'static str,
     /// The extra texture slots (#400, [`crate::shadergen::textures`]) the helper
     /// samples, as `t_<slot>`. The assembler declares a slot only when some block
@@ -111,7 +116,8 @@ pub struct Block {
     /// that, with the same `{args}` as [`Block::call`] and `in` in scope (#648). The
     /// assembler runs it in the variant's depth-only entry points too, after the UV
     /// chain, so a fragment the colour pass cuts casts no shadow and fills no SSAO
-    /// depth. `None` for a block that only restyles colour, and always for postfx.
+    /// depth. `None` for a block that only restyles colour, and always for postfx and
+    /// ui (a ui block fades to transparent; the UI pass has no depth passes).
     pub cut: Option<&'static str>,
 }
 
@@ -120,6 +126,7 @@ pub fn catalog(pass: PassKind) -> &'static [Block] {
     match pass {
         PassKind::Surface => surface::BLOCKS,
         PassKind::Postfx => postfx::BLOCKS,
+        PassKind::Ui => ui::BLOCKS,
     }
 }
 
@@ -134,7 +141,7 @@ mod tests {
 
     #[test]
     fn every_block_has_unique_id_within_its_pass() {
-        for pass in [PassKind::Surface, PassKind::Postfx] {
+        for pass in PassKind::ALL {
             let cat = catalog(pass);
             for (i, b) in cat.iter().enumerate() {
                 assert!(
@@ -158,9 +165,9 @@ mod tests {
 
     #[test]
     fn uv_stage_blocks_are_surface_only() {
-        assert!(catalog(PassKind::Postfx)
-            .iter()
-            .all(|b| b.stage == Stage::Color));
+        for pass in [PassKind::Postfx, PassKind::Ui] {
+            assert!(catalog(pass).iter().all(|b| b.stage == Stage::Color));
+        }
         assert!(catalog(PassKind::Surface)
             .iter()
             .any(|b| b.stage == Stage::Uv));
@@ -168,7 +175,9 @@ mod tests {
 
     #[test]
     fn only_surface_blocks_cut_and_their_helper_defines_the_cut() {
-        assert!(catalog(PassKind::Postfx).iter().all(|b| b.cut.is_none()));
+        for pass in [PassKind::Postfx, PassKind::Ui] {
+            assert!(catalog(pass).iter().all(|b| b.cut.is_none()));
+        }
         for b in catalog(PassKind::Surface) {
             if let Some(cut) = b.cut {
                 let name = cut.split('(').next().unwrap();
@@ -184,9 +193,9 @@ mod tests {
                 assert!(crate::shadergen::textures::slot(t).is_ok(), "{}: {t}", b.id);
             }
         }
-        assert!(catalog(PassKind::Postfx)
-            .iter()
-            .all(|b| b.textures.is_empty()));
+        for pass in [PassKind::Postfx, PassKind::Ui] {
+            assert!(catalog(pass).iter().all(|b| b.textures.is_empty()));
+        }
     }
 
     #[test]
@@ -195,5 +204,7 @@ mod tests {
         assert!(find(PassKind::Postfx, "vignette").is_some());
         assert!(find(PassKind::Surface, "vignette").is_none());
         assert!(find(PassKind::Postfx, "definitely_not_a_block").is_none());
+        assert!(find(PassKind::Ui, "glitch_slices").is_some());
+        assert!(find(PassKind::Postfx, "glitch_slices").is_none());
     }
 }

@@ -26,6 +26,7 @@ use glam::Vec2;
 use super::cache::{CanvasPlace, UiViewCache};
 use super::effects::{color_pass, GroupKey};
 use super::mesh::build_canvas_meshes;
+use super::pipeline::UiPass;
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
 use crate::ui::{CanvasSpace, UiLayout, UiView};
@@ -77,6 +78,7 @@ impl Renderer {
             })
             .collect();
         view.ui.sync(&self.device, &self.queue, meshes);
+        self.prepare_ui_shades(view, scene.ui_time);
         self.upload_batch_uniforms(&mut view.ui);
         self.render_masks(view);
     }
@@ -95,6 +97,7 @@ impl Renderer {
         }
         view.ui.drawn += drawn;
         self.ui_renderer.ensure_pipeline(&self.device, format);
+        self.ui_renderer.shaders.ensure_screen(&self.device, format);
         self.run_backdrop_blur(view);
         self.encode_ui(&view.ui, &target, format, view.size());
     }
@@ -127,16 +130,9 @@ impl Renderer {
             for (i, canvas) in screen() {
                 pass.set_vertex_buffer(0, canvas.buffer.slice(..));
                 for (b, batch) in canvas.mesh.batches.iter().enumerate() {
-                    // A backdrop always composites "over" (#426); else the blend mode.
-                    let mode = (batch.blend, batch.backdrop.is_some());
-                    if bound != Some(mode) {
-                        let pipeline = match mode.1 {
-                            true => ui.backdrops.get(&format),
-                            false => ui.pipelines.get(&(format, batch.blend)),
-                        };
-                        let Some(pipeline) = pipeline else { continue };
-                        pass.set_pipeline(pipeline);
-                        bound = Some(mode);
+                    let at = (cache, i, b);
+                    if !ui.bind_batch(&mut pass, at, UiPass::Screen(format), &mut bound) {
+                        continue;
                     }
                     pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
                     let slot = cache.effects.batch_offset(i, b);
