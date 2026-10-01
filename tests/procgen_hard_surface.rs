@@ -45,6 +45,7 @@ fn bake_seeded(nodes: &[Node], seed: u64) -> Image {
         seed,
         nodes: nodes.to_vec(),
         output: None,
+        outputs: Default::default(),
     };
     evaluate(&recipe).expect("recipe evaluates")
 }
