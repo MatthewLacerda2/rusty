@@ -1,14 +1,14 @@
-//! src/procgen/ops/generators.rs — source ops (no inputs).
+//! src/procgen/ops/generators/mod.rs — source ops (no inputs).
 //!
 //! Every generator is a pure **sampler** `(u, v) -> Rgba` over the unit domain
 //! `[0, 1)²`; [`sampler`] builds one from an [`OpKind`] and the runner paints it per
 //! pixel. They are seamless by construction because every periodic param is a
 //! **count of periods per tile** ([`count`]): noise/Voronoi wrap an integer lattice
-//! through [`super::super::hash`] (the [`noise`] and [`voronoi`] families, #406), and
-//! wave/brick/checker repeat a whole number of times (#392). Two generators are the documented exceptions: `gradient linear` is a
-//! one-way ramp (use `linear_tiling` for a seamless one), and the radial shapes
-//! (`gradient radial`, `wave rings`) meet the edge mirror-symmetrically — continuous
-//! across the seam, not periodic beyond it.
+//! through [`super::super::hash`] (the `noise` and `voronoi` families, #406), and
+//! wave/brick/checker repeat a whole number of times (#392). Two generators are the
+//! documented exceptions: `gradient linear` is a one-way ramp (use `linear_tiling`
+//! for a seamless one), and the radial shapes (`gradient radial`, `wave rings`) meet
+//! the edge mirror-symmetrically — continuous across the seam, not periodic beyond it.
 
 mod noise;
 mod voronoi;
