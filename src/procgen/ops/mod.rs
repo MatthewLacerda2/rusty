@@ -7,9 +7,10 @@
 //!
 //! - [`generators`] — sources with no input (constant, noise and its fBM / ridged /
 //!   turbulence family, Voronoi F1 / F2 / edges, gradient,
-//!   wave, brick, checker, white noise).
+//!   wave, brick, shape, checker, white noise).
 //! - [`color`] — color ramp, mix (blend modes), invert, bright/contrast, HSV, gamma.
-//! - [`vector`] — domain mapping, domain warp, bump→normal, combine/separate RGB.
+//! - [`vector`] — domain mapping, domain warp, bump→normal, combine/separate RGB;
+//!   [`tile`] — the seeded grid scatter.
 //! - [`math`] — math, map range, clamp, RGB→BW.
 //! - [`filter`] — separable blur.
 //!
@@ -21,6 +22,7 @@ pub mod color;
 pub mod filter;
 pub mod generators;
 pub mod math;
+pub mod tile;
 pub mod vector;
 
 use super::image_buf::Image;
@@ -42,6 +44,7 @@ pub fn eval_node(op: &OpKind, inputs: &[&Image], resolution: u32, seed: u64) -> 
         | OpKind::Gradient { .. }
         | OpKind::Wave { .. }
         | OpKind::Brick { .. }
+        | OpKind::Shape { .. }
         | OpKind::Checker { .. }
         | OpKind::WhiteNoise => eval_generator(op, resolution, seed),
         OpKind::ColorRamp { .. }
@@ -58,6 +61,18 @@ pub fn eval_node(op: &OpKind, inputs: &[&Image], resolution: u32, seed: u64) -> 
         OpKind::Math { .. } | OpKind::MapRange { .. } | OpKind::Clamp { .. } | OpKind::RgbToBw => {
             eval_math(op, inputs, resolution)
         }
+        OpKind::Tile {
+            count,
+            jitter,
+            rotation_jitter,
+            scale_jitter,
+        } => match inputs.first() {
+            Some(src) => {
+                let j = tile::Jitter::new(*jitter, *rotation_jitter, *scale_jitter);
+                tile::tile(src, *count, j, seed)
+            }
+            None => Image::new(resolution),
+        },
         OpKind::Blur { radius } => match inputs.first() {
             Some(src) => filter::blur(src, filter::pixel_radius(*radius, src.resolution())),
             None => Image::new(resolution),

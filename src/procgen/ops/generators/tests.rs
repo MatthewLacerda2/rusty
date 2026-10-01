@@ -3,7 +3,8 @@
 //! whole tile away, for fractional params too (they round to whole counts).
 
 use super::*;
-use crate::procgen::recipe::{NoiseKind, VoronoiOutput};
+use crate::procgen::recipe::ShapeKind::*;
+use crate::procgen::recipe::{BrickOutput, NoiseKind, VoronoiOutput};
 
 /// A spread of sample points, deterministic and off every lattice line.
 fn points() -> impl Iterator<Item = (f32, f32)> {
@@ -53,11 +54,24 @@ fn lattice_ops() -> Vec<OpKind> {
             kind: WaveKind::Bands,
             frequency: s,
         });
-        ops.push(OpKind::Brick {
-            rows: s,
-            cols: s + 0.7,
-            mortar: 0.05,
-        });
+        for output in [BrickOutput::Mask, BrickOutput::Random, BrickOutput::Bevel] {
+            let (rows, cols, mortar) = (s, s + 0.7, 0.05);
+            ops.push(OpKind::Brick {
+                rows,
+                cols,
+                mortar,
+                output,
+            });
+        }
+        for kind in [Circle, Rect, RoundedRect, Line] {
+            let (size, roundness, softness) = ([s / 6.0, 0.3], 0.5, s / 20.0);
+            ops.push(OpKind::Shape {
+                kind,
+                size,
+                roundness,
+                softness,
+            });
+        }
         ops.push(OpKind::Checker {
             tiles: s as u32,
             color_a: [0.0; 4],
@@ -134,6 +148,7 @@ fn counts_round_to_whole_periods_and_brick_rows_to_even() {
             rows: 3.0,
             cols: 2.0,
             mortar: 0.1,
+            output: BrickOutput::Mask,
         },
         64,
         0,

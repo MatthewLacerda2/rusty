@@ -55,6 +55,7 @@ mod physics_queries;
 mod physics_rapier;
 mod prefab_api;
 mod procgen_bake;
+mod procgen_hard_surface;
 mod procgen_ops;
 mod procgen_ops_math;
 mod procgen_organic;
