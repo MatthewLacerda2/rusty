@@ -47,6 +47,10 @@ pub struct RenderCounters {
     /// (#440). Their draw calls are in `draw_calls` — one per merged sprite batch, and
     /// one per instanced run of mesh particles.
     pub particles_drawn: u32,
+    /// Render-texture cameras drawn this frame (#430). Their geometry is already in
+    /// `draw_calls` / `triangles`; a camera skipped (unreferenced, or between its
+    /// `update_every` frames) is not counted.
+    pub render_texture_draws: u32,
 }
 
 impl RenderCounters {
@@ -64,6 +68,7 @@ impl RenderCounters {
             ("ui_draws", self.ui_draws.into()),
             ("ssao_samples", self.ssao_samples),
             ("particles_drawn", self.particles_drawn.into()),
+            ("render_texture_draws", self.render_texture_draws.into()),
         ]
     }
 

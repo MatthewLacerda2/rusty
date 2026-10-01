@@ -63,10 +63,13 @@ impl Renderer {
     }
 
     /// The cache key a map path resolves to: the path when its texture is resident,
-    /// else empty (the default texture). Lets the pool detect a late-loaded map.
+    /// else empty (the default texture). Lets the pool detect a late-loaded map. A
+    /// render texture's key also names its allocation (#430), so a resize rebinds.
     fn resolved_key(&self, path: Option<&String>) -> String {
         match path {
-            Some(p) if self.gpu_textures.contains_key(p) => p.clone(),
+            Some(p) if self.gpu_textures.contains_key(p) => {
+                self.render_texture_key(p).unwrap_or_else(|| p.clone())
+            }
             _ => String::new(),
         }
     }

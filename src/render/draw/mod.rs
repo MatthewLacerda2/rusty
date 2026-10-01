@@ -11,16 +11,14 @@ mod pass;
 mod probes;
 pub(crate) mod resources;
 pub(crate) mod sort;
+pub(crate) mod stack;
 pub(crate) mod uniforms;
 
 use glam::Vec3;
 
-use self::pass::{PassClear, ScenePassFrame};
-use crate::render::gpu::uniforms::FogUniform;
+use self::stack::StackPass;
 use crate::render::lod::LodSelection;
-use crate::render::passes::ssao::{SsaoFrame, SsaoPlan};
-use crate::render::postfx::params::build_post_params;
-use crate::render::{build_camera_stack, CameraUniform, RenderView, Renderer};
+use crate::render::{build_camera_stack, texture_cameras, RenderView, Renderer};
 use crate::scene::{Camera, Scene};
 
 impl Renderer {
@@ -56,8 +54,9 @@ impl Renderer {
     /// Renders the 3D scene into `view` (a per-view target/depth/post-FX bundle, #355),
     /// compositing the final image to `output`.
     ///
-    /// In play mode this composites the camera stack (#93): the scene's active
-    /// `CameraComponent` entities, sorted by `render_order`, each draw with their own
+    /// In play mode this first draws the scene's render-texture cameras (#430) into
+    /// their textures, then composites the screen camera stack (#93): the active
+    /// `CameraComponent` entities, sorted by `render_order`, each with their own
     /// culling mask / lens / clear flags so a viewmodel or UI camera layers on top of
     /// the world. In edit mode the free-fly `camera` is the single pass. Post-FX runs
     /// once over the composited HDR target.
@@ -69,81 +68,33 @@ impl Renderer {
         output: &wgpu::TextureView,
         editor_mode: bool,
     ) {
+        let textures = match editor_mode {
+            true => Vec::new(),
+            false => texture_cameras(camera, scene),
+        };
+        self.sync_render_textures(view, &textures);
         self.prepare_frame(view, scene, camera);
-        let aspect = view.aspect();
 
         // The ordered camera stack (one entry in edit mode / when no scene camera).
         let stack = build_camera_stack(camera, scene, !editor_mode);
-        // The sun's cascades follow the base camera; every stacked camera samples them.
-        // So do the dynamic casters' LOD levels (#472): a shadow shows the level its
-        // caster shows in the main view.
+        // The sun's cascades follow the base camera; every stacked camera — and every
+        // render-texture camera (#430) — samples them. So do the dynamic casters' LOD
+        // levels (#472): a shadow shows the level its caster shows in the main view.
         let base_lod = LodSelection::for_camera(scene, &stack[0]);
-        self.run_shadow_passes(scene, &stack[0], aspect, &base_lod);
-        let last = stack.len().saturating_sub(1);
-        // The base (first) camera drives the shared post-FX history / motion vectors.
-        let base_view_proj = stack[0].build_view_projection(aspect);
-        let ssao = SsaoPlan::for_scene(scene, self.quality);
+        self.run_shadow_passes(scene, &stack[0], view.aspect(), &base_lod);
+        self.draw_render_textures(view, scene, &textures);
         // Lay out and mesh the UI through the base camera (#418, #429): world
         // canvases draw inside each camera's pass below, screen canvases after it.
         self.prepare_ui(view, scene, &stack[0], editor_mode);
+        let pass = StackPass {
+            stack: &stack,
+            output,
+            editor_mode,
+            full_post_fx: true,
+        };
+        self.draw_stack(view, scene, pass);
 
-        for (idx, cam) in stack.iter().enumerate() {
-            // 1. Write this camera's view/projection uniform.
-            let view_proj = cam.build_view_projection(aspect);
-            // This camera's world-space frustum, for culling off-screen entities (#330).
-            // Built per camera because each stacked camera has its own lens/orientation;
-            // the reflection-capture faces call `render` per face and so get it for free.
-            let frustum = crate::render::Frustum::from_view_proj(view_proj);
-            let camera_uniform = CameraUniform {
-                view_proj: view_proj.to_cols_array(),
-                camera_pos: cam.position.to_array(),
-                time: scene.shader_time,
-                fog: FogUniform::from_settings(&scene.fog),
-            };
-            self.queue
-                .write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&camera_uniform));
-
-            // 2. Batch this camera's solids (the culling mask differs per camera) into
-            // instanced draws and upload their packed data (#470). The split separates
-            // opaque/cutout (the solids pass) from transparent (the sorted
-            // alpha-blended pass below) (#242).
-            // Each camera picks its own LOD levels (#472), before batching so one level
-            // of one prop is still one instanced draw.
-            let lod = LodSelection::for_camera(scene, cam);
-            let solids = self.precreate_solid_resources(scene, cam, &frustum, &lod);
-            let overlays = self.precreate_overlays(scene, editor_mode);
-
-            let frame = ScenePassFrame {
-                editor_mode,
-                clear: PassClear::for_pass(idx == 0, cam.clear_flags),
-                ssao: ssao.map(|plan| SsaoFrame::for_camera(plan, view_proj, cam)),
-            };
-            self.execute_scene_pass(view, frame, &solids.draws.opaque, &overlays);
-
-            // Project box-decals over this camera's lit surfaces (reads the scene
-            // depth to reconstruct geometry), after solids/skybox and before the
-            // additive particles so decals sit on the surface, not over the sparks.
-            self.draw_decals(view, scene, cam);
-
-            // Translucent solids (#242): alpha-blended, depth-tested against opaque,
-            // drawn back-to-front (already sorted) after opaque + decals so glass
-            // composites over the world behind it.
-            self.draw_transparent(view, &solids.draws.transparent);
-            // World canvases (#429): scene geometry, occluded by it, before particles.
-            self.draw_world_ui(view, cam, aspect, FogUniform::from_settings(&scene.fog));
-
-            // Ribbons (#441) then sprite particles for this camera, each back to front;
-            // mesh particles already drew with the solids.
-            let effects = self.draw_effects(view, scene, cam);
-            self.count_camera(&solids, scene.decals.len(), effects);
-
-            // 3. Composite + post-process once, over the final pass's HDR target.
-            if idx == last {
-                self.run_post_fx(view, scene, output, base_view_proj, cam.position.to_array());
-            }
-        }
-
-        // 4. The in-game UI over the finished frame (#418): after post-FX, so a HUD
+        // The in-game UI over the finished frame (#418): after post-FX, so a HUD
         // is never tonemapped, bloomed or FXAA-softened. Not in the Scene view.
         if !editor_mode {
             self.draw_ui(view);
@@ -177,44 +128,6 @@ impl Renderer {
         }
     }
 
-    /// Run the post-process chain (color correction, bloom, motion blur, SSR) over the
-    /// view's composited HDR target, writing the corrected image to `output`.
-    fn run_post_fx(
-        &mut self,
-        view: &mut RenderView,
-        scene: &Scene,
-        output: &wgpu::TextureView,
-        view_proj: glam::Mat4,
-        camera_pos: [f32; 3],
-    ) {
-        use crate::render::postfx::PostFxContext;
-
-        let (mut post_params, bloom_enabled) = build_post_params(
-            scene,
-            self.quality,
-            view_proj,
-            view.post_fx.prev_view_proj,
-            camera_pos,
-        );
-        post_params.misc[1] = 1.0 / view.post_fx.bloom_size.0 as f32;
-        post_params.misc[2] = 1.0 / view.post_fx.bloom_size.1 as f32;
-        view.post_fx.prev_view_proj = view_proj;
-
-        let skybox_view = self
-            .skybox_texture
-            .as_ref()
-            .map(|tex| &tex.view)
-            .unwrap_or(&self.default_texture.view);
-        let ctx = PostFxContext {
-            depth_view: &view.depth_view,
-            skybox_view,
-            output,
-        };
-        let passes = crate::render::postfx::params::post_passes(scene, bloom_enabled);
-        view.post_fx
-            .run(&self.device, &self.queue, ctx, post_params, passes);
-    }
-
     /// Bind (or clear) the active reflection probe's baked cubemap for `camera_pos` (#245):
     /// the nearest probe whose box covers the camera and that carries a baked `cubemap_path`
     /// wins. Rebinding happens only when the active path changes (tracked by
@@ -246,7 +159,7 @@ impl Renderer {
 /// Every active entity's resolved material map paths (albedo, metallic, roughness,
 /// normal, emissive) the forward shader samples — gathered as owned strings so the
 /// scene borrow ends before the textures are uploaded (#202, #207).
-fn active_material_map_paths(scene: &Scene) -> Vec<String> {
+pub(crate) fn active_material_map_paths(scene: &Scene) -> Vec<String> {
     scene
         .world
         .ids_with_material()

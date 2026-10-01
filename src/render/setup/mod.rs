@@ -212,6 +212,7 @@ impl Renderer {
             static_capture: false,
             capture_probe_bounce: false,
             frame_counters: Default::default(),
+            render_texture_ids: Default::default(),
             _gpu_permit: gpu_permit,
         }
     }

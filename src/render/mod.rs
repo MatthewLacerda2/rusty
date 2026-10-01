@@ -5,6 +5,7 @@ mod frustum;
 pub(crate) mod lod;
 mod preview;
 pub mod readback;
+pub(crate) mod render_texture;
 mod setup;
 mod stats;
 #[cfg(test)]
@@ -210,6 +211,10 @@ pub struct Renderer {
 
     /// What the last `render` call submitted (#433) — read by the dev layer's stats.
     pub frame_counters: RenderCounters,
+
+    /// Every registered render texture's current allocation id, by path, and the
+    /// last id handed out (#430) — the material cache's key for `"rt:"` maps.
+    render_texture_ids: (HashMap<String, u64>, u64),
 
     /// This renderer's slot in the headless budget (#366) — `Some` for headless
     /// renderers, `None` for the windowed one, which is the application itself and
