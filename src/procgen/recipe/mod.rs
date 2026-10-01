@@ -17,94 +17,14 @@
 //! with a default. [`Node`]'s check lives in `recipe/node.rs`.
 
 mod catalog;
+mod kinds;
 mod node;
 
 pub use catalog::{Lit, OpInfo, OpParam, OPS};
+pub use kinds::*;
 pub use node::Node;
 
 use serde::{Deserialize, Serialize};
-
-/// A blend mode for the [`OpKind::Mix`] op — the common Blender / Photoshop set.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum BlendMode {
-    /// Linear interpolate a→b by the factor.
-    Mix,
-    Add,
-    Multiply,
-    Screen,
-    Overlay,
-    Subtract,
-    Difference,
-}
-
-/// A scalar math operation for [`OpKind::Math`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum MathOp {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Power,
-    Min,
-    Max,
-    Abs,
-    Fract,
-    Sqrt,
-}
-
-/// Which kind of noise [`OpKind::Noise`] produces.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum NoiseKind {
-    /// A single octave of gradient (Perlin) noise.
-    Perlin,
-    /// Fractional Brownian motion: several Perlin octaves summed.
-    Fbm,
-    /// `1 − |n|`, squared, summed over octaves: sharp crests (rock veins, scratches).
-    Ridged,
-    /// `|n|` summed over octaves: billowy creases (smoke, grime).
-    Turbulence,
-}
-
-/// Which kind of wave [`OpKind::Wave`] produces.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum WaveKind {
-    /// Parallel bands across the domain.
-    Bands,
-    /// Concentric rings from the domain center.
-    Rings,
-}
-
-/// Which kind of gradient [`OpKind::Gradient`] produces.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum GradientKind {
-    /// Left→right linear ramp, 0→1 — the one generator that does **not** tile
-    /// (a hard edge at the wrap); use it under a mask or a `mapping { tiling = false }`.
-    Linear,
-    /// Left→center→right triangle ramp, 0→1→0: the seamless linear ramp.
-    LinearTiling,
-    /// Center→edge radial ramp.
-    Radial,
-}
-
-/// What the Voronoi op outputs per pixel.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum VoronoiOutput {
-    /// Distance to the nearest cell point (F1) — classic cellular.
-    #[default]
-    Distance,
-    /// A flat random color per cell.
-    Cells,
-    /// Distance to the second-nearest cell point (F2).
-    F2,
-    /// `F2 − F1`: ~0 on cell borders — cracks, dried mud, cobble outlines.
-    Edges,
-}
 
 /// One stop in a [`ColorRamp`](OpKind::ColorRamp): position in `[0, 1]` and its color.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -155,11 +75,25 @@ pub enum OpKind {
     Wave { kind: WaveKind, frequency: f32 },
     /// A brick / running-bond pattern; `rows`/`cols` bricks across the domain
     /// (`rows` rounds to an even count so the running bond closes at the wrap).
+    /// `output` picks the face mask, a seeded value per brick, or a bevel ramp.
     Brick {
         rows: f32,
         cols: f32,
         #[serde(default = "default_mortar")]
         mortar: f32,
+        #[serde(default)]
+        output: BrickOutput,
+    },
+    /// One centred shape per tile as a mask (1 inside, 0 outside). `size` is its
+    /// width/height in tile units; `roundness` (0–1) rounds a `rounded_rect`'s
+    /// corners; `softness` (tile units) ramps the edge inward, a bevel profile.
+    Shape {
+        kind: ShapeKind,
+        size: [f32; 2],
+        #[serde(default = "quarter")]
+        roundness: f32,
+        #[serde(default)]
+        softness: f32,
     },
     /// A 2-color checkerboard; `tiles` squares across each axis (rounded up to even).
     Checker {
@@ -204,6 +138,19 @@ pub enum OpKind {
     CombineRgb,
     /// Pull one channel of the input out as grayscale. `channel` 0=R,1=G,2=B,3=A.
     SeparateRgb { channel: u8 },
+    /// Scatter (1 input): stamp the input once per cell of a `count`×`count` grid,
+    /// each cell seeded with an offset (`jitter`, in cells), a rotation
+    /// (`rotation_jitter`, in turns) and a scale (`scale_jitter`); overlaps keep the
+    /// brighter stamp. Always tiles.
+    Tile {
+        count: f32,
+        #[serde(default)]
+        jitter: f32,
+        #[serde(default)]
+        rotation_jitter: f32,
+        #[serde(default)]
+        scale_jitter: f32,
+    },
     /// Domain warp (2 inputs): sample input A displaced by input B's R/G, centred
     /// on 0.5 and scaled by `strength` in **tile units**; wrapped, so it tiles.
     Warp { strength: f32 },
@@ -247,6 +194,10 @@ fn two() -> f32 {
 
 fn half() -> f32 {
     0.5
+}
+
+fn quarter() -> f32 {
+    0.25
 }
 
 fn default_mortar() -> f32 {

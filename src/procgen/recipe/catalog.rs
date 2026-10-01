@@ -143,6 +143,21 @@ pub const OPS: &[OpInfo] = &[
             req("rows", "number"),
             req("cols", "number"),
             opt("mortar", "number", Lit::Number(0.05)),
+            OpParam {
+                default: Some(Lit::Text("mask")),
+                ..choice("output", &["mask", "random", "bevel"])
+            },
+        ],
+    ),
+    op(
+        "shape",
+        "generator",
+        0,
+        &[
+            choice("kind", &["circle", "rect", "rounded_rect", "line"]),
+            req("size", "vec2"),
+            opt("roundness", "number", Lit::Number(0.25)),
+            opt("softness", "number", Lit::Number(0.0)),
         ],
     ),
     op(
@@ -195,6 +210,17 @@ pub const OPS: &[OpInfo] = &[
     op("bump_to_normal", "vector", 1, &[req("strength", "number")]),
     op("combine_rgb", "vector", 3, &[]),
     op("separate_rgb", "vector", 1, &[req("channel", "integer")]),
+    op(
+        "tile",
+        "vector",
+        1,
+        &[
+            req("count", "number"),
+            opt("jitter", "number", Lit::Number(0.0)),
+            opt("rotation_jitter", "number", Lit::Number(0.0)),
+            opt("scale_jitter", "number", Lit::Number(0.0)),
+        ],
+    ),
     op("warp", "vector", 2, &[req("strength", "number")]),
     op(
         "math",

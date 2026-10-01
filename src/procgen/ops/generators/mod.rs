@@ -5,12 +5,15 @@
 //! pixel. They are seamless by construction because every periodic param is a
 //! **count of periods per tile** ([`count`]): noise/Voronoi wrap an integer lattice
 //! through [`super::super::hash`] (the `noise` and `voronoi` families, #406), and
-//! wave/brick/checker repeat a whole number of times (#392). Two generators are the
+//! wave/brick/checker repeat a whole number of times (#392); `shape` is
+//! symmetric about the tile centre, so it meets itself at the wrap (#407). Two generators are the
 //! documented exceptions: `gradient linear` is a one-way ramp (use `linear_tiling`
 //! for a seamless one), and the radial shapes (`gradient radial`, `wave rings`) meet
 //! the edge mirror-symmetrically — continuous across the seam, not periodic beyond it.
 
+mod brick;
 mod noise;
+mod shape;
 mod voronoi;
 
 use super::super::hash;
@@ -57,7 +60,18 @@ pub fn sampler(op: &OpKind, resolution: u32, seed: u64) -> Option<Sampler> {
         } => voronoi::sampler(scale, output, randomness, seed),
         OpKind::Gradient { kind } => gradient(kind),
         OpKind::Wave { kind, frequency } => wave(kind, frequency),
-        OpKind::Brick { rows, cols, mortar } => brick(rows, cols, mortar),
+        OpKind::Brick {
+            rows,
+            cols,
+            mortar,
+            output,
+        } => brick::sampler(rows, cols, mortar, output, seed),
+        OpKind::Shape {
+            kind,
+            size,
+            roundness,
+            softness,
+        } => shape::sampler(kind, size, roundness, softness),
         OpKind::Checker {
             tiles,
             color_a,
@@ -120,25 +134,6 @@ fn wave(kind: WaveKind, frequency: f32) -> Sampler {
             WaveKind::Rings => (u - 0.5).hypot(v - 0.5) * f,
         };
         gray(0.5 + 0.5 * (phase * std::f32::consts::TAU).sin())
-    })
-}
-
-/// Running-bond brick: `cols`×`rows` bricks, every other row offset half a brick.
-/// `rows` rounds to an **even** count so the alternation closes at the wrap. Mortar
-/// gaps read 0, brick faces read 1 (a mask).
-fn brick(rows: f32, cols: f32, mortar: f32) -> Sampler {
-    let rows = count(rows / 2.0) * 2.0;
-    let cols = count(cols);
-    Box::new(move |u, v| {
-        let ry = v * rows;
-        let offset = if (ry.floor() as i64).rem_euclid(2) == 0 {
-            0.0
-        } else {
-            0.5
-        };
-        let cx = (u * cols + offset).rem_euclid(1.0);
-        let cy = ry.rem_euclid(1.0);
-        gray(if cx < mortar || cy < mortar { 0.0 } else { 1.0 })
     })
 }
 
