@@ -4,7 +4,8 @@
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
 //! `Scene`, `Random`, `Timer`, `Tween`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
 //! `Assets`, `Texture`, `Shader`, `Sound`, `Particles`, `Layers`, `Graphics`, `Video`,
-//! `Storage`, `Canvas`, `RectTransform`, `UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Shape`, `Selectable`,
+//! `Storage`, `Canvas`, `RectTransform`, `UI`, `Image`, `CanvasGroup`, `RectMask`, `Mask`,
+//! `BackdropFilter`, `Text`, `Shape`, `Selectable`,
 //! `LayoutGroup`, `LayoutElement`, `Joint`, `LODGroup`, `Trail`, `Line`,
 //! `Application`, plus the dev-only `Debug`)
 //! is registered from this tree onto the live Lua runtime.
@@ -19,6 +20,7 @@ pub mod animator;
 pub mod application;
 pub mod assets;
 pub mod audio;
+pub mod backdrop_filter;
 pub mod camera;
 pub mod canvas;
 pub mod canvas_group;
@@ -37,6 +39,7 @@ pub mod lighting;
 pub mod line;
 pub mod lod_group;
 pub(crate) mod lua_json;
+pub mod mask;
 pub mod material;
 pub mod nav;
 pub mod particle;
@@ -193,11 +196,7 @@ pub fn register<'lua, 'scope>(
     ui::register(lua, scope, ctx.scene, (ctx.screen, ctx.video), ctx.camera)?;
     ui::register_events(lua, scope, ctx)?;
     selectable::register(lua, scope, ctx.scene, ctx.event_system)?;
-    image::register(lua, scope, ctx.scene)?;
-    canvas_group::register(lua, scope, ctx.scene)?;
-    rect_mask::register(lua, scope, ctx.scene)?;
-    layout_group::register(lua, scope, ctx.scene)?;
-    layout_element::register(lua, scope, ctx.scene)?;
+    register_ui_components(lua, scope, ctx.scene)?;
     text::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
     shape::register(lua, scope, ctx.scene)?;
     decals::register(lua, scope, ctx.scene)?;
@@ -210,6 +209,22 @@ pub fn register<'lua, 'scope>(
     #[cfg(feature = "dev")]
     debug::register(lua, scope, ctx)?;
     Ok(())
+}
+
+/// The UI component namespaces that borrow only the scene: the graphic, its
+/// group, clips and backdrop (#418, #426, #428), and the layout pair (#421).
+fn register_ui_components<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    image::register(lua, scope, scene)?;
+    canvas_group::register(lua, scope, scene)?;
+    rect_mask::register(lua, scope, scene)?;
+    mask::register(lua, scope, scene)?;
+    backdrop_filter::register(lua, scope, scene)?;
+    layout_group::register(lua, scope, scene)?;
+    layout_element::register(lua, scope, scene)
 }
 
 /// Set a named entry on `table` from a built function value.

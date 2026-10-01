@@ -1,10 +1,10 @@
 //! Tests for the UI raycast (#420): draw order, canvas sort order, raycast_target,
-//! active, CanvasGroup.blocks_raycasts, RectMask clipping and rotated rects.
+//! active, CanvasGroup.blocks_raycasts, RectMask and Mask clipping and rotated rects.
 
 use glam::{Quat, Vec2};
 
 use super::raycast;
-use crate::components::{CanvasComponent, CanvasGroupComponent, RectMaskComponent};
+use crate::components::{CanvasComponent, CanvasGroupComponent, MaskComponent, RectMaskComponent};
 use crate::ui::events::fixture::{panel, scene, SCREEN};
 use crate::ui::UiLayout;
 
@@ -78,6 +78,22 @@ fn a_rect_mask_clips_what_it_contains() {
     let child = panel(&mut s, mask, Vec2::ZERO, Vec2::splat(300.0));
     assert_eq!(hit(&s, 50.0, 50.0), Some(child));
     assert_eq!(hit(&s, 150.0, 150.0), None, "outside the mask");
+}
+
+#[test]
+fn a_mask_clips_its_children_but_not_itself() {
+    let (mut s, canvas) = scene();
+    let frame = panel(&mut s, canvas, Vec2::ZERO, Vec2::splat(100.0));
+    s.world.set_mask(frame, Some(MaskComponent::default()));
+    let map = panel(&mut s, frame, Vec2::ZERO, Vec2::splat(300.0));
+    assert_eq!(hit(&s, 50.0, 50.0), Some(map));
+    assert_eq!(hit(&s, 150.0, 150.0), None, "a masked-out child is not hit");
+    s.world.image_mut(map).expect("image").raycast_target = false;
+    assert_eq!(
+        hit(&s, 50.0, 50.0),
+        Some(frame),
+        "the mask graphic still is"
+    );
 }
 
 #[test]

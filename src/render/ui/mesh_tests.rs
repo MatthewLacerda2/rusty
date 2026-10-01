@@ -96,7 +96,7 @@ fn a_mask_breaks_the_batch_and_clips_its_subtree() {
     element(&mut scene, panel, Vec2::ZERO, Vec2::splat(500.0), None);
     let batches = &build(&scene)[0].batches;
     assert_eq!(batches.len(), 2);
-    let clip = batches[1].clip.expect("masked");
+    let clip = batches[1].clip.rect.expect("masked");
     // Top-left origin: y = 1080 - (200 + 40).
     assert_eq!((clip.x, clip.y, clip.w, clip.h), (100, 840, 50, 40));
     assert_eq!(batches[1].range.len(), 12, "the panel and its child");

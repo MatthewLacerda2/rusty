@@ -1,5 +1,6 @@
-//! The Rect Mask inspector card (#418): the clip's padding. The write routes
-//! through `scene::authoring::rect_mask`.
+//! The Rect Mask and Mask inspector cards (#418, #428): the rect clip's padding and
+//! feather, and the graphic clip's show-graphic toggle. Writes route through
+//! `scene::authoring::rect_mask`.
 
 use egui_phosphor::regular as icon;
 
@@ -10,7 +11,7 @@ use crate::scene::authoring::rect_mask as mask_ops;
 /// Rect Mask card. A THIN client (#287): the widget reads a snapshot and routes the
 /// write through the shared op; remove detaches the component.
 pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool) {
-    let Some(padding) = world.rect_mask(id).map(|m| m.padding) else {
+    let Some((padding, mut feather)) = world.rect_mask(id).map(|m| (m.padding, m.feather)) else {
         return;
     };
     let mut remove = false;
@@ -22,9 +23,40 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
             }
             changed = true;
         }
+        let soft = ui
+            .horizontal(|ui| {
+                ui.label("Feather:");
+                let drag = egui::DragValue::new(&mut feather).clamp_range(0.0..=f32::MAX);
+                ui.add(drag).changed()
+            })
+            .inner;
+        if let (true, Some(mut m)) = (soft, world.rect_mask_mut(id)) {
+            mask_ops::set_feather(&mut m, feather);
+            changed = true;
+        }
     });
     if remove {
         world.set_rect_mask(id, None);
+    }
+    *is_dirty |= remove || changed;
+}
+
+/// Mask card: whether the mask graphic also draws. Same thin-client shape.
+pub fn draw_mask(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool) {
+    let Some(mut show) = world.mask(id).map(|m| m.show_mask_graphic) else {
+        return;
+    };
+    let mut remove = false;
+    let mut changed = false;
+    component_card(ui, icon::CIRCLE_DASHED, "Mask", Some(&mut remove), |ui| {
+        let toggled = ui.checkbox(&mut show, "Show Mask Graphic").changed();
+        if let (true, Some(mut m)) = (toggled, world.mask_mut(id)) {
+            mask_ops::set_show_mask_graphic(&mut m, show);
+            changed = true;
+        }
+    });
+    if remove {
+        world.set_mask(id, None);
     }
     *is_dirty |= remove || changed;
 }

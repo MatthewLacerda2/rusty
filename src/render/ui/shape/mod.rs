@@ -73,6 +73,26 @@ pub(in crate::render::ui) fn push_shape(
     close_batch(mesh, (UiSource::Solid, shape.blend), clip, start);
 }
 
+/// Just `shape`'s body over `rect`, painted `fill` border included — the shape a
+/// Mask clips to or a backdrop shows through (#426, #428).
+pub(in crate::render::ui) fn push_shape_body(
+    mesh: &mut CanvasMesh,
+    frame: &Frame,
+    rect: &UiRect,
+    shape: &ShapeComponent,
+    fill: Fill,
+) {
+    let border = Vec4::new(1.0, 1.0, 1.0, fill.max_alpha());
+    push_quad(
+        mesh,
+        frame,
+        rect,
+        shape,
+        Layer::Body,
+        Paint { fill, border },
+    );
+}
+
 /// The shadow and glow quads (whichever are on), tinted by `tint`.
 fn push_effects(
     mesh: &mut CanvasMesh,

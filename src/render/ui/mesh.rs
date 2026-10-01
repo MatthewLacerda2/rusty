@@ -5,34 +5,45 @@
 //! `Shape` and `Text` (an entity with several draws them in that order) as triangles in
 //! normalized device coordinates, tagged with what it samples and how it is
 //! clipped. Consecutive graphics sharing a source (solid, a texture, a font's
-//! atlas), a blend mode (#425) and a clip merge into one [`UiBatch`]; a change of
-//! any starts a new one — so a HUD of solid bars is one draw call per canvas however many bars it
-//! has, and a label is one draw call however many glyphs it has.
+//! atlas), a blend mode (#425), a clip ([`UiClip`]: rect, feather and mask, #428)
+//! and no backdrop merge into one [`UiBatch`]; a change of any starts a new one —
+//! so a HUD of solid bars is one draw call per canvas however many bars it has,
+//! and a label is one draw call however many glyphs it has.
 //!
 //! Inherited state rides down the walk (parents precede children in the layout):
 //! **visibility** (the entity and every ancestor active), **alpha** (the product of
-//! every `CanvasGroup` on the chain) and **clip** (every `RectMask` on the chain,
-//! intersected, as a pixel scissor rect).
+//! every `CanvasGroup` on the chain) and **clip** (every `RectMask` on the chain
+//! intersected, with its feather, and the nearest `Mask` — see `clip`).
+//!
+//! Two graphics are not plain batches: a `Mask`'s graphic is recorded as a
+//! [`MaskDraw`] (rendered into its coverage texture, and batched only when
+//! `show_mask_graphic` is on), and a `BackdropFilter` adds a backdrop batch under
+//! the graphic on an overlay canvas (`effects`). Both take their shape from
+//! [`push_graphic`]: the entity's Image, else its Shape, else its rect.
 //!
 //! A `WorldSpace` canvas (#429) has no screen: its "screen" is its own reference
 //! rect (scale 1), so its NDC span exactly that rect and the world pass maps them
 //! onto the canvas plane. Its clips are rects in that space too; the world pass
 //! cannot scissor a plane in perspective, so it clips them per fragment against
-//! [`Scissor::ndc`] instead (#619).
+//! [`UiClip::ndc`] instead (#619).
 
 use std::collections::HashMap;
 
 use glam::{Vec2, Vec4};
 
+pub(super) use super::clip::Inherited;
+pub(crate) use super::clip::UiClip;
+use super::effects::backdrop::{push_backdrop, UiBackdrop};
+use super::effects::mask::{push_mask, MaskDraw};
 use super::geometry::image_triangles;
-use super::shape::push_shape;
+use super::shape::{push_shape, push_shape_body};
 use super::text::atlas::FontAtlases;
 use super::text::emit::push_text;
 pub(crate) use super::vertex::UiVertex;
 use super::vertex::{Fill, MODE_IMAGE};
-use crate::components::UiBlend;
+use crate::components::{ImageComponent, UiBlend};
 use crate::ecs::World;
-use crate::ui::{UiLayout, UiRect};
+use crate::ui::{CanvasSpace, UiLayout, UiRect};
 
 /// What a batch samples.
 #[derive(Clone, Debug, PartialEq)]
@@ -45,36 +56,19 @@ pub(crate) enum UiSource {
     Font(Option<String>),
 }
 
-/// A scissor rect in target pixels, top-left origin (wgpu's convention).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Scissor {
-    pub(crate) x: u32,
-    pub(crate) y: u32,
-    pub(crate) w: u32,
-    pub(crate) h: u32,
-}
-
-impl Scissor {
-    /// This rect on a `frame`-pixel target as NDC bounds `[min.x, min.y, max.x,
-    /// max.y]` — the space the canvas's vertices are in.
-    pub(crate) fn ndc(self, frame: Vec2) -> [f32; 4] {
-        let frame = frame.max(Vec2::ONE);
-        let lo = Vec2::new(self.x as f32, frame.y - (self.y + self.h) as f32);
-        let hi = lo + Vec2::new(self.w as f32, self.h as f32);
-        let (lo, hi) = (lo / frame * 2.0 - Vec2::ONE, hi / frame * 2.0 - Vec2::ONE);
-        [lo.x, lo.y, hi.x, hi.y]
-    }
-}
-
-/// A run of vertices drawn with one source, one blend mode and one clip.
+/// A run of vertices drawn with one source, one blend mode, one clip and one
+/// backdrop.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct UiBatch {
     /// What it samples.
     pub(crate) source: UiSource,
     /// How it composites (#425): each mode is its own pipeline.
     pub(crate) blend: UiBlend,
-    /// The scissor, or `None` for the whole target.
-    pub(crate) clip: Option<Scissor>,
+    /// How it is clipped.
+    pub(crate) clip: UiClip,
+    /// A backdrop batch (#426): what it shows behind the graphic, or `None` for an
+    /// ordinary graphic.
+    pub(crate) backdrop: Option<UiBackdrop>,
     /// The vertex range in the canvas's vertex list.
     pub(crate) range: std::ops::Range<u32>,
 }
@@ -88,15 +82,8 @@ pub(crate) struct CanvasMesh {
     pub(crate) frame: Vec2,
     pub(crate) vertices: Vec<UiVertex>,
     pub(crate) batches: Vec<UiBatch>,
-}
-
-/// What an element passes to its children.
-#[derive(Clone, Copy)]
-pub(super) struct Inherited {
-    visible: bool,
-    pub(super) alpha: f32,
-    /// Pixel bounds `(min, max)`, bottom-left origin.
-    clip: Option<(Vec2, Vec2)>,
+    /// Its `Mask` graphics, parents before children (#428).
+    pub(crate) masks: Vec<MaskDraw>,
 }
 
 /// What every element of one build reads: the scene, the target size in pixels and
@@ -105,6 +92,8 @@ pub(super) struct Frame<'a> {
     pub(super) world: &'a World,
     pub(super) screen: Vec2,
     tex_size: &'a dyn Fn(&str) -> Option<Vec2>,
+    /// Whether the canvas being built is a screen overlay (backdrops draw only there).
+    pub(super) overlay: bool,
 }
 
 /// Build every canvas's mesh on a `screen`-pixel target. `tex_size` reports a
@@ -122,6 +111,7 @@ pub(crate) fn build_canvas_meshes(
         world,
         screen,
         tex_size,
+        overlay: true,
     };
     let mut meshes: Vec<CanvasMesh> = Vec::new();
     let mut state: HashMap<u32, Inherited> = HashMap::new();
@@ -130,11 +120,12 @@ pub(crate) fn build_canvas_meshes(
             .parent_id(id)
             .and_then(|p| state.get(&p).copied())
             .filter(|_| id != rect.canvas)
-            .unwrap_or_else(|| root_state(world, id));
-        let here = inherit(world, id, rect, parent);
-        state.insert(id, here);
+            .unwrap_or_else(|| Inherited::root(world, id));
+        let (here, down) = parent.child(world, id, rect);
+        state.insert(id, down);
         if meshes.last().map(|m| m.canvas) != Some(rect.canvas) {
             frame.screen = canvas_screen(world, rect.canvas, screen);
+            frame.overlay = layout.space(rect.canvas) == CanvasSpace::Screen;
             meshes.push(CanvasMesh {
                 canvas: rect.canvas,
                 frame: frame.screen,
@@ -142,8 +133,12 @@ pub(crate) fn build_canvas_meshes(
             });
         }
         if let Some(mesh) = meshes.last_mut() {
-            push_image(mesh, &frame, id, rect, here);
-            push_shape(mesh, &frame, id, rect, here);
+            push_backdrop(mesh, &frame, id, rect, here);
+            if world.mask(id).is_none_or(|m| m.show_mask_graphic) {
+                push_image(mesh, &frame, id, rect, here);
+                push_shape(mesh, &frame, id, rect, here);
+            }
+            push_mask(mesh, &frame, id, rect, here);
             push_text(mesh, &frame, id, rect, here, atlases);
         }
     }
@@ -160,46 +155,6 @@ fn canvas_screen(world: &World, id: u32, screen: Vec2) -> Vec2 {
     }
 }
 
-/// A root canvas's starting state: visible only when it and every ancestor are active.
-fn root_state(world: &World, id: u32) -> Inherited {
-    let mut visible = true;
-    let mut cur = Some(id);
-    for _ in 0..=world.len() {
-        let Some(c) = cur else { break };
-        visible &= world.is_active(c);
-        cur = world.parent_id(c);
-    }
-    Inherited {
-        visible,
-        alpha: 1.0,
-        clip: None,
-    }
-}
-
-/// Fold this element's own active flag, CanvasGroup and RectMask into `parent`'s.
-fn inherit(world: &World, id: u32, rect: &UiRect, parent: Inherited) -> Inherited {
-    let visible = parent.visible && world.is_active(id);
-    let alpha = parent.alpha * world.canvas_group(id).map_or(1.0, |g| g.alpha);
-    let clip = match world.rect_mask(id) {
-        Some(mask) => {
-            let (lo, hi) = rect.bounds();
-            let p = mask.padding;
-            let lo = (lo + Vec2::new(p.x, p.y)) * rect.scale_factor;
-            let hi = (hi - Vec2::new(p.z, p.w)) * rect.scale_factor;
-            Some(match parent.clip {
-                Some((plo, phi)) => (lo.max(plo), hi.min(phi)),
-                None => (lo, hi),
-            })
-        }
-        None => parent.clip,
-    };
-    Inherited {
-        visible,
-        alpha,
-        clip,
-    }
-}
-
 /// Emit `id`'s Image (if any, visible and not fully clipped) into `mesh`.
 fn push_image(mesh: &mut CanvasMesh, frame: &Frame, id: u32, rect: &UiRect, state: Inherited) {
     let Some(image) = frame.world.image(id) else {
@@ -212,11 +167,23 @@ fn push_image(mesh: &mut CanvasMesh, frame: &Frame, id: u32, rect: &UiRect, stat
     let Some(clip) = visible_clip(state, fill.max_alpha(), frame.screen) else {
         return;
     };
+    let start = mesh.vertices.len() as u32;
+    let source = push_image_tris(mesh, frame, rect, &image, fill);
+    close_batch(mesh, (source, image.blend), clip, start);
+}
+
+/// Append `image`'s triangles over `rect` painted `fill`; returns what they sample.
+fn push_image_tris(
+    mesh: &mut CanvasMesh,
+    frame: &Frame,
+    rect: &UiRect,
+    image: &ImageComponent,
+    fill: Fill,
+) -> UiSource {
     let size = rect.rect.1;
     let tex = image.shown_texture().and_then(frame.tex_size);
-    let tris = image_triangles(&image, size, tex);
+    let tris = image_triangles(image, size, tex);
     let [bl, tl, _, br] = rect.corners;
-    let start = mesh.vertices.len() as u32;
     let half = size * 0.5;
     mesh.vertices.extend(tris.iter().map(|&(p, uv)| {
         let pos = to_ndc(bl + (br - bl) * p.x + (tl - bl) * p.y, rect, frame.screen);
@@ -225,22 +192,56 @@ fn push_image(mesh: &mut CanvasMesh, frame: &Frame, id: u32, rect: &UiRect, stat
         v.sdf[0] = MODE_IMAGE;
         v
     }));
-    let source = image
+    image
         .shown_texture()
-        .map_or(UiSource::Solid, |t| UiSource::Texture(t.to_string()));
-    close_batch(mesh, (source, image.blend), clip, start);
+        .map_or(UiSource::Solid, |t| UiSource::Texture(t.to_string()))
+}
+
+/// What a [`push_graphic`] shape is painted with.
+#[derive(Clone, Copy)]
+pub(super) enum Coverage {
+    /// The graphic's own colour (or gradient) — a Mask: its alpha is the clip.
+    Own,
+    /// Opaque white at this alpha whatever the graphic's colour — a backdrop.
+    Flat(f32),
+}
+
+/// Append the triangles of `id`'s graphic shape — its Image, else its Shape, else
+/// its whole rect — painted per `coverage`, and return what they sample. A Mask's
+/// coverage and a backdrop both take their shape from here (#426, #428).
+pub(super) fn push_graphic(
+    mesh: &mut CanvasMesh,
+    frame: &Frame,
+    id: u32,
+    rect: &UiRect,
+    coverage: Coverage,
+) -> UiSource {
+    let paint = |gradient, color: Vec4| match coverage {
+        Coverage::Own => Fill::new(gradient, color),
+        Coverage::Flat(a) => Fill::new(None, Vec4::new(1.0, 1.0, 1.0, a)),
+    };
+    if let Some(image) = frame.world.image(id) {
+        let fill = paint(image.gradient.as_ref(), image.color);
+        return push_image_tris(mesh, frame, rect, &image, fill);
+    }
+    if let Some(shape) = frame.world.shape(id) {
+        push_shape_body(
+            mesh,
+            frame,
+            rect,
+            &shape,
+            paint(shape.gradient.as_ref(), shape.color),
+        );
+        return UiSource::Solid;
+    }
+    let fill = paint(None, Vec4::ONE);
+    push_image_tris(mesh, frame, rect, &ImageComponent::default(), fill)
 }
 
 /// The clip a graphic draws under, or `None` when it draws nothing (hidden, fully
 /// transparent, or clipped away entirely).
-pub(super) fn visible_clip(state: Inherited, alpha: f32, screen: Vec2) -> Option<Option<Scissor>> {
-    if !state.visible || alpha <= 0.0 {
-        return None;
-    }
-    match state.clip {
-        Some(bounds) => scissor(bounds, screen).map(Some),
-        None => Some(None),
-    }
+pub(super) fn visible_clip(state: Inherited, alpha: f32, screen: Vec2) -> Option<UiClip> {
+    state.visible_clip(alpha, screen)
 }
 
 /// A canvas point (reference units) → normalized device coordinates.
@@ -253,40 +254,35 @@ pub(super) fn to_ndc(canvas: Vec2, rect: &UiRect, screen: Vec2) -> [f32; 2] {
 pub(super) fn close_batch(
     mesh: &mut CanvasMesh,
     (source, blend): (UiSource, UiBlend),
-    clip: Option<Scissor>,
+    clip: UiClip,
+    start: u32,
+) {
+    close_run(mesh, (source, blend, None), clip, start);
+}
+
+/// [`close_batch`] for a run drawn with `backdrop` (`None`: an ordinary graphic).
+pub(super) fn close_run(
+    mesh: &mut CanvasMesh,
+    (source, blend, backdrop): (UiSource, UiBlend, Option<UiBackdrop>),
+    clip: UiClip,
     start: u32,
 ) {
     let end = mesh.vertices.len() as u32;
+    let next = UiBatch {
+        source,
+        blend,
+        clip,
+        backdrop,
+        range: start..end,
+    };
+    let same = |b: &UiBatch| {
+        (&b.source, b.blend, b.clip, b.backdrop) == (&next.source, blend, clip, backdrop)
+    };
     match mesh.batches.last_mut() {
-        Some(b)
-            if b.source == source && b.blend == blend && b.clip == clip && b.range.end == start =>
-        {
-            b.range.end = end
-        }
-        _ if end > start => mesh.batches.push(UiBatch {
-            source,
-            blend,
-            clip,
-            range: start..end,
-        }),
+        Some(b) if b.range.end == start && same(b) => b.range.end = end,
+        _ if end > start => mesh.batches.push(next),
         _ => {}
     }
-}
-
-/// Pixel bounds (bottom-left origin) → a top-left scissor clamped to the target, or
-/// `None` when nothing is left.
-fn scissor((lo, hi): (Vec2, Vec2), screen: Vec2) -> Option<Scissor> {
-    let lo = lo.floor().clamp(Vec2::ZERO, screen);
-    let hi = hi.ceil().clamp(Vec2::ZERO, screen);
-    if hi.x <= lo.x || hi.y <= lo.y {
-        return None;
-    }
-    Some(Scissor {
-        x: lo.x as u32,
-        y: (screen.y - hi.y) as u32,
-        w: (hi.x - lo.x) as u32,
-        h: (hi.y - lo.y) as u32,
-    })
 }
 
 #[cfg(test)]

@@ -51,6 +51,13 @@ impl QualityPreset {
             QualityPreset::Medium | QualityPreset::High => 2,
         }
     }
+
+    /// Divisor of the UI backdrop blur's working resolution (#426) — a power of
+    /// two, the size its first level is composited at. The bloom's, for the same
+    /// reason: a blurred image loses nothing to a smaller buffer.
+    pub fn backdrop_divisor(self) -> u32 {
+        self.bloom_divisor()
+    }
 }
 
 /// The resolution and sample count of the SSAO pass on one tier (#436).

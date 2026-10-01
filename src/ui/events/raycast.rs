@@ -14,7 +14,9 @@
 //! - it and every ancestor are active;
 //! - no `CanvasGroup` on it or above it has `blocks_raycasts = false`;
 //! - the point is inside every `RectMask` above it (and its own), padding applied —
-//!   the same axis-aligned screen clip drawing uses;
+//!   the same axis-aligned screen clip drawing uses — and inside the rect of every
+//!   `Mask` above it (Unity's `Mask` filters by rect, not by its graphic's alpha:
+//!   a click in a round minimap's corner still reaches it);
 //! - the point is inside its final quad, rotation and scale included.
 //!
 //! A fully transparent graphic still blocks (Unity's default alpha threshold of 0).
@@ -106,10 +108,17 @@ fn in_quad(rect: &UiRect, p: Vec2) -> bool {
     area != 0.0 && !(pos && neg)
 }
 
-/// Whether `point` (reference units) is inside every `RectMask` on `id`'s chain.
+/// Whether `point` (reference units) is inside every `RectMask` on `id`'s chain,
+/// and inside the quad of every `Mask` above it.
 fn inside_masks(world: &World, layout: &UiLayout, id: u32, point: Vec2) -> bool {
     ancestors_or_self(world, id).into_iter().all(|c| {
-        let (Some(mask), Some(rect)) = (world.rect_mask(c), layout.get(c)) else {
+        let Some(rect) = layout.get(c) else {
+            return true;
+        };
+        if c != id && world.has_mask(c) && !in_quad(rect, point) {
+            return false;
+        }
+        let Some(mask) = world.rect_mask(c) else {
             return true;
         };
         let (lo, hi) = rect.bounds();

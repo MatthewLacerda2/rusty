@@ -10,124 +10,25 @@
 //! `WorldSpace` canvases — signs and terminals are scene geometry; the game's HUD
 //! and a camera canvas glued to the editor's free-fly camera are not.
 //!
-//! **Dirty strategy.** Each view keeps one vertex buffer per canvas plus the mesh it
-//! holds. Rebuilding the CPU mesh is a cheap walk; a canvas's buffer is re-uploaded
-//! only when its mesh differs from last frame's (a layout or graphic change), and
-//! reallocated only when it outgrows its capacity. A static HUD therefore costs no
-//! uploads per frame.
+//! **Dirty strategy.** Each view keeps one vertex buffer per canvas (`cache`);
+//! rebuilding the CPU mesh is a cheap walk, and a canvas's buffer is re-uploaded
+//! only when its mesh changed. A static HUD therefore costs no uploads per frame.
+//!
+//! **Effects.** After the sync, every batch's clip slot is written and each Mask's
+//! coverage texture rendered (`effects`, #428), before the camera stack — world
+//! canvases need them too. Right before the overlay pass, the backdrop blur runs
+//! over the finished frame (`effects::blur`, #426), only when a backdrop shows.
 
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use glam::Vec2;
 
-use super::mesh::{build_canvas_meshes, CanvasMesh};
-use super::world::{CanvasPlace, WorldUniforms};
+use super::cache::{CanvasPlace, UiViewCache};
+use super::effects::{color_pass, GroupKey};
+use super::mesh::build_canvas_meshes;
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
 use crate::ui::{CanvasSpace, UiLayout, UiView};
-
-/// One canvas's GPU copy of its mesh, and where it draws this frame.
-pub(super) struct CanvasGpu {
-    pub(super) mesh: CanvasMesh,
-    pub(super) buffer: wgpu::Buffer,
-    place: CanvasPlace,
-}
-
-/// A view's UI vertex buffers, one per drawn canvas in draw order (see the module
-/// docs for when they are re-uploaded).
-#[derive(Default)]
-pub struct UiViewCache {
-    canvases: Vec<CanvasGpu>,
-    /// How many canvas buffers the last frame (re-)uploaded — the dirty signal.
-    uploads: usize,
-    /// How many canvases the last frame drew (a world canvas once per camera).
-    pub(super) drawn: usize,
-    /// The world canvases' per-camera uniforms (#429), made on first use.
-    pub(super) world: Option<WorldUniforms>,
-    /// Draw the screen-space canvases in an editor-mode (Scene view) render too —
-    /// the Scene tab's UI overlay toggle (#423). Off: the Scene view shows only
-    /// world canvases.
-    pub screen_in_editor: bool,
-}
-
-impl UiViewCache {
-    /// UI batches (draw calls) the last render of this view issued.
-    pub fn last_batches(&self) -> usize {
-        match self.drawn {
-            0 => 0,
-            _ => self.canvases.iter().map(|c| c.mesh.batches.len()).sum(),
-        }
-    }
-
-    /// Canvas buffers (re-)uploaded by the last render of this view.
-    pub fn last_uploads(&self) -> usize {
-        self.uploads
-    }
-
-    /// Canvases the last render of this view drew (0 when it had nowhere to draw).
-    pub fn last_drawn(&self) -> usize {
-        self.drawn
-    }
-
-    /// Synced canvas `i`, in draw order.
-    pub(super) fn canvas(&self, i: usize) -> &CanvasGpu {
-        &self.canvases[i]
-    }
-
-    /// Every synced canvas's placement, in draw order.
-    pub(super) fn places(&self) -> impl Iterator<Item = CanvasPlace> + '_ {
-        self.canvases.iter().map(|c| c.place)
-    }
-
-    /// Adopt this frame's `meshes`, uploading only the ones that changed.
-    fn sync(
-        &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        meshes: Vec<(CanvasMesh, CanvasPlace)>,
-    ) {
-        let mut old: HashMap<u32, CanvasGpu> = self
-            .canvases
-            .drain(..)
-            .map(|c| (c.mesh.canvas, c))
-            .collect();
-        self.uploads = 0;
-        for (mesh, place) in meshes {
-            let bytes: &[u8] = bytemuck::cast_slice(&mesh.vertices);
-            let gpu = match old.remove(&mesh.canvas) {
-                Some(c) if c.mesh == mesh => CanvasGpu { place, ..c },
-                Some(c) if c.buffer.size() >= bytes.len() as u64 => {
-                    queue.write_buffer(&c.buffer, 0, bytes);
-                    self.uploads += 1;
-                    CanvasGpu { mesh, place, ..c }
-                }
-                _ => {
-                    self.uploads += 1;
-                    let buffer = create_buffer(device, bytes);
-                    CanvasGpu {
-                        mesh,
-                        buffer,
-                        place,
-                    }
-                }
-            };
-            self.canvases.push(gpu);
-        }
-    }
-}
-
-/// A vertex buffer holding `bytes`, with room to grow (the next power of two).
-fn create_buffer(device: &wgpu::Device, bytes: &[u8]) -> wgpu::Buffer {
-    use wgpu::util::DeviceExt;
-    let mut contents = bytes.to_vec();
-    contents.resize(bytes.len().next_power_of_two().max(256), 0);
-    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("UI Canvas Vertices"),
-        contents: &contents,
-        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-    })
-}
 
 impl Renderer {
     /// Lay out and mesh `scene`'s UI for `view` through `camera`, uploading only
@@ -176,6 +77,8 @@ impl Renderer {
             })
             .collect();
         view.ui.sync(&self.device, &self.queue, meshes);
+        self.upload_batch_uniforms(&mut view.ui);
+        self.render_masks(view);
     }
 
     /// Draw the screen canvases [`Renderer::prepare_ui`] synced over `view`'s
@@ -192,6 +95,7 @@ impl Renderer {
         }
         view.ui.drawn += drawn;
         self.ui_renderer.ensure_pipeline(&self.device, format);
+        self.run_backdrop_blur(view);
         self.encode_ui(&view.ui, &target, format, view.size());
     }
 
@@ -204,44 +108,42 @@ impl Renderer {
         size: winit::dpi::PhysicalSize<u32>,
     ) {
         let ui = &self.ui_renderer;
+        let screen = || {
+            let all = cache.canvases().iter().enumerate();
+            all.filter(|(_, c)| c.place.space == CanvasSpace::Screen)
+        };
+        let divisor = Some(self.quality.backdrop_divisor());
+        let key = |b| GroupKey::of(b, divisor);
+        let keys = screen().flat_map(|(_, c)| c.mesh.batches.iter().map(key));
+        let groups = self.batch_groups(&cache.effects, keys);
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("UI Encoder"),
             });
         {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("UI Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: target,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
+            let mut pass = color_pass(&mut encoder, "UI Pass", target, wgpu::LoadOp::Load);
             let mut bound = None;
-            let screen = cache
-                .canvases
-                .iter()
-                .filter(|c| c.place.space == CanvasSpace::Screen);
-            for canvas in screen {
+            for (i, canvas) in screen() {
                 pass.set_vertex_buffer(0, canvas.buffer.slice(..));
-                for batch in &canvas.mesh.batches {
-                    if bound != Some(batch.blend) {
-                        let Some(pipeline) = ui.pipelines.get(&(format, batch.blend)) else {
-                            continue;
+                for (b, batch) in canvas.mesh.batches.iter().enumerate() {
+                    // A backdrop always composites "over" (#426); else the blend mode.
+                    let mode = (batch.blend, batch.backdrop.is_some());
+                    if bound != Some(mode) {
+                        let pipeline = match mode.1 {
+                            true => ui.backdrops.get(&format),
+                            false => ui.pipelines.get(&(format, batch.blend)),
                         };
+                        let Some(pipeline) = pipeline else { continue };
                         pass.set_pipeline(pipeline);
-                        bound = Some(batch.blend);
+                        bound = Some(mode);
                     }
                     pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
+                    let slot = cache.effects.batch_offset(i, b);
+                    pass.set_bind_group(1, &groups[&key(batch)], &[slot]);
                     let s = batch
                         .clip
+                        .rect
                         .map_or((0, 0, size.width, size.height), |s| (s.x, s.y, s.w, s.h));
                     pass.set_scissor_rect(s.0, s.1, s.2, s.3);
                     pass.draw(batch.range.clone(), 0..1);

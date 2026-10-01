@@ -5,30 +5,35 @@
 //! [`ImageComponent`] graphic, the [`TextComponent`] label, the texture-free
 //! [`ShapeComponent`] graphic and the blend / gradient look they share (#425), the
 //! [`CanvasGroupComponent`] (subtree alpha and interaction flags) and the
-//! [`RectMaskComponent`] clip, the [`SelectableComponent`] (an interactive
+//! [`RectMaskComponent`] clip and [`MaskComponent`] graphic clip (#428), the
+//! [`BackdropFilterComponent`] frosted glass (#426), the [`SelectableComponent`] (an interactive
 //! element, #420), and the [`LayoutGroupComponent`] / [`LayoutElementComponent`]
 //! pair that arranges children automatically (#421). Computed state — rects,
 //! batches — lives in `ui::UiLayout` and the renderer, never here. The model is
 //! recorded in `docs/ui.md`.
 
+pub mod backdrop;
 pub mod canvas;
 pub mod canvas_group;
 pub mod image;
 pub mod layout_element;
 pub mod layout_group;
 pub mod look;
+pub mod mask;
 pub mod rect_mask;
 pub mod rect_transform;
 pub mod selectable;
 pub mod shape;
 pub mod text;
 
+pub use backdrop::BackdropFilterComponent;
 pub use canvas::{CanvasComponent, CanvasRenderMode, CanvasSway};
 pub use canvas_group::CanvasGroupComponent;
 pub use image::{FillMethod, FillOrigin, ImageComponent, ImageType};
 pub use layout_element::{LayoutAxisFit, LayoutElementComponent};
 pub use layout_group::{LayoutConstraint, LayoutCorner, LayoutGroupComponent, LayoutKind};
 pub use look::{GradientKind, GradientStop, UiBlend, UiGradient, MAX_GRADIENT_STOPS};
+pub use mask::MaskComponent;
 pub use rect_mask::RectMaskComponent;
 pub use rect_transform::{RectTransformComponent, WorldAnchor};
 pub use selectable::{NavigationMode, SelectableComponent, SelectableTransition, SelectionState};

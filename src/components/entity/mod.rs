@@ -21,6 +21,7 @@ use super::{
     RigidBodyComponent, ScriptComponent, SelectableComponent, TextComponent, TransformComponent,
     VisualCorrectionComponent,
 };
+use super::{BackdropFilterComponent, MaskComponent};
 use super::{JointComponent, LineComponent, LodGroupComponent, SubEmitters, TrailComponent};
 
 /// The live link from an instance entity back to the `.prefab` it was stamped from
@@ -112,6 +113,14 @@ pub struct Entity {
     /// scenes.
     #[serde(default)]
     pub rect_mask: Option<RectMaskComponent>,
+    /// Clips the UI subtree to this entity's graphic (#428). `#[serde(default)]` for
+    /// pre-#428 scenes.
+    #[serde(default)]
+    pub mask: Option<MaskComponent>,
+    /// Frosted glass behind this UI graphic (#426). `#[serde(default)]` for pre-#426
+    /// scenes.
+    #[serde(default)]
+    pub backdrop_filter: Option<BackdropFilterComponent>,
     /// UI text label (#419). `#[serde(default)]` for pre-#419 scenes.
     #[serde(default)]
     pub text: Option<TextComponent>,
@@ -179,6 +188,8 @@ impl Entity {
             image: None,
             canvas_group: None,
             rect_mask: None,
+            mask: None,
+            backdrop_filter: None,
             text: None,
             selectable: None,
             layout_group: None,

@@ -16,6 +16,7 @@ use crate::components::{
     ScriptComponent, SelectableComponent, TextComponent, TextureComponent, TrailComponent,
     TransformComponent, VisualCorrectionComponent,
 };
+use crate::components::{BackdropFilterComponent, MaskComponent};
 
 /// On-disk shape used only for deserialization, so old single-`script` scenes
 /// (pre-#83) keep loading. It accepts both the new `scripts: Vec<…>` and the
@@ -65,6 +66,10 @@ pub(super) struct EntityRepr {
     canvas_group: Option<CanvasGroupComponent>,
     #[serde(default)]
     rect_mask: Option<RectMaskComponent>,
+    #[serde(default)]
+    mask: Option<MaskComponent>,
+    #[serde(default)]
+    backdrop_filter: Option<BackdropFilterComponent>,
     #[serde(default)]
     text: Option<TextComponent>,
     #[serde(default)]
@@ -123,6 +128,8 @@ impl From<EntityRepr> for Entity {
             image: r.image,
             canvas_group: r.canvas_group,
             rect_mask: r.rect_mask,
+            mask: r.mask,
+            backdrop_filter: r.backdrop_filter,
             text: r.text,
             selectable: r.selectable,
             layout_group: r.layout_group,

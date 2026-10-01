@@ -145,6 +145,32 @@ impl PostFx {
         Self::fullscreen(encoder, &self.blur_pipeline, &blur_bg, &self.bloom_b.view);
     }
 
+    /// Composite this frame's scene once more into `ctx.output` — graded,
+    /// tonemapped and bloomed, without FXAA or the authored effects — as the source
+    /// of the UI's backdrop blur (#426), which runs after the chain at its own,
+    /// downsampled size (every read is by uv). Uses the params and bloom `run` left.
+    pub(crate) fn composite_into(
+        &self,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+        ctx: PostFxContext<'_>,
+    ) {
+        let bg = self.io_bind_group(
+            device,
+            &self.scene_hdr.view,
+            &self.bloom_b.view,
+            ctx.depth_view,
+            ctx.skybox_view,
+        );
+        Self::fullscreen(encoder, &self.composite_pipeline, &bg, ctx.output);
+    }
+
+    /// The format the chain writes its output in (what [`PostFx::composite_into`]
+    /// must target).
+    pub(crate) fn output_format(&self) -> wgpu::TextureFormat {
+        self.output_format
+    }
+
     /// Build a bind group: params + color(1) + sampler(2) + bloom(3) + depth(4) +
     /// skybox(5). `color` is the texture the pass reads, `bloom` an aux texture.
     fn io_bind_group(

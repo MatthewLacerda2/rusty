@@ -55,6 +55,8 @@ component_kinds! {
         Image,
         CanvasGroup,
         RectMask,
+        Mask,
+        BackdropFilter,
         Text,
         Selectable,
         LayoutGroup,
@@ -75,8 +77,9 @@ impl ComponentKind {
     /// `kind → [kinds]`: `VisualCorrection → Camera` (a correction stack is inert
     /// without a camera to correct), and the UI graphic and clip need a rect to fill
     /// or clip to, a Selectable a rect to be hit in, and the layout pair a rect to
-    /// arrange or size (`Image` / `Text` / `Shape` / `RectMask` / `Selectable` / `LayoutGroup` /
-    /// `LayoutElement → RectTransform`, as Unity's `Graphic`, `RectMask2D` and
+    /// arrange or size (`Image` / `Text` / `Shape` / `RectMask` / `Mask` /
+    /// `BackdropFilter` / `Selectable` / `LayoutGroup` / `LayoutElement →
+    /// RectTransform`, as Unity's `Graphic`, `RectMask2D`, `Mask` and
     /// layout components require one), and a Joint the Rigidbody it constrains
     /// (`Joint → RigidBody`, as Unity's `Joint`). A new dependency is one line here, enforced
     /// everywhere by construction.
@@ -87,6 +90,8 @@ impl ComponentKind {
             | ComponentKind::Text
             | ComponentKind::Shape
             | ComponentKind::RectMask
+            | ComponentKind::Mask
+            | ComponentKind::BackdropFilter
             | ComponentKind::Selectable
             | ComponentKind::LayoutGroup
             | ComponentKind::LayoutElement => &[ComponentKind::RectTransform],
@@ -114,6 +119,8 @@ impl ComponentKind {
             "image" => Some(Self::Image),
             "canvasgroup" => Some(Self::CanvasGroup),
             "rectmask" | "rectmask2d" => Some(Self::RectMask),
+            "mask" => Some(Self::Mask),
+            "backdropfilter" | "backdrop" => Some(Self::BackdropFilter),
             "text" | "textmeshpro" | "textmeshprougui" => Some(Self::Text),
             "selectable" => Some(Self::Selectable),
             "layoutgroup" => Some(Self::LayoutGroup),

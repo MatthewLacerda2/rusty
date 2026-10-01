@@ -79,6 +79,7 @@ fn add_ui_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) 
         authoring::add_with_requirements(world, id, ComponentKind::RectMask);
         ui.close_menu();
     }
+    add_mask_components(ui, world, id);
     if !world.has_selectable(id)
         && ui
             .button(format!("{}  Selectable", icon::CURSOR_CLICK))
@@ -86,6 +87,32 @@ fn add_ui_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) 
     {
         authoring::add_with_requirements(world, id, ComponentKind::Selectable);
         ui.close_menu();
+    }
+}
+
+/// Add-menu entries for the graphic-shaped Mask (#428) and the Backdrop Filter
+/// (#426). Both require a RectTransform, via the shared dependency verb.
+fn add_mask_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
+    type Has = fn(&crate::ecs::World, u32) -> bool;
+    let entries: [(ComponentKind, Has, &str, &str); 2] = [
+        (
+            ComponentKind::Mask,
+            |w, id| w.has_mask(id),
+            icon::CIRCLE_DASHED,
+            "Mask",
+        ),
+        (
+            ComponentKind::BackdropFilter,
+            |w, id| w.has_backdrop_filter(id),
+            icon::DROP_HALF,
+            "Backdrop Filter",
+        ),
+    ];
+    for (kind, has, glyph, name) in entries {
+        if !has(world, id) && ui.button(format!("{glyph}  {name}")).clicked() {
+            authoring::add_with_requirements(world, id, kind);
+            ui.close_menu();
+        }
     }
 }
 

@@ -37,8 +37,14 @@ pub struct RenderCounters {
     /// Shadow-caster draw calls (static bake + dynamic); an instanced run of casters
     /// sharing a mesh is one draw (#470).
     pub shadow_draws: u32,
-    /// UI batches drawn.
+    /// UI batches drawn — backdrop batches (#426) included.
     pub ui_draws: u32,
+    /// UI `Mask` coverage textures rendered (#428): one pass per visible Mask.
+    pub ui_mask_passes: u32,
+    /// Fullscreen passes the UI backdrop blur ran (#426): the downsampled
+    /// composite, the down chain and each blurred level's way up. `0` when no
+    /// backdrop is visible.
+    pub ui_blur_passes: u32,
     /// Depth taps the SSAO occlusion pass traced (#436): its texels times the tier's
     /// samples, summed over the camera stack; `0` with AO off. Its depth prepass is
     /// counted in `draw_calls` and `triangles`.
@@ -66,6 +72,8 @@ impl RenderCounters {
             ("lights_dropped", self.lights_dropped.into()),
             ("shadow_draws", self.shadow_draws.into()),
             ("ui_draws", self.ui_draws.into()),
+            ("ui_mask_passes", self.ui_mask_passes.into()),
+            ("ui_blur_passes", self.ui_blur_passes.into()),
             ("ssao_samples", self.ssao_samples),
             ("particles_drawn", self.particles_drawn.into()),
             ("render_texture_draws", self.render_texture_draws.into()),
@@ -112,12 +120,15 @@ impl Renderer {
         c.particles_drawn += particles.instances + solids.mesh_particles;
     }
 
-    /// Close the frame's counters: the shadow casters drawn and the UI batches.
+    /// Close the frame's counters: the shadow casters drawn and the UI batches and
+    /// effect passes.
     pub(crate) fn finish_counters(&mut self, view: &RenderView) {
         let c = &mut self.frame_counters;
         c.shadow_draws = self.shadow_renderer.drawn.len() as u32;
         c.add_draws(self.shadow_renderer.drawn.iter().copied());
         c.ui_draws = view.ui.last_batches() as u32;
+        c.ui_mask_passes = view.ui.last_mask_passes();
+        c.ui_blur_passes = view.ui.last_blur_passes();
         c.draw_calls += c.ui_draws;
     }
 }

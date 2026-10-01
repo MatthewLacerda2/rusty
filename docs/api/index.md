@@ -288,6 +288,8 @@ One file per namespace, in reference order:
 - [`Image`](Image.md)
 - [`CanvasGroup`](CanvasGroup.md)
 - [`RectMask`](RectMask.md)
+- [`Mask`](Mask.md)
+- [`BackdropFilter`](BackdropFilter.md)
 - [`Selectable`](Selectable.md)
 - [`LayoutGroup`](LayoutGroup.md)
 - [`LayoutElement`](LayoutElement.md)
