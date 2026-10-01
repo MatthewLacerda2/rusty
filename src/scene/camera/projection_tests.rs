@@ -57,3 +57,19 @@ fn screen_ray_inverts_world_to_screen() {
     let (_, centre) = cam.screen_ray(SCREEN * 0.5, SCREEN);
     assert!((centre - cam.forward()).length() < 1e-5);
 }
+
+#[test]
+fn orthographic_maps_its_half_height_to_the_screen_edge() {
+    use crate::components::Projection;
+    let mut cam = camera();
+    cam.projection = Projection::Orthographic { size: 10.0 };
+    let screen = Vec2::new(200.0, 100.0);
+    let ahead = cam.position + cam.forward() * 50.0;
+    // Size is the half-height: 10 units up lands on the top edge, at any distance.
+    let up = cam.world_to_screen(ahead + Vec3::Y * 10.0, screen);
+    assert!((up.position.y - 100.0).abs() < 1e-3, "{up:?}");
+    assert!((up.depth - 50.0).abs() < 1e-3, "depth is the view distance");
+    // Rays are parallel: every pixel's ray points down the view axis.
+    let (_, dir) = cam.screen_ray(Vec2::new(10.0, 90.0), screen);
+    assert!(dir.dot(cam.forward()) > 0.9999);
+}
