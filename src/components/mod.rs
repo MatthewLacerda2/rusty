@@ -54,7 +54,8 @@ pub use ui::{
     FillMethod, FillOrigin, ImageComponent, ImageType, LayoutAxisFit, LayoutConstraint,
     LayoutCorner, LayoutElementComponent, LayoutGroupComponent, LayoutKind, MaskComponent,
     NavigationMode, RectMaskComponent, RectTransformComponent, SelectableComponent,
-    SelectableTransition, SelectionState, TextAlignment, TextComponent, TextOverflow, WorldAnchor,
+    SelectableTransition, SelectionState, TextAlignment, TextComponent, TextOverflow, UiShader,
+    WorldAnchor,
 };
 pub use ui::{
     GradientKind, GradientStop, ShapeComponent, ShapeCorner, ShapeGlow, ShapeKind, ShapeShadow,

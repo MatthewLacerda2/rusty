@@ -3,7 +3,7 @@
 //! The text counterpart of the mesh builder's image emission: each glyph quad
 //! (rect-local) is mapped through the element's laid-out corners — so rotation and
 //! scale carry the text — and appended as two triangles, batched per font atlas
-//! under the element's inherited clip, with its CanvasGroup alpha folded into the
+//! under the element's inherited clip and custom shader (#427), with its CanvasGroup alpha folded into the
 //! fill, outline and glow colours.
 
 use bytemuck::Zeroable;
@@ -11,6 +11,7 @@ use glam::{Vec2, Vec4};
 
 use super::atlas::FontAtlases;
 use super::quads::{text_quads, TextQuad};
+use crate::render::ui::custom::shaded::shade;
 use crate::render::ui::mesh::{
     close_batch, to_ndc, visible_clip, CanvasMesh, Frame, Inherited, UiSource, UiVertex,
 };
@@ -40,6 +41,7 @@ pub(in crate::render::ui) fn push_text(
     );
     // A Selectable's ColorTint (#420) multiplies every colour, like the group alpha.
     let alpha = text.state_tint * Vec4::new(1.0, 1.0, 1.0, state.alpha);
+    let shade = shade(&text.shader, rect, frame.screen);
     for quad in text_quads(&text, size, atlases) {
         let start = mesh.vertices.len() as u32;
         let TextQuad { corners, uv, .. } = &quad;
@@ -62,6 +64,11 @@ pub(in crate::render::ui) fn push_text(
             sdf: quad.sdf,
             ..Zeroable::zeroed()
         }));
-        close_batch(mesh, (UiSource::Font(quad.font), text.blend), clip, start);
+        close_batch(
+            mesh,
+            (UiSource::Font(quad.font), text.blend, &shade),
+            clip,
+            start,
+        );
     }
 }

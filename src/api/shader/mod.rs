@@ -1,7 +1,7 @@
 //! src/api/shader/mod.rs — the `Shader` namespace (#272).
 //!
 //! Agent-facing surface for **WGSL shader authoring**: compose a recipe selecting
-//! a base pass (`surface` | `postfx`) and a list of curated building blocks, then
+//! a base pass (`surface` | `postfx` | `ui`) and a list of curated building blocks, then
 //! **bake** a `.wgsl` module that conforms to the engine's pass + bind-group
 //! contract. The bake **validates the assembled module by composing it through
 //! `naga_oil`** (the same path the engine loads it by) and **rejects a module that
@@ -35,6 +35,7 @@ use mlua::{Lua, Value};
 
 use super::{put, Reg};
 use crate::shadergen::assemble::assemble;
+use crate::shadergen::bake::base_source;
 use crate::shadergen::recipe::PassKind;
 use crate::shadergen::validate::validate;
 use crate::shadergen::{bake_recipe, ShaderRecipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
@@ -97,24 +98,18 @@ fn bake(recipe: &ShaderRecipe, out_dir: Option<String>) -> mlua::Result<String> 
 
 /// Assemble + compose-check a recipe without writing; returns the entry points.
 fn dry_run(recipe: &ShaderRecipe) -> Result<Vec<String>, String> {
-    let surface_base = match recipe.pass {
-        PassKind::Surface => std::fs::read_to_string(format!("{ENGINE_SHADER_DIR}/shader.wgsl"))
-            .map_err(|e| e.to_string())?,
-        PassKind::Postfx => String::new(),
-    };
-    let module = assemble(recipe, &surface_base)?;
+    let base = base_source(recipe.pass, ENGINE_SHADER_DIR)?;
+    let module = assemble(recipe, &base)?;
     validate(ENGINE_SHADER_DIR, &module)
 }
 
-/// Parse a pass tag from Lua (`"surface"` | `"postfx"`).
+/// Parse a pass tag from Lua (`"surface"` | `"postfx"` | `"ui"`).
 fn parse_pass(name: &str) -> Result<PassKind, String> {
-    match name.to_ascii_lowercase().as_str() {
-        "surface" => Ok(PassKind::Surface),
-        "postfx" => Ok(PassKind::Postfx),
-        other => Err(format!(
-            "unknown shader pass: {other} (want surface | postfx)"
-        )),
-    }
+    let lower = name.to_ascii_lowercase();
+    PassKind::ALL
+        .into_iter()
+        .find(|p| p.tag() == lower)
+        .ok_or_else(|| format!("unknown shader pass: {lower} (want surface | postfx | ui)"))
 }
 
 #[cfg(test)]

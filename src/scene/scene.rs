@@ -110,6 +110,10 @@ pub struct Scene {
     /// The sim's game time (`Time::time`) the renderer uploads as the shaders'
     /// `camera.time` (#398). Written by the tick; `0` outside Play. Never serialized.
     pub shader_time: f32,
+    /// The sim's unscaled clock (`Time::unscaled_time`) custom UI shaders read (#427):
+    /// it keeps running at time scale 0, so a paused menu still animates. Written by
+    /// the tick; `0` outside Play. Never serialized.
+    pub ui_time: f32,
     /// Authoritative per-frame world-matrix store (#331): filled O(N) once per frame in
     /// hierarchy order, then read by every render-frame consumer (the forward pass, both
     /// shadow collects, and #330's frustum culling) instead of each walking the parent
@@ -139,6 +143,7 @@ impl Default for Scene {
             pending_load: None,
             persistent: std::collections::BTreeSet::new(),
             shader_time: 0.0,
+            ui_time: 0.0,
             world_cache: WorldMatrixCache::default(),
         }
     }

@@ -32,14 +32,22 @@ pub enum PassKind {
     /// the most self-contained pass. The chosen postfx blocks transform the
     /// sampled scene color before output.
     Postfx,
+    /// UI pass (#427): the UI shader (`ui.wgsl`) kept verbatim, with the chosen ui
+    /// blocks folded over a graphic's own shaded colour — glitch, scanlines,
+    /// hologram — on screen and world canvases alike.
+    Ui,
 }
 
 impl PassKind {
+    /// Every pass kind, in declaration order.
+    pub const ALL: [PassKind; 3] = [PassKind::Surface, PassKind::Postfx, PassKind::Ui];
+
     /// The lowercase tag used in error messages and the block catalog lookup.
     pub fn tag(self) -> &'static str {
         match self {
             PassKind::Surface => "surface",
             PassKind::Postfx => "postfx",
+            PassKind::Ui => "ui",
         }
     }
 }

@@ -24,6 +24,7 @@ use glam::{Vec2, Vec4};
 use serde::{Deserialize, Serialize};
 
 use super::look::{UiBlend, UiGradient};
+use super::shader::UiShader;
 
 /// The primitive a Shape draws. See the module docs.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -132,6 +133,9 @@ pub struct ShapeComponent {
     pub blend: UiBlend,
     /// Whether the pointer can hit this graphic (its rect, as for `Image`).
     pub raycast_target: bool,
+    /// A custom ui shader to draw with (#427); `None` draws with the standard one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shader: Option<UiShader>,
     /// Runtime only, never saved: the colour a `Selectable`'s `ColorTint` multiplies
     /// in (#420).
     #[serde(skip)]
@@ -158,6 +162,7 @@ impl Default for ShapeComponent {
             glow: ShapeGlow::default(),
             blend: UiBlend::Normal,
             raycast_target: true,
+            shader: None,
             state_tint: Vec4::ONE,
         }
     }

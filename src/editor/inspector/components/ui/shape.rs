@@ -33,6 +33,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         changed |= ui
             .checkbox(&mut edit.raycast_target, "Raycast Target")
             .changed();
+        changed |= super::shader::row(ui, &mut edit.shader);
     });
     if changed {
         if let Some(mut s) = world.shape_mut(id) {
@@ -106,4 +107,5 @@ fn write_back(s: &mut ShapeComponent, e: ShapeComponent) {
     ops::set_glow(s, e.glow.size, e.glow.intensity, e.glow.color);
     ops::set_blend(s, e.blend);
     ops::set_raycast_target(s, e.raycast_target);
+    super::shader::write_back(&mut s.shader, e.shader);
 }

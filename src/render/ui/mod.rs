@@ -17,6 +17,9 @@
 //! - `vertex` — the one vertex format every graphic shares, and fill/gradient encoding.
 //! - `shape` — a `Shape`'s SDF quads: shadow, glow, body (#425).
 //! - `blend` — the blend modes as GPU blend state (#425).
+//! - `pipeline` — the screen and world pipeline shapes, built in one place.
+//! - `custom` — custom ui shaders (#427): a graphic's shade as its batch carries it
+//!   (pure), the variant cache and the per-graphic uniforms.
 //! - `text` — SDF glyph generation, the per-font atlases and text quads.
 //! - `cache` — the per-view vertex buffers (re-upload only a canvas whose
 //!   geometry changed).
@@ -31,10 +34,12 @@
 pub(crate) mod blend;
 pub(crate) mod cache;
 pub(crate) mod clip;
+pub(crate) mod custom;
 pub(crate) mod draw;
 pub(crate) mod effects;
 pub(crate) mod geometry;
 pub(crate) mod mesh;
+pub(crate) mod pipeline;
 pub(crate) mod shape;
 pub(crate) mod text;
 pub(crate) mod vertex;
@@ -82,6 +87,8 @@ pub struct UiRenderer {
     fonts: HashMap<Option<String>, text::gpu::AtlasGpu>,
     /// The world-canvas pipeline (#429).
     world: world::WorldUiPipeline,
+    /// Custom ui shaders' pipelines (#427).
+    shaders: custom::UiShaders,
 }
 
 impl UiRenderer {
@@ -111,6 +118,7 @@ impl UiRenderer {
         let white_view = white_texture(device, queue);
         let white = bind(device, &layout, &white_view, &sampler);
         let world = world::WorldUiPipeline::new(device, &shader, &[&layout, &batch_layout]);
+        let shaders = custom::UiShaders::new(device, [&layout, &batch_layout, &world.layout]);
         Self {
             shader,
             layout,
@@ -127,6 +135,7 @@ impl UiRenderer {
             atlases: Default::default(),
             fonts: HashMap::new(),
             world,
+            shaders,
         }
     }
 
@@ -153,28 +162,13 @@ impl UiRenderer {
         format: wgpu::TextureFormat,
         (mode, entry): (UiBlend, &str),
     ) -> wgpu::RenderPipeline {
-        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("UI Pipeline"),
-            layout: Some(&self.pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &self.shader,
-                entry_point: "vs_main",
-                buffers: &[vertex::vertex_layout()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &self.shader,
-                entry_point: entry,
-                targets: &[Some(wgpu::ColorTargetState {
-                    format,
-                    blend: Some(blend::blend_state(mode)),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-        })
+        let shader = ("UI Pipeline", &self.shader, &self.pipeline_layout);
+        pipeline::build_entry(
+            device,
+            shader,
+            pipeline::UiPass::Screen(format),
+            (mode, entry),
+        )
     }
 
     /// The bind group a batch drawing `source` samples (white when it is not loaded).

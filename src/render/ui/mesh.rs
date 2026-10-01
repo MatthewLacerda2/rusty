@@ -5,8 +5,8 @@
 //! `Shape` and `Text` (an entity with several draws them in that order) as triangles in
 //! normalized device coordinates, tagged with what it samples and how it is
 //! clipped. Consecutive graphics sharing a source (solid, a texture, a font's
-//! atlas), a blend mode (#425), a clip ([`UiClip`]: rect, feather and mask, #428)
-//! and no backdrop merge into one [`UiBatch`]; a change of any starts a new one —
+//! atlas), a blend mode (#425), a clip ([`UiClip`]: rect, feather and mask, #428),
+//! a custom shader (#427, `custom::shaded`) and no backdrop merge into one [`UiBatch`]; a change of any starts a new one —
 //! so a HUD of solid bars is one draw call per canvas however many bars it has,
 //! and a label is one draw call however many glyphs it has.
 //!
@@ -33,6 +33,7 @@ use glam::{Vec2, Vec4};
 
 pub(super) use super::clip::Inherited;
 pub(crate) use super::clip::UiClip;
+use super::custom::shaded::{shade, UiShade};
 use super::effects::backdrop::{push_backdrop, UiBackdrop};
 use super::effects::mask::{push_mask, MaskDraw};
 use super::geometry::image_triangles;
@@ -66,6 +67,8 @@ pub(crate) struct UiBatch {
     pub(crate) blend: UiBlend,
     /// How it is clipped.
     pub(crate) clip: UiClip,
+    /// The custom ui shader it draws with (#427), or `None` for the standard one.
+    pub(crate) shade: Option<UiShade>,
     /// A backdrop batch (#426): what it shows behind the graphic, or `None` for an
     /// ordinary graphic.
     pub(crate) backdrop: Option<UiBackdrop>,
@@ -169,7 +172,8 @@ fn push_image(mesh: &mut CanvasMesh, frame: &Frame, id: u32, rect: &UiRect, stat
     };
     let start = mesh.vertices.len() as u32;
     let source = push_image_tris(mesh, frame, rect, &image, fill);
-    close_batch(mesh, (source, image.blend), clip, start);
+    let shade = shade(&image.shader, rect, frame.screen);
+    close_batch(mesh, (source, image.blend, &shade), clip, start);
 }
 
 /// Append `image`'s triangles over `rect` painted `fill`; returns what they sample.
@@ -250,37 +254,36 @@ pub(super) fn to_ndc(canvas: Vec2, rect: &UiRect, screen: Vec2) -> [f32; 2] {
 }
 
 /// Close the vertices from `start` on into the last batch when it shares `source`,
-/// blend mode and `clip`, else into a new one.
+/// blend mode, `shade` and `clip`, else into a new one.
 pub(super) fn close_batch(
     mesh: &mut CanvasMesh,
-    (source, blend): (UiSource, UiBlend),
+    (source, blend, shade): (UiSource, UiBlend, &Option<UiShade>),
     clip: UiClip,
     start: u32,
 ) {
-    close_run(mesh, (source, blend, None), clip, start);
+    close_run(mesh, (source, blend, None, shade.as_ref()), clip, start);
 }
 
 /// [`close_batch`] for a run drawn with `backdrop` (`None`: an ordinary graphic).
 pub(super) fn close_run(
     mesh: &mut CanvasMesh,
-    (source, blend, backdrop): (UiSource, UiBlend, Option<UiBackdrop>),
+    (source, blend, backdrop, shade): (UiSource, UiBlend, Option<UiBackdrop>, Option<&UiShade>),
     clip: UiClip,
     start: u32,
 ) {
     let end = mesh.vertices.len() as u32;
-    let next = UiBatch {
-        source,
-        blend,
-        clip,
-        backdrop,
-        range: start..end,
-    };
-    let same = |b: &UiBatch| {
-        (&b.source, b.blend, b.clip, b.backdrop) == (&next.source, blend, clip, backdrop)
-    };
+    let key = (&source, blend, clip, backdrop, shade);
+    let same = |b: &UiBatch| (&b.source, b.blend, b.clip, b.backdrop, b.shade.as_ref()) == key;
     match mesh.batches.last_mut() {
         Some(b) if b.range.end == start && same(b) => b.range.end = end,
-        _ if end > start => mesh.batches.push(next),
+        _ if end > start => mesh.batches.push(UiBatch {
+            shade: shade.cloned(),
+            source,
+            blend,
+            clip,
+            backdrop,
+            range: start..end,
+        }),
         _ => {}
     }
 }

@@ -9,7 +9,7 @@ fraction of the font size), so they scale with the text. Colours are
 **display-space (sRGB) RGBA with straight alpha**, each `0..1`. Getters return a
 neutral default (zeros, `false`, `nil`) when the entity has no Text; setters are then
 no-ops. Adding a Text also adds a `RectTransform`. The model — fonts, wrapping,
-overflow, auto-size, rich text — is in [`docs/ui.md`](../ui.md).
+overflow, auto-size, rich text — is in [`docs/ui.md`](../ui.md). A custom ui shader (glitch, hologram…) is named with `UI.SetShader` (see `UI.md`, #427).
 
 | Function | Signature | Returns |
 |---|---|---|

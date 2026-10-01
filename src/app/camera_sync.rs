@@ -23,16 +23,21 @@ impl GameWorld {
         sync_lens_from_scene(&mut camera, &scene, self.resources.is_playing);
     }
 
-    /// Hand the sim's game time to the renderer (#398) as `Scene::shader_time`, which
-    /// it uploads as `camera.time`. Zero outside Play, so edit-mode and preview shots
-    /// stay pixel-comparable; the renderer only reads it, never owns the clock.
+    /// Hand the sim's clocks to the renderer: game time (#398) as
+    /// `Scene::shader_time`, which it uploads as `camera.time`, and unscaled time as
+    /// `Scene::ui_time` for custom UI shaders (#427). Zero outside Play, so edit-mode
+    /// and preview shots stay pixel-comparable; the renderer only reads them, never
+    /// owns the clock.
     pub(crate) fn sync_shader_time(&mut self) {
-        let time = if self.resources.is_playing {
-            self.resources.time.borrow().time as f32
+        let (time, ui_time) = if self.resources.is_playing {
+            let t = self.resources.time.borrow();
+            (t.time as f32, t.unscaled_time as f32)
         } else {
-            0.0
+            (0.0, 0.0)
         };
-        self.world.scene.borrow_mut().shader_time = time;
+        let mut scene = self.world.scene.borrow_mut();
+        scene.shader_time = time;
+        scene.ui_time = ui_time;
     }
 
     /// Editor-mode free-fly camera (WASD + arrow look). Runs each frame while not in

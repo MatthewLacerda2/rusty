@@ -5,7 +5,7 @@
 //! byte-identical WGSL. It is the only place blocks become source, so the output
 //! is bounded to the catalog by construction.
 //!
-//! Two shapes, one per pass:
+//! Three shapes, one per pass:
 //! - **surface** — the canonical forward shader (`shader.wgsl`, passed in as
 //!   `surface_base`) is the base; its standard `vs_main` + PBR lighting are kept
 //!   verbatim and the chosen blocks are folded into the final color just before
@@ -16,6 +16,8 @@
 //!   the fullscreen-triangle `vs_fullscreen`, and an `fs_main` that samples the
 //!   tonemapped color then folds the chosen blocks. This matches the fullscreen-fragment
 //!   shape of the postfx pass.
+//! - **ui** (#427, `ui`) — the UI shader (`ui.wgsl`) is the base, kept verbatim but
+//!   for `graphic()`, which folds the blocks over the graphic's shaded colour.
 //!
 //! A surface block that samples an extra texture slot (#400) makes the variant
 //! declare that slot's binding — once, however many blocks read it; a variant with
@@ -31,6 +33,7 @@
 
 mod depth;
 mod emit;
+pub(crate) mod ui;
 mod uv;
 
 use std::fmt::Write as _;
@@ -51,8 +54,8 @@ pub use depth::{CUT_PREPASS, CUT_SHADOW};
 /// scene fog (#437) last — so an authored look is fogged like every other surface.
 const SURFACE_RETURN: &str = "return vec4<f32>(apply_fog(camera.fog, lighting_color, in.world_position, camera.camera_pos), base_color.a);";
 
-/// Assemble `recipe` into a complete WGSL module. `surface_base` is the canonical
-/// forward shader source (only consulted for [`PassKind::Surface`]). Returns an
+/// Assemble `recipe` into a complete WGSL module. `surface_base` is the pass's base
+/// shader (`bake::base_source`: the forward shader for surface, `ui.wgsl` for ui). Returns an
 /// error if a selected block is unknown for the pass, or the surface base lacks
 /// the expected splice point.
 pub fn assemble(recipe: &ShaderRecipe, surface_base: &str) -> Result<String, String> {
@@ -70,6 +73,7 @@ pub fn assemble_with_params(
     let wgsl = match recipe.pass {
         PassKind::Surface => assemble_surface(recipe, &resolved, &layout, surface_base)?,
         PassKind::Postfx => assemble_postfx(recipe, &resolved, &layout),
+        PassKind::Ui => ui::assemble(recipe, &resolved, &layout, surface_base)?,
     };
     Ok((wgsl, layout))
 }

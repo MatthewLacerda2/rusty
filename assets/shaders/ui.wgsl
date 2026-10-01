@@ -340,9 +340,17 @@ fn clip_coverage(p: vec2<f32>) -> f32 {
     return k.x * k.y * k.z * k.w * mask;
 }
 
+// The colour a graphic draws with, on screen and world canvases alike. A baked
+// ui shader (#427, `Shader.Bake` pass "ui") replaces exactly this function with
+// its blocks folded over `shade(in)`; keep its text in step with
+// `shadergen::assemble::ui::GRAPHIC`. Clips and masks apply after it.
+fn graphic(in: VertexOut) -> vec4<f32> {
+    return shade(in);
+}
+
 @fragment
 fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
-    return shade(in) * clip_coverage(in.canvas);
+    return graphic(in) * clip_coverage(in.canvas);
 }
 
 // A Mask's graphic into its coverage texture (R8): the graphic's alpha, clipped by
@@ -367,7 +375,7 @@ fn fs_backdrop(in: VertexOut) -> @location(0) vec4<f32> {
 // Into the linear HDR target: un-premultiply, decode, fog, premultiply again.
 @fragment
 fn fs_world(in: VertexOut) -> @location(0) vec4<f32> {
-    let c = shade(in) * clip_coverage(in.canvas);
+    let c = graphic(in) * clip_coverage(in.canvas);
     let rgb = select(c.rgb / max(c.a, 1e-6), vec3<f32>(0.0), c.a <= 0.0);
     let f = fog_factor(world_ui.fog, in.world, world_ui.eye.xyz);
     let lit = mix(decode_srgb(rgb), world_ui.fog.color, f);

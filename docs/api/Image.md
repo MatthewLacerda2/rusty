@@ -6,7 +6,8 @@ multiplied by a texture. Colours are **display-space (sRGB) RGBA with straight
 alpha**, each `0..1` — a 50% alpha looks exactly as it does in an image editor.
 Getters return a neutral default (zeros, `"None"`, `false`, `nil`) when the entity
 has no Image; setters are then no-ops. Adding an Image also adds a `RectTransform`.
-How each type draws is in [`docs/ui.md`](../ui.md).
+How each type draws is in [`docs/ui.md`](../ui.md). To draw it through a custom ui
+shader (glitch, hologram, dissolve…), use `UI.SetShader` (see `UI.md`, #427).
 
 | Function | Signature | Returns |
 |---|---|---|

@@ -49,4 +49,5 @@ mod world_ui_fog_screenshot;
 mod world_ui_mask_screenshot;
 mod world_ui_scene;
 mod world_ui_screenshot;
+mod world_ui_shader_screenshot;
 mod world_ui_shape_screenshot;

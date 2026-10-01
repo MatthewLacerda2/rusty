@@ -20,6 +20,24 @@ through it, so world and camera canvases are hit, listed and clicked too.
 | `UI.FindSelectable` | `(id, direction)` | where keyboard navigation from `id` goes in `direction` (`"Up"`, `"Down"`, `"Left"`, `"Right"`), or `nil` — Unity's `FindSelectableOn*`, for an `OnMove` handler that navigates itself |
 | `UI.Click` | `(id)` | `true` if the click will land on `id` (or its descendant) — see below |
 | `UI.List` | `()` | array of every visible `Selectable`, in draw order — see below |
+| `UI.SetShader` | `(id, name)` | — draw `id`'s graphics (its `Image`, `Shape` and `Text`) with the baked ui shader `name` (#427); `nil` or `""` restores the standard shader. Naming a different shader drops the old one's param values. Errors when `id` has none of them. See below |
+| `UI.GetShader` | `(id)` | the ui shader `id`'s graphics draw with (its first graphic's in draw order: Image, Shape, Text), or `nil` |
+| `UI.SetShaderParam` | `(id, name, value)` | — set a **runtime** param of the shader on every graphic of `id` that names one, e.g. `"dissolve.amount"`; `value` is a number or an array (one number broadcasts). Strict: an unknown or baked param, or a wrong count, errors listing the runtime params; so does calling it before `SetShader` |
+| `UI.GetShaderParam` | `(id, name)` | the value it draws with: the one set, else the baked default (a number, or an array for a vector param) |
+
+**Custom shaders** (`UI.SetShader` & co., #427) are Unity's `Graphic.material`: bake
+one with `Shader.Bake` and `pass = "ui"` (see [`Shader.md`](Shader.md#the-ui-pass)),
+name it on a graphic, and drive its runtime params the way
+`Material.SetShaderParam` drives a material's — same names (`"block.param"`, or
+`"block.index.param"` when the block repeats), same values, no re-bake:
+
+```lua
+UI.SetShader(panel, "hud_dissolve")
+UI.SetShaderParam(panel, "dissolve.amount", 0.5)   -- half burnt away
+```
+
+The model — what a ui shader changes, the unscaled clock, fallback — is in
+[*Custom shaders* in `docs/ui.md`](../ui.md#custom-shaders).
 
 **`UI.Create(kind, [parentId])`** builds what the editor's GameObject ▸ UI menu
 builds (#422), through the same code: `kind` is `"Canvas"`, `"Panel"`, `"Image"`,

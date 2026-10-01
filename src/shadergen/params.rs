@@ -1,7 +1,7 @@
-//! src/shadergen/params.rs — the runtime params of a baked surface shader (#399):
-//! Unity's `material.SetFloat`.
+//! src/shadergen/params.rs — the runtime params of a baked surface or ui shader
+//! (#399, #427): Unity's `material.SetFloat`.
 //!
-//! A surface block param marked [`Param::runtime`](super::blocks::Param) is not
+//! A surface (or ui) block param marked [`Param::runtime`](super::blocks::Param) is not
 //! baked as a WGSL `const`: the assembler reads it from slot `n` of the material's
 //! param uniform (`@group(2) @binding(6)`, a fixed `array<vec4<f32>, 16>`), so a
 //! script changes it with a buffer write — no re-bake, no pipeline rebuild. The
@@ -13,6 +13,10 @@
 //! appears once in the recipe, `"<block>.<index>.<param>"` always (and required when
 //! it appears more than once). Values are stored on the material by the canonical
 //! name [`ParamLayout::name`] gives.
+//!
+//! A **ui** shader (#427) packs the same slots into its per-graphic uniform
+//! ([`UI_UNIFORM_DECL`]) behind a small header (the graphic's rect and the clock),
+//! and the values live on the graphic instead of a material.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -34,6 +38,11 @@ pub type PackedParams = [[f32; 4]; PARAM_SLOTS];
 
 /// The WGSL a surface variant with runtime params declares (binding = [`PARAM_BINDING`]).
 pub const UNIFORM_DECL: &str = "struct ShaderParams {\n    v: array<vec4<f32>, 16>,\n};\n@group(2) @binding(6) var<uniform> shader_params: ShaderParams;\n";
+
+/// The WGSL every ui variant declares (#427): its graphic's rect in canvas NDC
+/// (origin, x and y axes), the rect's size in target pixels, the clock, and the 16
+/// runtime-param slots — one per graphic, at a dynamic offset.
+pub const UI_UNIFORM_DECL: &str = "struct UiShade {\n    origin_x: vec4<f32>,\n    axis_y_size: vec4<f32>,\n    time: vec4<f32>,\n    v: array<vec4<f32>, 16>,\n};\n@group(3) @binding(0) var<uniform> shader_params: UiShade;\n";
 
 /// One runtime param: which block instance and param it is, its uniform slot, its
 /// lane count, and its baked default (the recipe's value, else the block's).
@@ -57,7 +66,8 @@ pub struct ParamLayout {
 
 impl ParamLayout {
     /// Allocate a slot per runtime param of `instances`, in recipe then catalog
-    /// order. Empty for postfx (no material). Errors past [`PARAM_SLOTS`].
+    /// order. Empty for postfx (no material or graphic to hold the values). Errors
+    /// past [`PARAM_SLOTS`].
     pub fn from_instances(
         pass: PassKind,
         instances: &[(&'static Block, &BlockSel)],
@@ -70,7 +80,8 @@ impl ParamLayout {
             for p in block.params.iter().filter(|p| p.runtime) {
                 if params.len() == PARAM_SLOTS {
                     return Err(format!(
-                        "more than {PARAM_SLOTS} runtime params in one surface shader"
+                        "more than {PARAM_SLOTS} runtime params in one {} shader",
+                        pass.tag()
                     ));
                 }
                 let default = match sel.params.get(p.name) {
@@ -151,15 +162,12 @@ impl ParamLayout {
     }
 
     fn unknown(&self, name: &str) -> String {
-        let baked = name
-            .split('.')
-            .next()
-            .and_then(|b| find(PassKind::Surface, b))
-            .is_some_and(|b| {
-                b.params
-                    .iter()
-                    .any(|p| !p.runtime && name.ends_with(&format!(".{}", p.name)))
-            });
+        let block = name.split('.').next().unwrap_or_default();
+        let baked = PassKind::ALL
+            .into_iter()
+            .filter_map(|pass| find(pass, block))
+            .flat_map(|b| b.params)
+            .any(|p| !p.runtime && name.ends_with(&format!(".{}", p.name)));
         let what = if baked {
             "is baked, not a runtime param"
         } else {
@@ -219,7 +227,7 @@ pub fn sidecar_path(wgsl: &Path) -> PathBuf {
     wgsl.with_extension("params.json")
 }
 
-/// Where surface shader `name` resolves, searched in the renderer's order (authored
+/// Where shader `name` resolves, searched in the renderer's order (authored
 /// workspace, then the engine set); `None` for a missing or non-bare name.
 pub fn resolve_module(dirs: &[&str], name: &str) -> Option<PathBuf> {
     if name.is_empty() || name.contains(['/', '\\']) || name.contains("..") {
@@ -230,10 +238,10 @@ pub fn resolve_module(dirs: &[&str], name: &str) -> Option<PathBuf> {
         .find(|p| p.is_file())
 }
 
-/// The runtime params of surface shader `name`, as the renderer will resolve it.
+/// The runtime params of shader `name` (surface or ui), as the renderer will resolve it.
 pub fn load(name: &str) -> Result<ParamLayout, String> {
     let dirs = [DEFAULT_OUT_DIR, ENGINE_SHADER_DIR];
     let path = resolve_module(&dirs, name)
-        .ok_or_else(|| format!("no surface shader named {name:?} (bake it with Shader.Bake)"))?;
+        .ok_or_else(|| format!("no shader named {name:?} (bake it with Shader.Bake)"))?;
     ParamLayout::read_beside(&path)
 }

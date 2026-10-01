@@ -57,7 +57,7 @@ fn material_key(scene: &mut Scene, id: u32) -> mlua::Result<String> {
 }
 
 /// A Lua number, or an array of numbers, as floats.
-fn floats(value: Value) -> mlua::Result<Vec<f32>> {
+pub(crate) fn floats(value: Value) -> mlua::Result<Vec<f32>> {
     match value {
         Value::Integer(i) => Ok(vec![i as f32]),
         Value::Number(n) => Ok(vec![n as f32]),

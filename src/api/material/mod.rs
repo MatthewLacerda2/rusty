@@ -27,7 +27,7 @@
 
 mod asset;
 mod from_lua;
-mod shader_params;
+pub(crate) mod shader_params;
 mod shader_textures;
 
 use std::cell::RefCell;

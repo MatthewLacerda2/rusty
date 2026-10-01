@@ -25,6 +25,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         changed |= draw_paragraph(ui, &mut edit);
         ui.separator();
         changed |= draw_effects(ui, &mut edit);
+        changed |= super::shader::row(ui, &mut edit.shader);
     });
     if changed {
         if let Some(mut t) = world.text_mut(id) {
@@ -127,4 +128,5 @@ fn write_back(t: &mut TextComponent, e: TextComponent) {
     ops::set_shadow(t, e.shadow_offset, e.shadow_color);
     ops::set_glow(t, e.glow_size, e.glow_color);
     ops::set_blend(t, e.blend);
+    super::shader::write_back(&mut t.shader, e.shader);
 }

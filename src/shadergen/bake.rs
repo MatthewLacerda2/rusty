@@ -2,14 +2,14 @@
 //! (#272).
 //!
 //! [`bake_recipe`] is the verb the API surface drives. It:
-//! 1. reads the canonical forward shader from `engine_shaders` (for a surface
-//!    recipe — the base whose `vs_main`/lighting the variant keeps),
+//! 1. reads the base from `engine_shaders` ([`base_source`]: the forward shader for
+//!    a surface recipe, the UI shader for a ui one),
 //! 2. [`assemble`](super::assemble)s the recipe into a complete `.wgsl` module,
 //! 3. [`validate`](super::validate)s it by composing through `naga_oil` against
 //!    `common` (the gate — a module that won't compose is **never written**), and
 //! 4. writes `<out_dir>/<name>.wgsl`, the file the engine's `ShaderRegistry` loads
-//!    by name, and — for a surface recipe — its runtime-param layout beside it as
-//!    `<name>.params.json` (#399).
+//!    by name, and — for a surface or ui recipe — its runtime-param layout beside it
+//!    as `<name>.params.json` (#399).
 //!
 //! The engine's committed shader set (`engine_shaders`, normally
 //! `assets/shaders`) is read-only here — it supplies the surface base and the
@@ -63,19 +63,13 @@ pub fn bake_recipe(
     engine_shaders: &str,
     out_dir: &str,
 ) -> Result<String, BakeError> {
-    let surface_base = match recipe.pass {
-        PassKind::Surface => std::fs::read_to_string(format!("{engine_shaders}/shader.wgsl"))
-            .map_err(|e| BakeError::BaseRead(e.to_string()))?,
-        PassKind::Postfx => String::new(),
-    };
-
-    let (module, params) =
-        assemble_with_params(recipe, &surface_base).map_err(BakeError::Assemble)?;
+    let base = base_source(recipe.pass, engine_shaders).map_err(BakeError::BaseRead)?;
+    let (module, params) = assemble_with_params(recipe, &base).map_err(BakeError::Assemble)?;
     validate(engine_shaders, &module).map_err(BakeError::Validate)?;
 
     std::fs::create_dir_all(out_dir).map_err(|e| BakeError::Write(e.to_string()))?;
     let path = format!("{out_dir}/{}.wgsl", recipe.name);
-    if recipe.pass == PassKind::Surface {
+    if recipe.pass != PassKind::Postfx {
         let json =
             serde_json::to_string_pretty(&params).map_err(|e| BakeError::Write(e.to_string()))?;
         let sidecar = sidecar_path(std::path::Path::new(&path));
@@ -84,6 +78,20 @@ pub fn bake_recipe(
     std::fs::write(&path, &module).map_err(|e| BakeError::Write(e.to_string()))?;
     GENERATION.fetch_add(1, Ordering::Relaxed);
     Ok(path)
+}
+
+/// The engine shader a `pass` recipe is spliced into: `shader.wgsl` for surface,
+/// `ui.wgsl` for ui (#427), nothing for the self-contained postfx shape.
+pub fn base_source(pass: PassKind, engine_shaders: &str) -> Result<String, String> {
+    let file = match pass {
+        PassKind::Surface => "shader.wgsl",
+        PassKind::Ui => "ui.wgsl",
+        PassKind::Postfx => return Ok(String::new()),
+    };
+    // Splice points span lines, so a CRLF checkout (Windows) must not hide them.
+    let source =
+        std::fs::read_to_string(format!("{engine_shaders}/{file}")).map_err(|e| e.to_string())?;
+    Ok(source.replace("\r\n", "\n"))
 }
 
 /// Bumped by every successful bake, so a consumer that caches compiled modules
