@@ -24,6 +24,7 @@ pub fn bake(nodes: Vec<Node>) -> Image {
         seed: 7,
         nodes,
         output: None,
+        outputs: Default::default(),
     };
     evaluate(&recipe).expect("recipe evaluates")
 }

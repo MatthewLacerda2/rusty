@@ -17,6 +17,7 @@ wall-clock or unseeded RNG).
 | Function | Signature | Returns |
 |---|---|---|
 | `Texture.Bake` | `(recipe, path, slot)` | the written `path` |
+| `Texture.BakeSet` | `(recipe, prefix)` | `{ [slot] = path, … }` — one PNG per entry of the recipe's `outputs` |
 | `Texture.ToJson` | `(recipe)` | the recipe's canonical JSON string |
 | `Texture.Ops` | `()` | the op catalog: `{ {op, category, inputs, params = { {name, type, default, required, values} } }, … }` |
 
@@ -38,6 +39,44 @@ lists the valid ones — a typo like `"basecolour"` never silently bakes linear 
 The returned `path` drops straight into a material slot, e.g.
 `Material.SetTexture(id, Texture.Bake(recipe, "out/albedo.png", "base_color"))`.
 
+### A whole map set from one graph — `Texture.BakeSet`
+
+A PBR material needs albedo, normal and roughness derived from the **same** pattern
+(the mortar lines must match across maps). Give the recipe an `outputs` table — slot
+→ node id — and `Texture.BakeSet` evaluates the graph **once** (shared upstream nodes
+run once), bakes each output with its slot's encoding to `<prefix>_<slot>.png`, and
+returns canonical slot → path:
+
+```lua
+local maps = Texture.BakeSet({
+  resolution = 1024, seed = 7,
+  nodes = { ...one brick+noise graph... },
+  outputs = { base_color = "albedo", normal = "n", metallic_roughness = "mr" },
+}, "out/brick")
+-- maps = { base_color = "out/brick_base_color.png", normal = "out/brick_normal.png",
+--          metallic_roughness = "out/brick_metallic_roughness.png" }
+```
+
+Each map is **byte-identical** to baking that node alone with `Texture.Bake`. The
+`outputs` keys are slot names as in the table below (aliases accepted; the result
+and the file name use the canonical name: `albedo` → `base_color`, `orm` →
+`metallic_roughness`). The result's slots feed `Material.DefineAsset` map keys:
+
+| Result key | `Material.DefineAsset` key(s) |
+|---|---|
+| `base_color` | `base_color_map` |
+| `emissive` | `emissive_map` |
+| `normal` | `normal_map` |
+| `roughness` | `roughness_map` |
+| `metallic` | `metallic_map` |
+| `metallic_roughness` | `metallic_map` **and** `roughness_map` (the same PNG) |
+| `data` | — (no material slot) |
+
+Everything is checked before a file is written: a recipe with no `outputs`, an
+unknown slot, two keys naming one slot (`albedo` and `base_color`), or an unknown
+node id is an error and nothing is baked. `outputs` is optional and ignored by
+`Texture.Bake`, which still bakes the single `output`.
+
 ### The recipe shape
 
 ```lua
@@ -45,6 +84,7 @@ The returned `path` drops straight into a material slot, e.g.
   resolution = 1024,        -- power-of-two canvas; sane default 1024
   seed = 42,                -- folded into every stochastic op (default 0)
   output = "n1",            -- output node id (optional; defaults to the last node)
+  -- outputs = { base_color = "n1", … },  -- slot → node id, for Texture.BakeSet
   nodes = {
     { id = "n0", op = "noise", kind = "fbm", scale = 8.0, octaves = 4 },
     { id = "n1", op = "color_ramp", inputs = {"n0"},

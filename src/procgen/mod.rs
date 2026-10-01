@@ -17,11 +17,13 @@
 //!   truth, round-trips losslessly.
 //! - [`runner`] — DAG → [`image_buf::Image`] in dependency order.
 //! - [`bake`] — buffer → PNG with per-slot glTF encoding/packing.
+//! - `bake_set` — a recipe's named `outputs` → one PNG per slot, one evaluation (#403).
 //! - [`ops`] — the op-set grouped by category, plus the per-node dispatcher.
 //! - [`hash`] — dependency-free deterministic value hashing for stochastic ops.
 //! - [`image_buf`] — the linear-RGBA buffer the runner works in (wrapping domain).
 
 pub mod bake;
+mod bake_set;
 pub mod hash;
 pub mod image_buf;
 pub mod ops;
@@ -29,9 +31,10 @@ pub mod recipe;
 pub mod runner;
 
 pub use bake::Slot;
+pub use bake_set::bake_set;
 pub use image_buf::Image;
 pub use recipe::TextureRecipe;
-pub use runner::{evaluate, RunError};
+pub use runner::{evaluate, evaluate_many, RunError};
 
 /// Evaluate `recipe` and bake it to a `.png` at `path` for the named `slot`. The
 /// one-call front door the API surface drives: recipe → buffer → encoded PNG.
@@ -60,6 +63,7 @@ mod tests {
                 inputs: vec![],
             }],
             output: None,
+            outputs: Default::default(),
         }
     }
 
@@ -83,6 +87,7 @@ mod tests {
                 inputs: vec![],
             }],
             output: None,
+            outputs: Default::default(),
         };
         bake_recipe(&recipe, Slot::Data, a.to_str().unwrap()).unwrap();
         bake_recipe(&recipe, Slot::Data, b.to_str().unwrap()).unwrap();

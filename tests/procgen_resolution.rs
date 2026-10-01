@@ -22,6 +22,7 @@ fn bake(nodes: &[Node], resolution: u32) -> Image {
         seed: 3,
         nodes,
         output: None,
+        outputs: Default::default(),
     };
     evaluate(&recipe).expect("recipe evaluates")
 }
