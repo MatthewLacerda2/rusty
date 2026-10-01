@@ -12,16 +12,24 @@ use crate::scene::Scene;
 use crate::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use crate::shadergen::{bake_recipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
 
-/// A dissolve surface shader and a mid-gray mask PNG, unique to this run; removed
-/// on drop.
-struct Dissolve {
-    shader: String,
-    mask: String,
+/// A dissolve surface shader and a mask PNG, unique to this run; removed on drop.
+pub(super) struct Dissolve {
+    pub shader: String,
+    pub mask: String,
 }
 
 impl Dissolve {
+    /// With a mid-gray mask.
     fn bake() -> Self {
-        let shader = format!("test_dissolve_{}", std::process::id());
+        Self::with_mask(
+            "gray",
+            &image::RgbaImage::from_pixel(4, 4, image::Rgba([128, 128, 128, 255])),
+        )
+    }
+
+    /// With `mask` saved as this run's `<tag>` mask.
+    pub(super) fn with_mask(tag: &str, mask: &image::RgbaImage) -> Self {
+        let shader = format!("test_dissolve_{tag}_{}", std::process::id());
         let recipe = ShaderRecipe {
             pass: PassKind::Surface,
             name: shader.clone(),
@@ -31,11 +39,9 @@ impl Dissolve {
             }],
         };
         bake_recipe(&recipe, ENGINE_SHADER_DIR, DEFAULT_OUT_DIR).expect("bake succeeds");
-        let mask = crate::test_temp::dir().join(format!("{shader}_mask.png"));
-        image::RgbaImage::from_pixel(4, 4, image::Rgba([128, 128, 128, 255]))
-            .save(&mask)
-            .expect("mask written");
-        let mask = mask.to_string_lossy().into_owned();
+        let path = crate::test_temp::dir().join(format!("{shader}_mask.png"));
+        mask.save(&path).expect("mask written");
+        let mask = path.to_string_lossy().into_owned();
         Self { shader, mask }
     }
 }

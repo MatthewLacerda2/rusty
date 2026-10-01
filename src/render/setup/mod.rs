@@ -157,6 +157,9 @@ impl Renderer {
                     &shadows.layout,
                 ],
             ),
+            shadows
+                .renderer
+                .clip_layout(&device, &textures.material_layout),
             crate::render::postfx::HDR_FORMAT,
         );
         Self {

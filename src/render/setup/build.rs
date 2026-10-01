@@ -81,13 +81,18 @@ impl GpuResources {
         let global =
             create_global_bindings(device, &camera_lighting_layout, &textures.default_texture);
         let ssao = ssao::SsaoRenderer::new(device, queue, &mut registry);
-        let shadows = create_shadow_system(device, &mut registry, &ssao.no_ao);
+        // One module draws the solids and their shadows (#648).
+        let shader = registry.load(device, "shader.wgsl", "Forward Lit Shader");
+        let shadows = create_shadow_system(device, &shader, &ssao.no_ao, &textures);
         let forward = create_forward_passes(
             device,
-            &camera_lighting_layout,
-            &entity_bones_layout,
+            &shader,
+            [
+                &camera_lighting_layout,
+                &entity_bones_layout,
+                &shadows.layout,
+            ],
             &textures,
-            &shadows.layout,
             &mut registry,
         );
         let billboards = create_billboard_passes(
@@ -210,11 +215,12 @@ fn create_global_bindings(
 /// samples the active cascade array — with `no_ao`, the white stand-in for SSAO.
 fn create_shadow_system(
     device: &wgpu::Device,
-    registry: &mut ShaderRegistry,
+    shader: &wgpu::ShaderModule,
     no_ao: &wgpu::TextureView,
+    textures: &Textures,
 ) -> ShadowSystem {
     let layout = bind_layouts::create_shadow_layout(device);
-    let renderer = shadows::ShadowRenderer::new(device, registry);
+    let renderer = shadows::ShadowRenderer::new(device, shader, &textures.material_layout);
 
     let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Shadow Uniform Buffer"),
@@ -234,18 +240,16 @@ fn create_shadow_system(
     }
 }
 
-/// Compile the forward shader and build the forward-lit, line, outline and skybox
-/// passes that all draw into the HDR offscreen target.
+/// Build the forward-lit, line, outline and skybox passes that all draw into the HDR
+/// offscreen target, the solids through the forward `shader`.
+/// `layouts` are groups 0, 1 and 3: camera + lighting, entity + bones, shadows.
 fn create_forward_passes(
     device: &wgpu::Device,
-    camera_lighting_layout: &wgpu::BindGroupLayout,
-    entity_bones_layout: &wgpu::BindGroupLayout,
+    shader: &wgpu::ShaderModule,
+    [camera_lighting_layout, entity_bones_layout, shadow_layout]: [&wgpu::BindGroupLayout; 3],
     textures: &Textures,
-    shadow_layout: &wgpu::BindGroupLayout,
     registry: &mut ShaderRegistry,
 ) -> ForwardPasses {
-    let shader = registry.load(device, "shader.wgsl", "Forward Lit Shader");
-
     // Skybox binds a single-texture `GpuTexture.bind_group` at its group(1), so it
     // keeps the single `texture_layout`; the forward pipelines use `material_layout`.
     let skybox_renderer = skybox::SkyboxRenderer::new(
@@ -258,7 +262,7 @@ fn create_forward_passes(
 
     let pl = pipelines::create_pipelines(
         device,
-        &shader,
+        shader,
         HDR_FORMAT,
         camera_lighting_layout,
         entity_bones_layout,

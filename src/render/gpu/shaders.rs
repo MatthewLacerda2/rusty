@@ -143,7 +143,6 @@ mod tests {
         let mut registry = ShaderRegistry::new("assets/shaders");
         for name in [
             "shader.wgsl",
-            "shadow.wgsl",
             "skybox.wgsl",
             "sky_gradient.wgsl",
             "particles.wgsl",

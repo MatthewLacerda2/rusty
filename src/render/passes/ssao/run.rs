@@ -78,10 +78,13 @@ impl Renderer {
             timestamp_writes: None,
             occlusion_query_set: None,
         });
-        pass.set_pipeline(&self.prepass_pipeline);
         pass.set_bind_group(0, &self.global_bind_group, &[]);
         // The prepass reads nothing from group 3; the no-AO group satisfies the layout.
         pass.set_bind_group(3, &self.shadow_bind_group, &[]);
-        self.draw_batches(&mut pass, solids, SolidPass::Prepass);
+        self.draw_batches(
+            &mut pass,
+            solids,
+            SolidPass::Prepass(&self.prepass_pipeline),
+        );
     }
 }

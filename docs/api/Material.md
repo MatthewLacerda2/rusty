@@ -96,7 +96,8 @@ visible fallback.
 >   inert.
 > - **Cutout** — alpha-tested hard edges (foliage, chain-link, grates): a fragment
 >   whose sampled alpha is below `alpha_cutoff` is discarded, the rest is opaque. Still
->   writes depth and needs no sorting.
+>   writes depth and needs no sorting. Its shadow is cut the same way (#648): a leaf
+>   card shadows its leaf, not its quad.
 > - **Transparent** — alpha-blended (glass, holograms, fades): the surface blends over
 >   what is behind it using `alpha` (× the texture's alpha) as the opacity. Drawn in a
 >   separate pass after the opaque geometry, sorted back-to-front per object, with depth
@@ -151,8 +152,9 @@ Material.SetShader(enemy, "enemy_toon")   -- or `shader = "enemy_toon"` in a rec
 ```
 
 - Every entity sharing the material draws with the shader, opaque and transparent
-  alike; the shadow and depth passes are unchanged (a surface shader restyles
-  colour — even `dissolve`'s cut is colour-pass only, #648).
+  alike. Its shadow and SSAO depth match the standard shader's, except where a
+  block cuts fragments (`dissolve`): those are cut from the shadow and the SSAO
+  depth too (#648).
 - The module is compiled the first frame a material uses it. A name that is not
   there, a module that fails to compile, or a `postfx` module logs one warning and
   **renders with the standard shader** — a bad shader never crashes the game. A

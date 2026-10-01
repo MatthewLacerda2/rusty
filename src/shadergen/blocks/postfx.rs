@@ -44,6 +44,7 @@ pub const BLOCKS: &[Block] = &[
         call: "pfx_tint({prev}, uv{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "grayscale",
@@ -53,6 +54,7 @@ pub const BLOCKS: &[Block] = &[
         call: "pfx_grayscale({prev}, uv{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "vignette",
@@ -75,6 +77,7 @@ pub const BLOCKS: &[Block] = &[
         call: "pfx_vignette({prev}, uv{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "scanline",
@@ -97,6 +100,7 @@ pub const BLOCKS: &[Block] = &[
         call: "pfx_scanline({prev}, uv{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "posterize",
@@ -111,6 +115,7 @@ pub const BLOCKS: &[Block] = &[
         call: "pfx_posterize({prev}, uv{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "film_grain",
@@ -125,6 +130,7 @@ pub const BLOCKS: &[Block] = &[
         call: "pfx_film_grain({prev}, uv{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "damage_vignette",
@@ -153,6 +159,7 @@ pub const BLOCKS: &[Block] = &[
         call: "pfx_damage_vignette({prev}, uv{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "chromatic_aberration",
@@ -167,6 +174,7 @@ pub const BLOCKS: &[Block] = &[
         call: "pfx_chromatic_aberration({prev}, uv{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "sharpen",
@@ -181,6 +189,7 @@ pub const BLOCKS: &[Block] = &[
         call: "pfx_sharpen({prev}, uv{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "radial_blur",
@@ -203,5 +212,6 @@ pub const BLOCKS: &[Block] = &[
         call: "pfx_radial_blur({prev}, uv{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
 ];

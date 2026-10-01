@@ -37,6 +37,7 @@ pub const BLOCKS: &[Block] = &[
         call: "srf_toon_ramp({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "fresnel_rim",
@@ -50,6 +51,7 @@ pub const BLOCKS: &[Block] = &[
         call: "srf_fresnel_rim({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "tint",
@@ -59,6 +61,7 @@ pub const BLOCKS: &[Block] = &[
         call: "srf_tint({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "emissive_boost",
@@ -71,6 +74,7 @@ pub const BLOCKS: &[Block] = &[
         call: "srf_emissive_boost({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "uv_scroll_stripes",
@@ -84,6 +88,7 @@ pub const BLOCKS: &[Block] = &[
         call: "srf_uv_scroll_stripes({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "desaturate",
@@ -93,6 +98,7 @@ pub const BLOCKS: &[Block] = &[
         call: "srf_desaturate({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "height_fog",
@@ -106,6 +112,7 @@ pub const BLOCKS: &[Block] = &[
         call: "srf_height_fog({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "hit_flash",
@@ -118,6 +125,7 @@ pub const BLOCKS: &[Block] = &[
         call: "srf_hit_flash({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "dissolve",
@@ -128,10 +136,11 @@ pub const BLOCKS: &[Block] = &[
             Param::live("edge_color", 1.0, 3),
             Param::baked("tiling", 1.0, 1),
         ],
-        helper: "fn srf_dissolve(c: vec3<f32>, in: VertexOutput, amount: f32, edge_width: f32, edge_color: vec3<f32>, tiling: f32) -> vec3<f32> {\n    let m = textureSample(t_mask, s_diffuse, in.tex_coords * tiling).r;\n    if (amount > 0.0 && m < amount) {\n        discard;\n    }\n    let edge = 1.0 - smoothstep(amount, amount + max(edge_width, 0.0001), m);\n    return mix(c, edge_color, select(0.0, edge, amount > 0.0));\n}",
+        helper: "fn srf_dissolve_cut(in: VertexOutput, amount: f32, edge_width: f32, edge_color: vec3<f32>, tiling: f32) -> f32 {\n    let m = textureSample(t_mask, s_diffuse, in.tex_coords * tiling).r;\n    if (amount > 0.0 && m < amount) {\n        discard;\n    }\n    return m;\n}\nfn srf_dissolve(c: vec3<f32>, in: VertexOutput, amount: f32, edge_width: f32, edge_color: vec3<f32>, tiling: f32) -> vec3<f32> {\n    let m = srf_dissolve_cut(in, amount, edge_width, edge_color, tiling);\n    let edge = 1.0 - smoothstep(amount, amount + max(edge_width, 0.0001), m);\n    return mix(c, edge_color, select(0.0, edge, amount > 0.0));\n}",
         call: "srf_dissolve({prev}, in{args})",
         textures: &["mask"],
         stage: Stage::Color,
+        cut: Some("srf_dissolve_cut(in{args})"),
     },
     Block {
         id: "detail_overlay",
@@ -145,6 +154,7 @@ pub const BLOCKS: &[Block] = &[
         call: "srf_detail_overlay({prev}, in{args})",
         textures: &["mask"],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "pulse_glow",
@@ -158,6 +168,7 @@ pub const BLOCKS: &[Block] = &[
         call: "srf_pulse_glow({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "uv_scroll",
@@ -167,6 +178,7 @@ pub const BLOCKS: &[Block] = &[
         call: "uv_uv_scroll({prev}, in{args})",
         textures: &[],
         stage: Stage::Uv,
+        cut: None,
     },
     Block {
         id: "triplanar_detail",
@@ -179,6 +191,7 @@ pub const BLOCKS: &[Block] = &[
         call: "srf_triplanar_detail({prev}, in{args})",
         textures: &["mask"],
         stage: Stage::Color,
+        cut: None,
     },
     Block {
         id: "hologram",
@@ -192,5 +205,6 @@ pub const BLOCKS: &[Block] = &[
         call: "srf_hologram({prev}, in{args})",
         textures: &[],
         stage: Stage::Color,
+        cut: None,
     },
 ];

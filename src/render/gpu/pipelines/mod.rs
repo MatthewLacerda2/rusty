@@ -58,21 +58,30 @@ pub(crate) fn create_pipelines(
         transparent: p(&render_layout, &transparent_spec()),
         line: p(&line_layout, &line_spec()),
         outline: p(&render_layout, &outline_spec()),
-        prepass: make_prepass(device, shader, &render_layout),
+        prepass: make_prepass(device, shader, &render_layout, "fs_prepass"),
     }
 }
 
 /// An authored surface variant's opaque + transparent pipelines (#396): the forward
-/// and transparent specs over `shader`, through the forward pipeline `layout`.
+/// and transparent specs over `shader`, through the forward pipeline layout — and,
+/// when its blocks `cut`, its depth pipelines (#648): the prepass through the same
+/// layout, the shadow cascades through the shadow pass's clip layout.
 pub(crate) fn surface_pipelines(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
     format: wgpu::TextureFormat,
-    layout: &wgpu::PipelineLayout,
+    [layout, shadow_layout]: [&wgpu::PipelineLayout; 2],
+    cut: bool,
 ) -> surface::SurfacePipelines {
+    use crate::render::passes::shadows::depth_pipeline;
+    use crate::shadergen::assemble::{CUT_PREPASS, CUT_SHADOW};
     surface::SurfacePipelines {
         forward: make_pipeline(device, shader, format, layout, &forward_spec()),
         transparent: make_pipeline(device, shader, format, layout, &transparent_spec()),
+        cut: cut.then(|| surface::CutPipelines {
+            prepass: make_prepass(device, shader, layout, CUT_PREPASS),
+            shadow: depth_pipeline(device, shader, shadow_layout, Some(CUT_SHADOW)),
+        }),
     }
 }
 
@@ -213,12 +222,14 @@ fn make_pipeline(
 }
 
 /// The SSAO depth prepass (#436): the solids' depth alone, through the forward vertex
-/// stage (skinning, instancing) and `fs_prepass` (cutout clip, unlit skip). Same
-/// layout as the forward pass, so it records with the same bind groups.
+/// stage (skinning, instancing) and `fragment` — `fs_prepass` (cutout clip, unlit
+/// skip), or a cutting variant's `fs_prepass_cut` (#648). Same layout as the forward
+/// pass, so it records with the same bind groups.
 fn make_prepass(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
     layout: &wgpu::PipelineLayout,
+    fragment: &str,
 ) -> wgpu::RenderPipeline {
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("SSAO Depth Prepass Pipeline"),
@@ -230,7 +241,7 @@ fn make_prepass(
         },
         fragment: Some(wgpu::FragmentState {
             module: shader,
-            entry_point: "fs_prepass",
+            entry_point: fragment,
             targets: &[],
         }),
         primitive: wgpu::PrimitiveState::default(),
@@ -245,3 +256,6 @@ fn make_prepass(
         multiview: None,
     })
 }
+
+#[cfg(test)]
+mod scrolled_cut_tests;

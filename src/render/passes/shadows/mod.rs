@@ -3,21 +3,27 @@
 //! cached static array per cascade, re-baked only when that cascade's light volume
 //! moves (#355); each frame the static layers are copied into the active array and the
 //! dynamic casters drawn over them. Casters are drawn instanced, one draw per mesh per
-//! cascade (#470, `casters`), skinned ones in their animated pose (#599).
+//! cascade (#470, `casters`), skinned ones in their animated pose (#599). A caster
+//! whose surface clips fragments — a cutout, a dissolve — clips its shadow too (#648,
+//! `clips`).
 
 pub(crate) mod cascades;
 mod casters;
+mod clips;
 mod frame;
 mod setup;
 mod uniform;
 
-use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::gpu::pipelines::surface::SurfaceShaders;
 use crate::render::lod::LodSelection;
+use crate::render::CameraUniform;
 use crate::scene::SceneId;
 use cascades::{Cascade, MAX_CASCADES};
 use casters::{CasterBuffer, CasterFrame};
+use clips::Clip;
 use glam::Mat4;
 
+pub(crate) use setup::depth_pipeline;
 pub(crate) use uniform::CascadeUniform;
 
 /// Byte stride between the cascades' light-space matrices in the depth pass's uniform
@@ -34,7 +40,12 @@ pub struct ShadowRenderer {
     pub active_view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,
 
+    /// Plain depth, no fragment stage: most casters.
     pipeline: wgpu::RenderPipeline,
+    /// The game time a cutting variant's UV chain reads as `camera.time` (#648).
+    time_buffer: wgpu::Buffer,
+    /// A Cutout material's caster, alpha-tested through its material group (#648).
+    clip_pipeline: wgpu::RenderPipeline,
     light_space_buffer: wgpu::Buffer,
     /// This frame's cascades, fitted to the camera by [`Self::update_cascades`].
     pub(crate) cascades: Vec<Cascade>,
@@ -49,6 +60,7 @@ pub struct ShadowRenderer {
     static_cache: [Option<(SceneId, Mat4)>; MAX_CASCADES],
 
     global_bind_group: wgpu::BindGroup,
+    global_layout: wgpu::BindGroupLayout,
     entity_layout: wgpu::BindGroupLayout,
 
     /// The static bake's and the dynamic pass's casters (#470) and joints (#599), every cascade
@@ -69,7 +81,14 @@ impl ShadowRenderer {
     /// the same way), with the first cascade covering a few metres instead of 60.
     pub const CASCADE_SIZE: u32 = 1024;
 
-    pub fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
+    /// The pass and its pipelines, over the forward `shader`'s shadow stage;
+    /// `material_layout` is the forward pass's group 2, which a clipped caster binds
+    /// (#648).
+    pub fn new(
+        device: &wgpu::Device,
+        shader: &wgpu::ShaderModule,
+        material_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
         let textures = Self::create_depth_textures(device);
         let sampler = Self::create_sampler(device);
 
@@ -80,9 +99,16 @@ impl ShadowRenderer {
             mapped_at_creation: false,
         });
 
+        let time_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Shadow Game Time Buffer"),
+            size: std::mem::size_of::<CameraUniform>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
         let (global_layout, global_bind_group, entity_layout) =
-            Self::create_pass_layouts(device, &light_space_buffer);
-        let pipeline = Self::create_pipeline(device, &global_layout, &entity_layout, registry);
+            Self::create_pass_layouts(device, [&light_space_buffer, &time_buffer]);
+        let layouts = [&global_layout, &entity_layout, material_layout];
+        let [pipeline, clip_pipeline] = Self::create_pipelines(device, layouts, shader);
         let static_casters = CasterBuffer::new(device, &entity_layout);
         let dynamic_casters = CasterBuffer::new(device, &entity_layout);
 
@@ -94,15 +120,44 @@ impl ShadowRenderer {
             active_view: textures.active_view,
             sampler,
             pipeline,
+            time_buffer,
+            clip_pipeline,
             light_space_buffer,
             cascades: Vec::new(),
             static_cache: [None; MAX_CASCADES],
             global_bind_group,
+            global_layout,
             entity_layout,
             static_casters,
             dynamic_casters,
             drawn: Vec::new(),
             instancing: true,
+        }
+    }
+
+    /// The layout a surface variant's clipped shadow pipeline is built through (#648):
+    /// this pass's two groups, then `material_layout`.
+    pub(crate) fn clip_layout(
+        &self,
+        device: &wgpu::Device,
+        material_layout: &wgpu::BindGroupLayout,
+    ) -> wgpu::PipelineLayout {
+        let layouts = [&self.global_layout, &self.entity_layout, material_layout];
+        setup::clip_layout(device, layouts)
+    }
+
+    /// The pipeline a run of casters draws with: plain depth, the cutout clip, or a
+    /// surface variant's cut (the cutout clip if that variant failed to build).
+    fn pipeline_for<'a>(
+        &'a self,
+        surfaces: &'a SurfaceShaders,
+        clip: Option<Clip>,
+    ) -> &'a wgpu::RenderPipeline {
+        match clip {
+            None => &self.pipeline,
+            Some(c) => surfaces
+                .cut(c.pipeline)
+                .map_or(&self.clip_pipeline, |cut| &cut.shadow),
         }
     }
 
@@ -119,6 +174,15 @@ impl ShadowRenderer {
     /// editor changes something that moves static geometry.
     pub fn invalidate_static_cache(&mut self) {
         self.static_cache = [None; MAX_CASCADES];
+    }
+
+    /// Upload the game time, for the cuts that animate with it (#648).
+    pub fn set_time(&self, queue: &wgpu::Queue, time: f32) {
+        let uniform = CameraUniform {
+            time,
+            ..bytemuck::Zeroable::zeroed()
+        };
+        queue.write_buffer(&self.time_buffer, 0, bytemuck::bytes_of(&uniform));
     }
 
     /// Adopt this frame's `cascades` and upload their light-space matrices.
@@ -142,7 +206,7 @@ impl ShadowRenderer {
         frame: &CasterFrame,
         lod: &LodSelection,
     ) {
-        let (scene, gpu_meshes) = (frame.scene, frame.gpu_meshes);
+        let scene = frame.scene;
         let key = |c: &Cascade| Some((scene.id(), c.light_space));
         let stale: Vec<usize> = (0..self.cascades.len())
             .filter(|&i| self.static_cache[i] != key(&self.cascades[i]))
@@ -155,7 +219,7 @@ impl ShadowRenderer {
             for (&i, batches) in stale.iter().zip(&batches) {
                 let view = &self.static_layers[i];
                 let mut pass = depth_pass(encoder, "Shadow Static Pass", view, true);
-                self.draw_casters(&mut pass, gpu_meshes, batches, true, i);
+                self.draw_casters(&mut pass, frame, batches, true, i);
             }
             for i in stale {
                 self.static_cache[i] = key(&self.cascades[i]);
@@ -172,7 +236,7 @@ impl ShadowRenderer {
             }
             let view = &self.active_layers[i];
             let mut pass = depth_pass(encoder, "Shadow Dynamic Pass", view, false);
-            self.draw_casters(&mut pass, gpu_meshes, batches, false, i);
+            self.draw_casters(&mut pass, frame, batches, false, i);
         }
     }
 
@@ -227,3 +291,6 @@ fn depth_pass<'a>(
 
 #[cfg(test)]
 mod cache_tests;
+
+#[cfg(test)]
+mod cutout_tests;

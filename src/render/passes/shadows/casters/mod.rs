@@ -2,8 +2,9 @@
 //!
 //! Every caster the light can see is gathered as `(mesh, world matrix)`, sorted by mesh
 //! so copies of one prop are neighbours, and packed into one matrix array; each run of
-//! one mesh is then a single instanced depth draw. The depth pass has no material — it
-//! writes depth only — so the mesh alone is the key.
+//! one mesh is then a single instanced depth draw. The plain depth pass has no
+//! material — it writes depth only — so the mesh alone is the key; a clipped caster
+//! (#648, `clips`) also keys on its cut and material group, which its draw binds.
 //!
 //! Skinned casters are posed (#599): each sweep packs its skinned casters' palettes
 //! (`MeshComponent::active_palette`, the matrices the forward pass draws) into the
@@ -22,17 +23,27 @@ mod buffer;
 use std::collections::HashMap;
 use std::ops::Range;
 
+use super::clips::{CasterClip, Clip};
 use super::ShadowRenderer;
 use crate::render::gpu::draw_buffers::{push_palette, JointMatrix};
+use crate::render::gpu::material_cache::MaterialCache;
+use crate::render::gpu::pipelines::surface::SurfaceShaders;
 use crate::render::lod::LodSelection;
 use crate::render::{transform_aabb, Frustum, GpuMesh, MeshId};
 use crate::scene::Scene;
 pub(super) use buffer::CasterBuffer;
 use buffer::CasterData;
 
-/// One instanced depth draw: `instances` of `mesh`, `num_indices` each.
+/// What a run of casters shares: its clip (`None` for plain depth), then its mesh.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct CasterKey {
+    pub clip: Option<Clip>,
+    pub mesh: MeshId,
+}
+
+/// One instanced depth draw: `instances` of `key`'s mesh, `num_indices` each.
 pub(super) struct CasterBatch {
-    mesh: MeshId,
+    key: CasterKey,
     num_indices: u32,
     instances: Range<u32>,
 }
@@ -44,12 +55,13 @@ impl CasterBatch {
     }
 }
 
-/// Group `casters` into instanced runs of one mesh, returning the packed casters (in
-/// draw order) and the batches. Sorted by mesh — stable, so scene order holds within
-/// a run; depth writes make the order between runs irrelevant. With `instancing` off,
-/// one draw per caster in scene order (the pre-#470 path, for comparison).
+/// Group `casters` into instanced runs of one key, returning the packed casters (in
+/// draw order) and the batches. Sorted by key — plain casters first, so the clipping
+/// pipelines bind last — and stable, so scene order holds within a run; depth writes
+/// make the order between runs irrelevant. With `instancing` off, one draw per caster
+/// in scene order (the pre-#470 path, for comparison).
 pub(super) fn batch_casters(
-    mut casters: Vec<(MeshId, u32, CasterData)>,
+    mut casters: Vec<(CasterKey, u32, CasterData)>,
     instancing: bool,
 ) -> (Vec<CasterData>, Vec<CasterBatch>) {
     if instancing {
@@ -57,13 +69,13 @@ pub(super) fn batch_casters(
     }
     let mut matrices = Vec::with_capacity(casters.len());
     let mut batches: Vec<CasterBatch> = Vec::new();
-    for (mesh, num_indices, caster) in casters {
+    for (key, num_indices, caster) in casters {
         let index = matrices.len() as u32;
         matrices.push(caster);
         match batches.last_mut() {
-            Some(run) if instancing && run.mesh == mesh => run.instances.end = index + 1,
+            Some(run) if instancing && run.key == key => run.instances.end = index + 1,
             _ => batches.push(CasterBatch {
-                mesh,
+                key,
                 num_indices,
                 instances: index..index + 1,
             }),
@@ -78,6 +90,11 @@ pub(super) struct CasterFrame<'a> {
     pub queue: &'a wgpu::Queue,
     pub scene: &'a Scene,
     pub gpu_meshes: &'a HashMap<MeshId, GpuMesh>,
+    /// The clipped casters (#648), and the material groups and variant pipelines
+    /// their draws bind.
+    pub clips: &'a HashMap<u32, CasterClip>,
+    pub materials: &'a MaterialCache,
+    pub surfaces: &'a SurfaceShaders,
 }
 
 impl ShadowRenderer {
@@ -107,7 +124,7 @@ impl ShadowRenderer {
                     c.bounds
                         .is_none_or(|(lo, hi)| frustum.intersects_aabb(lo, hi))
                 })
-                .map(|c| (c.mesh.clone(), c.num_indices, c.caster))
+                .map(|c| (c.key.clone(), c.num_indices, c.caster))
                 .collect();
             let (packed, mut batches) = batch_casters(casters, self.instancing);
             let base = matrices.len() as u32;
@@ -128,7 +145,8 @@ impl ShadowRenderer {
         per_cascade
     }
 
-    /// Every active caster matching `want_static` that has a GPU mesh, and the joint
+    /// Every active caster matching `want_static` — a caster a surface variant cuts
+    /// counts as dynamic (see `clips`) — that has a GPU mesh, and the joint
     /// matrices its skinned casters' `bone_base`s index — one palette per caster per
     /// sweep, however many cascades draw it.
     fn collect_casters(
@@ -141,7 +159,10 @@ impl ShadowRenderer {
         let mut casters = Vec::new();
         let mut joints = Vec::new();
         for id in scene.world.ids_with_mesh() {
-            if !scene.world.is_active(id) || scene.world.is_static(id) != want_static {
+            let clip = frame.clips.get(&id);
+            let moving = clip.is_some_and(|c| c.clip.is_variant());
+            let is_static = scene.world.is_static(id) && !moving;
+            if !scene.world.is_active(id) || is_static != want_static {
                 continue;
             }
             // A level of detail this sweep does not draw (#472).
@@ -159,21 +180,30 @@ impl ShadowRenderer {
             let bounds = (!mesh.is_skinned())
                 .then(|| transform_aabb(gpu_mesh.local_aabb.0, gpu_mesh.local_aabb.1, world));
             let bone_base = push_palette(&mut joints, mesh.active_palette());
+            let mut caster = CasterData::new(world, bone_base);
+            if let Some((cutoff, textured)) = clip.and_then(|c| c.cutout) {
+                caster = caster.cutout(cutoff, textured);
+            }
             casters.push(Candidate {
-                mesh: mesh_id,
+                key: CasterKey {
+                    clip: clip.map(|c| c.clip),
+                    mesh: mesh_id,
+                },
                 num_indices: gpu_mesh.num_indices,
-                caster: CasterData::new(world, bone_base),
+                caster,
                 bounds,
             });
         }
         (casters, joints)
     }
 
-    /// Record one sweep's instanced depth draws for `cascade` from its caster buffer.
+    /// Record one sweep's instanced depth draws for `cascade` from its caster buffer:
+    /// plain runs through the depth-only pipeline, clipped ones through the cutout
+    /// clip or their variant's cut, with their material group bound (#648).
     pub(super) fn draw_casters<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
-        gpu_meshes: &'a HashMap<MeshId, GpuMesh>,
+        frame: &CasterFrame<'a>,
         batches: &[CasterBatch],
         want_static: bool,
         cascade: usize,
@@ -184,13 +214,21 @@ impl ShadowRenderer {
             &self.dynamic_casters
         };
         let offset = (cascade as u64 * super::LIGHT_SPACE_STRIDE) as u32;
-        render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.global_bind_group, &[offset]);
         render_pass.set_bind_group(1, &casters.bind_group, &[]);
+        let mut bound = None;
         for batch in batches {
-            let Some(gpu_mesh) = gpu_meshes.get(&batch.mesh) else {
+            let Some(gpu_mesh) = frame.gpu_meshes.get(&batch.key.mesh) else {
                 continue;
             };
+            let clip = batch.key.clip;
+            if bound != Some(clip.map(|c| c.pipeline)) {
+                render_pass.set_pipeline(self.pipeline_for(frame.surfaces, clip));
+                bound = Some(clip.map(|c| c.pipeline));
+            }
+            if let Some(clip) = clip {
+                render_pass.set_bind_group(2, frame.materials.group(clip.material), &[]);
+            }
             render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
             render_pass
                 .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
@@ -202,7 +240,7 @@ impl ShadowRenderer {
 /// One caster before culling: its draw, its instance data and its world bounds (`None` when skinned —
 /// never culled).
 struct Candidate {
-    mesh: MeshId,
+    key: CasterKey,
     num_indices: u32,
     caster: CasterData,
     bounds: Option<(glam::Vec3, glam::Vec3)>,

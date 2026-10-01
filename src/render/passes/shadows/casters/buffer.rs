@@ -1,30 +1,47 @@
-//! A sweep's caster data on the GPU: the per-caster array `shadow.wgsl` indexes by
-//! instance, and the joint array its skinned casters' palettes live in (#599).
+//! A sweep's caster data on the GPU: the per-caster array `shader.wgsl`'s shadow stage
+//! indexes by instance, and the joint array its skinned casters' palettes live in (#599).
 
 use crate::render::gpu::draw_buffers::{joint_array_bytes, JointMatrix};
 use crate::render::gpu::grow_buffer::GrowBuffer;
+use crate::render::passes::shadows::setup::{CASTERS_BINDING, JOINTS_BINDING};
 
-/// One caster as `shadow.wgsl`'s `Caster` reads it: world matrix, then where its
-/// palette starts in the joint array (0 — the identity — for an unskinned mesh).
+/// One caster as `shader.wgsl`'s `Caster` reads it: world matrix, where its palette
+/// starts in the joint array (0 — the identity — for an unskinned mesh), and its
+/// cutout alpha test (#648; a cutoff of 0 clips nothing).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(in crate::render::passes::shadows) struct CasterData {
     pub model: [f32; 16],
     pub bone_base: u32,
-    _pad: [u32; 3],
+    pub alpha_cutoff: f32,
+    pub use_texture: u32,
+    _pad: u32,
 }
 
 impl CasterData {
+    /// A caster whose shadow is not alpha-tested; [`Self::cutout`] adds the test.
     pub fn new(model: glam::Mat4, bone_base: u32) -> Self {
         Self {
             model: model.to_cols_array(),
             bone_base,
-            _pad: [0; 3],
+            alpha_cutoff: 0.0,
+            use_texture: 0,
+            _pad: 0,
+        }
+    }
+
+    /// This caster, its shadow clipped where its albedo's alpha (when `textured`) is
+    /// below `cutoff` — a Cutout material's test (#242, #648).
+    pub fn cutout(self, cutoff: f32, textured: bool) -> Self {
+        Self {
+            alpha_cutoff: cutoff,
+            use_texture: u32::from(textured),
+            ..self
         }
     }
 }
 
-/// The caster and joint arrays and the bind group that exposes them to `shadow.wgsl`.
+/// The caster and joint arrays and the bind group that exposes them to the shadow stage.
 pub(in crate::render::passes::shadows) struct CasterBuffer {
     casters: GrowBuffer,
     joints: GrowBuffer,
@@ -77,11 +94,11 @@ fn caster_group(
         layout,
         entries: &[
             wgpu::BindGroupEntry {
-                binding: 0,
+                binding: CASTERS_BINDING,
                 resource: casters.buffer().as_entire_binding(),
             },
             wgpu::BindGroupEntry {
-                binding: 1,
+                binding: JOINTS_BINDING,
                 resource: joints.buffer().as_entire_binding(),
             },
         ],

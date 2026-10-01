@@ -107,6 +107,12 @@ pub struct Block {
     pub textures: &'static [&'static str],
     /// Which fold the call joins: the color chain or the UV chain.
     pub stage: Stage,
+    /// A block that `discard`s fragments (`dissolve`) names the call that does only
+    /// that, with the same `{args}` as [`Block::call`] and `in` in scope (#648). The
+    /// assembler runs it in the variant's depth-only entry points too, after the UV
+    /// chain, so a fragment the colour pass cuts casts no shadow and fills no SSAO
+    /// depth. `None` for a block that only restyles colour, and always for postfx.
+    pub cut: Option<&'static str>,
 }
 
 /// The catalog of blocks valid for `pass`, in stable order.
@@ -158,6 +164,17 @@ mod tests {
         assert!(catalog(PassKind::Surface)
             .iter()
             .any(|b| b.stage == Stage::Uv));
+    }
+
+    #[test]
+    fn only_surface_blocks_cut_and_their_helper_defines_the_cut() {
+        assert!(catalog(PassKind::Postfx).iter().all(|b| b.cut.is_none()));
+        for b in catalog(PassKind::Surface) {
+            if let Some(cut) = b.cut {
+                let name = cut.split('(').next().unwrap();
+                assert!(b.helper.contains(&format!("fn {name}(")), "{}", b.id);
+            }
+        }
     }
 
     #[test]

@@ -149,14 +149,33 @@ pub fn chain(instances: &[Instance], seed: &str, layout: &ParamLayout, stage: St
         if block.stage != stage {
             continue;
         }
-        let args: String = block
-            .params
-            .iter()
-            .map(|p| format!(", {}", arg(block, index, p, layout)))
-            .collect();
+        let args = args(block, index, layout);
         expr = block.call.replace("{prev}", &expr).replace("{args}", &args);
     }
     expr
+}
+
+/// Each cutting instance's [`Block::cut`] call (#648), in recipe order, with
+/// `{args}` filled exactly as [`chain`] fills it — so the depth passes cut where
+/// the colour pass does. Empty when no block cuts.
+pub fn cuts(instances: &[Instance], layout: &ParamLayout) -> Vec<String> {
+    instances
+        .iter()
+        .enumerate()
+        .filter_map(|(index, (block, _))| {
+            let cut = block.cut?;
+            Some(cut.replace("{args}", &args(block, index, layout)))
+        })
+        .collect()
+}
+
+/// An instance's `{args}`: `, a, b` — its param constants or uniform slots.
+fn args(block: &Block, index: usize, layout: &ParamLayout) -> String {
+    block
+        .params
+        .iter()
+        .map(|p| format!(", {}", arg(block, index, p, layout)))
+        .collect()
 }
 
 #[cfg(test)]
