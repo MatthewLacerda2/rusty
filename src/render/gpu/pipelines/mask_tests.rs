@@ -58,8 +58,9 @@ fn two_spheres(d: &Dissolve) -> (RefCell<Scene>, u32, u32) {
     let masked = sphere(&mut scene, -1.2, &d.shader);
     let plain = sphere(&mut scene, 1.2, &d.shader);
     let scene = RefCell::new(scene);
+    // A long-bracket string: a Windows path's backslashes are not escapes there.
     let script = format!(
-        r#"Material.SetShaderTexture({masked}, "mask", "{}")"#,
+        r#"Material.SetShaderTexture({masked}, "mask", [==[{}]==])"#,
         d.mask
     );
     lua(&scene, &script);
