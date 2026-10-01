@@ -301,6 +301,9 @@ metallic→B/roughness→G packing, seamless tiling).
 | `Bake` | ✅ | renderer — writes a `.png` consumed by `load_texture` via the material map slots; per-slot glTF encoding applied on bake |
 | `ToJson` | ✅ | round-trip — the recipe's canonical serde form; re-bakes byte-identically |
 
+(`Texture.Ops` is read-only introspection — the op catalog with each op's params,
+types and defaults (#411) — not a setter, so it doesn't add to the count.)
+
 ### `Shader` — writes a `.wgsl` the `ShaderRegistry` loads (over the pass contract)
 
 `Shader` writes files rather than mutating a component, so its **read-site is the
@@ -322,7 +325,8 @@ assembles byte-identical WGSL) and the API tests (`src/api/shader/mod.rs`).
 | `ToJson` | ✅ | round-trip — the recipe's canonical serde form; re-assembles byte-identically |
 
 (`Shader.Validate` and `Shader.Blocks` are read-only introspection — a compose
-dry-run and the block-catalog listing — not setters, so they don't add to the count.)
+dry-run and the block-catalog listing with each block's params — not setters, so they
+don't add to the count.)
 
 ### `Sound` — writes a `.wav` the audio runtime decodes (over `AudioSource.clip`)
 

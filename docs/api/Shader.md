@@ -24,12 +24,26 @@ passes, bindings, or render features).
 | `Shader.Bake` | `(recipe [, out_dir])` | the written `<out_dir>/<name>.wgsl` path |
 | `Shader.Validate` | `(recipe)` | array of the composed module's entry-point names (dry-run; **writes nothing**) |
 | `Shader.ToJson` | `(recipe)` | the recipe's canonical JSON string |
-| `Shader.Blocks` | `(pass)` | array of the curated block ids for `pass` (`"surface"` \| `"postfx"`) |
+| `Shader.Blocks` | `(pass)` | the curated blocks for `pass` (`"surface"` \| `"postfx"`): `{ {id, desc, params = { {name, default, arity, runtime} } }, … }` |
 
 `recipe` is a table **or** its serialized JSON string (from `Shader.ToJson`, or a
 saved `.json`) — both forms decode alike, with the same errors. `out_dir` defaults to `project/assets/shaders`. Use `Shader.Validate` to
 compose-check a recipe before committing to a bake, and `Shader.Blocks` to discover
-the catalog rather than guess block ids.
+the catalog rather than guess block ids or params.
+
+`Shader.Blocks` reads the same catalog the bake checks params against, so it is
+always current (#411). Each block has its `id`, a one-line `desc`, and its `params`
+in the order the block declares them: `name`, `default` (a number, or for a vector
+param an array of `arity` numbers — the broadcast default, ready to paste), `arity`
+(1 scalar, 2–4 vector) and `runtime` (whether the param can be changed per material
+without a re-bake; `false` for every param until runtime shader params land, #399).
+
+```lua
+for _, b in ipairs(Shader.Blocks("postfx")) do
+  print(b.id, b.desc)
+  for _, p in ipairs(b.params) do print("  ", p.name, p.arity, p.default) end
+end
+```
 
 ### The recipe shape
 

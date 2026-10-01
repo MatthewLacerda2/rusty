@@ -18,6 +18,7 @@ wall-clock or unseeded RNG).
 |---|---|---|
 | `Texture.Bake` | `(recipe, path, slot)` | the written `path` |
 | `Texture.ToJson` | `(recipe)` | the recipe's canonical JSON string |
+| `Texture.Ops` | `()` | the op catalog: `{ {op, category, inputs, params = { {name, type, default, required, values} } }, … }` |
 
 `recipe` is a table **or** its serialized JSON string (from `Texture.ToJson`, or a
 saved `.json`) — both forms decode alike, with the same errors. `slot` names the target map and selects the **glTF encoding** applied on the
@@ -63,6 +64,24 @@ in dependency order in linear `[f32]` RGBA, then the bake encodes/packs per `slo
 ### The op-set (curated "Blender-lite")
 
 Grouped like Blender's node menus; `op` is the tag string in each node.
+
+**Ask the engine, not this page.** `Texture.Ops()` returns the live catalog — the
+list below is a summary of it. Each entry has the `op` tag, its `category`
+(`generator` | `color` | `vector` | `math` | `filter`), how many `inputs` it consumes
+(a missing input reads as a black canvas), and its `params`. Each param has a
+`name`, a `type` (`number` | `integer` | `bool` | `color` (RGBA array) | `vec2` |
+`enum` | `stops`), `required`, a `default` when it has one (absent when required),
+and for an `enum` the accepted `values`. Units and rounding are the ones *Tiling*
+and *Units* below describe. A unit test holds the catalog to the recipe parser, so
+it can't name an op or param the parser doesn't take, or a default it doesn't apply.
+
+```lua
+for _, o in ipairs(Texture.Ops()) do
+  if o.op == "brick" then
+    for _, p in ipairs(o.params) do print(p.name, p.type, p.default) end
+  end
+end  -- rows number nil / cols number nil / mortar number 0.05
+```
 
 - **Generators** (no inputs): `constant {color}`; `noise {kind="perlin"|"fbm", scale,
   octaves}`; `voronoi {scale, output="distance"|"cells"}`; `gradient
