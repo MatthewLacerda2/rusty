@@ -24,6 +24,7 @@ mod normal_emissive_maps_screenshot;
 mod particle_modes_screenshot;
 mod particle_scene;
 mod particle_soft_lit_screenshot;
+mod postfx_blocks_screenshot;
 mod postfx_screenshot;
 mod preview_api;
 mod ribbons_screenshot;

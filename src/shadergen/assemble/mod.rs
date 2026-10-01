@@ -151,6 +151,9 @@ fn assemble_postfx(recipe: &ShaderRecipe, resolved: &[Instance], layout: &ParamL
 /// vertex stage, matching `postfx.wgsl`'s self-contained fullscreen contract
 /// (group(0) binding 0 = the post params, 1 = the colour so far, 2 = its sampler).
 /// `game_time()` is the sim's game time (#398), the surface blocks' `camera.time`.
+/// `source_tap(uv)` and `source_texel()` let a sampling block (#402) read this
+/// module's input at an offset and step by whole pixels; `textureSampleLevel` keeps
+/// a tap legal wherever a helper is called (no derivative uniformity rule).
 const POSTFX_SCAFFOLD: &str = r#"
 #import common::{PostParams}
 
@@ -175,6 +178,14 @@ fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> VsOut {
 
 fn game_time() -> f32 {
     return params.camera_pos.w;
+}
+
+fn source_texel() -> vec2<f32> {
+    return 1.0 / vec2<f32>(textureDimensions(t_color));
+}
+
+fn source_tap(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(t_color, s_color, uv, 0.0).rgb;
 }
 "#;
 

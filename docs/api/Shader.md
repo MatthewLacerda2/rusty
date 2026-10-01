@@ -90,7 +90,8 @@ assembles byte-identical WGSL.
   before #470 was written against the old per-entity layout — re-bake it.
 - **`postfx`** — a self-contained **fullscreen-triangle** fragment program over the
   **tonemapped** scene color (`vs_fullscreen` + `fs_main`), the most self-contained
-  pass; each block grades the sampled color per-pixel. A baked postfx module runs
+  pass; each block grades the sampled color, and sampling blocks may also tap
+  the input at offsets. A baked postfx module runs
   in a game once a volume lists it: `Graphics.SetCustomEffects({"crt"})` (see
   `Graphics.md`, *Custom effects*). The renderer loads it from the default output
   dir, so bake it there (no `out_dir`).
@@ -111,6 +112,14 @@ What a block's helper can read (#398). Surface blocks get the forward contract:
 
 Postfx blocks see the sampled color `c`, the fragment `uv`, and **`game_time()`** —
 the same game clock (it reads the post params' `camera_pos.w`, bound at binding 0).
+**Sampling blocks** (#402) also read the module's input at other places:
+`source_tap(uv)` samples it (clamped at the screen edge) and `source_texel()` is
+one pixel's size in uv, for stepping by whole pixels. A sampling block reads the
+module's **input** — what the chain handed this module — not the colour the blocks
+before it in the same recipe produced; it adds the offset taps' *difference* from
+the centre tap to the running colour. First in a recipe that is exactly the
+classic effect; after a grade it layers the same fringe or detail on top. Put
+sampling blocks first when that distinction matters.
 
 ### The block library (curated)
 
@@ -131,7 +140,17 @@ into the lit color; postfx blocks grade the sampled scene color.
   under it (a glowing floor mist on one material), not a substitute for scene fog.
 - **Postfx** (fullscreen grades over the tonemapped color, `[0, 1]`): `tint
   {color}`; `grayscale`; `vignette {strength, radius}`; `scanline {count,
-  strength}`; `posterize {levels}`. Exposure, saturation and contrast are **not**
+  strength}`; `posterize {levels}`. Animated by game time: `film_grain
+  {strength = 0.06}` (per-pixel noise, new every frame while time runs; frozen at
+  time 0 in edit mode); `damage_vignette {color = 1, intensity = 0.5, pulse_speed
+  = 0}` (edges blend toward `color` — set it, e.g. `{0.8, 0, 0}` for damage red;
+  `pulse_speed` is radians per game second, 0 holds it steady). Sampling:
+  `chromatic_aberration {strength = 0.01}` (R and B split radially from the
+  centre, `strength` as a fraction of the distance to it); `sharpen {amount =
+  0.5}` (5-tap unsharp mask); `radial_blur {strength = 0.05, center = 0.5}`
+  (8 taps toward `center` in uv — speed/impact streaks). Block params are baked
+  constants: a script can't drive `intensity` per frame yet (runtime volume
+  params are a follow-up), so swap between baked variants for now. Exposure, saturation and contrast are **not**
   blocks: the volume already grades them in HDR (`Graphics.SetExposure`,
   `SetSaturation`, `SetContrast`), so a recipe naming them is refused as an unknown
   block (#397).
