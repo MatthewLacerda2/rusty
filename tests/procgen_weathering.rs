@@ -135,6 +135,7 @@ fn weathering_bakes_byte_identically_per_seed() {
             seed,
             nodes: nodes.clone(),
             output: None,
+            outputs: Default::default(),
         };
         evaluate(&recipe).expect("recipe evaluates")
     };
