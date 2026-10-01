@@ -24,6 +24,7 @@ mod api_doc_layout;
 mod asset_scene_reference;
 mod audio_api;
 mod callback_doc_drift;
+mod camera_target_api;
 mod decals_api;
 mod default_ambient;
 mod gamepad_api;

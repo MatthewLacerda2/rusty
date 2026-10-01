@@ -7,7 +7,10 @@ single material, so editing it once updates all of them. These functions resolve
 the entity's referenced material in the library and mutate that shared asset;
 calling one on an entity that has no material yet **creates** a default library
 material and attaches the reference. `SetTexture` sets the albedo (`base_color`)
-map; an empty path clears it.
+map; an empty path clears it. Any map path may be `"rt:<name>"` — a camera's render
+texture ([`Camera`](Camera.md#camera-entities-projection-and-render-textures-430)),
+the in-world security monitor: put it on the emissive map so the screen glows its
+picture whatever the lighting.
 
 | Function | Signature |
 |---|---|

@@ -3,7 +3,7 @@
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `CameraComponent` field by field: the projection (`fov` / `near` / `far`), the
 //! `culling_mask`, the camera-stack knobs (`render_order` / `clear_flags`), and the
-//! motion-blur fields.
+//! motion-blur fields, the projection and the render-texture target (#430).
 //!
 //! The editor's Camera card routes every field write through these (#287). The Lua
 //! `Camera.*` namespace drives the *render* `Camera` (yaw/pitch/position/fov of the
@@ -18,7 +18,7 @@
 //!
 //! Allowed deps: components (the `CameraComponent`/`ClearFlags` data). Pure.
 
-use crate::components::{CameraComponent, ClearFlags};
+use crate::components::{CameraComponent, ClearFlags, Projection, RenderTarget};
 
 /// Set the camera's field of view (degrees).
 pub fn set_fov(c: &mut CameraComponent, fov: f32) {
@@ -65,6 +65,77 @@ pub fn set_motion_blur_samples(c: &mut CameraComponent, samples: u32) {
 pub fn set_fxaa_active(c: &mut CameraComponent, active: bool) {
     c.fxaa_active = active;
 }
+
+/// The largest render-texture side, in pixels — a guard against a typo allocating
+/// gigabytes, not a quality bound (4096² is a 64 MB colour target).
+pub const MAX_TARGET_SIZE: u32 = 4096;
+
+/// Set the camera's projection (#430). An orthographic size is clamped to > 0.
+pub fn set_projection(c: &mut CameraComponent, projection: Projection) {
+    c.projection = match projection {
+        Projection::Orthographic { size } => Projection::Orthographic {
+            size: size.max(0.01),
+        },
+        p => p,
+    };
+}
+
+/// The projection's name: `"Perspective"` or `"Orthographic"`.
+pub fn projection_name(p: Projection) -> &'static str {
+    match p {
+        Projection::Perspective => "Perspective",
+        Projection::Orthographic { .. } => "Orthographic",
+    }
+}
+
+/// Parse a projection name (case-insensitive) with the orthographic `size` to use.
+pub fn parse_projection(name: &str, size: f32) -> Option<Projection> {
+    match name.to_ascii_lowercase().as_str() {
+        "perspective" => Some(Projection::Perspective),
+        "orthographic" => Some(Projection::Orthographic { size }),
+        _ => None,
+    }
+}
+
+/// Point the camera at a render texture `name` at `width` x `height` (#430),
+/// keeping its post-FX / update rate if it already had a target. An empty name
+/// clears the target, returning the camera to the screen stack.
+pub fn set_target_texture(c: &mut CameraComponent, name: &str, width: u32, height: u32) {
+    let name = name.trim();
+    if name.is_empty() {
+        c.target_texture = None;
+        return;
+    }
+    let (width, height) = (
+        width.clamp(1, MAX_TARGET_SIZE),
+        height.clamp(1, MAX_TARGET_SIZE),
+    );
+    let mut target = c
+        .target_texture
+        .take()
+        .unwrap_or_else(|| RenderTarget::new(name, width, height));
+    (target.name, target.width, target.height) = (name.to_string(), width, height);
+    c.target_texture = Some(target);
+}
+
+/// Run the render texture's full post-FX chain or only tonemap it (no-op without a
+/// target).
+pub fn set_target_post_fx(c: &mut CameraComponent, on: bool) {
+    if let Some(t) = c.target_texture.as_mut() {
+        t.post_fx = on;
+    }
+}
+
+/// Redraw the render texture every `n`th frame, at least 1 (no-op without a target).
+pub fn set_target_update_every(c: &mut CameraComponent, n: u32) {
+    if let Some(t) = c.target_texture.as_mut() {
+        t.update_every = n.max(1);
+    }
+}
+
+#[cfg(test)]
+#[path = "camera_target_tests.rs"]
+mod target_tests;
 
 #[cfg(test)]
 mod tests {

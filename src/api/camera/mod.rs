@@ -3,7 +3,11 @@
 //! Get/Set for position, yaw, pitch and fov over the shared `scene::Camera` the
 //! simulation drives, plus `GetForward`/`GetRight` basis vectors so a controller
 //! script can move and aim relative to where the camera looks, and the world ↔
-//! screen projections (`WorldToScreen`, `ScreenToWorldRay`, #429).
+//! screen projections (`WorldToScreen`, `ScreenToWorldRay`, #429). Those drive the
+//! view camera; the per-entity functions (`component`) tune a camera *entity's*
+//! projection and render-texture target (#430).
+
+pub mod component;
 
 use std::cell::RefCell;
 
@@ -26,6 +30,7 @@ pub fn register<'lua, 'scope>(
     register_orientation(scope, &table, camera)?;
     register_fov(scope, &table, camera)?;
     register_projection(scope, &table, ctx)?;
+    component::register(scope, &table, ctx.scene)?;
 
     lua.globals()
         .set("Camera", table)

@@ -6,6 +6,7 @@
 use egui_phosphor::regular as icon;
 
 mod custom_effects;
+mod target;
 mod visual_correction;
 
 pub use visual_correction::draw_visual_correction;
@@ -42,6 +43,7 @@ pub fn draw_camera(
 
     let mut remove = false;
     component_card(ui, icon::VIDEO_CAMERA, "Camera", Some(&mut remove), |ui| {
+        target::draw_projection_mode(ui, world, id, &cam, is_dirty);
         draw_projection(ui, world, id, &cam, is_dirty);
         draw_culling_mask(ui, world, id, cam.culling_mask, named_layers, is_dirty);
         draw_stacking(ui, world, id, cam.render_order, cam.clear_flags, is_dirty);
@@ -50,6 +52,7 @@ pub fn draw_camera(
             "✔ Intrinsic Motion Blur (Active | 64 Samples)",
         );
         draw_fxaa(ui, world, id, cam.fxaa_active, is_dirty);
+        target::draw_target(ui, world, id, &cam, is_dirty);
     });
     if remove {
         // Cascade to camera-dependent components (VisualCorrection) from the
