@@ -1,17 +1,19 @@
-//! Resource construction for the post-process chain: bind-group layout, the four
+//! Resource construction for the post-process chain: bind-group layout, the five
 //! fullscreen pipelines, the params buffer, sampler, and the render targets.
 
 use crate::render::gpu::shaders::ShaderRegistry;
 
+use super::custom::CustomChain;
 use super::{PfxTarget, PostFx, PostParams, HDR_FORMAT};
 
-/// The chain's four pipelines, named rather than positional — a 4-tuple of
-/// `RenderPipeline` is four chances to wire the wrong one to the wrong pass.
+/// The chain's built-in pipelines, named rather than positional — a tuple of
+/// `RenderPipeline` is one chance per pass to wire the wrong one to the wrong pass.
 struct Pipelines {
     bright: wgpu::RenderPipeline,
     blur: wgpu::RenderPipeline,
     composite: wgpu::RenderPipeline,
     fxaa: wgpu::RenderPipeline,
+    copy: wgpu::RenderPipeline,
 }
 
 impl PostFx {
@@ -31,12 +33,15 @@ impl PostFx {
 
         let (full_size, bloom_size, scene_hdr, bloom_a, bloom_b, ldr) =
             Self::create_targets(device, width, height, bloom_divisor, output_format);
+        let custom = CustomChain::new(device, &io_layout, output_format, full_size);
 
         Self {
             bright_pipeline: pipelines.bright,
             blur_pipeline: pipelines.blur,
             composite_pipeline: pipelines.composite,
             fxaa_pipeline: pipelines.fxaa,
+            copy_pipeline: pipelines.copy,
+            custom,
             io_layout,
             params_buffer,
             sampler,
@@ -51,7 +56,8 @@ impl PostFx {
         }
     }
 
-    /// Build the four fullscreen passes (bright extract, blur, composite, FXAA).
+    /// Build the built-in fullscreen passes (bright extract, blur, composite, FXAA,
+    /// copy).
     fn create_pipelines(
         device: &wgpu::Device,
         io_layout: &wgpu::BindGroupLayout,
@@ -65,20 +71,19 @@ impl PostFx {
             bind_group_layouts: &[io_layout],
             push_constant_ranges: &[],
         });
+        let pass = |fs: &str, format| {
+            let entries = ("vs_fullscreen", fs);
+            Self::fullscreen_pipeline(device, &shader, &pipeline_layout, entries, format)
+        };
 
         Pipelines {
-            bright: Self::pipeline(device, &shader, &pipeline_layout, "fs_bright", HDR_FORMAT),
-            blur: Self::pipeline(device, &shader, &pipeline_layout, "fs_blur", HDR_FORMAT),
-            // Both of these write LDR: the composite into `ldr` (or straight to the
-            // output when FXAA is off), FXAA always into the output.
-            composite: Self::pipeline(
-                device,
-                &shader,
-                &pipeline_layout,
-                "fs_composite",
-                output_format,
-            ),
-            fxaa: Self::pipeline(device, &shader, &pipeline_layout, "fs_fxaa", output_format),
+            bright: pass("fs_bright", HDR_FORMAT),
+            blur: pass("fs_blur", HDR_FORMAT),
+            // The rest write LDR: the composite into `ldr` (or straight to the output
+            // when nothing follows it), FXAA and the copy always into the output.
+            composite: pass("fs_composite", output_format),
+            fxaa: pass("fs_fxaa", output_format),
+            copy: pass("fs_copy", output_format),
         }
     }
 
@@ -114,6 +119,7 @@ impl PostFx {
         self.bloom_a = bloom_a;
         self.bloom_b = bloom_b;
         self.ldr = ldr;
+        self.custom.resize(device, full_size.0, full_size.1);
     }
 
     #[allow(clippy::type_complexity)]
@@ -144,7 +150,7 @@ impl PostFx {
         ((w, h), (bw, bh), scene_hdr, bloom_a, bloom_b, ldr)
     }
 
-    fn target(
+    pub(super) fn target(
         device: &wgpu::Device,
         width: u32,
         height: u32,
@@ -162,18 +168,25 @@ impl PostFx {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            // COPY_*: the authored-effect chain keeps its result as next frame's
+            // history (#397) by copying one LDR target into another.
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         PfxTarget { texture, view }
     }
 
-    fn pipeline(
+    /// A fullscreen-triangle pass: `(vs, fs)` entry points of `shader`, writing one
+    /// `format` target with no blending.
+    pub(super) fn fullscreen_pipeline(
         device: &wgpu::Device,
         shader: &wgpu::ShaderModule,
         layout: &wgpu::PipelineLayout,
-        fs_entry: &str,
+        (vs_entry, fs_entry): (&str, &str),
         format: wgpu::TextureFormat,
     ) -> wgpu::RenderPipeline {
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -181,7 +194,7 @@ impl PostFx {
             layout: Some(layout),
             vertex: wgpu::VertexState {
                 module: shader,
-                entry_point: "vs_fullscreen",
+                entry_point: vs_entry,
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {

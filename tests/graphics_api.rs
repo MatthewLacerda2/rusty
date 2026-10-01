@@ -10,6 +10,7 @@ use std::rc::Rc;
 use mlua::Lua;
 use rusty::components::{CameraComponent, ClearFlags, Tonemap, VisualCorrectionComponent};
 use rusty::core::quality::QualityPreset;
+use rusty::scene::authoring::default_visual_correction;
 use rusty::scene::Scene;
 
 fn scene_with_volume() -> Rc<RefCell<Scene>> {
@@ -18,20 +19,11 @@ fn scene_with_volume() -> Rc<RefCell<Scene>> {
     scene.world.set_visual_correction(
         id,
         Some(VisualCorrectionComponent {
-            active: true,
             bloom_active: false,
-            bloom_intensity: 1.0,
-            bloom_threshold: 0.8,
-            exposure: 0.0,
-            contrast: 1.0,
-            saturation: 1.0,
             ssr_active: false,
             ssr_quality: "Low".to_string(),
             ssr_temporal_upsampling: false,
-            tonemap: Tonemap::Aces,
-            gamma: 1.0,
-            shadows: Default::default(),
-            ssao: Default::default(),
+            ..default_visual_correction()
         }),
     );
     scene.world.set_camera(

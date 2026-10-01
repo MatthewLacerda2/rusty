@@ -60,6 +60,12 @@ pub struct VisualCorrectionComponent {
     /// with the engine defaults (on).
     #[serde(default)]
     pub ssao: SsaoSettings,
+    /// Authored postfx modules (`Shader.Bake` with `pass = "postfx"`, #397), run in
+    /// this order after tonemapping and before FXAA. Each is a module *name*, the
+    /// file the renderer loads from the authored-shader workspace. `#[serde(default)]`
+    /// loads older scenes with none.
+    #[serde(default)]
+    pub custom_effects: Vec<String>,
 }
 
 /// How the sun's cascaded shadow map covers the view (#435) — HDRP's Shadows volume
@@ -164,6 +170,8 @@ struct VisualCorrectionFile {
     shadows: ShadowSettings,
     #[serde(default)]
     ssao: SsaoSettings,
+    #[serde(default)]
+    custom_effects: Vec<String>,
 }
 
 impl From<VisualCorrectionFile> for VisualCorrectionComponent {
@@ -187,6 +195,7 @@ impl From<VisualCorrectionFile> for VisualCorrectionComponent {
             gamma,
             shadows: f.shadows,
             ssao: f.ssao,
+            custom_effects: f.custom_effects,
         }
     }
 }
@@ -231,6 +240,15 @@ mod tests {
             (vc.ssao.active, vc.ssao.radius, vc.ssao.intensity),
             (true, 1.5, 1.0)
         );
+    }
+
+    #[test]
+    fn custom_effects_default_empty_and_round_trip_in_order() {
+        assert!(load("").custom_effects.is_empty());
+        let vc = load(r#", "custom_effects": ["crt", "vignette_red"]"#);
+        let back: VisualCorrectionComponent =
+            serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
+        assert_eq!(back.custom_effects, ["crt", "vignette_red"]);
     }
 
     #[test]

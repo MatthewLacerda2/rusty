@@ -78,6 +78,7 @@ fn neutral_volume() -> VisualCorrectionComponent {
             active: false,
             ..Default::default()
         },
+        custom_effects: Vec::new(),
     }
 }
 

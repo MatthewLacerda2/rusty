@@ -6,7 +6,7 @@
 
 use glam::Mat4;
 
-use super::PostParams;
+use super::{PostParams, PostPasses};
 use crate::core::quality::QualityPreset;
 use crate::scene::Scene;
 
@@ -78,6 +78,31 @@ pub fn build_post_params(
     (params, bloom_enabled)
 }
 
+/// The optional passes this frame runs: bloom (decided by [`build_post_params`]),
+/// FXAA, and the active volume's authored effects.
+pub fn post_passes(scene: &Scene, bloom: bool) -> PostPasses {
+    PostPasses {
+        bloom,
+        fxaa: fxaa_enabled(scene),
+        custom: custom_effects(scene),
+    }
+}
+
+/// The authored post-FX modules of the first active volume (#397) — the same volume
+/// [`build_post_params`] reads — in the order they run. None without a volume.
+pub fn custom_effects(scene: &Scene) -> Vec<String> {
+    scene
+        .world
+        .ids_with_visual_correction()
+        .into_iter()
+        .filter(|&id| scene.world.is_active(id))
+        .find_map(|id| {
+            let vc = scene.world.visual_correction(id)?;
+            vc.active.then(|| vc.custom_effects.clone())
+        })
+        .unwrap_or_default()
+}
+
 /// Whether the FXAA pass runs this frame (#360).
 ///
 /// Deliberately *not* folded into [`build_post_params`]: that walks visual-correction
@@ -131,6 +156,7 @@ mod tests {
             gamma: 1.3,
             shadows: Default::default(),
             ssao: Default::default(),
+            custom_effects: Vec::new(),
         }
     }
 
@@ -195,6 +221,19 @@ mod tests {
         assert_eq!(p.flags[0], 2.0, "real screen-space SSR on High");
         assert_eq!(p.flags[1], 1.0, "motion blur on on High");
         assert_eq!(p.misc[3], 16.0, "motion-blur samples passed through");
+    }
+
+    #[test]
+    fn custom_effects_come_from_the_active_volume_only() {
+        let mut v = vc();
+        v.custom_effects = vec!["crt".into(), "grain".into()];
+        assert_eq!(
+            custom_effects(&scene_with_vc(v.clone(), None)),
+            ["crt", "grain"]
+        );
+        v.active = false;
+        assert!(custom_effects(&scene_with_vc(v, None)).is_empty());
+        assert!(custom_effects(&Scene::new()).is_empty());
     }
 
     #[test]

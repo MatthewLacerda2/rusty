@@ -9,7 +9,8 @@
 //!   `build_post_params` rebuilds the GPU uniform from these EVERY frame, so a write
 //!   here takes effect next frame for free — no GPU pipeline is touched from script.
 //!   The same volume carries the sun's shadow cascades (`shadows`, #435), which the
-//!   shadow pass re-fits from every frame, and its ambient occlusion (`ssao`, #436).
+//!   shadow pass re-fits from every frame, its ambient occlusion (`ssao`, #436) and
+//!   its authored post-FX list (`effects`, #397).
 //! * The scene's fog (`fog`, #437) — scene-level, not per-volume, so it needs no
 //!   volume; the renderer packs it into every pass's camera globals each frame.
 //! * The global `QualityPreset` resource (Low/Medium/High), gating SSR + motion
@@ -24,6 +25,7 @@
 use std::cell::RefCell;
 
 mod camera;
+mod effects;
 mod fog;
 mod shadows;
 mod ssao;
@@ -57,6 +59,7 @@ pub fn register<'lua, 'scope>(
     shadows::register_shadows(scope, &table, scene)?;
     fog::register_fog(scope, &table, scene)?;
     ssao::register_ssao(scope, &table, scene)?;
+    effects::register_custom_effects(scope, &table, scene)?;
 
     lua.globals()
         .set("Graphics", table)

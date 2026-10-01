@@ -1,9 +1,11 @@
 //! src/editor/inspector/components/camera/ — the Camera inspector card (this
-//! `mod.rs`) plus the Visual Correction card (`visual_correction`), split apart to
-//! stay under the size cap. Both cards live on the same camera entity.
+//! `mod.rs`) plus the Visual Correction card (`visual_correction`, with its custom
+//! effects list in `custom_effects`), split apart to stay under the size cap. Both
+//! cards live on the same camera entity.
 
 use egui_phosphor::regular as icon;
 
+mod custom_effects;
 mod visual_correction;
 
 pub use visual_correction::draw_visual_correction;

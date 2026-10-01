@@ -1,7 +1,8 @@
 //! Per-frame execution of the post-process chain: bright-pass, a 2D gaussian
-//! blur, then the composite that writes the corrected image to the target.
+//! blur, the composite (tonemap + grade), the authored effects (#397), then FXAA —
+//! or a plain copy — that writes the finished image to the target.
 
-use super::{PostFx, PostParams};
+use super::{PfxTarget, PostFx, PostParams};
 
 impl PostFx {
     /// Run the full chain. `depth_view` is the scene depth (for SSR + motion blur),
@@ -18,8 +19,10 @@ impl PostFx {
         let PostPasses {
             bloom: bloom_enabled,
             fxaa: fxaa_enabled,
+            custom,
         } = passes;
         queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
+        self.custom.prepare(device, &custom);
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("PostFX Encoder"),
@@ -30,9 +33,10 @@ impl PostFx {
         }
 
         // Composite reads scene HDR + bloom_b (final blur result) + depth + skybox.
-        // With FXAA on it lands in the LDR target for that pass to sample; with FXAA
-        // off it writes the output directly, so the off path is byte-for-byte what
-        // the chain produced before this pass existed.
+        // When anything follows it (FXAA, authored effects) it lands in the LDR target
+        // for that pass to sample; otherwise it writes the output directly, so the
+        // plain path is byte-for-byte what the chain produced before those existed.
+        let effects = self.custom.loaded(&custom);
         let composite_bg = self.io_bind_group(
             device,
             &self.scene_hdr.view,
@@ -40,32 +44,69 @@ impl PostFx {
             ctx.depth_view,
             ctx.skybox_view,
         );
-        let composite_target = if fxaa_enabled {
-            &self.ldr.view
-        } else {
-            ctx.output
-        };
+        let followed = fxaa_enabled || !effects.is_empty();
+        let composite_target = if followed { &self.ldr.view } else { ctx.output };
         Self::fullscreen(
             &mut encoder,
             &self.composite_pipeline,
             &composite_bg,
             composite_target,
         );
+        let finished = self.run_custom(device, &mut encoder, &ctx, &effects);
 
         // FXAA: tonemapped LDR in, anti-aliased output out. The aux/depth/skybox
         // bindings are unused by the pass but must satisfy the shared IO layout.
-        if fxaa_enabled {
-            let fxaa_bg = self.io_bind_group(
+        // Without FXAA, authored effects still need their result copied out.
+        let last = match (fxaa_enabled, effects.is_empty()) {
+            (true, _) => Some(&self.fxaa_pipeline),
+            (false, false) => Some(&self.copy_pipeline),
+            (false, true) => None,
+        };
+        if let Some(pipeline) = last {
+            let bg = self.io_bind_group(
                 device,
-                &self.ldr.view,
+                &finished.view,
                 &self.bloom_b.view,
                 ctx.depth_view,
                 ctx.skybox_view,
             );
-            Self::fullscreen(&mut encoder, &self.fxaa_pipeline, &fxaa_bg, ctx.output);
+            Self::fullscreen(&mut encoder, pipeline, &bg, ctx.output);
         }
 
         queue.submit(std::iter::once(encoder.finish()));
+    }
+
+    /// Run the authored effects (#397) over the composite in `ldr`, ping-ponging with
+    /// the second LDR target, and keep the result as next frame's history. Returns the
+    /// target holding the result (`ldr` itself when there are no effects).
+    fn run_custom<'s>(
+        &'s self,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+        ctx: &PostFxContext<'_>,
+        effects: &[&wgpu::RenderPipeline],
+    ) -> &'s PfxTarget {
+        let (mut src, mut dst) = (&self.ldr, &self.custom.ldr_b);
+        if effects.is_empty() {
+            return src;
+        }
+        for pipeline in effects {
+            let bg = self.io_bind_group(
+                device,
+                &src.view,
+                &self.custom.history.view,
+                ctx.depth_view,
+                ctx.skybox_view,
+            );
+            Self::fullscreen(encoder, pipeline, &bg, &dst.view);
+            (src, dst) = (dst, src);
+        }
+        encoder.copy_texture_to_texture(
+            src.texture.as_image_copy(),
+            self.custom.history.texture.as_image_copy(),
+            src.texture.size(),
+        );
+        src
     }
 
     /// Bright-pass (scene HDR -> bloom_a), then a 2D gaussian blur (a -> b),
@@ -175,12 +216,14 @@ impl PostFx {
 /// Which optional passes run this frame. Bundled rather than passed as loose bools so
 /// `run` stays under the 6-arg threshold — and so two same-typed flags can't be
 /// swapped silently at the call site.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct PostPasses {
     /// Run the bright-pass + blur that feed the composite's bloom add.
     pub bloom: bool,
     /// Run the final anti-aliasing pass (#360).
     pub fxaa: bool,
+    /// Authored post-FX modules to run after tonemapping, in order (#397).
+    pub custom: Vec<String>,
 }
 
 /// The per-frame views the chain reads/writes, bundled to keep `run` under the
