@@ -13,6 +13,7 @@
 use std::fmt::Write as _;
 
 use crate::shadergen::blocks::{Block, Param};
+use crate::shadergen::params::ParamLayout;
 use crate::shadergen::recipe::{BlockSel, ParamValue};
 
 /// One resolved block instance: the catalog block and the recipe entry selecting
@@ -56,12 +57,16 @@ pub fn check_params(block: &Block, sel: &BlockSel, index: usize) -> Result<(), S
     Ok(())
 }
 
-/// Emit every instance's params as WGSL `const`s named `<id>_<index>_<param>`,
-/// reading the recipe's value or the declared default. Params must already have
-/// passed [`check_params`].
-pub fn emit_params(out: &mut String, instances: &[Instance]) {
+/// Emit every instance's baked params as WGSL `const`s named `<id>_<index>_<param>`,
+/// reading the recipe's value or the declared default; a param `layout` holds is
+/// read from the param uniform instead (#399) and emits nothing here. Params must
+/// already have passed [`check_params`].
+pub fn emit_params(out: &mut String, instances: &[Instance], layout: &ParamLayout) {
     for (index, (block, sel)) in instances.iter().enumerate() {
         for p in block.params {
+            if layout.slot_of(index, p.name).is_some() {
+                continue;
+            }
             let _ = writeln!(
                 out,
                 "const {}: {} = {};",
@@ -86,6 +91,16 @@ pub fn emit_helpers(out: &mut String, instances: &[Instance]) {
 /// The per-instance WGSL constant for one param.
 fn const_name(block: &Block, index: usize, p: &Param) -> String {
     format!("{}_{}_{}", block.id, index, p.name)
+}
+
+/// The expression an instance passes for `p`: its uniform slot (swizzled to its
+/// arity) when runtime, else its baked constant.
+fn arg(block: &Block, index: usize, p: &Param, layout: &ParamLayout) -> String {
+    let Some(s) = layout.slot_of(index, p.name) else {
+        return const_name(block, index, p);
+    };
+    let swizzle = ["", ".x", ".xy", ".xyz", ""][s.arity];
+    format!("shader_params.v[{}]{swizzle}", s.slot)
 }
 
 /// The WGSL type for a param's arity.
@@ -125,14 +140,14 @@ pub fn fmt_f32(v: f32) -> String {
 
 /// Build the chained fold expression: starting from `seed`, wrap each instance's
 /// `call` around the previous via its `{prev}` placeholder, in recipe order, with
-/// `{args}` filled by that instance's param constants.
-pub fn chain(instances: &[Instance], seed: &str) -> String {
+/// `{args}` filled by that instance's param constants or uniform slots.
+pub fn chain(instances: &[Instance], seed: &str, layout: &ParamLayout) -> String {
     let mut expr = seed.to_string();
     for (index, (block, _)) in instances.iter().enumerate() {
         let args: String = block
             .params
             .iter()
-            .map(|p| format!(", {}", const_name(block, index, p)))
+            .map(|p| format!(", {}", arg(block, index, p, layout)))
             .collect();
         expr = block.call.replace("{prev}", &expr).replace("{args}", &args);
     }
