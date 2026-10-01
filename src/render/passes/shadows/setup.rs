@@ -93,33 +93,7 @@ impl ShadowRenderer {
         wgpu::BindGroup,
         wgpu::BindGroupLayout,
     ) {
-        let global_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Shadow Global Layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: LIGHT_BINDING,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: true,
-                        min_binding_size: wgpu::BufferSize::new(64),
-                    },
-                    count: None,
-                },
-                // The forward `camera` slot, holding only the game time: a cutting
-                // variant's UV chain reads `camera.time` (#648).
-                wgpu::BindGroupLayoutEntry {
-                    binding: TIME_BINDING,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-        });
+        let global_layout = global_layout(device);
 
         let global_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Shadow Global Bind Group"),
@@ -185,6 +159,38 @@ const LIGHT_BINDING: u32 = 6;
 const TIME_BINDING: u32 = 0;
 pub(super) const CASTERS_BINDING: u32 = 3;
 pub(super) const JOINTS_BINDING: u32 = 1;
+
+/// The shadow stage's group 0: the cascade's light-space matrix (dynamic offset,
+/// one per cascade) and the game time.
+fn global_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("Shadow Global Layout"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: LIGHT_BINDING,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: true,
+                    min_binding_size: wgpu::BufferSize::new(64),
+                },
+                count: None,
+            },
+            // The forward `camera` slot, holding only the game time: a cutting
+            // variant's UV chain reads `camera.time` (#648).
+            wgpu::BindGroupLayoutEntry {
+                binding: TIME_BINDING,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+        ],
+    })
+}
 
 /// The clipping shadow pipelines' layout: light, casters, material (#648).
 pub(crate) fn clip_layout(

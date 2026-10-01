@@ -87,10 +87,12 @@ impl GpuResources {
         let forward = create_forward_passes(
             device,
             &shader,
-            &camera_lighting_layout,
-            &entity_bones_layout,
+            [
+                &camera_lighting_layout,
+                &entity_bones_layout,
+                &shadows.layout,
+            ],
             &textures,
-            &shadows.layout,
             &mut registry,
         );
         let billboards = create_billboard_passes(
@@ -240,13 +242,12 @@ fn create_shadow_system(
 
 /// Build the forward-lit, line, outline and skybox passes that all draw into the HDR
 /// offscreen target, the solids through the forward `shader`.
+/// `layouts` are groups 0, 1 and 3: camera + lighting, entity + bones, shadows.
 fn create_forward_passes(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
-    camera_lighting_layout: &wgpu::BindGroupLayout,
-    entity_bones_layout: &wgpu::BindGroupLayout,
+    [camera_lighting_layout, entity_bones_layout, shadow_layout]: [&wgpu::BindGroupLayout; 3],
     textures: &Textures,
-    shadow_layout: &wgpu::BindGroupLayout,
     registry: &mut ShaderRegistry,
 ) -> ForwardPasses {
     // Skybox binds a single-texture `GpuTexture.bind_group` at its group(1), so it

@@ -256,3 +256,6 @@ fn make_prepass(
         multiview: None,
     })
 }
+
+#[cfg(test)]
+mod scrolled_cut_tests;
