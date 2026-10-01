@@ -79,6 +79,8 @@ pub(in crate::ecs) fn build_bundle(entity: Entity, seq: u64) -> hecs::EntityBuil
         entity.layout_element,
         entity.joint,
         entity.lod_group,
+        entity.trail,
+        entity.line,
         entity.prefab_link,
     );
     b

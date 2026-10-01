@@ -11,18 +11,38 @@ impl Renderer {
         queue: &wgpu::Queue,
         layout: &wgpu::BindGroupLayout,
     ) -> GpuTexture {
-        let width = 64;
-        let height = 64;
-        let pixels = Self::checkerboard_pixels(width, height);
+        let pixels = Self::checkerboard_pixels(64, 64);
+        let label = "Default Checkerboard Texture";
+        Self::create_pixel_texture(device, queue, layout, (64, &pixels), label)
+    }
 
+    /// A 1×1 white texture: what an effect with no texture of its own samples, so
+    /// its colour is its tint alone (#441's ribbons).
+    pub(crate) fn create_white_texture(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        layout: &wgpu::BindGroupLayout,
+    ) -> GpuTexture {
+        Self::create_pixel_texture(device, queue, layout, (1, &[255; 4]), "White Texture")
+    }
+
+    /// Upload a square `(side, rgba8 pixels)` sRGB texture with a repeating,
+    /// nearest-filtered sampler.
+    fn create_pixel_texture(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        layout: &wgpu::BindGroupLayout,
+        (side, pixels): (u32, &[u8]),
+        label: &str,
+    ) -> GpuTexture {
         let size = wgpu::Extent3d {
-            width: width as u32,
-            height: height as u32,
+            width: side,
+            height: side,
             depth_or_array_layers: 1,
         };
 
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Default Checkerboard Texture"),
+            label: Some(label),
             size,
             mip_level_count: 1,
             sample_count: 1,
@@ -39,11 +59,11 @@ impl Renderer {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            &pixels,
+            pixels,
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * width as u32),
-                rows_per_image: Some(height as u32),
+                bytes_per_row: Some(4 * side),
+                rows_per_image: Some(side),
             },
             size,
         );
@@ -56,13 +76,7 @@ impl Renderer {
             ..Default::default()
         });
 
-        Self::finalize_texture(
-            device,
-            layout,
-            texture,
-            sampler,
-            Some("Default Checkerboard Bind Group"),
-        )
+        Self::finalize_texture(device, layout, texture, sampler, Some(label))
     }
 
     /// Create the texture view + bind group and assemble the final `GpuTexture`.

@@ -71,7 +71,8 @@ const REBAKE_INTERVAL_FRAMES: u64 = 60;
 /// are seen) and right before `animate` (so a fired transition is sampled the
 /// same tick). `late_update_scripts` (#324) runs after physics, animation and
 /// particles have resolved this tick's state, so scripts can react to settled
-/// transforms. `apply_destroys` (#323) is the tick's tail: it drains the
+/// transforms. Trails (#441) record right after it, so they sample where
+/// `LateUpdate` left each entity. `apply_destroys` (#323) is the tick's tail: it drains the
 /// deferred-destroy queue (firing `OnDisable`/`OnDestroy`) after every other
 /// system has seen the entity. The scene-load phase (#432) follows it, so a
 /// `Scene.Load` swaps the World only once the whole tick is done with it, right
@@ -87,6 +88,7 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, animate)
         .add_system(Stage::FixedUpdate, super::particles::tick_particles)
         .add_system(Stage::FixedUpdate, late_update_scripts)
+        .add_system(Stage::FixedUpdate, super::trails::tick_trails)
         .add_system(Stage::FixedUpdate, apply_destroys)
         .add_system(Stage::FixedUpdate, super::scene_load::apply_scene_load)
         .add_system(Stage::FixedUpdate, advance_frame);

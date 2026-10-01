@@ -1,10 +1,11 @@
 //! src/editor/inspector/components/particles/widgets.rs — the card's labelled
-//! rows: clamped numbers, vectors, combos, `[min, max]` ranges and keyframe lists.
+//! rows: clamped numbers, vectors, combos, `[min, max]` ranges, keyframe lists and
+//! colour gradients. The Trail and Line cards (#441) reuse them.
 
-use crate::core::curve::{Curve, Key, Range};
+use crate::core::curve::{ColorKey, Curve, Gradient, Key, Range};
 
 /// A labelled, clamped `f32` drag row. Returns whether the value changed.
-pub(super) fn clamped(
+pub(in crate::editor::inspector::components) fn clamped(
     ui: &mut egui::Ui,
     label: &str,
     value: &mut f32,
@@ -34,7 +35,12 @@ pub(super) fn drag_u32(
 }
 
 /// A labelled x/y/z drag row over a `Vec3`. Returns whether any axis changed.
-pub(super) fn vec3(ui: &mut egui::Ui, label: &str, value: &mut glam::Vec3, speed: f32) -> bool {
+pub(in crate::editor::inspector::components) fn vec3(
+    ui: &mut egui::Ui,
+    label: &str,
+    value: &mut glam::Vec3,
+    speed: f32,
+) -> bool {
     ui.horizontal(|ui| {
         ui.label(label);
         let mut c = ui
@@ -52,7 +58,7 @@ pub(super) fn vec3(ui: &mut egui::Ui, label: &str, value: &mut glam::Vec3, speed
 }
 
 /// A combo box over a small set of `Copy + PartialEq` enum variants; returns whether it changed.
-pub(super) fn combo<T: Copy + PartialEq>(
+pub(in crate::editor::inspector::components) fn combo<T: Copy + PartialEq>(
     ui: &mut egui::Ui,
     label: &str,
     value: &mut T,
@@ -104,7 +110,11 @@ pub(super) fn range_row(
 
 /// A collapsible keyframe list: one `t` / value row per key, a remove button each
 /// and an "Add key" button. Returns the edited curve (keys re-sorted) on change.
-pub(super) fn curve_editor(ui: &mut egui::Ui, label: &str, curve: &Curve) -> Option<Curve> {
+pub(in crate::editor::inspector::components) fn curve_editor(
+    ui: &mut egui::Ui,
+    label: &str,
+    curve: &Curve,
+) -> Option<Curve> {
     let mut keys = curve.keys.clone();
     let mut changed = false;
     egui::CollapsingHeader::new(label)
@@ -145,4 +155,46 @@ fn key_rows(ui: &mut egui::Ui, keys: &mut Vec<Key>) -> bool {
         changed = true;
     }
     changed
+}
+
+/// Colour keys (t + RGB, removable, addable) and the alpha curve.
+pub(in crate::editor::inspector::components) fn gradient_editor(
+    ui: &mut egui::Ui,
+    label: &str,
+    gradient: &Gradient,
+) -> Option<Gradient> {
+    let mut g = gradient.clone();
+    let mut changed = false;
+    egui::CollapsingHeader::new(label).show(ui, |ui| {
+        let mut remove = None;
+        for (i, key) in g.color_keys.iter_mut().enumerate() {
+            ui.horizontal(|ui| {
+                ui.label("t");
+                let t = egui::DragValue::new(&mut key.t)
+                    .speed(0.01)
+                    .clamp_range(0.0..=1.0);
+                changed |= ui.add(t).changed();
+                changed |= ui.color_edit_button_rgb(&mut key.color).changed();
+                if ui.small_button("x").clicked() {
+                    remove = Some(i);
+                }
+            });
+        }
+        if let Some(i) = remove {
+            g.color_keys.remove(i);
+            changed = true;
+        }
+        if ui.button("Add color key").clicked() {
+            g.color_keys.push(ColorKey {
+                t: 1.0,
+                color: [1.0; 3],
+            });
+            changed = true;
+        }
+        if let Some(alpha) = curve_editor(ui, "Alpha", &g.alpha) {
+            g.alpha = alpha;
+            changed = true;
+        }
+    });
+    changed.then_some(g)
 }

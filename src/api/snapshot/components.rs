@@ -12,7 +12,9 @@ use crate::components::{
     LightComponent, LightType, MaterialAsset, MeshComponent, NavMeshAgentComponent,
     ParticleEmitterComponent, RigidBodyComponent,
 };
-use crate::components::{JointComponent, LodGroupComponent};
+use crate::components::{
+    JointComponent, LineComponent, LodGroupComponent, RibbonStyle, TrailComponent,
+};
 
 /// Mesh identity: the primitive kind and, for imported meshes, the
 /// `path::sub_object` asset reference. Never the GPU geometry.
@@ -230,4 +232,36 @@ pub(crate) fn lod_group_value(g: &LodGroupComponent) -> Value {
         .map(|l| json!({ "screen_height": l.screen_height, "renderers": l.renderers }))
         .collect();
     json!({ "size": g.size, "levels": levels })
+}
+
+/// Trail (#441): its settings and how many points it has recorded right now.
+pub(crate) fn trail_value(t: &TrailComponent) -> Value {
+    json!({
+        "emitting": t.emitting,
+        "time": t.time,
+        "min_vertex_distance": t.min_vertex_distance,
+        "position_count": t.runtime.points.len(),
+        "style": style_value(&t.style),
+    })
+}
+
+/// Line (#441): its points, their space and the loop flag.
+pub(crate) fn line_value(l: &LineComponent) -> Value {
+    json!({
+        "positions": l.positions.iter().map(|&p| vec3(p)).collect::<Vec<_>>(),
+        "use_world_space": l.use_world_space,
+        "loop": l.looping,
+        "style": style_value(&l.style),
+    })
+}
+
+/// The look a trail and a line share: width curve, colour gradient, texture, blend.
+fn style_value(s: &RibbonStyle) -> Value {
+    json!({
+        "width": s.width,
+        "color": s.color,
+        "texture": s.texture,
+        "texture_mode": s.texture_mode.name(),
+        "blend": s.blend,
+    })
 }

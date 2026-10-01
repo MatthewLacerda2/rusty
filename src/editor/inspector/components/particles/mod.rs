@@ -14,7 +14,7 @@
 mod over_life;
 mod render;
 mod start;
-mod widgets;
+pub(in crate::editor::inspector::components) mod widgets;
 
 use egui_phosphor::regular as icon;
 use widgets::{clamped, combo, drag_u32};

@@ -182,7 +182,7 @@ impl ParticleRenderer {
 
 /// Additive blend (src + dst), keeping dst alpha. Sparks/fire brighten the HDR
 /// target so the bloom pass picks them up.
-fn additive_blend() -> wgpu::BlendState {
+pub(crate) fn additive_blend() -> wgpu::BlendState {
     wgpu::BlendState {
         color: wgpu::BlendComponent {
             src_factor: wgpu::BlendFactor::SrcAlpha,

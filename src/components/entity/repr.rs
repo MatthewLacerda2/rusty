@@ -10,11 +10,11 @@ use crate::components::particle::LegacyEmitter;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, ColliderComponent, ImageComponent, JointComponent,
-    LayoutElementComponent, LayoutGroupComponent, LightComponent, LodGroupComponent, MaterialAsset,
-    MaterialComponent, MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent,
-    RectMaskComponent, RectTransformComponent, RigidBodyComponent, ScriptComponent,
-    SelectableComponent, TextComponent, TextureComponent, TransformComponent,
-    VisualCorrectionComponent,
+    LayoutElementComponent, LayoutGroupComponent, LightComponent, LineComponent, LodGroupComponent,
+    MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent,
+    ParticleEmitterComponent, RectMaskComponent, RectTransformComponent, RigidBodyComponent,
+    ScriptComponent, SelectableComponent, TextComponent, TextureComponent, TrailComponent,
+    TransformComponent, VisualCorrectionComponent,
 };
 
 /// On-disk shape used only for deserialization, so old single-`script` scenes
@@ -78,6 +78,10 @@ pub(super) struct EntityRepr {
     #[serde(default)]
     lod_group: Option<LodGroupComponent>,
     #[serde(default)]
+    trail: Option<TrailComponent>,
+    #[serde(default)]
+    line: Option<LineComponent>,
+    #[serde(default)]
     prefab_link: Option<PrefabLink>,
     parent_id: Option<u32>,
     children: Vec<u32>,
@@ -91,19 +95,7 @@ impl From<EntityRepr> for Entity {
         if let Some(legacy) = r.script {
             scripts.insert(0, legacy);
         }
-        // Material migration: a new-format `material` reference is taken verbatim; a
-        // legacy inline `texture` becomes a per-entity library material whose data is
-        // carried in `pending_material` for `apply_scene_data` to insert by name.
-        let (material, pending_material) = match (r.material, r.texture) {
-            (Some(m), _) => (Some(m), None),
-            (None, Some(t)) => (
-                Some(MaterialComponent {
-                    material: format!("entity_{}_material", r.id),
-                }),
-                Some(MaterialAsset::from_legacy(&t)),
-            ),
-            (None, None) => (None, None),
-        };
+        let (material, pending_material) = migrate_material(r.id, r.material, r.texture);
         Self {
             id: r.id,
             name: r.name,
@@ -135,9 +127,31 @@ impl From<EntityRepr> for Entity {
             layout_element: r.layout_element,
             joint: r.joint,
             lod_group: r.lod_group,
+            trail: r.trail,
+            line: r.line,
             prefab_link: r.prefab_link,
             parent_id: r.parent_id,
             children: r.children,
         }
+    }
+}
+
+/// Material migration: a new-format `material` reference is taken verbatim; a
+/// legacy inline `texture` becomes a per-entity library material whose data is
+/// carried in `pending_material` for `apply_scene_data` to insert by name.
+fn migrate_material(
+    id: u32,
+    material: Option<MaterialComponent>,
+    texture: Option<TextureComponent>,
+) -> (Option<MaterialComponent>, Option<MaterialAsset>) {
+    match (material, texture) {
+        (Some(m), _) => (Some(m), None),
+        (None, Some(t)) => (
+            Some(MaterialComponent {
+                material: format!("entity_{id}_material"),
+            }),
+            Some(MaterialAsset::from_legacy(&t)),
+        ),
+        (None, None) => (None, None),
     }
 }

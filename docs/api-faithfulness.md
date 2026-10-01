@@ -206,6 +206,21 @@ edits and each physics step.)
 | `SetSoft` | ✅ | renderer — `soft_fade` against the read-only scene depth |
 | `SetLit` | ✅ | renderer — `emitter_light` (probe DC or flat ambient) + `particle_light` over the lighting uniform |
 
+### `Trail` — over `Entity.trail` (#441)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetEmitting` / `SetTime` / `SetMinVertexDistance` | ✅ | sim — `TrailComponent::advance`, run by `app/trails.rs` each fixed tick, records and ages the points with them (`tests/ribbons/trail.rs`); round-trips |
+| `Clear` | ✅ | renderer — empties the recorded points the ribbon pass draws |
+| `SetWidth` / `SetWidthCurve` / `SetColor` / `SetColors` / `SetTexture` / `SetTextureMode` / `SetBlend` | ✅ | renderer — `render/passes/ribbons` builds the strip's width, colour and `u` from the style and picks the blend pipeline and texture (`tests/gpu/ribbons_screenshot.rs`); round-trips |
+
+### `Line` — over `Entity.line` (#441)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetPositions` / `SetPosition` / `SetPositionCount` / `SetUseWorldSpace` / `SetLoop` | ✅ | renderer — `render/passes/ribbons` places the strip through the points (local ones through the entity's world matrix), closing it when looping (`tests/gpu/ribbons_screenshot.rs`); round-trips (`tests/ribbons/line.rs`) |
+| `SetWidth` / `SetWidthCurve` / `SetColor` / `SetColors` / `SetTexture` / `SetTextureMode` / `SetBlend` | ✅ | renderer — as `Trail`'s style row; round-trips |
+
 ### `Audio` — over the `AudioMaestro` resource (+ `Entity.audio`)
 
 | Setter | Status | Read-site |

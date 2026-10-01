@@ -275,6 +275,8 @@ One file per namespace, in reference order:
 - [`Reflection`](Reflection.md)
 - [`Lighting`](Lighting.md)
 - [`Particles`](Particles.md)
+- [`Trail`](Trail.md)
+- [`Line`](Line.md)
 - [`Audio`](Audio.md)
 - [`Decals`](Decals.md)
 - [`Layers`](Layers.md)

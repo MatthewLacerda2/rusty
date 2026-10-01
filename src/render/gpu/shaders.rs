@@ -147,6 +147,7 @@ mod tests {
             "skybox.wgsl",
             "sky_gradient.wgsl",
             "particles.wgsl",
+            "ribbons.wgsl",
             "decals.wgsl",
             "postfx.wgsl",
             "ui.wgsl",

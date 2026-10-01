@@ -20,7 +20,7 @@ use super::{
     RigidBodyComponent, ScriptComponent, SelectableComponent, TextComponent, TransformComponent,
     VisualCorrectionComponent,
 };
-use super::{JointComponent, LodGroupComponent, SubEmitters};
+use super::{JointComponent, LineComponent, LodGroupComponent, SubEmitters, TrailComponent};
 
 /// The live link from an instance entity back to the `.prefab` it was stamped from
 /// (#216). Set on EVERY entity of a linked instance — not just the root — so that
@@ -131,6 +131,14 @@ pub struct Entity {
     /// pre-#472 scenes.
     #[serde(default)]
     pub lod_group: Option<LodGroupComponent>,
+    /// Ribbon along the entity's recent path (#441). `#[serde(default)]` for
+    /// pre-#441 scenes.
+    #[serde(default)]
+    pub trail: Option<TrailComponent>,
+    /// Ribbon through authored points (#441). `#[serde(default)]` for pre-#441
+    /// scenes.
+    #[serde(default)]
+    pub line: Option<LineComponent>,
     /// Live link back to the source `.prefab` for a *linked* prefab instance (#216).
     /// `None` on a plain entity or a v1 unpacked copy. Carried on every entity of an
     /// instance. `#[serde(default)]` so pre-#216 scenes load with no link.
@@ -173,6 +181,8 @@ impl Entity {
             layout_element: None,
             joint: None,
             lod_group: None,
+            trail: None,
+            line: None,
             prefab_link: None,
             parent_id: None,
             children: Vec::new(),

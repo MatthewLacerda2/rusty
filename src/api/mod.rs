@@ -5,7 +5,7 @@
 //! `Scene`, `Random`, `Timer`, `Tween`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
 //! `Assets`, `Texture`, `Shader`, `Sound`, `Particles`, `Layers`, `Graphics`, `Video`,
 //! `Storage`, `Canvas`, `RectTransform`, `UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Selectable`,
-//! `LayoutGroup`, `LayoutElement`, `Joint`, `LODGroup`,
+//! `LayoutGroup`, `LayoutElement`, `Joint`, `LODGroup`, `Trail`, `Line`,
 //! `Application`, plus the dev-only `Debug`)
 //! is registered from this tree onto the live Lua runtime.
 //! `scripting`
@@ -34,6 +34,7 @@ pub mod layout_element;
 pub mod layout_group;
 pub mod light;
 pub mod lighting;
+pub mod line;
 pub mod lod_group;
 pub(crate) mod lua_json;
 pub mod material;
@@ -45,6 +46,7 @@ pub mod random;
 pub mod rect_mask;
 pub mod rect_transform;
 pub mod reflection;
+mod ribbon_style;
 pub mod scene;
 pub mod scene_hierarchy;
 pub mod scene_load;
@@ -60,6 +62,7 @@ mod text_layout;
 pub mod texture;
 pub mod time;
 pub mod timer;
+pub mod trail;
 pub mod transform;
 pub mod tween;
 pub mod ui;
@@ -180,6 +183,8 @@ pub fn register<'lua, 'scope>(
     reflection::register(lua, scope, ctx.scene, ctx.scene_path)?;
     lighting::register(lua, scope, ctx.scene, ctx.scene_path, ctx.nav)?;
     particle::register(lua, scope, ctx.scene)?;
+    trail::register(lua, scope, ctx.scene)?;
+    line::register(lua, scope, ctx.scene)?;
     audio::register(lua, scope, ctx.scene, ctx.audio, ctx.time, ctx.camera)?;
     canvas::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
     rect_transform::register(lua, scope, ctx.scene)?;

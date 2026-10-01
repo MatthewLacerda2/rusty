@@ -27,7 +27,7 @@ use components::{
     animator_value, audio_value, camera_component_value, collider_value, light_value,
     material_value, mesh_value, nav_agent_value, particle_value, rigidbody_value,
 };
-use components::{joint_value, lod_group_value};
+use components::{joint_value, line_value, lod_group_value, trail_value};
 use ui::{
     canvas_group_value, canvas_value, image_value, layout_element_value, layout_group_value,
     rect_mask_value, rect_transform_value, selectable_value, text_value,
@@ -125,6 +125,8 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -
         "layout_element": world.layout_element(id).map(|e| layout_element_value(&e)),
         "joint": world.joint(id).map(|j| joint_value(&j)),
         "lod_group": world.lod_group(id).map(|g| lod_group_value(&g)),
+        "trail": world.trail(id).map(|t| trail_value(&t)),
+        "line": world.line(id).map(|l| line_value(&l)),
         "ui_rect": crate::ui::layout::rect_in(world, id, view)
             .map(|r| super::ui::rect_value(world, &r, view)),
     })
@@ -156,6 +158,8 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
         (World::has_layout_element, "LayoutElement"),
         (World::has_joint, "Joint"),
         (World::has_lod_group, "LODGroup"),
+        (World::has_trail, "TrailRenderer"),
+        (World::has_line, "LineRenderer"),
         (
             |w, id| w.scripts(id).is_some_and(|s| !s.is_empty()),
             "Script",

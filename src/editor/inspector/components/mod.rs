@@ -14,6 +14,7 @@ pub mod material;
 pub mod particles;
 pub mod prefab;
 pub mod render;
+pub mod ribbons;
 pub mod script_fields;
 pub mod settings;
 pub mod transform;

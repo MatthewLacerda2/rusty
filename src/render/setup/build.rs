@@ -43,10 +43,11 @@ pub(crate) struct ForwardPasses {
     pub skybox_renderer: skybox::SkyboxRenderer,
 }
 
-/// Billboard particle + box-projector decal passes; both reuse the renderer's
+/// Billboard particle, ribbon (#441) and box-projector decal passes; all reuse the renderer's
 /// `texture_layout` (group 1 / group 3 respectively).
 pub(crate) struct BillboardPasses {
     pub particle_renderer: crate::render::passes::particles::ParticleRenderer,
+    pub ribbon_renderer: crate::render::passes::ribbons::RibbonRenderer,
     pub decal_renderer: crate::render::passes::decals::DecalRenderer,
 }
 
@@ -91,6 +92,7 @@ impl GpuResources {
         );
         let billboards = create_billboard_passes(
             device,
+            queue,
             &textures.texture_layout,
             &camera_lighting_layout,
             &mut registry,
@@ -111,11 +113,12 @@ impl GpuResources {
     }
 }
 
-/// Billboard particle + box-projector decal passes; both reuse the renderer's
-/// `texture_layout` (group 1 / group 3 respectively), and the particles also share
-/// the decal pass's scene-depth layout and the camera + lighting group 0 (#440).
+/// Billboard particle, ribbon (#441) and box-projector decal passes; all reuse the
+/// renderer's `texture_layout` (group 1 / group 3 respectively), and the particles
+/// also share the decal pass's scene-depth layout and the camera + lighting group 0 (#440).
 fn create_billboard_passes(
     device: &wgpu::Device,
+    queue: &wgpu::Queue,
     texture_layout: &wgpu::BindGroupLayout,
     camera_lighting_layout: &wgpu::BindGroupLayout,
     registry: &mut ShaderRegistry,
@@ -130,6 +133,12 @@ fn create_billboard_passes(
     };
     BillboardPasses {
         particle_renderer: ParticleRenderer::new(device, layouts, registry),
+        ribbon_renderer: crate::render::passes::ribbons::RibbonRenderer::new(
+            device,
+            queue,
+            texture_layout,
+            registry,
+        ),
         decal_renderer,
     }
 }
