@@ -5,12 +5,13 @@
 //! inside the Game view focuses it; a click anywhere else (Inspector, Hierarchy, the
 //! Scene tab) takes focus away and frees the cursor — except while the game holds the
 //! cursor locked, when the pointer is captured and a "click elsewhere" is really a
-//! click at the captured position (ESC stops Play, the way out).
+//! click at the captured position (Esc frees the cursor first, the way out, #576).
 
 use super::EditorFrontend;
 use crate::app::{GameWorld, PlayTransition};
 use crate::editor::{ViewportInteraction, ViewportTab};
 use crate::shell::input::GameViewRect;
+use crate::shell::Frontend;
 
 /// Whether the Game view has focus after this frame's pointer activity.
 pub fn next_focus(
@@ -48,8 +49,11 @@ pub fn game_view_rect(
 }
 
 impl EditorFrontend {
-    /// Play focuses the Game view; Stop drops focus.
+    /// Play focuses the Game view; Stop drops focus. Either one ends an Esc release.
     pub(super) fn focus_on_transition(&mut self, transition: PlayTransition) {
+        if transition != PlayTransition::None {
+            self.cursor_release.reset();
+        }
         match transition {
             PlayTransition::Entered => {
                 self.editor_ui.viewport_tab = ViewportTab::Game;
@@ -67,7 +71,8 @@ impl EditorFrontend {
         game: &GameWorld,
         interaction: &ViewportInteraction,
     ) {
-        let captured = game.input().borrow().cursor().locked;
+        let captured = self.cursor(game).locked;
+        self.cursor_release.on_pointer(interaction);
         let focused = next_focus(self.game_focused, interaction, captured);
         if self.game_focused && !focused {
             game.input().borrow_mut().release_all();

@@ -97,6 +97,11 @@ pub trait Frontend {
     /// The sim entered or left Play this frame (the editor focuses the Game view).
     fn on_play_transition(&mut self, _game: &mut GameWorld, _transition: PlayTransition) {}
 
+    /// The OS cursor: the game's request while it has input (the editor's Esc frees it).
+    fn cursor(&self, game: &GameWorld) -> crate::core::input::CursorState {
+        input::CursorPolicy::effective(game.input().borrow().cursor(), self.game_has_input(game))
+    }
+
     /// A physical key changed state, after the shell wrote it into the sim.
     fn on_key(&mut self, _game: &mut GameWorld, _key: KeyCode, _pressed: bool) {}
 
@@ -231,10 +236,7 @@ fn run_frame<F: Frontend>(
     }
     audio::apply_mix(game);
     frontend.on_play_transition(game, transition);
-    // The game's cursor request (Play defaults to locked + hidden), while it has input.
-    let requested = game.input().borrow().cursor();
-    let cursor = input::CursorPolicy::effective(requested, frontend.game_has_input(game));
-    shell.cursor.sync(cursor, &shell.window);
+    shell.cursor.sync(frontend.cursor(game), &shell.window);
 
     match frame::quit_action(F::HOST, game.take_quit_request(), game.is_playing()) {
         QuitAction::Exit => {

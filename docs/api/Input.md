@@ -54,8 +54,14 @@ clipboard: the text lives in the input state only. Text only — no rich content
 **Who hears input.** The player: the game always does. The editor: only in Play
 with the **Game view focused** — entering Play switches to the Game tab and focuses
 it, a click inside the Game view focuses it, a click elsewhere unfocuses it (except
-while the cursor is locked, when the pointer is captured; ESC stops Play). Losing
-focus releases held keys, with their `GetKeyUp` edges.
+while the cursor is locked, when the pointer is captured). Losing focus releases
+held keys, with their `GetKeyUp` edges.
+
+**Esc in the editor** frees the cursor and still reaches the game as `ESCAPE`, so a
+game's own pause menu can be play-tested there (Unity's behaviour). The game's lock
+request is untouched — `SetCursorLocked` is not called for it — and a click inside
+the Game view captures the cursor again. Stopping Play is Ctrl+P (Cmd+P on macOS)
+or the toolbar. The standalone player has no such override: Esc is only a key.
 
 | Function | Signature | Returns |
 |---|---|---|

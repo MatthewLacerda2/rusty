@@ -32,7 +32,7 @@ These are easy to conflate but do very different things; keep them straight:
 - **Step** (`Time.Step(n)`): while paused, **advance exactly `n` fixed-dt frames**,
   then halt again. Frame-precise and deterministic (the fixed-dt path), so the same
   `n` steps from the same state always produce the same result.
-- **Stop** (`set_playing(false)`, the editor's Stop button / ESC): leaves play mode
+- **Stop** (`set_playing(false)`, the editor's Stop button / Ctrl+P, Cmd+P on macOS): leaves play mode
   and **restores the edit snapshot, discarding all play-mode state**. Stop is a
   *reset*, not a pause — use it to return to the authored scene, never to "continue
   later."
