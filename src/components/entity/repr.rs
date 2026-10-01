@@ -82,6 +82,8 @@ pub(super) struct EntityRepr {
     #[serde(default)]
     line: Option<LineComponent>,
     #[serde(default)]
+    shape: Option<crate::components::ShapeComponent>,
+    #[serde(default)]
     prefab_link: Option<PrefabLink>,
     parent_id: Option<u32>,
     children: Vec<u32>,
@@ -129,6 +131,7 @@ impl From<EntityRepr> for Entity {
             lod_group: r.lod_group,
             trail: r.trail,
             line: r.line,
+            shape: r.shape,
             prefab_link: r.prefab_link,
             parent_id: r.parent_id,
             children: r.children,

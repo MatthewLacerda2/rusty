@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 mod repr;
 
+use super::ShapeComponent;
 use super::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, ColliderComponent, ImageComponent, LayoutElementComponent,
@@ -139,6 +140,9 @@ pub struct Entity {
     /// scenes.
     #[serde(default)]
     pub line: Option<LineComponent>,
+    /// Texture-free SDF UI graphic (#425). `#[serde(default)]` for pre-#425 scenes.
+    #[serde(default)]
+    pub shape: Option<ShapeComponent>,
     /// Live link back to the source `.prefab` for a *linked* prefab instance (#216).
     /// `None` on a plain entity or a v1 unpacked copy. Carried on every entity of an
     /// instance. `#[serde(default)]` so pre-#216 scenes load with no link.
@@ -183,6 +187,7 @@ impl Entity {
             lod_group: None,
             trail: None,
             line: None,
+            shape: None,
             prefab_link: None,
             parent_id: None,
             children: Vec::new(),

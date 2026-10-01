@@ -22,6 +22,7 @@
 
 use std::ops::{Deref, DerefMut};
 
+use crate::components::ShapeComponent;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, ColliderComponent, ImageComponent, LayoutElementComponent,
@@ -141,5 +142,6 @@ optional_component_accessors! {
     LodGroupComponent => lod_group, lod_group_mut, has_lod_group, set_lod_group, take_lod_group, ids_with_lod_group;
     TrailComponent => trail, trail_mut, has_trail, set_trail, take_trail, ids_with_trail;
     LineComponent => line, line_mut, has_line, set_line, take_line, ids_with_line;
+    ShapeComponent => shape, shape_mut, has_shape, set_shape, take_shape, ids_with_shape;
     PrefabLink => prefab_link, prefab_link_mut, has_prefab_link, set_prefab_link, take_prefab_link, ids_with_prefab_link;
 }
