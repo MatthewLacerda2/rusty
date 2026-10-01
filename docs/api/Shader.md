@@ -205,8 +205,9 @@ unknown slot is an error naming it.
 
 The natural producer is `Texture.Bake` (see `Texture.md`): bake a tiling noise and
 point the mask at the PNG it wrote — or name an `rt:<name>` render texture. Bake
-it with slot `base_color`: the renderer currently sRGB-decodes every map it samples
-(#647), so a `data` bake would read darker than authored.
+it with slot `data`: a mask holds values, not colour, so the renderer samples its
+bytes raw (a mid-grey 128 reads ≈ 0.5), like every data map (#647). A render
+texture reads as the linear values its camera shaded.
 
 ```lua
 Shader.Bake({ pass = "surface", name = "enemy_die",

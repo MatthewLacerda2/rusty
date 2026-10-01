@@ -104,14 +104,15 @@ fn gpu_dissolve_burns_away_where_the_mask_is_below_amount_and_no_mask_is_white()
     let backdrop = backdrop(&mut renderer, &scene, masked);
     assert_ne!(backdrop, l0, "the sphere shows against the backdrop");
 
-    // Gray (~0.22 once decoded) is above 0.1: the threshold, not a blanket discard.
-    set(masked, 0.1);
+    // Gray (128, read raw as ≈ 0.5, #647) is above 0.4: the threshold, not a
+    // blanket discard. Decoded as sRGB it would read ≈ 0.22 and burn here.
+    set(masked, 0.4);
     let left = |r: &mut Renderer| halves(r, &scene.borrow())[0];
     assert_eq!(left(&mut renderer), l0, "above amount stays");
 
-    // ...and below 0.5, so the masked sphere burns away; the white fallback is not.
-    set(masked, 0.5);
-    set(plain, 0.5);
+    // ...and below 0.6, so the masked sphere burns away; the white fallback is not.
+    set(masked, 0.6);
+    set(plain, 0.6);
     let [l1, r1] = halves(&mut renderer, &scene.borrow());
     assert_eq!(l1, backdrop, "the masked sphere burned away");
     assert_eq!(r1, r0, "no mask samples white, so nothing dissolves");

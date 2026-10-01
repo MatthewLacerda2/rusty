@@ -5,6 +5,8 @@
 //! whose surface shader has runtime params (#399) gets its own group over its own
 //! param buffer, rewritten here when its values change. The extra shader texture
 //! slots (`mask`, #400) bind after the maps, white when a material names none.
+//! Albedo and emissive bind a texture's sRGB-decoding view; the data maps bind its
+//! raw view, so one upload serves a file named in both roles (#647).
 
 use std::rc::Rc;
 
@@ -93,10 +95,15 @@ impl Renderer {
             resource: wgpu::BindingResource::Sampler(&self.default_texture.sampler),
         }];
         let slots = textures::SLOTS.iter().map(|slot| slot.binding);
-        for (map, binding) in maps.iter().zip([0u32, 2, 3, 4, 5].into_iter().chain(slots)) {
+        let bindings = [0u32, 2, 3, 4, 5].into_iter().chain(slots);
+        for (i, (map, binding)) in maps.iter().zip(bindings).enumerate() {
+            let view = match is_colour_map(i) {
+                true => &map.view,
+                false => &map.data_view,
+            };
             entries.push(wgpu::BindGroupEntry {
                 binding,
-                resource: wgpu::BindingResource::TextureView(&map.view),
+                resource: wgpu::BindingResource::TextureView(view),
             });
         }
         entries.push(wgpu::BindGroupEntry {
@@ -116,6 +123,13 @@ impl Renderer {
     pub(crate) fn material_group_count(&self) -> usize {
         self.materials.len()
     }
+}
+
+/// Whether the map at `index` (in [`material_texture_paths`] order) holds colour —
+/// albedo or emissive, sampled through the sRGB-decoding view. Every other map and
+/// shader texture slot holds data and samples its texels raw (glTF 2.0, #647).
+pub(crate) fn is_colour_map(index: usize) -> bool {
+    matches!(index, 0 | 4)
 }
 
 /// Every texture path `material`'s group 2 binds, in [`MapSignature`] order: the

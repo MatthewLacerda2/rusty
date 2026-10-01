@@ -78,7 +78,12 @@ impl MeshId {
 // Stores GPU handlers for textures
 pub struct GpuTexture {
     pub texture: wgpu::Texture,
+    /// The colour view: an sRGB-stored image decodes to linear on sample. What
+    /// albedo, emissive, UI, decals and particles bind.
     pub view: wgpu::TextureView,
+    /// The same texels read as stored, with no sRGB decode (#647): what a material's
+    /// data maps (metallic, roughness, normal, the shader texture slots) bind.
+    pub data_view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,
     pub bind_group: wgpu::BindGroup,
 }

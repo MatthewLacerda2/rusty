@@ -41,7 +41,7 @@ fn vc() -> VisualCorrectionComponent {
 
 /// A large ambient-lit plane carrying the given material. The plane faces +Y so its
 /// ambient term sits at the sky pole, maximizing the normal-map signal.
-fn scene(material: MaterialAsset) -> Scene {
+pub(super) fn scene(material: MaterialAsset) -> Scene {
     let mut s = Scene::new();
     s.ambient_intensity = 1.0;
     let id = s.add_entity("Plane".to_string());
