@@ -6,6 +6,7 @@
 use std::cell::RefCell;
 
 use super::params_tests::{halves, lua, sphere, RES};
+use crate::render::Renderer;
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::Scene;
 use crate::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
@@ -48,61 +49,64 @@ impl Drop for Dissolve {
     }
 }
 
-#[test]
-fn gpu_dissolve_burns_away_where_the_mask_is_below_amount_and_no_mask_is_white() {
-    let d = Dissolve::bake();
-    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
-        return;
-    };
+/// A lit scene with two spheres drawn by the dissolve shader; only the left
+/// (`masked`) one names the gray mask. Returns the scene and the two ids.
+fn two_spheres(d: &Dissolve) -> (RefCell<Scene>, u32, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
     let masked = sphere(&mut scene, -1.2, &d.shader);
     let plain = sphere(&mut scene, 1.2, &d.shader);
     let scene = RefCell::new(scene);
-    let set = |id: u32, amount: f32| {
-        lua(
-            &scene,
-            &format!(r#"Material.SetShaderParam({id}, "dissolve.amount", {amount})"#),
-        )
-    };
-    lua(
-        &scene,
-        &format!(
-            r#"Material.SetShaderTexture({masked}, "mask", "{}")"#,
-            d.mask
-        ),
+    let script = format!(
+        r#"Material.SetShaderTexture({masked}, "mask", "{}")"#,
+        d.mask
     );
+    lua(&scene, &script);
+    (scene, masked, plain)
+}
+
+/// The left half with the masked sphere moved out of view: what a hole shows.
+fn backdrop(renderer: &mut Renderer, scene: &RefCell<Scene>, masked: u32) -> (u32, u32) {
+    let moved = |x: f32| {
+        scene
+            .borrow_mut()
+            .world
+            .transform_mut(masked)
+            .unwrap()
+            .position
+            .x = x
+    };
+    moved(100.0);
+    let [bg, _] = halves(renderer, &scene.borrow());
+    moved(-1.2);
+    bg
+}
+
+#[test]
+fn gpu_dissolve_burns_away_where_the_mask_is_below_amount_and_no_mask_is_white() {
+    let d = Dissolve::bake();
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+        return;
+    };
+    let (scene, masked, plain) = two_spheres(&d);
+    let set = |id: u32, amount: f32| {
+        let script = format!(r#"Material.SetShaderParam({id}, "dissolve.amount", {amount})"#);
+        lua(&scene, &script)
+    };
 
     let [l0, r0] = halves(&mut renderer, &scene.borrow());
     assert!(
         l0.1 > 0 && r0.1 > 0,
         "both whole at amount 0: {l0:?} {r0:?}"
     );
-    let backdrop = {
-        let moved = |x: f32| {
-            scene
-                .borrow_mut()
-                .world
-                .transform_mut(masked)
-                .unwrap()
-                .position
-                .x = x
-        };
-        moved(100.0);
-        let [bg, _] = halves(&mut renderer, &scene.borrow());
-        moved(-1.2);
-        bg
-    };
+    let backdrop = backdrop(&mut renderer, &scene, masked);
     assert_ne!(backdrop, l0, "the sphere shows against the backdrop");
 
     // Gray (~0.22 once decoded) is above 0.1: the threshold, not a blanket discard.
     set(masked, 0.1);
-    assert_eq!(
-        halves(&mut renderer, &scene.borrow())[0],
-        l0,
-        "above amount stays"
-    );
+    let left = |r: &mut Renderer| halves(r, &scene.borrow())[0];
+    assert_eq!(left(&mut renderer), l0, "above amount stays");
 
     // ...and below 0.5, so the masked sphere burns away; the white fallback is not.
     set(masked, 0.5);
@@ -112,5 +116,5 @@ fn gpu_dissolve_burns_away_where_the_mask_is_below_amount_and_no_mask_is_white()
     assert_eq!(r1, r0, "no mask samples white, so nothing dissolves");
 
     set(masked, 0.0);
-    assert_eq!(halves(&mut renderer, &scene.borrow())[0], l0, "whole again");
+    assert_eq!(left(&mut renderer), l0, "whole again");
 }

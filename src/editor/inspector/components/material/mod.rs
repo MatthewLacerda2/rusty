@@ -50,7 +50,7 @@ pub fn draw_material_card(
         preview::draw(
             ui,
             editor,
-            PreviewSubject::Material(materials[&key].clone()),
+            PreviewSubject::Material(Box::new(materials[&key].clone())),
         );
         return;
     }
