@@ -219,3 +219,64 @@ The measurement is zimmer's (`zimmer::level`), taken on the samples before they 
 encoded, so it costs nothing extra. `Sound.Level` decodes with the engine's own clip
 decoder and feeds the same meter, so a bake and `Sound.Level` of its file agree (up
 to the 16-bit rounding the WAV adds).
+
+### What a set is made of (#380)
+
+Every number above looks at **one** bake. `Sound.Survey` looks at a **set** of patch
+and song documents and counts what they are made of — so "all fourteen impact sounds
+are `noise` under a lowpass between 700 and 900 Hz", or "the same karplus arp is the
+loudest thing in all six cues", is something you can read off a table without anyone
+listening. It reads the documents only: **no bake, no decode, no samples**.
+
+| Function | Signature | Returns |
+|---|---|---|
+| `Sound.Survey` | `(paths)` | the survey table below |
+
+`paths` is a list. Each entry is a **path** to a patch or song `.json`, or an
+**inline document** — a table, or a JSON string (any string starting with `{`), the
+same two forms every `Sound` verb takes. A document with `tracks` is a song;
+anything else is a patch. Inline entries are named `#1`, `#2`, … by position.
+
+| Field | Meaning |
+|---|---|
+| `patches` | One row per one-shot patch: `name`, `source` (the kind, e.g. `noise`), `filter` (its kind, `nil` without one), `cutoff` (Hz, `nil` without a filter), `sustain`. |
+| `songs` | One row per song: `name`, `bpm` (the tempo it plays at), `seconds` (one pass of the arrangement), `register` (`{ low, high, names }`, MIDI, e.g. `names = "E1-A5"`), `loudest` (track name), and `tracks`. |
+| `songs[].tracks` | Per track: `name`, `source`, `gain`, `cutoff`, `sustain`, `notes`, `median` (MIDI), `duty`, `density` (notes per second). |
+| `skipped` | `{ name, error }` for each document that could not be read or parsed. The rest of the set is still surveyed. |
+| `rollup` | Across the set: `patches`, `songs`, `sources` (per kind: `source`, `patches`, `songs`, `loudest`, and `cutoff = { low, high }` over its patches), `tempo = { low, high }`, `register`. **`nil` for a set of one** — a summary of one row repeats it. |
+
+```lua
+local report = Sound.Survey({
+  "project/assets/sounds/impact_wood.json",
+  "project/assets/sounds/impact_metal.json",
+  "project/assets/sounds/impact_dirt.json",
+})
+for _, row in ipairs(report.rollup.sources) do
+  print(row.source, row.patches, row.cutoff and row.cutoff.low, row.cutoff and row.cutoff.high)
+end
+```
+
+How to read the columns:
+
+- **`loudest` is `gain × duty`, never the highest gain.** Percussion is written loud
+  *because* it is short: a hat at gain 0.9 firing for a fifth of each beat does not
+  lead a piece over an arp held throughout. It is a better proxy, not an ear.
+- **`duty`** is the share of the piece a track is sounding for, `0..1` — the
+  *union* of its notes, so a chord held for a bar is one bar of sound.
+- **`median`** is the median pitch, so one octave leap does not move where a track
+  sits; with an even count it is the upper middle note, never a pitch between two.
+- **`sustain` is the amp envelope's sustain, not the source's.** A `karplus` string
+  damps on its own and an `fm2` modulator decays on its own, so a patch can read
+  `sustain = 0.4` and still be a decaying sound. Don't over-trust this one number.
+- **What a track *is* versus what it *does*:** `source`, `gain` and `cutoff` describe
+  the instrument; `sustain`, `notes`/`density` and register describe its role. Two
+  different source kinds can play the same role and read as one instrument, so look
+  at both halves.
+- A song track whose patch path cannot be resolved keeps its row with `source`,
+  `cutoff` and `sustain` absent, rather than failing the survey.
+
+**It counts, and stops.** There is no score, no grade, no diversity number, and
+nothing here can fail: six variations on one instrument is a legitimate thing to
+write on purpose. It also makes no claim that a combination "sounds like" anything —
+the table reports what the documents say. Song rows are zimmer's survey
+(`zimmer::survey`); patch rows are rusty's, since zimmer leaves one-shots out.
