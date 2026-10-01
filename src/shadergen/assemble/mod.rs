@@ -130,8 +130,12 @@ fn assemble_postfx(recipe: &ShaderRecipe) -> Result<String, String> {
 
 /// The fixed postfx scaffolding: scene-color bindings and the fullscreen-triangle
 /// vertex stage, matching `postfx.wgsl`'s self-contained fullscreen contract
-/// (group(0) binding 1 = the colour so far, binding 2 = its sampler).
+/// (group(0) binding 0 = the post params, 1 = the colour so far, 2 = its sampler).
+/// `game_time()` is the sim's game time (#398), the surface blocks' `camera.time`.
 const POSTFX_SCAFFOLD: &str = r#"
+#import common::{PostParams}
+
+@group(0) @binding(0) var<uniform> params: PostParams;
 @group(0) @binding(1) var t_color: texture_2d<f32>;
 @group(0) @binding(2) var s_color: sampler;
 
@@ -148,6 +152,10 @@ fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> VsOut {
     out.uv = vec2<f32>(x, y);
     out.pos = vec4<f32>(x * 2.0 - 1.0, 1.0 - y * 2.0, 0.0, 1.0);
     return out;
+}
+
+fn game_time() -> f32 {
+    return params.camera_pos.w;
 }
 "#;
 

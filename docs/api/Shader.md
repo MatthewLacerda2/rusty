@@ -95,7 +95,8 @@ What a block's helper can read (#398). Surface blocks get the forward contract:
 - `entity` — the per-draw `EntityUniforms`; the material maps (`t_diffuse`,
   `t_emissive`, … with `s_diffuse`).
 
-Postfx blocks see only the sampled color `c` and the fragment `uv` — no time yet.
+Postfx blocks see the sampled color `c`, the fragment `uv`, and **`game_time()`** —
+the same game clock (it reads the post params' `camera_pos.w`, bound at binding 0).
 
 ### The block library (curated)
 

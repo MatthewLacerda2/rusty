@@ -26,7 +26,13 @@ pub fn build_post_params(
         view_proj: view_proj.to_cols_array(),
         inv_view_proj: view_proj.inverse().to_cols_array(),
         prev_view_proj: prev_view_proj.to_cols_array(),
-        camera_pos: [camera_pos[0], camera_pos[1], camera_pos[2], 0.0],
+        // w: game time (#398), the clock the scene's shaders read as `camera.time`.
+        camera_pos: [
+            camera_pos[0],
+            camera_pos[1],
+            camera_pos[2],
+            scene.shader_time,
+        ],
         ..Default::default()
     };
 
@@ -191,6 +197,15 @@ mod tests {
         assert_eq!(p.bloom[2], Tonemap::Reinhard.to_index() as f32);
         assert_eq!(p.bloom[3], 1.0); // bloom enabled
         assert!(bloom);
+    }
+
+    #[test]
+    fn game_time_rides_in_camera_pos_w() {
+        let mut scene = scene_with_vc(vc(), None);
+        scene.shader_time = 2.5;
+        let id = Mat4::IDENTITY;
+        let (p, _) = build_post_params(&scene, QualityPreset::Medium, id, id, [1.0; 3]);
+        assert_eq!(p.camera_pos, [1.0, 1.0, 1.0, 2.5]);
     }
 
     #[test]

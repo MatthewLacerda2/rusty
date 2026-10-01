@@ -34,7 +34,8 @@ pub struct PostParams {
     pub inv_view_proj: [f32; 16],
     pub prev_view_proj: [f32; 16],
     pub view_proj: [f32; 16],
-    /// camera world position (xyz) + pad
+    /// camera world position (xyz) + the sim's game time (w, #398) — authored
+    /// postfx effects read it as `game_time()`
     pub camera_pos: [f32; 4],
 }
 
