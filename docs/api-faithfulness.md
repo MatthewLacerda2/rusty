@@ -374,6 +374,7 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 |---|---|---|
 | `SetColor` / `SetTexture` / `SetType` / `SetBorder` / `SetFillMethod` / `SetFillOrigin` / `SetFillAmount` / `SetFillClockwise` / `SetPreserveAspect` | ✅ | render — `render::ui::mesh::build_canvas_meshes` + `render::ui::geometry::image_triangles` in the UI pass (`tests/gpu/ui_hud_screenshot.rs`); round-trips (`tests/ui_graphics_api.rs`) |
 | `SetRaycastTarget` | ✅ | sim — `ui::events::raycast` (`UI.Raycast`, pointer dispatch; `src/ui/events/raycast_tests.rs`); round-trips |
+| `SetGradient` / `SetBlend` | ✅ | render — `render::ui::vertex::Fill` (the stops per vertex) and the batch's blend pipeline (`render::ui::blend`) in the UI pass (`tests/gpu/ui_shapes_screenshot.rs`); round-trips (`tests/ui_look_api.rs`) |
 
 ### `CanvasGroup` — over `Entity.canvas_group` (#418)
 
@@ -394,6 +395,14 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 |---|---|---|
 | `SetText` / `SetFont` / `SetBoldFont` / `SetItalicFont` / `SetFontSize` / `SetColor` / `SetAlignment` / `SetWrap` / `SetOverflow` / `SetLineSpacing` / `SetLetterSpacing` / `SetAutoSize` / `SetRichText` | ✅ | sim — `ui::text::layout_text` (also `Text.GetLayout` / `GetPreferredSize`); render — `render::ui::text::quads` in the UI pass; round-trips (`tests/ui_text_api/`) |
 | `SetOutline` / `SetShadow` / `SetGlow` | ✅ | render — the SDF parameters and shadow quads of `render::ui::text::quads`, cut in `ui.wgsl` (`tests/gpu/ui_text_screenshot.rs`); round-trips |
+| `SetBlend` | ✅ | render — the batch's blend pipeline (`render::ui::blend`); round-trips (`tests/ui_look_api.rs`) |
+| `SetRaycastTarget` | ✅ | sim — `ui::events::raycast`; round-trips |
+
+### `Shape` — over `Entity.shape` (#425)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetKind` / `SetCorner` / `SetRadius` / `SetInnerRadius` / `SetArc` / `SetThickness` / `SetDash` / `SetColor` / `SetGradient` / `SetBorder` / `SetShadow` / `SetGlow` / `SetBlend` | ✅ | render — `render::ui::shape` (the SDF quads) cut by `shape_distance` / `sdf_shape` in `ui.wgsl` (`tests/gpu/ui_shapes_screenshot.rs`); round-trips (`tests/ui_look_api.rs`) |
 | `SetRaycastTarget` | ✅ | sim — `ui::events::raycast`; round-trips |
 
 ### `Selectable` — over `Entity.selectable` (#420)

@@ -30,6 +30,7 @@ overflow, auto-size, rich text — is in [`docs/ui.md`](../ui.md).
 | `Text.GetOutline` / `SetOutline` | `(id)` / `(id, width, r, g, b, a)` | `width, r, g, b, a` — thickness in ems (0 = none), drawn outside the glyph edge |
 | `Text.GetShadow` / `SetShadow` | `(id)` / `(id, dx, dy, r, g, b, a)` | `dx, dy, r, g, b, a` — drop-shadow offset in reference units (0, 0 = none) |
 | `Text.GetGlow` / `SetGlow` | `(id)` / `(id, size, r, g, b, a)` | `size, r, g, b, a` — glow reach past the edge in ems (0 = none): the neon look |
+| `Text.GetBlend` / `SetBlend` | `(id)` / `(id, name)` | `"Normal"`, `"Additive"`, `"Multiply"` or `"Screen"` (#425) |
 | `Text.GetPreferredSize` | `(id)` | `width, height` it wants: the widest line unwrapped, and the block height wrapped at the element's current rect width (Unity's `preferredWidth` / `preferredHeight`) |
 | `Text.MeasureString` | `(id, string)` | `width, height` of `string` on one unwrapped block in the entity's font and size — plain text at its `font_size`, trailing spaces counted (`\n` still breaks; `0, 0` without a Text). Where an input field puts its caret. |
 | `Text.GetLayout` | `(id)` | `{ width, height, lines, font_size, truncated }` as drawn in the current rect (`font_size` is auto-size's pick), or `nil` when the entity has no Text or no rect |

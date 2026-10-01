@@ -57,7 +57,7 @@ case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `Texture` (alias `Material`), `NavMeshAgent`, `Camera`, `Particles`,
 `VisualCorrection`, `Audio` (alias `AudioSource`), `Canvas`, `RectTransform`,
 `Image`, `CanvasGroup`, `RectMask` (alias `RectMask2D`), `Text` (alias
-`TextMeshPro`), `Selectable`, `LayoutGroup`, `LayoutElement` (alias
+`TextMeshPro`), `Shape`, `Selectable`, `LayoutGroup`, `LayoutElement` (alias
 `ContentSizeFitter`), `Joint` (aliases `FixedJoint`, `HingeJoint`,
 `CharacterJoint` — all add a default `Fixed` joint; set its kind with
 `Joint.SetKind`), `LODGroup` (alias `LOD`), `Trail` (alias `TrailRenderer`),
@@ -82,8 +82,8 @@ every surface (editor Add menu, this API, and scene load):
 
 The declared dependencies are **`VisualCorrection` requires `Camera`** (a
 color/bloom/SSR correction stack is inert without a camera to correct) and
-**`Image`, `Text`, `RectMask`, `Selectable`, `LayoutGroup` and `LayoutElement`
-require `RectTransform`** (a graphic fills, a mask clips to, and a layout arranges
+**`Image`, `Text`, `Shape`, `RectMask`, `Selectable`, `LayoutGroup` and
+`LayoutElement` require `RectTransform`** (a graphic fills, a mask clips to, and a layout arranges
 a rect — Unity's `Graphic`, `RectMask2D` and layout components declare the same),
 and **`Joint` requires `RigidBody`** (a joint constrains a body — Unity's `Joint` too).
 

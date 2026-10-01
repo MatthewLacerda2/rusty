@@ -76,6 +76,7 @@ mod ui_api;
 mod ui_events;
 mod ui_graphics_api;
 mod ui_layout_api;
+mod ui_look_api;
 mod ui_text_api;
 mod ui_widgets;
 mod ui_world_api;
