@@ -23,6 +23,7 @@ fn sample_recipe() -> TextureRecipe {
             },
         ],
         output: Some("n1".into()),
+        outputs: Default::default(),
     }
 }
 
@@ -55,4 +56,15 @@ fn an_unknown_recipe_key_is_refused() {
     let err =
         TextureRecipe::from_json(r#"{ "resolution": 8, "nodes": [], "seeed": 3 }"#).unwrap_err();
     assert!(err.contains("seeed"), "{err}");
+}
+
+#[test]
+fn outputs_round_trip_and_stay_out_of_single_output_json() {
+    let single = sample_recipe().to_json().unwrap();
+    assert!(!single.contains("outputs"), "{single}");
+    let mut r = sample_recipe();
+    r.outputs.insert("base_color".into(), "n0".into());
+    r.outputs.insert("normal".into(), "n1".into());
+    let back = TextureRecipe::from_json(&r.to_json().unwrap()).unwrap();
+    assert_eq!(r, back);
 }

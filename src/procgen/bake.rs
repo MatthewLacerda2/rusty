@@ -69,6 +69,35 @@ impl Slot {
         )
     }
 
+    /// The canonical name of the slot — the key `Texture.BakeSet` returns its path
+    /// under and the suffix of its file name (`<prefix>_<name>.png`).
+    pub fn name(self) -> &'static str {
+        match self {
+            Slot::BaseColor => "base_color",
+            Slot::Emissive => "emissive",
+            Slot::Normal => "normal",
+            Slot::Roughness => "roughness",
+            Slot::Metallic => "metallic",
+            Slot::MetallicRoughness => "metallic_roughness",
+            Slot::Data => "data",
+        }
+    }
+
+    /// The `Material.DefineAsset` map keys this slot's PNG fills (#409): a packed
+    /// metallic-roughness map fills both `metallic_map` and `roughness_map` (the
+    /// shader reads B and G from it); `data` feeds no material slot.
+    pub fn material_maps(self) -> &'static [&'static str] {
+        match self {
+            Slot::BaseColor => &["base_color_map"],
+            Slot::Emissive => &["emissive_map"],
+            Slot::Normal => &["normal_map"],
+            Slot::Roughness => &["roughness_map"],
+            Slot::Metallic => &["metallic_map"],
+            Slot::MetallicRoughness => &["metallic_map", "roughness_map"],
+            Slot::Data => &[],
+        }
+    }
+
     /// Whether this slot's color channels are sRGB-encoded on bake.
     fn is_srgb(self) -> bool {
         matches!(self, Slot::BaseColor | Slot::Emissive)

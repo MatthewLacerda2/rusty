@@ -11,6 +11,9 @@
 //!   encoded for the named `slot` (base_color / emissive = sRGB; normal /
 //!   roughness / metallic / data = linear; `metallic_roughness` packs metallic→B,
 //!   roughness→G). Returns the written path.
+//! - `Texture.BakeSet(recipe, prefix)` — bake every entry of the recipe's
+//!   `outputs` (slot → node id) from one evaluation to `<prefix>_<slot>.png`
+//!   (#403). Returns a table canonical slot → path.
 //! - `Texture.ToJson(recipe)` — serialize a recipe to its canonical JSON for
 //!   saving / diffing.
 //! - `Texture.Ops()` — the op catalog: each op's tag, category, input count and
@@ -32,7 +35,7 @@ mod ops;
 use mlua::{Lua, Value};
 
 use super::{put, Reg};
-use crate::procgen::{bake_recipe, Slot, TextureRecipe};
+use crate::procgen::{bake_recipe, bake_set, Slot, TextureRecipe};
 use from_lua::parse_recipe;
 
 /// Register the `Texture` namespace onto `lua`.
@@ -45,6 +48,16 @@ pub fn register(lua: &Lua) -> Reg {
         lua.create_function(|_, (recipe, path, slot): (Value, String, String)| {
             let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
             bake(&recipe, &path, &slot)
+        }),
+    )?;
+
+    put(
+        &table,
+        "BakeSet",
+        lua.create_function(|lua, (recipe, prefix): (Value, String)| {
+            let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
+            let paths = bake_set(&recipe, &prefix).map_err(mlua::Error::RuntimeError)?;
+            lua.create_table_from(paths)
         }),
     )?;
 
@@ -74,6 +87,8 @@ fn bake(recipe: &TextureRecipe, path: &str, slot: &str) -> mlua::Result<String> 
     bake_recipe(recipe, slot, path).map_err(mlua::Error::RuntimeError)
 }
 
+#[cfg(test)]
+mod bake_set_tests;
 #[cfg(test)]
 mod tests {
     use mlua::Lua;

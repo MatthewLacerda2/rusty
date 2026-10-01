@@ -47,6 +47,18 @@ impl std::fmt::Display for RunError {
 /// Evaluate `recipe` to its output [`Image`]. The output is the explicit `output`
 /// node if set, else the last node in the list.
 pub fn evaluate(recipe: &TextureRecipe) -> Result<Image, RunError> {
+    let target = match &recipe.output {
+        Some(id) => id.as_str(),
+        None => recipe.nodes.last().map_or("", |n| n.id.as_str()),
+    };
+    Ok(evaluate_many(recipe, &[target])?.remove(0))
+}
+
+/// Evaluate several output nodes of `recipe` in one pass (#403), returning their
+/// images in the order of `targets`. Every node runs at most once, so upstream nodes
+/// the outputs share are evaluated once — and each image is byte-identical to the
+/// one [`evaluate`] gives with that node as the single `output`.
+pub fn evaluate_many(recipe: &TextureRecipe, targets: &[&str]) -> Result<Vec<Image>, RunError> {
     if recipe.resolution == 0 {
         return Err(RunError::BadResolution);
     }
@@ -61,17 +73,25 @@ pub fn evaluate(recipe: &TextureRecipe) -> Result<Image, RunError> {
         .map(|(i, n)| (n.id.as_str(), i))
         .collect();
 
-    let target = match &recipe.output {
-        Some(id) => *by_id
-            .get(id.as_str())
-            .ok_or_else(|| RunError::UnknownOutput(id.clone()))?,
-        None => recipe.nodes.len() - 1,
-    };
+    let indices = targets
+        .iter()
+        .map(|id| {
+            by_id
+                .get(id)
+                .copied()
+                .ok_or_else(|| RunError::UnknownOutput(id.to_string()))
+        })
+        .collect::<Result<Vec<usize>, _>>()?;
 
     let mut cache: HashMap<usize, Image> = HashMap::new();
     let mut state = vec![Visit::Unseen; recipe.nodes.len()];
-    eval_index(recipe, &by_id, target, &mut cache, &mut state)?;
-    Ok(cache.remove(&target).expect("output evaluated"))
+    for &i in &indices {
+        eval_index(recipe, &by_id, i, &mut cache, &mut state)?;
+    }
+    Ok(indices
+        .iter()
+        .map(|i| cache.get(i).expect("output evaluated").clone())
+        .collect())
 }
 
 /// DFS visit state for cycle detection.
@@ -150,6 +170,7 @@ mod tests {
                 node("inv", OpKind::Invert, &["c"]),
             ],
             output: Some("inv".into()),
+            outputs: Default::default(),
         };
         let img = evaluate(&recipe).unwrap();
         let p = img.pixels()[0];
@@ -165,6 +186,7 @@ mod tests {
             seed: 0,
             nodes: vec![node("inv", OpKind::Invert, &["ghost"])],
             output: None,
+            outputs: Default::default(),
         };
         assert!(matches!(
             evaluate(&recipe),
@@ -182,6 +204,7 @@ mod tests {
                 node("b", OpKind::Invert, &["a"]),
             ],
             output: Some("a".into()),
+            outputs: Default::default(),
         };
         assert!(matches!(evaluate(&recipe), Err(RunError::Cycle(_))));
     }
@@ -193,6 +216,7 @@ mod tests {
             seed: 0,
             nodes: vec![],
             output: None,
+            outputs: Default::default(),
         };
         assert_eq!(evaluate(&empty), Err(RunError::Empty));
         let bad = TextureRecipe {
@@ -200,6 +224,7 @@ mod tests {
             seed: 0,
             nodes: vec![node("c", OpKind::WhiteNoise, &[])],
             output: None,
+            outputs: Default::default(),
         };
         assert_eq!(evaluate(&bad), Err(RunError::BadResolution));
     }

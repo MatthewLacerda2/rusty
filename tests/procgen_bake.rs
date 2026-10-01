@@ -22,6 +22,7 @@ fn noise_recipe(resolution: u32, seed: u64) -> TextureRecipe {
             inputs: vec![],
         }],
         output: None,
+        outputs: Default::default(),
     }
 }
 
@@ -98,6 +99,7 @@ fn metallic_roughness_packs_metallic_b_roughness_g() {
             inputs: vec![],
         }],
         output: None,
+        outputs: Default::default(),
     };
     let img = evaluate(&recipe).unwrap();
     let px = encode(&img, Slot::MetallicRoughness).get_pixel(0, 0).0;

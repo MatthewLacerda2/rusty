@@ -12,6 +12,7 @@ fn run(nodes: Vec<Node>, output: &str, resolution: u32) -> Image {
         seed: 0,
         nodes,
         output: Some(output.into()),
+        outputs: Default::default(),
     };
     evaluate(&recipe).expect("recipe evaluates")
 }

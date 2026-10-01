@@ -24,6 +24,8 @@ pub use catalog::{Lit, OpInfo, OpParam, OPS};
 pub use kinds::*;
 pub use node::Node;
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 /// One stop in a [`ColorRamp`](OpKind::ColorRamp): position in `[0, 1]` and its color.
@@ -217,6 +219,11 @@ pub struct TextureRecipe {
     /// Explicit output node id. If absent, the runner uses the last node.
     #[serde(default)]
     pub output: Option<String>,
+    /// Named outputs for a whole map set (#403): slot name → node id, all baked from
+    /// one evaluation by `Texture.BakeSet`. Empty (the default) for a single-output
+    /// recipe, and omitted from its JSON.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub outputs: BTreeMap<String, String>,
 }
 
 impl TextureRecipe {
