@@ -7,7 +7,7 @@
 //! names; each test writes only its own files. Built on the fog tests' flat,
 //! unlit wall so a pixel is exactly the surface colour.
 
-use rusty::components::{CameraComponent, ClearFlags};
+use rusty::components::CameraComponent;
 use rusty::dev::capture::CaptureHost;
 use rusty::scene::Scene;
 use rusty::shadergen::{bake_recipe, ShaderRecipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
@@ -102,16 +102,10 @@ fn the_fxaa_off_path_still_lands_the_effects() {
     scene.world.set_camera(
         id,
         Some(CameraComponent {
-            active: true,
             fov: 60.0,
-            near: 0.1,
             far: 100.0,
-            culling_mask: u32::MAX,
-            render_order: 0,
-            clear_flags: ClearFlags::Skybox,
-            motion_blur_active: false,
-            motion_blur_samples: 0,
             fxaa_active: false,
+            ..Default::default()
         }),
     );
     let Some([r, g, b]) = centre(&mut CaptureHost::new(), &scene, "pfx397_nofxaa") else {
