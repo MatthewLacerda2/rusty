@@ -4,7 +4,7 @@
 //! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
 //! `Scene`, `Random`, `Timer`, `Tween`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
 //! `Assets`, `Texture`, `Shader`, `Sound`, `Particles`, `Layers`, `Graphics`, `Video`,
-//! `Storage`, `Canvas`, `RectTransform`, `UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Selectable`,
+//! `Storage`, `Canvas`, `RectTransform`, `UI`, `Image`, `CanvasGroup`, `RectMask`, `Text`, `Shape`, `Selectable`,
 //! `LayoutGroup`, `LayoutElement`, `Joint`, `LODGroup`, `Trail`, `Line`,
 //! `Application`, plus the dev-only `Debug`)
 //! is registered from this tree onto the live Lua runtime.
@@ -53,6 +53,7 @@ pub mod scene_load;
 pub mod scene_prefab;
 pub mod selectable;
 pub mod shader;
+pub mod shape;
 pub mod snapshot;
 pub mod sound;
 pub mod storage;
@@ -66,6 +67,7 @@ pub mod trail;
 pub mod transform;
 pub mod tween;
 pub mod ui;
+mod ui_look;
 pub mod video;
 
 use std::cell::RefCell;
@@ -197,6 +199,7 @@ pub fn register<'lua, 'scope>(
     layout_group::register(lua, scope, ctx.scene)?;
     layout_element::register(lua, scope, ctx.scene)?;
     text::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
+    shape::register(lua, scope, ctx.scene)?;
     decals::register(lua, scope, ctx.scene)?;
     layers::register(lua, scope, ctx.scene)?;
     graphics::register(lua, scope, ctx.scene, ctx.quality)?;

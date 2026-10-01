@@ -10,7 +10,7 @@
 //! crossing point in its own reference units; `ray_limit` (the nearest wall, when
 //! the caller knows it) stops the ray. A graphic can be hit when:
 //!
-//! - it is an `Image` or `Text` with `raycast_target`;
+//! - it is an `Image`, `Shape` or `Text` with `raycast_target`;
 //! - it and every ancestor are active;
 //! - no `CanvasGroup` on it or above it has `blocks_raycasts = false`;
 //! - the point is inside every `RectMask` above it (and its own), padding applied —
@@ -80,9 +80,10 @@ fn is_hit(world: &World, layout: &UiLayout, id: u32, rect: &UiRect, point: Vec2)
         && inside_masks(world, layout, id, point)
 }
 
-/// An `Image` or `Text` with `raycast_target` on.
+/// An `Image`, `Shape` or `Text` with `raycast_target` on.
 fn is_raycast_target(world: &World, id: u32) -> bool {
     world.image(id).is_some_and(|i| i.raycast_target)
+        || world.shape(id).is_some_and(|s| s.raycast_target)
         || world.text(id).is_some_and(|t| t.raycast_target)
 }
 

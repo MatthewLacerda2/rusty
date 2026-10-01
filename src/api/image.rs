@@ -1,9 +1,10 @@
 //! src/api/image.rs — `Image` namespace (#418).
 //!
 //! Get/Set over an entity's `ImageComponent`: tint colour, texture, image type,
-//! 9-slice border, the fill (method, origin, amount, direction), preserve-aspect
-//! and raycast target. Every setter routes through the shared
-//! `scene::authoring::image` ops the inspector card uses, so validation lives once.
+//! 9-slice border, the fill (method, origin, amount, direction), preserve-aspect,
+//! raycast target, and the look (#425): blend mode and gradient tint. Every setter
+//! routes through the shared `scene::authoring::image` ops the inspector card
+//! uses, so validation lives once.
 //! Getters return a neutral default when the entity has no Image; setters are then
 //! no-ops. Enum values travel as their names (case-insensitive; unknown ignored).
 
@@ -12,6 +13,7 @@ use std::cell::RefCell;
 use glam::Vec4;
 use mlua::Lua;
 
+use super::ui_look::{BlendAccess, GradientAccess};
 use super::{put, Reg};
 use crate::components::ImageComponent;
 use crate::scene::authoring::image as image_ops;
@@ -80,6 +82,26 @@ const BOOLS: [(&str, BoolGet, BoolSet); 3] = [
     ),
 ];
 
+/// `Get/SetBlend` (#425).
+const BLEND: BlendAccess = BlendAccess {
+    get: |s, id| s.world.image(id).map(|i| i.blend),
+    set: |s, id, b| {
+        if let Some(mut i) = s.world.image_mut(id) {
+            image_ops::set_blend(&mut i, b);
+        }
+    },
+};
+
+/// `Get/SetGradient` (#425): the tint's gradient.
+const GRADIENT: GradientAccess = GradientAccess {
+    get: |s, id| s.world.image(id).map(|i| i.gradient.clone()),
+    set: |s, id, g| {
+        if let Some(mut i) = s.world.image_mut(id) {
+            image_ops::set_gradient(&mut i, g);
+        }
+    },
+};
+
 /// Register the `Image` namespace onto `lua`.
 pub fn register<'lua, 'scope>(
     lua: &'lua Lua,
@@ -97,6 +119,8 @@ pub fn register<'lua, 'scope>(
         register_bool(scope, &table, scene, suffix, get, set)?;
     }
     register_texture_and_amount(scope, &table, scene)?;
+    super::ui_look::register_blend(scope, &table, scene, BLEND)?;
+    super::ui_look::register_gradient(scope, &table, scene, GRADIENT)?;
     lua.globals().set("Image", table).map_err(|e| e.to_string())
 }
 

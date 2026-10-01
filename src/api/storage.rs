@@ -11,6 +11,7 @@ use std::cell::RefCell;
 use mlua::{Lua, Table, Value as LuaValue};
 use serde_json::Value as JsonValue;
 
+use super::lua_json::json_to_lua;
 use super::{put, Reg};
 use crate::core::storage::Storage;
 
@@ -152,31 +153,4 @@ fn table_to_json(t: &Table) -> Result<JsonValue, String> {
         map.insert(key, lua_to_json(&v)?);
     }
     Ok(JsonValue::Object(map))
-}
-
-/// Convert stored JSON back into an mlua value.
-fn json_to_lua<'lua>(lua: &'lua Lua, value: &JsonValue) -> mlua::Result<LuaValue<'lua>> {
-    Ok(match value {
-        JsonValue::Null => LuaValue::Nil,
-        JsonValue::Bool(b) => LuaValue::Boolean(*b),
-        JsonValue::Number(n) => match n.as_i64() {
-            Some(i) => LuaValue::Integer(i),
-            None => LuaValue::Number(n.as_f64().unwrap_or(0.0)),
-        },
-        JsonValue::String(s) => LuaValue::String(lua.create_string(s)?),
-        JsonValue::Array(items) => {
-            let t = lua.create_table()?;
-            for (i, item) in items.iter().enumerate() {
-                t.raw_set(i + 1, json_to_lua(lua, item)?)?;
-            }
-            LuaValue::Table(t)
-        }
-        JsonValue::Object(map) => {
-            let t = lua.create_table()?;
-            for (k, v) in map {
-                t.raw_set(k.as_str(), json_to_lua(lua, v)?)?;
-            }
-            LuaValue::Table(t)
-        }
-    })
 }

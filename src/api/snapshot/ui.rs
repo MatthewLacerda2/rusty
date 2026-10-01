@@ -7,8 +7,9 @@ use serde_json::{json, Value};
 
 use crate::components::{
     CanvasComponent, CanvasGroupComponent, ImageComponent, RectMaskComponent,
-    RectTransformComponent,
+    RectTransformComponent, ShapeComponent,
 };
+use crate::scene::authoring::ui_look::blend_name;
 
 /// Canvas authoring view (#417): render mode, sort order and the scaler. The
 /// computed rect is the entity's `ui_rect`, not part of the component.
@@ -62,6 +63,36 @@ pub(crate) fn image_value(i: &ImageComponent) -> Value {
         "fill_clockwise": i.fill_clockwise,
         "preserve_aspect": i.preserve_aspect,
         "raycast_target": i.raycast_target,
+        "gradient": i.gradient,
+        "blend": blend_name(i.blend),
+    })
+}
+
+/// Shape authoring view (#425): the primitive, its fill, border, effects and blend.
+/// Enum values are their `Shape.*` names; the gradient is the `Shape.SetGradient`
+/// table's shape.
+pub(crate) fn shape_value(s: &ShapeComponent) -> Value {
+    use crate::scene::authoring::shape as ops;
+    let v4 = |v: glam::Vec4| json!([v.x, v.y, v.z, v.w]);
+    json!({
+        "kind": ops::kind_name(s.kind),
+        "corner": ops::corner_name(s.corner),
+        "radius": v4(s.radius),
+        "inner_radius": s.inner_radius,
+        "arc": [s.arc_start, s.arc_end],
+        "thickness": s.thickness,
+        "dash": [s.dash, s.gap],
+        "color": v4(s.color),
+        "gradient": s.gradient,
+        "border": { "width": s.border_width, "color": v4(s.border_color) },
+        "shadow": {
+            "offset": [s.shadow.offset.x, s.shadow.offset.y],
+            "blur": s.shadow.blur,
+            "color": v4(s.shadow.color),
+        },
+        "glow": { "size": s.glow.size, "intensity": s.glow.intensity, "color": v4(s.glow.color) },
+        "blend": blend_name(s.blend),
+        "raycast_target": s.raycast_target,
     })
 }
 
@@ -132,6 +163,7 @@ pub(crate) fn text_value(t: &crate::components::TextComponent) -> Value {
         "outline": { "width": t.outline_width, "color": v4(t.outline_color) },
         "shadow": { "offset": [t.shadow_offset.x, t.shadow_offset.y], "color": v4(t.shadow_color) },
         "glow": { "size": t.glow_size, "color": v4(t.glow_color) },
+        "blend": blend_name(t.blend),
     })
 }
 
