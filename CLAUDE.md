@@ -25,7 +25,9 @@ HUD, raycast gunplay with spread, recoil and wallbangs, grenades (smoke, flash, 
 molotov), and multi-floor maps with jump spots, drops and ladders. Trepang2 stays the
 quality bar; CS:GO is the tight, mechanical bar beside it. Both are **single-player and
 offline: no multiplayer, no networking, no online services — ever.** Netcode and
-replication never qualify as foundation work.
+replication never qualify as foundation work. That rules out the *game* being online,
+not the engine calling third-party APIs: tooling that reaches an external service
+(e.g. a provider generating audio while authoring) is fine.
 
 ## Start here
 - **README.md** — what the engine is and what you can do with it.
