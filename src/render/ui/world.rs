@@ -20,7 +20,6 @@
 use glam::{Mat4, Vec2};
 
 use super::draw::UiViewCache;
-use super::mesh::UiSource;
 use crate::render::gpu::grow_buffer::GrowBuffer;
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::postfx::HDR_FORMAT;
@@ -235,12 +234,7 @@ impl Renderer {
                     bound = Some(i);
                 }
                 let batch = &canvas.mesh.batches[b];
-                let group = match &batch.source {
-                    UiSource::Solid => None,
-                    UiSource::Texture(p) => ui.textures.get(p).map(|(_, g)| g),
-                    UiSource::Font(f) => ui.fonts.get(f).map(|a| &a.group),
-                };
-                pass.set_bind_group(0, group.unwrap_or(&ui.white), &[]);
+                pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
                 pass.set_bind_group(1, &uniforms.group, &[offset]);
                 pass.draw(batch.range.clone(), 0..1);
             }

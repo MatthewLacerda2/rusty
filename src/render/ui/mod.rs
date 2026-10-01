@@ -127,6 +127,16 @@ impl UiRenderer {
         self.pipelines.insert(format, pipeline);
     }
 
+    /// The bind group a batch drawing `source` samples (white when it is not loaded).
+    fn source_group(&self, source: &mesh::UiSource) -> &wgpu::BindGroup {
+        let group = match source {
+            mesh::UiSource::Solid => None,
+            mesh::UiSource::Texture(p) => self.textures.get(p).map(|(_, g)| g),
+            mesh::UiSource::Font(f) => self.fonts.get(f).map(|a| &a.group),
+        };
+        group.unwrap_or(&self.white)
+    }
+
     /// The bind group sampling `texture` (the white one for `None`), creating and
     /// caching it on first use or when the texture behind the path changed.
     fn bind_group(&mut self, device: &wgpu::Device, texture: Option<(&str, Rc<GpuTexture>)>) {

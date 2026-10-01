@@ -21,7 +21,7 @@ use std::rc::Rc;
 
 use glam::Vec2;
 
-use super::mesh::{build_canvas_meshes, CanvasMesh, UiSource, UiVertex};
+use super::mesh::{build_canvas_meshes, CanvasMesh, UiVertex};
 use super::world::{CanvasPlace, WorldUniforms};
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -243,13 +243,7 @@ impl Renderer {
             for canvas in screen {
                 pass.set_vertex_buffer(0, canvas.buffer.slice(..));
                 for batch in &canvas.mesh.batches {
-                    let group = match &batch.source {
-                        UiSource::Solid => None,
-                        UiSource::Texture(p) => ui.textures.get(p).map(|(_, g)| g),
-                        UiSource::Font(f) => ui.fonts.get(f).map(|a| &a.group),
-                    };
-                    let group = group.unwrap_or(&ui.white);
-                    pass.set_bind_group(0, group, &[]);
+                    pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
                     let s = batch
                         .clip
                         .map_or((0, 0, size.width, size.height), |s| (s.x, s.y, s.w, s.h));
