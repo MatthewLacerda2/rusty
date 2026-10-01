@@ -78,39 +78,47 @@ impl WorldUiPipeline {
             bind_group_layouts: &[texture_layout, &layout],
             push_constant_ranges: &[],
         });
-        let build = |mode| {
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("World UI Pipeline"),
-                layout: Some(&pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: shader,
-                    entry_point: "vs_world",
-                    buffers: &[super::vertex::vertex_layout()],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: shader,
-                    entry_point: "fs_world",
-                    targets: &[Some(wgpu::ColorTargetState {
-                        format: HDR_FORMAT,
-                        blend: Some(super::blend::blend_state(mode)),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    })],
-                }),
-                primitive: wgpu::PrimitiveState::default(),
-                depth_stencil: Some(wgpu::DepthStencilState {
-                    format: wgpu::TextureFormat::Depth32Float,
-                    depth_write_enabled: false,
-                    depth_compare: wgpu::CompareFunction::LessEqual,
-                    stencil: wgpu::StencilState::default(),
-                    bias: wgpu::DepthBiasState::default(),
-                }),
-                multisample: wgpu::MultisampleState::default(),
-                multiview: None,
-            })
-        };
+        let build = |mode| build_pipeline(device, shader, &pipeline_layout, mode);
         let pipelines = UiBlend::ALL.into_iter().map(build).collect();
         Self { layout, pipelines }
     }
+}
+
+/// The world pipeline drawing with `mode` (see [`WorldUiPipeline::new`]).
+fn build_pipeline(
+    device: &wgpu::Device,
+    shader: &wgpu::ShaderModule,
+    layout: &wgpu::PipelineLayout,
+    mode: UiBlend,
+) -> wgpu::RenderPipeline {
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("World UI Pipeline"),
+        layout: Some(layout),
+        vertex: wgpu::VertexState {
+            module: shader,
+            entry_point: "vs_world",
+            buffers: &[super::vertex::vertex_layout()],
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: shader,
+            entry_point: "fs_world",
+            targets: &[Some(wgpu::ColorTargetState {
+                format: HDR_FORMAT,
+                blend: Some(super::blend::blend_state(mode)),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: Some(wgpu::DepthStencilState {
+            format: wgpu::TextureFormat::Depth32Float,
+            depth_write_enabled: false,
+            depth_compare: wgpu::CompareFunction::LessEqual,
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState::default(),
+        }),
+        multisample: wgpu::MultisampleState::default(),
+        multiview: None,
+    })
 }
 
 /// A view's world-canvas uniforms: one aligned slot per canvas batch, rewritten

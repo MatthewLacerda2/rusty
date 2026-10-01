@@ -18,10 +18,12 @@ const RECIPE: &str = include_str!("ui_look_recipe.lua");
 /// Run `f` with the namespaces the recipe uses registered over `scene`.
 fn with_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
     let (path, playing) = (RefCell::new(None), RefCell::new(false));
+    let screen = RefCell::new(rusty::ui::ScreenSize::default());
+    let video = RefCell::new(rusty::core::video::VideoSettings::default());
     let lua = Lua::new();
     lua.scope(|scope| {
         rusty::api::scene::register(&lua, scope, scene, &path, &playing).unwrap();
-        rusty::api::rect_transform::register(&lua, scope, scene).unwrap();
+        rusty::api::rect_transform::register(&lua, scope, scene, (&screen, &video)).unwrap();
         rusty::api::shape::register(&lua, scope, scene).unwrap();
         rusty::api::image::register(&lua, scope, scene).unwrap();
         f(&lua);

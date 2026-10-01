@@ -27,10 +27,11 @@ fn skin(scene: &mut Scene, id: u32, color: Vec4, blend: UiBlend, glow: f32) {
     scene.world.set_shape(id, Some(shape));
 }
 
-#[test]
-fn a_masked_shape_and_an_additive_shape_draw_on_a_world_canvas() {
+/// A 2×2 m, 400-unit sign 5 m ahead (pixels ~25..71 on both axes) on black: its
+/// left half masks a red shape twice its size (glow and all), its right half
+/// carries an additive green shape.
+fn scene() -> Scene {
     let mut scene = dark_scene();
-    // A 2×2 m, 400-unit sign 5 m ahead: pixels ~25..71 on both axes.
     let sign = CanvasComponent {
         render_mode: CanvasRenderMode::WorldSpace,
         reference_resolution: Vec2::splat(400.0),
@@ -69,7 +70,12 @@ fn a_masked_shape_and_an_additive_shape_draw_on_a_world_canvas() {
         UiBlend::Additive,
         0.0,
     );
-    let Some(img) = shot(&scene, "rusty_world_ui_shape.png") else {
+    scene
+}
+
+#[test]
+fn a_masked_shape_and_an_additive_shape_draw_on_a_world_canvas() {
+    let Some(img) = shot(&scene(), "rusty_world_ui_shape.png") else {
         return;
     };
     let px = |x: u32, y: u32| img.get_pixel(x, y).0;

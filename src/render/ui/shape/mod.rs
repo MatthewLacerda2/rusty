@@ -58,6 +58,29 @@ pub(in crate::render::ui) fn push_shape(
     // A Selectable's ColorTint (#420) multiplies every colour, like the group alpha.
     let tint = shape.state_tint * Vec4::new(1.0, 1.0, 1.0, state.alpha);
     let start = mesh.vertices.len() as u32;
+    push_effects(mesh, frame, rect, &shape, tint);
+    let flat = shape.gradient.is_none().then_some(shape.color);
+    let fill = Fill::new(shape.gradient.as_ref(), flat.unwrap_or(Vec4::ONE) * tint);
+    let border = shape.border_color * tint;
+    push_quad(
+        mesh,
+        frame,
+        rect,
+        &shape,
+        Layer::Body,
+        Paint { fill, border },
+    );
+    close_batch(mesh, (UiSource::Solid, shape.blend), clip, start);
+}
+
+/// The shadow and glow quads (whichever are on), tinted by `tint`.
+fn push_effects(
+    mesh: &mut CanvasMesh,
+    frame: &Frame,
+    rect: &UiRect,
+    shape: &ShapeComponent,
+    tint: Vec4,
+) {
     if shape.shadow.is_on() {
         let s = shape.shadow;
         let layer = Layer::Shadow {
@@ -69,7 +92,7 @@ pub(in crate::render::ui) fn push_shape(
             mesh,
             frame,
             rect,
-            &shape,
+            shape,
             layer,
             Paint {
                 fill,
@@ -86,7 +109,7 @@ pub(in crate::render::ui) fn push_shape(
             mesh,
             frame,
             rect,
-            &shape,
+            shape,
             layer,
             Paint {
                 fill,
@@ -94,18 +117,6 @@ pub(in crate::render::ui) fn push_shape(
             },
         );
     }
-    let flat = shape.gradient.is_none().then_some(shape.color);
-    let fill = Fill::new(shape.gradient.as_ref(), flat.unwrap_or(Vec4::ONE) * tint);
-    let border = shape.border_color * tint;
-    push_quad(
-        mesh,
-        frame,
-        rect,
-        &shape,
-        Layer::Body,
-        Paint { fill, border },
-    );
-    close_batch(mesh, (UiSource::Solid, shape.blend), clip, start);
 }
 
 /// Append one quad (two triangles) of `layer` over `rect`.

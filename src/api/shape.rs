@@ -163,53 +163,49 @@ fn register_nums<'lua, 'scope>(
     )
 }
 
-/// `Get/SetKind`, `Get/SetCorner` (by name; unknown ignored) and
-/// `Get/SetRaycastTarget`.
+type NameGet = fn(&ShapeComponent) -> &'static str;
+type NameSet = fn(&mut ShapeComponent, &str);
+
+/// `Get/SetKind` and `Get/SetCorner`, by name (case-insensitive; unknown ignored).
+const NAMES: [(&str, NameGet, NameSet); 2] = [
+    (
+        "Kind",
+        |c| ops::kind_name(c.kind),
+        |c, n| {
+            if let Some(k) = ops::parse_kind(n) {
+                ops::set_kind(c, k);
+            }
+        },
+    ),
+    (
+        "Corner",
+        |c| ops::corner_name(c.corner),
+        |c, n| {
+            if let Some(k) = ops::parse_corner(n) {
+                ops::set_corner(c, k);
+            }
+        },
+    ),
+];
+
+/// The [`NAMES`] accessors (`"None"` without a Shape) and `Get/SetRaycastTarget`.
 fn register_names<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &Table,
     scene: Scoped<'scope>,
 ) -> Reg {
-    let read = |f: fn(&ShapeComponent) -> &'static str| {
-        move |_: &Lua, id: u32| {
-            Ok(scene
-                .borrow()
-                .world
-                .shape(id)
-                .map_or("None", |c| f(&c))
-                .to_string())
-        }
-    };
-    put(
-        table,
-        "GetKind",
-        scope.create_function(read(|c| ops::kind_name(c.kind))),
-    )?;
-    put(
-        table,
-        "GetCorner",
-        scope.create_function(read(|c| ops::corner_name(c.corner))),
-    )?;
-    put(
-        table,
-        "SetKind",
-        scope.create_function(move |_, (id, name): (u32, String)| {
-            if let Some(k) = ops::parse_kind(&name) {
-                with_shape(&mut scene.borrow_mut(), id, |c| ops::set_kind(c, k));
-            }
+    for (suffix, get, set) in NAMES {
+        let read = move |_: &Lua, id: u32| {
+            let s = scene.borrow();
+            Ok(s.world.shape(id).map_or("None", |c| get(&c)).to_string())
+        };
+        put(table, &format!("Get{suffix}"), scope.create_function(read))?;
+        let write = move |_: &Lua, (id, name): (u32, String)| {
+            with_shape(&mut scene.borrow_mut(), id, |c| set(c, &name));
             Ok(())
-        }),
-    )?;
-    put(
-        table,
-        "SetCorner",
-        scope.create_function(move |_, (id, name): (u32, String)| {
-            if let Some(k) = ops::parse_corner(&name) {
-                with_shape(&mut scene.borrow_mut(), id, |c| ops::set_corner(c, k));
-            }
-            Ok(())
-        }),
-    )?;
+        };
+        put(table, &format!("Set{suffix}"), scope.create_function(write))?;
+    }
     put(
         table,
         "GetRaycastTarget",
