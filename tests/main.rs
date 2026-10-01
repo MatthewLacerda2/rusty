@@ -70,6 +70,7 @@ mod sound_song_api;
 mod starter_materials;
 mod texture_api;
 mod transform_api;
+mod ui_anchor_preset_api;
 mod ui_api;
 mod ui_events;
 mod ui_graphics_api;

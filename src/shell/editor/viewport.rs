@@ -3,8 +3,12 @@
 
 use super::EditorFrontend;
 use crate::app::GameWorld;
-use crate::editor::{ViewportInteraction, ViewportTab};
+use crate::ecs::World;
+use crate::editor::viewport::rect_tool::{self, OverlayFrame};
+use crate::editor::viewport::{gizmo, pick};
+use crate::editor::{EditorUi, ViewportInteraction, ViewportTab};
 use crate::render::RenderView;
+use crate::scene::Scene;
 use crate::shell::Shell;
 
 /// (Re)bind a freshly-rendered offscreen `target_view` to a stable egui texture id so
@@ -79,6 +83,7 @@ impl EditorFrontend {
 
         let scene = game.scene().borrow();
         let scene_tab = interaction.tab == ViewportTab::Scene;
+        view.ui.screen_in_editor = scene_tab && self.editor_ui.ui_overlay;
         let camera = if scene_tab {
             game.camera().borrow().clone()
         } else {
@@ -141,26 +146,24 @@ impl EditorFrontend {
         );
     }
 
-    /// Apply the Scene-tab pointer interaction: a drag on an axis handle translates the
-    /// selection (same `Transform` path as the inspector); a plain click picks the
-    /// entity under the cursor (or deselects on empty space). The Game tab is
-    /// view-only. Routes through the editor's `selected_entity_id`, so inspector and
-    /// overlay agree. Picking works in points: the image rect is already in points.
+    /// Apply the Scene-tab pointer interaction: with the UI overlay on, a drag on the
+    /// selected UI element's rect-tool handles edits its RectTransform (#423);
+    /// otherwise a drag on an axis handle translates the selection (same `Transform`
+    /// path as the inspector). A plain click picks the UI under the cursor, then the
+    /// entity (or deselects on empty space). The Game tab is view-only. Routes
+    /// through the editor's `selected_entity_id`, so inspector and overlay agree.
+    /// Picking works in points: the image rect is already in points.
     pub(super) fn handle_viewport_interaction(
         &mut self,
         game: &GameWorld,
         interaction: &ViewportInteraction,
+        pixels_per_point: f32,
     ) {
-        use crate::editor::viewport::{gizmo, pick};
-
         let ui = &mut self.editor_ui;
-        if interaction.tab != ViewportTab::Scene {
-            ui.gizmo_drag = None;
-            return;
-        }
-        let Some(local) = interaction.hover_local else {
-            if !interaction.dragging {
-                ui.gizmo_drag = None;
+        let scene_tab = interaction.tab == ViewportTab::Scene;
+        let Some(local) = interaction.hover_local.filter(|_| scene_tab) else {
+            if !scene_tab || !interaction.dragging {
+                (ui.gizmo_drag, ui.rect_drag) = (None, None);
             }
             return;
         };
@@ -172,12 +175,20 @@ impl EditorFrontend {
         let camera = game.camera().borrow().clone();
         let ray = pick::ray_from_ndc(&camera, aspect, ndc_x, ndc_y);
         let mut scene = game.scene().borrow_mut();
+        let frame = OverlayFrame {
+            size: glam::Vec2::new(size.x, size.y),
+            pixels_per_point,
+        };
+        let point = glam::Vec2::new(local.x, local.y);
 
-        // 1. Continue or start a gizmo drag on the current selection's axis handles.
+        // 1. Continue or start a rect-tool drag, else a gizmo drag, on the selection.
         if interaction.dragging {
             let Some(id) = ui.selected_entity_id else {
                 return;
             };
+            if drive_rect_tool(ui, &mut scene.world, &frame, (id, point), interaction) {
+                return;
+            }
             let Some(origin) = pick::entity_world_position(&scene, id) else {
                 return;
             };
@@ -193,14 +204,53 @@ impl EditorFrontend {
             }
             return;
         }
-        ui.gizmo_drag = None;
+        (ui.gizmo_drag, ui.rect_drag) = (None, None);
 
-        // 2. A plain click selects the entity under the cursor, or deselects empty space.
+        // 2. A plain click selects the UI under the cursor — the overlay, then world
+        // canvases in front of the nearest mesh — else that mesh, else deselects.
         if interaction.clicked {
-            let hit = pick::pick_entity(&scene, ray).map(|(id, _)| id);
+            let hit = click_pick(&scene, &frame, point, ui.ui_overlay, ray);
             ui.selected_entity_id = hit;
             ui.selected_asset_path = None;
             scene.selected_entity_id = hit;
         }
     }
+}
+
+/// Grab (on the drag's first frame, overlay on) or continue a rect-tool drag of
+/// `(id, point)`, the selection and the pointer. Returns whether the rect tool owns
+/// the drag — the move gizmo then stays out of it.
+fn drive_rect_tool(
+    ui: &mut EditorUi,
+    world: &mut World,
+    frame: &OverlayFrame,
+    (id, point): (u32, glam::Vec2),
+    interaction: &ViewportInteraction,
+) -> bool {
+    if interaction.drag_started {
+        let grab = || rect_tool::begin(world, frame, id, point);
+        ui.rect_drag = ui.ui_overlay.then(grab).flatten();
+    }
+    let Some(drag) = ui.rect_drag else {
+        return false;
+    };
+    let d = interaction.drag_delta;
+    ui.is_dirty |= rect_tool::apply(world, frame, drag, glam::Vec2::new(d.x, d.y));
+    true
+}
+
+/// What a click at `point` selects: the UI under it (the overlay while shown, then
+/// world canvases in front of the nearest mesh), else that mesh.
+fn click_pick(
+    scene: &Scene,
+    frame: &OverlayFrame,
+    point: glam::Vec2,
+    overlay: bool,
+    ray: pick::Ray,
+) -> Option<u32> {
+    let mesh = pick::pick_entity(scene, ray);
+    let limit = mesh.map_or(f32::INFINITY, |(_, toi)| toi);
+    let ray = (ray.origin, ray.dir);
+    let widget = rect_tool::pick(&scene.world, frame, point, overlay, ray, limit);
+    widget.or(mesh.map(|(id, _)| id))
 }

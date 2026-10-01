@@ -6,9 +6,12 @@
 //! **Game** (the active `CameraComponent`'s view — what the player sees). The panel
 //! owns no GPU state; the shell's editor frontend registers the texture and feeds the [`egui::TextureId`]
 //! in, and reads the returned [`ViewportInteraction`] back to drive picking/gizmo.
+//! The Scene tab's **UI** toggle draws the screen-space canvases over the scene and
+//! enables the rect tool on them (`rect_tool`, #423).
 
 pub mod gizmo;
 pub mod pick;
+pub mod rect_tool;
 
 /// Which view the viewport tab strip is showing.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -53,19 +56,32 @@ pub fn draw(
     editor: &mut crate::editor::EditorUi,
     ctx: &egui::Context,
     texture: Option<egui::TextureId>,
+    world: &crate::ecs::World,
 ) -> ViewportInteraction {
     let t = editor.theme;
     let mut tab = editor.viewport_tab;
+    let mut overlay = editor.ui_overlay;
 
     let response = egui::CentralPanel::default()
         .frame(egui::Frame::none().fill(t.bg_tier0))
         .show(ctx, |ui| {
-            draw_tab_strip(ui, &mut tab, t);
-            draw_image(ui, texture, t)
+            draw_tab_strip(ui, &mut tab, &mut overlay, t);
+            let response = draw_image(ui, texture, t);
+            if tab == ViewportTab::Scene && overlay {
+                let frame = rect_tool::OverlayFrame {
+                    size: glam::Vec2::new(response.rect.width(), response.rect.height()),
+                    pixels_per_point: ctx.pixels_per_point(),
+                };
+                let painter = ui.painter_at(response.rect);
+                let selected = editor.selected_entity_id;
+                rect_tool::overlay::paint(&painter, response.rect.min, &frame, world, selected, &t);
+            }
+            response
         })
         .inner;
 
     editor.viewport_tab = tab;
+    editor.ui_overlay = overlay;
     let interaction = build_interaction(tab, &response);
     // Record the image rect's pixel size so the front-end resizes the offscreen
     // target to match (points scaled by the egui pixels-per-point).
@@ -73,8 +89,14 @@ pub fn draw(
     interaction
 }
 
-/// The tab strip: Scene / Game selectors. Mirrors Unity's viewport tabs.
-fn draw_tab_strip(ui: &mut egui::Ui, tab: &mut ViewportTab, t: crate::editor::theme::Theme) {
+/// The tab strip: Scene / Game selectors (Unity's viewport tabs), and on the Scene
+/// tab the UI overlay toggle.
+fn draw_tab_strip(
+    ui: &mut egui::Ui,
+    tab: &mut ViewportTab,
+    overlay: &mut bool,
+    t: crate::editor::theme::Theme,
+) {
     egui::Frame::none()
         .fill(t.bg_tier1)
         .inner_margin(t.space_xs)
@@ -91,6 +113,12 @@ fn draw_tab_strip(ui: &mut egui::Ui, tab: &mut ViewportTab, t: crate::editor::th
                     .clicked()
                 {
                     *tab = ViewportTab::Game;
+                }
+                if *tab == ViewportTab::Scene {
+                    ui.separator();
+                    ui.toggle_value(overlay, "UI").on_hover_text(
+                        "Draw the screen-space canvases and edit them with the rect tool",
+                    );
                 }
             });
         });

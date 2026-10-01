@@ -238,7 +238,7 @@ impl Frontend for EditorFrontend {
             .flatten()
             .map(|render| game_focus::game_view_rect(&interaction, ppp, render));
         self.render_viewport_scene(shell, game, &interaction, ppp);
-        self.handle_viewport_interaction(game, &interaction);
+        self.handle_viewport_interaction(game, &interaction, ppp);
         // Only when the Inspector's Preview tab requested one this frame (#352).
         self.render_preview_scene(shell, ppp);
 

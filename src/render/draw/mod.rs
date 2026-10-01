@@ -96,8 +96,9 @@ impl Renderer {
         self.draw_stack(view, scene, pass);
 
         // The in-game UI over the finished frame (#418): after post-FX, so a HUD
-        // is never tonemapped, bloomed or FXAA-softened. Not in the Scene view.
-        if !editor_mode {
+        // is never tonemapped, bloomed or FXAA-softened. Not in the Scene view
+        // unless its UI overlay is on (#423).
+        if !editor_mode || view.ui.screen_in_editor {
             self.draw_ui(view);
         }
         self.finish_counters(view);

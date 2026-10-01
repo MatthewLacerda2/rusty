@@ -6,6 +6,7 @@
 
 use glam::Vec2;
 
+use super::sizes::layout_children;
 use super::{child_node, group, root_canvas_of, root_node, UiRect};
 use crate::ecs::World;
 use crate::ui::UiView;
@@ -37,4 +38,12 @@ pub fn rect_in(world: &World, id: u32, view: &UiView) -> Option<UiRect> {
         parent = link;
     }
     Some(node.rect)
+}
+
+/// Whether the layout group on `id`'s parent places it — its anchors, position and
+/// size are then driven, and the editor shows them read-only, as Unity does (#423).
+pub fn driven_by_group(world: &World, id: u32) -> bool {
+    world
+        .parent_id(id)
+        .is_some_and(|p| world.layout_group(p).is_some() && layout_children(world, p).contains(&id))
 }

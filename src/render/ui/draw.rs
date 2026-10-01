@@ -62,6 +62,10 @@ pub struct UiViewCache {
     pub(super) drawn: usize,
     /// The world canvases' per-camera uniforms (#429), made on first use.
     pub(super) world: Option<WorldUniforms>,
+    /// Draw the screen-space canvases in an editor-mode (Scene view) render too —
+    /// the Scene tab's UI overlay toggle (#423). Off: the Scene view shows only
+    /// world canvases.
+    pub screen_in_editor: bool,
 }
 
 impl UiViewCache {
@@ -171,9 +175,14 @@ impl Renderer {
         let meshes = build_canvas_meshes(&scene.world, &layout, screen, &tex_size, atlases);
         self.ui_renderer.upload_atlases(&self.device, &self.queue);
         let world = &scene.world;
+        let overlay = view.ui.screen_in_editor;
         let meshes = meshes
             .into_iter()
-            .filter(|m| !editor_mode || world.canvas(m.canvas).is_some_and(|c| c.is_world_space()))
+            .filter(|m| {
+                !editor_mode
+                    || overlay
+                    || world.canvas(m.canvas).is_some_and(|c| c.is_world_space())
+            })
             .map(|m| {
                 let place = CanvasPlace {
                     space: layout.space(m.canvas),
