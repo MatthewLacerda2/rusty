@@ -8,7 +8,7 @@ use super::bake_tests::{lua_with_sound, tmp, IMPACT_PATCH};
 
 /// Write interleaved 16-bit `samples` as a 44.1 kHz WAV — the bare RIFF header,
 /// so a test can hand `Sound.Level` a signal of exactly known amplitude.
-fn write_wav(name: &str, channels: u16, samples: &[i16]) -> String {
+pub(super) fn write_wav(name: &str, channels: u16, samples: &[i16]) -> String {
     let (rate, data) = (44_100u32, (samples.len() * 2) as u32);
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"RIFF");
