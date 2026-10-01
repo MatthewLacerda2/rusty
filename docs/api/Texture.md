@@ -92,7 +92,18 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   second-nearest point, `edges` is F2 − F1 — ~0 on cell borders: cracks, dried mud,
   cobble outlines; `randomness` 0 is a regular grid, 1 full jitter); `gradient
   {kind="linear"|"linear_tiling"|"radial"}`; `wave {kind="bands"|"rings", frequency}`;
-  `brick {rows, cols, mortar}`; `checker {tiles, color_a, color_b}`; `white_noise`.
+  `brick {rows, cols, mortar=0.05, output="mask"|"random"|"bevel"}` (`mortar` is the
+  gap as a fraction of one brick, reading 0 in every output; `mask` is 1 on brick
+  faces, `random` a seeded value per brick — feed a `color_ramp` for per-brick colour
+  or roughness variation — and `bevel` a ramp from 0 at the mortar to 1 on the brick's
+  centre line, a rounded-brick height for `bump_to_normal`); `shape
+  {kind="circle"|"rect"|"rounded_rect"|"line", size=[w,h], roundness=0.25,
+  softness=0}` (one shape centred in the tile, 1 inside and 0 outside: `circle` is the
+  ellipse filling `size`, `line` a horizontal stroke `w` long and `h` thick with round
+  caps — turn it with `mapping {rotation = 0.25}`; `roundness` 0–1 rounds a
+  `rounded_rect`'s corners; `softness > 0` ramps the edge from 0 to 1 that far inside,
+  a bevel profile for `bump_to_normal`); `checker {tiles, color_a, color_b}`;
+  `white_noise`.
 - **Color** (1 input, 2 for `mix`): `color_ramp {stops}`; `mix {mode, factor}` with
   `mode` ∈ `mix/add/multiply/screen/overlay/subtract/difference`; `invert`;
   `bright_contrast {bright, contrast}`; `hue_sat_value {hue, sat, value}`; `gamma
@@ -103,7 +114,14 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   RGB); `separate_rgb {channel=0..3}`; `warp {strength}` (2 inputs: samples input 1
   displaced by input 2's R/G, centred on 0.5 so mid-grey moves nothing; `strength` is in
   tile units; feed input 2 a `combine_rgb` of two different noises — a grayscale one has
-  R = G and only pushes along the diagonal).
+  R = G and only pushes along the diagonal); `tile {count, jitter=0, rotation_jitter=0,
+  scale_jitter=0}` (1 input: stamps the input once per cell of a `count`×`count` grid;
+  each cell is seeded from the recipe `seed` with an offset of up to ±`jitter`/2 cells,
+  a turn of up to ±`rotation_jitter`/2 turns and a scale in `1 ± scale_jitter/2`, each
+  jitter clamped to 0–1. The input is read as **one stamp** — the unit square, nothing
+  outside it — so give it empty margins (a `shape` smaller than the tile); a stamp
+  pushed over its cell's border is drawn into the neighbour cell, and overlapping
+  stamps keep the brighter value per channel. Rivets are `shape circle` → `tile`).
 - **Converter / math**: `math {func, value}` with `func` ∈
   `add/subtract/multiply/divide/power/min/max/abs/fract/sqrt`; `map_range {from_min,
   from_max, to_min, to_max}`; `clamp {min, max}`; `rgb_to_bw`.
@@ -121,6 +139,7 @@ field stays a number, so `4.5` is accepted — it bakes as `5`):
 | wave | `frequency` | nearest whole number ≥ 1 |
 | brick | `cols` | nearest whole number ≥ 1 |
 | brick | `rows` | nearest **even** number ≥ 2 (the half-brick offset must close at the wrap) |
+| tile | `count` | nearest whole number ≥ 1 |
 | checker | `tiles` | up to **even** (an odd count puts two same-colour squares together at the wrap) |
 | mapping (`tiling = true`) | `scale` | nearest whole number ≥ 1 per axis |
 | mapping (`tiling = true`) | `rotation` | nearest quarter turn |
@@ -129,7 +148,8 @@ field stays a number, so `4.5` is accepted — it bakes as `5`):
 maps that are never tiled; it opens a seam. `gradient linear` (0→1 left to right) is
 the one generator that does **not** tile — it has a hard edge at the wrap; use it under
 a mask, or use `linear_tiling` (0→1→0) for a seamless ramp. `gradient radial` and
-`wave rings` meet the edge mirror-symmetrically: continuous across the seam.
+`wave rings` meet the edge mirror-symmetrically: continuous across the seam, and so
+does `shape` (a shape larger than the tile is clipped at the edge, symmetrically).
 
 ### Units
 
@@ -142,6 +162,8 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
   `strength / 2` of a tile.
 - `bump_to_normal.strength` scales the slope measured in tile units (height change
   across one whole tile), not per pixel.
+- `shape.size` and `shape.softness` are in tiles (`size = [0.5, 0.5]` is half the
+  tile each way); under `tile`, that is a fraction of one cell.
 - `white_noise` is the exception: its grain is one pixel by definition.
 
 **Migration (#392, #394).** Recipes written before these changes bake differently:
@@ -164,4 +186,21 @@ Texture.Bake({
   },
   output = "mr",
 }, "out/crate_mr.png", "metallic_roughness")
+```
+
+Example — a riveted floor plate's normal map: a bevelled rounded panel with a
+jittered grid of domed rivets added on top at half height, turned into normals:
+
+```lua
+Texture.Bake({
+  resolution = 512, seed = 3,
+  nodes = {
+    { id = "panel", op = "shape", kind = "rounded_rect", size = {0.92, 0.92}, softness = 0.03 },
+    { id = "dot", op = "shape", kind = "circle", size = {0.3, 0.3}, softness = 0.12 },
+    { id = "rivets", op = "tile", count = 8, jitter = 0.1, inputs = {"dot"} },
+    { id = "height", op = "mix", mode = "add", factor = 0.5, inputs = {"panel", "rivets"} },
+    { id = "n", op = "bump_to_normal", strength = 0.4, inputs = {"height"} },
+  },
+  output = "n",
+}, "out/plate_n.png", "normal")
 ```

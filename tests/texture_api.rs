@@ -83,3 +83,28 @@ fn bake_json_matches_bake_table() {
     std::fs::remove_file(from_table).ok();
     std::fs::remove_file(from_json).ok();
 }
+
+#[test]
+fn the_documented_riveted_plate_bakes() {
+    let lua = Lua::new();
+    rusty::api::texture::register(&lua).unwrap();
+    let path = tmp("rusty_texture_api_plate_n.png");
+    // docs/api/Texture.md's hard-surface example, at a test-sized resolution.
+    let script = format!(
+        r#"return Texture.Bake({{
+          resolution = 32, seed = 3,
+          nodes = {{
+            {{ id = "panel", op = "shape", kind = "rounded_rect", size = {{0.92, 0.92}}, softness = 0.03 }},
+            {{ id = "dot", op = "shape", kind = "circle", size = {{0.3, 0.3}}, softness = 0.12 }},
+            {{ id = "rivets", op = "tile", count = 8, jitter = 0.1, inputs = {{"dot"}} }},
+            {{ id = "height", op = "mix", mode = "add", factor = 0.5, inputs = {{"panel", "rivets"}} }},
+            {{ id = "n", op = "bump_to_normal", strength = 0.4, inputs = {{"height"}} }},
+          }},
+          output = "n",
+        }}, "{path}", "normal")"#
+    );
+    let out: String = lua.load(&script).eval().unwrap();
+    assert_eq!(out, path);
+    assert!(image::open(&path).is_ok(), "baked PNG decodes");
+    std::fs::remove_file(path).ok();
+}
