@@ -66,8 +66,9 @@ pub enum PreviewSubject {
     /// this module. The scene itself carries only the default material; the render
     /// call swaps the pipeline's shader (see `render_preview_scene` in `main.rs`).
     Shader(String),
-    /// An already-resolved material asset (from the entity's `MaterialComponent`
-    /// card, since materials have no on-disk file to dispatch on).
+    /// An already-resolved material asset — from the entity's `MaterialComponent`
+    /// card, or looked up by name by `Debug.PreviewMaterial` (#404) — since materials
+    /// have no on-disk file to dispatch on.
     Material(Box<MaterialAsset>),
 }
 

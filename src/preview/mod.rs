@@ -27,7 +27,8 @@ pub use scene::{build_preview_scene, PreviewMesh, PreviewSubject, SUZANNE_PATH};
 /// `extension` is matched case-insensitively. [`PreviewSubject::Material`] is absent
 /// by construction: a material asset lives in `Scene::materials` and has no file on
 /// disk to dispatch on, so it is only ever selected directly (the Material component
-/// card builds it from the entity's `MaterialComponent`).
+/// card builds it from the entity's `MaterialComponent`; `Debug.PreviewMaterial` from
+/// the library by name, #404).
 pub fn subject_for_path(path: &str) -> Option<PreviewSubject> {
     let extension = std::path::Path::new(path)
         .extension()
