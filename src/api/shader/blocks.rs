@@ -50,7 +50,7 @@ fn default<'lua>(lua: &'lua Lua, p: &Param) -> mlua::Result<Value<'lua>> {
     if p.arity == 1 {
         return Ok(Value::Number(d));
     }
-    Ok(Value::Table(lua.create_sequence_from(
-        std::iter::repeat(d).take(p.arity),
-    )?))
+    Ok(Value::Table(
+        lua.create_sequence_from(std::iter::repeat_n(d, p.arity))?,
+    ))
 }
