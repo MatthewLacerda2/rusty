@@ -6,6 +6,7 @@
 //! swapchain (#183). Built only with the `editor` Cargo feature, which is what keeps
 //! egui out of a shipped player.
 
+mod cursor_release;
 mod game_focus;
 mod paint;
 mod viewport;
@@ -18,6 +19,7 @@ use super::frame::Host;
 use super::{boot, Frontend, Shell};
 use crate::app::{GameWorld, PlayTransition};
 use crate::core::application::BUILD_SETTINGS_PATH;
+use crate::core::input::CursorState;
 use crate::core::video::VideoSettings;
 use crate::editor::{EditorUi, ViewportInteraction, ViewportTab};
 use crate::render::RenderView;
@@ -43,6 +45,8 @@ pub struct EditorFrontend {
     preview_view: Option<RenderView>,
     /// Whether the Game view has input focus (#416; see `game_focus`).
     game_focused: bool,
+    /// Whether Esc has freed the cursor over the game's lock (#576).
+    cursor_release: cursor_release::CursorRelease,
     /// Where the Game view sat last frame, for mapping the pointer; `None` while the
     /// Scene tab is showing.
     game_view: Option<GameViewRect>,
@@ -81,6 +85,7 @@ impl EditorFrontend {
             preview_texture_id: None,
             preview_view: None,
             game_focused: false,
+            cursor_release: Default::default(),
             game_view: None,
             scene_id: None,
         }
@@ -196,14 +201,18 @@ impl Frontend for EditorFrontend {
         self.focus_on_transition(transition);
     }
 
-    /// ESC in Play stops it — the editor's way back to edit mode.
+    /// The game's request, unless Esc freed the cursor (#576).
+    fn cursor(&self, game: &GameWorld) -> CursorState {
+        let requested = game.input().borrow().cursor();
+        self.cursor_release
+            .effective(requested, self.game_has_input(game))
+    }
+
+    /// Esc in Play frees the cursor and still reaches the game (Unity's behaviour);
+    /// Ctrl/Cmd+P or the toolbar stops Play.
     fn on_key(&mut self, game: &mut GameWorld, key: KeyCode, pressed: bool) {
-        if key == KeyCode::Escape && pressed && game.is_playing() {
-            game.set_playing(false);
-            game.console()
-                .borrow_mut()
-                .info("Unlocked cursor, entering EditorMode".to_string());
-        }
+        let has_input = self.game_has_input(game);
+        self.cursor_release.on_key(key, pressed, has_input);
     }
 
     fn draw(

@@ -134,6 +134,11 @@ fn config_menu(editor: &mut EditorUi, ui: &mut egui::Ui) {
     });
 }
 
+/// Ctrl+P (Cmd+P on macOS) toggles Play, as in Unity (#576). Esc does not stop Play:
+/// in the Game view it frees the cursor and reaches the game.
+const PLAY_SHORTCUT: egui::KeyboardShortcut =
+    egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::P);
+
 /// Minimal transport row: Play / Stop + the current mode label.
 fn draw_transport(
     editor: &mut EditorUi,
@@ -142,6 +147,8 @@ fn draw_transport(
     is_playing: &mut bool,
 ) {
     let t = editor.theme;
+    let toggled = ui.input_mut(|i| i.consume_shortcut(&PLAY_SHORTCUT));
+    let shortcut = ui.ctx().format_shortcut(&PLAY_SHORTCUT);
     ui.horizontal(|ui| {
         let play_btn = if *is_playing {
             egui::Button::new(
@@ -155,8 +162,11 @@ fn draw_transport(
                 egui::RichText::new(format!("{}  Play", icon::PLAY)).color(t.text_secondary),
             )
         };
-        if ui.add(play_btn).clicked() {
+        let play = ui.add(play_btn).on_hover_text(format!("Play ({shortcut})"));
+        if play.clicked() || (toggled && !*is_playing) {
             *is_playing = true;
+        } else if toggled {
+            stop(editor, scene, is_playing);
         }
 
         let stop_btn = if !*is_playing {
@@ -171,10 +181,9 @@ fn draw_transport(
                 egui::RichText::new(format!("{}  Stop", icon::STOP)).color(t.text_secondary),
             )
         };
-        if ui.add(stop_btn).clicked() {
-            *is_playing = false;
-            scene.selected_entity_id = None;
-            editor.selected_entity_id = None;
+        let stop_hint = format!("Stop ({shortcut})");
+        if ui.add(stop_btn).on_hover_text(stop_hint).clicked() {
+            stop(editor, scene, is_playing);
         }
 
         ui.separator();
@@ -187,6 +196,13 @@ fn draw_transport(
             }
         ));
     });
+}
+
+/// Leave Play, dropping a selection that names an entity of the play copy.
+fn stop(editor: &mut EditorUi, scene: &mut Scene, is_playing: &mut bool) {
+    *is_playing = false;
+    scene.selected_entity_id = None;
+    editor.selected_entity_id = None;
 }
 
 /// The About modal window. Toggled from the About menu.
