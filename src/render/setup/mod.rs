@@ -183,7 +183,7 @@ impl Renderer {
             global_bind_group: global.global_bind_group,
             global_bind_group_dirty: false,
             draw_buffers,
-            materials: Default::default(),
+            materials: crate::render::gpu::material_cache::MaterialCache::new(textures.zero_params),
             surface_shaders,
             instancing: true,
             shadow_layout: shadows.layout,
