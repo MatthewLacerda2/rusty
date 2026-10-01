@@ -37,8 +37,50 @@ pub fn pip_scene(target: Option<RenderTarget>) -> Scene {
     scene
 }
 
+/// No UI: a big monitor box 14 m in front of the screen camera whose emissive map is
+/// `"rt:pip"`, and a texture camera that looks at the red box — and whose texture
+/// is on a surface it is itself drawn with (the feedback case).
+pub fn monitor_scene() -> Scene {
+    let mut scene = pip_scene(Some(RenderTarget::new("pip", 64, 64)));
+    let ui: Vec<u32> = ["Canvas", "Pip"]
+        .iter()
+        .filter_map(|n| scene.find_entity_by_name(n))
+        .collect();
+    for id in ui {
+        scene.world.set_active(id, false);
+    }
+    let monitor = add_box(&mut scene, "Monitor", "screen");
+    let mut t = scene.world.transform_mut(monitor).expect("transform");
+    // Box meshes share one geometry by primitive name, so size it by scale.
+    (t.position, t.scale) = (Vec3::new(0.0, 0.0, 20.0), Vec3::new(4.0, 4.0, 0.25));
+    drop(t);
+    let screen = MaterialAsset {
+        base_color: [0.0, 0.0, 0.0],
+        emissive: [1.0, 1.0, 1.0],
+        emissive_map: Some("rt:pip".to_string()),
+        ..Default::default()
+    };
+    scene.materials.insert("screen".to_string(), screen);
+    // The red box also wears the texture: the camera samples what it draws.
+    if let Some(red) = scene.materials.get_mut("red") {
+        red.base_color_map = Some("rt:pip".to_string());
+    }
+    scene
+}
+
 fn add_red_box(scene: &mut Scene) {
-    let id = scene.add_entity("Box".to_string());
+    add_box(scene, "Box", "red");
+    let red = MaterialAsset {
+        base_color: [1.0, 0.0, 0.0],
+        emissive: [1.0, 0.0, 0.0],
+        ..Default::default()
+    };
+    scene.materials.insert("red".to_string(), red);
+}
+
+/// A 2 m box wearing `material`.
+fn add_box(scene: &mut Scene, name: &str, material: &str) -> u32 {
+    let id = scene.add_entity(name.to_string());
     let (vertices, indices) = rusty::components::mesh::primitives::generate_box(2.0, 2.0, 2.0);
     let mesh = MeshComponent {
         primitive_type: "Box".to_string(),
@@ -53,15 +95,10 @@ fn add_red_box(scene: &mut Scene) {
     };
     scene.world.set_mesh(id, Some(mesh));
     let material = MaterialComponent {
-        material: "red".to_string(),
+        material: material.to_string(),
     };
     scene.world.set_material(id, Some(material));
-    let red = MaterialAsset {
-        base_color: [1.0, 0.0, 0.0],
-        emissive: [1.0, 0.0, 0.0],
-        ..Default::default()
-    };
-    scene.materials.insert("red".to_string(), red);
+    id
 }
 
 /// A canvas one reference unit per pixel, with the Image over the left half.

@@ -5,7 +5,7 @@ use rusty::components::RenderTarget;
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
 
-use super::render_texture_scene::{pip_scene, screen_camera, SIZE};
+use super::render_texture_scene::{monitor_scene, pip_scene, screen_camera, SIZE};
 
 /// Red-dominant: the box, seen through the texture.
 fn is_red(px: [u8; 3]) -> bool {
@@ -76,4 +76,29 @@ fn update_every_skips_frames_between_draws() {
         assert!(is_red(img.get_pixel(32, 64).0), "frame {}", draws.len());
     }
     assert_eq!(draws, [1, 0, 1]);
+}
+
+#[test]
+fn a_material_map_shows_it_on_an_in_world_monitor() {
+    let path = std::env::temp_dir().join("rusty_render_texture_monitor.png");
+    let mut host = CaptureHost::new();
+    // Two frames: the second also samples a texture the camera drew the frame before.
+    for _ in 0..2 {
+        let shot = capture_into(
+            &mut host,
+            &monitor_scene(),
+            &screen_camera(),
+            &path,
+            SIZE,
+            SIZE,
+        );
+        if !shot.expect("capture must not error") {
+            return;
+        }
+    }
+    let img = image::open(&path).expect("png").to_rgb8();
+    let centre = img.get_pixel(SIZE / 2, SIZE / 2).0;
+    assert!(is_red(centre), "monitor centre: got {centre:?}");
+    let (counters, _) = host.last_frame.expect("a frame was drawn");
+    assert_eq!(counters.render_texture_draws, 1);
 }

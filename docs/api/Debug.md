@@ -131,7 +131,8 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
   "rigidbody": { "active": true, "is_kinematic": false, "mass": .., "velocity": [x,y,z],
                  "use_gravity": true },
   "camera":    { "active": true, "fov": .., "near": .., "far": .., "culling_mask": ..,
-                 "render_order": 0 },
+                 "render_order": 0, "projection": "Perspective",
+                 "target_texture": null },                      // or "rt:<name>" (#430)
   "nav_agent": { "active": true, "radius": .., "target": [x,y,z], "speed": .., .. },
   "particles": { "active": true, "texture": null, "rate": .., "lifetime": .., .. },
   "animator":  { "clip": "Idle", "time": .., "speed": .., "playing": true,
