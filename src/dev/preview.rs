@@ -21,9 +21,11 @@
 //!
 //! Allowed deps: preview, render (headless path).
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use super::capture::CaptureHost;
+use crate::components::MaterialAsset;
 use crate::preview::{self, OrbitState, PreviewMesh, PreviewSubject};
 
 /// Default edge length of a preview shot. Square, like every reference engine's
@@ -76,13 +78,52 @@ pub fn capture_asset_into(
     options: PreviewOptions,
 ) -> Result<bool, String> {
     let subject = resolve_subject(asset_path)?;
-    let scene = preview::build_preview_scene(options.mesh, &subject);
+    capture_subject_into(host, &subject, asset_path, out_png.as_ref(), options)
+}
+
+/// Render the material asset `name` from `materials` (the live scene's library) into
+/// a PNG at `out_png` (#404) — the headless twin of the Material card's Preview tab,
+/// which builds the very same [`PreviewSubject::Material`]. The asset renders through
+/// the ordinary forward path, so its authored `shader`, runtime `shader_params` and
+/// extra `shader_textures` (the `mask` slot) all apply exactly as on an entity.
+///
+/// Same return contract as [`capture_asset_into`]; a name the library doesn't hold
+/// is the caller error.
+pub fn capture_material(
+    materials: &BTreeMap<String, MaterialAsset>,
+    name: &str,
+    out_png: impl AsRef<Path>,
+    options: PreviewOptions,
+) -> Result<bool, String> {
+    let material = materials
+        .get(name)
+        .ok_or_else(|| format!("no material asset named {name:?} in the scene's library"))?;
+    let subject = PreviewSubject::Material(Box::new(material.clone()));
+    let label = format!("material {name:?}");
+    capture_subject_into(
+        &mut CaptureHost::new(),
+        &subject,
+        &label,
+        out_png.as_ref(),
+        options,
+    )
+}
+
+/// The shared tail of every capture: build the isolated scene for `subject`, render
+/// it at the fixed framing, and write the PNG. `label` names the subject in the
+/// no-adapter warning.
+fn capture_subject_into(
+    host: &mut CaptureHost,
+    subject: &PreviewSubject,
+    label: &str,
+    out_png: &Path,
+    options: PreviewOptions,
+) -> Result<bool, String> {
+    let scene = preview::build_preview_scene(options.mesh, subject);
     let resolution = options.clamped_resolution();
 
     let Some((renderer, view)) = host.frame(resolution, resolution) else {
-        log::warn!(
-            "[Preview] no GPU/software adapter available — skipping preview of {asset_path}"
-        );
+        log::warn!("[Preview] no GPU/software adapter available — skipping preview of {label}");
         return Ok(false);
     };
     let Some(target_view) = view.color_target_view() else {
@@ -92,7 +133,7 @@ pub fn capture_asset_into(
 
     // The shader arm draws with the previewed module as this view's forward pipeline —
     // the same call the editor tab makes; every other subject renders the stock one.
-    match &subject {
+    match subject {
         PreviewSubject::Shader(path) => {
             renderer.render_preview_with_shader(view, &scene, &camera, &target_view, path);
         }

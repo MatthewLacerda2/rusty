@@ -12,6 +12,7 @@ because the namespace is absent.
 | `Debug.Snapshot` | `()` | a pretty **JSON string**: the whole live world (below) |
 | `Debug.SnapshotEntity` | `(id)` | a pretty **JSON string**: one entity (below), or `null` if absent |
 | `Debug.Preview` | `(asset_path, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
+| `Debug.PreviewMaterial` | `(name, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
 | `Debug.Stats` | `()` | a **table**: the frame stats — timings and counters (below) |
 
 ### The preview — eyes on an authored asset (#353)
@@ -33,8 +34,24 @@ Debug.Preview("project/assets/brick.png", "out/brick.png", { mesh = "cube", reso
 **Previewable kinds** — the same set the Inspector tab accepts, dispatched on the file
 extension: models (`gltf` / `glb` / `obj` / `fbx`, rendered as themselves), textures
 (`png` / `tga` / `jpg` / `jpeg`, applied as the base-color map), and shaders (`wgsl`,
-which shades the stand-in mesh). Material assets have no on-disk file, so they are
-previewable only from their Inspector card, not through this path-based call.
+which shades the stand-in mesh). Material assets have no on-disk file, so they have
+their own call, below.
+
+**Material assets — `Debug.PreviewMaterial(name, out_png [, opts])`** (#404) renders a
+named asset from the scene's material library (anything `Material.DefineAsset` defined,
+or a glTF import brought in) on the stand-in mesh — the same picture its Inspector
+Material card shows in its Preview tab. It is the assembled result, every map at once:
+albedo, metallic/roughness, normal and emissive maps, the render mode, and the authored
+`shader` with its stored runtime params (`Material.SetShaderParam` values, else the
+baked defaults) and its extra texture slots such as `mask`. An `rt:<name>` render
+texture in any slot samples **white** here: the preview scene is isolated and has no
+camera drawing that texture. A name the library doesn't hold raises, naming it.
+
+```lua
+-- define -> look -> iterate
+Material.DefineAsset("brick", { base_color_map = "brick_albedo.png", roughness = 0.8 })
+Debug.PreviewMaterial("brick", "out/brick_mat.png", { mesh = "cube" })
+```
 
 **Options** (all optional): `mesh` is `"sphere"` (default), `"cube"` or `"suzanne"` and
 is ignored for models; `resolution` is the square output's edge in pixels (default

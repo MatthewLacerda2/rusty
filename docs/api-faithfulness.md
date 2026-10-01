@@ -431,12 +431,13 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 | Setter | Status | Read-site |
 |---|---|---|
 | `Log` / `Warn` / `Error` | ✅ | sim — appends to the console buffer the REPL/overlay render |
+| `PreviewMaterial` | ✅ | reads `Scene.materials[name]` into `preview::build_preview_scene`'s `PreviewSubject::Material` — the Inspector Material card's one read-site — and renders it through the ordinary forward path (`tests/gpu/preview_material.rs`, #404) |
 
 ## Summary
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 121 |
+| ✅ faithful | 122 |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 

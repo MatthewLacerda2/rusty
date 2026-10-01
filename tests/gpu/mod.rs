@@ -27,6 +27,7 @@ mod particle_soft_lit_screenshot;
 mod postfx_blocks_screenshot;
 mod postfx_screenshot;
 mod preview_api;
+mod preview_material;
 mod render_texture_scene;
 mod render_texture_screenshot;
 mod ribbons_screenshot;

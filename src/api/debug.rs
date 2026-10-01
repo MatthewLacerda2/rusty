@@ -1,7 +1,8 @@
 //! src/api/debug.rs — `Debug` namespace (DEV-ONLY).
 //!
 //! `Debug.Log/Warn/Error`, the structured scene-read `Debug.Snapshot` /
-//! `Debug.SnapshotEntity` (#180), the headless `Debug.Preview` asset shot (#353) and
+//! `Debug.SnapshotEntity` (#180), the headless `Debug.Preview` asset shot (#353) and its
+//! named-material twin `Debug.PreviewMaterial` (#404), and
 //! the frame stats `Debug.Stats` (#433) — the agent's observation channels:
 //! structured, visual, and performance. Registered
 //! only in dev builds — stripped from the shipped game, like Unity `Debug.*` under
@@ -10,7 +11,7 @@
 use mlua::{Lua, Table};
 
 use super::{put, snapshot, ApiScopedCtx, Reg};
-use crate::dev::preview::{capture_asset, PreviewOptions};
+use crate::dev::preview::{capture_asset, capture_material, PreviewOptions};
 use crate::preview::PreviewMesh;
 use crate::ui::UiView;
 
@@ -25,6 +26,7 @@ pub fn register<'lua, 'scope>(
     register_logging(scope, &table, ctx.console)?;
     register_snapshot(scope, &table, ctx)?;
     register_preview(lua, &table)?;
+    register_preview_material(scope, &table, ctx.scene)?;
     register_stats(scope, &table, ctx.stats)?;
 
     lua.globals().set("Debug", table).map_err(|e| e.to_string())
@@ -94,6 +96,30 @@ fn register_preview(lua: &Lua, table: &Table) -> Reg {
             |_, (asset_path, out_png, opts): (String, String, Option<Table>)| {
                 let options = preview_options(opts.as_ref())?;
                 let written = capture_asset(&asset_path, &out_png, options)
+                    .map_err(mlua::Error::RuntimeError)?;
+                Ok(written.then_some(out_png))
+            },
+        ),
+    )
+}
+
+/// `Debug.PreviewMaterial(name, out_png [, opts])` — the material-asset arm of
+/// `Debug.Preview` (#404). Material assets live in the scene's library, not on disk,
+/// so this one borrows the scene to look `name` up (a name it doesn't hold raises),
+/// then renders the copy in the same isolated preview scene as the Inspector's
+/// Material card. Same options and the same `nil`-without-a-GPU return.
+fn register_preview_material<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &Table,
+    scene: &'scope std::cell::RefCell<crate::scene::Scene>,
+) -> Reg {
+    put(
+        table,
+        "PreviewMaterial",
+        scope.create_function(
+            move |_, (name, out_png, opts): (String, String, Option<Table>)| {
+                let options = preview_options(opts.as_ref())?;
+                let written = capture_material(&scene.borrow().materials, &name, &out_png, options)
                     .map_err(mlua::Error::RuntimeError)?;
                 Ok(written.then_some(out_png))
             },
