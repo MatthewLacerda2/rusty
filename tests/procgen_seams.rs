@@ -128,3 +128,22 @@ fn mapping_keeps_a_seamless_input_seamless() {
         assert_seamless(&format!("mapping {scale:?} {rotation}"), &img);
     }
 }
+
+#[test]
+fn height_ops_keep_a_seamless_height_seamless() {
+    let height = OpKind::Brick {
+        rows: 6.0,
+        cols: 3.0,
+        mortar: 0.08,
+        output: rusty::procgen::recipe::BrickOutput::Mask,
+    };
+    let curvature = OpKind::Curvature {
+        radius: 0.03,
+        strength: 2.0,
+    };
+    for op in [OpKind::Cavity { radius: 0.05 }, curvature] {
+        let label = format!("{op:?}");
+        let img = bake(vec![node("h", height.clone(), &[]), node("m", op, &["h"])]);
+        assert_seamless(&label, &img);
+    }
+}

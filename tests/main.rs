@@ -61,6 +61,7 @@ mod procgen_ops_math;
 mod procgen_organic;
 mod procgen_resolution;
 mod procgen_seams;
+mod procgen_weathering;
 mod proptest_scene;
 mod reflection_probes;
 mod ribbons;

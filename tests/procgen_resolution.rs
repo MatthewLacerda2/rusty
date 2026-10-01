@@ -115,3 +115,19 @@ fn mapping_resamples_bilinearly() {
         assert_resolution_independent(&format!("mapping tiling={tiling}"), &nodes, 0.01);
     }
 }
+
+#[test]
+fn height_op_radii_are_in_tile_units() {
+    let ops = [
+        OpKind::Cavity { radius: 0.04 },
+        OpKind::Curvature {
+            radius: 0.03,
+            strength: 3.0,
+        },
+    ];
+    for op in ops {
+        let label = format!("{op:?}");
+        let nodes = [perlin(4.0), node("c", op, &["n"])];
+        assert_resolution_independent(&label, &nodes, 0.02);
+    }
+}

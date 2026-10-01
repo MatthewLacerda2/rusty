@@ -144,8 +144,11 @@ end  -- rows number nil / cols number nil / mortar number 0.05
   `rounded_rect`'s corners; `softness > 0` ramps the edge from 0 to 1 that far inside,
   a bevel profile for `bump_to_normal`); `checker {tiles, color_a, color_b}`;
   `white_noise`.
-- **Color** (1 input, 2 for `mix`): `color_ramp {stops}`; `mix {mode, factor}` with
-  `mode` ∈ `mix/add/multiply/screen/overlay/subtract/difference`; `invert`;
+- **Color** (1 input; `mix` takes 2 or 3): `color_ramp {stops}`; `mix {mode,
+  factor=1}` with `mode` ∈ `mix/add/multiply/screen/overlay/subtract/difference` —
+  inputs `{a, b, mask}`: the result is `a` blended toward `mode(a, b)` by `factor`,
+  and an optional third input `mask` makes that per pixel (`factor × mask.red`; black
+  keeps `a`, white takes the full blend); `invert`;
   `bright_contrast {bright, contrast}`; `hue_sat_value {hue, sat, value}`; `gamma
   {gamma}`.
 - **Vector / normal**: `mapping {scale=[x,y], rotation, translation=[x,y],
@@ -165,7 +168,13 @@ end  -- rows number nil / cols number nil / mortar number 0.05
 - **Converter / math**: `math {func, value}` with `func` ∈
   `add/subtract/multiply/divide/power/min/max/abs/fract/sqrt`; `map_range {from_min,
   from_max, to_min, to_max}`; `clamp {min, max}`; `rgb_to_bw`.
-- **Filter**: `blur {radius}` (separable box blur; wraps, so it stays tiling).
+- **Filter**: `blur {radius}` (separable box blur; wraps, so it stays tiling);
+  `cavity {radius}` (height → `1 − max(blur(h) − h, 0)`: white on flat and raised
+  ground, dark in crevices — multiply into albedo for baked occlusion, `invert` it
+  for a dirt mask); `curvature {radius, strength=1}` (height → `0.5 + strength × (h −
+  mean of h on a ring radius away)`: above mid-grey on convex edges — edge wear —
+  below in concave grooves — grime; `map_range` it into a hard mask). Both read the
+  input's red as height and wrap, so the masks tile.
 
 ### Tiling
 
@@ -204,6 +213,8 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
   across one whole tile), not per pixel.
 - `shape.size` and `shape.softness` are in tiles (`size = [0.5, 0.5]` is half the
   tile each way); under `tile`, that is a fraction of one cell.
+- `cavity.radius` is a tile fraction like `blur.radius`; `curvature.radius` is a
+  distance in tiles, sampled bilinearly (so sub-pixel radii stay smooth).
 - `white_noise` is the exception: its grain is one pixel by definition.
 
 **Migration (#392, #394).** Recipes written before these changes bake differently:
@@ -243,4 +254,27 @@ Texture.Bake({
   },
   output = "n",
 }, "out/plate_n.png", "normal")
+```
+
+Example — worn, grimy painted metal: curvature finds the raised edges, a noisy mask
+chips the paint off them to show bare metal, and cavity darkens the grooves:
+
+```lua
+Texture.Bake({
+  resolution = 512, seed = 4,
+  nodes = {
+    { id = "h", op = "brick", rows = 4, cols = 2, mortar = 0.06 },        -- panel height
+    { id = "paint", op = "constant", color = {0.20, 0.32, 0.18, 1} },
+    { id = "metal", op = "constant", color = {0.55, 0.56, 0.58, 1} },
+    { id = "curv", op = "curvature", radius = 0.01, strength = 3, inputs = {"h"} },
+    { id = "edge", op = "map_range", from_min = 0.6, from_max = 0.7,
+      to_min = 0, to_max = 1, inputs = {"curv"} },
+    { id = "chips", op = "noise", kind = "fbm", scale = 8, octaves = 4 },
+    { id = "wear", op = "mix", mode = "multiply", inputs = {"edge", "chips"} },
+    { id = "worn", op = "mix", mode = "mix", inputs = {"paint", "metal", "wear"} },
+    { id = "cav", op = "cavity", radius = 0.02, inputs = {"h"} },
+    { id = "out", op = "mix", mode = "multiply", inputs = {"worn", "cav"} },
+  },
+  output = "out",
+}, "out/panel_albedo.png", "albedo")
 ```
