@@ -13,9 +13,15 @@
 // the scene (`world_ui.to_world`) and projected by the camera, drawn into the HDR
 // scene target before post-FX, depth-tested against the world and fogged like it
 // (the shared `fog_factor`, #437). The HDR target is linear, so the display-space
-// result is decoded before it fogs and blends. A scissor cannot follow a plane in
-// perspective, so a RectMask clips here instead (#619): each batch's clip arrives
-// as canvas-NDC bounds and a fragment outside them draws nothing.
+// result is decoded before it fogs and blends.
+//
+// Every batch, overlay or world, is clipped here per fragment (`clip_coverage`):
+// its RectMask bounds arrive as canvas-NDC bounds (#619 — a scissor cannot follow
+// a plane in perspective), softened over each edge's feather (#428), times the
+// nearest Mask's coverage texture (#428), sampled at the fragment's canvas
+// position. Batches with nothing to clip bind a white mask and unbounded bounds.
+// `fs_mask` renders a Mask's graphic into that texture; `fs_backdrop` (#426) shows
+// the blurred, filtered frame through a graphic's shape on overlay canvases.
 //
 // Text vertices (`sdf.x` = 1) sample a single-channel signed distance field
 // instead: 0.5 is the glyph edge and the field reaches SPREAD atlas pixels either
@@ -73,20 +79,32 @@ struct VertexOut {
     @location(14) stop_t: vec4<f32>,
 };
 
+// One batch's clip and backdrop: the RectMask bounds (canvas NDC: min.xy, max.xy),
+// each edge's feather (canvas NDC: left, bottom, right, top; 0 = hard), and a
+// backdrop's tint and [saturation, brightness].
+struct UiBatch {
+    clip: vec4<f32>,
+    feather: vec4<f32>,
+    tint: vec4<f32>,
+    grade: vec4<f32>,
+};
+
 // A world canvas's placement for one camera: canvas NDC → world, world → clip;
-// the camera position, the batch's clip (canvas NDC: min.xy, max.xy) and the
-// scene fog.
+// the camera position and the scene fog.
 struct WorldUi {
     view_proj: mat4x4<f32>,
     to_world: mat4x4<f32>,
     eye: vec4<f32>,
-    clip_rect: vec4<f32>,
     fog: Fog,
 };
 
 @group(0) @binding(0) var ui_texture: texture_2d<f32>;
 @group(0) @binding(1) var ui_sampler: sampler;
-@group(1) @binding(0) var<uniform> world_ui: WorldUi;
+@group(1) @binding(0) var<uniform> batch: UiBatch;
+@group(1) @binding(1) var mask_texture: texture_2d<f32>;
+@group(1) @binding(2) var backdrop_texture: texture_2d<f32>;
+@group(1) @binding(3) var effect_sampler: sampler;
+@group(2) @binding(0) var<uniform> world_ui: WorldUi;
 
 fn pass_through(in: VertexIn, clip: vec4<f32>, world: vec3<f32>) -> VertexOut {
     var out: VertexOut;
@@ -304,17 +322,52 @@ fn sdf_shape(in: VertexOut, d: f32, aa: f32) -> vec4<f32> {
     return premul(tint(in), body) + premul(in.outline, max(edge - body, 0.0));
 }
 
+// A canvas-NDC point → the uv of a texture covering the canvas (mask, backdrop).
+fn canvas_uv(p: vec2<f32>) -> vec2<f32> {
+    return vec2<f32>(p.x * 0.5 + 0.5, 0.5 - p.y * 0.5);
+}
+
+// How much of the batch shows at canvas-NDC `p`: inside the RectMask bounds (hard,
+// or faded over each edge's feather) times the Mask coverage there.
+fn clip_coverage(p: vec2<f32>) -> f32 {
+    let r = batch.clip;
+    let inside = vec4<f32>(p.x - r.x, p.y - r.y, r.z - p.x, r.w - p.y);
+    let f = batch.feather;
+    let hard = select(vec4<f32>(0.0), vec4<f32>(1.0), inside >= vec4<f32>(0.0));
+    let soft = clamp(inside / max(f, vec4<f32>(1e-6)), vec4<f32>(0.0), vec4<f32>(1.0));
+    let k = select(hard, soft, f > vec4<f32>(0.0));
+    let mask = textureSample(mask_texture, effect_sampler, canvas_uv(p)).r;
+    return k.x * k.y * k.z * k.w * mask;
+}
+
 @fragment
 fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
-    return shade(in);
+    return shade(in) * clip_coverage(in.canvas);
+}
+
+// A Mask's graphic into its coverage texture (R8): the graphic's alpha, clipped by
+// the masks above it (#428).
+@fragment
+fn fs_mask(in: VertexOut) -> @location(0) vec4<f32> {
+    return vec4<f32>(shade(in).a * clip_coverage(in.canvas), 0.0, 0.0, 0.0);
+}
+
+// A backdrop (#426): the blurred frame (display-encoded, read through a non-sRGB
+// view) through the graphic's shape — saturated, brightened, then tinted.
+@fragment
+fn fs_backdrop(in: VertexOut) -> @location(0) vec4<f32> {
+    let cover = shade(in).a * clip_coverage(in.canvas);
+    var c = textureSample(backdrop_texture, effect_sampler, canvas_uv(in.canvas)).rgb;
+    let luma = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
+    c = mix(vec3<f32>(luma), c, batch.grade.x) * batch.grade.y;
+    c = clamp(mix(c, batch.tint.rgb, batch.tint.a), vec3<f32>(0.0), vec3<f32>(1.0));
+    return vec4<f32>(c * cover, cover);
 }
 
 // Into the linear HDR target: un-premultiply, decode, fog, premultiply again.
 @fragment
 fn fs_world(in: VertexOut) -> @location(0) vec4<f32> {
-    let r = world_ui.clip_rect;
-    let inside = all(in.canvas >= r.xy) && all(in.canvas <= r.zw);
-    let c = shade(in) * select(0.0, 1.0, inside);
+    let c = shade(in) * clip_coverage(in.canvas);
     let rgb = select(c.rgb / max(c.a, 1e-6), vec3<f32>(0.0), c.a <= 0.0);
     let f = fog_factor(world_ui.fog, in.world, world_ui.eye.xyz);
     let lit = mix(decode_srgb(rgb), world_ui.fog.color, f);

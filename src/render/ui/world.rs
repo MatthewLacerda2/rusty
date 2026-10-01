@@ -13,13 +13,16 @@
 //! ([`CanvasSpace::World`]) and through the camera. They are rewritten per camera,
 //! never the vertex buffers, so a static sign uploads nothing while the view moves.
 //! A scissor cannot follow a plane in perspective, so `RectMask` clips in canvas
-//! space instead (#619): each batch gets its own uniform slot carrying its clip as
-//! NDC bounds, and the fragment shader drops what falls outside — the same space
-//! the hit-test checks masks in, so what draws is what is hit.
+//! space instead (#619): each batch binds its slot of the view's batch uniform
+//! (`effects`, shared with the overlay) carrying its clip as canvas-NDC bounds,
+//! feather and Mask texture (#428), and the fragment shader fades or drops what
+//! falls outside — the same space the hit-test checks masks in, so what draws is
+//! what is hit. A `BackdropFilter` is not drawn here (`effects::backdrop`).
 
-use glam::{Mat4, Vec2};
+use glam::Mat4;
 
-use super::draw::UiViewCache;
+use super::cache::UiViewCache;
+use super::effects::GroupKey;
 use crate::components::UiBlend;
 use crate::render::gpu::grow_buffer::GrowBuffer;
 use crate::render::gpu::uniforms::FogUniform;
@@ -35,13 +38,8 @@ struct WorldUiUniform {
     view_proj: [f32; 16],
     to_world: [f32; 16],
     eye: [f32; 4],
-    /// The batch's clip, canvas NDC `[min.x, min.y, max.x, max.y]`.
-    clip: [f32; 4],
     fog: FogUniform,
 }
-
-/// Bounds that clip nothing (a graphic may overflow its canvas's rect).
-const NO_CLIP: [f32; 4] = [-f32::MAX, -f32::MAX, f32::MAX, f32::MAX];
 
 /// The world pass's shared GPU state: its uniform layout and pipeline.
 pub(crate) struct WorldUiPipeline {
@@ -53,10 +51,11 @@ pub(crate) struct WorldUiPipeline {
 impl WorldUiPipeline {
     /// Build the pipelines, one per blend mode: into the HDR target, depth-tested
     /// (`LessEqual`) but never written, no culling (a canvas reads from both sides).
+    /// `shared` is the overlay's groups (texture, batch); the placement is group 2.
     pub(crate) fn new(
         device: &wgpu::Device,
         shader: &wgpu::ShaderModule,
-        texture_layout: &wgpu::BindGroupLayout,
+        shared: &[&wgpu::BindGroupLayout; 2],
     ) -> Self {
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("World UI Layout"),
@@ -75,7 +74,7 @@ impl WorldUiPipeline {
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("World UI Pipeline Layout"),
-            bind_group_layouts: &[texture_layout, &layout],
+            bind_group_layouts: &[shared[0], shared[1], &layout],
             push_constant_ranges: &[],
         });
         let build = |mode| build_pipeline(device, shader, &pipeline_layout, mode);
@@ -121,8 +120,8 @@ fn build_pipeline(
     })
 }
 
-/// A view's world-canvas uniforms: one aligned slot per canvas batch, rewritten
-/// per camera.
+/// A view's world-canvas uniforms: one aligned slot per canvas, rewritten per
+/// camera.
 pub(crate) struct WorldUniforms {
     buffer: GrowBuffer,
     group: wgpu::BindGroup,
@@ -150,19 +149,15 @@ impl Renderer {
         let mut bytes = Vec::new();
         let mut draws = Vec::new();
         for &(_, i, to_world) in &items {
-            let mesh = &view.ui.canvas(i).mesh;
-            for (b, batch) in mesh.batches.iter().enumerate() {
-                let u = WorldUiUniform {
-                    view_proj: view_proj.to_cols_array(),
-                    to_world: to_world.to_cols_array(),
-                    eye: cam.position.extend(1.0).to_array(),
-                    clip: batch.clip.map_or(NO_CLIP, |c| c.ndc(mesh.frame)),
-                    fog,
-                };
-                draws.push((i, b, bytes.len() as u32));
-                bytes.extend_from_slice(bytemuck::bytes_of(&u));
-                bytes.resize(bytes.len() + stride - slot, 0);
-            }
+            let u = WorldUiUniform {
+                view_proj: view_proj.to_cols_array(),
+                to_world: to_world.to_cols_array(),
+                eye: cam.position.extend(1.0).to_array(),
+                fog,
+            };
+            draws.push((i, bytes.len() as u32));
+            bytes.extend_from_slice(bytemuck::bytes_of(&u));
+            bytes.resize(bytes.len() + stride - slot, 0);
         }
         self.upload_world_uniforms(view, &bytes);
         view.ui.drawn += items.len();
@@ -204,58 +199,73 @@ impl Renderer {
         }
     }
 
-    /// Record and submit the world pass: `(canvas index, batch index, uniform
-    /// offset)` in draw order.
-    fn encode_world_ui(&self, view: &RenderView, draws: &[(usize, usize, u32)]) {
+    /// Record and submit the world pass: `(canvas index, placement offset)` in
+    /// draw order.
+    fn encode_world_ui(&self, view: &RenderView, draws: &[(usize, u32)]) {
         let ui = &self.ui_renderer;
         let Some(uniforms) = view.ui.world.as_ref() else {
             return;
         };
+        let batches = |i| view.ui.canvas(i).mesh.batches.iter();
+        let keys = draws
+            .iter()
+            .flat_map(|&(i, _)| batches(i).map(|b| GroupKey::of(b, None)));
+        let groups = self.batch_groups(&view.ui.effects, keys);
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("World UI Encoder"),
             });
         {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("World UI Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view.post_fx.scene_hdr.view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &view.depth_view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-            let (mut bound, mut blend) = (None, None);
-            for &(i, b, offset) in draws {
+            let mut pass = world_pass(&mut encoder, view);
+            let mut blend = None;
+            for &(i, offset) in draws {
                 let canvas = view.ui.canvas(i);
-                if bound != Some(i) {
-                    pass.set_vertex_buffer(0, canvas.buffer.slice(..));
-                    bound = Some(i);
+                pass.set_vertex_buffer(0, canvas.buffer.slice(..));
+                pass.set_bind_group(2, &uniforms.group, &[offset]);
+                for (b, batch) in canvas.mesh.batches.iter().enumerate() {
+                    if blend != Some(batch.blend) {
+                        pass.set_pipeline(&ui.world.pipelines[super::blend::index(batch.blend)]);
+                        blend = Some(batch.blend);
+                    }
+                    let slot = view.ui.effects.batch_offset(i, b);
+                    pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
+                    pass.set_bind_group(1, &groups[&GroupKey::of(batch, None)], &[slot]);
+                    pass.draw(batch.range.clone(), 0..1);
                 }
-                let batch = &canvas.mesh.batches[b];
-                if blend != Some(batch.blend) {
-                    pass.set_pipeline(&ui.world.pipelines[super::blend::index(batch.blend)]);
-                    blend = Some(batch.blend);
-                }
-                pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
-                pass.set_bind_group(1, &uniforms.group, &[offset]);
-                pass.draw(batch.range.clone(), 0..1);
             }
         }
         self.queue.submit(Some(encoder.finish()));
+    }
+}
+
+/// The world pass over `view`'s HDR scene colour and depth, both loaded.
+fn world_pass<'e>(
+    encoder: &'e mut wgpu::CommandEncoder,
+    view: &'e RenderView,
+) -> wgpu::RenderPass<'e> {
+    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("World UI Pass"),
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            view: &view.post_fx.scene_hdr.view,
+            resolve_target: None,
+            ops: keep(),
+        })],
+        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+            view: &view.depth_view,
+            depth_ops: Some(keep()),
+            stencil_ops: None,
+        }),
+        timestamp_writes: None,
+        occlusion_query_set: None,
+    })
+}
+
+/// Load and store: draw over what the camera's passes left.
+fn keep<T>() -> wgpu::Operations<T> {
+    wgpu::Operations {
+        load: wgpu::LoadOp::Load,
+        store: wgpu::StoreOp::Store,
     }
 }
 
@@ -278,18 +288,6 @@ fn world_items(cache: &UiViewCache, cam: &Camera) -> Vec<(f32, usize, Mat4)> {
             Some((centre.distance(cam.position), i, m * ndc))
         })
         .collect()
-}
-
-/// Where a synced canvas draws this frame — refreshed every frame, never part of
-/// the re-upload check (a moving world canvas re-uploads nothing).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct CanvasPlace {
-    /// Its reference units' space.
-    pub(crate) space: CanvasSpace,
-    /// Its root rect's size, reference units.
-    pub(crate) size: Vec2,
-    /// The canvas entity's layer (camera culling).
-    pub(crate) layer: u8,
 }
 
 #[cfg(test)]

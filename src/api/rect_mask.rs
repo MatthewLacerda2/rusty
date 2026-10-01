@@ -1,8 +1,8 @@
 //! src/api/rect_mask.rs — `RectMask` namespace (#418).
 //!
 //! Get/Set over an entity's `RectMaskComponent` (Unity's `RectMask2D`): the clip's
-//! `Padding` inset. Whether a mask exists is `Scene.AddComponent(id, "RectMask")` /
-//! `RemoveComponent`. The setter routes through the shared
+//! `Padding` inset and its soft-edge `Feather` (#428). Whether a mask exists is `Scene.AddComponent(id, "RectMask")` /
+//! `RemoveComponent`. The setters route through the shared
 //! `scene::authoring::rect_mask` op the inspector card uses.
 
 use std::cell::RefCell;
@@ -36,6 +36,24 @@ pub fn register<'lua, 'scope>(
         scope.create_function(|_, (id, l, b, r, t): (u32, f32, f32, f32, f32)| {
             if let Some(mut m) = scene.borrow_mut().world.rect_mask_mut(id) {
                 mask_ops::set_padding(&mut m, Vec4::new(l, b, r, t));
+            }
+            Ok(())
+        }),
+    )?;
+    put(
+        &table,
+        "GetFeather",
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
+            Ok(scene.world.rect_mask(id).map_or(0.0, |m| m.feather))
+        }),
+    )?;
+    put(
+        &table,
+        "SetFeather",
+        scope.create_function(|_, (id, feather): (u32, f32)| {
+            if let Some(mut m) = scene.borrow_mut().world.rect_mask_mut(id) {
+                mask_ops::set_feather(&mut m, feather);
             }
             Ok(())
         }),

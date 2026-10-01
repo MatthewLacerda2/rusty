@@ -388,6 +388,19 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 | Setter | Status | Read-site |
 |---|---|---|
 | `SetPadding` | ✅ | render — the subtree's scissor rect in `render::ui::mesh`; round-trips |
+| `SetFeather` | ✅ | render — the batch's soft clip (`render::ui::clip`, cut in `ui.wgsl`; `tests/gpu/ui_mask_screenshot.rs`); round-trips (`tests/ui_mask_api.rs`) |
+
+### `Mask` — over `Entity.mask` (#428)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetShowMaskGraphic` | ✅ | render — whether `render::ui::mesh` batches the mask's own graphic (`tests/gpu/ui_mask_screenshot.rs`); round-trips (`tests/ui_mask_api.rs`) |
+
+### `BackdropFilter` — over `Entity.backdrop_filter` (#426)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetBlurRadius` / `SetTint` / `SetSaturation` / `SetBrightness` | ✅ | render — the backdrop batch and its blur level in `render::ui::backdrop`, filtered in `ui.wgsl` (`tests/gpu/ui_backdrop_screenshot.rs`); round-trips (`tests/ui_mask_api.rs`) |
 
 ### `Text` — over `Entity.text` (#419)
 

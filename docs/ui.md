@@ -176,7 +176,7 @@ textures are sampled with linear filtering at their base level (no mips — UI d
 1:1, where mips only blur). A `Sliced`/`Tiled` image without a texture draws as `Simple`;
 a `Tiled` image caps itself at 1024 tiles by growing the tile.
 
-### `CanvasGroup` and `RectMask`
+### `CanvasGroup`, `RectMask` and `Mask`
 
 - **`CanvasGroup`** — `alpha` multiplies every graphic on the entity and below it;
   nested groups multiply (screen fades, disabled panels). `interactable = false`
@@ -184,8 +184,36 @@ a `Tiled` image caps itself at 1024 tiles by growing the tile.
   pass through the whole subtree (see *Interaction*).
 - **`RectMask`** — Unity's `RectMask2D`: the entity's own graphic and its whole subtree
   are clipped to the axis-aligned screen bounds of its rect, inset by `padding`; nested
-  masks intersect. The clip is a scissor rect, so a rotated mask clips to its bounding
-  box (as in Unity). Soft and shape masks are #428.
+  masks intersect. The clip is axis-aligned, so a rotated mask clips to its bounding
+  box (as in Unity). **`feather`** (reference units, #428) softens it: content fades
+  out over that distance inside each edge — the faded ends of a scrolling list. When
+  masks nest, each edge of the intersection keeps the feather of the mask it came
+  from, so a soft list inside a hard panel fades only at the list's own edges.
+- **`Mask`** (#428) — Unity's `Mask`: the subtree *below* the entity is clipped to
+  the entity's own graphic — its `Image`'s texture alpha times its colour alpha (an
+  entity without an `Image` masks to its rect). A circle sprite makes a round
+  minimap — an `Image` showing `"rt:minimap"` under a circle-sprite Mask — a
+  soft-edged sprite a feathered one, a `Filled` radial image a radial wipe.
+  `show_mask_graphic` (Unity's `showMaskGraphic`) says whether the mask's graphic
+  also draws; off, it only shapes the clip. Masks nest to any depth (they multiply)
+  and combine with every `RectMask` above. Hit-testing clips to the mask's rect —
+  Unity's rule — not its alpha: a click in a round minimap's corner still reaches it.
+  `Shape` graphics (#425) become mask graphics the same way once they land.
+- **`BackdropFilter`** (#426) — frosted glass, CSS's `backdrop-filter`: the frame
+  behind the entity's graphic is blurred by `blur_radius` (reference units), then
+  desaturated (`saturation`, 1 unchanged), multiplied by `brightness` and mixed
+  toward `tint` by its alpha, and shown through the graphic's shape (its `Image`'s
+  texture alpha, or its rect) *under* the graphic. The graphic's colour alpha does
+  not hide it — an `Image` with alpha 0 is pure glass, a dark half-transparent one
+  darkens it further — while a `CanvasGroup` fades it like any graphic. The pause
+  screen of a modern shooter: a full-screen panel with a 24-unit blur and a 0.25
+  black tint. **Screen-space (overlay) canvases only** — see *Masks and backdrops*
+  below.
+
+A separate `BackdropFilter` component rather than fields on `Image` keeps the cost
+visible where it is paid (one more batch, and the blur) and leaves `Image` the plain
+uGUI graphic; it works on any graphic that shapes it, `Shape` included once #425
+lands.
 
 ### `Text`
 
@@ -366,6 +394,48 @@ batch together as `Normal` solid geometry; the scan line's `Additive` is a new b
   changed (a layout or graphic change) and reallocated only when it outgrows its
   capacity, so a static HUD uploads nothing per frame.
 
+### Masks and backdrops
+
+Every batch — overlay or world — binds one **batch group** (`render::ui::effects`):
+its slot of the view's batch uniform (its `RectMask` bounds and per-edge feather in
+canvas NDC, a backdrop's tint and filter), the nearest `Mask`'s coverage texture, the
+blurred frame for a backdrop, and a sampler. The fragment shader multiplies every
+graphic by that clip's coverage (`clip_coverage` in `ui.wgsl`); a batch with no
+mask binds white. A change of mask, feather or backdrop breaks the batch like a
+change of clip.
+
+- **Hard rect clips** still also scissor on overlay canvases (cheap pixel
+  rejection); the shader's per-fragment cut is what clips a world canvas and what
+  feathers.
+- **`Mask`: a coverage texture, not the stencil.** Each visible Mask's graphic is
+  drawn into an R8 texture the size of its canvas's frame (the screen, or a world
+  canvas's own rect) before the camera stack, through `fs_mask`: the graphic's alpha
+  times the clip of every mask above it, which that draw samples. So a mask's
+  texture is already the product of its whole chain, a masked batch samples exactly
+  one texture, and nesting has no depth limit — a stencil's increment/decrement
+  scheme (Unity's) runs out of bits and can only cut hard, while the texture carries
+  soft coverage. The cost is one R8 target and one small pass per visible Mask
+  (`ui_mask_passes`). Being addressed in canvas NDC, the same texture serves overlay
+  and world canvases: **masks work on world canvases too**.
+- **Backdrop: re-composited, not copied.** The overlay pass draws onto the finished
+  frame — often a swapchain image, which can be neither copied nor sampled. So right
+  before the overlay pass the blur **re-runs the post-FX composite** over the view's
+  HDR scene colour (after the camera stack's last stage, post-FX, #636) into its
+  first level at 1/2 of the view's size (1/4 on Low — the `Graphics` quality tier's
+  bloom divisor). The backdrop is therefore the graded, tonemapped, bloomed 3D frame
+  — everything but FXAA and authored post-FX effects, which a blur erases anyway —
+  and **not UI drawn before it**: a pause panel over the HUD shows blurred world,
+  not blurred HUD. Then a **dual-filter** chain (Bjørge, SIGGRAPH 2015; `ui_blur.wgsl`)
+  halves down to the deepest level any backdrop needs and climbs back per level; each
+  level doubles the reach, `level = ceil(log2(radius_px / (2 × divisor)))`, capped at
+  6. One blur per distinct level per frame across every canvas; **none** when no
+  backdrop is visible. `ui_blur_passes` counts them (the composite included).
+- **Why overlay only.** A world or camera canvas draws inside the camera pass, into
+  the HDR target before post-FX, when no finished frame exists to blur; frosted glass
+  in the world would need a mid-stack copy of the HDR target per camera. On those
+  canvases a `BackdropFilter` is ignored and the graphic draws as it would without
+  one.
+
 ## Interaction
 
 Unity's `EventSystem`, `StandaloneInputModule` and `GraphicRaycaster`, run **in the
@@ -384,8 +454,10 @@ The pointer is in **UI screen pixels** — bottom-left origin, y-up, the frame o
 pre-order (the last-drawn graphic is on top). A graphic is hit when it is an
 `Image` or `Text` with `raycast_target`, it and every ancestor are `active`, no
 `CanvasGroup` on it or above it has `blocks_raycasts = false`, the point is inside
-every `RectMask` on its chain (padding applied, the same clip drawing uses), and
-the point is inside its **final quad** — rotation and scale included. A fully
+every `RectMask` on its chain (padding applied, the same clip drawing uses) and
+inside the rect of every `Mask` above it (Unity's rule: the mask's rect, not its
+alpha; a feather does not shrink the hit area), and the point is inside its
+**final quad** — rotation and scale included. A fully
 transparent graphic still blocks (Unity's default). While the cursor is locked
 (mouse-look) the pointer is off the UI.
 
@@ -623,7 +695,8 @@ canvases; the HUD and camera canvases only with its UI overlay on. **`RectMask` 
 to the same axis-aligned bounds in canvas units: a scissor cannot follow a plane in
 perspective, so the fragment shader cuts each graphic at its mask's edge instead —
 the same space the hit-test checks masks in, so a world-space Scroll View or
-Dropdown draws exactly what it hits.
+Dropdown draws exactly what it hits. Feathered `RectMask`s and graphic `Mask`s work
+there too (#428); a `BackdropFilter` does not (see *Masks and backdrops*).
 
 **Interaction.** The pointer carries the camera ray through it. Screen canvases are
 hit first (they draw over the world); then the world and camera canvases the ray

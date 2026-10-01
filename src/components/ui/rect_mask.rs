@@ -4,7 +4,8 @@
 //! the axis-aligned screen bounds of this element's rect, inset by `padding`;
 //! nested masks intersect. The renderer applies it as a scissor rect, so the
 //! clip is rectangular even when the masked element is rotated (as in Unity).
-//! Soft and shape masks are #428. Pure authoring data.
+//! `feather` softens its edges (#428) — faded list ends; graphic-shaped clips are
+//! `MaskComponent`. Pure authoring data.
 
 use glam::Vec4;
 use serde::{Deserialize, Serialize};
@@ -16,4 +17,7 @@ pub struct RectMaskComponent {
     /// Inset of the clip from the element's bounds in reference units — `x` left,
     /// `y` bottom, `z` right, `w` top (Unity's order). Negative grows the clip.
     pub padding: Vec4,
+    /// Width of the soft edge, reference units (#428): content fades out over this
+    /// distance inside the clip's edge. `0` is a hard clip. Kept `>= 0`.
+    pub feather: f32,
 }

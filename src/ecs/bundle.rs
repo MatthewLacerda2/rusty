@@ -73,6 +73,8 @@ pub(in crate::ecs) fn build_bundle(entity: Entity, seq: u64) -> hecs::EntityBuil
         entity.image,
         entity.canvas_group,
         entity.rect_mask,
+        entity.mask,
+        entity.backdrop_filter,
         entity.text,
         entity.selectable,
         entity.layout_group,

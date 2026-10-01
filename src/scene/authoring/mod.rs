@@ -16,6 +16,7 @@
 
 pub mod animator;
 pub mod audio;
+pub mod backdrop;
 pub mod camera;
 pub mod canvas;
 pub mod canvas_group;

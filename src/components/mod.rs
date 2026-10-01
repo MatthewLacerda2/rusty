@@ -50,11 +50,11 @@ pub use script::{ScriptComponent, ScriptFieldValue};
 pub use texture::TextureComponent;
 pub use transform::TransformComponent;
 pub use ui::{
-    CanvasComponent, CanvasGroupComponent, CanvasRenderMode, CanvasSway, FillMethod, FillOrigin,
-    ImageComponent, ImageType, LayoutAxisFit, LayoutConstraint, LayoutCorner,
-    LayoutElementComponent, LayoutGroupComponent, LayoutKind, NavigationMode, RectMaskComponent,
-    RectTransformComponent, SelectableComponent, SelectableTransition, SelectionState,
-    TextAlignment, TextComponent, TextOverflow, WorldAnchor,
+    BackdropFilterComponent, CanvasComponent, CanvasGroupComponent, CanvasRenderMode, CanvasSway,
+    FillMethod, FillOrigin, ImageComponent, ImageType, LayoutAxisFit, LayoutConstraint,
+    LayoutCorner, LayoutElementComponent, LayoutGroupComponent, LayoutKind, MaskComponent,
+    NavigationMode, RectMaskComponent, RectTransformComponent, SelectableComponent,
+    SelectableTransition, SelectionState, TextAlignment, TextComponent, TextOverflow, WorldAnchor,
 };
 pub use ui::{
     GradientKind, GradientStop, ShapeComponent, ShapeCorner, ShapeGlow, ShapeKind, ShapeShadow,

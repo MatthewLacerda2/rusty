@@ -1,7 +1,7 @@
 use glam::Vec2;
 
 use super::*;
-use crate::render::ui::mesh::Scissor;
+use crate::render::ui::clip::Scissor;
 
 #[test]
 fn a_scissor_maps_to_the_canvas_ndc_its_vertices_use() {

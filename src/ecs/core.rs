@@ -171,6 +171,8 @@ impl World {
             image: self.image(id).map(|c| (*c).clone()),
             canvas_group: self.canvas_group(id).map(|c| (*c).clone()),
             rect_mask: self.rect_mask(id).map(|c| (*c).clone()),
+            mask: self.mask(id).map(|c| (*c).clone()),
+            backdrop_filter: self.backdrop_filter(id).map(|c| (*c).clone()),
             text: self.text(id).map(|c| (*c).clone()),
             selectable: self.selectable(id).map(|c| (*c).clone()),
             layout_group: self.layout_group(id).map(|c| (*c).clone()),

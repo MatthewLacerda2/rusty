@@ -28,6 +28,7 @@ use components::{
     material_value, mesh_value, nav_agent_value, particle_value, rigidbody_value,
 };
 use components::{joint_value, line_value, lod_group_value, trail_value};
+use ui::{backdrop_filter_value, mask_value};
 use ui::{
     canvas_group_value, canvas_value, image_value, layout_element_value, layout_group_value,
     rect_mask_value, rect_transform_value, selectable_value, shape_value, text_value,
@@ -119,6 +120,8 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -
         "image": world.image(id).map(|i| image_value(&i)),
         "canvas_group": world.canvas_group(id).map(|g| canvas_group_value(&g)),
         "rect_mask": world.rect_mask(id).map(|m| rect_mask_value(&m)),
+        "mask": world.mask(id).map(|m| mask_value(&m)),
+        "backdrop_filter": world.backdrop_filter(id).map(|b| backdrop_filter_value(&b)),
         "text": world.text(id).map(|t| text_value(&t)),
         "shape": world.shape(id).map(|s| shape_value(&s)),
         "selectable": world.selectable(id).map(|s| selectable_value(&s)),
@@ -153,6 +156,8 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
         (World::has_image, "Image"),
         (World::has_canvas_group, "CanvasGroup"),
         (World::has_rect_mask, "RectMask"),
+        (World::has_mask, "Mask"),
+        (World::has_backdrop_filter, "BackdropFilter"),
         (World::has_text, "Text"),
         (World::has_shape, "Shape"),
         (World::has_selectable, "Selectable"),

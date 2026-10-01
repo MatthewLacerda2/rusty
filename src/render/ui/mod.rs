@@ -8,14 +8,19 @@
 //! reverse.
 //!
 //! - `geometry` — one `Image`'s triangles per image type (pure).
+//! - `clip` — what clips a graphic: RectMask bounds and feather, the nearest Mask
+//!   (pure).
 //! - `mesh` — the layout → one vertex list per canvas, split into batches on
-//!   texture / clip changes, with CanvasGroup alpha and RectMask clips (pure).
+//!   texture / clip changes, with CanvasGroup alpha and the clips (pure).
+//! - `effects` — the batch group every batch binds: soft clips, Mask coverage
+//!   textures (#428) and the backdrop blur (#426).
 //! - `vertex` — the one vertex format every graphic shares, and fill/gradient encoding.
 //! - `shape` — a `Shape`'s SDF quads: shadow, glow, body (#425).
 //! - `blend` — the blend modes as GPU blend state (#425).
 //! - `text` — SDF glyph generation, the per-font atlases and text quads.
-//! - `draw` — the per-view cache (re-upload only a canvas whose geometry
-//!   changed) and the screen pass itself.
+//! - `cache` — the per-view vertex buffers (re-upload only a canvas whose
+//!   geometry changed).
+//! - `draw` — preparing a view's UI and the screen pass itself.
 //! - `world` — world canvases (`WorldSpace`, `ScreenSpaceCamera`) drawn in the
 //!   scene, inside each camera's pass (#429).
 //!
@@ -24,7 +29,10 @@
 //! target (see `docs/ui.md` for why this beats an in-shader encode).
 
 pub(crate) mod blend;
+pub(crate) mod cache;
+pub(crate) mod clip;
 pub(crate) mod draw;
+pub(crate) mod effects;
 pub(crate) mod geometry;
 pub(crate) mod mesh;
 pub(crate) mod shape;
@@ -40,7 +48,7 @@ use crate::render::gpu::bind_layouts;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::GpuTexture;
 
-pub use draw::UiViewCache;
+pub use cache::UiViewCache;
 
 /// Every shared GPU resource of the UI pass. One per `Renderer`; pipelines are
 /// built lazily per target format (the window's and the headless one differ).
@@ -50,11 +58,21 @@ pub struct UiRenderer {
     pipeline_layout: wgpu::PipelineLayout,
     /// One pipeline per (target format, blend mode).
     pipelines: HashMap<(wgpu::TextureFormat, UiBlend), wgpu::RenderPipeline>,
+    /// The backdrop batches' pipeline (#426), per target format.
+    backdrops: HashMap<wgpu::TextureFormat, wgpu::RenderPipeline>,
     /// Linear, clamped, base-level-only: UI sprites are drawn near 1:1, so mips
     /// would only blur them.
     sampler: wgpu::Sampler,
     /// A 1×1 white texture, sampled by solid-colour graphics.
     white: wgpu::BindGroup,
+    /// Its view: the mask and backdrop of a batch that has neither.
+    white_view: wgpu::TextureView,
+    /// Every batch's group 1: clip, mask and backdrop (`effects`).
+    batch_layout: wgpu::BindGroupLayout,
+    /// Draws a Mask's graphic into its coverage texture (#428).
+    mask_pipeline: wgpu::RenderPipeline,
+    /// The backdrop's blur chain (#426).
+    blur: effects::blur::BlurPipelines,
     /// Bind groups per texture path, kept with the texture they bind so a reloaded
     /// texture rebinds.
     textures: HashMap<String, (Rc<GpuTexture>, wgpu::BindGroup)>,
@@ -75,11 +93,14 @@ impl UiRenderer {
     ) -> Self {
         let shader = registry.load(device, "ui.wgsl", "UI Shader");
         let layout = bind_layouts::create_texture_layout(device);
+        let batch_layout = effects::batch_layout(device);
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("UI Pipeline Layout"),
-            bind_group_layouts: &[&layout],
+            bind_group_layouts: &[&layout, &batch_layout],
             push_constant_ranges: &[],
         });
+        let mask_pipeline = effects::mask_gpu::mask_pipeline(device, &shader, &pipeline_layout);
+        let blur_shader = registry.load(device, "ui_blur.wgsl", "UI Blur Shader");
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("UI Sampler"),
             mag_filter: wgpu::FilterMode::Linear,
@@ -87,16 +108,21 @@ impl UiRenderer {
             lod_max_clamp: 0.0,
             ..Default::default()
         });
-        let white = white_texture(device, queue);
-        let white = bind(device, &layout, &white, &sampler);
-        let world = world::WorldUiPipeline::new(device, &shader, &layout);
+        let white_view = white_texture(device, queue);
+        let white = bind(device, &layout, &white_view, &sampler);
+        let world = world::WorldUiPipeline::new(device, &shader, &[&layout, &batch_layout]);
         Self {
             shader,
             layout,
             pipeline_layout,
             pipelines: HashMap::new(),
+            backdrops: HashMap::new(),
             sampler,
             white,
+            white_view,
+            batch_layout,
+            mask_pipeline,
+            blur: effects::blur::BlurPipelines::new(device, blur_shader),
             textures: HashMap::new(),
             atlases: Default::default(),
             fonts: HashMap::new(),
@@ -104,23 +130,28 @@ impl UiRenderer {
         }
     }
 
-    /// Build the pipelines for `format` if absent, one per blend mode: premultiplied
-    /// colour, no depth, no culling (a clockwise radial fill winds the other way).
+    /// Build the pipelines for `format` if absent, one per blend mode, plus the
+    /// backdrop's (#426, always "over"): premultiplied colour, no depth, no culling
+    /// (a clockwise radial fill winds the other way).
     fn ensure_pipeline(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat) {
         for mode in UiBlend::ALL {
             if !self.pipelines.contains_key(&(format, mode)) {
-                let pipeline = self.build_pipeline(device, format, mode);
+                let pipeline = self.build_pipeline(device, format, (mode, "fs_main"));
                 self.pipelines.insert((format, mode), pipeline);
             }
         }
+        if !self.backdrops.contains_key(&format) {
+            let pipeline = self.build_pipeline(device, format, (UiBlend::Normal, "fs_backdrop"));
+            self.backdrops.insert(format, pipeline);
+        }
     }
 
-    /// The screen pipeline drawing into `format` with `mode`.
+    /// The screen pipeline drawing into `format` with `mode` through `entry`.
     fn build_pipeline(
         &self,
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
-        mode: UiBlend,
+        (mode, entry): (UiBlend, &str),
     ) -> wgpu::RenderPipeline {
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("UI Pipeline"),
@@ -132,7 +163,7 @@ impl UiRenderer {
             },
             fragment: Some(wgpu::FragmentState {
                 module: &self.shader,
-                entry_point: "fs_main",
+                entry_point: entry,
                 targets: &[Some(wgpu::ColorTargetState {
                     format,
                     blend: Some(blend::blend_state(mode)),
@@ -196,7 +227,7 @@ impl crate::render::Renderer {
 }
 
 /// A texture + the UI sampler as a bind group against `layout`.
-fn bind(
+pub(crate) fn bind(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
     view: &wgpu::TextureView,

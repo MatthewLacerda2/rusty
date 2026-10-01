@@ -135,10 +135,27 @@ pub(crate) fn selectable_value(s: &crate::components::SelectableComponent) -> Va
     })
 }
 
-/// RectMask authoring view (#418): the clip's padding (left, bottom, right, top).
+/// RectMask authoring view (#418): the clip's padding (left, bottom, right, top) and
+/// its soft-edge feather (#428).
 pub(crate) fn rect_mask_value(m: &RectMaskComponent) -> Value {
     let p = m.padding;
-    json!({ "padding": [p.x, p.y, p.z, p.w] })
+    json!({ "padding": [p.x, p.y, p.z, p.w], "feather": m.feather })
+}
+
+/// Mask authoring view (#428): whether the mask's own graphic draws.
+pub(crate) fn mask_value(m: &crate::components::MaskComponent) -> Value {
+    json!({ "show_mask_graphic": m.show_mask_graphic })
+}
+
+/// BackdropFilter authoring view (#426): blur radius, tint, saturation, brightness.
+pub(crate) fn backdrop_filter_value(b: &crate::components::BackdropFilterComponent) -> Value {
+    let t = b.tint;
+    json!({
+        "blur_radius": b.blur_radius,
+        "tint": [t.x, t.y, t.z, t.w],
+        "saturation": b.saturation,
+        "brightness": b.brightness,
+    })
 }
 
 /// Text authoring view (#419): the string, fonts, sizing, wrapping and effects.

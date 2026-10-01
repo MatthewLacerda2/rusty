@@ -30,6 +30,7 @@ use crate::components::{
     ParticleEmitterComponent, PrefabLink, RectMaskComponent, RectTransformComponent,
     RigidBodyComponent, SelectableComponent, TextComponent, VisualCorrectionComponent,
 };
+use crate::components::{BackdropFilterComponent, MaskComponent};
 use crate::components::{JointComponent, LineComponent, LodGroupComponent, TrailComponent};
 
 use super::world::{Ref, RefMut, World};
@@ -134,6 +135,8 @@ optional_component_accessors! {
     ImageComponent => image, image_mut, has_image, set_image, take_image, ids_with_image;
     CanvasGroupComponent => canvas_group, canvas_group_mut, has_canvas_group, set_canvas_group, take_canvas_group, ids_with_canvas_group;
     RectMaskComponent => rect_mask, rect_mask_mut, has_rect_mask, set_rect_mask, take_rect_mask, ids_with_rect_mask;
+    MaskComponent => mask, mask_mut, has_mask, set_mask, take_mask, ids_with_mask;
+    BackdropFilterComponent => backdrop_filter, backdrop_filter_mut, has_backdrop_filter, set_backdrop_filter, take_backdrop_filter, ids_with_backdrop_filter;
     TextComponent => text, text_mut, has_text, set_text, take_text, ids_with_text;
     SelectableComponent => selectable, selectable_mut, has_selectable, set_selectable, take_selectable, ids_with_selectable;
     LayoutGroupComponent => layout_group, layout_group_mut, has_layout_group, set_layout_group, take_layout_group, ids_with_layout_group;

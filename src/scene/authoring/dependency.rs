@@ -26,6 +26,7 @@
 //!
 //! Allowed deps: components, scene, ecs.
 
+use crate::components::{BackdropFilterComponent, MaskComponent};
 use crate::components::{
     CanvasComponent, CanvasGroupComponent, ImageComponent, RectMaskComponent,
     RectTransformComponent, SelectableComponent, TextComponent,
@@ -59,6 +60,8 @@ pub(crate) fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::Image => world.has_image(id),
         ComponentKind::CanvasGroup => world.has_canvas_group(id),
         ComponentKind::RectMask => world.has_rect_mask(id),
+        ComponentKind::Mask => world.has_mask(id),
+        ComponentKind::BackdropFilter => world.has_backdrop_filter(id),
         ComponentKind::Text => world.has_text(id),
         ComponentKind::Selectable => world.has_selectable(id),
         ComponentKind::LayoutGroup => world.has_layout_group(id),
@@ -99,6 +102,10 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
             world.set_canvas_group(id, Some(CanvasGroupComponent::default()))
         }
         ComponentKind::RectMask => world.set_rect_mask(id, Some(RectMaskComponent::default())),
+        ComponentKind::Mask => world.set_mask(id, Some(MaskComponent::default())),
+        ComponentKind::BackdropFilter => {
+            world.set_backdrop_filter(id, Some(BackdropFilterComponent::default()))
+        }
         ComponentKind::Text => world.set_text(id, Some(TextComponent::default())),
         ComponentKind::Selectable => world.set_selectable(id, Some(SelectableComponent::default())),
         ComponentKind::LayoutGroup => {
@@ -135,6 +142,8 @@ pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool
         ComponentKind::Image => world.set_image(id, None),
         ComponentKind::CanvasGroup => world.set_canvas_group(id, None),
         ComponentKind::RectMask => world.set_rect_mask(id, None),
+        ComponentKind::Mask => world.set_mask(id, None),
+        ComponentKind::BackdropFilter => world.set_backdrop_filter(id, None),
         ComponentKind::Text => world.set_text(id, None),
         ComponentKind::Selectable => world.set_selectable(id, None),
         ComponentKind::LayoutGroup => world.set_layout_group(id, None),

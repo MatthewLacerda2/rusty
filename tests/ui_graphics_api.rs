@@ -128,6 +128,7 @@ fn graphics_components_survive_save_and_load() {
     scene.world.set_canvas_group(id, Some(group.clone()));
     let mask = RectMaskComponent {
         padding: Vec4::splat(2.0),
+        feather: 3.0,
     };
     scene.world.set_rect_mask(id, Some(mask.clone()));
     let path = crate::temp::dir()
