@@ -42,6 +42,7 @@ like any library material (no engine special-casing).
 |---|---|---|
 | `Material.DefineAsset` | `(name, recipe)` | — (inserts/overwrites the library asset under `name`) |
 | `Material.GetAsset` | `(name)` | the asset's canonical JSON string, or `nil` if absent |
+| `Material.Rebake` | `(name [, resolution])` | — (re-bakes the asset's `maps` recipe; errors if it has none) |
 | `Material.HasAsset` | `(name)` | `bool` |
 
 The **recipe** is a table (or that table's JSON string — both decode alike) whose shape mirrors the `MaterialAsset` document one-to-one
@@ -83,6 +84,41 @@ through the *same* shared ops the per-entity setters use: `alpha`/`alpha_cutoff`
 to `[0,1]`, and an unknown `render_mode` string degrades to `Opaque` — so validation is
 single-sourced, not re-implemented. `Material.DefineAsset` **overwrites** any existing
 asset of that name.
+
+#### One call: the maps recipe inside the material — `maps`
+
+Instead of baking each map with `Texture.Bake`/`Texture.BakeSet` and passing the
+paths, give the material its **multi-output texture recipe** as `maps` (the same
+document `Texture.BakeSet` takes, `outputs` and all). `DefineAsset` bakes it once to
+`project/assets/textures/<name>_<slot>.png` and fills the matching map keys (the
+`Texture.BakeSet` result table in `Texture.md` lists which slot fills which key —
+`metallic_roughness` fills both `metallic_map` and `roughness_map`):
+
+```lua
+Material.DefineAsset("rusty_panel", {
+  roughness = 1.0, metallic = 1.0,            -- factors scale the maps, as always
+  normal_map = "hand_made_n.png",             -- an explicit map key wins over the bake
+  shader = "enemy_toon",                      -- every other key works as above
+  maps = {
+    resolution = 256, seed = 3,
+    nodes = { ... },
+    outputs = { base_color = "albedo", normal = "n", metallic_roughness = "mr" },
+  },
+})
+Material.Rebake("rusty_panel", 2048)          -- iterate at 256, ship at 2048
+```
+
+- The **recipe is stored on the asset** (`maps` in its JSON and the scene file), so
+  the material describes itself: `GetAsset` returns it, and that JSON redefines the
+  same material. The baked PNGs are a cache the recipe regenerates.
+- `Material.Rebake(name [, resolution])` re-bakes from the stored recipe to the same
+  paths; a `resolution` given is kept in the recipe for the next rebake. It is an
+  error when `name` is absent or has no `maps`.
+- A map key the material **already holds** is never overwritten by a bake — set by
+  hand in the recipe, it wins; one the bake filled points at the same file next time.
+- Everything is checked before a file is written or the library changes: a bad `maps`
+  recipe (an unknown slot, node id or key), or a `name` holding `/` or `\`, is an
+  error and `DefineAsset` defines nothing.
 
 An **unknown recipe key** (`metalic_map`) is an error naming it and listing the valid
 keys, like every authoring recipe (`Texture`, `Shader`, `Sound`). The **deliberate

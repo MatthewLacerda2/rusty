@@ -13,6 +13,11 @@
 //!   `scene.materials` under `name`, overwriting any existing asset of that name. The
 //!   recipe is a Lua table **or** its JSON string (the on-disk form, #410), so a saved
 //!   recipe re-defines through the same verb without a round-trip through Lua.
+//!   A `maps` texture recipe (#409) is baked first, to
+//!   `project/assets/textures/<name>_<slot>.png`, filling the map paths the recipe
+//!   left empty; a failed bake defines nothing.
+//! - `Material.Rebake(name [, resolution])` — re-bake the stored `maps` recipe,
+//!   optionally at a new resolution the recipe then keeps.
 //! - `Material.GetAsset(name)` — the named asset's canonical JSON (or `nil` if absent),
 //!   so the authored asset is observable through the same surface.
 //! - `Material.HasAsset(name)` — whether the library holds an asset under `name`.
@@ -23,6 +28,7 @@
 //! editor card call — so validation lives once.
 
 use std::cell::RefCell;
+use std::path::Path;
 
 use super::from_lua::{asset_from_lua, Validated};
 use super::{parse_render_mode, put, Reg};
@@ -62,6 +68,17 @@ pub fn register<'lua, 'scope>(
 
     put(
         table,
+        "Rebake",
+        scope.create_function(|_, (name, resolution): (String, Option<u32>)| {
+            let mut scene = scene.borrow_mut();
+            let dir = Path::new(mat_ops::MAPS_DIR);
+            mat_ops::rebake_maps(&mut scene.materials, &name, resolution, dir)
+                .map_err(mlua::Error::RuntimeError)
+        }),
+    )?;
+
+    put(
+        table,
         "HasAsset",
         scope.create_function(|_, name: String| Ok(scene.borrow().materials.contains_key(&name))),
     )
@@ -74,9 +91,10 @@ pub fn register<'lua, 'scope>(
 fn define(
     scene: &RefCell<Scene>,
     name: &str,
-    asset: MaterialAsset,
+    mut asset: MaterialAsset,
     validated: Validated,
 ) -> Result<(), String> {
+    mat_ops::bake_maps(&mut asset, name, Path::new(mat_ops::MAPS_DIR))?;
     let mut scene = scene.borrow_mut();
     let materials = &mut scene.materials;
     mat_ops::define_asset(materials, name, asset);
@@ -98,6 +116,9 @@ fn define(
     Ok(())
 }
 
+#[cfg(test)]
+#[path = "maps_tests.rs"]
+mod maps_tests;
 #[cfg(test)]
 mod tests {
     use mlua::Lua;

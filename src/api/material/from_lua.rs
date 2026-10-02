@@ -12,8 +12,12 @@
 //!   emissive = {0.0, 0.0, 0.0}, emissive_map = "e.png",
 //!   render_mode = "Cutout", alpha = 1.0, alpha_cutoff = 0.5,
 //!   shader = "enemy_toon", shader_textures = { mask = "noise.png" },
+//!   maps = { resolution = 512, nodes = { ... }, outputs = { base_color = "albedo" } },
 //! }
 //! ```
+//!
+//! `maps` (#409) is a multi-output texture recipe; it is parsed here and rides on
+//! the asset (`maps_recipe`), and the caller bakes it.
 //!
 //! Marshaling goes Lua table or JSON string → `serde_json::Value` (via the shared
 //! [`crate::api::lua_json`] converter) → `MaterialAsset`, so the factor/map decoding
@@ -28,6 +32,7 @@ use mlua::Value;
 
 use crate::api::lua_json::recipe_json;
 use crate::components::MaterialAsset;
+use crate::procgen::TextureRecipe;
 
 /// The validation-bearing fields lifted out of the recipe so the caller applies them
 /// through the shared `set_*` ops. `None` means "not authored" — leave the asset's
@@ -49,6 +54,16 @@ pub struct Validated {
     pub shader_textures: Vec<(String, String)>,
 }
 
+/// Parse a material recipe's `maps` value (#409) — a multi-output `TextureRecipe`
+/// document — so a bad recipe is refused, naming the key, before anything is
+/// defined or baked. An absent `maps` is none.
+fn maps_recipe(value: Option<serde_json::Value>) -> Result<Option<TextureRecipe>, String> {
+    value
+        .map(serde_json::from_value)
+        .transpose()
+        .map_err(|e| format!("maps is a texture recipe (see Texture.BakeSet): {e}"))
+}
+
 /// Parse a material recipe — a Lua table or its JSON string (#410) — into a base
 /// [`MaterialAsset`] (factors + map slots) plus the [`Validated`] fields the caller
 /// must apply through the shared ops. Errors carry a message the REPL/script
@@ -64,6 +79,7 @@ fn asset_from_json_value(
     mut value: serde_json::Value,
 ) -> Result<(MaterialAsset, Validated), String> {
     let mut validated = Validated::default();
+    let mut maps = None;
     if let Some(obj) = value.as_object_mut() {
         validated.render_mode = obj
             .remove("render_mode")
@@ -80,9 +96,11 @@ fn asset_from_json_value(
             .remove("shader")
             .and_then(|v| v.as_str().map(str::to_string));
         validated.shader_textures = shader_textures(obj.remove("shader_textures"))?;
+        maps = maps_recipe(obj.remove("maps"))?;
     }
     refuse_unknown_keys(&value)?;
-    let asset: MaterialAsset = serde_json::from_value(value).map_err(|e| e.to_string())?;
+    let mut asset: MaterialAsset = serde_json::from_value(value).map_err(|e| e.to_string())?;
+    asset.maps_recipe = maps;
     Ok((asset, validated))
 }
 
@@ -112,7 +130,9 @@ fn refuse_unknown_keys(value: &serde_json::Value) -> Result<(), String> {
     };
     match given.keys().find(|k| !known.contains_key(*k)) {
         Some(key) => {
-            let valid: Vec<&str> = known.keys().map(String::as_str).collect();
+            // The lifted keys are valid too, though an empty asset never writes them.
+            let mut valid: Vec<&str> = known.keys().map(String::as_str).collect();
+            valid.extend(["shader_textures", "maps"]);
             Err(format!(
                 "unknown material key {key:?}; expected one of {}",
                 valid.join(", ")
