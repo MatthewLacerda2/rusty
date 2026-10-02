@@ -165,3 +165,6 @@ mod gpu_tests;
 #[cfg(test)]
 #[path = "plan_tests.rs"]
 mod plan_tests;
+
+#[cfg(test)]
+mod contact_tests;

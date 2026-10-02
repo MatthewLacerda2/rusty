@@ -217,7 +217,14 @@ pub(crate) fn clip_layout(
 
 /// A shadow-cascade depth pipeline over `shader`'s `vs_shadow`: depth only with no
 /// `fragment`, or clipped by one (`fs_shadow`, a cutting variant's `fs_shadow_cut`,
-/// #648). Front faces culled and a sloped bias, to fight shadow acne.
+/// #648). Shared by the sun's cascades and the spot/point atlas, so both bias alike.
+///
+/// It draws **front faces** (back faces culled), as Unity does, so the map holds each
+/// caster's lit side. Culling front faces instead stores the far side, whose bottom
+/// sits at the floor's own depth: any bias then lights a strip under every object's
+/// base (#665), and a single-sided `Plane` casts nothing. Acne on the lit faces now
+/// stored is held off by the sloped bias here plus the receiver's normal offset and
+/// depth bias (`sample_cascade` / `sample_local_shadow`).
 pub(crate) fn depth_pipeline(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
@@ -243,7 +250,7 @@ pub(crate) fn depth_pipeline(
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
             front_face: wgpu::FrontFace::Ccw,
-            cull_mode: Some(wgpu::Face::Front),
+            cull_mode: Some(wgpu::Face::Back),
             ..Default::default()
         },
         depth_stencil: Some(wgpu::DepthStencilState {
