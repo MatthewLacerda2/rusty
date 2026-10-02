@@ -98,7 +98,7 @@ fn register_settings_getters<'lua, 'scope>(
 /// inspector's Navmesh section has (editor↔API parity). `agent_radius` is live (#277): the
 /// re-bake erodes the walkable surface inward by the radius, so a larger radius closes thin
 /// passages and pulls the surface off walls. `agent_height` is live too (#278): the re-bake
-/// carves cells whose overhead clearance is below the height, so a taller agent loses access
+/// drops spans whose open space is below the height, so a taller agent loses access
 /// to low overhangs / crawlspaces.
 fn register_settings_setters<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,

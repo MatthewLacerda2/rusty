@@ -1,9 +1,22 @@
 ## `Navigation`
 
-The navmesh is a height-field surface (#130): each grid cell carries a baked
-surface height, so paths follow ramps, stairs, and multi-level terrain in real `y`
-rather than a flat `y = 0` plane. The returned waypoint's `y` is the surface height
-of the next cell — agents climb and descend instead of sliding through geometry.
+The navmesh is a **layered grid** (#454, the compact-heightfield half of Recast): every
+XZ cell holds a list of walkable **spans**, each a floor height plus the open space above
+it. Stacked floors, a catwalk over a corridor and a bridge over a road are all walkable at
+once, and paths climb stairs and ramps from one floor to the next in real `y`.
+
+The bake reads the **real geometry** of every active, static, non-trigger collider: the
+same shapes physics collides with (rotated boxes, ramps, spheres, capsules, convex hulls
+and triangle meshes), rasterised into each cell column. A ramp bakes as a slope, not a
+plateau at its highest point. **Where there is no collider there is no navmesh**: no
+implicit ground past the level's edge, and an empty scene bakes nothing (as in Unity).
+
+`GetNextPathStep` resolves the start and the target to spans with one rule: **the nearest
+span below the point, favouring the floor under a character's feet** — the highest floor
+at most `MaxStep` above the point, else the lowest floor above it. A chest-height target
+therefore means the floor under it, not the one overhead. A point over a column with no
+span (a wall, a hole) uses the nearest column with one, up to 5 cells away. The returned
+waypoint's `y` is the next span's floor; with no path it returns the target itself.
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -18,23 +31,23 @@ scene inspector's **Navmesh** section (editor↔API parity). `AgentRadius` **ero
 walkable surface** at bake time (#277, the standard Recast/Unity meaning): the surface is
 pulled back off every wall — and off the world edge — by the radius, so passages narrower
 than ~`2 * radius` close up and paths keep clearance instead of hugging geometry. A radius
-of `0` is an exact no-op (the surface hugs geometry as before). `AgentHeight` **carves
-low-headroom cells** at bake time (#278, the radius's vertical companion): a walkable cell
-whose clearance to the lowest static geometry overhead is below the height is marked
-non-walkable, so the agent can't path under a low overhang or through a crawlspace. A cell
-with nothing overhead has infinite headroom and is never carved (height `0` and overhead-free
-scenes are no-ops). This is single-surface only — it subtracts low cells, it does not add a
-second walkable layer.
+of `0` is an exact no-op (the surface hugs geometry as before). `AgentHeight` **drops
+low-headroom spans** at bake time (#278, the radius's vertical companion): a span whose
+open space up to the next solid above is below the height is not walkable, so the agent
+can't path under a low overhang or through a crawlspace, and a move between two spans
+needs that height in the gap they share. The floor *above* an overhang stays walkable.
+`MaxSlope` also decides which surfaces are walkable at all: a triangle steeper than it is
+not a floor.
 
 | Function | Signature | Returns / Effect |
 |---|---|---|
 | `Navigation.GetAgentRadius` | `()` | agent radius (world units) |
 | `Navigation.SetAgentRadius` | `(radius)` | writes `nav_settings.agent_radius` + re-bakes (erodes walkable surface by radius) |
 | `Navigation.GetAgentHeight` | `()` | agent height (world units) |
-| `Navigation.SetAgentHeight` | `(height)` | writes `nav_settings.agent_height` + re-bakes (carves cells with overhead clearance below the height) |
+| `Navigation.SetAgentHeight` | `(height)` | writes `nav_settings.agent_height` + re-bakes (drops spans with less open space above than the height) |
 | `Navigation.GetMaxSlope` | `()` | max walkable grade (rise per unit travelled) |
 | `Navigation.SetMaxSlope` | `(slope)` | writes `nav_settings.max_slope` + re-bakes |
-| `Navigation.GetMaxStep` | `()` | max step height between adjacent cells |
+| `Navigation.GetMaxStep` | `()` | max step height between spans in adjacent cells |
 | `Navigation.SetMaxStep` | `(step)` | writes `nav_settings.max_step` + re-bakes |
 | `Navigation.GetGridSpacing` | `()` | grid cell size (world units) |
 | `Navigation.SetGridSpacing` | `(spacing)` | writes `nav_settings.grid_spacing` + re-bakes (re-shapes the grid) |
@@ -42,10 +55,10 @@ second walkable layer.
 ### Navmesh bounds (#452)
 
 The grid covers an XZ rectangle resolved from the scene **on every bake**. By default it
-is the extent of the static geometry the bake reads (active, static colliders' world
-AABBs), grown by `2.0` plus the agent radius on every side so the radius erosion never
+is the extent of the static geometry the bake reads (active, static, non-trigger
+colliders' world AABBs), grown by `2.0` plus the agent radius on every side so the radius erosion never
 eats the ground around the outermost geometry. An **empty scene** (no static geometry)
-bakes over a default `±20` box. A scene can instead **author** its bounds (Unity's nav
+bakes over a default `±20` box, which holds no spans since there is nothing to stand on. A scene can instead **author** its bounds (Unity's nav
 volume): they serialize in `nav_settings.bounds` and are editable from the scene
 inspector's **Navmesh** section (editor↔API parity). Either way the bounds snap outward to
 multiples of `GridSpacing`, so cell centres stay on a fixed world lattice. Anything outside

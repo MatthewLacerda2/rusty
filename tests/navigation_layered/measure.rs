@@ -33,6 +33,11 @@ fn measure_bake_time_and_memory() {
         let g = bake(&mut scene, level::BOUNDS);
         let elapsed = start.elapsed();
         report(spacing, elapsed.as_secs_f64() * 1e3, &g);
+        let start = Instant::now();
+        let path = g.path_between(Vec3::new(190.0, 0.0, 190.0), Vec3::new(30.0, 8.0, 15.0));
+        let ms = start.elapsed().as_secs_f64() * 1e3;
+        let len = path.map_or(0, |p| p.len());
+        eprintln!("  street-to-roof A*: {len} spans, {ms:.1} ms");
     }
     if let Ok(status) = std::fs::read_to_string("/proc/self/status") {
         let peak = status.lines().find(|l| l.starts_with("VmHWM"));

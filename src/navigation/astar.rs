@@ -7,7 +7,7 @@
 
 use super::{NavigationGraph, SpanRef};
 use glam::Vec3;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::BinaryHeap;
 
 #[derive(Copy, Clone, PartialEq)]
 struct NodeState {
@@ -37,17 +37,25 @@ impl PartialOrd for NodeState {
     }
 }
 
-/// The mutable A\* working set, keyed by span index.
-#[derive(Default)]
+/// The mutable A\* working set: dense per-span arrays (a span index is the node id),
+/// cheaper than hashing on the long cross-level queries a bot issues.
 struct Frontier {
     open_set: BinaryHeap<NodeState>,
-    g_score: HashMap<u32, f32>,
-    came_from: HashMap<u32, SpanRef>,
+    g_score: Vec<f32>,
+    came_from: Vec<Option<SpanRef>>,
 }
 
 impl Frontier {
+    fn new(spans: usize) -> Self {
+        Self {
+            open_set: BinaryHeap::new(),
+            g_score: vec![f32::INFINITY; spans],
+            came_from: vec![None; spans],
+        }
+    }
+
     fn g_of(&self, index: u32) -> f32 {
-        *self.g_score.get(&index).unwrap_or(&f32::INFINITY)
+        self.g_score[index as usize]
     }
 }
 
@@ -86,8 +94,8 @@ impl NavigationGraph {
         if start == goal {
             return Some(vec![start]);
         }
-        let mut frontier = Frontier::default();
-        frontier.g_score.insert(start.index, 0.0);
+        let mut frontier = Frontier::new(self.spans.len());
+        frontier.g_score[start.index as usize] = 0.0;
         frontier.open_set.push(NodeState {
             node: start,
             g_score: 0.0,
@@ -106,18 +114,36 @@ impl NavigationGraph {
         None
     }
 
-    /// Relax every span `current` can move to.
+    /// Relax every span `current` can move to. The cardinal links are found once and
+    /// reused as the corner-cutting check for the diagonals (`neighbour`'s rule).
     fn expand(&self, current: NodeState, goal: SpanRef, frontier: &mut Frontier) {
-        let y = self.spans[current.node.index as usize].y;
+        let here = current.node;
+        let y = self.spans[here.index as usize].y;
+        let card = |dx: i32, dz: i32| self.link_to(here, here.gx + dx, here.gz + dz);
+        let (east, west, north, south) = (card(1, 0), card(-1, 0), card(0, 1), card(0, -1));
         for &(dx, dz, horiz) in &DIRS {
-            let Some(next) = self.neighbour(current.node, dx, dz) else {
+            let next = match (dx, dz) {
+                (1, 0) => east,
+                (-1, 0) => west,
+                (0, 1) => north,
+                (0, -1) => south,
+                _ => {
+                    let x_open = if dx > 0 { east } else { west }.is_some();
+                    let z_open = if dz > 0 { north } else { south }.is_some();
+                    if !(x_open && z_open) {
+                        continue;
+                    }
+                    self.link_to(here, here.gx + dx, here.gz + dz)
+                }
+            };
+            let Some(next) = next else {
                 continue;
             };
             let dh = (self.spans[next.index as usize].y - y).abs();
             let tentative_g = current.g_score + horiz + dh;
             if tentative_g < frontier.g_of(next.index) {
-                frontier.came_from.insert(next.index, current.node);
-                frontier.g_score.insert(next.index, tentative_g);
+                frontier.came_from[next.index as usize] = Some(here);
+                frontier.g_score[next.index as usize] = tentative_g;
                 frontier.open_set.push(NodeState {
                     node: next,
                     g_score: tentative_g,
@@ -137,10 +163,10 @@ fn heuristic(a: SpanRef, b: SpanRef) -> f32 {
 }
 
 /// Walk the `came_from` chain back from `goal`, returning the path start→goal.
-fn reconstruct_path(came_from: &HashMap<u32, SpanRef>, goal: SpanRef) -> Vec<SpanRef> {
+fn reconstruct_path(came_from: &[Option<SpanRef>], goal: SpanRef) -> Vec<SpanRef> {
     let mut path = vec![goal];
     let mut curr = goal;
-    while let Some(&prev) = came_from.get(&curr.index) {
+    while let Some(prev) = came_from[curr.index as usize] {
         path.push(prev);
         curr = prev;
     }

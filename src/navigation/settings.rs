@@ -20,9 +20,8 @@ use super::grid::{DEFAULT_GRID_SPACING, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP};
 pub const DEFAULT_AGENT_RADIUS: f32 = 0.5;
 
 /// Default agent height (world units) — Unity's default humanoid agent height. Consumed
-/// at bake time (#278): a walkable cell whose vertical clearance to the lowest static
-/// geometry overhead is less than this height is marked non-walkable (no crawling under
-/// a low overhang). With nothing overhead, headroom is ∞, so the pass is a no-op.
+/// at bake time (#278): a span with less open space above it than this height is not
+/// walkable (no crawling under a low overhang).
 pub const DEFAULT_AGENT_HEIGHT: f32 = 2.0;
 
 /// Per-scene navmesh bake settings (Unity's per-scene navmesh bake parameters).
@@ -39,11 +38,10 @@ pub struct NavMeshSettings {
     /// the world edge. `0` is an exact no-op (the surface hugs geometry as before).
     #[serde(default = "default_agent_radius")]
     pub agent_radius: f32,
-    /// Agent height (world units). Consumed by the bake (#278): a walkable cell whose
-    /// vertical clearance to the lowest static geometry overhead is below this height is
-    /// carved out (so an agent can't path under a low overhang / through a crawlspace).
-    /// A cell with nothing overhead has infinite headroom, so it is never carved — simple
-    /// scenes (floor + walls, no ceilings) bake unchanged.
+    /// Agent height (world units). Consumed by the bake (#278): a span whose open space
+    /// up to the next solid above is below this height is dropped (so an agent can't path
+    /// under a low overhang / through a crawlspace), and a move between two spans needs it
+    /// in their shared gap. A span with nothing above has infinite headroom.
     #[serde(default = "default_agent_height")]
     pub agent_height: f32,
     /// Max walkable grade (rise per unit of horizontal travel). A ramp steeper than
