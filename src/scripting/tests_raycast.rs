@@ -7,15 +7,16 @@ use super::tests_spatial::spatial_runtime;
 #[test]
 fn raycast_appends_the_hit_point_and_surface_normal() {
     let (m, a, _) = spatial_runtime();
-    // From z=-5 along +Z: `a`'s -Z face at z=-1, 4 m away, facing back.
+    // From z=-5 along +Z: `a`'s -Z face at z=-1, 4 m away, facing back. `a` is
+    // on no skeleton (no bone, no bone name) and is its own root (#464).
     assert_eq!(
         m.eval("Physics.Raycast(0,0,-5, 0,0,1)").unwrap(),
-        format!("true, {a}, 4, 0, 0, -1, 0, 0, -1")
+        format!("true, {a}, 4, 0, 0, -1, 0, 0, -1, nil, nil, {a}")
     );
-    // A miss zeroes every value after `hit`.
+    // A miss zeroes every number after `hit` and leaves the rest nil.
     assert_eq!(
         m.eval("Physics.Raycast(0,0,-5, 0,0,-1)").unwrap(),
-        "false, 0, 0, 0, 0, 0, 0, 0, 0"
+        "false, 0, 0, 0, 0, 0, 0, 0, 0, nil, nil, nil"
     );
 }
 
@@ -34,7 +35,7 @@ fn sphere_cast_appends_the_contact_point_and_normal() {
     // A 0.5 m sphere from z=2 meets `b`'s z=9 face after 6.5 m of travel.
     assert_eq!(
         m.eval("Physics.SphereCast(0,0,2, 0,0,1, 0.5)").unwrap(),
-        format!("true, {b}, 6.5, 0, 0, 9, 0, 0, -1")
+        format!("true, {b}, 6.5, 0, 0, 9, 0, 0, -1, nil, nil, {b}")
     );
 }
 

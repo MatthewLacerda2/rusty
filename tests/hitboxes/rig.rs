@@ -10,7 +10,9 @@ use rusty::scene::skeleton::HitboxOptions;
 use rusty::scene::Scene;
 
 /// (name, parent slot, bind position, vertex box centre, box size), mesh space.
-const BONES: [(&str, Option<usize>, [f32; 3], [f32; 3], [f32; 3]); 5] = [
+type Bone = (&'static str, Option<usize>, [f32; 3], [f32; 3], [f32; 3]);
+
+const BONES: [Bone; 5] = [
     (
         "pelvis",
         None,

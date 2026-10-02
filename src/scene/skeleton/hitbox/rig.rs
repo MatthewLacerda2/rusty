@@ -8,8 +8,10 @@ use crate::components::mesh::Vertex;
 use crate::components::MeshComponent;
 use crate::scene::Scene;
 
-/// (name, parent slot, bind position in mesh space, vertex box centre, box size).
-pub(super) const BONES: [(&str, Option<usize>, [f32; 3], [f32; 3], [f32; 3]); 5] = [
+/// (name, parent slot, bind position, vertex box centre, box size), mesh space.
+pub(super) type Bone = (&'static str, Option<usize>, [f32; 3], [f32; 3], [f32; 3]);
+
+pub(super) const BONES: [Bone; 5] = [
     (
         "pelvis",
         None,

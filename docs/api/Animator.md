@@ -75,7 +75,9 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
   the scene loads, so a re-exported skeleton keeps them; an override or
   attachment whose bone no longer exists is dropped with a warning in the log
   (the attachment stays under the skinned entity). Components added to a bone
-  itself are not saved: put a hitbox `Collider` on a child of the bone.
+  itself are not saved: put a hitbox `Collider` on a child of the bone —
+  `Physics.GenerateHitboxes(id)` does exactly that for every bone (see
+  `Physics`, *Per-bone hitboxes*, #464).
 - **Destroying** the skinned entity destroys its skeleton and what hangs from it.
 
 `Debug.Snapshot()` leaves bones out by default; `Debug.Snapshot({ bones = true })`
