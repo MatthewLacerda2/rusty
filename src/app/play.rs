@@ -72,11 +72,12 @@ impl GameWorld {
 /// system has seen the entity. The scene-load phase (#432) follows it, so a
 /// `Scene.Load` swaps the World only once the whole tick is done with it, right
 /// before `advance_frame`. The skin palette build (#453) runs in `Render`, after
-/// every stage that may move a bone. `pose_ragdolls` (#466) is the post-animation
-/// writer: right after `animate`, it puts each simulated ragdoll bone back where
-/// physics left it, so `LateUpdate` and skinning see the ragdoll, not the clip.
-/// `follow_bones` (#464) runs after the last sim writer of a bone (`LateUpdate`),
-/// so hitboxes are queried where they render.
+/// every stage that may move a bone. The post-animation writers, in order:
+/// `animate` writes the clip pose; `pose_ragdolls` (#466) puts each simulated
+/// ragdoll bone back where physics left it; `LateUpdate` scripts set this tick's
+/// targets; `solve_ik` (#461) post-processes the final pose, skipping any bone a
+/// dynamic body carries (physics wins over IK); `follow_bones` (#464) then moves
+/// the hitbox query poses to the pose that renders.
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::FixedUpdate, rebake_nav)
         .add_system(Stage::FixedUpdate, init_scripts)
@@ -89,6 +90,7 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, pose_ragdolls)
         .add_system(Stage::FixedUpdate, super::particles::tick_particles)
         .add_system(Stage::FixedUpdate, late_update_scripts)
+        .add_system(Stage::FixedUpdate, solve_ik)
         .add_system(Stage::FixedUpdate, follow_bones)
         .add_system(Stage::FixedUpdate, super::trails::tick_trails)
         .add_system(Stage::FixedUpdate, apply_destroys)
@@ -163,6 +165,13 @@ fn pose_ragdolls(world: &mut World, res: &mut Resources) {
     if let Some(physics) = res.physics.borrow().as_ref() {
         physics.pose_bones(&mut world.scene.borrow_mut());
     }
+}
+
+/// Bend the posed bones toward their IK targets (#461, `scene::skeleton::ik`):
+/// after the Animator and `LateUpdate`, before `follow_bones` and the palette
+/// build. A ragdolled bone (dynamic body) is skipped — physics wins.
+fn solve_ik(world: &mut World, _res: &mut Resources) {
+    world.scene.borrow_mut().solve_ik();
 }
 
 /// Advance the deterministic play-mode frame counter.

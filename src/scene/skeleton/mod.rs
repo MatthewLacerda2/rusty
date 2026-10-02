@@ -21,8 +21,11 @@
 //! - `hitbox` fits per-bone hitbox colliders and names the bone a hit struck (#464).
 //! - `ragdoll` turns those hitboxes into jointed bodies and switches them between
 //!   the Animator and physics (#466).
+//! - `ik` bends the posed bones toward script-set targets after `LateUpdate`;
+//!   bones a ragdoll's dynamic body carries are skipped (#461).
 
 mod hitbox;
+mod ik;
 mod palette;
 mod persist;
 mod ragdoll;
@@ -31,6 +34,7 @@ mod sync;
 use std::collections::BTreeSet;
 
 pub use hitbox::{fit_hitboxes, HitboxFit, HitboxOptions, HITBOX_NAME};
+pub use ik::{solve_aim, solve_two_bone, AimSettings, BonePose};
 pub use persist::{strip_bones, take_bone_parents};
 pub use ragdoll::{RagdollOptions, RAGDOLL_LAYER};
 
