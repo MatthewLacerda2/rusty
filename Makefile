@@ -168,8 +168,8 @@ mergeable: ## Did CI really run on this PR's head? make mergeable PR=524
 # rebased head before pushing it (#571; ARGS=--no-check skips). Never resolves
 # a conflict or touches a worktree of yours; it names what to clean up.
 # ARGS passes flags through, e.g. ARGS=--dry-run (reads only, writes nothing).
-queue: ## Rebase, wait for CI, squash-merge each in turn. make queue PRS="524 526"
-	@test -n "$(PRS)" || { echo "queue: which pull requests? e.g. make queue PRS=\"524 526\"" >&2; exit 1; }
+queue: ## Rebase, wait for CI, squash-merge each in turn. make queue PRS="524 526", or ARGS=--watch
+	@test -n "$(PRS)$(filter --watch,$(ARGS))" || { echo "queue: which pull requests? e.g. make queue PRS=\"524 526\", or make queue ARGS=--watch" >&2; exit 1; }
 	@python3 .github/scripts/merge-queue.py $(PRS) $(ARGS)
 
 # "Blocked by #N" written in an issue body but never recorded as a GitHub

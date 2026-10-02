@@ -12,7 +12,10 @@ scorsese (#486); its incidents are cited as scorsese#N.
 
 Invoked, never a service: it runs when somebody types `make queue`, on the pull
 requests they name, in the order they name them. `--dry-run` does every read
-and the local rebase, and writes nothing to GitHub.
+and the local rebase, and writes nothing to GitHub. `--watch` (#664) names
+none: it takes each pull request as it turns ready, in label-priority order,
+and is still invoked, never a service — it exits on the first hand-back, on
+the machine failing, or when nothing is left ([`queue_watch`]).
 
 ## Why it does not skip a run instead
 
@@ -126,6 +129,7 @@ call.
 Run it:
 
     make queue PRS="524 526"
+    make queue ARGS="--watch --no-check"
     python3 .github/scripts/merge-queue.py 524 526 --dry-run
 
 The decisions are pure functions over plain dictionaries, tested without a
@@ -152,6 +156,12 @@ _spec = importlib.util.spec_from_file_location(
 )
 mergeable = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(mergeable)
+
+_spec = importlib.util.spec_from_file_location(
+    "queue_watch", Path(__file__).resolve().parent / "queue_watch.py"
+)
+queue_watch = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(queue_watch)
 
 # How often GitHub is asked again. A cold run is about ten minutes; a tighter
 # poll buys only API calls.
@@ -227,6 +237,10 @@ WAIT, GO, STOP = "wait", "go", "stop"
 MERGED, GREEN, DRY, HANDED_BACK = "merged", "green", "dry run", "handed back"
 # The machine failed, not the branch ([`Stopped`]); and what the stop left untouched.
 STOPPED, NOT_TAKEN = "stopped the queue", "not taken"
+# A watched pull request that turned draft or closed between listing and taking,
+# and what [`take`] says about one.
+NOT_READY = "not ready"
+NOT_OPEN, A_DRAFT = "it is {}.", "it is a draft; mark it ready first."
 
 
 class Stopped(Exception):
@@ -683,10 +697,10 @@ def take(repo: str, number: int, opts: argparse.Namespace) -> tuple[int, str, st
     """One pull request, from where it is to merged or handed back."""
     pull = look(number)
     if pull.get("state") != "OPEN":
-        return number, HANDED_BACK, f"it is {str(pull.get('state')).lower()}."
+        return number, HANDED_BACK, NOT_OPEN.format(str(pull.get("state")).lower())
     if pull.get("isDraft"):
         # Before any push: a draft is not a claim, so there is nothing to check.
-        return number, HANDED_BACK, "it is a draft; mark it ready first."
+        return number, HANDED_BACK, A_DRAFT
 
     branch, head = pull["headRefName"], pull["headRefOid"]
     git("fetch", "--quiet", "origin", "main", cwd=opts.root)
@@ -746,7 +760,15 @@ def parse(argv: list[str]) -> argparse.Namespace:
             " turn. Merging stays serialized; this only does the waiting."
         ),
     )
-    parser.add_argument("prs", metavar="PR", type=int, nargs="+", help="pull request numbers, merged in the order given")
+    parser.add_argument("prs", metavar="PR", type=int, nargs="*", help="pull request numbers, merged in the order given")
+    parser.add_argument(
+        "--watch", action="store_true",
+        help="name no PR: take each one as it turns ready, by label priority; exit on the first hand-back or when nothing is left",
+    )
+    parser.add_argument(
+        "--idle", type=float, default=queue_watch.IDLE_MINUTES, metavar="MINUTES",
+        help=f"--watch: exit when nothing is ready and no open PR has moved for this long (default {queue_watch.IDLE_MINUTES})",
+    )
     parser.add_argument("--no-merge", action="store_true", help="stop at green and hand each branch back rather than merging it")
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -769,7 +791,10 @@ def parse(argv: list[str]) -> argparse.Namespace:
         help="where the pre-push checks build (default: target/merge-queue under --root; never a worktree's own)",
     )
     parser.add_argument("--root", default=".", metavar="DIR", help="the git checkout to rebase in (default: the current directory)")
-    return parser.parse_args(argv)
+    opts = parser.parse_args(argv)
+    if bool(opts.prs) == opts.watch:
+        parser.error("name the pull requests, or pass --watch; not both, not neither")
+    return opts
 
 
 def drain(numbers: list[int], turn) -> list[tuple[int, str, str]]:
@@ -790,6 +815,55 @@ def drain(numbers: list[int], turn) -> list[tuple[int, str, str]]:
     return results
 
 
+def quietly(*args: str) -> object | None:
+    """`gh`'s parsed JSON, or `None` when it fails: a watch outlives a blip."""
+    done = subprocess.run(["gh", *args], capture_output=True, text=True, check=False)
+    if done.returncode != 0:
+        say(f"gh {args[0]} {args[1]} failed: {done.stderr.strip()}")
+        return None
+    try:
+        return json.loads(done.stdout)
+    except json.JSONDecodeError:
+        return None
+
+
+def issue_labels() -> dict[int, set[str]]:
+    """Every open issue's labels: the priority [`queue_watch.rank`] reads."""
+    issues = quietly("issue", "list", "--state", "open", "--limit", "1000", "--json", "number,labels") or []
+    return {i["number"]: queue_watch.names(i.get("labels")) for i in issues}
+
+
+def unready(result: tuple[int, str, str]) -> tuple[int, str, str]:
+    """[`take`]'s refusal of a draft or closed pull request, renamed for the
+    watch: it raced the listing, and is not a hand-back to wake anyone for."""
+    number, state, why = result
+    refused = why == A_DRAFT or why in {NOT_OPEN.format(s) for s in ("closed", "merged")}
+    return (number, NOT_READY, why) if state == HANDED_BACK and refused else result
+
+
+def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
+    """What [`queue_watch.run`] does to the world, bound to this repository."""
+    common = git("rev-parse", "--git-common-dir", cwd=opts.root).stdout.strip() or ".git"
+    return argparse.Namespace(
+        pulls=lambda: quietly(
+            "pr", "list", "--state", "open", "--limit", "200", "--json", queue_watch.LIST_FIELDS
+        ),
+        issue_labels=issue_labels,
+        turn=lambda number: unready(drain([number], lambda n: take(repo, n, opts))[0]),
+        head=lambda number: (quietly("pr", "view", str(number), "--json", "headRefOid") or {}).get("headRefOid"),
+        clock=time.monotonic,
+        sleep=time.sleep,
+        say=say,
+        memory=Path(opts.root, common, queue_watch.MEMORY),
+        bots=BOTS,
+        merged=MERGED,
+        # A dry run previews every ready one; it hands nothing back for real.
+        ends={GREEN, DRY} | ({HANDED_BACK} if opts.dry_run else set()),
+        stops={STOPPED},
+        skips={NOT_READY},
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     opts = parse(sys.argv[1:] if argv is None else argv)
     if not (opts.no_check or opts.dry_run):
@@ -798,10 +872,17 @@ def main(argv: list[str] | None = None) -> int:
             say(f"refusing to start: {refused[0]}", *refused[1:])
             return 1
     repo = mergeable.gh("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
-    results = drain(ordered(opts.prs), lambda number: take(repo, number, opts))
+    if opts.watch:
+        results, why, clean = queue_watch.run(effects(repo, opts), opts)
+    else:
+        results = drain(ordered(opts.prs), lambda number: take(repo, number, opts))
     print()
     for line in summary(results):
         say(line)
+    if opts.watch:
+        say(f"watch ended: {why}")
+        if not clean:
+            return 1
     return 0 if all(state in (MERGED, GREEN, DRY) for _, state, _ in results) else 1
 
 
