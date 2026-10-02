@@ -57,8 +57,10 @@ impl Renderer {
         };
         self.shadow_renderer
             .render_cascades(&mut encoder, &frame, lod);
-        self.shadow_renderer.render_atlas(&mut encoder, &frame, lod);
+        let bake = self.shadow_renderer.render_atlas(&mut encoder, &frame, lod);
         self.queue.submit(std::iter::once(encoder.finish()));
+        self.frame_counters.shadow_atlas_cached = bake.cached;
+        self.frame_counters.shadow_atlas_rebaked = bake.rebaked;
     }
 }
 

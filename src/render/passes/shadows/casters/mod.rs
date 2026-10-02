@@ -14,8 +14,8 @@
 //!
 //! Casters are gathered once per sweep and culled per light volume — a cascade (#435)
 //! or an atlas tile (#468) — so a prop inside two volumes is drawn into both. The
-//! cascades' static bake and dynamic pass and the atlas each own a [`CasterBuffer`]
-//! holding every volume's casters: all three are recorded into the same encoder
+//! cascades' and the atlas's static bakes and dynamic passes each own a [`CasterBuffer`]
+//! holding every volume's casters: all four are recorded into the same encoder
 //! before one submit, so sharing one buffer would let a later upload overwrite an
 //! earlier sweep's casters.
 
@@ -93,17 +93,19 @@ pub(super) enum Sweep {
     Static,
     /// The cascades' per-frame pass: everything the bake leaves out.
     Dynamic,
-    /// The point/spot shadow atlas (#468): every caster, redrawn each frame.
-    Atlas,
+    /// The point/spot shadow atlas's cached bake of its stale tiles (#694): static
+    /// casters only.
+    AtlasStatic,
+    /// The atlas's per-frame pass over every tile: everything its bake leaves out.
+    AtlasDynamic,
 }
 
 impl Sweep {
     /// Whether a caster whose static flag is `is_static` is drawn in this sweep.
     fn takes(self, is_static: bool) -> bool {
         match self {
-            Sweep::Static => is_static,
-            Sweep::Dynamic => !is_static,
-            Sweep::Atlas => true,
+            Sweep::Static | Sweep::AtlasStatic => is_static,
+            Sweep::Dynamic | Sweep::AtlasDynamic => !is_static,
         }
     }
 }
@@ -161,7 +163,8 @@ impl ShadowRenderer {
         let buffer = match sweep {
             Sweep::Static => &mut self.static_casters,
             Sweep::Dynamic => &mut self.dynamic_casters,
-            Sweep::Atlas => &mut self.atlas.casters,
+            Sweep::AtlasStatic => &mut self.atlas.static_casters,
+            Sweep::AtlasDynamic => &mut self.atlas.dynamic_casters,
         };
         let layout = &self.entity_layout;
         buffer.upload(frame.device, frame.queue, layout, &matrices, &joints);
@@ -235,7 +238,8 @@ impl ShadowRenderer {
         let (casters, global) = match sweep {
             Sweep::Static => (&self.static_casters, &self.global_bind_group),
             Sweep::Dynamic => (&self.dynamic_casters, &self.global_bind_group),
-            Sweep::Atlas => (&self.atlas.casters, &self.atlas.global),
+            Sweep::AtlasStatic => (&self.atlas.static_casters, &self.atlas.global),
+            Sweep::AtlasDynamic => (&self.atlas.dynamic_casters, &self.atlas.global),
         };
         let offset = (volume as u64 * super::LIGHT_SPACE_STRIDE) as u32;
         render_pass.set_bind_group(0, global, &[offset]);
