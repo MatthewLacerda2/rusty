@@ -5,10 +5,10 @@
 
 use std::mem::{offset_of, size_of};
 
-use super::shaders::ShaderRegistry;
 use super::uniforms::{CameraUniform, LightingUniform};
 use crate::render::clusters::LocalLight;
 use crate::render::passes::shadows::atlas::ShadowTile;
+use crate::shadergen::compose;
 
 const PROBE: &str = "#import common::{CameraUniforms, LightingUniforms, LocalLight, ShadowTile}\n\
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;\n\
@@ -21,8 +21,8 @@ const PROBE: &str = "#import common::{CameraUniforms, LightingUniforms, LocalLig
 
 /// `(member offset by name, struct size)` of the WGSL struct named `name`.
 fn wgsl_struct(name: &str) -> (Vec<(String, usize)>, usize) {
-    let mut composer = ShaderRegistry::composer_with_common("assets/shaders").unwrap();
-    let module = ShaderRegistry::validate_source(&mut composer, PROBE).unwrap();
+    let mut composer = compose::composer_with_common("assets/shaders").unwrap();
+    let module = compose::compose(&mut composer, PROBE, "probe.wgsl").unwrap();
     let found = module
         .types
         .iter()

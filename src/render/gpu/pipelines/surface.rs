@@ -36,10 +36,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
-use crate::render::gpu::shaders::ShaderRegistry;
 use crate::shadergen::assemble::{CUT_PREPASS, CUT_SHADOW};
 use crate::shadergen::params::ParamLayout;
-use crate::shadergen::{DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{compose, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
 
 /// The pipeline id of the renderer's standard forward shader.
 pub(crate) const STANDARD: usize = 0;
@@ -247,8 +246,8 @@ impl SurfaceShaders {
     /// pipelines under a validation error scope, so wgpu refuses instead of panicking.
     fn build(&self, device: &wgpu::Device, path: &PathBuf) -> Result<SurfacePipelines, String> {
         let source = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        let mut composer = ShaderRegistry::composer_with_common(ENGINE_SHADER_DIR)?;
-        let module = ShaderRegistry::validate_source(&mut composer, &source)?;
+        let mut composer = compose::composer_with_common(ENGINE_SHADER_DIR)?;
+        let module = compose::compose(&mut composer, &source, &path.to_string_lossy())?;
         let has = |entry: &str, stage| {
             module
                 .entry_points

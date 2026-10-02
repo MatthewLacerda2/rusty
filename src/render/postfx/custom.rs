@@ -20,11 +20,10 @@
 
 use std::collections::HashMap;
 
-use naga_oil::compose::{Composer, NagaModuleDescriptor};
+use naga_oil::compose::Composer;
 
 use super::{PfxTarget, PostFx};
-use crate::render::gpu::shaders::ShaderRegistry;
-use crate::shadergen::{bake_generation, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_generation, compose, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
 
 /// The authored-effect half of the chain: its extra targets and its module cache.
 pub struct CustomChain {
@@ -131,15 +130,10 @@ impl EffectCache {
         let source = std::fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
         let composer = match &mut self.composer {
             Some(c) => c,
-            slot => slot.insert(ShaderRegistry::composer_with_common(ENGINE_SHADER_DIR)?),
+            slot => slot.insert(compose::composer_with_common(ENGINE_SHADER_DIR)?),
         };
-        let module = composer
-            .make_naga_module(NagaModuleDescriptor {
-                source: &source,
-                file_path: &path,
-                ..Default::default()
-            })
-            .map_err(|e| format!("{path} failed to compose: {e:?}"))?;
+        let module = compose::compose(composer, &source, &path)
+            .map_err(|e| format!("{path} failed to compose: {e}"))?;
         for entry in ["vs_fullscreen", "fs_main"] {
             if !module.entry_points.iter().any(|e| e.name == entry) {
                 return Err(format!("{path} has no `{entry}` (not a postfx module?)"));

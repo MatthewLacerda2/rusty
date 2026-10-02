@@ -14,7 +14,7 @@ agent can read exactly what failed.
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
 | Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation`/`ui`/`api`/`scene`/`components`/`ecs`/`core`/`time`/`asset`/`procgen`/`shadergen`/`audio` |
-| Dependency direction | `tools/lint -- --direction` | sim modules (the determinism list minus `shadergen`, which #722 adds) never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
+| Dependency direction | `tools/lint -- --direction` | sim modules (the determinism list) never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
 | Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`/`ui`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every *migrated* first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard), minus the burn-down baseline |
@@ -85,8 +85,9 @@ primitive builders in `components::mesh`, `Camera` and `Decal` in `scene`,
 `render::gpu::mesh::vertex_layout`). There is no baseline — the guard landed with
 zero violations (#494), and it is the groundwork the crate split (#495) needs.
 `api` joined the scan in #723: it is the surface scripts drive from inside the sim.
-`shadergen` is the one sim-reached module still outside it — it imports
-`crate::render` once, and #722 removes that import and adds it. Both guards fail on
+`shadergen` joined in #722, once its GPU-free `naga_oil` composition moved out of
+`render` into `shadergen::compose` (the renderer's `ShaderRegistry` now calls it).
+Both guards fail on
 a listed directory that no longer exists, and `test-lint` pins each list, so a
 module can only leave a scan through a reviewed edit.
 
