@@ -8,17 +8,20 @@ use rusty::editor::theme::Theme;
 const W: u32 = 1280;
 const H: u32 = 720;
 
-/// The share of pixels in the column `x0..x1` (middle half of the height) that are the
-/// panel fill, give or take a little for the sRGB round trip.
+/// The share of pixels in the column `x0..x1` (middle half of the height) painted in
+/// the editor's panel or card fill, give or take a little for the sRGB round trip.
 fn panel_share(img: &image::RgbaImage, x0: u32, x1: u32) -> f32 {
-    let fill = Theme::dark().bg_tier1;
-    let near = |a: u8, b: u8| a.abs_diff(b) <= 2;
+    let theme = Theme::dark();
+    let fills = [theme.bg_tier1, theme.bg_tier2];
+    let near = |p: [u8; 4], c: egui::Color32| {
+        p[0].abs_diff(c.r()) <= 2 && p[1].abs_diff(c.g()) <= 2 && p[2].abs_diff(c.b()) <= 2
+    };
     let (mut hits, mut total) = (0u32, 0u32);
     for y in H / 4..H * 3 / 4 {
         for x in x0..x1 {
             let p = img.get_pixel(x, y).0;
             total += 1;
-            hits += u32::from(near(p[0], fill.r()) && near(p[1], fill.g()) && near(p[2], fill.b()));
+            hits += u32::from(fills.iter().any(|&c| near(p, c)));
         }
     }
     hits as f32 / total as f32

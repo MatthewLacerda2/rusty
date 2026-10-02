@@ -172,6 +172,39 @@ from the budget's acquire). A test in that module also fails if the filter in
 `.config/nextest.toml` stops matching the Rust predicate, so the two copies of the
 rule cannot drift apart.
 
+## Editor captures (#731)
+`screenshot::capture` shows the game; **`dev::editor_capture`** shows the *editor* —
+the egui panels around the scene viewport — rendered offscreen to a PNG with no window,
+on lavapipe or any adapter. It is how an agent that changes the editor lets the operator
+see the change without launching it:
+
+```sh
+make editor-capture OUT=after.png ARGS="--select Player"
+# or: cargo run --features dev --bin editor-capture -- --out after.png --play --game
+```
+
+Options: `--scene <path>` (default: the built-in default scene, in memory), `--select
+<name>`, `--play` (the Play-mode chrome; the sim is not stepped), `--game` (the Game
+tab), `--size <W>x<H>` (default 1600x900). From Rust, `editor_capture::capture(&game,
+path, &EditorCaptureOptions { .. })` takes any `GameWorld`, and `capture_into` shares a
+`CaptureHost` across shots.
+
+Each frame runs the editor's own `EditorUi::draw`, renders the scene into the viewport
+rect the layout asked for, and binds it as the viewport's texture; the last frame is
+painted with `egui_wgpu` and read back. A fixed size, a 1× scale, a fixed frame count
+and a synthetic clock make it **deterministic**: the same scene and options give the same
+bytes on the same machine. What it cannot show: hover states, open menus and popups.
+
+**An editor-visible PR attaches captures** — before (on `main`) and after, of the panel
+it changes. Commit the PNGs on a throwaway commit, link them by that commit's SHA, and
+remove them in the next commit (as #725 did), so none lands on `main`; `.gitignore`
+already ignores `editor-capture*.png` at the root.
+
+The smoke test (`tests/gpu/editor_capture.rs`) checks that the default scene captures,
+the image is not blank and the hierarchy, viewport and inspector sit where the editor
+puts them. **No pixel goldens** of the editor: fonts and anti-aliasing differ across
+platforms and adapters, so a golden would break on every one but the machine that made it.
+
 ## Performance budgets (frame stats, #433)
 A scenario can assert on performance the same way it asserts on behaviour. The harness
 records frame stats every tick (see `Debug.Stats` in `docs/api/Debug.md` for the

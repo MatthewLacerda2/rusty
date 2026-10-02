@@ -50,6 +50,11 @@ name more.
 - A test that renders is named `gpu_*` (in-crate) or lives under `tests/gpu/`
   (integration). Install lavapipe to run them:
   `sudo apt-get install -y mesa-vulkan-drivers libvulkan1`.
+- **An editor-visible PR attaches captures.** If the branch changes what the editor
+  draws (a panel, an inspector card, the theme), run `make editor-capture` on `main`
+  and on the branch (`ARGS="--select <entity>"` to open its inspector) and show both
+  in the PR description, the way `docs/testing.md` § Editor captures says. Never
+  leave a PNG on the branch that merges. (#731; #725 did it by hand.)
 - `make gates` (foreground) before readying.
 - If `cargo nextest` is missing in the container, install the prebuilt binary
   (`curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ~/.cargo/bin`)
