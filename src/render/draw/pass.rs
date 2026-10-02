@@ -4,6 +4,7 @@
 use crate::render::draw::batch::DrawBatch;
 use crate::render::draw::resources::{OutlineResource, Overlays};
 use crate::render::gpu::draw_buffers::DrawBuffers;
+use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::pipelines::surface::SolidPass;
 use crate::render::passes::ssao::SsaoFrame;
 use crate::render::{RenderView, Renderer};
@@ -161,9 +162,9 @@ impl Renderer {
         }
     }
 
-    /// Rebuild the group-0 bind group with the active skybox, but only when the skybox
-    /// changed — its camera/lighting buffers are persistent, so an unchanged skybox
-    /// needs no rebuild (skips ~one bind-group creation per camera per frame, #210).
+    /// Rebuild the group-0 bind group, but only when something it names changed — the
+    /// skybox, the probe cube, or a light-cluster buffer that grew (#434). Its buffers
+    /// are otherwise persistent (skips ~one bind-group creation per camera, #210).
     fn update_global_bind_group(&mut self) {
         if !self.global_bind_group_dirty {
             return;
@@ -179,36 +180,14 @@ impl Renderer {
             .reflection_cube
             .as_deref()
             .unwrap_or(&self.default_cube);
-        self.global_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Global Bind Group with Reflections"),
-            layout: &self.camera_lighting_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: self.camera_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: self.lighting_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(skybox_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::Sampler(skybox_sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 4,
-                    resource: wgpu::BindingResource::TextureView(&cube.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 5,
-                    resource: wgpu::BindingResource::Sampler(&cube.sampler),
-                },
-            ],
-        });
+        self.global_bind_group = GlobalGroup {
+            camera: &self.camera_buffer,
+            lighting: &self.lighting_buffer,
+            skybox: (skybox_view, skybox_sampler),
+            cube: (&cube.view, &cube.sampler),
+            clusters: &self.clusters,
+        }
+        .create(&self.device, &self.camera_lighting_layout);
     }
 
     /// Record `batches` into `pass`: per batch, its pipeline when it differs from the

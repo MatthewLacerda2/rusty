@@ -17,6 +17,18 @@ struct Fog {
     _pad_c: f32,
 };
 
+// How a point finds its light cluster (#434). Mirrors the Rust `ClusterUniform`;
+// built per camera by `render::clusters::ClusterGrid`, which bins on the CPU with
+// the same tiles and slices `cluster_index` reads here.
+struct Clusters {
+    // depth = dot(view_z.xyz, p) + view_z.w: distance along the view axis.
+    view_z: vec4<f32>,
+    // x scale, y bias, z 1 = log2 slices (perspective) / 0 = linear, w near plane.
+    slices: vec4<f32>,
+    // Tiles across, tiles up, depth slices; w unused.
+    dims: vec4<u32>,
+};
+
 struct CameraUniforms {
     view_proj: mat4x4<f32>,
     camera_pos: vec3<f32>,
@@ -25,6 +37,8 @@ struct CameraUniforms {
     time: f32,
     // Rides with the camera so every pass that already binds it fogs for free.
     fog: Fog,
+    // This camera's light-cluster grid (#434).
+    clusters: Clusters,
 };
 
 // The post-process chain's uniform (group 0, binding 0 of every post pass, built-in
@@ -65,29 +79,11 @@ struct DirectionalLight {
     _pad: f32,
 };
 
-struct PointLight {
-    position: vec3<f32>,
-    color: vec3<f32>,
-    intensity: f32,
-    range: f32,
-};
-
-struct Spotlight {
-    position: vec3<f32>,
-    direction: vec3<f32>,
-    color: vec3<f32>,
-    intensity: f32,
-    range: f32,
-    inner_cone: f32, // Cosine of inner angle
-    outer_cone: f32, // Cosine of outer angle
-};
-
 struct LightingUniforms {
     ambient: AmbientLight,
-    dir_light: DirectionalLight,
-    point_lights: array<PointLight, 4>,
-    spot_light: Spotlight,
-    num_point_lights: u32,
+    // Up to four suns (#434); slot 0 is the one casting the cascaded shadows.
+    dir_lights: array<DirectionalLight, 4>,
+    num_dir_lights: u32,
     ssr_active: f32,
     ssr_quality: f32,
     ssr_temporal_upsampling: f32,
@@ -106,6 +102,50 @@ struct LightingUniforms {
     refl_box_min: vec4<f32>,
     refl_box_max: vec4<f32>,
 };
+
+// One point or spot light of the frame (#434), in the storage array at group 0
+// binding 7 (group 3 in the particle pass). Mirrors the Rust `LocalLight`.
+struct LocalLight {
+    position: vec3<f32>,
+    range: f32,
+    color: vec3<f32>,
+    intensity: f32,
+    direction: vec3<f32>,
+    kind: u32,        // 0 point, 1 spot
+    inner_cone: f32,  // cosine of the inner half-angle
+    outer_cone: f32,  // cosine of the outer half-angle
+    _pad_a: f32,
+    _pad_b: f32,
+};
+
+// The light cluster `world` falls in: its screen tile (from `view_proj`) and its
+// depth slice. A point off screen clamps to the edge tile. Index order is
+// x + tiles_x * (y + tiles_y * slice), as the CPU binner writes it.
+fn cluster_index(c: Clusters, view_proj: mat4x4<f32>, world: vec3<f32>) -> u32 {
+    let clip = view_proj * vec4<f32>(world, 1.0);
+    let ndc = clip.xy / max(clip.w, 1e-6);
+    let tiles = vec2<f32>(c.dims.xy);
+    let tile = vec2<u32>(clamp(floor((ndc * 0.5 + 0.5) * tiles), vec2<f32>(0.0), tiles - 1.0));
+    let depth = max(dot(c.view_z.xyz, world) + c.view_z.w, c.slices.w);
+    let f = select(depth, log2(depth), c.slices.z > 0.5);
+    let slice = u32(clamp(floor(f * c.slices.x + c.slices.y), 0.0, f32(c.dims.z - 1u)));
+    return tile.x + c.dims.x * (tile.y + c.dims.y * slice);
+}
+
+// The radiance a local light delivers at `world`: inverse-square falloff cut at its
+// range, and for a spotlight the smoothed cone. Zero when out of reach.
+fn local_light_radiance(light: LocalLight, world: vec3<f32>) -> vec3<f32> {
+    let d = distance(light.position, world);
+    if (d > light.range) {
+        return vec3<f32>(0.0);
+    }
+    var cone = 1.0;
+    if (light.kind == 1u) {
+        let theta = dot((light.position - world) / max(d, 1e-6), -light.direction);
+        cone = clamp((theta - light.outer_cone) / max(light.inner_cone - light.outer_cone, 1e-4), 0.0, 1.0);
+    }
+    return light.color * light.intensity * cone / (d * d + 1.0);
+}
 
 // Standard mesh vertex layout — position, normal, UVs, skeletal animation data
 // (four joint indices + blend weights; no joint cap, #455), and the tangent basis for normal

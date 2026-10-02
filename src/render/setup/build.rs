@@ -8,7 +8,9 @@
 //! depends on what) instead of a pass-through layer (#211). Behavior is unchanged.
 
 use crate::core::quality::QualityPreset;
+use crate::render::clusters::ClusterBuffers;
 use crate::render::gpu::bind_layouts;
+use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::pipelines;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::postfx::HDR_FORMAT;
@@ -21,6 +23,8 @@ pub(crate) struct GlobalBindings {
     pub camera_buffer: wgpu::Buffer,
     pub lighting_buffer: wgpu::Buffer,
     pub global_bind_group: wgpu::BindGroup,
+    /// The light-cluster buffers group 0 binds (#434).
+    pub clusters: ClusterBuffers,
 }
 
 /// Shadow renderer, its cascade uniform buffer, and the main-pass bind group that
@@ -148,8 +152,8 @@ fn create_billboard_passes(
     }
 }
 
-/// Camera + lighting uniform buffers and the group-0 bind group (also binds the
-/// default texture/sampler).
+/// Camera + lighting uniform buffers, the light clusters and the group-0 bind group
+/// (also binds the default texture/sampler).
 fn create_global_bindings(
     device: &wgpu::Device,
     camera_lighting_layout: &wgpu::BindGroupLayout,
@@ -173,41 +177,21 @@ fn create_global_bindings(
     // the active reflection probe's cubemap (or the renderer's own fallback). The shader
     // ignores it (the `refl_has_cubemap` flag stays 0) and samples the 2D skybox instead.
     let cube = crate::render::ibl::cubemap::fallback_cube(device);
-    let global_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("Global Bind Group"),
-        layout: camera_lighting_layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: camera_buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: lighting_buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: wgpu::BindingResource::TextureView(&default_texture.view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 3,
-                resource: wgpu::BindingResource::Sampler(&default_texture.sampler),
-            },
-            wgpu::BindGroupEntry {
-                binding: 4,
-                resource: wgpu::BindingResource::TextureView(&cube.view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 5,
-                resource: wgpu::BindingResource::Sampler(&cube.sampler),
-            },
-        ],
-    });
+    let clusters = ClusterBuffers::new(device);
+    let global_bind_group = GlobalGroup {
+        camera: &camera_buffer,
+        lighting: &lighting_buffer,
+        skybox: (&default_texture.view, &default_texture.sampler),
+        cube: (&cube.view, &cube.sampler),
+        clusters: &clusters,
+    }
+    .create(device, camera_lighting_layout);
 
     GlobalBindings {
         camera_buffer,
         lighting_buffer,
         global_bind_group,
+        clusters,
     }
 }
 

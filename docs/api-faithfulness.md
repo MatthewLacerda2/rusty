@@ -181,9 +181,9 @@ edits and each physics step.)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetColor` | ✅ | renderer — `apply_scene_lights` lighting uniform |
+| `SetColor` | ✅ | renderer — `apply_scene_lights` lighting uniform (ambient, directional); `clusters::local_lights` light array (point, spot, #434) |
 | `SetIntensity` | ✅ | renderer — same (clamped ≥ 0) |
-| `SetRange` | ✅ | renderer — point/spot attenuation |
+| `SetRange` | ✅ | renderer — point/spot attenuation, and the radius the light is binned into clusters with (#434) |
 | `SetType` | ✅ | renderer — selects light path; unknown names ignored |
 
 ### `Particles` — over `Entity.particles`

@@ -1,4 +1,5 @@
 mod camera;
+pub(crate) mod clusters;
 mod debug_meshes;
 mod draw;
 mod frustum;
@@ -40,7 +41,7 @@ pub use view::RenderView;
 // the size cap); re-imported here so the render module body still names them directly.
 pub(crate) use gpu::uniforms::{
     AmbientLightUniform, CameraUniform, DirectionalLightUniform, EntityUniform, InstanceData,
-    LightingUniform, PointLightUniform, SpotlightUniform,
+    LightingUniform,
 };
 
 // Stores GPU Buffer handlers for meshes
@@ -119,6 +120,8 @@ pub struct Renderer {
     /// Rebuild the group-0 bind group only when the skybox it binds changed, not every
     /// camera every frame — its camera/lighting buffers are persistent (#210).
     global_bind_group_dirty: bool,
+    /// The light-cluster buffers group 0 binds (#434), refilled per camera.
+    clusters: clusters::ClusterBuffers,
     /// The packed per-frame draw data every solid draw binds as group 1 (#470): per-draw
     /// uniforms, bone palettes and instances, rewritten per camera.
     draw_buffers: gpu::draw_buffers::DrawBuffers,

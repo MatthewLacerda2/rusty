@@ -16,6 +16,7 @@
 use super::pass::{PassClear, ScenePassFrame};
 use super::resources::SolidResources;
 use super::stack::StackPass;
+use crate::render::clusters::ClusterGrid;
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::lod::LodSelection;
 use crate::render::passes::particles::ParticleDraws;
@@ -30,6 +31,7 @@ pub(crate) type CameraPass = fn(&mut Renderer, &mut RenderView, &mut CameraCtx);
 /// module doc); the name is for tests and reading, not lookup.
 pub(crate) const CAMERA_PASSES: &[(&str, CameraPass)] = &[
     ("camera_uniform", upload_camera),
+    ("light_clusters", bin_lights),
     ("solids", batch_solids),
     ("scene", scene_pass),
     ("decals", decals),
@@ -54,6 +56,8 @@ pub(crate) struct CameraCtx<'a> {
     pub base_view_proj: glam::Mat4,
     /// World-space frustum, for culling off-screen entities (#330).
     pub frustum: Frustum,
+    /// This camera's light-cluster grid (#434).
+    pub clusters: ClusterGrid,
     pub fog: FogUniform,
     pub ssao: Option<SsaoPlan>,
     /// The LOD level each entity shows to this camera (#472).
@@ -82,6 +86,7 @@ impl<'a> CameraCtx<'a> {
     ) -> Self {
         let cam = &stack.stack[idx];
         let view_proj = cam.build_view_projection(shared.aspect);
+        let clusters = ClusterGrid::new(cam, shared.aspect);
         Self {
             scene,
             cam,
@@ -100,7 +105,9 @@ impl<'a> CameraCtx<'a> {
                 camera_pos: cam.position.to_array(),
                 time: scene.shader_time,
                 fog: shared.fog,
+                clusters: clusters.uniform(),
             },
+            clusters,
             solids: SolidResources::default(),
             effects: ParticleDraws::default(),
         }
@@ -110,6 +117,11 @@ impl<'a> CameraCtx<'a> {
 fn upload_camera(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
     r.queue
         .write_buffer(&r.camera_buffer, 0, bytemuck::bytes_of(&ctx.uniform));
+}
+
+/// Bin the frame's point and spot lights into this camera's clusters (#434).
+fn bin_lights(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
+    r.bin_lights(&ctx.clusters);
 }
 
 /// This camera's solids (the culling mask differs per camera) as instanced draws

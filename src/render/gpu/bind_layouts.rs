@@ -42,7 +42,9 @@ fn sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
 }
 
 /// Group 0: Camera (0), Lighting (1), Skybox Texture (2), Skybox Sampler (3), Reflection
-/// Probe Cube (4), Reflection Probe Sampler (5). The cube is the active probe's baked,
+/// Probe Cube (4), Reflection Probe Sampler (5), and the light clusters (#434): the
+/// frame's point/spot lights (7), each cluster's light range (8) and the light-index
+/// list (9). Binding 6 is the shadow module's (see `shader.wgsl`). The cube is the active probe's baked,
 /// prefiltered cubemap (#245); the shader samples it (parallax-corrected, roughness->mip)
 /// when a probe applies and falls back to the 2D skybox otherwise.
 pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
@@ -57,6 +59,10 @@ pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::Bind
             sampler_entry(3),
             texture_entry(4, Cube),
             sampler_entry(5),
+            // Vertex-visible too, for lit particles (#440).
+            storage_entry(7, wgpu::ShaderStages::VERTEX_FRAGMENT),
+            storage_entry(8, wgpu::ShaderStages::VERTEX_FRAGMENT),
+            storage_entry(9, wgpu::ShaderStages::VERTEX_FRAGMENT),
         ],
     })
 }
