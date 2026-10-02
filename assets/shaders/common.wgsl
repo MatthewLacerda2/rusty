@@ -96,7 +96,9 @@ struct LightingUniforms {
     // the env reflection samples THAT cube (roughness -> mip) with parallax correction
     // instead of the 2D skybox. 0.0 falls back to the skybox. Mirrors the Rust uniform.
     refl_has_cubemap: f32,
-    _refl_pad_a: f32,
+    // 1.0 when a skybox panorama is bound at binding 2 (#718); 0.0 means the sky on
+    // screen is the procedural gradient, which the env reflection then reflects too.
+    sky_textured: f32,
     _refl_pad_b: f32,
     refl_center: vec4<f32>,
     refl_box_min: vec4<f32>,
@@ -304,4 +306,70 @@ fn sky_fog(fog: Fog, color: vec3<f32>, dir: vec3<f32>, eye: vec3<f32>) -> vec3<f
     let f = fog_factor(fog, eye + dir * FOG_SKY_DISTANCE, eye);
     let horizon = 1.0 - smoothstep(0.0, 0.4, dir.y);
     return mix(color, fog.color, f * horizon);
+}
+
+// --- The procedural sky (#256) ------------------------------------------------
+// The colour of the procedural sky along `dir`, before fog: a ground -> horizon ->
+// sky gradient tinted from `sky_color` (the scene's ambient colour) plus a cheap,
+// static cloud layer. ONE function, two callers: the sky pass draws it when no
+// panorama is bound (`sky_gradient.wgsl`), and the forward pass reflects it in the
+// same case (#718), so a metal surface mirrors the sky that is actually on screen.
+
+fn sky_hash(p: vec2<f32>) -> f32 {
+    // Deterministic 2D -> 1D hash in [0, 1). No engine RNG: this is the platform
+    // (render) layer, and the result is a pure function of direction.
+    let h = dot(p, vec2<f32>(127.1, 311.7));
+    return fract(sin(h) * 43758.5453);
+}
+
+fn sky_value_noise(p: vec2<f32>) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+    // Smoothstep interpolation weights for C1-continuous cells.
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = sky_hash(i + vec2<f32>(0.0, 0.0));
+    let b = sky_hash(i + vec2<f32>(1.0, 0.0));
+    let c = sky_hash(i + vec2<f32>(0.0, 1.0));
+    let d = sky_hash(i + vec2<f32>(1.0, 1.0));
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+fn sky_fbm(p: vec2<f32>) -> f32 {
+    var sum = 0.0;
+    var amp = 0.5;
+    var freq = p;
+    for (var i = 0; i < 5; i = i + 1) {
+        sum = sum + amp * sky_value_noise(freq);
+        freq = freq * 2.0;
+        amp = amp * 0.5;
+    }
+    return sum;
+}
+
+fn procedural_sky(sky_color: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
+    // Ground is the darker quarter of the sky tint, exactly as the forward pass's
+    // hemisphere ambient; the horizon a desaturated lift toward white (the classic
+    // default-skybox glow).
+    let ground_color = sky_color * 0.25;
+    let horizon_color = mix(sky_color, vec3<f32>(1.0), 0.6);
+
+    // Blend ground -> horizon below the horizon line, horizon -> sky above it. The
+    // `pow` tightens each band so the horizon glow stays near y = 0.
+    let up = clamp(dir.y, 0.0, 1.0);
+    let down = clamp(-dir.y, 0.0, 1.0);
+    var color = mix(horizon_color, sky_color, pow(up, 0.5));
+    color = mix(color, ground_color, pow(down, 0.35));
+
+    // Cloud layer, sky hemisphere only. Project the view ray onto a flat sky dome so
+    // cells bunch up toward the horizon, then carve soft cloud shapes out of the FBM
+    // and tint them a hair brighter than the sky. Coverage fades out near the horizon
+    // (so clouds don't bleed into the glow) and is absent below it.
+    if (dir.y > 0.0) {
+        let dome = dir.xz / max(dir.y, 0.15);
+        let coverage = smoothstep(0.45, 0.80, sky_fbm(dome * 1.6));
+        let band = smoothstep(0.05, 0.35, up);
+        let cloud_color = mix(sky_color, vec3<f32>(1.0), 0.85);
+        color = mix(color, cloud_color, coverage * band * 0.6);
+    }
+    return color;
 }

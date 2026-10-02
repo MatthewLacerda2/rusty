@@ -1,4 +1,4 @@
-#import common::{CameraUniforms, LightingUniforms, LocalLight, NO_SHADOW, ShadowTile, VertexInput, apply_fog, blend_joints, cluster_index, local_light_radiance, local_shadow_tile, sample_local_shadow}
+#import common::{CameraUniforms, LightingUniforms, LocalLight, NO_SHADOW, ShadowTile, VertexInput, apply_fog, blend_joints, cluster_index, local_light_radiance, local_shadow_tile, procedural_sky, sample_local_shadow}
 
 struct EntityUniforms {
     model_matrix: mat4x4<f32>,
@@ -371,6 +371,32 @@ fn parallax_correct(world_pos: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     return normalize(hit - lighting.refl_center.xyz);
 }
 
+// The environment a surface reflects along the mirror direction `R` (#244, #718). The
+// raw direction is parallax-corrected against the active reflection probe's box when one
+// covers the fragment, so the reflection tracks the room as the camera moves rather than
+// behaving like an infinitely-distant sky. Then the source, in order: the probe's baked,
+// prefiltered cube (roughness selects the mip, #245); the skybox panorama; and with
+// neither, the same procedural sky the sky pass draws (#256), so the reflection matches
+// what is on screen. (Roughness blurs only the baked cube; the 2D skies stay sharp until
+// #245 prefilters them.)
+fn environment_reflection(world_pos: vec3<f32>, raw_r: vec3<f32>, roughness: f32) -> vec3<f32> {
+    var R = normalize(raw_r);
+    if (lighting.refl_active > 0.5) {
+        R = parallax_correct(world_pos, R);
+    }
+    if (lighting.refl_has_cubemap > 0.5) {
+        let max_mip = f32(textureNumLevels(t_refl_cube) - 1u);
+        return textureSampleLevel(t_refl_cube, s_refl_cube, R, roughness * max_mip).rgb;
+    }
+    if (lighting.sky_textured > 0.5) {
+        // The equirectangular panorama, mapped as the skybox pass maps it.
+        let phi = atan2(R.z, R.x);
+        let theta = acos(clamp(R.y, -1.0, 1.0));
+        return textureSample(t_skybox, s_skybox, vec2<f32>((phi + PI) / (2.0 * PI), theta / PI)).rgb;
+    }
+    return procedural_sky(lighting.ambient.color, R);
+}
+
 // The SSAO depth prepass (#436): depth only, so it writes no colour. Cutout texels
 // are clipped as `fs_main` clips them, and unlit draws (gizmos, grids) are skipped:
 // neither should cast occlusion. A surface variant whose blocks cut fragments
@@ -544,37 +570,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         lighting_color += calculate_pbr(N, V, L, radiance, F0, metallic, roughness, albedo);
     }
 
-    // 5. Environment reflections (#244). The raw mirror direction is parallax-corrected
-    // against the active reflection probe's box when one covers the fragment, so the
-    // reflected environment tracks the room as the camera moves rather than behaving
-    // like an infinitely-distant skybox. With no probe (or no SSR) it samples the global
-    // skybox directly, the prior behaviour. (Roughness will select a prefiltered cubemap
-    // mip once #245 bakes the chain; today the LDR skybox is the env source.)
-    if (lighting.ssr_active > 0.5) {
-        var R = reflect(-V, N);
-        if (lighting.refl_active > 0.5) {
-            R = parallax_correct(in.world_position, normalize(R));
-        }
-        var env_reflection: vec3<f32>;
-        if (lighting.refl_has_cubemap > 0.5) {
-            // The probe's baked, prefiltered cube: roughness selects the mip, so a mirror
-            // reads the sharp base level and a rough surface a blurrier one. `R` is already
-            // parallax-corrected against the probe box above.
-            let max_mip = f32(textureNumLevels(t_refl_cube) - 1u);
-            env_reflection = textureSampleLevel(t_refl_cube, s_refl_cube, R, roughness * max_mip).rgb;
-        } else {
-            // No baked cube: fall back to the equirectangular skybox (the #244 behaviour).
-            let phi = atan2(R.z, R.x);
-            let theta = acos(clamp(R.y, -1.0, 1.0));
-            let u = (phi + PI) / (2.0 * PI);
-            let v = theta / PI;
-            env_reflection = textureSample(t_skybox, s_skybox, vec2<f32>(u, v)).rgb;
-        }
-
-        let F_refl = FresnelSchlick(max(dot(N, V), 0.0), F0);
-        let reflection_scale = (1.0 - roughness) * (metallic + (1.0 - metallic) * 0.2);
-        lighting_color += env_reflection * F_refl * reflection_scale * ao;
-    }
+    // 5. Environment reflections (#244), always on (#718): like Unity's Lighting ->
+    // Environment Reflections, the sky / reflection-probe term applies whether or not
+    // the camera runs SSR, which only adds screen-space detail on top (postfx). A metal
+    // has no diffuse term, so without this it renders black. See `environment_reflection`.
+    let R = reflect(-V, N);
+    let F_refl = FresnelSchlick(max(dot(N, V), 0.0), F0);
+    let reflection_scale = (1.0 - roughness) * (metallic + (1.0 - metallic) * 0.2);
+    lighting_color += environment_reflection(in.world_position, R, roughness) * F_refl * reflection_scale * ao;
 
     // 6. Emissive (#222 factor, #207 map): self-illumination added on top of the lit
     // colour, independent of any light. The factor is modulated by the emissive map's

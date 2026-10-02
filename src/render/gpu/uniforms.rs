@@ -95,10 +95,12 @@ pub(crate) struct LightingUniform {
     // camera; the shader box-projects against `[refl_box_min, refl_box_max]` around
     // `refl_center`. `refl_has_cubemap` (#245) 1.0 when that probe has a baked cube at
     // binding 4 — then the shader samples it (roughness->mip), else the skybox. Pads keep
-    // each `vec4` 16-byte aligned, matching the WGSL layout.
+    // each `vec4` 16-byte aligned, matching the WGSL layout. `sky_textured` (#718) 1.0
+    // when a skybox panorama is bound, else the shader reflects the procedural sky.
     pub refl_active: f32,
     pub refl_has_cubemap: f32,
-    pub _refl_pad: [f32; 2],
+    pub sky_textured: f32,
+    pub _refl_pad: f32,
     pub refl_center: [f32; 4],
     pub refl_box_min: [f32; 4],
     pub refl_box_max: [f32; 4],
