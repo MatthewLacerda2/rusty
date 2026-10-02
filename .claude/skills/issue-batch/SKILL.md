@@ -357,8 +357,11 @@ sessions on a branch are the second kind. The line is not crisp, so err upwards.
   A call the issue simply did not foresee is **not** one of these when Unity has
   an answer: take Unity's (CLAUDE.md, *When in doubt, Unity's way*), name it in
   the PR, and carry on.
-- Mark the pull request **draft**, say why in the description, and stop. Do not
-  thrash.
+- **Save, ask, move on.** Push what exists (a dead session takes uncommitted work
+  with it), mark the pull request **draft**, write what is needed and why in the
+  description and an issue comment, then **take the next startable work**. The
+  branch stops, never the batch (operator, 2026-10-02: "the work is saved but the
+  progress doesn't stop"). Do not thrash on the stopped branch.
 
 When working unattended, prefer leaving a comment on the issue and continuing
 over stalling the night on a question. Questions asked *while planning* are asked
