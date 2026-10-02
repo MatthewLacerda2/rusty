@@ -27,6 +27,7 @@ mod compound;
 #[cfg(test)]
 mod compound_tests;
 mod convert;
+mod follow;
 mod joints;
 #[cfg(test)]
 mod joints_tests;

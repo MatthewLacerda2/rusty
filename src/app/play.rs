@@ -72,7 +72,8 @@ impl GameWorld {
 /// system has seen the entity. The scene-load phase (#432) follows it, so a
 /// `Scene.Load` swaps the World only once the whole tick is done with it, right
 /// before `advance_frame`. The skin palette build (#453) runs in `Render`, after
-/// every stage that may move a bone.
+/// every stage that may move a bone. `follow_bones` (#464) runs after the last
+/// sim writer of a bone (`LateUpdate`), so hitboxes are queried where they render.
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::FixedUpdate, rebake_nav)
         .add_system(Stage::FixedUpdate, init_scripts)
@@ -84,6 +85,7 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, animate)
         .add_system(Stage::FixedUpdate, super::particles::tick_particles)
         .add_system(Stage::FixedUpdate, late_update_scripts)
+        .add_system(Stage::FixedUpdate, follow_bones)
         .add_system(Stage::FixedUpdate, super::trails::tick_trails)
         .add_system(Stage::FixedUpdate, apply_destroys)
         .add_system(Stage::FixedUpdate, super::scene_load::apply_scene_load)
@@ -140,6 +142,15 @@ fn step_physics(world: &mut World, res: &mut Resources) {
         }
     };
     res.script_manager.dispatch_physics_events(events);
+}
+
+/// Move every collider hanging from a bone (a hitbox) to the pose the Animator
+/// and `LateUpdate` left it in, so the next tick's casts hit what was rendered
+/// (#464, see `physics::follow`).
+fn follow_bones(world: &mut World, res: &mut Resources) {
+    if let Some(physics) = res.physics.borrow_mut().as_mut() {
+        physics.follow_bones(&world.scene.borrow());
+    }
 }
 
 /// Advance the deterministic play-mode frame counter.

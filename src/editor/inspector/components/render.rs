@@ -5,8 +5,15 @@ use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::light as light_ops;
 use crate::scene::{LightComponent, LightType};
 
-/// 3B. Mesh details
-pub fn draw_mesh(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool) {
+/// 3B. Mesh details. A skinned mesh also offers *Generate Hitboxes* (#464): the
+/// click is deferred into `generate_hitboxes`, since generation needs the Scene.
+pub fn draw_mesh(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    is_dirty: &mut bool,
+    generate_hitboxes: &mut bool,
+) {
     if !world.has_mesh(id) {
         return;
     }
@@ -19,6 +26,14 @@ pub fn draw_mesh(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_d
                 mesh.vertices.len(),
                 mesh.indices.len()
             ));
+            if mesh.skin.is_some()
+                && ui
+                    .button("Generate Hitboxes")
+                    .on_hover_text("One collider per bone, on the Hitbox layer")
+                    .clicked()
+            {
+                *generate_hitboxes = true;
+            }
         }
     });
     if remove {

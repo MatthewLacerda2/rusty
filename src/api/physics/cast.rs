@@ -1,7 +1,8 @@
 //! src/api/physics/cast.rs — `Physics.Raycast` / `SphereCast` / `RaycastAll`.
 //!
 //! Query-only line casts through the live rapier world. A hit carries the
-//! entity, distance, world point and surface normal (#446). All share one
+//! entity, distance, world point and surface normal (#446), plus the bone it
+//! struck and the hierarchy root it belongs to (#464). All share one
 //! acceptance test (`accepts`) with the volume and point queries, so every
 //! spatial query honours the same ignore / layer-mask rules (#91, #311).
 
@@ -29,21 +30,54 @@ pub(super) fn accepts(scene: &Scene, id: u32, ignore: Option<u32>, mask: Option<
     }
 }
 
-/// A single cast's Lua returns: `hit, entity_id, distance, px, py, pz, nx, ny, nz`.
-/// Point and normal are appended after the original triple, so three-value
-/// callers are untouched; hit=false ⇒ every other value is 0.
-type CastResult = (bool, u32, f32, f32, f32, f32, f32, f32, f32);
+/// A single cast's Lua returns:
+/// `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root`.
+/// Each addition is appended (point and normal by #446, the bone and root by
+/// #464), so shorter callers are untouched. hit=false ⇒ every number is 0 and
+/// the rest nil; `bone`/`bone_name` are nil for a hit off any skeleton.
+type CastResult = (
+    bool,
+    u32,
+    f32,
+    f32,
+    f32,
+    f32,
+    f32,
+    f32,
+    f32,
+    Option<u32>,
+    Option<String>,
+    Option<u32>,
+);
 
 /// Fold an optional hit into the [`CastResult`] both single casts return.
-fn cast_result(hit: Option<RayHit>) -> CastResult {
+fn cast_result(scene: &Scene, hit: Option<RayHit>) -> CastResult {
     match hit {
         Some(RayHit {
             id,
             distance,
             point: p,
             normal: n,
-        }) => (true, id, distance, p.x, p.y, p.z, n.x, n.y, n.z),
-        None => (false, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+        }) => {
+            let bone = scene.hit_bone(id);
+            (
+                true,
+                id,
+                distance,
+                p.x,
+                p.y,
+                p.z,
+                n.x,
+                n.y,
+                n.z,
+                bone,
+                bone.and_then(|b| scene.world.name(b).map(|n| n.clone())),
+                Some(scene.root_of(id)),
+            )
+        }
+        None => (
+            false, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, None, None, None,
+        ),
     }
 }
 
@@ -56,10 +90,16 @@ fn vec_table<'lua>(lua: &'lua mlua::Lua, v: Vec3) -> mlua::Result<Table<'lua>> {
     Ok(t)
 }
 
-/// One `RaycastAll` entry: `{id, distance, point = {x,y,z}, normal = {x,y,z}}`.
-fn hit_table<'lua>(lua: &'lua mlua::Lua, hit: &RayHit) -> mlua::Result<Table<'lua>> {
+/// One `RaycastAll` entry: `{id, distance, point = {x,y,z}, normal = {x,y,z},
+/// bone, bone_name, root}` — `bone`/`bone_name` absent off a skeleton.
+fn hit_table<'lua>(lua: &'lua mlua::Lua, scene: &Scene, hit: &RayHit) -> mlua::Result<Table<'lua>> {
     let t = lua.create_table()?;
     t.set("id", hit.id)?;
+    if let Some(bone) = scene.hit_bone(hit.id) {
+        t.set("bone", bone)?;
+        t.set("bone_name", scene.world.name(bone).map(|n| n.clone()))?;
+    }
+    t.set("root", scene.root_of(hit.id))?;
     t.set("distance", hit.distance)?;
     t.set("point", vec_table(lua, hit.point)?)?;
     t.set("normal", vec_table(lua, hit.normal)?)?;
@@ -96,14 +136,17 @@ fn register_raycast<'lua, 'scope>(
             // mode / no Play has built one).
             let physics = physics.borrow();
             let scene = scene.borrow();
-            Ok(cast_result(physics.as_ref().and_then(|world| {
-                world.raycast_hit(
-                    Vec3::new(ox, oy, oz),
-                    Vec3::new(dx, dy, dz),
-                    f32::MAX,
-                    |id| accepts(&scene, id, ignore, mask),
-                )
-            })))
+            Ok(cast_result(
+                &scene,
+                physics.as_ref().and_then(|world| {
+                    world.raycast_hit(
+                        Vec3::new(ox, oy, oz),
+                        Vec3::new(dx, dy, dz),
+                        f32::MAX,
+                        |id| accepts(&scene, id, ignore, mask),
+                    )
+                }),
+            ))
         }),
     )
 }
@@ -125,15 +168,18 @@ fn register_spherecast<'lua, 'scope>(
         scope.create_function(|_, (ox, oy, oz, dx, dy, dz, radius, ignore, mask): Args| {
             let physics = physics.borrow();
             let scene = scene.borrow();
-            Ok(cast_result(physics.as_ref().and_then(|world| {
-                world.sphere_cast_hit(
-                    Vec3::new(ox, oy, oz),
-                    Vec3::new(dx, dy, dz),
-                    radius,
-                    f32::MAX,
-                    |id| accepts(&scene, id, ignore, mask),
-                )
-            })))
+            Ok(cast_result(
+                &scene,
+                physics.as_ref().and_then(|world| {
+                    world.sphere_cast_hit(
+                        Vec3::new(ox, oy, oz),
+                        Vec3::new(dx, dy, dz),
+                        radius,
+                        f32::MAX,
+                        |id| accepts(&scene, id, ignore, mask),
+                    )
+                }),
+            ))
         }),
     )
 }
@@ -161,7 +207,7 @@ fn register_raycast_all<'lua, 'scope>(
             });
             let out = lua.create_table()?;
             for (i, hit) in hits.iter().enumerate() {
-                out.set(i + 1, hit_table(lua, hit)?)?;
+                out.set(i + 1, hit_table(lua, &scene, hit)?)?;
             }
             Ok(out)
         }),

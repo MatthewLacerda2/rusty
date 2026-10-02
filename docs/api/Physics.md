@@ -3,10 +3,12 @@
 Rigidbody control plus the spatial query surface over the live rapier world —
 line casts, volume overlaps, and per-collider point queries (#311). Every query
 routes through the same query pipeline the engine uses, so a script's query and
-the engine's agree. Casts return `(hit, entity_id, distance, px, py, pz, nx, ny, nz)`
-— the world-space hit point and outward surface normal are appended, so a caller
-that takes only the first three values is unaffected (#446). On a miss every value
-after `hit` is `0`.
+the engine's agree. Casts return
+`(hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root)` — the world-space
+hit point and outward surface normal (#446), then the **bone** the hit struck, its
+name, and the hierarchy **root** of what was hit (#464; see *Per-bone hitboxes*). Each group
+is appended, so a caller that takes only the first values is unaffected. On a miss
+every number after `hit` is `0` and the rest are `nil`.
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -18,9 +20,9 @@ after `hit` is `0`.
 | `Physics.SetKinematic` | `(id, is_kinematic)` | — |
 | `Physics.GetCollisionDetection` | `(id)` | `"Discrete"` \| `"Continuous"` |
 | `Physics.SetCollisionDetection` | `(id, mode)` | — (`mode` is `"Discrete"` or `"Continuous"`) |
-| `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz` |
-| `Physics.SphereCast` | `(ox, oy, oz, dx, dy, dz, radius [, ignore_id [, layer_mask]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz` |
-| `Physics.RaycastAll` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask])` | array of `{id, distance, point = {x,y,z}, normal = {x,y,z}}`, nearest first |
+| `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root` |
+| `Physics.SphereCast` | `(ox, oy, oz, dx, dy, dz, radius [, ignore_id [, layer_mask]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root` |
+| `Physics.RaycastAll` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask])` | array of `{id, distance, point = {x,y,z}, normal = {x,y,z}, bone, bone_name, root}`, nearest first |
 | `Physics.OverlapSphere` | `(cx, cy, cz, radius [, layer_mask])` | array of entity ids |
 | `Physics.OverlapBox` | `(cx, cy, cz, hx, hy, hz [, layer_mask])` | array of entity ids |
 | `Physics.OverlapCapsule` | `(x0, y0, z0, x1, y1, z1, radius [, layer_mask])` | array of entity ids |
@@ -33,6 +35,7 @@ after `hit` is `0`.
 | `Physics.SetColliderShape` | `(id, shape)` | — (`shape` is the same table; errors on a bad one) |
 | `Physics.GetPhysicsMaterial` | `(id)` | `friction, bounciness, friction_combine, bounce_combine` |
 | `Physics.SetPhysicsMaterial` | `(id, friction, bounciness [, friction_combine [, bounce_combine]])` | — |
+| `Physics.GenerateHitboxes` | `(id [, { bones = {..}, min_size = n, layer = "Hitbox" }])` | `{ [bone_name] = hitbox_id, .. }`; errors without a skinned mesh |
 
 The optional trailing `ignore_id` skips one entity in the cast — pass the shooter's
 own id so a shot can't hit its source. The engine has no built-in "don't hit the
@@ -214,3 +217,57 @@ world `x = 11`. Unity semantics:
 - **Hierarchy changes apply on the next physics step.** Reparenting, adding or
   removing a Collider or Rigidbody, or activating/deactivating a collider
   rebuilds just the affected bodies at the start of the next fixed tick.
+
+### Per-bone hitboxes (#464)
+
+A skinned character's damage model is per body part: a head, a chest, limbs.
+`Physics.GenerateHitboxes(id)` (or **Generate Hitboxes** on the inspector's Mesh
+card) fits one collider per bone of `id`'s skinned mesh and returns
+`{ bone_name = hitbox_id }`:
+
+- **Fitted from the skin.** Each vertex belongs to the bone it is weighted to
+  most. A bone's hitbox is the box around its vertices in the bone's own frame:
+  a **capsule** along the longest side, or a **box** when the cross-section is
+  flat (a chest, a pelvis, a hand). A bone spanning less than `min_size` (model
+  units, default `0.08`) — a finger, an eye, a twist bone — hands its vertices to
+  its parent, so the hand's hitbox covers the fingers. `bones = {"head", ..}`
+  limits generation to those bones (the others fold into their nearest listed
+  ancestor). Same skin, same hitboxes: regenerating refits the existing ones in
+  place and removes those that no longer qualify.
+- **On a child of the bone.** Each hitbox is an ordinary entity named `Hitbox`
+  under its bone, carrying a plain `Collider`, so it stays hand-tweakable
+  (`SetColliderShape`, `Transform.*`). Bones are rebuilt from the model on load,
+  but a child of a bone is saved and re-attached to its bone by name, so the
+  hitboxes survive save/load and a re-exported model.
+- **On the `Hitbox` layer.** The layer (`layer = ".."` to choose another) is
+  created on first use in a free slot, with every Collision Matrix cell off:
+  hitboxes never push, block or trigger anything — a `CharacterController`
+  walks through them — and only answer queries. An existing layer of that name
+  keeps the matrix the project gave it.
+- **They follow the animation.** The Animator moves the bone, the bone carries
+  the hitbox. After the tick's last bone writer (`LateUpdate`), every collider
+  under a bone is moved to its bone's pose for queries, so a cast in the next
+  `Update` hits the pose that was on screen.
+
+**Hits name the bone and the character.** `Raycast` / `SphereCast` return the
+struck `bone` (the hit entity itself when it is a bone, else its nearest bone
+ancestor; `nil` off a skeleton), its `bone_name` (the glTF joint name) and `root`, the top of the hit entity's hierarchy
+(Unity's `Transform.root`: the character). `RaycastAll` entries carry `bone`,
+`bone_name` and `root`.
+
+**Convention: the capsule moves, the hitboxes take the shots.** Put the
+character's movement capsule (its `CharacterController` or collider) on a layer
+the shot's `layer_mask` leaves out, and the hitbox layer in it:
+
+```lua
+local SHOT = (1 << Layers.NameToIndex("Default")) | (1 << Layers.NameToIndex("Hitbox"))
+local hit, id, dist, px, py, pz, nx, ny, nz, bone, part, root =
+  Physics.Raycast(ox, oy, oz, dx, dy, dz, self_id, SHOT)
+if hit and bone then
+  Damage(root, part == "head" and 4 or 1)     -- "head", "spine", ...; multipliers are game-side Lua
+end
+```
+
+A hitbox under a dynamic `Rigidbody` joins its body as a compound part and adds
+to its mass; a character driven by a `CharacterController` (kinematic) is
+unaffected.
