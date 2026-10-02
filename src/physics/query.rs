@@ -164,6 +164,36 @@ impl PhysicsWorld {
         hits.into_iter().find(|h| h.distance > 1e-3)
     }
 
+    /// Whether a solid collider lies on the segment `from → to` — the audio
+    /// occlusion query (#467). Sensors (triggers) pass sound, and a collider the
+    /// segment starts inside (the listener's own capsule) is looked past.
+    pub fn segment_blocked(&self, from: Vec3, to: Vec3, accept: impl Fn(u32) -> bool) -> bool {
+        let delta = to - from;
+        let length = delta.length();
+        if length <= 1e-3 {
+            return false;
+        }
+        let ray = Ray::new(to_na_vec(from).into(), to_na_vec(delta / length));
+        let predicate = self.handle_accepts(&accept);
+        let filter = QueryFilter::default()
+            .exclude_sensors()
+            .predicate(&predicate);
+        let mut blocked = false;
+        self.query_pipeline.intersections_with_ray(
+            &self.bodies,
+            &self.colliders,
+            &ray,
+            length,
+            true,
+            filter,
+            |_, hit| {
+                blocked = hit.time_of_impact > 1e-3;
+                !blocked
+            },
+        );
+        blocked
+    }
+
     /// Resolve a rapier ray intersection to a [`RayHit`]; `None` when the
     /// collider belongs to no entity.
     fn ray_hit(&self, ray: &Ray, handle: ColliderHandle, hit: RayIntersection) -> Option<RayHit> {

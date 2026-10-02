@@ -246,6 +246,8 @@ edits and each physics step.)
 | `CreateGroup` / `SetGroupVolume` / `SetGroupMute` / `SetGroupLowPass` / `SetGroupHighPass` / `SetGroupReverbSend` | ✅ | sim (`Mixer`) + platform — the group's kira track (volume, filters, reverb send, `device/groups.rs`); observable via `GetGroupState` / `GetGroups` |
 | `DefineSnapshot` / `TransitionToSnapshot` | ✅ | sim — `Mixer::advance` blends on unscaled sim time each `LateUpdate`, then the moved groups reach the device; observable via `GetSnapshot` / `GetGroupState` |
 | `AddDuck` / `ClearDucks` | ✅ | sim — duck envelopes stepped with the mixer; observable as `GetGroupState().duck` |
+| `SetOcclusionSettings` | ✅ | sim — `AudioMaestro::occlude` (each `LateUpdate`) casts through the rapier world with the mask and budget and scales the muffle by the strength; observable via `GetOcclusionSettings` and `GetSpatial`'s `occlusion` |
+| `SetOcclusionEnabled` | ✅ | `AudioSource.occlusion_enabled` — read by the cast each tick; observable via `GetOcclusionEnabled` and `Debug.Snapshot` |
 
 The maestro carries a **no-op backend** on the headless harness, so the *sound* is a
 windowed-only side effect; the **introspection log + playing set** are the

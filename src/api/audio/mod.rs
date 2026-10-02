@@ -4,7 +4,8 @@
 //! `AudioSource` (`Play`/`Stop`), retune its volume (`SetVolume`), fire a
 //! fire-and-forget one-shot at a world position (`PlayAt`), and read/set the single
 //! master volume and the speaker mode (#546) on the `AudioMaestro`, and drive the
-//! mixer's groups, snapshots and ducks (`groups.rs`, `snapshots.rs`, #465). One surface, three callers — the same verbs
+//! mixer's groups, snapshots and ducks (`groups.rs`, `snapshots.rs`, #465) and
+//! occlusion (`occlusion.rs`, #467). One surface, three callers — the same verbs
 //! the editor's play-state and the play-mode systems drive.
 //!
 //! Every verb routes through the shared `AudioMaestro` (a Resource), so a scripted
@@ -18,6 +19,7 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 mod groups;
+mod occlusion;
 mod snapshots;
 
 use super::{put, Reg};
@@ -47,6 +49,7 @@ pub fn register<'lua, 'scope>(
     groups::register_groups(scope, &table, audio)?;
     groups::register_output(scope, &table, scene, audio)?;
     snapshots::register_snapshots(scope, &table, audio, time)?;
+    occlusion::register_occlusion(scope, &table, scene, audio)?;
 
     lua.globals().set("Audio", table).map_err(|e| e.to_string())
 }
@@ -240,9 +243,10 @@ fn register_speaker_mode<'lua, 'scope>(
 }
 
 /// `GetSpatial` — read the resolved spatial state of an entity's `AudioSource` against
-/// the listener (the active camera). Returns `(gain, pan, playing)`: `gain` is the
-/// pre-master volume after distance rolloff + `spatial_blend`, `pan` is `[-1, 1]`
-/// (left→right). This is the agent-facing introspection (#213) for "how a source is
+/// the listener (the active camera). Returns `(gain, pan, playing, occlusion)`:
+/// `gain` is the pre-master volume after distance rolloff + `spatial_blend` and the
+/// occlusion muffle, `pan` is `[-1, 1]` (left→right), `occlusion` the smoothed
+/// factor in `[0, 1]` (#467). This is the agent-facing introspection (#213) for "how a source is
 /// heard right now" — pure math, identical with or without an audio device.
 fn register_spatial<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
@@ -256,11 +260,12 @@ fn register_spatial<'lua, 'scope>(
         "GetSpatial",
         scope.create_function(|_, id: u32| {
             let Some((src, pos)) = emitter(&scene.borrow(), id) else {
-                // No source: report silent + centred + not playing.
-                return Ok((0.0_f32, 0.0_f32, false));
+                // No source: report silent + centred + not playing + clear.
+                return Ok((0.0_f32, 0.0_f32, false, 0.0_f32));
             };
             let info = audio.borrow().voice_info(id, &src, pos, &listener(camera));
-            Ok((info.spatial.gain, info.spatial.pan, info.playing))
+            let spatial = info.spatial;
+            Ok((spatial.gain, spatial.pan, info.playing, info.occlusion))
         }),
     )
 }

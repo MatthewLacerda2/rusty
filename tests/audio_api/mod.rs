@@ -5,6 +5,7 @@
 
 mod global;
 mod mixer;
+mod occlusion;
 mod oneshot;
 mod voices;
 

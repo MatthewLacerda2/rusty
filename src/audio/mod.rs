@@ -27,6 +27,7 @@ pub mod introspection;
 pub mod maestro;
 pub mod mix;
 pub mod mixer;
+pub mod occlusion;
 #[cfg(test)]
 pub mod recording;
 pub mod spatial;
@@ -38,5 +39,6 @@ pub use introspection::{AudioEvent, AudioEventKind, AudioEventLog, SpatialResult
 pub use maestro::AudioMaestro;
 pub use mix::{MixEnv, Rolloff, Shot};
 pub use mixer::{GroupPatch, GroupState, Mixer};
+pub use occlusion::{Occluder, OcclusionSettings};
 pub use spatial::Listener;
 pub use speaker::SpeakerMode;

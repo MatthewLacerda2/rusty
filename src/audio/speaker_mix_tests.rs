@@ -26,7 +26,7 @@ fn default_home_theater_hands_over_the_unshaped_mix() {
     let (src, at) = hard_left();
     m.set_master_volume(0.7);
     m.play_source(1, &src, at, 0);
-    let expected = mix::resolve_voice(&MixEnv::default(), &src, 1.0, Vec3::from(at));
+    let expected = mix::resolve_voice(&MixEnv::default(), &src, 1.0, Vec3::from(at), 0.0);
     let handed = rec.borrow().current(rec.borrow().last_voice()).unwrap();
     assert_eq!(
         handed,

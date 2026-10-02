@@ -2,7 +2,8 @@
 //!
 //! Unity's `AudioSource`: a per-entity emitter referencing an audio `clip` to play,
 //! with a linear 3D rolloff (`spatial_blend`, `initial_distance`, `final_distance`),
-//! a time-scale opt-out and the mixer group it plays through (#465). The windowed
+//! a time-scale opt-out, the mixer group it plays through (#465) and an occlusion
+//! opt-out (#467). The windowed
 //! runtime applies all of it to the device each frame (`shell/audio.rs`).
 //!
 //! Pure authoring data — every field serde-persists. The component knows nothing
@@ -47,6 +48,17 @@ pub struct AudioSourceComponent {
     /// `Play`, not a voice already sounding.
     #[serde(default)]
     pub output_group: String,
+
+    /// Whether geometry between the listener and this source muffles it (#467,
+    /// Steam Audio's per-source occlusion toggle). Only a spatialized source
+    /// (`spatial_blend > 0`) is ever occluded.
+    #[serde(default = "occlusion_default")]
+    pub occlusion_enabled: bool,
+}
+
+/// Occlusion is on unless a source opts out (also for scenes saved before #467).
+fn occlusion_default() -> bool {
+    true
 }
 
 impl Default for AudioSourceComponent {
@@ -61,6 +73,7 @@ impl Default for AudioSourceComponent {
             initial_distance: 1.0,
             final_distance: 16.0,
             output_group: String::new(),
+            occlusion_enabled: true,
         }
     }
 }

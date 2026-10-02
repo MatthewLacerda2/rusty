@@ -11,6 +11,7 @@ pub mod backend;
 pub mod capture;
 pub mod decode;
 pub mod groups;
+pub mod lowpass;
 pub mod output;
 pub mod voice;
 

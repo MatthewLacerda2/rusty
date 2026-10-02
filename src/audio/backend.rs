@@ -15,6 +15,7 @@
 //! backend, while the actual sound is a platform-layer side effect the `NullBackend`
 //! simply skips.
 
+use super::mixer::settings::LOW_PASS_OFF;
 use super::mixer::{GroupId, GroupMix};
 use super::speaker::SpeakerMode;
 
@@ -40,6 +41,9 @@ pub struct VoiceMix {
     pub speed: f32,
     /// Whether the voice is held paused (resumes where it left off).
     pub paused: bool,
+    /// The voice's own low-pass cutoff in Hz, closed by occlusion (#467); at
+    /// `LOW_PASS_OFF` the filter is bypassed.
+    pub low_pass: f32,
 }
 
 impl VoiceMix {
@@ -50,6 +54,7 @@ impl VoiceMix {
         spatial_blend: 0.0,
         speed: 1.0,
         paused: false,
+        low_pass: LOW_PASS_OFF,
     };
 
     /// This mix with its gain multiplied by `master`.

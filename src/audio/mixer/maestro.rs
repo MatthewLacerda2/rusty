@@ -139,11 +139,12 @@ impl AudioMaestro {
         self.sync_groups();
     }
 
-    /// Leaving Play: silence every voice and discard play-mode mixer changes, as
-    /// Stop discards the scene's.
+    /// Leaving Play: silence every voice and discard play-mode mixer and occlusion
+    /// settings changes, as Stop discards the scene's.
     pub fn exit_play(&mut self) {
         self.stop_all();
         self.reset_mixer();
+        self.set_occlusion_settings(Default::default());
     }
 }
 
