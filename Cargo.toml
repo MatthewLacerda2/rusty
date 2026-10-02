@@ -48,6 +48,13 @@ name = "session-mcp"
 path = "src/bin/session_mcp.rs"
 required-features = ["dev"]
 
+# Headless editor capture (#731): the egui editor over a scene, offscreen, to a PNG —
+# what an editor-visible PR attaches. Dev-only, and needs the editor.
+[[bin]]
+name = "editor-capture"
+path = "src/bin/editor_capture.rs"
+required-features = ["dev", "editor"]
+
 # The whole integration suite. `tests/main.rs` declares every test file as a module;
 # `tests/layout.rs` fails if a file is added without its `mod` line (docs/testing.md).
 [[test]]

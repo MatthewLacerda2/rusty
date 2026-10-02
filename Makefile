@@ -23,7 +23,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue blockers
+.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue blockers editor-capture
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -177,3 +177,9 @@ queue: ## Rebase, wait for CI, squash-merge each in turn. make queue PRS="524 52
 # Lists them and exits 1; ARGS=--fix records them. Run at the start of a batch.
 blockers: ## Prose-only "Blocked by #N" GitHub never recorded. ARGS=--fix records them
 	@python3 .github/scripts/blockers.py $(ARGS)
+
+# The whole editor, headless, to a PNG (#731): what an editor-visible PR attaches.
+# Needs a GPU or lavapipe. ARGS passes the binary's options (--select, --play, ...).
+OUT ?= editor-capture.png
+editor-capture: ## Render the editor to a PNG headlessly. make editor-capture OUT=after.png ARGS="--select Player"
+	cargo run --quiet --features dev --bin editor-capture -- --out $(OUT) $(ARGS)

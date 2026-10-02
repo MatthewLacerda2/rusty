@@ -61,3 +61,6 @@ out/
 
 # Python bytecode from the merge helpers in .github/scripts (#486)
 __pycache__/
+
+# Headless editor captures (#731): attached to PRs, never committed.
+/editor-capture*.png
