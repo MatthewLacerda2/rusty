@@ -253,7 +253,7 @@ fn draw_components(
     gameplay::draw_animator(ui, world, id, &mut editor.is_dirty);
     gameplay::draw_collider(ui, world, id, &mut editor.is_dirty, &mut pending.nav_bake);
     gameplay::draw_bodies(ui, world, id, &mut editor.is_dirty);
-    gameplay::draw_navigation(ui, world, id, &mut editor.is_dirty, pending_nav_bake);
+    gameplay::draw_navigation(ui, world, id, &mut editor.is_dirty, &mut pending.nav_bake);
 
     camera::draw_camera(ui, world, id, named_layers, &mut editor.is_dirty);
     camera::draw_visual_correction(ui, world, id, &mut editor.is_dirty);
