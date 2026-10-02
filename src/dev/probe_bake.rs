@@ -9,8 +9,6 @@
 //! Authoring-time only: a probe bake is a dev action (the baked SH is saved into the
 //! `<scene>.lighting.json` sidecar and loaded by the runtime), so the whole path lives
 //! behind the `dev` feature with the rest of the agentic layer.
-//!
-//! Allowed deps: render (headless path), scene.
 
 use crate::render::{Renderer, DEFAULT_BAKE_RESOLUTION};
 use crate::scene::Scene;

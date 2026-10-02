@@ -4,7 +4,7 @@
 //! through `authoring::ribbon`. The editor's Trail card and the Lua `Trail.*`
 //! namespace both call these.
 //!
-//! Allowed deps: components. Pure.
+//! Pure.
 
 use super::ribbon::non_negative;
 use crate::components::TrailComponent;

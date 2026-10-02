@@ -1,4 +1,4 @@
-//! src/scene/authoring.rs — Shared structural-authoring verbs.
+//! src/scene/authoring/mod.rs — Shared structural-authoring verbs.
 //!
 //! The one place the engine knows how to change scene *structure*: create an
 //! entity (optionally as one of the hierarchy toolbar's primitives), attach or
@@ -11,8 +11,6 @@
 //! live edit world. Parenting/destroy/save have their own canonical `Scene` entry
 //! points (`set_parent` / `destroy_entity` / `save_to_file`); the structural API
 //! verbs call straight into those, so they are not duplicated here.
-//!
-//! Allowed deps: components, render::mesh (primitive geometry), scene.
 
 pub mod animator;
 pub mod audio;

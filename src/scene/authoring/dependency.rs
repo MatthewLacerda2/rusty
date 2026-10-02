@@ -23,8 +23,6 @@
 //! asset; it has no requirements and is required by nothing, so it never flows through
 //! here — `set_default`'s Material arm exists only for completeness and stages the
 //! default asset the same way the editor Add menu does.
-//!
-//! Allowed deps: components, scene, ecs.
 
 use crate::components::ReverbZoneComponent;
 use crate::components::{BackdropFilterComponent, MaskComponent};

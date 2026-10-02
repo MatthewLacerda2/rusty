@@ -6,7 +6,7 @@
 //! limit range is ordered, break thresholds are non-negative, and the axis is a
 //! unit vector (a zero axis is ignored).
 //!
-//! Allowed deps: components (the `JointComponent` data). Pure.
+//! Pure.
 
 use glam::{Vec2, Vec3};
 

@@ -6,8 +6,6 @@
 //! attached only when present; `Entity` (defined in `entity.rs`) is the
 //! document shape one GameObject's columns assemble into/out of, not live
 //! storage. `Transform` is mandatory.
-//!
-//! Allowed deps: components::*, glam, serde, asset (data only).
 
 pub mod animator;
 pub mod audio_source;

@@ -13,8 +13,6 @@
 //!   - Built in Rust by `scene::default_scene::build` (#667).
 //!   - Seeded into  project/scenes/  on boot, the same way bot.lua is seeded,
 //!     because /project/ is the gitignored runtime workspace.
-//!
-//! Allowed deps: scene::serialize, ecs.
 
 use std::path::Path;
 

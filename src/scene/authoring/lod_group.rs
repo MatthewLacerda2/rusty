@@ -7,7 +7,7 @@
 //! rose above its finer neighbour's could never be shown), the size is positive,
 //! and a level index out of range is a no-op.
 //!
-//! Allowed deps: components (the `LodGroupComponent` data). Pure.
+//! Pure.
 
 use crate::components::lod_group::{default_thresholds, LodGroupComponent, LodLevel};
 

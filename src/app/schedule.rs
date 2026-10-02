@@ -10,8 +10,6 @@
 //! [`SystemProbe`](super::SystemProbe) can attribute per-system cost (#433). With no
 //! probe installed the frame runs the systems directly — the default, and the only
 //! path a ship build takes.
-//!
-//! Allowed deps: app::probe, app::resources, app::stage, app::system, app::world.
 
 use super::probe::SystemProbe;
 use super::resources::Resources;

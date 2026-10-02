@@ -6,7 +6,7 @@
 //! colours stay in `[0, 1]`, sizes stay positive (auto-size keeps `min ≤ max`),
 //! effect widths are non-negative, and an empty font path means "the default".
 //!
-//! Allowed deps: components (the `TextComponent` data). Pure.
+//! Pure.
 
 use glam::{Vec2, Vec4};
 

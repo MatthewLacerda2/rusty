@@ -4,7 +4,7 @@
 //! The editor's Canvas Group card and the Lua `CanvasGroup.*` namespace both route
 //! every write through these; the alpha is kept in `[0, 1]`.
 //!
-//! Allowed deps: components (the `CanvasGroupComponent` data). Pure.
+//! Pure.
 
 use crate::components::CanvasGroupComponent;
 

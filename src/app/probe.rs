@@ -9,8 +9,6 @@
 //! the same pure function of (seed, inputs, fixed dt) with or without one installed.
 //!
 //! No probe is installed by default, and a ship build never installs one.
-//!
-//! Allowed deps: app::*.
 
 use super::game::GameWorld;
 use super::resources::Resources;

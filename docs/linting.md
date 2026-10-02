@@ -13,8 +13,9 @@ agent can read exactly what failed.
 | Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]` |
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
-| Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation`/`ui`/`api`/`scene`/`components`/`ecs`/`core`/`time`/`asset`/`procgen`/`shadergen`/`audio` |
-| Dependency direction | `tools/lint -- --direction` | sim modules (the determinism list) never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
+| Module layering | `tools/lint -- --layers` | every `crate::<module>` import matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724) |
+| Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in the table's sim modules |
+| Dependency direction | `tools/lint -- --direction` | the table's sim modules never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
 | Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`/`ui`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every *migrated* first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard), minus the burn-down baseline |
@@ -73,12 +74,40 @@ has no `[lints]` table: it is not clippy-gated, so one would be dead config.
 **TODO list, not a pardon**: as a file is split, remove its entry. Never add new
 entries. When the file is empty, the size gate is fully on.
 
+## Module layering (`--layers`)
+Which module may import which is declared once, in `tools/lint/src/layers/table.rs`
+(#724). It replaced 64 per-file `//! Allowed deps:` headers that nothing checked
+(at least 7 had drifted) and the copies of the sim-module list that the determinism
+and direction guards, `CLAUDE.md` and these docs each kept.
+
+- **One row per `src/<module>`, bottom-up.** A row names the modules it may import,
+  and each must sit **above** it. The table is then a topological order: the graph
+  has no cycles. The only pair allowed to reference each other is listed in `PEERS`
+  (`scripting` ↔ `api`: scripting installs the Lua surface, the surface reads state
+  scripting owns).
+- **Rows mark the sim.** Everything a sim module imports must be sim as well, so
+  `scene → shadergen → render` style leaks fail, not only direct ones. The
+  determinism and direction guards scan this derived set (`layers::sim_dirs`), and
+  `test-lint` pins it, so a module leaves the sim only through a reviewed edit.
+- **Exact, not a ceiling.** The lint measures every non-comment `crate::<module>`
+  reference outside test code and reports `UNDECLARED_DEP` (code uses an edge the
+  row lacks), `STALE_DEP` (the row lists an edge nothing uses), `CYCLE`, `SIM_LEAK`,
+  and `UNDECLARED_MODULE` / `MISSING_MODULE`. Test code (`#[cfg(test)]` items and
+  test-only module files) is exempt, as in the other guards.
+- **Known exceptions** are in `EXCEPTIONS`, each naming the open issue that removes
+  it: `api → dev` and `api → preview` (#737), `dev → editor` (#738). The lint reports
+  `STALE_EXCEPTION` once the edge is gone. There is no baseline beyond these rows.
+
+A new import between modules is one edit to the row, in the same PR. If the edge
+breaks the order or leaves the sim, move the code down a layer instead.
+
 ## Dependency direction (`--direction`)
 The sim runs headless with no GPU and no UI, so the dependency arrow points one way:
 `render` and `editor` import sim types, never the reverse. `tools/lint -- --direction`
-scans the sim modules (`app`, `scripting`, `physics`, `navigation`, `ui`, `api`,
-`scene`, `components`, `ecs`, `core`, `time`, `asset`, `procgen`, `audio`) and fails on any non-comment reference
+scans the table's sim modules and fails on any non-comment reference
 to `crate::render`, `crate::editor`, `wgpu` or `egui` (whole path segments only).
+The layering lint already covers the `crate::` half, transitively; this guard keeps
+the external crates, which the table does not model.
 Plain data the renderer and the sim share lives sim-side: the mesh `Vertex` and the
 primitive builders in `components::mesh`, `Camera` and `Decal` in `scene`,
 `QualityPreset` in `core::quality`; the renderer keeps only the GPU half (e.g.
@@ -87,9 +116,6 @@ zero violations (#494), and it is the groundwork the crate split (#495) needs.
 `api` joined the scan in #723: it is the surface scripts drive from inside the sim.
 `shadergen` joined in #722, once its GPU-free `naga_oil` composition moved out of
 `render` into `shadergen::compose` (the renderer's `ShaderRegistry` now calls it).
-Both guards fail on
-a listed directory that no longer exists, and `test-lint` pins each list, so a
-module can only leave a scan through a reviewed edit.
 
 ## Component completeness (`--components`)
 A first-class component is only "done" when it appears on all four axes that
@@ -198,7 +224,7 @@ The rule is deliberately narrow:
   hatch — it documents *why* the value must be present at the call site. Use `?`
   where a `Result` should propagate, `.expect(...)` where the invariant is real and
   local; reach for the bare `.unwrap()` nowhere in the sim core.
-- **Sim modules only.** The platform layer (`shell`, `render`, `dev`) is exempt —
+- **Sim core only.** The platform layer (the table's non-sim rows) is exempt —
   e.g. `render/gpu/shaders.rs` panicking at boot on a bad shader is fail-fast-at-startup,
   not a mid-sim hazard. The determinism guard's exemption is the same platform layer.
 - **Tests exempt.** `clippy.toml`'s `allow-unwrap-in-tests = true` lets test code

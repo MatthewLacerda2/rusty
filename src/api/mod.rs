@@ -12,9 +12,6 @@
 //! `scripting`
 //! owns the runtime and lifecycle; `api` owns the surface. One surface, three
 //! callers — they never drift apart.
-//!
-//! Allowed deps: core, components, physics, navigation, render, time, scripting,
-//! asset (for the `Assets` manifest).
 
 pub mod animator;
 pub mod application;

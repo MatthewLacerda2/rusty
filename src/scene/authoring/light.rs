@@ -11,8 +11,7 @@
 //! Each op takes `&mut LightComponent`; the caller's accessor
 //! (`world.light_mut(id)`) carries the no-op-when-absent semantics (#344).
 //!
-//! Allowed deps: components (the `LightComponent`/`LightType` data). Pure: no
-//! wall-clock, no RNG.
+//! Pure: no wall-clock, no RNG.
 
 use glam::Vec3;
 

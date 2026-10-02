@@ -17,8 +17,6 @@
 //!   contract (physics pair ordering, replay byte-identity). Since #346 each is
 //!   a narrow hecs query (archetype-filtered, then sorted by `Core::seq`), so
 //!   its cost tracks the carrier population, not the scene size.
-//!
-//! Allowed deps: hecs, components.
 
 use std::ops::{Deref, DerefMut};
 

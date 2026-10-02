@@ -69,6 +69,9 @@ jobs:
       - name: Size gate (full scan; legacy grandfathered via baseline)
         if: needs.changes.outputs.code != 'false'
         run: cargo run --quiet --manifest-path tools/lint/Cargo.toml
+      - name: Layering lint (module imports match the declared table; no cycles, no sim leaks)
+        if: needs.changes.outputs.code != 'false'
+        run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- --layers
       - name: Determinism guard (no wall-clock / unseeded RNG in sim modules)
         if: needs.changes.outputs.code != 'false'
         run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- --determinism

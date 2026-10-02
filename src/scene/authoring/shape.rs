@@ -5,7 +5,7 @@
 //! through these, so validation lives once: colours stay in `[0, 1]`, lengths are
 //! non-negative, and the gradient is sanitized by the shared `ui_look` op.
 //!
-//! Allowed deps: components (the `ShapeComponent` data). Pure.
+//! Pure.
 
 use glam::{Vec2, Vec4};
 

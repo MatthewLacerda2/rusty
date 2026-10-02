@@ -7,7 +7,7 @@
 //! texture path means "no texture", and the fill origin always suits the fill
 //! method (Unity's per-method origin enums, folded into one).
 //!
-//! Allowed deps: components (the `ImageComponent` data). Pure.
+//! Pure.
 
 use glam::Vec4;
 

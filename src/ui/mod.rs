@@ -18,8 +18,8 @@
 //!
 //! The render pass (#418) draws these; layout groups (#421) build on them. The model is recorded in `docs/ui.md`.
 //!
-//! Allowed deps: components, ecs, core, scene (the sim `Camera`; tests), glam, ab_glyph / ttf-parser (fonts). Never `render` / `editor` / `wgpu` /
-//! `egui` — the layout runs headless (the direction guard enforces it).
+//! The layout runs headless: it never touches `render`, `editor`, `wgpu` or `egui`
+//! (the layer table in `tools/lint/src/layers/table.rs` enforces it).
 
 // Panic-free sim core (#195): bare `.unwrap()` is denied here, as in the other
 // sim modules. See docs/linting.md.

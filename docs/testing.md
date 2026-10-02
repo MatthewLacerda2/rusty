@@ -271,15 +271,15 @@ gates-vs-signals rule), surfaced where the agent acts on it.
 
 Targets are deliberately differentiated:
 
-- **A per-module floor on the sim modules** (`app`, `scripting`, `physics`,
-  `navigation`) — pure logic, no GPU, the part that must be right and where
+- **A per-module floor on the core sim modules** (`app`, `scripting`, `physics`,
+  `navigation`; a deliberate subset of the layer table's sim rows) — pure logic, no GPU, the part that must be right and where
   mutation/property testing is aimed — **and on `api`** (#350), the Lua surface
   every game script drives: the doc drift gate proves a binding *exists*, only a
   behavioral test proves it *works* (`tests/<namespace>_api.rs`, one file per
   namespace). The floors live in `coverage-baseline.txt` at the repo root (one
   `module floor` line each) and **ratchet**: raise them as coverage improves,
   never lower them silently.
-- **No floor on the platform layer** (`shell`, `render`, `dev`) — headless
+- **No floor on the platform layer** (the layer table's non-sim rows) — headless
   coverage there is low-value.
 
 It runs in two tiers, both non-blocking (mirroring mutation testing, below):
@@ -309,8 +309,9 @@ dev-only surface); for the per-PR view, `cargo llvm-cov report --cobertura
 ## Mutation testing
 [`cargo-mutants`](https://github.com/sourcefrog/cargo-mutants) audits whether the
 suite actually *catches* bugs — the headline guardrail against green-but-vacuous
-agent-written tests. It mutates the deterministic sim (`app`, `scripting`,
-`physics`, `navigation`), the pure-logic part where a silent bug hurts most, and
+agent-written tests. It mutates the core of the deterministic sim (`app`,
+`scripting`, `physics`, `navigation`; a deliberate subset of the layer table's sim
+rows), the pure-logic part where a silent bug hurts most, and
 reports the **surviving** mutants (a change no test failed on). It runs in two
 tiers, both **non-blocking** — mutation never gates a merge:
 

@@ -4,6 +4,9 @@
 //! editor → sim, never the other way (#494). Once a sim module names a `render` or
 //! `editor` type — or a GPU/UI crate directly — the headless path compiles the
 //! display layer again and the cycle a crate split (#495) would have to cut is back.
+//! The sim set comes from the layer table (`layers/table.rs`, #724), whose lint also
+//! catches the transitive leaks this one-hop guard cannot; this guard still owns the
+//! external crates (`wgpu`, `egui`) the table does not model.
 //!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --direction`
 //! Exit code 1 on any violation; report mirrored to `.lint/report.txt`.
@@ -11,32 +14,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::exit;
-
-/// Directories whose `.rs` files are sim code and must not depend on the display
-/// layer: the sim trees, `ui` (the in-game UI's layout, which runs headless in the
-/// sim, #417), the data the sim runs on (`scene`, `components`, `ecs`, `core`,
-/// `time`, `asset`), `api` (the surface scripts drive from inside the sim, #723),
-/// `procgen` (a material's texture recipe), `shadergen` (shader authoring, which
-/// scene authoring and `Shader.Bake` reach; its GPU-free composition lives there
-/// so `render` depends on it, never the reverse, #722) and `audio` (a sim
-/// `Resource`). A listed directory that no longer exists is a violation.
-const SIM_DIRS: &[&str] = &[
-    "src/app",
-    "src/scripting",
-    "src/physics",
-    "src/navigation",
-    "src/scene",
-    "src/components",
-    "src/ecs",
-    "src/core",
-    "src/time",
-    "src/asset",
-    "src/ui",
-    "src/api",
-    "src/procgen",
-    "src/shadergen",
-    "src/audio",
-];
 
 /// Banned paths, matched as whole path segments on non-comment source: the engine's
 /// own display modules, and the GPU / UI crates by name.
@@ -47,10 +24,11 @@ const REPORT: &str = ".lint/report.txt";
 /// Entry point: scan the sim modules and fail on any sim → display-layer reference.
 pub fn run() {
     let mut violations = Vec::new();
-    for dir in SIM_DIRS {
+    for dir in crate::layers::sim_dirs() {
+        let dir = dir.as_str();
         if !Path::new(dir).is_dir() {
             violations.push(format!(
-                "MISSING_DIR {dir} — listed in SIM_DIRS but absent; update the list"
+                "MISSING_DIR {dir} — a sim module in the layer table but absent; update tools/lint/src/layers/table.rs"
             ));
             continue;
         }
@@ -179,40 +157,5 @@ mod tests {
     fn comments_are_ignored() {
         assert!(banned_in(strip_comment("//! never wgpu/egui")).is_empty());
         assert!(banned_in(strip_comment("let x = 1; // crate::render::Camera")).is_empty());
-    }
-
-    #[test]
-    fn sim_dirs_are_pinned() {
-        // Dropping a module off the scan must be a deliberate, reviewed edit (#723).
-        let mut dirs = SIM_DIRS.to_vec();
-        dirs.sort_unstable();
-        let mut want = [
-            "src/api",
-            "src/app",
-            "src/asset",
-            "src/audio",
-            "src/components",
-            "src/core",
-            "src/ecs",
-            "src/navigation",
-            "src/physics",
-            "src/procgen",
-            "src/scene",
-            "src/scripting",
-            "src/shadergen",
-            "src/time",
-            "src/ui",
-        ];
-        want.sort_unstable();
-        assert_eq!(dirs, want);
-        assert!(!SIM_DIRS.contains(&"src/render"));
-    }
-
-    #[test]
-    fn sim_dirs_all_exist() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        for dir in SIM_DIRS {
-            assert!(root.join(dir).is_dir(), "{dir} is listed but missing");
-        }
     }
 }

@@ -18,8 +18,6 @@
 //! Runtime caveat: like `screenshot`, this needs a GPU or software adapter (e.g.
 //! lavapipe). With none available it returns `Ok(false)` after a clear log and NEVER
 //! panics, so a headless CI box without a GPU degrades instead of failing.
-//!
-//! Allowed deps: preview, render (headless path).
 
 use std::collections::BTreeMap;
 use std::path::Path;

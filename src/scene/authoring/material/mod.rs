@@ -14,9 +14,7 @@
 //! `scene.materials` and `scene.world` at once — can call them without a borrow
 //! conflict.
 //!
-//! Allowed deps: components (the `MaterialAsset`/`MaterialComponent`/`RenderMode`
-//! data), scene (the library type + `Scene` for `ensure_material_key`). Pure: no
-//! wall-clock, no RNG.
+//! Pure: no wall-clock, no RNG.
 
 mod maps;
 

@@ -12,8 +12,6 @@
 //! Storage itself is real per-component hecs columns (#345); `Entity`
 //! (`components::entity`) survives only as the on-disk document shape that
 //! `write_components`/`entity_document` decompose/recompose against.
-//!
-//! Allowed deps: hecs, components.
 
 pub mod access;
 mod bundle;

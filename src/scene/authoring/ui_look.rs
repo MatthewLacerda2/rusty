@@ -5,7 +5,7 @@
 //! cards and Lua namespaces) route through these: a gradient keeps 2–4 stops in
 //! ascending `t` within `[0, 1]`, colours in `[0, 1]`, and a positive radius.
 //!
-//! Allowed deps: components (the look data). Pure.
+//! Pure.
 
 use glam::{Vec2, Vec4};
 
