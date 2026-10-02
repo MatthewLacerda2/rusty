@@ -124,7 +124,7 @@ impl AudioMaestro {
         self.speaker_mode
     }
 
-    /// Switch the speaker mode: the master bus is retuned and every live voice
+    /// Switch the speaker mode: the output stage is retuned and every live voice
     /// re-sent with the new per-voice shaping.
     pub fn set_speaker_mode(&mut self, mode: SpeakerMode) {
         self.speaker_mode = mode;

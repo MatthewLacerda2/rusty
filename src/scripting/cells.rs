@@ -25,7 +25,7 @@ impl ScriptManager {
     }
 
     /// Handle to the shared audio maestro, so the platform layer can inject the real
-    /// `RodioBackend` and read the introspection log.
+    /// `KiraBackend` and read the introspection log.
     pub fn audio_cell(&self) -> Rc<RefCell<AudioMaestro>> {
         Rc::clone(&self.audio)
     }

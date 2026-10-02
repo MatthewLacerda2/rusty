@@ -208,6 +208,7 @@ pub(crate) fn audio_value(a: &AudioSourceComponent) -> Value {
         "spatial_blend": a.spatial_blend,
         "initial_distance": a.initial_distance,
         "final_distance": a.final_distance,
+        "output_group": a.output_group,
     })
 }
 

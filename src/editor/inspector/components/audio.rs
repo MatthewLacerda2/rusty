@@ -1,13 +1,14 @@
-//! src/editor/inspector_audio.rs — the AudioSource inspector card (#212).
+//! src/editor/inspector/components/audio.rs — the AudioSource inspector card (#212).
 //!
 //! Edits every serde-persisted field of `AudioSourceComponent`: the clip path, per-
 //! source volume, loop / play-on-start flags, the time-scaled toggle (gameplay vs.
 //! music/UI), and the spatial fields stored now for #213 (spatial blend + the
-//! linear rolloff distances). Pure authoring data — the card never touches the audio
+//! linear rolloff distances), and the mixer output group (#465). Pure authoring data — the card never touches the audio
 //! device; the `AudioMaestro` reads these when a voice starts.
 
 use egui_phosphor::regular as icon;
 
+use crate::audio::mixer::DEFAULT_GROUPS;
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::audio as audio_ops;
 use crate::scene::AudioSourceComponent;
@@ -67,7 +68,48 @@ fn draw_clip(
         }
         changed = true;
     }
-    changed
+    changed | draw_output(ui, world, id, a)
+}
+
+/// The mixer group the voice plays through: the default buses, plus a group the
+/// source already names (one a script creates at runtime). Master stores as `""`.
+fn draw_output(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    a: &AudioSourceComponent,
+) -> bool {
+    let current = if a.output_group.is_empty() {
+        DEFAULT_GROUPS[0]
+    } else {
+        a.output_group.as_str()
+    };
+    let mut picked = None;
+    ui.horizontal(|ui| {
+        ui.label("Output:");
+        egui::ComboBox::from_id_source(("audio_output", id))
+            .selected_text(current)
+            .show_ui(ui, |ui| {
+                let custom = (!DEFAULT_GROUPS.contains(&current)).then_some(current);
+                for name in DEFAULT_GROUPS.iter().copied().chain(custom) {
+                    if ui.selectable_label(name == current, name).clicked() {
+                        picked = Some(name.to_string());
+                    }
+                }
+            });
+    });
+    let Some(name) = picked.filter(|n| n != current) else {
+        return false;
+    };
+    let group = if name == DEFAULT_GROUPS[0] {
+        String::new()
+    } else {
+        name
+    };
+    if let Some(mut c) = world.audio_mut(id) {
+        audio_ops::set_output_group(&mut c, group);
+    }
+    true
 }
 
 /// Playback flags: loop, play-on-start, and the time-scaled toggle.

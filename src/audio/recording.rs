@@ -18,7 +18,7 @@ pub struct Recording {
     pub plays: Vec<(VoiceId, PlayParams)>,
     pub mixes: Vec<(VoiceId, VoiceMix)>,
     pub stops: Vec<VoiceId>,
-    /// Every speaker mode the master bus was set to, in order.
+    /// Every speaker mode the output stage was set to, in order.
     pub speaker_modes: Vec<SpeakerMode>,
     /// Voices still "sounding" — started voices join, a test removes one to finish it.
     pub live: BTreeSet<VoiceId>,

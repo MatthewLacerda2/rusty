@@ -4,7 +4,7 @@
 //! `AudioSource` (`Play`/`Stop`), retune its volume (`SetVolume`), fire a
 //! fire-and-forget one-shot at a world position (`PlayAt`), and read/set the single
 //! master volume and the speaker mode (#546) on the `AudioMaestro`, and drive the
-//! mixer's groups, snapshots and ducks (`mixer.rs`, #465). One surface, three callers — the same verbs
+//! mixer's groups, snapshots and ducks (`groups.rs`, `snapshots.rs`, #465). One surface, three callers — the same verbs
 //! the editor's play-state and the play-mode systems drive.
 //!
 //! Every verb routes through the shared `AudioMaestro` (a Resource), so a scripted
@@ -17,7 +17,8 @@ use std::cell::RefCell;
 
 use mlua::Lua;
 
-mod mixer;
+mod groups;
+mod snapshots;
 
 use super::{put, Reg};
 use glam::Vec3;
@@ -43,7 +44,9 @@ pub fn register<'lua, 'scope>(
     register_oneshot_and_master(scope, &table, audio, time)?;
     register_spatial(scope, &table, scene, audio, camera)?;
     register_speaker_mode(scope, &table, audio)?;
-    mixer::register(scope, &table, audio, time)?;
+    groups::register_groups(scope, &table, audio)?;
+    groups::register_output(scope, &table, scene, audio)?;
+    snapshots::register_snapshots(scope, &table, audio, time)?;
 
     lua.globals().set("Audio", table).map_err(|e| e.to_string())
 }
