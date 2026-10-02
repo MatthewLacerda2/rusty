@@ -110,6 +110,12 @@ different machine, re-measure rather than trust them):
   `df -h` about 10 GB free. A built worktree is ~2.5–4.5 GB, no longer 12–16.
   Running out of disk still shows up as `No space left on device` at the link
   step — the tell-tale ENOSPC.
+- **A local session that touches Rust also runs rust-analyzer** (the
+  `rust-analyzer-lsp` plugin, #488): about 4 GB resident once it has analysed the
+  crate (measured 2026-10-02: ~1 min to load, ~1 min to analyse). Count it against
+  the cap above: three such sessions are ~12 GB of language servers before anything
+  compiles, so on a 15 GB machine the practical limit is two local agents. Coding
+  goes to cloud sessions, which bring their own memory.
 
 `docs/testing.md` has the arithmetic.
 
