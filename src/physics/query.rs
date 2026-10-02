@@ -30,9 +30,9 @@ pub(super) fn is_live(bodies: &RigidBodySet, collider: &Collider) -> bool {
 }
 
 /// One ray hit: the entity struck, how far along the ray, the world-space point,
-/// and the world-space outward surface normal there. A struct rather than a
-/// tuple so later hit data (the hitbox bone, #464) is one more field, not a
-/// signature change at every caller.
+/// and the world-space outward surface normal there. Which bone and which
+/// character a hit belongs to (#464) are scene facts, read off `id` by
+/// `Scene::hit_bone` / `Scene::root_of`, so physics stays hierarchy-agnostic.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RayHit {
     /// Entity id owning the collider hit — the compound *part*, not its body.

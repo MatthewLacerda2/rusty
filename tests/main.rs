@@ -31,6 +31,7 @@ mod decals_api;
 mod default_ambient;
 mod gamepad_api;
 mod graphics_api;
+mod hitboxes;
 mod input_api;
 mod joint_api;
 mod layers_api;

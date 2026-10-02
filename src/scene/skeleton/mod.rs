@@ -18,13 +18,16 @@
 //!   under their bones on load. A bone that no longer exists is warned about, never
 //!   dropped silently.
 //! - `palette` builds each skinned mesh's posed palette from the bones.
+//! - `hitbox` fits per-bone hitbox colliders and names the bone a hit struck (#464).
 
+mod hitbox;
 mod palette;
 mod persist;
 mod sync;
 
 use std::collections::BTreeSet;
 
+pub use hitbox::{fit_hitboxes, HitboxFit, HitboxOptions, HITBOX_NAME};
 pub use persist::{strip_bones, take_bone_parents};
 
 use crate::scene::Scene;

@@ -1,5 +1,6 @@
 pub mod assets;
 pub mod components;
+mod pending;
 pub mod preview;
 
 use egui_phosphor::regular as icon;
@@ -9,6 +10,7 @@ use self::components::{
     add, audio, camera, gameplay, lod_group, material, particles, prefab, render, ribbons,
     settings, transform, ui as ui_cards,
 };
+use self::pending::PendingEdits;
 use crate::editor::{EditorUi, InspectorTarget};
 use crate::navigation::NavigationGraph;
 use crate::scene::{MaterialAsset, Scene};
@@ -92,39 +94,6 @@ fn draw_collapsed(ctx: &egui::Context, t: crate::editor::theme::Theme, open: &mu
         });
 }
 
-/// Edits the per-frame card draw defers until the mutable entity guard has dropped,
-/// because each needs `&mut Scene` (or `&mut NavigationGraph`) that the guard's borrow
-/// would otherwise block. Collected during the draw, then applied by [`Self::apply`].
-#[derive(Default)]
-struct PendingEdits {
-    parent_change: Option<Option<u32>>,
-    nav_bake: bool,
-    layer_changed: bool,
-    prefab_action: Option<prefab::PrefabAction>,
-}
-
-impl PendingEdits {
-    /// Apply the deferred edits once the entity guard has dropped: re-parent, run a
-    /// prefab verb, mark dirty, and re-bake the navmesh as requested.
-    fn apply(self, editor: &mut EditorUi, scene: &mut Scene, nav: &mut NavigationGraph, id: u32) {
-        if self.layer_changed {
-            editor.is_dirty = true;
-        }
-        if let Some(action) = self.prefab_action {
-            if prefab::dispatch(scene, action) {
-                editor.is_dirty = true;
-            }
-        }
-        if let Some(new_parent) = self.parent_change {
-            let _ = scene.set_parent(id, new_parent);
-        }
-        if self.nav_bake {
-            // Incremental when only colliders/obstacles changed (#456).
-            nav.sync(scene);
-        }
-    }
-}
-
 fn draw_entity_inspector(
     editor: &mut EditorUi,
     ui: &mut egui::Ui,
@@ -179,7 +148,7 @@ fn draw_entity_inspector(
             selected_id,
             materials,
             &cx.named_layers,
-            &mut pending.nav_bake,
+            &mut pending,
         );
     }
 
@@ -272,18 +241,19 @@ fn draw_components(
     id: u32,
     materials: &mut BTreeMap<String, MaterialAsset>,
     named_layers: &[(u8, String)],
-    pending_nav_bake: &mut bool,
+    pending: &mut PendingEdits,
 ) {
-    render::draw_mesh(ui, world, id, &mut editor.is_dirty);
+    let hitboxes = &mut pending.generate_hitboxes;
+    render::draw_mesh(ui, world, id, &mut editor.is_dirty, hitboxes);
     material::draw_material_card(ui, editor, world, id, materials);
     render::draw_light(ui, world, id, &mut editor.is_dirty);
     lod_group::draw_lod_group(ui, world, id, &mut editor.is_dirty);
 
     gameplay::draw_script(ui, world, id, &mut editor.is_dirty);
     gameplay::draw_animator(ui, world, id, &mut editor.is_dirty);
-    gameplay::draw_collider(ui, world, id, &mut editor.is_dirty, pending_nav_bake);
+    gameplay::draw_collider(ui, world, id, &mut editor.is_dirty, &mut pending.nav_bake);
     gameplay::draw_bodies(ui, world, id, &mut editor.is_dirty);
-    gameplay::draw_navigation(ui, world, id, &mut editor.is_dirty, pending_nav_bake);
+    gameplay::draw_navigation(ui, world, id, &mut editor.is_dirty, &mut pending.nav_bake);
 
     camera::draw_camera(ui, world, id, named_layers, &mut editor.is_dirty);
     camera::draw_visual_correction(ui, world, id, &mut editor.is_dirty);
