@@ -10,7 +10,7 @@
 //! option setters do nothing to an element that is not a marker. Anchor presets
 //! (#423) re-anchor an element without moving it (`preset`).
 //!
-//! Allowed deps: components (the `RectTransformComponent` data). Pure.
+//! Pure.
 
 use glam::{Vec2, Vec3};
 

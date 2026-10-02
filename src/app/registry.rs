@@ -9,8 +9,6 @@
 //! The default `App` is built by [`build`], which calls each module's `register`
 //! in the exact order the old hand-wired `play.rs` ran them, so the per-frame
 //! execution order is preserved bit-for-bit.
-//!
-//! Allowed deps: app::*.
 
 use super::resources::Resources;
 use super::schedule::Schedule;

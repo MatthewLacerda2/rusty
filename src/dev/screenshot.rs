@@ -17,8 +17,6 @@
 //! container. When none is available, these return `Ok(false)` after a clear log —
 //! they NEVER panic, and the rest of the dev layer (Step / StepUntil / state) needs no
 //! GPU at all.
-//!
-//! Allowed deps: render (headless path), api.
 
 use std::path::Path;
 

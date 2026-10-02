@@ -5,7 +5,7 @@
 //! through these, so the rules live once: the ends stay finite, and a cost below
 //! zero (or NaN) means "use the link's length", stored as `-1`.
 //!
-//! Allowed deps: components (the component data), scene::nav_settings (the area limit). Pure.
+//! Pure.
 
 use glam::Vec3;
 

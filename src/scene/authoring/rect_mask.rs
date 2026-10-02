@@ -5,7 +5,7 @@
 //! The editor's Rect Mask and Mask cards and the Lua `RectMask.*` / `Mask.*`
 //! namespaces route every write through this.
 //!
-//! Allowed deps: components (the `RectMaskComponent` data). Pure.
+//! Pure.
 
 use glam::Vec4;
 

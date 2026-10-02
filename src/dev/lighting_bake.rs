@@ -19,8 +19,8 @@
 //! So a level with no probes gets a full auto-place + bake; one with hand-authored
 //! probes is a pure rebake — manual placement is never clobbered.
 //!
-//! Allowed deps: render (via the two bakes), scene (placement + data), navigation (read:
-//! the walkable extent light probes fill, handed to placement as plain bounds).
+//! It reads `navigation` only for the walkable extent light probes fill, handed to
+//! placement as plain bounds.
 
 use crate::navigation::NavigationGraph;
 use crate::scene::lighting::placement;

@@ -16,7 +16,7 @@
 //! (the card forces a fixed 64-sample high-quality mode), so the ops are plain sets to
 //! keep both behaviours byte-identical.
 //!
-//! Allowed deps: components (the `CameraComponent`/`ClearFlags` data). Pure.
+//! Pure.
 
 use crate::components::{CameraComponent, ClearFlags, Projection, RenderTarget};
 

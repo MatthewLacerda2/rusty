@@ -5,7 +5,7 @@
 //! every write through these, so the rules live once: the centre stays finite, the
 //! box keeps a positive size, and the area is a valid id (`0..MAX_AREAS`).
 //!
-//! Allowed deps: components (the component data), scene::nav_settings (the area limit). Pure.
+//! Pure.
 
 use glam::Vec3;
 

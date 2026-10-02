@@ -6,7 +6,7 @@
 //! reference resolution is kept ≥ 1 per axis, the width/height match and the sway
 //! in `[0, 1]`, the world density > 0 and the camera plane ≥ 1 cm away (#429).
 //!
-//! Allowed deps: components (the `CanvasComponent` data). Pure.
+//! Pure.
 
 use glam::Vec2;
 

@@ -14,7 +14,7 @@
 //! (#287). The `Graphics` adapter still parses the tonemap/quality strings into the
 //! typed values these ops take.
 //!
-//! Allowed deps: components (the `VisualCorrectionComponent`/`Tonemap` data). Pure.
+//! Pure.
 
 use crate::components::{ShadowSettings, SsaoSettings, Tonemap, VisualCorrectionComponent};
 

@@ -17,7 +17,7 @@ TEST := cargo nextest run --locked
 
 # The gates, in the order `make gates` runs them. `deny` sits last: its failures
 # are about dependencies (and it needs the network), so a code failure reports first.
-GATES := fmt size determinism direction components parity test-lint scripts clippy doc test deny
+GATES := fmt size layers determinism direction components parity test-lint scripts clippy doc test deny
 # Checks on the gate runner itself, run before any gate.
 SELF_CHECKS := target-dir inventory
 
@@ -106,6 +106,9 @@ fmt: ## [gate] rustfmt, engine and tools/lint
 
 size: ## [gate] File-length cap, full scan (tools/lint)
 	$(LINT)
+
+layers: ## [gate] Module imports match the declared layer table (tools/lint/src/layers/table.rs)
+	$(LINT) -- --layers
 
 determinism: ## [gate] No wall-clock / unseeded RNG in the sim modules
 	$(LINT) -- --determinism

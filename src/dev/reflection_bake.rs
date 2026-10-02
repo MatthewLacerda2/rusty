@@ -15,8 +15,6 @@
 //! Authoring-time only: a reflection bake is a dev action (its output is baked-asset
 //! files + path refs the runtime loads), so the whole path lives behind the `dev` feature
 //! with the rest of the agentic layer.
-//!
-//! Allowed deps: render (headless path), scene.
 
 use std::path::Path;
 

@@ -8,8 +8,6 @@
 //! The actual bots live in `project/scripts/*.lua`, like any other script. This file
 //! only documents the pattern and hosts the small shared helpers the harness needs to
 //! wire a bot onto the Player at run time.
-//!
-//! Allowed deps: api (writable Input).
 
 use crate::scene::{Scene, ScriptComponent};
 

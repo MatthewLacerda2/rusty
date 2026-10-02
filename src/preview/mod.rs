@@ -10,8 +10,6 @@
 //! is the point of the module living outside `editor/` — the headless path must not
 //! reach into the UI tree to render a preview, or the two front-ends drift into two
 //! preview scenes.
-//!
-//! Allowed deps: asset, components, render (for `Camera`), scene.
 
 pub mod orbit;
 pub mod scene;

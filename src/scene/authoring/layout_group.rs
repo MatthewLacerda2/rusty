@@ -5,7 +5,7 @@
 //! every write through these: padding may be negative (it pushes children out),
 //! a cell size never is, and a fixed column / row count is at least 1.
 //!
-//! Allowed deps: components (the `LayoutGroupComponent` data). Pure.
+//! Pure.
 
 use glam::{Vec2, Vec4};
 

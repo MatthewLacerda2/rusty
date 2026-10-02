@@ -6,7 +6,7 @@
 //! share one write + one clamp. The `Graphics` adapter still parses the mode name
 //! into the typed value `set_mode` takes.
 //!
-//! Allowed deps: scene (the `FogSettings` data). Pure.
+//! Pure.
 
 use glam::Vec3;
 

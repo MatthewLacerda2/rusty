@@ -9,8 +9,7 @@
 //! unknown or baked param, or a wrong number of values, is an error naming it — and
 //! stored by its canonical name.
 //!
-//! Allowed deps: components (the `UiShader` data), ecs (the graphic lookup),
-//! shadergen::params (the layout). Pure apart from reading the sidecar.
+//! Pure apart from reading the sidecar.
 
 use crate::components::UiShader;
 use crate::ecs::World;

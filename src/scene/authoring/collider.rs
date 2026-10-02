@@ -10,7 +10,7 @@
 //! Each op takes `&mut ColliderComponent`; the caller's accessor
 //! (`world.collider_mut(id)`) carries the no-op-when-absent semantics (#344).
 //!
-//! Allowed deps: components (the `ColliderComponent`/`ColliderShape` data). Pure.
+//! Pure.
 
 use crate::components::{ColliderComponent, ColliderShape, PhysicsMaterial};
 

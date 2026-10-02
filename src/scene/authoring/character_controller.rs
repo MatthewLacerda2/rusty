@@ -8,7 +8,7 @@
 //! zero (the collide-and-slide sweep needs a gap to keep). The runtime fields
 //! (`is_grounded`, the flags, the ground normal) are written only by `Move`.
 //!
-//! Allowed deps: components (the component data). Pure.
+//! Pure.
 
 use glam::Vec3;
 

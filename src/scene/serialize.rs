@@ -9,9 +9,6 @@
 //! never baked GPU buffers. On load we rehydrate the non-serialized data —
 //! primitive meshes from `primitive_type`, and the collider world AABBs — so the
 //! file stays human-readable/diffable and small.
-//!
-//! Allowed deps: ecs, components, asset (for re-importing `"Asset"` meshes),
-//! render::mesh (the `Vertex` type rehydration targets).
 
 use std::collections::BTreeMap;
 

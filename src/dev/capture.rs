@@ -27,8 +27,6 @@
 //! the host reports `None` and its callers return `Ok(false)` — the same contract
 //! `Renderer::new_headless` has always had, kept in one place. The probe is attempted
 //! once; a box with no adapter does not retry per shot.
-//!
-//! Allowed deps: render (headless path).
 
 use std::path::Path;
 

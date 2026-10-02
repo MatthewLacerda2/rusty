@@ -342,12 +342,15 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   input, cursor, settings and what `Application.Quit()` means; the editor and the
   standalone player are its two frontends. Window/input behaviour both need goes in
   the shell, once — never copied into a frontend.
+- **One declared layering.** Which module may import which is written once, in
+  `tools/lint/src/layers/table.rs` (#724): one row per `src/<module>`, bottom-up,
+  each naming the modules it may use. Rows also mark which modules are **sim**; the
+  rest are the platform layer. `make layers` checks the code against it. Read the
+  table, not a file header, to answer "may X use Y?", and change the table in the same
+  PR that adds a new module-to-module import.
 - **Determinism.** The sim is a pure function of (seed, inputs, fixed dt). Wall-clock
-  reads and unseeded RNG are banned from the sim modules — the sim proper (`app`,
-  `scripting`, `physics`, `navigation`, `ui`), the `api` scripts call, and the data
-  and tools it runs on (`scene`, `components`, `ecs`, `core`, `time`, `asset`,
-  `procgen`, `shadergen`, `audio`); the platform layer (`shell`, `render`, `editor`,
-  `dev`, `preview`) is exempt.
+  reads and unseeded RNG are banned from the sim modules (the table's `sim` rows); the
+  platform layer is exempt.
   Scripts run inside the sim too: the gameplay Lua VM has no `os`/`io`, and
   `math.random` routes to the seeded `Random` resource (`core::random`, #443).
 - **Use `glam`** for all math; keep egui / wgpu / mlua decoupled.
@@ -379,12 +382,14 @@ Failures from `tools/lint` are written to `.lint/report.txt`. See **docs/linting
   **clippy is a hard gate** (`-D warnings`: default, `dev`, and the no-editor player
   build); the lint policy
   lives in `Cargo.toml`'s `[lints]`, not in flags.
+- **Layering lint** (`make layers`) — fails when a `crate::<module>` import is not
+  in the layer table, when a table entry is stale, on any cycle, and when a sim
+  module imports a platform one (so leaks through a middle module fail too). Test
+  code is exempt. Known exceptions sit in the table, each with its open issue.
 - **Determinism guard** (`make determinism`) — fails on wall-clock / unseeded RNG
-  in the sim modules listed under *Determinism* above; it protects the harness's
-  reproducibility.
-- **Direction guard** (`make direction`) — fails when a sim module (the same list)
-  references `crate::render`, `crate::editor`, `wgpu`
-  or `egui`; the arrow is render/editor → sim.
+  in the table's sim modules; it protects the harness's reproducibility.
+- **Direction guard** (`make direction`) — fails when a sim module references
+  `crate::render`, `crate::editor`, `wgpu` or `egui`; the arrow is render/editor → sim.
 - `make gates` refuses to run when cargo's target dir is outside the worktree — a
   shared one is a false green.
 - `tools/lint/baseline.txt` grandfathers the files that currently exceed the size

@@ -16,7 +16,7 @@
 //! setters (`SetActive`, `SetRate`, `SetShape`, `SetLifetime`, …) are field writes
 //! routed here.
 //!
-//! Allowed deps: components (the emitter data + its enums), core (curves). Pure.
+//! Pure.
 
 mod render;
 

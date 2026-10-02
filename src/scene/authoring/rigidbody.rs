@@ -12,7 +12,7 @@
 //! kinematic gate to derive a velocity delta), not a field write, so it is not an
 //! op here.
 //!
-//! Allowed deps: components (the `RigidBodyComponent` data). Pure.
+//! Pure.
 
 use glam::Vec3;
 

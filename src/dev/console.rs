@@ -14,8 +14,6 @@
 //! runs it through that evaluator, and writes the echoed prompt plus the result
 //! (or error) into the shared `ConsoleLogs` buffer. Both the editor input line
 //! and the harness call `evaluate_line`, so they share byte-for-byte behaviour.
-//!
-//! Allowed deps: scripting (mlua), api.
 
 use std::cell::RefCell;
 

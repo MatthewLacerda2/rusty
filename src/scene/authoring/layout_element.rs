@@ -6,7 +6,7 @@
 //! override is `None` (use the content's value) or a non-negative number — a
 //! negative one clears it, as Unity reads `-1` as "unset".
 //!
-//! Allowed deps: components (the `LayoutElementComponent` data). Pure.
+//! Pure.
 
 use crate::components::{LayoutAxisFit, LayoutElementComponent};
 

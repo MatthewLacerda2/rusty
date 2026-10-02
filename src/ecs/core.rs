@@ -11,8 +11,6 @@
 //! is fine anywhere. What consumers must not do is reach into live storage
 //! directly — that lives in `world.rs`'s generic column accessors, used only
 //! from this module and `access.rs`.
-//!
-//! Allowed deps: hecs, components.
 
 use crate::components::{
     AnimatorComponent, Entity, MaterialAsset, MeshComponent, ScriptComponent, TransformComponent,

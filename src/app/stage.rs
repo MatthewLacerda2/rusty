@@ -7,8 +7,6 @@
 //!
 //! `FixedUpdate` is the deterministic, fixed-dt stage the headless harness steps;
 //! the simulation systems live there so a fixed-timestep replay is reproducible.
-//!
-//! Allowed deps: none.
 
 /// One slot in the schedule. The ordering of the variants here is the canonical
 /// execution order, materialised by [`Stage::FRAME_ORDER`].

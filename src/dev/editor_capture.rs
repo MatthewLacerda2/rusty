@@ -18,8 +18,6 @@
 //! before; [`DEFAULT_FRAMES`] covers both. The sim is never stepped.
 //!
 //! No adapter → `Ok(false)`, the same skip contract as every headless capture.
-//!
-//! Allowed deps: render (headless path), editor.
 
 use std::cell::RefCell;
 use std::path::Path;

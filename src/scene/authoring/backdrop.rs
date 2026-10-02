@@ -4,7 +4,7 @@
 //! `BackdropFilterComponent`. The editor's Backdrop Filter card and the Lua
 //! `BackdropFilter.*` namespace both route every write through this.
 //!
-//! Allowed deps: components (the `BackdropFilterComponent` data). Pure.
+//! Pure.
 
 use glam::Vec4;
 

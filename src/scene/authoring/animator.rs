@@ -12,7 +12,7 @@
 //! (`loop_clip`, #313) — route through [`set_playing`] / [`set_freeze`] /
 //! [`set_looping`] here, so the card's toggles and the bindings share each write.
 //!
-//! Allowed deps: components (the `AnimatorComponent` data). Pure.
+//! Pure.
 
 use crate::components::AnimatorComponent;
 

@@ -6,8 +6,6 @@
 //! can never drift. Split out of `scene::authoring` to keep that module under the
 //! size cap; re-exported from there so existing `authoring::ComponentKind` paths
 //! still resolve.
-//!
-//! Allowed deps: components, scene.
 
 use crate::scene::authoring::defaults::attach_default_material;
 use crate::scene::authoring::dependency;

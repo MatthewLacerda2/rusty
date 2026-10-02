@@ -13,6 +13,7 @@
 mod components;
 mod determinism;
 mod direction;
+mod layers;
 mod parity;
 mod size;
 
@@ -30,6 +31,13 @@ fn main() {
     // reference `crate::render`, `crate::editor`, `wgpu` or `egui`.
     if args.iter().any(|a| a == "--direction") {
         direction::run();
+        return;
+    }
+
+    // `--layers` runs the module-layering lint (#724): every `crate::<module>`
+    // reference must match the declared table in `layers/table.rs`.
+    if args.iter().any(|a| a == "--layers") {
+        layers::run();
         return;
     }
 

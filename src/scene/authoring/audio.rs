@@ -14,7 +14,7 @@
 //! sets; the card's drag-range clamps are a UI affordance applied to the widget
 //! local before the op is called.
 //!
-//! Allowed deps: components (the `AudioSourceComponent` data). Pure.
+//! Pure.
 
 use crate::components::AudioSourceComponent;
 

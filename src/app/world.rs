@@ -14,8 +14,6 @@
 //! rather than holding a long `&mut Scene` that would deadlock a re-entrant script
 //! call. Lifting the script surface fully off `Rc<RefCell>` is the follow-up the
 //! issue flags as its hardest part.
-//!
-//! Allowed deps: scene.
 
 use std::cell::RefCell;
 use std::rc::Rc;

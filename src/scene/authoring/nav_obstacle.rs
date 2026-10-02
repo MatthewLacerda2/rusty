@@ -6,7 +6,7 @@
 //! and the carving thresholds never go negative. The runtime fields (the carve
 //! pose, stationary time, velocity) are written only by the play-mode tick.
 //!
-//! Allowed deps: components (the component data). Pure.
+//! Pure.
 
 use glam::Vec3;
 

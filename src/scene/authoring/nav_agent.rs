@@ -12,7 +12,7 @@
 //! before; the card's drag-range clamps are a UI affordance applied to the widget's
 //! local value before the op is called, so the editor still bounds its inputs.
 //!
-//! Allowed deps: components (the `NavMeshAgentComponent` data). Pure.
+//! Pure.
 
 use glam::Vec3;
 

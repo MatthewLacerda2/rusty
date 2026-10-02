@@ -9,8 +9,6 @@
 //!
 //! Implemented as a `SceneData` snapshot taken on the play-state transition and
 //! applied back via `serialize::apply_scene_data` on Stop.
-//!
-//! Allowed deps: scene::serialize, ecs.
 
 use crate::scene::serialize::{apply_scene_data, to_scene_data, SceneData};
 use crate::scene::Scene;

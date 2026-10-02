@@ -19,8 +19,7 @@
 //! `shell/boot.rs` after `GameWorld::new`, so the deterministic sim/harness keep the
 //! [`NullBackend`]. Nothing here reads a wall clock or unseeded RNG.
 //!
-//! Allowed deps: components (the `AudioSource` data), core (`Storage`, for the
-//! persisted speaker mode), asset (the shared decoder, #385), kira (device only).
+//! kira is used for the output device only.
 
 pub mod backend;
 pub mod device;

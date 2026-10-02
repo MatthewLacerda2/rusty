@@ -2,9 +2,9 @@
 //!
 //! The simulation must be a pure function of (seed, inputs, fixed dt). Wall-clock
 //! reads and unseeded RNG break replayability, so they are BANNED from the sim
-//! modules and only allowed in the platform/display layer (`main.rs`, `shell/`,
-//! `render/`, `editor/`, `dev/`, `preview/`, `bin/`), which legitimately needs real
-//! time and randomness.
+//! modules and only allowed in the platform layer, which legitimately needs real
+//! time and randomness. Which modules are sim is declared once, in the layer table
+//! (`layers/table.rs`, #724); this guard scans that derived set.
 //!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --determinism`
 //! Exit code 1 on any violation; report mirrored to `.lint/report.txt`.
@@ -12,37 +12,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::exit;
-
-/// Directories whose `.rs` files are sim code and must stay deterministic: the four
-/// sim trees and the in-game UI layout (#417); `api`, the Rust side of every Lua call
-/// a script makes inside `FixedUpdate`/`Update` (#723, the twin of #443's Lua-side
-/// ban); the data the sim runs on (`scene`, `components`, `ecs`, `core`, `time`,
-/// `asset`); `procgen` and `shadergen`, which the scene's materials and `Shader.Bake`
-/// reach; and `audio`, whose maestro is a `Resource` stepped by sim time — its kira
-/// device thread is fed mixes, it never reads a clock, so it stays inside the scan.
-///
-/// The synthesiser behind `Sound.*` is no longer here: it is scorsese's zimmer
-/// crate (#413), whose byte-identical promise scorsese guards itself.
-///
-/// A listed directory that no longer exists is a violation, so a rename can't
-/// silently drop a module out of the scan.
-const SIM_DIRS: &[&str] = &[
-    "src/app",
-    "src/scripting",
-    "src/physics",
-    "src/navigation",
-    "src/ui",
-    "src/api",
-    "src/scene",
-    "src/components",
-    "src/ecs",
-    "src/core",
-    "src/time",
-    "src/asset",
-    "src/procgen",
-    "src/shadergen",
-    "src/audio",
-];
 
 /// Banned call fragments. Matched as substrings on non-comment source.
 /// `rand::random` is the unseeded global RNG; seeded generators (`StdRng::from_seed`,
@@ -54,10 +23,11 @@ const REPORT: &str = ".lint/report.txt";
 /// Entry point: scan the sim modules and fail on any banned wall-clock / RNG use.
 pub fn run() {
     let mut violations = Vec::new();
-    for dir in SIM_DIRS {
+    for dir in crate::layers::sim_dirs() {
+        let dir = dir.as_str();
         if !Path::new(dir).is_dir() {
             violations.push(format!(
-                "MISSING_DIR {dir} — listed in SIM_DIRS but absent; update the list"
+                "MISSING_DIR {dir} — a sim module in the layer table but absent; update tools/lint/src/layers/table.rs"
             ));
             continue;
         }
@@ -156,39 +126,5 @@ mod tests {
         assert!(BANNED.contains(&"Instant::now"));
         assert!(BANNED.contains(&"SystemTime"));
         assert!(BANNED.contains(&"rand::random"));
-    }
-
-    #[test]
-    fn sim_dirs_are_pinned() {
-        // Dropping a module off the scan must be a deliberate, reviewed edit (#723).
-        let mut dirs = SIM_DIRS.to_vec();
-        dirs.sort_unstable();
-        let mut want = [
-            "src/api",
-            "src/app",
-            "src/asset",
-            "src/audio",
-            "src/components",
-            "src/core",
-            "src/ecs",
-            "src/navigation",
-            "src/physics",
-            "src/procgen",
-            "src/scene",
-            "src/scripting",
-            "src/shadergen",
-            "src/time",
-            "src/ui",
-        ];
-        want.sort_unstable();
-        assert_eq!(dirs, want);
-    }
-
-    #[test]
-    fn sim_dirs_all_exist() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        for dir in SIM_DIRS {
-            assert!(root.join(dir).is_dir(), "{dir} is listed but missing");
-        }
     }
 }

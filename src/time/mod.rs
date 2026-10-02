@@ -3,8 +3,6 @@
 //! Holds the per-frame `delta_time`, the fixed-timestep `fixed_delta_time` the
 //! headless harness drives, and a monotonic `frame_count`. The simulation advances
 //! it once per tick; Lua reads it through the `Time` namespace (Unity: `Time`).
-//!
-//! Allowed deps: none.
 
 /// The canonical fixed timestep (60 Hz). Matches `dev::harness::FIXED_DT`; kept
 /// here too so non-dev builds have the value without pulling in the dev tree.

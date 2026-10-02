@@ -4,7 +4,7 @@
 //! The editor's Selectable card and the Lua `Selectable.*` namespace both route every
 //! write through these; colours are kept in `[0, 1]` and the fade non-negative.
 //!
-//! Allowed deps: components (the `SelectableComponent` data). Pure.
+//! Pure.
 
 use glam::Vec4;
 

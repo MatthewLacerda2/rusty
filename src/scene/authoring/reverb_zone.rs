@@ -6,7 +6,7 @@
 //! full one, and params stay in range. Unity's preset rule lives here too: picking a
 //! preset writes its params, editing a param makes the zone `Custom`.
 //!
-//! Allowed deps: components (the component data). Pure.
+//! Pure.
 
 use crate::components::{ReverbParams, ReverbPreset, ReverbZoneComponent};
 

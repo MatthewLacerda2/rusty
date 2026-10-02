@@ -6,7 +6,7 @@
 //! gradient keys sit in `t ∈ [0, 1]`, colours are non-negative (HDR is allowed,
 //! for additive tracers that bloom) and alpha stays in `[0, 1]`.
 //!
-//! Allowed deps: components, core::curve. Pure.
+//! Pure.
 
 use crate::components::{ParticleBlend, RibbonStyle, TextureMode};
 use crate::core::curve::{Curve, Gradient};

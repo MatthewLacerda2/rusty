@@ -11,8 +11,6 @@
 //! resources distinct at the system boundary — there is no longer one opaque
 //! `GameWorld` blob the systems reach through. The scaled per-frame `dt` lives on
 //! `Resources` (`Resources::dt`), so systems take no third argument.
-//!
-//! Allowed deps: app::*.
 
 use super::resources::Resources;
 use super::world::World;

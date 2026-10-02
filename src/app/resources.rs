@@ -15,8 +15,6 @@
 //! is a follow-up (issue #39's hardest part). Threading `&mut Scene`/`&mut Resources`
 //! through the system call path — done here — removes the borrow-panic risk from the
 //! engine systems themselves: they no longer reach through one opaque blob.
-//!
-//! Allowed deps: app::*, core, navigation, physics, render, scene, scripting, time, ui.
 
 use std::cell::RefCell;
 use std::rc::Rc;
