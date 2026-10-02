@@ -189,7 +189,10 @@ green, so a PR must never be readied just to make CI run. On 2026-09-30 #520's s
 readied its PR to get Windows CI on a temporary 200-round test loop, and it merged with
 the loop still in (#559 reverted it). For a proof run on a draft, dispatch the
 workflow on the branch instead: `gh workflow run ci.yml --ref <branch>` runs
-`build-test` and `build-test-cross` without readying anything.
+the gates (`build-test`, `build-test-cross`, `deny`, `ci-gate`) and the ~15-min
+`coverage` ratchet without readying anything. Never add `-f force_mutants=true` to a proof run: that
+input starts the full mutation sweep, five runners for ~3.5 h taken from every
+other PR's gates (#705).
 
 **A cloud session is never woken by its own background work.** A routine session
 that starts a build in the background and ends its turn to wait sits idle forever —

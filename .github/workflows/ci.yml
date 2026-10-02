@@ -14,7 +14,9 @@ on:
   # the queue. Mutation testing is split differently (see the two `mutants*` jobs):
   # a fast, diff-scoped, informational run *does* run per-PR so the coding agent
   # gets a fresh-context catch, while the full-sim sweep moved to the nightly
-  # `schedule` below — the report-only backstop.
+  # `schedule` below — the report-only backstop. A manual dispatch (a proof run
+  # on a branch) runs the gates and `coverage`, and sweeps only when
+  # `force_mutants` asks (#705).
   push:
     branches: [main]
   # Nightly full-sim mutation sweep (the `mutants` job): re-examines untouched code
@@ -29,10 +31,12 @@ on:
     - cron: '0 3 * * *'
   workflow_dispatch:
     inputs:
-      # The nightly sweep skips a commit a finished sweep already covered (#506);
-      # this forces it anyway (e.g. after changing the sweep itself).
+      # A dispatch runs the full mutation sweep only when this is set (#705): a
+      # proof run of a branch wants the gates, not ~3.5 h of five runners. Set,
+      # it also overrides the nightly's skip of an already-swept commit (#506)
+      # (e.g. after changing the sweep itself).
       force_mutants:
-        description: Run the full mutation sweep even if a finished sweep already covered this commit
+        description: Run the full mutation sweep (a dispatch skips it otherwise), even if a finished sweep already covered this commit
         type: boolean
         default: false
 
@@ -41,7 +45,8 @@ on:
 # `pull_request` runs share a group; every other event (push to `main`, the
 # nightly schedule, merge_group, manual) is keyed on its own run id, so each of
 # those runs finishes — a shared group would still let a newer run replace a
-# *pending* one, even with cancel-in-progress off.
+# *pending* one, even with cancel-in-progress off. `ci-pr-closed.yml` joins a
+# PR's group when the PR closes or merges, cancelling a run nobody reads (#705).
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -513,6 +518,10 @@ jobs:
   # coding agent fixes them in-PR; that routing is what makes "informational" bite
   # without a hard gate. `continue-on-error` keeps it from ever blocking a merge,
   # and the cheap `sim` paths-filter short-circuits PRs that touch no sim code.
+  # The timeout bounds a runaway (#705): over 42 finished runs the median was
+  # ~1 min and the 95th percentile 37 min, but two held a runner for 103 and
+  # 240 min while merge gates queued. Past 90 min the job is cut off and the PR
+  # simply gets no mutation report — it is informational either way.
   mutants-pr:
     needs: changes
     runs-on: ubuntu-latest
@@ -521,6 +530,7 @@ jobs:
       github.event.pull_request.draft == false &&
       needs.changes.outputs.sim != 'false'
     continue-on-error: true
+    timeout-minutes: 90
     permissions:
       contents: read
       pull-requests: write
@@ -636,9 +646,23 @@ jobs:
   # lookup itself errors, the sweep runs (a wasted night beats a silent gap), and
   # this job never fails, so a skipped sweep reads as `skipped` — not red — to
   # main-health. `force_mutants` on a manual dispatch bypasses the lookup.
+  #
+  # A dispatch reaches this job only with `force_mutants` (#705): a plain
+  # dispatch is a proof run of the gates, and sweeping a branch commit — never
+  # swept before, so never skipped — took five runners for ~3.5 h on every one.
+  #
+  # One sweep at a time, repo-wide (#705): if another run's sweep shards are
+  # still going, this run skips its own rather than taking five more runners
+  # from the merge gates; the next night sweeps whatever `main` is by then.
+  # This is a lookup, not a `concurrency` group, because a group on the
+  # `mutants` matrix would serialise its own shards and cancel all but one
+  # pending, and a group on this job releases as soon as it finishes. Forced
+  # sweeps obey it too — re-dispatch once the running sweep ends.
   mutants-plan:
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.force_mutants)
     permissions:
       contents: read
       actions: read   # list this workflow's past runs and read their artifacts
@@ -651,12 +675,27 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
           FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force_mutants }}
         run: |
           decide() {
             echo "sweep=$1" >> "$GITHUB_OUTPUT"
             echo "$2" | tee -a "$GITHUB_STEP_SUMMARY"
           }
+          # Is another run's sweep still holding shards? Any commit, any branch.
+          if ! live=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?status=in_progress&per_page=100" \
+                --jq ".workflow_runs[] | select(.id != $RUN_ID) | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.id) \\(.html_url)\""); then
+            echo '::warning::could not list running runs; sweeping to be safe'
+            live=''
+          fi
+          while read -r id url; do
+            [ -n "$id" ] || continue
+            if gh api "repos/$REPO/actions/runs/$id/jobs?per_page=100" \
+                --jq '.jobs[] | select((.name | startswith("mutants (")) and .status != "completed") | .id' | grep -q .; then
+              decide false "Mutation sweep skipped: $url is still sweeping, and only one sweep runs at a time."
+              exit 0
+            fi
+          done <<< "$live"
           if [ "$FORCE" = true ]; then
             decide true "Mutation sweep forced by \`force_mutants\`."; exit 0
           fi
@@ -681,7 +720,7 @@ jobs:
   # diff run, this re-mutates the *entire* deterministic sim (app/scripting/physics/
   # navigation), re-examining untouched code the diff run never touches and
   # tracking/ratcheting the survivor backlog (#158–#161). Runs on the nightly
-  # `schedule` or on demand; never on a PR, never blocking. No `needs: changes`:
+  # `schedule` or a `force_mutants` dispatch; never on a PR, never blocking. No `needs: changes`:
   # there is no PR/push diff to filter on a scheduled/manual run, so it always
   # sweeps the full set.
   #
@@ -704,6 +743,9 @@ jobs:
     runs-on: ubuntu-latest
     if: needs.mutants-plan.outputs.sweep == 'true'
     continue-on-error: true
+    # GitHub's 6 h ceiling, spelled out: the shard sizing above budgets against
+    # it (~3.5 h observed), and `mutants-report` names a shard it cuts off.
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       max-parallel: 5
