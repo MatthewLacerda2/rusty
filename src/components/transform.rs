@@ -28,6 +28,25 @@ impl TransformComponent {
         Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.position)
     }
 
+    /// Decompose an affine matrix (no shear) into position / rotation / scale.
+    pub fn from_matrix(m: Mat4) -> Self {
+        let (scale, rotation, position) = m.to_scale_rotation_translation();
+        Self {
+            position,
+            rotation,
+            scale,
+        }
+    }
+
+    /// Whether `other` is the same transform within `eps` (a rotation and its
+    /// negation are the same orientation).
+    pub fn approx_eq(&self, other: &Self, eps: f32) -> bool {
+        self.position.abs_diff_eq(other.position, eps)
+            && self.scale.abs_diff_eq(other.scale, eps)
+            && (self.rotation.abs_diff_eq(other.rotation, eps)
+                || self.rotation.abs_diff_eq(-other.rotation, eps))
+    }
+
     pub fn euler_angles(&self) -> Vec3 {
         let (yaw, pitch, roll) = self.rotation.to_euler(glam::EulerRot::YXZ);
         Vec3::new(pitch.to_degrees(), yaw.to_degrees(), roll.to_degrees())

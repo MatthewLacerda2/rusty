@@ -76,7 +76,8 @@ const REBAKE_INTERVAL_FRAMES: u64 = 60;
 /// deferred-destroy queue (firing `OnDisable`/`OnDestroy`) after every other
 /// system has seen the entity. The scene-load phase (#432) follows it, so a
 /// `Scene.Load` swaps the World only once the whole tick is done with it, right
-/// before `advance_frame`.
+/// before `advance_frame`. The skin palette build (#453) runs in `Render`, after
+/// every stage that may move a bone.
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::FixedUpdate, rebake_nav)
         .add_system(Stage::FixedUpdate, init_scripts)
@@ -91,7 +92,8 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, super::trails::tick_trails)
         .add_system(Stage::FixedUpdate, apply_destroys)
         .add_system(Stage::FixedUpdate, super::scene_load::apply_scene_load)
-        .add_system(Stage::FixedUpdate, advance_frame);
+        .add_system(Stage::FixedUpdate, advance_frame)
+        .add_system(Stage::Render, build_skin_palettes);
 }
 
 /// The script phase's head: drain queued script loads — entities spawned during
@@ -165,9 +167,10 @@ fn tick_nav(world: &mut World, res: &mut Resources) {
     nav.tick_nav_agents(&mut s, res.frame_dt);
 }
 
-/// Advance every active entity's animator and re-pose its skinned mesh from the
-/// imported clips (#80). The sampler is a pure function of (skin, clip, time), so
-/// stepping at the fixed dt is deterministic.
+/// Advance every active entity's animator and write the sampled pose onto its
+/// bone GameObjects (#80, #453). The sampler is a pure function of (skin, clip,
+/// time), so stepping at the fixed dt is deterministic. Writers after this one
+/// (`LateUpdate` scripts, physics) may override a bone before the palette build.
 fn animate(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
     let mut s = world.scene.borrow_mut();
@@ -177,15 +180,25 @@ fn animate(world: &mut World, res: &mut Resources) {
         }
         // The animator + mesh split borrow goes through the facade's sanctioned
         // helper (#344) — the animate system's re-pose step.
-        s.world.with_animator_and_mesh_mut(id, |anim, mesh| {
+        let writes = s.world.with_animator_and_mesh_mut(id, |anim, mesh| {
             // The current clip's duration is the wrap length when the animator loops.
             let duration = super::animation::current_clip_duration(anim, mesh.as_deref());
             anim.advance(dt, duration);
-            if let Some(mesh) = mesh {
-                super::animation::repose_mesh(anim, mesh);
-            }
+            mesh.map(|m| super::animation::bone_writes(anim, m))
         });
+        for (bone, local) in writes.flatten().unwrap_or_default() {
+            if let Some(mut t) = s.world.transform_mut(bone) {
+                *t = local;
+            }
+        }
     }
+}
+
+/// The palette build (#453): once every pose writer of the frame has run, skin
+/// each mesh from its bones. Registered in `Render` — draw-data preparation, after
+/// `LateUpdate`; edit mode calls the same build from `GameWorld::tick`.
+fn build_skin_palettes(world: &mut World, _res: &mut Resources) {
+    world.scene.borrow_mut().build_skin_palettes();
 }
 
 #[cfg(test)]

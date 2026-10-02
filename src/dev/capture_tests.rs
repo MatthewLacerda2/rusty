@@ -33,6 +33,7 @@ fn box_scene(ambient: f32) -> Scene {
             skin: None,
             clips: Vec::new(),
             pose_palette: Vec::new(),
+            skeleton: Default::default(),
             is_dirty: DirtyFlag::new(true),
         }),
     );

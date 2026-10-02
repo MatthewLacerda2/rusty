@@ -25,6 +25,7 @@ fn save_load_preserves_values_and_rehydrates_mesh() {
             skin: None,
             clips: Vec::new(),
             pose_palette: Vec::new(),
+            skeleton: Default::default(),
             is_dirty: rusty::scene::DirtyFlag::new(true),
         }),
     );

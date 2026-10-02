@@ -51,6 +51,7 @@ fn yard(pose: Mat4) -> Scene {
             skin: Some(skin),
             clips: Vec::new(),
             pose_palette: vec![pose],
+            skeleton: Default::default(),
             is_dirty: DirtyFlag::new(true),
         }),
     );

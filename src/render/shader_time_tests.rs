@@ -50,6 +50,7 @@ fn glowing_box() -> Scene {
             skin: None,
             clips: Vec::new(),
             pose_palette: Vec::new(),
+            skeleton: Default::default(),
             is_dirty: DirtyFlag::new(true),
         }),
     );

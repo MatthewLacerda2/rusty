@@ -38,6 +38,11 @@ fn instance_entity_ids(scene: &Scene, root_id: u32) -> Option<Vec<u32>> {
             .prefab_link(id)
             .is_some_and(|l| l.source == source);
         if !same_source {
+            // A bone (#453) carries no link, but the instance's own entities may
+            // hang from it.
+            if scene.bone_owner(id).is_some() {
+                stack.extend(scene.world.children(id));
+            }
             continue;
         }
         ids.push(id);
@@ -136,6 +141,8 @@ pub fn reimport_instance(scene: &mut Scene, root_id: u32) -> Result<(), String> 
     for id in ids {
         rebuild_entity(scene, id, &baselines, true);
     }
+    // A rebuilt skinned mesh lost its bone binding; re-bind it by name (#453).
+    scene.sync_skeletons();
     scene.update_all_colliders();
     Ok(())
 }
@@ -153,6 +160,7 @@ pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), 
         }
         rebuild_entity(scene, id, &baselines, false);
     }
+    scene.sync_skeletons();
     scene.update_all_colliders();
     Ok(())
 }

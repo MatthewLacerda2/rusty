@@ -121,6 +121,14 @@ fn build_skin(
         })
         .collect();
     let local_bind = skin.joints().map(|j| local_transform(&j)).collect();
+    let names = skin
+        .joints()
+        .enumerate()
+        .map(|(slot, j)| {
+            j.name()
+                .map_or_else(|| format!("joint_{slot}"), str::to_string)
+        })
+        .collect();
     let joint_parents = joint_nodes
         .iter()
         .map(|node| parents.get(node).and_then(|p| slot_of.get(p)).copied())
@@ -133,5 +141,6 @@ fn build_skin(
         parents: joint_parents,
         joint_nodes,
         mesh_inverse,
+        names,
     }
 }

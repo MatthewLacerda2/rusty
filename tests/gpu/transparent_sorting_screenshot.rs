@@ -59,6 +59,7 @@ fn add_quad(scene: &mut Scene, name: &str, z: f32, color: [f32; 3], alpha: f32) 
             skin: None,
             clips: Vec::new(),
             pose_palette: Vec::new(),
+            skeleton: Default::default(),
             is_dirty: rusty::scene::DirtyFlag::new(true),
         }),
     );

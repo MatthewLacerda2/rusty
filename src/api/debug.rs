@@ -159,7 +159,7 @@ fn parse_mesh(name: &str) -> mlua::Result<PreviewMesh> {
     }
 }
 
-/// `Debug.Snapshot()` (whole world) and `Debug.SnapshotEntity(id)` (one entity) —
+/// `Debug.Snapshot([opts])` (whole world) and `Debug.SnapshotEntity(id)` (one entity) —
 /// the structured scene-read, returned as a pretty JSON string the agent parses.
 fn register_snapshot<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
@@ -175,13 +175,16 @@ fn register_snapshot<'lua, 'scope>(
     put(
         table,
         "Snapshot",
-        scope.create_function(move |_, ()| {
-            let value = snapshot::world_value(
+        scope.create_function(move |_, opts: Option<Table>| {
+            // `{ bones = true }` includes skeleton bones, left out by default (#453).
+            let bones = opts.and_then(|o| o.get::<_, Option<bool>>("bones").ok().flatten());
+            let value = snapshot::world_value_with(
                 &scene.borrow(),
                 &camera.borrow(),
                 time.borrow().frame_count,
                 *is_playing.borrow(),
                 pixels(),
+                bones.unwrap_or(false),
             );
             Ok(serde_json::to_string_pretty(&value).unwrap_or_default())
         }),

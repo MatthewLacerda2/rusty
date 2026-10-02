@@ -38,6 +38,7 @@ fn scene_with_fxaa(on: bool) -> Scene {
             skin: None,
             clips: Vec::new(),
             pose_palette: Vec::new(),
+            skeleton: Default::default(),
             is_dirty: DirtyFlag::new(true),
         }),
     );

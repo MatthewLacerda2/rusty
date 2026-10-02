@@ -34,6 +34,7 @@ pub fn wall_scene(distance: f32, color: [f32; 3]) -> Scene {
             skin: None,
             clips: Vec::new(),
             pose_palette: Vec::new(),
+            skeleton: Default::default(),
             is_dirty: rusty::scene::DirtyFlag::new(true),
         }),
     );

@@ -83,6 +83,12 @@ impl World {
             .is_some()
     }
 
+    /// The local Transform matrix and the parent, in one lookup — the hot read
+    /// of every hierarchy walk (the world-matrix cache, the skin palette build).
+    pub fn local_and_parent(&self, id: u32) -> Option<(glam::Mat4, Option<u32>)> {
+        self.with_pair::<TransformComponent, Core, _>(id, |t, c| (t.to_matrix(), c.parent_id))
+    }
+
     pub fn parent_id(&self, id: u32) -> Option<u32> {
         self.component::<Core>(id).and_then(|c| c.parent_id)
     }
@@ -185,6 +191,7 @@ impl World {
             shape: self.shape(id).map(|c| (*c).clone()),
             prefab_link: self.prefab_link(id).map(|c| (*c).clone()),
             parent_id: core.parent_id,
+            parent_bone: None,
             children: core.children.clone(),
         })
     }

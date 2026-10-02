@@ -42,6 +42,7 @@ pub(crate) fn vec3(v: Vec3) -> Value {
 
 /// The whole-world snapshot: play-state envelope + camera + every entity. `screen`
 /// is the UI's screen size in pixels (for each UI element's computed `ui_rect`).
+/// Skeleton bones (#453) are left out — see [`world_value_with`].
 pub fn world_value(
     scene: &Scene,
     camera: &Camera,
@@ -49,17 +50,37 @@ pub fn world_value(
     playing: bool,
     screen: Vec2,
 ) -> Value {
+    world_value_with(scene, camera, frame, playing, screen, false)
+}
+
+/// [`world_value`], choosing whether skeleton bones are included (#453): a
+/// character's ~65 bones would flood the read, so they are opt-in, and an
+/// included bone is marked `"bone": true`.
+pub fn world_value_with(
+    scene: &Scene,
+    camera: &Camera,
+    frame: u64,
+    playing: bool,
+    screen: Vec2,
+    include_bones: bool,
+) -> Value {
     // Markers are placed through the camera, as the UI lays them out (#429).
     let view = UiView::with_camera(screen, camera.clone());
+    let bones = scene.bone_ids();
     // Collect ids first so the per-entity accessor borrows below don't overlap
     // any iterator-held guard.
     let ids = scene.entity_ids();
     let entities: Vec<Value> = ids
         .iter()
         .filter(|&&id| scene.world.contains(id))
+        .filter(|id| include_bones || !bones.contains(id))
         .map(|&id| {
             let world_matrix = scene.compute_world_matrix(id);
-            entity_value(scene, id, world_matrix, &view)
+            let mut value = entity_value(scene, id, world_matrix, &view);
+            if bones.contains(&id) {
+                value["bone"] = json!(true);
+            }
+            value
         })
         .collect();
     json!({

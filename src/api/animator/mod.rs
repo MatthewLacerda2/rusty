@@ -8,6 +8,7 @@
 //! component's `freeze` flag; `SetLooping` wraps the playhead at the clip's end.
 //! `SetBool`/`SetFloat`/`SetInt`/`SetTrigger` (#314) write the typed graph
 //! parameters the animation-graph evaluator (#316) reads to decide transitions.
+//! `GetBone` (#453) finds a bone GameObject of the entity's skeleton by name.
 //! The graph control surface (#316: `SetGraph`, `SetGraphEnabled`, `PlayNode`,
 //! `PlayAnimation`, `GetCurrentNode`) lives in `graph.rs` — one namespace, split
 //! to stay under the size cap.
@@ -39,6 +40,7 @@ pub fn register<'lua, 'scope>(
     register_set_looping(scope, &table, scene)?;
     register_set_bool_float(scope, &table, scene, console)?;
     register_set_int_trigger(scope, &table, scene, console)?;
+    register_get_bone(scope, &table, scene)?;
     graph::register(scope, &table, scene, console)?;
 
     lua.globals()
@@ -83,6 +85,22 @@ fn register_play<'lua, 'scope>(
                 anim.crossfade(clip, duration);
             }
             Ok(())
+        }),
+    )
+}
+
+/// `GetBone` — the bone GameObject of the entity's skeleton named `name` (#453),
+/// or `nil`. Bones are ordinary entities: parent to one, move it, add to it.
+fn register_get_bone<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "GetBone",
+        scope.create_function(|_, (id, name): (u32, String)| {
+            Ok(scene.borrow().find_bone(id, &name))
         }),
     )
 }

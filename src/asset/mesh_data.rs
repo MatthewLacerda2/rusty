@@ -78,9 +78,38 @@ pub struct SkinData {
     /// posed joint global by this re-expresses the palette in mesh-local space, the
     /// same convention `bind_global` already bakes in.
     pub mesh_inverse: Mat4,
+    /// Name of each joint node, in joint order (`joint_{slot}` when the glTF node
+    /// is unnamed). The key a bone GameObject is spawned under and re-bound by
+    /// (#453), so overrides and attachments survive a re-exported skeleton.
+    pub names: Vec<String>,
 }
 
 impl SkinData {
+    /// The joint's name, or the `joint_{slot}` fallback for a skin built without
+    /// names.
+    pub fn name(&self, slot: usize) -> String {
+        self.names
+            .get(slot)
+            .cloned()
+            .unwrap_or_else(|| format!("joint_{slot}"))
+    }
+
+    /// The fixed transform from mesh-local space into a root joint's parent space:
+    /// whatever sits between the skinned node and the skeleton root in the glTF (an
+    /// `Armature` node's rotation and scale). Recovered as
+    /// `bind_global * local_bind⁻¹`, so a root bone's mesh-local transform is this
+    /// times its sampled local. Identity for a joint that has a parent joint.
+    pub fn root_offset(&self, slot: usize) -> Mat4 {
+        if self.parents.get(slot).copied().flatten().is_some() {
+            return Mat4::IDENTITY;
+        }
+        let (Some(global), Some(local)) = (self.bind_global.get(slot), self.local_bind.get(slot))
+        else {
+            return Mat4::IDENTITY;
+        };
+        *global * local.matrix().inverse()
+    }
+
     /// The bind-pose bone palette: `bind_global[j] * inverse_bind[j]` per joint.
     /// Joints are paired in order; a length mismatch is truncated to the shorter.
     pub fn bind_palette(&self) -> Vec<Mat4> {

@@ -209,6 +209,7 @@ impl Scene {
     }
 
     pub fn destroy_entity(&mut self, id: u32) {
+        self.despawn_skeleton(id); // its bones, and what hangs from them (#453)
         self.world.despawn(id);
         if self.selected_entity_id == Some(id) {
             self.selected_entity_id = None;

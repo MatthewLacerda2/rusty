@@ -126,6 +126,7 @@ fn play_animation_returns_whether_the_mesh_carries_the_clip() {
                 duration: 1.0,
             }],
             pose_palette: Vec::new(),
+            skeleton: Default::default(),
             is_dirty: Default::default(),
         }),
     );

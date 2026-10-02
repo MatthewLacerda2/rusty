@@ -265,7 +265,11 @@ the parent/child hierarchy. It can be **empty** — a Transform and nothing else
 a grouping pivot or a spawn marker. Or it can be configured: instantiating a glTF
 yields a GameObject carrying a `Transform`, a `Mesh`, a `Collider` when the asset
 provides one, and the engine's default `Material`. Same object, more components — that
-is the only difference between an empty marker and a fully-dressed enemy.
+is the only difference between an empty marker and a fully-dressed enemy. A *skinned*
+glTF also brings its skeleton: one child GameObject per bone (#453), posed by the
+`Animator` and read back for skinning, so attaching a gun or a hitbox to a hand is
+plain parenting. Bones are rebuilt from the model on load; the scene saves only
+per-bone overrides and what hangs from a bone.
 
 1. **Resources** — engine singletons, one per World (Unity's engine statics: `Time`,
    `Input`, the nav graph, the console, the active camera, play-state, the renderer).

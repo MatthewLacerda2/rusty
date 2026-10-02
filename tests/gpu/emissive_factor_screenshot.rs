@@ -60,6 +60,7 @@ fn scene(emissive: [f32; 3], bloom: bool) -> Scene {
             skin: None,
             clips: Vec::new(),
             pose_palette: Vec::new(),
+            skeleton: Default::default(),
             is_dirty: rusty::scene::DirtyFlag::new(true),
         }),
     );

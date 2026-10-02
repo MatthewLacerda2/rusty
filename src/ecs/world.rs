@@ -233,6 +233,18 @@ impl World {
         Some(f(a, b))
     }
 
+    /// Shared borrow of two columns of one entity under a single id lookup.
+    pub(in crate::ecs) fn with_pair<A: hecs::Component, B: hecs::Component, R>(
+        &self,
+        id: u32,
+        f: impl FnOnce(&A, &B) -> R,
+    ) -> Option<R> {
+        let &handle = self.handles.get(&id)?;
+        let mut query = self.inner.query_one::<(&A, &B)>(handle).ok()?;
+        let (a, b) = query.get()?;
+        Some(f(a, b))
+    }
+
     /// Spawn a brand-new hecs entity carrying every column of `entity` at
     /// once — a single archetype placement via `EntityBuilder`, instead of N
     /// sequential `insert_one` calls that would each re-migrate the entity
