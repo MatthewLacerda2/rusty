@@ -161,6 +161,12 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     // scene doc; the cubemaps themselves are loaded lazily by the renderer (#244).
     scene.reflection_probes = data.reflection_probes;
 
+    // Rebuild every skeleton from its model, then hang the saved attachments back
+    // on their bones by name (#453) — before prefab propagation, which rebuilds a
+    // linked skinned entity from its source and would drop its bone overrides.
+    scene.sync_skeletons();
+    scene.attach_to_bones(bone_parents);
+
     scene.update_all_colliders();
 
     // Propagate every linked prefab instance against its source on load (#216):
@@ -168,14 +174,6 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     // overrides on top. A missing/renamed source is skipped per instance (the
     // instance keeps its last-saved values), so this never aborts the load.
     crate::scene::prefab::link::reimport_all_linked_instances(scene);
-
-    // Rebuild every skeleton from its model, then hang the saved attachments back
-    // on their bones by name (#453).
-    scene.sync_skeletons();
-    if !bone_parents.is_empty() {
-        scene.attach_to_bones(bone_parents);
-        scene.update_all_colliders();
-    }
 
     // Validate declared component dependencies on load (#359): a hand-edited or
     // drifted scene carrying a dependent component without its requirement (e.g. a

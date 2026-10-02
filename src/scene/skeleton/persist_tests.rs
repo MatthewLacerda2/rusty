@@ -135,3 +135,40 @@ fn a_prefab_of_a_character_keeps_its_bone_attachment() {
     assert_eq!(held.len(), 1);
     assert_eq!(*scene.world.name(held[0]).unwrap(), "Gun");
 }
+
+/// A linked prefab instance is rebuilt from its source on every load; the bones a
+/// designer turned on the instance, and the gun its source hangs on a bone, must
+/// survive that propagation.
+#[test]
+fn a_linked_prefab_instance_keeps_its_bone_overrides_through_propagation() {
+    let (source, hero) = armed_hero("linked");
+    let path = crate::test_temp::dir().join("rusty_453_linked.prefab");
+    let path = path.to_string_lossy().replace('\\', "/");
+    crate::scene::save_prefab(&source, hero, &path).unwrap();
+
+    let mut scene = Scene::new();
+    let instance = crate::scene::load_and_instantiate_linked(&mut scene, &path, None).unwrap();
+    let joint0 = scene.find_bone(instance, "Joint0").unwrap();
+    scene.world.transform_mut(joint0).unwrap().scale = Vec3::splat(2.0);
+
+    let loaded = reload(&scene);
+    let hero = loaded.find_entity_by_name("Hero").unwrap();
+    let joint0 = loaded.find_bone(hero, "Joint0").unwrap();
+    let joint1 = loaded.find_bone(hero, "Joint1").unwrap();
+    let scale = loaded.world.transform(joint0).unwrap().scale;
+    assert!(
+        scale.abs_diff_eq(Vec3::splat(2.0), 1e-6),
+        "the instance's override"
+    );
+    let turned = loaded.world.transform(joint1).unwrap().rotation;
+    assert!(
+        turned.abs_diff_eq(Quat::from_rotation_z(0.5), 1e-6),
+        "the source's override"
+    );
+    let gun = loaded.find_entity_by_name("Gun").unwrap();
+    assert_eq!(loaded.world.parent_id(gun), Some(joint1));
+    assert!(
+        loaded.world.prefab_link(gun).is_some(),
+        "the gun is still part of the instance"
+    );
+}

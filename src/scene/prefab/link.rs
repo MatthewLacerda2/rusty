@@ -38,6 +38,11 @@ fn instance_entity_ids(scene: &Scene, root_id: u32) -> Option<Vec<u32>> {
             .prefab_link(id)
             .is_some_and(|l| l.source == source);
         if !same_source {
+            // A bone (#453) carries no link, but the instance's own entities may
+            // hang from it.
+            if scene.bone_owner(id).is_some() {
+                stack.extend(scene.world.children(id));
+            }
             continue;
         }
         ids.push(id);
