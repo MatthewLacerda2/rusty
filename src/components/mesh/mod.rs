@@ -17,7 +17,7 @@ pub mod primitives;
 mod skeleton;
 mod vertex;
 
-pub use skeleton::BoneBinding;
+pub use skeleton::{BoneBinding, BoneBody};
 pub use vertex::Vertex;
 
 /// Interior-mutable boolean that is `Sync` (single-threaded engine invariant).

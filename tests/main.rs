@@ -66,6 +66,7 @@ mod procgen_resolution;
 mod procgen_seams;
 mod procgen_weathering;
 mod proptest_scene;
+mod ragdoll;
 mod reflection_probes;
 mod ribbons;
 mod scene_roundtrip;

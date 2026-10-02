@@ -31,12 +31,16 @@ mod follow;
 mod joints;
 #[cfg(test)]
 mod joints_tests;
+mod live;
+#[cfg(test)]
+mod live_tests;
 mod material;
 #[cfg(test)]
 mod material_tests;
 mod query;
 #[cfg(test)]
 mod query_active_tests;
+mod ragdoll;
 #[cfg(test)]
 mod raycast_tests;
 mod spatial;

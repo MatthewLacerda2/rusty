@@ -47,6 +47,7 @@ pub mod nav_obstacle;
 pub mod particle;
 pub mod physics;
 pub mod probe;
+pub mod ragdoll;
 pub mod random;
 pub mod rect_mask;
 pub mod rect_transform;
@@ -181,6 +182,7 @@ pub fn register<'lua, 'scope>(
     physics::register(lua, scope, ctx.scene)?;
     physics::register_hitscan(lua, scope, ctx.scene, ctx.physics)?;
     joint::register(lua, scope, ctx.scene)?;
+    ragdoll::register(lua, scope, ctx.scene, ctx.physics)?;
     character_controller::register(lua, scope, ctx.scene, ctx.physics)?;
     lod_group::register(lua, scope, ctx.scene)?;
     time::register(lua, scope, ctx.time)?;
