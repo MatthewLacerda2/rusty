@@ -13,7 +13,9 @@ link or the navmesh moves (`IsConnected` says which). A link is two-way by defau
 one-way link (a drop through a hatch) is crossed start to end only.
 
 `Cost` is the path cost of crossing it in world units (Unity's `costOverride`): negative
-(the default, `-1`) uses the link's length. A higher cost makes paths prefer walking when
+(the default, `-1`) uses the link's length times its **area's** cost. `Area` (#460,
+default `0`, `Walkable`) is the link's navigation area: an agent whose area mask excludes
+it never crosses it (see `Navigation`, *Areas and costs*). A higher cost makes paths prefer walking when
 walking is not much longer; the search never counts a link as cheaper than the straight
 ground distance it covers.
 
@@ -33,5 +35,6 @@ no-ops. Add one with `Scene.AddComponent(id, "OffMeshLink")` (alias `NavMeshLink
 | `OffMeshLink.GetEnd` / `SetEnd` | `(id)` / `(id, x, y, z)` | the end point, local to the entity (non-finite is ignored) |
 | `OffMeshLink.GetBidirectional` / `SetBidirectional` | `(id)` / `(id, bool)` | whether agents may cross it end to start too |
 | `OffMeshLink.GetCost` / `SetCost` | `(id)` / `(id, cost)` | the crossing cost in world units; negative means the link's length (stored as `-1`) |
+| `OffMeshLink.GetArea` / `SetArea` | `(id)` / `(id, area)` | the link's area id, `0`–`31` (out of range is ignored) |
 | `OffMeshLink.GetActive` / `SetActive` | `(id)` / `(id, bool)` | Unity's `activated`: an inactive link connects nothing |
 | `OffMeshLink.IsConnected` | `(id)` | whether both ends found the navmesh at the last rebake |

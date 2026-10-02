@@ -10,14 +10,16 @@ same shapes physics collides with (rotated boxes, ramps, spheres, capsules, conv
 and triangle meshes), rasterised into each cell column. A ramp bakes as a slope, not a
 plateau at its highest point. **Where there is no collider there is no navmesh**: no
 implicit ground past the level's edge, and an empty scene bakes nothing (as in Unity).
-Carving `NavMeshObstacle`s cut their footprint out of it (see `NavMeshObstacle`), and
+Carving `NavMeshObstacle`s cut their footprint out of it (see `NavMeshObstacle`),
+`NavMeshModifierVolume`s give parts of it a navigation area with its own cost (below), and
 off-mesh links join what walking can't (below).
 
 ### Keeping the navmesh current (#456)
 
 In Play the navmesh follows the scene **every tick**, rebaking **only what changed**. Each
 tick compares the static colliders (shape and world pose; added, removed, moved, resized,
-toggled static or active), the carving obstacles and the authored off-mesh links against
+toggled static or active), the carving obstacles, the area modifier volumes and the
+authored off-mesh links against
 what the last bake read; a link change re-snaps the links without rebaking any floor. A
 change dirties the cells its old and new footprints cover; only those cells, plus the
 agent-radius erosion's reach around them, are rebaked. The result is exactly the navmesh
@@ -59,10 +61,10 @@ off every wall. A path is a table:
 | Function | Signature | Returns |
 |---|---|---|
 | `Navigation.GetNextPathStep` | `(cx, cy, cz, tx, ty, tz)` | the next corner `x, y, z` of the smoothed path (its `y` is that floor's height); with no path, the target itself |
-| `Navigation.CalculatePath` | `(fx, fy, fz, tx, ty, tz)` | a path table (above) |
+| `Navigation.CalculatePath` | `(fx, fy, fz, tx, ty, tz [, areaMask])` | a path table (above); with `areaMask`, the path enters only those areas (see *Areas and costs*) |
 | `Navigation.GetPathLength` | `(path)` | the length along a path table's `corners` (the same number as its `length`) |
-| `Navigation.SamplePosition` | `(x, y, z, maxDistance)` | `found, x, y, z` — the walkable point nearest the given one (3D distance) within `maxDistance`; `false, 0, 0, 0` when there is none |
-| `Navigation.Raycast` | `(fx, fy, fz, tx, ty, tz)` | `hit, x, y, z` — walks the navmesh straight from the start toward the end; `hit` is `true` when a wall, ledge, eroded edge or too-steep step stops it, and `x, y, z` is where it stopped (the end point when clear), on the floor it reached |
+| `Navigation.SamplePosition` | `(x, y, z, maxDistance [, areaMask])` | `found, x, y, z` — the walkable point nearest the given one (3D distance) within `maxDistance`, on a floor whose area `areaMask` allows; `false, 0, 0, 0` when there is none |
+| `Navigation.Raycast` | `(fx, fy, fz, tx, ty, tz [, areaMask])` | `hit, x, y, z` — walks the navmesh straight from the start toward the end; `hit` is `true` when a wall, ledge, eroded edge, too-steep step or a floor outside `areaMask` stops it, and `x, y, z` is where it stopped (the end point when clear), on the floor it reached |
 
 `Raycast` follows ramps and stairs, so a clear walk can end on another floor; the
 returned `y` says which. Its start must stand on the navmesh: from off it the walk is
@@ -112,6 +114,51 @@ table is:
 | `Navigation.GetJumpDistance` / `SetJumpDistance` | `()` / `(metres)` | the widest gap a generated jump crosses (`0`: none) + re-bakes |
 | `Navigation.GetJumpHeight` / `SetJumpHeight` | `()` / `(metres)` | the highest ledge a generated jump climbs (`0`: none) + re-bakes |
 | `Navigation.GetLinkSpacing` / `SetLinkSpacing` | `()` / `(metres)` | one generated link per this much edge + re-bakes |
+
+### Areas and costs (#460)
+
+Every walkable floor and every off-mesh link has a **navigation area**, an id `0`–`31`
+(Unity's NavMesh areas). The scene's **area table** names each area and gives it a
+**cost**: a path pays `distance × cost` across it, so agents prefer cheap areas and cross
+a costly one only when nothing cheaper gets there — "same navmesh, different costs". An
+agent's **area mask** (`NavMeshAgent.SetAreaMask`, and the optional `areaMask` on the
+queries above; bit `i` = area `i`, `-1` = every area) says which areas it may enter at
+all. Two areas are built in: **`Walkable`** (`0`, every floor's area by default) and
+**`NotWalkable`** (`1`, which removes the floor a modifier volume covers). Areas are
+assigned by `NavMeshModifierVolume` boxes at bake time, and by `OffMeshLink.SetArea`
+(generated links are `Walkable`).
+
+- Costs are at least `1` (lower values clamp up), so the search stays optimal.
+- A step between floors of two areas pays the mean of their costs; a diagonal step pays at
+  least the dearer of the two cells it cuts past, so a path never shaves the corner of an
+  area it routes around.
+- The smoothing never pulls a straight leg across a floor the mask excludes or one dearer
+  than the stretch it smooths: a path that went around the mud stays out of it. Paths get
+  a corner where the cost changes.
+- A query's start floor is exempt from the mask, so an agent standing in a forbidden area
+  can still walk out; a target in one gives a `partial` path.
+- **Costs are read at search time, never baked.** `SetAreaCost` takes effect on the very
+  next query, rebakes nothing, and makes every agent re-plan on its next tick (a cost
+  change anywhere may change any path). Area *assignments* (moving a volume) rebake only
+  the cells involved.
+
+The table serializes with the scene (`nav_settings.areas`) and is editable from the scene
+inspector's **Navmesh** section (editor↔API parity).
+
+| Function | Signature | Returns / Effect |
+|---|---|---|
+| `Navigation.GetAreaFromName` | `(name)` | the area's id, or `-1` when no area has that name (case-sensitive) |
+| `Navigation.DefineArea` | `(name [, cost])` | the id of a new area (cost default `1`), or of the existing one re-costed; errors on an empty name, a non-finite cost, or a full table (32 areas) |
+| `Navigation.GetAreaCost` | `(name)` | the area's cost, or `nil` when undefined |
+| `Navigation.SetAreaCost` | `(name, cost)` | sets the cost (clamped to at least `1`); no rebake, agents re-plan; errors on an unknown area or a non-finite cost |
+| `Navigation.GetAreas` | `()` | a list of `{index =, name =, cost =}`, one per area in id order |
+
+```lua
+local fire = Navigation.DefineArea("Fire", 1)
+NavMeshModifierVolume.SetArea(molotovZone, fire)   -- where the fire is
+Navigation.SetAreaCost("Fire", 50)                 -- burning: avoid unless trapped
+NavMeshAgent.SetAreaMask(bot, -1 ~ (1 << fire))    -- this bot never walks into it
+```
 
 ### Per-scene bake settings (#276)
 

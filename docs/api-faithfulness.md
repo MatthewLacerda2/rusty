@@ -109,6 +109,7 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 | `SetAgentRadius` | ✅ | sim — `navigation/bake/erosion.rs` **erodes the walkable spans by the radius** (#277): the agent-radius read-site. Passages narrower than ~`2*radius` close and the surface pulls off walls/world-edge; `radius==0` is an exact no-op. Round-trips through `SceneData`; `thin_passage_closes_under_erosion` / `wide_corridor_keeps_core_pulled_off_both_walls` prove it |
 | `SetAgentHeight` | ✅ | sim — `navigation/bake/heightfield.rs::open_spans` **drops spans whose open space is below the height** (#278, layered in #454): the agent-height read-site, also applied to moves by `navigation/links.rs`. The floor under a low overhang goes; the overhang's own top stays. Round-trips through `SceneData`; `set_agent_height_round_trips_and_rebakes` (`api/nav`) + `low_overhang_drops_the_floor_beneath_but_keeps_its_top` / `taller_agent_drops_a_superset` (`navigation::bake::tests::headroom`) prove it |
 | `SetDropHeight` / `SetJumpDistance` / `SetJumpHeight` / `SetLinkSpacing` | ✅ | sim — `navigation/offmesh/generate.rs::LinkParams` turns them into the generated drop and jump links (#462); round-trips. `drops_leave_the_platform_edges_and_land_on_the_floor` / `a_gap_is_jumped_both_ways_within_the_jump_distance` prove it |
+| `SetAreaCost` / `DefineArea` | ✅ | sim — `astar.rs::expand` multiplies each step by the area cost (`NavigationGraph::area_costs`, refreshed by `sync` without a rebake, #460); round-trips in `nav_settings.areas`. `a_costly_strip_is_routed_around_when_a_detour_exists` / `a_runtime_cost_change_reroutes_without_a_rebake` prove it |
 
 ### `NavMeshAgent` — over `Entity.nav_agent`
 
@@ -123,6 +124,7 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 | `SetAvoidancePriority` | ✅ | sim — `navigation/avoidance` picks each pair's dodge share by priority (#463); round-trips |
 | `SetAvoidanceEnabled` | ✅ | sim — `navigation/agents/tick.rs` only runs ORCA for agents with it on; round-trips |
 | `SetAutoTraverseOffMeshLink` | ✅ | sim — `navigation/agents/tick.rs::on_link` crosses the link itself only with it on (#462); round-trips. `an_agent_waits_on_a_link_until_its_script_completes_it` proves it |
+| `SetAreaMask` | ✅ | sim — `navigation/agents/mod.rs::plan_agent_path` plans with it (`calculate_path_masked`, #460) and the op drops the cached path; round-trips. `a_masked_out_area_is_never_entered` / `the_area_table_masks_and_masked_queries_reach_the_navmesh` prove it |
 
 ### `NavMeshObstacle` — over `Entity.nav_obstacle`
 
@@ -137,6 +139,13 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 | Setter | Status | Read-site |
 |---|---|---|
 | `SetStart` / `SetEnd` / `SetBidirectional` / `SetCost` / `SetActive` | ✅ | sim — `navigation/offmesh/authored.rs::authored_keys` reads them into the bake inputs; `resolve_authored` snaps the ends and A\* crosses the link (`link_moves`); round-trips. `an_authored_ladder_connects_two_floors` proves it |
+| `SetArea` | ✅ | sim — `link_moves` skips a link whose area the query's mask excludes and charges its length at the area's cost (#460); round-trips. `an_agent_never_climbs_a_ladder_its_area_mask_excludes` proves it |
+
+### `NavMeshModifierVolume` — over `Entity.nav_modifier`
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetCenter` / `SetSize` / `SetArea` / `SetActive` | ✅ | sim — `navigation/bake/modifiers.rs::modifier_keys` reads them into the bake inputs and `apply` assigns the area to the spans inside the box (`NotWalkable` removes them); round-trips. `a_volume_assigns_its_area_to_the_floor_inside_it` / `volume_edits_rebake_incrementally_to_a_full_bake` prove it |
 
 ### `Physics` — over `Entity.rigidbody`
 

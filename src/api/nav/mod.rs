@@ -203,6 +203,8 @@ fn set_and_rebake(
 }
 
 #[cfg(test)]
+mod areas_tests;
+#[cfg(test)]
 mod query_tests;
 #[cfg(test)]
 mod settings_tests;

@@ -78,3 +78,19 @@ fn smoothing_never_pulls_a_string_across_a_link() {
     );
     assert_eq!(path.corners[i], link.end, "and leaves from its top");
 }
+
+#[test]
+fn an_agent_never_climbs_a_ladder_its_area_mask_excludes() {
+    let (mut scene, ladder) = ladder();
+    scene.world.offmesh_link_mut(ladder).unwrap().area = 3;
+    let (ground, deck) = (Vec3::new(2.0, 0.0, 5.0), Vec3::new(16.0, 4.0, 5.0));
+    let g = baked(&scene);
+    assert_eq!(
+        g.calculate_path(ground, deck).status,
+        NavPathStatus::Complete
+    );
+    let no_ladders = !(1 << 3);
+    let path = g.calculate_path_masked(ground, deck, no_ladders);
+    assert_eq!(path.status, NavPathStatus::Partial, "stays on the ground");
+    assert!(path.links.is_empty());
+}

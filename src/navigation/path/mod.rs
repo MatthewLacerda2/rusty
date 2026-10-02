@@ -9,6 +9,8 @@
 //! path into corners (cut at every off-mesh link, #462, which it never pulls a
 //! string across), `sample` finds the nearest walkable point.
 
+#[cfg(test)]
+mod area_tests;
 mod sample;
 mod smooth;
 #[cfg(test)]
@@ -81,7 +83,7 @@ impl NavigationGraph {
             Some(&end) => self.span_world(end),
             None => first,
         };
-        let (corners, links) = self.pull_route(&spans, first, last);
+        let (corners, links) = self.pull_route(&spans, (first, last), mask);
         NavPath {
             status: if complete {
                 NavPathStatus::Complete
