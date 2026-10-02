@@ -6,8 +6,7 @@ pub mod state;
 mod state_tests;
 mod tick;
 
-use super::NavigationGraph;
-use crate::components::NavPathStatus;
+use super::{NavPath, NavigationGraph};
 use crate::scene::NavMeshAgentComponent;
 use glam::Vec3;
 
@@ -18,6 +17,10 @@ const REPLAN_TARGET_EPSILON_SQ: f32 = 0.25;
 /// before a forced re-plan. Frame-count based, never wall-clock, so the sim
 /// stays a pure function of (seed, inputs, dt).
 const MAX_PATH_AGE_FRAMES: u32 = 60;
+/// How far (world units) from its target the agent looks for the walkable point to
+/// head for, when the target itself is off the navmesh (#666). Past it the target is
+/// unreachable and the agent plans no path.
+pub const TARGET_SAMPLE_DISTANCE: f32 = 8.0;
 /// How close (world units, XZ plane) the agent must get to a waypoint before
 /// the cursor advances to the next one.
 const WAYPOINT_REACHED_DISTANCE: f32 = 0.5;
@@ -42,9 +45,8 @@ impl NavigationGraph {
         if agent.frames_since_replan >= MAX_PATH_AGE_FRAMES {
             return true;
         }
-        // The final waypoint is the literal target, which may lie off the navmesh (a
-        // flying player, a point past the floor's edge); testing it would re-plan every
-        // frame. Interior waypoints are span floors: one gone means the mesh changed.
+        // A path walked to its last corner stays valid (see above). Every other corner
+        // is a span floor: one gone means the mesh changed.
         if agent.path_cursor + 1 >= agent.cached_path.len() {
             return false;
         }
@@ -52,23 +54,22 @@ impl NavigationGraph {
             .is_none()
     }
 
-    /// Plans the agent's smoothed path to its target once ([`Self::calculate_path`],
-    /// #458) and stores its corners on the agent, resetting the cursor and bookkeeping.
-    /// The start corner is dropped (the agent is already there). A complete path ends
-    /// on the literal target, so the agent finishes on the goal rather than on its
-    /// floor; with no path at all that leaves a one-waypoint beeline. A partial path
-    /// ends where the target stops being reachable, and the agent stops there.
-    fn plan_agent_path(&self, agent: &mut NavMeshAgentComponent, current_pos: Vec3) {
-        let path = self.calculate_path(current_pos, agent.target);
-        let mut waypoints: Vec<Vec3> = path.corners.into_iter().skip(1).collect();
-        if path.status != NavPathStatus::Partial {
-            let t = agent.target;
-            if waypoints.last().is_some_and(|w| w.x == t.x && w.z == t.z) {
-                waypoints.pop();
-            }
-            waypoints.push(t);
-        }
-        agent.cached_path = waypoints;
+    /// Plans the agent's smoothed path once ([`Self::calculate_path`], #458) and
+    /// stores its corners on the agent, resetting the cursor and bookkeeping. The
+    /// target is first projected onto the walkable point nearest it (within
+    /// [`TARGET_SAMPLE_DISTANCE`]), so the path ends on the navmesh, never on the raw
+    /// target: a flying player or a point past the floor's edge is chased to the
+    /// nearest place the agent can stand, where it stops (Unity's behaviour, #666).
+    /// A partial path ends where the target stops being reachable. No walkable point
+    /// near the target (or none under the agent) plans no path, and the agent stays.
+    /// The start corner is dropped (the agent is already there). `feet` is where the
+    /// agent's feet are, not its Transform.
+    fn plan_agent_path(&self, agent: &mut NavMeshAgentComponent, feet: Vec3) {
+        let path = match self.sample_position(agent.target, TARGET_SAMPLE_DISTANCE) {
+            Some(goal) => self.calculate_path(feet, goal),
+            None => NavPath::invalid(),
+        };
+        agent.cached_path = path.corners.into_iter().skip(1).collect();
         // Waypoints drop the start corner, so corner `i` is waypoint `i - 1`.
         agent.path_links = path.links.iter().map(|&(i, l)| (i - 1, l)).collect();
         agent.path_cursor = 0;
@@ -78,16 +79,22 @@ impl NavigationGraph {
         agent.frames_since_replan = 0;
     }
 
+    /// Re-plan the agent's path now if it is stale, so the steering decision that
+    /// follows measures against a path planned for the current target.
+    pub(super) fn refresh_path(&self, agent: &mut NavMeshAgentComponent, feet: Vec3) {
+        self.keep_path_if_untouched(agent, feet);
+        if self.path_cache_invalid(agent) {
+            self.plan_agent_path(agent, feet);
+        }
+    }
+
     /// Returns the world position the agent should steer toward this frame,
     /// using the cached path (re-planning only when invalid) and advancing the
     /// cursor past any waypoints already reached. Waypoints carry the baked surface
     /// height (#130) so the goal follows ramps/stairs in `y`; the reached test stays
     /// on the XZ plane so a height delta never strands the cursor on a waypoint.
     fn cached_next_step(&self, agent: &mut NavMeshAgentComponent, current_pos: Vec3) -> Vec3 {
-        self.keep_path_if_untouched(agent, current_pos);
-        if self.path_cache_invalid(agent) {
-            self.plan_agent_path(agent, current_pos);
-        }
+        self.refresh_path(agent, current_pos);
         while agent.path_cursor < agent.cached_path.len() {
             let wp = agent.cached_path[agent.path_cursor];
             let dx = wp.x - current_pos.x;
@@ -103,7 +110,7 @@ impl NavigationGraph {
         agent.frames_since_replan = agent.frames_since_replan.saturating_add(1);
         match agent.cached_path.get(agent.path_cursor) {
             Some(wp) => *wp,
-            None => agent.destination(),
+            None => agent.cached_path.last().copied().unwrap_or(current_pos),
         }
     }
 }
@@ -165,21 +172,39 @@ mod tests {
     }
 
     #[test]
-    fn off_mesh_target_does_not_replan_every_frame() {
+    fn off_mesh_target_is_projected_onto_the_navmesh() {
         let mut graph = open_graph();
         let hole = graph.index(10, 20); // the target's column holds no span
         graph.spans.remove(hole);
         for start in &mut graph.cell_start[hole + 1..] {
             *start -= 1;
         }
-        let mut agent = test_agent(Vec3::new(10.0, 0.0, 20.0));
-        graph.plan_agent_path(&mut agent, Vec3::new(9.0, 0.0, 19.0));
-        assert_eq!(agent.cached_path.len(), 2, "one span, then the raw target");
-        agent.path_cursor = 1;
+        let mut agent = test_agent(Vec3::new(10.0, 3.0, 20.0));
+        graph.plan_agent_path(&mut agent, Vec3::new(5.0, 0.0, 15.0));
+        let end = *agent.cached_path.last().expect("a path");
+        assert!(
+            graph.span_under(end).is_some(),
+            "ends on the navmesh: {end}"
+        );
+        assert_eq!(end.y, 0.0, "on the floor, not at the target's height");
+        assert!(
+            end.distance(Vec3::new(10.0, 0.0, 20.0)) < 1.0,
+            "nearest point: {end}"
+        );
+        agent.path_cursor = agent.cached_path.len() - 1;
         assert!(
             !graph.path_cache_invalid(&agent),
-            "the raw target is not a span"
+            "a walked path stays valid"
         );
+    }
+
+    #[test]
+    fn target_with_no_navmesh_nearby_plans_no_path() {
+        let graph = open_graph();
+        let mut agent = test_agent(Vec3::new(10.0, 0.0, 20.0 + 2.0 * TARGET_SAMPLE_DISTANCE));
+        graph.plan_agent_path(&mut agent, Vec3::new(5.0, 0.0, 15.0));
+        assert!(agent.cached_path.is_empty());
+        assert_eq!(agent.path_status, crate::components::NavPathStatus::Invalid);
     }
 
     #[test]

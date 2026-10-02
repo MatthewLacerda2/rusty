@@ -33,30 +33,7 @@ pub fn draw_nav_agent(
             }
             *is_dirty = true;
         }
-        let rows: [(&str, f32, _, NavOp); 4] = [
-            ("Speed:", agent.speed, 0.0..=100.0, nav_ops::set_speed),
-            (
-                "Acceleration:",
-                agent.acceleration,
-                0.0..=100.0,
-                nav_ops::set_acceleration,
-            ),
-            (
-                "Stopping Distance:",
-                agent.stopping_distance,
-                0.0..=50.0,
-                nav_ops::set_stopping_distance,
-            ),
-            ("Radius:", agent.radius, 0.01..=10.0, nav_ops::set_radius),
-        ];
-        for (label, mut value, range, op) in rows {
-            if clamped(ui, label, &mut value, range) {
-                if let Some(mut a) = world.nav_agent_mut(id) {
-                    op(&mut a, value);
-                }
-                *is_dirty = true;
-            }
-        }
+        draw_agent_tuning(ui, world, id, &agent, is_dirty);
         draw_agent_avoidance(ui, world, id, &agent, is_dirty);
         draw_agent_target(ui, world, id, agent.target, is_dirty);
         ui.label(format!(
@@ -67,6 +44,47 @@ pub fn draw_nav_agent(
     if remove {
         world.set_nav_agent(id, None);
         *is_dirty = true;
+    }
+}
+
+/// The nav-agent scalar tuning rows (speed, acceleration, stopping distance, radius,
+/// base offset), each clamped and routed through its shared op.
+fn draw_agent_tuning(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    agent: &crate::components::NavMeshAgentComponent,
+    is_dirty: &mut bool,
+) {
+    let rows: [(&str, f32, _, NavOp); 5] = [
+        ("Speed:", agent.speed, 0.0..=100.0, nav_ops::set_speed),
+        (
+            "Acceleration:",
+            agent.acceleration,
+            0.0..=100.0,
+            nav_ops::set_acceleration,
+        ),
+        (
+            "Stopping Distance:",
+            agent.stopping_distance,
+            0.0..=50.0,
+            nav_ops::set_stopping_distance,
+        ),
+        ("Radius:", agent.radius, 0.01..=10.0, nav_ops::set_radius),
+        (
+            "Base Offset:",
+            agent.base_offset,
+            -10.0..=10.0,
+            nav_ops::set_base_offset,
+        ),
+    ];
+    for (label, mut value, range, op) in rows {
+        if clamped(ui, label, &mut value, range) {
+            if let Some(mut a) = world.nav_agent_mut(id) {
+                op(&mut a, value);
+            }
+            *is_dirty = true;
+        }
     }
 }
 

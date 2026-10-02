@@ -34,6 +34,15 @@ pub struct NavPath {
 }
 
 impl NavPath {
+    /// No path: an end has no navmesh nearby.
+    pub fn invalid() -> Self {
+        Self {
+            status: NavPathStatus::Invalid,
+            corners: Vec::new(),
+            links: Vec::new(),
+        }
+    }
+
     /// The path's length along its corners, in world units (0 for no path).
     pub fn length(&self) -> f32 {
         path_length(&self.corners)
@@ -56,11 +65,7 @@ impl NavigationGraph {
     /// navmesh nearby there is no path (`Invalid`, no corners).
     pub fn calculate_path(&self, from: Vec3, to: Vec3) -> NavPath {
         let (Some(start), Some(goal)) = (self.snap(from), self.snap(to)) else {
-            return NavPath {
-                status: NavPathStatus::Invalid,
-                corners: Vec::new(),
-                links: Vec::new(),
-            };
+            return NavPath::invalid();
         };
         let (spans, complete) = self.find_path_or_closest(start, goal);
         let first = self.point_on_span(from, start);

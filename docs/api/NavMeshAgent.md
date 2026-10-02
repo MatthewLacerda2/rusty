@@ -10,7 +10,8 @@ Per-entity navmesh agent control.
 | `NavMeshAgent.SetAcceleration` | `(id, acceleration)` | — |
 | `NavMeshAgent.SetStoppingDistance` | `(id, distance)` | — |
 | `NavMeshAgent.SetRadius` | `(id, radius)` | — |
-| `NavMeshAgent.IsAtTarget` | `(id)` | `bool` |
+| `NavMeshAgent.SetBaseOffset` / `GetBaseOffset` | `(id, offset)` / `(id)` | how far the entity's origin sits above the agent's feet (Unity's `baseOffset`, default `0`) |
+| `NavMeshAgent.IsAtTarget` | `(id)` | `bool` — its feet are within `StoppingDistance` of where its path ends (the target projected onto the navmesh) |
 | `NavMeshAgent.GetVelocity` | `(id)` | `x, y, z` |
 | `NavMeshAgent.SetActive` | `(id, active)` | — |
 | `NavMeshAgent.SetAvoidancePriority` | `(id, priority)` | — (0–99, clamped; lower = more important) |
@@ -19,7 +20,7 @@ Per-entity navmesh agent control.
 | `NavMeshAgent.RemainingDistance` | `(id)` | distance left along the path from where it stands; `math.huge` with no path |
 | `NavMeshAgent.GetPathStatus` | `(id)` | `"complete"`, `"partial"` or `"invalid"` (no path planned) |
 | `NavMeshAgent.GetPath` | `(id)` | a path table (see `Navigation`): the agent's position, then the corners still ahead |
-| `NavMeshAgent.Warp` | `(id, x, y, z)` | `bool` — teleports onto the navmesh point nearest `x, y, z` (within 1 unit); `false` and no move when there is none |
+| `NavMeshAgent.Warp` | `(id, x, y, z)` | `bool` — teleports its feet onto the navmesh point nearest `x, y, z` (within 1 unit); `false` and no move when there is none |
 | `NavMeshAgent.ResetPath` | `(id)` | — stops following: the target becomes where it stands |
 | `NavMeshAgent.IsOnOffMeshLink` | `(id)` | `bool` — the agent is on an off-mesh link (see below) |
 | `NavMeshAgent.GetCurrentOffMeshLink` | `(id)` | the link it is on, as a link table (see `Navigation`), or `nil` |
@@ -36,7 +37,16 @@ plans again when the target moves, a rebake changes cells its remaining path cro
 the way may have opened), the path ages out (60 fixed frames), or a corner ahead stops
 being walkable. When the target is unreachable the path
 is **partial** and the agent stops at its end, the nearest reachable point, instead of
-pressing into the wall. `Warp` drops the old path and stops the agent dead; it plans once
+pressing into the wall.
+
+The path never ends off the navmesh (#666): the target is first projected onto the
+walkable point nearest it, within 8 units, and the agent walks there and stops. A target
+past the floor's edge is chased to the edge; a target above the floor (a flying player, a
+chest-height point) is reached on the floor under it. A target with no navmesh within 8
+units plans no path (`"invalid"`), and the agent stays where it is. Arrival is measured
+from the agent's **feet** — its Transform minus `BaseOffset` — to that projected end, so
+an agent whose body is centred on its origin sets `BaseOffset` to half its height and
+stands on the floor instead of sinking into it. `Warp` drops the old path and stops the agent dead; it plans once
 from the new position on its next tick. `ResetPath` is Unity's: the agent slows to a stop
 where it is.
 

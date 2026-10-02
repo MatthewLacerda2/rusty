@@ -9,7 +9,7 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::super::{put, Reg};
-use crate::navigation::NavigationGraph;
+use crate::navigation::{is_at_target, NavigationGraph};
 use crate::scene::authoring::nav_agent as nav_ops;
 use crate::scene::Scene;
 
@@ -101,7 +101,7 @@ fn register_agent_motion<'lua, 'scope>(
     )
 }
 
-/// Footprint tuning: `SetStoppingDistance` / `SetRadius`.
+/// Footprint tuning: `SetStoppingDistance` / `SetRadius` / `Set`-`GetBaseOffset`.
 fn register_agent_size<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,
@@ -129,6 +129,27 @@ fn register_agent_size<'lua, 'scope>(
             }
             Ok(())
         }),
+    )?;
+
+    put(
+        table,
+        "SetBaseOffset",
+        scope.create_function(|_, (id, offset): (u32, f32)| {
+            let mut scene = scene.borrow_mut();
+            if let Some(mut c) = scene.world.nav_agent_mut(id) {
+                nav_ops::set_base_offset(&mut c, offset);
+            }
+            Ok(())
+        }),
+    )?;
+
+    put(
+        table,
+        "GetBaseOffset",
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
+            Ok(scene.world.nav_agent(id).map_or(0.0, |a| a.base_offset))
+        }),
     )
 }
 
@@ -152,8 +173,7 @@ fn register_agent_queries<'lua, 'scope>(
                         .transform(id)
                         .map(|t| t.position)
                         .unwrap_or(Vec3::ZERO);
-                    let to_target = agent.target - current_pos;
-                    to_target.length() <= agent.stopping_distance
+                    is_at_target(&agent, current_pos)
                 })
                 .unwrap_or(true);
             Ok(at_target)

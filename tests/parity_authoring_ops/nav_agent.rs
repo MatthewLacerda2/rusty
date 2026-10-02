@@ -72,3 +72,30 @@ fn nav_agent_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Erro
     assert_eq!(a.avoidance_enabled, b.avoidance_enabled);
     Ok(())
 }
+
+#[test]
+fn base_offset_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
+    let scene = RefCell::new(Scene::new());
+    let via_lua = entity_with_agent(&mut scene.borrow_mut(), "ViaLua");
+    let via_op = entity_with_agent(&mut scene.borrow_mut(), "ViaOp");
+    let nav = RefCell::new(NavigationGraph::new(0.0, 20.0, 0.0, 20.0, 1.0));
+    let lua = Lua::new();
+    let read = lua.scope(|s| {
+        rusty::api::nav::register(&lua, s, &scene, &nav).unwrap();
+        let src = format!(
+            "NavMeshAgent.SetBaseOffset({via_lua}, 1.0) return NavMeshAgent.GetBaseOffset({via_lua})"
+        );
+        lua.load(src).eval::<f32>()
+    })?;
+    nav_ops::set_base_offset(
+        &mut scene.borrow_mut().world.nav_agent_mut(via_op).unwrap(),
+        1.0,
+    );
+    let sc = scene.borrow();
+    let (a, b) = (
+        sc.world.nav_agent(via_lua).unwrap(),
+        sc.world.nav_agent(via_op).unwrap(),
+    );
+    assert_eq!((read, a.base_offset, b.base_offset), (1.0, 1.0, 1.0));
+    Ok(())
+}

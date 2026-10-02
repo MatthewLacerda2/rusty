@@ -34,7 +34,9 @@ mod snap;
 pub(crate) mod test_support;
 
 pub use agents::complete_off_mesh_link;
-pub use agents::state::{remaining_corners, remaining_distance, reset_path, WARP_SNAP_DISTANCE};
+pub use agents::state::{
+    is_at_target, remaining_corners, remaining_distance, reset_path, WARP_SNAP_DISTANCE,
+};
 pub use bake::{CellRect, Rebake};
 pub use bounds::{NavBounds, BOUNDS_MARGIN, EMPTY_SCENE_HALF_EXTENT};
 pub use grid::{
