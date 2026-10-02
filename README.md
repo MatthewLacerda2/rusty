@@ -86,6 +86,13 @@ the game for you, and only open a window when you want to.
   Code over MCP (see [`docs/mcp.md`](docs/mcp.md)).
 - `cargo doc --no-deps` — the Rust API reference.
 
+The first launch seeds a **default scene** into `project/scenes/default.scene`: a
+checkerboard floor, a Player, an Enemy_1 that chases it around a cover wall, a sun
+and a couple of props. Seeding also bakes the scene's checker texture
+(`project/assets/textures/`) and an example surface shader, `default_rim`, with its
+recipe (`project/assets/shaders/`). Files that already exist are never overwritten.
+To get the current default scene back, delete `project/scenes/default.scene`.
+
 ## Shipping a build
 
 A shipped game is the **player** binary built without the editor:

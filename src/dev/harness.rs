@@ -74,16 +74,18 @@ pub struct Harness {
 }
 
 impl Harness {
-    /// Build a harness around a freshly populated demo world and enter play mode.
-    /// `bot_script` is the enemy brain path (empty to skip scripts).
+    /// Build a harness around the default scene — the one the editor seeds (#667) —
+    /// and enter play mode. `bot_script` is the enemy brain path (empty to skip it).
     pub fn new(out_dir: impl AsRef<Path>, bot_script: &str) -> Self {
         // Headless runs don't boot through main.rs, so seed the bundled default
-        // scripts (the Player's controller + enemy brain) into the project workspace
-        // here too, exactly as the windowed boot does.
+        // scripts (the Player's controller + enemy brain) and the default scene's
+        // texture and shader into the project workspace here too, as the windowed
+        // boot does.
         crate::scene::seed_default_scripts();
+        crate::scene::default_scene::seed_default_assets();
 
         let mut scene = Scene::new();
-        super::demo_scene::build(&mut scene, bot_script);
+        crate::scene::default_scene::build(&mut scene, bot_script);
 
         // Baked over the scene's own bounds (#452) — the same path the windowed game takes.
         let nav = NavigationGraph::from_scene(&scene);
