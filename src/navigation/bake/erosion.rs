@@ -30,6 +30,35 @@ use super::super::{NavigationGraph, SpanRef};
 use super::columns::Columns;
 use super::region::CellRect;
 
+/// Window-local numbering of the spans of a [`CellRect`]: within one row of the
+/// window the spans are contiguous in storage, so each row is an offset.
+struct WindowIndex {
+    window: CellRect,
+    /// Per window row: (first global span index, first local index).
+    rows: Vec<(usize, usize)>,
+    len: usize,
+}
+
+impl WindowIndex {
+    fn new(g: &NavigationGraph, window: CellRect) -> Self {
+        let mut rows = Vec::with_capacity((window.z1 - window.z0 + 1) as usize);
+        let mut len = 0;
+        for gz in window.z0..=window.z1 {
+            let first = g.span_range(window.x0, gz).start;
+            let end = g.span_range(window.x1, gz).end;
+            rows.push((first, len));
+            len += end - first;
+        }
+        Self { window, rows, len }
+    }
+
+    /// The local index of global span `i`, which lies in window row `gz`.
+    fn of(&self, gz: i32, i: usize) -> usize {
+        let (first, local) = self.rows[(gz - self.window.z0) as usize];
+        local + (i - first)
+    }
+}
+
 const CARDINALS: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 const DIAGONALS: [(i32, i32); 4] = [(1, 1), (1, -1), (-1, 1), (-1, -1)];
 
@@ -56,34 +85,36 @@ impl NavigationGraph {
             .grown(reach(agent_radius, self.grid_spacing))
             .clamped(self)
             .unwrap_or(region);
-        let dist = self.boundary_distances(window, threshold);
+        let local = WindowIndex::new(self, window);
+        let dist = self.boundary_distances(&local, threshold);
         let mut out = Columns::with_capacity(region.cells());
         for gz in region.z0..=region.z1 {
             for gx in region.x0..=region.x1 {
                 let range = self.span_range(gx, gz);
-                let kept = range.filter(|&i| dist[i] >= threshold);
+                let kept = range.filter(|&i| dist[local.of(gz, i)] >= threshold);
                 out.push_column(kept.map(|i| self.spans[i]));
             }
         }
         out
     }
 
-    /// Chamfer distance from the walkable edge for every span of `window`, capped at
-    /// `threshold` (`u32::MAX` past it, and outside the window).
-    fn boundary_distances(&self, window: CellRect, threshold: u32) -> Vec<u32> {
-        let mut dist = vec![u32::MAX; self.spans.len()];
+    /// Chamfer distance from the walkable edge for every span of the window, by
+    /// window-local index, capped at `threshold` (`u32::MAX` past it).
+    fn boundary_distances(&self, local: &WindowIndex, threshold: u32) -> Vec<u32> {
+        let window = local.window;
+        let mut dist = vec![u32::MAX; local.len];
         let mut queue = BinaryHeap::new();
         for s in self.span_refs_in(window) {
             if CARDINALS
                 .iter()
                 .any(|&(dx, dz)| self.neighbour(s, dx, dz).is_none())
             {
-                dist[s.index as usize] = 0;
+                dist[local.of(s.gz, s.index as usize)] = 0;
                 queue.push(Reverse((0, s.index, s.gx, s.gz)));
             }
         }
         while let Some(Reverse((d, index, gx, gz))) = queue.pop() {
-            if d > dist[index as usize] {
+            if d > dist[local.of(gz, index as usize)] {
                 continue;
             }
             let here = SpanRef { gx, gz, index };
@@ -95,9 +126,13 @@ impl NavigationGraph {
                 let Some(n) = self.neighbour(here, dx, dz) else {
                     continue;
                 };
+                if !window.contains(n.gx, n.gz) {
+                    continue;
+                }
                 let nd = d + cost;
-                if nd < threshold && nd < dist[n.index as usize] && window.contains(n.gx, n.gz) {
-                    dist[n.index as usize] = nd;
+                let slot = &mut dist[local.of(n.gz, n.index as usize)];
+                if nd < threshold && nd < *slot {
+                    *slot = nd;
                     queue.push(Reverse((nd, n.index, n.gx, n.gz)));
                 }
             }
