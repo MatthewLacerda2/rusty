@@ -50,10 +50,9 @@ mod tests {
 
     /// A simple checker recipe used by several spine-level tests.
     fn checker_recipe(resolution: u32, seed: u64) -> TextureRecipe {
-        TextureRecipe {
+        TextureRecipe::new(
             resolution,
-            seed,
-            nodes: vec![Node {
+            vec![Node {
                 id: "c".into(),
                 op: OpKind::Checker {
                     tiles: 4,
@@ -62,9 +61,8 @@ mod tests {
                 },
                 inputs: vec![],
             }],
-            output: None,
-            outputs: Default::default(),
-        }
+        )
+        .with_seed(seed)
     }
 
     #[test]
@@ -72,10 +70,9 @@ mod tests {
         let dir = crate::test_temp::dir();
         let a = dir.join("rusty_procgen_det_a.png");
         let b = dir.join("rusty_procgen_det_b.png");
-        let recipe = TextureRecipe {
-            resolution: 64,
-            seed: 1234,
-            nodes: vec![Node {
+        let recipe = TextureRecipe::new(
+            64,
+            vec![Node {
                 id: "n".into(),
                 op: OpKind::Noise {
                     kind: recipe::NoiseKind::Fbm,
@@ -86,9 +83,8 @@ mod tests {
                 },
                 inputs: vec![],
             }],
-            output: None,
-            outputs: Default::default(),
-        };
+        )
+        .with_seed(1234);
         bake_recipe(&recipe, Slot::Data, a.to_str().unwrap()).unwrap();
         bake_recipe(&recipe, Slot::Data, b.to_str().unwrap()).unwrap();
         let ba = std::fs::read(&a).unwrap();

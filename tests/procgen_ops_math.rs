@@ -6,13 +6,7 @@ use rusty::procgen::recipe::{GradientKind, Node, OpKind, TextureRecipe};
 use rusty::procgen::{evaluate, Image};
 
 fn run(nodes: Vec<Node>, output: &str, resolution: u32) -> Image {
-    let recipe = TextureRecipe {
-        resolution,
-        seed: 0,
-        nodes,
-        output: Some(output.into()),
-        outputs: Default::default(),
-    };
+    let recipe = TextureRecipe::new(resolution, nodes).with_output(output);
     evaluate(&recipe).expect("recipe evaluates")
 }
 

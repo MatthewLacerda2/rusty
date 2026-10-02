@@ -3,10 +3,9 @@
 use super::*;
 
 fn sample_recipe() -> TextureRecipe {
-    TextureRecipe {
-        resolution: 64,
-        seed: 7,
-        nodes: vec![
+    TextureRecipe::new(
+        64,
+        vec![
             Node {
                 id: "n0".into(),
                 op: OpKind::Checker {
@@ -22,9 +21,9 @@ fn sample_recipe() -> TextureRecipe {
                 inputs: vec!["n0".into()],
             },
         ],
-        output: Some("n1".into()),
-        outputs: Default::default(),
-    }
+    )
+    .with_seed(7)
+    .with_output("n1")
 }
 
 #[test]

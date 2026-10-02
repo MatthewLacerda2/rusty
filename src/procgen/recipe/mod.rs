@@ -242,6 +242,32 @@ pub struct TextureRecipe {
 }
 
 impl TextureRecipe {
+    /// A single-output recipe over `nodes`: seed 0, output the last node, no named
+    /// outputs. Tests build recipes through this and the `with_*` setters below, so a
+    /// new optional field touches only the code that uses it (#663). `resolution` is
+    /// required, which is why there is no `Default`: a zero-sized recipe never bakes.
+    pub fn new(resolution: u32, nodes: Vec<Node>) -> Self {
+        Self {
+            resolution,
+            seed: 0,
+            nodes,
+            output: None,
+            outputs: BTreeMap::new(),
+        }
+    }
+
+    /// Set the noise seed.
+    pub fn with_seed(mut self, seed: u64) -> Self {
+        self.seed = seed;
+        self
+    }
+
+    /// Name the output node explicitly instead of the last one.
+    pub fn with_output(mut self, id: impl Into<String>) -> Self {
+        self.output = Some(id.into());
+        self
+    }
+
     /// Serialize to pretty JSON — the on-disk recipe form.
     pub fn to_json(&self) -> Result<String, String> {
         serde_json::to_string_pretty(self).map_err(|e| e.to_string())

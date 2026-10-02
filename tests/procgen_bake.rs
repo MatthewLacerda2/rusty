@@ -7,10 +7,9 @@ use rusty::procgen::recipe::{Node, NoiseKind, OpKind, TextureRecipe};
 use rusty::procgen::{bake_recipe, evaluate};
 
 fn noise_recipe(resolution: u32, seed: u64) -> TextureRecipe {
-    TextureRecipe {
+    TextureRecipe::new(
         resolution,
-        seed,
-        nodes: vec![Node {
+        vec![Node {
             id: "n".into(),
             op: OpKind::Noise {
                 kind: NoiseKind::Perlin,
@@ -21,9 +20,8 @@ fn noise_recipe(resolution: u32, seed: u64) -> TextureRecipe {
             },
             inputs: vec![],
         }],
-        output: None,
-        outputs: Default::default(),
-    }
+    )
+    .with_seed(seed)
 }
 
 fn tmp(name: &str) -> String {
@@ -88,19 +86,16 @@ fn srgb_vs_linear_encoding_is_applied_per_slot() {
 fn metallic_roughness_packs_metallic_b_roughness_g() {
     // A recipe whose output red is metallic and green is roughness; the MR pack must
     // route metallic to B and roughness to G in one bake.
-    let recipe = TextureRecipe {
-        resolution: 4,
-        seed: 0,
-        nodes: vec![Node {
+    let recipe = TextureRecipe::new(
+        4,
+        vec![Node {
             id: "c".into(),
             op: OpKind::Constant {
                 color: [1.0, 0.5, 0.0, 1.0], // R=metallic=1, G=roughness=0.5
             },
             inputs: vec![],
         }],
-        output: None,
-        outputs: Default::default(),
-    };
+    );
     let img = evaluate(&recipe).unwrap();
     let px = encode(&img, Slot::MetallicRoughness).get_pixel(0, 0).0;
     assert_eq!(px[2], 255, "metallic -> B");

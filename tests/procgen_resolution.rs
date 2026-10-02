@@ -17,13 +17,7 @@ pub fn node(id: &str, op: OpKind, inputs: &[&str]) -> Node {
 
 fn bake(nodes: &[Node], resolution: u32) -> Image {
     let nodes = nodes.to_vec();
-    let recipe = TextureRecipe {
-        resolution,
-        seed: 3,
-        nodes,
-        output: None,
-        outputs: Default::default(),
-    };
+    let recipe = TextureRecipe::new(resolution, nodes).with_seed(3);
     evaluate(&recipe).expect("recipe evaluates")
 }
 

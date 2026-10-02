@@ -156,10 +156,9 @@ mod tests {
 
     #[test]
     fn evaluates_in_dependency_order() {
-        let recipe = TextureRecipe {
-            resolution: 8,
-            seed: 0,
-            nodes: vec![
+        let recipe = TextureRecipe::new(
+            8,
+            vec![
                 node(
                     "c",
                     OpKind::Constant {
@@ -169,9 +168,8 @@ mod tests {
                 ),
                 node("inv", OpKind::Invert, &["c"]),
             ],
-            output: Some("inv".into()),
-            outputs: Default::default(),
-        };
+        )
+        .with_output("inv");
         let img = evaluate(&recipe).unwrap();
         let p = img.pixels()[0];
         assert!((p[0] - 0.8).abs() < 1e-5);
@@ -181,13 +179,7 @@ mod tests {
 
     #[test]
     fn missing_input_is_reported() {
-        let recipe = TextureRecipe {
-            resolution: 8,
-            seed: 0,
-            nodes: vec![node("inv", OpKind::Invert, &["ghost"])],
-            output: None,
-            outputs: Default::default(),
-        };
+        let recipe = TextureRecipe::new(8, vec![node("inv", OpKind::Invert, &["ghost"])]);
         assert!(matches!(
             evaluate(&recipe),
             Err(RunError::UnknownInput { .. })
@@ -196,36 +188,22 @@ mod tests {
 
     #[test]
     fn cycle_is_detected() {
-        let recipe = TextureRecipe {
-            resolution: 8,
-            seed: 0,
-            nodes: vec![
+        let recipe = TextureRecipe::new(
+            8,
+            vec![
                 node("a", OpKind::Invert, &["b"]),
                 node("b", OpKind::Invert, &["a"]),
             ],
-            output: Some("a".into()),
-            outputs: Default::default(),
-        };
+        )
+        .with_output("a");
         assert!(matches!(evaluate(&recipe), Err(RunError::Cycle(_))));
     }
 
     #[test]
     fn empty_and_bad_resolution_error() {
-        let empty = TextureRecipe {
-            resolution: 8,
-            seed: 0,
-            nodes: vec![],
-            output: None,
-            outputs: Default::default(),
-        };
+        let empty = TextureRecipe::new(8, vec![]);
         assert_eq!(evaluate(&empty), Err(RunError::Empty));
-        let bad = TextureRecipe {
-            resolution: 0,
-            seed: 0,
-            nodes: vec![node("c", OpKind::WhiteNoise, &[])],
-            output: None,
-            outputs: Default::default(),
-        };
+        let bad = TextureRecipe::new(0, vec![node("c", OpKind::WhiteNoise, &[])]);
         assert_eq!(evaluate(&bad), Err(RunError::BadResolution));
     }
 }
