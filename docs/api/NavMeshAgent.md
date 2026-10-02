@@ -21,7 +21,7 @@ Per-entity navmesh agent control.
 Moving agents steer around each other with **ORCA** (optimal reciprocal collision
 avoidance, van den Berg et al. 2011): each frame an agent's preferred velocity toward its
 next waypoint is bent just enough to stay clear of its 10 nearest agents (within 10 world
-units) for the next 2 seconds, then the usual walkable-cell slide applies. Agents keep
+units) for the next 2 seconds, then the usual slide applies: each axis moves only onto a span linked to the agent's own (within the step, slope and headroom limits), and the agent stands on the floor it walked onto (#454). Agents keep
 their `Radius` apart. **`AvoidancePriority`** is Unity's `avoidancePriority` (default
 `50`): an agent ignores agents with a *higher* number (they yield to it), splits the dodge
 with equal numbers, and yields fully to lower numbers. An agent with avoidance **off**

@@ -37,8 +37,8 @@ pub fn draw(
 /// path the entity inspector's collider/static toggles trigger via `pending_nav_bake`,
 /// no second re-bake mechanism. `agent_radius` is live (#277): the re-bake erodes the
 /// walkable surface inward by the radius (clearance off walls, thin passages close).
-/// `agent_height` is live (#278): the re-bake carves cells whose overhead clearance is
-/// below the height (no pathing under a low overhang / through a crawlspace).
+/// `agent_height` is live (#278): the re-bake drops spans whose open space is below the
+/// height (no pathing under a low overhang / through a crawlspace).
 fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph) {
     ui.add_space(8.0);
     egui::CollapsingHeader::new("🧭 Navmesh")
@@ -56,7 +56,7 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
                     .changed();
                 changed |= ui
                     .add(egui::Slider::new(&mut s.agent_height, 0.0..=5.0).text("Agent Height"))
-                    .on_hover_text("Carves cells with less overhead clearance than this height")
+                    .on_hover_text("Drops floors with less open space above them than this height")
                     .changed();
                 changed |= ui
                     .add(egui::Slider::new(&mut s.max_slope, 0.0..=4.0).text("Max Slope"))
@@ -64,7 +64,7 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
                     .changed();
                 changed |= ui
                     .add(egui::Slider::new(&mut s.max_step, 0.0..=4.0).text("Max Step"))
-                    .on_hover_text("Max step height between adjacent cells (stairs, curbs)")
+                    .on_hover_text("Max step height between adjacent floors (stairs, curbs)")
                     .changed();
                 changed |= ui
                     .add(egui::Slider::new(&mut s.grid_spacing, 0.25..=4.0).text("Grid Spacing"))

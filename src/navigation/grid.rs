@@ -14,26 +14,41 @@ pub const DEFAULT_MAX_SLOPE: f32 = 1.0;
 /// [`NavMeshSettings`]: super::NavMeshSettings
 pub const DEFAULT_GRID_SPACING: f32 = 1.0;
 
-/// Height-field navigation model (#130). The flat 2D walkability grid is extended
-/// with a parallel per-cell surface-height field so agents traverse ramps, stairs,
-/// and multi-level terrain following real `y`.
+/// One walkable surface in a cell's column: a floor an agent can stand on and the
+/// open space above it, up to the next solid (`ceiling`, `f32::INFINITY` when the
+/// sky is open). Recast's compact-heightfield span.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct NavSpan {
+    /// World `y` of the floor.
+    pub y: f32,
+    /// World `y` of the underside of the next solid above, or `f32::INFINITY`.
+    pub ceiling: f32,
+}
+
+/// A walkable span by position: its cell and its index into [`NavigationGraph::spans`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct SpanRef {
+    pub gx: i32,
+    pub gz: i32,
+    pub index: u32,
+}
+
+/// Layered navigation grid (#454): an XZ grid whose every cell holds an ordered
+/// list of walkable spans, so stacked floors, a catwalk over a corridor or a bridge
+/// over a road are all walkable at once. This is the compact-heightfield half of
+/// Recast; there is no polygon mesh on top of it.
 ///
-/// # Representation decision
-/// A **per-cell height field** was chosen over a triangle navmesh or layered cells:
-/// it is the minimal, deterministic extension of the existing XZ grid — same
-/// indexing, same A\* topology, same bake-footprint optimization, same waypoint
-/// cache — and it has no floating-point set ordering to threaten byte-identical
-/// replay. Each cell stores one surface height (the highest static-collider top
-/// covering it, else ground `0.0`). Traversal between adjacent cells is a
-/// connectivity rule, not a per-cell flag: a move is allowed only when the surface
-/// delta clears both `max_step` (absolute curb height) and `max_slope` (grade,
-/// rise per unit of horizontal travel). A wall top — raised far above all its
-/// neighbours — fails this against every neighbour and is therefore unreachable,
-/// so A\* never routes onto it and steering never slides up it.
+/// # Storage
+/// A flat compact array: [`Self::spans`] holds every walkable span, grouped by cell
+/// in row-major order and sorted bottom-up within a cell; the spans of cell `i` are
+/// `spans[cell_start[i]..cell_start[i + 1]]`. One allocation for the whole level,
+/// no per-cell `Vec` headers, and a span's index is a stable A\* node id.
 ///
-/// Deliberately scoped out (documented follow-up): true multi-layer overpasses
-/// (two walkable surfaces at the same XZ, e.g. a bridge over a path). A single
-/// height per cell picks the upper surface there.
+/// # Traversal
+/// A move between spans in adjacent cells is a connectivity rule, not a stored edge
+/// (`links.rs`): the floor delta must clear `max_step` and `max_slope`, and the open
+/// gap the two spans share must fit `agent_height`. A wall top is a span too, but
+/// no neighbour is within a step of it, so A\* never reaches it.
 pub struct NavigationGraph {
     pub min_x: f32,
     pub max_x: f32,
@@ -42,15 +57,16 @@ pub struct NavigationGraph {
     pub grid_spacing: f32,
     pub width: i32,
     pub height: i32,
-    /// Per-cell explicit walkability, row-major `gz * width + gx`. Reserved for
-    /// hard blocking; reachability is otherwise the per-edge step/slope rule.
-    pub walkability: Vec<bool>,
-    /// Per-cell surface height (world `y`), parallel to `walkability`.
-    pub heightfield: Vec<f32>,
-    /// Max absolute step height between adjacent cells for a move to be allowed.
+    /// Per-cell span ranges into [`Self::spans`], `width * height + 1` prefix offsets.
+    pub cell_start: Vec<u32>,
+    /// Every walkable span, grouped by cell (row-major), bottom-up within a cell.
+    pub spans: Vec<NavSpan>,
+    /// Max absolute step height between adjacent spans for a move to be allowed.
     pub max_step: f32,
     /// Max walkable grade (rise per unit of horizontal travel).
     pub max_slope: f32,
+    /// Minimum open height a span (and a move between two spans) must offer.
+    pub agent_height: f32,
     /// Monotonic counter bumped on every `bake`. Agents stamp the generation
     /// their cached path was planned against (#126); a mismatch forces a re-plan,
     /// so a rebake (e.g. a moved static collider) transparently invalidates every
@@ -59,11 +75,17 @@ pub struct NavigationGraph {
 }
 
 impl NavigationGraph {
+    /// An unbaked graph: one open span on flat ground at `y = 0` in every cell. The
+    /// first [`Self::bake`] replaces it with what the scene's geometry supports, so
+    /// this flat floor exists only for graphs that are never baked (tests, tools).
     pub fn new(min_x: f32, max_x: f32, min_z: f32, max_z: f32, spacing: f32) -> Self {
         let width = ((max_x - min_x) / spacing).ceil() as i32 + 1;
         let height = ((max_z - min_z) / spacing).ceil() as i32 + 1;
         let cells = (width * height) as usize;
-
+        let flat = NavSpan {
+            y: 0.0,
+            ceiling: f32::INFINITY,
+        };
         Self {
             min_x,
             max_x,
@@ -72,82 +94,77 @@ impl NavigationGraph {
             grid_spacing: spacing,
             width,
             height,
-            walkability: vec![true; cells],
-            heightfield: vec![0.0; cells],
+            cell_start: (0..=cells as u32).collect(),
+            spans: vec![flat; cells],
             max_step: DEFAULT_MAX_STEP,
             max_slope: DEFAULT_MAX_SLOPE,
+            agent_height: super::DEFAULT_AGENT_HEIGHT,
             bake_generation: 0,
         }
     }
 
-    /// Converts a world coordinate to grid coordinates (x, z). `y` is discarded
-    /// here on purpose — height is recovered separately via [`Self::height_at`].
+    /// Converts a world coordinate to grid coordinates (x, z), clamped to the grid.
+    /// `y` is discarded: which span of the column is meant is `snap.rs`'s job.
     pub fn world_to_grid(&self, pos: Vec3) -> (i32, i32) {
         let x = ((pos.x - self.min_x) / self.grid_spacing).round() as i32;
         let z = ((pos.z - self.min_z) / self.grid_spacing).round() as i32;
         (x.clamp(0, self.width - 1), z.clamp(0, self.height - 1))
     }
 
-    /// Converts grid coordinates to a world position on the baked surface: the XZ
-    /// cell center carried up to its surface height (#130), no longer hardcoded 0.
-    pub fn grid_to_world(&self, gx: i32, gz: i32) -> Vec3 {
+    /// World XZ of a cell's centre (`y = 0`).
+    pub fn cell_center(&self, gx: i32, gz: i32) -> Vec3 {
         Vec3::new(
             self.min_x + (gx as f32) * self.grid_spacing,
-            self.height_at(gx, gz),
+            0.0,
             self.min_z + (gz as f32) * self.grid_spacing,
         )
     }
 
-    /// Surface height (world `y`) of a cell; `0.0` for out-of-bounds cells.
-    pub fn height_at(&self, gx: i32, gz: i32) -> f32 {
-        if gx < 0 || gx >= self.width || gz < 0 || gz >= self.height {
-            return 0.0;
-        }
-        self.heightfield[self.index(gx, gz)]
+    /// World position of a span: its cell's centre carried up to its floor.
+    pub fn span_world(&self, s: SpanRef) -> Vec3 {
+        let mut w = self.cell_center(s.gx, s.gz);
+        w.y = self.spans[s.index as usize].y;
+        w
+    }
+
+    pub fn in_bounds(&self, gx: i32, gz: i32) -> bool {
+        gx >= 0 && gx < self.width && gz >= 0 && gz < self.height
     }
 
     pub(super) fn index(&self, gx: i32, gz: i32) -> usize {
         (gz * self.width + gx) as usize
     }
 
-    pub fn is_walkable(&self, gx: i32, gz: i32) -> bool {
-        if gx < 0 || gx >= self.width || gz < 0 || gz >= self.height {
-            return false;
+    /// The index range of a cell's spans in [`Self::spans`]; empty out of bounds.
+    pub fn span_range(&self, gx: i32, gz: i32) -> std::ops::Range<usize> {
+        if !self.in_bounds(gx, gz) {
+            return 0..0;
         }
-        self.walkability[self.index(gx, gz)]
+        let i = self.index(gx, gz);
+        self.cell_start[i] as usize..self.cell_start[i + 1] as usize
     }
 
-    /// Finds the closest walkable grid node in concentric rings up to radius 5 if
-    /// the original node is blocked.
-    pub fn closest_walkable(&self, gx: i32, gz: i32) -> (i32, i32) {
-        if self.is_walkable(gx, gz) {
-            return (gx, gz);
-        }
-        let mut best_dist = f32::MAX;
-        let mut best_node = (gx, gz);
-        for r in 1_i32..=5_i32 {
-            let mut found = false;
-            for dx in -r..=r {
-                for dz in -r..=r {
-                    if dx.abs() != r && dz.abs() != r {
-                        continue;
-                    }
-                    let (nx, nz) = (gx + dx, gz + dz);
-                    if self.is_walkable(nx, nz) {
-                        let dist_sq = (dx * dx + dz * dz) as f32;
-                        if dist_sq < best_dist {
-                            best_dist = dist_sq;
-                            best_node = (nx, nz);
-                            found = true;
-                        }
-                    }
-                }
-            }
-            if found {
-                break;
-            }
-        }
-        best_node
+    /// A cell's walkable spans, bottom-up; empty out of bounds.
+    pub fn spans_at(&self, gx: i32, gz: i32) -> &[NavSpan] {
+        &self.spans[self.span_range(gx, gz)]
+    }
+
+    /// Whether a cell holds any walkable span.
+    pub fn is_walkable(&self, gx: i32, gz: i32) -> bool {
+        !self.span_range(gx, gz).is_empty()
+    }
+
+    /// Every walkable span with its cell, in storage order.
+    pub fn span_refs(&self) -> impl Iterator<Item = SpanRef> + '_ {
+        (0..self.height).flat_map(move |gz| {
+            (0..self.width).flat_map(move |gx| {
+                self.span_range(gx, gz).map(move |i| SpanRef {
+                    gx,
+                    gz,
+                    index: i as u32,
+                })
+            })
+        })
     }
 }
 
@@ -156,77 +173,57 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_sizes_grid_and_defaults_flat() {
+    fn new_is_one_flat_open_span_per_cell() {
         let g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
         assert_eq!((g.width, g.height), (11, 11));
-        assert_eq!(g.walkability.len(), 121);
-        assert_eq!(g.heightfield.len(), 121);
-        // A fresh graph is flat ground at y = 0, fully walkable.
-        assert!(g.heightfield.iter().all(|&h| h == 0.0));
-        assert!(g.walkability.iter().all(|&w| w));
+        assert_eq!(g.spans.len(), 121);
+        assert_eq!(g.cell_start.len(), 122);
+        assert!(g
+            .spans
+            .iter()
+            .all(|s| s.y == 0.0 && s.ceiling.is_infinite()));
+        assert_eq!(g.spans_at(3, 2).len(), 1);
+        assert!(g.spans_at(-1, 0).is_empty(), "out of bounds holds nothing");
     }
 
     #[test]
-    fn grid_to_world_carries_surface_height() {
+    fn span_world_carries_the_floor_height() {
         let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
-        let idx = g.index(4, 5);
-        g.heightfield[idx] = 2.5;
-        let w = g.grid_to_world(4, 5);
-        assert_eq!(w, Vec3::new(4.0, 2.5, 5.0));
-        // Out-of-bounds height falls back to 0.0.
-        assert_eq!(g.height_at(-1, 0), 0.0);
+        let r = g.span_range(4, 5);
+        g.spans[r.start].y = 2.5;
+        let s = SpanRef {
+            gx: 4,
+            gz: 5,
+            index: r.start as u32,
+        };
+        assert_eq!(g.span_world(s), Vec3::new(4.0, 2.5, 5.0));
     }
 
-    #[test]
-    fn closest_walkable_finds_nearest_open_cell() {
-        let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
-        let idx = g.index(5, 5);
-        g.walkability[idx] = false;
-        let (nx, nz) = g.closest_walkable(5, 5);
-        assert!(g.is_walkable(nx, nz));
-        assert_eq!(
-            (nx - 5).abs() + (nz - 5).abs(),
-            1,
-            "nearest ring is distance 1"
-        );
-    }
-
-    /// Kill `- min_x → + min_x`, `/ spacing → * spacing`, and `round → floor`
-    /// mutations in world_to_grid by asserting exact cell for several inputs.
+    /// Exact cells for several inputs pin `- min_x`, `/ spacing` and `round`.
     #[test]
     fn world_to_grid_rounds_to_nearest_cell() {
         let g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
         assert_eq!(g.world_to_grid(Vec3::new(3.0, 0.0, 5.0)), (3, 5));
         assert_eq!(g.world_to_grid(Vec3::new(3.6, 0.0, 5.4)), (4, 5));
         assert_eq!(g.world_to_grid(Vec3::new(3.4, 0.0, 4.6)), (3, 5));
-        // Non-zero origin: offset must be subtracted before dividing.
         let g2 = NavigationGraph::new(2.0, 12.0, 2.0, 12.0, 1.0);
         assert_eq!(g2.world_to_grid(Vec3::new(5.0, 0.0, 7.0)), (3, 5));
     }
 
-    /// Kill `* width → / width` or `+ gx → - gx` in index(): the formula
-    /// gz*width+gx must map (gx,gz) to the correct flat offset.
     #[test]
     fn index_is_row_major() {
         let g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0); // width = 11
         assert_eq!(g.index(0, 0), 0);
         assert_eq!(g.index(1, 0), 1);
-        assert_eq!(g.index(0, 1), 11); // 1*11 + 0
-        assert_eq!(g.index(3, 2), 25); // 2*11 + 3
+        assert_eq!(g.index(0, 1), 11);
+        assert_eq!(g.index(3, 2), 25);
     }
 
-    /// Kill `< → <=` or `< → >` in closest_walkable distance comparison: a
-    /// diagonal candidate (dist²=2) must NOT beat a cardinal one (dist²=1).
     #[test]
-    fn closest_walkable_prefers_cardinal_over_diagonal() {
-        let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
-        let idx = g.index(5, 5);
-        g.walkability[idx] = false;
-        let (nx, nz) = g.closest_walkable(5, 5);
-        let dist_sq = (nx - 5) * (nx - 5) + (nz - 5) * (nz - 5);
-        assert_eq!(
-            dist_sq, 1,
-            "cardinal ring (dist²=1) chosen over diagonal (dist²=2)"
-        );
+    fn span_refs_walks_every_span_with_its_cell() {
+        let g = NavigationGraph::new(0.0, 2.0, 0.0, 1.0, 1.0); // 3 x 2
+        let refs: Vec<_> = g.span_refs().collect();
+        assert_eq!(refs.len(), 6);
+        assert_eq!((refs[4].gx, refs[4].gz, refs[4].index), (1, 1, 4));
     }
 }

@@ -19,8 +19,9 @@ fn harness_graph_is_the_from_scene_bake_of_its_scene() {
     let fresh = NavigationGraph::from_scene(&demo);
 
     assert_eq!(nav.bounds(), fresh.bounds());
-    assert_eq!(nav.heightfield, fresh.heightfield);
-    assert_eq!(nav.walkability, fresh.walkability);
+    assert_eq!(nav.spans, fresh.spans);
+    assert_eq!(nav.cell_start, fresh.cell_start);
+    assert!(!nav.spans.is_empty(), "the demo floor is walkable");
     // The demo floor spans ±18.75; + 2.0 margin + 0.5 radius, snapped outward.
     assert_eq!(nav.bounds(), NavBounds::new(-22.0, 22.0, -22.0, 22.0));
 }

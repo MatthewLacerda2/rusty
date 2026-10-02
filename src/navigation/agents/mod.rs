@@ -34,23 +34,26 @@ impl NavigationGraph {
         if agent.frames_since_replan >= MAX_PATH_AGE_FRAMES {
             return true;
         }
-        let wp = agent.cached_path[agent.path_cursor];
-        let (gx, gz) = self.world_to_grid(wp);
-        !self.is_walkable(gx, gz)
+        // The final waypoint is the literal target, which may lie off the navmesh (a
+        // flying player, a point past the floor's edge); testing it would re-plan every
+        // frame. Interior waypoints are span floors: one gone means the mesh changed.
+        if agent.path_cursor + 1 == agent.cached_path.len() {
+            return false;
+        }
+        self.span_under(agent.cached_path[agent.path_cursor])
+            .is_none()
     }
 
-    /// Runs A* once from the agent's current cell to its target and stores the
+    /// Runs A* once from the agent's current span to its target and stores the
     /// resulting waypoints on the agent, resetting the cursor and bookkeeping.
     /// The start cell is dropped (the agent is already there) and the literal
     /// target is appended so the agent finishes on the goal, not the goal's cell
     /// center. A failed search still yields a one-waypoint beeline to the target.
     fn plan_agent_path(&self, agent: &mut NavMeshAgentComponent, current_pos: Vec3) {
-        let (sx, sz) = self.world_to_grid(current_pos);
-        let (tx, tz) = self.world_to_grid(agent.target);
         let mut waypoints = Vec::new();
-        if let Some(path) = self.find_path(sx, sz, tx, tz) {
-            for &(gx, gz) in path.iter().skip(1) {
-                waypoints.push(self.grid_to_world(gx, gz));
+        if let Some(path) = self.path_between(current_pos, agent.target) {
+            for &s in path.iter().skip(1) {
+                waypoints.push(self.span_world(s));
             }
         }
         waypoints.push(agent.target);
@@ -94,7 +97,7 @@ mod tests {
     use crate::scene::Scene;
 
     fn open_graph() -> NavigationGraph {
-        // 21x21 fully-walkable grid (no colliders baked).
+        // 21x21 flat grid, never baked: one open span per cell.
         NavigationGraph::new(0.0, 20.0, 0.0, 20.0, 1.0)
     }
 
@@ -142,6 +145,24 @@ mod tests {
         // A rebake bumps the generation; the agent's path is now stale.
         graph.bake(&Scene::new());
         assert!(graph.path_cache_invalid(&agent));
+    }
+
+    #[test]
+    fn off_mesh_target_does_not_replan_every_frame() {
+        let mut graph = open_graph();
+        let hole = graph.index(10, 20); // the target's column holds no span
+        graph.spans.remove(hole);
+        for start in &mut graph.cell_start[hole + 1..] {
+            *start -= 1;
+        }
+        let mut agent = test_agent(Vec3::new(10.0, 0.0, 20.0));
+        graph.plan_agent_path(&mut agent, Vec3::new(9.0, 0.0, 19.0));
+        assert_eq!(agent.cached_path.len(), 2, "one span, then the raw target");
+        agent.path_cursor = 1;
+        assert!(
+            !graph.path_cache_invalid(&agent),
+            "the raw target is not a span"
+        );
     }
 
     #[test]

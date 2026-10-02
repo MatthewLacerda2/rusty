@@ -1,16 +1,13 @@
-//! Height-field navigation: a per-cell walkable surface (XZ grid + parallel
-//! surface-height field, #130) baked from static colliders, A\* search over it,
-//! and the per-frame agent steering tick. Split into focused submodules —
-//! `grid` (the `NavigationGraph` model + world<->grid/height conversions),
-//! `bounds` (the XZ area the grid covers, resolved from the scene, #452),
-//! `bake` (deriving walkability + the height field from colliders, incl. the
-//! agent-radius erosion), `headroom` (the agent-height clearance pass that carves
-//! low-overhang cells, #278), `astar` (the height/step-aware A\* search and path
-//! queries), `agents` (cached-path planning + the steering tick), and `avoidance`
-//! (ORCA local avoidance between agents, #463) — all hanging
-//! off the single re-exported [`NavigationGraph`] type. Agents follow the real baked
-//! `y` of the surface (ramps, stairs, multi-level terrain), not a preserved-constant
-//! height.
+//! Layered navigation (#454): an XZ grid whose cells each hold a list of walkable
+//! spans (stacked floors, a bridge over a road), baked from the static colliders'
+//! real triangles, with A\* over spans and the per-frame agent steering tick. Split
+//! into focused submodules — `grid` (the `NavigationGraph` model and its compact span
+//! storage), `bounds` (the XZ area the grid covers, resolved from the scene, #452),
+//! `bake` (rasterise → spans → agent-radius erosion), `links` (which span a move
+//! reaches), `snap` (which span a world point means), `astar` (the span search and
+//! path queries), `agents` (cached-path planning + the steering tick), and
+//! `avoidance` (ORCA local avoidance between agents, #463) — all hanging off the
+//! single re-exported [`NavigationGraph`] type.
 
 // Panic-free sim core (#195): bare `.unwrap()` is denied here (use `?` or a
 // documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
@@ -22,19 +19,19 @@ mod astar;
 mod astar_tests;
 mod avoidance;
 mod bake;
-#[cfg(test)]
-mod bake_tests;
 mod bounds;
 #[cfg(test)]
 mod bounds_tests;
-#[cfg(test)]
-mod erosion_tests;
 mod grid;
-mod headroom;
-#[cfg(test)]
-mod headroom_tests;
+mod links;
 mod settings;
+mod snap;
+#[cfg(test)]
+pub(crate) mod test_support;
 
 pub use bounds::{NavBounds, BOUNDS_MARGIN, EMPTY_SCENE_HALF_EXTENT};
-pub use grid::NavigationGraph;
+pub use grid::{
+    NavSpan, NavigationGraph, SpanRef, DEFAULT_GRID_SPACING, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP,
+};
 pub use settings::{NavMeshSettings, DEFAULT_AGENT_HEIGHT, DEFAULT_AGENT_RADIUS};
+pub use snap::SNAP_RINGS;

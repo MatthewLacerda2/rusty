@@ -118,35 +118,40 @@ impl NavigationGraph {
     }
 
     /// Return the slide-constrained position after one step of `agent.velocity`.
-    /// The agent snaps to the baked surface height of the cell it ends on (#130) —
-    /// `y` follows ramps/stairs instead of being preserved.
+    /// Each axis moves only onto a span linked to the agent's current one (walkable,
+    /// within the step/slope limits, enough headroom), so agents climb ramps and
+    /// stairs but never slide up a wall face (#130). The agent then stands on the
+    /// span it reached — the floor it walked onto, not whichever floor of that
+    /// column is highest (#454). Off the navmesh it does not move.
     fn slide(&self, agent: &mut NavMeshAgentComponent, current_pos: Vec3, delta_time: f32) -> Vec3 {
-        let (cx, cz) = self.world_to_grid(current_pos);
+        let Some(from) = self.span_under(current_pos) else {
+            agent.velocity = Vec3::ZERO;
+            return current_pos;
+        };
         let mut final_pos = current_pos;
+        let mut on = from;
 
-        // Test X movement slide: only step onto a cell reachable from the current
-        // one (walkable AND within the step/slope limit), so agents climb ramps and
-        // stairs but never slide up a wall face (#130).
-        let proposed_pos_x = current_pos + Vec3::new(agent.velocity.x * delta_time, 0.0, 0.0);
-        let (gx, gz) = self.world_to_grid(proposed_pos_x);
-        if self.step_connected(cx, cz, gx, gz) {
-            final_pos.x = proposed_pos_x.x;
-        } else {
-            agent.velocity.x = 0.0;
+        let proposed_x = current_pos + Vec3::new(agent.velocity.x * delta_time, 0.0, 0.0);
+        let (gx, gz) = self.world_to_grid(proposed_x);
+        match self.link_to(from, gx, gz) {
+            Some(s) => {
+                final_pos.x = proposed_x.x;
+                on = s;
+            }
+            None => agent.velocity.x = 0.0,
         }
 
-        // Test Z movement slide
-        let proposed_pos_z = final_pos + Vec3::new(0.0, 0.0, agent.velocity.z * delta_time);
-        let (gx, gz) = self.world_to_grid(proposed_pos_z);
-        if self.step_connected(cx, cz, gx, gz) {
-            final_pos.z = proposed_pos_z.z;
-        } else {
-            agent.velocity.z = 0.0;
+        let proposed_z = final_pos + Vec3::new(0.0, 0.0, agent.velocity.z * delta_time);
+        let (gx, gz) = self.world_to_grid(proposed_z);
+        match self.link_to(from, gx, gz) {
+            Some(s) => {
+                final_pos.z = proposed_z.z;
+                on = s;
+            }
+            None => agent.velocity.z = 0.0,
         }
 
-        // Snap Y to the baked surface under the new XZ — the agent rides the ramp.
-        let (gx, gz) = self.world_to_grid(final_pos);
-        final_pos.y = self.height_at(gx, gz);
+        final_pos.y = self.spans[on.index as usize].y;
         final_pos
     }
 }
