@@ -29,6 +29,20 @@ pub use persist::{strip_bones, take_bone_parents};
 
 use crate::scene::Scene;
 
+/// The `next_entity_id` a save records: the World's, minus the ids at its top
+/// held by bones. Bones are respawned with fresh ids on every load, so without
+/// this each load-and-save cycle would grow the saved counter by the bone count —
+/// churn in a version-controlled scene file. Reusing a bone's id is safe: nothing
+/// saved refers to a bone by id.
+pub fn saved_next_id(scene: &Scene) -> u32 {
+    let bones = scene.bone_ids();
+    let mut next = scene.world.next_id();
+    while next > 1 && bones.contains(&(next - 1)) {
+        next -= 1;
+    }
+    next
+}
+
 impl Scene {
     /// Every bone entity of every skinned mesh in the scene.
     pub fn bone_ids(&self) -> BTreeSet<u32> {

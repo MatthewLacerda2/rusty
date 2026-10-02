@@ -100,7 +100,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
             crate::scene::skeleton::strip_bones(&mut entities);
             entities
         },
-        next_entity_id: scene.world.next_id(),
+        next_entity_id: crate::scene::skeleton::saved_next_id(scene),
         selected_entity_id: scene.selected_entity_id,
         skybox_path: scene.skybox_path.clone(),
         ambient_color: scene.ambient_color,

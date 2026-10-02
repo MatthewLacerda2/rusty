@@ -96,10 +96,9 @@ impl Scene {
         if let Some(cached) = map.get(&id) {
             return *cached;
         }
-        let Some(local) = self.world.transform(id).map(|t| t.to_matrix()) else {
+        let Some((local, parent)) = self.world.local_and_parent(id) else {
             return Mat4::IDENTITY;
         };
-        let parent = self.world.parent_id(id);
         let world = match parent {
             Some(parent_id) => self.fill_world_matrix(parent_id, map) * local,
             None => local,

@@ -37,8 +37,7 @@ impl Scene {
         let owner_inverse = self.compute_world_matrix(owner).inverse();
         let mut in_mesh: Vec<Mat4> = Vec::with_capacity(bones.len());
         for (slot, &bone) in bones.iter().enumerate() {
-            let local = self.world.transform(bone)?.to_matrix();
-            let parent = self.world.parent_id(bone);
+            let (local, parent) = self.world.local_and_parent(bone)?;
             let parent_slot = skin.parents.get(slot).copied().flatten();
             let m = match (parent, parent_slot) {
                 (Some(p), _) if p == owner => local,

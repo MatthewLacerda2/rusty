@@ -11,7 +11,7 @@ use rig::{armed_scene, play};
 #[test]
 fn the_animator_poses_the_bone_and_the_skin_follows_it() {
     let (scene, hero, hand, gun) = armed_scene(None);
-    let scene = play(scene, 31); // the first tick enters Play; 30 more = 0.5 s
+    let scene = play(scene, 30); // 30 fixed steps = 0.5 s
     let s = scene.borrow();
     let x = s.world.transform(hand).unwrap().position.x;
     assert!((x - 1.0).abs() < 1e-3, "half-way the hand slid +1, got {x}");
