@@ -104,7 +104,7 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 | `SetMaxStep` | ✅ | sim — `navigation/bake.rs::bake` copies it into `NavigationGraph::max_step` (the per-edge step rule); round-trips. `bake_sources_max_step_from_scene_settings` proves a ledge flips reachability |
 | `SetGridSpacing` | ✅ | sim — `navigation/bake.rs::bake` re-shapes the grid dimensions from it (`apply_grid_spacing`); round-trips |
 | `SetAgentRadius` | ✅ | sim — `navigation/bake/erosion.rs` **erodes the walkable spans by the radius** (#277): the agent-radius read-site. Passages narrower than ~`2*radius` close and the surface pulls off walls/world-edge; `radius==0` is an exact no-op. Round-trips through `SceneData`; `thin_passage_closes_under_erosion` / `wide_corridor_keeps_core_pulled_off_both_walls` prove it |
-| `SetAgentHeight` | ✅ | sim — `navigation/bake/heightfield.rs::push_open_spans` **drops spans whose open space is below the height** (#278, layered in #454): the agent-height read-site, also applied to moves by `navigation/links.rs`. The floor under a low overhang goes; the overhang's own top stays. Round-trips through `SceneData`; `set_agent_height_round_trips_and_rebakes` (`api/nav`) + `low_overhang_drops_the_floor_beneath_but_keeps_its_top` / `taller_agent_drops_a_superset` (`navigation::bake::tests::headroom`) prove it |
+| `SetAgentHeight` | ✅ | sim — `navigation/bake/heightfield.rs::open_spans` **drops spans whose open space is below the height** (#278, layered in #454): the agent-height read-site, also applied to moves by `navigation/links.rs`. The floor under a low overhang goes; the overhang's own top stays. Round-trips through `SceneData`; `set_agent_height_round_trips_and_rebakes` (`api/nav`) + `low_overhang_drops_the_floor_beneath_but_keeps_its_top` / `taller_agent_drops_a_superset` (`navigation::bake::tests::headroom`) prove it |
 
 ### `NavMeshAgent` — over `Entity.nav_agent`
 
@@ -118,6 +118,14 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 | `SetActive` | ✅ | sim — gates agent stepping |
 | `SetAvoidancePriority` | ✅ | sim — `navigation/avoidance` picks each pair's dodge share by priority (#463); round-trips |
 | `SetAvoidanceEnabled` | ✅ | sim — `navigation/agents/tick.rs` only runs ORCA for agents with it on; round-trips |
+
+### `NavMeshObstacle` — over `Entity.nav_obstacle`
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetShape` / `SetCenter` / `SetSize` / `SetRadius` / `SetHeight` | ✅ | sim — `navigation/obstacle.rs::ObstacleVolume` is the carved volume (`bake/carve.rs`) and the avoidance disc; round-trips. `a_carving_obstacle_blocks_the_path_and_reopens_when_removed` proves it |
+| `SetActive` / `SetCarving` | ✅ | sim — `NavMeshObstacleComponent::is_carving` gates carving (`obstacle.rs::carving_volumes`) and avoidance (`avoidance_obstacles`); round-trips |
+| `SetCarveOnlyStationary` / `SetMoveThreshold` / `SetTimeToStationary` | ✅ | sim — `navigation/obstacle.rs::tick_obstacles` + `is_carving`; `carve_only_stationary_waits_for_the_obstacle_to_stand_still` proves it; round-trips |
 
 ### `Physics` — over `Entity.rigidbody`
 

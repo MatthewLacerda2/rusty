@@ -70,3 +70,40 @@ pub fn ground(g: &NavigationGraph, gx: i32, gz: i32) -> SpanRef {
 pub fn floors(g: &NavigationGraph, gx: i32, gz: i32) -> Vec<f32> {
     g.spans_at(gx, gz).iter().map(|s| s.y).collect()
 }
+
+/// A box `NavMeshObstacle` of `size` centred at `center`; `carve` turns carving
+/// on, carving at once rather than after standing still.
+pub fn add_obstacle(scene: &mut Scene, center: Vec3, size: Vec3, carve: bool) -> u32 {
+    let id = scene.add_entity("obstacle".to_string());
+    if let Some(mut t) = scene.world.transform_mut(id) {
+        t.position = center;
+    }
+    let o = crate::components::NavMeshObstacleComponent {
+        size,
+        carve,
+        carve_only_stationary: false,
+        ..Default::default()
+    };
+    scene.world.set_nav_obstacle(id, Some(o));
+    id
+}
+
+/// Move entity `id` to `position`, keeping its collider's cached bounds current.
+pub fn move_to(scene: &mut Scene, id: u32, position: Vec3) {
+    if let Some(mut t) = scene.world.transform_mut(id) {
+        t.position = position;
+    }
+    scene.update_entity_collider(id);
+}
+
+/// Assert two graphs hold the same spans in the same cells, bit for bit.
+pub fn assert_same_mesh(a: &NavigationGraph, b: &NavigationGraph) {
+    assert_eq!(a.cell_start, b.cell_start, "per-cell span counts differ");
+    let bits = |g: &NavigationGraph| -> Vec<(u32, u32)> {
+        g.spans
+            .iter()
+            .map(|s| (s.y.to_bits(), s.ceiling.to_bits()))
+            .collect()
+    };
+    assert_eq!(bits(a), bits(b), "span heights differ");
+}

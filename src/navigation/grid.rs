@@ -72,6 +72,9 @@ pub struct NavigationGraph {
     /// so a rebake (e.g. a moved static collider) transparently invalidates every
     /// stale agent path without `bake` needing mutable access to the scene.
     pub bake_generation: u64,
+    /// What the last bake kept to rebake incrementally (#456); `None` until the
+    /// first bake.
+    pub(super) bake_state: Option<Box<super::bake::BakeState>>,
 }
 
 impl NavigationGraph {
@@ -100,6 +103,7 @@ impl NavigationGraph {
             max_slope: DEFAULT_MAX_SLOPE,
             agent_height: super::DEFAULT_AGENT_HEIGHT,
             bake_generation: 0,
+            bake_state: None,
         }
     }
 

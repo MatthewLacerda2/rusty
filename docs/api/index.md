@@ -262,6 +262,7 @@ One file per namespace, in reference order:
 - [`Sound`](Sound.md)
 - [`Navigation`](Navigation.md)
 - [`NavMeshAgent`](NavMeshAgent.md)
+- [`NavMeshObstacle`](NavMeshObstacle.md)
 - [`Physics`](Physics.md)
 - [`Joint`](Joint.md)
 - [`CharacterController`](CharacterController.md)

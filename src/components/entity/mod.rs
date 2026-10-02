@@ -21,7 +21,7 @@ use super::{
     RigidBodyComponent, ScriptComponent, SelectableComponent, TextComponent, TransformComponent,
     VisualCorrectionComponent,
 };
-use super::{BackdropFilterComponent, MaskComponent};
+use super::{BackdropFilterComponent, MaskComponent, NavMeshObstacleComponent};
 use super::{CharacterControllerComponent, JointComponent, LineComponent, LodGroupComponent};
 use super::{SubEmitters, TrailComponent};
 
@@ -88,6 +88,10 @@ pub struct Entity {
     pub collider: Option<ColliderComponent>,
     pub rigidbody: Option<RigidBodyComponent>,
     pub nav_agent: Option<NavMeshAgentComponent>,
+    /// Carves the navmesh or is avoided by agents (#456). `#[serde(default)]` for
+    /// pre-#456 scenes.
+    #[serde(default)]
+    pub nav_obstacle: Option<NavMeshObstacleComponent>,
     pub camera: Option<CameraComponent>,
     pub visual_correction: Option<VisualCorrectionComponent>,
     #[serde(default)]
@@ -190,6 +194,7 @@ impl Entity {
             collider: None,
             rigidbody: None,
             nav_agent: None,
+            nav_obstacle: None,
             camera: None,
             visual_correction: None,
             particles: None,

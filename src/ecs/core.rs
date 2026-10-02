@@ -168,6 +168,7 @@ impl World {
             collider: self.collider(id).map(|c| (*c).clone()),
             rigidbody: self.rigidbody(id).map(|c| (*c).clone()),
             nav_agent: self.nav_agent(id).map(|c| (*c).clone()),
+            nav_obstacle: self.nav_obstacle(id).map(|c| (*c).clone()),
             camera: self.camera(id).map(|c| (*c).clone()),
             visual_correction: self.visual_correction(id).map(|c| (*c).clone()),
             particles: self.particles(id).map(|c| (*c).clone()),

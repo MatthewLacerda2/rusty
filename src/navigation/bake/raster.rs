@@ -17,11 +17,15 @@
 //!
 //! A cell's column is its square around the centre, shrunk by [`EDGE_EPS`] so a
 //! collider that only touches a cell's edge does not claim it.
+//!
+//! Every column is rasterised on its own, so a rebake of a [`CellRect`] (#456)
+//! clips only into that rectangle's cells and gets the very solids a full bake
+//! would have there.
 
 use glam::Vec3;
 
-use super::super::bounds::static_collider_ids;
 use super::super::NavigationGraph;
+use super::region::CellRect;
 use crate::physics::collider_world_triangles;
 use crate::scene::Scene;
 
@@ -42,29 +46,63 @@ pub(super) struct Solid {
 /// A clipped polygon: at most 7 vertices (a triangle cut by four planes).
 type Poly = ([Vec3; 8], usize);
 
-/// Rasterise every static collider of `scene` into solid spans on `g`'s grid.
-pub(super) fn rasterize(g: &NavigationGraph, scene: &Scene) -> Vec<Solid> {
+/// Rasterise the colliders `ids` of `scene` into solid spans on `g`'s grid, within
+/// `region`. Also returns each collider's footprint: the cells its triangles reach
+/// over the whole grid (`None` off the grid or without a collider), in `ids` order.
+pub(super) fn rasterize(
+    g: &NavigationGraph,
+    scene: &Scene,
+    ids: &[u32],
+    region: CellRect,
+) -> (Vec<Solid>, Vec<Option<CellRect>>) {
     let mut out = Vec::new();
-    for id in static_collider_ids(scene) {
+    let mut rects = Vec::with_capacity(ids.len());
+    for &id in ids {
         let Some(mesh) = collider_world_triangles(scene, id) else {
+            rects.push(None);
             continue;
         };
-        let mut column = ColumnSink::new(mesh.convex);
-        for t in &mesh.triangles {
-            let tri = t.map(|i| mesh.vertices[i as usize]);
-            let walkable = faces_up(tri, g.max_slope, mesh.convex);
-            clip_into_cells(g, tri, |cell, min, max| {
-                column.add(Solid {
-                    cell,
-                    min,
-                    max,
-                    walkable,
-                })
-            });
-        }
-        column.drain_into(&mut out);
+        rects.push(footprint(g, &mesh.vertices));
+        let walkable = |tri| faces_up(tri, g.max_slope, mesh.convex);
+        let tris = mesh
+            .triangles
+            .iter()
+            .map(|t| t.map(|i| mesh.vertices[i as usize]));
+        rasterize_mesh(g, region, tris, mesh.convex, walkable, &mut out);
     }
-    out
+    (out, rects)
+}
+
+/// The cells a set of world vertices reaches, clamped to `g`.
+pub(super) fn footprint(g: &NavigationGraph, vertices: &[Vec3]) -> Option<CellRect> {
+    let lo = vertices.iter().copied().reduce(Vec3::min)?;
+    let hi = vertices.iter().copied().reduce(Vec3::max)?;
+    CellRect::covering(g, lo, hi)
+}
+
+/// Clip one mesh's world triangles into the cells of `region`, appending its solids
+/// to `out`; `walkable` decides each triangle's flag.
+pub(super) fn rasterize_mesh(
+    g: &NavigationGraph,
+    region: CellRect,
+    triangles: impl Iterator<Item = [Vec3; 3]>,
+    convex: bool,
+    walkable: impl Fn([Vec3; 3]) -> bool,
+    out: &mut Vec<Solid>,
+) {
+    let mut column = ColumnSink::new(convex);
+    for tri in triangles {
+        let walkable = walkable(tri);
+        clip_into_cells(g, tri, region, |cell, min, max| {
+            column.add(Solid {
+                cell,
+                min,
+                max,
+                walkable,
+            })
+        });
+    }
+    column.drain_into(out);
 }
 
 /// Collects one collider's spans: per triangle for a mesh, one per cell for a convex
@@ -117,22 +155,19 @@ fn faces_up(t: [Vec3; 3], max_slope: f32, convex: bool) -> bool {
     up > 0.0 && (n.x * n.x + n.z * n.z).sqrt() <= max_slope * up
 }
 
-/// Clip `tri` against every cell column it crosses, reporting `(cell, min_y, max_y)`.
-fn clip_into_cells(g: &NavigationGraph, tri: [Vec3; 3], mut emit: impl FnMut(u32, f32, f32)) {
-    let (lo, hi) = (
-        tri[0].min(tri[1]).min(tri[2]),
-        tri[0].max(tri[1]).max(tri[2]),
-    );
+/// Clip `tri` against every column of `region` it crosses, reporting
+/// `(cell, min_y, max_y)`.
+fn clip_into_cells(
+    g: &NavigationGraph,
+    tri: [Vec3; 3],
+    region: CellRect,
+    mut emit: impl FnMut(u32, f32, f32),
+) {
+    let Some(cells) = footprint(g, &tri).and_then(|f| f.intersection(region)) else {
+        return;
+    };
+    let (x0, z0, x1, z1) = (cells.x0, cells.z0, cells.x1, cells.z1);
     let s = g.grid_spacing;
-    let cell_of = |v: f32, origin: f32| ((v - origin) / s).round() as i32;
-    let (z0, z1) = (
-        cell_of(lo.z, g.min_z).max(0),
-        cell_of(hi.z, g.min_z).min(g.height - 1),
-    );
-    let (x0, x1) = (
-        cell_of(lo.x, g.min_x).max(0),
-        cell_of(hi.x, g.min_x).min(g.width - 1),
-    );
     let half = s * (0.5 - EDGE_EPS);
     let tri_poly: Poly = (
         [

@@ -27,8 +27,10 @@ Per-entity navmesh agent control.
 An active agent plans a **smoothed path** to its target (the same one
 `Navigation.CalculatePath` returns) and steers corner to corner, so it cuts straight
 across open ground instead of zig-zagging over grid cells. It keeps that path, and only
-plans again when the target moves, the navmesh is rebaked, the path ages out (60 fixed
-frames), or a corner ahead stops being walkable. When the target is unreachable the path
+plans again when the target moves, a rebake changes cells its remaining path crosses
+(#456; a rebake elsewhere leaves it be, and a partial path re-plans on any rebake, since
+the way may have opened), the path ages out (60 fixed frames), or a corner ahead stops
+being walkable. When the target is unreachable the path
 is **partial** and the agent stops at its end, the nearest reachable point, instead of
 pressing into the wall. `Warp` drops the old path and stops the agent dead; it plans once
 from the new position on its next tick. `ResetPath` is Unity's: the agent slows to a stop

@@ -41,6 +41,7 @@ mod material_library;
 mod nav_agents_values;
 mod nav_avoidance;
 mod nav_avoidance_door;
+mod nav_obstacle_door;
 mod navigation_layered;
 mod navmesh_settings;
 mod parity_authoring_ops;

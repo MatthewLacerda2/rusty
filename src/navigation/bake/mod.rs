@@ -8,24 +8,44 @@
 //! 2. `heightfield` — each column's solids merge; every walkable top with at least
 //!    `agent_height` of open space above it becomes a span. No solid, no span: there
 //!    is no implicit ground past the geometry (#666).
-//! 3. `erosion` — spans within `agent_radius` of the surface's edge are dropped.
+//! 3. `carve` — carving `NavMeshObstacle`s cut their footprint out (#456).
+//! 4. `erosion` — spans within `agent_radius` of the surface's edge are dropped.
+//!
+//! Steps 1–3 are per column; erosion reads a fixed neighbourhood. That makes the
+//! bake **incremental** (#456, `sync`): the graph keeps its pre-erosion spans and a
+//! record of its inputs (`state`), and a change re-runs 1–3 over the dirty cells
+//! and erosion over those grown by its reach — the same result a full bake gives.
 //!
 //! Deterministic: pure geometry, a total order on every sort, no RNG or clock.
 
+mod carve;
+mod columns;
 mod erosion;
 mod heightfield;
+mod inputs;
 mod raster;
+mod region;
+mod state;
+mod sync;
 
 #[cfg(test)]
 mod tests;
 
+pub use region::CellRect;
+pub use state::BakeState;
+pub use sync::Rebake;
+
+use super::obstacle::ObstacleVolume;
 use super::NavigationGraph;
 use crate::scene::Scene;
+use inputs::{collider_keys, obstacle_keys, BakeInputs, Source};
 
 impl NavigationGraph {
-    /// Re-bake the walkable spans from the scene's static colliders and its
-    /// `nav_settings`, re-shaping the grid to the scene's bounds first (#452).
+    /// Re-bake the walkable spans from the scene's static colliders, its carving
+    /// obstacles and its `nav_settings`, re-shaping the grid to the scene's bounds
+    /// first (#452). Always the whole grid: [`Self::sync`] rebakes only what changed.
     pub fn bake(&mut self, scene: &Scene) {
+        let log = self.bake_state.take().map(|s| s.log).unwrap_or_default();
         self.reshape_for(scene);
         let settings = &scene.nav_settings;
         self.max_step = settings.max_step;
@@ -35,8 +55,67 @@ impl NavigationGraph {
         // re-plan (#126).
         self.bake_generation = self.bake_generation.wrapping_add(1);
 
-        let solids = raster::rasterize(self, scene);
-        self.build_spans(solids);
-        self.erode_for_agent_radius(settings.agent_radius);
+        let all = CellRect::all(self);
+        let colliders = collider_keys(scene);
+        let obstacles = obstacle_keys(scene);
+        let mut raw = self.empty_like();
+        let ids: Vec<u32> = colliders.iter().map(|&(id, _)| id).collect();
+        let volumes: Vec<&ObstacleVolume> = obstacles.iter().map(|(_, v)| v).collect();
+        let rects = raw.rebuild_raw(scene, &ids, &volumes, all);
+        let eroded = raw.eroded_columns(settings.agent_radius, all);
+        self.cell_start = eroded.cell_start;
+        self.spans = eroded.spans;
+
+        let colliders = colliders.into_iter().zip(rects);
+        let obstacles = obstacles.into_iter().map(|(id, v)| {
+            let rect = raster::footprint(&raw, &v.triangles().concat());
+            (id, v, rect)
+        });
+        let inputs = BakeInputs {
+            settings: settings.clone(),
+            colliders: colliders
+                .map(|((id, key), rect)| Source { id, key, rect })
+                .collect(),
+            obstacles: obstacles
+                .map(|(id, key, rect)| Source { id, key, rect })
+                .collect(),
+        };
+        let mut state = BakeState { raw, inputs, log };
+        state.log.record(self.bake_generation, None);
+        self.bake_state = Some(Box::new(state));
+    }
+
+    /// Rebuild the pre-erosion spans of `region` from the colliders `ids` and the
+    /// carving `obstacles` that reach it, and splice them in. Returns each
+    /// collider's footprint, in `ids` order.
+    fn rebuild_raw(
+        &mut self,
+        scene: &Scene,
+        ids: &[u32],
+        obstacles: &[&ObstacleVolume],
+        region: CellRect,
+    ) -> Vec<Option<CellRect>> {
+        let (solids, rects) = raster::rasterize(self, scene, ids, region);
+        let mut cols = self.build_columns(solids, region);
+        carve::carve(self, &mut cols, region, obstacles);
+        self.splice(region, &cols);
+        rects
+    }
+
+    /// A graph of the same grid and traversal limits with no spans at all.
+    fn empty_like(&self) -> Self {
+        let mut g = Self::new(
+            self.min_x,
+            self.max_x,
+            self.min_z,
+            self.max_z,
+            self.grid_spacing,
+        );
+        g.spans.clear();
+        g.cell_start.fill(0);
+        g.max_step = self.max_step;
+        g.max_slope = self.max_slope;
+        g.agent_height = self.agent_height;
+        g
     }
 }

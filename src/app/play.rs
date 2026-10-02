@@ -60,11 +60,6 @@ impl GameWorld {
     }
 }
 
-/// Rebake cadence in play-mode frames. At the fixed 1/60 timestep this is "once a
-/// second", but the trigger is the frame count, not the wall clock — that is what
-/// makes a headless replay deterministic.
-const REBAKE_INTERVAL_FRAMES: u64 = 60;
-
 /// Register the play-mode systems into the schedule, in the exact order the old
 /// hand-wired loop ran them. All are sim systems, so they live in `FixedUpdate`.
 /// The graph evaluator (#316) sits after the scripts (so parameters set this tick
@@ -147,18 +142,24 @@ fn step_physics(world: &mut World, res: &mut Resources) {
     res.script_manager.dispatch_physics_events(events);
 }
 
-/// Advance the deterministic play-mode frame counter (drives the rebake cadence).
+/// Advance the deterministic play-mode frame counter.
 fn advance_frame(_world: &mut World, res: &mut Resources) {
     res.play_frame += 1;
 }
 
-/// Rebake the navmesh once per second (every `REBAKE_INTERVAL_FRAMES` frames), so
-/// the graph follows static geometry that moved during play.
+/// Keep the navmesh in step with the scene every tick (#456): advance the
+/// obstacles' carving bookkeeping, then rebake only the cells whose static
+/// colliders or carving obstacles changed. Play frame 0 bakes in full, so a Play
+/// session starts from the same navmesh whatever edit mode left behind.
 fn rebake_nav(world: &mut World, res: &mut Resources) {
-    if !res.play_frame.is_multiple_of(REBAKE_INTERVAL_FRAMES) {
-        return;
+    let mut scene = world.scene.borrow_mut();
+    crate::navigation::tick_obstacles(&mut scene, res.frame_dt);
+    let mut nav = res.nav.borrow_mut();
+    if res.play_frame == 0 {
+        nav.bake(&scene);
+    } else {
+        nav.sync(&scene);
     }
-    res.nav.borrow_mut().bake(&world.scene.borrow());
 }
 
 fn tick_nav(world: &mut World, res: &mut Resources) {

@@ -10,6 +10,20 @@ same shapes physics collides with (rotated boxes, ramps, spheres, capsules, conv
 and triangle meshes), rasterised into each cell column. A ramp bakes as a slope, not a
 plateau at its highest point. **Where there is no collider there is no navmesh**: no
 implicit ground past the level's edge, and an empty scene bakes nothing (as in Unity).
+Carving `NavMeshObstacle`s cut their footprint out of it (see `NavMeshObstacle`).
+
+### Keeping the navmesh current (#456)
+
+In Play the navmesh follows the scene **every tick**, rebaking **only what changed**. Each
+tick compares the static colliders (shape and world pose; added, removed, moved, resized,
+toggled static or active) and the carving obstacles against what the last bake read. A
+change dirties the cells its old and new footprints cover; only those cells, plus the
+agent-radius erosion's reach around them, are rebaked. The result is exactly the navmesh
+a full bake of the scene would give, and an agent re-plans only when its path crosses a
+rebaked cell. A tick where nothing changed costs one pass over the colliders and
+obstacles, so geometry can move every frame (a door swinging shut) and agents see it the
+same tick. Play's first frame bakes in full; so does a change of the bake settings or of
+the grid's bounds.
 
 Every query resolves the start and the target to spans with one rule: **the nearest
 span below the point, favouring the floor under a character's feet** — the highest floor

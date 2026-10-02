@@ -21,6 +21,7 @@ pub mod lod_group;
 pub mod material;
 pub mod mesh;
 pub mod nav_agent;
+pub mod nav_obstacle;
 pub mod particle;
 pub mod ribbon;
 pub mod rigidbody;
@@ -44,6 +45,7 @@ pub use mesh::{DirtyFlag, MeshComponent};
 pub use nav_agent::{
     NavMeshAgentComponent, NavPathStatus, DEFAULT_AVOIDANCE_PRIORITY, MAX_AVOIDANCE_PRIORITY,
 };
+pub use nav_obstacle::{NavMeshObstacleComponent, ObstacleShape};
 pub use particle::{
     CollisionResponse, EmitFrom, EmitMode, EmitShape, Flipbook, Particle, ParticleBlend,
     ParticleEmitterComponent, ParticleRender, ParticleRenderMode, SubEmitTrigger, SubEmitters,

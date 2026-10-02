@@ -7,6 +7,7 @@ mod bridge;
 mod building;
 mod level;
 mod measure;
+mod rebake;
 
 use glam::{Quat, Vec3};
 use rusty::navigation::{NavBounds, NavigationGraph, SpanRef};

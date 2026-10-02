@@ -1,3 +1,4 @@
+mod changed;
 pub mod state;
 #[cfg(test)]
 mod state_tests;
@@ -21,7 +22,7 @@ const WAYPOINT_REACHED_DISTANCE: f32 = 0.5;
 
 impl NavigationGraph {
     /// Whether `agent`'s cached path must be discarded and re-planned. Re-plan
-    /// when there is no path, when the navmesh was rebaked since planning, when the
+    /// when there is no path, when a rebake since planning touched it (#456), when the
     /// target drifted past the epsilon, when the path has aged out, or when the next
     /// waypoint is no longer walkable. A path the agent has walked to the end of stays
     /// valid: re-planning it every frame would change nothing (a partial path ends
@@ -79,6 +80,7 @@ impl NavigationGraph {
     /// height (#130) so the goal follows ramps/stairs in `y`; the reached test stays
     /// on the XZ plane so a height delta never strands the cursor on a waypoint.
     fn cached_next_step(&self, agent: &mut NavMeshAgentComponent, current_pos: Vec3) -> Vec3 {
+        self.keep_path_if_untouched(agent, current_pos);
         if self.path_cache_invalid(agent) {
             self.plan_agent_path(agent, current_pos);
         }

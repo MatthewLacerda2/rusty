@@ -64,6 +64,7 @@ pub(in crate::ecs) fn build_bundle(entity: Entity, seq: u64) -> hecs::EntityBuil
         entity.collider,
         entity.rigidbody,
         entity.nav_agent,
+        entity.nav_obstacle,
         entity.camera,
         entity.visual_correction,
         entity.particles,
