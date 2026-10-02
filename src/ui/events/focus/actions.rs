@@ -61,7 +61,7 @@ fn any_pad_down(input: &InputState, suffix: &str) -> bool {
 
 /// This tick's edge actions, in a fixed order: one Move per arrow or d-pad press,
 /// then Next / Previous, Submit, Cancel. A held Move's repeats come from
-/// [`MoveRepeat`], not here.
+/// the event system's held-Move repeat clock, not here.
 pub fn nav_actions(input: &InputState) -> Vec<NavAction> {
     let mut actions: Vec<NavAction> = Vec::new();
     for (dir, key) in move_keys() {
