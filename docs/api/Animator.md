@@ -33,7 +33,7 @@ path + active state are saved with the entity.
 
 | Function | Signature | Notes |
 |---|---|---|
-| `Animator.Play` | `(id, clip)` | Hard-cut to `clip` from its start (also releases a `Pause`). Raw clip-level control: it does not consult the graph — jump graph states with `PlayNode`. |
+| `Animator.Play` | `(id, clip)` | Hard-cut the base layer to `clip` from its start (also releases a `Pause`). Raw clip-level control: it does not consult the graph — jump graph states with `PlayNode`. |
 | `Animator.PlayAnimation` | `(id, clip)` | Like `Play`, but honest and queryable: returns `true` only when the entity's mesh actually carries a clip named `clip` (and an animator to play it); `false` otherwise, without side effects (`Play` silently no-ops on a missing clip). |
 | `Animator.Crossfade` | `(id, clip, duration)` | Blend out of the current clip over `duration` seconds (a zero/negative duration, or a fade into the current clip, degrades to `Play`). |
 | `Animator.Stop` | `(id)` | Halt playback (freezes the pose). |

@@ -1,7 +1,8 @@
 //! src/app/animation.rs — the deterministic keyframe sampler (#80).
 //!
-//! Poses an imported skeleton ([`SkinData`]) from an [`AnimationClip`] at a given
-//! clip time. Since #453 the pose lands on the **bone GameObjects**: the sampler
+//! Poses an imported skeleton ([`SkinData`]) from animation clips
+//! ([`AnimationClip`](crate::asset::anim_data::AnimationClip)) at given clip
+//! times. Since #453 the pose lands on the **bone GameObjects**: the sampler
 //! produces each joint's local TRS, a crossfade blends two poses in TRS space
 //! (lerp translation and scale, slerp rotation — blending finished matrices
 //! shrinks limbs), and the `animate` system writes the result onto the bones. The
