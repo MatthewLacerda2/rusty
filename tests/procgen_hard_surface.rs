@@ -40,13 +40,7 @@ fn brick(output: BrickOutput) -> Vec<Node> {
 }
 
 fn bake_seeded(nodes: &[Node], seed: u64) -> Image {
-    let recipe = TextureRecipe {
-        resolution: 64,
-        seed,
-        nodes: nodes.to_vec(),
-        output: None,
-        outputs: Default::default(),
-    };
+    let recipe = TextureRecipe::new(64, nodes.to_vec()).with_seed(seed);
     evaluate(&recipe).expect("recipe evaluates")
 }
 

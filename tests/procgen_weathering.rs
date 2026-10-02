@@ -130,13 +130,7 @@ fn weathering_bakes_byte_identically_per_seed() {
         mix(BlendMode::Multiply, &["cav", "n", "cur"]),
     ];
     let at = |seed| {
-        let recipe = TextureRecipe {
-            resolution: 64,
-            seed,
-            nodes: nodes.clone(),
-            output: None,
-            outputs: Default::default(),
-        };
+        let recipe = TextureRecipe::new(64, nodes.clone()).with_seed(seed);
         evaluate(&recipe).expect("recipe evaluates")
     };
     assert_eq!(at(5).pixels(), at(5).pixels(), "same seed, different bake");

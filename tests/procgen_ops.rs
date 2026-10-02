@@ -7,13 +7,7 @@ use rusty::procgen::{evaluate, Image};
 
 /// Build a recipe from `nodes` with `output` and evaluate it.
 fn run(nodes: Vec<Node>, output: &str, resolution: u32) -> Image {
-    let recipe = TextureRecipe {
-        resolution,
-        seed: 0,
-        nodes,
-        output: Some(output.into()),
-        outputs: Default::default(),
-    };
+    let recipe = TextureRecipe::new(resolution, nodes).with_output(output);
     evaluate(&recipe).expect("recipe evaluates")
 }
 

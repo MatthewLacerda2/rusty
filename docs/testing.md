@@ -16,6 +16,10 @@
 - CI (`.github/workflows/ci.yml`) and `make test` run the engine suite with
   **cargo-nextest** plus `cargo test --doc`, both feature sets; the lint xtask keeps
   plain `cargo test`. See *The test runner* below.
+- A test builds an engine struct through a constructor or `..Default::default()`,
+  never a literal naming every field, unless every field is the point of the test:
+  a new field then breaks only the tests that use it (#663; e.g.
+  `TextureRecipe::new(res, nodes).with_seed(7)`).
 
 ## The test runner: cargo-nextest
 `make test` and CI run the suite with [cargo-nextest](https://nexte.st) (#484),
