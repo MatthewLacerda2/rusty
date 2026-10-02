@@ -106,6 +106,7 @@ fn draw_tab_strip(
         .inner_margin(egui::Margin::symmetric(t.space_sm, t.space_xs + 1.0))
         .stroke(egui::Stroke::new(1.0, t.border))
         .show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
             ui.horizontal(|ui| {
                 let scene = format!("{}  Scene", icon::CUBE_FOCUS);
                 if chrome::tab(ui, &t, *tab == ViewportTab::Scene, &scene).clicked() {
