@@ -1,6 +1,10 @@
+pub mod state;
+#[cfg(test)]
+mod state_tests;
 mod tick;
 
 use super::NavigationGraph;
+use crate::components::NavPathStatus;
 use crate::scene::NavMeshAgentComponent;
 use glam::Vec3;
 
@@ -17,12 +21,13 @@ const WAYPOINT_REACHED_DISTANCE: f32 = 0.5;
 
 impl NavigationGraph {
     /// Whether `agent`'s cached path must be discarded and re-planned. Re-plan
-    /// when there is no path, when the cursor has run off the end, when the
-    /// navmesh was rebaked since planning, when the target drifted past the
-    /// epsilon, when the path has aged out, or when the next waypoint is no
-    /// longer walkable.
+    /// when there is no path, when the navmesh was rebaked since planning, when the
+    /// target drifted past the epsilon, when the path has aged out, or when the next
+    /// waypoint is no longer walkable. A path the agent has walked to the end of stays
+    /// valid: re-planning it every frame would change nothing (a partial path ends
+    /// where the target can't be reached) and cost a full search each time.
     fn path_cache_invalid(&self, agent: &NavMeshAgentComponent) -> bool {
-        if agent.cached_path.is_empty() || agent.path_cursor >= agent.cached_path.len() {
+        if agent.cached_path.is_empty() {
             return true;
         }
         if agent.path_generation != self.bake_generation {
@@ -37,28 +42,32 @@ impl NavigationGraph {
         // The final waypoint is the literal target, which may lie off the navmesh (a
         // flying player, a point past the floor's edge); testing it would re-plan every
         // frame. Interior waypoints are span floors: one gone means the mesh changed.
-        if agent.path_cursor + 1 == agent.cached_path.len() {
+        if agent.path_cursor + 1 >= agent.cached_path.len() {
             return false;
         }
         self.span_under(agent.cached_path[agent.path_cursor])
             .is_none()
     }
 
-    /// Runs A* once from the agent's current span to its target and stores the
-    /// resulting waypoints on the agent, resetting the cursor and bookkeeping.
-    /// The start cell is dropped (the agent is already there) and the literal
-    /// target is appended so the agent finishes on the goal, not the goal's cell
-    /// center. A failed search still yields a one-waypoint beeline to the target.
+    /// Plans the agent's smoothed path to its target once ([`Self::calculate_path`],
+    /// #458) and stores its corners on the agent, resetting the cursor and bookkeeping.
+    /// The start corner is dropped (the agent is already there). A complete path ends
+    /// on the literal target, so the agent finishes on the goal rather than on its
+    /// floor; with no path at all that leaves a one-waypoint beeline. A partial path
+    /// ends where the target stops being reachable, and the agent stops there.
     fn plan_agent_path(&self, agent: &mut NavMeshAgentComponent, current_pos: Vec3) {
-        let mut waypoints = Vec::new();
-        if let Some(path) = self.path_between(current_pos, agent.target) {
-            for &s in path.iter().skip(1) {
-                waypoints.push(self.span_world(s));
+        let path = self.calculate_path(current_pos, agent.target);
+        let mut waypoints: Vec<Vec3> = path.corners.into_iter().skip(1).collect();
+        if path.status != NavPathStatus::Partial {
+            let t = agent.target;
+            if waypoints.last().is_some_and(|w| w.x == t.x && w.z == t.z) {
+                waypoints.pop();
             }
+            waypoints.push(t);
         }
-        waypoints.push(agent.target);
         agent.cached_path = waypoints;
         agent.path_cursor = 0;
+        agent.path_status = path.status;
         agent.planned_target = agent.target;
         agent.path_generation = self.bake_generation;
         agent.frames_since_replan = 0;
@@ -86,7 +95,7 @@ impl NavigationGraph {
         agent.frames_since_replan = agent.frames_since_replan.saturating_add(1);
         match agent.cached_path.get(agent.path_cursor) {
             Some(wp) => *wp,
-            None => agent.target,
+            None => agent.destination(),
         }
     }
 }

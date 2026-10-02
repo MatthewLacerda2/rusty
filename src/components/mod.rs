@@ -41,7 +41,9 @@ pub use light::{LightComponent, LightType};
 pub use lod_group::{LodGroupComponent, LodLevel};
 pub use material::{MaterialAsset, MaterialComponent, RenderMode};
 pub use mesh::{DirtyFlag, MeshComponent};
-pub use nav_agent::{NavMeshAgentComponent, DEFAULT_AVOIDANCE_PRIORITY, MAX_AVOIDANCE_PRIORITY};
+pub use nav_agent::{
+    NavMeshAgentComponent, NavPathStatus, DEFAULT_AVOIDANCE_PRIORITY, MAX_AVOIDANCE_PRIORITY,
+};
 pub use particle::{
     CollisionResponse, EmitFrom, EmitMode, EmitShape, Flipbook, Particle, ParticleBlend,
     ParticleEmitterComponent, ParticleRender, ParticleRenderMode, SubEmitTrigger, SubEmitters,

@@ -9,14 +9,17 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::super::{put, Reg};
+use crate::navigation::NavigationGraph;
 use crate::scene::authoring::nav_agent as nav_ops;
 use crate::scene::Scene;
 
-/// `NavMeshAgent.*` target / speed / radius accessors over the nav-agent component.
+/// `NavMeshAgent.*` target / speed / radius accessors over the nav-agent component, and
+/// its path state (`path_state`, #458).
 pub fn register<'lua, 'scope>(
     lua: &'lua Lua,
     scope: &mlua::Scope<'lua, 'scope>,
     scene: &'scope RefCell<Scene>,
+    nav: &'scope RefCell<NavigationGraph>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -25,6 +28,8 @@ pub fn register<'lua, 'scope>(
     register_agent_size(scope, &table, scene)?;
     register_agent_queries(scope, &table, scene)?;
     register_agent_avoidance(scope, &table, scene)?;
+    super::path_state::register_reads(scope, &table, scene)?;
+    super::path_state::register_writes(scope, &table, scene, nav)?;
 
     lua.globals()
         .set("NavMeshAgent", table)

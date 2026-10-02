@@ -1,12 +1,15 @@
 //! src/api/nav/ — `Navigation` + `NavMeshAgent` namespaces.
 //!
-//! `Navigation` queries the shared nav graph (`GetNextPathStep`) and exposes the
+//! `Navigation` queries the shared nav graph (`GetNextPathStep`, and the path queries in
+//! `query`, #458) and exposes the
 //! per-scene navmesh bake settings (#276); `agent` registers `NavMeshAgent.*`, which
 //! reads and writes an entity's optional nav-agent component. Split into this `mod.rs`
 //! (the `Navigation` namespace + settings) and `agent.rs` (the `NavMeshAgent` surface)
 //! to stay under the size cap while keeping each Lua namespace one cohesive unit.
 
 mod agent;
+mod path_state;
+mod query;
 
 use std::cell::RefCell;
 
@@ -25,7 +28,7 @@ pub fn register<'lua, 'scope>(
     nav: &'scope RefCell<NavigationGraph>,
 ) -> Reg {
     register_navigation(lua, scope, scene, nav)?;
-    agent::register(lua, scope, scene)
+    agent::register(lua, scope, scene, nav)
 }
 
 /// `Navigation.GetNextPathStep` over the shared nav graph, plus the per-scene navmesh
@@ -54,6 +57,7 @@ fn register_navigation<'lua, 'scope>(
     register_settings_getters(scope, &table, scene)?;
     register_settings_setters(scope, &table, scene, nav)?;
     register_bounds(scope, &table, scene, nav)?;
+    query::register(scope, &table, nav)?;
 
     lua.globals()
         .set("Navigation", table)
@@ -194,5 +198,7 @@ fn set_and_rebake(
     Ok(())
 }
 
+#[cfg(test)]
+mod query_tests;
 #[cfg(test)]
 mod settings_tests;

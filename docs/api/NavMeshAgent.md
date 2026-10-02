@@ -15,6 +15,24 @@ Per-entity navmesh agent control.
 | `NavMeshAgent.SetActive` | `(id, active)` | — |
 | `NavMeshAgent.SetAvoidancePriority` | `(id, priority)` | — (0–99, clamped; lower = more important) |
 | `NavMeshAgent.SetAvoidanceEnabled` | `(id, enabled)` | — |
+| `NavMeshAgent.HasPath` | `(id)` | `bool` — the agent holds a planned path |
+| `NavMeshAgent.RemainingDistance` | `(id)` | distance left along the path from where it stands; `math.huge` with no path |
+| `NavMeshAgent.GetPathStatus` | `(id)` | `"complete"`, `"partial"` or `"invalid"` (no path planned) |
+| `NavMeshAgent.GetPath` | `(id)` | a path table (see `Navigation`): the agent's position, then the corners still ahead |
+| `NavMeshAgent.Warp` | `(id, x, y, z)` | `bool` — teleports onto the navmesh point nearest `x, y, z` (within 1 unit); `false` and no move when there is none |
+| `NavMeshAgent.ResetPath` | `(id)` | — stops following: the target becomes where it stands |
+
+### Following a path (#458)
+
+An active agent plans a **smoothed path** to its target (the same one
+`Navigation.CalculatePath` returns) and steers corner to corner, so it cuts straight
+across open ground instead of zig-zagging over grid cells. It keeps that path, and only
+plans again when the target moves, the navmesh is rebaked, the path ages out (60 fixed
+frames), or a corner ahead stops being walkable. When the target is unreachable the path
+is **partial** and the agent stops at its end, the nearest reachable point, instead of
+pressing into the wall. `Warp` drops the old path and stops the agent dead; it plans once
+from the new position on its next tick. `ResetPath` is Unity's: the agent slows to a stop
+where it is.
 
 ### Local avoidance (#463)
 

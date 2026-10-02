@@ -4,7 +4,7 @@
 use std::time::Instant;
 
 use glam::Vec3;
-use rusty::navigation::NavigationGraph;
+use rusty::navigation::{NavPathStatus, NavigationGraph};
 
 use super::{bake, heights, level};
 
@@ -20,9 +20,18 @@ fn level_bakes_three_floors_and_connects_street_to_roof() {
         .expect("street to roof via both ramps");
     let ys = heights(&g, &path);
     assert_eq!((ys[0], *ys.last().expect("path")), (0.0, 8.0), "{ys:?}");
+    // Smoothed (#458): the same climb as a handful of corners, ending on the roof.
+    let smooth = g.calculate_path(Vec3::new(190.0, 0.0, 190.0), Vec3::new(30.0, 8.0, 15.0));
+    assert_eq!(smooth.status, NavPathStatus::Complete);
+    assert!(
+        smooth.corners.len() * 4 < path.len(),
+        "{} corners",
+        smooth.corners.len()
+    );
+    assert_eq!(smooth.corners.last().map(|c| c.y), Some(8.0));
 }
 
-/// `cargo test --release --features dev --test main -- --ignored --nocapture measure`
+/// `cargo test --release --features dev --test integration -- --ignored --nocapture measure`
 #[test]
 #[ignore = "measurement for the PR record; run in release"]
 fn measure_bake_time_and_memory() {
@@ -38,6 +47,11 @@ fn measure_bake_time_and_memory() {
         let ms = start.elapsed().as_secs_f64() * 1e3;
         let len = path.map_or(0, |p| p.len());
         eprintln!("  street-to-roof A*: {len} spans, {ms:.1} ms");
+        let start = Instant::now();
+        let smooth = g.calculate_path(Vec3::new(190.0, 0.0, 190.0), Vec3::new(30.0, 8.0, 15.0));
+        let ms = start.elapsed().as_secs_f64() * 1e3;
+        let n = smooth.corners.len();
+        eprintln!("  CalculatePath (A* + smoothing): {n} corners, {ms:.1} ms");
     }
     if let Ok(status) = std::fs::read_to_string("/proc/self/status") {
         let peak = status.lines().find(|l| l.starts_with("VmHWM"));

@@ -11,6 +11,29 @@ pub const DEFAULT_AVOIDANCE_PRIORITY: u8 = 50;
 /// The highest (least important) avoidance priority, as in Unity.
 pub const MAX_AVOIDANCE_PRIORITY: u8 = 99;
 
+/// Whether a computed path reaches its target (Unity's `NavMeshPathStatus`, #458).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NavPathStatus {
+    /// The path ends on the target.
+    Complete,
+    /// The target is unreachable; the path ends on the reachable point nearest to it.
+    Partial,
+    /// No path: the start or the target has no navmesh nearby (or none was planned).
+    #[default]
+    Invalid,
+}
+
+impl NavPathStatus {
+    /// The lowercase name scripts see (`"complete"`, `"partial"`, `"invalid"`).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Complete => "complete",
+            Self::Partial => "partial",
+            Self::Invalid => "invalid",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NavMeshAgentComponent {
     pub active: bool,
@@ -56,6 +79,21 @@ pub struct NavMeshAgentComponent {
     /// (frame-count based, never wall-clock, so the sim stays deterministic).
     #[serde(skip)]
     pub frames_since_replan: u32,
+    /// Whether the cached path reaches the target (#458). A partial path ends on the
+    /// reachable point nearest the target, and the agent stops there.
+    #[serde(skip)]
+    pub path_status: NavPathStatus,
+}
+
+impl NavMeshAgentComponent {
+    /// Where the agent is actually headed: the target, or the end of a partial path
+    /// (Unity stops an agent there rather than pressing into the wall).
+    pub fn destination(&self) -> Vec3 {
+        match (self.path_status, self.cached_path.last()) {
+            (NavPathStatus::Partial, Some(end)) => *end,
+            _ => self.target,
+        }
+    }
 }
 
 fn default_avoidance_priority() -> u8 {
@@ -83,6 +121,7 @@ impl Default for NavMeshAgentComponent {
             planned_target: Vec3::ZERO,
             path_generation: 0,
             frames_since_replan: 0,
+            path_status: NavPathStatus::Invalid,
         }
     }
 }
