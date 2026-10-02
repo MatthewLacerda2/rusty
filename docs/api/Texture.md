@@ -72,6 +72,10 @@ and the file name use the canonical name: `albedo` → `base_color`, `orm` →
 | `metallic_roughness` | `metallic_map` **and** `roughness_map` (the same PNG) |
 | `data` | — (no material slot) |
 
+To skip the hand-off, put the whole recipe in the material as `maps`
+(`Material.DefineAsset(name, { maps = recipe })`, see `Material.md`): it bakes
+with `BakeSet` and fills these keys for you, and `Material.Rebake` re-bakes it.
+
 Everything is checked before a file is written: a recipe with no `outputs`, an
 unknown slot, two keys naming one slot (`albedo` and `base_color`), or an unknown
 node id is an error and nothing is baked. `outputs` is optional and ignored by

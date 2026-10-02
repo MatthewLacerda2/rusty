@@ -1,4 +1,4 @@
-//! src/scene/authoring/material.rs — Shared material-authoring ops.
+//! src/scene/authoring/material/mod.rs — Shared material-authoring ops.
 //!
 //! The ONE place the engine knows how to mutate a library `MaterialAsset` field by
 //! field (the PBR factors, the glTF-PBR map paths, and the transparency story —
@@ -18,7 +18,11 @@
 //! data), scene (the library type + `Scene` for `ensure_material_key`). Pure: no
 //! wall-clock, no RNG.
 
+mod maps;
+
 use std::collections::BTreeMap;
+
+pub use maps::{bake_maps, rebake_maps, MAPS_DIR};
 
 use crate::scene::{MaterialAsset, MaterialComponent, RenderMode, Scene};
 use crate::shadergen::params::{self, ParamLayout};
@@ -228,5 +232,4 @@ pub fn shader_param(
 }
 
 #[cfg(test)]
-#[path = "material_tests.rs"]
 mod tests;

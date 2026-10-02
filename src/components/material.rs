@@ -16,6 +16,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use super::TextureComponent;
+use crate::procgen::TextureRecipe;
 
 fn default_base_color() -> [f32; 3] {
     [1.0, 1.0, 1.0]
@@ -111,6 +112,11 @@ pub struct MaterialAsset {
     /// samples white. Empty — and absent from the scene file — by default.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub shader_textures: BTreeMap<String, String>,
+    /// The multi-output texture recipe the maps bake from (#409) — the `maps` key of
+    /// the document. The recipe is the truth and the baked PNGs a regenerable cache
+    /// (`Material.Rebake`). `None` — and absent from the scene file — by default.
+    #[serde(default, rename = "maps", skip_serializing_if = "Option::is_none")]
+    pub maps_recipe: Option<TextureRecipe>,
 }
 
 impl Default for MaterialAsset {
@@ -131,6 +137,7 @@ impl Default for MaterialAsset {
             shader: None,
             shader_params: BTreeMap::new(),
             shader_textures: BTreeMap::new(),
+            maps_recipe: None,
         }
     }
 }
@@ -148,15 +155,7 @@ impl MaterialAsset {
             metallic_map: t.metallic_map.clone(),
             roughness: t.roughness,
             roughness_map: t.roughness_map.clone(),
-            normal_map: None,
-            emissive: [0.0, 0.0, 0.0],
-            emissive_map: None,
-            render_mode: RenderMode::Opaque,
-            alpha: default_alpha(),
-            alpha_cutoff: default_alpha_cutoff(),
-            shader: None,
-            shader_params: BTreeMap::new(),
-            shader_textures: BTreeMap::new(),
+            ..Self::default()
         }
     }
 
