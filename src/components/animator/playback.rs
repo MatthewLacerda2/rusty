@@ -189,10 +189,20 @@ impl Playback {
     /// one by `current`, wrapping when looping (a pure `rem_euclid`, so the fixed
     /// timestep stays deterministic); the outgoing one at `previous_per_second`,
     /// never wrapping. The crossfade itself runs on unscaled `dt` and, once done,
-    /// drops the outgoing motion.
-    pub fn advance(&mut self, dt: f32, speed: f32, current: Playhead, previous_per_second: f32) {
+    /// drops the outgoing motion. Returns the current playhead's travel this step,
+    /// `(from, to)` before any wrap — what animation events (#459) are crossed
+    /// against.
+    pub fn advance(
+        &mut self,
+        dt: f32,
+        speed: f32,
+        current: Playhead,
+        previous_per_second: f32,
+    ) -> (f32, f32) {
         let step = dt * speed * self.node_speed;
+        let from = self.time;
         self.time += step * current.per_second;
+        let to = self.time;
         if self.loop_clip && current.wrap > 0.0 {
             self.time = self.time.rem_euclid(current.wrap);
         }
@@ -203,6 +213,7 @@ impl Playback {
                 self.end_crossfade();
             }
         }
+        (from, to)
     }
 
     fn set_current(&mut self, motion: Motion<'_>) {

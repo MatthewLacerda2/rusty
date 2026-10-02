@@ -67,6 +67,7 @@ fn two_d_weights_sum_to_one_and_peak_at_their_own_child() {
                 .map(|(i, p)| BlendChild2D {
                     clip: format!("c{i}"),
                     position: p.to_array(),
+                    events: Vec::new(),
                 })
                 .collect(),
         };
@@ -118,10 +119,12 @@ fn unset_parameters_read_zero_and_a_far_point_falls_back_to_the_nearest() {
             BlendChild1D {
                 clip: "Walk".into(),
                 threshold: 2.0,
+                events: Vec::new(),
             },
             BlendChild1D {
                 clip: "Idle".into(),
                 threshold: 0.0,
+                events: Vec::new(),
             },
         ],
     };
@@ -133,10 +136,12 @@ fn unset_parameters_read_zero_and_a_far_point_falls_back_to_the_nearest() {
             BlendChild2D {
                 clip: "A".into(),
                 position: [0.0, 0.0],
+                events: Vec::new(),
             },
             BlendChild2D {
                 clip: "B".into(),
                 position: [1.0, 0.0],
+                events: Vec::new(),
             },
         ],
     };

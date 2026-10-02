@@ -83,6 +83,7 @@ pub fn node(name: &str, clip: &str) -> GraphNode {
         blend_tree: None,
         is_loop: true,
         speed: None,
+        events: Vec::new(),
     }
 }
 

@@ -10,6 +10,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::AnimationEvent;
+
 /// A blend tree: its kind, the parameter(s) it reads and its children. The
 /// variant *is* the kind, so a 1D tree can never carry a second axis.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -44,6 +46,9 @@ pub enum BlendTree {
 pub struct BlendChild1D {
     pub clip: String,
     pub threshold: f32,
+    /// The child clip's animation events (#459), in its own seconds.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<AnimationEvent>,
 }
 
 /// One child of a 2D tree: a clip and the `[x, y]` point it plays alone at.
@@ -51,6 +56,9 @@ pub struct BlendChild1D {
 pub struct BlendChild2D {
     pub clip: String,
     pub position: [f32; 2],
+    /// The child clip's animation events (#459), in its own seconds.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<AnimationEvent>,
 }
 
 impl BlendTree {
@@ -68,6 +76,19 @@ impl BlendTree {
                 parameter_y,
                 ..
             } => vec![parameter_x, parameter_y],
+        }
+    }
+
+    /// The children's animation events (#459), in authored order.
+    pub fn child_events(&self) -> Vec<&[AnimationEvent]> {
+        match self {
+            BlendTree::Simple1D { children, .. } => {
+                children.iter().map(|c| c.events.as_slice()).collect()
+            }
+            BlendTree::FreeformDirectional2D { children, .. }
+            | BlendTree::FreeformCartesian2D { children, .. } => {
+                children.iter().map(|c| c.events.as_slice()).collect()
+            }
         }
     }
 

@@ -5,7 +5,6 @@
 //! the active state back.
 
 use std::cell::RefCell;
-use std::collections::BTreeMap;
 
 use mlua::Lua;
 use rusty::asset::anim_data::AnimationClip;
@@ -44,7 +43,6 @@ fn run(scene: &RefCell<Scene>, script: &str) -> String {
 /// so it can be embedded in a Lua literal on Windows too.
 fn saved_graph() -> String {
     let graph = AnimationGraph {
-        parameters: BTreeMap::new(),
         base: StateMachine {
             nodes: vec![GraphNode {
                 name: "Run".to_string(),
@@ -52,11 +50,12 @@ fn saved_graph() -> String {
                 blend_tree: None,
                 is_loop: true,
                 speed: Some(2.0),
+                events: Vec::new(),
             }],
             edges: Vec::new(),
             entry: "Run".to_string(),
         },
-        layers: Vec::new(),
+        ..AnimationGraph::default()
     };
     let path = crate::temp::dir().join("rusty_316_api.animgraph");
     animation_graph::save(&path, &graph).unwrap();

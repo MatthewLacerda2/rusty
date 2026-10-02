@@ -5,6 +5,7 @@
 //! and finite, distinct positions — two children on one point would split the
 //! weight arbitrarily, so that is an authoring error, not something to guess at.
 
+use super::event::check_events;
 use super::{AnimationGraph, BlendTree, GraphNode, ParameterDeclaration};
 
 impl AnimationGraph {
@@ -18,6 +19,13 @@ impl AnimationGraph {
             (Some(tree), true) => self.check_tree(name, tree, problems),
             (None, false) => {}
         }
+        let label = format!("node '{name}'");
+        if node.blend_tree.is_some() && !node.events.is_empty() {
+            problems.push(format!(
+                "{label} is a blend tree with events of its own; put them on its children"
+            ));
+        }
+        check_events(&label, &node.events, problems);
     }
 
     fn check_tree(&self, node: &str, tree: &BlendTree, problems: &mut Vec<String>) {
@@ -49,6 +57,9 @@ impl AnimationGraph {
             .any(|(i, p)| points[..i].contains(p));
         if duplicated {
             problems.push(format!("{label} has two children at the same position"));
+        }
+        for (clip, events) in clips.iter().zip(tree.child_events()) {
+            check_events(&format!("{label} child '{clip}'"), events, problems);
         }
     }
 }

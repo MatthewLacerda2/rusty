@@ -74,7 +74,8 @@ impl GameWorld {
 /// before `advance_frame`. The skin palette build (#453) runs in `Render`, after
 /// every stage that may move a bone. The post-animation writers, in order:
 /// `animate` writes the clip pose; `pose_ragdolls` (#466) puts each simulated
-/// ragdoll bone back where physics left it; `LateUpdate` scripts set this tick's
+/// ragdoll bone back where physics left it; `OnAnimationEvent` (#459) then
+/// fires for the events this tick's playheads crossed; `LateUpdate` scripts set this tick's
 /// targets; `solve_ik` (#461) post-processes the final pose, skipping any bone a
 /// dynamic body carries (physics wins over IK); `follow_bones` (#464) then moves
 /// the hitbox query poses to the pose that renders.
@@ -88,6 +89,7 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, super::animation::graph::evaluate_graphs)
         .add_system(Stage::FixedUpdate, animate)
         .add_system(Stage::FixedUpdate, pose_ragdolls)
+        .add_system(Stage::FixedUpdate, dispatch_animation_events)
         .add_system(Stage::FixedUpdate, super::particles::tick_particles)
         .add_system(Stage::FixedUpdate, late_update_scripts)
         .add_system(Stage::FixedUpdate, solve_ik)
@@ -217,16 +219,31 @@ fn animate(world: &mut World, res: &mut Resources) {
         let graph = path.and_then(|p| res.animation_graphs.get_or_load(&p, &res.console));
         // The animator + mesh split borrow goes through the facade's sanctioned
         // helper (#344) — the animate system's re-pose step.
-        let writes = s.world.with_animator_and_mesh_mut(id, |anim, mesh| {
-            super::animation::advance(anim, mesh.as_deref(), graph, dt);
-            mesh.map(|m| super::animation::bone_writes(anim, m, graph))
+        let stepped = s.world.with_animator_and_mesh_mut(id, |anim, mesh| {
+            let crossed = super::animation::advance(anim, mesh.as_deref(), graph, dt);
+            (
+                crossed,
+                mesh.map(|m| super::animation::bone_writes(anim, m, graph)),
+            )
         });
-        for (bone, local) in writes.flatten().unwrap_or_default() {
+        let (crossed, writes) = stepped.unwrap_or_default();
+        let events = crossed.into_iter().map(|e| (id, e.name));
+        res.animation_events.extend(events);
+        for (bone, local) in writes.unwrap_or_default() {
             if let Some(mut t) = s.world.transform_mut(bone) {
                 *t = local;
             }
         }
     }
+}
+
+/// `OnAnimationEvent(id, name)` (#459) for every event `animate` queued this
+/// tick: after the animation step and ragdoll posing, so a handler reads the
+/// pose this tick renders (bar `LateUpdate` and IK), and before `LateUpdate`, as
+/// in Unity, where animation events fire during the Animator's update.
+fn dispatch_animation_events(_world: &mut World, res: &mut Resources) {
+    let events = std::mem::take(&mut res.animation_events);
+    res.script_manager.dispatch_animation_events(&events);
 }
 
 /// The palette build (#453): once every pose writer of the frame has run, skin

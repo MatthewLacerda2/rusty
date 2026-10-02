@@ -21,12 +21,14 @@
 
 mod blend_tree;
 mod clip;
+mod events;
 pub(crate) mod graph;
 mod layers;
 mod motion;
 
 pub use blend_tree::tree_weights;
 pub use clip::sample_palette;
+pub use events::{Crossed, END_EVENT};
 pub use motion::Pose;
 
 use crate::asset::animation_graph::{AnimationGraph, LayerBlending};
@@ -121,14 +123,16 @@ pub fn sample_pose<'m>(
 /// Advance every layer's playheads by `dt` (scaled by the animator's `speed` and
 /// each node's rate), each at its own motion's rate: a clip in seconds, a blend
 /// tree by its weighted cycle length. Nothing moves while stopped or paused.
+/// Returns the animation events (#459) crossed this step, in firing order; an
+/// extra layer at weight 0 is silent.
 pub fn advance(
     anim: &mut AnimatorComponent,
     mesh: Option<&MeshComponent>,
     graph: Option<&AnimationGraph>,
     dt: f32,
-) {
+) -> Vec<Crossed> {
     if !anim.is_running() {
-        return;
+        return Vec::new();
     }
     let clips = mesh.map_or(&[][..], |m| &m.clips[..]);
     let AnimatorComponent {
@@ -143,10 +147,15 @@ pub fn advance(
         machine: graph.and_then(|g| g.machine(layer)),
         parameters,
     };
-    context(0).advance(base, dt, *speed);
+    let mut crossed = context(0).advance(base, dt, *speed, 0);
     for (i, state) in layers.iter_mut().enumerate() {
-        context(i + 1).advance(&mut state.playback, dt, *speed);
+        let events = context(i + 1).advance(&mut state.playback, dt, *speed, i + 1);
+        if state.weight > 0.0 {
+            crossed.extend(events);
+        }
     }
+    events::sort(&mut crossed);
+    crossed
 }
 
 /// Blend two poses of equal length in TRS space, `t` in `[0, 1]` (0 → `from`,

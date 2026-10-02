@@ -49,6 +49,12 @@ pub const ON_COLLISION_EXIT: &str = "OnCollisionExit";
 /// `break_force` / `break_torque` (#449) — `(id, force, torque)`, after that
 /// tick's collision callbacks. The component is already gone.
 pub const ON_JOINT_BREAK: &str = "OnJointBreak";
+/// Called once per animation event the owning entity's Animator crossed this
+/// tick (#459) — `(id, name)`: an authored marker on the playing graph node (or
+/// the dominant blend-tree child), or `"End"` when a non-looping motion finishes.
+/// Dispatched after the animation step and ragdoll posing, before `LateUpdate`,
+/// in the order the playheads crossed them.
+pub const ON_ANIMATION_EVENT: &str = "OnAnimationEvent";
 /// Called when the owning entity becomes active (#323): on its first activation
 /// — between `Awake` and `Start`, so the first-tick order is
 /// `Awake → OnEnable → Start` — and again on every later inactive→active edge.
@@ -116,6 +122,7 @@ pub const LIFECYCLE_CALLBACKS: &[&str] = &[
     ON_COLLISION_STAY,
     ON_COLLISION_EXIT,
     ON_JOINT_BREAK,
+    ON_ANIMATION_EVENT,
     ON_POINTER_ENTER,
     ON_POINTER_EXIT,
     ON_POINTER_DOWN,
