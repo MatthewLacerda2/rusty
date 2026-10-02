@@ -18,10 +18,12 @@
 pub mod access;
 mod bundle;
 pub mod core;
+mod epoch;
 mod handles;
 #[cfg(test)]
 mod query_tests;
 pub mod world;
 
 pub use access::{CompMut, CompRef};
+pub use epoch::Epoch;
 pub use world::World;

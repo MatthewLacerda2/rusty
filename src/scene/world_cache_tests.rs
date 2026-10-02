@@ -79,3 +79,68 @@ fn a_cache_miss_falls_back_to_the_live_walk_never_stale_wrong() {
     // The previously cached entity is unaffected.
     assert_eq!(world_translation(&scene, c), Vec3::new(7.0, 0.0, 0.0));
 }
+
+#[test]
+fn a_despawned_entity_is_never_answered_from_the_old_fill() {
+    // #727: the store outlives the frame, so a despawn after the refresh must not leave its
+    // old slot readable. The read misses and walks live: a gone entity has no transform.
+    let mut scene = Scene::new();
+    let (gp, p, c) = nested_chain(&mut scene);
+    scene.refresh_world_matrices();
+    assert_eq!(world_translation(&scene, c), Vec3::new(7.0, 0.0, 0.0));
+
+    scene.world.despawn(c);
+    assert_eq!(scene.world_matrix(c), glam::Mat4::IDENTITY);
+    // Survivors still read their correct (as-of-refresh) matrices.
+    assert_eq!(world_translation(&scene, p), Vec3::new(3.0, 0.0, 0.0));
+    assert_eq!(world_translation(&scene, gp), Vec3::new(1.0, 0.0, 0.0));
+}
+
+#[test]
+fn an_id_reused_after_a_clear_reads_the_new_entity_not_the_old_one() {
+    // A scene load clears the world and restarts ids at 1, so the next spawns reuse the
+    // cached ids. Before any refresh, those reads must see the new entities.
+    let mut scene = Scene::new();
+    let (gp, _p, c) = nested_chain(&mut scene);
+    scene.refresh_world_matrices();
+
+    scene.world.clear();
+    let a = scene.add_entity("new-a".into());
+    let b = scene.add_entity("new-b".into());
+    let reused = scene.add_entity("new-c".into());
+    assert_eq!((a, reused), (gp, c), "ids restart at 1 after a clear");
+    scene.world.transform_mut(reused).unwrap().position = Vec3::new(0.0, 9.0, 0.0);
+
+    assert_eq!(world_translation(&scene, reused), Vec3::new(0.0, 9.0, 0.0));
+    assert_eq!(scene.world_matrix(b), scene.compute_world_matrix(b));
+}
+
+#[test]
+fn the_kept_store_matches_the_live_walk_across_churning_refreshes() {
+    // Spawn, reparent and despawn between refreshes: every refresh must agree with the
+    // recursive walk for every live id, whatever the previous fills left in the store.
+    let mut scene = Scene::new();
+    let mut live: Vec<u32> = Vec::new();
+    for frame in 0..40u32 {
+        let id = scene.add_entity(format!("e{frame}"));
+        scene.world.transform_mut(id).unwrap().position = Vec3::new(frame as f32, 1.0, 0.0);
+        if let Some(&parent) = live.get((frame as usize * 7) % live.len().max(1)) {
+            scene.set_parent(id, Some(parent)).unwrap();
+        }
+        live.push(id);
+        if frame % 3 == 2 {
+            let gone = live.remove((frame as usize * 5) % live.len());
+            scene.world.despawn(gone);
+            scene.refresh_world_matrices();
+            assert_eq!(scene.world_matrix(gone), glam::Mat4::IDENTITY);
+        }
+        scene.refresh_world_matrices();
+        for &id in scene.world.ids() {
+            assert_eq!(
+                scene.world_matrix(id),
+                scene.compute_world_matrix(id),
+                "id {id}"
+            );
+        }
+    }
+}

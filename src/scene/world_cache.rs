@@ -31,29 +31,85 @@
 //! `RefCell` never contends.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
 
 use glam::Mat4;
 
+use crate::ecs::Epoch;
 use crate::scene::Scene;
 
 /// The scene's authoritative per-frame world-matrix store (#331). Interior-mutable so a
 /// `&Scene` render path can refill it at a defined frame point without threading `&mut`
 /// through every consumer.
+///
+/// **Dense by id, kept across frames (#727).** Like `ecs::handles` (#696), `slots` is a
+/// `Vec` indexed by stable id, so a read or a memo probe is a bounds check and a load
+/// rather than a SipHash. A slot points into `matrices`, which holds one matrix per entity
+/// filled this pass; both keep their allocation from frame to frame. Nothing is cleared
+/// between fills: each refresh bumps `fill`, and a slot stamped with an older fill counts
+/// as empty. Slots cost 8 bytes per id up to the highest id seen (ids are compact, see
+/// `ecs::handles`), the matrices 64 bytes per live entity.
+///
+/// **Never stale-wrong across despawns or id reuse.** The fill also records the world's
+/// [`Epoch`], which changes on every despawn and `clear` (after which ids restart at 1).
+/// Until the next refresh, a read under a different epoch misses and the caller walks the
+/// live hierarchy instead, so a gone or reused id is never answered from the old fill.
 #[derive(Default)]
 pub struct WorldMatrixCache {
-    matrices: RefCell<HashMap<u32, Mat4>>,
+    inner: RefCell<Store>,
+}
+
+#[derive(Default)]
+struct Store {
+    /// Stable id → `(fill, index into matrices)`; valid only when `fill` is current.
+    slots: Vec<(u32, u32)>,
+    matrices: Vec<Mat4>,
+    /// The current fill's stamp; `0` means "never filled", so a fresh slot is empty.
+    fill: u32,
+    /// The world epoch the current fill was computed under.
+    epoch: Option<Epoch>,
+}
+
+impl Store {
+    /// The matrix filled for `id` this pass, if any.
+    #[inline]
+    fn get(&self, id: u32) -> Option<Mat4> {
+        match self.slots.get(id as usize) {
+            Some(&(fill, at)) if fill == self.fill => Some(self.matrices[at as usize]),
+            _ => None,
+        }
+    }
+
+    fn put(&mut self, id: u32, world: Mat4) {
+        let slot = id as usize;
+        if slot >= self.slots.len() {
+            self.slots.resize(slot + 1, (0, 0));
+        }
+        self.slots[slot] = (self.fill, self.matrices.len() as u32);
+        self.matrices.push(world);
+    }
+
+    /// Start a new fill under `epoch`: every slot of the previous one goes stale at once.
+    fn begin(&mut self, epoch: Epoch) {
+        self.fill = self.fill.wrapping_add(1);
+        if self.fill == 0 {
+            // Wrapped (after ~4 billion refreshes): old stamps could alias, so forget them.
+            self.slots.clear();
+            self.fill = 1;
+        }
+        self.matrices.clear();
+        self.epoch = Some(epoch);
+    }
 }
 
 impl WorldMatrixCache {
-    /// This entity's cached world matrix, or `None` if it was not in the last fill.
-    fn get(&self, id: u32) -> Option<Mat4> {
-        self.matrices.borrow().get(&id).copied()
-    }
-
-    /// Replace the whole store with a freshly computed `id -> world matrix` map.
-    fn replace(&self, map: HashMap<u32, Mat4>) {
-        *self.matrices.borrow_mut() = map;
+    /// This entity's cached world matrix, or `None` if it was not in the last fill or the
+    /// world's ids have changed meaning since (a despawn or a `clear`).
+    fn get(&self, id: u32, epoch: Epoch) -> Option<Mat4> {
+        let store = self.inner.borrow();
+        if store.epoch != Some(epoch) {
+            return None;
+        }
+        store.get(id)
     }
 }
 
@@ -78,32 +134,32 @@ impl Scene {
     }
 
     /// Fill the per-frame world-matrix store O(N) in hierarchy order (#331). Memoizes each
-    /// entity's world matrix into `map` so a parent shared by many children — and every
+    /// entity's world matrix into the store so a parent shared by many children — and every
     /// ancestor above it — is resolved exactly once, not once per child per consumer.
     /// Call this once at each frame point whose consumers read [`Scene::world_matrix`].
     pub fn refresh_world_matrices(&self) {
-        let ids = self.world.ids().to_vec();
-        let mut map: HashMap<u32, Mat4> = HashMap::with_capacity(ids.len());
-        for id in ids {
-            self.fill_world_matrix(id, &mut map);
+        let mut store = self.world_cache.inner.borrow_mut();
+        store.begin(self.world.epoch());
+        for &id in self.world.ids() {
+            self.fill_world_matrix(id, &mut store);
         }
-        self.world_cache.replace(map);
     }
 
-    /// Memoized world-matrix fill for one entity: returns a cached value if present, else
-    /// resolves the parent (recursively, sharing the same `map`) and stores the product.
-    fn fill_world_matrix(&self, id: u32, map: &mut HashMap<u32, Mat4>) -> Mat4 {
-        if let Some(cached) = map.get(&id) {
-            return *cached;
+    /// Memoized world-matrix fill for one entity: returns the value already filled this
+    /// pass if present, else resolves the parent (recursively, sharing the same store) and
+    /// stores the product.
+    fn fill_world_matrix(&self, id: u32, store: &mut Store) -> Mat4 {
+        if let Some(cached) = store.get(id) {
+            return cached;
         }
         let Some((local, parent)) = self.world.local_and_parent(id) else {
             return Mat4::IDENTITY;
         };
         let world = match parent {
-            Some(parent_id) => self.fill_world_matrix(parent_id, map) * local,
+            Some(parent_id) => self.fill_world_matrix(parent_id, store) * local,
             None => local,
         };
-        map.insert(id, world);
+        store.put(id, world);
         world
     }
 
@@ -112,7 +168,7 @@ impl Scene {
     /// correct — see the module's freshness contract.
     pub fn world_matrix(&self, entity_id: u32) -> Mat4 {
         self.world_cache
-            .get(entity_id)
+            .get(entity_id, self.world.epoch())
             .unwrap_or_else(|| self.compute_world_matrix(entity_id))
     }
 
