@@ -30,6 +30,7 @@ pub fn emissive_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3, emissi
         skin: None,
         clips: Vec::new(),
         pose_palette: Vec::new(),
+        skeleton: Default::default(),
         is_dirty: DirtyFlag::new(true),
     };
     scene.world.set_mesh(id, Some(mesh));

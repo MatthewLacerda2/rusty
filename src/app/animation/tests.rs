@@ -28,6 +28,7 @@ fn chain_skin() -> SkinData {
         parents: vec![None, Some(0)],
         joint_nodes: vec![0, 1],
         mesh_inverse: Mat4::IDENTITY,
+        names: vec!["root".to_string(), "tip".to_string()],
     }
 }
 
@@ -122,14 +123,60 @@ fn rotation_slerps_between_keys() {
 }
 
 #[test]
-fn blend_palettes_is_linear() {
-    let a = vec![Mat4::IDENTITY];
-    let b = vec![Mat4::from_translation(Vec3::new(4.0, 0.0, 0.0))];
-    let mid = blend_palettes(&a, &b, 0.5);
-    assert!((mid[0].to_cols_array()[12] - 2.0).abs() < 1e-5);
-    // Endpoints return the pure inputs.
-    assert!(blend_palettes(&a, &b, 0.0)[0].abs_diff_eq(a[0], 1e-6));
-    assert!(blend_palettes(&a, &b, 1.0)[0].abs_diff_eq(b[0], 1e-6));
+fn blend_poses_lerps_translation_and_hits_the_endpoints() {
+    let a = vec![JointTransform::default()];
+    let b = vec![JointTransform {
+        translation: Vec3::new(4.0, 0.0, 0.0),
+        ..JointTransform::default()
+    }];
+    assert!((blend_poses(&a, &b, 0.5)[0].translation.x - 2.0).abs() < 1e-5);
+    assert_eq!(blend_poses(&a, &b, 0.0), a);
+    assert_eq!(blend_poses(&a, &b, 1.0), b);
+}
+
+/// #453 regression: crossfading between two opposite rotations must keep the
+/// limb's length. Lerping the finished matrices (the old `blend_palettes`)
+/// averaged +90° and -90° about Z into a degenerate matrix that collapsed the
+/// child onto its parent; TRS blending slerps through the rest pose instead.
+#[test]
+fn crossfade_between_opposite_rotations_keeps_limb_length() {
+    let skin = chain_skin();
+    let pose = |angle: f32| {
+        let mut locals = skin.local_bind.clone();
+        locals[0].rotation = Quat::from_rotation_z(angle);
+        locals
+    };
+    let half_pi = std::f32::consts::FRAC_PI_2;
+    for t in [0.25, 0.5, 0.75] {
+        let blended = blend_poses(&pose(half_pi), &pose(-half_pi), t);
+        let tip = compose_globals(&skin, &blended)[1].w_axis.truncate();
+        assert!(
+            (tip.length() - 1.0).abs() < 1e-5,
+            "t={t}: limb length {}",
+            tip.length()
+        );
+    }
+}
+
+/// The animator writes only the bones its clip drives: `translate_clip` keys
+/// joint0 alone, so joint1's bone is left to whatever else poses it.
+#[test]
+fn bone_writes_cover_only_the_driven_joints() {
+    let mut mesh = two_clip_mesh();
+    mesh.clips = vec![translate_clip()];
+    mesh.skeleton.bones = vec![10, 11];
+    let mut anim = looping_animator("Slide");
+    anim.time = 0.5;
+    let writes = bone_writes(&anim, &mesh);
+    assert_eq!(writes.len(), 1);
+    assert_eq!(writes[0].0, 10);
+    assert!(writes[0]
+        .1
+        .position
+        .abs_diff_eq(Vec3::new(1.0, 0.0, 0.0), 1e-5));
+    // An unbound skeleton gets no writes.
+    mesh.skeleton.bones.clear();
+    assert!(bone_writes(&anim, &mesh).is_empty());
 }
 
 /// A named clip whose single track ends at `end` seconds (so `duration == end`).
@@ -152,6 +199,7 @@ fn two_clip_mesh() -> MeshComponent {
         skin: Some(chain_skin()),
         clips: vec![named_clip("Short", 0.75), named_clip("Long", 2.5)],
         pose_palette: Vec::new(),
+        skeleton: Default::default(),
         is_dirty: Default::default(),
     }
 }

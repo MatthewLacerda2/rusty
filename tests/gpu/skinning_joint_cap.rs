@@ -39,6 +39,7 @@ fn scene(last: Mat4) -> Scene {
             skin: None,
             clips: Vec::new(),
             pose_palette: Vec::new(),
+            skeleton: Default::default(),
             is_dirty: DirtyFlag::new(true),
         }),
     );

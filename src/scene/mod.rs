@@ -14,6 +14,8 @@
 //! Submodules:
 //!   scene     — the `Scene` aggregate (the `ecs::World` + scene-level state)
 //!   serialize — World <-> SceneData
+//!   rehydrate — rebuild a mesh's geometry + rig from its on-disk reference
+//!   skeleton  — bones as GameObjects: spawn, save-strip, palette build (#453)
 //!   io        — save/load, path + extension, default-scene seeding
 //!   snapshot  — edit-mode snapshot/restore around Play
 //!   runtime   — play-mode requests drained at the tick tail: destroys, scene loads
@@ -30,10 +32,12 @@ pub mod layers;
 pub mod lighting;
 pub mod lod_instance;
 pub mod prefab;
+pub mod rehydrate;
 pub mod runtime;
 #[allow(clippy::module_inception)]
 pub mod scene;
 pub mod serialize;
+pub mod skeleton;
 pub mod snapshot;
 pub mod world_cache;
 

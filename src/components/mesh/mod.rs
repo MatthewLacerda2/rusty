@@ -14,8 +14,10 @@ use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 
 pub mod primitives;
+mod skeleton;
 mod vertex;
 
+pub use skeleton::BoneBinding;
 pub use vertex::Vertex;
 
 /// Interior-mutable boolean that is `Sync` (single-threaded engine invariant).
@@ -78,12 +80,17 @@ pub struct MeshComponent {
     /// source file (#80). Empty for unanimated/static meshes; rehydrated on load.
     #[serde(skip)]
     pub clips: Vec<AnimationClip>,
-    /// The currently *posed* bone palette, written each frame by the animation
-    /// system (#80) when a clip is driving this skeleton. Empty when no animation is
-    /// active; the renderer then falls back to `bind_palette` (the rest pose). Like
-    /// the bind palette it is runtime-only and never serialized.
+    /// The currently *posed* bone palette, rebuilt each frame from the bone
+    /// GameObjects' transforms (#453) once the animator and every later writer
+    /// (scripts, physics) have posed them. Empty before the skeleton is spawned;
+    /// the renderer then falls back to `bind_palette` (the rest pose). Like the bind
+    /// palette it is runtime-only and never serialized.
     #[serde(skip)]
     pub pose_palette: Vec<glam::Mat4>,
+    /// The bone GameObjects this skin is driven by, plus the designer's per-bone
+    /// overrides (#453). Only the overrides are saved, and only when there are any.
+    #[serde(default, skip_serializing_if = "BoneBinding::is_unmodified")]
+    pub skeleton: BoneBinding,
     // For GPU rendering, we hold the loaded state or buffers in the renderer
     #[serde(skip)]
     pub is_dirty: DirtyFlag, // Set to true when mesh data changes to update GPU buffers

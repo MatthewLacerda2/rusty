@@ -91,6 +91,7 @@ fn add_box(scene: &mut Scene, name: &str, material: &str) -> u32 {
         skin: None,
         clips: Vec::new(),
         pose_palette: Vec::new(),
+        skeleton: Default::default(),
         is_dirty: rusty::scene::DirtyFlag::new(true),
     };
     scene.world.set_mesh(id, Some(mesh));

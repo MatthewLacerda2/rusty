@@ -14,6 +14,7 @@ fn mesh(primitive: &str, asset: Option<&str>) -> MeshComponent {
         skin: None,
         clips: Vec::new(),
         pose_palette: Vec::new(),
+        skeleton: Default::default(),
         is_dirty: DirtyFlag::new(false),
     }
 }

@@ -66,6 +66,7 @@ fn box_mesh() -> crate::scene::MeshComponent {
         skin: None,
         clips: Vec::new(),
         pose_palette: Vec::new(),
+        skeleton: Default::default(),
         is_dirty: crate::scene::DirtyFlag::new(true),
     }
 }

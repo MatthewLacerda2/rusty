@@ -136,6 +136,8 @@ pub fn reimport_instance(scene: &mut Scene, root_id: u32) -> Result<(), String> 
     for id in ids {
         rebuild_entity(scene, id, &baselines, true);
     }
+    // A rebuilt skinned mesh lost its bone binding; re-bind it by name (#453).
+    scene.sync_skeletons();
     scene.update_all_colliders();
     Ok(())
 }
@@ -153,6 +155,7 @@ pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), 
         }
         rebuild_entity(scene, id, &baselines, false);
     }
+    scene.sync_skeletons();
     scene.update_all_colliders();
     Ok(())
 }

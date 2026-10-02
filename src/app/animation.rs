@@ -1,9 +1,12 @@
 //! src/app/animation.rs — the deterministic keyframe sampler (#80).
 //!
 //! Poses an imported skeleton ([`SkinData`]) from an [`AnimationClip`] at a given
-//! clip time, producing the mesh-local bone palette the renderer uploads (the same
-//! `bind_global[j] * inverse_bind[j]` convention #79 established, but with the
-//! joints' local transforms overridden by the sampled keyframes).
+//! clip time. Since #453 the pose lands on the **bone GameObjects**: the sampler
+//! produces each joint's local TRS, a crossfade blends two poses in TRS space
+//! (lerp translation and scale, slerp rotation — blending finished matrices
+//! shrinks limbs), and the `animate` system writes the result onto the bones. The
+//! skin palette is then built from the bones by `Scene::build_skin_palettes`, after
+//! every later writer (scripts, physics) had its say.
 //!
 //! Purity / determinism: every function here is a pure function of (skin, clip,
 //! time) — no wall clock, no RNG — so a headless replay at the fixed timestep is
@@ -13,41 +16,95 @@ pub(crate) mod graph;
 
 use crate::asset::anim_data::{AnimationClip, Interpolation, Track};
 use crate::asset::mesh_data::{JointTransform, SkinData};
-use crate::components::{AnimatorComponent, MeshComponent};
+use crate::components::{AnimatorComponent, MeshComponent, TransformComponent};
 use glam::{Mat4, Quat, Vec3};
 
-/// Re-pose `mesh`'s skeleton from `anim`'s current state, writing the result into
-/// the mesh's `pose_palette` (the renderer then uploads it instead of the bind
-/// pose). A skinless mesh, a missing clip, or a stopped animator leaves the pose
-/// palette empty so rendering falls back to the rest pose.
-pub fn repose_mesh(anim: &AnimatorComponent, mesh: &mut MeshComponent) {
-    let Some(skin) = clip_skin(mesh) else {
-        mesh.pose_palette.clear();
-        return;
-    };
-    let Some(current) = find_clip(mesh, &anim.current_clip) else {
-        mesh.pose_palette.clear();
-        return;
-    };
-    let current_pose = sample_palette(skin, current, anim.time);
-    mesh.pose_palette = match crossfade_source(anim, mesh, skin) {
-        Some(prev_pose) => blend_palettes(&prev_pose, &current_pose, anim.crossfade_weight()),
-        None => current_pose,
-    };
-}
-
-/// The outgoing crossfade pose, if a crossfade is active and its previous clip is
-/// still resolvable on the mesh.
-fn crossfade_source(
+/// The local transform `anim` gives each of `mesh`'s bones this tick, as
+/// `(bone entity, transform)` writes. A joint neither the current nor the
+/// outgoing clip animates is not written, so a script or an override posing it
+/// keeps it (Unity leaves unanimated properties alone). Empty without a bound
+/// skeleton or a resolvable clip: a stopped animator leaves the bones where they
+/// are.
+pub fn bone_writes(
     anim: &AnimatorComponent,
     mesh: &MeshComponent,
-    skin: &SkinData,
-) -> Option<Vec<Mat4>> {
+) -> Vec<(u32, TransformComponent)> {
+    let Some((skin, pose)) = sample_pose(anim, mesh) else {
+        return Vec::new();
+    };
+    let bones = &mesh.skeleton.bones;
+    if bones.len() != pose.len() {
+        return Vec::new();
+    }
+    pose.into_iter()
+        .enumerate()
+        .filter_map(|(slot, local)| Some((bones[slot], bone_local(skin, slot, local?))))
+        .collect()
+}
+
+/// A joint's sampled local as its bone's Transform. A skeleton root's bone hangs
+/// off the skinned entity, so the fixed root offset (an `Armature` node) is folded
+/// in; every other bone's parent is its parent joint's bone, so TRS maps 1:1.
+fn bone_local(skin: &SkinData, slot: usize, local: JointTransform) -> TransformComponent {
+    if skin.parents.get(slot).copied().flatten().is_some() {
+        return TransformComponent {
+            position: local.translation,
+            rotation: local.rotation,
+            scale: local.scale,
+        };
+    }
+    TransformComponent::from_matrix(skin.root_offset(slot) * local.matrix())
+}
+
+/// The pose `anim` puts `mesh`'s skeleton in: per joint slot, the local TRS, or
+/// `None` for a joint no playing clip animates. Crossfades blend in TRS space.
+/// `None` for a skinless mesh or an unresolvable clip.
+pub fn sample_pose<'m>(
+    anim: &AnimatorComponent,
+    mesh: &'m MeshComponent,
+) -> Option<(&'m SkinData, Vec<Option<JointTransform>>)> {
+    let skin = clip_skin(mesh)?;
+    let current = find_clip(mesh, &anim.current_clip)?;
+    let mut pose = sampled_locals(skin, current, anim.time);
+    let mut driven = driven_slots(current, pose.len());
+    if let Some(prev) = crossfade_source(anim, mesh) {
+        let from = sampled_locals(skin, prev, anim.previous_time);
+        pose = blend_poses(&from, &pose, anim.crossfade_weight());
+        for (d, p) in driven.iter_mut().zip(driven_slots(prev, pose.len())) {
+            *d |= p;
+        }
+    }
+    let pose = pose
+        .into_iter()
+        .zip(driven)
+        .map(|(local, driven)| driven.then_some(local))
+        .collect();
+    Some((skin, pose))
+}
+
+/// Which joint slots `clip` has any keyframes for.
+fn driven_slots(clip: &AnimationClip, joints: usize) -> Vec<bool> {
+    (0..joints)
+        .map(|slot| {
+            clip.tracks.get(slot).is_some_and(|t| {
+                !t.translation.times.is_empty()
+                    || !t.rotation.times.is_empty()
+                    || !t.scale.times.is_empty()
+            })
+        })
+        .collect()
+}
+
+/// The clip being faded out, if a crossfade is active and its clip is still
+/// resolvable on the mesh.
+fn crossfade_source<'m>(
+    anim: &AnimatorComponent,
+    mesh: &'m MeshComponent,
+) -> Option<&'m AnimationClip> {
     if !anim.is_crossfading() {
         return None;
     }
-    let prev = find_clip(mesh, anim.previous_clip.as_deref()?)?;
-    Some(sample_palette(skin, prev, anim.previous_time))
+    find_clip(mesh, anim.previous_clip.as_deref()?)
 }
 
 /// The skin to pose, but only when the mesh actually carries clips to play.
@@ -71,33 +128,31 @@ pub fn current_clip_duration(anim: &AnimatorComponent, mesh: Option<&MeshCompone
 /// Pose `skin` with `clip` sampled at `time` seconds, returning one mesh-local
 /// matrix per joint slot (matching the vertices' `joint_indices`). A joint the clip
 /// never animates keeps its bind-pose local transform, so a clip that drives only
-/// part of the skeleton leaves the rest at rest.
+/// part of the skeleton leaves the rest at rest. The pure-data twin of the bone
+/// path (sample → write bones → `Scene::build_skin_palettes`), with no entities:
+/// both yield the same palette for an untouched skeleton.
 pub fn sample_palette(skin: &SkinData, clip: &AnimationClip, time: f32) -> Vec<Mat4> {
     let locals = sampled_locals(skin, clip, time);
     let globals = compose_globals(skin, &locals);
     globals
         .iter()
         .zip(skin.inverse_bind.iter())
-        .map(|(g, ib)| skin.mesh_inverse * *g * *ib)
+        .map(|(g, ib)| *g * *ib)
         .collect()
 }
 
-/// Linearly blend two palettes of equal length, `t` in `[0, 1]` (0 → `from`,
-/// 1 → `to`). Matrices are blended component-wise: adequate for the short crossfade
-/// window between two skeletal poses, and fully deterministic. A length mismatch is
-/// truncated to the shorter (defensive — palettes from one skin always match).
-pub fn blend_palettes(from: &[Mat4], to: &[Mat4], t: f32) -> Vec<Mat4> {
+/// Blend two poses of equal length in TRS space, `t` in `[0, 1]` (0 → `from`,
+/// 1 → `to`): translation and scale lerp, rotation slerps along the shortest arc,
+/// so a limb keeps its length however far apart the two poses are. A length
+/// mismatch is truncated to the shorter (poses from one skin always match).
+pub fn blend_poses(from: &[JointTransform], to: &[JointTransform], t: f32) -> Vec<JointTransform> {
     let t = t.clamp(0.0, 1.0);
     from.iter()
         .zip(to.iter())
-        .map(|(a, b)| {
-            let a = a.to_cols_array();
-            let b = b.to_cols_array();
-            let mut out = [0.0_f32; 16];
-            for i in 0..16 {
-                out[i] = a[i] + (b[i] - a[i]) * t;
-            }
-            Mat4::from_cols_array(&out)
+        .map(|(a, b)| JointTransform {
+            translation: a.translation.lerp(b.translation, t),
+            rotation: a.rotation.slerp(b.rotation, t),
+            scale: a.scale.lerp(b.scale, t),
         })
         .collect()
 }
@@ -121,8 +176,8 @@ fn sampled_locals(skin: &SkinData, clip: &AnimationClip, time: f32) -> Vec<Joint
         .collect()
 }
 
-/// Compose every joint's local transform into a model-space global by walking up
-/// its parent chain. The skin's `parents` form a forest (slots topologically after
+/// Compose every joint's local transform into a mesh-local global by walking up
+/// its parent chain (a root picks up its [`SkinData::root_offset`]). The skin's `parents` form a forest (slots topologically after
 /// their parents in glTF), so a single pass left-to-right resolves each global from
 /// its already-resolved parent.
 fn compose_globals(skin: &SkinData, locals: &[JointTransform]) -> Vec<Mat4> {
@@ -133,7 +188,7 @@ fn compose_globals(skin: &SkinData, locals: &[JointTransform]) -> Vec<Mat4> {
             // A forward reference can't happen in well-formed glTF, but guard it:
             // an unresolved parent is treated as a root rather than panicking.
             Some(parent) if parent < slot => globals[parent] * local_mat,
-            _ => local_mat,
+            _ => skin.root_offset(slot) * local_mat,
         };
     }
     globals

@@ -66,6 +66,8 @@ pub fn instantiate_asset(
     scene
         .world
         .set_mesh(id, Some(crate::scene::asset_mesh_component(reference)));
+    // A skinned sub-object brings its skeleton as child bone entities (#453).
+    scene.sync_skeleton(id);
 
     apply_material(scene, id, &asset_ref.path, &asset, &asset_ref.sub_object);
     if sync_collider(scene, id, &asset_ref.path, &asset, &asset_ref.sub_object) {

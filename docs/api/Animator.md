@@ -47,4 +47,36 @@ path + active state are saved with the entity.
 | `Animator.SetGraph` | `(id, path)` | Assign the `.animgraph` asset at `path` to drive this animator (`""` clears it). Resets the active state, so evaluation re-binds — seeding declared defaults and entering the new graph's entry node — on the next fixed step. |
 | `Animator.SetGraphEnabled` | `(id, enabled)` | Pause/resume graph auto-evaluation. Disabled, the graph is inert data and the animator stays under direct `Play`/`Crossfade` control; re-enabling resumes from the same active node. |
 | `Animator.PlayNode` | `(id, node)` | Jump straight to the named graph node (state), bypassing all conditions: a hard cut into its clip, adopting its loop flag and speed. Returns `true` on success; `false` (with a console warning for a bad graph or unknown node) otherwise. |
+| `Animator.GetBone` | `(id, name)` | The id of the bone GameObject named `name` (the glTF joint name, e.g. `"hand_r"`) in the entity's skeleton, or `nil` when the entity has no skinned mesh or no such bone. Bones are ordinary entities — see *Bones are GameObjects* below. |
 | `Animator.GetCurrentNode` | `(id)` | The active graph node's name, or `nil` when there is no animator/graph or evaluation hasn't bound it yet. |
+
+### Bones are GameObjects (#453)
+
+Instantiating a skinned model spawns its **skeleton as child entities** of the
+skinned entity: one entity per joint, named after the glTF joint node, arranged
+in the joint hierarchy (Unity's model). Each bone has a `Transform` and nothing
+else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent`,
+`Physics`, the snapshot.
+
+- **The Animator writes the pose.** Each fixed step it writes the sampled local
+  Transform of every bone its clip animates (a crossfade blends the two poses in
+  TRS space: translation and scale lerp, rotation slerps, so limbs keep their
+  length). A bone no playing clip animates is left alone.
+- **Later writers override it.** `LateUpdate` scripts (IK, procedural recoil,
+  aim) and physics may move a bone after the Animator; the mesh is skinned from
+  the bones once per frame after all of them, so what moved a bone last is what
+  renders.
+- **Attach by parenting.** A gun goes under `hand_r`:
+  `Scene.SetParent(gun, Animator.GetBone(enemy, "hand_r"))`.
+- **Saving.** Bones are rebuilt from the model on load, so the scene never
+  stores the skeleton. It stores what you authored on it: a bone moved away from
+  its rest pose is saved as a per-bone **override** (by bone name), and anything
+  parented under a bone is saved with that bone's name. Both re-bind by name when
+  the scene loads, so a re-exported skeleton keeps them; an override or
+  attachment whose bone no longer exists is dropped with a warning in the log
+  (the attachment stays under the skinned entity). Components added to a bone
+  itself are not saved: put a hitbox `Collider` on a child of the bone.
+- **Destroying** the skinned entity destroys its skeleton and what hangs from it.
+
+`Debug.Snapshot()` leaves bones out by default; `Debug.Snapshot({ bones = true })`
+includes them. The editor's Hierarchy shows a skeleton collapsed.

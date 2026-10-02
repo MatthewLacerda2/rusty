@@ -93,6 +93,8 @@ pub(super) struct EntityRepr {
     #[serde(default)]
     prefab_link: Option<PrefabLink>,
     parent_id: Option<u32>,
+    #[serde(default)]
+    parent_bone: Option<String>,
     children: Vec<u32>,
 }
 
@@ -144,6 +146,7 @@ impl From<EntityRepr> for Entity {
             shape: r.shape,
             prefab_link: r.prefab_link,
             parent_id: r.parent_id,
+            parent_bone: r.parent_bone,
             children: r.children,
         }
     }

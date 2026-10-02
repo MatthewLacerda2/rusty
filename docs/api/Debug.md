@@ -9,7 +9,7 @@ because the namespace is absent.
 | `Debug.Log` | `(message)` | — |
 | `Debug.Warn` | `(message)` | — |
 | `Debug.Error` | `(message)` | — |
-| `Debug.Snapshot` | `()` | a pretty **JSON string**: the whole live world (below) |
+| `Debug.Snapshot` | `([opts])` | a pretty **JSON string**: the whole live world (below). Skeleton bones are left out unless `opts.bones` is `true` |
 | `Debug.SnapshotEntity` | `(id)` | a pretty **JSON string**: one entity (below), or `null` if absent |
 | `Debug.Preview` | `(asset_path, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
 | `Debug.PreviewMaterial` | `(name, out_png [, opts])` | the written path, or `nil` if the machine has no GPU |
@@ -129,6 +129,11 @@ Top level:
   "entities": [ <entity>, ... ]
 }
 ```
+
+A skinned character's skeleton is ~65 bone entities (#453), so bones are **left
+out** of `entities` by default. `Debug.Snapshot({ bones = true })` includes them,
+each marked `"bone": true`. `Debug.SnapshotEntity(id)` reads a bone like any
+entity, and `Animator.GetBone(id, name)` finds one by name.
 
 Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
 

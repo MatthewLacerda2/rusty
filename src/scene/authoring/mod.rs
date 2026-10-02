@@ -142,6 +142,7 @@ pub fn primitive_mesh_component(primitive: Primitive) -> Option<MeshComponent> {
         skin: None,
         clips: Vec::new(),
         pose_palette: Vec::new(),
+        skeleton: Default::default(),
         is_dirty: crate::scene::DirtyFlag::new(true),
     })
 }

@@ -15,8 +15,11 @@
 //! can never drift. Apply/link/overrides for linked instances live in submodules.
 
 pub mod apply;
+mod extract;
 pub mod link;
 pub mod overrides;
+
+pub use extract::extract_prefab;
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -51,82 +54,6 @@ pub struct PrefabData {
     pub entities: Vec<Entity>,
     /// The materials referenced by the subtree, keyed by their library name.
     pub materials: BTreeMap<String, MaterialAsset>,
-}
-
-/// Walk `root_id` + its descendants, deep-clone their bundles, remap to local
-/// (0-based) ids — rewriting `parent_id`/`children` through the map and detaching
-/// the root's own parent — and slice out the materials the subtree references.
-/// Returns `None` if `root_id` is not a live entity.
-pub fn extract_prefab(scene: &Scene, root_id: u32) -> Option<PrefabData> {
-    if !scene.world.contains(root_id) {
-        return None;
-    }
-    let order = collect_subtree(scene, root_id);
-
-    // Stable old-id -> local-id map (root = 0, then descendants in subtree order).
-    let local: BTreeMap<u32, u32> = order
-        .iter()
-        .enumerate()
-        .map(|(i, &id)| (id, i as u32))
-        .collect();
-
-    let mut entities = Vec::with_capacity(order.len());
-    let mut materials = BTreeMap::new();
-    for &old_id in &order {
-        let mut entity = scene.world.entity_document(old_id)?;
-        remap_entity(&mut entity, &local, old_id == root_id);
-        if let Some(mat) = &entity.material {
-            if let Some(asset) = scene.materials.get(&mat.material) {
-                materials.insert(mat.material.clone(), asset.clone());
-            }
-        }
-        entities.push(entity);
-    }
-
-    Some(PrefabData {
-        root: 0,
-        entities,
-        materials,
-    })
-}
-
-/// Depth-first subtree ids starting at `root_id` (root first), following the live
-/// `children` lists. Used so extract order is deterministic and parent precedes
-/// child.
-fn collect_subtree(scene: &Scene, root_id: u32) -> Vec<u32> {
-    let mut order = Vec::new();
-    let mut stack = vec![root_id];
-    while let Some(id) = stack.pop() {
-        order.push(id);
-        // Push children reversed so they come out in declared order.
-        for child in scene.world.children(id).into_iter().rev() {
-            stack.push(child);
-        }
-    }
-    order
-}
-
-/// Rewrite one entity's identity into the local id space: its own `id`, its
-/// `children`, its component references (dropped when outside the subtree), and its
-/// `parent_id` (cleared for the root, which detaches from its scene). The `pending_material` migration carrier is never
-/// part of a freshly cloned runtime entity, so nothing to scrub there. Any
-/// `prefab_link` is **dropped**: extracting an already-linked instance bakes it down
-/// into a fresh flat prefab — the new `.prefab` is a plain subtree with no nested
-/// links back to whatever the instance came from (#216 scope).
-fn remap_entity(entity: &mut Entity, local: &BTreeMap<u32, u32>, is_root: bool) {
-    entity.id = local[&entity.id];
-    entity.prefab_link = None;
-    entity.remap_refs(&|r| local.get(&r).copied());
-    entity.children = entity
-        .children
-        .iter()
-        .filter_map(|c| local.get(c).copied())
-        .collect();
-    entity.parent_id = if is_root {
-        None
-    } else {
-        entity.parent_id.and_then(|p| local.get(&p).copied())
-    };
 }
 
 /// Clone a prefab into `scene` as an independent **unpacked** copy (v1 behaviour, no
@@ -168,6 +95,7 @@ fn stamp_prefab(
     let renames = merge_materials(scene, &prefab.materials);
     let base = scene.world.next_id();
     let mut new_root = base + prefab.root;
+    let mut bone_parents = Vec::new();
     for entity in &prefab.entities {
         let local_id = entity.id;
         let mut entity = entity.clone();
@@ -187,8 +115,11 @@ fn stamp_prefab(
         if entity.parent_id.is_none() {
             new_root = entity.id;
         }
+        bone_parents.extend(entity.parent_bone.take().map(|b| (entity.id, b)));
         scene.world.insert_entity(entity);
     }
+    scene.sync_skeletons();
+    scene.attach_to_bones(bone_parents);
 
     // Parent the new root under the requested parent (cycle-checked by `set_parent`).
     if let Some(parent_id) = parent {

@@ -15,17 +15,16 @@
 
 use std::collections::BTreeMap;
 
-use glam::{Mat4, Vec3};
+use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
-use crate::asset::{self, MeshVertex, SubMesh};
-use crate::components::mesh::Vertex;
 use crate::components::{Entity, MaterialAsset};
 use crate::navigation::NavMeshSettings;
-use crate::scene::authoring::{primitive_geometry, Primitive};
 use crate::scene::collision_matrix::CollisionMatrix;
 use crate::scene::layers::LayerRegistry;
 use crate::scene::Scene;
+
+pub use super::rehydrate::{asset_mesh_component, rehydrate_entity_mesh};
 
 fn default_skybox_path() -> String {
     String::new()
@@ -95,7 +94,12 @@ pub struct SceneData {
 /// Read the live World's component values out into a serializable document.
 pub fn to_scene_data(scene: &Scene) -> SceneData {
     SceneData {
-        entities: scene.world.collect_entities(),
+        entities: {
+            // Bones are rebuilt from the model on load, never saved (#453).
+            let mut entities = scene.world.collect_entities();
+            crate::scene::skeleton::strip_bones(&mut entities);
+            entities
+        },
         next_entity_id: scene.world.next_id(),
         selected_entity_id: scene.selected_entity_id,
         skybox_path: scene.skybox_path.clone(),
@@ -111,129 +115,10 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
     }
 }
 
-/// Convert one imported `MeshVertex` (pure data) into the renderer's `Vertex`,
-/// carrying the skin binding (`joint_indices`/`joint_weights`) through to the GPU
-/// vertex; static meshes keep the unskinned identity binding (#79).
-fn vertex_from_imported(v: &MeshVertex) -> Vertex {
-    Vertex {
-        position: v.position,
-        normal: v.normal,
-        tex_coords: v.tex_coords,
-        joint_indices: v.joint_indices,
-        joint_weights: v.joint_weights,
-        tangent: v.tangent,
-    }
-}
-
-/// The non-serialized data a mesh component is rebuilt with on load: GPU-ready
-/// geometry plus the imported rig (bind palette, skeleton, clips). A primitive or a
-/// failed import yields the empty default — no skin, no clips, GPU bones at identity.
-#[derive(Default)]
-struct RehydratedMesh {
-    vertices: Vec<Vertex>,
-    indices: Vec<u32>,
-    bind_palette: Vec<Mat4>,
-    skin: Option<crate::asset::SkinData>,
-    clips: Vec<crate::asset::AnimationClip>,
-}
-
-impl RehydratedMesh {
-    /// A primitive's geometry with no rig — primitives are never skinned/animated.
-    fn primitive(geometry: (Vec<Vertex>, Vec<u32>)) -> Self {
-        Self {
-            vertices: geometry.0,
-            indices: geometry.1,
-            ..Self::default()
-        }
-    }
-
-    /// Pull geometry + the full rig (bind palette, skeleton, clips) out of an
-    /// imported sub-mesh.
-    fn from_sub_mesh(sub: &SubMesh) -> Self {
-        let bind_palette = sub
-            .skin
-            .as_ref()
-            .map(|s| s.bind_palette())
-            .unwrap_or_default();
-        Self {
-            vertices: sub.vertices.iter().map(vertex_from_imported).collect(),
-            indices: sub.indices.clone(),
-            bind_palette,
-            skin: sub.skin.clone(),
-            clips: sub.clips.clone(),
-        }
-    }
-}
-
-/// Re-import an `"Asset"` mesh's geometry + rig from its path-based `asset_ref`
-/// (`path::sub_object`). On failure (missing/renamed source — the accepted
-/// path-based trade-off) the mesh rehydrates empty rather than aborting the load.
-fn rehydrate_asset_mesh(asset_ref: &Option<String>) -> RehydratedMesh {
-    match asset_ref {
-        Some(reference) => match asset::import_sub_mesh(reference) {
-            Ok(sub) => RehydratedMesh::from_sub_mesh(&sub),
-            Err(_) => RehydratedMesh::default(),
-        },
-        None => RehydratedMesh::default(),
-    }
-}
-
-/// Rebuild one mesh's vertex/index data + rig from its on-disk REFERENCE: a
-/// primitive from `primitive_type`, or an imported sub-mesh from `asset_ref` when
-/// the type is `"Asset"`. GPU buffers are never stored on disk, only rebuilt here.
-fn rehydrate_one(primitive_type: &str, asset_ref: &Option<String>) -> RehydratedMesh {
-    if primitive_type == "Asset" {
-        return rehydrate_asset_mesh(asset_ref);
-    }
-    // Primitive geometry is owned by `scene::authoring` so a created primitive and
-    // a loaded one are byte-identical.
-    match Primitive::parse(primitive_type).and_then(primitive_geometry) {
-        Some(geometry) => RehydratedMesh::primitive(geometry),
-        None => RehydratedMesh::default(),
-    }
-}
-
-/// Rebuild one entity's mesh (if any) from its on-disk reference. Shared by scene
-/// load and prefab instantiate (#215) so both rehydrate identically; GPU buffers
-/// are never stored on disk, only rebuilt here.
-pub fn rehydrate_entity_mesh(entity: &mut Entity) {
-    if let Some(mesh) = &mut entity.mesh {
-        let rebuilt = rehydrate_one(&mesh.primitive_type, &mesh.asset_ref);
-        mesh.vertices = rebuilt.vertices;
-        mesh.indices = rebuilt.indices;
-        mesh.bind_palette = rebuilt.bind_palette;
-        mesh.skin = rebuilt.skin;
-        mesh.clips = rebuilt.clips;
-        // A freshly rehydrated mesh starts at its rest pose; the animation
-        // system repopulates the posed palette once a clip plays.
-        mesh.pose_palette = Vec::new();
-        mesh.is_dirty.set(true);
-    }
-}
-
 /// Rebuild every mesh in the document from its reference (see [`rehydrate_one`]).
 fn rehydrate_meshes(data: &mut SceneData) {
     for entity in &mut data.entities {
         rehydrate_entity_mesh(entity);
-    }
-}
-
-/// Build an `"Asset"` mesh component from a path-based reference, importing its
-/// geometry up front. The reference is the only identity stored; on save the
-/// vertices are dropped and re-imported from it (see `rehydrate_meshes`). Returns
-/// an empty-geometry component if the import fails.
-pub fn asset_mesh_component(reference: &str) -> crate::scene::MeshComponent {
-    let rebuilt = rehydrate_asset_mesh(&Some(reference.to_string()));
-    crate::scene::MeshComponent {
-        primitive_type: "Asset".to_string(),
-        asset_ref: Some(reference.to_string()),
-        vertices: rebuilt.vertices,
-        indices: rebuilt.indices,
-        bind_palette: rebuilt.bind_palette,
-        skin: rebuilt.skin,
-        clips: rebuilt.clips,
-        pose_palette: Vec::new(),
-        is_dirty: crate::scene::DirtyFlag::new(true),
     }
 }
 
@@ -254,6 +139,7 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
         }
     }
 
+    let bone_parents = crate::scene::skeleton::take_bone_parents(&mut data.entities);
     scene.world.clear();
     for entity in data.entities {
         scene.world.insert_entity(entity);
@@ -282,6 +168,14 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     // overrides on top. A missing/renamed source is skipped per instance (the
     // instance keeps its last-saved values), so this never aborts the load.
     crate::scene::prefab::link::reimport_all_linked_instances(scene);
+
+    // Rebuild every skeleton from its model, then hang the saved attachments back
+    // on their bones by name (#453).
+    scene.sync_skeletons();
+    if !bone_parents.is_empty() {
+        scene.attach_to_bones(bone_parents);
+        scene.update_all_colliders();
+    }
 
     // Validate declared component dependencies on load (#359): a hand-edited or
     // drifted scene carrying a dependent component without its requirement (e.g. a

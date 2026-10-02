@@ -76,6 +76,7 @@ fn scene(metallic: f32, metallic_map: Option<String>) -> Scene {
             skin: None,
             clips: Vec::new(),
             pose_palette: Vec::new(),
+            skeleton: Default::default(),
             is_dirty: rusty::scene::DirtyFlag::new(true),
         }),
     );

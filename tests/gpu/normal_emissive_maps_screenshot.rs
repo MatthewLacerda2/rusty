@@ -55,6 +55,7 @@ pub(super) fn scene(material: MaterialAsset) -> Scene {
         skin: None,
         clips: Vec::new(),
         pose_palette: Vec::new(),
+        skeleton: Default::default(),
         is_dirty: rusty::scene::DirtyFlag::new(true),
     };
     let mat = MaterialComponent {

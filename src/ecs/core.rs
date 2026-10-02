@@ -185,6 +185,7 @@ impl World {
             shape: self.shape(id).map(|c| (*c).clone()),
             prefab_link: self.prefab_link(id).map(|c| (*c).clone()),
             parent_id: core.parent_id,
+            parent_bone: None,
             children: core.children.clone(),
         })
     }

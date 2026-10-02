@@ -34,6 +34,7 @@ fn mid_grey_scene() -> Scene {
             skin: None,
             clips: Vec::new(),
             pose_palette: Vec::new(),
+            skeleton: Default::default(),
             is_dirty: DirtyFlag::new(true),
         }),
     );
