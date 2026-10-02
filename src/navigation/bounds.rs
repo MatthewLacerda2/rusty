@@ -10,8 +10,8 @@
 //!   [`BOUNDS_MARGIN`] plus the agent radius so the radius erosion's pull-back off the
 //!   world edge never eats the ground around the outermost geometry;
 //! * an **empty scene** (no static geometry) falls back to the historical ±20 box
-//!   ([`EMPTY_SCENE_HALF_EXTENT`]), so a scene with nothing to derive from still has
-//!   flat ground to walk on.
+//!   ([`EMPTY_SCENE_HALF_EXTENT`]). With nothing to stand on it holds no spans
+//!   (#454): no geometry, no navmesh, as in Unity.
 //!
 //! Resolved bounds snap outward to multiples of the grid spacing, so cell centres stay
 //! on the same world lattice whatever the geometry's extent (a moved crate never shifts
@@ -88,20 +88,30 @@ impl NavBounds {
     }
 }
 
-/// World AABBs of every collider the bake reads: active, static, collider active. The
-/// one definition of "static geometry" shared by the surface pass and the bounds.
-pub(super) fn static_aabbs(scene: &Scene) -> impl Iterator<Item = (Vec3, Vec3)> + '_ {
+/// Every collider the bake reads: entity active, static, collider active and not a
+/// trigger (Unity leaves triggers out of the navmesh). The one definition of "static
+/// geometry" shared by the rasteriser and the bounds.
+pub(super) fn static_collider_ids(scene: &Scene) -> impl Iterator<Item = u32> + '_ {
     scene
         .world
         .ids_with_collider()
         .into_iter()
-        .filter_map(|id| {
-            if !scene.world.is_active(id) || !scene.world.is_static(id) {
-                return None;
-            }
-            let col = scene.world.collider(id)?;
-            col.active.then_some((col.aabb_min, col.aabb_max))
+        .filter(move |&id| {
+            scene.world.is_active(id)
+                && scene.world.is_static(id)
+                && scene
+                    .world
+                    .collider(id)
+                    .is_some_and(|c| c.active && !c.is_trigger)
         })
+}
+
+/// World AABBs of the bake's static colliders.
+fn static_aabbs(scene: &Scene) -> impl Iterator<Item = (Vec3, Vec3)> + '_ {
+    static_collider_ids(scene).filter_map(move |id| {
+        let col = scene.world.collider(id)?;
+        Some((col.aabb_min, col.aabb_max))
+    })
 }
 
 /// The XZ extent of the scene's static geometry, `None` when there is none.

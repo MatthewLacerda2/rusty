@@ -3,27 +3,10 @@
 //! and a path to geometry far past the old hardcoded ±20 box.
 
 use super::bounds::resolve_bounds;
+use super::test_support::add_box_with as add_box;
 use super::*;
-use crate::scene::{ColliderComponent, ColliderShape, Scene};
+use crate::scene::Scene;
 use glam::Vec3;
-
-/// Adds a box collider spanning the given world AABB; `is_static` picks bake eligibility.
-fn add_box(scene: &mut Scene, min: Vec3, max: Vec3, is_static: bool) -> u32 {
-    let id = scene.add_entity("box".to_string());
-    scene.world.set_static(id, is_static);
-    scene.world.set_collider(
-        id,
-        Some(ColliderComponent {
-            active: true,
-            shape: ColliderShape::Box { size: max - min },
-            is_trigger: false,
-            material: Default::default(),
-            aabb_min: min,
-            aabb_max: max,
-        }),
-    );
-    id
-}
 
 fn bounds(min_x: f32, max_x: f32, min_z: f32, max_z: f32) -> NavBounds {
     NavBounds {
@@ -81,12 +64,18 @@ fn snapping_follows_the_grid_spacing() {
 }
 
 #[test]
-fn only_active_static_colliders_count() {
+fn only_active_static_solid_colliders_count() {
     let mut scene = Scene::new();
     add_box(&mut scene, Vec3::ZERO, Vec3::ONE, true);
     add_box(&mut scene, Vec3::splat(90.0), Vec3::splat(95.0), false); // dynamic
     let off = add_box(&mut scene, Vec3::splat(-95.0), Vec3::splat(-90.0), true);
     scene.world.set_active(off, false);
+    let trigger = add_box(&mut scene, Vec3::splat(50.0), Vec3::splat(55.0), true);
+    scene
+        .world
+        .collider_mut(trigger)
+        .expect("collider")
+        .is_trigger = true;
     assert_eq!(resolve_bounds(&scene, 1.0), bounds(-3.0, 4.0, -3.0, 4.0));
 }
 
@@ -159,7 +148,7 @@ fn rebake_reshapes_to_new_geometry() {
     assert_eq!(g.bounds(), bounds(-3.0, 44.0, -3.0, 4.0));
     let fresh = NavigationGraph::new(-3.0, 44.0, -3.0, 4.0, 1.0);
     assert_eq!((g.width, g.height), (fresh.width, fresh.height));
-    assert_eq!(g.walkability.len(), (48 * 8) as usize);
+    assert_eq!(g.cell_start.len(), (48 * 8 + 1) as usize);
 }
 
 /// A zero, negative or infinite `grid_spacing` keeps the graph's current spacing, so the

@@ -3,7 +3,7 @@
 //! Each setter must prove its write is *consumed*: we set via the Lua binding, assert
 //! `scene.nav_settings` reflects it, and that a re-bake observes it — the bake is the
 //! read-site. `agent_radius`'s bake effect (walkable-surface erosion) is exercised in the
-//! navigation tests (`navigation::erosion_tests`); here we assert it persists/round-trips.
+//! navigation tests (`navigation::bake::tests::erosion`); here we assert it persists/round-trips.
 
 use std::cell::RefCell;
 
@@ -11,32 +11,27 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::register;
-use crate::components::{ColliderComponent, ColliderShape};
+use crate::navigation::test_support::{add_box, add_floor, ground};
 use crate::navigation::{NavBounds, NavigationGraph};
 use crate::scene::Scene;
 
-/// A scene with one static box collider spanning the given world AABB, plus a freshly
-/// baked graph over a 0..10 × 0..10 grid at unit spacing.
+/// A scene with a floor (top y = 0) and one static box collider spanning the given world
+/// AABB, plus a freshly baked graph over a 0..10 × 0..10 grid at unit spacing.
 fn scene_and_nav(min: Vec3, max: Vec3) -> (RefCell<Scene>, RefCell<NavigationGraph>) {
     let mut scene = Scene::new();
-    let id = scene.add_entity("step".to_string());
-    scene.world.set_static(id, true);
-    scene.world.set_collider(
-        id,
-        Some(ColliderComponent {
-            active: true,
-            shape: ColliderShape::Box { size: max - min },
-            is_trigger: false,
-            material: Default::default(),
-            aabb_min: min,
-            aabb_max: max,
-        }),
-    );
+    add_floor(&mut scene, 0.0, 10.0, 0.0, 10.0);
+    add_box(&mut scene, min, max);
     // Pin the grid (#452) so the cell indices asserted below stay put.
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
     let mut nav = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     nav.bake(&scene);
     (RefCell::new(scene), RefCell::new(nav))
+}
+
+/// Whether the ledge on cell (4,4) is one step from the floor at (3,4).
+fn ledge_reachable(nav: &RefCell<NavigationGraph>) -> bool {
+    let nav = nav.borrow();
+    nav.link_to(ground(&nav, 3, 4), 4, 4).is_some()
 }
 
 /// `SetMaxStep` round-trips into `scene.nav_settings` AND is consumed by the re-bake:
@@ -53,10 +48,7 @@ fn set_max_step_round_trips_and_rebakes() {
         // Default max_step (0.5): a 1.0 ledge is NOT reachable from a neighbour.
         let before: f32 = lua.load("return Navigation.GetMaxStep()").eval().unwrap();
         assert_eq!(before, 0.5, "starts at the historical default");
-        assert!(
-            !nav.borrow().cell_reachable(4, 4),
-            "1.0 ledge blocked at step 0.5"
-        );
+        assert!(!ledge_reachable(&nav), "1.0 ledge blocked at step 0.5");
 
         // Raise max_step past the ledge: the setter re-bakes, so it becomes reachable.
         lua.load("Navigation.SetMaxStep(1.5)").exec().unwrap();
@@ -77,7 +69,7 @@ fn set_max_step_round_trips_and_rebakes() {
         "re-bake pushed it into the graph"
     );
     assert!(
-        nav.borrow().cell_reachable(4, 4),
+        ledge_reachable(&nav),
         "1.0 ledge reachable after raising max_step to 1.5"
     );
 }
@@ -86,7 +78,7 @@ fn set_max_step_round_trips_and_rebakes() {
 #[test]
 fn set_grid_spacing_reshapes_grid_on_rebake() {
     let (scene, nav) = scene_and_nav(Vec3::new(3.6, 0.0, 3.6), Vec3::new(4.4, 0.2, 4.4));
-    let cells_before = nav.borrow().walkability.len();
+    let cells_before = nav.borrow().cell_start.len();
     let lua = Lua::new();
     lua.scope(|scope| {
         register(&lua, scope, &scene, &nav).unwrap();
@@ -98,7 +90,7 @@ fn set_grid_spacing_reshapes_grid_on_rebake() {
     assert_eq!(scene.borrow().nav_settings.grid_spacing, 2.0);
     assert_eq!(nav.borrow().grid_spacing, 2.0, "graph re-spaced on re-bake");
     assert!(
-        nav.borrow().walkability.len() < cells_before,
+        nav.borrow().cell_start.len() < cells_before,
         "coarser spacing => fewer cells"
     );
 }
@@ -122,7 +114,7 @@ fn set_agent_height_round_trips_and_rebakes() {
         // Short agent (0.5 < 1.0 clearance): the cell under the overhang stays walkable.
         lua.load("Navigation.SetAgentHeight(0.5)").exec().unwrap();
         assert!(
-            nav.borrow().is_walkable(4, 4),
+            nav.borrow().spans_at(4, 4)[0].y == 0.0,
             "0.5 agent fits under a 1.0 overhang"
         );
 
@@ -134,8 +126,8 @@ fn set_agent_height_round_trips_and_rebakes() {
             .unwrap();
         assert_eq!(h, 2.0, "getter reflects the write");
         assert!(
-            !nav.borrow().is_walkable(4, 4),
-            "2.0 agent cannot fit under a 1.0 overhang — cell carved on re-bake"
+            nav.borrow().spans_at(4, 4)[0].y > 0.0,
+            "2.0 agent cannot fit under a 1.0 overhang — floor dropped on re-bake"
         );
         Ok(())
     })
