@@ -33,7 +33,7 @@ pub fn draw_nav_agent(
             }
             *is_dirty = true;
         }
-        let rows: [(&str, f32, _, NavOp); 4] = [
+        let rows: [(&str, f32, _, NavOp); 5] = [
             ("Speed:", agent.speed, 0.0..=100.0, nav_ops::set_speed),
             (
                 "Acceleration:",
@@ -48,6 +48,12 @@ pub fn draw_nav_agent(
                 nav_ops::set_stopping_distance,
             ),
             ("Radius:", agent.radius, 0.01..=10.0, nav_ops::set_radius),
+            (
+                "Base Offset:",
+                agent.base_offset,
+                -10.0..=10.0,
+                nav_ops::set_base_offset,
+            ),
         ];
         for (label, mut value, range, op) in rows {
             if clamped(ui, label, &mut value, range) {

@@ -61,6 +61,12 @@ pub struct NavMeshAgentComponent {
     /// the link until a script calls `CompleteOffMeshLink`.
     #[serde(default = "default_true")]
     pub auto_traverse_off_mesh_link: bool,
+    /// How far the entity's origin sits above the agent's feet (Unity's
+    /// `baseOffset`, default 0): the agent stands its feet on the navmesh and its
+    /// Transform this much higher, so a body centred on its origin rests on the
+    /// floor instead of sinking half into it (#666).
+    #[serde(default)]
+    pub base_offset: f32,
 
     // --- Cached pathfinding state (#126) ---
     //
@@ -103,13 +109,14 @@ pub struct NavMeshAgentComponent {
 }
 
 impl NavMeshAgentComponent {
-    /// Where the agent is actually headed: the target, or the end of a partial path
-    /// (Unity stops an agent there rather than pressing into the wall).
-    pub fn destination(&self) -> Vec3 {
-        match (self.path_status, self.cached_path.last()) {
-            (NavPathStatus::Partial, Some(end)) => *end,
-            _ => self.target,
-        }
+    /// Where the agent's feet are when its Transform is at `position`.
+    pub fn feet(&self, position: Vec3) -> Vec3 {
+        position - Vec3::Y * self.base_offset
+    }
+
+    /// Where its Transform goes to stand its feet on `feet`.
+    pub fn body(&self, feet: Vec3) -> Vec3 {
+        feet + Vec3::Y * self.base_offset
     }
 }
 
@@ -134,6 +141,7 @@ impl Default for NavMeshAgentComponent {
             avoidance_priority: DEFAULT_AVOIDANCE_PRIORITY,
             avoidance_enabled: true,
             auto_traverse_off_mesh_link: true,
+            base_offset: 0.0,
             cached_path: Vec::new(),
             path_cursor: 0,
             planned_target: Vec3::ZERO,

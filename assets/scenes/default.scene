@@ -369,6 +369,7 @@
         "speed": 3.5,
         "acceleration": 8.0,
         "stopping_distance": 0.5,
+        "base_offset": 1.0,
         "velocity": [
           0.0,
           0.0,

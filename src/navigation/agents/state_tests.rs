@@ -86,7 +86,10 @@ fn agent_stops_at_the_end_of_a_partial_path() {
     let a = agent(&scene, id);
     assert_eq!(a.path_status, NavPathStatus::Partial);
     let at = scene.world.transform(id).expect("transform").position;
-    assert!(at.distance(a.destination()) <= 0.1, "parked at {at}");
+    assert!(
+        at.distance(*a.cached_path.last().unwrap()) <= 0.1,
+        "parked at {at}"
+    );
     assert_eq!(
         a.velocity,
         Vec3::ZERO,

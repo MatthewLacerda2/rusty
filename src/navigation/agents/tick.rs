@@ -8,6 +8,7 @@ use super::super::avoidance::{self, AvoidanceAgent};
 use super::super::obstacle::avoidance_obstacles;
 use super::super::NavigationGraph;
 use super::link::auto_traverse;
+use super::state::is_at_target;
 use crate::scene::{NavMeshAgentComponent, Scene};
 
 /// An agent that took part in this frame's tick, carried from the steering pass
@@ -47,7 +48,10 @@ impl NavigationGraph {
                     self.on_link(scene, id, agent, position, delta_time);
                     continue;
                 }
-                let steering = (agent.destination() - position).length() > agent.stopping_distance;
+                // Re-plan first, so arrival is measured against this target's path.
+                let feet = agent.feet(position);
+                self.refresh_path(&mut agent, feet);
+                let steering = !agent.cached_path.is_empty() && !is_at_target(&agent, position);
                 let moved_with = if steering { agent.velocity } else { Vec3::ZERO };
                 if steering {
                     self.accelerate_toward_waypoint(&mut agent, position, delta_time);
@@ -93,7 +97,8 @@ impl NavigationGraph {
     ) {
         // Query the next waypoint from the agent's cached path,
         // re-planning with A* only when the cache is invalid (#126).
-        let next_step = self.cached_next_step(agent, current_pos);
+        let feet = agent.feet(current_pos);
+        let next_step = self.cached_next_step(agent, feet);
         if agent.off_mesh_link.is_some() {
             return; // reached a link: it stands still until the link is crossed
         }
@@ -146,11 +151,13 @@ impl NavigationGraph {
     /// within the step/slope limits, enough headroom), so agents climb ramps and
     /// stairs but never slide up a wall face (#130). The agent then stands on the
     /// span it reached — the floor it walked onto, not whichever floor of that
-    /// column is highest (#454). Off the navmesh it does not move.
-    fn slide(&self, agent: &mut NavMeshAgentComponent, current_pos: Vec3, delta_time: f32) -> Vec3 {
+    /// column is highest (#454) — with its Transform `base_offset` above it (#666).
+    /// Off the navmesh it does not move. `body` is the agent's Transform position.
+    fn slide(&self, agent: &mut NavMeshAgentComponent, body: Vec3, delta_time: f32) -> Vec3 {
+        let current_pos = agent.feet(body);
         let Some(from) = self.span_under(current_pos) else {
             agent.velocity = Vec3::ZERO;
-            return current_pos;
+            return body;
         };
         let mut final_pos = current_pos;
         let mut on = from;
@@ -176,7 +183,7 @@ impl NavigationGraph {
         }
 
         final_pos.y = self.spans[on.index as usize].y;
-        final_pos
+        agent.body(final_pos)
     }
 }
 

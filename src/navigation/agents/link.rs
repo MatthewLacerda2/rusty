@@ -25,27 +25,29 @@ pub(super) fn enter_link(agent: &mut NavMeshAgentComponent) -> bool {
     true
 }
 
-/// One tick of the engine's own traversal: `pos` moved toward the link's end by
-/// `speed · dt`. Arriving completes the link.
+/// One tick of the engine's own traversal: the Transform at `pos` moved toward the
+/// link's end (with the agent's base offset) by `speed · dt`. Arriving completes the
+/// link.
 pub(super) fn auto_traverse(agent: &mut NavMeshAgentComponent, pos: Vec3, dt: f32) -> Vec3 {
     let Some(link) = agent.off_mesh_link else {
         return pos;
     };
-    let to_end = link.end - pos;
+    let end = agent.body(link.end);
+    let to_end = end - pos;
     let step = agent.speed.max(0.0) * dt;
     if to_end.length() <= step {
-        return complete_off_mesh_link(agent).unwrap_or(link.end);
+        return complete_off_mesh_link(agent).unwrap_or(end);
     }
     pos + to_end.normalize_or_zero() * step
 }
 
 /// Finish the link the agent is on (Unity's `CompleteOffMeshLink`): it leaves the
-/// link at rest and walks on from its end, which is returned for the caller to
-/// place the agent at. `None` when it is not on a link.
+/// link at rest and walks on from its end; where its Transform goes to stand there
+/// is returned for the caller to place the agent at. `None` when it is not on a link.
 pub fn complete_off_mesh_link(agent: &mut NavMeshAgentComponent) -> Option<Vec3> {
     let link = agent.off_mesh_link.take()?;
     agent.velocity = Vec3::ZERO;
-    Some(link.end)
+    Some(agent.body(link.end))
 }
 
 #[cfg(test)]

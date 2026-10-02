@@ -2,7 +2,8 @@
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `NavMeshAgentComponent` field by field: the `active` flag, the motion tuning
-//! (`speed` / `acceleration` / `stopping_distance`), the footprint `radius`, the
+//! (`speed` / `acceleration` / `stopping_distance`), the footprint `radius` and
+//! `base_offset`, the
 //! `target` destination, and the local-avoidance settings (#463).
 //!
 //! BOTH the editor's NavMesh Agent card and the Lua `NavMeshAgent.*` setters route
@@ -40,6 +41,12 @@ pub fn set_stopping_distance(a: &mut NavMeshAgentComponent, stopping_distance: f
 /// Set the agent's footprint radius.
 pub fn set_radius(a: &mut NavMeshAgentComponent, radius: f32) {
     a.radius = radius;
+}
+
+/// Set how far the entity's origin sits above the agent's feet (#666, Unity's
+/// `baseOffset`).
+pub fn set_base_offset(a: &mut NavMeshAgentComponent, base_offset: f32) {
+    a.base_offset = base_offset;
 }
 
 /// Set the agent's destination target.
@@ -89,6 +96,7 @@ mod tests {
         set_acceleration(&mut e, 8.0);
         set_stopping_distance(&mut e, 0.5);
         set_radius(&mut e, 0.4);
+        set_base_offset(&mut e, 1.0);
         set_target(&mut e, Vec3::new(1.0, 0.0, 2.0));
         set_avoidance_priority(&mut e, 12.0);
         set_avoidance_enabled(&mut e, false);
@@ -99,6 +107,7 @@ mod tests {
         assert_eq!(a.acceleration, 8.0);
         assert_eq!(a.stopping_distance, 0.5);
         assert_eq!(a.radius, 0.4);
+        assert_eq!(a.base_offset, 1.0);
         assert_eq!(a.target, Vec3::new(1.0, 0.0, 2.0));
         assert_eq!(a.avoidance_priority, 12);
         assert!(!a.avoidance_enabled);
