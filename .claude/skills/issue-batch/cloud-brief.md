@@ -32,7 +32,9 @@ name more.
   merges a ready PR the moment its CI is green.
 - For a proof run on a draft, dispatch the workflow on the branch instead of
   readying: `gh workflow run ci.yml --ref <branch>` (without `gh`, the GitHub MCP
-  `actions_run_trigger` does the same).
+  `actions_run_trigger` does the same). It runs the gates (and `coverage`), not the mutation sweep. Never pass
+  `force_mutants`: that starts the ~3.5 h full mutation sweep on five runners
+  the batch's gates need (#705).
 - **Once ready, the branch is the merge queue's.** Don't push to it again, and
   cancel any `send_later` check-in that would. The queue rebases, pushes and
   merges it, and it refuses to merge a head it did not watch, so a late push
