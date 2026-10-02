@@ -1,5 +1,6 @@
 //! src/bin/editor_capture.rs — the whole editor to a PNG, headless (dev-only, #731).
 //!
+//! ```text
 //! Usage:
 //!   cargo run --bin editor-capture --features dev -- [options]
 //!   make editor-capture OUT=before.png ARGS="--select Player"
@@ -11,6 +12,7 @@
 //!   --play              draw the Play-mode chrome (the sim is not stepped)
 //!   --game              show the Game tab instead of the Scene tab
 //!   --size <W>x<H>      capture size (default 1600x900)
+//! ```
 //!
 //! Deterministic: a fixed size, scale and frame count. Exits 0 when written, 1 when the
 //! box has no GPU/software adapter (install lavapipe), 2 on bad arguments or errors.
