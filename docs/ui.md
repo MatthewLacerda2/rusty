@@ -558,11 +558,27 @@ is dropped), stamping rewrites them to the new instance's ids, and a linked
 instance's propagation compares them in its own ids — so a button prefab keeps
 pointing at its own icon however many times it is placed.
 
-### Keyboard focus
+### Keyboard and gamepad focus
 
-The focused ("selected") entity is what the keyboard drives. Keys become **logical
-actions** first — Move (arrows), Next / Previous (Tab / Shift+Tab), Submit (Enter,
-keypad Enter), Cancel (Escape) — so a gamepad later maps onto the same actions.
+The focused ("selected") entity is what the keyboard and gamepad drive. Input
+becomes **logical actions** first, and only those drive focus (Unity's
+`InputSystemUIInputModule` defaults; every pad slot counts):
+
+| Action | Keyboard | Gamepad |
+|---|---|---|
+| Move | arrows | d-pad (`PADUP` …), left stick |
+| Next / Previous | Tab / Shift+Tab | — |
+| Submit | Enter, keypad Enter | `PADA` (south) |
+| Cancel | Escape | `PADB` (east) |
+
+**A held Move repeats** (#672): the press moves once, then again after **0.5 s**,
+then every **0.1 s** while the same direction is held (Unity's `moveRepeatDelay` /
+`moveRepeatRate`). The clock is the tick's **unscaled** dt, so a paused menu
+repeats and a headless run repeats on the same ticks every time. The **left stick**
+counts once it leans at least **0.5** (Unity's press point, on top of the pad's
+dead zone), and everything held — arrows, d-pads, sticks — sums to one direction
+by its dominant axis (vertical on a tie), so a diagonal moves once, not twice. A
+stick has no press edge: leaning into a new direction is the press.
 
 - **Move** follows the focused Selectable's `navigation`: `Explicit` takes the
   target for that direction; `Automatic` picks, among the *candidates*, the centre
@@ -625,8 +641,9 @@ by editing its components or forks its behaviour by copying its script.
 - **Finding their parts.** A widget script reaches its own children by name with
   `Scene.FindChild(id, "Handle Slide Area/Handle")`, never a stored id, so a prefab
   stamp or a duplicate keeps working. Renaming a part detaches it.
-- **Keyboard.** Widgets are `Selectable`s, so Tab, the arrows and Enter reach
-  them. A widget that needs the arrows itself defines `OnMove` (Unity's
+- **Keyboard and gamepad.** Widgets are `Selectable`s, so Tab, the arrows, the
+  d-pad and stick, Enter and pad `A` reach them. A widget that needs Move itself
+  defines `OnMove` (Unity's
   `IMoveHandler`): the move goes to it instead of navigation, and it navigates on
   its own with `UI.FindSelectable` — a slider steps on Left / Right and moves the
   focus on Up / Down.

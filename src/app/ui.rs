@@ -66,6 +66,7 @@ pub(super) fn dispatch_ui_events(world: &mut World, res: &mut Resources) {
             view: &view,
             walls: &walls,
             handles: &handles,
+            dt: res.time.borrow().unscaled_delta_time,
         };
         res.event_system.borrow_mut().process(&frame)
     };

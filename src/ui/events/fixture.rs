@@ -110,6 +110,7 @@ impl Rig {
             view: &view,
             walls: &|_, _| wall,
             handles: &handles,
+            dt: crate::time::FIXED_DELTA_TIME,
         };
         self.events.process(&frame)
     }

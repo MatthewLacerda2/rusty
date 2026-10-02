@@ -8,9 +8,10 @@
 //!
 //! 1. **Selection** a script changed since last tick is announced (`OnDeselect`,
 //!    `OnSelect`), and a selection that went inactive or was destroyed is dropped.
-//! 2. **Keyboard navigation** (`focus`): arrows move focus, Tab / Shift+Tab cycle
-//!    it, Enter submits (`OnSubmit`), Escape cancels (`OnCancel`); a focused entity
-//!    defining `OnMove` takes the arrows itself.
+//! 2. **Focus navigation** (`focus`): arrows, the d-pad and the left stick move
+//!    focus (repeating while held), Tab / Shift+Tab cycle it, Enter or pad `A`
+//!    submits (`OnSubmit`), Escape or pad `B` cancels (`OnCancel`); a focused
+//!    entity defining `OnMove` takes the Move itself.
 //! 3. **Pointer** (`pointer`): the top-most raycast target under the mouse
 //!    ([`raycast()`]) drives `OnPointerEnter` / `OnPointerExit`; each mouse button's
 //!    edges drive `OnPointerDown` / `OnPointerUp` / `OnPointerClick` and the drag
@@ -45,6 +46,7 @@ use crate::core::input::InputState;
 use crate::ecs::World;
 use crate::ui::{UiLayout, UiPointer, UiView};
 
+use focus::MoveRepeat;
 pub use focus::{find_selectable, nav_actions, NavAction, DIRECTIONS};
 pub use raycast::{raycast, raycast_pointer};
 
@@ -79,7 +81,8 @@ pub enum UiHook {
     Deselect,
     Submit,
     Cancel,
-    /// An arrow key a focused entity's `OnMove` takes instead of navigation.
+    /// A Move (arrow, d-pad, stick) a focused entity's `OnMove` takes instead of
+    /// navigation.
     Move,
 }
 
@@ -146,6 +149,8 @@ pub struct Frame<'a> {
     /// The walls a world-canvas hit must be in front of.
     pub walls: Walls<'a>,
     pub handles: &'a dyn Fn(u32, UiHook) -> bool,
+    /// This tick's unscaled seconds — the held Move's repeat clock (#672).
+    pub dt: f32,
 }
 
 /// One mouse button's press in flight.
@@ -176,6 +181,8 @@ pub struct EventSystem {
     /// Last tick's pointer with its ray, for `canvas_delta` (#429).
     last_ui: Option<UiPointer>,
     buttons: [ButtonState; 3],
+    /// The held Move's repeat clock.
+    repeat: MoveRepeat,
     fades: BTreeMap<u32, transition::Fade>,
 }
 
@@ -255,9 +262,6 @@ fn accepts(world: &World, id: u32) -> bool {
 
 #[cfg(test)]
 mod fixture;
-#[cfg(test)]
-#[path = "focus_tests.rs"]
-mod focus_tests;
 #[cfg(test)]
 #[path = "pointer_tests.rs"]
 mod pointer_tests;

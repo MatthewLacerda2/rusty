@@ -1,9 +1,9 @@
 //! src/ui/events/focus.rs — keyboard focus: selection and navigation (#420).
 //!
-//! The focused ("selected") entity is what the keyboard drives. Input becomes
-//! **logical actions** first ([`nav_actions`]) — Move, Next / Previous, Submit,
-//! Cancel — and only those drive focus, so a gamepad later maps onto the same
-//! actions without touching this module.
+//! The focused ("selected") entity is what the keyboard and gamepad drive. Input
+//! becomes **logical actions** first (`actions`: [`nav_actions`] and the held
+//! Move's repeat, #672) — Move, Next / Previous, Submit, Cancel — and only those
+//! drive focus.
 //!
 //! - **Move** follows the focused Selectable's `navigation`: `Explicit` takes the
 //!   `select_on_*` entity, `Automatic` the best-scoring candidate in that direction
@@ -16,12 +16,14 @@
 //!   `OnMove(id, event)` and focus stays put — a slider turns Left / Right into
 //!   value steps, an input field into caret moves. It navigates on its own with
 //!   `UI.FindSelectable` (the same [`find_selectable`] rule).
-//! - **Submit / Cancel** (Enter / Escape) fire `OnSubmit` / `OnCancel` on the
+//! - **Submit / Cancel** (Enter or pad `A` / Escape or pad `B`) fire `OnSubmit` / `OnCancel` on the
 //!   focused entity itself — they do not bubble, as in Unity.
 //!
 //! A *candidate* is a visible, interactable Selectable whose navigation is not
 //! `None`. Every change of focus fires `OnDeselect` on the old entity, then
 //! `OnSelect` on the new one.
+
+mod actions;
 
 use glam::Vec2;
 
@@ -31,48 +33,13 @@ use super::{
     accepts, is_interactable, Delivery, EventSystem, Frame, PointerButton, PointerEvent, UiHook,
 };
 use crate::components::NavigationMode;
-use crate::core::input::InputState;
 use crate::ecs::World;
 use crate::ui::UiLayout;
 
-/// A logical navigation action.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NavAction {
-    /// Move focus: `0` up, `1` down, `2` left, `3` right (the `select_on` order).
-    Move(usize),
-    Next,
-    Previous,
-    Submit,
-    Cancel,
-}
+pub use actions::{held_direction, nav_actions, MoveRepeat, NavAction};
 
 /// Unit directions in `select_on` order, y-up.
 pub const DIRECTIONS: [Vec2; 4] = [Vec2::Y, Vec2::NEG_Y, Vec2::NEG_X, Vec2::X];
-
-/// This tick's navigation actions from the keyboard, in a fixed order.
-pub fn nav_actions(input: &InputState) -> Vec<NavAction> {
-    let mut actions = Vec::new();
-    for (i, key) in ["UP", "DOWN", "LEFT", "RIGHT"].into_iter().enumerate() {
-        if input.get_key_down(key) {
-            actions.push(NavAction::Move(i));
-        }
-    }
-    if input.get_key_down("TAB") {
-        let shift = input.is_key_down("LEFTSHIFT") || input.is_key_down("RIGHTSHIFT");
-        actions.push(if shift {
-            NavAction::Previous
-        } else {
-            NavAction::Next
-        });
-    }
-    if input.get_key_down("ENTER") || input.get_key_down("KEYPADENTER") {
-        actions.push(NavAction::Submit);
-    }
-    if input.get_key_down("ESCAPE") {
-        actions.push(NavAction::Cancel);
-    }
-    actions
-}
 
 impl EventSystem {
     /// Drop a focus that went inactive or was destroyed, and announce a focus a
@@ -97,9 +64,14 @@ impl EventSystem {
         self.announced = new;
     }
 
-    /// The keyboard phase of [`EventSystem::process`].
+    /// The navigation phase of [`EventSystem::process`]: this tick's edge actions,
+    /// then a held Move's repeat.
     pub(super) fn navigate(&mut self, f: &Frame, out: &mut Vec<Delivery>) {
-        for action in nav_actions(f.input) {
+        let mut actions = nav_actions(f.input);
+        let pressed = actions.iter().any(|a| matches!(a, NavAction::Move(_)));
+        let held = held_direction(f.input);
+        actions.extend(self.repeat.tick(held, pressed, f.dt));
+        for action in actions {
             match action {
                 NavAction::Move(dir) => {
                     let Some(s) = self.selected else { continue };
@@ -215,3 +187,8 @@ fn cycle(f: &Frame, from: Option<u32>, forward: bool) -> Option<u32> {
     };
     Some(all[i])
 }
+
+#[cfg(test)]
+mod pad_tests;
+#[cfg(test)]
+mod tests;

@@ -180,6 +180,12 @@ enters, like the keybinding remap: sticks use a *radial* dead zone (the stick's
 distance from centre, so diagonals don't snap to the axes), rescaled so output starts
 at `0` just past the zone and reaches `1` at full travel. Injected axes bypass them.
 
+**UI navigation** (#672). Pads drive the UI's focus like the keyboard, from any
+slot: the d-pad and left stick Move (repeating while held: 0.5 s, then every 0.1 s),
+`PADA` Submits, `PADB` Cancels. The stick counts past `0.5`, by its dominant axis.
+The full mapping is in `docs/ui.md` (*Keyboard and gamepad focus*). A game reading
+the same buttons in `Update` sees them too — gate gameplay on its own menu state.
+
 **Rumble** is a request: the sim records it (`GetRumble` reads it back, headless
 included) and the platform plays it on pads that support force feedback. `low` is
 the heavy low-frequency motor, `high` the light buzzy one. A new request replaces
