@@ -21,14 +21,18 @@ three, four cost six. A rebase buys no correctness.
 So: **one in the merge queue, one being written.** Nothing idles through a
 ten-minute CI run, and nothing rebases twice.
 
-**The merge queue is `make queue PRS="a b c"`** (the `ci-merge` skill has the
-detail): it rebases, pushes, waits for CI on the new head, asks `make mergeable`
-and squash-merges, one at a time, in the order given — so the session running
-the batch is not the one sitting through each run. Hand it the ready pull
-requests in label-priority order; a hand-back (conflict, red, no run) skips that
-entry and the rest carry on, so read its summary rather than assuming the whole
-list landed. It never resolves a conflict: a hand-back naming paths goes back to
-the branch's author. `ARGS=--dry-run` shows what it would do and writes nothing.
+**The merge queue is `make queue ARGS=--watch`** (the `ci-merge` skill has the
+detail): started once, in the background, it takes each pull request the moment
+it turns ready, highest label priority first, and rebases, pushes, waits for CI
+on the new head, asks `make mergeable` and squash-merges, one at a time — so the
+session running the batch is not the one sitting through each run, nor the one
+noticing each draft flip to ready (#664). It **exits on the first hand-back**
+(conflict, red, no run), on the machine failing, or when nothing is left, and
+that exit is what wakes you: read the report, deal with the hand-back, start it
+again. It never resolves a conflict: a hand-back naming paths goes back to the
+branch's author. `make queue PRS="a b c"` still takes named pull requests in the
+order given (a hand-back there skips the entry and the rest carry on), and
+`ARGS=--dry-run` shows what either would do and writes nothing.
 
 ## The real limit is file collision, not count
 
@@ -209,12 +213,17 @@ This is the shape that ran the 2026-09-30 batch (≈40 pull requests merged in o
 day). Each role does what only it can do.
 
 **The orchestrator (this session, local)** writes no feature code. It picks work,
-briefs cloud coders, reviews and merges. Its loop per ready pull request:
+briefs cloud coders, reviews and merges. It **starts `make queue
+ARGS="--watch --no-check"` once, in the background** (from a worktree under
+`.claude/worktrees/`), and is woken only when the watch exits — never a
+per-PR polling loop or a chain of `make queue PRS=N` runs (#664: the 2026-09-30
+batch spent about 69 queue invocations and dozens of hand-built watchers on
+that, and one chain was cancelled by mistake). Its loop per pull request:
 
 1. Read the description. Check the decisions against the issue, and note any
    human-only checks (a window, speakers) as a checklist; don't hold for them.
-2. **Use `make queue PRS="N"`** for rebase → check → push → wait → merge; don't
-   hand-roll that loop. The queue rebases in a throwaway worktree, runs
+2. **The watch does** rebase → check → push → wait → merge; don't hand-roll
+   that loop. The queue rebases in a throwaway worktree, runs
    `cargo check --locked --all-targets` with `dev` and `--no-default-features`
    plus the size gate on the rebased tree **before** pushing (#571), and hands
    the branch back — unpushed — on a conflict or a failed check. A clean
@@ -233,8 +242,12 @@ briefs cloud coders, reviews and merges. Its loop per ready pull request:
    the machine is shared or busy. What it gives up is catching a semantic break
    before the push. That cost three breaks in the 126-PR batch of 2026-09-30, each
    a CI round instead of a three-minute check, and each still handed back unmerged.
-3. A hand-back is the queue's whole report: fix a conflict or a failed check on
-   the branch (or brief its coder to), then queue it again. A one-line semantic
+3. A hand-back is the queue's whole report, and the watch exits on it: fix a
+   conflict or a failed check on the branch (or brief its coder to), and start
+   the watch again right away — the other ready pull requests are waiting. The
+   handed-back head is passed over until it moves, so restarting never re-takes
+   an unfixed branch; once its fix is pushed the watch takes it again on its
+   own (`make queue PRS=N` takes it regardless). A one-line semantic
    break (a field a merge ahead added) is quickest fixed here. A many-hunk
    conflict goes back to **the session that wrote the branch**, which still holds
    its design: the coder's `send_later` check-in is a routine bound to its

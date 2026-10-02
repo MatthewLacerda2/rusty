@@ -44,8 +44,19 @@ to see what it said.
 
 ## The merge, one branch at a time
 
-`make queue PRS="a b c"` does the whole loop, one pull request at a time, in the
-order given — so no agent sits through a ten-minute run holding a worktree open:
+`make queue ARGS=--watch` (#664) is how a batch runs it: started once, it takes
+every open pull request as it turns **ready**, highest priority first —
+infrastructure → architecture → bug → foundation → feature, read from the pull
+request's labels and the issues it closes, then unlabelled, oldest first,
+Dependabot after all of them — and **exits** on the first hand-back, on the
+machine failing (below), or when nothing is left (no open pull request, or only
+drafts and handed-back heads, none moved for `--idle` minutes, default 90). A
+handed-back head is remembered (under the checkout's git directory) and passed
+over by later watches until it moves. It composes with every flag below; a
+batch runs `ARGS="--watch --no-check"`. `make queue PRS="a b c"` takes named
+pull requests instead, in the order given. Either way, the loop is one pull
+request at a time — so no agent sits through a ten-minute run holding a
+worktree open:
 
 1. Rebase onto the latest `origin/main`, in a throwaway detached worktree it
    creates and removes (never one an agent is standing in).
@@ -62,7 +73,8 @@ order given — so no agent sits through a ten-minute run holding a worktree ope
 6. Squash-merge with the house-style title (`Title (#issue) (#pr)`) and
    `--match-head-commit`, so a push after the verdict makes GitHub refuse.
 
-It **hands back** — skips the entry, names why, carries on with the next — on a
+It **hands back** — names why; with named pull requests it skips that entry and
+carries on, under `--watch` it exits — on a
 conflict (naming the paths; it never resolves one), a rebased head that fails
 the local check (never pushed), a red run, a run that never
 appears, a head somebody else moved, a draft, or a merge GitHub refused. A 502 on
