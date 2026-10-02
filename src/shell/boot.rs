@@ -52,22 +52,6 @@ pub fn refresh_assets() -> crate::asset::audio::Refresh {
     crate::asset::audio::refresh(std::path::Path::new(ASSET_ROOT))
 }
 
-/// The editor's window-focus refresh (Unity's auto-refresh), logged to the console so
-/// the swap of an `.mp3` for its `.wav` is never silent. A no-op in the player: a
-/// shipped project has nothing arriving.
-pub fn refresh_assets_on_focus(game: &GameWorld) {
-    if !cfg!(feature = "editor") {
-        return;
-    }
-    let mut console = game.console().borrow_mut();
-    for (warning, line) in refresh_assets().lines() {
-        match warning {
-            true => console.warn(line),
-            false => console.info(line),
-        }
-    }
-}
-
 /// Open the window at `size` with `title`.
 pub fn create_window(
     event_loop: &EventLoop<()>,
