@@ -196,7 +196,6 @@ pub(crate) fn animator_value(a: &AnimatorComponent) -> Value {
         "layers": a.layers.iter().map(layer_value).collect::<Vec<_>>(),
     })
 }
-
 fn layer_value(l: &LayerState) -> Value {
     json!({ "name": l.name, "weight": l.weight, "node": l.playback.current_node })
 }
