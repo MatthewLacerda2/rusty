@@ -31,7 +31,10 @@ noticing each draft flip to ready (#664). It **exits on the first hand-back**
 that exit is what wakes you: read the report, deal with the hand-back, start it
 again. Start it with `--for 70` (#697): background commands are killed at two
 hours, and the deadline is only checked between pull requests, so the one in hand
-can still run up to the per-PR `--deadline` (45 min); 70 + 45 stays under the cap. The watch ends itself first, between pull requests, with the last line
+can still run up to the per-PR `--deadline` (45 min); 70 + 45 stays under the cap.
+When many coders push at once, runs wait for GitHub runners (2026-10-02: a run's
+first job started 13 minutes in, and #699 was handed back green-but-unfinished at
+45). Raise `--deadline` and lower `--for` together: `--for 50 --deadline 60`. The watch ends itself first, between pull requests, with the last line
 `watch ended: deadline reached …` — relaunch it as it was, nothing to read. It never resolves a conflict: a hand-back naming paths goes back to the
 branch's author. `make queue PRS="a b c"` still takes named pull requests in the
 order given (a hand-back there skips the entry and the rest carry on), and
