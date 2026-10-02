@@ -10,7 +10,7 @@ use rusty::app::GameWorld;
 use rusty::components::AnimatorComponent;
 use rusty::core::input::InputState;
 use rusty::navigation::NavigationGraph;
-use rusty::scene::{Scene, ScriptComponent};
+use rusty::scene::ScriptComponent;
 use rusty::scripting::ConsoleLogs;
 
 use super::{ragdolled, rig};
