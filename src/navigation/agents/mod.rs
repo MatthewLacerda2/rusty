@@ -34,7 +34,12 @@ impl NavigationGraph {
         if agent.frames_since_replan >= MAX_PATH_AGE_FRAMES {
             return true;
         }
-        // The waypoint's span may have gone (an obstacle, a rebake in place).
+        // The final waypoint is the literal target, which may lie off the navmesh (a
+        // flying player, a point past the floor's edge); testing it would re-plan every
+        // frame. Interior waypoints are span floors: one gone means the mesh changed.
+        if agent.path_cursor + 1 == agent.cached_path.len() {
+            return false;
+        }
         self.span_under(agent.cached_path[agent.path_cursor])
             .is_none()
     }
@@ -140,6 +145,24 @@ mod tests {
         // A rebake bumps the generation; the agent's path is now stale.
         graph.bake(&Scene::new());
         assert!(graph.path_cache_invalid(&agent));
+    }
+
+    #[test]
+    fn off_mesh_target_does_not_replan_every_frame() {
+        let mut graph = open_graph();
+        let hole = graph.index(10, 20); // the target's column holds no span
+        graph.spans.remove(hole);
+        for start in &mut graph.cell_start[hole + 1..] {
+            *start -= 1;
+        }
+        let mut agent = test_agent(Vec3::new(10.0, 0.0, 20.0));
+        graph.plan_agent_path(&mut agent, Vec3::new(9.0, 0.0, 19.0));
+        assert_eq!(agent.cached_path.len(), 2, "one span, then the raw target");
+        agent.path_cursor = 1;
+        assert!(
+            !graph.path_cache_invalid(&agent),
+            "the raw target is not a span"
+        );
     }
 
     #[test]
