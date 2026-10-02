@@ -8,7 +8,7 @@
 //! `clips`).
 //!
 //! Point and spot lights cast through a shadow atlas instead (#468, `atlas`), drawn
-//! with the same pipelines and casters.
+//! with the same pipelines and casters, its static casters cached per tile (#694).
 
 pub(crate) mod atlas;
 pub(crate) mod cascades;
@@ -90,10 +90,10 @@ impl ShadowRenderer {
 
     /// The pass and its pipelines, over the forward `shader`'s shadow stage;
     /// `material_layout` is the forward pass's group 2, which a clipped caster binds
-    /// (#648).
+    /// (#648); `atlas_shader` is `shadow_atlas.wgsl`, the atlas's tile blits (#694).
     pub fn new(
         device: &wgpu::Device,
-        shader: &wgpu::ShaderModule,
+        [shader, atlas_shader]: [&wgpu::ShaderModule; 2],
         material_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let textures = Self::create_depth_textures(device);
@@ -118,7 +118,8 @@ impl ShadowRenderer {
         let [pipeline, clip_pipeline] = Self::create_pipelines(device, layouts, shader);
         let static_casters = CasterBuffer::new(device, &entity_layout);
         let dynamic_casters = CasterBuffer::new(device, &entity_layout);
-        let atlas = ShadowAtlas::new(device, &global_layout, &entity_layout, &time_buffer);
+        let atlas_layouts = [&global_layout, &entity_layout];
+        let atlas = ShadowAtlas::new(device, atlas_layouts, &time_buffer, atlas_shader);
 
         Self {
             static_texture: textures.static_texture,
@@ -179,10 +180,12 @@ impl ShadowRenderer {
             .any(|baked| baked.map(|(s, _)| s) != Some(scene))
     }
 
-    /// Drop every static bake, so the next render re-bakes them. Called when the
-    /// editor changes something that moves static geometry.
+    /// Drop every static bake — the cascades' and the atlas tiles' (#694) — so the
+    /// next render re-bakes them. Called when the editor changes something that
+    /// moves static geometry.
     pub fn invalidate_static_cache(&mut self) {
         self.static_cache = [None; MAX_CASCADES];
+        self.atlas.invalidate();
     }
 
     /// Upload the game time, for the cuts that animate with it (#648).

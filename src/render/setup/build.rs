@@ -87,7 +87,9 @@ impl GpuResources {
         let ssao = ssao::SsaoRenderer::new(device, queue, &mut registry);
         // One module draws the solids and their shadows (#648).
         let shader = registry.load(device, "shader.wgsl", "Forward Lit Shader");
-        let shadows = create_shadow_system(device, &shader, &ssao.no_ao, &textures);
+        let atlas_shader = registry.load(device, "shadow_atlas.wgsl", "Shadow Atlas Shader");
+        let shadow_shaders = [&shader, &atlas_shader];
+        let shadows = create_shadow_system(device, shadow_shaders, &ssao.no_ao, &textures);
         let forward = create_forward_passes(
             device,
             &shader,
@@ -195,16 +197,17 @@ fn create_global_bindings(
     }
 }
 
-/// Shadow renderer, its cascade uniform buffer, and the main-pass bind group that
-/// samples the active cascade array — with `no_ao`, the white stand-in for SSAO.
+/// Shadow renderer (over the forward shader and the atlas's blits, `shaders`), its
+/// cascade uniform buffer, and the main-pass bind group that samples the active
+/// cascade array — with `no_ao`, the white stand-in for SSAO.
 fn create_shadow_system(
     device: &wgpu::Device,
-    shader: &wgpu::ShaderModule,
+    shaders: [&wgpu::ShaderModule; 2],
     no_ao: &wgpu::TextureView,
     textures: &Textures,
 ) -> ShadowSystem {
     let layout = bind_layouts::create_shadow_layout(device);
-    let renderer = shadows::ShadowRenderer::new(device, shader, &textures.material_layout);
+    let renderer = shadows::ShadowRenderer::new(device, shaders, &textures.material_layout);
 
     let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Shadow Uniform Buffer"),

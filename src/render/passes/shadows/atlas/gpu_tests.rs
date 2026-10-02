@@ -18,7 +18,7 @@ fn block(scene: &mut Scene, position: Vec3, scale: Vec3) {
 }
 
 /// A dark scene: no sky, sun or ambient.
-fn dark() -> Scene {
+pub(super) fn dark() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     scene.ambient_intensity = 0.0;
@@ -26,7 +26,7 @@ fn dark() -> Scene {
 }
 
 /// Add a `kind` light at `at`, pointing along `dir`, casting when `shadows`.
-fn lamp(scene: &mut Scene, kind: Primitive, at: Vec3, dir: Vec3, shadows: bool) {
+pub(super) fn lamp(scene: &mut Scene, kind: Primitive, at: Vec3, dir: Vec3, shadows: bool) {
     let id = create_entity(scene, "Lamp", Some(kind));
     let mut t = scene.world.transform_mut(id).unwrap();
     (t.position, t.rotation) = (at, Quat::from_rotation_arc(Vec3::NEG_Z, dir.normalize()));

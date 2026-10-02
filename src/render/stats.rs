@@ -58,6 +58,11 @@ pub struct RenderCounters {
     pub shadow_atlas_tiles: u32,
     /// Atlas texels those tiles cover, out of 2048² (#468).
     pub shadow_atlas_texels: u64,
+    /// Atlas tiles whose static casters came from the static cache this frame (#694).
+    pub shadow_atlas_cached: u32,
+    /// Atlas tiles whose static casters were re-baked this frame (#694): the light
+    /// moved, its tile moved or resized, or the cache was invalidated.
+    pub shadow_atlas_rebaked: u32,
     /// UI batches drawn — backdrop batches (#426) included.
     pub ui_draws: u32,
     /// UI `Mask` coverage textures rendered (#428): one pass per visible Mask.
@@ -100,6 +105,8 @@ impl RenderCounters {
             ("shadow_lights_dropped", self.shadow_lights_dropped.into()),
             ("shadow_atlas_tiles", self.shadow_atlas_tiles.into()),
             ("shadow_atlas_texels", self.shadow_atlas_texels),
+            ("shadow_atlas_cached", self.shadow_atlas_cached.into()),
+            ("shadow_atlas_rebaked", self.shadow_atlas_rebaked.into()),
             ("ui_draws", self.ui_draws.into()),
             ("ui_mask_passes", self.ui_mask_passes.into()),
             ("ui_blur_passes", self.ui_blur_passes.into()),
