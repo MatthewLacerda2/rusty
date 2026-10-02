@@ -51,10 +51,9 @@ fn corpus_seed_still_loads() {
     // it MUST load via the legacy migration without panicking, proving the
     // back-compat path against a real checked-in file. (The tracked default.scene it
     // was copied from is now built in Rust, #667.)
-    for path in ["fuzz/corpus/scene_deserialize/seed_default.scene"] {
-        let text = std::fs::read_to_string(path).unwrap();
-        let data: rusty::scene::SceneData =
-            serde_json::from_str(&text).unwrap_or_else(|e| panic!("{path}: {e}"));
-        apply_scene_data(&mut Scene::new(), data);
-    }
+    let path = "fuzz/corpus/scene_deserialize/seed_default.scene";
+    let text = std::fs::read_to_string(path).unwrap();
+    let data: rusty::scene::SceneData =
+        serde_json::from_str(&text).unwrap_or_else(|e| panic!("{path}: {e}"));
+    apply_scene_data(&mut Scene::new(), data);
 }
