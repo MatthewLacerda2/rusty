@@ -15,7 +15,8 @@ requests they name, in the order they name them. `--dry-run` does every read
 and the local rebase, and writes nothing to GitHub. `--watch` (#664) names
 none: it takes each pull request as it turns ready, in label-priority order,
 and is still invoked, never a service — it exits on the first hand-back, on
-the machine failing, or when nothing is left ([`queue_watch`]).
+the machine failing, when nothing is left, or between pull requests once its
+`--for` deadline passes ([`queue_watch`]).
 
 ## Why it does not skip a run instead
 
@@ -129,7 +130,7 @@ call.
 Run it:
 
     make queue PRS="524 526"
-    make queue ARGS="--watch --no-check"
+    make queue ARGS="--watch --no-check --for 110"
     python3 .github/scripts/merge-queue.py 524 526 --dry-run
 
 The decisions are pure functions over plain dictionaries, tested without a
@@ -769,6 +770,13 @@ def parse(argv: list[str]) -> argparse.Namespace:
         "--idle", type=float, default=queue_watch.IDLE_MINUTES, metavar="MINUTES",
         help=f"--watch: exit when nothing is ready and no open PR has moved for this long (default {queue_watch.IDLE_MINUTES})",
     )
+    parser.add_argument(
+        "--for", dest="for_minutes", type=float, metavar="MINUTES",
+        help=(
+            "--watch: take no new PR once this long has passed; finish the one in hand, then exit cleanly,"
+            f" as 'nothing left' does, with a last line saying '{queue_watch.DEADLINE}' (relaunch it then)"
+        ),
+    )
     parser.add_argument("--no-merge", action="store_true", help="stop at green and hand each branch back rather than merging it")
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -794,6 +802,8 @@ def parse(argv: list[str]) -> argparse.Namespace:
     opts = parser.parse_args(argv)
     if bool(opts.prs) == opts.watch:
         parser.error("name the pull requests, or pass --watch; not both, not neither")
+    if opts.for_minutes is not None and not opts.watch:
+        parser.error("--for bounds a --watch; named pull requests end on their own")
     return opts
 
 
