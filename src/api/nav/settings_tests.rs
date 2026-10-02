@@ -21,8 +21,10 @@ fn scene_and_nav(min: Vec3, max: Vec3) -> (RefCell<Scene>, RefCell<NavigationGra
     let mut scene = Scene::new();
     add_floor(&mut scene, 0.0, 10.0, 0.0, 10.0);
     add_box(&mut scene, min, max);
-    // Pin the grid (#452) so the cell indices asserted below stay put.
+    // Pin the grid (#452) so the cell indices asserted below stay put, and keep the
+    // radius erosion off the single cells asserted on.
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
+    scene.nav_settings.agent_radius = 0.0;
     let mut nav = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     nav.bake(&scene);
     (RefCell::new(scene), RefCell::new(nav))
@@ -197,8 +199,8 @@ fn set_get_clear_bounds_round_trip_and_rebake() {
         assert_eq!(get().0, -61.0, "rejected write left the bounds alone");
 
         lua.load("Navigation.ClearBounds()").exec().unwrap();
-        // Derived: [3.6, 4.4] grown by 2.0 + 0.5 → [1.1, 6.9] → [1, 7].
-        assert_eq!(get(), (1.0, 7.0, 1.0, 7.0, false));
+        // Derived: the floor's [0, 10] grown by 2.0 + 0.0 radius → [-2, 12].
+        assert_eq!(get(), (-2.0, 12.0, -2.0, 12.0, false));
         Ok(())
     })
     .unwrap();

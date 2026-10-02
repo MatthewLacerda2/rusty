@@ -3,31 +3,22 @@
 
 use glam::Vec3;
 use rusty::navigation::{NavBounds, NavigationGraph};
-use rusty::scene::{ColliderComponent, ColliderShape, NavMeshAgentComponent, Scene};
+use rusty::scene::{NavMeshAgentComponent, Scene};
+
+use crate::navigation_layered::add_box as add_wall;
 
 const DT: f32 = 1.0 / 60.0;
 const RADIUS: f32 = 0.5;
-
-fn add_wall(scene: &mut Scene, min: Vec3, max: Vec3) {
-    let id = scene.add_entity("wall".to_string());
-    scene.world.set_static(id, true);
-    scene.world.set_collider(
-        id,
-        Some(ColliderComponent {
-            active: true,
-            shape: ColliderShape::Box { size: max - min },
-            is_trigger: false,
-            aabb_min: min,
-            aabb_max: max,
-            material: Default::default(),
-        }),
-    );
-}
 
 /// A wall along x = 10 with a door over cells z = 10..=11 (world z ∈ [9.5, 11.5),
 /// two agent diameters), eight agents west of it bound for spread-out goals east.
 fn door_scene() -> (Scene, NavigationGraph, Vec<(u32, Vec3)>) {
     let mut scene = Scene::new();
+    add_wall(
+        &mut scene,
+        Vec3::new(0.0, -0.2, 0.0),
+        Vec3::new(20.0, 0.0, 20.0),
+    ); // the floor
     add_wall(
         &mut scene,
         Vec3::new(9.5, 0.0, 0.0),
