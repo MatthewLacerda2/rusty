@@ -62,6 +62,12 @@ The files where everything collides are the ones every feature appends to:
 - `src/app/registry.rs`'s `build()` — where order *is* the per-frame execution
   order, so a merge that reorders it changes behaviour silently.
 - `src/editor/inspector/components/add/` — the Add Component menu.
+- `src/scene/authoring/dependency.rs` — `set_default`, `has_kind`, `clear_one`:
+  dispatchers that gain one arm per component and cross clippy's 50-line cap when
+  two component branches land together (#699 + #703 on 2026-10-02). Split such a
+  dispatcher by group (UI kinds behind `set_default_ui`), never trim it line by line.
+- `src/components/entity/repr.rs` imports and `docs/api/Scene.md`'s component
+  list — both sides add one line at the same spot every time.
 - `docs/api/index.md` — the namespace list and the lifecycle callbacks, and a
   hard gate parses it. The namespace tables are one file each since #569, so two
   branches documenting different namespaces no longer collide.
@@ -254,13 +260,25 @@ that, and one chain was cancelled by mistake). Its loop per pull request:
    the machine is shared or busy. What it gives up is catching a semantic break
    before the push. That cost three breaks in the 126-PR batch of 2026-09-30, each
    a CI round instead of a three-minute check, and each still handed back unmerged.
+   **The watch exits at once when no pull request is open at all**, which is the
+   state right after a wave of coders launches and before their first drafts
+   exist. Start it once a draft is up (or poll for the first ready one yourself).
 3. A hand-back is the queue's whole report, and the watch exits on it: fix a
    conflict or a failed check on the branch (or brief its coder to), and start
    the watch again right away — the other ready pull requests are waiting. The
    handed-back head is passed over until it moves, so restarting never re-takes
    an unfixed branch; once its fix is pushed the watch takes it again on its
    own (`make queue PRS=N` takes it regardless). A one-line semantic
-   break (a field a merge ahead added) is quickest fixed here. A many-hunk
+   break (a field a merge ahead added) is quickest fixed here — but with
+   `--no-check` nothing compiles your resolution before CI does, so **grep every
+   use of anything either side moved or renamed, and check the 300-line file and
+   50-line function caps**, before pushing. On 2026-10-02 a hand-resolved #700
+   kept a variable #699 still used, and only the coder's check-in caught it. A
+   resolution that needs a compile to trust (a file split, a dispatcher over the
+   cap, two systems' order) goes to a cloud routine instead.
+   **A coder's own check-in may push while the queue holds its PR**; the queue
+   hands it back as "somebody else pushed". Wait for that coder's PR comment,
+   then `make queue PRS=N`. A many-hunk
    conflict goes back to **the session that wrote the branch**, which still holds
    its design: the coder's `send_later` check-in is a routine bound to its
    persistent session, so `update` that routine's prompt with the rebase request
@@ -327,6 +345,13 @@ an API a script can reach, and five slots don't need one.
 
 A merge changes the graph. Whatever the merged issue blocked is fair game the
 moment it lands — so the decision is one merge wide, not one batch wide.
+
+**Re-read the whole board, not your list of it.** Coders file what they find
+(seven issues mid-batch on 2026-10-02, two of them red-main and a test race), and
+the operator files from other machines. A batch that only tracks the issues it
+started stops early and misreports what is left. That happened once on
+2026-10-02: the operator had to point out the board was not done. Count what is
+left from `gh issue list`, never from memory.
 
 But re-reading is not a licence to start everything: **start the next one, and
 keep the second slot for whatever is furthest along.** The label order decides
