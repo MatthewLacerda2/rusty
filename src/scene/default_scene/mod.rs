@@ -213,7 +213,7 @@ fn add_props(scene: &mut Scene) {
     let crate_at = (Vec3::new(-6.0, 0.5, -1.0), Vec3::ONE);
     let unit = ColliderShape::Box { size: Vec3::ONE };
     solid(scene, "Crate", Primitive::Box, crate_at, unit, looks::CRATE);
-    let ball_at = (Vec3::new(-5.5, 0.75, -6.5), Vec3::splat(0.75));
+    let ball_at = (Vec3::new(-3.5, 0.75, -2.5), Vec3::splat(0.75));
     let ball = ColliderShape::Sphere { radius: 1.0 };
     solid(
         scene,
