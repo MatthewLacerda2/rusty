@@ -302,6 +302,11 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   write or even read the engine's code. As long as the docs stay current, Claude can tell
   the developer how anything is done — so keeping documentation truthful is load-bearing,
   not a nicety.
+- **When in doubt, Unity's way.** When the work hits a call its issue never foresaw (a
+  default, an edge-case behaviour, how an API takes its arguments), do what Unity does
+  and say so in the PR; most of it is well figured out. This fills gaps the planning
+  missed. It does not override a decision the issue made, and it does not bring in what
+  rusty deliberately leaves out.
 - **AI-driven, editor↔API parity.** rusty is built for an agent-driven workflow in the
   *Claude Code + Blender-MCP* style: the agent can do anything a user can do in the
   editor — create entities, place and configure components, instantiate assets, save

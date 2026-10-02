@@ -340,8 +340,11 @@ sessions on a branch are the second kind. The line is not crisp, so err upwards.
 ## When to hand back to the user
 
 - ≈3 attempts at the same failure.
-- A decision that is genuinely theirs: an API name game scripts will type, a
-  change to the five kinds, anything a `planning` label would have carried.
+- A decision that is genuinely theirs: a change to the five kinds, a departure
+  from what the issue decided, anything a `planning` label would have carried.
+  A call the issue simply did not foresee is **not** one of these when Unity has
+  an answer: take Unity's (CLAUDE.md, *When in doubt, Unity's way*), name it in
+  the PR, and carry on.
 - Mark the pull request **draft**, say why in the description, and stop. Do not
   thrash.
 
