@@ -53,13 +53,15 @@ machine failing (below), or when nothing is left (no open pull request, or only
 drafts and handed-back heads, none moved for `--idle` minutes, default 90). A
 handed-back head is remembered (under the checkout's git directory) and passed
 over by later watches until it moves. It composes with every flag below; a
-batch runs `ARGS="--watch --no-check --for 110"`. **`--for MINUTES`** (#697) is
+batch runs `ARGS="--watch --no-check --for 70"`. **`--for MINUTES`** (#697) is
 the watch's own deadline: once it passes, the watch takes no new pull request,
 finishes the one in hand (merged or handed back) and exits cleanly with a last
 line `watch ended: deadline reached (…); N merged, nothing in hand.` That exit
 is not a report — **relaunch the watch** with the same arguments. It exists
 because a background command is killed at two hours wherever it is, a push or
-a merge included; 110 keeps the deadline under that cap, so every exit lands
+a merge included. The deadline is checked only before taking a pull request,
+so the take in hand can outlast it by up to the per-PR `--deadline` (45 min):
+`--for 70` keeps 70 + 45 under that cap (110 did not — corrected 2-Oct-2026), so every exit lands
 between pull requests. The deadline is checked only before a take, so a take
 started at minute 109 still runs to its end — usually minutes, at worst its
 own `--deadline` (45) of CI waiting. `make queue PRS="a b c"` takes named

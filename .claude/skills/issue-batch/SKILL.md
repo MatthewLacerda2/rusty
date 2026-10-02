@@ -29,8 +29,9 @@ session running the batch is not the one sitting through each run, nor the one
 noticing each draft flip to ready (#664). It **exits on the first hand-back**
 (conflict, red, no run), on the machine failing, or when nothing is left, and
 that exit is what wakes you: read the report, deal with the hand-back, start it
-again. Start it with `--for 110` (#697): background commands are killed at two
-hours, so the watch ends itself first, between pull requests, with the last line
+again. Start it with `--for 70` (#697): background commands are killed at two
+hours, and the deadline is only checked between pull requests, so the one in hand
+can still run up to the per-PR `--deadline` (45 min); 70 + 45 stays under the cap. The watch ends itself first, between pull requests, with the last line
 `watch ended: deadline reached …` — relaunch it as it was, nothing to read. It never resolves a conflict: a hand-back naming paths goes back to the
 branch's author. `make queue PRS="a b c"` still takes named pull requests in the
 order given (a hand-back there skips the entry and the rest carry on), and
@@ -219,7 +220,7 @@ day). Each role does what only it can do.
 
 **The orchestrator (this session, local)** writes no feature code. It picks work,
 briefs cloud coders, reviews and merges. It **starts `make queue
-ARGS="--watch --no-check --for 110"` in the background** (from a worktree under
+ARGS="--watch --no-check --for 70"` in the background** (from a worktree under
 `.claude/worktrees/`), relaunches it unchanged each time it exits on its
 deadline (`watch ended: deadline reached`, #697: the first overnight watch was
 killed at the two-hour background cap mid-CI-wait), and is otherwise woken only
