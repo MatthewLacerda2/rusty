@@ -70,7 +70,8 @@ the same API as gameplay, all compiled out of a shipped build (the `dev` feature
   Code attaches to a live edit-mode session natively and drives it like Blender-MCP
   drives Blender (see [`docs/mcp.md`](docs/mcp.md)).
 - **Screenshots** — render a single frame offscreen to a PNG so the agent can actually
-  *see* and critique a frame.
+  *see* and critique a frame. **Editor captures** do the same for the whole editor
+  (panels and viewport), so an editor change can be reviewed from a picture.
 
 The payoff: you can trust your IDE — preferably Claude — to write, run, and play-test
 the game for you, and only open a window when you want to.
@@ -82,6 +83,8 @@ the game for you, and only open a window when you want to.
   straight into Play, full-window, no editor (see *Shipping a build* below).
 - `cargo run --bin play --features dev -- <scenario.lua> <out_dir>` — the headless
   harness; writes `results.json` + `console.log` (and any screenshots) to `<out_dir>`.
+- `make editor-capture OUT=editor.png` — the editor over the default scene, headless,
+  to a PNG (see [`docs/testing.md`](docs/testing.md) § Editor captures).
 - `cargo run --bin session-mcp --features dev` — drive the live engine from Claude
   Code over MCP (see [`docs/mcp.md`](docs/mcp.md)).
 - `cargo doc --no-deps` — the Rust API reference.

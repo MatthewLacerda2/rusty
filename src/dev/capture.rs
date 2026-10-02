@@ -72,13 +72,7 @@ impl CaptureHost {
     /// contract every headless path in the engine already has.
     pub fn frame(&mut self, width: u32, height: u32) -> Option<(&mut Renderer, &mut RenderView)> {
         let (width, height) = (width.max(1), height.max(1));
-        if !self.probed {
-            self.probed = true;
-            // Born at the first shot's size purely so a lone capture is identical to the
-            // unshared path; nothing in the render path reads `config` offscreen, which
-            // is precisely why later shots may ask for any other size.
-            self.renderer = pollster::block_on(Renderer::new_headless(width, height));
-        }
+        self.renderer(width, height)?;
         let renderer = self.renderer.as_mut()?;
         // Create-or-resize, the same guard the editor viewport uses: a repeat shot at
         // the same size is a no-op rather than a reallocation.
@@ -91,6 +85,23 @@ impl CaptureHost {
             renderer.quality.bloom_divisor(),
         );
         Some((renderer, self.view.as_mut()?))
+    }
+
+    /// Just the renderer, built on first use (at `width` x `height`) and never resizing
+    /// the view — for a caller that draws into targets of its own, like the editor
+    /// capture's egui pass (#731). `None` on a box with no adapter, as for [`frame`].
+    ///
+    /// [`frame`]: Self::frame
+    pub fn renderer(&mut self, width: u32, height: u32) -> Option<&mut Renderer> {
+        if !self.probed {
+            self.probed = true;
+            // Born at the first shot's size purely so a lone capture is identical to the
+            // unshared path; nothing in the render path reads `config` offscreen, which
+            // is precisely why later shots may ask for any other size.
+            let (width, height) = (width.max(1), height.max(1));
+            self.renderer = pollster::block_on(Renderer::new_headless(width, height));
+        }
+        self.renderer.as_mut()
     }
 
     /// Copy the view's colour target back to the CPU and encode it as a PNG at `path`.

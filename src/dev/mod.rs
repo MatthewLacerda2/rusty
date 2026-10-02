@@ -18,6 +18,7 @@
 //!   botplayer   — bot-player pattern notes + helper to attach a bot to the Player
 //!   capture     — one renderer + view held across N shots (#355), shared by the two below
 //!   screenshot  — offscreen render -> PNG (the GPU "eyes"); skips if no adapter
+//!   editor_capture — the whole egui editor offscreen -> PNG, `editor` builds only (#731)
 //!   preview     — headless asset preview -> PNG (eyes on *assets*, #353)
 //!   snapshot    — world -> JSON observation
 //!   stats       — frame stats: the schedule timing probe + render counters (#433)
@@ -30,6 +31,8 @@ pub mod bridge;
 pub mod capture;
 pub mod command_channel;
 pub mod console;
+#[cfg(feature = "editor")]
+pub mod editor_capture;
 pub mod harness;
 pub mod lighting_bake;
 pub mod mcp;
