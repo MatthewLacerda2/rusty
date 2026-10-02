@@ -3,7 +3,7 @@
 //! One kira send track every mixer group sends into: a pre-delay, then kira's
 //! reverb (Freeverb) fully wet. The listener's blended zone params retune it live:
 //! the decay maps to the comb feedback, the damping is kira's, the wet level is the
-//! bus's volume, and the pre-delay is ours ([`PreDelay`]), since kira's delay fixes
+//! bus's volume, and the pre-delay is ours (`PreDelay`), since kira's delay fixes
 //! its time when it is built. Outside every zone the bus is silent, so a group's
 //! send only colours the mix where a zone says the space rings (Unity's reverb
 //! zones on an `AudioSource`'s `reverbZoneMix`).
