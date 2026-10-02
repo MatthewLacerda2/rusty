@@ -1,8 +1,6 @@
-use crate::editor::inspector::components::card::card_frame;
 use crate::editor::EditorUi;
 use crate::scene::Scene;
 use egui_phosphor::regular as icon;
-use std::fs;
 use std::path::Path;
 
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &str) {
@@ -14,7 +12,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     ui.heading(format!("{}  Model: {}", icon::CUBE, filename));
     ui.add_space(5.0);
 
-    draw_metadata_card(ui, path);
+    draw_metadata(ui, path);
     ui.add_space(10.0);
     ui.separator();
     ui.add_space(5.0);
@@ -44,23 +42,14 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
 
 /// File metadata card: path, on-disk size, and the asset type derived from the
 /// file extension.
-fn draw_metadata_card(ui: &mut egui::Ui, path: &str) {
+fn draw_metadata(ui: &mut egui::Ui, path: &str) {
     let ext = Path::new(path)
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_uppercase();
-    card_frame(&crate::editor::theme::from_ui(ui)).show(ui, |ui| {
-        ui.vertical(|ui| {
-            ui.label(format!("Path: {}", path));
-            let size_str = if let Ok(meta) = fs::metadata(path) {
-                format_size(meta.len())
-            } else {
-                "Unknown size".to_string()
-            };
-            ui.label(format!("Size: {}", size_str));
-            ui.label(format!("Type: {} Model Asset", ext));
-        });
+    super::metadata::draw_metadata_card(ui, path, |ui| {
+        ui.label(format!("Type: {} Model Asset", ext));
     });
 }
 
@@ -197,16 +186,6 @@ fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
         editor.is_dirty = true;
         editor.selected_entity_id = Some(ent_id);
         editor.selected_asset_path = None;
-    }
-}
-
-fn format_size(bytes: u64) -> String {
-    if bytes < 1024 {
-        format!("{} B", bytes)
-    } else if bytes < 1024 * 1024 {
-        format!("{:.1} KB", bytes as f64 / 1024.0)
-    } else {
-        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
     }
 }
 

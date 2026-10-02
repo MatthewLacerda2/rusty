@@ -1,4 +1,3 @@
-use crate::editor::inspector::components::card::card_frame;
 use crate::editor::EditorUi;
 use crate::navigation::{NavBounds, NavigationGraph};
 use crate::scene::Scene;
@@ -23,7 +22,7 @@ pub fn draw(
     ui.heading(format!("{}  Scene: {}", icon::FILM_SLATE, filename));
     ui.add_space(5.0);
 
-    draw_metadata_card(ui, path);
+    draw_metadata(ui, path);
     ui.add_space(10.0);
     ui.separator();
     ui.add_space(5.0);
@@ -202,13 +201,7 @@ fn draw_bake_lighting(
 
 /// File metadata card: path, on-disk size, plus the entity count and skybox
 /// peeked out of the scene's JSON without fully loading it.
-fn draw_metadata_card(ui: &mut egui::Ui, path: &str) {
-    let size_str = if let Ok(meta) = fs::metadata(path) {
-        format_size(meta.len())
-    } else {
-        "Unknown size".to_string()
-    };
-
+fn draw_metadata(ui: &mut egui::Ui, path: &str) {
     // Attempt to inspect JSON content
     let mut entity_count = 0;
     let mut skybox_str = "None".to_string();
@@ -223,13 +216,9 @@ fn draw_metadata_card(ui: &mut egui::Ui, path: &str) {
         }
     }
 
-    card_frame(&crate::editor::theme::from_ui(ui)).show(ui, |ui| {
-        ui.vertical(|ui| {
-            ui.label(format!("Path: {}", path));
-            ui.label(format!("Size: {}", size_str));
-            ui.label(format!("Entities serialized: {}", entity_count));
-            ui.label(format!("Skybox: {}", skybox_str));
-        });
+    super::metadata::draw_metadata_card(ui, path, |ui| {
+        ui.label(format!("Entities serialized: {}", entity_count));
+        ui.label(format!("Skybox: {}", skybox_str));
     });
 }
 
@@ -286,15 +275,5 @@ fn draw_scene_operations(
                 console.error(format!("Failed to save scene: {}", e));
             }
         }
-    }
-}
-
-fn format_size(bytes: u64) -> String {
-    if bytes < 1024 {
-        format!("{} B", bytes)
-    } else if bytes < 1024 * 1024 {
-        format!("{:.1} KB", bytes as f64 / 1024.0)
-    } else {
-        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
     }
 }

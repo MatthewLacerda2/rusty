@@ -1,4 +1,3 @@
-use crate::editor::inspector::components::card::card_frame;
 use crate::editor::EditorUi;
 use crate::scene::{Scene, ScriptComponent};
 use crate::scripting::ConsoleLogs;
@@ -21,7 +20,9 @@ pub fn draw(
     ui.heading(format!("{}  Script: {}", icon::FILE_CODE, filename));
     ui.add_space(5.0);
 
-    draw_metadata_card(ui, path);
+    super::metadata::draw_metadata_card(ui, path, |ui| {
+        ui.label("Type: Lua Script");
+    });
     ui.add_space(10.0);
     ui.separator();
     ui.add_space(5.0);
@@ -32,22 +33,6 @@ pub fn draw(
     ui.add_space(5.0);
 
     draw_attach_to_entity(ui, editor, scene, console, path, filename);
-}
-
-/// File metadata card: path, on-disk size, and asset type.
-fn draw_metadata_card(ui: &mut egui::Ui, path: &str) {
-    card_frame(&crate::editor::theme::from_ui(ui)).show(ui, |ui| {
-        ui.vertical(|ui| {
-            ui.label(format!("Path: {}", path));
-            let size_str = if let Ok(meta) = fs::metadata(path) {
-                format_size(meta.len())
-            } else {
-                "Unknown size".to_string()
-            };
-            ui.label(format!("Size: {}", size_str));
-            ui.label("Type: Lua Script");
-        });
-    });
 }
 
 /// Live script editor: an editable text area plus a button that writes the
@@ -148,15 +133,5 @@ fn draw_attach_to_entity(
                 filename, clicked_entity_name
             ));
         }
-    }
-}
-
-fn format_size(bytes: u64) -> String {
-    if bytes < 1024 {
-        format!("{} B", bytes)
-    } else if bytes < 1024 * 1024 {
-        format!("{:.1} KB", bytes as f64 / 1024.0)
-    } else {
-        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
     }
 }

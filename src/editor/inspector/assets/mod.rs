@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod image;
+mod metadata;
 pub mod model;
 mod nav_areas;
 pub mod prefab;
