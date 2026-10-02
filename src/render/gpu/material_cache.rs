@@ -9,8 +9,10 @@
 //!
 //! The key is the *resolved* signature (a map's path only once its texture is
 //! resident, else empty for the default), so a late-loading texture gets a fresh group
-//! rather than a stale one (#207). Entries are never evicted: there is one per material
-//! look in use, a small set, and each is only a bind group over shared textures.
+//! rather than a stale one (#207). Entries are evicted only when a texture file is
+//! re-written (#689): then every group is dropped and rebuilt on next use, since a
+//! group holds the old upload. There is one per material look in use, a small set,
+//! and each is only a bind group over shared textures.
 //!
 //! **Runtime params (#399).** A material whose surface shader exposes runtime params
 //! owns one uniform buffer, keyed by its library name, and its group binds that buffer
@@ -100,6 +102,14 @@ impl MaterialCache {
         });
         queue.write_buffer(&buffer, 0, bytemuck::cast_slice(&values));
         self.params.insert(owner.to_owned(), (buffer, values));
+    }
+
+    /// Drop every group (their param buffers stay), so the next lookup rebuilds each
+    /// over the textures resident now — called when a texture file was re-written
+    /// (#689), before any draw of the frame resolves an index.
+    pub(crate) fn forget_groups(&mut self) {
+        self.index.clear();
+        self.groups.clear();
     }
 
     /// Distinct material groups built so far.

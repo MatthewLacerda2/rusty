@@ -1,3 +1,5 @@
+pub(crate) mod freshness;
+
 use std::rc::Rc;
 
 use image::GenericImageView;
@@ -146,10 +148,15 @@ impl Renderer {
         pixels
     }
 
-    /// Loads and registers a new texture from a filepath. Caches results dynamically.
+    /// Loads and registers a new texture from a filepath. Caches results dynamically;
+    /// a failed load is remembered as a miss (drawn with the default) and retried
+    /// once the file appears, never cached under its path (#689).
     pub fn load_texture(&mut self, path_str: &str) -> Rc<GpuTexture> {
         if let Some(tex) = self.gpu_textures.get(path_str) {
             return Rc::clone(tex);
+        }
+        if self.texture_freshness.misses.contains(path_str) {
+            return Rc::clone(&self.default_texture);
         }
         // A render texture (#430) is never on disk: it is registered by the frame
         // that draws it, and until then shows the default — uncached, so it appears
@@ -158,12 +165,11 @@ impl Renderer {
             return Rc::clone(&self.default_texture);
         }
 
-        // Try load texture, falling back to the default on failure.
-        let tex = match image::open(path_str) {
-            Ok(img) => self.upload_image_texture(path_str, &img),
-            Err(_) => Rc::clone(&self.default_texture),
+        let Ok(img) = image::open(path_str) else {
+            self.texture_freshness.misses.insert(path_str.to_string());
+            return Rc::clone(&self.default_texture);
         };
-
+        let tex = self.upload_image_texture(path_str, &img);
         self.gpu_textures
             .insert(path_str.to_string(), Rc::clone(&tex));
         tex

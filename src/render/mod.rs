@@ -137,6 +137,8 @@ pub struct Renderer {
     // across entities resolves to one buffer pair, not one per entity.
     pub gpu_meshes: HashMap<MeshId, GpuMesh>,
     pub gpu_textures: HashMap<String, Rc<GpuTexture>>,
+    /// Which cached uploads went stale: re-written files and failed loads (#689).
+    pub(crate) texture_freshness: gpu::textures::freshness::TextureFreshness,
     pub default_texture: Rc<GpuTexture>,
     /// What an extra shader texture slot samples with no texture of its own (#400).
     pub white_texture: Rc<GpuTexture>,
