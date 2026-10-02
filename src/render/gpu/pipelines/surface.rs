@@ -289,7 +289,7 @@ mod params_tests;
 
 #[cfg(test)]
 #[path = "mask_tests.rs"]
-mod mask_tests;
+pub(crate) mod mask_tests;
 
 #[cfg(test)]
 #[path = "gameplay_blocks_tests.rs"]

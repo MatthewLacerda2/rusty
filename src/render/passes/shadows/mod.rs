@@ -6,20 +6,25 @@
 //! cascade (#470, `casters`), skinned ones in their animated pose (#599). A caster
 //! whose surface clips fragments — a cutout, a dissolve — clips its shadow too (#648,
 //! `clips`).
+//!
+//! Point and spot lights cast through a shadow atlas instead (#468, `atlas`), drawn
+//! with the same pipelines and casters.
 
+pub(crate) mod atlas;
 pub(crate) mod cascades;
 mod casters;
 mod clips;
 mod frame;
 mod setup;
+mod sweeps;
 mod uniform;
 
 use crate::render::gpu::pipelines::surface::SurfaceShaders;
-use crate::render::lod::LodSelection;
 use crate::render::CameraUniform;
 use crate::scene::SceneId;
+use atlas::ShadowAtlas;
 use cascades::{Cascade, MAX_CASCADES};
-use casters::{CasterBuffer, CasterFrame};
+use casters::CasterBuffer;
 use clips::Clip;
 use glam::Mat4;
 
@@ -73,6 +78,8 @@ pub struct ShadowRenderer {
     pub(crate) drawn: Vec<(u32, u32)>,
     /// Mirrors `Renderer::instancing`: off draws one caster per call (#470 tests).
     pub(crate) instancing: bool,
+    /// The point and spot lights' shadow atlas (#468).
+    pub(crate) atlas: ShadowAtlas,
 }
 
 impl ShadowRenderer {
@@ -111,6 +118,7 @@ impl ShadowRenderer {
         let [pipeline, clip_pipeline] = Self::create_pipelines(device, layouts, shader);
         let static_casters = CasterBuffer::new(device, &entity_layout);
         let dynamic_casters = CasterBuffer::new(device, &entity_layout);
+        let atlas = ShadowAtlas::new(device, &global_layout, &entity_layout, &time_buffer);
 
         Self {
             static_texture: textures.static_texture,
@@ -132,6 +140,7 @@ impl ShadowRenderer {
             dynamic_casters,
             drawn: Vec::new(),
             instancing: true,
+            atlas,
         }
     }
 
@@ -196,97 +205,6 @@ impl ShadowRenderer {
         }
         self.cascades = cascades;
     }
-
-    /// Record the frame's shadow sweeps: re-bake the static layers whose light volume
-    /// moved, copy the static layers into the active array, and draw the dynamic
-    /// casters over each cascade — skipping the LOD levels `lod` hides (#472).
-    fn render(
-        &mut self,
-        encoder: &mut wgpu::CommandEncoder,
-        frame: &CasterFrame,
-        lod: &LodSelection,
-    ) {
-        let scene = frame.scene;
-        let key = |c: &Cascade| Some((scene.id(), c.light_space));
-        let stale: Vec<usize> = (0..self.cascades.len())
-            .filter(|&i| self.static_cache[i] != key(&self.cascades[i]))
-            .collect();
-        if !stale.is_empty() {
-            // The bake outlives the frame, so it cannot follow the camera's LOD
-            // choice: it bakes every group at LOD0 (#472).
-            let finest = LodSelection::finest(scene);
-            let batches = self.prepare_casters(frame, &finest, true, &stale);
-            for (&i, batches) in stale.iter().zip(&batches) {
-                let view = &self.static_layers[i];
-                let mut pass = depth_pass(encoder, "Shadow Static Pass", view, true);
-                self.draw_casters(&mut pass, frame, batches, true, i);
-            }
-            for i in stale {
-                self.static_cache[i] = key(&self.cascades[i]);
-            }
-        }
-
-        self.copy_static_layers(encoder);
-
-        let all: Vec<usize> = (0..self.cascades.len()).collect();
-        let batches = self.prepare_casters(frame, lod, false, &all);
-        for (i, batches) in batches.iter().enumerate() {
-            if batches.is_empty() {
-                continue;
-            }
-            let view = &self.active_layers[i];
-            let mut pass = depth_pass(encoder, "Shadow Dynamic Pass", view, false);
-            self.draw_casters(&mut pass, frame, batches, false, i);
-        }
-    }
-
-    /// Copy the frame's cascade layers from the static bake into the active array.
-    fn copy_static_layers(&self, encoder: &mut wgpu::CommandEncoder) {
-        let layer = |texture| wgpu::ImageCopyTexture {
-            texture,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-            aspect: wgpu::TextureAspect::All,
-        };
-        encoder.copy_texture_to_texture(
-            layer(&self.static_texture),
-            layer(&self.active_texture),
-            wgpu::Extent3d {
-                width: Self::CASCADE_SIZE,
-                height: Self::CASCADE_SIZE,
-                depth_or_array_layers: self.cascades.len().max(1) as u32,
-            },
-        );
-    }
-}
-
-/// A depth-only pass over one cascade layer: cleared for a bake, loaded for the
-/// dynamic casters drawn over the copied statics.
-fn depth_pass<'a>(
-    encoder: &'a mut wgpu::CommandEncoder,
-    label: &str,
-    view: &'a wgpu::TextureView,
-    clear: bool,
-) -> wgpu::RenderPass<'a> {
-    let load = if clear {
-        wgpu::LoadOp::Clear(1.0)
-    } else {
-        wgpu::LoadOp::Load
-    };
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some(label),
-        color_attachments: &[],
-        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-            view,
-            depth_ops: Some(wgpu::Operations {
-                load,
-                store: wgpu::StoreOp::Store,
-            }),
-            stencil_ops: None,
-        }),
-        timestamp_writes: None,
-        occlusion_query_set: None,
-    })
 }
 
 #[cfg(test)]

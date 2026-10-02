@@ -117,8 +117,9 @@ pub(crate) fn apply_ssr_settings(lighting_uniform: &mut LightingUniform, scene: 
 }
 
 impl crate::render::Renderer {
-    /// Write the frame's lighting uniform and its point and spot lights (#434), and
-    /// start the frame counters (#433) with the light counts.
+    /// Write the frame's lighting uniform and stage its point and spot lights (#434;
+    /// uploaded once the shadow atlas has placed them, #468), and start the frame
+    /// counters (#433) with the light counts.
     pub(super) fn upload_lighting(&mut self, scene: &Scene, camera_pos: Vec3) {
         let lighting_uniform = self.build_lighting_uniform(scene, camera_pos);
         self.queue.write_buffer(
@@ -126,7 +127,8 @@ impl crate::render::Renderer {
             0,
             bytemuck::bytes_of(&lighting_uniform),
         );
-        self.upload_local_lights(crate::render::clusters::local_lights(scene));
+        self.clusters
+            .stage(crate::render::clusters::local_lights(scene));
         self.begin_counters(scene);
     }
 

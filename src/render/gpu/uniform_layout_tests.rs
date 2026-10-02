@@ -8,13 +8,15 @@ use std::mem::{offset_of, size_of};
 use super::shaders::ShaderRegistry;
 use super::uniforms::{CameraUniform, LightingUniform};
 use crate::render::clusters::LocalLight;
+use crate::render::passes::shadows::atlas::ShadowTile;
 
-const PROBE: &str = "#import common::{CameraUniforms, LightingUniforms, LocalLight}\n\
+const PROBE: &str = "#import common::{CameraUniforms, LightingUniforms, LocalLight, ShadowTile}\n\
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;\n\
 @group(0) @binding(1) var<uniform> lighting: LightingUniforms;\n\
 @group(0) @binding(7) var<storage, read> lights: array<LocalLight>;\n\
+@group(0) @binding(8) var<storage, read> tiles: array<ShadowTile>;\n\
 @fragment fn fs_main() -> @location(0) vec4<f32> {\n\
-    return vec4<f32>(camera.time + lighting.ssr_active + lights[0].range);\n\
+    return vec4<f32>(camera.time + lighting.ssr_active + lights[0].range + tiles[0].params.x);\n\
 }\n";
 
 /// `(member offset by name, struct size)` of the WGSL struct named `name`.
@@ -96,6 +98,17 @@ fn local_light_matches_wgsl_layout() {
         ("direction", offset_of!(LocalLight, direction)),
         ("kind", offset_of!(LocalLight, kind)),
         ("outer_cone", offset_of!(LocalLight, outer_cone)),
+        ("shadow", offset_of!(LocalLight, shadow)),
     ];
     assert_layout("LocalLight", &pairs, size_of::<LocalLight>());
+}
+
+#[test]
+fn shadow_tile_matches_wgsl_layout() {
+    let pairs = [
+        ("view_proj", offset_of!(ShadowTile, view_proj)),
+        ("rect", offset_of!(ShadowTile, rect)),
+        ("params", offset_of!(ShadowTile, params)),
+    ];
+    assert_layout("ShadowTile", &pairs, size_of::<ShadowTile>());
 }

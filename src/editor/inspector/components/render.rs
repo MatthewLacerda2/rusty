@@ -75,6 +75,13 @@ pub fn draw_light(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_
                     *is_dirty = true;
                 }
             });
+            let mut shadows = light.cast_shadows;
+            if ui.checkbox(&mut shadows, "Cast Shadows").changed() {
+                if let Some(mut l) = world.light_mut(id) {
+                    light_ops::set_cast_shadows(&mut l, shadows);
+                }
+                *is_dirty = true;
+            }
         }
 
         if light.light_type == LightType::Spotlight {

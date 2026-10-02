@@ -20,6 +20,7 @@ fn entity_with_light(scene: &mut Scene, name: &str) -> u32 {
             range: 5.0,
             inner_cone: 0.0,
             outer_cone: 0.0,
+            cast_shadows: false,
         }),
     );
     id
@@ -40,6 +41,7 @@ fn light_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> 
             Light.SetIntensity({via_lua}, -5.0)
             Light.SetRange({via_lua}, -2.0)
             Light.SetType({via_lua}, "Directional")
+            Light.SetCastShadows({via_lua}, true)
         "#
         ))
         .exec()
@@ -54,6 +56,7 @@ fn light_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> 
         light_ops::set_intensity(&mut e, -5.0); // clamped to 0 by the shared op
         light_ops::set_range(&mut e, -2.0); // clamped to 0 by the shared op
         light_ops::set_type(&mut e, LightType::Directional);
+        light_ops::set_cast_shadows(&mut e, true);
     }
 
     let sc = scene.borrow();
@@ -63,6 +66,7 @@ fn light_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> 
     assert_eq!(a.intensity, b.intensity);
     assert_eq!(a.range, b.range);
     assert_eq!(a.light_type, b.light_type);
+    assert_eq!(a.cast_shadows, b.cast_shadows);
     // The clamp is single-sourced in the op the binding calls.
     assert_eq!(a.intensity, 0.0);
     assert_eq!(a.range, 0.0);

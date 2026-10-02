@@ -1,8 +1,8 @@
 //! src/scene/authoring/light.rs — Shared light-authoring ops.
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
-//! `LightComponent` field by field (colour, intensity, range, type, and the
-//! spotlight cone angles), including the validation each write owns (the `≥ 0`
+//! `LightComponent` field by field (colour, intensity, range, type, the
+//! spotlight cone angles and the shadow toggle), including the validation each write owns (the `≥ 0`
 //! clamp on intensity/range, the inner≤outer cone ordering).
 //!
 //! BOTH callers route through here so the editor and the API can never drift: the
@@ -45,6 +45,11 @@ pub fn set_cones(l: &mut LightComponent, inner: f32, outer: f32) {
     l.inner_cone = inner.min(outer);
 }
 
+/// Set whether a point or spot light casts shadows through the shadow atlas (#468).
+pub fn set_cast_shadows(l: &mut LightComponent, on: bool) {
+    l.cast_shadows = on;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -62,6 +67,7 @@ mod tests {
             range: 10.0,
             inner_cone: 30.0,
             outer_cone: 45.0,
+            cast_shadows: false,
         };
         scene.world.set_light(id, Some(c));
         (scene, id)

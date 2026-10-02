@@ -14,6 +14,8 @@ pub(crate) struct ClusterBuffers {
     indices: GrowBuffer,
     /// The frame's lights as uploaded: what every camera of the frame bins.
     frame_lights: Vec<LocalLight>,
+    /// Which of `frame_lights` ask for a shadow (#468), for the atlas plan.
+    shadow_requests: Vec<bool>,
     aabbs: AabbCache,
 }
 
@@ -25,6 +27,7 @@ impl ClusterBuffers {
             ranges: storage("Cluster Ranges"),
             indices: storage("Cluster Light Indices"),
             frame_lights: Vec::new(),
+            shadow_requests: Vec::new(),
             aabbs: AabbCache::default(),
         }
     }
@@ -39,13 +42,32 @@ impl ClusterBuffers {
     }
 }
 
+impl ClusterBuffers {
+    /// Adopt the frame's point and spot lights, each with whether it asks for a
+    /// shadow. Uploaded by [`Renderer::upload_local_lights`] once the shadow atlas
+    /// has given them their tiles.
+    pub(crate) fn stage(&mut self, lights: Vec<(LocalLight, bool)>) {
+        (self.frame_lights, self.shadow_requests) = lights.into_iter().unzip();
+    }
+
+    /// The staged lights, each with whether it asks for a shadow.
+    pub(crate) fn staged(&self) -> Vec<(LocalLight, bool)> {
+        let requests = self.shadow_requests.iter().copied();
+        self.frame_lights.iter().copied().zip(requests).collect()
+    }
+
+    /// Give light `light` the shadow-atlas tiles from `first_tile` on (#468).
+    pub(crate) fn set_shadow(&mut self, light: usize, first_tile: u32) {
+        self.frame_lights[light].shadow = first_tile;
+    }
+}
+
 impl Renderer {
-    /// Upload the frame's point and spot lights, once per frame.
-    pub(crate) fn upload_local_lights(&mut self, lights: Vec<LocalLight>) {
+    /// Upload the frame's staged point and spot lights, once per frame.
+    pub(crate) fn upload_local_lights(&mut self) {
         let c = &mut self.clusters;
-        let bytes = bytemuck::cast_slice(&lights);
+        let bytes = bytemuck::cast_slice(&c.frame_lights);
         self.global_bind_group_dirty |= c.lights.upload(&self.device, &self.queue, bytes);
-        c.frame_lights = lights;
     }
 
     /// Bin the frame's lights into one camera's clusters and upload its lists,

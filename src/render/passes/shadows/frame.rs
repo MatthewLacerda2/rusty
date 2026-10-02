@@ -1,19 +1,22 @@
 //! The frame's shadow sweep (#435): pick the sun, fit the cascades to the base camera,
-//! upload both uniforms and record the depth passes — once per frame, before the
-//! camera stack draws, so every stacked camera samples the same maps.
+//! upload both uniforms, plan the point/spot shadow atlas (#468) and record the depth
+//! passes — once per frame, before the camera stack draws, so every stacked camera
+//! samples the same maps.
 
 use glam::Vec3;
 
 use super::casters::CasterFrame;
-use super::{cascades, CascadeUniform, ShadowRenderer};
+use super::{atlas, cascades, CascadeUniform, ShadowRenderer};
 use crate::components::{LightType, ShadowSettings};
 use crate::render::lod::LodSelection;
 use crate::render::Renderer;
 use crate::scene::{Camera, Scene};
 
 impl Renderer {
-    /// Fit the cascades to `camera` (at `aspect`) and render the shadow maps, the
-    /// dynamic casters at the LOD levels `lod` (the base camera's) shows (#472).
+    /// Fit the cascades to `camera` (at `aspect`), plan the atlas for the lights it
+    /// sees, upload the frame's local lights with their tiles, and render the shadow
+    /// maps — the dynamic casters at the LOD levels `lod` (the base camera's) shows
+    /// (#472).
     pub(crate) fn run_shadow_passes(
         &mut self,
         scene: &Scene,
@@ -35,6 +38,7 @@ impl Renderer {
         self.shadow_renderer.update_cascades(&self.queue, fitted);
         self.shadow_renderer
             .set_time(&self.queue, scene.shader_time);
+        self.plan_shadow_atlas(camera, aspect);
 
         let mut encoder = self
             .device
@@ -51,8 +55,29 @@ impl Renderer {
             materials: &self.materials,
             surfaces: &self.surface_shaders,
         };
-        self.shadow_renderer.render(&mut encoder, &frame, lod);
+        self.shadow_renderer
+            .render_cascades(&mut encoder, &frame, lod);
+        self.shadow_renderer.render_atlas(&mut encoder, &frame, lod);
         self.queue.submit(std::iter::once(encoder.finish()));
+    }
+}
+
+impl Renderer {
+    /// Place the staged local lights' shadows in the atlas as `camera` (at `aspect`)
+    /// sees them, upload the lights with their tiles, and count what fit (#468).
+    fn plan_shadow_atlas(&mut self, camera: &Camera, aspect: f32) {
+        let view_proj = camera.build_view_projection(aspect);
+        let plan = atlas::plan(&self.clusters.staged(), view_proj, camera.position);
+        for &(light, first_tile) in &plan.shadows {
+            self.clusters.set_shadow(light, first_tile);
+        }
+        self.upload_local_lights();
+        let c = &mut self.frame_counters;
+        c.shadowed_lights = plan.shadows.len() as u32;
+        c.shadow_lights_dropped = plan.dropped;
+        c.shadow_atlas_tiles = plan.tiles.len() as u32;
+        c.shadow_atlas_texels = plan.texels();
+        self.shadow_renderer.atlas.update(&self.queue, plan.tiles);
     }
 }
 

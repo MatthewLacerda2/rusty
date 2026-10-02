@@ -199,8 +199,9 @@ pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
 }
 
 /// Main shadow bind group layout: the cascade uniform, the cascade depth array, the
-/// comparison sampler (#435), and the view's ambient-occlusion texture (#436) — the
-/// forward pass's group 3, everything it reads that a per-frame pass produced.
+/// comparison sampler (#435), the view's ambient-occlusion texture (#436), and the
+/// point/spot shadow atlas with its tiles (#468) — the forward pass's group 3,
+/// everything it reads that a per-frame pass produced.
 pub(crate) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Main Shadow Bind Group Layout"),
@@ -241,6 +242,17 @@ pub(crate) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayo
                 },
                 count: None,
             },
+            wgpu::BindGroupLayoutEntry {
+                binding: 4,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Depth,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            storage_entry(5, wgpu::ShaderStages::FRAGMENT),
         ],
     })
 }
@@ -274,6 +286,14 @@ pub(crate) fn create_shadow_bind_group(
             wgpu::BindGroupEntry {
                 binding: 3,
                 resource: wgpu::BindingResource::TextureView(ao),
+            },
+            wgpu::BindGroupEntry {
+                binding: 4,
+                resource: wgpu::BindingResource::TextureView(&shadows.atlas.view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 5,
+                resource: shadows.atlas.tiles.as_entire_binding(),
             },
         ],
     })

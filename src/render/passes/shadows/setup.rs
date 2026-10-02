@@ -94,25 +94,8 @@ impl ShadowRenderer {
         wgpu::BindGroupLayout,
     ) {
         let global_layout = global_layout(device);
-
-        let global_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Shadow Global Bind Group"),
-            layout: &global_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: LIGHT_BINDING,
-                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: light_space_buffer,
-                        offset: 0,
-                        size: wgpu::BufferSize::new(64),
-                    }),
-                },
-                wgpu::BindGroupEntry {
-                    binding: TIME_BINDING,
-                    resource: time_buffer.as_entire_binding(),
-                },
-            ],
-        });
+        let global_bind_group =
+            global_group(device, &global_layout, light_space_buffer, time_buffer);
 
         // Every caster as one storage array, indexed per instance (#470) — and read by
         // the clip's fragment for its alpha test (#648) — and the joint matrices its
@@ -187,6 +170,34 @@ fn global_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
                     min_binding_size: None,
                 },
                 count: None,
+            },
+        ],
+    })
+}
+
+/// A shadow stage's group 0 over `layout`: one light matrix of `light_space` (picked
+/// by dynamic offset) and the game time — the cascades' and the atlas's (#468).
+pub(super) fn global_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    light_space: &wgpu::Buffer,
+    time_buffer: &wgpu::Buffer,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("Shadow Global Bind Group"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: LIGHT_BINDING,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: light_space,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(64),
+                }),
+            },
+            wgpu::BindGroupEntry {
+                binding: TIME_BINDING,
+                resource: time_buffer.as_entire_binding(),
             },
         ],
     })

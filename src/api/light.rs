@@ -1,7 +1,7 @@
 //! src/api/light.rs — `Light` namespace.
 //!
-//! Get/Set over an entity's optional `LightComponent`: colour, intensity, range
-//! and light type. Every setter maps onto a real field the renderer reads
+//! Get/Set over an entity's optional `LightComponent`: colour, intensity, range,
+//! light type and whether it casts shadows. Every setter maps onto a real field the renderer reads
 //! (`apply_scene_lights`), so a script tweak takes effect on the next frame's
 //! lighting uniform. There is no per-light "active" flag in the engine — a light
 //! is gated by its owning entity's `active` (a `Scene` concern), so this surface
@@ -29,6 +29,7 @@ pub fn register<'lua, 'scope>(
     register_intensity(scope, &table, scene)?;
     register_range(scope, &table, scene)?;
     register_type(scope, &table, scene)?;
+    register_cast_shadows(scope, &table, scene)?;
 
     lua.globals().set("Light", table).map_err(|e| e.to_string())
 }
@@ -155,6 +156,35 @@ fn register_type<'lua, 'scope>(
     )
 }
 
+/// `GetCastShadows` / `SetCastShadows`: whether a point or spot light casts shadows
+/// through the shadow atlas (#468). The sun always casts; it ignores the flag.
+fn register_cast_shadows<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "GetCastShadows",
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
+            Ok(scene.world.light(id).is_some_and(|l| l.cast_shadows))
+        }),
+    )?;
+
+    put(
+        table,
+        "SetCastShadows",
+        scope.create_function(|_, (id, on): (u32, bool)| {
+            let mut scene = scene.borrow_mut();
+            if let Some(mut c) = scene.world.light_mut(id) {
+                light_ops::set_cast_shadows(&mut c, on);
+            }
+            Ok(())
+        }),
+    )
+}
+
 /// Canonical name for a [`LightType`] (the value `GetType` returns / `SetType` takes).
 fn type_name(t: &LightType) -> &'static str {
     match t {
@@ -196,6 +226,7 @@ mod tests {
                 range: 10.0,
                 inner_cone: 30.0,
                 outer_cone: 45.0,
+                cast_shadows: false,
             }),
         );
         (RefCell::new(scene), id)
@@ -220,6 +251,9 @@ mod tests {
             lua.load(format!("Light.SetType({id}, 'Directional')"))
                 .exec()
                 .unwrap();
+            lua.load(format!("Light.SetCastShadows({id}, true)"))
+                .exec()
+                .unwrap();
             Ok(())
         })
         .unwrap();
@@ -230,6 +264,7 @@ mod tests {
         assert_eq!(light.intensity, 3.0);
         assert_eq!(light.range, 25.0);
         assert_eq!(light.light_type, LightType::Directional);
+        assert!(light.cast_shadows);
     }
 
     #[test]

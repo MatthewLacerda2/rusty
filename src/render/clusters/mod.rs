@@ -28,7 +28,7 @@ mod lights;
 pub(crate) use bin::bin;
 pub(crate) use gpu::ClusterBuffers;
 pub(crate) use grid::ClusterGrid;
-pub(crate) use lights::{local_lights, LocalLight};
+pub(crate) use lights::{local_lights, LocalLight, KIND_SPOT};
 
 /// Clusters across, up and deep. 16×9 tiles match a 16:9 screen with square-ish
 /// tiles; 24 exponential slices keep each slice's depth span proportional to its

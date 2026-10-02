@@ -13,7 +13,7 @@ use crate::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use crate::shadergen::{bake_recipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
 
 /// A dissolve surface shader and a mask PNG, unique to this run; removed on drop.
-pub(super) struct Dissolve {
+pub(crate) struct Dissolve {
     pub shader: String,
     pub mask: String,
 }
@@ -28,7 +28,7 @@ impl Dissolve {
     }
 
     /// With `mask` saved as this run's `<tag>` mask.
-    pub(super) fn with_mask(tag: &str, mask: &image::RgbaImage) -> Self {
+    pub(crate) fn with_mask(tag: &str, mask: &image::RgbaImage) -> Self {
         let shader = format!("test_dissolve_{tag}_{}", std::process::id());
         let recipe = ShaderRecipe {
             pass: PassKind::Surface,

@@ -114,8 +114,10 @@ struct LocalLight {
     kind: u32,        // 0 point, 1 spot
     inner_cone: f32,  // cosine of the inner half-angle
     outer_cone: f32,  // cosine of the outer half-angle
+    // First tile in the shadow atlas (#468): a spotlight's one, a point light's six
+    // cube faces (+X, -X, +Y, -Y, +Z, -Z); NO_SHADOW when it casts none.
+    shadow: u32,
     _pad_a: f32,
-    _pad_b: f32,
 };
 
 // The light cluster `world` falls in: its screen tile (from `view_proj`) and its
@@ -145,6 +147,74 @@ fn local_light_radiance(light: LocalLight, world: vec3<f32>) -> vec3<f32> {
         cone = clamp((theta - light.outer_cone) / max(light.inner_cone - light.outer_cone, 1e-4), 0.0, 1.0);
     }
     return light.color * light.intensity * cone / (d * d + 1.0);
+}
+
+// `LocalLight.shadow` of a light with no tile in the shadow atlas (#468).
+const NO_SHADOW: u32 = 0xffffffffu;
+
+// One tile of the point/spot shadow atlas (#468): a light face's view-projection,
+// its square in atlas UVs (xy corner, zw size), and in `params.x` the world size of
+// one of its texels a metre from the light. Mirrors the Rust `ShadowTile`.
+struct ShadowTile {
+    view_proj: mat4x4<f32>,
+    rect: vec4<f32>,
+    params: vec4<f32>,
+};
+
+// The atlas tile holding `light`'s shadow at `world`: a spotlight's one, or the
+// point light's cube face along the major axis from the light; NO_SHADOW if none.
+fn local_shadow_tile(light: LocalLight, world: vec3<f32>) -> u32 {
+    if (light.shadow == NO_SHADOW || light.kind == 1u) {
+        return light.shadow;
+    }
+    let d = world - light.position;
+    let a = abs(d);
+    var face = select(5u, 4u, d.z > 0.0);
+    if (a.x >= a.y && a.x >= a.z) {
+        face = select(1u, 0u, d.x > 0.0);
+    } else if (a.y >= a.z) {
+        face = select(3u, 2u, d.y > 0.0);
+    }
+    return light.shadow + face;
+}
+
+// How lit `world` (normal `N`) is by the light at `light_pos`, through its atlas
+// `tile`: 3x3 PCF of comparison taps, kept inside the tile so a kernel never reads
+// a neighbour. The surface is pushed off along its normal by a texel or two (more
+// at grazing light), sized by the texel footprint at its distance from the light.
+// 1.0 outside the tile's view.
+fn sample_local_shadow(
+    tile: ShadowTile,
+    atlas: texture_depth_2d,
+    s: sampler_comparison,
+    light_pos: vec3<f32>,
+    world: vec3<f32>,
+    N: vec3<f32>,
+) -> f32 {
+    let to_light = light_pos - world;
+    let dist = length(to_light);
+    let NdotL = clamp(dot(N, to_light / max(dist, 1e-6)), 0.0, 1.0);
+    let offset = N * dist * tile.params.x * (0.5 + 1.5 * (1.0 - NdotL));
+    let clip = tile.view_proj * vec4<f32>(world + offset, 1.0);
+    if (clip.w <= 0.0) {
+        return 1.0;
+    }
+    let ndc = clip.xyz / clip.w;
+    if (any(abs(ndc.xy) > vec2<f32>(1.0)) || ndc.z > 1.0) {
+        return 1.0;
+    }
+    let texel = 1.0 / f32(textureDimensions(atlas).x);
+    let lo = tile.rect.xy + vec2<f32>(texel * 1.5);
+    let hi = tile.rect.xy + tile.rect.zw - vec2<f32>(texel * 1.5);
+    let uv = tile.rect.xy + vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * tile.rect.zw;
+    var lit = 0.0;
+    for (var x = -1; x <= 1; x = x + 1) {
+        for (var y = -1; y <= 1; y = y + 1) {
+            let tap = clamp(uv + vec2<f32>(f32(x), f32(y)) * texel, lo, hi);
+            lit += textureSampleCompareLevel(atlas, s, tap, ndc.z);
+        }
+    }
+    return lit / 9.0;
 }
 
 // Standard mesh vertex layout — position, normal, UVs, skeletal animation data

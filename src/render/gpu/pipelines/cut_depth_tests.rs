@@ -43,7 +43,7 @@ pub(crate) fn slab_yard(shader: Option<&str>) -> (Scene, u32) {
 }
 
 /// Point `id`'s mask at `d`'s and set its `dissolve.amount`.
-fn dissolve(scene: &RefCell<Scene>, id: u32, d: &Dissolve, amount: f32) {
+pub(crate) fn dissolve(scene: &RefCell<Scene>, id: u32, d: &Dissolve, amount: f32) {
     let script = format!(
         r#"Material.SetShaderTexture({id}, "mask", [==[{}]==])
         Material.SetShaderParam({id}, "dissolve.amount", {amount})"#,
