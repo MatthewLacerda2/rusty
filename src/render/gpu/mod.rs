@@ -5,6 +5,7 @@
 
 pub(crate) mod bind_layouts;
 pub(crate) mod draw_buffers;
+pub(crate) mod global_group;
 pub(crate) mod grow_buffer;
 pub(crate) mod material_cache;
 pub mod mesh;

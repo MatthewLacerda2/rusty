@@ -10,9 +10,7 @@ use crate::render::passes::particles::ParticleDraws;
 use crate::render::{RenderView, Renderer};
 use crate::scene::{LightType, Scene};
 
-/// The forward lighting uniform's slot count per light type: 4 point lights, and one
-/// each of directional, spot and ambient (a later one overwrites an earlier one).
-const POINT_LIGHT_SLOTS: u32 = 4;
+use crate::render::gpu::uniforms::MAX_DIRECTIONAL_LIGHTS;
 
 /// Counters for one `Renderer::render` call, summed over every camera in the stack.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -32,8 +30,22 @@ pub struct RenderCounters {
     pub lod_hidden_entities: u32,
     /// Active lights in the scene.
     pub lights: u32,
-    /// Active lights the forward uniform had no slot for — silently unlit today.
+    /// Lights left unlit: directional lights past the 4 slots, every ambient light
+    /// but the last, and per camera the point/spot lights in view past the
+    /// clustered budget (256, the farthest dropped; #434). Summed over the stack.
     pub lights_dropped: u32,
+    /// Point/spot lights binned into at least one light cluster (#434), summed
+    /// over the camera stack.
+    pub lights_visible: u32,
+    /// Point/spot lights outside a camera's view, culled before binning so they
+    /// cost it nothing (#434), summed over the camera stack.
+    pub lights_culled: u32,
+    /// Entries written to the cluster light lists (#434): how many (cluster,
+    /// light) pairs the shaders may visit, summed over the camera stack.
+    pub light_cluster_refs: u64,
+    /// CPU microseconds spent binning lights into clusters (#434), summed over
+    /// the camera stack. Wall-clock, so the one counter that varies run to run.
+    pub light_bin_us: u64,
     /// Shadow-caster draw calls (static bake + dynamic); an instanced run of casters
     /// sharing a mesh is one draw (#470).
     pub shadow_draws: u32,
@@ -70,6 +82,10 @@ impl RenderCounters {
             ("lod_hidden_entities", self.lod_hidden_entities.into()),
             ("lights", self.lights.into()),
             ("lights_dropped", self.lights_dropped.into()),
+            ("lights_visible", self.lights_visible.into()),
+            ("lights_culled", self.lights_culled.into()),
+            ("light_cluster_refs", self.light_cluster_refs),
+            ("light_bin_us", self.light_bin_us),
             ("shadow_draws", self.shadow_draws.into()),
             ("ui_draws", self.ui_draws.into()),
             ("ui_mask_passes", self.ui_mask_passes.into()),
@@ -134,7 +150,8 @@ impl Renderer {
 }
 
 /// `(active lights, lights with no uniform slot)` — mirrors `apply_scene_lights`,
-/// which keeps the first four point lights and the last of each other type.
+/// which keeps four directional lights and the last ambient. Point and spot lights
+/// are clustered (#434); the binning stage counts the ones a camera drops.
 pub(crate) fn count_lights(scene: &Scene) -> (u32, u32) {
     let mut per_type = [0u32; 4];
     for id in scene.world.ids_with_light() {
@@ -151,11 +168,8 @@ pub(crate) fn count_lights(scene: &Scene) -> (u32, u32) {
             LightType::Ambient => 3,
         }] += 1;
     }
-    let dropped = per_type[0].saturating_sub(POINT_LIGHT_SLOTS)
-        + per_type[1..]
-            .iter()
-            .map(|n| n.saturating_sub(1))
-            .sum::<u32>();
+    let dropped =
+        per_type[1].saturating_sub(MAX_DIRECTIONAL_LIGHTS as u32) + per_type[3].saturating_sub(1);
     (per_type.iter().sum(), dropped)
 }
 

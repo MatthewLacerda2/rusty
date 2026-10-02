@@ -186,6 +186,7 @@ impl Renderer {
             lighting_buffer: global.lighting_buffer,
             global_bind_group: global.global_bind_group,
             global_bind_group_dirty: false,
+            clusters: global.clusters,
             draw_buffers,
             materials: crate::render::gpu::material_cache::MaterialCache::new(textures.zero_params),
             surface_shaders,

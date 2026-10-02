@@ -1,4 +1,4 @@
-#import common::{CameraUniforms, LightingUniforms, VertexInput, apply_fog, blend_joints}
+#import common::{CameraUniforms, LightingUniforms, LocalLight, VertexInput, apply_fog, blend_joints, cluster_index, local_light_radiance}
 
 struct EntityUniforms {
     model_matrix: mat4x4<f32>,
@@ -61,6 +61,16 @@ var s_skybox: sampler;
 var t_refl_cube: texture_cube<f32>;
 @group(0) @binding(5)
 var s_refl_cube: sampler;
+
+// Clustered lights (#434): the frame's point/spot lights, each cluster's
+// (offset, count) into `cluster_lights`, and that flat list of light indices.
+// Binding 6 is the shadow module's (below).
+@group(0) @binding(7)
+var<storage, read> local_lights: array<LocalLight>;
+@group(0) @binding(8)
+var<storage, read> cluster_ranges: array<vec2<u32>>;
+@group(0) @binding(9)
+var<storage, read> cluster_lights: array<u32>;
 
 @group(1) @binding(0)
 var<uniform> entity: EntityUniforms;
@@ -294,7 +304,7 @@ fn calculate_shadow(world_pos: vec3<f32>, N: vec3<f32>) -> f32 {
     while (c < count - 1 && depth > shadow.splits[c]) {
         c = c + 1;
     }
-    let NdotL = clamp(dot(N, normalize(-lighting.dir_light.direction)), 0.0, 1.0);
+    let NdotL = clamp(dot(N, normalize(-lighting.dir_lights[0].direction)), 0.0, 1.0);
     var lit = sample_cascade(c, world_pos, N, NdotL);
 
     let blend_start = shadow.splits[c] * (1.0 - shadow.params.z);
@@ -503,41 +513,24 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let ao = ambient_occlusion(in.clip_position.xy);
     var lighting_color = ambient_irradiance * albedo * (1.0 - metallic) * ao;
 
-    // 2. Directional Light
-    let L_dir = normalize(-lighting.dir_light.direction);
-    let radiance_dir = lighting.dir_light.color * lighting.dir_light.intensity;
+    // 2. Directional lights (#434). Slot 0 is the sun, the one the cascades shadow.
     let shadow = calculate_shadow(in.world_position, N);
-    lighting_color += calculate_pbr(N, V, L_dir, radiance_dir, F0, metallic, roughness, albedo) * shadow;
-
-
-    // 3. Point Lights
-    for (var i = 0u; i < lighting.num_point_lights; i = i + 1u) {
-        let light = lighting.point_lights[i];
-        let light_dir = light.position - in.world_position;
-        let d = length(light_dir);
-        if (d > light.range) {
-            continue;
-        }
-        let L = normalize(light_dir);
-        let atten = 1.0 / (d * d + 1.0);
-        let radiance = light.color * light.intensity * atten;
-        lighting_color += calculate_pbr(N, V, L, radiance, F0, metallic, roughness, albedo);
+    for (var i = 0u; i < lighting.num_dir_lights; i = i + 1u) {
+        let sun = lighting.dir_lights[i];
+        let radiance = sun.color * sun.intensity * select(1.0, shadow, i == 0u);
+        lighting_color += calculate_pbr(N, V, normalize(-sun.direction), radiance, F0, metallic, roughness, albedo);
     }
 
-    // 4. Spotlight
-    let spot = lighting.spot_light;
-    let spot_dir = spot.position - in.world_position;
-    let spot_dist = length(spot_dir);
-    if (spot_dist <= spot.range) {
-        let L_spot = normalize(spot_dir);
-        let theta = dot(L_spot, normalize(-spot.direction));
-        
-        if (theta > spot.outer_cone) {
-            let intensity = clamp((theta - spot.outer_cone) / (spot.inner_cone - spot.outer_cone), 0.0, 1.0);
-            let atten = 1.0 / (spot_dist * spot_dist + 1.0);
-            let radiance = spot.color * spot.intensity * atten * intensity;
-            lighting_color += calculate_pbr(N, V, L_spot, radiance, F0, metallic, roughness, albedo);
+    // 3. Point and spot lights, only those binned into this fragment's cluster (#434).
+    let range = cluster_ranges[cluster_index(camera.clusters, camera.view_proj, in.world_position)];
+    for (var i = 0u; i < range.y; i = i + 1u) {
+        let light = local_lights[cluster_lights[range.x + i]];
+        let radiance = local_light_radiance(light, in.world_position);
+        if (all(radiance == vec3<f32>(0.0))) {
+            continue;
         }
+        let L = normalize(light.position - in.world_position);
+        lighting_color += calculate_pbr(N, V, L, radiance, F0, metallic, roughness, albedo);
     }
 
     // 5. Environment reflections (#244). The raw mirror direction is parallax-corrected

@@ -12,6 +12,22 @@ pub(crate) struct CameraUniform {
     /// Game time for shader animation (#398), `camera.time` in WGSL — the vec3 pad slot.
     pub time: f32,
     pub fog: FogUniform,
+    /// This camera's light-cluster grid (#434): how a point finds its cluster.
+    pub clusters: ClusterUniform,
+}
+
+/// How a world point finds its light cluster (#434), mirroring `Clusters` in
+/// `common.wgsl`. Built per camera by `render::clusters::ClusterGrid`.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Default, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct ClusterUniform {
+    /// `depth = dot(xyz, p) + w`: a point's distance along the view axis.
+    pub view_z: [f32; 4],
+    /// Depth slice of a point: `x` scale, `y` bias, `z` 1 for log slices
+    /// (perspective) or 0 for linear (orthographic), `w` the near plane.
+    pub slices: [f32; 4],
+    /// Tiles across, tiles up, depth slices; `w` unused.
+    pub dims: [u32; 4],
 }
 
 /// The scene fog (#437), mirroring `Fog` in `common.wgsl`. Carried by every pass's
@@ -62,40 +78,16 @@ pub(crate) struct DirectionalLightUniform {
     pub _pad2: [f32; 4],
 }
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct PointLightUniform {
-    pub position: [f32; 3],
-    pub _pad1: f32,
-    pub color: [f32; 3],
-    pub intensity: f32,
-    pub range: f32,
-    pub _pad2: [f32; 3],
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct SpotlightUniform {
-    pub position: [f32; 3],
-    pub _pad1: f32,
-    pub direction: [f32; 3],
-    pub _pad2: f32,
-    pub color: [f32; 3],
-    pub intensity: f32,
-    pub range: f32,
-    pub inner_cone: f32,
-    pub outer_cone: f32,
-    pub _pad3: f32,
-}
+/// The most directional lights shaded at once (#434); slot 0 is the sun, the one
+/// that casts the cascaded shadows. Past this they are dropped and counted.
+pub(crate) const MAX_DIRECTIONAL_LIGHTS: usize = 4;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct LightingUniform {
     pub ambient: AmbientLightUniform,
-    pub dir_light: DirectionalLightUniform,
-    pub point_lights: [PointLightUniform; 4],
-    pub spot_light: SpotlightUniform,
-    pub num_point_lights: u32,
+    pub dir_lights: [DirectionalLightUniform; MAX_DIRECTIONAL_LIGHTS],
+    pub num_dir_lights: u32,
     pub ssr_active: f32,
     pub ssr_quality: f32,
     pub ssr_temporal_upsampling: f32,

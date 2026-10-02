@@ -5,10 +5,8 @@
 
 use glam::Vec3;
 
-use crate::render::{
-    AmbientLightUniform, DirectionalLightUniform, LightingUniform, PointLightUniform,
-    SpotlightUniform,
-};
+use crate::render::gpu::uniforms::MAX_DIRECTIONAL_LIGHTS;
+use crate::render::{AmbientLightUniform, DirectionalLightUniform, LightingUniform};
 use crate::scene::{LightType, Scene};
 
 /// The base lighting uniform before scene lights/SSR are scanned in.
@@ -18,34 +16,8 @@ pub(crate) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
             color: scene.ambient_color.to_array(),
             intensity: scene.ambient_intensity,
         },
-        dir_light: DirectionalLightUniform {
-            direction: [0.0, -1.0, 0.0],
-            _pad1: 0.0,
-            color: [1.0, 1.0, 1.0],
-            intensity: 0.0,
-            _pad2: [0.0; 4],
-        },
-        point_lights: [PointLightUniform {
-            position: [0.0, 0.0, 0.0],
-            _pad1: 0.0,
-            color: [0.0, 0.0, 0.0],
-            intensity: 0.0,
-            range: 0.0,
-            _pad2: [0.0; 3],
-        }; 4],
-        spot_light: SpotlightUniform {
-            position: [0.0, 0.0, 0.0],
-            _pad1: 0.0,
-            direction: [0.0, 0.0, 0.0],
-            _pad2: 0.0,
-            color: [0.0, 0.0, 0.0],
-            intensity: 0.0,
-            range: 0.0,
-            inner_cone: 0.0,
-            outer_cone: 0.0,
-            _pad3: 0.0,
-        },
-        num_point_lights: 0,
+        dir_lights: [bytemuck::Zeroable::zeroed(); MAX_DIRECTIONAL_LIGHTS],
+        num_dir_lights: 0,
         ssr_active: 0.0,
         ssr_quality: 0.0,
         ssr_temporal_upsampling: 0.0,
@@ -75,10 +47,12 @@ pub(crate) fn apply_reflection_probe(
     }
 }
 
-/// Populate the dynamic light slots from active light entities (point lights capped
-/// at the 4-slot budget).
+/// Fill the ambient and directional slots from the active light entities. The last
+/// ambient wins. Directional lights fill [`MAX_DIRECTIONAL_LIGHTS`] slots in entity
+/// order, except that the last one (the shadow pass's sun) always takes slot 0.
+/// Point and spot lights go to the cluster lights instead (#434).
 pub(crate) fn apply_scene_lights(lighting_uniform: &mut LightingUniform, scene: &Scene) {
-    let mut pt_idx = 0;
+    let mut dirs = Vec::new();
     for id in scene.world.ids_with_light() {
         if !scene.world.is_active(id) {
             continue;
@@ -92,55 +66,22 @@ pub(crate) fn apply_scene_lights(lighting_uniform: &mut LightingUniform, scene: 
                     intensity: light.intensity,
                 };
             }
-            LightType::Directional => {
-                let dir = transform.rotation * Vec3::NEG_Z;
-                lighting_uniform.dir_light = DirectionalLightUniform {
-                    direction: dir.to_array(),
-                    _pad1: 0.0,
-                    color: light.color.to_array(),
-                    intensity: light.intensity,
-                    _pad2: [0.0; 4],
-                };
-            }
-            LightType::Point => {
-                if pt_idx < 4 {
-                    lighting_uniform.point_lights[pt_idx] = PointLightUniform {
-                        position: transform.position.to_array(),
-                        _pad1: 0.0,
-                        color: light.color.to_array(),
-                        intensity: light.intensity,
-                        range: light.range,
-                        _pad2: [0.0; 3],
-                    };
-                    pt_idx += 1;
-                }
-            }
-            LightType::Spotlight => {
-                lighting_uniform.spot_light = spotlight_uniform(&transform, &light);
-            }
+            LightType::Directional => dirs.push(DirectionalLightUniform {
+                direction: (transform.rotation * Vec3::NEG_Z).to_array(),
+                _pad1: 0.0,
+                color: light.color.to_array(),
+                intensity: light.intensity,
+                _pad2: [0.0; 4],
+            }),
+            LightType::Point | LightType::Spotlight => {}
         }
     }
-    lighting_uniform.num_point_lights = pt_idx as u32;
-}
-
-/// Build the spotlight uniform, baking cone half-angles into their cosines.
-pub(crate) fn spotlight_uniform(
-    transform: &crate::components::TransformComponent,
-    light: &crate::components::LightComponent,
-) -> SpotlightUniform {
-    let dir = transform.rotation * Vec3::NEG_Z;
-    SpotlightUniform {
-        position: transform.position.to_array(),
-        _pad1: 0.0,
-        direction: dir.to_array(),
-        _pad2: 0.0,
-        color: light.color.to_array(),
-        intensity: light.intensity,
-        range: light.range,
-        inner_cone: light.inner_cone.to_radians().cos(),
-        outer_cone: light.outer_cone.to_radians().cos(),
-        _pad3: 0.0,
+    if let Some(sun) = dirs.pop() {
+        dirs.insert(0, sun);
     }
+    dirs.truncate(MAX_DIRECTIONAL_LIGHTS);
+    lighting_uniform.dir_lights[..dirs.len()].copy_from_slice(&dirs);
+    lighting_uniform.num_dir_lights = dirs.len() as u32;
 }
 
 /// Fold active Visual Correction (SSR) components into the uniform; last one wins.
@@ -176,8 +117,8 @@ pub(crate) fn apply_ssr_settings(lighting_uniform: &mut LightingUniform, scene: 
 }
 
 impl crate::render::Renderer {
-    /// Write the frame's lighting uniform, and start the frame counters (#433) with
-    /// the light counts — which lights got a uniform slot is decided right here.
+    /// Write the frame's lighting uniform and its point and spot lights (#434), and
+    /// start the frame counters (#433) with the light counts.
     pub(super) fn upload_lighting(&mut self, scene: &Scene, camera_pos: Vec3) {
         let lighting_uniform = self.build_lighting_uniform(scene, camera_pos);
         self.queue.write_buffer(
@@ -185,6 +126,7 @@ impl crate::render::Renderer {
             0,
             bytemuck::bytes_of(&lighting_uniform),
         );
+        self.upload_local_lights(crate::render::clusters::local_lights(scene));
         self.begin_counters(scene);
     }
 

@@ -16,7 +16,7 @@
 // them. Every mode fogs per vertex (#437); alpha/additive blending is selected by
 // the pipeline, which picks the matching fragment entry point.
 
-#import common::{Fog, LightingUniforms, fog_factor}
+#import common::{CameraUniforms, Fog, LightingUniforms, LocalLight, cluster_index, fog_factor, local_light_radiance}
 
 struct ParticleGlobals {
     view_proj: mat4x4<f32>,
@@ -33,8 +33,13 @@ struct ParticleGlobals {
 @group(1) @binding(1) var sprite_sampler: sampler;
 // The scene depth (read-only this pass) — soft particles fade against it.
 @group(2) @binding(0) var scene_depth: texture_depth_2d;
-// The renderer's group 0 (camera + lighting + env); only `lighting` is read.
+// The renderer's group 0 (camera + lighting + env + light clusters, #434); the
+// camera is read only to find a vertex's light cluster.
+@group(3) @binding(0) var<uniform> camera: CameraUniforms;
 @group(3) @binding(1) var<uniform> lighting: LightingUniforms;
+@group(3) @binding(7) var<storage, read> local_lights: array<LocalLight>;
+@group(3) @binding(8) var<storage, read> cluster_ranges: array<vec2<u32>>;
+@group(3) @binding(9) var<storage, read> cluster_lights: array<u32>;
 
 struct InstanceInput {
     @location(0) center: vec3<f32>,
@@ -118,7 +123,7 @@ fn sheet_uv(uv: vec2<f32>, sheet: vec4<f32>) -> vec2<f32> {
 
 // Light arriving at a point from the scene lights, with no surface normal: each
 // light counts as it would on a matte surface turned toward it (radiance / pi).
-// Point + spot attenuation match the forward pass.
+// Point + spot falloff is the forward pass's (`local_light_radiance`).
 fn particle_light(world: vec3<f32>, light: vec4<f32>) -> vec3<f32> {
     // Flat ambient: the forward pass's sky/ground gradient averaged over directions.
     var total = lighting.ambient.color * lighting.ambient.intensity * 0.625;
@@ -126,20 +131,13 @@ fn particle_light(world: vec3<f32>, light: vec4<f32>) -> vec3<f32> {
         total = light.rgb;
     }
     let inv_pi = 0.31830988;
-    total += lighting.dir_light.color * lighting.dir_light.intensity * inv_pi;
-    for (var i = 0u; i < lighting.num_point_lights; i = i + 1u) {
-        let p = lighting.point_lights[i];
-        let d = distance(p.position, world);
-        if (d <= p.range) {
-            total += p.color * p.intensity / (d * d + 1.0) * inv_pi;
-        }
+    for (var i = 0u; i < lighting.num_dir_lights; i = i + 1u) {
+        total += lighting.dir_lights[i].color * lighting.dir_lights[i].intensity * inv_pi;
     }
-    let spot = lighting.spot_light;
-    let spot_d = distance(spot.position, world);
-    if (spot_d <= spot.range && spot_d > 0.0) {
-        let theta = dot((spot.position - world) / spot_d, normalize(-spot.direction));
-        let cone = clamp((theta - spot.outer_cone) / max(spot.inner_cone - spot.outer_cone, 1e-4), 0.0, 1.0);
-        total += spot.color * spot.intensity / (spot_d * spot_d + 1.0) * cone * inv_pi;
+    // Point and spot lights through this vertex's cluster (#434).
+    let range = cluster_ranges[cluster_index(camera.clusters, camera.view_proj, world)];
+    for (var i = 0u; i < range.y; i = i + 1u) {
+        total += local_light_radiance(local_lights[cluster_lights[range.x + i]], world) * inv_pi;
     }
     return total;
 }

@@ -75,12 +75,15 @@ impl Camera {
     }
 
     pub fn build_view_projection(&self, aspect: f32) -> Mat4 {
-        let forward = self.forward();
-        let view = Mat4::look_at_rh(self.position, self.position + forward, Vec3::Y);
+        self.projection_matrix(aspect) * self.view_matrix()
+    }
+
+    /// The view → clip matrix for a viewport of `aspect` (wgpu depth `0..1`).
+    pub fn projection_matrix(&self, aspect: f32) -> Mat4 {
         // Guard against a degenerate range (e.g. far <= near from hand-edited values),
         // which would otherwise produce a NaN projection.
         let far = self.far.max(self.near + 0.001);
-        let proj = match self.projection {
+        match self.projection {
             Projection::Perspective => {
                 Mat4::perspective_rh(self.fov.to_radians(), aspect, self.near, far)
             }
@@ -88,8 +91,7 @@ impl Camera {
                 let (h, w) = (size.max(0.001), size.max(0.001) * aspect);
                 Mat4::orthographic_rh(-w, w, -h, h, self.near, far)
             }
-        };
-        proj * view
+        }
     }
 
     /// Whether an entity on `layer` is rendered by this camera's culling mask.
