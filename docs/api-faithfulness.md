@@ -69,6 +69,9 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `Play` | ✅ | sim — `app/animation.rs` samples `current_clip` against imported clips |
 | `Crossfade` | ✅ | sim — drives blend state, sampled by `app/animation.rs` (#80) |
 | `Stop` | ✅ | sim — `is_playing=false` halts the sampler |
+| `AddTwoBoneIK` / `AddAimIK` / `RemoveIK` | ✅ | sim — `Scene::solve_ik` (system `solve_ik`, after `LateUpdate`) solves `AnimatorComponent.ik`; round-trips (#461) |
+| `SetIKTarget[Entity]` / `SetIKHint[Entity]` | ✅ | sim — read by `Scene::solve_ik` each fixed step (runtime only, not saved) (#461) |
+| `SetIKWeight` | ✅ | sim — scales the solve in `Scene::solve_ik`; round-trips (#461) |
 
 ### `Input` — over the shared `InputState`
 
@@ -507,7 +510,7 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 122 |
+| ✅ faithful | 125 |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 

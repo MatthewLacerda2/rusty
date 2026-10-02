@@ -51,6 +51,15 @@ path + active state are saved with the entity.
 | `Animator.GetCurrentNode` | `(id [, layer])` | The active graph node's name in `layer` (default: the base layer), or `nil` when there is no animator/graph/such layer or evaluation hasn't bound it yet. |
 | `Animator.SetLayerWeight` | `(id, layer, weight)` | Set an extra layer's weight, clamped to `[0, 1]` (0 hides it, 1 applies it fully); returns `true` when set. `layer` is an index (1 = the first extra layer) or the layer's name. The base layer (0) is always at full weight, so it is refused with a warning, as is an unknown layer. |
 | `Animator.GetLayerWeight` | `(id, layer)` | A layer's live weight (`1` for the base layer), or `nil` for an unknown layer. |
+| `Animator.AddTwoBoneIK` | `(id, name, root, mid, tip)` | Add (or replace) a **two-bone IK** constraint named `name` over three bones of the entity's skeleton, by bone name: `root` (upper arm / thigh), `mid` (forearm / shin), `tip` (hand / foot). Saved with the animator at full weight; it does nothing until it has a target. Returns `true`; `false` with a warning when the entity has no animator or a bone doesn't exist. See *Inverse kinematics*. |
+| `Animator.AddAimIK` | `(id, name, bones [, opts])` | Add (or replace) an **aim chain** named `name`: `bones` lists bone names root → tip (`{"spine", "chest", "neck", "head"}`), and the last bone's aim axis turns toward the target. `opts`: `weights` (each bone's share of the turn, parallel to `bones`; default even), `axis` (`{x, y, z}` in the last bone's local space; default `{0, 0, 1}`, glTF forward), `clamp` (the most the aim leaves the animated aim, in degrees; default 180) and `weight` (default 1). Same return as `AddTwoBoneIK`. |
+| `Animator.RemoveIK` | `(id, name)` | Remove the IK constraint `name`, putting back the pose it last wrote; `true` when there was one. |
+| `Animator.SetIKTarget` | `(id, name, x, y, z)` | Set constraint `name`'s target to a world-space point (Unity's `SetIKPosition` / `SetLookAtPosition`). Returns `true`; `false` with a warning for an unknown constraint. Targets are runtime state, not saved. |
+| `Animator.SetIKTargetEntity` | `(id, name, target)` | Make constraint `name` reach for entity `target`'s live world position every step (a gun's foregrip, the player's head). Same return as `SetIKTarget`. |
+| `Animator.SetIKHint` | `(id, name, x, y, z)` | Set a two-bone constraint's **hint** (pole) to a world point: the elbow or knee bends toward it (Unity's `SetIKHintPosition`). Ignored by aim chains. Same return as `SetIKTarget`. |
+| `Animator.SetIKHintEntity` | `(id, name, hint)` | Like `SetIKHint`, following entity `hint`'s live world position. |
+| `Animator.SetIKWeight` | `(id, name, weight)` | Set constraint `name`'s weight, clamped to `[0, 1]` (Unity's `SetIKPositionWeight` / `SetLookAtWeight`). 0 leaves the animated pose exactly as it was. Saved. Same return as `SetIKTarget`. |
+| `Animator.GetIKWeight` | `(id, name)` | Constraint `name`'s weight, or `nil` when there is none. |
 
 ### Blend trees (#457)
 
@@ -139,11 +148,13 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
   Transform of every bone its clips animate, across all layers (a crossfade blends the two poses in
   TRS space: translation and scale lerp, rotation slerps, so limbs keep their
   length). A bone no playing clip animates is left alone.
-- **Later writers override it.** `LateUpdate` scripts (IK, procedural recoil,
-  aim) and physics may move a bone after the Animator — a ragdolled bone is put
-  back where its body is right after the Animator runs; the mesh is skinned from
-  the bones once per frame after all of them, so what moved a bone last is what
-  renders.
+- **Later writers override it, in a fixed order each tick.** The Animator writes
+  the clip pose; a ragdolled bone is then put back where its physics body is;
+  `LateUpdate` scripts (procedural recoil, a hand-made aim, setting IK targets)
+  run next; IK (below) bends the result last, skipping any bone a ragdoll's
+  dynamic body carries (physics wins); hitboxes then follow the bones. The mesh is
+  skinned from the bones once per frame after all of them, so what moved a bone
+  last is what renders.
 - **Attach by parenting.** A gun goes under `hand_r`:
   `Scene.SetParent(gun, Animator.GetBone(enemy, "hand_r"))`.
 - **Saving.** Bones are rebuilt from the model on load, so the scene never
@@ -162,3 +173,52 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
 
 `Debug.Snapshot()` leaves bones out by default; `Debug.Snapshot({ bones = true })`
 includes them. The editor's Hierarchy shows a skeleton collapsed.
+
+### Inverse kinematics (#461)
+
+IK bends the animated pose toward targets a script chooses, so an enemy aims
+its torso and head at you whatever its legs are doing, a support hand stays on
+the foregrip, and feet land on stairs. It is configured **on the Animator**: a
+list of named constraints over the skeleton's bones (by bone name), saved with
+the entity. Two kinds, after Unity's Animation Rigging:
+
+- **Two-bone IK** (`AddTwoBoneIK`, Unity's `TwoBoneIK`) — an arm or a leg. The
+  `root` and `mid` bones rotate so the `tip` lands on the target; the tip keeps
+  its own local rotation. Out of reach, the limb straightens and points at the
+  target. The elbow or knee bends toward the **hint** when one is set, else it
+  keeps the animation's bend plane. The **weight** pulls the target from where
+  the animation put the tip (0.5 reaches half-way).
+- **Aim chain** (`AddAimIK`, Unity's `MultiAim` / `SetLookAt*`) — a short chain
+  (spine → chest → neck → head) turns so its last bone's aim axis points at the
+  target. Each bone takes its `weights` share of the turn, the turn never
+  leaves the animated aim by more than `clamp` degrees, and the **weight** scales
+  what is left.
+
+**Targets are runtime state** (Unity sets IK goals every frame): set them from a
+script with `SetIKTarget` (a point) or `SetIKTargetEntity` (followed every step).
+A constraint without a target leaves the pose alone, and a weight of 0 is an
+exact no-op.
+
+**When it runs.** Each fixed step: the Animator poses the bones, ragdolled
+bones are put back where physics left them, `LateUpdate` scripts run (the place to set this tick's targets), then **IK**, then
+hitboxes follow the bones (so a shot hits the IK'd pose, `Physics`, *Per-bone
+hitboxes*), and the mesh is skinned in `Render`. Aim chains solve before limbs,
+so a hand reaching for a gun held by the aimed arm reaches where the aim put it.
+IK post-processes each step's pose: what it wrote last step is put back first
+(unless something else has moved the bone since), so a bone no clip animates
+does not drift. A constraint touching a bone carried by a **dynamic
+`Rigidbody`** (a ragdolled limb) is skipped: physics wins. IK runs in Play only.
+
+```lua
+-- Start: an enemy that looks at the player and keeps its left hand on the gun.
+Animator.AddAimIK(id, "Look", { "spine", "chest", "neck", "head" },
+  { weights = { 0.2, 0.3, 0.2, 0.3 }, clamp = 70 })
+Animator.AddTwoBoneIK(id, "LeftHand", "upperarm_l", "lowerarm_l", "hand_l")
+Animator.SetIKTargetEntity(id, "LeftHand", foregrip)
+-- LateUpdate: track the player.
+local x, y, z = Transform.GetPosition(player)
+Animator.SetIKTarget(id, "Look", x, y + 1.6, z)
+```
+
+Foot placement is a two-bone constraint per leg whose target a script sets from
+a downward `Physics.Raycast`; the engine does no ground probing of its own.

@@ -11,8 +11,10 @@
 use serde::{Deserialize, Serialize};
 
 mod graph_state;
+mod ik;
 mod parameters;
 mod playback;
+pub use ik::{IkChain, IkConstraint, IkTarget};
 pub use parameters::{AnimatorParameter, AnimatorParameters};
 pub use playback::{Motion, Playback, Playhead};
 
@@ -52,6 +54,10 @@ pub struct AnimatorComponent {
     /// Filled when the evaluator binds them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub layers: Vec<LayerState>,
+    /// IK constraints over the skeleton (#461), solved after `LateUpdate` and
+    /// before skinning: two-bone limbs and aim chains, addressed by name.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ik: Vec<IkConstraint>,
 }
 
 /// One extra layer's runtime state (#457).
@@ -87,6 +93,7 @@ impl Default for AnimatorComponent {
             graph: None,
             graph_enabled: true,
             layers: Vec::new(),
+            ik: Vec::new(),
         }
     }
 }
@@ -131,6 +138,23 @@ impl AnimatorComponent {
             let speed = self.speed;
             self.base
                 .advance(dt, speed, Playhead::clip(clip_duration), 1.0);
+        }
+    }
+
+    /// The IK constraint named `name` (#461).
+    pub fn ik_mut(&mut self, name: &str) -> Option<&mut IkConstraint> {
+        self.ik.iter_mut().find(|c| c.name == name)
+    }
+
+    /// Add `constraint`, replacing one of the same name in place (keeping its
+    /// place in the list; the runtime target and hint are reset with it).
+    pub fn set_ik(&mut self, mut constraint: IkConstraint) {
+        match self.ik_mut(&constraint.name) {
+            Some(slot) => {
+                constraint.applied = std::mem::take(&mut slot.applied);
+                *slot = constraint;
+            }
+            None => self.ik.push(constraint),
         }
     }
 

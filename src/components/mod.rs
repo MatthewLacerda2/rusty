@@ -34,8 +34,8 @@ pub mod ui;
 pub mod visual_correction;
 
 pub use animator::{
-    AnimatorComponent, AnimatorParameter, AnimatorParameters, LayerState, Motion, Playback,
-    Playhead,
+    AnimatorComponent, AnimatorParameter, AnimatorParameters, IkChain, IkConstraint, IkTarget,
+    LayerState, Motion, Playback, Playhead,
 };
 pub use audio_source::AudioSourceComponent;
 pub use camera::{CameraComponent, ClearFlags, Projection, RenderTarget, RENDER_TEXTURE_PREFIX};
