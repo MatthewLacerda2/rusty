@@ -66,7 +66,7 @@ impl NavigationGraph {
     /// agent's feet are, not its Transform.
     fn plan_agent_path(&self, agent: &mut NavMeshAgentComponent, feet: Vec3) {
         let path = match self.sample_position(agent.target, TARGET_SAMPLE_DISTANCE) {
-            Some(goal) => self.calculate_path(feet, goal),
+            Some(goal) => self.calculate_path_masked(feet, goal, agent.area_mask),
             None => NavPath::invalid(),
         };
         agent.cached_path = path.corners.into_iter().skip(1).collect();

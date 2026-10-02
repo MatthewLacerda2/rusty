@@ -2,7 +2,8 @@
 //!
 //! Unity's `OffMeshLink` / `NavMeshLink`: an authored link between two walkable
 //! points (a ladder, a window, a gap) — its two ends (offsets from the entity's
-//! Transform), whether it runs both ways, its path cost, and whether it is active;
+//! Transform), whether it runs both ways, its path cost and area (#460), and whether
+//! it is active;
 //! plus `IsConnected`, whether both ends found the navmesh at the last rebake.
 //! Every setter routes through the shared `scene::authoring::offmesh_link` ops the
 //! inspector card uses. Getters return a neutral default without a link; setters
@@ -76,7 +77,8 @@ fn register_ends<'lua, 'scope>(
     Ok(())
 }
 
-/// `Active`, `Bidirectional` and `Cost` (negative: the link's length).
+/// `Active`, `Bidirectional`, `Area` (#460) and `Cost` (negative: the link's length
+/// at its area's cost).
 fn register_options<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     t: &Table<'lua>,
@@ -100,6 +102,13 @@ fn register_options<'lua, 'scope>(
         });
         put(t, &format!("Set{name}"), f)?;
     }
+    let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map_or(0, |l| l.area)));
+    put(t, "GetArea", f)?;
+    let f = scope.create_function(move |_, (id, area): (u32, i64)| {
+        write(scene, id, |l| ops::set_area(l, area));
+        Ok(())
+    });
+    put(t, "SetArea", f)?;
     let f = scope
         .create_function(move |_, id: u32| Ok(get(scene, id).map_or(-1.0, |l| l.cost_override)));
     put(t, "GetCost", f)?;

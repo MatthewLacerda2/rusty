@@ -66,6 +66,7 @@ pub(in crate::ecs) fn build_bundle(entity: Entity, seq: u64) -> hecs::EntityBuil
         entity.nav_agent,
         entity.nav_obstacle,
         entity.offmesh_link,
+        entity.nav_modifier,
         entity.camera,
         entity.visual_correction,
         entity.particles,

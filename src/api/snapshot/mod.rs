@@ -140,6 +140,7 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
         (World::has_nav_agent, "NavMeshAgent"),
         (World::has_nav_obstacle, "NavMeshObstacle"),
         (World::has_offmesh_link, "OffMeshLink"),
+        (World::has_nav_modifier, "NavMeshModifierVolume"),
         (World::has_particles, "ParticleEmitter"),
         (World::has_animator, "Animator"),
         (World::has_audio, "AudioSource"),

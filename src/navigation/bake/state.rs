@@ -53,6 +53,15 @@ impl ChangeLog {
 }
 
 impl NavigationGraph {
+    /// Make every cached agent path stale without rebaking (#460: an area cost
+    /// changed): a new generation whose change log entry says "anything changed".
+    pub(in crate::navigation) fn invalidate_paths(&mut self) {
+        self.bake_generation = self.bake_generation.wrapping_add(1);
+        if let Some(st) = self.bake_state.as_mut() {
+            st.log.record(self.bake_generation, None);
+        }
+    }
+
     /// The cell rectangles every bake after `generation` changed, or `None` when
     /// that is unknown (a full bake, or too long ago): then anything may have.
     pub fn changes_since(&self, generation: u64) -> Option<Vec<CellRect>> {

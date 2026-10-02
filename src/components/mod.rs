@@ -21,6 +21,7 @@ pub mod lod_group;
 pub mod material;
 pub mod mesh;
 pub mod nav_agent;
+pub mod nav_modifier;
 pub mod nav_obstacle;
 pub mod offmesh_link;
 pub mod particle;
@@ -50,6 +51,7 @@ pub use mesh::{DirtyFlag, MeshComponent};
 pub use nav_agent::{
     NavMeshAgentComponent, NavPathStatus, DEFAULT_AVOIDANCE_PRIORITY, MAX_AVOIDANCE_PRIORITY,
 };
+pub use nav_modifier::NavMeshModifierVolumeComponent;
 pub use nav_obstacle::{NavMeshObstacleComponent, ObstacleShape};
 pub use offmesh_link::{
     OffMeshLinkComponent, OffMeshLinkData, OffMeshLinkKind, LINK_SNAP_DISTANCE,

@@ -88,8 +88,9 @@ fn draw_agent_tuning(
     }
 }
 
-/// The nav-agent local-avoidance toggle + priority (#463) and the off-mesh link
-/// auto-traverse toggle (#462), through the shared ops.
+/// The nav-agent local-avoidance toggle + priority (#463), the off-mesh link
+/// auto-traverse toggle (#462) and the area mask (#460, bit `i` = area `i`), through
+/// the shared ops.
 fn draw_agent_avoidance(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -112,6 +113,18 @@ fn draw_agent_avoidance(
         }
         *is_dirty = true;
     }
+    let mut mask = agent.area_mask;
+    ui.horizontal(|ui| {
+        ui.label("Area Mask:");
+        let edited = ui.add(egui::DragValue::new(&mut mask).hexadecimal(8, false, true));
+        let all = ui.button("All").on_hover_text("Every area").clicked();
+        if edited.changed() || all {
+            if let Some(mut a) = world.nav_agent_mut(id) {
+                nav_ops::set_area_mask(&mut a, if all { u32::MAX } else { mask });
+            }
+            *is_dirty = true;
+        }
+    });
     let mut priority = agent.avoidance_priority;
     ui.horizontal(|ui| {
         ui.label("Avoidance Priority:");

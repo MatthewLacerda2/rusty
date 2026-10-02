@@ -65,6 +65,10 @@ pub struct OffMeshLinkComponent {
     /// The path cost of crossing it, in world units; negative uses its length
     /// (Unity's `costOverride`).
     pub cost_override: f32,
+    /// The link's navigation area (#460, Unity's `area`): agents whose area mask
+    /// excludes it never cross it, and without a cost override its length is
+    /// charged at the area's cost.
+    pub area: u8,
 }
 
 impl Default for OffMeshLinkComponent {
@@ -76,6 +80,7 @@ impl Default for OffMeshLinkComponent {
             end: Vec3::new(0.0, 0.0, 2.0),
             bidirectional: true,
             cost_override: -1.0,
+            area: 0,
         }
     }
 }

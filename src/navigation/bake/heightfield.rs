@@ -54,7 +54,11 @@ impl NavigationGraph {
 fn open_spans(column: &[Solid], agent_height: f32) -> impl Iterator<Item = NavSpan> + '_ {
     column.iter().enumerate().filter_map(move |(i, s)| {
         let ceiling = column.get(i + 1).map_or(f32::INFINITY, |above| above.min);
-        (s.walkable && ceiling - s.max >= agent_height).then_some(NavSpan { y: s.max, ceiling })
+        (s.walkable && ceiling - s.max >= agent_height).then_some(NavSpan {
+            y: s.max,
+            ceiling,
+            area: super::super::WALKABLE_AREA,
+        })
     })
 }
 

@@ -3,7 +3,7 @@
 //! live apart to stay under the size cap: the Collider card in `collider`, the
 //! RigidBody card in `physics`, the NavMesh Agent card in `nav_agent`, the NavMesh
 //! Obstacle card in `nav_obstacle`, the Off-Mesh Link card in `offmesh_link`, the
-//! Joint card in `joint`, the
+//! NavMesh Modifier Volume card in `nav_modifier`, the Joint card in `joint`, the
 //! CharacterController card in `character_controller`.
 
 use egui_phosphor::regular as icon;
@@ -13,6 +13,7 @@ mod character_controller;
 mod collider;
 mod joint;
 mod nav_agent;
+mod nav_modifier;
 mod nav_obstacle;
 mod offmesh_link;
 mod physics;
@@ -21,6 +22,7 @@ pub use character_controller::draw_character_controller;
 pub use collider::draw_collider;
 pub use joint::draw_joint;
 pub use nav_agent::draw_nav_agent;
+pub use nav_modifier::draw_nav_modifier;
 pub use nav_obstacle::draw_nav_obstacle;
 pub use offmesh_link::draw_offmesh_link;
 pub use physics::draw_rigidbody;
@@ -37,7 +39,7 @@ pub fn draw_bodies(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is
 }
 
 /// The navigation cards, in inspector order: NavMesh Agent, NavMesh Obstacle,
-/// Off-Mesh Link.
+/// Off-Mesh Link, NavMesh Modifier Volume.
 pub fn draw_navigation(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -47,7 +49,8 @@ pub fn draw_navigation(
 ) {
     draw_nav_agent(ui, world, id, is_dirty);
     draw_nav_obstacle(ui, world, id, is_dirty, &mut *pending_nav_bake);
-    draw_offmesh_link(ui, world, id, is_dirty, pending_nav_bake);
+    draw_offmesh_link(ui, world, id, is_dirty, &mut *pending_nav_bake);
+    draw_nav_modifier(ui, world, id, is_dirty, pending_nav_bake);
 }
 
 /// 3D. Script bindings — one card per attached script (#83). An entity can carry

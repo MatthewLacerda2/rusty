@@ -71,10 +71,12 @@ mod tests {
         let ground = NavSpan {
             y: 0.0,
             ceiling: 3.0,
+            area: 0,
         };
         let upper = NavSpan {
             y: 3.2,
             ceiling: f32::INFINITY,
+            area: 0,
         };
         g.spans = vec![ground, ground, upper, ground];
         g.cell_start = vec![0, 1, 3, 4];

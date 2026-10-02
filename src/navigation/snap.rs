@@ -82,7 +82,11 @@ mod tests {
     /// One cell with floors at y = 0, 4 and 8.
     fn tower() -> NavigationGraph {
         let mut g = NavigationGraph::new(0.0, 0.0, 0.0, 0.0, 1.0);
-        let floor = |y: f32, ceiling: f32| NavSpan { y, ceiling };
+        let floor = |y: f32, ceiling: f32| NavSpan {
+            y,
+            ceiling,
+            area: 0,
+        };
         g.spans = vec![floor(0.0, 3.8), floor(4.0, 7.8), floor(8.0, f32::INFINITY)];
         g.cell_start = vec![0, 3];
         g

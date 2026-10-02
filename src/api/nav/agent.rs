@@ -31,6 +31,7 @@ pub fn register<'lua, 'scope>(
     super::path_state::register_reads(scope, &table, scene)?;
     super::path_state::register_writes(scope, &table, scene, nav)?;
     super::offmesh::register_agent(scope, &table, scene)?;
+    super::areas::register_agent(scope, &table, scene)?;
 
     lua.globals()
         .set("NavMeshAgent", table)

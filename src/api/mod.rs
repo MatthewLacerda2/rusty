@@ -43,6 +43,7 @@ pub(crate) mod lua_json;
 pub mod mask;
 pub mod material;
 pub mod nav;
+pub mod nav_modifier;
 pub mod nav_obstacle;
 pub mod offmesh_link;
 pub mod particle;
@@ -180,6 +181,7 @@ pub fn register<'lua, 'scope>(
     scene::register(lua, scope, ctx.scene, ctx.scene_path, ctx.is_playing)?;
     nav::register(lua, scope, ctx.scene, ctx.nav)?;
     nav_obstacle::register(lua, scope, ctx.scene)?;
+    nav_modifier::register(lua, scope, ctx.scene)?;
     offmesh_link::register(lua, scope, ctx.scene, ctx.nav)?;
     physics::register(lua, scope, ctx.scene)?;
     physics::register_hitscan(lua, scope, ctx.scene, ctx.physics)?;

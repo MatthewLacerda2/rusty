@@ -18,7 +18,9 @@ use crate::components::{
     TransformComponent, VisualCorrectionComponent,
 };
 use crate::components::{BackdropFilterComponent, MaskComponent};
-use crate::components::{NavMeshObstacleComponent, OffMeshLinkComponent};
+use crate::components::{
+    NavMeshModifierVolumeComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
+};
 
 /// On-disk shape used only for deserialization, so old single-`script` scenes
 /// (pre-#83) keep loading. It accepts both the new `scripts: Vec<…>` and the
@@ -55,6 +57,8 @@ pub(super) struct EntityRepr {
     nav_obstacle: Option<NavMeshObstacleComponent>,
     #[serde(default)]
     offmesh_link: Option<OffMeshLinkComponent>,
+    #[serde(default)]
+    nav_modifier: Option<NavMeshModifierVolumeComponent>,
     camera: Option<CameraComponent>,
     visual_correction: Option<VisualCorrectionComponent>,
     /// Read through the pre-#439 `size_end` migration.
@@ -133,6 +137,7 @@ impl From<EntityRepr> for Entity {
             nav_agent: r.nav_agent,
             nav_obstacle: r.nav_obstacle,
             offmesh_link: r.offmesh_link,
+            nav_modifier: r.nav_modifier,
             camera: r.camera,
             visual_correction: r.visual_correction,
             particles: r.particles.map(ParticleEmitterComponent::from),

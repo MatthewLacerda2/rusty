@@ -5,7 +5,7 @@
 //! through these, so the rules live once: the ends stay finite, and a cost below
 //! zero (or NaN) means "use the link's length", stored as `-1`.
 //!
-//! Allowed deps: components (the component data). Pure.
+//! Allowed deps: components (the component data), navigation (the area limit). Pure.
 
 use glam::Vec3;
 
@@ -45,6 +45,14 @@ pub fn set_cost_override(l: &mut Link, cost: f32) {
     }
 }
 
+/// Set the link's navigation area (#460). An id past the area table's limit is
+/// ignored.
+pub fn set_area(l: &mut Link, area: i64) {
+    if (0..crate::navigation::MAX_AREAS as i64).contains(&area) {
+        l.area = area as u8;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -66,6 +74,9 @@ mod tests {
         assert_eq!(l.cost_override, -1.0, "negative means the length");
         set_cost_override(&mut l, f32::NAN);
         assert_eq!(l.cost_override, -1.0);
+        set_area(&mut l, 4);
+        set_area(&mut l, 40);
+        assert_eq!(l.area, 4, "an out-of-range area is ignored");
         set_bidirectional(&mut l, false);
         set_active(&mut l, false);
         assert!(!l.bidirectional && !l.active);

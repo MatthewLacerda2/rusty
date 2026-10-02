@@ -7,10 +7,14 @@
 //! or a stair onto the next floor and stops at a wall, a ledge or an eroded edge.
 //! Where the segment passes exactly through a cell corner it is a diagonal move, and
 //! both cells beside the corner must be reachable too (no corner-cutting).
+//!
+//! Every span entered must also pass an area filter (#460): the raycast's area mask,
+//! or the smoothing's "same area as this run". A span that fails it stops the walk
+//! like a wall; the start span is exempt.
 
 use glam::Vec3;
 
-use super::super::{NavigationGraph, SpanRef};
+use super::super::{in_mask, NavigationGraph, SpanRef, ALL_AREAS};
 
 /// Two crossings closer than this (in segment parameter `t`) count as one corner.
 const CORNER_EPSILON: f32 = 1e-5;
@@ -31,8 +35,13 @@ impl NavigationGraph {
     /// navmesh (`span_under`); off it the walk is blocked at once, at `from` (Unity
     /// reports a hit for a source off the mesh). `None` when the graph is empty there.
     pub fn raycast(&self, from: Vec3, to: Vec3) -> Option<NavRaycastHit> {
+        self.raycast_masked(from, to, ALL_AREAS)
+    }
+
+    /// [`Self::raycast`] walking only across the areas in `mask` (#460).
+    pub fn raycast_masked(&self, from: Vec3, to: Vec3, mask: u32) -> Option<NavRaycastHit> {
         match self.span_under(from) {
-            Some(start) => Some(self.trace(start, from, to)),
+            Some(start) => Some(self.trace(start, from, to, |a| in_mask(mask, a))),
             None => self.snap(from).map(|span| NavRaycastHit {
                 hit: true,
                 position: from,
@@ -41,8 +50,15 @@ impl NavigationGraph {
         }
     }
 
-    /// Walk from span `start`, standing at `from`, straight toward `to`.
-    pub(super) fn trace(&self, start: SpanRef, from: Vec3, to: Vec3) -> NavRaycastHit {
+    /// Walk from span `start`, standing at `from`, straight toward `to`, entering only
+    /// spans whose area passes `allowed`.
+    pub(super) fn trace(
+        &self,
+        start: SpanRef,
+        from: Vec3,
+        to: Vec3,
+        allowed: impl Fn(u8) -> bool,
+    ) -> NavRaycastHit {
         let s = self.grid_spacing;
         let (fu, fv) = ((from.x - self.min_x) / s, (from.z - self.min_z) / s);
         let (du, dv) = ((to.x - from.x) / s, (to.z - from.z) / s);
@@ -62,7 +78,9 @@ impl NavigationGraph {
             } else {
                 (0, step_z)
             };
-            let Some(next) = self.neighbour(on, dx, dz) else {
+            let next = self.neighbour(on, dx, dz);
+            let next = next.filter(|n| self.walk_allows(on, *n, (dx, dz), &allowed));
+            let Some(next) = next else {
                 return self.stop(on, from.lerp(to, t), true);
             };
             on = next;
@@ -73,6 +91,24 @@ impl NavigationGraph {
                 next_z += delta_z;
             }
         }
+    }
+
+    /// Whether the area filter lets a walk step from `on` to `next` by `(dx, dz)`: the
+    /// span it lands on passes, and so do both cells a diagonal cuts past.
+    fn walk_allows(
+        &self,
+        on: SpanRef,
+        next: SpanRef,
+        (dx, dz): (i32, i32),
+        allowed: &impl Fn(u8) -> bool,
+    ) -> bool {
+        let passes =
+            |s: Option<SpanRef>| s.is_some_and(|s| allowed(self.spans[s.index as usize].area));
+        passes(Some(next))
+            && (dx == 0
+                || dz == 0
+                || passes(self.link_to(on, on.gx + dx, on.gz))
+                    && passes(self.link_to(on, on.gx, on.gz + dz)))
     }
 
     /// The walk's result on span `on`: `p` kept inside that span's cell, on its floor.

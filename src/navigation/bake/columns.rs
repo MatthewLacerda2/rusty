@@ -88,6 +88,7 @@ mod tests {
         NavSpan {
             y,
             ceiling: f32::INFINITY,
+            area: 0,
         }
     }
 

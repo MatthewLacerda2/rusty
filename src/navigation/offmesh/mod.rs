@@ -47,8 +47,12 @@ pub struct OffMeshLink {
     pub to: LinkEnd,
     /// Whether it can be crossed end to start too. Generated links are one-way.
     pub bidirectional: bool,
-    /// The cost of crossing, in world units; negative uses the link's length.
+    /// The cost of crossing, in world units; negative uses the link's length times
+    /// its area's cost.
     pub cost_override: f32,
+    /// The link's navigation area (#460): an agent whose mask excludes it never
+    /// crosses it. Generated links are `Walkable`.
+    pub area: u8,
     /// The authoring entity, `None` for a generated link.
     pub owner: Option<u32>,
 }
@@ -89,10 +93,12 @@ impl OffMeshLinks {
     }
 }
 
-/// One link move out of a span: where it lands, its A\* cost, and the link crossed.
+/// One link move out of a span: where it lands, its A\* cost, its area, and the link
+/// crossed.
 pub(super) struct LinkMove {
     pub to: SpanRef,
     pub cost: f32,
+    pub area: u8,
     pub data: OffMeshLinkData,
 }
 
@@ -140,8 +146,9 @@ impl NavigationGraph {
     }
 
     /// The link moves out of span `here`, in a fixed order. A move's cost is the
-    /// link's (its `cost_override`, else its length) in A\*'s units, never below the
-    /// octile distance it covers, so the search heuristic stays admissible.
+    /// link's (its `cost_override`, else its length times its area's cost, #460) in
+    /// A\*'s units, never below the octile distance it covers, so the search
+    /// heuristic stays admissible.
     pub(super) fn link_moves(&self, here: SpanRef) -> impl Iterator<Item = LinkMove> + '_ {
         let key = (
             self.index(here.gx, here.gz) as u32,
@@ -160,6 +167,7 @@ impl NavigationGraph {
                 Some(LinkMove {
                     to,
                     cost,
+                    area: link.area,
                     data: link.data(forward),
                 })
             })
@@ -184,7 +192,7 @@ impl NavigationGraph {
             link.cost_override / s
         } else {
             let flat = Vec3::new(b.x - a.x, 0.0, b.z - a.z).length();
-            flat / s + (b.y - a.y).abs()
+            (flat / s + (b.y - a.y).abs()) * self.area_cost(link.area)
         };
         cost.max(super::astar::heuristic(from, to))
     }

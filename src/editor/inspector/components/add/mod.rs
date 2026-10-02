@@ -102,6 +102,11 @@ fn add_physics_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: 
         authoring::add_with_requirements(world, id, ComponentKind::OffMeshLink);
         ui.close_menu();
     }
+    let volume = format!("{}  NavMesh Modifier Volume", icon::SELECTION);
+    if !world.has_nav_modifier(id) && ui.button(volume).clicked() {
+        authoring::add_with_requirements(world, id, ComponentKind::NavMeshModifierVolume);
+        ui.close_menu();
+    }
     if !world.has_joint(id) && ui.button(format!("{}  Joint", icon::LINK)).clicked() {
         authoring::add_with_requirements(world, id, ComponentKind::Joint);
         ui.close_menu();

@@ -77,6 +77,20 @@ pub fn draw_offmesh_link(
                 });
             }
             ui.label("Negative cost: the link's length");
+            let mut area = l.area;
+            let edited = ui
+                .horizontal(|ui| {
+                    ui.label("Area:");
+                    let max = (crate::navigation::MAX_AREAS - 1) as u8;
+                    ui.add(egui::DragValue::new(&mut area).clamp_range(0..=max))
+                        .changed()
+                })
+                .inner;
+            if edited {
+                write(world, id, (&mut *d, &mut *b), |l| {
+                    link_ops::set_area(l, i64::from(area))
+                });
+            }
         },
     );
     if remove {

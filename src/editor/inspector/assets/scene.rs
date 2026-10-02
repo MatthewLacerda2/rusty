@@ -78,6 +78,7 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
             if changed {
                 nav.bake(scene);
             }
+            super::nav_areas::draw(ui, scene, nav);
         });
 }
 

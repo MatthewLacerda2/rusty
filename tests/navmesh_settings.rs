@@ -4,7 +4,7 @@
 //! pre-#276 save file that omits the `nav_settings` block rehydrates with those defaults
 //! (back-compat), and (c) authored settings survive a save→load round-trip.
 
-use rusty::navigation::{NavBounds, NavMeshSettings};
+use rusty::navigation::{default_areas, NavArea, NavBounds, NavMeshSettings};
 use rusty::scene::Scene;
 
 fn tmp(name: &str) -> String {
@@ -59,6 +59,14 @@ fn nav_settings_survive_round_trip() {
         jump_distance: 2.0,
         jump_height: 1.0,
         link_spacing: 4.0,
+        areas: {
+            let mut areas = default_areas();
+            areas.push(NavArea {
+                name: "Mud".into(),
+                cost: 3.0,
+            });
+            areas
+        },
     };
     let path = tmp("rusty_nav_settings_roundtrip.scene");
     scene.save_to_file(&path).unwrap();
