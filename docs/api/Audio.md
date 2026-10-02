@@ -3,9 +3,10 @@
 Play sound through the engine's `AudioMaestro` (the audio engine singleton). An
 entity carries an `AudioSource` component (`clip`, `volume`, `loop`,
 `play_on_start`, `is_time_scaled`, plus the spatial fields `spatial_blend`,
-`initial_distance`, `final_distance`, and `output_group`, the mixer group it plays
-through); these verbs start/stop and retune it, fire one-shots, set the single master
-volume and the speaker mode, read a source's resolved 3D spatial state, and drive the
+`initial_distance`, `final_distance`, `output_group`, the mixer group it plays
+through, and `occlusion_enabled`); these verbs start/stop and retune it, fire
+one-shots, set the single master volume and the speaker mode, read a source's
+resolved 3D spatial state, tune [occlusion](#occlusion), and drive the
 [mixer](#mixer-groups-snapshots-and-ducking): groups (buses) with volume, filters and
 a reverb send, snapshots, and ducking. Decode is `.ogg` (Vorbis) / `.wav` / `.mp3`, path-cached;
 a clip that fails to decode logs one warning naming the file and plays nothing.
@@ -37,7 +38,11 @@ play-test can assert *what* played, *where*, and *by whom* — one-shots include
 | `Audio.SetMasterVolume` | `(v)` | — (clamped to `[0, 1]`; re-folds every live voice) |
 | `Audio.GetSpeakerMode` | `()` | `string` — `"headphones"`, `"tv"` or `"home_theater"` (the default) |
 | `Audio.SetSpeakerMode` | `(mode)` | — (one of the names above, case-insensitive; anything else is an error). Persisted; see [Speaker mode](#speaker-mode) |
-| `Audio.GetSpatial` | `(id)` | `(gain, pan, playing)` — the source's resolved 3D state against the listener (the active camera): `gain` linear pre-master, `pan` `[-1, 1]` (left→right), `playing` bool |
+| `Audio.GetSpatial` | `(id)` | `(gain, pan, playing, occlusion)` — the source's resolved 3D state against the listener (the active camera): `gain` linear pre-master (occlusion muffle included), `pan` `[-1, 1]` (left→right), `playing` bool, `occlusion` the smoothed [occlusion](#occlusion) factor `[0, 1]` (`0` when not playing) |
+| `Audio.SetOcclusionSettings` | `({ strength, layer_mask, voices_per_tick })` | — changes the fields the table names: `strength` `[0, 1]` (default 1; 0 turns occlusion off), `layer_mask` (bit per layer, default all), `voices_per_tick` (≥ 1, default 16). An unknown key is an error |
+| `Audio.GetOcclusionSettings` | `()` | table — `strength`, `layer_mask`, `voices_per_tick` |
+| `Audio.SetOcclusionEnabled` | `(id, bool)` | — sets the entity's `AudioSource.occlusion_enabled` (default `true`); an entity with no `AudioSource` is an error |
+| `Audio.GetOcclusionEnabled` | `(id)` | `bool` — the source's `occlusion_enabled`, or `nil` with no `AudioSource` |
 | `Audio.SetOutputGroup` | `(id, group)` | — sets the entity's `AudioSource.output_group` (`""` is Master); an unknown group, or an entity with no `AudioSource`, is an error. Takes effect at the voice's next `Play` |
 | `Audio.GetOutputGroup` | `(id)` | `string` — the source's `output_group` (`""` is Master), or `nil` with no `AudioSource` |
 | `Audio.GetGroups` | `()` | `{string}` — every mixer group's name, parents before children (`Master` first) |
@@ -97,6 +102,38 @@ applied in place — a moving source never restarts.
   unless the call passes its own `min_distance, max_distance` — the same **linear**
   rolloff, over the wider band. A gunshot 30 m away is silent by default and audible
   with `Audio.PlayAt(clip, x, y, z, 1.0, 2, 80)`; distant fire is where the fight is.
+
+### Occlusion
+
+A spatialized source (`spatial_blend > 0`, `occlusion_enabled`) heard through a
+wall is **muffled**: quieter and low-passed, so a shot behind concrete sounds
+unlike one in line of sight (Steam Audio's occlusion, cut down).
+
+- **Casts.** Three rays go through the physics world from the listener (the active
+  camera) to the source: one at the source and one 0.5 m to each side of it, level,
+  across the line of sight. The fraction blocked is the **occlusion factor**, so
+  stepping past a door frame takes it through ⅓ and ⅔ instead of flipping it.
+  Triggers pass sound, the collider the listener stands in is looked past, and so
+  are the source's own entity and its parents. Only colliders on a layer in the
+  `layer_mask` occlude: clear the bits of characters and props sound should pass.
+- **Effect.** At factor `1` (× `strength`) the voice plays at 0.35 gain (about
+  −9 dB) through a 12 dB/octave low-pass at 800 Hz; the cutoff moves in octaves
+  between 22 kHz (open, the filter bypassed) and that. `Audio.GetSpatial`'s `gain`
+  includes the muffle.
+- **Cadence.** A voice is cast the moment it starts, so a shot behind a wall is
+  muffled from its first sample. After that, each `LateUpdate` re-casts up to
+  `voices_per_tick` voices, round-robin, so the cost stays bounded.
+- **Smoothing.** The factor moves to each new cast linearly over 0.25 s of unscaled
+  time, so a source never pops as you step around a corner.
+
+All of it is resolved in the sim (deterministic, same on the headless harness as in
+the editor); the device only applies the result. **Stop** resets the settings.
+Material transmission, diffraction and portals are not modelled.
+
+```lua
+Audio.SetOcclusionSettings({ layer_mask = ~(1 << 8) })  -- all but layer 8 (characters)
+Audio.SetOcclusionEnabled(radio, false)   -- this one carries through walls
+```
 
 ### Time scale and pause
 

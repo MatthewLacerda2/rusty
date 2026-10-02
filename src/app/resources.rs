@@ -116,6 +116,8 @@ impl Resources {
         camera: Rc<RefCell<Camera>>,
         time: Rc<RefCell<Time>>,
     ) -> Self {
+        let physics = Rc::new(RefCell::new(None));
+        let occluder = super::audio::occluder(Rc::clone(&scene), Rc::clone(&physics));
         let mut script_manager = ScriptManager::new(
             scene,
             Rc::clone(&input),
@@ -132,6 +134,7 @@ impl Resources {
         // windowed app injects the real `KiraBackend` after construction. Shared
         // with the script runtime so the `Audio` namespace drives the same maestro.
         let audio = Rc::new(RefCell::new(AudioMaestro::default()));
+        audio.borrow_mut().set_occluder(occluder);
         script_manager.set_audio_cell(Rc::clone(&audio));
         let screen = Rc::new(RefCell::new(ScreenSize::default()));
         script_manager.set_screen_cell(Rc::clone(&screen));
@@ -151,7 +154,7 @@ impl Resources {
             ui_layout: UiLayout::default(),
             event_system,
             application,
-            physics: Rc::new(RefCell::new(None)),
+            physics,
             is_playing: false,
             was_playing: false,
             play_frame: 0,

@@ -148,15 +148,14 @@ fn draw_playback(
     changed
 }
 
-/// Spatial fields — stored now, consumed by #213. Shown so an author can set them
-/// up ahead of the spatialization landing.
+/// Spatial fields (#213) and the occlusion opt-out (#467).
 fn draw_spatial(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
     a: &AudioSourceComponent,
 ) -> bool {
-    ui.label("Spatial (3D — applied by #213)");
+    ui.label("Spatial (3D)");
     let mut changed = false;
     let mut spatial_blend = a.spatial_blend;
     if clamped(ui, "Spatial Blend:", &mut spatial_blend, 0.0..=1.0) {
@@ -176,6 +175,17 @@ fn draw_spatial(
     if clamped(ui, "Max Distance:", &mut final_distance, 0.0..=1000.0) {
         if let Some(mut c) = world.audio_mut(id) {
             audio_ops::set_final_distance(&mut c, final_distance);
+        }
+        changed = true;
+    }
+    let mut occlusion = a.occlusion_enabled;
+    if ui
+        .checkbox(&mut occlusion, "Occlusion")
+        .on_hover_text("Geometry between the listener and the source muffles it (#467).")
+        .changed()
+    {
+        if let Some(mut c) = world.audio_mut(id) {
+            audio_ops::set_occlusion_enabled(&mut c, occlusion);
         }
         changed = true;
     }

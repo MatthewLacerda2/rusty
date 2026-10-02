@@ -44,8 +44,12 @@ pub struct VoiceInfo {
     pub is_time_scaled: bool,
     /// Whether the maestro currently has this source playing.
     pub playing: bool,
-    /// The resolved spatial state — `(gain, pan)` against the listener (#213).
+    /// The resolved spatial state — `(gain, pan)` against the listener (#213); the
+    /// gain already carries the occlusion muffle.
     pub spatial: SpatialResult,
+    /// The smoothed occlusion factor in `[0, 1]` (#467): how much of the source
+    /// geometry hides from the listener; `0` when it is not playing.
+    pub occlusion: f32,
 }
 
 /// What kind of play action an [`AudioEvent`] records.

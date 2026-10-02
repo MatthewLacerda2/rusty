@@ -22,6 +22,7 @@ use super::backend::{AudioBackend, NullBackend, PlayParams, VoiceId, VoiceMix};
 use super::introspection::{AudioEvent, AudioEventKind, AudioEventLog, DEFAULT_EVENT_CAP};
 use super::mix::{self, MixEnv};
 use super::mixer::{GroupId, Mixer};
+use super::occlusion::Occlusion;
 use super::speaker::SpeakerMode;
 use crate::components::AudioSourceComponent;
 
@@ -65,6 +66,8 @@ pub struct AudioMaestro {
     pub(super) env: MixEnv,
     /// The mixer groups, snapshots and ducks every voice routes through (#465).
     pub(super) mixer: Mixer,
+    /// Every voice's occlusion factor and the casts behind it (#467).
+    pub(super) occlusion: Occlusion,
     /// The agent-facing log of play/stop/one-shot actions.
     log: AudioEventLog,
     /// Monotone id source for backend voices (deterministic — never a clock/RNG).
@@ -90,6 +93,7 @@ impl AudioMaestro {
             oneshots: BTreeMap::new(),
             env: MixEnv::default(),
             mixer: Mixer::default(),
+            occlusion: Occlusion::default(),
             log: AudioEventLog::new(DEFAULT_EVENT_CAP),
             next_voice: 1,
         };
@@ -165,10 +169,11 @@ impl AudioMaestro {
         self.stop_source(id, position, tick, /*log_stop=*/ false);
         let source_volume = source.volume.max(0.0);
         let at = Vec3::from(position);
-        let mix = mix::resolve_voice(&self.env, source, source_volume, at);
+        let (occluded, mix) = self.resolve_start(source, Some(id), source_volume, at);
         let group = self.route(&source.output_group);
         let (voice, started) = self.start(&source.clip, source.looping, mix, group);
         if started {
+            self.track_occlusion(voice, occluded);
             self.entity_voices.insert(
                 id,
                 LiveVoice {
@@ -210,19 +215,6 @@ impl AudioMaestro {
         }
     }
 
-    /// Retune entity `id`'s live voice volume (pre-master); persisted so a later
-    /// master change keeps the right ratio. No-op if the entity has no live voice.
-    pub fn set_source_volume(&mut self, id: u32, volume: f32) {
-        let (master, mode) = (self.master_volume, self.speaker_mode);
-        if let Some(live) = self.entity_voices.get_mut(&id) {
-            live.source_volume = volume.max(0.0);
-            live.mix =
-                mix::resolve_voice(&self.env, &live.source, live.source_volume, live.position);
-            self.backend
-                .set_mix(live.voice, &live.mix.for_output(master, mode));
-        }
-    }
-
     /// Whether entity `id` currently has a live voice.
     pub fn is_source_playing(&self, id: u32) -> bool {
         self.entity_voices.contains_key(&id)
@@ -243,10 +235,11 @@ impl AudioMaestro {
         let volume = volume.max(0.0);
         let source = mix::oneshot_source(clip, rolloff);
         let at = Vec3::from(position);
-        let mix = mix::resolve_voice(&self.env, &source, volume, at);
+        let (occluded, mix) = self.resolve_start(&source, None, volume, at);
         let group = self.route(group);
         let (voice, started) = self.start(clip, false, mix, group);
         if started {
+            self.track_occlusion(voice, occluded);
             let position = at;
             self.oneshots.insert(
                 voice,

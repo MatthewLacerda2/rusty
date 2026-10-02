@@ -169,7 +169,7 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
   "audio":     { "clip": "music/theme.ogg", "volume": .., "loop": false,
                  "play_on_start": false, "is_time_scaled": true,
                  "spatial_blend": 0.0, "initial_distance": .., "final_distance": ..,
-                 "output_group": "" },
+                 "output_group": "", "occlusion_enabled": true },
   "canvas":    { "render_mode": "ScreenSpaceOverlay", "sort_order": 0,
                  "reference_resolution": [1920, 1080], "match_width_or_height": 0.0,
                  "pixels_per_unit": 100.0, "plane_distance": 1.0, "tilt": [x,y],

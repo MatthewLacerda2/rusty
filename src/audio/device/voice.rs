@@ -13,6 +13,8 @@
 //!     2D (`0`) keeps its stereo image untouched;
 //!   * a clip with more than two channels uses its first two as left/right.
 //!
+//! Occlusion (#467) closes the voice's own low-pass ([`LowPass`]) after the pan.
+//!
 //! Pan is a **balance** law: the far channel fades linearly to silence, the near one
 //! stays at unity (`pan = -1` ⇒ right silent). A centred voice plays at unity on both
 //! channels. kira's own sounds pan with a constant-power law and keep no channel
@@ -31,6 +33,7 @@ use kira::sound::{Sound, SoundData};
 use kira::Frame;
 
 use super::decode::CachedClip;
+use super::lowpass::LowPass;
 use crate::audio::backend::VoiceMix;
 
 /// An `f32` shared between the backend (writer) and the audio thread (reader).
@@ -54,6 +57,8 @@ pub struct VoiceControl {
     spatial_blend: AtomicF32,
     speed: AtomicF32,
     paused: AtomicBool,
+    /// The voice's low-pass cutoff in Hz (occlusion, #467).
+    low_pass: AtomicF32,
     /// Set by the backend to end the voice; kira then unloads it.
     stopped: AtomicBool,
     /// Set by the audio thread when a one-shot reaches its end.
@@ -75,6 +80,7 @@ impl VoiceControl {
         self.spatial_blend.set(mix.spatial_blend.clamp(0.0, 1.0));
         self.speed.set(mix.speed.max(0.0));
         self.paused.store(mix.paused, Ordering::Relaxed);
+        self.low_pass.set(mix.low_pass);
     }
 
     /// End the voice at the audio thread's next buffer.
@@ -116,6 +122,8 @@ pub struct ClipSound {
     position: f64,
     /// Scratch for the interpolated frame (one sample per clip channel).
     frame: Vec<f32>,
+    /// The voice's own low-pass, after the pan (#467).
+    filter: LowPass,
 }
 
 impl ClipSound {
@@ -127,6 +135,7 @@ impl ClipSound {
             control,
             position: 0.0,
             frame,
+            filter: LowPass::default(),
         }
     }
 
@@ -162,6 +171,7 @@ impl Sound for ClipSound {
         let c = &self.control;
         let (gain, pan, blend) = (c.gain.get(), c.pan.get(), c.spatial_blend.get());
         let step = f64::from(c.speed.get()) * f64::from(self.clip.sample_rate()) * dt;
+        let low_pass = LowPass::coefficient(c.low_pass.get(), dt);
         if c.paused.load(Ordering::Relaxed) || c.stopped.load(Ordering::Relaxed) {
             out.fill(Frame::ZERO);
             return;
@@ -172,7 +182,8 @@ impl Sound for ClipSound {
                 continue;
             }
             self.sample();
-            let (l, r) = mix_frame(&self.frame, pan, blend);
+            let mixed = mix_frame(&self.frame, pan, blend);
+            let (l, r) = self.filter.process(low_pass, mixed);
             *frame = Frame::new(l * gain, r * gain);
             self.position += step;
         }

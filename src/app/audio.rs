@@ -2,7 +2,7 @@
 //!
 //! A `Startup`-stage system: when the world enters Play, start every
 //! `AudioSource` flagged `play_on_start` (Unity's "Play On Awake"). And a
-//! `LateUpdate` one stepping the mixer (#465) — snapshot blends and ducking — on
+//! `LateUpdate` one stepping the mixer (#465) and voice occlusion (#467) — snapshot blends and ducking — on
 //! `Time.unscaledTime`, so the mix state is a function of sim time and a replay
 //! reads back the same groups. It drives the
 //! shared `AudioMaestro` exactly as the `Audio` API does, so a `play_on_start`
@@ -14,10 +14,16 @@
 //! is not a sim system: the windowed shell applies it after each advance
 //! (`shell/audio.rs`, #412), so no device is threaded through a deterministic stage.
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use super::registry::App;
 use super::resources::Resources;
 use super::stage::Stage;
 use super::world::World;
+use crate::audio::Occluder;
+use crate::physics::{is_hittable, PhysicsWorld};
+use crate::scene::{layer_in_mask, Scene};
 
 /// Register the audio systems. The auto-start runs once in `Startup`, after the
 /// scene + scripts are live (so a `Start` script could already have toggled a
@@ -25,6 +31,46 @@ use super::world::World;
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::Startup, start_play_on_start);
     app.add_system(Stage::LateUpdate, advance_mixer);
+    app.add_system(Stage::LateUpdate, occlude_voices);
+}
+
+/// Re-cast and smooth every voice's occlusion (#467) against the active camera,
+/// on unscaled time like the mixer.
+fn occlude_voices(world: &mut World, res: &mut Resources) {
+    let dt = res.time.borrow().unscaled_delta_time;
+    let listener = res.camera.borrow().position;
+    let scene = world.scene.borrow();
+    let lookup = |id| {
+        let source = scene.world.audio(id)?.clone();
+        Some((source, scene.world.transform(id)?.position))
+    };
+    res.audio.borrow_mut().occlude(listener, dt, lookup);
+}
+
+/// The physics query audio occlusion casts through: a solid collider on an
+/// occluding layer between the two points, looking past the source's own entity
+/// and its ancestors (a voice on a character's child is not hidden by its body).
+/// Reads nothing while either cell is busy or no physics world is built.
+pub(super) fn occluder(
+    scene: Rc<RefCell<Scene>>,
+    physics: Rc<RefCell<Option<PhysicsWorld>>>,
+) -> Occluder {
+    Box::new(move |from, to, ignore, mask| {
+        let (Ok(scene), Ok(physics)) = (scene.try_borrow(), physics.try_borrow()) else {
+            return false;
+        };
+        let Some(physics) = physics.as_ref() else {
+            return false;
+        };
+        let skip: Vec<u32> = std::iter::successors(ignore, |&id| scene.world.parent_id(id))
+            .take(64)
+            .collect();
+        physics.segment_blocked(from, to, |id| {
+            !skip.contains(&id)
+                && is_hittable(&scene, id)
+                && layer_in_mask(scene.world.layer(id), mask)
+        })
+    })
 }
 
 /// Step the mixer to this frame's unscaled sim time.
@@ -71,3 +117,7 @@ pub(super) fn start_sources(world: &World, res: &Resources, admit: impl Fn(u32) 
 #[cfg(test)]
 #[path = "audio_tests.rs"]
 mod audio_tests;
+
+#[cfg(test)]
+#[path = "audio_occlusion_tests.rs"]
+mod audio_occlusion_tests;

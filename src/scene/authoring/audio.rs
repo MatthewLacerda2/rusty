@@ -4,13 +4,15 @@
 //! `AudioSourceComponent` field by field: the `clip` path, per-source `volume`, the
 //! playback flags (`looping` / `play_on_start` / `is_time_scaled`), and the spatial
 //! fields (`spatial_blend` / `initial_distance` / `final_distance`) and the mixer
-//! `output_group` (#465).
+//! `output_group` (#465), and the `occlusion_enabled` opt-out (#467).
 //!
 //! The editor's Audio Source card routes every field write through these (#287). The
 //! Lua `Audio.*` namespace mostly drives the live `AudioMaestro` voice (play / stop /
-//! live volume), NOT the persisted component fields; its one field write,
-//! `Audio.SetOutputGroup`, shares [`set_output_group`] with the card. They are plain sets; the card's drag-range clamps are a
-//! UI affordance applied to the widget local before the op is called.
+//! live volume), NOT the persisted component fields; its two field writes,
+//! `Audio.SetOutputGroup` and `Audio.SetOcclusionEnabled`, share
+//! [`set_output_group`] and [`set_occlusion_enabled`] with the card. They are plain
+//! sets; the card's drag-range clamps are a UI affordance applied to the widget
+//! local before the op is called.
 //!
 //! Allowed deps: components (the `AudioSourceComponent` data). Pure.
 
@@ -61,6 +63,11 @@ pub fn set_output_group(a: &mut AudioSourceComponent, group: String) {
     a.output_group = group;
 }
 
+/// Set whether geometry muffles the source (#467).
+pub fn set_occlusion_enabled(a: &mut AudioSourceComponent, on: bool) {
+    a.occlusion_enabled = on;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,6 +96,7 @@ mod tests {
         set_initial_distance(&mut e, 2.0);
         set_final_distance(&mut e, 20.0);
         set_output_group(&mut e, "Music".to_string());
+        set_occlusion_enabled(&mut e, false);
         let a = &*e;
         assert_eq!(a.clip, "sfx/hit.ogg");
         assert_eq!(a.volume, 0.5);
@@ -99,5 +107,6 @@ mod tests {
         assert_eq!(a.initial_distance, 2.0);
         assert_eq!(a.final_distance, 20.0);
         assert_eq!(a.output_group, "Music");
+        assert!(!a.occlusion_enabled);
     }
 }

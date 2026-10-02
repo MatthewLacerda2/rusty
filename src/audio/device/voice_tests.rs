@@ -51,6 +51,7 @@ fn control_clamps_out_of_range_values_and_tracks_liveness() {
         spatial_blend: 2.0,
         speed: -1.0,
         paused: false,
+        low_pass: 500.0,
     });
     assert_eq!(control.gain.get(), 0.0);
     assert_eq!(control.pan.get(), -1.0);

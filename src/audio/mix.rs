@@ -22,6 +22,7 @@ use glam::{Quat, Vec3};
 use super::backend::VoiceMix;
 use super::introspection::{SpatialResult, VoiceInfo};
 use super::maestro::AudioMaestro;
+use super::occlusion;
 use super::spatial::{self, Listener};
 use crate::components::AudioSourceComponent;
 
@@ -48,12 +49,14 @@ impl Default for MixEnv {
 }
 
 /// Resolve one voice's pre-master mix: `source`'s spatial + time-scale fields at
-/// world `position`, with `volume` as its per-source gain.
+/// world `position`, with `volume` as its per-source gain, muffled by its applied
+/// `occlusion` factor (#467).
 pub fn resolve_voice(
     env: &MixEnv,
     source: &AudioSourceComponent,
     volume: f32,
     position: Vec3,
+    occlusion: f32,
 ) -> VoiceMix {
     let SpatialResult { gain, pan } = spatial::resolve(
         &env.listener,
@@ -64,12 +67,14 @@ pub fn resolve_voice(
         source.final_distance,
     );
     let scaled = source.is_time_scaled;
+    let (muffle, low_pass) = occlusion::effect(occlusion);
     VoiceMix {
-        gain,
+        gain: gain * muffle,
         pan,
         spatial_blend: source.spatial_blend.clamp(0.0, 1.0),
         speed: if scaled { env.time_scale } else { 1.0 },
         paused: scaled && (env.paused || env.time_scale <= 0.0),
+        low_pass,
     }
 }
 
@@ -142,12 +147,20 @@ impl AudioMaestro {
     ) {
         self.env = *env;
         let (master, mode) = (self.master_volume, self.speaker_mode);
+        let occlusion = &self.occlusion;
         for (&id, live) in self.entity_voices.iter_mut() {
             if let Some((source, position)) = lookup(id) {
                 live.source = source;
                 live.position = position;
             }
-            let mix = resolve_voice(env, &live.source, live.source_volume, live.position);
+            let occluded = occlusion.applied(live.voice);
+            let mix = resolve_voice(
+                env,
+                &live.source,
+                live.source_volume,
+                live.position,
+                occluded,
+            );
             if mix != live.mix {
                 live.mix = mix;
                 self.backend
@@ -160,7 +173,8 @@ impl AudioMaestro {
                 backend.stop(voice);
                 return false;
             }
-            let mix = resolve_voice(env, &shot.source, shot.volume, shot.position);
+            let occluded = occlusion.applied(voice);
+            let mix = resolve_voice(env, &shot.source, shot.volume, shot.position, occluded);
             if mix != shot.mix {
                 shot.mix = mix;
                 backend.set_mix(voice, &mix.for_output(master, mode));
@@ -182,15 +196,14 @@ impl AudioMaestro {
         position: glam::Vec3,
         listener: &Listener,
     ) -> VoiceInfo {
-        let volume = self
-            .entity_voices
-            .get(&id)
-            .map_or(source.volume.max(0.0), |live| live.source_volume);
+        let live = self.entity_voices.get(&id);
+        let volume = live.map_or(source.volume.max(0.0), |live| live.source_volume);
+        let occluded = live.map_or(0.0, |live| self.occlusion.applied(live.voice));
         let env = MixEnv {
             listener: *listener,
             ..self.env
         };
-        let mix = resolve_voice(&env, source, volume, position);
+        let mix = resolve_voice(&env, source, volume, position, occluded);
         let spatial = SpatialResult {
             gain: mix.gain,
             pan: mix.pan,
@@ -203,6 +216,21 @@ impl AudioMaestro {
             is_time_scaled: source.is_time_scaled,
             playing: self.is_source_playing(id),
             spatial,
+            occlusion: self.source_occlusion(id),
+        }
+    }
+
+    /// Retune entity `id`'s live voice volume (pre-master); persisted so a later
+    /// master change keeps the right ratio. No-op if the entity has no live voice.
+    pub fn set_source_volume(&mut self, id: u32, volume: f32) {
+        let (master, mode) = (self.master_volume, self.speaker_mode);
+        if let Some(live) = self.entity_voices.get_mut(&id) {
+            live.source_volume = volume.max(0.0);
+            let occluded = self.occlusion.applied(live.voice);
+            let (source, at) = (&live.source, live.position);
+            live.mix = resolve_voice(&self.env, source, live.source_volume, at, occluded);
+            self.backend
+                .set_mix(live.voice, &live.mix.for_output(master, mode));
         }
     }
 
