@@ -125,6 +125,12 @@ is wrong.
   module-separate branches to **cloud sessions** as extra coders: that lifts the local
   build limit, never the one-at-a-time merge. The `issue-batch` skill says when, and
   how to prove a session really is remote.
+- **The lightest batch keeps only the merge queue local.** With the coding in cloud
+  sessions, `make queue ARGS=--no-check` skips the local compile check of each rebased
+  head and lets CI judge it, so merging costs this machine `git` and GitHub calls, not a
+  build. Prefer it whenever the machine has other work. The price is that a rebase broken
+  by a merge ahead (rare: a few in 126 PRs) is caught by CI a round later, not before
+  the push.
 - **Infrastructure- then architecture-first (NOT "make it up as we go").** We do **not**
   improvise or pile on features ad hoc. Whenever we find a problem — something that
   already bites or will bite more than once, a pattern worth adopting, or a gold-standard
