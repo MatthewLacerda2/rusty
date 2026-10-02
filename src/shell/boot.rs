@@ -108,7 +108,7 @@ pub fn load_game(scene_path: &str) -> GameWorld {
 /// Open the real audio device and inject it into the `AudioMaestro` (#212). A box
 /// with no audio device keeps the no-op backend, logging instead of failing.
 pub fn init_audio(game: &GameWorld) {
-    match crate::audio::RodioBackend::open() {
+    match crate::audio::KiraBackend::open() {
         Some(backend) => game
             .resources
             .audio

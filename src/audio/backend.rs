@@ -6,7 +6,7 @@
 //!   * [`NullBackend`] — does nothing, holds no device. It is the **default**, and
 //!     the one the headless / `play` harness uses, so the deterministic sim never
 //!     depends on an audio device (CLAUDE.md: the platform layer owns hardware).
-//!   * `RodioBackend` (see `device/rodio.rs`) — the real mixer, opened by the
+//!   * `KiraBackend` (see `device/kira.rs`) — the real mixer, opened by the
 //!     windowed shell (`shell/boot.rs`). It is wired in *after* `GameWorld::new`, so the
 //!     harness path that calls `GameWorld::new` stays device-free.
 //!
@@ -15,6 +15,7 @@
 //! backend, while the actual sound is a platform-layer side effect the `NullBackend`
 //! simply skips.
 
+use super::mixer::{GroupId, GroupMix};
 use super::speaker::SpeakerMode;
 
 /// A handle to one playing voice, opaque to the maestro. The backend maps it to its
@@ -75,6 +76,8 @@ pub struct PlayParams {
     pub looping: bool,
     /// The initial mix, so the first samples already play at the resolved state.
     pub mix: VoiceMix,
+    /// The mixer group the voice routes into (#465).
+    pub group: GroupId,
 }
 
 /// The platform-layer audio device abstraction. Implementors own the mixer; the
@@ -101,6 +104,13 @@ pub trait AudioBackend {
     /// Shape the summed output for `mode` (#546) — the master-bus half of the
     /// speaker mode; the per-voice half arrives already folded into each mix.
     fn set_speaker_mode(&mut self, mode: SpeakerMode);
+
+    /// Create mixer group `id` under `parent` (`None`: the root, summing into the
+    /// output), replacing any group already at `id` (#465). Parents come first.
+    fn add_group(&mut self, id: GroupId, parent: Option<GroupId>);
+
+    /// Apply group `id`'s resolved mix (volume, filters, reverb send) in place.
+    fn set_group(&mut self, id: GroupId, mix: &GroupMix);
 }
 
 /// The do-nothing backend: holds no device, plays no sound, but reports a voice as
@@ -124,6 +134,9 @@ impl AudioBackend for NullBackend {
     fn stop_all(&mut self) {}
     /// No output to shape; the maestro keeps the mode for read-back.
     fn set_speaker_mode(&mut self, _mode: SpeakerMode) {}
+    /// No tracks to build; the maestro's mixer keeps the resolved state.
+    fn add_group(&mut self, _id: GroupId, _parent: Option<GroupId>) {}
+    fn set_group(&mut self, _id: GroupId, _mix: &GroupMix) {}
 }
 
 #[cfg(test)]
@@ -137,6 +150,7 @@ mod tests {
             clip: "x.ogg".to_string(),
             looping: false,
             mix: VoiceMix::FLAT,
+            group: GroupId::MASTER,
         };
         assert!(b.play(VoiceId(1), &params));
         // These are all no-ops; just assert they don't panic.
@@ -145,5 +159,6 @@ mod tests {
         b.stop(VoiceId(1));
         b.stop_all();
         b.set_speaker_mode(SpeakerMode::Tv);
+        b.add_group(GroupId(1), Some(GroupId::MASTER));
     }
 }

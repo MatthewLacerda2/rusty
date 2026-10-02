@@ -29,21 +29,13 @@ use mlua::{Lua, Table};
 use crate::audio::device::decode::decode_file;
 use zimmer::level::{Layer, Profile, Profiler, Span};
 
-/// Full scale of a decoded 16-bit sample, as the divisor that maps it to `-1..1`.
-const I16_FULL_SCALE: f32 = 32_768.0;
-
 /// Measure the clip at `path` over the PCM the engine's decoder produces for it —
 /// any format `ClipCache` plays (`.wav`, `.ogg`, `.mp3`). A file carries no
 /// arrangement, so its sections fall on zimmer's fixed grid.
 pub fn measure_file(path: &str) -> Result<Profile, String> {
     let clip = decode_file(path).map_err(|e| format!("cannot decode '{path}': {e}"))?;
-    let samples: Vec<f32> = clip
-        .samples()
-        .iter()
-        .map(|&s| f32::from(s) / I16_FULL_SCALE)
-        .collect();
     let mut profiler = Profiler::new(usize::from(clip.channels()), clip.sample_rate());
-    profiler.feed(&samples);
+    profiler.feed(clip.samples());
     Ok(profiler.finish())
 }
 

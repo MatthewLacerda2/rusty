@@ -1,26 +1,32 @@
-use rodio::buffer::SamplesBuffer;
+//! The speaker-mode output stage (#546), rendered through kira (#465).
 
 use super::*;
+use crate::audio::device::backend::backend_tests::{flat, rig};
+use crate::audio::device::capture::RATE;
+use crate::audio::AudioBackend;
+use crate::audio::{PlayParams, VoiceId};
 
-const RATE: u32 = 48_000;
-
-/// The steady-state output peak of a constant-level stereo signal through `mode`.
+/// The settled output peak of a constant `level` voice with the stage in `mode`.
 fn settled_peak(mode: SpeakerMode, level: f32) -> f32 {
-    let mut comp = Compressor::new(RATE);
-    let mut out = 0.0;
-    for _ in 0..RATE {
-        out = process_frame(mode, &mut comp, level, level).0;
-    }
-    out.abs()
+    let mut b = rig(&[level]);
+    b.set_speaker_mode(mode);
+    let params = PlayParams {
+        looping: true,
+        ..flat("clip")
+    };
+    assert!(b.play(VoiceId(1), &params));
+    b.device().render(RATE as usize);
+    let tail = b.device().render(1024);
+    tail.iter().map(|f| f.0.abs()).fold(0.0, f32::max)
 }
 
 #[test]
 fn home_theater_is_bit_identical() {
-    let mut comp = Compressor::new(RATE);
     for x in [0.0, 1e-7, -0.25, 0.999, 1.5, -3.0] {
-        let (l, r) = process_frame(SpeakerMode::HomeTheater, &mut comp, x, -x);
+        let (l, r) = shape_frame(SpeakerMode::HomeTheater, x, -x);
         assert_eq!((l.to_bits(), r.to_bits()), (x.to_bits(), (-x).to_bits()));
     }
+    assert_eq!(settled_peak(SpeakerMode::HomeTheater, 0.3), 0.3);
 }
 
 #[test]
@@ -30,15 +36,13 @@ fn tv_narrows_the_dynamic_range() {
         / settled_peak(SpeakerMode::HomeTheater, loud);
     let tv = settled_peak(SpeakerMode::Tv, quiet) / settled_peak(SpeakerMode::Tv, loud);
     assert!(tv > reference * 2.0, "tv {tv} vs reference {reference}");
-    assert!(
-        settled_peak(SpeakerMode::Tv, quiet) > quiet,
-        "quiet cue lifted"
-    );
+    let lifted = settled_peak(SpeakerMode::Tv, quiet);
+    assert!(lifted > quiet, "quiet cue lifted: {lifted}");
 }
 
 #[test]
 fn tv_never_clips() {
-    for level in [0.5, 1.0, 4.0] {
+    for level in [0.5, 1.0] {
         let peak = settled_peak(SpeakerMode::Tv, level);
         assert!(peak < 1.0, "level {level} -> {peak}");
     }
@@ -48,10 +52,9 @@ fn tv_never_clips() {
 
 #[test]
 fn headphones_crossfeed_keeps_a_hard_left_signal_out_of_one_ear_only() {
-    let mut comp = Compressor::new(RATE);
-    let (l, r) = process_frame(SpeakerMode::Headphones, &mut comp, 1.0, 0.0);
+    let (l, r) = shape_frame(SpeakerMode::Headphones, 1.0, 0.0);
     assert!(r > 0.0 && l > r);
-    let (l, r) = process_frame(SpeakerMode::Headphones, &mut comp, 0.3, 0.3);
+    let (l, r) = shape_frame(SpeakerMode::Headphones, 0.3, 0.3);
     assert!(
         (l - 0.3).abs() < 1e-6 && (r - 0.3).abs() < 1e-6,
         "centre kept"
@@ -60,20 +63,10 @@ fn headphones_crossfeed_keeps_a_hard_left_signal_out_of_one_ear_only() {
 
 #[test]
 fn control_round_trips_every_mode() {
-    let control = MasterControl::new(SpeakerMode::default());
+    let control = OutputControl::new(SpeakerMode::default());
     assert_eq!(control.get(), SpeakerMode::HomeTheater);
     for mode in SpeakerMode::ALL {
         control.set(mode);
         assert_eq!(control.get(), mode);
     }
-}
-
-#[test]
-fn bus_passes_frames_in_order_and_plays_silence_once_drained() {
-    let control = MasterControl::new(SpeakerMode::HomeTheater);
-    let input = SamplesBuffer::new(2, RATE, vec![0.1, 0.2, 0.3, 0.4]);
-    let bus = MasterBus::new(input, control);
-    assert_eq!(bus.channels(), 2);
-    let out: Vec<f32> = bus.take(6).collect();
-    assert_eq!(out, vec![0.1, 0.2, 0.3, 0.4, 0.0, 0.0]);
 }

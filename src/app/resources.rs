@@ -129,7 +129,7 @@ impl Resources {
         let storage = Rc::new(RefCell::new(Storage::new()));
         script_manager.set_storage(Rc::clone(&storage));
         // The audio maestro starts with a no-op backend (the harness path); the
-        // windowed app injects the real `RodioBackend` after construction. Shared
+        // windowed app injects the real `KiraBackend` after construction. Shared
         // with the script runtime so the `Audio` namespace drives the same maestro.
         let audio = Rc::new(RefCell::new(AudioMaestro::default()));
         script_manager.set_audio_cell(Rc::clone(&audio));

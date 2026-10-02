@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use super::backend::{AudioBackend, PlayParams, VoiceId, VoiceMix};
+use super::mixer::{GroupId, GroupMix};
 use super::speaker::SpeakerMode;
 
 /// Everything a [`RecordingBackend`] was told, in order.
@@ -17,10 +18,14 @@ pub struct Recording {
     pub plays: Vec<(VoiceId, PlayParams)>,
     pub mixes: Vec<(VoiceId, VoiceMix)>,
     pub stops: Vec<VoiceId>,
-    /// Every speaker mode the master bus was set to, in order.
+    /// Every speaker mode the output stage was set to, in order.
     pub speaker_modes: Vec<SpeakerMode>,
     /// Voices still "sounding" — started voices join, a test removes one to finish it.
     pub live: BTreeSet<VoiceId>,
+    /// Every group created, with its parent, in order.
+    pub groups_added: Vec<(GroupId, Option<GroupId>)>,
+    /// Every group mix applied, in order.
+    pub group_mixes: Vec<(GroupId, GroupMix)>,
 }
 
 impl Recording {
@@ -29,6 +34,12 @@ impl Recording {
         let mixed = self.mixes.iter().rev().find(|(v, _)| *v == id);
         let played = self.plays.iter().rev().find(|(v, _)| *v == id);
         mixed.map(|m| m.1).or(played.map(|p| p.1.mix))
+    }
+
+    /// The mix group `id` was last set to.
+    pub fn group(&self, id: GroupId) -> Option<GroupMix> {
+        let last = self.group_mixes.iter().rev().find(|(g, _)| *g == id);
+        last.map(|(_, mix)| *mix)
     }
 
     /// The voice id of the most recent play.
@@ -71,5 +82,11 @@ impl AudioBackend for RecordingBackend {
     }
     fn set_speaker_mode(&mut self, mode: SpeakerMode) {
         self.0.borrow_mut().speaker_modes.push(mode);
+    }
+    fn add_group(&mut self, id: GroupId, parent: Option<GroupId>) {
+        self.0.borrow_mut().groups_added.push((id, parent));
+    }
+    fn set_group(&mut self, id: GroupId, mix: &GroupMix) {
+        self.0.borrow_mut().group_mixes.push((id, *mix));
     }
 }

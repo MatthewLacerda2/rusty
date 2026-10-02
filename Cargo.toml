@@ -104,7 +104,13 @@ gilrs = "0.11.2"
 # in both frontends: X11 and macOS. Already in the tree through egui-winit (same
 # version, same no-image features), but the player build has no egui.
 arboard = { version = "3.6.1", default-features = false }
-rodio = { version = "0.19", default-features = false, features = ["symphonia-vorbis", "symphonia-wav", "symphonia-mp3"] }
+# The audio device and mixer (#465): kira's cpal backend, mixer tracks, filters,
+# sends and tweened parameters. Caret on 0.x pins the minor: 0.13 is a deliberate bump.
+# Its own decoding is off: clips decode through symphonia below, which keeps a clip's
+# channel count (kira's loader drops it and rejects more than two channels).
+kira = { version = "0.12.5", default-features = false, features = ["cpal"] }
+# Clip decoding (#212, #545): `.ogg` Vorbis, `.wav` and `.mp3`. The version kira uses.
+symphonia = { version = "0.6", default-features = false, features = ["mp3", "ogg", "vorbis", "wav", "pcm"] }
 # Not used by rusty's code (#552). proptest turns on getrandom's `std` feature (via
 # rand_core), so without this line `cargo build` and `cargo test` resolve getrandom
 # differently. That split rebuilt ahash, hashbrown, hecs, the wgpu and egui stacks

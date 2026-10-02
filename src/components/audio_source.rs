@@ -1,9 +1,9 @@
 //! src/components/audio_source.rs — AudioSource component (#212, #213, #412).
 //!
 //! Unity's `AudioSource`: a per-entity emitter referencing an audio `clip` to play,
-//! with a linear 3D rolloff (`spatial_blend`, `initial_distance`, `final_distance`)
-//! and a time-scale opt-out. The windowed runtime applies all of it to the device
-//! each frame (`shell/audio.rs`).
+//! with a linear 3D rolloff (`spatial_blend`, `initial_distance`, `final_distance`),
+//! a time-scale opt-out and the mixer group it plays through (#465). The windowed
+//! runtime applies all of it to the device each frame (`shell/audio.rs`).
 //!
 //! Pure authoring data — every field serde-persists. The component knows nothing
 //! about the audio device: the platform-layer `AudioMaestro` (the resource) owns
@@ -41,6 +41,12 @@ pub struct AudioSourceComponent {
     pub initial_distance: f32,
     /// Rolloff: silent at/after this distance.
     pub final_distance: f32,
+
+    /// The mixer group the voice plays through (#465; Unity's `outputAudioMixerGroup`).
+    /// Empty means Master. Read when the voice starts, so a change reroutes the next
+    /// `Play`, not a voice already sounding.
+    #[serde(default)]
+    pub output_group: String,
 }
 
 impl Default for AudioSourceComponent {
@@ -54,6 +60,7 @@ impl Default for AudioSourceComponent {
             spatial_blend: 0.0,
             initial_distance: 1.0,
             final_distance: 16.0,
+            output_group: String::new(),
         }
     }
 }

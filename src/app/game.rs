@@ -274,8 +274,9 @@ impl GameWorld {
         self.resources.script_manager.shutdown();
         self.resources.play_frame = 0;
         *self.resources.physics.borrow_mut() = None;
-        // Silence every voice on Stop (Unity stops play-mode audio at exit).
-        self.resources.audio.borrow_mut().stop_all();
+        // Silence every voice on Stop (Unity stops play-mode audio at exit), and
+        // discard play-mode mixer changes (#465) as the scene's are below.
+        self.resources.audio.borrow_mut().exit_play();
         // Restore the edit scene captured on Play, discarding play-mode state.
         if let Some(snapshot) = self.resources.edit_snapshot.take() {
             snapshot.restore(&mut self.world.scene.borrow_mut());

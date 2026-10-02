@@ -7,14 +7,14 @@
 //!     never touches the setting sounds exactly as authored.
 //!   * **Headphones**: a narrower stereo image. Each voice's pan is scaled by
 //!     [`HEADPHONE_WIDTH`], so a hard-panned 3D source never sits in one ear only,
-//!     and the master bus adds a light crossfeed for clips that are wide on their own
+//!     and the output stage adds a light crossfeed for clips that are wide on their own
 //!     (music, stereo ambience).
-//!   * **TV**: dynamic range compression on the master bus. Quiet cues (footsteps,
+//!   * **TV**: dynamic range compression on the output stage. Quiet cues (footsteps,
 //!     reloads) come up and loud peaks are held down, so they stay audible over room
 //!     noise on small speakers.
 //!
 //! The per-voice half ([`SpeakerMode::shape`]) is here and applied by the maestro;
-//! the summed-output half is the device's master bus (`device/master.rs`). Both are
+//! the summed-output half is the device's output stage (`device/output.rs`). Both are
 //! output shaping in the platform layer: `FixedUpdate` never reads the mode, so the
 //! sim stays deterministic. Stereo only; true surround is out of scope.
 //!

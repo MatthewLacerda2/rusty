@@ -240,7 +240,11 @@ edits and each physics step.)
 | `SetVolume` | ✅ | platform — re-folds the live voice's gain (master × per-source) |
 | `PlayAt` | ✅ | platform (`play_at` one-shot) + introspection log — the log entry is the one-shot's only trace |
 | `SetMasterVolume` | ✅ | platform — re-folds every live voice; observable via `GetMasterVolume` |
-| `SetSpeakerMode` | ✅ | platform — re-sends every live voice shaped for the mode (headphones narrows pan) and retunes the device's master bus (TV compression); observable via `GetSpeakerMode`, persisted as `audio.speaker_mode` |
+| `SetSpeakerMode` | ✅ | platform — re-sends every live voice shaped for the mode (headphones narrows pan) and retunes the device's output stage (TV compression); observable via `GetSpeakerMode`, persisted as `audio.speaker_mode` |
+| `SetOutputGroup` | ✅ | `AudioSource.output_group` — routes the voice's next `Play` into that mixer group (`PlayParams.group`); observable via `GetOutputGroup` and `Debug.Snapshot` |
+| `CreateGroup` / `SetGroupVolume` / `SetGroupMute` / `SetGroupLowPass` / `SetGroupHighPass` / `SetGroupReverbSend` | ✅ | sim (`Mixer`) + platform — the group's kira track (volume, filters, reverb send, `device/groups.rs`); observable via `GetGroupState` / `GetGroups` |
+| `DefineSnapshot` / `TransitionToSnapshot` | ✅ | sim — `Mixer::advance` blends on unscaled sim time each `LateUpdate`, then the moved groups reach the device; observable via `GetSnapshot` / `GetGroupState` |
+| `AddDuck` / `ClearDucks` | ✅ | sim — duck envelopes stepped with the mixer; observable as `GetGroupState().duck` |
 
 The maestro carries a **no-op backend** on the headless harness, so the *sound* is a
 windowed-only side effect; the **introspection log + playing set** are the
