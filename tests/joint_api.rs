@@ -44,6 +44,8 @@ fn setters_write_through_and_getters_read_back() {
              Joint.SetUseLimits({id}, true)
              Joint.SetLimits({id}, 110, -500)
              Joint.SetSwingLimit({id}, 30)
+             Joint.SetSwing2Limit({id}, 200)
+             Joint.SetSwingAxis({id}, 0, 0, -3)
              Joint.SetBreakForce({id}, -3)
              Joint.SetBreakTorque({id}, 75)
              Joint.SetAutoConfigureConnectedAnchor({id}, false)
@@ -66,11 +68,14 @@ fn setters_write_through_and_getters_read_back() {
         assert_eq!(axis, "Number(0), Number(1), Number(0)");
         let limits = eval(lua, &format!("return Joint.GetLimits({id})"));
         assert_eq!(limits, "Number(-179), Number(110)");
+        let swing = eval(lua, &format!("return Joint.GetSwingAxis({id})"));
+        assert_eq!(swing, "Number(0), Number(0), Number(-1)");
     });
     let j = scene.borrow().world.joint(id).map(|j| j.clone()).unwrap();
     assert_eq!(j.anchor, Vec3::new(-0.5, 0.0, 0.0));
     assert_eq!(j.connected_anchor, Vec3::new(1.0, 2.0, 3.0));
-    assert_eq!((j.swing_limit, j.break_torque), (30.0, 75.0));
+    assert_eq!((j.swing_limit, j.swing2_limit), (30.0, 179.0));
+    assert_eq!(j.break_torque, 75.0);
     assert!(j.enable_collision && !j.auto_configure_connected_anchor);
 }
 

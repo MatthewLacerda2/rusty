@@ -2,12 +2,14 @@
 //!
 //! Each tick, before the step, [`PhysicsWorld::resync_joints`] matches the live
 //! joints to the scene: a joint is (re)built when it is new, when its shape
-//! (kind, bodies, anchors, axis, limits, collision flag) changed, or when either
+//! (kind, bodies, anchors, axes, limits, collision flag) changed, or when either
 //! body was rebuilt — rapier drops a removed body's joints with it. Break
 //! thresholds are read live and never force a rebuild.
 //!
 //! **Frames.** The joint's frame sits at `anchor` (this entity's local space,
-//! scaled like its geometry) with its X axis along `axis`. Both bodies get that
+//! scaled like its geometry) with its X axis along `axis` and its Y axis along
+//! `swing_axis` made perpendicular to it — so a Ball's swing 1 is a rotation
+//! about Y and swing 2 one about Z (Unity's `CharacterJoint`). Both bodies get that
 //! same world frame, so the pose the bodies are in when the joint is built is its
 //! rest pose, and the limits are measured from it (Unity's behaviour). With
 //! `auto_configure_connected_anchor` off, the connected side's origin moves to
@@ -25,7 +27,7 @@
 
 use std::collections::BTreeMap;
 
-use glam::{Quat, Vec3};
+use glam::{Mat3, Quat, Vec3};
 use rapier3d::prelude::*;
 
 use super::compound::{body_owner, world_pose};
@@ -136,7 +138,7 @@ impl PhysicsWorld {
         let j = &key.shape;
         let pose = world_pose(scene, id)?;
         let anchor = pose.pos + pose.rot * (pose.scale * j.anchor);
-        let rot = pose.rot * Quat::from_rotation_arc(Vec3::X, j.axis.normalize_or_zero());
+        let rot = pose.rot * joint_basis(j.axis, j.swing_axis);
         let connected = match (j.auto_configure_connected_anchor, j.connected_body) {
             (true, _) => anchor,
             (false, None) => j.connected_anchor,
@@ -212,13 +214,25 @@ fn local_frame((bpos, brot): (Vec3, Quat), pos: Vec3, rot: Quat) -> Isometry<Rea
     to_iso(inv * (pos - bpos), (inv * rot).normalize())
 }
 
+/// The rotation taking the joint frame to this entity's local space: X along
+/// `axis`, Y along `swing_axis`'s part perpendicular to it (any perpendicular
+/// when it has none), Z completing the right-handed frame.
+fn joint_basis(axis: Vec3, swing_axis: Vec3) -> Quat {
+    let x = axis.try_normalize().unwrap_or(Vec3::X);
+    let y = (swing_axis - x * swing_axis.dot(x))
+        .try_normalize()
+        .unwrap_or_else(|| x.any_orthonormal_vector());
+    Quat::from_mat3(&Mat3::from_cols(x, y, x.cross(y)))
+}
+
 /// Whether `load` breaks a joint rated `threshold` (`0`: unbreakable).
 fn exceeds(load: f32, threshold: f32) -> bool {
     threshold > 0.0 && load > threshold
 }
 
 /// The rapier joint for `j`'s kind: which axes are locked and the angle limits
-/// (degrees → radians) on the free ones. The joint X axis is `j.axis`.
+/// (degrees → radians) on the free ones. The joint X axis is `j.axis`, Y the
+/// swing axis and Z swing 2's (see [`joint_basis`]).
 fn joint_builder(j: &JointComponent) -> GenericJointBuilder {
     let rad = |d: f32| d.to_radians();
     let twist = [rad(j.limits.x), rad(j.limits.y)];
@@ -233,12 +247,13 @@ fn joint_builder(j: &JointComponent) -> GenericJointBuilder {
         }
         JointKind::Ball => {
             let b = GenericJointBuilder::new(JointAxesMask::LOCKED_SPHERICAL_AXES);
-            let swing = [-rad(j.swing_limit), rad(j.swing_limit)];
+            let swing1 = [-rad(j.swing_limit), rad(j.swing_limit)];
+            let swing2 = [-rad(j.swing2_limit), rad(j.swing2_limit)];
             match j.use_limits {
                 true => b
                     .limits(JointAxis::AngX, twist)
-                    .limits(JointAxis::AngY, swing)
-                    .limits(JointAxis::AngZ, swing),
+                    .limits(JointAxis::AngY, swing1)
+                    .limits(JointAxis::AngZ, swing2),
                 false => b,
             }
         }

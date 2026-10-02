@@ -1,7 +1,7 @@
 //! src/api/joint.rs — `Joint` namespace (#449).
 //!
 //! Get/Set over an entity's `JointComponent`: its kind, the connected body, the
-//! anchors and axis, the limits, the break thresholds and the collision flag.
+//! anchors and axes, the limits, the break thresholds and the collision flag.
 //! Every setter routes through the shared `scene::authoring::joint` ops the
 //! inspector card uses. Getters return a neutral default without a Joint; setters
 //! are then no-ops. The kind travels as its name (`"Fixed"`, `"Hinge"`, `"Ball"`,
@@ -103,7 +103,7 @@ fn vec3_pair<'lua, 'scope>(
     put(t, &format!("Set{name}"), f)
 }
 
-/// `Get/SetKind`, `Get/SetConnectedBody`, the anchors, the axis and
+/// `Get/SetKind`, `Get/SetConnectedBody`, the anchors, the axes and
 /// `Get/SetEnableCollision`.
 fn register_shape<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
@@ -136,12 +136,14 @@ fn register_shape<'lua, 'scope>(
     );
     bool_pair(scope, t, scene, "AutoConfigureConnectedAnchor", auto)?;
     vec3_pair(scope, t, scene, "Axis", (|j| j.axis, ops::set_axis))?;
+    let swing_axis: Field<Vec3> = (|j| j.swing_axis, ops::set_swing_axis);
+    vec3_pair(scope, t, scene, "SwingAxis", swing_axis)?;
     let collide: Field<bool> = (|j| j.enable_collision, ops::set_enable_collision);
     bool_pair(scope, t, scene, "EnableCollision", collide)
 }
 
 /// `Get/SetUseLimits`, `Get/SetLimits` (min, max degrees), `Get/SetSwingLimit`,
-/// `Get/SetBreakForce`, `Get/SetBreakTorque`.
+/// `Get/SetSwing2Limit`, `Get/SetBreakForce`, `Get/SetBreakTorque`.
 fn register_limits<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     t: &Table<'lua>,
@@ -166,6 +168,8 @@ fn register_limits<'lua, 'scope>(
     put(t, "SetLimits", f)?;
     let swing: Field<f32> = (|j| j.swing_limit, ops::set_swing_limit);
     f32_pair(scope, t, scene, "SwingLimit", swing)?;
+    let swing2: Field<f32> = (|j| j.swing2_limit, ops::set_swing2_limit);
+    f32_pair(scope, t, scene, "Swing2Limit", swing2)?;
     let force: Field<f32> = (|j| j.break_force, ops::set_break_force);
     f32_pair(scope, t, scene, "BreakForce", force)?;
     let torque: Field<f32> = (|j| j.break_torque, ops::set_break_torque);

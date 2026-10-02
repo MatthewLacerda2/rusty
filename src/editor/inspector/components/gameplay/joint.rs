@@ -150,19 +150,39 @@ fn draw_limits(
         write(world, id, is_dirty, |c| joint_ops::set_limits(c, min, max));
     }
     if j.kind == JointKind::Ball {
-        let mut swing = j.swing_limit;
-        let drag = egui::DragValue::new(&mut swing).clamp_range(0.0..=joint_ops::MAX_ANGLE);
-        if ui
-            .horizontal(|ui| {
-                ui.label("Swing Limit (deg):");
-                ui.add(drag).changed()
-            })
-            .inner
-        {
-            write(world, id, is_dirty, |c| {
-                joint_ops::set_swing_limit(c, swing)
-            });
-        }
+        draw_swing(ui, world, id, j, is_dirty);
+    }
+}
+
+/// A Ball's swing axis and its two swing limits (Unity's swing 1 / swing 2).
+fn draw_swing(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    j: &JointComponent,
+    is_dirty: &mut bool,
+) {
+    if let Some(v) = vec3_row(ui, "Swing Axis:", j.swing_axis) {
+        write(world, id, is_dirty, |c| joint_ops::set_swing_axis(c, v));
+    }
+    let row = |ui: &mut egui::Ui, label: &str, v: &mut f32| {
+        ui.horizontal(|ui| {
+            ui.label(label);
+            let drag = egui::DragValue::new(v).clamp_range(0.0..=joint_ops::MAX_ANGLE);
+            ui.add(drag).changed()
+        })
+        .inner
+    };
+    let (mut swing1, mut swing2) = (j.swing_limit, j.swing2_limit);
+    if row(ui, "Swing 1 Limit (deg):", &mut swing1) {
+        write(world, id, is_dirty, |c| {
+            joint_ops::set_swing_limit(c, swing1)
+        });
+    }
+    if row(ui, "Swing 2 Limit (deg):", &mut swing2) {
+        write(world, id, is_dirty, |c| {
+            joint_ops::set_swing2_limit(c, swing2)
+        });
     }
 }
 

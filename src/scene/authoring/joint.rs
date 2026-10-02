@@ -49,6 +49,14 @@ pub fn set_axis(j: &mut JointComponent, axis: Vec3) {
     }
 }
 
+/// Set a Ball joint's swing-1 axis, normalized. A zero (or non-finite) axis
+/// names no direction and is ignored.
+pub fn set_swing_axis(j: &mut JointComponent, axis: Vec3) {
+    if let Some(unit) = axis.try_normalize() {
+        j.swing_axis = unit;
+    }
+}
+
 /// Set whether the angle limits apply.
 pub fn set_use_limits(j: &mut JointComponent, use_limits: bool) {
     j.use_limits = use_limits;
@@ -61,9 +69,16 @@ pub fn set_limits(j: &mut JointComponent, min: f32, max: f32) {
     j.limits = Vec2::new(a.min(b), a.max(b));
 }
 
-/// Set a Ball joint's swing cone (degrees), clamped to `[0, MAX_ANGLE]`.
+/// Set a Ball joint's swing-1 limit (degrees, about the swing axis), clamped to
+/// `[0, MAX_ANGLE]`.
 pub fn set_swing_limit(j: &mut JointComponent, degrees: f32) {
     j.swing_limit = clamp_angle(degrees).max(0.0);
+}
+
+/// Set a Ball joint's swing-2 limit (degrees, about `axis × swing_axis`),
+/// clamped to `[0, MAX_ANGLE]`.
+pub fn set_swing2_limit(j: &mut JointComponent, degrees: f32) {
+    j.swing2_limit = clamp_angle(degrees).max(0.0);
 }
 
 /// Set the breaking force, floored at 0 (unbreakable).
@@ -111,7 +126,11 @@ mod tests {
         set_limits(&mut j, 400.0, -30.0);
         assert_eq!(j.limits, Vec2::new(-30.0, MAX_ANGLE), "clamped and ordered");
         set_swing_limit(&mut j, -10.0);
-        assert_eq!(j.swing_limit, 0.0);
+        set_swing2_limit(&mut j, 500.0);
+        assert_eq!((j.swing_limit, j.swing2_limit), (0.0, MAX_ANGLE));
+        set_swing_axis(&mut j, Vec3::new(0.0, 0.0, -2.0));
+        set_swing_axis(&mut j, Vec3::NAN);
+        assert_eq!(j.swing_axis, Vec3::NEG_Z);
         set_break_force(&mut j, -5.0);
         set_break_torque(&mut j, f32::NAN);
         assert_eq!((j.break_force, j.break_torque), (0.0, 0.0));
