@@ -11,16 +11,48 @@ and triangle meshes), rasterised into each cell column. A ramp bakes as a slope,
 plateau at its highest point. **Where there is no collider there is no navmesh**: no
 implicit ground past the level's edge, and an empty scene bakes nothing (as in Unity).
 
-`GetNextPathStep` resolves the start and the target to spans with one rule: **the nearest
+Every query resolves the start and the target to spans with one rule: **the nearest
 span below the point, favouring the floor under a character's feet** — the highest floor
 at most `MaxStep` above the point, else the lowest floor above it. A chest-height target
 therefore means the floor under it, not the one overhead. A point over a column with no
-span (a wall, a hole) uses the nearest column with one, up to 5 cells away. The returned
-waypoint's `y` is the next span's floor; with no path it returns the target itself.
+span (a wall, a hole) uses the nearest column with one, up to 5 cells away.
+
+### Paths and queries (#458)
+
+Paths are **smoothed**: the A* search over spans is string-pulled into **corners**, so a
+path across an open room is one straight run (two corners: start and end) and a path
+round a wall turns only where the wall is in the way. A straight leg only ever crosses
+walkable spans, so the smoothed path keeps the agent-radius clearance the bake eroded
+off every wall. A path is a table:
+
+```lua
+{ status = "complete" | "partial" | "invalid",
+  corners = { {x=, y=, z=}, ... },   -- start first, end last; y is the floor height
+  length = n }                       -- world units along the corners
+```
+
+- **`complete`** — the path reaches the target. Its ends are the query points themselves
+  (on their floors) when they stand over the navmesh.
+- **`partial`** — the target is unreachable (another island, a sealed room); the path ends
+  on the reachable point nearest to it, as Unity's `PathPartial`.
+- **`invalid`** — the start or the target has no navmesh within 5 cells; no corners.
+
+`SamplePosition` and `Raycast` answer on the navmesh, not physics: *walkable*, not
+*solid*. Every query is synchronous and deterministic.
 
 | Function | Signature | Returns |
 |---|---|---|
-| `Navigation.GetNextPathStep` | `(cx, cy, cz, tx, ty, tz)` | next waypoint `x, y, z` on the baked surface along the A* path |
+| `Navigation.GetNextPathStep` | `(cx, cy, cz, tx, ty, tz)` | the next corner `x, y, z` of the smoothed path (its `y` is that floor's height); with no path, the target itself |
+| `Navigation.CalculatePath` | `(fx, fy, fz, tx, ty, tz)` | a path table (above) |
+| `Navigation.GetPathLength` | `(path)` | the length along a path table's `corners` (the same number as its `length`) |
+| `Navigation.SamplePosition` | `(x, y, z, maxDistance)` | `found, x, y, z` — the walkable point nearest the given one (3D distance) within `maxDistance`; `false, 0, 0, 0` when there is none |
+| `Navigation.Raycast` | `(fx, fy, fz, tx, ty, tz)` | `hit, x, y, z` — walks the navmesh straight from the start toward the end; `hit` is `true` when a wall, ledge, eroded edge or too-steep step stops it, and `x, y, z` is where it stopped (the end point when clear), on the floor it reached |
+
+`Raycast` follows ramps and stairs, so a clear walk can end on another floor; the
+returned `y` says which. Its start must stand on the navmesh: from off it the walk is
+blocked at once, at the start (Unity's rule). `SamplePosition` with `maxDistance` of a
+few metres is the usual way to turn a picked point (a callout, a click) into one an
+agent can reach.
 
 ### Per-scene bake settings (#276)
 
