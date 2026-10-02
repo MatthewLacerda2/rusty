@@ -22,6 +22,7 @@ pub(super) fn sample_graph() -> AnimationGraph {
         blend_tree: None,
         is_loop,
         speed,
+        events: Vec::new(),
     };
     AnimationGraph {
         parameters,

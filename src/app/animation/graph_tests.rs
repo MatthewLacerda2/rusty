@@ -15,6 +15,7 @@ fn node(name: &str, clip: &str, is_loop: bool, speed: Option<f32>) -> GraphNode 
         blend_tree: None,
         is_loop,
         speed,
+        events: Vec::new(),
     }
 }
 

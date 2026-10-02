@@ -15,6 +15,7 @@ use crate::components::{AnimatorParameters, Motion, Playback, Playhead};
 use super::blend_poses;
 use super::blend_tree::tree_weights;
 use super::clip::{driven_slots, sampled_locals};
+use super::events::Crossed;
 
 /// Per joint slot, the local TRS a layer gives it, or `None` where it is not
 /// driven.
@@ -36,7 +37,7 @@ struct Sampled {
 }
 
 impl MotionContext<'_> {
-    fn clip(&self, name: &str) -> Option<&AnimationClip> {
+    pub(super) fn clip(&self, name: &str) -> Option<&AnimationClip> {
         self.clips.iter().find(|c| c.name == name)
     }
 
@@ -149,12 +150,21 @@ impl MotionContext<'_> {
         }
     }
 
-    /// Advance `playback` by `dt` at `speed`, each playhead at its motion's rate.
-    pub fn advance(&self, playback: &mut Playback, dt: f32, speed: f32) {
+    /// Advance `playback` by `dt` at `speed`, each playhead at its motion's rate,
+    /// and return the animation events (#459) the current motion crossed, tagged
+    /// with `layer`.
+    pub fn advance(
+        &self,
+        playback: &mut Playback,
+        dt: f32,
+        speed: f32,
+        layer: usize,
+    ) -> Vec<Crossed> {
         let current = self.playhead(playback.motion());
         let previous = playback
             .previous_motion()
             .map_or(1.0, |m| self.playhead(m).per_second);
-        playback.advance(dt, speed, current, previous);
+        let span = playback.advance(dt, speed, current, previous);
+        self.crossed(playback, current, span, layer)
     }
 }

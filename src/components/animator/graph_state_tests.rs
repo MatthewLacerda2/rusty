@@ -18,6 +18,7 @@ fn run_node() -> GraphNode {
         blend_tree: None,
         is_loop: true,
         speed: Some(2.0),
+        events: Vec::new(),
     }
 }
 

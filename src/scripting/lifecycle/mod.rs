@@ -22,9 +22,10 @@
 //! The transition-specific dispatch — the `OnDisable` falling-edge sweep and the
 //! deferred-destroy drain (`OnDisable`→`OnDestroy`) — lives in the `transitions`
 //! submodule, the UI callbacks (#420) in `ui`, the trigger and collision callbacks
-//! (#310, #448) in `physics`; this file holds the shared dispatch core and the
+//! (#310, #448) in `physics`, `OnAnimationEvent` (#459) in `animation`; this file holds the shared dispatch core and the
 //! per-frame hooks.
 
+mod animation;
 mod physics;
 mod transitions;
 mod ui;

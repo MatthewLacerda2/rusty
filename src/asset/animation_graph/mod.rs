@@ -21,12 +21,14 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 mod blend_tree;
+mod event;
 mod io;
 mod layer;
 mod validate;
 mod validate_motion;
 
 pub use blend_tree::{BlendChild1D, BlendChild2D, BlendTree};
+pub use event::AnimationEvent;
 pub use io::{is_graph_path, load, save};
 pub use layer::{GraphLayer, LayerBlending};
 pub use validate::GraphError;
@@ -69,6 +71,10 @@ pub struct GraphNode {
     /// `None` means 1× (no override).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub speed: Option<f32>,
+    /// The clip's animation events (#459), in its own seconds. A blend-tree node
+    /// carries none of its own: each child carries its clip's.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<AnimationEvent>,
 }
 
 /// A directed transition `from → to`. It fires when **all** its conditions hold
@@ -194,6 +200,8 @@ impl AnimationGraph {
     }
 }
 
+#[cfg(test)]
+mod event_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

@@ -14,6 +14,7 @@ pub fn tree_node(name: &str, children: &[(&str, f32)]) -> GraphNode {
         .map(|&(clip, threshold)| BlendChild1D {
             clip: clip.to_string(),
             threshold,
+            events: Vec::new(),
         })
         .collect();
     GraphNode {

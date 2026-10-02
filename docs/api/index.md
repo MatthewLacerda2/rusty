@@ -101,6 +101,7 @@ Component menu offers.
 | `OnCollisionStay` | `OnCollisionStay(id, other, contact)` | After the physics step, once per touching solid pair, every frame the contact persists — including the frame `OnCollisionEnter` fires (the same edge rule as `OnTrigger`). |
 | `OnCollisionExit` | `OnCollisionExit(id, other)` | Once, on the first frame the pair's surfaces no longer touch (or either collider is deactivated) — after that frame's `OnCollisionStay`. No `contact`: nothing is touching any more. |
 | `OnJointBreak` | `OnJointBreak(id, force, torque)` | Once, on the tick the entity's `Joint` carried more than its non-zero `break_force` (newtons) or `break_torque` (newton-metres) — after that tick's collision callbacks. `force` / `torque` are what it carried. The `Joint` component is already destroyed (Unity), so the bodies are free. |
+| `OnAnimationEvent` | `OnAnimationEvent(id, name)` | Once per animation event the entity's `Animator` crossed this tick (#459): an authored marker on the playing graph node or blend-tree child, or `"End"` when a non-looping clip or tree reaches its end. After the animation step (and ragdoll posing), before `LateUpdate`. Rules and order: [`Animator`](Animator.md), *Animation events*. |
 | `OnEnable` | `OnEnable(id)` | When the owning entity becomes `active`: on its **first** activation — between `Awake` and `Start`, so the first-tick order is `Awake → OnEnable → Start` — and again on every later inactive→active transition (e.g. a script's `Scene.SetActive(id, true)` re-enabling a pooled object). Detected by diffing the entity's `active` flag against the previous tick, so it fires **exactly once** per rising edge. |
 | `OnDisable` | `OnDisable(id)` | When the owning entity becomes inactive: once on each `active`→inactive transition (e.g. `Scene.Deactivate`), and once more — immediately **before** `OnDestroy` — when an *active* entity is destroyed. Fires **exactly once** per falling edge. While disabled, the entity receives no other gameplay callback (no `Update`/`LateUpdate`/`OnTrigger`/`OnCollision*`). |
 | `OnDestroy` | `OnDestroy(id)` | Once, when the entity is removed **during play** — by `Scene.DestroyEntity`, or because `Scene.Load` unloaded its scene (unless it was marked `Scene.DontDestroyOnLoad`) — after its `OnDisable` if it was active. The entity is still readable during the callback (removal happens just after). See the divergence note: **Stop does not fire `OnDestroy`.** |
@@ -183,6 +184,9 @@ headless replays stay byte-identical):
   sides of its pair — A about B, then B about A — and an entity carrying
   several scripts is notified in ascending script-index order. The tick's
   `OnJointBreak`s come last, ascending by joint entity id.
+- `OnAnimationEvent`s fire after the tick's animation step and before
+  `LateUpdate`: by entity id ascending, each entity's events in the order its
+  playheads crossed them, then layer, then authored order.
 - `OnEnable`/`OnDisable` are detected at the head of the script phase by diffing
   each instance's `active` state against the previous tick, in the order
   `OnDisable` (falling edges) → `Awake` → `OnEnable` (rising edges) → `Start` —
