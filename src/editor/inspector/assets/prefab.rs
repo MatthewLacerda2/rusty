@@ -5,7 +5,6 @@
 //! `instantiate_prefab`), so it stamps an independent copy with fresh deterministic
 //! ids exactly like `Scene.Instantiate` does for a script.
 
-use crate::editor::inspector::components::card::card_frame;
 use egui_phosphor::regular as icon;
 use std::fs;
 use std::path::Path;
@@ -22,7 +21,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     ui.heading(format!("{}  Prefab: {}", icon::PACKAGE, filename));
     ui.add_space(5.0);
 
-    draw_metadata_card(ui, path);
+    draw_metadata(ui, path);
 
     ui.add_space(15.0);
     ui.separator();
@@ -49,20 +48,12 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
 
 /// File metadata card: path, on-disk size, entity + material counts read from the
 /// document (so the agent/user sees the subtree's shape before stamping it).
-fn draw_metadata_card(ui: &mut egui::Ui, path: &str) {
-    card_frame(&crate::editor::theme::from_ui(ui)).show(ui, |ui| {
-        ui.vertical(|ui| {
-            ui.label(format!("Path: {}", path));
-            let size_str = match fs::metadata(path) {
-                Ok(meta) => format_size(meta.len()),
-                Err(_) => "Unknown size".to_string(),
-            };
-            ui.label(format!("Size: {}", size_str));
-            if let Some((entities, materials)) = counts(path) {
-                ui.label(format!("Entities: {entities}"));
-                ui.label(format!("Materials: {materials}"));
-            }
-        });
+fn draw_metadata(ui: &mut egui::Ui, path: &str) {
+    super::metadata::draw_metadata_card(ui, path, |ui| {
+        if let Some((entities, materials)) = counts(path) {
+            ui.label(format!("Entities: {entities}"));
+            ui.label(format!("Materials: {materials}"));
+        }
     });
 }
 
@@ -81,15 +72,5 @@ fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
         editor.is_dirty = true;
         editor.selected_entity_id = Some(root_id);
         editor.selected_asset_path = None;
-    }
-}
-
-fn format_size(bytes: u64) -> String {
-    if bytes < 1024 {
-        format!("{} B", bytes)
-    } else if bytes < 1024 * 1024 {
-        format!("{:.1} KB", bytes as f64 / 1024.0)
-    } else {
-        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
     }
 }
