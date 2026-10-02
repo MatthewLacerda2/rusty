@@ -37,6 +37,19 @@ pub fn seed_project_workspace() {
     // that uses them; the play loop itself runs no gameplay.
     crate::scene::seed_default_scripts();
     crate::scene::seed_default_scene();
+    for (_, line) in refresh_assets().lines() {
+        println!("{line}");
+    }
+}
+
+/// The project tree an asset refresh sweeps (the content browser's root): an `.mp3`
+/// anywhere under it is converted to `.wav` (#385).
+pub const ASSET_ROOT: &str = "project";
+
+/// Import what arrived in the project since the last look (Unity's asset refresh):
+/// today that is MP3 → WAV. Runs at boot and, in the editor, on window focus.
+pub fn refresh_assets() -> crate::asset::audio::Refresh {
+    crate::asset::audio::refresh(std::path::Path::new(ASSET_ROOT))
 }
 
 /// Open the window at `size` with `title`.

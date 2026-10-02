@@ -21,6 +21,7 @@
 
 pub mod audio;
 pub mod boot;
+mod focus;
 pub mod frame;
 pub mod input;
 pub mod player;
@@ -169,15 +170,7 @@ fn handle_window_event<F: Frontend>(
         WindowEvent::ScaleFactorChanged { .. } => {
             shell.renderer.resize(shell.window.inner_size());
         }
-        WindowEvent::Focused(focused) => {
-            shell.window_focused = *focused;
-            if *focused {
-                capture_clipboard(shell, game); // copied in another app, maybe
-            } else {
-                // Key-ups never arrive for keys released while unfocused.
-                game.input().borrow_mut().release_all();
-            }
-        }
+        WindowEvent::Focused(focused) => focus::changed(shell, game, *focused),
         WindowEvent::ModifiersChanged(modifiers) => shell.modifiers = modifiers.state(),
         WindowEvent::KeyboardInput {
             event:

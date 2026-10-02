@@ -10,6 +10,18 @@ volume and the speaker mode, read a source's resolved 3D spatial state, and driv
 a reverb send, snapshots, and ducking. Decode is `.ogg` (Vorbis) / `.wav` / `.mp3`, path-cached;
 a clip that fails to decode logs one warning naming the file and plays nothing.
 
+**Clip formats.** Ship **WAV** for one-shots and loops, **OGG** (Vorbis) for music and
+long dialogue, where size matters (a 3-minute stereo track is ~30 MB as WAV, ~3 MB as
+OGG; Vorbis loops without padding). **MP3 is a source format, not a shipped one**: an
+`.mp3` that enters the project is converted to a 16-bit PCM `.wav` beside it, with the
+encoder delay and padding trimmed, and the `.mp3` is removed (see
+[`Assets.Refresh`](Assets.md#assetsrefresh)). So one-shots fire on their first real
+sample and loops have no silence at the seam. Channels and sample rate are kept as the
+source has them (a mono MP3 stays mono, a stereo one stereo; the stereo rule under
+`spatial_blend` applies as for any clip). A `clip` that still names a converted
+`foo.mp3` plays `foo.wav`. An MP3 not converted yet still plays, trimmed the same way,
+until the next refresh replaces it.
+
 `Play`/`Stop`/`PlayAt` return a `bool` that is `true` when the maestro accepted the
 voice; on the **headless harness the audio backend is a no-op**, so playback makes no
 sound but every action is still recorded in the maestro's introspection log (so a
