@@ -145,7 +145,7 @@ edits and each physics step.)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetKind` / `SetConnectedBody` / `SetAnchor` / `SetConnectedAnchor` / `SetAutoConfigureConnectedAnchor` / `SetAxis` / `SetUseLimits` / `SetLimits` / `SetSwingLimit` / `SetEnableCollision` | ✅ | sim — `PhysicsWorld::resync_joints` builds the rapier joint from them, rebuilding on a change (`src/physics/joints_tests.rs`); round-trips, the connected body remapped through prefabs (`tests/joint_api.rs`) |
+| `SetKind` / `SetConnectedBody` / `SetAnchor` / `SetConnectedAnchor` / `SetAutoConfigureConnectedAnchor` / `SetAxis` / `SetSwingAxis` / `SetUseLimits` / `SetLimits` / `SetSwingLimit` / `SetSwing2Limit` / `SetEnableCollision` | ✅ | sim — `PhysicsWorld::resync_joints` builds the rapier joint from them, rebuilding on a change; swing 1 / swing 2 stop a Ball per axis (`src/physics/joints_tests.rs`); round-trips, the connected body remapped through prefabs (`tests/joint_api.rs`) |
 | `SetBreakForce` / `SetBreakTorque` | ✅ | sim — `PhysicsWorld::break_joints` reads them live after each step (`src/physics/joints_tests.rs`); round-trips |
 
 ### `CharacterController` — over `Entity.character_controller` (#451)

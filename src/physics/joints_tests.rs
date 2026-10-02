@@ -1,6 +1,7 @@
 //! src/physics/joints_tests.rs — `Joint` components in the rapier world (#449): a
 //! fixed joint holds and welds, a hinge swings within its limits, a ball joint is
-//! a pendulum, a joint breaks past its force, and a run replays identically.
+//! a pendulum whose two swing limits stop it per axis (#675), a joint breaks past
+//! its force, and a run replays identically.
 
 use glam::{Quat, Vec2, Vec3};
 
@@ -203,4 +204,54 @@ fn play_mode_edits_rebuild_only_what_changed() {
     }
     assert!(world.joints.is_empty() && world.impulse_joints.is_empty());
     assert!(pos(&scene, id).y < 4.5, "a removed joint frees the body");
+}
+
+/// A cube one unit right of a world pivot, on a limited Ball joint with the given
+/// swing axis and swing 1 / swing 2 limits; after `ticks`, how far (degrees) it
+/// has fallen below the horizontal, with the deepest it ever got.
+fn ball_fall(swing_axis: Vec3, swing1: f32, swing2: f32, ticks: usize) -> (f32, f32) {
+    let mut scene = Scene::new();
+    let id = cube(&mut scene, Vec3::X);
+    let ball = JointComponent {
+        kind: JointKind::Ball,
+        anchor: -Vec3::X,
+        swing_axis,
+        use_limits: true,
+        swing_limit: swing1,
+        swing2_limit: swing2,
+        ..Default::default()
+    };
+    joint(&mut scene, id, ball);
+    let mut world = PhysicsWorld::from_scene(&scene);
+    let mut deepest: f32 = 0.0;
+    let mut fall = 0.0;
+    for _ in 0..ticks {
+        world.step(&mut scene, DT);
+        let p = pos(&scene, id);
+        fall = (-p.y).atan2(p.x).to_degrees();
+        deepest = deepest.max(fall);
+    }
+    (fall, deepest)
+}
+
+#[test]
+fn ball_joint_stops_at_each_axis_own_swing_limit() {
+    // Gravity swings the cube about Z: swing 2 with a Y swing axis, swing 1 with Z.
+    for (axis, s1, s2, limit) in [
+        (Vec3::Y, 60.0, 20.0, 20.0),
+        (Vec3::Y, 20.0, 60.0, 60.0),
+        (Vec3::Z, 20.0, 60.0, 20.0),
+        (Vec3::Z, 60.0, 20.0, 60.0),
+    ] {
+        let (fall, deepest) = ball_fall(axis, s1, s2, 120);
+        let case = format!("axis {axis}, swing {s1}/{s2}: fell {fall}, deepest {deepest}");
+        assert!(deepest < limit + 2.0, "never past the limit — {case}");
+        assert!(fall > limit - 2.0, "rests on the limit — {case}");
+    }
+}
+
+#[test]
+fn ball_swing_limits_replay_identically() {
+    let once = || ball_fall(Vec3::new(0.0, 1.0, 1.0), 15.0, 50.0, 90);
+    assert_eq!(once(), once());
 }

@@ -212,7 +212,7 @@ pub(crate) fn audio_value(a: &AudioSourceComponent) -> Value {
     })
 }
 
-/// Joint (#449): its kind, connected body (`null`: the world), anchors, axis,
+/// Joint (#449): its kind, connected body (`null`: the world), anchors, axes,
 /// limits (degrees), break thresholds and collision flag.
 pub(crate) fn joint_value(j: &JointComponent) -> Value {
     json!({
@@ -222,9 +222,11 @@ pub(crate) fn joint_value(j: &JointComponent) -> Value {
         "connected_anchor": vec3(j.connected_anchor),
         "auto_configure_connected_anchor": j.auto_configure_connected_anchor,
         "axis": vec3(j.axis),
+        "swing_axis": vec3(j.swing_axis),
         "use_limits": j.use_limits,
         "limits": [j.limits.x, j.limits.y],
         "swing_limit": j.swing_limit,
+        "swing2_limit": j.swing2_limit,
         "break_force": j.break_force,
         "break_torque": j.break_torque,
         "enable_collision": j.enable_collision,

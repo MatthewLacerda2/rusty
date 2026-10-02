@@ -8,10 +8,12 @@
 //! - `Hinge` leaves one rotation free, about `axis`, optionally within
 //!   `limits` (doors, elbows, knees);
 //! - `Ball` leaves all three rotations free: twist about `axis` within `limits`,
-//!   and a swing of up to `swing_limit` degrees away from it (shoulders, hips, a
+//!   a swing of up to `swing_limit` degrees about `swing_axis` (Unity's swing 1)
+//!   and of up to `swing2_limit` about `axis × swing_axis` (swing 2) — so a
+//!   shoulder can swing far forward yet little sideways (shoulders, hips, a
 //!   hanging lamp).
 //!
-//! `anchor` and `axis` are in this entity's local space. `connected_anchor` is in
+//! `anchor`, `axis` and `swing_axis` are in this entity's local space. `connected_anchor` is in
 //! the connected body's local space — or world space with no connected body —
 //! and is ignored while `auto_configure_connected_anchor` is on, which puts it
 //! wherever `anchor` sits when the joint is built (Unity's default). The joint's
@@ -58,7 +60,7 @@ impl JointKind {
 
 /// A joint between this entity's Rigidbody and another's. See the module docs.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(from = "JointFile")]
 pub struct JointComponent {
     pub kind: JointKind,
     /// The entity whose body this one is joined to; `None` joins it to the world.
@@ -72,12 +74,18 @@ pub struct JointComponent {
     pub auto_configure_connected_anchor: bool,
     /// Hinge axis / Ball twist axis, in this entity's local space.
     pub axis: Vec3,
-    /// Whether `limits` (and a Ball's `swing_limit`) apply.
+    /// Ball: the swing-1 axis, in this entity's local space (Unity's
+    /// `swingAxis`). Only its part perpendicular to `axis` counts.
+    pub swing_axis: Vec3,
+    /// Whether `limits` (and a Ball's swing limits) apply.
     pub use_limits: bool,
     /// Hinge angle / Ball twist range, in degrees from the rest pose: `(min, max)`.
     pub limits: Vec2,
-    /// Ball: how far (degrees) the body may swing away from the axis.
+    /// Ball: how far (degrees) the body may swing about `swing_axis` (swing 1).
     pub swing_limit: f32,
+    /// Ball: how far (degrees) the body may swing about `axis × swing_axis`
+    /// (swing 2). A scene saved without it gets `swing_limit`: a round cone.
+    pub swing2_limit: f32,
     /// Force (newtons) past which the joint breaks; `0` never breaks.
     pub break_force: f32,
     /// Torque (newton-metres) past which the joint breaks; `0` never breaks.
@@ -95,9 +103,11 @@ impl Default for JointComponent {
             connected_anchor: Vec3::ZERO,
             auto_configure_connected_anchor: true,
             axis: Vec3::X,
+            swing_axis: Vec3::Y,
             use_limits: false,
             limits: Vec2::new(-45.0, 45.0),
             swing_limit: 45.0,
+            swing2_limit: 45.0,
             break_force: 0.0,
             break_torque: 0.0,
             enable_collision: false,
@@ -114,6 +124,70 @@ impl JointComponent {
     /// `None`, joining the body to the world) — how it follows a prefab save / stamp.
     pub fn remap_refs(&mut self, map: &dyn Fn(u32) -> Option<u32>) {
         self.connected_body = self.connected_body.and_then(map);
+    }
+}
+
+/// How a `JointComponent` is read from a scene: every field optional, and a
+/// missing `swing2_limit` (scenes from before #675) copies `swing_limit`.
+#[derive(Deserialize)]
+#[serde(default)]
+struct JointFile {
+    kind: JointKind,
+    connected_body: Option<u32>,
+    anchor: Vec3,
+    connected_anchor: Vec3,
+    auto_configure_connected_anchor: bool,
+    axis: Vec3,
+    swing_axis: Vec3,
+    use_limits: bool,
+    limits: Vec2,
+    swing_limit: f32,
+    swing2_limit: Option<f32>,
+    break_force: f32,
+    break_torque: f32,
+    enable_collision: bool,
+}
+
+impl Default for JointFile {
+    fn default() -> Self {
+        let d = JointComponent::default();
+        Self {
+            kind: d.kind,
+            connected_body: d.connected_body,
+            anchor: d.anchor,
+            connected_anchor: d.connected_anchor,
+            auto_configure_connected_anchor: d.auto_configure_connected_anchor,
+            axis: d.axis,
+            swing_axis: d.swing_axis,
+            use_limits: d.use_limits,
+            limits: d.limits,
+            swing_limit: d.swing_limit,
+            swing2_limit: None,
+            break_force: d.break_force,
+            break_torque: d.break_torque,
+            enable_collision: d.enable_collision,
+        }
+    }
+}
+
+impl From<JointFile> for JointComponent {
+    fn from(f: JointFile) -> Self {
+        Self {
+            kind: f.kind,
+            connected_body: f.connected_body,
+            anchor: f.anchor,
+            connected_anchor: f.connected_anchor,
+            auto_configure_connected_anchor: f.auto_configure_connected_anchor,
+            axis: f.axis,
+            swing_axis: f.swing_axis,
+            use_limits: f.use_limits,
+            limits: f.limits,
+            swing_limit: f.swing_limit,
+            swing2_limit: f.swing2_limit.unwrap_or(f.swing_limit),
+            break_force: f.break_force,
+            break_torque: f.break_torque,
+            enable_collision: f.enable_collision,
+        }
     }
 }
 
@@ -139,5 +213,19 @@ mod tests {
         assert_eq!(j.connected_body, Some(14));
         j.remap_refs(&|_| None);
         assert_eq!(j.connected_body, None);
+    }
+
+    #[test]
+    fn a_scene_without_swing2_keeps_a_round_cone() {
+        let old: JointComponent =
+            serde_json::from_str(r#"{"kind":"Ball","swing_limit":30.0}"#).unwrap();
+        assert_eq!((old.swing_limit, old.swing2_limit), (30.0, 30.0));
+        assert_eq!(old.swing_axis, Vec3::Y);
+        let new = JointComponent {
+            swing2_limit: 70.0,
+            ..old
+        };
+        let json = serde_json::to_string(&new).unwrap();
+        assert_eq!(serde_json::from_str::<JointComponent>(&json).unwrap(), new);
     }
 }
