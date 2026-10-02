@@ -200,8 +200,9 @@ impl PhysicsWorld {
 
     /// Write integrated poses + velocities back onto the owner entities,
     /// converting each body's world pose into the owner's local `Transform`
-    /// (#445). Static bodies are skipped: physics never moves them, so their
-    /// transform stays authoritative (no world↔local round-trip drift). Every
+    /// (#445). Static and kinematic bodies keep their transform: physics never
+    /// moves the one, and the other is where its Transform sent it (no
+    /// world↔local round-trip drift). Every
     /// attached collider's world AABB is refreshed, since moving an owner moves
     /// its compound children too.
     fn sync_from_rapier(&self, scene: &mut Scene) {
@@ -221,7 +222,10 @@ impl PhysicsWorld {
         ) else {
             return;
         };
-        if !body.is_fixed() {
+        // Only a dynamic body's pose is the solver's. A kinematic one ended the
+        // step where its Transform put it, so writing it back would only add
+        // world↔local rounding to every animated bone each tick.
+        if body.is_dynamic() {
             let (pos, rot) = from_iso(body.position());
             let (local_pos, local_rot) = world_to_local(scene, owner, pos, rot);
             if let Some(mut t) = scene.world.transform_mut(owner) {

@@ -140,7 +140,8 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
   TRS space: translation and scale lerp, rotation slerps, so limbs keep their
   length). A bone no playing clip animates is left alone.
 - **Later writers override it.** `LateUpdate` scripts (IK, procedural recoil,
-  aim) and physics may move a bone after the Animator; the mesh is skinned from
+  aim) and physics may move a bone after the Animator — a ragdolled bone is put
+  back where its body is right after the Animator runs; the mesh is skinned from
   the bones once per frame after all of them, so what moved a bone last is what
   renders.
 - **Attach by parenting.** A gun goes under `hand_r`:
@@ -151,8 +152,10 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
   parented under a bone is saved with that bone's name. Both re-bind by name when
   the scene loads, so a re-exported skeleton keeps them; an override or
   attachment whose bone no longer exists is dropped with a warning in the log
-  (the attachment stays under the skinned entity). Components added to a bone
-  itself are not saved: put a hitbox `Collider` on a child of the bone —
+  (the attachment stays under the skinned entity). A bone's `Rigidbody` and
+  `Joint` (a ragdoll's, #466 — see [`Ragdoll`](Ragdoll.md)) are saved by bone
+  name too, the joint's connected bone included. Any other component added to a
+  bone itself is not saved: put a hitbox `Collider` on a child of the bone —
   `Physics.GenerateHitboxes(id)` does exactly that for every bone (see
   `Physics`, *Per-bone hitboxes*, #464).
 - **Destroying** the skinned entity destroys its skeleton and what hangs from it.

@@ -22,8 +22,8 @@ return { Update = function(id)\n\
   if n == 40 then Ragdoll.Disable(id) end\n\
 end }";
 
-#[test]
-fn a_running_ragdoll_keeps_its_speed_and_disable_hands_the_bones_back() {
+/// The running rig, ragdoll built and the switch script attached, in Play.
+fn running() -> (GameWorld, Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
     let rig = rig::character(&mut scene, Vec3::ZERO, true);
     scene
@@ -35,8 +35,6 @@ fn a_running_ragdoll_keeps_its_speed_and_disable_hands_the_bones_back() {
         path: path.to_string_lossy().replace('\\', "/"),
         ..Default::default()
     }];
-    let hips = rig::bone(&scene, rig, "Hips");
-    let hitbox = scene.hitbox_of(hips).unwrap();
     let scene = Rc::new(RefCell::new(scene));
     let mut gw = GameWorld::new(
         scene.clone(),
@@ -47,6 +45,14 @@ fn a_running_ragdoll_keeps_its_speed_and_disable_hands_the_bones_back() {
         Rc::new(RefCell::new(ConsoleLogs::new())),
     );
     gw.set_playing(true);
+    (gw, scene, rig)
+}
+
+#[test]
+fn a_running_ragdoll_keeps_its_speed_and_disable_hands_the_bones_back() {
+    let (mut gw, scene, rig) = running();
+    let hips = rig::bone(&scene.borrow(), rig, "Hips");
+    let hitbox = scene.borrow().hitbox_of(hips).unwrap();
     let layer = |s: &Scene, name: &str| s.layers.index_of(name).unwrap();
     for _ in 0..30 {
         gw.tick(1.0 / 60.0);

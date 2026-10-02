@@ -9,8 +9,9 @@
 use std::collections::BTreeMap;
 
 use super::sync::rest_local;
+use crate::asset::SkinData;
 use crate::components::mesh::BoneBody;
-use crate::components::Entity;
+use crate::components::{Entity, TransformComponent};
 use crate::scene::Scene;
 
 /// How far a bone may drift from its rest pose before it counts as an override.
@@ -37,38 +38,19 @@ pub fn strip_bones(entities: &mut Vec<Entity>) {
         let Some(skin) = &mesh.skin else {
             continue;
         };
-        let mut overrides = BTreeMap::new();
-        let mut bodies = BTreeMap::new();
+        let mut saved = SavedBones::default();
         let bones = &mesh.skeleton.bones;
         for (slot, bone) in bones.iter().enumerate() {
             let Some(&b) = index.get(bone) else {
                 continue;
             };
             let name = skin.name(slot);
-            let doc = &entities[b];
-            if !doc
-                .transform
-                .approx_eq(&rest_local(skin, slot), OVERRIDE_EPS)
-            {
-                overrides.insert(name.clone(), doc.transform.clone());
-            }
-            if let Some(body) = bone_body(doc, |id| {
-                let slot = bones.iter().position(|&b| b == id)?;
-                Some(skin.name(slot))
-            }) {
-                bodies.insert(name.clone(), body);
-            }
-            if carries_components(doc) {
-                log::warn!(
-                    "[Scene] bone '{name}' carries components that are not saved (bones are \
-                     rebuilt from the model); put them on a child of the bone instead."
-                );
-            }
+            saved.record(&entities[b], skin, bones, slot);
             bone_of.insert(*bone, (entities[i].id, name));
         }
         if let Some(mesh) = &mut entities[i].mesh {
-            mesh.skeleton.overrides = overrides;
-            mesh.skeleton.bodies = bodies;
+            mesh.skeleton.overrides = saved.overrides;
+            mesh.skeleton.bodies = saved.bodies;
         }
     }
     if bone_of.is_empty() {
@@ -78,6 +60,37 @@ pub fn strip_bones(entities: &mut Vec<Entity>) {
     entities.retain(|e| !bone_of.contains_key(&e.id));
     for entity in entities.iter_mut() {
         entity.children.retain(|c| !bone_of.contains_key(c));
+    }
+}
+
+/// What one skeleton saves of its bones, by bone name.
+#[derive(Default)]
+struct SavedBones {
+    overrides: BTreeMap<String, TransformComponent>,
+    bodies: BTreeMap<String, BoneBody>,
+}
+
+impl SavedBones {
+    /// Record bone `slot`'s document: its transform when it is off the rest
+    /// pose, its physics, and a warning for any other component.
+    fn record(&mut self, doc: &Entity, skin: &SkinData, bones: &[u32], slot: usize) {
+        let name = skin.name(slot);
+        if !doc
+            .transform
+            .approx_eq(&rest_local(skin, slot), OVERRIDE_EPS)
+        {
+            self.overrides.insert(name.clone(), doc.transform.clone());
+        }
+        let bone_name = |id: u32| Some(skin.name(bones.iter().position(|&b| b == id)?));
+        if let Some(body) = bone_body(doc, bone_name) {
+            self.bodies.insert(name.clone(), body);
+        }
+        if carries_components(doc) {
+            log::warn!(
+                "[Scene] bone '{name}' carries components that are not saved (bones are \
+                 rebuilt from the model); put them on a child of the bone instead."
+            );
+        }
     }
 }
 

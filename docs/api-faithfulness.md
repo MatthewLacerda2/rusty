@@ -134,7 +134,8 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 | `SetVelocity` | ✅ | sim — `physics/world.rs` integrates / writes back `velocity` |
 | `SetAngularVelocity` | ✅ | sim — `physics/world.rs` pushes `set_angvel` / writes back `angvel` |
 | `AddForce` | ✅ | sim — folds impulse into `velocity` (read above); skips kinematic |
-| `SetKinematic` | ✅ | sim — `physics/build.rs::class_of` / `world.rs` body class |
+| `AddForceAtPosition` / `AddImpulseAtPosition` | ✅ | sim — `physics/ragdoll.rs::impulse_response` turns the push into `velocity` / `angular_velocity` (read above) from the body's mass properties (`src/physics/live_tests.rs`, `tests/ragdoll/fall.rs`) |
+| `SetKinematic` | ✅ | sim — `physics/build.rs::class_of`; a mid-play switch reaches rapier through `physics/live.rs::body_type` in `world.rs::apply_body_state` (`set_kinematic_mid_play_stops_and_restarts_a_falling_body`) |
 | `SetCollisionDetection` | ✅ | sim — `physics/build.rs::ccd_enabled` / `world.rs` `enable_ccd` (proven by `physics/ccd_tests.rs`: Discrete tunnels, Continuous stops) |
 
 (The #311 spatial query surface — `Raycast`'s siblings `SphereCast`,
@@ -155,6 +156,13 @@ edits and each physics step.)
 |---|---|---|
 | `SetKind` / `SetConnectedBody` / `SetAnchor` / `SetConnectedAnchor` / `SetAutoConfigureConnectedAnchor` / `SetAxis` / `SetSwingAxis` / `SetUseLimits` / `SetLimits` / `SetSwingLimit` / `SetSwing2Limit` / `SetEnableCollision` | ✅ | sim — `PhysicsWorld::resync_joints` builds the rapier joint from them, rebuilding on a change; swing 1 / swing 2 stop a Ball per axis (`src/physics/joints_tests.rs`); round-trips, the connected body remapped through prefabs (`tests/joint_api.rs`) |
 | `SetBreakForce` / `SetBreakTorque` | ✅ | sim — `PhysicsWorld::break_joints` reads them live after each step (`src/physics/joints_tests.rs`); round-trips |
+
+### `Ragdoll` — over the bones' `Entity.rigidbody` / `Entity.joint` (#466)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `Build` | ✅ | sim — writes ordinary `Rigidbody` / `Joint` components the physics world builds (`tests/ragdoll/mod.rs`); round-trips by bone name (`scene::skeleton::ragdoll::persist_tests`) |
+| `Enable` / `Disable` | ✅ | sim — flips `is_kinematic` (read by `physics/live.rs::body_type`), seeds `velocity`, swaps the hitbox layer (read by `PhysicsWorld::sync_layers`); `PhysicsWorld::pose_bones` then poses the bones (`tests/ragdoll/switch.rs`) |
 
 ### `CharacterController` — over `Entity.character_controller` (#451)
 

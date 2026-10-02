@@ -17,6 +17,8 @@ every number after `hit` is `0` and the rest are `nil`.
 | `Physics.GetAngularVelocity` | `(id)` | `x, y, z` (radians/sec per axis) |
 | `Physics.SetAngularVelocity` | `(id, wx, wy, wz)` | — |
 | `Physics.AddForce` | `(id, fx, fy, fz)` | — (continuous force, see below) |
+| `Physics.AddForceAtPosition` | `(id, fx, fy, fz, px, py, pz)` | — (continuous force at a world point: moves and spins the body) |
+| `Physics.AddImpulseAtPosition` | `(id, jx, jy, jz, px, py, pz)` | — (impulse in N·s at a world point — a shot hitting a ragdoll bone) |
 | `Physics.SetKinematic` | `(id, is_kinematic)` | — |
 | `Physics.GetCollisionDetection` | `(id)` | `"Discrete"` \| `"Continuous"` |
 | `Physics.SetCollisionDetection` | `(id, mode)` | — (`mode` is `"Discrete"` or `"Continuous"`) |
@@ -268,6 +270,35 @@ if hit and bone then
 end
 ```
 
-A hitbox under a dynamic `Rigidbody` joins its body as a compound part and adds
-to its mass; a character driven by a `CharacterController` (kinematic) is
-unaffected.
+A hitbox under a dynamic `Rigidbody` joins its body as a compound part and
+takes a share of its mass; a character driven by a `CharacterController`
+(kinematic) is unaffected. **Ragdolls** (#466) turn the hitboxes into jointed
+bodies: see [`Ragdoll`](Ragdoll.md). A ragdolled hitbox moves to the `Ragdoll`
+layer, so a shot that should hit corpses adds that layer to its mask.
+
+### Mass, and forces at a point (#466)
+
+A Rigidbody's **mass** (kilograms, default `1`) is its body's mass, whatever the
+size of its colliders (Unity's `Rigidbody.mass`): it is spread over the body's
+solid colliders in proportion to their volume (a trigger carries none), which
+also sets the body's centre of mass and inertia. Changing it during Play takes
+effect on the next step. So do `SetKinematic` and an entity's layer: the body
+switches class in place (keeping its joints and contacts), and a collider follows
+its layer's Collision Matrix row.
+
+`AddImpulseAtPosition(id, jx, jy, jz, px, py, pz)` applies an impulse (N·s) at a
+world point — Unity's `AddForceAtPosition(…, ForceMode.Impulse)`. It changes the
+body's velocity by `J / mass` and its angular velocity by the torque
+`(point − centre of mass) × J` through the body's inertia, so a push off-centre
+spins it. `AddForceAtPosition` is the continuous-force version (`F · fixedDeltaTime`
+per call, like `AddForce`). Both are no-ops on a kinematic body or without a
+Rigidbody; outside Play only the linear part applies. Pass the hit point a
+`Raycast` returned:
+
+```lua
+local hit, _, _, px, py, pz, _, _, _, bone, _, root = Physics.Raycast(ox, oy, oz, dx, dy, dz, me, SHOT)
+if hit and bone then
+  Ragdoll.Enable(root)                                   -- first: Enable sets each body's velocity
+  Physics.AddImpulseAtPosition(bone, dx * 80, dy * 80, dz * 80, px, py, pz)
+end
+```

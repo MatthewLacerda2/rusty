@@ -34,6 +34,9 @@ use preset::{preset_for, Bend, JointPreset};
 /// The layer ragdolled hitboxes move to.
 pub const RAGDOLL_LAYER: &str = "Ragdoll";
 
+/// A skeleton's bones, their parent slots and their names, in joint order.
+type Skeleton = (Vec<u32>, Vec<Option<usize>>, Vec<String>);
+
 /// What [`Scene::build_ragdoll`] builds.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RagdollOptions {
@@ -119,10 +122,7 @@ impl Scene {
     }
 
     /// `owner`'s bones, their parent slots and names, in joint order.
-    fn skeleton_of(
-        &self,
-        owner: u32,
-    ) -> Result<(Vec<u32>, Vec<Option<usize>>, Vec<String>), String> {
+    fn skeleton_of(&self, owner: u32) -> Result<Skeleton, String> {
         let mesh = self
             .world
             .mesh(owner)
