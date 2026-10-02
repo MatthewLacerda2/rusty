@@ -1,9 +1,10 @@
-//! src/api/audio.rs — `Audio` namespace (#212).
+//! src/api/audio/ — `Audio` namespace (#212).
 //!
 //! Script/REPL/bot control over the engine's audio: start/stop an entity's
 //! `AudioSource` (`Play`/`Stop`), retune its volume (`SetVolume`), fire a
 //! fire-and-forget one-shot at a world position (`PlayAt`), and read/set the single
-//! master volume and the speaker mode (#546) on the `AudioMaestro`. One surface, three callers — the same verbs
+//! master volume and the speaker mode (#546) on the `AudioMaestro`, and drive the
+//! mixer's groups, snapshots and ducks (`mixer.rs`, #465). One surface, three callers — the same verbs
 //! the editor's play-state and the play-mode systems drive.
 //!
 //! Every verb routes through the shared `AudioMaestro` (a Resource), so a scripted
@@ -15,6 +16,8 @@
 use std::cell::RefCell;
 
 use mlua::Lua;
+
+mod mixer;
 
 use super::{put, Reg};
 use glam::Vec3;
@@ -40,6 +43,7 @@ pub fn register<'lua, 'scope>(
     register_oneshot_and_master(scope, &table, audio, time)?;
     register_spatial(scope, &table, scene, audio, camera)?;
     register_speaker_mode(scope, &table, audio)?;
+    mixer::register(scope, &table, audio, time)?;
 
     lua.globals().set("Audio", table).map_err(|e| e.to_string())
 }
@@ -126,8 +130,17 @@ fn register_source_control<'lua, 'scope>(
     )
 }
 
-/// `Audio.PlayAt(path, x, y, z [, vol [, min_distance, max_distance]])`.
-type PlayAtArgs = (String, f32, f32, f32, Option<f32>, Option<f32>, Option<f32>);
+/// `Audio.PlayAt(path, x, y, z [, vol [, min_distance, max_distance [, group]]])`.
+type PlayAtArgs = (
+    String,
+    f32,
+    f32,
+    f32,
+    Option<f32>,
+    Option<f32>,
+    Option<f32>,
+    Option<String>,
+);
 
 /// `PlayAt`'s optional rolloff band: both distances or neither, `0 <= min <= max`.
 fn rolloff_arg(min: Option<f32>, max: Option<f32>) -> Result<Rolloff, String> {
@@ -157,17 +170,19 @@ fn register_oneshot_and_master<'lua, 'scope>(
 ) -> Reg {
     // Fire a one-shot at a world position. `vol` defaults to 1.0; `min_distance` /
     // `max_distance` (both or neither) widen its rolloff band past the 1 → 16 m
-    // default (#575). Leaves no persistent component — only the maestro's event log.
+    // default (#575); `group` picks its mixer group (#465, Master by default). Leaves
+    // no persistent component — only the maestro's event log.
     put(
         table,
         "PlayAt",
         scope.create_function(|_, args: PlayAtArgs| {
-            let (path, x, y, z, vol, min, max) = args;
+            let (path, x, y, z, vol, min, max, group) = args;
             let rolloff = rolloff_arg(min, max).map_err(mlua::Error::RuntimeError)?;
             let now = tick(time);
             let shot = Shot {
                 volume: vol.unwrap_or(1.0),
                 rolloff,
+                group: group.as_deref().unwrap_or(""),
                 ..Shot::new(&path, [x, y, z])
             };
             let played = audio.borrow_mut().play_at(&shot, 0, now);

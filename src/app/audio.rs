@@ -1,7 +1,10 @@
 //! src/app/audio.rs — audio play-mode system (#212).
 //!
-//! One `Startup`-stage system: when the world enters Play, start every
-//! `AudioSource` flagged `play_on_start` (Unity's "Play On Awake"). It drives the
+//! A `Startup`-stage system: when the world enters Play, start every
+//! `AudioSource` flagged `play_on_start` (Unity's "Play On Awake"). And a
+//! `LateUpdate` one stepping the mixer (#465) — snapshot blends and ducking — on
+//! `Time.unscaledTime`, so the mix state is a function of sim time and a replay
+//! reads back the same groups. It drives the
 //! shared `AudioMaestro` exactly as the `Audio` API does, so a `play_on_start`
 //! voice and a scripted `Audio.Play` land in one device and one introspection log.
 //!
@@ -21,6 +24,13 @@ use super::world::World;
 /// source's flags before it fires).
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::Startup, start_play_on_start);
+    app.add_system(Stage::LateUpdate, advance_mixer);
+}
+
+/// Step the mixer to this frame's unscaled sim time.
+fn advance_mixer(_world: &mut World, res: &mut Resources) {
+    let now = res.time.borrow().unscaled_time;
+    res.audio.borrow_mut().advance_mixer(now);
 }
 
 /// Start every `play_on_start` AudioSource in the freshly-entered Play session.

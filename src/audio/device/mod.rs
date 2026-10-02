@@ -1,13 +1,17 @@
-//! src/audio/device/ — the real sound device: everything that touches `rodio`.
+//! src/audio/device/ — the real sound device: everything that touches kira (#465).
 //!
-//! The platform-layer half of audio: the [`RodioBackend`] (one sink per voice), the
-//! path-cached decoder it plays from, the stereo panner every voice runs through
-//! (#412), and the master bus they all sum into (#546). The maestro reaches it only through the `AudioBackend` trait, and the
-//! headless harness never constructs it.
+//! The platform-layer half of audio: the [`KiraBackend`] (kira's mixer), the
+//! path-cached decoder it plays from, the voice every clip plays as (#412's pan law),
+//! the mixer groups as kira tracks, and the speaker-mode output stage (#546). The
+//! maestro reaches it only through the `AudioBackend` trait, and the headless
+//! harness never constructs it.
 
+pub mod backend;
+#[cfg(test)]
+pub mod capture;
 pub mod decode;
-pub mod master;
-pub mod pan;
-pub mod rodio;
+pub mod groups;
+pub mod output;
+pub mod voice;
 
-pub use self::rodio::RodioBackend;
+pub use backend::KiraBackend;

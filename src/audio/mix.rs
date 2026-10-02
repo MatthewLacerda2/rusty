@@ -101,6 +101,8 @@ pub struct Shot<'a> {
     /// Per-shot linear gain (pre-master).
     pub volume: f32,
     pub rolloff: Rolloff,
+    /// The mixer group it plays through (`""` is Master, #465).
+    pub group: &'a str,
 }
 
 impl<'a> Shot<'a> {
@@ -111,6 +113,7 @@ impl<'a> Shot<'a> {
             position,
             volume: 1.0,
             rolloff: Rolloff::default(),
+            group: "",
         }
     }
 }

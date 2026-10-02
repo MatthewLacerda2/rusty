@@ -8,10 +8,11 @@
 //!
 //! It runs in the **platform layer**, not the sim: by default it carries a
 //! [`NullBackend`] (the harness path), and the windowed app swaps in the real
-//! `RodioBackend` after construction. A play action always updates the deterministic
-//! introspection log; only the *sound* is a backend side effect. The maestro never
-//! reads a wall clock or unseeded RNG — voice ids are a monotone counter and the
-//! event `tick` is supplied by the caller — so nothing here threatens replay.
+//! `KiraBackend` after construction. It also owns the [`Mixer`] (#465), whose groups
+//! every voice routes into (`mixer/maestro.rs`). A play action always updates the
+//! deterministic introspection log; only the *sound* is a backend side effect. Voice
+//! ids are a monotone counter and the event `tick` is supplied by the caller — no
+//! wall clock or unseeded RNG, so nothing here threatens replay.
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -20,6 +21,7 @@ use glam::Vec3;
 use super::backend::{AudioBackend, NullBackend, PlayParams, VoiceId, VoiceMix};
 use super::introspection::{AudioEvent, AudioEventKind, AudioEventLog, DEFAULT_EVENT_CAP};
 use super::mix::{self, MixEnv};
+use super::mixer::{GroupId, Mixer};
 use super::speaker::SpeakerMode;
 use crate::components::AudioSourceComponent;
 
@@ -33,6 +35,7 @@ pub(super) struct LiveVoice {
     pub(super) source_volume: f32,
     pub(super) position: Vec3,
     pub(super) mix: VoiceMix,
+    pub(super) group: GroupId,
 }
 
 /// A fire-and-forget `PlayAt` voice still sounding: tracked only so the per-frame
@@ -42,6 +45,7 @@ pub(super) struct OneShot {
     pub(super) volume: f32,
     pub(super) position: Vec3,
     pub(super) mix: VoiceMix,
+    pub(super) group: GroupId,
 }
 
 /// The audio engine singleton. See the module docs.
@@ -59,6 +63,8 @@ pub struct AudioMaestro {
     /// The listener + clock state of the last per-frame mix; a voice started between
     /// frames is resolved against it so its first samples are already mixed.
     pub(super) env: MixEnv,
+    /// The mixer groups, snapshots and ducks every voice routes through (#465).
+    pub(super) mixer: Mixer,
     /// The agent-facing log of play/stop/one-shot actions.
     log: AudioEventLog,
     /// Monotone id source for backend voices (deterministic — never a clock/RNG).
@@ -76,26 +82,30 @@ impl AudioMaestro {
     /// (`NullBackend`); the windowed app calls [`AudioMaestro::set_backend`] with the
     /// real device afterwards.
     pub fn with_backend(backend: Box<dyn AudioBackend>) -> Self {
-        Self {
+        let mut maestro = Self {
             backend,
             master_volume: 1.0,
             speaker_mode: SpeakerMode::default(),
             entity_voices: HashMap::new(),
             oneshots: BTreeMap::new(),
             env: MixEnv::default(),
+            mixer: Mixer::default(),
             log: AudioEventLog::new(DEFAULT_EVENT_CAP),
             next_voice: 1,
-        }
+        };
+        maestro.sync_groups();
+        maestro
     }
 
-    /// Swap in a different backend (the windowed app injects the real `RodioBackend`
+    /// Swap in a different backend (the windowed app injects the real `KiraBackend`
     /// after `GameWorld::new`). Any voices live on the old backend are forgotten;
-    /// the new one takes the current speaker mode.
+    /// the new one takes the current speaker mode and mixer groups.
     pub fn set_backend(&mut self, mut backend: Box<dyn AudioBackend>) {
         backend.set_speaker_mode(self.speaker_mode);
         self.backend = backend;
         self.entity_voices.clear();
         self.oneshots.clear();
+        self.sync_groups();
     }
 
     /// The current master volume.
@@ -127,11 +137,18 @@ impl AudioMaestro {
         mix.for_output(self.master_volume, self.speaker_mode)
     }
 
-    /// Mint the next backend voice id (deterministic monotone counter).
-    fn mint(&mut self) -> VoiceId {
-        let id = VoiceId(self.next_voice);
+    /// Start a voice on the backend under the next id (a deterministic monotone
+    /// counter), returning the id and whether the backend accepted it.
+    fn start(&mut self, clip: &str, looping: bool, mix: VoiceMix, to: GroupId) -> (VoiceId, bool) {
+        let voice = VoiceId(self.next_voice);
         self.next_voice += 1;
-        id
+        let params = PlayParams {
+            clip: clip.to_string(),
+            looping,
+            mix: self.output(mix),
+            group: to,
+        };
+        (voice, self.backend.play(voice, &params))
     }
 
     /// Start (or restart) entity `id`'s `AudioSource`. The `position` and `tick` are
@@ -149,15 +166,8 @@ impl AudioMaestro {
         let source_volume = source.volume.max(0.0);
         let at = Vec3::from(position);
         let mix = mix::resolve_voice(&self.env, source, source_volume, at);
-        let voice = self.mint();
-        let started = self.backend.play(
-            voice,
-            &PlayParams {
-                clip: source.clip.clone(),
-                looping: source.looping,
-                mix: self.output(mix),
-            },
-        );
+        let group = self.route(&source.output_group);
+        let (voice, started) = self.start(&source.clip, source.looping, mix, group);
         if started {
             self.entity_voices.insert(
                 id,
@@ -167,6 +177,7 @@ impl AudioMaestro {
                     source_volume,
                     position: at,
                     mix,
+                    group,
                 },
             );
         }
@@ -227,20 +238,14 @@ impl AudioMaestro {
             position,
             volume,
             rolloff,
+            group,
         } = *shot;
         let volume = volume.max(0.0);
         let source = mix::oneshot_source(clip, rolloff);
         let at = Vec3::from(position);
         let mix = mix::resolve_voice(&self.env, &source, volume, at);
-        let voice = self.mint();
-        let started = self.backend.play(
-            voice,
-            &PlayParams {
-                clip: clip.to_string(),
-                looping: false,
-                mix: self.output(mix),
-            },
-        );
+        let group = self.route(group);
+        let (voice, started) = self.start(clip, false, mix, group);
         if started {
             let position = at;
             self.oneshots.insert(
@@ -250,6 +255,7 @@ impl AudioMaestro {
                     volume,
                     position,
                     mix,
+                    group,
                 },
             );
         }

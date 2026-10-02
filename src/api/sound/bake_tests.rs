@@ -1,10 +1,8 @@
 //! Tests for the `Sound` namespace, driven the way a script drives it: author a
 //! patch as a Lua table, bake a note, check the file that came out.
 
-use mlua::Lua;
-use rodio::Source as _;
-
 use super::*;
+use mlua::Lua;
 
 /// A temp path with forward slashes: a Windows path (`C:\Users\…`) interpolated
 /// into a Lua string literal trips Lua's escape parser (`\U`), and Windows accepts
@@ -51,8 +49,8 @@ fn bake_writes_a_playable_wav_and_returns_its_path() {
         .get_or_decode(&path)
         .expect("the engine decodes the bake");
     // zimmer bakes stereo (its SYNTH_VERSION 3); the old in-tree synth was mono.
-    assert_eq!(clip.source().channels(), 2, "stereo");
-    assert_eq!(clip.source().sample_rate(), zimmer::SAMPLE_RATE);
+    assert_eq!(clip.channels(), 2, "stereo");
+    assert_eq!(clip.sample_rate(), zimmer::SAMPLE_RATE);
     std::fs::remove_file(path).ok();
 }
 
