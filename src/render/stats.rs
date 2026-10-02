@@ -46,9 +46,18 @@ pub struct RenderCounters {
     /// CPU microseconds spent binning lights into clusters (#434), summed over
     /// the camera stack. Wall-clock, so the one counter that varies run to run.
     pub light_bin_us: u64,
-    /// Shadow-caster draw calls (static bake + dynamic); an instanced run of casters
-    /// sharing a mesh is one draw (#470).
+    /// Shadow-caster draw calls (cascades' static bake + dynamic, and the point/spot
+    /// shadow atlas); an instanced run of casters sharing a mesh is one draw (#470).
     pub shadow_draws: u32,
+    /// Point/spot lights given a shadow in the atlas this frame (#468).
+    pub shadowed_lights: u32,
+    /// Point/spot lights that cast shadows and reach the view but found no room in
+    /// the atlas (#468): they shade unshadowed. The least important are dropped.
+    pub shadow_lights_dropped: u32,
+    /// Atlas tiles drawn this frame: one per spotlight, six per point light (#468).
+    pub shadow_atlas_tiles: u32,
+    /// Atlas texels those tiles cover, out of 2048² (#468).
+    pub shadow_atlas_texels: u64,
     /// UI batches drawn — backdrop batches (#426) included.
     pub ui_draws: u32,
     /// UI `Mask` coverage textures rendered (#428): one pass per visible Mask.
@@ -87,6 +96,10 @@ impl RenderCounters {
             ("light_cluster_refs", self.light_cluster_refs),
             ("light_bin_us", self.light_bin_us),
             ("shadow_draws", self.shadow_draws.into()),
+            ("shadowed_lights", self.shadowed_lights.into()),
+            ("shadow_lights_dropped", self.shadow_lights_dropped.into()),
+            ("shadow_atlas_tiles", self.shadow_atlas_tiles.into()),
+            ("shadow_atlas_texels", self.shadow_atlas_texels),
             ("ui_draws", self.ui_draws.into()),
             ("ui_mask_passes", self.ui_mask_passes.into()),
             ("ui_blur_passes", self.ui_blur_passes.into()),

@@ -71,6 +71,7 @@ pub(crate) fn light_value(l: &LightComponent) -> Value {
         "range": l.range,
         "inner_cone": l.inner_cone,
         "outer_cone": l.outer_cone,
+        "cast_shadows": l.cast_shadows,
     })
 }
 

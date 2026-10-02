@@ -22,4 +22,10 @@ pub struct LightComponent {
     pub range: f32,
     pub inner_cone: f32, // Degrees
     pub outer_cone: f32, // Degrees
+    /// Whether a point or spot light casts shadows, through the shadow atlas (#468).
+    /// Off by default, as in Unity: each shadowed light costs atlas space and a depth
+    /// pass per tile (six for a point light). The sun ignores it and always casts its
+    /// cascades.
+    #[serde(default)]
+    pub cast_shadows: bool,
 }

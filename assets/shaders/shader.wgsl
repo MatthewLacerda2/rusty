@@ -1,4 +1,4 @@
-#import common::{CameraUniforms, LightingUniforms, LocalLight, VertexInput, apply_fog, blend_joints, cluster_index, local_light_radiance}
+#import common::{CameraUniforms, LightingUniforms, LocalLight, NO_SHADOW, ShadowTile, VertexInput, apply_fog, blend_joints, cluster_index, local_light_radiance, local_shadow_tile, sample_local_shadow}
 
 struct EntityUniforms {
     model_matrix: mat4x4<f32>,
@@ -118,6 +118,11 @@ var s_shadow: sampler_comparison;
 // wherever the SSAO pass did not run (off, Low tier, the transparent pass).
 @group(3) @binding(3)
 var t_ao: texture_2d<f32>;
+// The point/spot shadow atlas (#468) and its tiles; a light's `shadow` indexes them.
+@group(3) @binding(4)
+var t_shadow_atlas: texture_depth_2d;
+@group(3) @binding(5)
+var<storage, read> shadow_tiles: array<ShadowTile>;
 
 fn ambient_occlusion(frag: vec2<f32>) -> f32 {
     let last = textureDimensions(t_ao) - vec2<u32>(1u);
@@ -521,13 +526,19 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         lighting_color += calculate_pbr(N, V, normalize(-sun.direction), radiance, F0, metallic, roughness, albedo);
     }
 
-    // 3. Point and spot lights, only those binned into this fragment's cluster (#434).
+    // 3. Point and spot lights, only those binned into this fragment's cluster (#434),
+    // each shadowed through the atlas when it casts (#468).
     let range = cluster_ranges[cluster_index(camera.clusters, camera.view_proj, in.world_position)];
     for (var i = 0u; i < range.y; i = i + 1u) {
         let light = local_lights[cluster_lights[range.x + i]];
-        let radiance = local_light_radiance(light, in.world_position);
+        var radiance = local_light_radiance(light, in.world_position);
         if (all(radiance == vec3<f32>(0.0))) {
             continue;
+        }
+        // Its shadow, when the atlas holds one (#468).
+        let tile = local_shadow_tile(light, in.world_position);
+        if (tile != NO_SHADOW) {
+            radiance *= sample_local_shadow(shadow_tiles[tile], t_shadow_atlas, s_shadow, light.position, in.world_position, N);
         }
         let L = normalize(light.position - in.world_position);
         lighting_color += calculate_pbr(N, V, L, radiance, F0, metallic, roughness, albedo);

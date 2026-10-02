@@ -12,11 +12,12 @@
 //! carries its `bone_base` per instance. The base rides the instance, not the draw, so
 //! skinned copies of one mesh still share one instanced draw.
 //!
-//! Casters are gathered once per sweep and culled per cascade (#435), so a prop inside
-//! two cascades is drawn into both. The static bake and the dynamic pass each own a
-//! [`CasterBuffer`] holding every cascade's casters: both are recorded into the same
-//! encoder before one submit, so sharing one buffer would let the second upload
-//! overwrite the first's casters.
+//! Casters are gathered once per sweep and culled per light volume — a cascade (#435)
+//! or an atlas tile (#468) — so a prop inside two volumes is drawn into both. The
+//! cascades' static bake and dynamic pass and the atlas each own a [`CasterBuffer`]
+//! holding every volume's casters: all three are recorded into the same encoder
+//! before one submit, so sharing one buffer would let a later upload overwrite an
+//! earlier sweep's casters.
 
 mod buffer;
 
@@ -33,6 +34,7 @@ use crate::render::{transform_aabb, Frustum, GpuMesh, MeshId};
 use crate::scene::Scene;
 pub(super) use buffer::CasterBuffer;
 use buffer::CasterData;
+use glam::Mat4;
 
 /// What a run of casters shares: its clip (`None` for plain depth), then its mesh.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -84,6 +86,28 @@ pub(super) fn batch_casters(
     (matrices, batches)
 }
 
+/// Which depth sweep a set of casters is for: each has its own caster buffer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Sweep {
+    /// The cascades' cached bake: static casters only.
+    Static,
+    /// The cascades' per-frame pass: everything the bake leaves out.
+    Dynamic,
+    /// The point/spot shadow atlas (#468): every caster, redrawn each frame.
+    Atlas,
+}
+
+impl Sweep {
+    /// Whether a caster whose static flag is `is_static` is drawn in this sweep.
+    fn takes(self, is_static: bool) -> bool {
+        match self {
+            Sweep::Static => is_static,
+            Sweep::Dynamic => !is_static,
+            Sweep::Atlas => true,
+        }
+    }
+}
+
 /// What one depth sweep needs from the renderer.
 pub(super) struct CasterFrame<'a> {
     pub device: &'a wgpu::Device,
@@ -98,26 +122,25 @@ pub(super) struct CasterFrame<'a> {
 }
 
 impl ShadowRenderer {
-    /// Gather every active caster whose `is_static` flag matches `want_static` and whose
-    /// LOD level `lod` shows, cull
-    /// it against each of `cascades`' light volumes, and upload every cascade's
-    /// batches into that sweep's one caster buffer. Returns the batches per cascade,
+    /// Gather every active caster `sweep` takes whose LOD level `lod` shows, cull it
+    /// against each of `volumes` (light view-projections), and upload every volume's
+    /// batches into that sweep's one caster buffer. Returns the batches per volume,
     /// in the order given.
     pub(super) fn prepare_casters(
         &mut self,
         frame: &CasterFrame,
         lod: &LodSelection,
-        want_static: bool,
-        cascades: &[usize],
+        sweep: Sweep,
+        volumes: &[Mat4],
     ) -> Vec<Vec<CasterBatch>> {
-        let (candidates, joints) = self.collect_casters(frame, lod, want_static);
+        let (candidates, joints) = self.collect_casters(frame, lod, sweep);
         let mut matrices = Vec::new();
-        let mut per_cascade = Vec::with_capacity(cascades.len());
-        for &i in cascades {
+        let mut per_volume = Vec::with_capacity(volumes.len());
+        for &volume in volumes {
             // Cull casters against the LIGHT's volume, not the camera's (#330). An
             // off-screen caster still inside a cascade must keep its shadow — culling
             // casters by the player camera is the classic pop-a-shadow bug.
-            let frustum = Frustum::from_view_proj(self.cascades[i].light_space);
+            let frustum = Frustum::from_view_proj(volume);
             let casters = candidates
                 .iter()
                 .filter(|c| {
@@ -133,27 +156,27 @@ impl ShadowRenderer {
             }
             matrices.extend(packed);
             self.drawn.extend(batches.iter().map(CasterBatch::counts));
-            per_cascade.push(batches);
+            per_volume.push(batches);
         }
-        let buffer = if want_static {
-            &mut self.static_casters
-        } else {
-            &mut self.dynamic_casters
+        let buffer = match sweep {
+            Sweep::Static => &mut self.static_casters,
+            Sweep::Dynamic => &mut self.dynamic_casters,
+            Sweep::Atlas => &mut self.atlas.casters,
         };
         let layout = &self.entity_layout;
         buffer.upload(frame.device, frame.queue, layout, &matrices, &joints);
-        per_cascade
+        per_volume
     }
 
-    /// Every active caster matching `want_static` — a caster a surface variant cuts
-    /// counts as dynamic (see `clips`) — that has a GPU mesh, and the joint
+    /// Every active caster `sweep` takes — a caster a surface variant cuts counts as
+    /// dynamic (see `clips`) — that has a GPU mesh, and the joint
     /// matrices its skinned casters' `bone_base`s index — one palette per caster per
     /// sweep, however many cascades draw it.
     fn collect_casters(
         &self,
         frame: &CasterFrame,
         lod: &LodSelection,
-        want_static: bool,
+        sweep: Sweep,
     ) -> (Vec<Candidate>, Vec<JointMatrix>) {
         let scene = frame.scene;
         let mut casters = Vec::new();
@@ -162,7 +185,7 @@ impl ShadowRenderer {
             let clip = frame.clips.get(&id);
             let moving = clip.is_some_and(|c| c.clip.is_variant());
             let is_static = scene.world.is_static(id) && !moving;
-            if !scene.world.is_active(id) || is_static != want_static {
+            if !scene.world.is_active(id) || !sweep.takes(is_static) {
                 continue;
             }
             // A level of detail this sweep does not draw (#472).
@@ -197,24 +220,25 @@ impl ShadowRenderer {
         (casters, joints)
     }
 
-    /// Record one sweep's instanced depth draws for `cascade` from its caster buffer:
-    /// plain runs through the depth-only pipeline, clipped ones through the cutout
-    /// clip or their variant's cut, with their material group bound (#648).
+    /// Record one sweep's instanced depth draws for its `volume`th light volume from
+    /// its caster buffer: plain runs through the depth-only pipeline, clipped ones
+    /// through the cutout clip or their variant's cut, with their material group
+    /// bound (#648).
     pub(super) fn draw_casters<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
         frame: &CasterFrame<'a>,
         batches: &[CasterBatch],
-        want_static: bool,
-        cascade: usize,
+        sweep: Sweep,
+        volume: usize,
     ) {
-        let casters = if want_static {
-            &self.static_casters
-        } else {
-            &self.dynamic_casters
+        let (casters, global) = match sweep {
+            Sweep::Static => (&self.static_casters, &self.global_bind_group),
+            Sweep::Dynamic => (&self.dynamic_casters, &self.global_bind_group),
+            Sweep::Atlas => (&self.atlas.casters, &self.atlas.global),
         };
-        let offset = (cascade as u64 * super::LIGHT_SPACE_STRIDE) as u32;
-        render_pass.set_bind_group(0, &self.global_bind_group, &[offset]);
+        let offset = (volume as u64 * super::LIGHT_SPACE_STRIDE) as u32;
+        render_pass.set_bind_group(0, global, &[offset]);
         render_pass.set_bind_group(1, &casters.bind_group, &[]);
         let mut bound = None;
         for batch in batches {

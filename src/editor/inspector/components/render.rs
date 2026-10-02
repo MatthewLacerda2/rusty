@@ -65,16 +65,7 @@ pub fn draw_light(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_
         });
 
         if light.light_type == LightType::Point || light.light_type == LightType::Spotlight {
-            let mut range = light.range;
-            ui.horizontal(|ui| {
-                ui.label("Distance:");
-                if ui.add(egui::Slider::new(&mut range, 0.1..=100.0)).changed() {
-                    if let Some(mut l) = world.light_mut(id) {
-                        light_ops::set_range(&mut l, range);
-                    }
-                    *is_dirty = true;
-                }
-            });
+            draw_local_light(ui, world, id, &light, is_dirty);
         }
 
         if light.light_type == LightType::Spotlight {
@@ -83,6 +74,33 @@ pub fn draw_light(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_
     });
     if remove {
         world.set_light(id, None);
+        *is_dirty = true;
+    }
+}
+
+/// A point or spot light's reach and whether it casts shadows (#468).
+fn draw_local_light(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    light: &LightComponent,
+    is_dirty: &mut bool,
+) {
+    let mut range = light.range;
+    ui.horizontal(|ui| {
+        ui.label("Distance:");
+        if ui.add(egui::Slider::new(&mut range, 0.1..=100.0)).changed() {
+            if let Some(mut l) = world.light_mut(id) {
+                light_ops::set_range(&mut l, range);
+            }
+            *is_dirty = true;
+        }
+    });
+    let mut shadows = light.cast_shadows;
+    if ui.checkbox(&mut shadows, "Cast Shadows").changed() {
+        if let Some(mut l) = world.light_mut(id) {
+            light_ops::set_cast_shadows(&mut l, shadows);
+        }
         *is_dirty = true;
     }
 }

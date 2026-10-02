@@ -27,6 +27,7 @@ fn light(kind: LightType, at: Vec3, range: f32) -> LocalLight {
         range,
         inner_cone: 20.0,
         outer_cone: 30.0,
+        cast_shadows: false,
     };
     LocalLight::new(&transform, &light).expect("a local light")
 }

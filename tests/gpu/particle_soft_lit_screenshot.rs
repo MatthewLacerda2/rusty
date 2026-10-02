@@ -54,6 +54,7 @@ fn a_lit_particle_is_dark_unlit_and_brightens_by_a_light() {
             range: 10.0,
             inner_cone: 0.0,
             outer_cone: 0.0,
+            cast_shadows: false,
         }),
     );
     let (Some(u), Some(d), Some(b)) = (

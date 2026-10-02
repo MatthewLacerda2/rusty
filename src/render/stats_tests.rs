@@ -10,6 +10,7 @@ fn light(light_type: LightType) -> LightComponent {
         range: 10.0,
         inner_cone: 20.0,
         outer_cone: 30.0,
+        cast_shadows: false,
     }
 }
 

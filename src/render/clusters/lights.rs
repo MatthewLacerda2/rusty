@@ -10,6 +10,8 @@ use crate::scene::{LightType, Scene};
 pub(crate) const KIND_POINT: u32 = 0;
 /// `LocalLight::kind` for a spotlight (cone cosines apply).
 pub(crate) const KIND_SPOT: u32 = 1;
+/// `LocalLight::shadow` for a light with no tile in the shadow atlas (#468).
+pub(crate) const NO_SHADOW: u32 = u32::MAX;
 
 /// One point or spot light, mirroring `LocalLight` in `common.wgsl` byte-for-byte.
 #[repr(C)]
@@ -26,7 +28,10 @@ pub(crate) struct LocalLight {
     /// Cosines of the spotlight's inner and outer cone half-angles.
     pub inner_cone: f32,
     pub outer_cone: f32,
-    pub _pad: [f32; 2],
+    /// Its first tile in the shadow atlas (#468) — a spotlight's one, a point light's
+    /// six cube faces in order — or [`NO_SHADOW`]. Set by the atlas plan each frame.
+    pub shadow: u32,
+    pub _pad: f32,
 }
 
 impl LocalLight {
@@ -46,7 +51,8 @@ impl LocalLight {
             kind,
             inner_cone: light.inner_cone.to_radians().cos(),
             outer_cone: light.outer_cone.to_radians().cos(),
-            _pad: [0.0; 2],
+            shadow: NO_SHADOW,
+            _pad: 0.0,
         })
     }
 
@@ -57,8 +63,9 @@ impl LocalLight {
     }
 }
 
-/// Every active point and spot light in the scene, in entity order.
-pub(crate) fn local_lights(scene: &Scene) -> Vec<LocalLight> {
+/// Every active point and spot light in the scene, in entity order, each with
+/// whether it asks for a shadow (`LightComponent::cast_shadows`, #468).
+pub(crate) fn local_lights(scene: &Scene) -> Vec<(LocalLight, bool)> {
     scene
         .world
         .ids_with_light()
@@ -67,7 +74,7 @@ pub(crate) fn local_lights(scene: &Scene) -> Vec<LocalLight> {
         .filter_map(|id| {
             let light = scene.world.light(id)?;
             let transform = scene.world.transform(id)?;
-            LocalLight::new(&transform, &light)
+            Some((LocalLight::new(&transform, &light)?, light.cast_shadows))
         })
         .collect()
 }
