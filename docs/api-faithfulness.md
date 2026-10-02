@@ -195,6 +195,7 @@ edits and each physics step.)
 | `SetIntensity` | ✅ | renderer — same (clamped ≥ 0) |
 | `SetRange` | ✅ | renderer — point/spot attenuation, and the radius the light is binned into clusters with (#434) |
 | `SetType` | ✅ | renderer — selects light path; unknown names ignored |
+| `SetCastShadows` | ✅ | renderer — `clusters::local_lights` hands the request to the shadow-atlas plan (`passes::shadows::atlas::plan`, #468), whose tiles the forward shader samples (`src/render/passes/shadows/atlas/gpu_tests.rs`); round-trips |
 
 ### `Particles` — over `Entity.particles`
 

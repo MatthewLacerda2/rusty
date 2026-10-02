@@ -2,7 +2,7 @@
 //! constructors split out of `pipelines.rs` to keep each file under the size cap;
 //! `pipelines` consumes these to build the pipeline layouts (behavior unchanged).
 
-/// A FRAGMENT-visible uniform-buffer layout entry at `binding`.
+/// A uniform-buffer layout entry at `binding`, seen by `visibility`.
 fn uniform_entry(binding: u32, visibility: wgpu::ShaderStages) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
         binding,
@@ -203,58 +203,37 @@ pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLa
 /// point/spot shadow atlas with its tiles (#468) — the forward pass's group 3,
 /// everything it reads that a per-frame pass produced.
 pub(crate) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    use wgpu::TextureViewDimension::{D2Array, D2};
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Main Shadow Bind Group Layout"),
         entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Depth,
-                    view_dimension: wgpu::TextureViewDimension::D2Array,
-                    multisampled: false,
-                },
-                count: None,
-            },
+            uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT),
+            depth_entry(1, D2Array),
             wgpu::BindGroupLayoutEntry {
                 binding: 2,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
                 count: None,
             },
-            wgpu::BindGroupLayoutEntry {
-                binding: 3,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    multisampled: false,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 4,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Depth,
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    multisampled: false,
-                },
-                count: None,
-            },
+            texture_entry(3, D2),
+            depth_entry(4, D2),
             storage_entry(5, wgpu::ShaderStages::FRAGMENT),
         ],
     })
+}
+
+/// A FRAGMENT-visible depth texture entry at `binding`, sampled by comparison.
+fn depth_entry(binding: u32, dim: wgpu::TextureViewDimension) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::FRAGMENT,
+        ty: wgpu::BindingType::Texture {
+            sample_type: wgpu::TextureSampleType::Depth,
+            view_dimension: dim,
+            multisampled: false,
+        },
+        count: None,
+    }
 }
 
 /// The forward pass's group 3 over [`create_shadow_layout`]: the cascade `uniform`,
