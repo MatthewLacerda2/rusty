@@ -6,12 +6,13 @@
 use std::collections::BTreeMap;
 
 use super::*;
-use crate::asset::animation_graph::{GraphNode, ParameterDeclaration};
+use crate::asset::animation_graph::{GraphNode, ParameterDeclaration, StateMachine};
 
 fn node(name: &str, clip: &str, is_loop: bool, speed: Option<f32>) -> GraphNode {
     GraphNode {
         name: name.to_string(),
         clip: clip.to_string(),
+        blend_tree: None,
         is_loop,
         speed,
     }
@@ -42,34 +43,37 @@ fn locomotion() -> AnimationGraph {
             ("armed".to_string(), ParameterDeclaration::Bool(true)),
             ("Jump".to_string(), ParameterDeclaration::Trigger),
         ]),
-        nodes: vec![
-            node("Idle", "IdleClip", true, None),
-            node("Run", "RunClip", true, Some(2.0)),
-            node("Jump", "JumpClip", false, None),
-        ],
-        edges: vec![
-            edge(
-                "Idle",
-                "Run",
-                vec![float_cond("speed", NumericOp::Greater, 1.0)],
-                0.25,
-            ),
-            edge(
-                "Idle",
-                "Jump",
-                vec![Condition::Trigger {
-                    parameter: "Jump".to_string(),
-                }],
-                0.0,
-            ),
-            edge(
-                "Run",
-                "Idle",
-                vec![float_cond("speed", NumericOp::LessEqual, 1.0)],
-                0.1,
-            ),
-        ],
-        entry: "Idle".to_string(),
+        base: StateMachine {
+            nodes: vec![
+                node("Idle", "IdleClip", true, None),
+                node("Run", "RunClip", true, Some(2.0)),
+                node("Jump", "JumpClip", false, None),
+            ],
+            edges: vec![
+                edge(
+                    "Idle",
+                    "Run",
+                    vec![float_cond("speed", NumericOp::Greater, 1.0)],
+                    0.25,
+                ),
+                edge(
+                    "Idle",
+                    "Jump",
+                    vec![Condition::Trigger {
+                        parameter: "Jump".to_string(),
+                    }],
+                    0.0,
+                ),
+                edge(
+                    "Run",
+                    "Idle",
+                    vec![float_cond("speed", NumericOp::LessEqual, 1.0)],
+                    0.1,
+                ),
+            ],
+            entry: "Idle".to_string(),
+        },
+        layers: Vec::new(),
     }
 }
 
@@ -85,9 +89,9 @@ fn first_step_binds_seeds_defaults_and_enters_entry() {
     let graph = locomotion();
     let mut anim = graph_animator();
     step_graph(&mut anim, &graph);
-    assert_eq!(anim.current_node.as_deref(), Some("Idle"));
-    assert_eq!(anim.current_clip, "IdleClip");
-    assert!(anim.is_playing && anim.loop_clip);
+    assert_eq!(anim.base.current_node.as_deref(), Some("Idle"));
+    assert_eq!(anim.base.current_clip, "IdleClip");
+    assert!(anim.is_playing && anim.base.loop_clip);
     assert!(!anim.is_crossfading(), "entry is a hard cut");
     // Declared defaults seeded; the trigger starts clear.
     assert_eq!(anim.get_float("speed"), Some(0.0));
@@ -111,16 +115,22 @@ fn satisfied_edge_crossfades_and_adopts_the_target_node() {
     step_graph(&mut anim, &graph); // bind → Idle
     anim.set_float("speed", 2.0);
     step_graph(&mut anim, &graph);
-    assert_eq!(anim.current_node.as_deref(), Some("Run"));
-    assert_eq!(anim.current_clip, "RunClip");
-    assert_eq!(anim.previous_clip.as_deref(), Some("IdleClip"));
-    assert_eq!(anim.crossfade_duration, 0.25, "the edge's blend length");
-    assert_eq!(anim.node_speed, 2.0, "per-node speed adopted");
+    assert_eq!(anim.base.current_node.as_deref(), Some("Run"));
+    assert_eq!(anim.base.current_clip, "RunClip");
+    assert_eq!(anim.base.previous_clip.as_deref(), Some("IdleClip"));
+    assert_eq!(
+        anim.base.crossfade_duration, 0.25,
+        "the edge's blend length"
+    );
+    assert_eq!(anim.base.node_speed, 2.0, "per-node speed adopted");
     // Back below the threshold: the Run → Idle edge brings it home.
     anim.set_float("speed", 0.5);
     step_graph(&mut anim, &graph);
-    assert_eq!(anim.current_node.as_deref(), Some("Idle"));
-    assert_eq!(anim.node_speed, 1.0, "speed override dropped with the node");
+    assert_eq!(anim.base.current_node.as_deref(), Some("Idle"));
+    assert_eq!(
+        anim.base.node_speed, 1.0,
+        "speed override dropped with the node"
+    );
 }
 
 #[test]
@@ -129,7 +139,7 @@ fn unsatisfied_edges_keep_the_current_node_playing() {
     let mut anim = graph_animator();
     step_graph(&mut anim, &graph);
     step_graph(&mut anim, &graph); // speed = 0.0, no trigger: nothing fires
-    assert_eq!(anim.current_node.as_deref(), Some("Idle"));
+    assert_eq!(anim.base.current_node.as_deref(), Some("Idle"));
     assert!(!anim.is_crossfading());
 }
 
@@ -140,12 +150,12 @@ fn fired_trigger_is_consumed_exactly_once() {
     step_graph(&mut anim, &graph); // bind → Idle
     anim.set_trigger("Jump");
     step_graph(&mut anim, &graph);
-    assert_eq!(anim.current_node.as_deref(), Some("Jump"));
-    assert!(!anim.loop_clip, "Jump's is_loop = false adopted");
+    assert_eq!(anim.base.current_node.as_deref(), Some("Jump"));
+    assert!(!anim.base.loop_clip, "Jump's is_loop = false adopted");
     assert!(!anim.trigger_is_set("Jump"), "read-and-clear on fire");
     step_graph(&mut anim, &graph);
     assert_eq!(
-        anim.current_node.as_deref(),
+        anim.base.current_node.as_deref(),
         Some("Jump"),
         "the cleared trigger cannot fire twice"
     );
@@ -155,7 +165,7 @@ fn fired_trigger_is_consumed_exactly_once() {
 fn first_authored_edge_wins_when_several_are_satisfiable() {
     let mut graph = locomotion();
     // A second satisfiable Idle edge, authored after the Idle → Run one.
-    graph.edges.push(edge(
+    graph.base.edges.push(edge(
         "Idle",
         "Jump",
         vec![float_cond("speed", NumericOp::Greater, 0.5)],
@@ -165,26 +175,30 @@ fn first_authored_edge_wins_when_several_are_satisfiable() {
     step_graph(&mut anim, &graph);
     anim.set_float("speed", 2.0); // satisfies both Idle edges
     step_graph(&mut anim, &graph);
-    assert_eq!(anim.current_node.as_deref(), Some("Run"), "priority order");
+    assert_eq!(
+        anim.base.current_node.as_deref(),
+        Some("Run"),
+        "priority order"
+    );
 }
 
 #[test]
 fn condition_less_edges_never_fire_from_data_alone() {
     let mut graph = locomotion();
-    graph.edges = vec![edge("Idle", "Run", Vec::new(), 0.0)];
+    graph.base.edges = vec![edge("Idle", "Run", Vec::new(), 0.0)];
     let mut anim = graph_animator();
     step_graph(&mut anim, &graph);
     step_graph(&mut anim, &graph);
-    assert_eq!(anim.current_node.as_deref(), Some("Idle"));
+    assert_eq!(anim.base.current_node.as_deref(), Some("Idle"));
 }
 
 #[test]
 fn a_stale_active_node_rebinds_to_the_entry() {
     let graph = locomotion();
     let mut anim = graph_animator();
-    anim.current_node = Some("Ghost".to_string()); // e.g. the asset was re-authored
+    anim.base.current_node = Some("Ghost".to_string()); // e.g. the asset was re-authored
     step_graph(&mut anim, &graph);
-    assert_eq!(anim.current_node.as_deref(), Some("Idle"));
+    assert_eq!(anim.base.current_node.as_deref(), Some("Idle"));
 }
 
 #[test]

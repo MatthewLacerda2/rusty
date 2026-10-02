@@ -1,9 +1,11 @@
 //! src/asset/animation_graph/ — the `AnimationGraph` asset (issue #315).
 //!
 //! The authored animation state machine, as pure data: **nodes** (each plays one
-//! clip), directed **edges** (transitions with AND-combined conditions and a linear
+//! clip or a [`BlendTree`] of clips, #457), directed **edges** (transitions with AND-combined conditions and a linear
 //! crossfade duration), the typed **parameter declarations** the conditions read,
-//! and the designated **entry node**. This is Unity's AnimatorController *asset*,
+//! and the designated **entry node**. Since #457 the top-level machine is the
+//! *base layer*, and `layers` stacks further machines over it, each with a weight,
+//! a blend mode and an optional bone mask ([`GraphLayer`]). This is Unity's AnimatorController *asset*,
 //! named for what it is. The per-entity runtime — live parameter values, active
 //! node, playhead — stays on the `AnimatorComponent` (#314/#316); the component
 //! references a graph **by path** (`guard.animgraph`), exactly like a mesh
@@ -18,10 +20,15 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+mod blend_tree;
 mod io;
+mod layer;
 mod validate;
+mod validate_motion;
 
+pub use blend_tree::{BlendChild1D, BlendChild2D, BlendTree};
 pub use io::{is_graph_path, load, save};
+pub use layer::{GraphLayer, LayerBlending};
 pub use validate::GraphError;
 
 /// The graph asset's file extension: `guard.animgraph` (rusty-only format, JSON
@@ -40,15 +47,21 @@ pub enum ParameterDeclaration {
     Trigger,
 }
 
-/// One state in the graph: the clip it plays and how it plays it.
+/// One state in the graph: the motion it plays — one clip, or a blend tree of
+/// clips (#457), never both — and how it plays it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GraphNode {
     /// The node's unique name — the identity `entry` and edges reference. Distinct
     /// from `clip`: two nodes may play the same clip differently.
     pub name: String,
     /// Name of the animation clip this node plays (matched against the entity's
-    /// clip list at runtime, like `AnimatorComponent::current_clip`).
+    /// clip list at runtime, like `AnimatorComponent::current_clip`). Empty for a
+    /// blend-tree node.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub clip: String,
+    /// The blend tree this node plays instead of a single clip (#457).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blend_tree: Option<BlendTree>,
     /// Loop the clip while this node is active (wraps the playhead, #313).
     #[serde(default)]
     pub is_loop: bool,
@@ -124,15 +137,13 @@ pub enum NumericOp {
     NotEqual,
 }
 
-/// The whole state machine, as one serde document. `nodes` and `edges` are `Vec`s
-/// because *authored order is priority order* — the evaluator (#316) takes the
-/// first satisfied outgoing edge — and `parameters` is a `BTreeMap` so the JSON
-/// stays name-sorted and diffable.
+/// One state machine: its states, its transitions and where it starts. The base
+/// layer's machine sits at the top level of the document; every extra
+/// [`GraphLayer`] carries its own. `nodes` and `edges` are `Vec`s because
+/// *authored order is priority order* — the evaluator (#316) takes the first
+/// satisfied outgoing edge.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct AnimationGraph {
-    /// The declared parameters: name → type + default value.
-    #[serde(default)]
-    pub parameters: BTreeMap<String, ParameterDeclaration>,
+pub struct StateMachine {
     /// The states, in authored order.
     pub nodes: Vec<GraphNode>,
     /// The transitions, in authored (priority) order.
@@ -142,19 +153,50 @@ pub struct AnimationGraph {
     pub entry: String,
 }
 
-impl AnimationGraph {
+impl StateMachine {
     /// Find a node by name.
     pub fn node(&self, name: &str) -> Option<&GraphNode> {
         self.nodes.iter().find(|n| n.name == name)
     }
+}
 
-    /// The outgoing edges of `from`, in authored (priority) order.
-    pub fn edges_from<'a>(&'a self, from: &'a str) -> impl Iterator<Item = &'a GraphEdge> {
-        self.edges.iter().filter(move |e| e.from == from)
+/// The whole graph, as one serde document: the shared parameter declarations,
+/// the base layer's machine (flattened to the top level, so a pre-#457
+/// single-layer graph is exactly a graph with no extra layers), and the extra
+/// layers in composition order. `parameters` is a `BTreeMap` so the JSON stays
+/// name-sorted and diffable.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct AnimationGraph {
+    /// The declared parameters: name → type + default value. Shared by every
+    /// layer.
+    #[serde(default)]
+    pub parameters: BTreeMap<String, ParameterDeclaration>,
+    /// The base layer (layer 0): always full weight, whole body, override.
+    #[serde(flatten)]
+    pub base: StateMachine,
+    /// Layers 1.. in composition order, each blended over everything below it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub layers: Vec<GraphLayer>,
+}
+
+impl AnimationGraph {
+    /// Find a base-layer node by name.
+    pub fn node(&self, name: &str) -> Option<&GraphNode> {
+        self.base.node(name)
+    }
+
+    /// The machine of layer `index` (0 is the base layer).
+    pub fn machine(&self, index: usize) -> Option<&StateMachine> {
+        match index {
+            0 => Some(&self.base),
+            i => self.layers.get(i - 1).map(|l| &l.machine),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod v2_tests;
 #[cfg(test)]
 mod validate_tests;

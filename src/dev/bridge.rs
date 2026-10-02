@@ -215,7 +215,7 @@ fn register_scene_animator(lua: &Lua, harness: &Shared) -> LuaResult<()> {
             let clip = s
                 .world
                 .animator(id)
-                .map(|a| a.current_clip.clone())
+                .map(|a| a.base.current_clip.clone())
                 .unwrap_or_default();
             Ok(clip)
         })?,

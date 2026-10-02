@@ -14,17 +14,21 @@
 //! Purity / determinism: evaluation is a pure function of (graph, parameter
 //! values, active state) — no wall clock, no RNG — and every container walked is
 //! ordered (`Vec` in authored order, `BTreeMap`), so a fixed-dt replay is
-//! byte-reproducible. Graph assets load lazily by path into the [`GraphCache`]
-//! (cleared on each Play enter so asset edits are picked up per session); a
-//! failing load is reported to the console once and cached as absent.
+//! byte-reproducible. Each extra layer (#457) is its own machine, stepped the
+//! same way right after the base layer, over the same shared parameters. Graph
+//! assets load lazily by path into the [`GraphCache`] (cleared on each Play enter
+//! so asset edits are picked up per session); a failing load is reported to the
+//! console once and cached as absent.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::rc::Rc;
 
-use crate::asset::animation_graph::{self, AnimationGraph, Condition, GraphEdge, NumericOp};
-use crate::components::AnimatorComponent;
+use crate::asset::animation_graph::{
+    self, AnimationGraph, Condition, GraphEdge, NumericOp, StateMachine,
+};
+use crate::components::{AnimatorComponent, Playback};
 use crate::scripting::ConsoleLogs;
 
 use super::super::{Resources, World};
@@ -88,27 +92,57 @@ pub fn evaluate_graphs(world: &mut World, res: &mut Resources) {
     }
 }
 
-/// One evaluation step for one animator: (re)bind when the active node is unknown
-/// or no longer in the graph, otherwise fire the first satisfied outgoing edge.
+/// One evaluation step for one animator: (re)bind the base layer when its active
+/// node is unknown or no longer in the graph, otherwise fire its first satisfied
+/// outgoing edge; then the same for every extra layer (#457), in order. Triggers
+/// are consumed only after every layer has decided, so one trigger can drive a
+/// transition in each layer that reads it (Unity resets a trigger once the
+/// frame's transitions have consumed it).
 pub(crate) fn step_graph(anim: &mut AnimatorComponent, graph: &AnimationGraph) {
     let bound = anim
+        .base
         .current_node
         .as_deref()
         .is_some_and(|node| graph.node(node).is_some());
-    if !bound {
+    let mut fired = Vec::new();
+    if bound {
+        if let Some(edge) = next_edge(anim, &anim.base, &graph.base) {
+            if let Some(target) = graph.node(&edge.to) {
+                anim.enter_node(target, edge.transition_duration);
+            }
+            fired.push(edge);
+        }
+    } else {
         anim.bind_graph(graph);
-        return;
     }
-    let Some(active) = anim.current_node.clone() else {
-        return;
-    };
-    let Some(edge) = graph.edges_from(&active).find(|e| edge_satisfied(anim, e)) else {
-        return;
-    };
-    consume_edge_triggers(anim, edge);
-    if let Some(target) = graph.node(&edge.to) {
-        anim.enter_node(target, edge.transition_duration);
+    anim.sync_layers(graph);
+    for (i, layer) in graph.layers.iter().enumerate() {
+        let Some(edge) = next_edge(anim, &anim.layers[i].playback, &layer.machine) else {
+            continue;
+        };
+        if let Some(target) = layer.machine.node(&edge.to) {
+            anim.layers[i]
+                .playback
+                .enter_node(target, edge.transition_duration);
+        }
+        fired.push(edge);
     }
+    for edge in fired {
+        consume_edge_triggers(anim, edge);
+    }
+}
+
+/// The first satisfied outgoing edge of `playback`'s active node in `machine`.
+fn next_edge<'g>(
+    anim: &AnimatorComponent,
+    playback: &Playback,
+    machine: &'g StateMachine,
+) -> Option<&'g GraphEdge> {
+    let active = playback.current_node.as_deref()?;
+    machine
+        .edges
+        .iter()
+        .find(|e| e.from == active && edge_satisfied(anim, e))
 }
 
 /// All of `edge`'s conditions hold (AND). An edge with **no** conditions never
@@ -163,6 +197,9 @@ fn consume_edge_triggers(anim: &mut AnimatorComponent, edge: &GraphEdge) {
     }
 }
 
+#[cfg(test)]
+#[path = "graph_layer_tests.rs"]
+mod graph_layer_tests;
 #[cfg(test)]
 #[path = "graph_tests.rs"]
 mod graph_tests;

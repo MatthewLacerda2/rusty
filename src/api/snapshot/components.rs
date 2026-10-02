@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 use super::vec3;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ColliderComponent, ColliderShape,
-    LightComponent, LightType, MaterialAsset, MeshComponent, NavMeshAgentComponent,
+    LayerState, LightComponent, LightType, MaterialAsset, MeshComponent, NavMeshAgentComponent,
     ParticleEmitterComponent, RigidBodyComponent,
 };
 use crate::components::{
@@ -180,20 +180,24 @@ pub(crate) fn particle_value(p: &ParticleEmitterComponent) -> Value {
 /// animation-graph binding (#316), so a script can read back what `Animator.Set*`
 /// wrote and which graph state the evaluator holds active. Each parameter
 /// serializes externally tagged, e.g. `{"Bool": true}` / `{"Trigger": false}`; the
-/// `BTreeMap` keeps the keys name-sorted.
+/// `BTreeMap` keeps the keys name-sorted. `layers` lists the extra layers (#457).
 pub(crate) fn animator_value(a: &AnimatorComponent) -> Value {
     json!({
-        "clip": a.current_clip,
-        "time": a.time,
+        "clip": a.base.current_clip,
+        "time": a.base.time,
         "speed": a.speed,
         "playing": a.is_playing,
-        "loop": a.loop_clip,
+        "loop": a.base.loop_clip,
         "paused": a.freeze,
         "parameters": a.parameters,
         "graph": a.graph,
         "graph_enabled": a.graph_enabled,
-        "node": a.current_node,
+        "node": a.base.current_node,
+        "layers": a.layers.iter().map(layer_value).collect::<Vec<_>>(),
     })
+}
+fn layer_value(l: &LayerState) -> Value {
+    json!({ "name": l.name, "weight": l.weight, "node": l.playback.current_node })
 }
 
 /// AudioSource authoring view (#212): the clip + playback flags, plus the spatial

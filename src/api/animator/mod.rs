@@ -10,10 +10,12 @@
 //! parameters the animation-graph evaluator (#316) reads to decide transitions.
 //! `GetBone` (#453) finds a bone GameObject of the entity's skeleton by name.
 //! The graph control surface (#316: `SetGraph`, `SetGraphEnabled`, `PlayNode`,
-//! `PlayAnimation`, `GetCurrentNode`) lives in `graph.rs` — one namespace, split
-//! to stay under the size cap.
+//! `PlayAnimation`) lives in `graph.rs`, and the layer surface (#457:
+//! `SetLayerWeight`, `GetLayerWeight`, `GetCurrentNode`) in `layers.rs` — one
+//! namespace, split to stay under the size cap.
 
 mod graph;
+mod layers;
 
 use std::cell::RefCell;
 
@@ -42,6 +44,7 @@ pub fn register<'lua, 'scope>(
     register_set_int_trigger(scope, &table, scene, console)?;
     register_get_bone(scope, &table, scene)?;
     graph::register(scope, &table, scene, console)?;
+    layers::register(scope, &table, scene, console)?;
 
     lua.globals()
         .set("Animator", table)

@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 
 use mlua::Lua;
 use rusty::asset::anim_data::AnimationClip;
-use rusty::asset::animation_graph::{self, AnimationGraph, GraphNode};
+use rusty::asset::animation_graph::{self, AnimationGraph, GraphNode, StateMachine};
 use rusty::components::{AnimatorComponent, MeshComponent};
 use rusty::scene::Scene;
 use rusty::scripting::ConsoleLogs;
@@ -45,14 +45,18 @@ fn run(scene: &RefCell<Scene>, script: &str) -> String {
 fn saved_graph() -> String {
     let graph = AnimationGraph {
         parameters: BTreeMap::new(),
-        nodes: vec![GraphNode {
-            name: "Run".to_string(),
-            clip: "RunClip".to_string(),
-            is_loop: true,
-            speed: Some(2.0),
-        }],
-        edges: Vec::new(),
-        entry: "Run".to_string(),
+        base: StateMachine {
+            nodes: vec![GraphNode {
+                name: "Run".to_string(),
+                clip: "RunClip".to_string(),
+                blend_tree: None,
+                is_loop: true,
+                speed: Some(2.0),
+            }],
+            edges: Vec::new(),
+            entry: "Run".to_string(),
+        },
+        layers: Vec::new(),
     };
     let path = crate::temp::dir().join("rusty_316_api.animgraph");
     animation_graph::save(&path, &graph).unwrap();
@@ -87,10 +91,10 @@ fn play_node_jumps_to_the_named_state_and_reports_honestly() {
         "true"
     );
     let anim = animator_of(&scene, id);
-    assert_eq!(anim.current_node.as_deref(), Some("Run"));
-    assert_eq!(anim.current_clip, "RunClip");
-    assert!(anim.loop_clip, "the node's is_loop is adopted");
-    assert_eq!(anim.node_speed, 2.0, "the node's speed is adopted");
+    assert_eq!(anim.base.current_node.as_deref(), Some("Run"));
+    assert_eq!(anim.base.current_clip, "RunClip");
+    assert!(anim.base.loop_clip, "the node's is_loop is adopted");
+    assert_eq!(anim.base.node_speed, 2.0, "the node's speed is adopted");
     assert_eq!(
         run(&scene, &format!("Animator.GetCurrentNode({id})")),
         "Run"
@@ -136,11 +140,11 @@ fn play_animation_returns_whether_the_mesh_carries_the_clip() {
     );
     let anim = animator_of(&scene, id);
     assert!(anim.is_playing);
-    assert_eq!(anim.current_clip, "Walk");
+    assert_eq!(anim.base.current_clip, "Walk");
     assert_eq!(
         run(&scene, &format!("Animator.PlayAnimation({id}, 'Ghost')")),
         "false",
         "a clip the mesh lacks is refused without side effects"
     );
-    assert_eq!(animator_of(&scene, id).current_clip, "Walk");
+    assert_eq!(animator_of(&scene, id).base.current_clip, "Walk");
 }

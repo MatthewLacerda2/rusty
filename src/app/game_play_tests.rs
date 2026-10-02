@@ -4,6 +4,7 @@
 //! fixed dt, no wall-clock, no RNG.
 
 use super::*;
+use crate::components::Playback;
 use crate::scene::{Scene, ScriptComponent};
 use glam::Vec3;
 use std::cell::RefCell;
@@ -211,7 +212,10 @@ fn animator_of(scene: &Rc<RefCell<Scene>>, id: u32) -> crate::components::Animat
 #[test]
 fn play_tick_advances_the_animator_through_the_loop() {
     let (scene, id) = rig_scene(crate::components::AnimatorComponent {
-        current_clip: "Walk".to_string(),
+        base: Playback {
+            current_clip: "Walk".to_string(),
+            ..Default::default()
+        },
         is_playing: true,
         ..Default::default()
     });
@@ -219,7 +223,7 @@ fn play_tick_advances_the_animator_through_the_loop() {
     gw.set_playing(true);
     gw.tick(DT);
     gw.tick(DT);
-    let time = animator_of(&scene, id).time;
+    let time = animator_of(&scene, id).base.time;
     assert_eq!(time, 2.0 * DT, "two stepped frames advanced the playhead");
 }
 
@@ -252,8 +256,8 @@ fn graph_driven_animator_transitions_through_the_play_loop() {
     gw.set_playing(true);
     gw.tick(DT); // first step binds: seeds "speed" = 0.0 and enters Idle
     let anim = animator_of(&scene, id);
-    assert_eq!(anim.current_node.as_deref(), Some("Idle"));
-    assert_eq!(anim.current_clip, "IdleClip");
+    assert_eq!(anim.base.current_node.as_deref(), Some("Idle"));
+    assert_eq!(anim.base.current_clip, "IdleClip");
     assert_eq!(anim.get_float("speed"), Some(0.0), "default seeded");
     scene
         .borrow_mut()
@@ -263,7 +267,7 @@ fn graph_driven_animator_transitions_through_the_play_loop() {
         .set_float("speed", 2.0);
     gw.tick(DT); // the Idle → Run edge fires and crossfades
     let anim = animator_of(&scene, id);
-    assert_eq!(anim.current_node.as_deref(), Some("Run"));
-    assert_eq!(anim.previous_clip.as_deref(), Some("IdleClip"));
-    assert_eq!(anim.crossfade_duration, 0.25);
+    assert_eq!(anim.base.current_node.as_deref(), Some("Run"));
+    assert_eq!(anim.base.previous_clip.as_deref(), Some("IdleClip"));
+    assert_eq!(anim.base.crossfade_duration, 0.25);
 }

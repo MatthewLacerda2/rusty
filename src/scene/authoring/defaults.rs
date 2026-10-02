@@ -8,6 +8,7 @@
 
 use glam::Vec3;
 
+use crate::components::Playback;
 use crate::scene::{
     AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape,
     CollisionDetection, LightComponent, LightType, MaterialAsset, MaterialComponent,
@@ -41,7 +42,10 @@ pub fn default_light() -> LightComponent {
 /// Default `AnimatorComponent` (the Add-Component menu's values).
 pub fn default_animator() -> AnimatorComponent {
     AnimatorComponent {
-        current_clip: "Idle".to_string(),
+        base: Playback {
+            current_clip: "Idle".to_string(),
+            ..Default::default()
+        },
         speed: 2.0,
         is_playing: true,
         ..Default::default()

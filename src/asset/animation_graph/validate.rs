@@ -9,7 +9,7 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
-use super::{AnimationGraph, Condition, ParameterDeclaration};
+use super::{AnimationGraph, Condition, ParameterDeclaration, StateMachine};
 
 /// Anything that can go wrong loading, saving, or validating a graph. String-y
 /// like `ImportError`: the asset layer is a leaf and callers surface these to a
@@ -40,14 +40,16 @@ impl fmt::Display for GraphError {
 impl std::error::Error for GraphError {}
 
 impl AnimationGraph {
-    /// Check every internal reference and value: unique named nodes, an entry that
-    /// exists, edges between existing nodes with sane durations, and conditions
-    /// over declared, type-matching parameters. `Ok(())` or ALL the violations.
+    /// Check every internal reference and value, in every layer: unique named
+    /// nodes, an entry that exists, edges between existing nodes with sane
+    /// durations, conditions over declared, type-matching parameters, well-formed
+    /// motions (#457), and unique, sanely weighted layers. `Ok(())` or ALL the
+    /// violations. A base-layer problem is reported bare; an extra layer's carries
+    /// a `layer 'name': ` prefix.
     pub fn validate(&self) -> Result<(), GraphError> {
         let mut problems = Vec::new();
-        self.check_nodes(&mut problems);
-        self.check_entry(&mut problems);
-        self.check_edges(&mut problems);
+        self.check_machine("", &self.base, &mut problems);
+        self.check_layers(&mut problems);
         if problems.is_empty() {
             Ok(())
         } else {
@@ -55,35 +57,56 @@ impl AnimationGraph {
         }
     }
 
-    fn check_nodes(&self, problems: &mut Vec<String>) {
+    fn check_machine(&self, prefix: &str, machine: &StateMachine, problems: &mut Vec<String>) {
+        let mut found = Vec::new();
+        self.check_nodes(machine, &mut found);
+        if machine.node(&machine.entry).is_none() {
+            found.push(format!("entry node '{}' does not exist", machine.entry));
+        }
+        self.check_edges(machine, &mut found);
+        problems.extend(found.into_iter().map(|p| format!("{prefix}{p}")));
+    }
+
+    fn check_layers(&self, problems: &mut Vec<String>) {
         let mut seen = BTreeSet::new();
-        for node in &self.nodes {
+        for (i, layer) in self.layers.iter().enumerate() {
+            let label = format!("layer #{} '{}'", i + 1, layer.name);
+            if layer.name.is_empty() {
+                problems.push(format!("{label} has an empty name"));
+            } else if !seen.insert(layer.name.as_str()) {
+                problems.push(format!("duplicate layer name '{}'", layer.name));
+            }
+            if !(0.0..=1.0).contains(&layer.weight) {
+                problems.push(format!("{label} has a weight outside [0, 1]"));
+            }
+            if layer.mask.iter().any(String::is_empty) {
+                problems.push(format!("{label} masks an empty bone name"));
+            }
+            self.check_machine(&format!("{label}: "), &layer.machine, problems);
+        }
+    }
+
+    fn check_nodes(&self, machine: &StateMachine, problems: &mut Vec<String>) {
+        let mut seen = BTreeSet::new();
+        for node in &machine.nodes {
             if node.name.is_empty() {
                 problems.push("a node has an empty name".to_string());
             }
             if !seen.insert(node.name.as_str()) {
                 problems.push(format!("duplicate node name '{}'", node.name));
             }
-            if node.clip.is_empty() {
-                problems.push(format!("node '{}' has an empty clip name", node.name));
-            }
+            self.check_motion(node, problems);
             if node.speed.is_some_and(|s| !s.is_finite()) {
                 problems.push(format!("node '{}' has a non-finite speed", node.name));
             }
         }
     }
 
-    fn check_entry(&self, problems: &mut Vec<String>) {
-        if self.node(&self.entry).is_none() {
-            problems.push(format!("entry node '{}' does not exist", self.entry));
-        }
-    }
-
-    fn check_edges(&self, problems: &mut Vec<String>) {
-        for (i, edge) in self.edges.iter().enumerate() {
+    fn check_edges(&self, machine: &StateMachine, problems: &mut Vec<String>) {
+        for (i, edge) in machine.edges.iter().enumerate() {
             let label = format!("edge #{i} ('{}' -> '{}')", edge.from, edge.to);
             for end in [&edge.from, &edge.to] {
-                if self.node(end).is_none() {
+                if machine.node(end).is_none() {
                     problems.push(format!("{label} references missing node '{end}'"));
                 }
             }
@@ -95,7 +118,6 @@ impl AnimationGraph {
             }
         }
     }
-
     /// A condition must read a *declared* parameter, and its variant (which keys
     /// the operator set) must match the declared type.
     fn check_condition(&self, label: &str, condition: &Condition, problems: &mut Vec<String>) {

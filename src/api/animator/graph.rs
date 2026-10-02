@@ -6,8 +6,8 @@
 //! (disabled, the animator stays under direct `Play`/`Crossfade` control),
 //! `PlayNode` jumps straight to a named graph state bypassing conditions —
 //! distinct from the raw clip-level `Play` — `PlayAnimation` plays a clip by name
-//! and honestly reports whether the mesh carries it, and `GetCurrentNode` reads
-//! back the active state the fixed-step evaluator drives.
+//! and honestly reports whether the mesh carries it. Reading the active state
+//! back (`GetCurrentNode`) lives with the layer surface in `layers.rs`.
 
 use std::cell::RefCell;
 use std::path::Path;
@@ -17,7 +17,9 @@ use crate::scene::authoring::animator as animator_ops;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
-use super::{put, Reg};
+use mlua::Value;
+
+use super::{layers, put, Reg};
 
 /// Register the graph-control functions onto the `Animator` table.
 pub(super) fn register<'lua, 'scope>(
@@ -28,8 +30,7 @@ pub(super) fn register<'lua, 'scope>(
 ) -> Reg {
     register_set_graph(scope, table, scene)?;
     register_play_node(scope, table, scene, console)?;
-    register_play_animation(scope, table, scene)?;
-    register_get_current_node(scope, table, scene)
+    register_play_animation(scope, table, scene)
 }
 
 /// `SetGraph` / `SetGraphEnabled` — assign (or clear, with `""`) the graph asset
@@ -64,10 +65,11 @@ fn register_set_graph<'lua, 'scope>(
     )
 }
 
-/// `PlayNode` — jump straight to the named graph node (state), bypassing every
-/// condition: a hard cut into the node's clip, adopting its loop flag and speed.
-/// `true` when the jump happened; `false` (with a console warning for a bad graph
-/// or unknown node) otherwise.
+/// `PlayNode(id, node [, layer])` — jump straight to the named graph node
+/// (state) of `layer` (default: the base layer), bypassing every condition: a
+/// hard cut into the node's motion, adopting its loop flag and speed. `true` when
+/// the jump happened; `false` (with a console warning for a bad graph, unknown
+/// layer or unknown node) otherwise.
 fn register_play_node<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &mlua::Table,
@@ -77,7 +79,7 @@ fn register_play_node<'lua, 'scope>(
     put(
         table,
         "PlayNode",
-        scope.create_function(|_, (id, node): (u32, String)| {
+        scope.create_function(|_, (id, node, layer): (u32, String, Option<Value>)| {
             let mut scene = scene.borrow_mut();
             let Some(mut anim) = scene.world.animator_mut(id) else {
                 return Ok(false);
@@ -85,22 +87,31 @@ fn register_play_node<'lua, 'scope>(
             let Some(path) = anim.graph.clone() else {
                 return Ok(false);
             };
+            let warn = |message: String| {
+                console
+                    .borrow_mut()
+                    .warn(format!("Animator.PlayNode: graph '{path}'{message}"));
+                Ok(false)
+            };
             let graph = match animation_graph::load(Path::new(&path)) {
                 Ok(graph) => graph,
-                Err(err) => {
-                    console
-                        .borrow_mut()
-                        .warn(format!("Animator.PlayNode: graph '{path}': {err}"));
-                    return Ok(false);
-                }
+                Err(err) => return warn(format!(": {err}")),
             };
-            let Some(target) = graph.node(&node) else {
-                console.borrow_mut().warn(format!(
-                    "Animator.PlayNode: graph '{path}' has no node '{node}'"
-                ));
-                return Ok(false);
+            anim.sync_layers(&graph);
+            let index = match &layer {
+                None => 0,
+                Some(l) => match layers::lookup(&anim, l) {
+                    Some(index) => index,
+                    None => return warn(format!(" has no layer {}", layers::describe(l))),
+                },
             };
-            anim.enter_node(target, 0.0);
+            let Some(target) = graph.machine(index).and_then(|m| m.node(&node)) else {
+                return warn(format!(" has no node '{node}'"));
+            };
+            match index {
+                0 => anim.enter_node(target, 0.0),
+                i => anim.layers[i - 1].playback.enter_node(target, 0.0),
+            }
             Ok(true)
         }),
     )
@@ -131,26 +142,6 @@ fn register_play_animation<'lua, 'scope>(
             };
             anim.play(name);
             Ok(true)
-        }),
-    )
-}
-
-/// `GetCurrentNode` — the active graph node's name, or `nil` when the animator is
-/// missing, has no graph, or the evaluator hasn't bound it yet.
-fn register_get_current_node<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
-    put(
-        table,
-        "GetCurrentNode",
-        scope.create_function(|_, id: u32| {
-            let scene = scene.borrow();
-            Ok(scene
-                .world
-                .animator(id)
-                .and_then(|a| a.current_node.clone()))
         }),
     )
 }

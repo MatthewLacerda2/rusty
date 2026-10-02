@@ -21,23 +21,23 @@ fn the_representative_graph_is_valid() {
 #[test]
 fn dangling_entry_is_rejected_including_the_empty_graph() {
     let mut graph = sample_graph();
-    graph.entry = "sprint".into();
+    graph.base.entry = "sprint".into();
     assert!(problems(&graph).contains("entry node 'sprint' does not exist"));
     // No nodes at all ⇒ the entry necessarily dangles.
-    graph.nodes.clear();
-    graph.edges.clear();
+    graph.base.nodes.clear();
+    graph.base.edges.clear();
     assert!(problems(&graph).contains("does not exist"));
 }
 
 #[test]
 fn duplicate_or_empty_node_names_and_empty_clips_are_rejected() {
     let mut graph = sample_graph();
-    graph.nodes[1].name = "idle".into();
+    graph.base.nodes[1].name = "idle".into();
     assert!(problems(&graph).contains("duplicate node name 'idle'"));
 
     let mut graph = sample_graph();
-    graph.nodes[2].name = String::new();
-    graph.nodes[2].clip = String::new();
+    graph.base.nodes[2].name = String::new();
+    graph.base.nodes[2].clip = String::new();
     let report = problems(&graph);
     assert!(report.contains("empty name"));
     assert!(report.contains("empty clip name"));
@@ -46,8 +46,8 @@ fn duplicate_or_empty_node_names_and_empty_clips_are_rejected() {
 #[test]
 fn edges_must_join_existing_nodes() {
     let mut graph = sample_graph();
-    graph.edges[0].from = "sprint".into();
-    graph.edges[2].to = "fall".into();
+    graph.base.edges[0].from = "sprint".into();
+    graph.base.edges[2].to = "fall".into();
     let report = problems(&graph);
     assert!(report.contains("edge #0 ('sprint' -> 'run') references missing node 'sprint'"));
     assert!(report.contains("edge #2 ('idle' -> 'fall') references missing node 'fall'"));
@@ -56,9 +56,9 @@ fn edges_must_join_existing_nodes() {
 #[test]
 fn negative_or_non_finite_durations_and_speeds_are_rejected() {
     let mut graph = sample_graph();
-    graph.edges[0].transition_duration = -0.1;
-    graph.edges[1].transition_duration = f32::NAN;
-    graph.nodes[1].speed = Some(f32::INFINITY);
+    graph.base.edges[0].transition_duration = -0.1;
+    graph.base.edges[1].transition_duration = f32::NAN;
+    graph.base.nodes[1].speed = Some(f32::INFINITY);
     let report = problems(&graph);
     assert!(report.contains("edge #0 ('idle' -> 'run') has a negative or non-finite duration"));
     assert!(report.contains("edge #1 ('run' -> 'idle') has a negative or non-finite duration"));
@@ -104,9 +104,9 @@ fn type_mismatched_conditions_are_rejected_for_every_kind() {
 #[test]
 fn all_violations_are_collected_in_one_pass() {
     let mut graph = sample_graph();
-    graph.entry = "sprint".into();
-    graph.nodes[0].clip = String::new();
-    graph.edges[0].to = "fall".into();
+    graph.base.entry = "sprint".into();
+    graph.base.nodes[0].clip = String::new();
+    graph.base.edges[0].to = "fall".into();
     graph.parameters.remove("Jump");
     match graph.validate() {
         Err(GraphError::Invalid(problems)) => assert_eq!(problems.len(), 4, "{problems:?}"),

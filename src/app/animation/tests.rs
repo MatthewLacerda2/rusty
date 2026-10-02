@@ -4,6 +4,7 @@
 use super::*;
 use crate::asset::anim_data::{AnimationClip, Interpolation, JointTrack, Track};
 use crate::asset::mesh_data::{JointTransform, SkinData};
+use crate::components::{Motion, Playback};
 use glam::{Mat4, Quat, Vec3};
 
 /// A two-joint chain skeleton: joint0 a root at the origin, joint1 its child
@@ -149,7 +150,7 @@ fn crossfade_between_opposite_rotations_keeps_limb_length() {
     let half_pi = std::f32::consts::FRAC_PI_2;
     for t in [0.25, 0.5, 0.75] {
         let blended = blend_poses(&pose(half_pi), &pose(-half_pi), t);
-        let tip = compose_globals(&skin, &blended)[1].w_axis.truncate();
+        let tip = clip::compose_globals(&skin, &blended)[1].w_axis.truncate();
         assert!(
             (tip.length() - 1.0).abs() < 1e-5,
             "t={t}: limb length {}",
@@ -166,8 +167,8 @@ fn bone_writes_cover_only_the_driven_joints() {
     mesh.clips = vec![translate_clip()];
     mesh.skeleton.bones = vec![10, 11];
     let mut anim = looping_animator("Slide");
-    anim.time = 0.5;
-    let writes = bone_writes(&anim, &mesh);
+    anim.base.time = 0.5;
+    let writes = bone_writes(&anim, &mesh, None);
     assert_eq!(writes.len(), 1);
     assert_eq!(writes[0].0, 10);
     assert!(writes[0]
@@ -176,7 +177,7 @@ fn bone_writes_cover_only_the_driven_joints() {
         .abs_diff_eq(Vec3::new(1.0, 0.0, 0.0), 1e-5));
     // An unbound skeleton gets no writes.
     mesh.skeleton.bones.clear();
-    assert!(bone_writes(&anim, &mesh).is_empty());
+    assert!(bone_writes(&anim, &mesh, None).is_empty());
 }
 
 /// A named clip whose single track ends at `end` seconds (so `duration == end`).
@@ -206,28 +207,33 @@ fn two_clip_mesh() -> MeshComponent {
 
 fn looping_animator(clip: &str) -> AnimatorComponent {
     AnimatorComponent {
-        current_clip: clip.to_string(),
+        base: Playback {
+            current_clip: clip.to_string(),
+            loop_clip: true,
+            ..Default::default()
+        },
         is_playing: true,
-        loop_clip: true,
         ..Default::default()
     }
 }
 
-/// #312 mutation audit: `current_clip_duration` must report each clip's ACTUAL
-/// length — a stub returning 0.0 / 1.0 / -1.0 fails on both clips here.
+/// #312 mutation audit: a clip's playhead must wrap at each clip's ACTUAL length
+/// — a stub returning 0.0 / 1.0 / -1.0 fails on both clips here.
 #[test]
-fn current_clip_duration_reports_the_actual_clip_length() {
+fn a_clip_playhead_wraps_at_the_actual_clip_length() {
     let mesh = two_clip_mesh();
-    let short = looping_animator("Short");
-    let long = looping_animator("Long");
-    assert_eq!(current_clip_duration(&short, Some(&mesh)), 0.75);
-    assert_eq!(current_clip_duration(&long, Some(&mesh)), 2.5);
-    // The "unknown, never wrap" sentinel: no mesh, or a clip the mesh lacks.
-    assert_eq!(current_clip_duration(&short, None), 0.0);
-    assert_eq!(
-        current_clip_duration(&looping_animator("Ghost"), Some(&mesh)),
-        0.0
-    );
+    let parameters = Default::default();
+    let context = |clips| motion::MotionContext {
+        clips,
+        machine: None,
+        parameters: &parameters,
+    };
+    let wrap = |clips, clip| context(clips).playhead(Motion::Clip(clip)).wrap;
+    assert_eq!(wrap(&mesh.clips[..], "Short"), 0.75);
+    assert_eq!(wrap(&mesh.clips[..], "Long"), 2.5);
+    // The "unknown, never wrap" sentinel: no clips, or a clip the mesh lacks.
+    assert_eq!(wrap(&[][..], "Short"), 0.0);
+    assert_eq!(wrap(&mesh.clips[..], "Ghost"), 0.0);
 }
 
 /// Two clips of different lengths wrap the looping playhead at different, exact
@@ -239,14 +245,13 @@ fn looping_playhead_wraps_at_each_clips_own_duration() {
     let mut long = looping_animator("Long");
     for anim in [&mut short, &mut long] {
         for _ in 0..2 {
-            let duration = current_clip_duration(anim, Some(&mesh));
-            anim.advance(0.5, duration);
+            advance(anim, Some(&mesh), None, 0.5);
         }
     }
     // 1.0 s of playback: the 0.75 s clip has wrapped (1.0 % 0.75), the 2.5 s
     // clip has not.
-    assert_eq!(short.time, 0.25);
-    assert_eq!(long.time, 1.0);
+    assert_eq!(short.base.time, 0.25);
+    assert_eq!(long.base.time, 1.0);
 }
 
 #[test]

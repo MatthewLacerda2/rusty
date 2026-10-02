@@ -117,7 +117,7 @@ fn animator_card_body(
     anim: &crate::components::AnimatorComponent,
     is_dirty: &mut bool,
 ) {
-    let mut clip = anim.current_clip.clone();
+    let mut clip = anim.base.current_clip.clone();
     ui.horizontal(|ui| {
         ui.label("Clip:");
         if ui.text_edit_singleline(&mut clip).changed() {
@@ -154,7 +154,7 @@ fn animator_card_body(
         }
         *is_dirty = true;
     }
-    let mut loop_clip = anim.loop_clip;
+    let mut loop_clip = anim.base.loop_clip;
     if ui.checkbox(&mut loop_clip, "Loop").changed() {
         if let Some(mut a) = world.animator_mut(id) {
             animator_ops::set_looping(&mut a, loop_clip);
@@ -197,7 +197,7 @@ fn draw_graph(
         }
         *is_dirty = true;
     }
-    if let Some(node) = &anim.current_node {
+    if let Some(node) = &anim.base.current_node {
         ui.label(format!("State: {node}"));
     }
 }
