@@ -262,7 +262,7 @@ ratchet step.** A missing directory leaks into every floored module's number —
 
 There is no version constant to bump here — rusty has no format version and no
 bake version. What plays that role is the **determinism guard**: a wall-clock read
-or an unseeded RNG anywhere in `app`, `scripting`, `physics` or `navigation`
+or an unseeded RNG anywhere in the sim modules (CLAUDE.md, *Determinism*)
 breaks replay for every harness run, and the gate refuses it rather than letting it
 land quietly.
 
