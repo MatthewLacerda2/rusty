@@ -104,6 +104,33 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
         ComponentKind::ReverbZone => {
             world.set_reverb_zone(id, Some(ReverbZoneComponent::default()))
         }
+        ui @ (ComponentKind::Canvas
+        | ComponentKind::RectTransform
+        | ComponentKind::Image
+        | ComponentKind::CanvasGroup
+        | ComponentKind::RectMask
+        | ComponentKind::Mask
+        | ComponentKind::BackdropFilter
+        | ComponentKind::Text
+        | ComponentKind::Selectable
+        | ComponentKind::LayoutGroup
+        | ComponentKind::LayoutElement
+        | ComponentKind::Shape) => set_default_ui(world, id, ui),
+        ComponentKind::Joint => world.set_joint(id, Some(JointComponent::default())),
+        ComponentKind::CharacterController => {
+            world.set_character_controller(id, Some(CharacterControllerComponent::default()))
+        }
+        ComponentKind::LodGroup => world.set_lod_group(id, Some(LodGroupComponent::default())),
+        ComponentKind::Trail => world.set_trail(id, Some(TrailComponent::default())),
+        ComponentKind::Line => world.set_line(id, Some(LineComponent::default())),
+    }
+}
+
+/// [`set_default`] for the in-game UI kinds, split out so the dispatcher stays
+/// under the function-length cap as first-class components keep arriving.
+/// A non-UI kind attaches nothing and returns `false`.
+fn set_default_ui(world: &mut World, id: u32, kind: ComponentKind) -> bool {
+    match kind {
         ComponentKind::Canvas => world.set_canvas(id, Some(CanvasComponent::default())),
         ComponentKind::RectTransform => {
             world.set_rect_transform(id, Some(RectTransformComponent::default()))
@@ -125,14 +152,8 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
         ComponentKind::LayoutElement => {
             world.set_layout_element(id, Some(LayoutElementComponent::default()))
         }
-        ComponentKind::Joint => world.set_joint(id, Some(JointComponent::default())),
-        ComponentKind::CharacterController => {
-            world.set_character_controller(id, Some(CharacterControllerComponent::default()))
-        }
-        ComponentKind::LodGroup => world.set_lod_group(id, Some(LodGroupComponent::default())),
-        ComponentKind::Trail => world.set_trail(id, Some(TrailComponent::default())),
-        ComponentKind::Line => world.set_line(id, Some(LineComponent::default())),
         ComponentKind::Shape => world.set_shape(id, Some(ShapeComponent::default())),
+        _ => false,
     }
 }
 
