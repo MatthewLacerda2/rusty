@@ -96,7 +96,7 @@ impl ClusterGrid {
 
     /// Every cluster's view-space AABB, indexed `x + X * (y + Y * slice)`: the
     /// bounds of its tile's four corner rays cut at the slice's two depths.
-    pub(crate) fn cluster_aabbs(&self) -> Vec<(Vec3, Vec3)> {
+    pub(crate) fn cluster_aabbs(&self) -> Vec<Aabb> {
         let [gx, gy, gz] = GRID;
         // One ray per tile corner, row-major, shared by every slice.
         let rays: Vec<(Vec3, Vec3)> = (0..=gy)
@@ -133,15 +133,18 @@ impl ClusterGrid {
 /// viewmodel, a render texture) rarely has more distinct lenses than this.
 const CACHED_LENSES: usize = 4;
 
+/// One cluster's view-space box, `(min, max)`.
+pub(crate) type Aabb = (Vec3, Vec3);
+
 /// Cluster boxes by projection, newest last, so an unchanged lens rebuilds nothing.
 #[derive(Default)]
 pub(crate) struct AabbCache {
-    entries: Vec<([u32; 16], Vec<(Vec3, Vec3)>)>,
+    entries: Vec<([u32; 16], Vec<Aabb>)>,
 }
 
 impl AabbCache {
     /// `grid`'s cluster boxes, built only when its projection is not cached.
-    pub(crate) fn get(&mut self, grid: &ClusterGrid) -> &[(Vec3, Vec3)] {
+    pub(crate) fn get(&mut self, grid: &ClusterGrid) -> &[Aabb] {
         let key = grid.key();
         match self.entries.iter().position(|(k, _)| *k == key) {
             Some(at) => {
