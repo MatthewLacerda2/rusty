@@ -1,16 +1,15 @@
 //! src/shadergen/validate.rs — compose an assembled module through `naga_oil`
 //! (#272), the gate that stops a bad shader from shipping.
 //!
-//! Validation reuses the engine's own load path: it builds a `naga_oil`
-//! [`Composer`](naga_oil::compose::Composer) pre-loaded with `common.wgsl` (via
-//! `ShaderRegistry::composer_with_common`) and runs the assembled module string
-//! through the same `make_naga_module` the engine calls when it *loads* the baked
-//! file (via `ShaderRegistry::validate_source`). So "validated at bake" means
+//! Validation reuses the engine's own load path: it runs the assembled module
+//! string through [`super::compose`], the single composition path
+//! `ShaderRegistry::load` also calls when the engine *loads* the baked file
+//! (#722). So "validated at bake" means
 //! validated by exactly the code that would later compile it — GPU-free, so it
 //! runs in CI with no adapter. A module that references an undefined binding, has
 //! a syntax error, or drops a required import fails here and the bake is rejected.
 
-use crate::render::gpu::shaders::ShaderRegistry;
+use super::compose;
 
 /// Validate an assembled WGSL `module` against `common` rooted at `base`.
 ///
@@ -18,8 +17,8 @@ use crate::render::gpu::shaders::ShaderRegistry;
 /// can assert contract conformance, e.g. a postfx module exposes `fs_main`), or a
 /// message describing why it failed to compose.
 pub fn validate(base: &str, module: &str) -> Result<Vec<String>, String> {
-    let mut composer = ShaderRegistry::composer_with_common(base)?;
-    let naga = ShaderRegistry::validate_source(&mut composer, module)?;
+    let mut composer = compose::composer_with_common(base)?;
+    let naga = compose::compose(&mut composer, module, "authored.wgsl")?;
     Ok(naga.entry_points.iter().map(|e| e.name.clone()).collect())
 }
 

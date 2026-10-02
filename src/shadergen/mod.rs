@@ -28,8 +28,10 @@
 //!   per-pass block catalog.
 //! - [`assemble`] — recipe → a complete, contract-conformant `.wgsl` module
 //!   string (deterministic; same recipe → byte-identical WGSL).
-//! - [`validate`] — module string → composed naga module via `naga_oil`, reusing
-//!   the engine's `ShaderRegistry` compose path; the gate that stops bad shaders.
+//! - [`compose`] — the one GPU-free `naga_oil` composition path (#722): the
+//!   engine's `ShaderRegistry` and every authored-shader loader compile through it.
+//! - [`validate`] — module string → composed naga module through [`compose`], the
+//!   same path the engine loads it by; the gate that stops bad shaders.
 //! - [`bake`] — assemble + validate, then write `<dir>/<name>.wgsl`.
 //! - [`params`] — a surface shader's runtime params (#399): which block params a
 //!   material sets from scripts, their uniform slots, and the `<name>.params.json`
@@ -40,6 +42,7 @@
 pub mod assemble;
 pub mod bake;
 pub mod blocks;
+pub mod compose;
 pub mod params;
 pub mod recipe;
 pub mod textures;

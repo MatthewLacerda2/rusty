@@ -2692,6 +2692,7 @@ dependencies = [
  "ktx2",
  "log",
  "mlua",
+ "naga",
  "naga_oil",
  "pollster",
  "proptest",

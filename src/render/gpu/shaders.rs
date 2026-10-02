@@ -6,11 +6,13 @@
 //! shaders be edited without recompiling the Rust crate, and allows passes to
 //! share type definitions via `#import "common"` rather than duplicating them.
 //!
-//! **Version lockstep:** `naga_oil 0.13` requires `naga 0.19`, which is the
-//! same version wgpu 0.19.x links against. Upgrade all three as a unit; see
-//! `Cargo.toml` for the pinned version comment.
+//! The composition itself — `common.wgsl` registration and `make_naga_module` —
+//! is [`crate::shadergen::compose`], the GPU-free path the shader bake validates
+//! through too (#722). This file keeps only the disk lookup and the wgpu handoff.
 
-use naga_oil::compose::{ComposableModuleDescriptor, Composer, NagaModuleDescriptor};
+use naga_oil::compose::Composer;
+
+use crate::shadergen::compose;
 
 /// Resolves and compiles WGSL shaders at runtime using a naga_oil Composer.
 ///
@@ -33,27 +35,12 @@ impl ShaderRegistry {
     /// condition.
     pub fn new(base: impl Into<String>) -> Self {
         let base = base.into();
-        let mut composer = Composer::default();
-        let common_path = format!("{base}/common.wgsl");
-        let common_src = std::fs::read_to_string(&common_path)
-            .unwrap_or_else(|e| panic!("ShaderRegistry: cannot read {common_path}: {e}"));
-        composer
-            .add_composable_module(ComposableModuleDescriptor {
-                source: &common_src,
-                file_path: "common",
-                // The module's import name. naga_oil derives it from a
-                // `#define_import_path` directive in the source or this field;
-                // `common.wgsl` has neither directive, so name it here or
-                // `add_composable_module` fails with `NoModuleName` and every
-                // `#import "common"` is unresolvable.
-                as_name: Some("common".to_owned()),
-                ..Default::default()
-            })
-            .unwrap_or_else(|e| panic!("ShaderRegistry: common.wgsl failed to compose: {e:?}"));
+        let composer =
+            compose::composer_with_common(&base).unwrap_or_else(|e| panic!("ShaderRegistry: {e}"));
         Self { composer, base }
     }
 
-    /// Resolve `<base>/<name>` through the Composer (handling any
+    /// Resolve `<base>/<name>` through [`compose::compose`] (handling any
     /// `#import "common"` directives) into a validated naga module. GPU-free:
     /// the wgpu device handoff lives in [`load`], so this path is unit-testable
     /// without an adapter.
@@ -61,59 +48,12 @@ impl ShaderRegistry {
     /// # Panics
     /// Panics on missing files or shader errors — both are authoring mistakes
     /// caught during engine startup, not recoverable runtime conditions.
-    fn compose(&mut self, name: &str) -> wgpu::naga::Module {
+    fn compose(&mut self, name: &str) -> compose::Module {
         let path = format!("{}/{name}", self.base);
         let source = std::fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("ShaderRegistry: cannot read {path}: {e}"));
-        self.composer
-            .make_naga_module(NagaModuleDescriptor {
-                source: &source,
-                file_path: &path,
-                ..Default::default()
-            })
-            .unwrap_or_else(|e| panic!("ShaderRegistry: {path} failed to compose: {e:?}"))
-    }
-
-    /// Build a bare composer pre-loaded with `common.wgsl` from `base`, the
-    /// validation context a shader is compiled in — but without the disk-file
-    /// loading [`new`] panics on. The shader-authoring bake (#272) reuses this so
-    /// an assembled module is validated through the **same** `naga_oil` +
-    /// `common` path the engine loads it by, with errors returned (not panicked)
-    /// so a bad authored shader fails the bake instead of shipping.
-    ///
-    /// Returns the composer, or a message if `common.wgsl` is missing/invalid.
-    pub fn composer_with_common(base: &str) -> Result<Composer, String> {
-        let mut composer = Composer::default();
-        let common_path = format!("{base}/common.wgsl");
-        let common_src = std::fs::read_to_string(&common_path)
-            .map_err(|e| format!("cannot read {common_path}: {e}"))?;
-        composer
-            .add_composable_module(ComposableModuleDescriptor {
-                source: &common_src,
-                file_path: "common",
-                as_name: Some("common".to_owned()),
-                ..Default::default()
-            })
-            .map_err(|e| format!("common.wgsl failed to compose: {e:?}"))?;
-        Ok(composer)
-    }
-
-    /// Compose a WGSL `source` **string** (not a file) against `common`,
-    /// returning the validated naga module or an error message. This is the
-    /// GPU-free validate path the #272 bake calls to prove an assembled shader
-    /// would load — the same `make_naga_module` the engine uses, only fed from a
-    /// string and surfacing errors rather than panicking.
-    pub fn validate_source(
-        composer: &mut Composer,
-        source: &str,
-    ) -> Result<wgpu::naga::Module, String> {
-        composer
-            .make_naga_module(NagaModuleDescriptor {
-                source,
-                file_path: "authored.wgsl",
-                ..Default::default()
-            })
-            .map_err(|e| format!("{e:?}"))
+        compose::compose(&mut self.composer, &source, &path)
+            .unwrap_or_else(|e| panic!("ShaderRegistry: {path} failed to compose: {e}"))
     }
 
     /// Load `<base>/<name>`, run it through the naga_oil Composer (resolving
@@ -134,6 +74,18 @@ impl ShaderRegistry {
 #[cfg(test)]
 mod tests {
     use super::ShaderRegistry;
+    use crate::shadergen::validate::validate;
+
+    const SHIPPED: [&str; 8] = [
+        "shader.wgsl",
+        "skybox.wgsl",
+        "sky_gradient.wgsl",
+        "particles.wgsl",
+        "ribbons.wgsl",
+        "decals.wgsl",
+        "postfx.wgsl",
+        "ui.wgsl",
+    ];
 
     /// Every shipped shader must compose against the registered `common` module
     /// without a GPU. This catches `#import` / module-name regressions on Linux
@@ -141,21 +93,49 @@ mod tests {
     #[test]
     fn all_shaders_compose() {
         let mut registry = ShaderRegistry::new("assets/shaders");
-        for name in [
-            "shader.wgsl",
-            "skybox.wgsl",
-            "sky_gradient.wgsl",
-            "particles.wgsl",
-            "ribbons.wgsl",
-            "decals.wgsl",
-            "postfx.wgsl",
-            "ui.wgsl",
-        ] {
+        for name in SHIPPED {
             let module = registry.compose(name);
             assert!(
                 !module.entry_points.is_empty(),
                 "{name} composed but has no entry points"
             );
         }
+    }
+
+    /// "Validated at bake" means validated by the code that loads it (#722): the
+    /// bake's `validate` and the registry's load agree on every shipped shader's
+    /// composed entry points, and a module one rejects the other rejects too.
+    #[test]
+    fn bake_validation_and_load_compose_identically() {
+        let mut registry = ShaderRegistry::new("assets/shaders");
+        for name in SHIPPED {
+            let source = std::fs::read_to_string(format!("assets/shaders/{name}")).unwrap();
+            let baked = validate("assets/shaders", &source).expect("bake validates");
+            let loaded: Vec<String> = registry
+                .compose(name)
+                .entry_points
+                .iter()
+                .map(|e| e.name.clone())
+                .collect();
+            assert_eq!(baked, loaded, "{name}: bake and load disagree");
+        }
+
+        let dir = std::env::temp_dir().join(format!("rusty-722-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::copy("assets/shaders/common.wgsl", dir.join("common.wgsl")).unwrap();
+        // Names a `common` struct that does not exist: naga rejects the unknown type.
+        let bad = "#import common::{CameraUniforms}\n\
+            @group(0) @binding(0) var<uniform> camera: NoSuchStruct;\n\
+            @fragment fn fs_main() -> @location(0) vec4<f32> { return vec4<f32>(0.0); }";
+        std::fs::write(dir.join("bad.wgsl"), bad).unwrap();
+        let base = dir.to_string_lossy().into_owned();
+        assert!(
+            validate(&base, bad).is_err(),
+            "bake accepted a broken module"
+        );
+        let load =
+            std::panic::catch_unwind(|| ShaderRegistry::new(base.clone()).compose("bad.wgsl"));
+        assert!(load.is_err(), "load accepted a module the bake rejects");
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

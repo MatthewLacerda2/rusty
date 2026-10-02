@@ -31,9 +31,8 @@ use uniforms::SLOT;
 use super::cache::UiViewCache;
 use super::pipeline::{self, UiPass};
 use crate::components::UiBlend;
-use crate::render::gpu::shaders::ShaderRegistry;
 use crate::shadergen::params::{self, ParamLayout};
-use crate::shadergen::{bake_generation, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_generation, compose, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
 
 /// One built variant.
 struct Variant {
@@ -130,8 +129,8 @@ impl UiShaders {
         let path = params::resolve_module(&dirs, name)
             .ok_or_else(|| format!("no `{name}.wgsl` in {}", dirs.join(" or ")))?;
         let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        let mut composer = ShaderRegistry::composer_with_common(ENGINE_SHADER_DIR)?;
-        let module = ShaderRegistry::validate_source(&mut composer, &source)?;
+        let mut composer = compose::composer_with_common(ENGINE_SHADER_DIR)?;
+        let module = compose::compose(&mut composer, &source, &path.to_string_lossy())?;
         for entry in ["vs_main", "fs_main", "vs_world", "fs_world"] {
             if !module.entry_points.iter().any(|e| e.name == entry) {
                 return Err(format!(

@@ -9,10 +9,10 @@
 //! the forward pipeline swapped for a compiled `.wgsl` module.
 
 use super::gpu::pipelines::create_pipelines;
-use super::gpu::shaders::ShaderRegistry;
 use super::{RenderView, Renderer};
 use crate::scene::Camera;
 use crate::scene::Scene;
+use crate::shadergen::{compose, ENGINE_SHADER_DIR};
 
 impl Renderer {
     /// Render `scene` with the forward pipeline temporarily rebuilt from
@@ -63,11 +63,11 @@ impl Renderer {
     /// (`assets/shaders/common.wgsl` — every shader's `#import "common"` target,
     /// regardless of where the previewed file itself lives), returning `None` rather
     /// than panicking on a missing file or a composition error (the non-panicking
-    /// path `ShaderRegistry` already exposes for the #272 authoring bake).
+    /// path the #272 authoring bake validates through, `shadergen::compose`).
     fn compose_preview_shader(&self, shader_path: &str) -> Option<wgpu::ShaderModule> {
         let source = std::fs::read_to_string(shader_path).ok()?;
-        let mut composer = ShaderRegistry::composer_with_common("assets/shaders").ok()?;
-        let naga_module = ShaderRegistry::validate_source(&mut composer, &source).ok()?;
+        let mut composer = compose::composer_with_common(ENGINE_SHADER_DIR).ok()?;
+        let naga_module = compose::compose(&mut composer, &source, shader_path).ok()?;
         Some(
             self.device
                 .create_shader_module(wgpu::ShaderModuleDescriptor {

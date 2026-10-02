@@ -382,8 +382,8 @@ Failures from `tools/lint` are written to `.lint/report.txt`. See **docs/linting
 - **Determinism guard** (`make determinism`) — fails on wall-clock / unseeded RNG
   in the sim modules listed under *Determinism* above; it protects the harness's
   reproducibility.
-- **Direction guard** (`make direction`) — fails when a sim module (the same list,
-  minus `shadergen` until #722) references `crate::render`, `crate::editor`, `wgpu`
+- **Direction guard** (`make direction`) — fails when a sim module (the same list)
+  references `crate::render`, `crate::editor`, `wgpu`
   or `egui`; the arrow is render/editor → sim.
 - `make gates` refuses to run when cargo's target dir is outside the worktree — a
   shared one is a false green.

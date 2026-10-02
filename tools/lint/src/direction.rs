@@ -16,10 +16,10 @@ use std::process::exit;
 /// layer: the sim trees, `ui` (the in-game UI's layout, which runs headless in the
 /// sim, #417), the data the sim runs on (`scene`, `components`, `ecs`, `core`,
 /// `time`, `asset`), `api` (the surface scripts drive from inside the sim, #723),
-/// `procgen` (a material's texture recipe) and `audio` (a sim `Resource`).
-///
-/// `shadergen` belongs here too but still imports `crate::render` once; #722 removes
-/// that import and adds it. A listed directory that no longer exists is a violation.
+/// `procgen` (a material's texture recipe), `shadergen` (shader authoring, which
+/// scene authoring and `Shader.Bake` reach; its GPU-free composition lives there
+/// so `render` depends on it, never the reverse, #722) and `audio` (a sim
+/// `Resource`). A listed directory that no longer exists is a violation.
 const SIM_DIRS: &[&str] = &[
     "src/app",
     "src/scripting",
@@ -34,6 +34,7 @@ const SIM_DIRS: &[&str] = &[
     "src/ui",
     "src/api",
     "src/procgen",
+    "src/shadergen",
     "src/audio",
 ];
 
@@ -198,6 +199,7 @@ mod tests {
             "src/procgen",
             "src/scene",
             "src/scripting",
+            "src/shadergen",
             "src/time",
             "src/ui",
         ];
