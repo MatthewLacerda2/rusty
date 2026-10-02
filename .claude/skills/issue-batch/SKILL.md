@@ -221,6 +221,12 @@ briefs cloud coders, reviews and merges. Its loop per ready pull request:
    (#562). The local check is a heavy build on a cold target, so it takes a
    build slot like any other. Run it from a worktree under `.claude/worktrees/`,
    never the scratchpad (a tmpfs a cold build fills, #580).
+   **`ARGS=--no-check` drops that build**: the rebase is pushed and CI is the
+   only judge. With every coder in the cloud, that makes the batch's whole local
+   footprint `git` plus `gh` (CLAUDE.md, *The lightest batch*), so use it whenever
+   the machine is shared or busy. What it gives up is catching a semantic break
+   before the push. That cost three breaks in the 126-PR batch of 2026-09-30, each
+   a CI round instead of a three-minute check, and each still handed back unmerged.
 3. A hand-back is the queue's whole report: fix a conflict or a failed check on
    the branch (or brief its coder to), then queue it again. A one-line semantic
    break (a field a merge ahead added) is quickest fixed here. A many-hunk
