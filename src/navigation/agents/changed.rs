@@ -69,6 +69,53 @@ fn segment_hits_box(a: Vec2, b: Vec2, lo: Vec2, hi: Vec2) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::navigation::test_support::{add_box, add_floor, move_to};
+    use crate::navigation::NavBounds;
+    use crate::scene::Scene;
+
+    /// A planned agent crossing a 20 × 10 floor along z = 2, and a crate far off.
+    fn planned() -> (Scene, NavigationGraph, NavMeshAgentComponent, u32) {
+        let mut scene = Scene::new();
+        scene.nav_settings.bounds = Some(NavBounds::new(0.0, 20.0, 0.0, 10.0));
+        add_floor(&mut scene, -1.0, 21.0, -1.0, 11.0);
+        let crate_id = add_box(
+            &mut scene,
+            Vec3::new(15.0, 0.0, 8.0),
+            Vec3::new(16.0, 1.0, 9.0),
+        );
+        let g = NavigationGraph::from_scene(&scene);
+        let mut agent = NavMeshAgentComponent {
+            active: true,
+            target: Vec3::new(18.0, 0.0, 2.0),
+            ..Default::default()
+        };
+        g.plan_agent_path(&mut agent, Vec3::new(2.0, 0.0, 2.0));
+        (scene, g, agent, crate_id)
+    }
+
+    #[test]
+    fn a_rebake_away_from_the_path_keeps_it() {
+        let (mut scene, mut g, mut agent, crate_id) = planned();
+        let path = agent.cached_path.clone();
+        move_to(&mut scene, crate_id, Vec3::new(10.0, 0.5, 8.5));
+        g.sync(&scene);
+        g.keep_path_if_untouched(&mut agent, Vec3::new(2.0, 0.0, 2.0));
+        assert_eq!(agent.path_generation, g.bake_generation, "restamped");
+        assert!(!g.path_cache_invalid(&agent));
+        assert_eq!(agent.cached_path, path);
+    }
+
+    #[test]
+    fn a_rebake_across_the_path_replans() {
+        let (mut scene, mut g, mut agent, crate_id) = planned();
+        move_to(&mut scene, crate_id, Vec3::new(10.0, 0.5, 2.0));
+        g.sync(&scene);
+        g.keep_path_if_untouched(&mut agent, Vec3::new(2.0, 0.0, 2.0));
+        assert!(
+            g.path_cache_invalid(&agent),
+            "the crate now sits on the path"
+        );
+    }
 
     #[test]
     fn segment_box_hits_crossings_and_misses_bystanders() {

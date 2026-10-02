@@ -16,6 +16,7 @@ use glam::{Mat4, Vec2, Vec3};
 use serde_json::{json, Value};
 
 mod components;
+mod navigation;
 mod ui;
 
 use crate::components::TransformComponent;
@@ -29,6 +30,7 @@ use components::{
     material_value, mesh_value, nav_agent_value, particle_value, rigidbody_value,
 };
 use components::{joint_value, line_value, lod_group_value, trail_value};
+use navigation::nav_obstacle_value;
 use ui::{backdrop_filter_value, mask_value};
 use ui::{
     canvas_group_value, canvas_value, image_value, layout_element_value, layout_group_value,
@@ -134,6 +136,7 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -
         "rigidbody": world.rigidbody(id).map(|r| rigidbody_value(&r)),
         "camera": world.camera(id).map(|c| camera_component_value(&c)),
         "nav_agent": world.nav_agent(id).map(|n| nav_agent_value(&n)),
+        "nav_obstacle": world.nav_obstacle(id).map(|o| nav_obstacle_value(&o)),
         "particles": world.particles(id).map(|p| particle_value(&p)),
         "animator": world.animator(id).map(|a| animator_value(&a)),
         "audio": world.audio(id).map(|a| audio_value(&a)),
@@ -171,6 +174,7 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
         (World::has_rigidbody, "Rigidbody"),
         (World::has_camera, "Camera"),
         (World::has_nav_agent, "NavMeshAgent"),
+        (World::has_nav_obstacle, "NavMeshObstacle"),
         (World::has_particles, "ParticleEmitter"),
         (World::has_animator, "Animator"),
         (World::has_audio, "AudioSource"),
