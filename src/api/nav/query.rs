@@ -56,7 +56,9 @@ pub(super) fn register<'lua, 'scope>(
         "CalculatePath",
         scope.create_function(
             |lua, (fx, fy, fz, tx, ty, tz): (f32, f32, f32, f32, f32, f32)| {
-                let NavPath { status, corners } = nav
+                let NavPath {
+                    status, corners, ..
+                } = nav
                     .borrow()
                     .calculate_path(Vec3::new(fx, fy, fz), Vec3::new(tx, ty, tz));
                 path_table(lua, status, &corners)

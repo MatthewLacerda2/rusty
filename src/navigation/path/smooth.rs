@@ -11,9 +11,39 @@
 
 use glam::Vec3;
 
-use super::super::{NavigationGraph, SpanRef};
+use super::super::{NavigationGraph, OffMeshLinkData, SpanRef};
+
+/// A route's corners, and the off-mesh legs among them (see `NavPath::links`).
+type Route = (Vec<Vec3>, Vec<(usize, OffMeshLinkData)>);
 
 impl NavigationGraph {
+    /// The corners of a span path that may cross off-mesh links (#462). The walked
+    /// stretches between links are string-pulled on their own, so a straight run
+    /// never cuts across a link; each link is one leg from its start to its end.
+    pub(super) fn pull_route(&self, path: &[SpanRef], first: Vec3, last: Vec3) -> Route {
+        let (mut corners, mut links) = (Vec::new(), Vec::new());
+        let (mut from, mut at) = (0, first);
+        for i in 1..path.len() {
+            if self.is_walk(path[i - 1], path[i]) {
+                continue;
+            }
+            let Some(link) = self.link_between(path[i - 1], path[i]) else {
+                continue;
+            };
+            corners.extend(self.string_pull(&path[from..i], at, link.start));
+            links.push((corners.len(), link));
+            (from, at) = (i, link.end);
+        }
+        corners.extend(self.string_pull(&path[from..], at, last));
+        (corners, links)
+    }
+
+    /// Whether `b` is one walking step from `a` (`neighbour`'s rule).
+    fn is_walk(&self, a: SpanRef, b: SpanRef) -> bool {
+        let (dx, dz) = (b.gx - a.gx, b.gz - a.gz);
+        dx.abs() <= 1 && dz.abs() <= 1 && self.neighbour(a, dx, dz) == Some(b)
+    }
+
     /// The corners of `path`, which starts at `first` and ends at `last` (points on
     /// its first and last spans). Always at least two corners for a non-empty path.
     pub(super) fn string_pull(&self, path: &[SpanRef], first: Vec3, last: Vec3) -> Vec<Vec3> {

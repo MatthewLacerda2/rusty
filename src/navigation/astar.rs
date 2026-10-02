@@ -3,7 +3,8 @@
 //! Nodes are spans, not cells, so a path can climb a staircase onto the floor
 //! directly above where it started. Edges are the 8-way moves `links.rs` allows;
 //! the cost is horizontal travel plus the vertical climb, and the octile XZ
-//! heuristic stays admissible because the climb only ever adds cost.
+//! heuristic stays admissible because the climb only ever adds cost. Off-mesh
+//! links (#462) are extra edges, costed never below the octile distance they span.
 
 use super::{NavigationGraph, SpanRef};
 use glam::Vec3;
@@ -152,22 +153,29 @@ impl NavigationGraph {
                 continue;
             };
             let dh = (self.spans[next.index as usize].y - y).abs();
-            let tentative_g = current.g_score + horiz + dh;
-            if tentative_g < frontier.g_of(next.index) {
-                frontier.came_from[next.index as usize] = Some(here);
-                frontier.g_score[next.index as usize] = tentative_g;
-                frontier.open_set.push(NodeState {
-                    node: next,
-                    g_score: tentative_g,
-                    f_score: tentative_g + heuristic(next, goal),
-                });
-            }
+            relax(frontier, here, next, current.g_score + horiz + dh, goal);
+        }
+        for link in self.link_moves(here) {
+            relax(frontier, here, link.to, current.g_score + link.cost, goal);
         }
     }
 }
 
+/// Record `next` as reached from `here` at cost `g` when that beats its best so far.
+fn relax(frontier: &mut Frontier, here: SpanRef, next: SpanRef, g: f32, goal: SpanRef) {
+    if g < frontier.g_of(next.index) {
+        frontier.came_from[next.index as usize] = Some(here);
+        frontier.g_score[next.index as usize] = g;
+        frontier.open_set.push(NodeState {
+            node: next,
+            g_score: g,
+            f_score: g + heuristic(next, goal),
+        });
+    }
+}
+
 /// Octile distance in cells: an admissible lower bound for 8-way moves.
-fn heuristic(a: SpanRef, b: SpanRef) -> f32 {
+pub(super) fn heuristic(a: SpanRef, b: SpanRef) -> f32 {
     let dx = (a.gx - b.gx).abs() as f32;
     let dz = (a.gz - b.gz).abs() as f32;
     let (dmin, dmax) = (dx.min(dz), dx.max(dz));

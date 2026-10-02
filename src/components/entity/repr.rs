@@ -7,7 +7,6 @@ use serde::Deserialize;
 
 use super::{Entity, PrefabLink};
 use crate::components::particle::LegacyEmitter;
-use crate::components::NavMeshObstacleComponent;
 use crate::components::ReverbZoneComponent;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
@@ -19,6 +18,7 @@ use crate::components::{
     TransformComponent, VisualCorrectionComponent,
 };
 use crate::components::{BackdropFilterComponent, MaskComponent};
+use crate::components::{NavMeshObstacleComponent, OffMeshLinkComponent};
 
 /// On-disk shape used only for deserialization, so old single-`script` scenes
 /// (pre-#83) keep loading. It accepts both the new `scripts: Vec<…>` and the
@@ -53,6 +53,8 @@ pub(super) struct EntityRepr {
     nav_agent: Option<NavMeshAgentComponent>,
     #[serde(default)]
     nav_obstacle: Option<NavMeshObstacleComponent>,
+    #[serde(default)]
+    offmesh_link: Option<OffMeshLinkComponent>,
     camera: Option<CameraComponent>,
     visual_correction: Option<VisualCorrectionComponent>,
     /// Read through the pre-#439 `size_end` migration.
@@ -130,6 +132,7 @@ impl From<EntityRepr> for Entity {
             rigidbody: r.rigidbody,
             nav_agent: r.nav_agent,
             nav_obstacle: r.nav_obstacle,
+            offmesh_link: r.offmesh_link,
             camera: r.camera,
             visual_correction: r.visual_correction,
             particles: r.particles.map(ParticleEmitterComponent::from),

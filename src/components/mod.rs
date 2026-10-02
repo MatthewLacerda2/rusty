@@ -22,6 +22,7 @@ pub mod material;
 pub mod mesh;
 pub mod nav_agent;
 pub mod nav_obstacle;
+pub mod offmesh_link;
 pub mod particle;
 pub mod reverb_zone;
 pub mod ribbon;
@@ -50,6 +51,9 @@ pub use nav_agent::{
     NavMeshAgentComponent, NavPathStatus, DEFAULT_AVOIDANCE_PRIORITY, MAX_AVOIDANCE_PRIORITY,
 };
 pub use nav_obstacle::{NavMeshObstacleComponent, ObstacleShape};
+pub use offmesh_link::{
+    OffMeshLinkComponent, OffMeshLinkData, OffMeshLinkKind, LINK_SNAP_DISTANCE,
+};
 pub use particle::{
     CollisionResponse, EmitFrom, EmitMode, EmitShape, Flipbook, Particle, ParticleBlend,
     ParticleEmitterComponent, ParticleRender, ParticleRenderMode, SubEmitTrigger, SubEmitters,

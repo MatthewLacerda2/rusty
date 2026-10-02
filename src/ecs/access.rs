@@ -31,7 +31,9 @@ use crate::components::{
     ParticleEmitterComponent, PrefabLink, RectMaskComponent, RectTransformComponent,
     RigidBodyComponent, SelectableComponent, TextComponent, VisualCorrectionComponent,
 };
-use crate::components::{BackdropFilterComponent, MaskComponent, NavMeshObstacleComponent};
+use crate::components::{
+    BackdropFilterComponent, MaskComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
+};
 use crate::components::{CharacterControllerComponent, JointComponent};
 use crate::components::{LineComponent, LodGroupComponent, TrailComponent};
 
@@ -129,6 +131,7 @@ optional_component_accessors! {
     RigidBodyComponent => rigidbody, rigidbody_mut, has_rigidbody, set_rigidbody, take_rigidbody, ids_with_rigidbody;
     NavMeshAgentComponent => nav_agent, nav_agent_mut, has_nav_agent, set_nav_agent, take_nav_agent, ids_with_nav_agent;
     NavMeshObstacleComponent => nav_obstacle, nav_obstacle_mut, has_nav_obstacle, set_nav_obstacle, take_nav_obstacle, ids_with_nav_obstacle;
+    OffMeshLinkComponent => offmesh_link, offmesh_link_mut, has_offmesh_link, set_offmesh_link, take_offmesh_link, ids_with_offmesh_link;
     CameraComponent => camera, camera_mut, has_camera, set_camera, take_camera, ids_with_camera;
     VisualCorrectionComponent => visual_correction, visual_correction_mut, has_visual_correction, set_visual_correction, take_visual_correction, ids_with_visual_correction;
     ParticleEmitterComponent => particles, particles_mut, has_particles, set_particles, take_particles, ids_with_particles;

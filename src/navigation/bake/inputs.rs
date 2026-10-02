@@ -15,6 +15,7 @@ use glam::Mat4;
 
 use super::super::bounds::static_collider_ids;
 use super::super::obstacle::{carving_volumes, ObstacleVolume};
+use super::super::offmesh::AuthoredKey;
 use super::super::NavMeshSettings;
 use super::region::CellRect;
 use crate::components::ColliderShape;
@@ -40,12 +41,19 @@ pub(super) struct BakeInputs {
     pub settings: NavMeshSettings,
     pub colliders: Vec<Source<ColliderKey>>,
     pub obstacles: Vec<Source<ObstacleVolume>>,
+    /// Authored off-mesh links (#462); they change links, never spans.
+    pub links: Vec<Source<AuthoredKey>>,
 }
 
 impl BakeInputs {
     /// The colliders whose recorded cells reach `region`.
     pub fn collider_ids_in(&self, region: CellRect) -> Vec<u32> {
         touching(&self.colliders, region).map(|s| s.id).collect()
+    }
+
+    /// The authored links as last read, by ascending id.
+    pub fn link_keys(&self) -> Vec<(u32, AuthoredKey)> {
+        self.links.iter().map(|s| (s.id, s.key)).collect()
     }
 
     /// The carving obstacles whose recorded cells reach `region`.

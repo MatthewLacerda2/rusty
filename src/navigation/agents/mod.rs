@@ -1,4 +1,6 @@
 mod changed;
+mod link;
+pub use link::complete_off_mesh_link;
 pub mod state;
 #[cfg(test)]
 mod state_tests;
@@ -67,6 +69,8 @@ impl NavigationGraph {
             waypoints.push(t);
         }
         agent.cached_path = waypoints;
+        // Waypoints drop the start corner, so corner `i` is waypoint `i - 1`.
+        agent.path_links = path.links.iter().map(|&(i, l)| (i - 1, l)).collect();
         agent.path_cursor = 0;
         agent.path_status = path.status;
         agent.planned_target = agent.target;
@@ -88,9 +92,11 @@ impl NavigationGraph {
             let wp = agent.cached_path[agent.path_cursor];
             let dx = wp.x - current_pos.x;
             let dz = wp.z - current_pos.z;
-            if (dx * dx + dz * dz).sqrt() <= WAYPOINT_REACHED_DISTANCE {
-                agent.path_cursor += 1;
-            } else {
+            if (dx * dx + dz * dz).sqrt() > WAYPOINT_REACHED_DISTANCE {
+                break;
+            }
+            agent.path_cursor += 1;
+            if link::enter_link(agent) {
                 break;
             }
         }

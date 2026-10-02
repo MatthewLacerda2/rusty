@@ -17,6 +17,7 @@ use serde_json::{json, Value};
 
 mod audio;
 mod components;
+mod fields;
 mod navigation;
 mod ui;
 
@@ -25,20 +26,6 @@ use crate::ecs::World;
 use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::ui::UiView;
-use audio::{audio_value, reverb_zone_value};
-use components::character_controller_value as cc_value;
-use components::{
-    animator_value, camera_component_value, collider_value, light_value, material_value,
-    mesh_value, nav_agent_value, particle_value, rigidbody_value,
-};
-use components::{joint_value, line_value, lod_group_value, trail_value};
-use navigation::nav_obstacle_value;
-use ui::{backdrop_filter_value, mask_value};
-use ui::{
-    canvas_group_value, canvas_value, image_value, layout_element_value, layout_group_value,
-    rect_mask_value, rect_transform_value, selectable_value, shape_value, text_value,
-};
-
 /// A `glam::Vec3` as a `[x, y, z]` JSON array. Shared with the `components` and `ui` builders.
 pub(crate) fn vec3(v: Vec3) -> Value {
     json!([v.x, v.y, v.z])
@@ -112,8 +99,7 @@ fn camera_value(cam: &Camera) -> Value {
 /// out of a whole-`Entity` borrow, so heavy fields (meshes) are never cloned.
 pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -> Value {
     let world = &scene.world;
-    let material = scene.material_asset_of(id);
-    json!({
+    let mut value = json!({
         "id": id,
         "name": world.name(id).map(|n| n.clone()).unwrap_or_default(),
         "active": world.is_active(id),
@@ -128,38 +114,16 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -
             .scripts(id)
             .map(|s| s.iter().map(|sc| sc.path.clone()).collect::<Vec<_>>())
             .unwrap_or_default(),
-        "mesh": world.mesh(id).map(|m| mesh_value(&m)),
-        "material": material.map(material_value),
-        "light": world.light(id).map(|l| light_value(&l)),
-        "collider": world.collider(id).map(|c| collider_value(&c)),
-        "rigidbody": world.rigidbody(id).map(|r| rigidbody_value(&r)),
-        "camera": world.camera(id).map(|c| camera_component_value(&c)),
-        "nav_agent": world.nav_agent(id).map(|n| nav_agent_value(&n)),
-        "nav_obstacle": world.nav_obstacle(id).map(|o| nav_obstacle_value(&o)),
-        "particles": world.particles(id).map(|p| particle_value(&p)),
-        "animator": world.animator(id).map(|a| animator_value(&a)),
-        "audio": world.audio(id).map(|a| audio_value(&a)),
-        "reverb_zone": world.reverb_zone(id).map(|z| reverb_zone_value(&z)),
-        "canvas": world.canvas(id).map(|c| canvas_value(&c)),
-        "rect_transform": world.rect_transform(id).map(|r| rect_transform_value(&r)),
-        "image": world.image(id).map(|i| image_value(&i)),
-        "canvas_group": world.canvas_group(id).map(|g| canvas_group_value(&g)),
-        "rect_mask": world.rect_mask(id).map(|m| rect_mask_value(&m)),
-        "mask": world.mask(id).map(|m| mask_value(&m)),
-        "backdrop_filter": world.backdrop_filter(id).map(|b| backdrop_filter_value(&b)),
-        "text": world.text(id).map(|t| text_value(&t)),
-        "shape": world.shape(id).map(|s| shape_value(&s)),
-        "selectable": world.selectable(id).map(|s| selectable_value(&s)),
-        "layout_group": world.layout_group(id).map(|g| layout_group_value(&g)),
-        "layout_element": world.layout_element(id).map(|e| layout_element_value(&e)),
-        "joint": world.joint(id).map(|j| joint_value(&j)),
-        "character_controller": world.character_controller(id).map(|c| cc_value(&c)),
-        "lod_group": world.lod_group(id).map(|g| lod_group_value(&g)),
-        "trail": world.trail(id).map(|t| trail_value(&t)),
-        "line": world.line(id).map(|l| line_value(&l)),
         "ui_rect": crate::ui::layout::rect_in(world, id, view)
             .map(|r| super::ui::rect_value(world, &r, view)),
-    })
+    });
+    if let Value::Object(map) = &mut value {
+        map.extend(
+            fields::component_fields(scene, id)
+                .map(|(k, v)| (k.to_owned(), v.unwrap_or(Value::Null))),
+        );
+    }
+    value
 }
 
 /// Names of the optional first-class components this entity carries (the
@@ -175,6 +139,7 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
         (World::has_camera, "Camera"),
         (World::has_nav_agent, "NavMeshAgent"),
         (World::has_nav_obstacle, "NavMeshObstacle"),
+        (World::has_offmesh_link, "OffMeshLink"),
         (World::has_particles, "ParticleEmitter"),
         (World::has_animator, "Animator"),
         (World::has_audio, "AudioSource"),

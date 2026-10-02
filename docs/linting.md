@@ -89,7 +89,7 @@ zero violations (#494), and it is the groundwork the crate split (#495) needs.
 ## Component completeness (`--components`)
 A first-class component is only "done" when it appears on all four axes that
 deliberately live in non-dependent layers: a field on `Entity`, an Add Component
-entry (`inspector/components/add.rs`), an inspector card (some `inspector/components/*.rs`), and an API
+entry (`inspector/components/add/`), an inspector card (some `inspector/components/*.rs`), and an API
 namespace (`src/api/<x>.rs` registered in `api/mod.rs` and documented in
 `docs/api/`). The gate discovers components from `Entity`'s
 `Option<…Component>` fields — so a new one can't slip through — and fails on any

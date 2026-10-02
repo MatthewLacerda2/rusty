@@ -6,6 +6,8 @@
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
+use super::OffMeshLinkData;
+
 /// Unity's default `avoidancePriority`: the middle of the 0–99 range.
 pub const DEFAULT_AVOIDANCE_PRIORITY: u8 = 50;
 /// The highest (least important) avoidance priority, as in Unity.
@@ -54,6 +56,11 @@ pub struct NavMeshAgentComponent {
     /// neighbour the others steer around; it just never dodges itself.
     #[serde(default = "default_true")]
     pub avoidance_enabled: bool,
+    /// Whether the engine moves the agent across an off-mesh link itself (#462,
+    /// Unity's `autoTraverseOffMeshLink`, on by default). Off, the agent stops on
+    /// the link until a script calls `CompleteOffMeshLink`.
+    #[serde(default = "default_true")]
+    pub auto_traverse_off_mesh_link: bool,
 
     // --- Cached pathfinding state (#126) ---
     //
@@ -83,6 +90,16 @@ pub struct NavMeshAgentComponent {
     /// reachable point nearest the target, and the agent stops there.
     #[serde(skip)]
     pub path_status: NavPathStatus,
+    /// The off-mesh links on the cached path (#462): `(i, link)` means the leg into
+    /// waypoint `i` crosses `link`.
+    #[serde(skip)]
+    pub path_links: Vec<(usize, OffMeshLinkData)>,
+    /// The link the agent is on now, if any (Unity's `isOnOffMeshLink`).
+    #[serde(skip)]
+    pub off_mesh_link: Option<OffMeshLinkData>,
+    /// How far (world units) auto-traversal has carried the agent along that link.
+    #[serde(skip)]
+    pub link_progress: f32,
 }
 
 impl NavMeshAgentComponent {
@@ -116,12 +133,16 @@ impl Default for NavMeshAgentComponent {
             velocity: Vec3::ZERO,
             avoidance_priority: DEFAULT_AVOIDANCE_PRIORITY,
             avoidance_enabled: true,
+            auto_traverse_off_mesh_link: true,
             cached_path: Vec::new(),
             path_cursor: 0,
             planned_target: Vec3::ZERO,
             path_generation: 0,
             frames_since_replan: 0,
             path_status: NavPathStatus::Invalid,
+            path_links: Vec::new(),
+            off_mesh_link: None,
+            link_progress: 0.0,
         }
     }
 }

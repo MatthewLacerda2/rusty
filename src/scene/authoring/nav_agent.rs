@@ -59,6 +59,12 @@ pub fn set_avoidance_enabled(a: &mut NavMeshAgentComponent, enabled: bool) {
     a.avoidance_enabled = enabled;
 }
 
+/// Set whether the engine moves the agent across off-mesh links itself (#462,
+/// Unity's `autoTraverseOffMeshLink`), or leaves it on the link for a script.
+pub fn set_auto_traverse_off_mesh_link(a: &mut NavMeshAgentComponent, auto: bool) {
+    a.auto_traverse_off_mesh_link = auto;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,6 +92,7 @@ mod tests {
         set_target(&mut e, Vec3::new(1.0, 0.0, 2.0));
         set_avoidance_priority(&mut e, 12.0);
         set_avoidance_enabled(&mut e, false);
+        set_auto_traverse_off_mesh_link(&mut e, false);
         let a = &*e;
         assert!(a.active);
         assert_eq!(a.speed, 3.5);
@@ -95,6 +102,7 @@ mod tests {
         assert_eq!(a.target, Vec3::new(1.0, 0.0, 2.0));
         assert_eq!(a.avoidance_priority, 12);
         assert!(!a.avoidance_enabled);
+        assert!(!a.auto_traverse_off_mesh_link);
     }
 
     #[test]

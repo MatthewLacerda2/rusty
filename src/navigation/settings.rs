@@ -63,6 +63,29 @@ pub struct NavMeshSettings {
     /// margin; an invalid override is ignored the same way (see `navigation::bounds`).
     #[serde(default)]
     pub bounds: Option<NavBounds>,
+    /// Auto-generated off-mesh links (#462, Unity's "Drop Height"): the furthest an
+    /// agent drops off a ledge onto the floor below. `0` (the default) makes no drop
+    /// links. See `navigation::offmesh`.
+    #[serde(default)]
+    pub drop_height: f32,
+    /// The widest gap a generated jump link crosses (Unity's "Jump Distance");
+    /// `0` (the default) makes no jump links across gaps.
+    #[serde(default)]
+    pub jump_distance: f32,
+    /// The highest ledge a generated jump link climbs onto (a box, a window sill);
+    /// `0` (the default) makes no jump links upward.
+    #[serde(default)]
+    pub jump_height: f32,
+    /// Generated links along one edge are thinned to one per this many world units.
+    #[serde(default = "default_link_spacing")]
+    pub link_spacing: f32,
+}
+
+/// Default spacing between generated links along one edge (world units).
+pub const DEFAULT_LINK_SPACING: f32 = 2.0;
+
+fn default_link_spacing() -> f32 {
+    DEFAULT_LINK_SPACING
 }
 
 fn default_agent_radius() -> f32 {
@@ -90,6 +113,10 @@ impl Default for NavMeshSettings {
             max_step: DEFAULT_MAX_STEP,
             grid_spacing: DEFAULT_GRID_SPACING,
             bounds: None,
+            drop_height: 0.0,
+            jump_distance: 0.0,
+            jump_height: 0.0,
+            link_spacing: DEFAULT_LINK_SPACING,
         }
     }
 }
@@ -142,6 +169,10 @@ mod tests {
                 min_z: -5.0,
                 max_z: 5.0,
             }),
+            drop_height: 4.0,
+            jump_distance: 1.5,
+            jump_height: 1.2,
+            link_spacing: 3.0,
         };
         let json = serde_json::to_string(&s).expect("serialize");
         let back: NavMeshSettings = serde_json::from_str(&json).expect("deserialize");

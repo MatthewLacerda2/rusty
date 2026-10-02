@@ -3,7 +3,7 @@
 //! Every first-class component must satisfy four axes that deliberately live in layers
 //! which don't depend on each other:
 //!   1. a field on `Entity` (`src/components/entity.rs`) — the discovery source,
-//!   2. an Add Component entry (`src/editor/inspector/components/add.rs`),
+//!   2. an Add Component entry (`src/editor/inspector/components/add/`),
 //!      guarding on absence through the #344 accessor facade,
 //!   3. an inspector card (some `src/editor/inspector/components/*.rs`) writing
 //!      through the facade's `_mut`/`set_` accessors,
@@ -44,11 +44,14 @@ mod axes;
 mod discover;
 mod waivers;
 
-use axes::{api_stems, editor_blob, has_add_menu, has_api, has_inspector, read, read_md_dir};
+use axes::{
+    add_menu_src, api_stems, editor_blob, has_add_menu, has_api, has_inspector, read, read_md_dir,
+};
 pub(crate) use discover::discover;
 use waivers::waived;
 
-const ADD_MENU: &str = "src/editor/inspector/components/add.rs";
+/// The Add Component menu: a module directory, every `.rs` under it.
+const ADD_MENU: &str = "src/editor/inspector/components/add";
 const API_MOD: &str = "src/api/mod.rs";
 const DOCS: &str = "docs/api";
 const BASELINE: &str = "tools/lint/components_baseline.txt";
@@ -60,7 +63,7 @@ const AXES: &[&str] = &["add_menu", "inspector", "api"];
 /// Entry point: discover every component and fail on any unbaselined missing axis.
 pub fn run() {
     let components = discover();
-    let add_src = read(ADD_MENU);
+    let add_src = add_menu_src();
     let editor_blob = editor_blob();
     let api_stems = api_stems();
     let api_mod = read(API_MOD);

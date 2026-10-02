@@ -21,7 +21,9 @@ use super::{
     RigidBodyComponent, ScriptComponent, SelectableComponent, TextComponent, TransformComponent,
     VisualCorrectionComponent,
 };
-use super::{BackdropFilterComponent, MaskComponent, NavMeshObstacleComponent};
+use super::{
+    BackdropFilterComponent, MaskComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
+};
 use super::{CharacterControllerComponent, JointComponent, LineComponent, LodGroupComponent};
 use super::{ReverbZoneComponent, SubEmitters, TrailComponent};
 
@@ -92,6 +94,9 @@ pub struct Entity {
     /// pre-#456 scenes.
     #[serde(default)]
     pub nav_obstacle: Option<NavMeshObstacleComponent>,
+    /// An authored off-mesh link (#462). `#[serde(default)]` for pre-#462 scenes.
+    #[serde(default)]
+    pub offmesh_link: Option<OffMeshLinkComponent>,
     pub camera: Option<CameraComponent>,
     pub visual_correction: Option<VisualCorrectionComponent>,
     #[serde(default)]
@@ -199,6 +204,7 @@ impl Entity {
             rigidbody: None,
             nav_agent: None,
             nav_obstacle: None,
+            offmesh_link: None,
             camera: None,
             visual_correction: None,
             particles: None,

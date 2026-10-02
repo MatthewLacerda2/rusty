@@ -6,7 +6,8 @@
 //!
 //! Split by responsibility: `trace` walks a straight line across linked spans (the
 //! raycast and the smoothing's visibility test), `smooth` string-pulls an A\* span
-//! path into corners, `sample` finds the nearest walkable point.
+//! path into corners (cut at every off-mesh link, #462, which it never pulls a
+//! string across), `sample` finds the nearest walkable point.
 
 mod sample;
 mod smooth;
@@ -19,7 +20,7 @@ use glam::Vec3;
 pub use crate::components::NavPathStatus;
 pub use trace::NavRaycastHit;
 
-use super::{NavigationGraph, SpanRef};
+use super::{NavigationGraph, OffMeshLinkData, SpanRef};
 
 /// A computed path: Unity's `NavMeshPath`. `corners` runs from the start to the end,
 /// both included, and only turns where something is in the way.
@@ -27,6 +28,9 @@ use super::{NavigationGraph, SpanRef};
 pub struct NavPath {
     pub status: NavPathStatus,
     pub corners: Vec<Vec3>,
+    /// The off-mesh links the path crosses (#462): `(i, link)` means the leg from
+    /// corner `i - 1` to corner `i` is `link`, from its start to its end.
+    pub links: Vec<(usize, OffMeshLinkData)>,
 }
 
 impl NavPath {
@@ -55,6 +59,7 @@ impl NavigationGraph {
             return NavPath {
                 status: NavPathStatus::Invalid,
                 corners: Vec::new(),
+                links: Vec::new(),
             };
         };
         let (spans, complete) = self.find_path_or_closest(start, goal);
@@ -64,13 +69,15 @@ impl NavigationGraph {
             Some(&end) => self.span_world(end),
             None => first,
         };
+        let (corners, links) = self.pull_route(&spans, first, last);
         NavPath {
             status: if complete {
                 NavPathStatus::Complete
             } else {
                 NavPathStatus::Partial
             },
-            corners: self.string_pull(&spans, first, last),
+            corners,
+            links,
         }
     }
 

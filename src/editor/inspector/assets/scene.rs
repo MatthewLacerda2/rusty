@@ -70,6 +70,7 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
                     .add(egui::Slider::new(&mut s.grid_spacing, 0.25..=4.0).text("Grid Spacing"))
                     .on_hover_text("Cell size; smaller = finer grid (re-shapes the grid)")
                     .changed();
+                changed |= draw_link_generation(ui, s);
                 changed | draw_nav_bounds(ui, &mut s.bounds, baked)
             };
             // Re-bake on apply through the shared bake path, so the knobs take effect
@@ -78,6 +79,46 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
                 nav.bake(scene);
             }
         });
+}
+
+/// The off-mesh link generation knobs (#462): drop height, jump distance and jump
+/// height (`0` turns each off), and the spacing between links along an edge — the
+/// same fields `Navigation.SetDropHeight` & co. write. Returns whether any changed.
+fn draw_link_generation(ui: &mut egui::Ui, s: &mut crate::navigation::NavMeshSettings) -> bool {
+    let rows = [
+        (
+            &mut s.drop_height,
+            0.0..=20.0,
+            "Drop Height",
+            "Generate drops off ledges up to this height (0: off)",
+        ),
+        (
+            &mut s.jump_distance,
+            0.0..=10.0,
+            "Jump Distance",
+            "Generate jumps across gaps up to this wide (0: off)",
+        ),
+        (
+            &mut s.jump_height,
+            0.0..=5.0,
+            "Jump Height",
+            "Generate jumps up ledges up to this high (0: off)",
+        ),
+        (
+            &mut s.link_spacing,
+            0.25..=10.0,
+            "Link Spacing",
+            "One generated link per this many metres of edge",
+        ),
+    ];
+    let mut changed = false;
+    for (value, range, label, hint) in rows {
+        changed |= ui
+            .add(egui::Slider::new(value, range).text(label))
+            .on_hover_text(hint)
+            .changed();
+    }
+    changed
 }
 
 /// The navmesh bounds (#452): the baked area read-out, plus an "Override Bounds" toggle

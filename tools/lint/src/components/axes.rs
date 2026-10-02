@@ -69,15 +69,22 @@ pub(super) fn api_stems() -> Vec<String> {
     out
 }
 
+/// Concatenate every source of the Add menu module (`ADD_MENU/**/*.rs`).
+pub(super) fn add_menu_src() -> String {
+    let mut files = Vec::new();
+    walk(Path::new(ADD_MENU), &mut files);
+    files.iter().map(read).collect::<Vec<_>>().join("\n")
+}
+
 /// Concatenate every `src/editor/` source EXCEPT the Add menu (so an add entry does
 /// not, by itself, satisfy the separate inspector-card axis).
 pub(super) fn editor_blob() -> String {
     let mut files = Vec::new();
     walk(Path::new(EDITOR_DIR), &mut files);
-    let add = normalize(Path::new(ADD_MENU));
+    let add = format!("{}/", normalize(Path::new(ADD_MENU)));
     files
         .iter()
-        .filter(|p| normalize(p) != add)
+        .filter(|p| !normalize(p).starts_with(&add))
         .map(read)
         .collect::<Vec<_>>()
         .join("\n")
