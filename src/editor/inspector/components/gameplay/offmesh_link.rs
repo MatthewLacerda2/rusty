@@ -27,6 +27,43 @@ fn write(
     *flags.1 = true;
 }
 
+/// The cost override and the area (#460) rows.
+fn draw_cost_and_area(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    l: &Link,
+    (d, b): (&mut bool, &mut bool),
+) {
+    let mut cost = l.cost_override;
+    let edited = ui
+        .horizontal(|ui| {
+            ui.label("Cost Override:");
+            ui.add(egui::DragValue::new(&mut cost).speed(0.1)).changed()
+        })
+        .inner;
+    if edited {
+        write(world, id, (&mut *d, &mut *b), |l| {
+            link_ops::set_cost_override(l, cost)
+        });
+    }
+    ui.label("Negative cost: the link's length at its area's cost");
+    let mut area = l.area;
+    let edited = ui
+        .horizontal(|ui| {
+            ui.label("Area:");
+            let max = (crate::navigation::MAX_AREAS - 1) as u8;
+            ui.add(egui::DragValue::new(&mut area).clamp_range(0..=max))
+                .changed()
+        })
+        .inner;
+    if edited {
+        write(world, id, (d, b), |l| {
+            link_ops::set_area(l, i64::from(area))
+        });
+    }
+}
+
 /// 3EM. OffMeshLink Component
 pub fn draw_offmesh_link(
     ui: &mut egui::Ui,
@@ -64,19 +101,7 @@ pub fn draw_offmesh_link(
                     link_ops::set_bidirectional(l, both)
                 });
             }
-            let mut cost = l.cost_override;
-            let edited = ui
-                .horizontal(|ui| {
-                    ui.label("Cost Override:");
-                    ui.add(egui::DragValue::new(&mut cost).speed(0.1)).changed()
-                })
-                .inner;
-            if edited {
-                write(world, id, (&mut *d, &mut *b), |l| {
-                    link_ops::set_cost_override(l, cost)
-                });
-            }
-            ui.label("Negative cost: the link's length");
+            draw_cost_and_area(ui, world, id, &l, (&mut *d, &mut *b));
         },
     );
     if remove {

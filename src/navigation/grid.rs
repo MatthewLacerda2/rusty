@@ -23,6 +23,9 @@ pub struct NavSpan {
     pub y: f32,
     /// World `y` of the underside of the next solid above, or `f32::INFINITY`.
     pub ceiling: f32,
+    /// The navigation area the span belongs to (#460): `WALKABLE_AREA` unless a
+    /// `NavMeshModifierVolume` assigned another at bake time.
+    pub area: u8,
 }
 
 /// A walkable span by position: its cell and its index into [`NavigationGraph::spans`].
@@ -67,11 +70,14 @@ pub struct NavigationGraph {
     pub max_slope: f32,
     /// Minimum open height a span (and a move between two spans) must offer.
     pub agent_height: f32,
-    /// Monotonic counter bumped on every `bake`. Agents stamp the generation
+    /// Monotonic counter bumped on every `bake` (and on an area cost change, #460). Agents stamp the generation
     /// their cached path was planned against (#126); a mismatch forces a re-plan,
     /// so a rebake (e.g. a moved static collider) transparently invalidates every
     /// stale agent path without `bake` needing mutable access to the scene.
     pub bake_generation: u64,
+    /// Each area's cost multiplier (#460), copied from the scene's area table at
+    /// bake time and refreshed by every `sync`: A\* reads costs here, never a rebake.
+    pub area_costs: [f32; super::MAX_AREAS],
     /// What the last bake kept to rebake incrementally (#456); `None` until the
     /// first bake.
     pub(super) bake_state: Option<Box<super::bake::BakeState>>,
@@ -90,6 +96,7 @@ impl NavigationGraph {
         let flat = NavSpan {
             y: 0.0,
             ceiling: f32::INFINITY,
+            area: super::WALKABLE_AREA,
         };
         Self {
             min_x,
@@ -105,6 +112,7 @@ impl NavigationGraph {
             max_slope: DEFAULT_MAX_SLOPE,
             agent_height: super::DEFAULT_AGENT_HEIGHT,
             bake_generation: 0,
+            area_costs: [super::MIN_AREA_COST; super::MAX_AREAS],
             bake_state: None,
             offmesh: Default::default(),
         }

@@ -67,6 +67,10 @@ pub struct NavMeshAgentComponent {
     /// floor instead of sinking half into it (#666).
     #[serde(default)]
     pub base_offset: f32,
+    /// The navigation areas the agent may enter (#460, Unity's `areaMask`): bit `i`
+    /// allows area `i`. Every area by default.
+    #[serde(default = "default_area_mask")]
+    pub area_mask: u32,
 
     // --- Cached pathfinding state (#126) ---
     //
@@ -124,6 +128,10 @@ fn default_avoidance_priority() -> u8 {
     DEFAULT_AVOIDANCE_PRIORITY
 }
 
+fn default_area_mask() -> u32 {
+    u32::MAX
+}
+
 fn default_true() -> bool {
     true
 }
@@ -142,6 +150,7 @@ impl Default for NavMeshAgentComponent {
             avoidance_enabled: true,
             auto_traverse_off_mesh_link: true,
             base_offset: 0.0,
+            area_mask: u32::MAX,
             cached_path: Vec::new(),
             path_cursor: 0,
             planned_target: Vec3::ZERO,

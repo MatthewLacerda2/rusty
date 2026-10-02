@@ -88,6 +88,22 @@ pub fn add_obstacle(scene: &mut Scene, center: Vec3, size: Vec3, carve: bool) ->
     id
 }
 
+/// A `NavMeshModifierVolume` box of `size` centred at `center`, assigning `area`.
+pub fn add_modifier(scene: &mut Scene, center: Vec3, size: Vec3, area: u8) -> u32 {
+    let id = scene.add_entity("modifier".to_string());
+    if let Some(mut t) = scene.world.transform_mut(id) {
+        t.position = center;
+    }
+    let v = crate::components::NavMeshModifierVolumeComponent {
+        center: Vec3::ZERO,
+        size,
+        area,
+        active: true,
+    };
+    scene.world.set_nav_modifier(id, Some(v));
+    id
+}
+
 /// Move entity `id` to `position`, keeping its collider's cached bounds current.
 pub fn move_to(scene: &mut Scene, id: u32, position: Vec3) {
     if let Some(mut t) = scene.world.transform_mut(id) {
@@ -96,14 +112,15 @@ pub fn move_to(scene: &mut Scene, id: u32, position: Vec3) {
     scene.update_entity_collider(id);
 }
 
-/// Assert two graphs hold the same spans in the same cells, bit for bit.
+/// Assert two graphs hold the same spans in the same cells, bit for bit, with the
+/// same areas (#460).
 pub fn assert_same_mesh(a: &NavigationGraph, b: &NavigationGraph) {
     assert_eq!(a.cell_start, b.cell_start, "per-cell span counts differ");
-    let bits = |g: &NavigationGraph| -> Vec<(u32, u32)> {
+    let bits = |g: &NavigationGraph| -> Vec<(u32, u32, u8)> {
         g.spans
             .iter()
-            .map(|s| (s.y.to_bits(), s.ceiling.to_bits()))
+            .map(|s| (s.y.to_bits(), s.ceiling.to_bits(), s.area))
             .collect()
     };
-    assert_eq!(bits(a), bits(b), "span heights differ");
+    assert_eq!(bits(a), bits(b), "span heights or areas differ");
 }

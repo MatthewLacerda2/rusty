@@ -268,6 +268,7 @@ One file per namespace, in reference order:
 - [`NavMeshAgent`](NavMeshAgent.md)
 - [`NavMeshObstacle`](NavMeshObstacle.md)
 - [`OffMeshLink`](OffMeshLink.md)
+- [`NavMeshModifierVolume`](NavMeshModifierVolume.md)
 - [`Physics`](Physics.md)
 - [`Joint`](Joint.md)
 - [`Ragdoll`](Ragdoll.md)

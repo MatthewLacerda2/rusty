@@ -20,6 +20,7 @@ pub struct AuthoredKey {
     pub end: Vec3,
     pub bidirectional: bool,
     pub cost_override: f32,
+    pub area: u8,
 }
 
 /// Every active link on an active entity, with its key, by ascending id.
@@ -38,6 +39,7 @@ pub fn authored_keys(scene: &Scene) -> Vec<(u32, AuthoredKey)> {
                 end,
                 bidirectional: link.bidirectional,
                 cost_override: link.cost_override,
+                area: link.area,
             };
             Some((id, key))
         })
@@ -64,6 +66,7 @@ impl NavigationGraph {
                     to: self.link_end(to),
                     bidirectional: k.bidirectional,
                     cost_override: k.cost_override,
+                    area: k.area,
                     owner: Some(id),
                 })
             })

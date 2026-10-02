@@ -8,7 +8,9 @@
 //! 2. `heightfield` — each column's solids merge; every walkable top with at least
 //!    `agent_height` of open space above it becomes a span. No solid, no span: there
 //!    is no implicit ground past the geometry (#666).
-//! 3. `carve` — carving `NavMeshObstacle`s cut their footprint out (#456).
+//! 3. `carve` — carving `NavMeshObstacle`s cut their footprint out (#456), then
+//!    `modifiers` — `NavMeshModifierVolume`s assign their area to the spans inside
+//!    them, and `NotWalkable` ones remove them (#460).
 //! 4. `erosion` — spans within `agent_radius` of the surface's edge are dropped.
 //! 5. off-mesh links (#462) — drops and jumps are generated along the ledges of the
 //!    result, and authored links snap onto it (`navigation::offmesh`).
@@ -25,6 +27,7 @@ mod columns;
 mod erosion;
 mod heightfield;
 mod inputs;
+mod modifiers;
 mod raster;
 mod region;
 mod state;
@@ -41,7 +44,8 @@ use super::obstacle::ObstacleVolume;
 use super::offmesh::{authored_keys, AuthoredKey, LinkParams};
 use super::NavigationGraph;
 use crate::scene::Scene;
-use inputs::{collider_keys, obstacle_keys, BakeInputs, Source};
+use inputs::{collider_keys, obstacle_keys, sources, BakeInputs, Source};
+use modifiers::{modifier_keys, ModifierVolume};
 
 impl NavigationGraph {
     /// Re-bake the walkable spans from the scene's static colliders, its carving
@@ -54,6 +58,7 @@ impl NavigationGraph {
         self.max_step = settings.max_step;
         self.max_slope = settings.max_slope;
         self.agent_height = settings.agent_height.max(0.0);
+        self.area_costs = super::cost_table(&settings.areas);
         // A new bake may change any span, so agents planned against an older one
         // re-plan (#126).
         self.bake_generation = self.bake_generation.wrapping_add(1);
@@ -64,7 +69,9 @@ impl NavigationGraph {
         let mut raw = self.empty_like();
         let ids: Vec<u32> = colliders.iter().map(|&(id, _)| id).collect();
         let volumes: Vec<&ObstacleVolume> = obstacles.iter().map(|(_, v)| v).collect();
-        let rects = raw.rebuild_raw(scene, &ids, &volumes, all);
+        let modifiers = modifier_keys(scene);
+        let boxes: Vec<&ModifierVolume> = modifiers.iter().map(|(_, v)| v).collect();
+        let rects = raw.rebuild_raw(scene, &ids, (&volumes, &boxes), all);
         let eroded = raw.eroded_columns(settings.agent_radius, all);
         self.cell_start = eroded.cell_start;
         self.spans = eroded.spans;
@@ -77,45 +84,36 @@ impl NavigationGraph {
         self.index_links();
 
         let colliders = colliders.into_iter().zip(rects);
-        let obstacles = obstacles.into_iter().map(|(id, v)| {
-            let rect = raster::footprint(&raw, &v.triangles().concat());
-            (id, v, rect)
-        });
         let inputs = BakeInputs {
             settings: settings.clone(),
             colliders: colliders
                 .map(|((id, key), rect)| Source { id, key, rect })
                 .collect(),
-            obstacles: obstacles
-                .map(|(id, key, rect)| Source { id, key, rect })
-                .collect(),
-            links: links
-                .into_iter()
-                .map(|(id, key)| Source {
-                    id,
-                    key,
-                    rect: link_rect(self, &key),
-                })
-                .collect(),
+            obstacles: sources(obstacles, |v| {
+                raster::footprint(&raw, &v.triangles().concat())
+            }),
+            modifiers: sources(modifiers, |v| v.footprint(&raw)),
+            links: sources(links, |k| link_rect(self, k)),
         };
         let mut state = BakeState { raw, inputs, log };
         state.log.record(self.bake_generation, None);
         self.bake_state = Some(Box::new(state));
     }
 
-    /// Rebuild the pre-erosion spans of `region` from the colliders `ids` and the
-    /// carving `obstacles` that reach it, and splice them in. Returns each
-    /// collider's footprint, in `ids` order.
+    /// Rebuild the pre-erosion spans of `region` from the colliders `ids`, the
+    /// carving obstacles and the modifier volumes that reach it, and splice them in.
+    /// Returns each collider's footprint, in `ids` order.
     fn rebuild_raw(
         &mut self,
         scene: &Scene,
         ids: &[u32],
-        obstacles: &[&ObstacleVolume],
+        (obstacles, modifiers): (&[&ObstacleVolume], &[&ModifierVolume]),
         region: CellRect,
     ) -> Vec<Option<CellRect>> {
         let (solids, rects) = raster::rasterize(self, scene, ids, region);
         let mut cols = self.build_columns(solids, region);
         carve::carve(self, &mut cols, region, obstacles);
+        modifiers::apply(self, &mut cols, region, modifiers);
         self.splice(region, &cols);
         rects
     }

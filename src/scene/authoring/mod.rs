@@ -35,6 +35,7 @@ pub mod line;
 pub mod lod_group;
 pub mod material;
 pub mod nav_agent;
+pub mod nav_modifier;
 pub mod nav_obstacle;
 pub mod offmesh_link;
 pub mod particles;

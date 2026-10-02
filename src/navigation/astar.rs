@@ -5,8 +5,14 @@
 //! the cost is horizontal travel plus the vertical climb, and the octile XZ
 //! heuristic stays admissible because the climb only ever adds cost. Off-mesh
 //! links (#462) are extra edges, costed never below the octile distance they span.
+//!
+//! Areas (#460): a step costs its distance times the mean cost of the two spans'
+//! areas (a diagonal at least the dearer cardinal it cuts past), a link its own cost (see `offmesh`), and a span or link whose area is not
+//! in the query's mask is never entered (the start span is exempt, so an agent
+//! standing in a forbidden area can still walk out). Every cost is at least 1, so
+//! the heuristic stays admissible.
 
-use super::{NavigationGraph, SpanRef};
+use super::{in_mask, NavSpan, NavigationGraph, SpanRef, ALL_AREAS, MIN_AREA_COST};
 use glam::Vec3;
 use std::collections::BinaryHeap;
 
@@ -98,6 +104,16 @@ impl NavigationGraph {
     /// distance, then least cost, then lowest index, so the choice is deterministic.
     /// The flag says whether the path reaches `goal`.
     pub fn find_path_or_closest(&self, start: SpanRef, goal: SpanRef) -> (Vec<SpanRef>, bool) {
+        self.find_path_masked(start, goal, ALL_AREAS)
+    }
+
+    /// [`Self::find_path_or_closest`] entering only the areas in `mask` (#460).
+    pub fn find_path_masked(
+        &self,
+        start: SpanRef,
+        goal: SpanRef,
+        mask: u32,
+    ) -> (Vec<SpanRef>, bool) {
         if start == goal {
             return (vec![start], true);
         }
@@ -122,41 +138,52 @@ impl NavigationGraph {
             if key < (closest.0, closest.1, closest.2.index) {
                 closest = (h, current.g_score, current.node);
             }
-            self.expand(current, goal, &mut frontier);
+            self.expand(current, goal, mask, &mut frontier);
         }
         (reconstruct_path(&frontier.came_from, closest.2), false)
     }
 
     /// Relax every span `current` can move to. The cardinal links are found once and
-    /// reused as the corner-cutting check for the diagonals (`neighbour`'s rule).
-    fn expand(&self, current: NodeState, goal: SpanRef, frontier: &mut Frontier) {
+    /// reused as the corner-cutting check for the diagonals (`neighbour`'s rule). A
+    /// diagonal cuts past both cardinal cells, so it pays at least the dearer of their
+    /// area costs: a path never shaves the corner of an area it routes around.
+    fn expand(&self, current: NodeState, goal: SpanRef, mask: u32, frontier: &mut Frontier) {
         let here = current.node;
-        let y = self.spans[here.index as usize].y;
-        let card = |dx: i32, dz: i32| self.link_to(here, here.gx + dx, here.gz + dz);
-        let (east, west, north, south) = (card(1, 0), card(-1, 0), card(0, 1), card(0, -1));
+        let NavSpan { y, area, .. } = self.spans[here.index as usize];
+        let step = |dx: i32, dz: i32| {
+            let to = self.link_to(here, here.gx + dx, here.gz + dz)?;
+            in_mask(mask, self.spans[to.index as usize].area).then_some(to)
+        };
+        let (east, west, north, south) = (step(1, 0), step(-1, 0), step(0, 1), step(0, -1));
+        let cost_of = |s: SpanRef| self.area_cost(self.spans[s.index as usize].area);
         for &(dx, dz, horiz) in &DIRS {
-            let next = match (dx, dz) {
-                (1, 0) => east,
-                (-1, 0) => west,
-                (0, 1) => north,
-                (0, -1) => south,
+            let (next, corner) = match (dx, dz) {
+                (1, 0) => (east, MIN_AREA_COST),
+                (-1, 0) => (west, MIN_AREA_COST),
+                (0, 1) => (north, MIN_AREA_COST),
+                (0, -1) => (south, MIN_AREA_COST),
                 _ => {
-                    let x_open = if dx > 0 { east } else { west }.is_some();
-                    let z_open = if dz > 0 { north } else { south }.is_some();
-                    if !(x_open && z_open) {
+                    let x = if dx > 0 { east } else { west };
+                    let z = if dz > 0 { north } else { south };
+                    let (Some(x), Some(z)) = (x, z) else {
                         continue;
-                    }
-                    self.link_to(here, here.gx + dx, here.gz + dz)
+                    };
+                    (step(dx, dz), cost_of(x).max(cost_of(z)))
                 }
             };
             let Some(next) = next else {
                 continue;
             };
-            let dh = (self.spans[next.index as usize].y - y).abs();
-            relax(frontier, here, next, current.g_score + horiz + dh, goal);
+            let to = self.spans[next.index as usize];
+            let cost = (0.5 * (self.area_cost(area) + cost_of(next))).max(corner);
+            let g = current.g_score + (horiz + (to.y - y).abs()) * cost;
+            relax(frontier, here, next, g, goal);
         }
         for link in self.link_moves(here) {
-            relax(frontier, here, link.to, current.g_score + link.cost, goal);
+            let lands = self.spans[link.to.index as usize].area;
+            if in_mask(mask, link.area) && in_mask(mask, lands) {
+                relax(frontier, here, link.to, current.g_score + link.cost, goal);
+            }
         }
     }
 }

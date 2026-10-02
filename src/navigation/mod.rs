@@ -5,7 +5,7 @@
 //! storage), `bounds` (the XZ area the grid covers, resolved from the scene, #452),
 //! `bake` (rasterise → spans → agent-radius erosion), `links` (which span a move
 //! reaches), `snap` (which span a world point means), `astar` (the span search),
-//! `offmesh` (drop, jump and authored links between spans, #462),
+//! `areas` (per-span area ids, their costs and agent masks, #460), `offmesh` (drop, jump and authored links between spans, #462),
 //! `path` (smoothed paths, `SamplePosition`, `Raycast`), `agents` (cached-path planning + the steering tick), and
 //! `avoidance` (ORCA local avoidance between agents, #463) — all hanging off the
 //! single re-exported [`NavigationGraph`] type.
@@ -15,6 +15,7 @@
 #![deny(clippy::unwrap_used)]
 
 mod agents;
+mod areas;
 mod astar;
 #[cfg(test)]
 mod astar_tests;
@@ -36,6 +37,10 @@ pub(crate) mod test_support;
 pub use agents::complete_off_mesh_link;
 pub use agents::state::{
     is_at_target, remaining_corners, remaining_distance, reset_path, WARP_SNAP_DISTANCE,
+};
+pub use areas::{
+    area_index, clamp_cost, cost_table, default_areas, in_mask, NavArea, ALL_AREAS, MAX_AREAS,
+    MIN_AREA_COST, NOT_WALKABLE_AREA, WALKABLE_AREA,
 };
 pub use bake::{CellRect, Rebake};
 pub use bounds::{NavBounds, BOUNDS_MARGIN, EMPTY_SCENE_HALF_EXTENT};

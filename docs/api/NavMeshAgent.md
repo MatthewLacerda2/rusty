@@ -26,6 +26,16 @@ Per-entity navmesh agent control.
 | `NavMeshAgent.GetCurrentOffMeshLink` | `(id)` | the link it is on, as a link table (see `Navigation`), or `nil` |
 | `NavMeshAgent.CompleteOffMeshLink` | `(id)` | `bool` — puts the agent on the link's end and resumes its path; `false` when it is on no link |
 | `NavMeshAgent.GetAutoTraverseOffMeshLink` / `SetAutoTraverseOffMeshLink` | `(id)` / `(id, bool)` | whether the engine crosses links for it (default `true`) |
+| `NavMeshAgent.GetAreaMask` / `SetAreaMask` | `(id)` / `(id, mask)` | the areas it may enter (Unity's `areaMask`): bit `i` allows area `i`; `-1` (the default) is every area. A new mask re-plans on the next tick |
+
+### Areas (#460)
+
+The agent's path is planned with its **area mask** and the scene's area **costs** (see
+`Navigation`, *Areas and costs*): it never steps onto a floor or crosses a link whose area
+the mask excludes, and it prefers cheap areas, crossing a costly one only when that is
+still the cheapest way. A target in an excluded area gives a `partial` path. A runtime
+cost change (`Navigation.SetAreaCost`) makes every agent re-plan on its next tick. To
+make a bot avoid a zone entirely: `NavMeshAgent.SetAreaMask(id, -1 ~ (1 << area))`.
 
 ### Following a path (#458)
 

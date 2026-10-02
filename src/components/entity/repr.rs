@@ -18,7 +18,9 @@ use crate::components::{
     TransformComponent, VisualCorrectionComponent,
 };
 use crate::components::{BackdropFilterComponent, MaskComponent};
-use crate::components::{NavMeshObstacleComponent, OffMeshLinkComponent};
+use crate::components::{
+    NavMeshModifierVolumeComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
+};
 
 /// On-disk shape used only for deserialization, so old single-`script` scenes
 /// (pre-#83) keep loading. It accepts both the new `scripts: Vec<…>` and the
@@ -55,6 +57,8 @@ pub(super) struct EntityRepr {
     nav_obstacle: Option<NavMeshObstacleComponent>,
     #[serde(default)]
     offmesh_link: Option<OffMeshLinkComponent>,
+    #[serde(default)]
+    nav_modifier: Option<NavMeshModifierVolumeComponent>,
     camera: Option<CameraComponent>,
     visual_correction: Option<VisualCorrectionComponent>,
     /// Read through the pre-#439 `size_end` migration.
@@ -106,14 +110,21 @@ pub(super) struct EntityRepr {
     children: Vec<u32>,
 }
 
+/// Migrate a pre-#83 single `script` into the plural vec, ahead of any (normally
+/// empty) new-format scripts, so legacy attachments still run.
+fn migrate_scripts(
+    mut scripts: Vec<ScriptComponent>,
+    legacy: Option<ScriptComponent>,
+) -> Vec<ScriptComponent> {
+    if let Some(legacy) = legacy {
+        scripts.insert(0, legacy);
+    }
+    scripts
+}
+
 impl From<EntityRepr> for Entity {
     fn from(r: EntityRepr) -> Self {
-        let mut scripts = r.scripts;
-        // Migrate a pre-#83 single `script` into the plural vec, ahead of any
-        // (normally empty) new-format scripts, so legacy attachments still run.
-        if let Some(legacy) = r.script {
-            scripts.insert(0, legacy);
-        }
+        let scripts = migrate_scripts(r.scripts, r.script);
         let (material, pending_material) = migrate_material(r.id, r.material, r.texture);
         Self {
             id: r.id,
@@ -133,6 +144,7 @@ impl From<EntityRepr> for Entity {
             nav_agent: r.nav_agent,
             nav_obstacle: r.nav_obstacle,
             offmesh_link: r.offmesh_link,
+            nav_modifier: r.nav_modifier,
             camera: r.camera,
             visual_correction: r.visual_correction,
             particles: r.particles.map(ParticleEmitterComponent::from),

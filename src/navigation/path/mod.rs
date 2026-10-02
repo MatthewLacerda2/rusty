@@ -9,6 +9,8 @@
 //! path into corners (cut at every off-mesh link, #462, which it never pulls a
 //! string across), `sample` finds the nearest walkable point.
 
+#[cfg(test)]
+mod area_tests;
 mod sample;
 mod smooth;
 #[cfg(test)]
@@ -20,7 +22,7 @@ use glam::Vec3;
 pub use crate::components::NavPathStatus;
 pub use trace::NavRaycastHit;
 
-use super::{NavigationGraph, OffMeshLinkData, SpanRef};
+use super::{NavigationGraph, OffMeshLinkData, SpanRef, ALL_AREAS};
 
 /// A computed path: Unity's `NavMeshPath`. `corners` runs from the start to the end,
 /// both included, and only turns where something is in the way.
@@ -64,17 +66,24 @@ impl NavigationGraph {
     /// the nearest reachable span instead (`Partial`), and when either end has no
     /// navmesh nearby there is no path (`Invalid`, no corners).
     pub fn calculate_path(&self, from: Vec3, to: Vec3) -> NavPath {
+        self.calculate_path_masked(from, to, ALL_AREAS)
+    }
+
+    /// [`Self::calculate_path`] entering only the areas in `mask` (#460). The ends
+    /// snap as usual; a target in an excluded area gives a `Partial` path to the
+    /// nearest point the agent may reach.
+    pub fn calculate_path_masked(&self, from: Vec3, to: Vec3, mask: u32) -> NavPath {
         let (Some(start), Some(goal)) = (self.snap(from), self.snap(to)) else {
             return NavPath::invalid();
         };
-        let (spans, complete) = self.find_path_or_closest(start, goal);
+        let (spans, complete) = self.find_path_masked(start, goal, mask);
         let first = self.point_on_span(from, start);
         let last = match spans.last() {
             Some(&end) if complete => self.point_on_span(to, end),
             Some(&end) => self.span_world(end),
             None => first,
         };
-        let (corners, links) = self.pull_route(&spans, first, last);
+        let (corners, links) = self.pull_route(&spans, (first, last), mask);
         NavPath {
             status: if complete {
                 NavPathStatus::Complete

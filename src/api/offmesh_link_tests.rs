@@ -53,6 +53,7 @@ fn setters_write_through_the_shared_ops_and_getters_read_back() {
              OffMeshLink.SetBidirectional(id, false)
              OffMeshLink.SetCost(id, -5)
              OffMeshLink.SetActive(id, false)
+             OffMeshLink.SetArea(id, 2)
              OffMeshLink.SetCost(bare, 3)",
         )
         .exec()?;
@@ -64,6 +65,8 @@ fn setters_write_through_the_shared_ops_and_getters_read_back() {
             .load("return OffMeshLink.GetActive(id), OffMeshLink.GetBidirectional(id), OffMeshLink.GetCost(id)")
             .eval()?;
         assert_eq!(flags, (false, false, -1.0), "a negative cost means the length");
+        let area: u8 = lua.load("return OffMeshLink.GetArea(id)").eval()?;
+        assert_eq!(area, 2);
         let none: (bool, f32, bool) = lua
             .load("return OffMeshLink.GetActive(bare), OffMeshLink.GetCost(bare), OffMeshLink.IsConnected(bare)")
             .eval()?;

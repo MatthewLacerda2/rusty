@@ -55,7 +55,8 @@ entity carrying only its mandatory `Transform` — the menu's **Create Empty**.
 **`kind`** is one of the Add Component menu's first-class components,
 case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `Texture` (alias `Material`), `NavMeshAgent`, `NavMeshObstacle` (alias
-`NavObstacle`), `OffMeshLink` (alias `NavMeshLink`), `Camera`, `Particles`,
+`NavObstacle`), `OffMeshLink` (alias `NavMeshLink`), `NavMeshModifierVolume` (alias
+`NavModifier`), `Camera`, `Particles`,
 `VisualCorrection`, `Audio` (alias `AudioSource`), `AudioReverbZone` (alias
 `ReverbZone`), `Canvas`, `RectTransform`,
 `Image`, `CanvasGroup`, `RectMask` (alias `RectMask2D`), `Mask`,

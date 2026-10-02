@@ -1,10 +1,13 @@
-//! src/api/snapshot/navigation.rs — the NavMeshObstacle (#456) and OffMeshLink
-//! (#462) snapshots, apart from `components.rs` to keep it under the size cap.
+//! src/api/snapshot/navigation.rs — the NavMeshObstacle (#456), OffMeshLink (#462)
+//! and NavMeshModifierVolume (#460) snapshots, apart from `components.rs` to keep it
+//! under the size cap.
 
 use serde_json::{json, Value};
 
 use super::vec3;
-use crate::components::{NavMeshObstacleComponent, OffMeshLinkComponent};
+use crate::components::{
+    NavMeshModifierVolumeComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
+};
 
 /// NavMeshObstacle: its shape, its carving options, and whether it carves now.
 pub(crate) fn nav_obstacle_value(o: &NavMeshObstacleComponent) -> Value {
@@ -32,5 +35,16 @@ pub(crate) fn offmesh_link_value(l: &OffMeshLinkComponent) -> Value {
         "end": vec3(l.end),
         "bidirectional": l.bidirectional,
         "cost_override": l.cost_override,
+        "area": l.area,
+    })
+}
+
+/// NavMeshModifierVolume: its local box and the area it assigns.
+pub(crate) fn nav_modifier_value(v: &NavMeshModifierVolumeComponent) -> Value {
+    json!({
+        "active": v.active,
+        "center": vec3(v.center),
+        "size": vec3(v.size),
+        "area": v.area,
     })
 }

@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod image;
 pub mod model;
+mod nav_areas;
 pub mod prefab;
 pub mod scene;
 pub mod script;

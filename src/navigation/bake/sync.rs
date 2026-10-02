@@ -2,9 +2,9 @@
 //!
 //! [`NavigationGraph::sync`] runs every play tick in place of the old full rebake
 //! every 60 frames. It diffs the scene against the inputs the last bake read
-//! (`inputs`): nothing changed costs one pass over the static colliders and the
-//! obstacles. A changed collider or obstacle dirties the cells its old and new
-//! footprints cover; overlapping dirty rectangles merge. Each rectangle's
+//! (`inputs`): nothing changed costs one pass over the static colliders, the
+//! obstacles and the modifier volumes (#460). A changed one dirties the cells
+//! its old and new footprints cover; overlapping dirty rectangles merge. Each rectangle's
 //! pre-erosion columns are rebuilt and spliced in, then erosion re-runs over the
 //! rectangles grown by its reach, and those cells of the final graph are spliced.
 //!
@@ -17,6 +17,7 @@
 use super::super::NavigationGraph;
 use super::erosion;
 use super::inputs::{collider_keys, diff, obstacle_keys};
+use super::modifiers::{modifier_keys, ModifierVolume};
 use super::raster;
 use super::region::{merge_overlapping, CellRect};
 use super::{link_rect, BakeState, ObstacleVolume};
@@ -40,10 +41,16 @@ impl NavigationGraph {
     /// inputs changed since the last bake. A graph that was never baked, or whose
     /// settings, bounds or spacing changed, is baked in full. The result is the
     /// same graph a full [`Self::bake`] of `scene` gives.
+    ///
+    /// Area costs (#460) are not a bake input: a changed cost is adopted here
+    /// without rebaking anything, and only makes cached agent paths stale.
     pub fn sync(&mut self, scene: &Scene) -> Rebake {
         let current = self.bake_state.as_ref().is_some_and(|st| {
-            st.inputs.settings == scene.nav_settings && !self.needs_reshape(scene)
+            st.inputs.settings.bakes_like(&scene.nav_settings) && !self.needs_reshape(scene)
         });
+        if current {
+            self.set_area_costs(&scene.nav_settings.areas);
+        }
         let Some(mut st) = self.bake_state.take().filter(|_| current) else {
             self.bake(scene);
             return Rebake::Full;
@@ -81,7 +88,8 @@ impl NavigationGraph {
         for &r in &regions {
             let ids = st.inputs.collider_ids_in(r);
             let volumes = st.inputs.obstacles_in(r);
-            st.raw.rebuild_raw(scene, &ids, &volumes, r);
+            let boxes = st.inputs.modifiers_in(r);
+            st.raw.rebuild_raw(scene, &ids, (&volumes, &boxes), r);
         }
         let radius = scene.nav_settings.agent_radius;
         let reach = erosion::reach(radius, self.grid_spacing);
@@ -138,8 +146,16 @@ impl BakeState {
             obstacle_rect,
             &mut dirty,
         );
+        let modifier_rect = |_: u32, v: &ModifierVolume| v.footprint(raw);
+        let modifiers = diff(
+            &self.inputs.modifiers,
+            modifier_keys(scene),
+            modifier_rect,
+            &mut dirty,
+        );
         self.inputs.colliders = colliders;
         self.inputs.obstacles = obstacles;
+        self.inputs.modifiers = modifiers;
         dirty
     }
 

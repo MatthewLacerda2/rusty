@@ -164,6 +164,7 @@ impl NavigationGraph {
                     to: self.link_end(t),
                     bidirectional: false,
                     cost_override: -1.0,
+                    area: super::super::WALKABLE_AREA,
                     owner: None,
                 });
             }

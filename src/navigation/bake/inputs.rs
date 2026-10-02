@@ -1,7 +1,8 @@
 //! src/navigation/bake/inputs.rs — what the last bake read, to find what changed (#456).
 //!
 //! The bake's inputs are the static colliders (shape + world pose), the carving
-//! obstacles (their [`ObstacleVolume`]) and the scene's `nav_settings`. The bake
+//! obstacles (their [`ObstacleVolume`]), the area modifier volumes (#460) and the
+//! scene's `nav_settings`. The bake
 //! keeps a record of each input with the cells it covered. Diffing that record
 //! against the scene marks a collider or obstacle that was added, removed, moved,
 //! resized or toggled: its old cells and its new cells are dirty. Records are kept
@@ -17,6 +18,7 @@ use super::super::bounds::static_collider_ids;
 use super::super::obstacle::{carving_volumes, ObstacleVolume};
 use super::super::offmesh::AuthoredKey;
 use super::super::NavMeshSettings;
+use super::modifiers::ModifierVolume;
 use super::region::CellRect;
 use crate::components::ColliderShape;
 use crate::scene::Scene;
@@ -41,6 +43,8 @@ pub(super) struct BakeInputs {
     pub settings: NavMeshSettings,
     pub colliders: Vec<Source<ColliderKey>>,
     pub obstacles: Vec<Source<ObstacleVolume>>,
+    /// Area modifier volumes (#460).
+    pub modifiers: Vec<Source<ModifierVolume>>,
     /// Authored off-mesh links (#462); they change links, never spans.
     pub links: Vec<Source<AuthoredKey>>,
 }
@@ -59,6 +63,11 @@ impl BakeInputs {
     /// The carving obstacles whose recorded cells reach `region`.
     pub fn obstacles_in(&self, region: CellRect) -> Vec<&ObstacleVolume> {
         touching(&self.obstacles, region).map(|s| &s.key).collect()
+    }
+
+    /// The modifier volumes whose recorded cells reach `region`.
+    pub fn modifiers_in(&self, region: CellRect) -> Vec<&ModifierVolume> {
+        touching(&self.modifiers, region).map(|s| &s.key).collect()
     }
 }
 
@@ -84,6 +93,20 @@ pub(super) fn collider_keys(scene: &Scene) -> Vec<(u32, ColliderKey)> {
 /// The carving obstacles with their volumes, by ascending id.
 pub(super) fn obstacle_keys(scene: &Scene) -> Vec<(u32, ObstacleVolume)> {
     carving_volumes(scene)
+}
+
+/// Fresh records of `keys`, each with the cells `rect_of` measures for it.
+pub(super) fn sources<K>(
+    keys: Vec<(u32, K)>,
+    mut rect_of: impl FnMut(&K) -> Option<CellRect>,
+) -> Vec<Source<K>> {
+    keys.into_iter()
+        .map(|(id, key)| Source {
+            id,
+            rect: rect_of(&key),
+            key,
+        })
+        .collect()
 }
 
 /// Diff the records `old` against the current keys `new` (both by ascending id).

@@ -25,7 +25,7 @@ use super::{
     BackdropFilterComponent, MaskComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
 };
 use super::{CharacterControllerComponent, JointComponent, LineComponent, LodGroupComponent};
-use super::{ReverbZoneComponent, SubEmitters, TrailComponent};
+use super::{NavMeshModifierVolumeComponent, ReverbZoneComponent, SubEmitters, TrailComponent};
 
 /// The live link from an instance entity back to the `.prefab` it was stamped from
 /// (#216). Set on EVERY entity of a linked instance — not just the root — so that
@@ -97,6 +97,9 @@ pub struct Entity {
     /// An authored off-mesh link (#462). `#[serde(default)]` for pre-#462 scenes.
     #[serde(default)]
     pub offmesh_link: Option<OffMeshLinkComponent>,
+    /// A navigation-area modifier volume (#460). `#[serde(default)]` for pre-#460 scenes.
+    #[serde(default)]
+    pub nav_modifier: Option<NavMeshModifierVolumeComponent>,
     pub camera: Option<CameraComponent>,
     pub visual_correction: Option<VisualCorrectionComponent>,
     #[serde(default)]
@@ -205,6 +208,7 @@ impl Entity {
             nav_agent: None,
             nav_obstacle: None,
             offmesh_link: None,
+            nav_modifier: None,
             camera: None,
             visual_correction: None,
             particles: None,

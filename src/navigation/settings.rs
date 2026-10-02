@@ -12,6 +12,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::areas::{default_areas, NavArea};
 use super::bounds::NavBounds;
 use super::grid::{DEFAULT_GRID_SPACING, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP};
 
@@ -79,6 +80,23 @@ pub struct NavMeshSettings {
     /// Generated links along one edge are thinned to one per this many world units.
     #[serde(default = "default_link_spacing")]
     pub link_spacing: f32,
+    /// The area table (#460): area `i` is row `i`, with its name and cost multiplier.
+    /// Up to `MAX_AREAS` rows; rows 0 and 1 are the built-in `Walkable` and
+    /// `NotWalkable`. Costs are read at search time, so the table is not a bake input.
+    #[serde(default = "default_areas")]
+    pub areas: Vec<NavArea>,
+}
+
+impl NavMeshSettings {
+    /// Whether a bake with `other` gives the same spans and links as one with these:
+    /// everything but the area table (costs are read at search time) is equal.
+    pub fn bakes_like(&self, other: &Self) -> bool {
+        let strip = |s: &Self| Self {
+            areas: Vec::new(),
+            ..s.clone()
+        };
+        strip(self) == strip(other)
+    }
 }
 
 /// Default spacing between generated links along one edge (world units).
@@ -117,6 +135,7 @@ impl Default for NavMeshSettings {
             jump_distance: 0.0,
             jump_height: 0.0,
             link_spacing: DEFAULT_LINK_SPACING,
+            areas: default_areas(),
         }
     }
 }
@@ -136,6 +155,17 @@ mod tests {
         assert_eq!(d.agent_radius, DEFAULT_AGENT_RADIUS);
         assert_eq!(d.agent_height, DEFAULT_AGENT_HEIGHT);
         assert_eq!(d.bounds, None, "bounds derive from the scene by default");
+        assert_eq!(d.areas, default_areas());
+    }
+
+    /// The area table never forces a rebake: costs are read at search time (#460).
+    #[test]
+    fn the_area_table_is_not_a_bake_input() {
+        let mut a = NavMeshSettings::default();
+        a.areas[0].cost = 5.0;
+        assert!(a.bakes_like(&NavMeshSettings::default()));
+        a.max_step = 0.3;
+        assert!(!a.bakes_like(&NavMeshSettings::default()));
     }
 
     /// A JSON object missing every field deserializes to the defaults (back-compat).
@@ -173,6 +203,7 @@ mod tests {
             jump_distance: 1.5,
             jump_height: 1.2,
             link_spacing: 3.0,
+            areas: default_areas(),
         };
         let json = serde_json::to_string(&s).expect("serialize");
         let back: NavMeshSettings = serde_json::from_str(&json).expect("deserialize");

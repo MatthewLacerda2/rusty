@@ -13,7 +13,7 @@ use super::components::{
     mesh_value, nav_agent_value, particle_value, rigidbody_value,
 };
 use super::components::{joint_value, line_value, lod_group_value, trail_value};
-use super::navigation::{nav_obstacle_value, offmesh_link_value};
+use super::navigation::{nav_modifier_value, nav_obstacle_value, offmesh_link_value};
 use super::ui::{backdrop_filter_value, mask_value};
 use super::ui::{
     canvas_group_value, canvas_value, image_value, layout_element_value, layout_group_value,
@@ -33,7 +33,7 @@ pub(super) fn component_fields(scene: &Scene, id: u32) -> impl Iterator<Item = F
 }
 
 /// Rendering, physics, navigation, animation and audio.
-fn world_fields(scene: &Scene, id: u32) -> [Field; 13] {
+fn world_fields(scene: &Scene, id: u32) -> [Field; 14] {
     let w = &scene.world;
     [
         ("mesh", w.mesh(id).map(|m| mesh_value(&m))),
@@ -50,6 +50,10 @@ fn world_fields(scene: &Scene, id: u32) -> [Field; 13] {
         (
             "offmesh_link",
             w.offmesh_link(id).map(|l| offmesh_link_value(&l)),
+        ),
+        (
+            "nav_modifier",
+            w.nav_modifier(id).map(|v| nav_modifier_value(&v)),
         ),
         ("particles", w.particles(id).map(|p| particle_value(&p))),
         ("animator", w.animator(id).map(|a| animator_value(&a))),
