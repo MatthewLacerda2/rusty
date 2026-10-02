@@ -4,8 +4,8 @@
 
 use glam::Vec2;
 
-use super::fixture::{button, scene, Handlers, Rig};
-use super::UiHook::*;
+use super::super::fixture::{button, scene, Handlers, Rig};
+use super::super::UiHook::*;
 use super::{nav_actions, NavAction};
 use crate::components::NavigationMode;
 
