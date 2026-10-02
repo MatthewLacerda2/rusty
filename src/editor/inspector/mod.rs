@@ -119,7 +119,8 @@ impl PendingEdits {
             let _ = scene.set_parent(id, new_parent);
         }
         if self.nav_bake {
-            nav.bake(scene);
+            // Incremental when only colliders/obstacles changed (#456).
+            nav.sync(scene);
         }
     }
 }
@@ -282,7 +283,7 @@ fn draw_components(
     gameplay::draw_animator(ui, world, id, &mut editor.is_dirty);
     gameplay::draw_collider(ui, world, id, &mut editor.is_dirty, pending_nav_bake);
     gameplay::draw_bodies(ui, world, id, &mut editor.is_dirty);
-    gameplay::draw_nav_agent(ui, world, id, &mut editor.is_dirty);
+    gameplay::draw_navigation(ui, world, id, &mut editor.is_dirty, pending_nav_bake);
 
     camera::draw_camera(ui, world, id, named_layers, &mut editor.is_dirty);
     camera::draw_visual_correction(ui, world, id, &mut editor.is_dirty);

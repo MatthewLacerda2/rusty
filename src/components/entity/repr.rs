@@ -7,6 +7,7 @@ use serde::Deserialize;
 
 use super::{Entity, PrefabLink};
 use crate::components::particle::LegacyEmitter;
+use crate::components::NavMeshObstacleComponent;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, CharacterControllerComponent, ColliderComponent, ImageComponent,
@@ -49,6 +50,8 @@ pub(super) struct EntityRepr {
     collider: Option<ColliderComponent>,
     rigidbody: Option<RigidBodyComponent>,
     nav_agent: Option<NavMeshAgentComponent>,
+    #[serde(default)]
+    nav_obstacle: Option<NavMeshObstacleComponent>,
     camera: Option<CameraComponent>,
     visual_correction: Option<VisualCorrectionComponent>,
     /// Read through the pre-#439 `size_end` migration.
@@ -123,6 +126,7 @@ impl From<EntityRepr> for Entity {
             collider: r.collider,
             rigidbody: r.rigidbody,
             nav_agent: r.nav_agent,
+            nav_obstacle: r.nav_obstacle,
             camera: r.camera,
             visual_correction: r.visual_correction,
             particles: r.particles.map(ParticleEmitterComponent::from),

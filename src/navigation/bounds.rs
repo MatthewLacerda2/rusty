@@ -183,13 +183,7 @@ impl NavigationGraph {
     /// pass re-fills them either way. An out-of-range spacing (≤ 0, non-finite) keeps the
     /// current one, so the bake stays a total, panic-free function.
     pub(super) fn reshape_for(&mut self, scene: &Scene) {
-        let spacing = scene.nav_settings.grid_spacing;
-        let spacing = if spacing.is_finite() && spacing > 0.0 {
-            spacing
-        } else {
-            self.grid_spacing
-        };
-        let b = resolve_bounds(scene, spacing);
+        let (b, spacing) = self.target_shape(scene);
         if b == self.bounds() && spacing == self.grid_spacing {
             return;
         }
@@ -197,5 +191,22 @@ impl NavigationGraph {
             bake_generation: self.bake_generation,
             ..Self::new(b.min_x, b.max_x, b.min_z, b.max_z, spacing)
         };
+    }
+
+    /// Whether a bake of `scene` would re-shape the grid (#456: then only a full
+    /// bake will do).
+    pub(super) fn needs_reshape(&self, scene: &Scene) -> bool {
+        self.target_shape(scene) != (self.bounds(), self.grid_spacing)
+    }
+
+    /// The bounds and spacing a bake of `scene` covers.
+    fn target_shape(&self, scene: &Scene) -> (NavBounds, f32) {
+        let spacing = scene.nav_settings.grid_spacing;
+        let spacing = if spacing.is_finite() && spacing > 0.0 {
+            spacing
+        } else {
+            self.grid_spacing
+        };
+        (resolve_bounds(scene, spacing), spacing)
     }
 }

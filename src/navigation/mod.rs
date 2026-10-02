@@ -24,6 +24,7 @@ mod bounds;
 mod bounds_tests;
 mod grid;
 mod links;
+mod obstacle;
 mod path;
 mod settings;
 mod snap;
@@ -31,10 +32,12 @@ mod snap;
 pub(crate) mod test_support;
 
 pub use agents::state::{remaining_corners, remaining_distance, reset_path, WARP_SNAP_DISTANCE};
+pub use bake::{CellRect, Rebake};
 pub use bounds::{NavBounds, BOUNDS_MARGIN, EMPTY_SCENE_HALF_EXTENT};
 pub use grid::{
     NavSpan, NavigationGraph, SpanRef, DEFAULT_GRID_SPACING, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP,
 };
+pub use obstacle::{tick_obstacles, ObstacleVolume};
 pub use path::{path_length, NavPath, NavPathStatus, NavRaycastHit};
 pub use settings::{NavMeshSettings, DEFAULT_AGENT_HEIGHT, DEFAULT_AGENT_RADIUS};
 pub use snap::SNAP_RINGS;

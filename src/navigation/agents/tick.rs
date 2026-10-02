@@ -1,9 +1,11 @@
 //! The per-frame agent steering tick: preferred velocity toward the next waypoint,
-//! local avoidance between agents (#463), then the walkable-cell slide.
+//! local avoidance between agents (#463) and around non-carving obstacles (#456),
+//! then the walkable-cell slide.
 
 use glam::{Vec2, Vec3};
 
 use super::super::avoidance::{self, AvoidanceAgent};
+use super::super::obstacle::avoidance_obstacles;
 use super::super::NavigationGraph;
 use crate::scene::{NavMeshAgentComponent, Scene};
 
@@ -65,6 +67,9 @@ impl NavigationGraph {
             scene.world.set_nav_agent(id, Some(agent));
         }
 
+        // Non-carving obstacles join after the agents, as neighbours that never
+        // dodge (#456); `ticked` stops the zip before them.
+        inputs.extend(avoidance_obstacles(scene));
         let velocities = avoidance::solve(&inputs, delta_time);
         for (t, v) in ticked.iter().zip(velocities) {
             if t.steering {

@@ -1,8 +1,9 @@
 //! src/editor/inspector/components/gameplay/ — the gameplay inspector cards. This
 //! `mod.rs` holds the Lua Script and Animator cards; the physics-flavoured cards
 //! live apart to stay under the size cap: the Collider card in `collider`, the
-//! RigidBody card in `physics`, the NavMesh Agent card in `nav_agent`, the Joint
-//! card in `joint`, the CharacterController card in `character_controller`.
+//! RigidBody card in `physics`, the NavMesh Agent card in `nav_agent`, the NavMesh
+//! Obstacle card in `nav_obstacle`, the Joint card in `joint`, the
+//! CharacterController card in `character_controller`.
 
 use egui_phosphor::regular as icon;
 use std::path::Path;
@@ -11,12 +12,14 @@ mod character_controller;
 mod collider;
 mod joint;
 mod nav_agent;
+mod nav_obstacle;
 mod physics;
 
 pub use character_controller::draw_character_controller;
 pub use collider::draw_collider;
 pub use joint::draw_joint;
 pub use nav_agent::draw_nav_agent;
+pub use nav_obstacle::draw_nav_obstacle;
 pub use physics::draw_rigidbody;
 
 use crate::editor::inspector::components::card::component_card;
@@ -28,6 +31,18 @@ pub fn draw_bodies(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is
     draw_rigidbody(ui, world, id, is_dirty);
     draw_joint(ui, world, id, is_dirty);
     draw_character_controller(ui, world, id, is_dirty);
+}
+
+/// The navigation cards, in inspector order: NavMesh Agent, NavMesh Obstacle.
+pub fn draw_navigation(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    is_dirty: &mut bool,
+    pending_nav_bake: &mut bool,
+) {
+    draw_nav_agent(ui, world, id, is_dirty);
+    draw_nav_obstacle(ui, world, id, is_dirty, pending_nav_bake);
 }
 
 /// 3D. Script bindings — one card per attached script (#83). An entity can carry

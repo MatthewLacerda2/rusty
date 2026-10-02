@@ -16,14 +16,17 @@
 //! pure function of the geometry, whatever order the colliders were visited in.
 
 use super::super::{NavSpan, NavigationGraph};
+use super::columns::Columns;
 use super::raster::Solid;
+use super::region::CellRect;
 
 /// Solids closer than this vertically are touching, and merge.
 const TOUCH_EPS: f32 = 1e-3;
 
 impl NavigationGraph {
-    /// Replace the graph's spans with the walkable open space above `solids`.
-    pub(super) fn build_spans(&mut self, mut solids: Vec<Solid>) {
+    /// The walkable open space above `solids` for the cells of `region`, as
+    /// row-major columns of that rectangle. Every solid must lie in `region`.
+    pub(super) fn build_columns(&self, mut solids: Vec<Solid>, region: CellRect) -> Columns {
         solids.sort_by(|a, b| {
             a.cell
                 .cmp(&b.cell)
@@ -31,34 +34,28 @@ impl NavigationGraph {
                 .then(a.max.total_cmp(&b.max))
                 .then(a.walkable.cmp(&b.walkable))
         });
-        let cells = (self.width * self.height) as usize;
-        self.spans.clear();
-        self.cell_start.clear();
-        self.cell_start.reserve(cells + 1);
+        let mut out = Columns::with_capacity(region.cells());
         let mut next = 0;
         let mut column = Vec::new();
-        for cell in 0..cells as u32 {
-            self.cell_start.push(self.spans.len() as u32);
-            let end = next + solids[next..].partition_point(|s| s.cell == cell);
-            merge_column(&solids[next..end], self.max_step, &mut column);
-            self.push_open_spans(&column);
-            next = end;
+        for gz in region.z0..=region.z1 {
+            for gx in region.x0..=region.x1 {
+                let cell = self.index(gx, gz) as u32;
+                let end = next + solids[next..].partition_point(|s| s.cell == cell);
+                merge_column(&solids[next..end], self.max_step, &mut column);
+                out.push_column(open_spans(&column, self.agent_height));
+                next = end;
+            }
         }
-        self.cell_start.push(self.spans.len() as u32);
+        out
     }
+}
 
-    /// Append the walkable spans above a merged column that clear `agent_height`.
-    fn push_open_spans(&mut self, column: &[Solid]) {
-        for (i, s) in column.iter().enumerate() {
-            if !s.walkable {
-                continue;
-            }
-            let ceiling = column.get(i + 1).map_or(f32::INFINITY, |above| above.min);
-            if ceiling - s.max >= self.agent_height {
-                self.spans.push(NavSpan { y: s.max, ceiling });
-            }
-        }
-    }
+/// The walkable spans above a merged column that clear `agent_height`.
+fn open_spans(column: &[Solid], agent_height: f32) -> impl Iterator<Item = NavSpan> + '_ {
+    column.iter().enumerate().filter_map(move |(i, s)| {
+        let ceiling = column.get(i + 1).map_or(f32::INFINITY, |above| above.min);
+        (s.walkable && ceiling - s.max >= agent_height).then_some(NavSpan { y: s.max, ceiling })
+    })
 }
 
 /// Merge one column's sorted solids into `out` (cleared first).

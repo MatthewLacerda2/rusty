@@ -1,6 +1,6 @@
 //! Unit tests for the play-loop systems in `play.rs` (#450): entering Play never
 //! moves the camera on the engine's own initiative (no entity is looked up by
-//! name), and the navmesh rebake keeps its 60-frame cadence.
+//! name), and the navmesh rebakes only when its static geometry changes (#456).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -62,21 +62,26 @@ fn standalone_boot_leaves_the_camera_where_the_scene_put_it() {
 }
 
 #[test]
-fn the_navmesh_rebakes_every_sixty_play_frames() {
+fn the_navmesh_rebakes_only_when_static_geometry_changes() {
     let mut gw = world_with_a_player();
+    let crate_id = {
+        let mut scene = gw.world.scene.borrow_mut();
+        crate::navigation::test_support::add_floor(&mut scene, -10.0, 10.0, -10.0, 10.0);
+        crate::navigation::test_support::add_box(&mut scene, Vec3::ZERO, Vec3::ONE)
+    };
     gw.set_playing(true);
     let generation = |gw: &GameWorld| gw.nav().borrow().bake_generation;
-    assert_eq!(generation(&gw), 0);
     gw.tick(DT); // play frame 0 bakes on entry
-    assert_eq!(generation(&gw), 1);
-    for _ in 0..59 {
-        gw.tick(DT); // play frames 1..=59: no rebake
+    let entry = generation(&gw);
+    for _ in 0..120 {
+        gw.tick(DT); // nothing moves: no rebake, however long
     }
-    assert_eq!(generation(&gw), 1);
-    gw.tick(DT); // play frame 60
-    assert_eq!(generation(&gw), 2);
-    for _ in 0..60 {
-        gw.tick(DT);
+    assert_eq!(generation(&gw), entry);
+    if let Some(mut t) = gw.world.scene.borrow_mut().world.transform_mut(crate_id) {
+        t.position.x += 3.0;
     }
-    assert_eq!(generation(&gw), 3, "play frame 120");
+    gw.tick(DT);
+    assert_eq!(generation(&gw), entry + 1, "the moved crate rebakes once");
+    gw.tick(DT);
+    assert_eq!(generation(&gw), entry + 1);
 }
