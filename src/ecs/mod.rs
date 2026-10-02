@@ -18,6 +18,7 @@
 pub mod access;
 mod bundle;
 pub mod core;
+mod handles;
 #[cfg(test)]
 mod query_tests;
 pub mod world;

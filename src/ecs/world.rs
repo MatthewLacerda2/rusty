@@ -23,18 +23,17 @@
 //! `core.rs`'s `entity_document` recomposes one back out through the named
 //! accessors.
 
-use std::collections::HashMap;
-
 use crate::components::Entity;
 
 use super::bundle::{build_bundle, Core};
+use super::handles::Handles;
 
 pub(in crate::ecs) use hecs::{Ref, RefMut};
 
 pub struct World {
     inner: hecs::World,
-    /// Stable engine id -> hecs handle (generational).
-    handles: HashMap<u32, hecs::Entity>,
+    /// Stable engine id -> hecs handle (generational), a dense table (#696).
+    handles: Handles,
     /// Insertion order of stable ids — preserves legacy `Vec<Entity>` ordering.
     order: Vec<u32>,
     /// Monotonic stable-id allocator (mirrors the legacy `next_entity_id`).
@@ -54,7 +53,7 @@ impl World {
     pub fn new() -> Self {
         Self {
             inner: hecs::World::new(),
-            handles: HashMap::new(),
+            handles: Handles::default(),
             order: Vec::new(),
             next_id: 1,
             next_seq: 0,
@@ -104,7 +103,7 @@ impl World {
 
     /// Despawn an entity by stable id.
     pub fn despawn(&mut self, id: u32) {
-        if let Some(handle) = self.handles.remove(&id) {
+        if let Some(handle) = self.handles.remove(id) {
             let _ = self.inner.despawn(handle);
         }
         self.order.retain(|&e| e != id);
@@ -120,14 +119,14 @@ impl World {
     }
 
     pub fn contains(&self, id: u32) -> bool {
-        self.handles.contains_key(&id)
+        self.handles.get(id).is_some()
     }
 
     /// Find the first *active* entity with this name, returning its stable id.
     /// Matches the legacy `Scene::find_entity_by_name` semantics.
     pub fn find_by_name(&self, name: &str) -> Option<u32> {
         self.order.iter().copied().find(|&id| {
-            let Some(&handle) = self.handles.get(&id) else {
+            let Some(handle) = self.handles.get(id) else {
                 return false;
             };
             self.inner
@@ -154,7 +153,7 @@ impl World {
 
     /// Shared borrow of one component column, by stable id.
     pub(in crate::ecs) fn component<T: hecs::Component>(&self, id: u32) -> Option<Ref<'_, T>> {
-        let &handle = self.handles.get(&id)?;
+        let handle = self.handles.get(id)?;
         self.inner.get::<&T>(handle).ok()
     }
 
@@ -163,7 +162,7 @@ impl World {
         &mut self,
         id: u32,
     ) -> Option<RefMut<'_, T>> {
-        let &handle = self.handles.get(&id)?;
+        let handle = self.handles.get(id)?;
         self.inner.get::<&mut T>(handle).ok()
     }
 
@@ -195,7 +194,7 @@ impl World {
         id: u32,
         value: Option<T>,
     ) -> bool {
-        let Some(&handle) = self.handles.get(&id) else {
+        let Some(handle) = self.handles.get(id) else {
             return false;
         };
         match value {
@@ -212,7 +211,7 @@ impl World {
     /// Detach and return a component column (`None` when absent or the entity
     /// is dead).
     pub(in crate::ecs) fn take_component<T: hecs::Component>(&mut self, id: u32) -> Option<T> {
-        let &handle = self.handles.get(&id)?;
+        let handle = self.handles.get(id)?;
         self.inner.remove_one::<T>(handle).ok()
     }
 
@@ -224,7 +223,7 @@ impl World {
         id: u32,
         f: impl FnOnce(&mut A, Option<&mut B>) -> R,
     ) -> Option<R> {
-        let &handle = self.handles.get(&id)?;
+        let handle = self.handles.get(id)?;
         let mut query = self
             .inner
             .query_one::<(&mut A, Option<&mut B>)>(handle)
@@ -239,7 +238,7 @@ impl World {
         id: u32,
         f: impl FnOnce(&A, &B) -> R,
     ) -> Option<R> {
-        let &handle = self.handles.get(&id)?;
+        let handle = self.handles.get(id)?;
         let mut query = self.inner.query_one::<(&A, &B)>(handle).ok()?;
         let (a, b) = query.get()?;
         Some(f(a, b))
@@ -266,7 +265,7 @@ impl World {
     /// when the entity does not exist.
     pub(in crate::ecs) fn overwrite(&mut self, entity: Entity) -> bool {
         let id = entity.id;
-        let Some(&old_handle) = self.handles.get(&id) else {
+        let Some(old_handle) = self.handles.get(id) else {
             return false;
         };
         // The entity keeps its slot in insertion order (`self.order` is not
