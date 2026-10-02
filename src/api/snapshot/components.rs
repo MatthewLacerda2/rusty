@@ -13,7 +13,8 @@ use crate::components::{
     ParticleEmitterComponent, RigidBodyComponent,
 };
 use crate::components::{
-    JointComponent, LineComponent, LodGroupComponent, RibbonStyle, TrailComponent,
+    CharacterControllerComponent, JointComponent, LineComponent, LodGroupComponent, RibbonStyle,
+    TrailComponent,
 };
 
 /// Mesh identity: the primitive kind and, for imported meshes, the
@@ -226,6 +227,23 @@ pub(crate) fn joint_value(j: &JointComponent) -> Value {
         "break_force": j.break_force,
         "break_torque": j.break_torque,
         "enable_collision": j.enable_collision,
+    })
+}
+
+/// CharacterController (#451): the capsule, its tuning, and what the last `Move`
+/// found.
+pub(crate) fn character_controller_value(c: &CharacterControllerComponent) -> Value {
+    json!({
+        "height": c.height,
+        "radius": c.radius,
+        "center": vec3(c.center),
+        "step_offset": c.step_offset,
+        "slope_limit": c.slope_limit,
+        "skin_width": c.skin_width,
+        "min_move_distance": c.min_move_distance,
+        "is_grounded": c.is_grounded,
+        "collision_flags": c.collision_flags,
+        "ground_normal": vec3(c.ground_normal),
     })
 }
 

@@ -41,8 +41,8 @@ player" rule; an entity is hittable simply if it exists **and is active**.
 **Inactive entities are invisible to queries (#521).** A deactivated entity
 (`SetActive(false)`) is skipped by every query — `Raycast`, `SphereCast`, the
 `Overlap*`/`Check*` family, and the engine's own hitscan pass through it, and
-`ClosestPoint`/`ContainsPoint` answer as if it had no collider — and a walking
-(kinematic) character moves through it instead of being blocked. Deactivating a
+`ClosestPoint`/`ContainsPoint` answer as if it had no collider — and a
+`CharacterController.Move` passes through it instead of being blocked. Deactivating a
 Rigidbody's entity hides its whole body, compound parts included; deactivating
 one part hides just that part. Like the rest of the query world, activation is
 picked up at the next physics tick, so a query in the same frame as the
@@ -123,26 +123,22 @@ body's contacts are found each fixed tick:
   than that is passed straight through under Discrete.
 
 Sweeping costs more, so flag only what is important or fast-moving for its size and
-leave everything else Discrete. Kinematic bodies (the player/bots) default to
-Discrete like everything else and **already** don't tunnel through walls — their
-movement is routed through rapier's collide-and-slide character sweep; setting them
-Continuous only helps rapier account for their fast motion against dynamic bodies,
-it is not a wall-behavior change. The mode is honoured at body build and re-applied
+leave everything else Discrete. A kinematic body is a pure mover, so Continuous
+only helps rapier account for its fast motion against dynamic bodies; it never stops
+it at a wall. Walls stop a character only through `CharacterController.Move`. The mode is honoured at body build and re-applied
 every tick, so flipping it mid-play takes effect immediately.
 
 A rigidbody's **`use_gravity`** flag (authored in the inspector / serialized in the
 scene) controls whether a body is pulled by the world's gravity (Unity:
 `Rigidbody.useGravity`). On a **dynamic** body, `false` exempts it from gravity
 (rapier `gravity_scale = 0`) while still letting it move under velocity and
-collisions. On a **kinematic** body — the character-controller class — `true` gives
-it character gravity: a downward fall speed accumulates each fixed tick on top of
-whatever motion the script drives, so a walking character drops off ledges, falls
-after a scripted jump, and settles onto the floor; ground contact zeroes the fall
-speed (with ground snapping keeping a resting body stable). With `false`, a
-kinematic body keeps exactly the vertical motion its scripts set. An entity with a
-collider but **no rigidbody** never falls. The flag is honoured at body build and
-each tick, so toggling it (or `Physics.SetKinematic`, which resets any accumulated
-fall speed) at runtime takes effect.
+collisions. A **kinematic** body ignores it, as in Unity: it is a pure mover that
+goes exactly where its `Transform` says — it neither falls nor collides-and-slides
+against walls (#451). A walking character that should be blocked, step up stairs
+and know it is grounded uses a [`CharacterController`](CharacterController.md),
+and its script applies gravity itself. An entity with a collider but **no
+rigidbody** is likewise a kinematic mover. The flag is honoured at body build and
+each tick, so toggling it at runtime takes effect.
 
 ### Collider shape and physics material (#447)
 
@@ -201,6 +197,8 @@ world `x = 11`. Unity semantics:
   or a character's per-bone hitboxes are built. Moving a part's `Transform`
   (script, animator) moves its collider on the body. With no Rigidbody ancestor
   the entity is its own body, as before (static, or an implicit kinematic body).
+  A `CharacterController` counts as a body here too: colliders under it ride its
+  capsule's body.
 - **Hits name the part.** `Raycast`, `SphereCast`, the overlaps, `ClosestPoint`,
   `ContainsPoint`, trigger and collision events report the entity that **owns the collider**
   that was hit, never the body's root — so a script can tell a head hit from a

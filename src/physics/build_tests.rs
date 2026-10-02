@@ -11,7 +11,9 @@
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::build::{build_shape, collider_inputs, interaction_groups, is_kinematic};
+use super::build::{
+    build_shape, class_of, classify, collider_inputs, interaction_groups, BodyClass,
+};
 use crate::components::{CapsuleAxis, ColliderComponent, ColliderShape, RigidBodyComponent};
 
 /// Local-AABB half-extents `(x, y, z)` of a built collider.
@@ -233,15 +235,20 @@ fn is_kinematic_only_for_non_static_bodies_without_a_dynamic_rigidbody() {
         use_gravity: true,
         collision_detection: crate::components::CollisionDetection::Discrete,
     };
-    assert!(!is_kinematic(true, None), "static is not kinematic");
+    let kinematic = |s, rb| matches!(classify(s, rb), BodyClass::Kinematic);
+    assert!(!kinematic(true, None), "static is not kinematic");
+    assert!(kinematic(false, None), "no rigidbody defaults to kinematic");
     assert!(
-        is_kinematic(false, None),
-        "no rigidbody defaults to kinematic"
-    );
-    assert!(
-        !is_kinematic(false, Some(&dynamic)),
+        !kinematic(false, Some(&dynamic)),
         "dynamic is not kinematic"
     );
+    // A CharacterController's body is kinematic whatever else it carries (#451).
+    let mut world = crate::ecs::World::new();
+    let id = world.spawn("Walker".to_string());
+    world.set_static(id, true);
+    world.set_rigidbody(id, Some(dynamic));
+    world.set_character_controller(id, Some(Default::default()));
+    assert!(matches!(class_of(&world, id), BodyClass::Kinematic));
 }
 
 #[test]

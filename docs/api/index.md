@@ -264,6 +264,7 @@ One file per namespace, in reference order:
 - [`NavMeshAgent`](NavMeshAgent.md)
 - [`Physics`](Physics.md)
 - [`Joint`](Joint.md)
+- [`CharacterController`](CharacterController.md)
 - [`Time`](Time.md)
 - [`Random`](Random.md)
 - [`Timer`](Timer.md)

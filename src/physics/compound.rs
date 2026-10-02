@@ -28,8 +28,7 @@ use crate::scene::Scene;
 
 /// The body layout the scene implies: body-owner entity id → the collider
 /// entities attached to that body. The owner's own collider, when it has one,
-/// comes first (the character sweep uses a body's first collider); the rest keep
-/// insertion order.
+/// comes first; the rest keep insertion order.
 pub(super) type BodyPlan = BTreeMap<u32, Vec<u32>>;
 
 /// A world-space pose: translation, rotation and (lossy) world scale.
@@ -41,11 +40,13 @@ pub(super) struct WorldPose {
 }
 
 /// The entity whose rapier body carries `id`'s collider: `id` itself when it has
-/// a Rigidbody, else its nearest Rigidbody ancestor, else `id` (its own body).
+/// a Rigidbody or a CharacterController, else its nearest such ancestor, else
+/// `id` (its own body). A CharacterController is a body of its own (#451), so
+/// hitboxes parented under a character ride its body.
 pub(super) fn body_owner(scene: &Scene, id: u32) -> u32 {
     let mut current = id;
     loop {
-        if scene.world.has_rigidbody(current) {
+        if scene.world.has_rigidbody(current) || scene.world.has_character_controller(current) {
             return current;
         }
         match scene.world.parent_id(current) {
@@ -55,13 +56,17 @@ pub(super) fn body_owner(scene: &Scene, id: u32) -> u32 {
     }
 }
 
-/// Group every active collider under the body that will carry it.
+/// Group every active collider — and every CharacterController's capsule — under
+/// the body that will carry it.
 pub(super) fn plan(scene: &Scene) -> BodyPlan {
     let mut plan = BodyPlan::new();
-    for id in scene.world.ids_with_collider() {
-        if !scene.world.collider(id).is_some_and(|c| c.active) {
-            continue;
-        }
+    let world = &scene.world;
+    let colliders = world
+        .ids_with_collider()
+        .into_iter()
+        .filter(|&id| world.collider(id).is_some_and(|c| c.active))
+        .filter(|&id| !world.has_character_controller(id));
+    for id in colliders.chain(world.ids_with_character_controller()) {
         plan.entry(body_owner(scene, id)).or_default().push(id);
     }
     for (&owner, ids) in plan.iter_mut() {

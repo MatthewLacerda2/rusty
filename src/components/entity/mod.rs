@@ -22,7 +22,8 @@ use super::{
     VisualCorrectionComponent,
 };
 use super::{BackdropFilterComponent, MaskComponent};
-use super::{JointComponent, LineComponent, LodGroupComponent, SubEmitters, TrailComponent};
+use super::{CharacterControllerComponent, JointComponent, LineComponent, LodGroupComponent};
+use super::{SubEmitters, TrailComponent};
 
 /// The live link from an instance entity back to the `.prefab` it was stamped from
 /// (#216). Set on EVERY entity of a linked instance — not just the root — so that
@@ -137,6 +138,10 @@ pub struct Entity {
     pub layout_element: Option<LayoutElementComponent>,
     #[serde(default)]
     pub joint: Option<JointComponent>,
+    /// Collide-and-slide capsule mover (#451). `#[serde(default)]` for pre-#451
+    /// scenes.
+    #[serde(default)]
+    pub character_controller: Option<CharacterControllerComponent>,
     /// Level-of-detail group over renderer entities (#472). `#[serde(default)]` for
     /// pre-#472 scenes.
     #[serde(default)]
@@ -195,6 +200,7 @@ impl Entity {
             layout_group: None,
             layout_element: None,
             joint: None,
+            character_controller: None,
             lod_group: None,
             trail: None,
             line: None,

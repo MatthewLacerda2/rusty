@@ -34,8 +34,13 @@ pub(super) fn classify(is_static: bool, rb: Option<&RigidBodyComponent>) -> Body
     }
 }
 
-pub(super) fn is_kinematic(is_static: bool, rb: Option<&RigidBodyComponent>) -> bool {
-    matches!(classify(is_static, rb), BodyClass::Kinematic)
+/// Owner `id`'s body class. A CharacterController's body is always kinematic
+/// (#451): it moves only where `CharacterController.Move` puts its Transform.
+pub(super) fn class_of(world: &World, id: u32) -> BodyClass {
+    if world.has_character_controller(id) {
+        return BodyClass::Kinematic;
+    }
+    classify(world.is_static(id), world.rigidbody(id).as_deref())
 }
 
 /// rapier `gravity_scale` for a body's `use_gravity` flag: `1.0` keeps the body
@@ -63,6 +68,12 @@ pub(super) fn ccd_enabled(mode: CollisionDetection) -> bool {
 /// `self`. The pose is not here: it comes from the hierarchy (`compound`).
 pub(super) struct ColliderInputs {
     pub shape: ColliderShape,
+    /// The shape's centre in the entity's local space, before scale: a
+    /// CharacterController's `center`, zero for a Collider.
+    pub center: Vec3,
+    /// An upright shape ignores the entity's rotation — a CharacterController's
+    /// capsule stays vertical however the entity turns (#451).
+    pub upright: bool,
     /// Live rest-pose geometry for a mesh collider (positions + triangle indices),
     /// captured here so it never enters the scene document.
     pub mesh_geom: Option<(Vec<[f32; 3]>, Vec<u32>)>,
@@ -72,9 +83,14 @@ pub(super) struct ColliderInputs {
 }
 
 /// Snapshot an entity's active-collider inputs, or `None` if it has no active
-/// collider (or is dead). A mesh collider also captures the rest-pose geometry it
-/// rebuilds from. Reads through the #344 accessor facade — shared guards only.
+/// collider (or is dead). A CharacterController's capsule supersedes a Collider
+/// on the same entity (#451). A mesh collider also captures the rest-pose
+/// geometry it rebuilds from. Reads through the #344 accessor facade — shared
+/// guards only.
 pub(super) fn collider_inputs(world: &World, id: u32) -> Option<ColliderInputs> {
+    if let Some(inputs) = super::character::character_collider_inputs(world, id) {
+        return Some(inputs);
+    }
     let collider = world.collider(id).filter(|c| c.active)?;
     let mesh_geom = if matches!(collider.shape, ColliderShape::Mesh { .. }) {
         world.mesh(id).map(|m| {
@@ -88,6 +104,8 @@ pub(super) fn collider_inputs(world: &World, id: u32) -> Option<ColliderInputs> 
     };
     Some(ColliderInputs {
         shape: collider.shape.clone(),
+        center: Vec3::ZERO,
+        upright: false,
         mesh_geom,
         is_trigger: collider.is_trigger,
         material: collider.material,
@@ -112,11 +130,10 @@ pub(super) struct BodyInputs {
 
 /// Snapshot the body-level inputs of owner `id`.
 pub(super) fn body_inputs(world: &World, id: u32) -> BodyInputs {
-    let is_static = world.is_static(id);
     let rb = world.rigidbody(id);
     let rb = rb.as_deref();
     BodyInputs {
-        class: classify(is_static, rb),
+        class: class_of(world, id),
         velocity: rb.map(|r| r.velocity).unwrap_or(Vec3::ZERO),
         angular_velocity: rb.map(|r| r.angular_velocity).unwrap_or(Vec3::ZERO),
         use_gravity: rb.is_none_or(|r| r.use_gravity),
@@ -132,7 +149,6 @@ pub(super) struct EntityBodyState {
     pub rot: Quat,
     pub vel: Vec3,
     pub angular_velocity: Vec3,
-    pub active: bool,
     pub kinematic: bool,
     pub is_static: bool,
     pub use_gravity: bool,
@@ -146,13 +162,10 @@ pub(super) struct EntityBodyState {
 pub(super) fn body_state(scene: &Scene, id: u32) -> Option<EntityBodyState> {
     let pose = world_pose(scene, id)?;
     let world = &scene.world;
-    // Gravity needs an authored rigidbody opting in: a collider-only entity
-    // (kinematic by default) is script-driven scenery and must never fall (#318),
-    // so a missing rigidbody reads as `use_gravity = false` here. Dynamic bodies
-    // always have one, so this matches `body_inputs` for them.
+    let class = class_of(world, id);
+    // Only dynamic bodies integrate gravity, and they always have a rigidbody.
     let rb = world.rigidbody(id);
     let rb = rb.as_deref();
-    let is_static = world.is_static(id);
     let use_gravity = rb.is_some_and(|r| r.use_gravity);
     let collision_detection = rb.map(|r| r.collision_detection).unwrap_or_default();
     Some(EntityBodyState {
@@ -160,9 +173,8 @@ pub(super) fn body_state(scene: &Scene, id: u32) -> Option<EntityBodyState> {
         rot: pose.rot,
         vel: rb.map(|r| r.velocity).unwrap_or(Vec3::ZERO),
         angular_velocity: rb.map(|r| r.angular_velocity).unwrap_or(Vec3::ZERO),
-        active: world.is_active(id),
-        kinematic: is_kinematic(is_static, rb),
-        is_static,
+        kinematic: matches!(class, BodyClass::Kinematic),
+        is_static: matches!(class, BodyClass::Static),
         use_gravity,
         ccd_enabled: ccd_enabled(collision_detection),
     })
@@ -209,18 +221,25 @@ pub(super) fn build_shape(
 /// two cross-axis scales. rapier takes the half-length of the inner segment
 /// (caps excluded), so a full length under `2r` collapses to a sphere.
 fn capsule_builder(radius: f32, height: f32, axis: CapsuleAxis, scale: Vec3) -> ColliderBuilder {
+    let (half_segment, r) = capsule_dims(radius, height, axis, scale);
+    match axis {
+        CapsuleAxis::X => ColliderBuilder::capsule_x(half_segment, r),
+        CapsuleAxis::Y => ColliderBuilder::capsule_y(half_segment, r),
+        CapsuleAxis::Z => ColliderBuilder::capsule_z(half_segment, r),
+    }
+}
+
+/// A capsule's `(half_segment, radius)` with the world scale baked in, as
+/// [`capsule_builder`] builds it — shared with the CharacterController's sweep so
+/// the shape it moves is the shape others collide with.
+pub(super) fn capsule_dims(radius: f32, height: f32, axis: CapsuleAxis, scale: Vec3) -> (f32, f32) {
     let (along, cross) = match axis {
         CapsuleAxis::X => (scale.x, scale.y.max(scale.z)),
         CapsuleAxis::Y => (scale.y, scale.x.max(scale.z)),
         CapsuleAxis::Z => (scale.z, scale.x.max(scale.y)),
     };
     let r = (radius * cross).max(1e-4);
-    let half_segment = (height * along * 0.5 - r).max(0.0);
-    match axis {
-        CapsuleAxis::X => ColliderBuilder::capsule_x(half_segment, r),
-        CapsuleAxis::Y => ColliderBuilder::capsule_y(half_segment, r),
-        CapsuleAxis::Z => ColliderBuilder::capsule_z(half_segment, r),
-    }
+    (((height * along * 0.5) - r).max(0.0), r)
 }
 
 /// Build a trimesh or convex-hull collider from rest-pose mesh geometry (#77),

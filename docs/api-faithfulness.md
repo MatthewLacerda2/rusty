@@ -126,7 +126,7 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 | `SetVelocity` | ✅ | sim — `physics/world.rs` integrates / writes back `velocity` |
 | `SetAngularVelocity` | ✅ | sim — `physics/world.rs` pushes `set_angvel` / writes back `angvel` |
 | `AddForce` | ✅ | sim — folds impulse into `velocity` (read above); skips kinematic |
-| `SetKinematic` | ✅ | sim — `physics/build.rs::is_kinematic` / `world.rs` body class |
+| `SetKinematic` | ✅ | sim — `physics/build.rs::class_of` / `world.rs` body class |
 | `SetCollisionDetection` | ✅ | sim — `physics/build.rs::ccd_enabled` / `world.rs` `enable_ccd` (proven by `physics/ccd_tests.rs`: Discrete tunnels, Continuous stops) |
 
 (The #311 spatial query surface — `Raycast`'s siblings `SphereCast`,
@@ -147,6 +147,16 @@ edits and each physics step.)
 |---|---|---|
 | `SetKind` / `SetConnectedBody` / `SetAnchor` / `SetConnectedAnchor` / `SetAutoConfigureConnectedAnchor` / `SetAxis` / `SetUseLimits` / `SetLimits` / `SetSwingLimit` / `SetEnableCollision` | ✅ | sim — `PhysicsWorld::resync_joints` builds the rapier joint from them, rebuilding on a change (`src/physics/joints_tests.rs`); round-trips, the connected body remapped through prefabs (`tests/joint_api.rs`) |
 | `SetBreakForce` / `SetBreakTorque` | ✅ | sim — `PhysicsWorld::break_joints` reads them live after each step (`src/physics/joints_tests.rs`); round-trips |
+
+### `CharacterController` — over `Entity.character_controller` (#451)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetHeight` / `SetRadius` / `SetCenter` | ✅ | sim — `physics::move_character` sweeps the capsule they describe, `PhysicsWorld::sync_characters` resizes its collider each tick, `physics::can_stand` tests it (`tests/character_controller/`); round-trips |
+| `SetStepOffset` / `SetSlopeLimit` / `SetSkinWidth` / `SetMinMoveDistance` | ✅ | sim — `physics::character::controller` configures rapier's controller from them on every `Move` (`tests/character_controller/`); round-trips |
+
+(`Move` is the verb the setters feed; `IsGrounded`, `GetCollisionFlags` and
+`GetGroundNormal` read back what it found.)
 
 ### `LODGroup` — over `Entity.lod_group` (#472)
 

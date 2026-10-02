@@ -24,6 +24,7 @@ pub mod backdrop_filter;
 pub mod camera;
 pub mod canvas;
 pub mod canvas_group;
+pub mod character_controller;
 #[cfg(feature = "dev")]
 pub mod debug;
 pub mod decals;
@@ -177,6 +178,7 @@ pub fn register<'lua, 'scope>(
     physics::register(lua, scope, ctx.scene)?;
     physics::register_hitscan(lua, scope, ctx.scene, ctx.physics)?;
     joint::register(lua, scope, ctx.scene)?;
+    character_controller::register(lua, scope, ctx.scene, ctx.physics)?;
     lod_group::register(lua, scope, ctx.scene)?;
     time::register(lua, scope, ctx.time)?;
     timer::register(lua, scope, ctx.scene, ctx.timers, ctx.console)?;

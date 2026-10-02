@@ -156,18 +156,20 @@ fn a_deactivated_owner_hides_its_active_parts() {
 
 #[test]
 fn the_character_sweep_walks_through_an_inactive_wall() {
-    // A collider-only (implicit kinematic) mover scripted 4 m through a thin
-    // static wall: blocked while the wall is active, straight through when the
-    // wall is deactivated in the same tick as the move.
+    // A CharacterController moved 4 m through a thin static wall: blocked
+    // while the wall is active, straight through once the tick has seen it
+    // deactivated.
     let run = |wall_active: bool| {
         let mut scene = Scene::new();
-        let mover = add_box(&mut scene, None, Vec3::ZERO, Vec3::splat(0.5));
+        let mover = scene.add_entity("Mover".to_string());
+        let cc = crate::components::CharacterControllerComponent::default();
+        scene.world.set_character_controller(mover, Some(cc));
         let wall = add_box(&mut scene, None, Vec3::X * 2.0, Vec3::new(0.2, 4.0, 4.0));
         scene.world.set_static(wall, true);
         let mut world = PhysicsWorld::from_scene(&scene);
         scene.world.set_active(wall, wall_active);
-        scene.world.transform_mut(mover).unwrap().position = Vec3::X * 4.0;
         world.step(&mut scene, DT);
+        super::move_character(Some(&world), &mut scene, mover, Vec3::X * 4.0);
         let x = scene.world.transform(mover).unwrap().position.x;
         x
     };

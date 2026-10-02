@@ -13,6 +13,7 @@ use super::build::{
     body_inputs, build_shape, ccd_enabled, collider_inputs, gravity_scale, interaction_groups,
     BodyClass,
 };
+use super::character::upright_offset;
 use super::compound::{plan, relative_pose, world_pose, BodyPlan, WorldPose};
 use super::convert::{to_iso, to_na_vec};
 use super::material::apply_material;
@@ -123,7 +124,17 @@ impl PhysicsWorld {
             .map(|(p, i)| (p.as_slice(), i.as_slice()));
         let mut collider = build_shape(&inp.shape, pose.scale, mesh_ref)?;
         let (offset_pos, offset_rot) = relative_pose(owner_pose, &pose);
-        collider.set_position(to_iso(offset_pos, offset_rot));
+        let offset = if inp.upright {
+            upright_offset(
+                owner_pose.rot,
+                offset_pos,
+                offset_rot,
+                inp.center * pose.scale,
+            )
+        } else {
+            to_iso(offset_pos, offset_rot)
+        };
+        collider.set_position(offset);
         collider.set_enabled(scene.world.is_active(id));
         collider.set_sensor(inp.is_trigger);
         apply_material(&mut collider, &inp.material);

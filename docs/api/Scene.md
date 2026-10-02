@@ -61,7 +61,7 @@ case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `TextMeshPro`), `Shape`, `Selectable`, `LayoutGroup`, `LayoutElement` (alias
 `ContentSizeFitter`), `Joint` (aliases `FixedJoint`, `HingeJoint`,
 `CharacterJoint` — all add a default `Fixed` joint; set its kind with
-`Joint.SetKind`), `LODGroup` (alias `LOD`), `Trail` (alias `TrailRenderer`),
+`Joint.SetKind`), `CharacterController` (alias `Character`), `LODGroup` (alias `LOD`), `Trail` (alias `TrailRenderer`),
 `Line` (alias `LineRenderer`).
 Each is added with the inspector's default values; adding an
 existing kind replaces it. (Scripts attach by path, not as a defaulted kind — a

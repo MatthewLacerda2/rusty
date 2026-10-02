@@ -5,7 +5,9 @@
 
 use rusty::dev::harness::Harness;
 
-/// Hold "W", run `frames` ticks at `scale`, return the player's forward travel.
+/// Hold "W", run `frames` ticks at `scale`, return the player's forward travel
+/// over the ground. Height is left out: the player script's gravity (#451)
+/// drops it onto the floor, and a fall is not linear in time.
 fn travel_at_scale(scale: f32, frames: u32) -> f32 {
     let h = Harness::new(crate::temp::dir().join("rusty_time_scale"), "");
 
@@ -24,7 +26,8 @@ fn travel_at_scale(scale: f32, frames: u32) -> f32 {
     let world = h.world.borrow();
     let scene = world.scene().borrow();
     let end = scene.world.transform(player_id).unwrap().position;
-    (end - start).length()
+    let d = end - start;
+    d.x.hypot(d.z)
 }
 
 #[test]
@@ -42,7 +45,8 @@ fn time_scale_half_halves_motion() {
     let half = travel_at_scale(0.5, 60);
     assert!(full > 0.1, "baseline motion should be non-trivial: {full}");
     assert!(
-        (half - full * 0.5).abs() < 1e-3,
+        // 1%: the landing contact (#451) shaves a few millimetres either way.
+        (half - full * 0.5).abs() < full * 0.01,
         "time_scale = 0.5 should halve motion: full={full} half={half}"
     );
 }

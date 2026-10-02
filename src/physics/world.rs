@@ -5,11 +5,10 @@
 //! from the scene on entering Play and stepped once per fixed physics tick:
 //!
 //!   1. `sync_to_rapier`  — push the (externally mutated) component transforms and
-//!      velocities into rapier. Kinematic bodies (player/enemy) are routed through
-//!      the `KinematicCharacterController` (collide-and-slide vs. walls, plus the
-//!      gravity fall speed when `use_gravity` is authored; see `character`) and
-//!      given the corrected next pose; dynamic bodies get their pose, linear
-//!      velocity, and gravity scale; static bodies stay put.
+//!      velocities into rapier. Kinematic bodies are pure movers: their next pose
+//!      is their Transform (a CharacterController has already collided-and-slid
+//!      it there in `Move`, see `character`); dynamic bodies get their pose,
+//!      linear velocity, and gravity scale; static bodies stay put.
 //!   2. `step`            — advance the rapier world by `dt` under gravity.
 //!   3. `sync_from_rapier`— write the integrated transforms + velocities back onto
 //!      the entities, and return the trigger and collision events scripts expect.
@@ -21,7 +20,6 @@ use std::collections::HashMap;
 use rapier3d::prelude::*;
 
 use super::build::{body_state, gravity_scale, EntityBodyState};
-use super::character;
 use super::collision_events::CollisionEvents;
 use super::compound::{world_to_local, BodyPlan};
 use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
@@ -44,9 +42,6 @@ pub struct PhysicsWorld {
     ccd_solver: CCDSolver,
     /// Exposed to the `physics` module (see `query`) for ray casts.
     pub(super) query_pipeline: QueryPipeline,
-    /// Per-body downward fall speed for gravity-driven kinematic bodies (#318),
-    /// keyed by entity id and carried across ticks; zeroed on ground contact.
-    fall_speeds: HashMap<u32, f32>,
     /// The body layout last built (#445): owner entity id -> the collider
     /// entities its body carries. Diffed each tick to rebuild changed bodies.
     pub(super) plan: BodyPlan,
@@ -87,7 +82,6 @@ impl PhysicsWorld {
             multibody_joints: MultibodyJointSet::new(),
             ccd_solver: CCDSolver::new(),
             query_pipeline: QueryPipeline::new(),
-            fall_speeds: HashMap::new(),
             plan: BodyPlan::new(),
             id_to_body: HashMap::new(),
             collider_to_id: HashMap::new(),
@@ -110,11 +104,12 @@ impl PhysicsWorld {
     /// character sweep, so no sweep sees a stale one), then each owner's world
     /// pose and velocities and each compound collider's offset. Walks the sorted
     /// plan, so the order is deterministic.
-    fn sync_to_rapier(&mut self, scene: &Scene, dt: f32) {
+    fn sync_to_rapier(&mut self, scene: &Scene) {
         self.resync_topology(scene);
         self.resync_joints(scene);
         self.sync_enabled(scene);
         self.sync_materials(scene);
+        self.sync_characters(scene);
         let plan = std::mem::take(&mut self.plan);
         for (&owner, ids) in &plan {
             let Some(&handle) = self.id_to_body.get(&owner) else {
@@ -123,54 +118,23 @@ impl PhysicsWorld {
             let Some(snapshot) = body_state(scene, owner) else {
                 continue;
             };
-            self.apply_body_state(owner, handle, &snapshot, dt);
+            self.apply_body_state(handle, &snapshot);
             self.sync_compound_parts(scene, owner, ids);
         }
         self.plan = plan;
     }
 
     /// Push one entity's snapshot into its rapier body for this tick.
-    fn apply_body_state(
-        &mut self,
-        id: u32,
-        handle: RigidBodyHandle,
-        snap: &EntityBodyState,
-        dt: f32,
-    ) {
-        if snap.kinematic {
-            // Route the script/input-set move through the controller so the
-            // body collides-and-slides against walls instead of teleporting.
-            // With `use_gravity` authored, feed the accumulated fall speed into
-            // the move (#318) — rapier never gravity-integrates a kinematic body.
-            let gravity = (snap.active && snap.use_gravity).then(|| character::GravityFall {
-                accel: -self.gravity.y,
-                speed: self.fall_speeds.get(&id).copied().unwrap_or(0.0),
-            });
-            let (next, fall_speed) = character::corrected_next_pose(
-                character::RapierRefs {
-                    bodies: &self.bodies,
-                    colliders: &self.colliders,
-                    queries: &self.query_pipeline,
-                },
-                handle,
-                to_iso(snap.pos, snap.rot),
-                dt,
-                gravity,
-            );
-            self.fall_speeds.insert(id, fall_speed);
-            let body = &mut self.bodies[handle];
-            body.enable_ccd(snap.ccd_enabled);
-            body.set_next_kinematic_position(next);
-            return;
-        }
-        // Leaving the kinematic class (`Physics.SetKinematic`) drops any carried
-        // fall speed, so toggling back later starts a fresh fall.
-        self.fall_speeds.remove(&id);
+    fn apply_body_state(&mut self, handle: RigidBodyHandle, snap: &EntityBodyState) {
         let body = &mut self.bodies[handle];
         // Re-apply the CCD mode each tick so `Physics.SetCollisionDetection`
         // toggled mid-play takes effect (mirrors the `gravity_scale` re-apply).
         body.enable_ccd(snap.ccd_enabled);
-        if snap.is_static {
+        if snap.kinematic {
+            // A pure mover (Unity's kinematic Rigidbody): it goes exactly where
+            // its Transform says, through anything in the way.
+            body.set_next_kinematic_position(to_iso(snap.pos, snap.rot));
+        } else if snap.is_static {
             body.set_position(to_iso(snap.pos, snap.rot), true);
         } else {
             // Dynamic: trust rapier for pose, but let scripts inject linear and
@@ -188,7 +152,7 @@ impl PhysicsWorld {
     /// joints that broke (#449), each list sorted for deterministic dispatch.
     pub fn step(&mut self, scene: &mut Scene, dt: f32) -> PhysicsEvents {
         self.integration_parameters.dt = dt;
-        self.sync_to_rapier(scene, dt);
+        self.sync_to_rapier(scene);
         let pre_solve = self.snapshot_velocities();
 
         self.physics_pipeline.step(

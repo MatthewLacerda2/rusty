@@ -255,20 +255,23 @@ fn relative_pose_carries_the_rotational_offset() {
 }
 
 #[test]
-fn kinematic_sweep_starts_from_the_collider_offset() {
-    // A kinematic body whose only collider is a part 2 m ahead on +x: driven
-    // 3 m toward a wall at x=4.5, the part (not the body origin) hits it.
+fn character_sweep_starts_from_the_capsule_center() {
+    // A CharacterController whose capsule is centred 2 m ahead on +x: moved
+    // 3 m toward a wall at x=4.5, the capsule (not the entity origin) hits it.
     let mut scene = Scene::new();
     let body = add(&mut scene, None, Vec3::ZERO, false);
-    rigidbody(&mut scene, body, true, Vec3::ZERO);
-    add(&mut scene, Some(body), Vec3::X * 2.0, true);
+    let cc = crate::components::CharacterControllerComponent {
+        height: 1.0,
+        center: Vec3::X * 2.0,
+        ..Default::default()
+    };
+    scene.world.set_character_controller(body, Some(cc));
     add(&mut scene, None, Vec3::new(4.5, 0.0, 0.0), true); // wall face at x=4
-    let mut world = PhysicsWorld::from_scene(&scene);
-    scene.world.transform_mut(body).unwrap().position = Vec3::X * 3.0;
-    world.step(&mut scene, DT);
+    let world = PhysicsWorld::from_scene(&scene);
+    super::move_character(Some(&world), &mut scene, body, Vec3::X * 3.0);
     let x = pos(&scene, body).x;
     assert!(
-        x > 1.0 && x < 1.6,
-        "part stops at the wall face: body x {x}"
+        x > 1.3 && x < 1.5,
+        "the capsule stops at the wall face: body x {x}"
     );
 }

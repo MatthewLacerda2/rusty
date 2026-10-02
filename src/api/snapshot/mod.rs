@@ -23,6 +23,7 @@ use crate::ecs::World;
 use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::ui::UiView;
+use components::character_controller_value as cc_value;
 use components::{
     animator_value, audio_value, camera_component_value, collider_value, light_value,
     material_value, mesh_value, nav_agent_value, particle_value, rigidbody_value,
@@ -128,6 +129,7 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -
         "layout_group": world.layout_group(id).map(|g| layout_group_value(&g)),
         "layout_element": world.layout_element(id).map(|e| layout_element_value(&e)),
         "joint": world.joint(id).map(|j| joint_value(&j)),
+        "character_controller": world.character_controller(id).map(|c| cc_value(&c)),
         "lod_group": world.lod_group(id).map(|g| lod_group_value(&g)),
         "trail": world.trail(id).map(|t| trail_value(&t)),
         "line": world.line(id).map(|l| line_value(&l)),
@@ -164,6 +166,7 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
         (World::has_layout_group, "LayoutGroup"),
         (World::has_layout_element, "LayoutElement"),
         (World::has_joint, "Joint"),
+        (World::has_character_controller, "CharacterController"),
         (World::has_lod_group, "LODGroup"),
         (World::has_trail, "TrailRenderer"),
         (World::has_line, "LineRenderer"),
