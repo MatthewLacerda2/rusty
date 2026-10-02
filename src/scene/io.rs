@@ -10,7 +10,7 @@
 //!   - one standardised scene extension (`.scene`, JSON inside).
 //!
 //! Default scene (there is always at least one):
-//!   - Authored/checked in at  assets/scenes/default.scene  (TRACKED).
+//!   - Built in Rust by `scene::default_scene::build` (#667).
 //!   - Seeded into  project/scenes/  on boot, the same way bot.lua is seeded,
 //!     because /project/ is the gitignored runtime workspace.
 //!
@@ -24,8 +24,6 @@ use crate::scene::Scene;
 /// The one standardised scene file extension (JSON inside).
 pub const SCENE_EXTENSION: &str = "scene";
 
-/// Tracked authoritative copy of the default scene.
-pub const DEFAULT_SCENE_SOURCE: &str = "assets/scenes/default.scene";
 /// Where the default scene is seeded into the gitignored project workspace.
 pub const DEFAULT_SCENE_PATH: &str = "project/scenes/default.scene";
 
@@ -79,16 +77,24 @@ pub fn read_scene_file(path: &str) -> Result<SceneData, String> {
     serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize scene {}: {}", path, e))
 }
 
-/// Seed the tracked default scene into the gitignored project workspace on boot,
-/// the same way `bot.lua` is seeded. No-op if the target already exists. Returns
-/// the seeded path so the caller can load it as the boot scene.
+/// Seed the default scene into the gitignored project workspace on boot, the same
+/// way `bot.lua` is seeded: built by [`default_scene::build`] and saved, only if the
+/// target is missing (delete it to get the current default back). Its texture and
+/// shader are seeded every time, each only if missing. Returns the seeded path so
+/// the caller can load it as the boot scene.
+///
+/// [`default_scene::build`]: crate::scene::default_scene::build
 pub fn seed_default_scene() -> String {
+    use crate::scene::default_scene;
+    default_scene::seed_default_assets();
     if let Some(parent) = Path::new(DEFAULT_SCENE_PATH).parent() {
         std::fs::create_dir_all(parent).ok();
     }
     if !Path::new(DEFAULT_SCENE_PATH).exists() {
-        if let Ok(contents) = std::fs::read_to_string(DEFAULT_SCENE_SOURCE) {
-            std::fs::write(DEFAULT_SCENE_PATH, contents).ok();
+        let mut scene = Scene::new();
+        default_scene::build(&mut scene, default_scene::BOT_SCRIPT);
+        if let Err(e) = save_to_file(&scene, DEFAULT_SCENE_PATH) {
+            eprintln!("[Scene] seeding the default scene failed: {e}");
         }
     }
     DEFAULT_SCENE_PATH.to_string()

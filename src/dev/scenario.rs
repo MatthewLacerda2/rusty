@@ -23,8 +23,8 @@ use mlua::Lua;
 
 use super::harness::Harness;
 
-/// Default enemy brain used by the demo scene when running scenarios.
-pub const DEFAULT_BOT_SCRIPT: &str = "project/assets/scripts/bot.lua";
+/// Default enemy brain used by the default scene when running scenarios.
+pub const DEFAULT_BOT_SCRIPT: &str = crate::scene::default_scene::BOT_SCRIPT;
 
 /// Outcome of a scenario run.
 pub struct RunReport {

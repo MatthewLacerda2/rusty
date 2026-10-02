@@ -8,7 +8,7 @@ mod play;
 mod steering;
 
 use glam::Vec3;
-use rusty::scene::Scene;
+use rusty::scene::{apply_scene_data, to_scene_data, Scene};
 
 /// The floor collider's half extent: a `[15, 0.1, 15]` box scaled 2.5.
 pub const FLOOR_HALF: f32 = 18.75;
@@ -17,12 +17,13 @@ pub const FLOOR_TOP: f32 = 0.05;
 /// Enemy_1's base offset: its body is 2 m tall and centred on its origin.
 pub const BASE_OFFSET: f32 = 1.0;
 
-/// The tracked default scene, and Enemy_1's id in it.
+/// The default scene as the editor boots it (built, then through its saved
+/// document), and Enemy_1's id in it.
 pub fn default_scene() -> (Scene, u32) {
+    let mut built = Scene::new();
+    rusty::scene::default_scene::build(&mut built, rusty::scene::default_scene::BOT_SCRIPT);
     let mut scene = Scene::new();
-    scene
-        .load_from_file(rusty::scene::DEFAULT_SCENE_SOURCE)
-        .expect("tracked default scene loads");
+    apply_scene_data(&mut scene, to_scene_data(&built));
     let enemy = scene.find_entity_by_name("Enemy_1").expect("Enemy_1");
     (scene, enemy)
 }

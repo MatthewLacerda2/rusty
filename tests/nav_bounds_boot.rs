@@ -1,8 +1,8 @@
 //! The windowed boot and the headless harness bake the same navmesh (#452).
 //!
 //! Both used to hardcode a ±20 grid; both now go through `NavigationGraph::from_scene`.
-//! The harness's graph must match a fresh `from_scene` bake of its demo scene, and the
-//! tracked default scene the windowed game boots must bake over its own bounds too.
+//! The harness's graph must match a fresh `from_scene` bake of its scene — the default
+//! scene the windowed game boots (#667) — and that bake spans the scene's own bounds.
 
 use rusty::dev::harness::Harness;
 use rusty::navigation::{NavBounds, NavigationGraph};
@@ -15,7 +15,7 @@ fn harness_graph_is_the_from_scene_bake_of_its_scene() {
     let nav = world.nav().borrow();
 
     let mut demo = Scene::new();
-    rusty::dev::demo_scene::build(&mut demo, "");
+    rusty::scene::default_scene::build(&mut demo, "");
     let fresh = NavigationGraph::from_scene(&demo);
 
     assert_eq!(nav.bounds(), fresh.bounds());
@@ -29,12 +29,10 @@ fn harness_graph_is_the_from_scene_bake_of_its_scene() {
 #[test]
 fn default_scene_bakes_over_its_own_bounds() {
     let mut scene = Scene::new();
-    scene
-        .load_from_file(rusty::scene::DEFAULT_SCENE_SOURCE)
-        .expect("tracked default scene loads");
+    rusty::scene::default_scene::build(&mut scene, "");
     let nav = NavigationGraph::from_scene(&scene);
     let b = nav.bounds();
-    eprintln!("default.scene bounds: {b:?}");
+    eprintln!("default scene bounds: {b:?}");
     assert!(b.is_valid());
     assert_ne!(
         b,

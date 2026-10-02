@@ -17,6 +17,7 @@
 //!   rehydrate — rebuild a mesh's geometry + rig from its on-disk reference
 //!   skeleton  — bones as GameObjects: spawn, save-strip, palette build (#453)
 //!   io        — save/load, path + extension, default-scene seeding
+//!   default_scene — the default scene's builder, materials and seeded assets
 //!   snapshot  — edit-mode snapshot/restore around Play
 //!   runtime   — play-mode requests drained at the tick tail: destroys, scene loads
 
@@ -25,6 +26,7 @@ pub mod authoring;
 pub mod camera;
 pub mod collision_matrix;
 pub mod decal;
+pub mod default_scene;
 pub mod fog;
 pub mod identity;
 pub mod io;
@@ -50,8 +52,7 @@ pub use fog::{FogMode, FogSettings};
 pub use identity::SceneId;
 pub use io::{
     is_scene_path, load_from_file, read_scene_file, save_to_file, seed_default_scene,
-    seed_default_scripts, DEFAULT_SCENE_PATH, DEFAULT_SCENE_SOURCE, DEFAULT_SCRIPTS_DEST_DIR,
-    SCENE_EXTENSION,
+    seed_default_scripts, DEFAULT_SCENE_PATH, DEFAULT_SCRIPTS_DEST_DIR, SCENE_EXTENSION,
 };
 pub use layers::{layer_in_mask, LayerRegistry, LAYER_COUNT};
 pub use lighting::io::{
