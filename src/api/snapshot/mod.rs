@@ -15,6 +15,7 @@
 use glam::{Mat4, Vec2, Vec3};
 use serde_json::{json, Value};
 
+mod audio;
 mod components;
 mod navigation;
 mod ui;
@@ -24,10 +25,11 @@ use crate::ecs::World;
 use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::ui::UiView;
+use audio::{audio_value, reverb_zone_value};
 use components::character_controller_value as cc_value;
 use components::{
-    animator_value, audio_value, camera_component_value, collider_value, light_value,
-    material_value, mesh_value, nav_agent_value, particle_value, rigidbody_value,
+    animator_value, camera_component_value, collider_value, light_value, material_value,
+    mesh_value, nav_agent_value, particle_value, rigidbody_value,
 };
 use components::{joint_value, line_value, lod_group_value, trail_value};
 use navigation::nav_obstacle_value;
@@ -137,6 +139,7 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -
         "particles": world.particles(id).map(|p| particle_value(&p)),
         "animator": world.animator(id).map(|a| animator_value(&a)),
         "audio": world.audio(id).map(|a| audio_value(&a)),
+        "reverb_zone": world.reverb_zone(id).map(|z| reverb_zone_value(&z)),
         "canvas": world.canvas(id).map(|c| canvas_value(&c)),
         "rect_transform": world.rect_transform(id).map(|r| rect_transform_value(&r)),
         "image": world.image(id).map(|i| image_value(&i)),
@@ -175,6 +178,7 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
         (World::has_particles, "ParticleEmitter"),
         (World::has_animator, "Animator"),
         (World::has_audio, "AudioSource"),
+        (World::has_reverb_zone, "AudioReverbZone"),
         (World::has_canvas, "Canvas"),
         (World::has_rect_transform, "RectTransform"),
         (World::has_image, "Image"),

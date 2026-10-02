@@ -8,8 +8,8 @@ use serde_json::{json, Value};
 
 use super::vec3;
 use crate::components::{
-    AnimatorComponent, AudioSourceComponent, CameraComponent, ColliderComponent, ColliderShape,
-    LayerState, LightComponent, LightType, MaterialAsset, MeshComponent, NavMeshAgentComponent,
+    AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, LayerState,
+    LightComponent, LightType, MaterialAsset, MeshComponent, NavMeshAgentComponent,
     ParticleEmitterComponent, RigidBodyComponent,
 };
 use crate::components::{
@@ -198,24 +198,6 @@ pub(crate) fn animator_value(a: &AnimatorComponent) -> Value {
 }
 fn layer_value(l: &LayerState) -> Value {
     json!({ "name": l.name, "weight": l.weight, "node": l.playback.current_node })
-}
-
-/// AudioSource authoring view (#212): the clip + playback flags, plus the spatial
-/// fields stored now for #213. The live playing state lives in the `AudioMaestro`
-/// roster, not here — this is the persistent component's own data.
-pub(crate) fn audio_value(a: &AudioSourceComponent) -> Value {
-    json!({
-        "clip": a.clip,
-        "volume": a.volume,
-        "loop": a.looping,
-        "play_on_start": a.play_on_start,
-        "is_time_scaled": a.is_time_scaled,
-        "spatial_blend": a.spatial_blend,
-        "initial_distance": a.initial_distance,
-        "final_distance": a.final_distance,
-        "output_group": a.output_group,
-        "occlusion_enabled": a.occlusion_enabled,
-    })
 }
 
 /// Joint (#449): its kind, connected body (`null`: the world), anchors, axes,

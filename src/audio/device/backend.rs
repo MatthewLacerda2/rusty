@@ -31,6 +31,7 @@ use super::voice::{ClipSound, ClipSoundData, VoiceControl};
 use crate::audio::backend::{AudioBackend, PlayParams, VoiceId, VoiceMix};
 use crate::audio::mixer::{GroupId, GroupMix};
 use crate::audio::SpeakerMode;
+use crate::components::ReverbParams;
 
 /// kira-backed mixer. Owns the `AudioManager`, which holds the device open for the
 /// life of the backend — dropping it silences everything.
@@ -139,6 +140,10 @@ impl<B: Backend> AudioBackend for KiraBackend<B> {
 
     fn set_group(&mut self, id: GroupId, mix: &GroupMix) {
         self.groups.set(id, mix);
+    }
+
+    fn set_reverb(&mut self, params: &ReverbParams) {
+        self.groups.set_reverb(params);
     }
 }
 

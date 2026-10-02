@@ -4,7 +4,7 @@
 //! track sums into its parent's, Master's into kira's main track). Each track runs
 //! a low-pass then a high-pass filter (kira's state-variable filter; an "open"
 //! filter is switched fully dry, so it is bit-transparent) and routes a send into
-//! the one reverb bus, a kira send track running kira's reverb fully wet. Volume,
+//! the one reverb bus (`reverb.rs`, tuned by reverb zones, #469). Volume,
 //! cutoffs and the send move with kira's 10 ms tween, so a snapshot stepped once a
 //! frame never clicks.
 
@@ -12,9 +12,11 @@ use std::collections::HashMap;
 
 use kira::backend::Backend;
 use kira::effect::filter::{FilterBuilder, FilterHandle, FilterMode};
-use kira::effect::reverb::ReverbBuilder;
-use kira::track::{SendTrackBuilder, SendTrackHandle, TrackBuilder, TrackHandle};
+use kira::track::{TrackBuilder, TrackHandle};
 use kira::{AudioManager, Decibels, Mix, Tween};
+
+use super::reverb::ReverbBus;
+use crate::components::ReverbParams;
 
 use crate::audio::mixer::settings::{HIGH_PASS_OFF, LOW_PASS_OFF};
 use crate::audio::mixer::{Filter, GroupId, GroupMix};
@@ -41,17 +43,21 @@ pub struct GroupTrack {
 /// Every group's track plus the reverb bus they send to.
 pub struct GroupTracks {
     tracks: HashMap<GroupId, GroupTrack>,
-    reverb: SendTrackHandle,
+    reverb: ReverbBus,
 }
 
 impl GroupTracks {
-    /// The reverb bus, ready for groups to be added.
+    /// The reverb bus (dry: no zone yet), ready for groups to be added.
     pub fn new<B: Backend>(manager: &mut AudioManager<B>) -> Option<Self> {
-        let reverb = SendTrackBuilder::new().with_effect(ReverbBuilder::new().mix(Mix::WET));
         Some(Self {
             tracks: HashMap::new(),
-            reverb: manager.add_send_track(reverb).ok()?,
+            reverb: ReverbBus::new(manager, &ReverbParams::DRY)?,
         })
+    }
+
+    /// Retune the reverb bus to the listener's zone blend.
+    pub fn set_reverb(&mut self, params: &ReverbParams) {
+        self.reverb.set(params);
     }
 
     /// Build group `id`'s track under `parent` (kira's main track for `None`),

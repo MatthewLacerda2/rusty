@@ -1,4 +1,4 @@
-//! src/editor/inspector/components/audio.rs — the AudioSource inspector card (#212).
+//! src/editor/inspector/components/audio/source.rs — the AudioSource inspector card (#212).
 //!
 //! Edits every serde-persisted field of `AudioSourceComponent`: the clip path, per-
 //! source volume, loop / play-on-start flags, the time-scaled toggle (gameplay vs.

@@ -256,12 +256,19 @@ edits and each physics step.)
 | `AddDuck` / `ClearDucks` | ✅ | sim — duck envelopes stepped with the mixer; observable as `GetGroupState().duck` |
 | `SetOcclusionSettings` | ✅ | sim — `AudioMaestro::occlude` (each `LateUpdate`) casts through the rapier world with the mask and budget and scales the muffle by the strength; observable via `GetOcclusionSettings` and `GetSpatial`'s `occlusion` |
 | `SetOcclusionEnabled` | ✅ | `AudioSource.occlusion_enabled` — read by the cast each tick; observable via `GetOcclusionEnabled` and `Debug.Snapshot` |
+| `GetReverbState` | ✅ | read-back only — the listener's zone blend `AudioMaestro::resolve_reverb` stores each `LateUpdate` (and sends to the reverb bus, `device/reverb.rs`) |
 
 The maestro carries a **no-op backend** on the headless harness, so the *sound* is a
 windowed-only side effect; the **introspection log + playing set** are the
 device-free read-sites a play-test asserts on (deterministic — voice ids are a
 monotone counter, the event tick is `Time.frameCount`). `AudioSource`'s authoring
 fields (incl. the spatial fields stored for #213) round-trip through `SceneData`.
+
+### `AudioReverbZone` — over `Entity.reverb_zone` (#469)
+
+| Setter | Status | Read-site |
+|---|---|---|
+| `SetMinDistance` / `SetMaxDistance` / `SetPreset` / `SetParams` | ✅ | sim — `app/audio.rs::resolve_reverb` blends every active zone around the camera each `LateUpdate`, then the device's reverb bus retunes (`device/reverb.rs`); observable via `Audio.GetReverbState`, round-trips via the getters and `Debug.Snapshot` |
 
 ### `Decals` — over `Scene.decals`
 

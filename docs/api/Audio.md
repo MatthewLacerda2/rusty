@@ -8,7 +8,8 @@ through, and `occlusion_enabled`); these verbs start/stop and retune it, fire
 one-shots, set the single master volume and the speaker mode, read a source's
 resolved 3D spatial state, tune [occlusion](#occlusion), and drive the
 [mixer](#mixer-groups-snapshots-and-ducking): groups (buses) with volume, filters and
-a reverb send, snapshots, and ducking. Decode is `.ogg` (Vorbis) / `.wav` / `.mp3`, path-cached;
+a reverb send, snapshots, and ducking, and read back the listener's
+[reverb zones](#reverb-zones). Decode is `.ogg` (Vorbis) / `.wav` / `.mp3`, path-cached;
 a clip that fails to decode logs one warning naming the file and plays nothing.
 
 **Clip formats.** Ship **WAV** for one-shots and loops, **OGG** (Vorbis) for music and
@@ -58,6 +59,7 @@ play-test can assert *what* played, *where*, and *by whom* — one-shots include
 | `Audio.GetSnapshot` | `()` | `(name, progress)` — the snapshot last transitioned to and how far along the blend is (`0..1`), or `nil` before any |
 | `Audio.AddDuck` | `(trigger, target, volume [, attack [, release]])` | — while `trigger` (or a group under it) has a live voice, `target`'s gain ramps to `volume` (linear, `[0, 1]`) over `attack` seconds (default 0.1), and back to 1 over `release` seconds (default 0.5) once it is silent; unknown groups are an error |
 | `Audio.ClearDucks` | `()` | — drops every duck rule; ducked groups recover at once |
+| `Audio.GetReverbState` | `()` | table — the listener's blended [reverb zones](#reverb-zones) as of the last `LateUpdate`: `decay_time`, `pre_delay`, `damping`, `wet` (what the reverb bus runs at), `weight` (the zones' summed weight at the listener, capped at 1; `0` in no zone) and `zones` (how many reach the listener) |
 
 A voice's volume is its per-source `volume` multiplied by the master volume (and by
 its distance rolloff — see below). The play events are also visible in the `Debug.Snapshot` per-entity `audio` block (the
@@ -177,7 +179,9 @@ ancestor's. Group names are exact (case-sensitive).
 Each group has a **volume** and **mute**, a **low-pass** and a **high-pass** filter
 (cutoff in Hz plus resonance; a 22 kHz low-pass and a 10 Hz high-pass are open and
 change nothing), and a **reverb send**: how much of the group feeds the one reverb
-bus (off by default; reverb zones, #469, will tune it).
+bus that [reverb zones](#reverb-zones) tune. **`World` sends 1 by default** (every
+other group 0), so world sounds take on the room's reverb out of the box; give
+`SFX` a send to make gunshots ring too.
 
 **Snapshots** are named, *partial* group settings: a snapshot changes only the
 fields it names, so a settings-menu `Music` volume survives a `BulletTime` that only
@@ -212,3 +216,36 @@ trigger a duck there.
 **Stop** discards play-mode mixer changes (groups created, settings, snapshots,
 ducks), as it does the scene's. The device applies group changes with a 10 ms ramp,
 so a blend stepped once a frame never clicks.
+
+### Reverb zones
+
+Unity's `AudioReverbZone`: an entity with an
+[`AudioReverbZone`](AudioReverbZone.md) is a sphere that sets the reverb of the
+world mix while the listener (the active camera) is inside it. The listener's
+**weight** in a zone is 1 within its `min_distance`, 0 at or past its
+`max_distance`, and linear between. Each `LateUpdate` the zones blend:
+
+- the tail's **character** — `decay_time`, `pre_delay`, `damping` — is the
+  weight-averaged character of the zones that reach the listener;
+- its **level** — `wet` — is their weighted sum divided by `max(total weight, 1)`.
+  A lone zone fades to dry at its edge; two zones the listener is fully inside
+  average rather than double. An `Off` zone inside a `Hall` halves the hall's level.
+
+Outside every zone the reverb bus is **silent**: a group's reverb send only colours
+the mix where a zone says the space rings (outdoors, use no zone or an `Outdoor`
+one). The blend runs on the zones' world positions in entity-id order, so it is a
+pure function of the scene and the camera: `Audio.GetReverbState` reads back the
+same values on the headless harness (no device) and in a replay. Inactive entities'
+zones do not count. **Stop** dries the reverb.
+
+On the device the reverb bus is a pre-delay into kira's reverb (Freeverb), fully wet:
+`decay_time` sets the comb feedback, `damping` its damping, `wet` the bus's level,
+and a 50 ms ramp smooths a jump (a teleport) into a glide. Geometry-derived
+acoustics and convolution reverb are out of scope, as is a per-source send beyond
+the groups'.
+
+```lua
+Audio.SetGroupReverbSend("SFX", 0.6)   -- gunshots ring in tunnels too
+local r = Audio.GetReverbState()
+print(r.decay_time, r.wet, r.zones)    -- e.g. 2.8  0.55  1 inside "B Tunnels"
+```

@@ -8,6 +8,7 @@ use serde::Deserialize;
 use super::{Entity, PrefabLink};
 use crate::components::particle::LegacyEmitter;
 use crate::components::NavMeshObstacleComponent;
+use crate::components::ReverbZoneComponent;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, CharacterControllerComponent, ColliderComponent, ImageComponent,
@@ -59,6 +60,8 @@ pub(super) struct EntityRepr {
     particles: Option<LegacyEmitter>,
     #[serde(default)]
     audio: Option<AudioSourceComponent>,
+    #[serde(default)]
+    reverb_zone: Option<ReverbZoneComponent>,
     #[serde(default)]
     canvas: Option<CanvasComponent>,
     #[serde(default)]
@@ -131,6 +134,7 @@ impl From<EntityRepr> for Entity {
             visual_correction: r.visual_correction,
             particles: r.particles.map(ParticleEmitterComponent::from),
             audio: r.audio,
+            reverb_zone: r.reverb_zone,
             canvas: r.canvas,
             rect_transform: r.rect_transform,
             image: r.image,

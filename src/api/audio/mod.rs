@@ -5,7 +5,8 @@
 //! fire-and-forget one-shot at a world position (`PlayAt`), and read/set the single
 //! master volume and the speaker mode (#546) on the `AudioMaestro`, and drive the
 //! mixer's groups, snapshots and ducks (`groups.rs`, `snapshots.rs`, #465) and
-//! occlusion (`occlusion.rs`, #467). One surface, three callers — the same verbs
+//! occlusion (`occlusion.rs`, #467), and read back the listener's blended reverb
+//! zones (`reverb.rs`, #469). One surface, three callers — the same verbs
 //! the editor's play-state and the play-mode systems drive.
 //!
 //! Every verb routes through the shared `AudioMaestro` (a Resource), so a scripted
@@ -20,6 +21,7 @@ use mlua::Lua;
 
 mod groups;
 mod occlusion;
+mod reverb;
 mod snapshots;
 
 use super::{put, Reg};
@@ -50,6 +52,7 @@ pub fn register<'lua, 'scope>(
     groups::register_output(scope, &table, scene, audio)?;
     snapshots::register_snapshots(scope, &table, audio, time)?;
     occlusion::register_occlusion(scope, &table, scene, audio)?;
+    reverb::register_reverb(scope, &table, audio)?;
 
     lua.globals().set("Audio", table).map_err(|e| e.to_string())
 }

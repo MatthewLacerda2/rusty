@@ -173,6 +173,7 @@ impl World {
             visual_correction: self.visual_correction(id).map(|c| (*c).clone()),
             particles: self.particles(id).map(|c| (*c).clone()),
             audio: self.audio(id).map(|c| (*c).clone()),
+            reverb_zone: self.reverb_zone(id).map(|c| (*c).clone()),
             canvas: self.canvas(id).map(|c| (*c).clone()),
             rect_transform: self.rect_transform(id).map(|c| (*c).clone()),
             image: self.image(id).map(|c| (*c).clone()),

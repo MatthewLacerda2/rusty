@@ -39,6 +39,7 @@ pub mod nav_obstacle;
 pub mod particles;
 pub mod rect_mask;
 pub mod rect_transform;
+pub mod reverb_zone;
 pub mod ribbon;
 pub mod rigidbody;
 pub mod selectable;

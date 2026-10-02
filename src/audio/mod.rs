@@ -8,7 +8,8 @@
 //! [`VoiceMix`] to the backend (`mix.rs`, #412); the real device pans each voice
 //! through `device/voice.rs`. Every voice routes through a group of the [`Mixer`]
 //! (`mixer/`, #465): buses with volume, filters and a reverb send, snapshots and
-//! ducking, stepped by sim time. The speaker mode (#546, `speaker.rs`) shapes the
+//! ducking, stepped by sim time; every group sends into one reverb bus that reverb
+//! zones tune from the listener's position (`reverb/`, #469). The speaker mode (#546, `speaker.rs`) shapes the
 //! output for the listening setup: per voice here, on the summed signal at the
 //! device's output stage.
 //!
@@ -30,6 +31,7 @@ pub mod mixer;
 pub mod occlusion;
 #[cfg(test)]
 pub mod recording;
+pub mod reverb;
 pub mod spatial;
 pub mod speaker;
 
@@ -40,5 +42,6 @@ pub use maestro::AudioMaestro;
 pub use mix::{MixEnv, Rolloff, Shot};
 pub use mixer::{GroupPatch, GroupState, Mixer};
 pub use occlusion::{Occluder, OcclusionSettings};
+pub use reverb::ReverbState;
 pub use spatial::Listener;
 pub use speaker::SpeakerMode;

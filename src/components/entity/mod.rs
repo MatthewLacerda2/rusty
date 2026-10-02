@@ -23,7 +23,7 @@ use super::{
 };
 use super::{BackdropFilterComponent, MaskComponent, NavMeshObstacleComponent};
 use super::{CharacterControllerComponent, JointComponent, LineComponent, LodGroupComponent};
-use super::{SubEmitters, TrailComponent};
+use super::{ReverbZoneComponent, SubEmitters, TrailComponent};
 
 /// The live link from an instance entity back to the `.prefab` it was stamped from
 /// (#216). Set on EVERY entity of a linked instance — not just the root — so that
@@ -100,6 +100,10 @@ pub struct Entity {
     /// load with no audio source.
     #[serde(default)]
     pub audio: Option<AudioSourceComponent>,
+    /// Listener-position reverb volume (#469). `#[serde(default)]` for pre-#469
+    /// scenes.
+    #[serde(default)]
+    pub reverb_zone: Option<ReverbZoneComponent>,
     /// UI root (#417). `#[serde(default)]` so pre-#417 scenes load with no canvas.
     #[serde(default)]
     pub canvas: Option<CanvasComponent>,
@@ -199,6 +203,7 @@ impl Entity {
             visual_correction: None,
             particles: None,
             audio: None,
+            reverb_zone: None,
             canvas: None,
             rect_transform: None,
             image: None,

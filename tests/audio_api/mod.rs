@@ -7,6 +7,7 @@ mod global;
 mod mixer;
 mod occlusion;
 mod oneshot;
+mod reverb;
 mod voices;
 
 use std::cell::RefCell;

@@ -51,6 +51,7 @@ pub mod random;
 pub mod rect_mask;
 pub mod rect_transform;
 pub mod reflection;
+pub mod reverb_zone;
 mod ribbon_style;
 pub mod scene;
 pub mod scene_hierarchy;
@@ -195,6 +196,7 @@ pub fn register<'lua, 'scope>(
     trail::register(lua, scope, ctx.scene)?;
     line::register(lua, scope, ctx.scene)?;
     audio::register(lua, scope, ctx.scene, ctx.audio, ctx.time, ctx.camera)?;
+    reverb_zone::register(lua, scope, ctx.scene)?;
     canvas::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
     rect_transform::register(lua, scope, ctx.scene, (ctx.screen, ctx.video))?;
     ui::register(lua, scope, ctx.scene, (ctx.screen, ctx.video), ctx.camera)?;

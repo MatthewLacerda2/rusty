@@ -18,6 +18,7 @@
 use super::mixer::settings::LOW_PASS_OFF;
 use super::mixer::{GroupId, GroupMix};
 use super::speaker::SpeakerMode;
+use crate::components::ReverbParams;
 
 /// A handle to one playing voice, opaque to the maestro. The backend maps it to its
 /// own internal sink/source; the maestro only stores it to later stop or remix.
@@ -116,6 +117,10 @@ pub trait AudioBackend {
 
     /// Apply group `id`'s resolved mix (volume, filters, reverb send) in place.
     fn set_group(&mut self, id: GroupId, mix: &GroupMix);
+
+    /// Run the reverb bus every group sends into at `params` (#469): the
+    /// listener's blended reverb zones.
+    fn set_reverb(&mut self, params: &ReverbParams);
 }
 
 /// The do-nothing backend: holds no device, plays no sound, but reports a voice as
@@ -142,6 +147,8 @@ impl AudioBackend for NullBackend {
     /// No tracks to build; the maestro's mixer keeps the resolved state.
     fn add_group(&mut self, _id: GroupId, _parent: Option<GroupId>) {}
     fn set_group(&mut self, _id: GroupId, _mix: &GroupMix) {}
+    /// No bus; the maestro keeps the resolved reverb for read-back.
+    fn set_reverb(&mut self, _params: &ReverbParams) {}
 }
 
 #[cfg(test)]

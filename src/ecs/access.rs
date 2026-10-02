@@ -22,6 +22,7 @@
 
 use std::ops::{Deref, DerefMut};
 
+use crate::components::ReverbZoneComponent;
 use crate::components::ShapeComponent;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
@@ -132,6 +133,7 @@ optional_component_accessors! {
     VisualCorrectionComponent => visual_correction, visual_correction_mut, has_visual_correction, set_visual_correction, take_visual_correction, ids_with_visual_correction;
     ParticleEmitterComponent => particles, particles_mut, has_particles, set_particles, take_particles, ids_with_particles;
     AudioSourceComponent => audio, audio_mut, has_audio, set_audio, take_audio, ids_with_audio;
+    ReverbZoneComponent => reverb_zone, reverb_zone_mut, has_reverb_zone, set_reverb_zone, take_reverb_zone, ids_with_reverb_zone;
     CanvasComponent => canvas, canvas_mut, has_canvas, set_canvas, take_canvas, ids_with_canvas;
     RectTransformComponent => rect_transform, rect_transform_mut, has_rect_transform, set_rect_transform, take_rect_transform, ids_with_rect_transform;
     ImageComponent => image, image_mut, has_image, set_image, take_image, ids_with_image;
