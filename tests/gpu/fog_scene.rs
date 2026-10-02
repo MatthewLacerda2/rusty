@@ -1,6 +1,7 @@
 //! Shared fixture for the scene-fog pixel tests (#437): a flat, light-independent
 //! wall and a neutral post-FX volume, so a pixel's colour is exactly the fogged
-//! surface colour, sRGB-encoded. Zero ambient + no lights + black albedo leaves a
+//! surface colour, sRGB-encoded. Zero ambient + no lights + black albedo + full
+//! roughness (no environment reflection, #718) leaves a
 //! surface's lit colour equal to its `emissive`; tonemap `None` and neutral grading
 //! pass it through, so a test can predict the pixel from the fog formula.
 
@@ -50,6 +51,8 @@ pub fn wall_scene(distance: f32, color: [f32; 3]) -> Scene {
         MaterialAsset {
             base_color: [0.0, 0.0, 0.0],
             emissive: color,
+            // Fully rough: no sky reflection (#718), so the pixel is the emissive alone.
+            roughness: 1.0,
             ..MaterialAsset::default()
         },
     );

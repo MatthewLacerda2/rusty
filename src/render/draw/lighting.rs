@@ -23,7 +23,8 @@ pub(crate) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
         ssr_temporal_upsampling: 0.0,
         refl_active: 0.0,
         refl_has_cubemap: 0.0,
-        _refl_pad: [0.0; 2],
+        sky_textured: 0.0,
+        _refl_pad: 0.0,
         refl_center: [0.0; 4],
         refl_box_min: [0.0; 4],
         refl_box_max: [0.0; 4],
@@ -134,7 +135,9 @@ impl crate::render::Renderer {
 
     /// Builds the per-frame lighting uniform from the scene's lights and SSR settings.
     /// `refl_has_cubemap` is set only when a baked cube is actually loaded for the active
-    /// probe (`self.reflection_cube`), so the shader never samples the black fallback cube.
+    /// probe (`self.reflection_cube`), so the shader never samples the black fallback cube;
+    /// likewise `sky_textured` only when a panorama is loaded (#718), else the shader
+    /// reflects the procedural sky the sky pass draws.
     fn build_lighting_uniform(&self, scene: &Scene, camera_pos: Vec3) -> LightingUniform {
         let mut lighting_uniform = default_lighting_uniform(scene);
         apply_scene_lights(&mut lighting_uniform, scene);
@@ -142,6 +145,9 @@ impl crate::render::Renderer {
         apply_reflection_probe(&mut lighting_uniform, scene, camera_pos);
         if self.reflection_cube.is_some() {
             lighting_uniform.refl_has_cubemap = 1.0;
+        }
+        if self.skybox_texture.is_some() {
+            lighting_uniform.sky_textured = 1.0;
         }
         lighting_uniform
     }

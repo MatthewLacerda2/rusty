@@ -82,7 +82,7 @@ const LOOKS: &[Look] = &[
     look(WALL, [0.78, 0.74, 0.68], 0.0, 0.9, true),
     look(ENEMY, [0.85, 0.12, 0.12], 0.1, 0.45, false),
     look(CRATE, [0.72, 0.5, 0.3], 0.0, 0.7, true),
-    look(METAL, [0.9, 0.9, 0.92], 0.55, 0.3, false),
+    look(METAL, [0.9, 0.9, 0.92], 1.0, 0.22, false),
 ];
 
 const fn look(
