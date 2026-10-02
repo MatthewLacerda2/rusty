@@ -201,6 +201,8 @@ impl AnimationGraph {
 }
 
 #[cfg(test)]
+mod event_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod v2_tests;

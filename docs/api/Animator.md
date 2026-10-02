@@ -136,6 +136,63 @@ name: `Animator.SetLayerWeight(id, "UpperBody", 0.5)`,
 "UpperBody")`. A graph written before layers existed is simply a graph with no
 extra layers.
 
+### Animation events (#459)
+
+An **animation event** is a named marker at a time in a clip. When the playhead
+crosses it, the animator entity's scripts get `OnAnimationEvent(id, name)` —
+Unity's `AnimationEvent`, with a name instead of a payload (switch on it in
+Lua). Footsteps on foot-down, the reload's magazine landing, the muzzle flash
+on an attack clip's fire frame, a melee window opening and closing: gameplay
+lands on the frame the animation shows, not on a timer that drifts from it.
+
+glTF can't carry events, so they are authored on the **graph**: a clip node's
+`events`, and each blend-tree child's own (a blend-tree node carries none of its
+own). `time` is in the clip's own seconds, whatever the playback speed.
+
+```json
+{ "name": "Reload", "clip": "RifleReload",
+  "events": [ { "time": 0.9, "name": "MagOut" }, { "time": 1.6, "name": "MagIn" } ] }
+```
+
+```lua
+function M.OnAnimationEvent(id, name)
+  if name == "MagIn" then ammo = MAG_SIZE end
+  if name == "End" then reloading = false end
+end
+```
+
+**Exactly once per crossing.** Each fixed step the playhead travels from where
+it was to where it is now, and every marker on the way fires once — the start
+of the travel counts, the end doesn't, so a marker at `0` fires as the clip
+starts:
+
+- A looping clip fires each marker once per loop, across the wrap. A step long
+  enough to loop twice fires it twice (at most 16 times per step).
+- A step (large `dt`, high speed) that skips over a marker still fires it, once.
+- A playhead that stands still (speed 0, `Pause`, `Stop`) fires nothing, even
+  parked on a marker.
+- **`"End"`** fires automatically, once, when a **non-looping** clip or blend
+  tree reaches its end. It also fires for a clip started with `Animator.Play`,
+  outside any graph.
+
+**Which motion fires.** Only what is really playing:
+
+- During a crossfade, the motion being **faded out is silent**; the one coming
+  in fires from its first frame: a transition hands the events over.
+- In a **blend tree**, only the **dominant child** fires — the highest weight,
+  the first authored on a tie — so a walk/run blend plays one set of footsteps,
+  not two. Put the same marker names on each child.
+- **Extra layers** fire too, while their weight is above 0 (an upper-body
+  reload layer fires `MagIn`); a layer at weight 0 is silent.
+
+**When and in what order.** Events fire after the tick's animation step and
+ragdoll posing, before `LateUpdate` (Unity fires them during the Animator's
+update) — so a handler sees this tick's animated pose, and `LateUpdate` sees
+what the handler did. Events crossed in the same step fire in the order the
+playheads crossed them, then by layer (base first), then in authored order; the
+whole dispatch is deterministic. Events are authored data only: there is no API
+to add them at runtime.
+
 ### Bones are GameObjects (#453)
 
 Instantiating a skinned model spawns its **skeleton as child entities** of the
@@ -150,7 +207,7 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
   length). A bone no playing clip animates is left alone.
 - **Later writers override it, in a fixed order each tick.** The Animator writes
   the clip pose; a ragdolled bone is then put back where its physics body is;
-  `LateUpdate` scripts (procedural recoil, a hand-made aim, setting IK targets)
+  `OnAnimationEvent` handlers (below) run; `LateUpdate` scripts (procedural recoil, a hand-made aim, setting IK targets)
   run next; IK (below) bends the result last, skipping any bone a ragdoll's
   dynamic body carries (physics wins); hitboxes then follow the bones. The mesh is
   skinned from the bones once per frame after all of them, so what moved a bone
