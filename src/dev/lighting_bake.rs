@@ -8,7 +8,7 @@
 //!   2. runs the two existing dev bakes — the multi-bounce light-probe bake (#250, #285,
 //!      `probe_bake`) and the GGX reflection-probe bake (#252, `reflection_bake`).
 //!
-//! Placement is the deterministic, pure step (`scene::lighting_placement`); the bakes
+//! Placement is the deterministic, pure step (`scene::lighting::placement`); the bakes
 //! are the render/dev step. This module is the single path both callers route through,
 //! so the button and the API never drift (editor↔API parity). It is dev-only — a baked
 //! lighting set is an authoring artifact (SH sidecar + KTX2 cubemaps) the runtime loads.
@@ -19,7 +19,8 @@
 //! So a level with no probes gets a full auto-place + bake; one with hand-authored
 //! probes is a pure rebake — manual placement is never clobbered.
 //!
-//! Allowed deps: render (via the two bakes), scene (placement + data), navigation (read).
+//! Allowed deps: render (via the two bakes), scene (placement + data), navigation (read:
+//! the walkable extent light probes fill, handed to placement as plain bounds).
 
 use crate::navigation::NavigationGraph;
 use crate::scene::lighting::placement;
@@ -95,7 +96,8 @@ fn auto_place_light(scene: &mut Scene, nav: Option<&NavigationGraph>, spacing: f
     if !scene.probes.is_empty() {
         return false;
     }
-    match placement::plan_light_probes(scene, nav, spacing) {
+    let walkable = nav.and_then(NavigationGraph::walkable_aabb);
+    match placement::plan_light_probes(scene, walkable, spacing) {
         Some(plan) => {
             scene.probes.fill_grid(plan.min, plan.max, plan.spacing);
             true

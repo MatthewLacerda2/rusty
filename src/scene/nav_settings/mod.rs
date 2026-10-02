@@ -1,20 +1,40 @@
-//! src/navigation/settings.rs — `NavMeshSettings`: per-scene navmesh bake tunables.
+//! src/scene/nav_settings/ — `NavMeshSettings`: per-scene navmesh bake tunables.
 //!
 //! These are the authorable knobs Unity exposes as per-scene navmesh bake settings.
-//! They live in the `navigation` module (a plain data struct with no `scene` deps) so
-//! `scene` can serialize them one-way — `scene` already references `navigation`
-//! (`scene::lighting::placement`), and this keeps that direction, never the reverse.
+//! They are plain serde data the scene saves, so they live with the scene, beside
+//! `FogSettings`: the arrow is navigation → scene, never the reverse (#721). The bake
+//! (`navigation`) reads them off the active `Scene` (`Scene::nav_settings`) and takes
+//! its defaults from the constants here, so they take effect on every re-bake. The
+//! serde defaults equal those constants, so a pre-#276 scene that omits the block
+//! bakes exactly as it did before.
 //!
-//! The bake reads these off the active `Scene` (`Scene::nav_settings`) instead of the
-//! historical hardcoded constants, so they take effect on every re-bake. The serde
-//! defaults equal those constants, so a pre-#276 scene that omits the block bakes
-//! exactly as it did before.
+//! Submodules: `area` (the area table's rows and limits, #460) and `bounds` (the
+//! authored XZ nav volume, #452). `navigation` re-exports all of it under its old
+//! paths.
+
+mod area;
+mod bounds;
+#[cfg(test)]
+mod tests;
 
 use serde::{Deserialize, Serialize};
 
-use super::areas::{default_areas, NavArea};
-use super::bounds::NavBounds;
-use super::grid::{DEFAULT_GRID_SPACING, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP};
+pub use area::{
+    default_areas, NavArea, ALL_AREAS, MAX_AREAS, MIN_AREA_COST, NOT_WALKABLE_AREA, WALKABLE_AREA,
+};
+pub use bounds::{NavBounds, EMPTY_SCENE_HALF_EXTENT};
+
+/// Default maximum height an agent can step up/down between two adjacent cells
+/// while still treating them as connected (stairs, curbs). World units.
+pub const DEFAULT_MAX_STEP: f32 = 0.5;
+/// Default maximum walkable slope, expressed as a height delta per cell of
+/// horizontal travel (i.e. `rise / grid_spacing`). A ramp steeper than this is
+/// not traversable. `1.0` ≈ 45° at unit spacing.
+pub const DEFAULT_MAX_SLOPE: f32 = 1.0;
+/// Default grid cell size in world units — the spacing every runtime
+/// `NavigationGraph` is created with. The [`NavMeshSettings`] default matches this so
+/// an unconfigured scene bakes at the historical resolution.
+pub const DEFAULT_GRID_SPACING: f32 = 1.0;
 
 /// A sensible default agent radius (world units). Consumed at bake time (#277): the bake
 /// erodes the walkable surface inward by this radius (clearance off walls/world-edge).
@@ -137,76 +157,5 @@ impl Default for NavMeshSettings {
             link_spacing: DEFAULT_LINK_SPACING,
             areas: default_areas(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// The struct `Default` and every field's serde default must equal the historical
-    /// bake constants, so an older scene missing the block bakes exactly as before.
-    #[test]
-    fn defaults_equal_bake_constants() {
-        let d = NavMeshSettings::default();
-        assert_eq!(d.max_step, DEFAULT_MAX_STEP);
-        assert_eq!(d.max_slope, DEFAULT_MAX_SLOPE);
-        assert_eq!(d.grid_spacing, DEFAULT_GRID_SPACING);
-        assert_eq!(d.agent_radius, DEFAULT_AGENT_RADIUS);
-        assert_eq!(d.agent_height, DEFAULT_AGENT_HEIGHT);
-        assert_eq!(d.bounds, None, "bounds derive from the scene by default");
-        assert_eq!(d.areas, default_areas());
-    }
-
-    /// The area table never forces a rebake: costs are read at search time (#460).
-    #[test]
-    fn the_area_table_is_not_a_bake_input() {
-        let mut a = NavMeshSettings::default();
-        a.areas[0].cost = 5.0;
-        assert!(a.bakes_like(&NavMeshSettings::default()));
-        a.max_step = 0.3;
-        assert!(!a.bakes_like(&NavMeshSettings::default()));
-    }
-
-    /// A JSON object missing every field deserializes to the defaults (back-compat).
-    #[test]
-    fn empty_json_object_fills_defaults() {
-        let s: NavMeshSettings = serde_json::from_str("{}").expect("empty object loads");
-        assert_eq!(s, NavMeshSettings::default());
-    }
-
-    /// A pre-#278 scene that carries the other knobs but omits `agent_height` still loads,
-    /// filling the new field with its serde default (back-compat for the height addition).
-    #[test]
-    fn legacy_json_without_agent_height_uses_default() {
-        let json = r#"{"agent_radius":0.5,"max_slope":1.0,"max_step":0.5,"grid_spacing":1.0}"#;
-        let s: NavMeshSettings = serde_json::from_str(json).expect("legacy object loads");
-        assert_eq!(s.agent_height, DEFAULT_AGENT_HEIGHT);
-        assert_eq!(s, NavMeshSettings::default());
-    }
-
-    #[test]
-    fn round_trips_through_json() {
-        let s = NavMeshSettings {
-            agent_radius: 0.7,
-            agent_height: 1.8,
-            max_slope: 0.5,
-            max_step: 0.25,
-            grid_spacing: 2.0,
-            bounds: Some(NavBounds {
-                min_x: -60.0,
-                max_x: 80.0,
-                min_z: -5.0,
-                max_z: 5.0,
-            }),
-            drop_height: 4.0,
-            jump_distance: 1.5,
-            jump_height: 1.2,
-            link_spacing: 3.0,
-            areas: default_areas(),
-        };
-        let json = serde_json::to_string(&s).expect("serialize");
-        let back: NavMeshSettings = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(s, back);
     }
 }

@@ -29,10 +29,11 @@ mod links;
 mod obstacle;
 mod offmesh;
 mod path;
-mod settings;
 mod snap;
 #[cfg(test)]
 pub(crate) mod test_support;
+#[cfg(test)]
+mod walkable_tests;
 
 pub use agents::complete_off_mesh_link;
 pub use agents::state::{
@@ -50,7 +51,8 @@ pub use grid::{
 pub use obstacle::{tick_obstacles, ObstacleVolume};
 pub use offmesh::{LinkEnd, OffMeshLink, OffMeshLinkData, OffMeshLinkKind};
 pub use path::{path_length, NavPath, NavPathStatus, NavRaycastHit};
-pub use settings::{
+// The bake settings are scene data (#721): the scene saves them, navigation reads them.
+pub use crate::scene::nav_settings::{
     NavMeshSettings, DEFAULT_AGENT_HEIGHT, DEFAULT_AGENT_RADIUS, DEFAULT_LINK_SPACING,
 };
 pub use snap::SNAP_RINGS;

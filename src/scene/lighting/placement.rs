@@ -1,8 +1,9 @@
-//! src/scene/lighting_placement.rs — Deterministic auto-placement of IBL probes.
+//! src/scene/lighting/placement.rs — Deterministic auto-placement of IBL probes.
 //!
 //! The "place well" half of the one-button bake (#246): given the STATIC scene (and,
-//! when available, the baked nav surface), compute where light probes and reflection
-//! probes should sit. This is a PURE, deterministic function of the scene/nav data —
+//! when available, the walkable extent of the baked nav surface), compute where light
+//! probes and reflection probes should sit. This is a PURE, deterministic function of
+//! the scene and those bounds —
 //! a grid + an AABB subdivision, no RNG and no wall-clock — so the same level always
 //! yields the same probe layout (the determinism the headless bake relies on).
 //!
@@ -11,9 +12,11 @@
 //!
 //! Two surfaces are placed:
 //!   * **Light probes** — a regular grid through the navigable volume. Bounds come from
-//!     the nav surface's walkable XZ extent (raised through a vertical headroom so
-//!     actors at different elevations get coverage) when a baked nav graph is present;
-//!     otherwise they fall back to the static-geometry AABB.
+//!     the walkable extent the caller passes in (`NavigationGraph::walkable_aabb`,
+//!     raised through a vertical headroom so actors at different elevations get
+//!     coverage) when a nav surface is baked; otherwise they fall back to the
+//!     static-geometry AABB. Taking bounds, not the graph, keeps the arrow
+//!     navigation → scene (#721).
 //!   * **Reflection probes** — one per coarse region, from an AABB subdivision of the
 //!     static bounds. Each region yields a centroid + a parallax box covering it.
 //!
@@ -21,7 +24,6 @@
 
 use glam::Vec3;
 
-use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 
 /// A light-probe grid request: the inclusive `[min, max]` corners and the cell spacing,
@@ -73,43 +75,20 @@ pub fn static_scene_aabb(scene: &Scene) -> Option<(Vec3, Vec3)> {
     found.then_some((min, max))
 }
 
-/// True when a nav graph has been baked into a usable walkable surface (a positive XZ
-/// span). A default/unbaked graph has a degenerate extent and is skipped.
-fn nav_is_baked(nav: &NavigationGraph) -> bool {
-    nav.width > 1 && nav.height > 1 && nav.max_x > nav.min_x && nav.max_z > nav.min_z
-}
-
-/// AABB of the baked nav surface: the bounding box of the spans an agent can actually
-/// stand on (every floor of every cell), with `y` spanning those floors up to
-/// `floor + VERTICAL_HEADROOM` so probes cover the volume actors move through. Bounding
-/// the *walkable* cells (not the full grid) means the agent-radius erosion (#277) tightens
-/// this extent: as the walkable surface pulls back off walls and through thin passages,
-/// the probe bounds follow where agents can actually stand. `None` when the graph is
-/// unbaked or nothing is walkable.
-fn nav_surface_aabb(nav: &NavigationGraph) -> Option<(Vec3, Vec3)> {
-    if !nav_is_baked(nav) {
-        return None;
-    }
-    let (mut min, mut max) = (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN));
-    for s in nav.span_refs() {
-        let w = nav.span_world(s); // XZ cell centre carried to the span's floor
-        min = min.min(w);
-        max = max.max(w);
-    }
-    if min.x > max.x {
-        return None; // no walkable span to bound
-    }
+/// The volume actors move through above a walkable extent: its floors, raised by
+/// `VERTICAL_HEADROOM` so probes cover heads and torsos, not only feet.
+fn actor_volume((min, mut max): (Vec3, Vec3)) -> (Vec3, Vec3) {
     max.y += VERTICAL_HEADROOM;
-    Some((min, max))
+    (min, max)
 }
 
 /// Choose the light-probe grid bounds: the navigable volume intersected with the
-/// scene's static AABB when a baked nav surface exists, else the static AABB alone,
+/// scene's static AABB when walkable bounds are given, else the static AABB alone,
 /// else `None` (nothing to place). The intersection keeps the grid inside the level
 /// rather than spilling past its walls when the nav extent is larger.
-fn placement_bounds(scene: &Scene, nav: Option<&NavigationGraph>) -> Option<(Vec3, Vec3)> {
+fn placement_bounds(scene: &Scene, walkable: Option<(Vec3, Vec3)>) -> Option<(Vec3, Vec3)> {
     let scene_aabb = static_scene_aabb(scene);
-    let nav_aabb = nav.and_then(nav_surface_aabb);
+    let nav_aabb = walkable.map(actor_volume);
     match (nav_aabb, scene_aabb) {
         (Some((nmin, nmax)), Some((smin, smax))) => {
             let min = nmin.max(smin);
@@ -125,15 +104,17 @@ fn placement_bounds(scene: &Scene, nav: Option<&NavigationGraph>) -> Option<(Vec
     }
 }
 
-/// Plan the light-probe grid for `scene`. `spacing` is the grid cell size in world
-/// units (clamped to a sane minimum). Returns `None` when there is nothing to bound
-/// (an empty/static-less scene), in which case the caller places no light probes.
+/// Plan the light-probe grid for `scene`. `walkable` is the `[min, max]` box of the
+/// spans agents stand on (`NavigationGraph::walkable_aabb`), `None` without a baked
+/// nav surface. `spacing` is the grid cell size in world units (clamped to a sane
+/// minimum). Returns `None` when there is nothing to bound (an empty/static-less
+/// scene), in which case the caller places no light probes.
 pub fn plan_light_probes(
     scene: &Scene,
-    nav: Option<&NavigationGraph>,
+    walkable: Option<(Vec3, Vec3)>,
     spacing: f32,
 ) -> Option<ProbeGridPlan> {
-    let (min, max) = placement_bounds(scene, nav)?;
+    let (min, max) = placement_bounds(scene, walkable)?;
     Some(ProbeGridPlan {
         min,
         max,

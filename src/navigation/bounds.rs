@@ -18,55 +18,18 @@
 //! every cell by a fraction). Pure AABB math — no RNG/clock — so the determinism guard
 //! for `navigation` holds.
 
-use serde::{Deserialize, Serialize};
-
 use super::NavigationGraph;
+pub use crate::scene::nav_settings::{NavBounds, EMPTY_SCENE_HALF_EXTENT};
 use crate::scene::Scene;
 use glam::Vec3;
 
 /// Ground (world units) kept around the outermost static geometry, on top of the agent
 /// radius, when the bounds are derived rather than authored.
 pub const BOUNDS_MARGIN: f32 = 2.0;
-/// Half-extent of the default box an empty scene (no static geometry) bakes over — the
-/// historical hardcoded ±20 bounds.
-pub const EMPTY_SCENE_HALF_EXTENT: f32 = 20.0;
 
-/// An XZ rectangle in world units: the area the navmesh grid covers.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub struct NavBounds {
-    pub min_x: f32,
-    pub max_x: f32,
-    pub min_z: f32,
-    pub max_z: f32,
-}
-
+// `NavBounds` itself is scene data (the authored override is saved with the scene);
+// the resolution steps below are the bake's.
 impl NavBounds {
-    pub const fn new(min_x: f32, max_x: f32, min_z: f32, max_z: f32) -> Self {
-        Self {
-            min_x,
-            max_x,
-            min_z,
-            max_z,
-        }
-    }
-
-    /// The default box an empty scene bakes over (±[`EMPTY_SCENE_HALF_EXTENT`]).
-    pub const EMPTY_SCENE: Self = Self {
-        min_x: -EMPTY_SCENE_HALF_EXTENT,
-        max_x: EMPTY_SCENE_HALF_EXTENT,
-        min_z: -EMPTY_SCENE_HALF_EXTENT,
-        max_z: EMPTY_SCENE_HALF_EXTENT,
-    };
-
-    /// Finite, with a positive extent on both axes. The bake ignores an invalid
-    /// override (falls back to the derived bounds) so it stays a total function.
-    pub fn is_valid(&self) -> bool {
-        let finite = [self.min_x, self.max_x, self.min_z, self.max_z]
-            .iter()
-            .all(|v| v.is_finite());
-        finite && self.min_x < self.max_x && self.min_z < self.max_z
-    }
-
     /// Grow every side by `margin`.
     fn grown(self, margin: f32) -> Self {
         Self {
@@ -164,6 +127,26 @@ impl NavigationGraph {
         );
         graph.bake(scene);
         graph
+    }
+
+    /// The box around every span an agent can stand on: every floor of every cell, at
+    /// its XZ cell centre and floor height. `None` when the graph is unbaked (a
+    /// degenerate grid) or nothing is walkable. Bounding the *walkable* spans (not the
+    /// full grid) means the agent-radius erosion (#277) tightens it. Light-probe
+    /// placement fills this extent (`dev::lighting_bake`, #721).
+    pub fn walkable_aabb(&self) -> Option<(Vec3, Vec3)> {
+        let baked =
+            self.width > 1 && self.height > 1 && self.max_x > self.min_x && self.max_z > self.min_z;
+        if !baked {
+            return None;
+        }
+        let (mut min, mut max) = (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN));
+        for s in self.span_refs() {
+            let w = self.span_world(s);
+            min = min.min(w);
+            max = max.max(w);
+        }
+        (min.x <= max.x).then_some((min, max))
     }
 
     /// The XZ area this graph currently covers.

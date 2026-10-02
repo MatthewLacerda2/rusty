@@ -1,5 +1,6 @@
-//! Tests for deterministic IBL auto-placement (#246). Sibling of
-//! `lighting_placement.rs`; shares its 300-line source cap.
+//! Tests for deterministic IBL auto-placement (#246). Sibling of `placement.rs`.
+//! Placement takes walkable bounds as plain `Vec3`s (#721); how the nav graph
+//! computes them is tested in `navigation` (`walkable_tests.rs`).
 //!
 //! The bake itself needs a GPU, but PLACEMENT is pure math — so these run anywhere,
 //! adapter or not. They pin two acceptance points: placement is a deterministic
@@ -10,7 +11,6 @@ use glam::Vec3;
 
 use super::{plan_light_probes, plan_reflection_probes, static_scene_aabb};
 use crate::components::{ColliderComponent, ColliderShape};
-use crate::navigation::{NavBounds, NavigationGraph};
 use crate::scene::Scene;
 
 /// Add a static box entity with a box collider of `size`, centred at `pos`.
@@ -83,16 +83,47 @@ fn light_probe_plan_none_on_empty_scene() {
     assert!(plan_light_probes(&scene, None, 4.0).is_none());
 }
 
+/// Walkable bounds narrower than the geometry box: the grid clips to the
+/// intersection in XZ (the navigable rectangle) and spans the walkable floors up
+/// through the actor headroom in Y.
 #[test]
-fn light_probe_plan_uses_nav_bounds_when_baked() {
+fn light_probe_plan_uses_walkable_bounds() {
     let scene = room_scene();
-    // A baked nav surface narrower than the geometry box: the grid should clip to the
-    // intersection in XZ (the navigable rectangle), not the wider geometry.
-    let mut nav = NavigationGraph::new(-4.0, 4.0, -4.0, 4.0, 1.0);
-    nav.bake_generation = 1;
-    let plan = plan_light_probes(&scene, Some(&nav), 4.0).unwrap();
-    assert!(plan.min.x >= -4.0 - 1e-4 && plan.max.x <= 4.0 + 1e-4);
-    assert!(plan.min.z >= -4.0 - 1e-4 && plan.max.z <= 4.0 + 1e-4);
+    let walkable = (Vec3::new(-4.0, 0.0, -4.0), Vec3::new(4.0, 0.0, 4.0));
+    let plan = plan_light_probes(&scene, Some(walkable), 4.0).unwrap();
+    assert_eq!(plan.min, Vec3::new(-4.0, 0.0, -4.0));
+    assert_eq!(
+        plan.max,
+        Vec3::new(4.0, 3.0, 4.0),
+        "floor + 3 units of headroom"
+    );
+}
+
+/// Walkable bounds wider than the level are clipped to its static box in XZ; the
+/// actor volume's Y range is kept even past the geometry.
+#[test]
+fn light_probe_plan_clips_walkable_bounds_to_the_level() {
+    let scene = room_scene();
+    let walkable = (Vec3::new(-30.0, 2.0, -5.0), Vec3::new(30.0, 2.5, 5.0));
+    let plan = plan_light_probes(&scene, Some(walkable), 4.0).unwrap();
+    assert_eq!(plan.min, Vec3::new(-10.0, 2.0, -5.0));
+    assert_eq!(plan.max, Vec3::new(10.0, 5.5, 5.0));
+}
+
+/// Walkable bounds that miss the level entirely leave nothing to fill.
+#[test]
+fn light_probe_plan_none_when_walkable_misses_the_level() {
+    let scene = room_scene();
+    let walkable = (Vec3::new(50.0, 0.0, 50.0), Vec3::new(60.0, 0.0, 60.0));
+    assert!(plan_light_probes(&scene, Some(walkable), 4.0).is_none());
+}
+
+/// Walkable bounds alone place a grid when the scene has no static geometry.
+#[test]
+fn light_probe_plan_from_walkable_bounds_alone() {
+    let walkable = (Vec3::new(-2.0, 1.0, -2.0), Vec3::new(2.0, 1.0, 2.0));
+    let plan = plan_light_probes(&Scene::new(), Some(walkable), 4.0).unwrap();
+    assert_eq!((plan.min, plan.max), (walkable.0, Vec3::new(2.0, 4.0, 2.0)));
 }
 
 #[test]
@@ -132,45 +163,15 @@ fn reflection_per_axis_cap_is_honoured() {
     assert_eq!(plans.len(), 9);
 }
 
-/// Probe-placement interaction with agent-radius erosion (#277). Light-probe bounds
-/// follow the baked WALKABLE extent, so eroding the surface (a larger agent radius) must
-/// TIGHTEN — never grow — the placement bounds: probes track where agents can actually
-/// stand. Built on a flat scene so erosion pulls the walkable rim in off the world edge.
-#[test]
-fn erosion_tightens_light_probe_bounds() {
-    let bake_with = |radius: f32| {
-        let mut scene = room_scene();
-        scene.nav_settings.agent_radius = radius;
-        // Pin the grid (#452) so the cell indices asserted below stay put.
-        scene.nav_settings.bounds = Some(NavBounds::new(-10.0, 10.0, -10.0, 10.0));
-        let mut nav = NavigationGraph::new(-10.0, 10.0, -10.0, 10.0, 1.0);
-        nav.bake(&scene);
-        plan_light_probes(&scene, Some(&nav), 4.0).expect("a plan from the baked nav")
-    };
-    let wide = bake_with(0.0); // no erosion: full walkable rectangle
-    let eroded = bake_with(2.0); // erodes the outer rim by ~2 cells
-    let wide_span = wide.max - wide.min;
-    let eroded_span = eroded.max - eroded.min;
-    assert!(
-        eroded_span.x <= wide_span.x + 1e-4 && eroded_span.z <= wide_span.z + 1e-4,
-        "erosion must not grow the probe bounds (x/z)"
-    );
-    assert!(
-        eroded_span.x < wide_span.x - 1e-4 || eroded_span.z < wide_span.z - 1e-4,
-        "a 2-unit radius visibly tightens the probe bounds off the world edge"
-    );
-}
-
 #[test]
 fn placement_is_deterministic() {
     // Same scene built twice → identical plans (no RNG, no clock, stable iteration).
     let a = room_scene();
     let b = room_scene();
-    let mut nav = NavigationGraph::new(-8.0, 8.0, -8.0, 8.0, 1.0);
-    nav.bake_generation = 1;
+    let walkable = Some((Vec3::new(-8.0, 0.0, -8.0), Vec3::new(8.0, 0.0, 8.0)));
     assert_eq!(
-        plan_light_probes(&a, Some(&nav), 4.0),
-        plan_light_probes(&b, Some(&nav), 4.0)
+        plan_light_probes(&a, walkable, 4.0),
+        plan_light_probes(&b, walkable, 4.0)
     );
     assert_eq!(
         plan_reflection_probes(&a, 10.0, 4),

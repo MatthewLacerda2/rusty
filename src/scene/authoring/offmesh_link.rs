@@ -5,7 +5,7 @@
 //! through these, so the rules live once: the ends stay finite, and a cost below
 //! zero (or NaN) means "use the link's length", stored as `-1`.
 //!
-//! Allowed deps: components (the component data), navigation (the area limit). Pure.
+//! Allowed deps: components (the component data), scene::nav_settings (the area limit). Pure.
 
 use glam::Vec3;
 
@@ -48,7 +48,7 @@ pub fn set_cost_override(l: &mut Link, cost: f32) {
 /// Set the link's navigation area (#460). An id past the area table's limit is
 /// ignored.
 pub fn set_area(l: &mut Link, area: i64) {
-    if (0..crate::navigation::MAX_AREAS as i64).contains(&area) {
+    if (0..crate::scene::nav_settings::MAX_AREAS as i64).contains(&area) {
         l.area = area as u8;
     }
 }

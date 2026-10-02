@@ -1,5 +1,8 @@
 //! src/navigation/areas.rs — navigation areas and their costs (#460).
 //!
+//! The table's data (rows, built-in ids, limits) is scene data in
+//! `scene::nav_settings`; this module is what the search does with it.
+//!
 //! Unity's NavMesh areas: every walkable span (and every off-mesh link) carries an
 //! **area id**, `0..MAX_AREAS`. The per-scene area table (`NavMeshSettings::areas`)
 //! names each area and gives it a **cost multiplier**: A\* charges a step
@@ -16,37 +19,11 @@
 //!   ([`NavigationGraph::area_costs`]) that `sync` refreshes every tick, and a change
 //!   invalidates every cached agent path so agents re-plan on the next tick.
 
-use serde::{Deserialize, Serialize};
+pub use crate::scene::nav_settings::{
+    default_areas, NavArea, ALL_AREAS, MAX_AREAS, MIN_AREA_COST, NOT_WALKABLE_AREA, WALKABLE_AREA,
+};
 
 use super::{NavMeshSettings, NavigationGraph};
-
-/// How many areas a scene can define: one bit each in an `u32` mask.
-pub const MAX_AREAS: usize = 32;
-/// The built-in area every span has by default.
-pub const WALKABLE_AREA: u8 = 0;
-/// The built-in area that removes the spans a modifier volume covers.
-pub const NOT_WALKABLE_AREA: u8 = 1;
-/// The mask of an agent that may enter every area (Unity's "Everything").
-pub const ALL_AREAS: u32 = u32::MAX;
-/// The lowest cost an area may have; keeps the A\* heuristic admissible.
-pub const MIN_AREA_COST: f32 = 1.0;
-
-/// One row of the area table: its name and its default cost multiplier.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct NavArea {
-    pub name: String,
-    pub cost: f32,
-}
-
-/// The built-in table: `Walkable` and `NotWalkable`, both cost 1.
-pub fn default_areas() -> Vec<NavArea> {
-    ["Walkable", "NotWalkable"]
-        .map(|name| NavArea {
-            name: name.to_string(),
-            cost: MIN_AREA_COST,
-        })
-        .to_vec()
-}
 
 /// A cost as the table stores it: at least [`MIN_AREA_COST`], `None` when not finite.
 pub fn clamp_cost(cost: f32) -> Option<f32> {
