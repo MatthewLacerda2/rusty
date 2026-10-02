@@ -42,8 +42,9 @@ while any body is simulated.
 - **Who poses a ragdolled bone.** The tick runs the physics step, then the
   Animator. Right after the Animator, every bone carried by a dynamic body is put
   back where its body is, so physics overrides the clip and `LateUpdate` scripts
-  and skinning see the ragdoll. The Animator keeps running for the bones without
-  a body (fingers, say).
+  and skinning see the ragdoll. IK ([`Animator`](Animator.md), *Inverse
+  kinematics*) skips any constraint touching such a bone, so physics wins over IK
+  too. The Animator keeps running for the bones without a body (fingers, say).
 - **Layers.** Alive, the hitboxes are on the `Hitbox` layer, which collides with
   nothing, so the character's capsule carries them. `Enable` moves them to the
   `Ragdoll` layer — created on first use, colliding with every layer except

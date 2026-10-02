@@ -2,7 +2,7 @@
 //! character, a shot fired in `Update` hits the arm where the animation put it
 //! that frame, and a CharacterController walks through hitboxes.
 
-mod rig;
+pub mod rig;
 
 use std::cell::RefCell;
 use std::rc::Rc;
