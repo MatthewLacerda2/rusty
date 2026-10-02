@@ -150,7 +150,7 @@ fn register_get_current_node<'lua, 'scope>(
             Ok(scene
                 .world
                 .animator(id)
-                .and_then(|a| a.current_node.clone()))
+                .and_then(|a| a.base.current_node.clone()))
         }),
     )
 }

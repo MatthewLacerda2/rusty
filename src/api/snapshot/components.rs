@@ -183,16 +183,16 @@ pub(crate) fn particle_value(p: &ParticleEmitterComponent) -> Value {
 /// `BTreeMap` keeps the keys name-sorted.
 pub(crate) fn animator_value(a: &AnimatorComponent) -> Value {
     json!({
-        "clip": a.current_clip,
-        "time": a.time,
+        "clip": a.base.current_clip,
+        "time": a.base.time,
         "speed": a.speed,
         "playing": a.is_playing,
-        "loop": a.loop_clip,
+        "loop": a.base.loop_clip,
         "paused": a.freeze,
         "parameters": a.parameters,
         "graph": a.graph,
         "graph_enabled": a.graph_enabled,
-        "node": a.current_node,
+        "node": a.base.current_node,
     })
 }
 

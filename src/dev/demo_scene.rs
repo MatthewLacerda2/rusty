@@ -7,7 +7,7 @@
 use glam::Vec3;
 
 use crate::components::mesh::primitives;
-use crate::components::CharacterControllerComponent;
+use crate::components::{CharacterControllerComponent, Playback};
 use crate::scene::{
     AnimatorComponent, ColliderComponent, ColliderShape, DirtyFlag, MaterialAsset,
     MaterialComponent, MeshComponent, Scene, ScriptComponent,
@@ -182,7 +182,10 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
     scene.world.set_animator(
         enemy_id,
         Some(AnimatorComponent {
-            current_clip: "Walk".to_string(),
+            base: Playback {
+                current_clip: "Walk".to_string(),
+                ..Default::default()
+            },
             speed: 3.0,
             is_playing: true,
             ..Default::default()

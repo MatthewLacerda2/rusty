@@ -180,9 +180,11 @@ fn tick_nav(world: &mut World, res: &mut Resources) {
 }
 
 /// Advance every active entity's animator and write the sampled pose onto its
-/// bone GameObjects (#80, #453). The sampler is a pure function of (skin, clip,
-/// time), so stepping at the fixed dt is deterministic. Writers after this one
-/// (`LateUpdate` scripts, physics) may override a bone before the palette build.
+/// bone GameObjects (#80, #453). Blend-tree nodes and extra layers (#457) resolve
+/// against the animator's graph asset, from the cache the evaluator just filled.
+/// The sampler is a pure function of (skin, clips, graph, parameters, time), so
+/// stepping at the fixed dt is deterministic. Writers after this one (`LateUpdate`
+/// scripts, physics) may override a bone before the palette build.
 fn animate(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
     let mut s = world.scene.borrow_mut();
@@ -190,13 +192,13 @@ fn animate(world: &mut World, res: &mut Resources) {
         if !s.world.is_active(id) {
             continue;
         }
+        let path = s.world.animator(id).and_then(|a| a.graph.clone());
+        let graph = path.and_then(|p| res.animation_graphs.get_or_load(&p, &res.console));
         // The animator + mesh split borrow goes through the facade's sanctioned
         // helper (#344) — the animate system's re-pose step.
         let writes = s.world.with_animator_and_mesh_mut(id, |anim, mesh| {
-            // The current clip's duration is the wrap length when the animator loops.
-            let duration = super::animation::current_clip_duration(anim, mesh.as_deref());
-            anim.advance(dt, duration);
-            mesh.map(|m| super::animation::bone_writes(anim, m))
+            super::animation::advance(anim, mesh.as_deref(), graph, dt);
+            mesh.map(|m| super::animation::bone_writes(anim, m, graph))
         });
         for (bone, local) in writes.flatten().unwrap_or_default() {
             if let Some(mut t) = s.world.transform_mut(bone) {

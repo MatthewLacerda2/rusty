@@ -16,9 +16,11 @@
 
 use crate::components::AnimatorComponent;
 
-/// Set the animator's current clip name.
+/// Set the animator's current clip name (the base layer's motion becomes that
+/// clip, even if a blend tree was playing).
 pub fn set_clip(a: &mut AnimatorComponent, clip: String) {
-    a.current_clip = clip;
+    a.base.current_clip = clip;
+    a.base.current_tree = None;
 }
 
 /// Set the animator's playback speed multiplier.
@@ -39,16 +41,18 @@ pub fn set_freeze(a: &mut AnimatorComponent, freeze: bool) {
 
 /// Set the animator's `loop_clip` flag (wrap the playhead at the clip's end).
 pub fn set_looping(a: &mut AnimatorComponent, loop_clip: bool) {
-    a.loop_clip = loop_clip;
+    a.base.loop_clip = loop_clip;
 }
 
 /// Set (or clear, with `None`) the animator's `AnimationGraph` asset path (#316).
 /// Resets the active-node state so the evaluator re-binds: its next step seeds the
-/// new graph's declared defaults and enters its entry node.
+/// new graph's declared defaults and enters its entry node — and its layers'
+/// (#457), whose old state is dropped.
 pub fn set_graph(a: &mut AnimatorComponent, graph: Option<String>) {
     a.graph = graph;
-    a.current_node = None;
-    a.node_speed = 1.0;
+    a.base.current_node = None;
+    a.base.node_speed = 1.0;
+    a.layers.clear();
 }
 
 /// Enable/disable graph auto-evaluation (#316). Disabled, the graph is inert and
@@ -84,11 +88,11 @@ mod tests {
         set_graph(&mut e, Some("guard.animgraph".to_string()));
         set_graph_enabled(&mut e, false);
         let a = &*e;
-        assert_eq!(a.current_clip, "Run");
+        assert_eq!(a.base.current_clip, "Run");
         assert_eq!(a.speed, 2.0);
         assert!(a.is_playing);
         assert!(a.freeze);
-        assert!(a.loop_clip);
+        assert!(a.base.loop_clip);
         assert_eq!(a.graph.as_deref(), Some("guard.animgraph"));
         assert!(!a.graph_enabled);
     }
@@ -99,13 +103,16 @@ mod tests {
         let mut e = scene.world.animator_mut(id).unwrap();
         {
             let a = &mut *e;
-            a.current_node = Some("Run".to_string());
-            a.node_speed = 2.0;
+            a.base.current_node = Some("Run".to_string());
+            a.base.node_speed = 2.0;
         }
         set_graph(&mut e, None);
         let a = &*e;
         assert_eq!(a.graph, None);
-        assert_eq!(a.current_node, None, "the stale active node is dropped");
-        assert_eq!(a.node_speed, 1.0, "the node speed override is dropped");
+        assert_eq!(
+            a.base.current_node, None,
+            "the stale active node is dropped"
+        );
+        assert_eq!(a.base.node_speed, 1.0, "the node speed override is dropped");
     }
 }

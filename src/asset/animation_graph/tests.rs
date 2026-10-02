@@ -19,18 +19,22 @@ pub(super) fn sample_graph() -> AnimationGraph {
     let node = |name: &str, clip: &str, is_loop, speed| GraphNode {
         name: name.into(),
         clip: clip.into(),
+        blend_tree: None,
         is_loop,
         speed,
     };
     AnimationGraph {
         parameters,
-        nodes: vec![
-            node("idle", "Idle", true, None),
-            node("run", "Run", true, Some(1.5)),
-            node("jump", "Jump_Start", false, None),
-        ],
-        edges: sample_edges(),
-        entry: "idle".into(),
+        base: StateMachine {
+            nodes: vec![
+                node("idle", "Idle", true, None),
+                node("run", "Run", true, Some(1.5)),
+                node("jump", "Jump_Start", false, None),
+            ],
+            edges: sample_edges(),
+            entry: "idle".into(),
+        },
+        layers: Vec::new(),
     }
 }
 
@@ -98,9 +102,9 @@ fn absent_optional_fields_default() {
     // neither `is_loop` nor `speed`.
     let json = r#"{ "nodes": [ { "name": "idle", "clip": "Idle" } ], "entry": "idle" }"#;
     let graph: AnimationGraph = serde_json::from_str(json).unwrap();
-    assert!(graph.parameters.is_empty() && graph.edges.is_empty());
-    assert!(!graph.nodes[0].is_loop);
-    assert_eq!(graph.nodes[0].speed, None);
+    assert!(graph.parameters.is_empty() && graph.base.edges.is_empty());
+    assert!(!graph.base.nodes[0].is_loop);
+    assert_eq!(graph.base.nodes[0].speed, None);
     assert!(graph.validate().is_ok());
 }
 
@@ -128,7 +132,7 @@ fn io_validates_both_directions() {
     let dir = crate::test_temp::dir().join("rusty_animgraph_invalid");
     std::fs::create_dir_all(&dir).unwrap();
     let mut graph = sample_graph();
-    graph.entry = "nope".into();
+    graph.base.entry = "nope".into();
     // An invalid graph can't reach disk from code…
     let path = dir.join("bad.animgraph");
     assert!(matches!(save(&path, &graph), Err(GraphError::Invalid(_))));
