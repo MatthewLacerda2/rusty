@@ -69,6 +69,7 @@ pub(in crate::ecs) fn build_bundle(entity: Entity, seq: u64) -> hecs::EntityBuil
         entity.visual_correction,
         entity.particles,
         entity.audio,
+        entity.reverb_zone,
         entity.canvas,
         entity.rect_transform,
         entity.image,

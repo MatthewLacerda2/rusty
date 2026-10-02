@@ -1,9 +1,10 @@
 //! Mixer groups as kira tracks (#465): a voice heard through its group's volume,
-//! mute, low-pass and reverb send.
+//! mute, low-pass and reverb send (into a bus a reverb zone has tuned, #469).
 
 use crate::audio::backend::{AudioBackend, PlayParams, VoiceId};
 use crate::audio::device::backend::backend_tests::{flat, rig};
 use crate::audio::mixer::{Filter, GroupId, GroupMix, GroupSettings};
+use crate::components::ReverbPreset;
 
 const TONE: [f32; 4] = [0.5; 4];
 
@@ -74,6 +75,7 @@ fn a_reverb_send_leaves_a_tail_after_the_voice_ends() {
             ..Default::default()
         };
         b.set_group(GroupId(1), &GroupMix::new(&settings, 1.0));
+        b.set_reverb(&ReverbPreset::Hall.params().unwrap());
         let params = PlayParams {
             group: GroupId(1),
             ..flat("clip")

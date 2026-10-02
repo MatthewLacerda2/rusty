@@ -2,7 +2,8 @@
 //!
 //! A `Startup`-stage system: when the world enters Play, start every
 //! `AudioSource` flagged `play_on_start` (Unity's "Play On Awake"). And a
-//! `LateUpdate` one stepping the mixer (#465) and voice occlusion (#467) — snapshot blends and ducking — on
+//! `LateUpdate` one stepping the mixer (#465), voice occlusion (#467) and the
+//! listener's reverb zones (#469) — snapshot blends and ducking — on
 //! `Time.unscaledTime`, so the mix state is a function of sim time and a replay
 //! reads back the same groups. It drives the
 //! shared `AudioMaestro` exactly as the `Audio` API does, so a `play_on_start`
@@ -32,6 +33,26 @@ pub(super) fn register(app: &mut App) {
     app.add_system(Stage::Startup, start_play_on_start);
     app.add_system(Stage::LateUpdate, advance_mixer);
     app.add_system(Stage::LateUpdate, occlude_voices);
+    app.add_system(Stage::LateUpdate, resolve_reverb);
+}
+
+/// Blend the reverb zones around the active camera onto the reverb bus (#469).
+/// Zones are summed in entity-id order, so two runs blend bit-identically.
+fn resolve_reverb(world: &mut World, res: &mut Resources) {
+    let listener = res.camera.borrow().position;
+    let scene = world.scene.borrow();
+    let mut ids = scene.world.ids_with_reverb_zone();
+    ids.retain(|&id| scene.world.is_active(id));
+    ids.sort_unstable();
+    let zones: Vec<_> = ids
+        .iter()
+        .filter_map(|&id| {
+            let zone = scene.world.reverb_zone(id)?.clone();
+            Some((scene.world_matrix(id).w_axis.truncate(), zone))
+        })
+        .collect();
+    let refs: Vec<_> = zones.iter().map(|(at, zone)| (*at, zone)).collect();
+    res.audio.borrow_mut().resolve_reverb(listener, &refs);
 }
 
 /// Re-cast and smooth every voice's occlusion (#467) against the active camera,

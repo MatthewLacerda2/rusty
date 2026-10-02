@@ -11,6 +11,7 @@ use std::rc::Rc;
 use super::backend::{AudioBackend, PlayParams, VoiceId, VoiceMix};
 use super::mixer::{GroupId, GroupMix};
 use super::speaker::SpeakerMode;
+use crate::components::ReverbParams;
 
 /// Everything a [`RecordingBackend`] was told, in order.
 #[derive(Default)]
@@ -26,6 +27,8 @@ pub struct Recording {
     pub groups_added: Vec<(GroupId, Option<GroupId>)>,
     /// Every group mix applied, in order.
     pub group_mixes: Vec<(GroupId, GroupMix)>,
+    /// Every reverb the bus was set to, in order.
+    pub reverbs: Vec<ReverbParams>,
 }
 
 impl Recording {
@@ -88,5 +91,8 @@ impl AudioBackend for RecordingBackend {
     }
     fn set_group(&mut self, id: GroupId, mix: &GroupMix) {
         self.0.borrow_mut().group_mixes.push((id, *mix));
+    }
+    fn set_reverb(&mut self, params: &ReverbParams) {
+        self.0.borrow_mut().reverbs.push(*params);
     }
 }

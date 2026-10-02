@@ -85,10 +85,16 @@ impl Default for Mixer {
             settings: GroupSettings::default(),
         }];
         for name in &DEFAULT_GROUPS[1..] {
+            // World sends fully into the reverb bus reverb zones tune (#469), as a
+            // Unity `AudioSource` takes part in reverb zones by default.
+            let reverb_send = if *name == "World" { 1.0 } else { 0.0 };
             groups.push(Group {
                 name: name.to_string(),
                 parent: Some(GroupId::MASTER),
-                settings: GroupSettings::default(),
+                settings: GroupSettings {
+                    reverb_send,
+                    ..GroupSettings::default()
+                },
             });
         }
         Self {

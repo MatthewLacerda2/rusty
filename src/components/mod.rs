@@ -23,6 +23,7 @@ pub mod mesh;
 pub mod nav_agent;
 pub mod nav_obstacle;
 pub mod particle;
+pub mod reverb_zone;
 pub mod ribbon;
 pub mod rigidbody;
 pub mod script;
@@ -53,6 +54,7 @@ pub use particle::{
     CollisionResponse, EmitFrom, EmitMode, EmitShape, Flipbook, Particle, ParticleBlend,
     ParticleEmitterComponent, ParticleRender, ParticleRenderMode, SubEmitTrigger, SubEmitters,
 };
+pub use reverb_zone::{ReverbParams, ReverbPreset, ReverbZoneComponent};
 pub use ribbon::{LineComponent, RibbonStyle, TextureMode, TrailComponent};
 pub use rigidbody::{CollisionDetection, RigidBodyComponent};
 pub use script::{ScriptComponent, ScriptFieldValue};

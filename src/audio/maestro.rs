@@ -23,6 +23,7 @@ use super::introspection::{AudioEvent, AudioEventKind, AudioEventLog, DEFAULT_EV
 use super::mix::{self, MixEnv};
 use super::mixer::{GroupId, Mixer};
 use super::occlusion::Occlusion;
+use super::reverb::ReverbState;
 use super::speaker::SpeakerMode;
 use crate::components::AudioSourceComponent;
 
@@ -68,6 +69,8 @@ pub struct AudioMaestro {
     pub(super) mixer: Mixer,
     /// Every voice's occlusion factor and the casts behind it (#467).
     pub(super) occlusion: Occlusion,
+    /// The listener's reverb, as the zones around it resolve (#469).
+    pub(super) reverb: ReverbState,
     /// The agent-facing log of play/stop/one-shot actions.
     log: AudioEventLog,
     /// Monotone id source for backend voices (deterministic — never a clock/RNG).
@@ -94,6 +97,7 @@ impl AudioMaestro {
             env: MixEnv::default(),
             mixer: Mixer::default(),
             occlusion: Occlusion::default(),
+            reverb: ReverbState::DRY,
             log: AudioEventLog::new(DEFAULT_EVENT_CAP),
             next_voice: 1,
         };
@@ -110,6 +114,7 @@ impl AudioMaestro {
         self.entity_voices.clear();
         self.oneshots.clear();
         self.sync_groups();
+        self.backend.set_reverb(&self.reverb.params);
     }
 
     /// The current master volume.
