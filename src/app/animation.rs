@@ -92,7 +92,7 @@ pub fn sample_pose<'m>(
         .unwrap_or_else(|| vec![None; skin.local_bind.len()]);
     let layers = graph.map_or(&[][..], |g| &g.layers[..]);
     for (i, (layer, state)) in layers.iter().zip(&anim.layers).enumerate() {
-        let weight = state.weight.unwrap_or(layer.weight);
+        let weight = state.weight;
         let ctx = context(i + 1);
         let Some(top) = ctx
             .sample(skin, &state.playback, false)
@@ -156,13 +156,24 @@ pub fn blend_poses(from: &[JointTransform], to: &[JointTransform], t: f32) -> Ve
     let t = t.clamp(0.0, 1.0);
     from.iter()
         .zip(to.iter())
-        .map(|(a, b)| JointTransform {
-            translation: a.translation.lerp(b.translation, t),
-            rotation: a.rotation.slerp(b.rotation, t),
-            scale: a.scale.lerp(b.scale, t),
-        })
+        .map(|(a, b)| blend_joint(*a, *b, t))
         .collect()
 }
 
+/// One joint's TRS blend, `t` in `[0, 1]` (see [`blend_poses`]).
+fn blend_joint(a: JointTransform, b: JointTransform, t: f32) -> JointTransform {
+    JointTransform {
+        translation: a.translation.lerp(b.translation, t),
+        rotation: a.rotation.slerp(b.rotation, t),
+        scale: a.scale.lerp(b.scale, t),
+    }
+}
+
+#[cfg(test)]
+mod layer_tests;
+#[cfg(test)]
+mod test_rig;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tree_tests;

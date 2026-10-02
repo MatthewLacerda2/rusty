@@ -3,6 +3,7 @@
 //! a child of a bone follows it, a `LateUpdate` script overrides the Animator before
 //! skinning reads the bones, and the whole path is deterministic.
 
+mod layers;
 mod rig;
 
 use glam::Vec3;

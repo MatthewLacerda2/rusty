@@ -158,11 +158,6 @@ impl StateMachine {
     pub fn node(&self, name: &str) -> Option<&GraphNode> {
         self.nodes.iter().find(|n| n.name == name)
     }
-
-    /// The outgoing edges of `from`, in authored (priority) order.
-    pub fn edges_from<'a>(&'a self, from: &'a str) -> impl Iterator<Item = &'a GraphEdge> {
-        self.edges.iter().filter(move |e| e.from == from)
-    }
 }
 
 /// The whole graph, as one serde document: the shared parameter declarations,
@@ -201,5 +196,7 @@ impl AnimationGraph {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod v2_tests;
 #[cfg(test)]
 mod validate_tests;

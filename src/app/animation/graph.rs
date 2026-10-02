@@ -198,5 +198,8 @@ fn consume_edge_triggers(anim: &mut AnimatorComponent, edge: &GraphEdge) {
 }
 
 #[cfg(test)]
+#[path = "graph_layer_tests.rs"]
+mod graph_layer_tests;
+#[cfg(test)]
 #[path = "graph_tests.rs"]
 mod graph_tests;

@@ -16,7 +16,7 @@ animator's `parameters` key.
 
 **Animation graphs (#316).** An animator may reference an **`AnimationGraph`**
 asset (a `.animgraph` file, #315) — a state machine whose nodes each play one
-clip and whose edges carry conditions over the parameters above. While a graph
+clip or a blend tree (below) and whose edges carry conditions over the parameters above. While a graph
 is assigned and enabled, the engine evaluates it automatically each fixed step:
 the **active node's** outgoing edges are checked in authored (priority) order,
 and the **first** edge whose conditions *all* hold fires — a crossfade into the
@@ -46,9 +46,86 @@ path + active state are saved with the entity.
 | `Animator.SetTrigger` | `(id, name)` | Latch the one-shot `Trigger` parameter `name`. The graph evaluator auto-clears it the moment it fires a transition; until then an unconsumed trigger stays latched — scripts never reset it by hand. |
 | `Animator.SetGraph` | `(id, path)` | Assign the `.animgraph` asset at `path` to drive this animator (`""` clears it). Resets the active state, so evaluation re-binds — seeding declared defaults and entering the new graph's entry node — on the next fixed step. |
 | `Animator.SetGraphEnabled` | `(id, enabled)` | Pause/resume graph auto-evaluation. Disabled, the graph is inert data and the animator stays under direct `Play`/`Crossfade` control; re-enabling resumes from the same active node. |
-| `Animator.PlayNode` | `(id, node)` | Jump straight to the named graph node (state), bypassing all conditions: a hard cut into its clip, adopting its loop flag and speed. Returns `true` on success; `false` (with a console warning for a bad graph or unknown node) otherwise. |
+| `Animator.PlayNode` | `(id, node [, layer])` | Jump straight to the named graph node (state) of `layer` (default: the base layer), bypassing all conditions: a hard cut into its clip or blend tree, adopting its loop flag and speed. Returns `true` on success; `false` (with a console warning for a bad graph, unknown layer or unknown node) otherwise. |
 | `Animator.GetBone` | `(id, name)` | The id of the bone GameObject named `name` (the glTF joint name, e.g. `"hand_r"`) in the entity's skeleton, or `nil` when the entity has no skinned mesh or no such bone. Bones are ordinary entities — see *Bones are GameObjects* below. |
-| `Animator.GetCurrentNode` | `(id)` | The active graph node's name, or `nil` when there is no animator/graph or evaluation hasn't bound it yet. |
+| `Animator.GetCurrentNode` | `(id [, layer])` | The active graph node's name in `layer` (default: the base layer), or `nil` when there is no animator/graph/such layer or evaluation hasn't bound it yet. |
+| `Animator.SetLayerWeight` | `(id, layer, weight)` | Set an extra layer's weight, clamped to `[0, 1]` (0 hides it, 1 applies it fully); returns `true` when set. `layer` is an index (1 = the first extra layer) or the layer's name. The base layer (0) is always at full weight, so it is refused with a warning, as is an unknown layer. |
+| `Animator.GetLayerWeight` | `(id, layer)` | A layer's live weight (`1` for the base layer), or `nil` for an unknown layer. |
+
+### Blend trees (#457)
+
+A graph node can play a **blend tree** instead of one clip: several clips at
+once, weighted by one or two `Float` parameters. Scripts only set the
+parameters (`Animator.SetFloat(id, "speed", v)`); the weights follow each fixed
+step. The children play **phase-synced**: one shared normalized time, each child
+sampled at that fraction of its own length, so a walk and a run blended together
+keep their feet in step. The tree's cycle length is the weight-averaged length
+of its children.
+
+| Kind | Reads | Weights |
+|---|---|---|
+| `Simple1D` | `parameter` | Children on a line by `threshold`. The two around the value cross-blend linearly (`speed` 0 idle, 2 walk, 6 run: at 4 it is half walk, half run); past either end the end child plays alone. |
+| `FreeformDirectional2D` | `parameter_x`, `parameter_y` | Children at `position` points read as directions × speeds (forward, back, strafes, diagonals, an optional idle at the origin). Gradient-band interpolation in polar space, so between forward and a strafe the *direction* turns rather than the speed dropping. |
+| `FreeformCartesian2D` | `parameter_x`, `parameter_y` | The same in plain x/y, for two axes that are not a direction (aim pitch × lean). |
+
+The weights always sum to 1. A parameter that is unset reads 0.
+
+```json
+{ "name": "Locomotion", "is_loop": true,
+  "blend_tree": { "FreeformDirectional2D": {
+    "parameter_x": "velX", "parameter_y": "velZ",
+    "children": [ { "clip": "Idle",       "position": [0, 0] },
+                  { "clip": "WalkFwd",    "position": [0, 2] },
+                  { "clip": "WalkBack",   "position": [0, -2] },
+                  { "clip": "StrafeLeft", "position": [-2, 0] },
+                  { "clip": "StrafeRight","position": [2, 0] } ] } } }
+```
+
+A node has a `clip` or a `blend_tree`, never both. The graph refuses to load
+when a tree reads a parameter that isn't a declared `Float`, has no children, or
+puts two children on the same point. Nested trees are not supported.
+
+### Layers and avatar masks (#457)
+
+The graph's top-level `nodes`/`edges`/`entry` are the **base layer** (layer 0).
+A `layers` list stacks further state machines over it, in order, each with its
+own `nodes`, `edges` and `entry`, evaluated each fixed step against the same
+shared parameters:
+
+- **`weight`** (0..1, default 1): how much the layer shows. Change it at runtime
+  with `Animator.SetLayerWeight`; fade a reload layer in and out by tweening it.
+- **`blending`**: `Override` (default) blends toward the layer's pose by the
+  weight; `Additive` adds the layer's motion **measured against that motion's
+  first frame** (Unity's default reference pose) — translation offset, rotation
+  delta in the bone's local space, scale ratio — scaled by the weight. A clip
+  whose bones never leave their first-frame pose adds nothing.
+- **`mask`**: bone names, each meaning that bone and its whole subtree
+  (`["spine_01"]` is "spine and up"). Empty is the whole body.
+
+A layer only touches bones that are inside its mask **and** keyed by what it
+plays; every other bone keeps the pose from the layers below. So an upper-body
+layer fires and reloads while the base layer's legs keep running, and an
+additive flinch layer stacks on any pose. A trigger can fire a transition in
+every layer that reads it in the same step; it is cleared after all layers have
+been evaluated.
+
+```json
+{ "parameters": { "speed": { "Float": 0 }, "Fire": "Trigger" },
+  "nodes": [ ... ], "edges": [ ... ], "entry": "Locomotion",
+  "layers": [
+    { "name": "UpperBody", "weight": 1, "blending": "Override", "mask": ["spine_01"],
+      "nodes": [ { "name": "Aim", "clip": "RifleAim", "is_loop": true },
+                 { "name": "Shoot", "clip": "RifleFire" } ],
+      "edges": [ { "from": "Aim", "to": "Shoot", "transition_duration": 0.05,
+                   "conditions": [ { "Trigger": { "parameter": "Fire" } } ] } ],
+      "entry": "Aim" } ] }
+```
+
+Layers are addressed by index (0 = base, 1 = the first entry of `layers`) or by
+name: `Animator.SetLayerWeight(id, "UpperBody", 0.5)`,
+`Animator.GetCurrentNode(id, "UpperBody")`, `Animator.PlayNode(id, "Shoot",
+"UpperBody")`. A graph written before layers existed is simply a graph with no
+extra layers.
 
 ### Bones are GameObjects (#453)
 
@@ -59,7 +136,7 @@ else, and is an ordinary entity in every API — `Transform.*`, `Scene.SetParent
 `Physics`, the snapshot.
 
 - **The Animator writes the pose.** Each fixed step it writes the sampled local
-  Transform of every bone its clip animates (a crossfade blends the two poses in
+  Transform of every bone its clips animate, across all layers (a crossfade blends the two poses in
   TRS space: translation and scale lerp, rotation slerps, so limbs keep their
   length). A bone no playing clip animates is left alone.
 - **Later writers override it.** `LateUpdate` scripts (IK, procedural recoil,

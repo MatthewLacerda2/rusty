@@ -15,6 +15,7 @@ use glam::{Quat, Vec3};
 use crate::asset::animation_graph::LayerBlending;
 use crate::asset::mesh_data::{JointTransform, SkinData};
 
+use super::blend_joint;
 use super::motion::Pose;
 
 /// One layer's contribution, ready to compose.
@@ -64,20 +65,12 @@ pub fn compose(pose: &mut Pose, layer: &LayerPose<'_>, bind: &[JointTransform]) 
             continue;
         };
         *out = Some(match layer.blending {
-            LayerBlending::Override => lerp(below, *top, weight),
+            LayerBlending::Override => blend_joint(below, *top, weight),
             LayerBlending::Additive => {
                 let reference = layer.reference.get(slot).copied().flatten();
                 add(below, *top, reference.unwrap_or(*top), weight)
             }
         });
-    }
-}
-
-fn lerp(a: JointTransform, b: JointTransform, t: f32) -> JointTransform {
-    JointTransform {
-        translation: a.translation.lerp(b.translation, t),
-        rotation: a.rotation.slerp(b.rotation, t),
-        scale: a.scale.lerp(b.scale, t),
     }
 }
 

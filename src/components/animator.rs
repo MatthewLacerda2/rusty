@@ -61,9 +61,9 @@ pub struct LayerState {
     /// addresses the layer by name.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
-    /// A script's weight (`Animator.SetLayerWeight`); `None` uses the graph's.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub weight: Option<f32>,
+    /// The layer's live weight in `[0, 1]`: the graph's authored weight when the
+    /// layer binds, then whatever `Animator.SetLayerWeight` sets.
+    pub weight: f32,
     #[serde(flatten)]
     pub playback: Playback,
 }

@@ -56,12 +56,17 @@ impl AnimatorComponent {
     }
 
     /// Match the extra layers' state to `graph`'s layers (#457): one state per
-    /// layer, each named after its layer, and any layer whose active node does not
-    /// resolve (new, or the graph changed) hard-cut into its entry node. A weight a
-    /// script set before the bind survives it.
+    /// layer, each named after its layer — a new one starting at the layer's
+    /// authored weight — and any layer whose active node does not resolve (new, or
+    /// the graph changed) hard-cut into its entry node.
     pub fn sync_layers(&mut self, graph: &AnimationGraph) {
+        self.layers.truncate(graph.layers.len());
+        let bound = self.layers.len();
         self.layers
-            .resize_with(graph.layers.len(), LayerState::default);
+            .extend(graph.layers[bound..].iter().map(|layer| LayerState {
+                weight: layer.weight,
+                ..LayerState::default()
+            }));
         for (state, layer) in self.layers.iter_mut().zip(&graph.layers) {
             if state.name != layer.name {
                 state.name.clone_from(&layer.name);
