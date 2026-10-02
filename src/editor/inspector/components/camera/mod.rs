@@ -48,8 +48,11 @@ pub fn draw_camera(
         draw_culling_mask(ui, world, id, cam.culling_mask, named_layers, is_dirty);
         draw_stacking(ui, world, id, cam.render_order, cam.clear_flags, is_dirty);
         ui.colored_label(
-            theme::from_ui(ui).accent_blue,
-            "✔ Intrinsic Motion Blur (Active | 64 Samples)",
+            theme::from_ui(ui).accent,
+            format!(
+                "{}  Intrinsic Motion Blur (Active | 64 Samples)",
+                icon::CHECK_CIRCLE
+            ),
         );
         draw_fxaa(ui, world, id, cam.fxaa_active, is_dirty);
         target::draw_target(ui, world, id, &cam, is_dirty);

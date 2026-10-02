@@ -40,7 +40,7 @@ pub fn paint(
         return;
     };
     let colour = if target.editable {
-        t.accent_blue
+        t.accent
     } else {
         t.text_secondary
     };

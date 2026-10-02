@@ -1,4 +1,6 @@
+use crate::editor::inspector::components::card::card_frame;
 use crate::editor::EditorUi;
+use egui_phosphor::regular as icon;
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
@@ -9,7 +11,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, path: &str) {
         .and_then(|f| f.to_str())
         .unwrap_or(path);
 
-    ui.heading(format!("🎵 Audio: {}", filename));
+    ui.heading(format!("{}  Audio: {}", icon::MUSIC_NOTES, filename));
     ui.add_space(5.0);
 
     draw_metadata_card(ui, path);
@@ -27,22 +29,18 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, path: &str) {
 
 /// File metadata card: path, on-disk size, and asset type.
 fn draw_metadata_card(ui: &mut egui::Ui, path: &str) {
-    egui::Frame::none()
-        .fill(crate::editor::theme::from_ui(ui).bg_tier2)
-        .inner_margin(8.0)
-        .rounding(6.0)
-        .show(ui, |ui| {
-            ui.vertical(|ui| {
-                ui.label(format!("Path: {}", path));
-                let size_str = if let Ok(meta) = fs::metadata(path) {
-                    format_size(meta.len())
-                } else {
-                    "Unknown size".to_string()
-                };
-                ui.label(format!("Size: {}", size_str));
-                ui.label("Type: Audio Clip");
-            });
+    card_frame(&crate::editor::theme::from_ui(ui)).show(ui, |ui| {
+        ui.vertical(|ui| {
+            ui.label(format!("Path: {}", path));
+            let size_str = if let Ok(meta) = fs::metadata(path) {
+                format_size(meta.len())
+            } else {
+                "Unknown size".to_string()
+            };
+            ui.label(format!("Size: {}", size_str));
+            ui.label("Type: Audio Clip");
         });
+    });
 }
 
 /// Audio clip source settings: volume, pitch, and looping.

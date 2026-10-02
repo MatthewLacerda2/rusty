@@ -15,7 +15,8 @@
 
 pub use crate::preview::{build_preview_scene, OrbitState, PreviewMesh, PreviewSubject};
 
-use crate::editor::{theme::Theme, EditorUi};
+use crate::editor::theme::{chrome, Theme};
+use crate::editor::EditorUi;
 use crate::scene::Camera;
 
 /// The rebuilt isolated scene, kept until the subject or mesh choice changes so a
@@ -41,19 +42,15 @@ pub struct PreviewRequest {
 /// and the Material component card, since materials have no on-disk file to hang a
 /// dispatch arm on. Mirrors the Scene/Game strip in `editor/viewport/mod.rs`.
 pub fn draw_tab_strip(ui: &mut egui::Ui, active: &mut bool, t: Theme) {
-    egui::Frame::none()
-        .fill(t.bg_tier1)
-        .inner_margin(t.space_xs)
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                if ui.selectable_label(!*active, "Details").clicked() {
-                    *active = false;
-                }
-                if ui.selectable_label(*active, "Preview").clicked() {
-                    *active = true;
-                }
-            });
-        });
+    ui.horizontal(|ui| {
+        if chrome::tab(ui, &t, !*active, "Details").clicked() {
+            *active = false;
+        }
+        if chrome::tab(ui, &t, *active, "Preview").clicked() {
+            *active = true;
+        }
+    });
+    ui.add_space(t.space_xs);
 }
 
 /// Draw the Preview tab's body: the mesh toggle and the offscreen image, sensing

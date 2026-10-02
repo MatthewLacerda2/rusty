@@ -1,5 +1,6 @@
 use egui_phosphor::regular as icon;
 
+use crate::editor::theme::chrome;
 use crate::editor::{content_browser, EditorUi};
 use crate::scene::Scene;
 use crate::scripting::{ConsoleLogs, LogLevel};
@@ -19,16 +20,10 @@ pub fn draw(
     egui::TopBottomPanel::bottom("Bottom Panel")
         .resizable(true)
         .min_height(112.0)
-        .frame(
-            egui::Frame::none()
-                .fill(t.bg_tier1)
-                .inner_margin(t.space_sm)
-                .stroke(egui::Stroke::new(1.0, t.border)),
-        )
+        .frame(chrome::panel_frame(&t))
         .show(ctx, |ui| {
             draw_tab_header(editor, console, ui);
-            ui.separator();
-            ui.add_space(3.0);
+            chrome::hairline(ui, &t);
 
             if editor.active_bottom_tab == "assets" {
                 content_browser::draw(editor, scene, console, ui);
@@ -43,33 +38,22 @@ pub fn draw(
 /// The tab header bar: the Content/Console selectors plus the right-aligned
 /// collapse caret and the per-tab utility button (Clear logs / jump to Root).
 fn draw_tab_header(editor: &mut EditorUi, console: &mut ConsoleLogs, ui: &mut egui::Ui) {
+    let t = editor.theme;
     ui.horizontal(|ui| {
-        if ui
-            .selectable_label(
-                editor.active_bottom_tab == "assets",
-                format!("{}  Content", icon::FOLDERS),
-            )
-            .clicked()
-        {
-            editor.active_bottom_tab = "assets".to_string();
-        }
-        if ui
-            .selectable_label(
-                editor.active_bottom_tab == "console",
-                format!("{}  Console", icon::TERMINAL_WINDOW),
-            )
-            .clicked()
-        {
-            editor.active_bottom_tab = "console".to_string();
+        let tabs = [
+            ("assets", format!("{}  Content", icon::FOLDERS)),
+            ("console", format!("{}  Console", icon::TERMINAL_WINDOW)),
+        ];
+        for (key, label) in tabs {
+            let selected = editor.active_bottom_tab == key;
+            if chrome::tab(ui, &t, selected, &label).clicked() {
+                editor.active_bottom_tab = key.to_string();
+            }
         }
 
         // Align the collapse caret and dynamic tab utility button on the right
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui
-                .button(icon::CARET_DOWN)
-                .on_hover_text("Collapse")
-                .clicked()
-            {
+            if chrome::icon_button(ui, icon::CARET_DOWN, "Collapse").clicked() {
                 editor.bottom_open = false;
             }
             if editor.active_bottom_tab == "console" {
@@ -88,15 +72,10 @@ fn draw_collapsed(ctx: &egui::Context, t: crate::editor::theme::Theme, open: &mu
     egui::TopBottomPanel::bottom("Bottom Rail")
         .resizable(false)
         .exact_height(28.0)
-        .frame(
-            egui::Frame::none()
-                .fill(t.bg_tier1)
-                .inner_margin(t.space_sm)
-                .stroke(egui::Stroke::new(1.0, t.border)),
-        )
+        .frame(chrome::rail_frame(&t))
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
-                if ui.button(icon::CARET_UP).on_hover_text("Expand").clicked() {
+                if chrome::icon_button(ui, icon::CARET_UP, "Expand").clicked() {
                     *open = true;
                 }
                 ui.colored_label(
@@ -135,7 +114,7 @@ pub fn draw_play_console(editor: &mut EditorUi, ctx: &egui::Context, console: &m
 fn draw_repl_input(editor: &mut EditorUi, ui: &mut egui::Ui) {
     ui.separator();
     ui.horizontal(|ui| {
-        ui.label("lua>");
+        ui.label(egui::RichText::new("lua>").monospace());
         let resp = ui.add(
             egui::TextEdit::singleline(&mut editor.repl_input.buffer)
                 .desired_width(f32::INFINITY)
@@ -167,10 +146,10 @@ fn draw_console(console: &mut ConsoleLogs, ui: &mut egui::Ui) {
                 for (msg, level) in &console.messages {
                     let color = match level {
                         LogLevel::Info => t.text_primary,
-                        LogLevel::Warning => t.accent_yellow,
+                        LogLevel::Warning => t.warning,
                         LogLevel::Error => t.danger,
                     };
-                    ui.colored_label(color, format!("  {}", msg));
+                    ui.label(egui::RichText::new(msg).monospace().color(color));
                 }
             }
         });

@@ -37,9 +37,7 @@ pub fn draw(
     let t = editor.theme;
     let selected = editor.selected_asset_path.clone();
 
-    let action = ui
-        .horizontal_wrapped(|ui| draw_grid(ui, t, &dir, &entries, &search, selected.as_deref()))
-        .inner;
+    let action = draw_grid(ui, t, &dir, &entries, &search, selected.as_deref());
 
     match action {
         Some(TileAction::Navigate(d)) => editor.current_dir = d,
@@ -64,8 +62,29 @@ fn read_entries(dir: &str) -> Option<Vec<(String, bool)>> {
     Some(entries)
 }
 
-/// Draw the up-tile (when not at root) plus a tile per visible entry, returning
-/// the first click action triggered this frame (if any).
+/// One tile to draw: what it shows and what clicking it does.
+struct Tile {
+    name: String,
+    glyph: &'static str,
+    color: egui::Color32,
+    selected: bool,
+    path: String,
+    kind: TileKind,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum TileKind {
+    Up,
+    Folder,
+    Scene,
+    File,
+}
+
+const TILE_SIZE: egui::Vec2 = egui::vec2(76.0, 64.0);
+
+/// Draw the up-tile (when not at root) plus a tile per visible entry in rows sized
+/// to the panel's width — never past its right edge — returning the first click
+/// action triggered this frame (if any).
 fn draw_grid(
     ui: &mut egui::Ui,
     t: Theme,
@@ -74,22 +93,39 @@ fn draw_grid(
     search: &str,
     selected: Option<&str>,
 ) -> Option<TileAction> {
+    let tiles = collect_tiles(t, dir, entries, search, selected);
+    let gap = ui.spacing().item_spacing.x;
+    let columns = ((ui.available_width() + gap) / (TILE_SIZE.x + gap)).max(1.0) as usize;
     let mut action = None;
+    for row in tiles.chunks(columns) {
+        ui.horizontal(|ui| {
+            for tile in row {
+                let resp = draw_tile(ui, t, tile);
+                action = action.take().or_else(|| tile_action(tile, &resp));
+            }
+        });
+    }
+    action
+}
+
+fn collect_tiles(
+    t: Theme,
+    dir: &str,
+    entries: &[(String, bool)],
+    search: &str,
+    selected: Option<&str>,
+) -> Vec<Tile> {
+    let mut tiles = Vec::new();
     if dir != ROOT {
         if let Some(parent) = Path::new(dir).parent() {
-            let up = tile(
-                ui,
-                t,
-                "..",
-                icon::ARROW_BEND_LEFT_UP,
-                t.text_secondary,
-                false,
-            );
-            if up.clicked() {
-                action = Some(TileAction::Navigate(
-                    parent.to_string_lossy().replace('\\', "/"),
-                ));
-            }
+            tiles.push(Tile {
+                name: "..".to_string(),
+                glyph: icon::ARROW_BEND_LEFT_UP,
+                color: t.text_secondary,
+                selected: false,
+                path: parent.to_string_lossy().replace('\\', "/"),
+                kind: TileKind::Up,
+            });
         }
     }
     for (path, is_dir) in entries {
@@ -98,56 +134,76 @@ fn draw_grid(
             continue;
         }
         let ext = extension(path);
-        let glyph = if *is_dir {
-            icon::FOLDER
-        } else {
-            type_glyph(&ext)
+        let (glyph, color, kind) = match (*is_dir, ext.as_str()) {
+            (true, _) => (
+                icon::FOLDER,
+                t.warning.linear_multiply(0.8),
+                TileKind::Folder,
+            ),
+            (false, "scene") => (type_glyph(&ext), t.asset_color(&ext), TileKind::Scene),
+            (false, _) => (type_glyph(&ext), t.asset_color(&ext), TileKind::File),
         };
-        let color = if *is_dir {
-            t.text_secondary
-        } else {
-            t.asset_color(&ext)
-        };
-        let is_sel = selected == Some(path.as_str());
-        let resp = tile(ui, t, &name, glyph, color, is_sel);
-        if *is_dir {
-            if resp.clicked() {
-                action = Some(TileAction::Navigate(path.clone()));
-            }
-        } else if ext == "scene" && resp.double_clicked() {
-            action = Some(TileAction::Load(path.clone(), name.clone()));
-        } else if resp.clicked() {
-            action = Some(TileAction::Select(path.clone()));
-        }
+        tiles.push(Tile {
+            selected: selected == Some(path.as_str()),
+            name,
+            glyph,
+            color,
+            path: path.clone(),
+            kind,
+        });
     }
-    action
+    tiles
+}
+
+/// What a click on `tile` does: folders open on click, scenes load on
+/// double-click, every other file (and a scene's single click) selects.
+fn tile_action(tile: &Tile, resp: &egui::Response) -> Option<TileAction> {
+    match tile.kind {
+        TileKind::Up | TileKind::Folder if resp.clicked() => {
+            Some(TileAction::Navigate(tile.path.clone()))
+        }
+        TileKind::Scene if resp.double_clicked() => {
+            Some(TileAction::Load(tile.path.clone(), tile.name.clone()))
+        }
+        TileKind::Scene | TileKind::File if resp.clicked() => {
+            Some(TileAction::Select(tile.path.clone()))
+        }
+        _ => None,
+    }
 }
 
 /// A single asset/folder tile: a type glyph over a (truncated) name. Returns a
-/// click-sensing response over the whole tile.
-fn tile(
-    ui: &mut egui::Ui,
-    t: Theme,
-    name: &str,
-    glyph: &str,
-    color: egui::Color32,
-    sel: bool,
-) -> egui::Response {
-    let fill = if sel { t.selection } else { t.bg_tier2 };
-    let edge = if sel { t.accent_purple } else { t.border };
-    let inner = egui::Frame::none()
-        .fill(fill)
-        .rounding(4.0)
-        .inner_margin(t.space_xs)
-        .stroke(egui::Stroke::new(1.0, edge))
-        .show(ui, |ui| {
-            ui.set_min_size(egui::vec2(72.0, 60.0));
-            ui.vertical_centered(|ui| {
-                ui.label(egui::RichText::new(glyph).size(26.0).color(color));
-                ui.label(egui::RichText::new(truncate(name)).small());
-            });
-        });
-    inner.response.interact(egui::Sense::click())
+/// click-sensing response over the whole tile. Hover lifts it a step.
+fn draw_tile(ui: &mut egui::Ui, t: Theme, tile: &Tile) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(TILE_SIZE, egui::Sense::click());
+    let (fill, edge) = if tile.selected {
+        (t.selection, t.accent)
+    } else if resp.hovered() {
+        (t.bg_hover, t.outline)
+    } else {
+        (t.bg_tier2, egui::Color32::TRANSPARENT)
+    };
+    let p = ui.painter();
+    p.rect(rect, 6.0, fill, egui::Stroke::new(1.0, edge));
+    let center = egui::Align2::CENTER_CENTER;
+    let glyph_pos = rect.center_top() + egui::vec2(0.0, 24.0);
+    p.text(
+        glyph_pos,
+        center,
+        tile.glyph,
+        egui::FontId::proportional(24.0),
+        tile.color,
+    );
+    let name_pos = rect.center_bottom() - egui::vec2(0.0, 12.0);
+    let small = egui::TextStyle::Small.resolve(ui.style());
+    p.text(
+        name_pos,
+        center,
+        truncate(&tile.name),
+        small,
+        t.text_primary,
+    );
+    resp.on_hover_text(&tile.name)
 }
 
 fn type_glyph(ext: &str) -> &'static str {

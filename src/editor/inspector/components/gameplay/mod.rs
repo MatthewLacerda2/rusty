@@ -69,9 +69,15 @@ pub fn draw_script(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is
             });
             let t = theme::from_ui(ui);
             if Path::new(&script.path).exists() {
-                ui.colored_label(t.accent_blue, "✔ Loaded and ready to run");
+                ui.colored_label(
+                    t.accent,
+                    format!("{}  Loaded and ready to run", icon::CHECK_CIRCLE),
+                );
             } else {
-                ui.colored_label(t.danger, "❌ File not found!");
+                ui.colored_label(
+                    t.danger,
+                    format!("{}  File not found!", icon::WARNING_CIRCLE),
+                );
             }
             // Schema-driven field controls (#84): one typed control per field the
             // script's optional `fields` table declares. No-op for plain scripts.
