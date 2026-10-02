@@ -175,7 +175,8 @@ fn add_lighting_combat(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32
     }
 }
 
-/// Add-menu entries for rigidbody, material/texture, nav-agent, nav-obstacle, joint
+/// Add-menu entries for rigidbody, material/texture, nav-agent, nav-obstacle,
+/// off-mesh link, joint
 /// and character controller. Each entry is offered only when absent. A Joint declares `requires(RigidBody)` (#449), so it
 /// goes through the shared dependency verb, matching `Scene.AddComponent`.
 fn add_physics_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
@@ -194,6 +195,11 @@ fn add_physics_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: 
     let cone = format!("{}  NavMesh Obstacle", icon::TRAFFIC_CONE);
     if !world.has_nav_obstacle(id) && ui.button(cone).clicked() {
         authoring::add_with_requirements(world, id, ComponentKind::NavMeshObstacle);
+        ui.close_menu();
+    }
+    let ladder = format!("{}  Off-Mesh Link", icon::LADDER_SIMPLE);
+    if !world.has_offmesh_link(id) && ui.button(ladder).clicked() {
+        authoring::add_with_requirements(world, id, ComponentKind::OffMeshLink);
         ui.close_menu();
     }
     if !world.has_joint(id) && ui.button(format!("{}  Joint", icon::LINK)).clicked() {

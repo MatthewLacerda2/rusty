@@ -44,6 +44,7 @@ pub mod mask;
 pub mod material;
 pub mod nav;
 pub mod nav_obstacle;
+pub mod offmesh_link;
 pub mod particle;
 pub mod physics;
 pub mod probe;
@@ -179,6 +180,7 @@ pub fn register<'lua, 'scope>(
     scene::register(lua, scope, ctx.scene, ctx.scene_path, ctx.is_playing)?;
     nav::register(lua, scope, ctx.scene, ctx.nav)?;
     nav_obstacle::register(lua, scope, ctx.scene)?;
+    offmesh_link::register(lua, scope, ctx.scene, ctx.nav)?;
     physics::register(lua, scope, ctx.scene)?;
     physics::register_hitscan(lua, scope, ctx.scene, ctx.physics)?;
     joint::register(lua, scope, ctx.scene)?;

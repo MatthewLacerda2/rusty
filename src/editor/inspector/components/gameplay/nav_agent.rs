@@ -70,7 +70,8 @@ pub fn draw_nav_agent(
     }
 }
 
-/// The nav-agent local-avoidance toggle + priority (#463), through the shared ops.
+/// The nav-agent local-avoidance toggle + priority (#463) and the off-mesh link
+/// auto-traverse toggle (#462), through the shared ops.
 fn draw_agent_avoidance(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -82,6 +83,14 @@ fn draw_agent_avoidance(
     if ui.checkbox(&mut enabled, "Avoid Other Agents").changed() {
         if let Some(mut a) = world.nav_agent_mut(id) {
             nav_ops::set_avoidance_enabled(&mut a, enabled);
+        }
+        *is_dirty = true;
+    }
+    let mut auto = agent.auto_traverse_off_mesh_link;
+    let label = "Auto Traverse Off-Mesh Link";
+    if ui.checkbox(&mut auto, label).changed() {
+        if let Some(mut a) = world.nav_agent_mut(id) {
+            nav_ops::set_auto_traverse_off_mesh_link(&mut a, auto);
         }
         *is_dirty = true;
     }

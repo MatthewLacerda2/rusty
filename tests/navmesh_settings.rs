@@ -55,6 +55,10 @@ fn nav_settings_survive_round_trip() {
             min_z: -10.0,
             max_z: 10.0,
         }),
+        drop_height: 3.0,
+        jump_distance: 2.0,
+        jump_height: 1.0,
+        link_spacing: 4.0,
     };
     let path = tmp("rusty_nav_settings_roundtrip.scene");
     scene.save_to_file(&path).unwrap();

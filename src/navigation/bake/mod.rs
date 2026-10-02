@@ -10,6 +10,8 @@
 //!    is no implicit ground past the geometry (#666).
 //! 3. `carve` — carving `NavMeshObstacle`s cut their footprint out (#456).
 //! 4. `erosion` — spans within `agent_radius` of the surface's edge are dropped.
+//! 5. off-mesh links (#462) — drops and jumps are generated along the ledges of the
+//!    result, and authored links snap onto it (`navigation::offmesh`).
 //!
 //! Steps 1–3 are per column; erosion reads a fixed neighbourhood. That makes the
 //! bake **incremental** (#456, `sync`): the graph keeps its pre-erosion spans and a
@@ -36,6 +38,7 @@ pub use state::BakeState;
 pub use sync::Rebake;
 
 use super::obstacle::ObstacleVolume;
+use super::offmesh::{authored_keys, AuthoredKey, LinkParams};
 use super::NavigationGraph;
 use crate::scene::Scene;
 use inputs::{collider_keys, obstacle_keys, BakeInputs, Source};
@@ -65,6 +68,13 @@ impl NavigationGraph {
         let eroded = raw.eroded_columns(settings.agent_radius, all);
         self.cell_start = eroded.cell_start;
         self.spans = eroded.spans;
+        self.offmesh.auto = match LinkParams::new(settings, self.grid_spacing) {
+            Some(p) => self.generate_links(&raw, &p, all),
+            None => Vec::new(),
+        };
+        let links = authored_keys(scene);
+        self.offmesh.authored = self.resolve_authored(&links);
+        self.index_links();
 
         let colliders = colliders.into_iter().zip(rects);
         let obstacles = obstacles.into_iter().map(|(id, v)| {
@@ -78,6 +88,14 @@ impl NavigationGraph {
                 .collect(),
             obstacles: obstacles
                 .map(|(id, key, rect)| Source { id, key, rect })
+                .collect(),
+            links: links
+                .into_iter()
+                .map(|(id, key)| Source {
+                    id,
+                    key,
+                    rect: link_rect(self, &key),
+                })
                 .collect(),
         };
         let mut state = BakeState { raw, inputs, log };
@@ -118,4 +136,9 @@ impl NavigationGraph {
         g.agent_height = self.agent_height;
         g
     }
+}
+
+/// The cells an authored link spans: the box its two ends bound.
+fn link_rect(g: &NavigationGraph, k: &AuthoredKey) -> Option<CellRect> {
+    CellRect::covering(g, k.start.min(k.end), k.start.max(k.end))
 }

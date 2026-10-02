@@ -34,7 +34,9 @@ use crate::components::{
 };
 use crate::components::{CharacterControllerComponent, JointComponent, LineComponent};
 use crate::components::{LayoutElementComponent, LayoutGroupComponent, ShapeComponent};
-use crate::components::{LodGroupComponent, NavMeshObstacleComponent, TrailComponent};
+use crate::components::{
+    LodGroupComponent, NavMeshObstacleComponent, OffMeshLinkComponent, TrailComponent,
+};
 use crate::ecs::World;
 use crate::scene::authoring::components::ComponentKind;
 use crate::scene::authoring::defaults::{
@@ -54,6 +56,7 @@ pub(crate) fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::Texture => world.has_material(id),
         ComponentKind::NavMeshAgent => world.has_nav_agent(id),
         ComponentKind::NavMeshObstacle => world.has_nav_obstacle(id),
+        ComponentKind::OffMeshLink => world.has_offmesh_link(id),
         ComponentKind::Camera => world.has_camera(id),
         ComponentKind::Particles => world.has_particles(id),
         ComponentKind::VisualCorrection => world.has_visual_correction(id),
@@ -92,6 +95,9 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
         ComponentKind::NavMeshAgent => world.set_nav_agent(id, Some(default_nav_agent())),
         ComponentKind::NavMeshObstacle => {
             world.set_nav_obstacle(id, Some(NavMeshObstacleComponent::default()))
+        }
+        ComponentKind::OffMeshLink => {
+            world.set_offmesh_link(id, Some(OffMeshLinkComponent::default()))
         }
         ComponentKind::Camera => world.set_camera(id, Some(default_camera())),
         ComponentKind::Particles => {
@@ -169,6 +175,7 @@ pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool
         ComponentKind::Texture => world.set_material(id, None),
         ComponentKind::NavMeshAgent => world.set_nav_agent(id, None),
         ComponentKind::NavMeshObstacle => world.set_nav_obstacle(id, None),
+        ComponentKind::OffMeshLink => world.set_offmesh_link(id, None),
         ComponentKind::Camera => world.set_camera(id, None),
         ComponentKind::Particles => world.set_particles(id, None),
         ComponentKind::VisualCorrection => world.set_visual_correction(id, None),

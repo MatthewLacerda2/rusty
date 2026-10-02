@@ -21,6 +21,10 @@ Per-entity navmesh agent control.
 | `NavMeshAgent.GetPath` | `(id)` | a path table (see `Navigation`): the agent's position, then the corners still ahead |
 | `NavMeshAgent.Warp` | `(id, x, y, z)` | `bool` — teleports onto the navmesh point nearest `x, y, z` (within 1 unit); `false` and no move when there is none |
 | `NavMeshAgent.ResetPath` | `(id)` | — stops following: the target becomes where it stands |
+| `NavMeshAgent.IsOnOffMeshLink` | `(id)` | `bool` — the agent is on an off-mesh link (see below) |
+| `NavMeshAgent.GetCurrentOffMeshLink` | `(id)` | the link it is on, as a link table (see `Navigation`), or `nil` |
+| `NavMeshAgent.CompleteOffMeshLink` | `(id)` | `bool` — puts the agent on the link's end and resumes its path; `false` when it is on no link |
+| `NavMeshAgent.GetAutoTraverseOffMeshLink` / `SetAutoTraverseOffMeshLink` | `(id)` / `(id, bool)` | whether the engine crosses links for it (default `true`) |
 
 ### Following a path (#458)
 
@@ -35,6 +39,35 @@ is **partial** and the agent stops at its end, the nearest reachable point, inst
 pressing into the wall. `Warp` drops the old path and stops the agent dead; it plans once
 from the new position on its next tick. `ResetPath` is Unity's: the agent slows to a stop
 where it is.
+
+### Off-mesh links (#462)
+
+A path can cross **off-mesh links**: authored `OffMeshLink`s (a ladder) and the drops
+and jumps the navmesh generates (see `Navigation`). Such a leg is one straight corner to
+corner, from the link's start to its end. When the agent reaches a link's start it stops
+steering and is **on the link** (`IsOnOffMeshLink`; Unity's `isOnOffMeshLink`) — the
+`Walking → OnLink → Walking` state machine:
+
+- **Auto-traverse on** (the default, Unity's `autoTraverseOffMeshLink`): the engine moves
+  it in a straight line to the link's end at its `Speed`, then it walks on.
+- **Off**: it waits on the link, as long as it takes. The script reads
+  `GetCurrentOffMeshLink` (`type` says `"drop"`, `"jump"` or `"manual"`; `owner` is the
+  authoring entity, for a ladder's animation), plays the vault, jump or climb, moves the
+  body, and calls `CompleteOffMeshLink`, which puts the agent on the link's end.
+
+On a link the agent neither re-plans nor takes part in local avoidance. `Warp` takes it
+off the link. It is poll-only: there is no callback. A one-way link (every generated one)
+is never crossed backwards, so a drop is never climbed back up.
+
+```lua
+function Update()
+  if NavMeshAgent.IsOnOffMeshLink(self.id) then
+    local link = NavMeshAgent.GetCurrentOffMeshLink(self.id)
+    -- play the climb for link.type, move toward link.endPos, then:
+    NavMeshAgent.CompleteOffMeshLink(self.id)
+  end
+end
+```
 
 ### Local avoidance (#463)
 

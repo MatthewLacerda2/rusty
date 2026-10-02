@@ -10,13 +10,15 @@ same shapes physics collides with (rotated boxes, ramps, spheres, capsules, conv
 and triangle meshes), rasterised into each cell column. A ramp bakes as a slope, not a
 plateau at its highest point. **Where there is no collider there is no navmesh**: no
 implicit ground past the level's edge, and an empty scene bakes nothing (as in Unity).
-Carving `NavMeshObstacle`s cut their footprint out of it (see `NavMeshObstacle`).
+Carving `NavMeshObstacle`s cut their footprint out of it (see `NavMeshObstacle`), and
+off-mesh links join what walking can't (below).
 
 ### Keeping the navmesh current (#456)
 
 In Play the navmesh follows the scene **every tick**, rebaking **only what changed**. Each
 tick compares the static colliders (shape and world pose; added, removed, moved, resized,
-toggled static or active) and the carving obstacles against what the last bake read. A
+toggled static or active), the carving obstacles and the authored off-mesh links against
+what the last bake read; a link change re-snaps the links without rebaking any floor. A
 change dirties the cells its old and new footprints cover; only those cells, plus the
 agent-radius erosion's reach around them, are rebaked. The result is exactly the navmesh
 a full bake of the scene would give, and an agent re-plans only when its path crosses a
@@ -67,6 +69,49 @@ returned `y` says which. Its start must stand on the navmesh: from off it the wa
 blocked at once, at the start (Unity's rule). `SamplePosition` with `maxDistance` of a
 few metres is the usual way to turn a picked point (a callout, a click) into one an
 agent can reach.
+
+### Off-mesh links (#462)
+
+**Off-mesh links** join walkable spans that walking can't: a drop off a ledge, a jump onto
+a box or across a gap, a ladder. A path can cross them (see `NavMeshAgent`, *Off-mesh
+links*, for what an agent does on one); a crossed link is one leg of the path, and the
+smoothing never pulls a straight run across a link. Two sources:
+
+- **Authored** `OffMeshLink` components (see `OffMeshLink`).
+- **Generated** at bake time along every **ledge** (a span with a cardinal neighbour it
+  can't walk to), looking straight out for the nearest floor it could land on. Each kind
+  is off until its setting is above `0` (Unity's "Drop Height" and "Jump Distance"):
+  - a **drop** (`DropHeight`): a floor more than `MaxStep` and at most `DropHeight` lower,
+    just past the edge (within the agent-radius margins both sides of it, plus two cells);
+  - a **jump**: up onto a floor at most `JumpHeight` higher in that same reach, or across
+    a gap at most `JumpDistance` wide beyond it, landing at most `DropHeight` lower. A
+    level jump needs a real gap on the way, so floor merely trimmed around a wall end is
+    never jumped.
+
+  Both ends need `AgentHeight` of room above the higher floor, and every column crossed
+  must be open there; walls stop the scan. Generated links are **one-way** (a drop is
+  never climbed back up; the far side generates its own jump back when one fits), and are
+  thinned to one per `LinkSpacing` (default `2`) along an edge. The incremental rebake
+  regenerates the links near a change, matching a full bake exactly.
+
+`GetOffMeshLinks` lists every link in the navmesh (the generated ones by source cell, then
+the authored ones by entity id) — the way to see where agents can drop and jump. A link
+table is:
+
+```lua
+{ type = "manual" | "drop" | "jump",
+  startPos = {x=, y=, z=}, endPos = {x=, y=, z=},  -- snapped onto the navmesh
+  owner = id | nil,                                -- the OffMeshLink's entity
+  bidirectional = bool }                           -- GetOffMeshLinks only
+```
+
+| Function | Signature | Returns / Effect |
+|---|---|---|
+| `Navigation.GetOffMeshLinks` | `()` | a list of link tables, every link in the navmesh |
+| `Navigation.GetDropHeight` / `SetDropHeight` | `()` / `(metres)` | the highest generated drop (`0`: none) + re-bakes |
+| `Navigation.GetJumpDistance` / `SetJumpDistance` | `()` / `(metres)` | the widest gap a generated jump crosses (`0`: none) + re-bakes |
+| `Navigation.GetJumpHeight` / `SetJumpHeight` | `()` / `(metres)` | the highest ledge a generated jump climbs (`0`: none) + re-bakes |
+| `Navigation.GetLinkSpacing` / `SetLinkSpacing` | `()` / `(metres)` | one generated link per this much edge + re-bakes |
 
 ### Per-scene bake settings (#276)
 

@@ -75,6 +75,8 @@ pub struct NavigationGraph {
     /// What the last bake kept to rebake incrementally (#456); `None` until the
     /// first bake.
     pub(super) bake_state: Option<Box<super::bake::BakeState>>,
+    /// Off-mesh links (#462): generated drops and jumps, and authored links.
+    pub(super) offmesh: super::offmesh::OffMeshLinks,
 }
 
 impl NavigationGraph {
@@ -104,6 +106,7 @@ impl NavigationGraph {
             agent_height: super::DEFAULT_AGENT_HEIGHT,
             bake_generation: 0,
             bake_state: None,
+            offmesh: Default::default(),
         }
     }
 

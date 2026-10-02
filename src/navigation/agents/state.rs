@@ -34,6 +34,7 @@ pub fn remaining_distance(agent: &NavMeshAgentComponent, position: Vec3) -> f32 
 /// Forget the cached path, so the next tick plans afresh — once.
 fn drop_path(agent: &mut NavMeshAgentComponent) {
     agent.cached_path.clear();
+    agent.path_links.clear();
     agent.path_cursor = 0;
 }
 
@@ -47,12 +48,14 @@ pub fn reset_path(agent: &mut NavMeshAgentComponent, position: Vec3) {
 impl NavigationGraph {
     /// Teleport `agent` to the walkable point nearest `point` (within
     /// [`WARP_SNAP_DISTANCE`]) and return it, or `None` (nothing changes) when there
-    /// is none. The agent keeps its target, stops dead, and plans one new path from
+    /// is none. The agent keeps its target, stops dead (off any off-mesh link it was
+    /// on), and plans one new path from
     /// the new position on its next tick, instead of sliding there or re-planning
     /// every frame.
     pub fn warp_agent(&self, agent: &mut NavMeshAgentComponent, point: Vec3) -> Option<Vec3> {
         let landed = self.sample_position(point, WARP_SNAP_DISTANCE)?;
         agent.velocity = Vec3::ZERO;
+        agent.off_mesh_link = None;
         drop_path(agent);
         Some(landed)
     }

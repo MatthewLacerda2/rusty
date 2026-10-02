@@ -1,10 +1,10 @@
-//! src/api/snapshot/navigation.rs — the NavMeshObstacle snapshot (#456), apart
-//! from `components.rs` to keep it under the size cap.
+//! src/api/snapshot/navigation.rs — the NavMeshObstacle (#456) and OffMeshLink
+//! (#462) snapshots, apart from `components.rs` to keep it under the size cap.
 
 use serde_json::{json, Value};
 
 use super::vec3;
-use crate::components::NavMeshObstacleComponent;
+use crate::components::{NavMeshObstacleComponent, OffMeshLinkComponent};
 
 /// NavMeshObstacle: its shape, its carving options, and whether it carves now.
 pub(crate) fn nav_obstacle_value(o: &NavMeshObstacleComponent) -> Value {
@@ -21,5 +21,16 @@ pub(crate) fn nav_obstacle_value(o: &NavMeshObstacleComponent) -> Value {
         "time_to_stationary": o.time_to_stationary,
         "is_carving": o.is_carving(),
         "velocity": vec3(o.velocity),
+    })
+}
+
+/// OffMeshLink: its local ends and options.
+pub(crate) fn offmesh_link_value(l: &OffMeshLinkComponent) -> Value {
+    json!({
+        "active": l.active,
+        "start": vec3(l.start),
+        "end": vec3(l.end),
+        "bidirectional": l.bidirectional,
+        "cost_override": l.cost_override,
     })
 }

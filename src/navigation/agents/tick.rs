@@ -7,6 +7,7 @@ use glam::{Vec2, Vec3};
 use super::super::avoidance::{self, AvoidanceAgent};
 use super::super::obstacle::avoidance_obstacles;
 use super::super::NavigationGraph;
+use super::link::auto_traverse;
 use crate::scene::{NavMeshAgentComponent, Scene};
 
 /// An agent that took part in this frame's tick, carried from the steering pass
@@ -42,6 +43,10 @@ impl NavigationGraph {
             };
             let current_pos = scene.world.transform(id).map(|t| t.position);
             if let (true, Some(position)) = (agent.active, current_pos) {
+                if agent.off_mesh_link.is_some() {
+                    self.on_link(scene, id, agent, position, delta_time);
+                    continue;
+                }
                 let steering = (agent.destination() - position).length() > agent.stopping_distance;
                 let moved_with = if steering { agent.velocity } else { Vec3::ZERO };
                 if steering {
@@ -97,6 +102,9 @@ impl NavigationGraph {
         // Query the next waypoint from the agent's cached path,
         // re-planning with A* only when the cache is invalid (#126).
         let next_step = self.cached_next_step(agent, current_pos);
+        if agent.off_mesh_link.is_some() {
+            return; // reached a link: it stands still until the link is crossed
+        }
         // Steer on the XZ plane so a tall step doesn't inflate the move distance.
         let mut to_next_dir = next_step - current_pos;
         to_next_dir.y = 0.0;
@@ -107,6 +115,25 @@ impl NavigationGraph {
         let diff_vel = desired_vel - agent.velocity;
         agent.velocity += diff_vel * (agent.acceleration * delta_time).min(1.0);
         agent.velocity.y = 0.0;
+    }
+
+    /// An agent on an off-mesh link (#462) neither steers nor avoids: the engine
+    /// carries it across when it auto-traverses, else it waits for its script.
+    fn on_link(
+        &self,
+        scene: &mut Scene,
+        id: u32,
+        mut agent: NavMeshAgentComponent,
+        position: Vec3,
+        delta_time: f32,
+    ) {
+        let moved = agent
+            .auto_traverse_off_mesh_link
+            .then(|| auto_traverse(&mut agent, position, delta_time));
+        scene.world.set_nav_agent(id, Some(agent));
+        if let (Some(p), Some(mut t)) = (moved, scene.world.transform_mut(id)) {
+            t.position = p;
+        }
     }
 
     /// Move a steering agent by its avoided `velocity` and write the new position.

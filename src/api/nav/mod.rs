@@ -8,6 +8,7 @@
 //! to stay under the size cap while keeping each Lua namespace one cohesive unit.
 
 mod agent;
+mod offmesh;
 mod path_state;
 mod query;
 
@@ -58,6 +59,7 @@ fn register_navigation<'lua, 'scope>(
     register_settings_setters(scope, &table, scene, nav)?;
     register_bounds(scope, &table, scene, nav)?;
     query::register(scope, &table, nav)?;
+    offmesh::register_navigation(scope, &table, scene, nav)?;
 
     lua.globals()
         .set("Navigation", table)
