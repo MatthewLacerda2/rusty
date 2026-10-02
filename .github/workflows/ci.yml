@@ -558,8 +558,10 @@ jobs:
         id: mutate
         # --in-diff restricts mutants to the lines this PR changed; the --file sim
         # globs keep it from mutating anything outside the deterministic sim even
-        # if the diff strays. Same dev-feature build + timeout guard as the sweep.
+        # if the diff strays. Same dev-feature build, timeout guard and memory
+        # cap as the sweep.
         run: |
+          ulimit -v 8388608
           cargo mutants --no-shuffle --timeout-multiplier 3 --in-diff pr.diff \
             --file 'src/app/**/*.rs' \
             --file 'src/scripting/**/*.rs' \
@@ -772,7 +774,18 @@ jobs:
         # against mutants that induce infinite loops. The exit code is recorded
         # so `mutants-report` can tell a finished shard (0 clean, 2 survivors,
         # 3 timeouts) from one that was cut off or never got past its baseline.
+        #
+        # `ulimit -v` caps every process at 8 GiB of address space, half the
+        # runner's 16 GB (#674). A mutant that turns a loop infinite *and*
+        # allocating (a `Vec::push` that never stops) fills RAM in seconds,
+        # long before the per-mutant timeout. That is the likeliest reading of
+        # the 2026-10-01 sweep: shard 1's runner got "received a shutdown
+        # signal" 4 min into a mutant whose test limit was 172 s, and the shard
+        # was lost with no report. Capped, the test binary dies on its own allocation and
+        # cargo-mutants counts the mutant caught. Local proof: the dev build
+        # and suite pass under the cap; real usage is far below it.
         run: |
+          ulimit -v 8388608
           rc=0
           cargo mutants --no-shuffle --timeout-multiplier 3 \
             --shard '${{ matrix.shard }}/${{ strategy.job-total }}' --sharding round-robin \
@@ -836,7 +849,7 @@ jobs:
             if [ -z "$total" ]; then
               echo '> ❌ No shard uploaded a report — nothing was measured.'
             elif [ -n "$unfinished" ]; then
-              echo "> ⚠️ Shards that did not finish (of $total):$unfinished — their mutants are unmeasured, not clean. \`exit:none\` means the shard was cut off (the 6 h ceiling) or failed before its run; resize the matrix if it recurs."
+              echo "> ⚠️ Shards that did not finish (of $total):$unfinished — their mutants are unmeasured, not clean. \`exit:none\` means the shard was cut off or failed before its run: check its log for the 6 h ceiling (resize the matrix) or a lost runner (\`received a shutdown signal\`, a one-off unless it recurs)."
             else
               echo "> All $total shards finished."
               # The marker `mutants-plan` looks for (#506): this commit is covered.
