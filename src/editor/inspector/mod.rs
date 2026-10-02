@@ -243,8 +243,8 @@ fn draw_components(
     named_layers: &[(u8, String)],
     pending: &mut PendingEdits,
 ) {
-    let hitboxes = &mut pending.generate_hitboxes;
-    render::draw_mesh(ui, world, id, &mut editor.is_dirty, hitboxes);
+    let skin_tool = &mut pending.skin_tool;
+    render::draw_mesh(ui, world, id, &mut editor.is_dirty, skin_tool);
     material::draw_material_card(ui, editor, world, id, materials);
     render::draw_light(ui, world, id, &mut editor.is_dirty);
     lod_group::draw_lod_group(ui, world, id, &mut editor.is_dirty);

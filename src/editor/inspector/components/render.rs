@@ -5,14 +5,25 @@ use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::light as light_ops;
 use crate::scene::{LightComponent, LightType};
 
-/// 3B. Mesh details. A skinned mesh also offers *Generate Hitboxes* (#464): the
-/// click is deferred into `generate_hitboxes`, since generation needs the Scene.
+/// The skinned-mesh tools a Mesh card button asks for, deferred because they need
+/// the Scene.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SkinTool {
+    /// *Generate Hitboxes* (#464).
+    Hitboxes,
+    /// *Build Ragdoll* (#466).
+    Ragdoll,
+}
+
+/// 3B. Mesh details. A skinned mesh also offers *Generate Hitboxes* (#464) and
+/// *Build Ragdoll* (#466): the click is deferred into `skin_tool`, since both
+/// need the Scene.
 pub fn draw_mesh(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
     id: u32,
     is_dirty: &mut bool,
-    generate_hitboxes: &mut bool,
+    skin_tool: &mut Option<SkinTool>,
 ) {
     if !world.has_mesh(id) {
         return;
@@ -26,13 +37,21 @@ pub fn draw_mesh(
                 mesh.vertices.len(),
                 mesh.indices.len()
             ));
-            if mesh.skin.is_some()
-                && ui
-                    .button("Generate Hitboxes")
-                    .on_hover_text("One collider per bone, on the Hitbox layer")
-                    .clicked()
-            {
-                *generate_hitboxes = true;
+            if mesh.skin.is_some() {
+                ui.horizontal(|ui| {
+                    let hitboxes = ui
+                        .button("Generate Hitboxes")
+                        .on_hover_text("One collider per bone, on the Hitbox layer");
+                    if hitboxes.clicked() {
+                        *skin_tool = Some(SkinTool::Hitboxes);
+                    }
+                    let ragdoll = ui
+                        .button("Build Ragdoll")
+                        .on_hover_text("A Rigidbody and Joint on each hitbox bone");
+                    if ragdoll.clicked() {
+                        *skin_tool = Some(SkinTool::Ragdoll);
+                    }
+                });
             }
         }
     });

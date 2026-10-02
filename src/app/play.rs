@@ -72,8 +72,11 @@ impl GameWorld {
 /// system has seen the entity. The scene-load phase (#432) follows it, so a
 /// `Scene.Load` swaps the World only once the whole tick is done with it, right
 /// before `advance_frame`. The skin palette build (#453) runs in `Render`, after
-/// every stage that may move a bone. `follow_bones` (#464) runs after the last
-/// sim writer of a bone (`LateUpdate`), so hitboxes are queried where they render.
+/// every stage that may move a bone. `pose_ragdolls` (#466) is the post-animation
+/// writer: right after `animate`, it puts each simulated ragdoll bone back where
+/// physics left it, so `LateUpdate` and skinning see the ragdoll, not the clip.
+/// `follow_bones` (#464) runs after the last sim writer of a bone (`LateUpdate`),
+/// so hitboxes are queried where they render.
 pub(super) fn register(app: &mut App) {
     app.add_system(Stage::FixedUpdate, rebake_nav)
         .add_system(Stage::FixedUpdate, init_scripts)
@@ -83,6 +86,7 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, step_physics)
         .add_system(Stage::FixedUpdate, super::animation::graph::evaluate_graphs)
         .add_system(Stage::FixedUpdate, animate)
+        .add_system(Stage::FixedUpdate, pose_ragdolls)
         .add_system(Stage::FixedUpdate, super::particles::tick_particles)
         .add_system(Stage::FixedUpdate, late_update_scripts)
         .add_system(Stage::FixedUpdate, follow_bones)
@@ -150,6 +154,14 @@ fn step_physics(world: &mut World, res: &mut Resources) {
 fn follow_bones(world: &mut World, res: &mut Resources) {
     if let Some(physics) = res.physics.borrow_mut().as_mut() {
         physics.follow_bones(&world.scene.borrow());
+    }
+}
+
+/// Override the Animator on every bone a dynamic body carries — a ragdoll's —
+/// with the pose this tick's step solved (#466, see `physics::ragdoll`).
+fn pose_ragdolls(world: &mut World, res: &mut Resources) {
+    if let Some(physics) = res.physics.borrow().as_ref() {
+        physics.pose_bones(&mut world.scene.borrow_mut());
     }
 }
 

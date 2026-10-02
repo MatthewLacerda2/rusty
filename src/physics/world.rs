@@ -24,6 +24,7 @@ use super::collision_events::CollisionEvents;
 use super::compound::{world_to_local, BodyPlan};
 use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
 use super::joints::JointMap;
+use super::live::body_type;
 use super::trigger_events::{self, TriggerEvents};
 use super::PhysicsEvents;
 use crate::scene::Scene;
@@ -109,6 +110,8 @@ impl PhysicsWorld {
         self.resync_joints(scene);
         self.sync_enabled(scene);
         self.sync_materials(scene);
+        self.sync_layers(scene);
+        self.sync_masses(scene);
         self.sync_characters(scene);
         let plan = std::mem::take(&mut self.plan);
         for (&owner, ids) in &plan {
@@ -127,6 +130,14 @@ impl PhysicsWorld {
     /// Push one entity's snapshot into its rapier body for this tick.
     fn apply_body_state(&mut self, handle: RigidBodyHandle, snap: &EntityBodyState) {
         let body = &mut self.bodies[handle];
+        let class = body_type(snap);
+        if body.body_type() != class {
+            // A Rigidbody switched class mid-play (`SetKinematic`, a ragdoll
+            // handoff, #466): the body changes in place at the entity's current
+            // pose, so its colliders, joints and contacts survive.
+            body.set_body_type(class, true);
+            body.set_position(to_iso(snap.pos, snap.rot), true);
+        }
         // Re-apply the CCD mode each tick so `Physics.SetCollisionDetection`
         // toggled mid-play takes effect (mirrors the `gravity_scale` re-apply).
         body.enable_ccd(snap.ccd_enabled);
@@ -194,31 +205,38 @@ impl PhysicsWorld {
     /// attached collider's world AABB is refreshed, since moving an owner moves
     /// its compound children too.
     fn sync_from_rapier(&self, scene: &mut Scene) {
-        for (&owner, ids) in &self.plan {
-            let Some(body) = self
-                .id_to_body
+        for &owner in self.plan.keys() {
+            self.write_back(scene, owner);
+        }
+    }
+
+    /// Write one owner's integrated pose and velocities back onto its entity and
+    /// refresh the world AABB of every collider its body carries.
+    pub(super) fn write_back(&self, scene: &mut Scene, owner: u32) {
+        let (Some(ids), Some(body)) = (
+            self.plan.get(&owner),
+            self.id_to_body
                 .get(&owner)
-                .and_then(|&h| self.bodies.get(h))
-            else {
-                continue;
-            };
-            if !body.is_fixed() {
-                let (pos, rot) = from_iso(body.position());
-                let (local_pos, local_rot) = world_to_local(scene, owner, pos, rot);
-                if let Some(mut t) = scene.world.transform_mut(owner) {
-                    t.position = local_pos;
-                    t.rotation = local_rot;
-                }
+                .and_then(|&h| self.bodies.get(h)),
+        ) else {
+            return;
+        };
+        if !body.is_fixed() {
+            let (pos, rot) = from_iso(body.position());
+            let (local_pos, local_rot) = world_to_local(scene, owner, pos, rot);
+            if let Some(mut t) = scene.world.transform_mut(owner) {
+                t.position = local_pos;
+                t.rotation = local_rot;
             }
-            if let Some(mut rb) = scene.world.rigidbody_mut(owner) {
-                if !rb.is_kinematic {
-                    rb.velocity = from_na_vec(*body.linvel());
-                    rb.angular_velocity = from_na_vec(*body.angvel());
-                }
+        }
+        if let Some(mut rb) = scene.world.rigidbody_mut(owner) {
+            if !rb.is_kinematic {
+                rb.velocity = from_na_vec(*body.linvel());
+                rb.angular_velocity = from_na_vec(*body.angvel());
             }
-            for &id in ids {
-                scene.update_entity_collider(id);
-            }
+        }
+        for &id in ids {
+            scene.update_entity_collider(id);
         }
     }
 }

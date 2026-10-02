@@ -3,11 +3,13 @@
 //! Bones are never saved. A document keeps, per skinned entity, the bones whose
 //! transform differs from the model's rest pose (`BoneBinding::overrides`), and
 //! every entity parented under a bone, re-pointed at the skinned entity with the
-//! bone's name in `parent_bone`. Both re-bind by name on load.
+//! bone's name in `parent_bone`, and the `Rigidbody` / `Joint` a ragdoll put on a
+//! bone (`BoneBinding::bodies`, #466). All re-bind by name on load.
 
 use std::collections::BTreeMap;
 
 use super::sync::rest_local;
+use crate::components::mesh::BoneBody;
 use crate::components::Entity;
 use crate::scene::Scene;
 
@@ -15,10 +17,11 @@ use crate::scene::Scene;
 const OVERRIDE_EPS: f32 = 1.0e-5;
 
 /// Take every skeleton out of `entities` (a document about to be saved or
-/// extracted): record each skinned entity's bone overrides, move each bone's
-/// non-bone children under the skinned entity with `parent_bone` set, and drop
-/// the bone documents. A bone carrying components is warned about: only its
-/// transform is kept, so a component belongs on a child of the bone.
+/// extracted): record each skinned entity's bone overrides and bone bodies, move
+/// each bone's non-bone children under the skinned entity with `parent_bone` set,
+/// and drop the bone documents. A bone carrying any other component is warned
+/// about: only its transform and physics are kept, so a component belongs on a
+/// child of the bone.
 pub fn strip_bones(entities: &mut Vec<Entity>) {
     let index: BTreeMap<u32, usize> = entities
         .iter()
@@ -35,7 +38,9 @@ pub fn strip_bones(entities: &mut Vec<Entity>) {
             continue;
         };
         let mut overrides = BTreeMap::new();
-        for (slot, bone) in mesh.skeleton.bones.iter().enumerate() {
+        let mut bodies = BTreeMap::new();
+        let bones = &mesh.skeleton.bones;
+        for (slot, bone) in bones.iter().enumerate() {
             let Some(&b) = index.get(bone) else {
                 continue;
             };
@@ -47,6 +52,12 @@ pub fn strip_bones(entities: &mut Vec<Entity>) {
             {
                 overrides.insert(name.clone(), doc.transform.clone());
             }
+            if let Some(body) = bone_body(doc, |id| {
+                let slot = bones.iter().position(|&b| b == id)?;
+                Some(skin.name(slot))
+            }) {
+                bodies.insert(name.clone(), body);
+            }
             if carries_components(doc) {
                 log::warn!(
                     "[Scene] bone '{name}' carries components that are not saved (bones are \
@@ -57,6 +68,7 @@ pub fn strip_bones(entities: &mut Vec<Entity>) {
         }
         if let Some(mesh) = &mut entities[i].mesh {
             mesh.skeleton.overrides = overrides;
+            mesh.skeleton.bodies = bodies;
         }
     }
     if bone_of.is_empty() {
@@ -95,10 +107,33 @@ fn reparent_attachments(
     }
 }
 
+/// A bone's `Rigidbody` and `Joint`, with a joint to another bone of the same
+/// skeleton (`bone_name` resolves it) saved by that bone's name. A joint to any
+/// other entity keeps its id. `None` for a bone with neither.
+fn bone_body(doc: &Entity, bone_name: impl Fn(u32) -> Option<String>) -> Option<BoneBody> {
+    if doc.rigidbody.is_none() && doc.joint.is_none() {
+        return None;
+    }
+    let mut joint = doc.joint.clone();
+    let connected_bone = joint.as_mut().and_then(|j| {
+        let name = bone_name(j.connected_body?)?;
+        j.connected_body = None;
+        Some(name)
+    });
+    Some(BoneBody {
+        rigidbody: doc.rigidbody.clone(),
+        joint,
+        connected_bone,
+    })
+}
+
 /// Whether a bone's document holds anything beyond what every bone has (name,
-/// transform, hierarchy, flags) — a component or a script.
+/// transform, hierarchy, flags, and the physics `bone_body` keeps) — a component
+/// or a script.
 fn carries_components(doc: &Entity) -> bool {
     let mut bare = Entity::new(doc.id, doc.name.clone());
+    bare.rigidbody = doc.rigidbody.clone();
+    bare.joint = doc.joint.clone();
     bare.active = doc.active;
     bare.is_static = doc.is_static;
     bare.layer = doc.layer;

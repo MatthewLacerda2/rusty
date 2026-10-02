@@ -3,6 +3,7 @@
 use glam::Mat4;
 
 use crate::asset::SkinData;
+use crate::components::mesh::BoneBody;
 use crate::components::TransformComponent;
 use crate::scene::Scene;
 
@@ -21,8 +22,8 @@ impl Scene {
     /// for a skeleton root) and spawned at its rest pose when absent — so a fresh
     /// instance gets a whole skeleton, and a mesh whose binding was reset (a prefab
     /// propagation rebuilt it) re-binds to the bones it already has. Then any
-    /// pending per-bone overrides are applied by name; one whose bone no longer
-    /// exists is dropped with a warning.
+    /// pending per-bone overrides and bone bodies (#466) are applied by name; one
+    /// whose bone no longer exists is dropped with a warning.
     pub fn sync_skeleton(&mut self, owner: u32) {
         let Some((skin, bound)) = self
             .world
@@ -36,10 +37,13 @@ impl Scene {
         } else {
             self.bind_bones(owner, &skin)
         };
-        let overrides = match self.world.mesh_mut(owner) {
+        let (overrides, bodies) = match self.world.mesh_mut(owner) {
             Some(mut mesh) => {
                 mesh.skeleton.bones = bones.clone();
-                std::mem::take(&mut mesh.skeleton.overrides)
+                (
+                    std::mem::take(&mut mesh.skeleton.overrides),
+                    std::mem::take(&mut mesh.skeleton.bodies),
+                )
             }
             None => return,
         };
@@ -56,6 +60,33 @@ impl Scene {
                 ),
             }
         }
+        for (name, body) in bodies {
+            self.restore_bone_body(owner, &name, body);
+        }
+    }
+
+    /// Put a saved [`BoneBody`] back on `owner`'s bone `name`, its joint's
+    /// connected bone resolved by name.
+    fn restore_bone_body(&mut self, owner: u32, name: &str, body: BoneBody) {
+        let Some(bone) = self.find_bone(owner, name) else {
+            log::warn!(
+                "[Asset] entity {owner}: the skeleton has no bone '{name}' any more; \
+                 its saved Rigidbody / Joint were dropped."
+            );
+            return;
+        };
+        let mut joint = body.joint;
+        if let (Some(j), Some(other)) = (joint.as_mut(), body.connected_bone) {
+            j.connected_body = self.find_bone(owner, &other);
+            if j.connected_body.is_none() {
+                log::warn!(
+                    "[Asset] entity {owner}: bone '{name}' was jointed to bone '{other}', \
+                     which the skeleton no longer has; the joint now holds it to the world."
+                );
+            }
+        }
+        self.world.set_rigidbody(bone, body.rigidbody);
+        self.world.set_joint(bone, joint);
     }
 
     /// Whether `bones` is a complete binding of `skin` to live entities.

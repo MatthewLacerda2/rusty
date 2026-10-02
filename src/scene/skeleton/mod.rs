@@ -19,16 +19,20 @@
 //!   dropped silently.
 //! - `palette` builds each skinned mesh's posed palette from the bones.
 //! - `hitbox` fits per-bone hitbox colliders and names the bone a hit struck (#464).
+//! - `ragdoll` turns those hitboxes into jointed bodies and switches them between
+//!   the Animator and physics (#466).
 
 mod hitbox;
 mod palette;
 mod persist;
+mod ragdoll;
 mod sync;
 
 use std::collections::BTreeSet;
 
 pub use hitbox::{fit_hitboxes, HitboxFit, HitboxOptions, HITBOX_NAME};
 pub use persist::{strip_bones, take_bone_parents};
+pub use ragdoll::{RagdollOptions, RAGDOLL_LAYER};
 
 use crate::scene::Scene;
 
