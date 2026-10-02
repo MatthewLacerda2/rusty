@@ -172,6 +172,8 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
                  "play_on_start": false, "is_time_scaled": true,
                  "spatial_blend": 0.0, "initial_distance": .., "final_distance": ..,
                  "output_group": "", "occlusion_enabled": true },
+  "reverb_zone": { "min_distance": 10.0, "max_distance": 15.0, "preset": "Room",
+                   "decay_time": .., "pre_delay": .., "damping": .., "wet": .. },
   "canvas":    { "render_mode": "ScreenSpaceOverlay", "sort_order": 0,
                  "reference_resolution": [1920, 1080], "match_width_or_height": 0.0,
                  "pixels_per_unit": 100.0, "plane_distance": 1.0, "tilt": [x,y],

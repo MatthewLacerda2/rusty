@@ -139,7 +139,8 @@ fn add_layout_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u
     }
 }
 
-/// Add-menu entry for the AudioSource component (#212). Offered only when absent.
+/// Add-menu entries for the AudioSource (#212) and AudioReverbZone (#469)
+/// components. Each is offered only when absent.
 fn add_audio(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
     if !world.has_audio(id)
         && ui
@@ -147,6 +148,11 @@ fn add_audio(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
             .clicked()
     {
         world.set_audio(id, Some(AudioSourceComponent::default()));
+        ui.close_menu();
+    }
+    let zone = format!("{}  Audio Reverb Zone", icon::WAVEFORM);
+    if !world.has_reverb_zone(id) && ui.button(zone).clicked() {
+        authoring::add_with_requirements(world, id, ComponentKind::ReverbZone);
         ui.close_menu();
     }
 }

@@ -280,6 +280,7 @@ One file per namespace, in reference order:
 - [`Trail`](Trail.md)
 - [`Line`](Line.md)
 - [`Audio`](Audio.md)
+- [`AudioReverbZone`](AudioReverbZone.md)
 - [`Decals`](Decals.md)
 - [`Layers`](Layers.md)
 - [`Graphics`](Graphics.md)

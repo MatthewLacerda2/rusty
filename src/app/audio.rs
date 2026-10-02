@@ -142,3 +142,7 @@ mod audio_tests;
 #[cfg(test)]
 #[path = "audio_occlusion_tests.rs"]
 mod audio_occlusion_tests;
+
+#[cfg(test)]
+#[path = "audio_reverb_tests.rs"]
+mod audio_reverb_tests;
