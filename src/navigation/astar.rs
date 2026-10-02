@@ -72,15 +72,12 @@ const DIRS: [(i32, i32, f32); 8] = [
 ];
 
 impl NavigationGraph {
-    /// The next point along the shortest path from `start` to `target`, carrying the
-    /// span's floor height so the caller follows stairs and ramps in `y`. Both ends
-    /// snap to spans (`snap.rs`); with no path (or nothing to snap to) it returns
-    /// `target`, the historical beeline.
+    /// The next corner of the smoothed path from `start` to `target`
+    /// ([`Self::calculate_path`]), carrying the floor height so the caller follows
+    /// stairs and ramps in `y`. With no path it returns `target`, the historical beeline.
     pub fn get_next_path_step(&self, start: Vec3, target: Vec3) -> Vec3 {
-        match self.path_between(start, target) {
-            Some(path) if path.len() > 1 => self.span_world(path[1]),
-            _ => target,
-        }
+        let path = self.calculate_path(start, target);
+        path.corners.get(1).copied().unwrap_or(target)
     }
 
     /// The span path from the span `start` snaps to to the one `target` snaps to.
@@ -91,8 +88,17 @@ impl NavigationGraph {
     /// A\* from span `start` to span `goal`, both ends included, or `None` when the
     /// goal is not reachable.
     pub fn find_path(&self, start: SpanRef, goal: SpanRef) -> Option<Vec<SpanRef>> {
+        let (path, complete) = self.find_path_or_closest(start, goal);
+        complete.then_some(path)
+    }
+
+    /// A\* from `start` toward `goal`. When the goal is unreachable, the path ends on
+    /// the reached span nearest to it instead (Unity's `PathPartial`): least octile
+    /// distance, then least cost, then lowest index, so the choice is deterministic.
+    /// The flag says whether the path reaches `goal`.
+    pub fn find_path_or_closest(&self, start: SpanRef, goal: SpanRef) -> (Vec<SpanRef>, bool) {
         if start == goal {
-            return Some(vec![start]);
+            return (vec![start], true);
         }
         let mut frontier = Frontier::new(self.spans.len());
         frontier.g_score[start.index as usize] = 0.0;
@@ -101,17 +107,23 @@ impl NavigationGraph {
             g_score: 0.0,
             f_score: heuristic(start, goal),
         });
+        let mut closest = (heuristic(start, goal), 0.0, start);
 
         while let Some(current) = frontier.open_set.pop() {
             if current.node == goal {
-                return Some(reconstruct_path(&frontier.came_from, goal));
+                return (reconstruct_path(&frontier.came_from, goal), true);
             }
             if current.g_score > frontier.g_of(current.node.index) {
                 continue; // a stale heap entry
             }
+            let h = heuristic(current.node, goal);
+            let key = (h, current.g_score, current.node.index);
+            if key < (closest.0, closest.1, closest.2.index) {
+                closest = (h, current.g_score, current.node);
+            }
             self.expand(current, goal, &mut frontier);
         }
-        None
+        (reconstruct_path(&frontier.came_from, closest.2), false)
     }
 
     /// Relax every span `current` can move to. The cardinal links are found once and

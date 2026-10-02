@@ -40,7 +40,7 @@ impl NavigationGraph {
             };
             let current_pos = scene.world.transform(id).map(|t| t.position);
             if let (true, Some(position)) = (agent.active, current_pos) {
-                let steering = (agent.target - position).length() > agent.stopping_distance;
+                let steering = (agent.destination() - position).length() > agent.stopping_distance;
                 let moved_with = if steering { agent.velocity } else { Vec3::ZERO };
                 if steering {
                     self.accelerate_toward_waypoint(&mut agent, position, delta_time);

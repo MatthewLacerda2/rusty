@@ -10,13 +10,20 @@ fn cells(path: &[SpanRef]) -> Vec<(i32, i32)> {
     path.iter().map(|s| (s.gx, s.gz)).collect()
 }
 
-/// A wrong branch returns `target` always; correct returns path[1], the adjacent cell.
+/// The next step is the path's next corner (#458): around a wall it is the corner
+/// past the wall, not the goal and not the adjacent cell.
 #[test]
-fn next_step_is_adjacent_not_the_goal() {
-    let g = open(10.0);
-    let step = g.get_next_path_step(Vec3::ZERO, Vec3::new(5.0, 0.0, 0.0));
-    assert!((step.x - 1.0).abs() < 0.01, "expected (1,0), got {step:?}");
-    assert!(step.z.abs() < 0.01, "expected (1,0), got {step:?}");
+fn next_step_is_the_next_corner() {
+    let mut g = open(10.0);
+    for gz in 0..=6 {
+        let i = g.span_range(5, gz).start;
+        g.spans[i].y = 5.0; // a wall at x = 5 up to z = 6
+    }
+    let step = g.get_next_path_step(Vec3::ZERO, Vec3::new(10.0, 0.0, 0.0));
+    assert!(
+        step.z >= 7.0 && step.x <= 5.0,
+        "turns at the wall's end, got {step}"
+    );
 }
 
 /// Priority-queue ordering mutations change the expansion and the path.
@@ -67,6 +74,7 @@ fn isolated_goal_has_no_path() {
     let i = g.span_range(3, 3).start;
     g.spans[i].y = 5.0; // a pillar top
     assert!(g.find_path(ground(&g, 0, 0), ground(&g, 3, 3)).is_none());
-    let target = Vec3::new(3.0, 5.0, 3.0);
-    assert_eq!(g.get_next_path_step(Vec3::ZERO, target), target, "beeline");
+    let (path, complete) = g.find_path_or_closest(ground(&g, 0, 0), ground(&g, 3, 3));
+    assert!(!complete);
+    assert_eq!(cells(&path).last(), Some(&(3, 2)), "ends beside the pillar");
 }
