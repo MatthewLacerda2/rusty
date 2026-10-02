@@ -70,7 +70,8 @@ fn bot_walks_along_the_edge_instead_of_pushing_into_it() {
 fn a_player_far_from_any_floor_leaves_the_bot_standing() {
     let (mut scene, enemy) = default_scene();
     let graph = NavigationGraph::from_scene(&scene);
-    let start = scene.world.transform(enemy).unwrap().position;
+    let start = Vec3::new(8.0, 1.05, 8.0); // standing on the floor
+    scene.world.transform_mut(enemy).unwrap().position = start;
     let end = chase(&mut scene, &graph, enemy, Vec3::new(60.0, 1.5, 8.0), 120);
     assert!(
         planar(start, end) < 1e-4,

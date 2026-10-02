@@ -48,9 +48,13 @@ impl NavigationGraph {
                     self.on_link(scene, id, agent, position, delta_time);
                     continue;
                 }
-                // Re-plan first, so arrival is measured against this target's path.
-                let feet = agent.feet(position);
-                self.refresh_path(&mut agent, feet);
+                // Re-plan first, so arrival is measured against this target's path —
+                // unless there is nothing to plan: no path, already at the target
+                // (a `ResetPath` agent plans nothing until it gets a new one).
+                if !(agent.cached_path.is_empty() && is_at_target(&agent, position)) {
+                    let feet = agent.feet(position);
+                    self.refresh_path(&mut agent, feet);
+                }
                 let steering = !agent.cached_path.is_empty() && !is_at_target(&agent, position);
                 let moved_with = if steering { agent.velocity } else { Vec3::ZERO };
                 if steering {
