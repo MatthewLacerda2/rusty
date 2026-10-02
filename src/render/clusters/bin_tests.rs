@@ -4,6 +4,7 @@
 use glam::{Quat, Vec3};
 
 use super::bin::Binned;
+use super::grid::AabbCache;
 use super::*;
 use crate::components::{LightComponent, Projection, TransformComponent};
 use crate::scene::{Camera, LightType};
@@ -30,6 +31,12 @@ fn light(kind: LightType, at: Vec3, range: f32) -> LocalLight {
     LocalLight::new(&transform, &light).expect("a local light")
 }
 
+/// Bin `lights` for [`camera`] with a cold cache.
+fn bin_view(lights: &[LocalLight]) -> Binned {
+    let grid = ClusterGrid::new(&camera(), 16.0 / 9.0);
+    bin(&grid, lights, &mut AabbCache::default())
+}
+
 fn lists_of(binned: &Binned, cluster: u32) -> &[u32] {
     let [offset, count] = binned.ranges[cluster as usize];
     &binned.indices[offset as usize..(offset + count) as usize]
@@ -42,7 +49,7 @@ fn assert_conservative(cam: &Camera, lights: &[LocalLight]) {
     let grid = ClusterGrid::new(cam, aspect);
     let view_proj = cam.build_view_projection(aspect);
     let frustum = crate::render::Frustum::from_view_proj(view_proj);
-    let binned = bin(&grid, lights);
+    let binned = bin(&grid, lights, &mut AabbCache::default());
     for (n, l) in lights.iter().enumerate() {
         let (c, r) = l.sphere();
         let steps = 6;
@@ -88,7 +95,7 @@ fn lights_out_of_view_are_culled_and_cost_nothing() {
         light(LightType::Point, Vec3::new(60.0, 0.0, -10.0), 3.0), // off to the side
         light(LightType::Point, Vec3::new(0.0, 0.0, -5.0), 0.0), // no reach
     ];
-    let binned = bin(&ClusterGrid::new(&camera(), 16.0 / 9.0), &lights);
+    let binned = bin_view(&lights);
     assert_eq!((binned.visible, binned.culled, binned.dropped), (0, 4, 0));
     assert!(binned.indices.is_empty());
 }
@@ -98,7 +105,7 @@ fn ranges_partition_the_index_list() {
     let lights: Vec<_> = (0..12)
         .map(|i| light(LightType::Point, Vec3::new(i as f32 - 6.0, 0.0, -8.0), 2.0))
         .collect();
-    let binned = bin(&ClusterGrid::new(&camera(), 16.0 / 9.0), &lights);
+    let binned = bin_view(&lights);
     assert_eq!(binned.visible, 12);
     let mut next = 0;
     for &[offset, count] in &binned.ranges {
@@ -120,7 +127,7 @@ fn past_the_budget_the_nearest_lights_win_and_the_rest_are_dropped() {
             )
         })
         .collect();
-    let binned = bin(&ClusterGrid::new(&camera(), 16.0 / 9.0), &lights);
+    let binned = bin_view(&lights);
     assert_eq!(binned.visible as usize, MAX_VISIBLE_LIGHTS);
     assert_eq!(binned.dropped as usize, extra);
     let max = *binned.indices.iter().max().unwrap() as usize;

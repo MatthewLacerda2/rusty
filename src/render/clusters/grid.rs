@@ -64,6 +64,12 @@ impl ClusterGrid {
         }
     }
 
+    /// The cache key of this grid's cluster boxes: they depend on the projection
+    /// alone (near, far, lens), not on where the camera stands.
+    fn key(&self) -> [u32; 16] {
+        self.proj.to_cols_array().map(f32::to_bits)
+    }
+
     /// What the shader needs to find a point's cluster.
     pub(crate) fn uniform(&self) -> ClusterUniform {
         let (scale, bias) = self.slice_scale_bias();
@@ -82,20 +88,26 @@ impl ClusterGrid {
         clip.truncate().truncate() / clip.w
     }
 
-    /// The view-space point on the ray through NDC `xy` at view depth `depth`.
-    fn ray_at(&self, ndc: Vec2, depth: f32) -> Vec3 {
-        let a = self.inv_proj.project_point3(ndc.extend(0.0));
-        let b = self.inv_proj.project_point3(ndc.extend(1.0));
-        let t = (depth + a.z) / (a.z - b.z);
-        a + (b - a) * t
+    /// The view-space ray through NDC `xy`: its points on the near and far planes.
+    fn ray(&self, ndc: Vec2) -> (Vec3, Vec3) {
+        let near = self.inv_proj.project_point3(ndc.extend(0.0));
+        (near, self.inv_proj.project_point3(ndc.extend(1.0)))
     }
 
-    /// Every cluster's view-space AABB, indexed `x + X * (y + Y * slice)`.
+    /// Every cluster's view-space AABB, indexed `x + X * (y + Y * slice)`: the
+    /// bounds of its tile's four corner rays cut at the slice's two depths.
     pub(crate) fn cluster_aabbs(&self) -> Vec<(Vec3, Vec3)> {
         let [gx, gy, gz] = GRID;
-        let corner = |i: u32, j: u32| {
-            Vec2::new(i as f32 / gx as f32, j as f32 / gy as f32) * 2.0 - Vec2::ONE
-        };
+        // One ray per tile corner, row-major, shared by every slice.
+        let rays: Vec<(Vec3, Vec3)> = (0..=gy)
+            .flat_map(|j| (0..=gx).map(move |i| (i, j)))
+            .map(|(i, j)| {
+                let uv = Vec2::new(i as f32 / gx as f32, j as f32 / gy as f32);
+                self.ray(uv * 2.0 - Vec2::ONE)
+            })
+            .collect();
+        // The point on ray `(a, b)` at view depth `d` (depth is -z in view space).
+        let at = |(a, b): (Vec3, Vec3), d: f32| a + (b - a) * ((d + a.z) / (a.z - b.z));
         let mut out = Vec::with_capacity(super::CLUSTER_COUNT);
         for k in 0..gz {
             let depths = [self.slice_depth(k), self.slice_depth(k + 1)];
@@ -103,8 +115,9 @@ impl ClusterGrid {
                 for i in 0..gx {
                     let (mut lo, mut hi) = (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN));
                     for (di, dj) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
+                        let ray = rays[((j + dj) * (gx + 1) + i + di) as usize];
                         for d in depths {
-                            let p = self.ray_at(corner(i + di, j + dj), d);
+                            let p = at(ray, d);
                             (lo, hi) = (lo.min(p), hi.max(p));
                         }
                     }
@@ -113,6 +126,36 @@ impl ClusterGrid {
             }
         }
         out
+    }
+}
+
+/// How many projections' cluster boxes stay cached: a camera stack (world, a
+/// viewmodel, a render texture) rarely has more distinct lenses than this.
+const CACHED_LENSES: usize = 4;
+
+/// Cluster boxes by projection, newest last, so an unchanged lens rebuilds nothing.
+#[derive(Default)]
+pub(crate) struct AabbCache {
+    entries: Vec<([u32; 16], Vec<(Vec3, Vec3)>)>,
+}
+
+impl AabbCache {
+    /// `grid`'s cluster boxes, built only when its projection is not cached.
+    pub(crate) fn get(&mut self, grid: &ClusterGrid) -> &[(Vec3, Vec3)] {
+        let key = grid.key();
+        match self.entries.iter().position(|(k, _)| *k == key) {
+            Some(at) => {
+                let hit = self.entries.remove(at);
+                self.entries.push(hit);
+            }
+            None => {
+                if self.entries.len() == CACHED_LENSES {
+                    self.entries.remove(0);
+                }
+                self.entries.push((key, grid.cluster_aabbs()));
+            }
+        }
+        &self.entries.last().expect("just pushed").1
     }
 }
 
@@ -140,3 +183,7 @@ impl ClusterGrid {
         tile.x as u32 + u.dims[0] * (tile.y as u32 + u.dims[1] * slice as u32)
     }
 }
+
+#[cfg(test)]
+#[path = "grid_tests.rs"]
+mod tests;

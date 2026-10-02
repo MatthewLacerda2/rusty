@@ -18,3 +18,12 @@ no light.
 
 `SetType` is case-insensitive; an unrecognized name is ignored (the current type
 is kept).
+
+**How many lights shade.** Point and spot lights are rendered with clustered
+forward lighting (#434): there is no fixed slot count. Each camera shades up to
+**256** point/spot lights in its view; past that, the ones farthest from the camera
+are dropped and counted in `Debug.Stats().lights_dropped`. A light outside the view
+costs nothing. A light's **range** is a hard cut-off and also how far it reaches into
+the cluster grid, so a tight range is the cheap one. Up to **4** directional lights
+shade at once; the last active one is the sun that casts the cascaded shadows. Only
+the last active ambient light counts.

@@ -3,6 +3,7 @@
 
 use std::time::Instant;
 
+use super::grid::AabbCache;
 use super::{bin, ClusterGrid, LocalLight};
 use crate::render::gpu::grow_buffer::GrowBuffer;
 use crate::render::Renderer;
@@ -13,6 +14,7 @@ pub(crate) struct ClusterBuffers {
     indices: GrowBuffer,
     /// The frame's lights as uploaded: what every camera of the frame bins.
     frame_lights: Vec<LocalLight>,
+    aabbs: AabbCache,
 }
 
 impl ClusterBuffers {
@@ -23,6 +25,7 @@ impl ClusterBuffers {
             ranges: storage("Cluster Ranges"),
             indices: storage("Cluster Light Indices"),
             frame_lights: Vec::new(),
+            aabbs: AabbCache::default(),
         }
     }
 
@@ -50,7 +53,7 @@ impl Renderer {
     pub(crate) fn bin_lights(&mut self, grid: &ClusterGrid) {
         let started = Instant::now();
         let c = &mut self.clusters;
-        let binned = bin(grid, &c.frame_lights);
+        let binned = bin(grid, &c.frame_lights, &mut c.aabbs);
         let (device, queue) = (&self.device, &self.queue);
         let mut grown = c
             .ranges

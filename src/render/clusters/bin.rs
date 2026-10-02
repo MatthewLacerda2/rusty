@@ -2,6 +2,7 @@
 
 use glam::Vec3;
 
+use super::grid::AabbCache;
 use super::{ClusterGrid, LocalLight, CLUSTER_COUNT, GRID, MAX_VISIBLE_LIGHTS};
 
 /// One camera's binned lights: per cluster an `[offset, count]` into `indices`, the
@@ -27,8 +28,8 @@ struct Candidate {
     slices: [u32; 2],
 }
 
-/// Bin `lights` into `grid`'s clusters.
-pub(crate) fn bin(grid: &ClusterGrid, lights: &[LocalLight]) -> Binned {
+/// Bin `lights` into `grid`'s clusters; `cache` keeps the cluster boxes per lens.
+pub(crate) fn bin(grid: &ClusterGrid, lights: &[LocalLight], cache: &mut AabbCache) -> Binned {
     let mut candidates: Vec<Candidate> = (0..lights.len() as u32)
         .filter_map(|i| candidate(grid, i, lights[i as usize].sphere()))
         .collect();
@@ -48,7 +49,7 @@ pub(crate) fn bin(grid: &ClusterGrid, lights: &[LocalLight]) -> Binned {
     if candidates.is_empty() {
         return out;
     }
-    let aabbs = grid.cluster_aabbs();
+    let aabbs = cache.get(grid);
     let mut pairs: Vec<(u32, u32)> = Vec::new();
     for c in &candidates {
         let before = pairs.len();

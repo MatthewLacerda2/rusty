@@ -89,7 +89,10 @@ print(s.frames, s.fixed_update_ms.avg, s.systems.update_scripts.max, s.entities.
 | `triangles` | triangles submitted by the solid, transparent, shadow and SSAO-prepass draws, every instance counted |
 | `visible_entities` / `culled_entities` | mesh entities drawn / skipped by the frustum cull, summed over the camera stack |
 | `lod_hidden_entities` | mesh entities skipped because their `LODGroup` showed another level (#472), summed over the camera stack |
-| `lights` / `lights_dropped` | active lights, and those the forward uniform had no slot for (past 4 point lights, or a 2nd directional/spot/ambient) — silently unlit |
+| `lights` / `lights_dropped` | active lights, and those left unlit: directional lights past 4, every ambient but the last, and per camera the point/spot lights in view past the clustered budget of 256 (the farthest go first, #434) |
+| `lights_visible` / `lights_culled` | point/spot lights binned into at least one light cluster / outside a camera's view and skipped before binning, so they cost nothing (#434); summed over the camera stack |
+| `light_cluster_refs` | entries in the cluster light lists (#434): the (cluster, light) pairs shaders may visit, summed over the camera stack — the clustered lighting's workload |
+| `light_bin_us` | CPU **microseconds** spent binning lights into clusters (#434), summed over the camera stack — wall-clock |
 | `shadow_draws` / `ui_draws` | shadow-caster draw calls (one per caster mesh, instanced, #470) / UI batches |
 | `ssao_samples` | depth taps the SSAO pass traced (occlusion texels × the tier's samples, #436); `0` when AO is off or on the Low tier |
 | `particles_drawn` | particles the renderer drew — sprite instances plus mesh particles, summed over the camera stack (#440). Their draws are in `draw_calls`: one per merged sprite batch, one per instanced run of mesh particles |
@@ -97,7 +100,7 @@ print(s.frames, s.fixed_update_ms.avg, s.systems.update_scripts.max, s.entities.
 | `ui_mask_passes` / `ui_blur_passes` | UI `Mask` coverage textures rendered (#428) / fullscreen passes of the UI backdrop blur, its composite included — `0` with no backdrop visible (#426) |
 | `renderer_ms` | CPU ms `Renderer::render` took to record the frame |
 
-Keys ending in `_ms` are **wall-clock** and differ run to run; everything else is a
+Keys ending in `_ms`, and `light_bin_us`, are **wall-clock** and differ run to run; everything else is a
 count and is deterministic for a deterministic run. The timings are measured *around*
 the sim by the dev layer and never fed back into it, so reading them cannot change a
 replay. Render counters appear only on frames something rendered through the headless
