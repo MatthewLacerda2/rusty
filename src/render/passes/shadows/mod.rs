@@ -212,3 +212,6 @@ mod cache_tests;
 
 #[cfg(test)]
 mod cutout_tests;
+
+#[cfg(test)]
+pub(super) mod contact_tests;
