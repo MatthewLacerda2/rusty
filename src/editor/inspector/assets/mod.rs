@@ -12,6 +12,7 @@ use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
+use egui_phosphor::regular as icon;
 
 pub fn draw_inspector(
     ui: &mut egui::Ui,
@@ -66,11 +67,11 @@ pub fn draw_inspector(
                 .file_name()
                 .and_then(|f| f.to_str())
                 .unwrap_or(path);
-            ui.heading(format!("📝 File: {}", filename));
+            ui.heading(format!("{}  File: {}", icon::FILE, filename));
             ui.add_space(5.0);
             ui.label(format!("Path: {}", path));
             ui.colored_label(
-                egui::Color32::GRAY,
+                crate::editor::theme::from_ui(ui).text_secondary,
                 "Unsupported file extension for specialized inspection.",
             );
         }

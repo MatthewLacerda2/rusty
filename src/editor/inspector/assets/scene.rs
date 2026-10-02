@@ -1,7 +1,9 @@
+use crate::editor::inspector::components::card::card_frame;
 use crate::editor::EditorUi;
 use crate::navigation::{NavBounds, NavigationGraph};
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
+use egui_phosphor::regular as icon;
 use std::fs;
 use std::path::Path;
 
@@ -18,7 +20,7 @@ pub fn draw(
         .and_then(|f| f.to_str())
         .unwrap_or(path);
 
-    ui.heading(format!("🎬 Scene: {}", filename));
+    ui.heading(format!("{}  Scene: {}", icon::FILM_SLATE, filename));
     ui.add_space(5.0);
 
     draw_metadata_card(ui, path);
@@ -41,7 +43,7 @@ pub fn draw(
 /// height (no pathing under a low overhang / through a crawlspace).
 fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph) {
     ui.add_space(8.0);
-    egui::CollapsingHeader::new("🧭 Navmesh")
+    egui::CollapsingHeader::new(format!("{}  Navmesh", icon::PATH))
         .default_open(false)
         .show(ui, |ui| {
             // Edit the settings behind a scoped borrow so it has dropped before the
@@ -168,7 +170,10 @@ fn draw_bake_lighting(
 ) {
     ui.add_space(8.0);
     if !ui
-        .add(egui::Button::new("💡 Bake Lighting").min_size(egui::Vec2::new(120.0, 30.0)))
+        .add(
+            egui::Button::new(format!("{}  Bake Lighting", icon::LIGHTBULB))
+                .min_size(egui::Vec2::new(120.0, 24.0)),
+        )
         .on_hover_text("Auto-place + bake light & reflection probes")
         .clicked()
     {
@@ -218,18 +223,14 @@ fn draw_metadata_card(ui: &mut egui::Ui, path: &str) {
         }
     }
 
-    egui::Frame::none()
-        .fill(crate::editor::theme::from_ui(ui).bg_tier2)
-        .inner_margin(8.0)
-        .rounding(6.0)
-        .show(ui, |ui| {
-            ui.vertical(|ui| {
-                ui.label(format!("Path: {}", path));
-                ui.label(format!("Size: {}", size_str));
-                ui.label(format!("Entities serialized: {}", entity_count));
-                ui.label(format!("Skybox: {}", skybox_str));
-            });
+    card_frame(&crate::editor::theme::from_ui(ui)).show(ui, |ui| {
+        ui.vertical(|ui| {
+            ui.label(format!("Path: {}", path));
+            ui.label(format!("Size: {}", size_str));
+            ui.label(format!("Entities serialized: {}", entity_count));
+            ui.label(format!("Skybox: {}", skybox_str));
         });
+    });
 }
 
 /// Scene operations: load the scene file into the world, or overwrite it with
@@ -247,7 +248,10 @@ fn draw_scene_operations(
 
     // Button to load scene
     if ui
-        .add(egui::Button::new("📂 Load Scene").min_size(egui::Vec2::new(120.0, 30.0)))
+        .add(
+            egui::Button::new(format!("{}  Load Scene", icon::FOLDER_OPEN))
+                .min_size(egui::Vec2::new(120.0, 24.0)),
+        )
         .clicked()
     {
         match scene.load_from_file(path) {
@@ -268,7 +272,10 @@ fn draw_scene_operations(
 
     // Button to save/overwrite scene
     if ui
-        .add(egui::Button::new("💾 Overwrite with Current").min_size(egui::Vec2::new(120.0, 30.0)))
+        .add(
+            egui::Button::new(format!("{}  Overwrite with Current", icon::FLOPPY_DISK))
+                .min_size(egui::Vec2::new(120.0, 24.0)),
+        )
         .clicked()
     {
         match scene.save_to_file(path) {

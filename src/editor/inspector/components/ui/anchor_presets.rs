@@ -6,7 +6,7 @@
 
 use crate::components::RectTransformComponent;
 use crate::scene::authoring::rect_transform::{AnchorPreset, AxisPreset};
-use egui::{Color32, Rect, Sense, Stroke};
+use egui::{Rect, Sense, Stroke};
 
 /// Rows top to bottom, then stretch — Unity's order.
 const ROWS: [AxisPreset; 4] = [
@@ -77,11 +77,7 @@ fn cell(ui: &mut egui::Ui, x: AxisPreset, y: AxisPreset, on: bool) -> egui::Resp
     p.rect_filled(rect, 2.0, fill);
     let inner = rect.shrink(7.0);
     p.rect_stroke(inner, 0.0, Stroke::new(1.0, t.text_secondary));
-    let colour = if on {
-        t.accent_blue
-    } else {
-        Color32::LIGHT_RED
-    };
+    let colour = if on { t.accent } else { t.danger };
     let span = |a: AxisPreset| match a {
         AxisPreset::Min => (0.0, 0.0),
         AxisPreset::Center => (0.5, 0.5),

@@ -13,6 +13,10 @@ pub mod gizmo;
 pub mod pick;
 pub mod rect_tool;
 
+use egui_phosphor::regular as icon;
+
+use crate::editor::theme::chrome;
+
 /// Which view the viewport tab strip is showing.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ViewportTab {
@@ -99,19 +103,17 @@ fn draw_tab_strip(
 ) {
     egui::Frame::none()
         .fill(t.bg_tier1)
-        .inner_margin(t.space_xs)
+        .inner_margin(egui::Margin::symmetric(t.space_sm, t.space_xs + 1.0))
+        .stroke(egui::Stroke::new(1.0, t.border))
         .show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
             ui.horizontal(|ui| {
-                if ui
-                    .selectable_label(*tab == ViewportTab::Scene, "Scene")
-                    .clicked()
-                {
+                let scene = format!("{}  Scene", icon::CUBE_FOCUS);
+                if chrome::tab(ui, &t, *tab == ViewportTab::Scene, &scene).clicked() {
                     *tab = ViewportTab::Scene;
                 }
-                if ui
-                    .selectable_label(*tab == ViewportTab::Game, "Game")
-                    .clicked()
-                {
+                let game = format!("{}  Game", icon::GAME_CONTROLLER);
+                if chrome::tab(ui, &t, *tab == ViewportTab::Game, &game).clicked() {
                     *tab = ViewportTab::Game;
                 }
                 if *tab == ViewportTab::Scene {

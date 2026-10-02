@@ -1,5 +1,6 @@
 use egui_phosphor::regular as icon;
 
+use crate::editor::theme::chrome;
 use crate::editor::{hierarchy_tree, EditorUi};
 use crate::scene::Scene;
 
@@ -15,28 +16,13 @@ pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
     egui::SidePanel::left("Hierarchy Panel")
         .resizable(true)
         .width_range(154.0..=340.0)
-        .frame(
-            egui::Frame::none()
-                .fill(t.bg_tier1)
-                .inner_margin(t.space_md)
-                .stroke(egui::Stroke::new(1.0, t.border)),
-        )
+        .frame(chrome::panel_frame(&t))
         .show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.heading(format!("{}  Scene Hierarchy", icon::TREE_STRUCTURE));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui
-                        .button(icon::CARET_LEFT)
-                        .on_hover_text("Collapse")
-                        .clicked()
-                    {
-                        editor.hierarchy_open = false;
-                    }
-                });
-            });
+            let title = (icon::TREE_STRUCTURE, "Hierarchy");
+            if chrome::panel_header(ui, &t, title.0, title.1, icon::CARET_LEFT) {
+                editor.hierarchy_open = false;
+            }
             draw_actions(editor, scene, ui);
-            ui.separator();
-            ui.add_space(t.space_xs);
 
             egui::ScrollArea::vertical().show(ui, |ui| {
                 let root_ids: Vec<u32> = scene
@@ -63,18 +49,9 @@ fn draw_collapsed(ctx: &egui::Context, t: crate::editor::theme::Theme, open: &mu
     egui::SidePanel::left("Hierarchy Rail")
         .resizable(false)
         .exact_width(26.0)
-        .frame(
-            egui::Frame::none()
-                .fill(t.bg_tier1)
-                .inner_margin(t.space_xs)
-                .stroke(egui::Stroke::new(1.0, t.border)),
-        )
+        .frame(chrome::rail_frame(&t))
         .show(ctx, |ui| {
-            if ui
-                .button(icon::CARET_RIGHT)
-                .on_hover_text("Expand")
-                .clicked()
-            {
+            if chrome::icon_button(ui, icon::CARET_RIGHT, "Expand").clicked() {
                 *open = true;
             }
         });
@@ -90,5 +67,6 @@ fn draw_actions(editor: &mut EditorUi, scene: &mut Scene, ui: &mut egui::Ui) {
             editor.selected_entity_id = None;
             editor.is_dirty = true;
         }
+        chrome::hairline(ui, &editor.theme);
     }
 }

@@ -22,7 +22,7 @@ use crate::scene::Scene;
 
 /// Draw the top-level **GameObject** menu button into the menu bar.
 pub fn game_object_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
-    ui.menu_button(format!("{}  GameObject", icon::CUBE), |ui| {
+    ui.menu_button("GameObject", |ui| {
         if ui
             .button(format!("{}  Create Empty", icon::CUBE_TRANSPARENT))
             .clicked()

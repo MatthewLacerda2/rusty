@@ -1,5 +1,7 @@
+use crate::editor::inspector::components::card::card_frame;
 use crate::editor::EditorUi;
 use crate::scene::Scene;
+use egui_phosphor::regular as icon;
 use std::fs;
 use std::path::Path;
 
@@ -9,7 +11,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
         .and_then(|f| f.to_str())
         .unwrap_or(path);
 
-    ui.heading(format!("📐 Model: {}", filename));
+    ui.heading(format!("{}  Model: {}", icon::CUBE, filename));
     ui.add_space(5.0);
 
     draw_metadata_card(ui, path);
@@ -30,7 +32,10 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     ui.add_space(5.0);
 
     if ui
-        .add(egui::Button::new("➕ Instantiate into Scene").min_size(egui::Vec2::new(140.0, 30.0)))
+        .add(
+            egui::Button::new(format!("{}  Instantiate into Scene", icon::PLUS))
+                .min_size(egui::Vec2::new(140.0, 24.0)),
+        )
         .clicked()
     {
         instantiate(editor, scene, path);
@@ -45,22 +50,18 @@ fn draw_metadata_card(ui: &mut egui::Ui, path: &str) {
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_uppercase();
-    egui::Frame::none()
-        .fill(crate::editor::theme::from_ui(ui).bg_tier2)
-        .inner_margin(8.0)
-        .rounding(6.0)
-        .show(ui, |ui| {
-            ui.vertical(|ui| {
-                ui.label(format!("Path: {}", path));
-                let size_str = if let Ok(meta) = fs::metadata(path) {
-                    format_size(meta.len())
-                } else {
-                    "Unknown size".to_string()
-                };
-                ui.label(format!("Size: {}", size_str));
-                ui.label(format!("Type: {} Model Asset", ext));
-            });
+    card_frame(&crate::editor::theme::from_ui(ui)).show(ui, |ui| {
+        ui.vertical(|ui| {
+            ui.label(format!("Path: {}", path));
+            let size_str = if let Ok(meta) = fs::metadata(path) {
+                format_size(meta.len())
+            } else {
+                "Unknown size".to_string()
+            };
+            ui.label(format!("Size: {}", size_str));
+            ui.label(format!("Type: {} Model Asset", ext));
         });
+    });
 }
 
 /// Model import settings: scale factor, normal/tangent import, and mesh
@@ -114,7 +115,10 @@ fn draw_sub_objects(ui: &mut egui::Ui, path: &str) {
     ui.heading(format!("Sub-Objects ({})", ids.len()));
     ui.add_space(5.0);
     if ids.is_empty() {
-        ui.colored_label(egui::Color32::GRAY, "No importable sub-meshes found.");
+        ui.colored_label(
+            crate::editor::theme::from_ui(ui).text_secondary,
+            "No importable sub-meshes found.",
+        );
     } else {
         let mut changed = false;
         for id in &ids {

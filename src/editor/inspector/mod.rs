@@ -11,6 +11,7 @@ use self::components::{
     settings, transform, ui as ui_cards,
 };
 use self::pending::PendingEdits;
+use crate::editor::theme::chrome;
 use crate::editor::{EditorUi, InspectorTarget};
 use crate::navigation::NavigationGraph;
 use crate::scene::{MaterialAsset, Scene};
@@ -33,27 +34,12 @@ pub fn draw(
     egui::SidePanel::right("Inspector Panel")
         .resizable(true)
         .width_range(182.0..=380.0)
-        .frame(
-            egui::Frame::none()
-                .fill(t.bg_tier1)
-                .inner_margin(t.space_md)
-                .stroke(egui::Stroke::new(1.0, t.border)),
-        )
+        .frame(chrome::panel_frame(&t))
         .show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.heading(format!("{}  Inspector", icon::SLIDERS_HORIZONTAL));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui
-                        .button(icon::CARET_RIGHT)
-                        .on_hover_text("Collapse")
-                        .clicked()
-                    {
-                        editor.inspector_open = false;
-                    }
-                });
-            });
-            ui.separator();
-            ui.add_space(5.0);
+            let glyph = icon::SLIDERS_HORIZONTAL;
+            if chrome::panel_header(ui, &t, glyph, "Inspector", icon::CARET_RIGHT) {
+                editor.inspector_open = false;
+            }
 
             egui::ScrollArea::vertical().show(ui, |ui| {
                 // Dispatch on the explicit inspector target (mutually exclusive).
@@ -77,18 +63,9 @@ fn draw_collapsed(ctx: &egui::Context, t: crate::editor::theme::Theme, open: &mu
     egui::SidePanel::right("Inspector Rail")
         .resizable(false)
         .exact_width(26.0)
-        .frame(
-            egui::Frame::none()
-                .fill(t.bg_tier1)
-                .inner_margin(t.space_xs)
-                .stroke(egui::Stroke::new(1.0, t.border)),
-        )
+        .frame(chrome::rail_frame(&t))
         .show(ctx, |ui| {
-            if ui
-                .button(icon::CARET_LEFT)
-                .on_hover_text("Expand")
-                .clicked()
-            {
+            if chrome::icon_button(ui, icon::CARET_LEFT, "Expand").clicked() {
                 *open = true;
             }
         });
@@ -167,39 +144,34 @@ fn draw_object_header(
     pending_nav_bake: &mut bool,
     layer_changed: &mut bool,
 ) {
-    egui::Frame::none()
-        .fill(t.bg_tier2)
-        .inner_margin(t.space_sm)
-        .rounding(4.0)
-        .stroke(egui::Stroke::new(1.0, t.border))
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.colored_label(t.text_secondary, icon::CUBE_FOCUS);
-                let mut name = world.name(id).map(|n| n.clone()).unwrap_or_default();
-                if ui
-                    .add(egui::TextEdit::singleline(&mut name).desired_width(f32::INFINITY))
-                    .changed()
-                {
-                    world.set_name(id, name);
-                }
-            });
-            ui.horizontal(|ui| {
-                let mut active = world.is_active(id);
-                if ui.checkbox(&mut active, "Active").changed() {
-                    world.set_active(id, active);
-                }
-                let mut is_static = world.is_static(id);
-                if ui
-                    .checkbox(&mut is_static, "Static")
-                    .on_hover_text("Blocks the navmesh")
-                    .changed()
-                {
-                    world.set_static(id, is_static);
-                    *pending_nav_bake = true;
-                }
-            });
-            draw_layer_combo(ui, world, id, layer_labels, layer_changed);
+    components::card::card_frame(&t).show(ui, |ui| {
+        ui.horizontal(|ui| {
+            ui.colored_label(t.text_secondary, icon::CUBE_FOCUS);
+            let mut name = world.name(id).map(|n| n.clone()).unwrap_or_default();
+            if ui
+                .add(egui::TextEdit::singleline(&mut name).desired_width(f32::INFINITY))
+                .changed()
+            {
+                world.set_name(id, name);
+            }
         });
+        ui.horizontal(|ui| {
+            let mut active = world.is_active(id);
+            if ui.checkbox(&mut active, "Active").changed() {
+                world.set_active(id, active);
+            }
+            let mut is_static = world.is_static(id);
+            if ui
+                .checkbox(&mut is_static, "Static")
+                .on_hover_text("Blocks the navmesh")
+                .changed()
+            {
+                world.set_static(id, is_static);
+                *pending_nav_bake = true;
+            }
+        });
+        draw_layer_combo(ui, world, id, layer_labels, layer_changed);
+    });
     ui.add_space(t.space_xs);
 }
 

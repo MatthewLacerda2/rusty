@@ -136,7 +136,7 @@ fn draw_overrides_list(
     }
     ui.label("Overridden fields:");
     for path in paths {
-        draw_override_row(ui, t.accent_blue, id, root, &path, action);
+        draw_override_row(ui, t.accent, id, root, &path, action);
     }
 }
 

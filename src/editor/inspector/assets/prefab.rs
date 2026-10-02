@@ -5,6 +5,8 @@
 //! `instantiate_prefab`), so it stamps an independent copy with fresh deterministic
 //! ids exactly like `Scene.Instantiate` does for a script.
 
+use crate::editor::inspector::components::card::card_frame;
+use egui_phosphor::regular as icon;
 use std::fs;
 use std::path::Path;
 
@@ -17,7 +19,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
         .and_then(|f| f.to_str())
         .unwrap_or(path);
 
-    ui.heading(format!("📦 Prefab: {}", filename));
+    ui.heading(format!("{}  Prefab: {}", icon::PACKAGE, filename));
     ui.add_space(5.0);
 
     draw_metadata_card(ui, path);
@@ -29,13 +31,16 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     ui.heading("Instantiation");
     ui.add_space(5.0);
     ui.colored_label(
-        egui::Color32::GRAY,
+        crate::editor::theme::from_ui(ui).text_secondary,
         "Stamps an independent (unpacked) copy into the scene.",
     );
     ui.add_space(5.0);
 
     if ui
-        .add(egui::Button::new("➕ Instantiate into Scene").min_size(egui::Vec2::new(140.0, 30.0)))
+        .add(
+            egui::Button::new(format!("{}  Instantiate into Scene", icon::PLUS))
+                .min_size(egui::Vec2::new(140.0, 24.0)),
+        )
         .clicked()
     {
         instantiate(editor, scene, path);
@@ -45,24 +50,20 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
 /// File metadata card: path, on-disk size, entity + material counts read from the
 /// document (so the agent/user sees the subtree's shape before stamping it).
 fn draw_metadata_card(ui: &mut egui::Ui, path: &str) {
-    egui::Frame::none()
-        .fill(crate::editor::theme::from_ui(ui).bg_tier2)
-        .inner_margin(8.0)
-        .rounding(6.0)
-        .show(ui, |ui| {
-            ui.vertical(|ui| {
-                ui.label(format!("Path: {}", path));
-                let size_str = match fs::metadata(path) {
-                    Ok(meta) => format_size(meta.len()),
-                    Err(_) => "Unknown size".to_string(),
-                };
-                ui.label(format!("Size: {}", size_str));
-                if let Some((entities, materials)) = counts(path) {
-                    ui.label(format!("Entities: {entities}"));
-                    ui.label(format!("Materials: {materials}"));
-                }
-            });
+    card_frame(&crate::editor::theme::from_ui(ui)).show(ui, |ui| {
+        ui.vertical(|ui| {
+            ui.label(format!("Path: {}", path));
+            let size_str = match fs::metadata(path) {
+                Ok(meta) => format_size(meta.len()),
+                Err(_) => "Unknown size".to_string(),
+            };
+            ui.label(format!("Size: {}", size_str));
+            if let Some((entities, materials)) = counts(path) {
+                ui.label(format!("Entities: {entities}"));
+                ui.label(format!("Materials: {materials}"));
+            }
         });
+    });
 }
 
 /// Read the prefab document and report its `(entity_count, material_count)`, or
