@@ -21,7 +21,14 @@ in the background is woken:
 - **the machine failing** (#584's stop, or GitHub unreachable for [`FAILS`]
   listings in a row);
 - **nothing left**: no open pull request, or none ready and no head among the
-  rest (drafts, remembered hand-backs) has moved for `--idle` minutes.
+  rest (drafts, remembered hand-backs) has moved for `--idle` minutes;
+- **its own deadline** (`--for MINUTES`, #697): past it, the watch takes no new
+  pull request. It is checked only between takes, never during one, so the one
+  in hand finishes (merged or handed back) and the exit always lands between
+  pull requests. A clean exit with its own last line ([`DEADLINE`]): whoever
+  started the watch relaunches it. It exists because the orchestrator runs the
+  watch as a background command, and those are killed at two hours wherever
+  they are — mid-push or mid-merge included.
 
 Which ready one goes first follows CLAUDE.md's priority, read from the
 pull request's own labels and the issues it closes (rusty labels issues, not
@@ -49,6 +56,9 @@ IDLE_MINUTES = 90
 # Consecutive listings GitHub may fail before the watch stops as the machine's
 # problem rather than retrying forever. At the default poll, five minutes.
 FAILS = 10
+
+# How the `--for` exit begins, so the starter can tell it from "nothing left".
+DEADLINE = "deadline reached"
 
 # What `gh pr list` is asked for, and the issues whose labels give the priority.
 LIST_FIELDS = "number,isDraft,headRefOid,baseRefName,author,labels,closingIssuesReferences"
@@ -116,6 +126,16 @@ def finished(pulls: list[dict], quiet: float, idle: float) -> str | None:
     return None
 
 
+def overdue(started: float, now: float, minutes: float | None) -> bool:
+    """Whether `--for` has run out. Asked only before taking a pull request."""
+    return minutes is not None and now - started >= minutes * 60
+
+
+def deadline_reached(results: list[tuple[int, str, str]], minutes: float, merged: str) -> str:
+    count = sum(1 for _, state, _ in results if state == merged)
+    return f"{DEADLINE} ({minutes:g} minutes); {count} merged, nothing in hand. Relaunch the watch."
+
+
 def forget_closed(memory: dict[int, str], pulls: list[dict]) -> dict[int, str]:
     """The memory without pull requests that are no longer open."""
     open_ = {p.get("number") for p in pulls}
@@ -146,11 +166,17 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, bool]:
     (ended without a hand-back: green under `--no-merge`, previewed by a dry run)
     `stops` (the machine's failure, [`merge-queue.Stopped`]) and `skips` (it
     turned draft or closed after the listing). Anything else is a hand-back.
+    `opts.for_minutes` (`--for`) is checked at the top of each pass, so only
+    between takes.
     """
     results, done, failed = [], set(), 0
     memory = recall(fx.memory)
     last, moved = None, fx.clock()
+    started = moved
     while True:
+        if overdue(started, fx.clock(), opts.for_minutes):
+            remember(fx.memory, memory)
+            return results, deadline_reached(results, opts.for_minutes, fx.merged), True
         pulls = fx.pulls()
         if pulls is None:
             failed += 1
