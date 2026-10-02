@@ -82,7 +82,7 @@ fn source(layers: &[Layer], exceptions: &[Exception], edges: &[Edge], out: &mut 
             .any(|l| l.module == e.from && l.deps.contains(&e.to.as_str()));
         if !allowed && !excepted(&e.from, &e.to) {
             out.push(format!(
-                "UNDECLARED_DEP {} `{} → {}` — not in {0}'s row",
+                "UNDECLARED_DEP {} `{} → {}` — not in {1}'s row",
                 e.at, e.from, e.to
             ));
         }
