@@ -18,6 +18,7 @@ use super::erosion;
 use super::inputs::{collider_keys, diff, obstacle_keys};
 use super::raster;
 use super::region::{merge_overlapping, CellRect};
+use super::{BakeState, ObstacleVolume};
 use crate::physics::collider_world_triangles;
 use crate::scene::Scene;
 
@@ -45,28 +46,7 @@ impl NavigationGraph {
             self.bake(scene);
             return Rebake::Full;
         };
-        let mut dirty = Vec::new();
-        let raw = &st.raw;
-        let collider_rect = |id: u32, _: &_| {
-            let mesh = collider_world_triangles(scene, id)?;
-            raster::footprint(raw, &mesh.vertices)
-        };
-        let colliders = diff(
-            &st.inputs.colliders,
-            collider_keys(scene),
-            collider_rect,
-            &mut dirty,
-        );
-        let obstacle_rect =
-            |_: u32, v: &super::ObstacleVolume| raster::footprint(raw, &v.triangles().concat());
-        let obstacles = diff(
-            &st.inputs.obstacles,
-            obstacle_keys(scene),
-            obstacle_rect,
-            &mut dirty,
-        );
-        st.inputs.colliders = colliders;
-        st.inputs.obstacles = obstacles;
+        let dirty = st.update_inputs(scene);
         if dirty.is_empty() {
             self.bake_state = Some(st);
             return Rebake::Unchanged;
@@ -90,5 +70,35 @@ impl NavigationGraph {
         st.log.record(self.bake_generation, Some(changed.clone()));
         self.bake_state = Some(st);
         Rebake::Incremental(changed)
+    }
+}
+
+impl BakeState {
+    /// Diff the recorded inputs against `scene`, record the current ones, and
+    /// return the cells whose inputs changed.
+    fn update_inputs(&mut self, scene: &Scene) -> Vec<CellRect> {
+        let mut dirty = Vec::new();
+        let raw = &self.raw;
+        let collider_rect = |id: u32, _: &_| {
+            let mesh = collider_world_triangles(scene, id)?;
+            raster::footprint(raw, &mesh.vertices)
+        };
+        let colliders = diff(
+            &self.inputs.colliders,
+            collider_keys(scene),
+            collider_rect,
+            &mut dirty,
+        );
+        let obstacle_rect =
+            |_: u32, v: &ObstacleVolume| raster::footprint(raw, &v.triangles().concat());
+        let obstacles = diff(
+            &self.inputs.obstacles,
+            obstacle_keys(scene),
+            obstacle_rect,
+            &mut dirty,
+        );
+        self.inputs.colliders = colliders;
+        self.inputs.obstacles = obstacles;
+        dirty
     }
 }

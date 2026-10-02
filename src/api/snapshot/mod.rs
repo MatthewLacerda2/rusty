@@ -120,10 +120,7 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -
         "parent": world.parent_id(id),
         "children": world.children(id),
         "components": inventory(world, id),
-        "transform": world
-            .transform(id)
-            .map(|t| transform_value(&t))
-            .unwrap_or(Value::Null),
+        "transform": world.transform(id).map(|t| transform_value(&t)),
         "bounds": bounds_value(scene, id, world_matrix),
         "scripts": world
             .scripts(id)
