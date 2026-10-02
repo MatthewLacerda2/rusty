@@ -5,12 +5,12 @@
 //! every write through these, so the rules live once: the centre stays finite, the
 //! box keeps a positive size, and the area is a valid id (`0..MAX_AREAS`).
 //!
-//! Allowed deps: components (the component data), navigation (the area limit). Pure.
+//! Allowed deps: components (the component data), scene::nav_settings (the area limit). Pure.
 
 use glam::Vec3;
 
 use crate::components::NavMeshModifierVolumeComponent as Volume;
-use crate::navigation::MAX_AREAS;
+use crate::scene::nav_settings::MAX_AREAS;
 
 /// The smallest extent a box side may have.
 pub const MIN_SIZE: f32 = 1e-3;

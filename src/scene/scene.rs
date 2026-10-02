@@ -13,10 +13,10 @@ use std::collections::BTreeMap;
 use glam::Vec3;
 
 use crate::ecs::World;
-use crate::navigation::NavMeshSettings;
 use crate::scene::collision_matrix::CollisionMatrix;
 use crate::scene::identity::SceneId;
 use crate::scene::layers::LayerRegistry;
+use crate::scene::nav_settings::NavMeshSettings;
 use crate::scene::world_cache::WorldMatrixCache;
 
 // Re-export the component types so the many existing `scene::…Component` paths

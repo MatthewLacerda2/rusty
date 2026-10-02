@@ -16,6 +16,7 @@
 //!   serialize — World <-> SceneData
 //!   rehydrate — rebuild a mesh's geometry + rig from its on-disk reference
 //!   skeleton  — bones as GameObjects: spawn, save-strip, palette build (#453)
+//!   nav_settings — the per-scene navmesh bake settings (`navigation` reads them)
 //!   io        — save/load, path + extension, default-scene seeding
 //!   default_scene — the default scene's builder, materials and seeded assets
 //!   snapshot  — edit-mode snapshot/restore around Play
@@ -33,6 +34,7 @@ pub mod io;
 pub mod layers;
 pub mod lighting;
 pub mod lod_instance;
+pub mod nav_settings;
 pub mod prefab;
 pub mod rehydrate;
 pub mod runtime;

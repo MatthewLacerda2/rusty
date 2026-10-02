@@ -1,18 +1,6 @@
 use glam::Vec3;
 
-/// Default maximum height an agent can step up/down between two adjacent cells
-/// while still treating them as connected (stairs, curbs). World units.
-pub const DEFAULT_MAX_STEP: f32 = 0.5;
-/// Default maximum walkable slope, expressed as a height delta per cell of
-/// horizontal travel (i.e. `rise / grid_spacing`). A ramp steeper than this is
-/// not traversable. `1.0` ≈ 45° at unit spacing.
-pub const DEFAULT_MAX_SLOPE: f32 = 1.0;
-/// Default grid cell size in world units — the spacing every runtime
-/// `NavigationGraph` is created with. The per-scene [`NavMeshSettings`] default
-/// matches this so an unconfigured scene bakes at the historical resolution.
-///
-/// [`NavMeshSettings`]: super::NavMeshSettings
-pub const DEFAULT_GRID_SPACING: f32 = 1.0;
+pub use crate::scene::nav_settings::{DEFAULT_GRID_SPACING, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP};
 
 /// One walkable surface in a cell's column: a floor an agent can stand on and the
 /// open space above it, up to the next solid (`ceiling`, `f32::INFINITY` when the

@@ -19,9 +19,9 @@ use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
 use crate::components::{Entity, MaterialAsset};
-use crate::navigation::NavMeshSettings;
 use crate::scene::collision_matrix::CollisionMatrix;
 use crate::scene::layers::LayerRegistry;
+use crate::scene::nav_settings::NavMeshSettings;
 use crate::scene::Scene;
 
 pub use super::rehydrate::{asset_mesh_component, rehydrate_entity_mesh};
