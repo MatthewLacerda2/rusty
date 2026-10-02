@@ -31,7 +31,7 @@ pub fn panel_header(ui: &mut Ui, t: &Theme, glyph: &str, title: &str, caret: &st
     let mut clicked = false;
     ui.horizontal(|ui| {
         ui.label(RichText::new(glyph).color(t.text_secondary));
-        ui.label(RichText::new(title).font(fonts::semibold(TITLE_SIZE)));
+        ui.label(RichText::new(title).font(fonts::semibold(ui.ctx(), TITLE_SIZE)));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             clicked = icon_button(ui, caret, "Collapse").clicked();
         });

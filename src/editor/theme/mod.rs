@@ -127,7 +127,7 @@ impl Theme {
     /// tokens into context memory for `&Ui`-only readers ([`from_ui`]).
     pub fn apply(&self, ctx: &Context) {
         let mut s = (*ctx.style()).clone();
-        style::configure(self, &mut s);
+        style::configure(self, ctx, &mut s);
         ctx.set_style(s);
         ctx.data_mut(|d| d.insert_temp(token_id(), *self));
     }

@@ -20,11 +20,13 @@ pub fn component_card(
 ) {
     let t = theme::from_ui(ui);
     card_frame(&t).show(ui, |ui| {
+        // Every card spans the panel, whether or not its header has a remove button.
+        ui.set_min_width(ui.available_width());
         let id = egui::Id::new(("component_card", title));
         CollapsingState::load_with_default_open(ui.ctx(), id, true)
             .show_header(ui, |ui| {
                 ui.colored_label(t.accent, glyph);
-                ui.label(egui::RichText::new(title).font(theme::fonts::semibold(12.5)));
+                ui.label(egui::RichText::new(title).font(theme::fonts::semibold(ui.ctx(), 12.5)));
                 if let Some(remove) = remove {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if chrome::icon_button(ui, icon::X, "Remove component").clicked() {

@@ -13,17 +13,17 @@ const WIDGET_RADIUS: f32 = 4.0;
 /// Corner radius of windows, menus and popups.
 const WINDOW_RADIUS: f32 = 8.0;
 
-pub(super) fn configure(t: &Theme, style: &mut Style) {
-    type_scale(style);
+pub(super) fn configure(t: &Theme, ctx: &egui::Context, style: &mut Style) {
+    type_scale(ctx, style);
     density(t, style);
     visuals(t, style);
 }
 
 /// Inter at compact UI sizes; headings are SemiBold, not bigger.
-fn type_scale(style: &mut Style) {
+fn type_scale(ctx: &egui::Context, style: &mut Style) {
     let inter = |size| FontId::new(size, FontFamily::Proportional);
     style.text_styles = [
-        (TextStyle::Heading, fonts::semibold(13.5)),
+        (TextStyle::Heading, fonts::semibold(ctx, 13.5)),
         (TextStyle::Body, inter(12.5)),
         (TextStyle::Button, inter(12.5)),
         (TextStyle::Small, inter(11.0)),

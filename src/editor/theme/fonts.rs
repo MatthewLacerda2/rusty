@@ -13,8 +13,19 @@ const SEMIBOLD: &str = "inter-semibold";
 
 /// A [`FontId`] in Inter SemiBold at `size` points — the editor's "strong" weight.
 /// (egui's `RichText::strong` only brightens the colour; this changes the weight.)
-pub fn semibold(size: f32) -> FontId {
-    FontId::new(size, FontFamily::Name(SEMIBOLD.into()))
+/// Fonts registered by [`install`] load on the *next* frame, and egui panics on a
+/// family it does not know yet, so until then this is the regular weight.
+pub fn semibold(ctx: &Context, size: f32) -> FontId {
+    let family = FontFamily::Name(SEMIBOLD.into());
+    let loaded = ctx.fonts(|f| f.families().contains(&family));
+    FontId::new(
+        size,
+        if loaded {
+            family
+        } else {
+            FontFamily::Proportional
+        },
+    )
 }
 
 /// Register Inter, JetBrains Mono and the Phosphor icon font. Call once.
