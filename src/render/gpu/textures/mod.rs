@@ -232,3 +232,6 @@ impl Renderer {
         ))
     }
 }
+
+#[cfg(test)]
+mod freshness_tests;

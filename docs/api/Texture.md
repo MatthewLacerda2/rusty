@@ -38,6 +38,9 @@ lists the valid ones — a typo like `"basecolour"` never silently bakes linear 
 
 The returned `path` drops straight into a material slot, e.g.
 `Material.SetTexture(id, Texture.Bake(recipe, "out/albedo.png", "base_color"))`.
+Baking again to a path already on screen shows the new texels on the next frame —
+the renderer re-reads every PNG a bake writes — and a material that named the path
+before the file existed picks it up once it is baked (#689).
 
 ### A whole map set from one graph — `Texture.BakeSet`
 
