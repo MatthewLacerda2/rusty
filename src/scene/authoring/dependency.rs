@@ -34,9 +34,7 @@ use crate::components::{
 };
 use crate::components::{CharacterControllerComponent, JointComponent, LineComponent};
 use crate::components::{LayoutElementComponent, LayoutGroupComponent, ShapeComponent};
-use crate::components::{
-    LodGroupComponent, NavMeshObstacleComponent, OffMeshLinkComponent, TrailComponent,
-};
+use crate::components::{LodGroupComponent, NavMeshObstacleComponent, TrailComponent};
 use crate::ecs::World;
 use crate::scene::authoring::components::ComponentKind;
 use crate::scene::authoring::defaults::{
@@ -96,9 +94,7 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
         ComponentKind::NavMeshObstacle => {
             world.set_nav_obstacle(id, Some(NavMeshObstacleComponent::default()))
         }
-        ComponentKind::OffMeshLink => {
-            world.set_offmesh_link(id, Some(OffMeshLinkComponent::default()))
-        }
+        ComponentKind::OffMeshLink => world.set_offmesh_link(id, Some(Default::default())),
         ComponentKind::Camera => world.set_camera(id, Some(default_camera())),
         ComponentKind::Particles => {
             world.set_particles(id, Some(ParticleEmitterComponent::default()))

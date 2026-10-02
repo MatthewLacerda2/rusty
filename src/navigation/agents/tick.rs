@@ -54,15 +54,7 @@ impl NavigationGraph {
                 } else {
                     decelerate(&mut agent, delta_time);
                 }
-                inputs.push(AvoidanceAgent {
-                    position: xz(position),
-                    velocity: xz(moved_with),
-                    preferred: xz(agent.velocity),
-                    radius: agent.radius,
-                    max_speed: agent.speed,
-                    priority: agent.avoidance_priority,
-                    solves: steering && agent.avoidance_enabled,
-                });
+                inputs.push(avoidance_input(&agent, position, moved_with, steering));
                 ticked.push(Ticked {
                     id,
                     position,
@@ -185,6 +177,25 @@ impl NavigationGraph {
 
         final_pos.y = self.spans[on.index as usize].y;
         final_pos
+    }
+}
+
+/// The agent as local avoidance sees it: where it is, the velocity it moved with,
+/// the one it wants, and whether it dodges this frame.
+fn avoidance_input(
+    agent: &NavMeshAgentComponent,
+    position: Vec3,
+    moved_with: Vec3,
+    steering: bool,
+) -> AvoidanceAgent {
+    AvoidanceAgent {
+        position: xz(position),
+        velocity: xz(moved_with),
+        preferred: xz(agent.velocity),
+        radius: agent.radius,
+        max_speed: agent.speed,
+        priority: agent.avoidance_priority,
+        solves: steering && agent.avoidance_enabled,
     }
 }
 
