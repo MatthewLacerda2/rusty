@@ -26,6 +26,7 @@ fn set(audio: &RefCell<AudioMaestro>, name: &str, patch: GroupPatch) -> mlua::Re
     audio.borrow_mut().set_group(name, &patch).map_err(err)
 }
 
+/// `GetGroups` / `CreateGroup` / `GetGroupState`, then the setters.
 pub(super) fn register_groups<'lua, 'scope>(
     scope: &mlua::Scope<'lua, 'scope>,
     table: &Table<'lua>,
@@ -56,6 +57,25 @@ pub(super) fn register_groups<'lua, 'scope>(
     )?;
     put(
         table,
+        "GetGroupState",
+        scope.create_function(|lua, name: String| {
+            let maestro = audio.borrow();
+            let id = maestro.mixer().require(&name).map_err(err)?;
+            state_table(lua, &maestro.mixer().state(id))
+        }),
+    )?;
+    register_levels(scope, table, audio)?;
+    register_filters(scope, table, audio)
+}
+
+/// `SetGroupVolume` / `SetGroupMute` / `SetGroupReverbSend`.
+fn register_levels<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &Table<'lua>,
+    audio: &'scope RefCell<AudioMaestro>,
+) -> Reg {
+    put(
+        table,
         "SetGroupVolume",
         scope.create_function(|_, (name, v): (String, f32)| {
             set(
@@ -84,6 +104,28 @@ pub(super) fn register_groups<'lua, 'scope>(
     )?;
     put(
         table,
+        "SetGroupReverbSend",
+        scope.create_function(|_, (name, v): (String, f32)| {
+            set(
+                audio,
+                &name,
+                GroupPatch {
+                    reverb_send: Some(v),
+                    ..Default::default()
+                },
+            )
+        }),
+    )
+}
+
+/// `SetGroupLowPass` / `SetGroupHighPass`.
+fn register_filters<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &Table<'lua>,
+    audio: &'scope RefCell<AudioMaestro>,
+) -> Reg {
+    put(
+        table,
         "SetGroupLowPass",
         scope.create_function(|_, (name, hz, q): (String, f32, Option<f32>)| {
             let low_pass = Some(Filter::new(hz, q.unwrap_or(0.0)));
@@ -110,29 +152,6 @@ pub(super) fn register_groups<'lua, 'scope>(
                     ..Default::default()
                 },
             )
-        }),
-    )?;
-    put(
-        table,
-        "SetGroupReverbSend",
-        scope.create_function(|_, (name, v): (String, f32)| {
-            set(
-                audio,
-                &name,
-                GroupPatch {
-                    reverb_send: Some(v),
-                    ..Default::default()
-                },
-            )
-        }),
-    )?;
-    put(
-        table,
-        "GetGroupState",
-        scope.create_function(|lua, name: String| {
-            let maestro = audio.borrow();
-            let id = maestro.mixer().require(&name).map_err(err)?;
-            state_table(lua, &maestro.mixer().state(id))
         }),
     )
 }

@@ -73,6 +73,15 @@ pub(super) fn register_snapshots<'lua, 'scope>(
                 .unzip())
         }),
     )?;
+    register_ducks(scope, table, audio)
+}
+
+/// `AddDuck` / `ClearDucks`.
+fn register_ducks<'lua, 'scope>(
+    scope: &mlua::Scope<'lua, 'scope>,
+    table: &Table<'lua>,
+    audio: &'scope RefCell<AudioMaestro>,
+) -> Reg {
     put(
         table,
         "AddDuck",
