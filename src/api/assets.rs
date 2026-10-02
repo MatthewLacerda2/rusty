@@ -7,13 +7,15 @@
 //! material count — the same catalogue the content browser shows a human, so the
 //! agent gets parity. Every `reference` round-trips through `AssetRef` /
 //! `import_sub_mesh`, so the instantiate verb can place exactly what the manifest
-//! names.
+//! names. `Assets.Refresh()` is the editor's auto-refresh on demand: it imports what
+//! arrived since the last look (MP3 → WAV, #385).
 
 use std::path::Path;
 
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
+use crate::asset::audio::{refresh, Refresh};
 use crate::asset::{build_manifest, AssetEntry, SubObjectEntry};
 
 /// The project asset root the manifest walks — the same `project` tree the content
@@ -36,6 +38,12 @@ pub fn register(lua: &Lua) -> Reg {
         lua.create_function(|lua, ()| manifest_table(lua)),
     )?;
 
+    put(
+        &table,
+        "Refresh",
+        lua.create_function(|lua, ()| refresh_table(lua, &refresh(Path::new(ASSET_ROOT)))),
+    )?;
+
     lua.globals()
         .set("Assets", table)
         .map_err(|e| e.to_string())
@@ -50,6 +58,25 @@ fn manifest_table(lua: &Lua) -> mlua::Result<Table<'_>> {
         assets.raw_set(i + 1, asset_entry_table(lua, entry)?)?;
     }
     Ok(assets)
+}
+
+/// `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... } }`.
+fn refresh_table<'lua>(lua: &'lua Lua, report: &Refresh) -> mlua::Result<Table<'lua>> {
+    let converted = lua.create_table()?;
+    for (i, (_, wav)) in report.converted.iter().enumerate() {
+        converted.raw_set(i + 1, wav.to_string_lossy())?;
+    }
+    let skipped = lua.create_table()?;
+    for (i, (mp3, why)) in report.skipped.iter().enumerate() {
+        let t = lua.create_table()?;
+        t.raw_set("path", mp3.to_string_lossy())?;
+        t.raw_set("reason", why.as_str())?;
+        skipped.raw_set(i + 1, t)?;
+    }
+    let t = lua.create_table()?;
+    t.raw_set("converted", converted)?;
+    t.raw_set("skipped", skipped)?;
+    Ok(t)
 }
 
 /// One file's record: `path`, `materialCount`, and an array of `subObjects`.

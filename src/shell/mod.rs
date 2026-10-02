@@ -173,6 +173,7 @@ fn handle_window_event<F: Frontend>(
             shell.window_focused = *focused;
             if *focused {
                 capture_clipboard(shell, game); // copied in another app, maybe
+                boot::refresh_assets_on_focus(game); // dropped in from outside, maybe
             } else {
                 // Key-ups never arrive for keys released while unfocused.
                 game.input().borrow_mut().release_all();

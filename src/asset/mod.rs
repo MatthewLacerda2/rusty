@@ -11,13 +11,17 @@
 //! opaque GUIDs. The `<file>.meta` sidecar carries import SETTINGS only, never
 //! identity (see `sidecar`).
 //!
-//! Purity: this module depends only on `glam` + the `gltf`/`tobj`/`serde` crates —
-//! never wgpu/egui/mlua — so it stays a pure data transform. It lives outside the
+//! Audio import (`audio`, #385) lives here too: MP3 is a source format, converted to
+//! WAV on arrival, and the one decoder every clip goes through.
+//!
+//! Purity: this module depends only on `glam` + the `gltf`/`tobj`/`serde`/`symphonia`
+//! crates — never wgpu/egui/mlua — so it stays a pure data transform. It lives outside the
 //! determinism-guarded sim trees (`app`/`scripting`/`physics`/`navigation`); a
 //! scene-load re-import is deterministic given the same file.
 
 pub mod anim_data;
 pub mod animation_graph;
+pub mod audio;
 pub mod gltf_anim;
 pub mod gltf_import;
 pub mod gltf_skin;

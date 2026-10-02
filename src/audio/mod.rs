@@ -19,7 +19,7 @@
 //! [`NullBackend`]. Nothing here reads a wall clock or unseeded RNG.
 //!
 //! Allowed deps: components (the `AudioSource` data), core (`Storage`, for the
-//! persisted speaker mode), kira + symphonia (device only).
+//! persisted speaker mode), asset (the shared decoder, #385), kira (device only).
 
 pub mod backend;
 pub mod device;
