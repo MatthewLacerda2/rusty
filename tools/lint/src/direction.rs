@@ -13,9 +13,13 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 
 /// Directories whose `.rs` files are sim code and must not depend on the display
-/// layer. Wider than the determinism guard's list: `scene`, `components`, `ecs`,
-/// `core`, `time` and `asset` hold the data the sim runs on; `ui` is the in-game
-/// UI's layout, which runs headless in the sim (#417).
+/// layer: the sim trees, `ui` (the in-game UI's layout, which runs headless in the
+/// sim, #417), the data the sim runs on (`scene`, `components`, `ecs`, `core`,
+/// `time`, `asset`), `api` (the surface scripts drive from inside the sim, #723),
+/// `procgen` (a material's texture recipe) and `audio` (a sim `Resource`).
+///
+/// `shadergen` belongs here too but still imports `crate::render` once; #722 removes
+/// that import and adds it. A listed directory that no longer exists is a violation.
 const SIM_DIRS: &[&str] = &[
     "src/app",
     "src/scripting",
@@ -28,6 +32,9 @@ const SIM_DIRS: &[&str] = &[
     "src/time",
     "src/asset",
     "src/ui",
+    "src/api",
+    "src/procgen",
+    "src/audio",
 ];
 
 /// Banned paths, matched as whole path segments on non-comment source: the engine's
@@ -40,6 +47,12 @@ const REPORT: &str = ".lint/report.txt";
 pub fn run() {
     let mut violations = Vec::new();
     for dir in SIM_DIRS {
+        if !Path::new(dir).is_dir() {
+            violations.push(format!(
+                "MISSING_DIR {dir} — listed in SIM_DIRS but absent; update the list"
+            ));
+            continue;
+        }
         let mut files = Vec::new();
         walk(Path::new(dir), &mut files);
         for path in files {
@@ -168,10 +181,36 @@ mod tests {
     }
 
     #[test]
-    fn guards_the_sim_and_its_data_modules() {
-        assert!(SIM_DIRS.contains(&"src/scene"));
-        assert!(SIM_DIRS.contains(&"src/components"));
+    fn sim_dirs_are_pinned() {
+        // Dropping a module off the scan must be a deliberate, reviewed edit (#723).
+        let mut dirs = SIM_DIRS.to_vec();
+        dirs.sort_unstable();
+        let mut want = [
+            "src/api",
+            "src/app",
+            "src/asset",
+            "src/audio",
+            "src/components",
+            "src/core",
+            "src/ecs",
+            "src/navigation",
+            "src/physics",
+            "src/procgen",
+            "src/scene",
+            "src/scripting",
+            "src/time",
+            "src/ui",
+        ];
+        want.sort_unstable();
+        assert_eq!(dirs, want);
         assert!(!SIM_DIRS.contains(&"src/render"));
-        assert!(!SIM_DIRS.contains(&"src/api"));
+    }
+
+    #[test]
+    fn sim_dirs_all_exist() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        for dir in SIM_DIRS {
+            assert!(root.join(dir).is_dir(), "{dir} is listed but missing");
+        }
     }
 }

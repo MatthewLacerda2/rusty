@@ -343,8 +343,11 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   standalone player are its two frontends. Window/input behaviour both need goes in
   the shell, once — never copied into a frontend.
 - **Determinism.** The sim is a pure function of (seed, inputs, fixed dt). Wall-clock
-  reads and unseeded RNG are banned from the sim modules (`app`, `scripting`,
-  `physics`, `navigation`); the platform layer (`shell`, `render`, `dev`) is exempt.
+  reads and unseeded RNG are banned from the sim modules — the sim proper (`app`,
+  `scripting`, `physics`, `navigation`, `ui`), the `api` scripts call, and the data
+  and tools it runs on (`scene`, `components`, `ecs`, `core`, `time`, `asset`,
+  `procgen`, `shadergen`, `audio`); the platform layer (`shell`, `render`, `editor`,
+  `dev`, `preview`) is exempt.
   Scripts run inside the sim too: the gameplay Lua VM has no `os`/`io`, and
   `math.random` routes to the seeded `Random` resource (`core::random`, #443).
 - **Use `glam`** for all math; keep egui / wgpu / mlua decoupled.
@@ -377,12 +380,11 @@ Failures from `tools/lint` are written to `.lint/report.txt`. See **docs/linting
   build); the lint policy
   lives in `Cargo.toml`'s `[lints]`, not in flags.
 - **Determinism guard** (`make determinism`) — fails on wall-clock / unseeded RNG
-  in the sim modules (`app`, `scripting`, `physics`, `navigation`, `ui`); it protects the
-  harness's reproducibility.
-- **Direction guard** (`make direction`) — fails when a sim module (`app`,
-  `scripting`, `physics`, `navigation`, `scene`, `components`, `ecs`, `core`, `time`,
-  `asset`, `ui`) references `crate::render`, `crate::editor`, `wgpu` or `egui`; the arrow is
-  render/editor → sim.
+  in the sim modules listed under *Determinism* above; it protects the harness's
+  reproducibility.
+- **Direction guard** (`make direction`) — fails when a sim module (the same list,
+  minus `shadergen` until #722) references `crate::render`, `crate::editor`, `wgpu`
+  or `egui`; the arrow is render/editor → sim.
 - `make gates` refuses to run when cargo's target dir is outside the worktree — a
   shared one is a false green.
 - `tools/lint/baseline.txt` grandfathers the files that currently exceed the size

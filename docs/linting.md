@@ -13,8 +13,8 @@ agent can read exactly what failed.
 | Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]` |
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
-| Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation`/`ui` |
-| Dependency direction | `tools/lint -- --direction` | sim modules (`app`/`scripting`/`physics`/`navigation`/`scene`/`components`/`ecs`/`core`/`time`/`asset`/`ui`) never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
+| Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in `app`/`scripting`/`physics`/`navigation`/`ui`/`api`/`scene`/`components`/`ecs`/`core`/`time`/`asset`/`procgen`/`shadergen`/`audio` |
+| Dependency direction | `tools/lint -- --direction` | sim modules (the determinism list minus `shadergen`, which #722 adds) never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
 | Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`/`ui`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every *migrated* first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard), minus the burn-down baseline |
@@ -76,15 +76,19 @@ entries. When the file is empty, the size gate is fully on.
 ## Dependency direction (`--direction`)
 The sim runs headless with no GPU and no UI, so the dependency arrow points one way:
 `render` and `editor` import sim types, never the reverse. `tools/lint -- --direction`
-scans the sim modules (`app`, `scripting`, `physics`, `navigation`, `scene`,
-`components`, `ecs`, `core`, `time`, `asset`, `ui`) and fails on any non-comment reference
+scans the sim modules (`app`, `scripting`, `physics`, `navigation`, `ui`, `api`,
+`scene`, `components`, `ecs`, `core`, `time`, `asset`, `procgen`, `audio`) and fails on any non-comment reference
 to `crate::render`, `crate::editor`, `wgpu` or `egui` (whole path segments only).
 Plain data the renderer and the sim share lives sim-side: the mesh `Vertex` and the
 primitive builders in `components::mesh`, `Camera` and `Decal` in `scene`,
 `QualityPreset` in `core::quality`; the renderer keeps only the GPU half (e.g.
 `render::gpu::mesh::vertex_layout`). There is no baseline — the guard landed with
 zero violations (#494), and it is the groundwork the crate split (#495) needs.
-`api` is the top-level surface and is deliberately outside the scan.
+`api` joined the scan in #723: it is the surface scripts drive from inside the sim.
+`shadergen` is the one sim-reached module still outside it — it imports
+`crate::render` once, and #722 removes that import and adds it. Both guards fail on
+a listed directory that no longer exists, and `test-lint` pins each list, so a
+module can only leave a scan through a reviewed edit.
 
 ## Component completeness (`--components`)
 A first-class component is only "done" when it appears on all four axes that
@@ -178,14 +182,15 @@ rg 'allow\(clippy::too_many_lines\)' src
 If a function grows past 50 lines, split it — **do not** silence the lint with a
 new `#[allow]`.
 
-The deterministic sim modules (`app`, `scripting`, `physics`, `navigation`, `ui`)
-The four deterministic sim modules (`app`, `scripting`, `physics`, `navigation`)
+The core sim modules (`app`, `scripting`, `physics`, `navigation`, `ui`)
 carry a module-level `#![deny(clippy::unwrap_used)]`, so a bare `.unwrap()` in
 their **production** code is a hard clippy error (caught by the same `-D warnings`
 gate, both feature sets, `make gates` + CI). This is the **survivability**
 sibling of the determinism guard's **reproducibility**: a `.unwrap()` that panics
 mid-frame kills an unattended/overnight play-test just as surely as a wall-clock
-read breaks replay — same protected boundary (#195), same rationale.
+read breaks replay — same rationale (#195). The determinism guard has since widened
+past these five (#723); extending the unwrap ban to the wider set is a separate
+burn-down, not yet measured.
 
 The rule is deliberately narrow:
 - **`unwrap`, not `expect`.** `.expect("clear invariant")` is the sanctioned escape
@@ -194,7 +199,7 @@ The rule is deliberately narrow:
   local; reach for the bare `.unwrap()` nowhere in the sim core.
 - **Sim modules only.** The platform layer (`shell`, `render`, `dev`) is exempt —
   e.g. `render/gpu/shaders.rs` panicking at boot on a bad shader is fail-fast-at-startup,
-  not a mid-sim hazard. This is the exact boundary the determinism guard uses.
+  not a mid-sim hazard. The determinism guard's exemption is the same platform layer.
 - **Tests exempt.** `clippy.toml`'s `allow-unwrap-in-tests = true` lets test code
   unwrap freely, so no per-test `#[allow]` noise.
 
