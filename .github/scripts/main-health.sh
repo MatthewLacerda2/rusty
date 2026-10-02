@@ -29,7 +29,8 @@ fi
 # A nightly mutation shard that concluded non-success is a *finding* when
 # cargo-mutants finished (exit 2 = survivors, 3 = timeouts) — that is the
 # signal's own report, not an outage. Anything else (no artifact, a baseline
-# that did not build, the 6 h ceiling) left its mutants unmeasured: file it.
+# that did not build, the 6 h ceiling, a lost runner) left its mutants
+# unmeasured: file it.
 shard_had_findings() {
   local dir rc
   dir=$(mktemp -d)
