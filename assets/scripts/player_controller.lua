@@ -6,7 +6,9 @@
 -- weapon all live HERE, so a game can edit or replace them without touching Rust.
 --
 -- Reproduces what the engine's old `drive_player` + `hitscan` did, verbatim:
---   * WASD moves the Player along the camera's ground plane at MOVE_SPEED.
+--   * WASD moves the Player along the camera's ground plane at MOVE_SPEED, through
+--     its CharacterController (#451): walls block it, steps are climbed, and the
+--     script applies its own GRAVITY, since Move applies none.
 --   * Arrow keys turn the follow-camera (yaw/pitch), pitch clamped to +/-80.
 --   * The camera trails the Player at -forward*FOLLOW_BACK + up*FOLLOW_UP.
 --   * The shoot key casts a hitscan on its RISING edge (one cast per press),
@@ -20,6 +22,8 @@
 local PlayerController = {}
 
 local MOVE_SPEED = 5.0      -- units/second of ground movement
+local GRAVITY = 20.0        -- units/second² the Player falls at
+local GROUND_STICK = -1.0   -- vertical speed while grounded, keeping it pressed down
 local LOOK_SPEED = 90.0     -- degrees/second of camera turn
 local PITCH_LIMIT = 80.0    -- clamp camera pitch to +/- this
 local FOLLOW_BACK = 4.5     -- how far the camera trails behind the Player
@@ -30,8 +34,8 @@ local START_PITCH = -10.0   -- initial camera pitch: tilted slightly down
 local START_BACK = 4.5      -- initial camera offset behind the Player (along -Z)
 local START_UP = 1.5        -- initial camera height above the Player
 
--- Move the Player along the camera's ground plane from WASD.
-local function move(entity_id, dt)
+-- Move the Player along the camera's ground plane from WASD, falling under GRAVITY.
+local function move(self, entity_id, dt)
     local fx, fy, fz = Camera.GetForward()
     local rx, ry, rz = Camera.GetRight()
     local mx, mz = 0.0, 0.0
@@ -40,11 +44,18 @@ local function move(entity_id, dt)
     if Input.IsKeyDown("D") then mx = mx + rx; mz = mz + rz end
     if Input.IsKeyDown("A") then mx = mx - rx; mz = mz - rz end
     local len = math.sqrt(mx * mx + mz * mz)
+    local dx, dz = 0.0, 0.0
     if len > 0.0316 then -- sqrt(0.001), matching the old length_squared > 0.001 guard
         local step = MOVE_SPEED * dt / len
-        local px, py, pz = Transform.GetPosition(entity_id)
-        Transform.SetPosition(entity_id, px + mx * step, py, pz + mz * step)
+        dx, dz = mx * step, mz * step
     end
+    local vy = self.vy or 0.0
+    if CharacterController.IsGrounded(entity_id) and vy < 0.0 then
+        vy = GROUND_STICK
+    end
+    vy = vy - GRAVITY * dt
+    CharacterController.Move(entity_id, dx, vy * dt, dz)
+    self.vy = vy
 end
 
 -- Turn the follow-camera from the arrow keys, then trail it behind the Player.
@@ -82,7 +93,7 @@ end
 -- The reusable per-frame drive: movement + camera follow + weapon. The bot-player
 -- calls this after injecting its own Input, so it shares the exact same controller.
 function PlayerController.drive(self, entity_id, dt)
-    move(entity_id, dt)
+    move(self, entity_id, dt)
     aim_camera(entity_id, dt)
     shoot(self, entity_id)
 end
@@ -98,6 +109,7 @@ end
 
 function PlayerController.Start(entity_id)
     PlayerController.shoot_was_down = false
+    PlayerController.vy = 0.0
     frame_camera(entity_id)
 end
 

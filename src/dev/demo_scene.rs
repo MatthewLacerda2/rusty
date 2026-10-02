@@ -7,9 +7,10 @@
 use glam::Vec3;
 
 use crate::components::mesh::primitives;
+use crate::components::CharacterControllerComponent;
 use crate::scene::{
-    AnimatorComponent, ColliderComponent, ColliderShape, CollisionDetection, DirtyFlag,
-    MaterialAsset, MaterialComponent, MeshComponent, RigidBodyComponent, Scene, ScriptComponent,
+    AnimatorComponent, ColliderComponent, ColliderShape, DirtyFlag, MaterialAsset,
+    MaterialComponent, MeshComponent, Scene, ScriptComponent,
 };
 
 /// Bundled default player brain (movement + camera + weapon), seeded next to
@@ -60,15 +61,13 @@ fn tint(scene: &mut Scene, key: &str, color: [f32; 3]) -> MaterialComponent {
     }
 }
 
-fn kinematic_body() -> RigidBodyComponent {
-    RigidBodyComponent {
-        active: true,
-        is_kinematic: true,
-        mass: 80.0,
-        velocity: Vec3::ZERO,
-        angular_velocity: Vec3::ZERO,
-        use_gravity: false,
-        collision_detection: CollisionDetection::Discrete,
+/// A walking character's capsule (#451): `height` tall, `radius` wide, centred on
+/// the entity. Scripts move it with `CharacterController.Move`.
+fn character(height: f32, radius: f32) -> CharacterControllerComponent {
+    CharacterControllerComponent {
+        height,
+        radius,
+        ..Default::default()
     }
 }
 
@@ -118,17 +117,9 @@ fn add_player(scene: &mut Scene) {
             ),
         )),
     );
-    scene.world.set_collider(
-        player_id,
-        Some(ColliderComponent {
-            shape: ColliderShape::Cylinder {
-                radius: 0.5,
-                height: 1.6,
-            },
-            ..box_collider(Vec3::ONE)
-        }),
-    );
-    scene.world.set_rigidbody(player_id, Some(kinematic_body()));
+    scene
+        .world
+        .set_character_controller(player_id, Some(character(1.6, 0.5)));
     scene.world.set_material(player_id, Some(material));
     // The Player's movement + camera + weapon are NOT engine code: they live in
     // the bundled default player_controller.lua, attached here like any script.
@@ -186,8 +177,7 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
     );
     scene
         .world
-        .set_collider(enemy_id, Some(box_collider(Vec3::new(1.3, 2.0, 1.3))));
-    scene.world.set_rigidbody(enemy_id, Some(kinematic_body()));
+        .set_character_controller(enemy_id, Some(character(2.0, 0.65)));
     scene.world.set_animator(
         enemy_id,
         Some(AnimatorComponent {
