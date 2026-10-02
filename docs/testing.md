@@ -60,8 +60,9 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   a runner can identify them by name (see the budget below).
 - **Every module can share one process.** nextest gives each test its own, but
   `cargo test` runs the whole binary in one, and both must stay correct. Nothing in
-  `tests/` may rely on having a process to itself: use a temp path unique to the file
-  (not one another file also writes), and never `set_var` / `set_current_dir`.
+  `tests/` may rely on having a process to itself: write scratch files under
+  `temp::dir()`, which is unique to the process *and* the test (#709), and never
+  `set_var` / `set_current_dir`.
 - Filtering works by module path: `cargo nextest run -E 'binary(integration)' physics_`.
 
 ## Build and test share one dependency graph

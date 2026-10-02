@@ -10,7 +10,7 @@
 //! on its own. `layout` fails the suite, naming the file, if one is forgotten.
 //!
 //! Every module now shares one process, so a test must not rely on having a process to
-//! itself: no fixed temp paths shared with another file, no `set_var`/`set_current_dir`.
+//! itself: scratch files go under `temp::dir()` (one per test), no `set_var`/`set_current_dir`.
 //! Filter by module path: `cargo nextest run -E 'binary(integration)' physics_` runs the
 //! physics files (`cargo test --test integration physics_` works too).
 
