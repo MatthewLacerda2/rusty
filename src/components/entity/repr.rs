@@ -110,14 +110,21 @@ pub(super) struct EntityRepr {
     children: Vec<u32>,
 }
 
+/// Migrate a pre-#83 single `script` into the plural vec, ahead of any (normally
+/// empty) new-format scripts, so legacy attachments still run.
+fn migrate_scripts(
+    mut scripts: Vec<ScriptComponent>,
+    legacy: Option<ScriptComponent>,
+) -> Vec<ScriptComponent> {
+    if let Some(legacy) = legacy {
+        scripts.insert(0, legacy);
+    }
+    scripts
+}
+
 impl From<EntityRepr> for Entity {
     fn from(r: EntityRepr) -> Self {
-        let mut scripts = r.scripts;
-        // Migrate a pre-#83 single `script` into the plural vec, ahead of any
-        // (normally empty) new-format scripts, so legacy attachments still run.
-        if let Some(legacy) = r.script {
-            scripts.insert(0, legacy);
-        }
+        let scripts = migrate_scripts(r.scripts, r.script);
         let (material, pending_material) = migrate_material(r.id, r.material, r.texture);
         Self {
             id: r.id,

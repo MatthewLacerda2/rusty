@@ -95,6 +95,20 @@ pub(super) fn obstacle_keys(scene: &Scene) -> Vec<(u32, ObstacleVolume)> {
     carving_volumes(scene)
 }
 
+/// Fresh records of `keys`, each with the cells `rect_of` measures for it.
+pub(super) fn sources<K>(
+    keys: Vec<(u32, K)>,
+    mut rect_of: impl FnMut(&K) -> Option<CellRect>,
+) -> Vec<Source<K>> {
+    keys.into_iter()
+        .map(|(id, key)| Source {
+            id,
+            rect: rect_of(&key),
+            key,
+        })
+        .collect()
+}
+
 /// Diff the records `old` against the current keys `new` (both by ascending id).
 /// Returns the new records; a changed, added or removed input pushes its old and
 /// new cells onto `dirty`. `rect_of` measures a new or changed input's cells.

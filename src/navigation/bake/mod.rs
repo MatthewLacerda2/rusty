@@ -44,7 +44,7 @@ use super::obstacle::ObstacleVolume;
 use super::offmesh::{authored_keys, AuthoredKey, LinkParams};
 use super::NavigationGraph;
 use crate::scene::Scene;
-use inputs::{collider_keys, obstacle_keys, BakeInputs, Source};
+use inputs::{collider_keys, obstacle_keys, sources, BakeInputs, Source};
 use modifiers::{modifier_keys, ModifierVolume};
 
 impl NavigationGraph {
@@ -84,33 +84,16 @@ impl NavigationGraph {
         self.index_links();
 
         let colliders = colliders.into_iter().zip(rects);
-        let obstacles = obstacles.into_iter().map(|(id, v)| {
-            let rect = raster::footprint(&raw, &v.triangles().concat());
-            (id, v, rect)
-        });
         let inputs = BakeInputs {
             settings: settings.clone(),
             colliders: colliders
                 .map(|((id, key), rect)| Source { id, key, rect })
                 .collect(),
-            obstacles: obstacles
-                .map(|(id, key, rect)| Source { id, key, rect })
-                .collect(),
-            modifiers: modifiers
-                .into_iter()
-                .map(|(id, key)| {
-                    let rect = key.footprint(&raw);
-                    Source { id, key, rect }
-                })
-                .collect(),
-            links: links
-                .into_iter()
-                .map(|(id, key)| Source {
-                    id,
-                    key,
-                    rect: link_rect(self, &key),
-                })
-                .collect(),
+            obstacles: sources(obstacles, |v| {
+                raster::footprint(&raw, &v.triangles().concat())
+            }),
+            modifiers: sources(modifiers, |v| v.footprint(&raw)),
+            links: sources(links, |k| link_rect(self, k)),
         };
         let mut state = BakeState { raw, inputs, log };
         state.log.record(self.bake_generation, None);

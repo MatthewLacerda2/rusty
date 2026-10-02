@@ -27,6 +27,21 @@ pub(in crate::ecs) struct Core {
     pub children: Vec<u32>,
 }
 
+impl Core {
+    /// The core of `entity` at insertion sequence `seq`, moving its children out.
+    fn take(entity: &mut Entity, seq: u64) -> Self {
+        Self {
+            id: entity.id,
+            seq,
+            active: entity.active,
+            is_static: entity.is_static,
+            layer: entity.layer,
+            parent_id: entity.parent_id,
+            children: std::mem::take(&mut entity.children),
+        }
+    }
+}
+
 /// Attach each `Some` value in `$field` to the builder; a `None` simply
 /// leaves that column unattached. Keeps `build_bundle` under the function
 /// line cap despite the component list being long.
@@ -40,17 +55,9 @@ macro_rules! add_present {
 /// core/name/transform/scripts plus every present optional component. Moves
 /// fields directly off `entity` (a series of partial moves) rather than one
 /// big destructure pattern, to stay well under the function line cap.
-pub(in crate::ecs) fn build_bundle(entity: Entity, seq: u64) -> hecs::EntityBuilder {
+pub(in crate::ecs) fn build_bundle(mut entity: Entity, seq: u64) -> hecs::EntityBuilder {
     let mut b = hecs::EntityBuilder::new();
-    b.add(Core {
-        id: entity.id,
-        seq,
-        active: entity.active,
-        is_static: entity.is_static,
-        layer: entity.layer,
-        parent_id: entity.parent_id,
-        children: entity.children,
-    });
+    b.add(Core::take(&mut entity, seq));
     b.add(entity.name);
     b.add(entity.transform);
     b.add(entity.scripts);

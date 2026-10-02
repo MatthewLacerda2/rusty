@@ -153,6 +153,19 @@ pub struct ApiScopedCtx<'scope> {
     pub event_system: &'scope RefCell<EventSystem>,
 }
 
+/// The navigation namespaces: `Navigation` + `NavMeshAgent`, `NavMeshObstacle`,
+/// `NavMeshModifierVolume` (#460) and `OffMeshLink`.
+fn register_navigation<'lua, 'scope>(
+    lua: &'lua Lua,
+    scope: &mlua::Scope<'lua, 'scope>,
+    ctx: &ApiScopedCtx<'scope>,
+) -> Reg {
+    nav::register(lua, scope, ctx.scene, ctx.nav)?;
+    nav_obstacle::register(lua, scope, ctx.scene)?;
+    nav_modifier::register(lua, scope, ctx.scene)?;
+    offmesh_link::register(lua, scope, ctx.scene, ctx.nav)
+}
+
 /// Register every namespace onto `lua` using `scope`-tied closures that borrow
 /// the engine resources via `ctx`. This is the one place the whole script
 /// surface is wired up, shared by gameplay scripts, the console REPL and
@@ -179,10 +192,7 @@ pub fn register<'lua, 'scope>(
     animator::register(lua, scope, ctx.scene, ctx.console)?;
     input::register_readable(lua, scope, ctx.input)?;
     scene::register(lua, scope, ctx.scene, ctx.scene_path, ctx.is_playing)?;
-    nav::register(lua, scope, ctx.scene, ctx.nav)?;
-    nav_obstacle::register(lua, scope, ctx.scene)?;
-    nav_modifier::register(lua, scope, ctx.scene)?;
-    offmesh_link::register(lua, scope, ctx.scene, ctx.nav)?;
+    register_navigation(lua, scope, ctx)?;
     physics::register(lua, scope, ctx.scene)?;
     physics::register_hitscan(lua, scope, ctx.scene, ctx.physics)?;
     joint::register(lua, scope, ctx.scene)?;
