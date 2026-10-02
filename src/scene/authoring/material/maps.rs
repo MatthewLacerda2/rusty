@@ -35,9 +35,11 @@ pub fn bake_maps(asset: &mut MaterialAsset, name: &str, dir: &Path) -> Result<()
         ));
     }
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let prefix = dir.join(name);
-    let baked = bake_set(recipe, &prefix.to_string_lossy())
-        .map_err(|e| format!("material {name:?} maps: {e}"))?;
+    // Joined with `/`, not `Path::join`: the paths land in the scene file, which must
+    // read the same on every platform (Windows accepts `/` too).
+    let dir_str = dir.to_string_lossy();
+    let prefix = format!("{}/{name}", dir_str.trim_end_matches(['/', '\\']));
+    let baked = bake_set(recipe, &prefix).map_err(|e| format!("material {name:?} maps: {e}"))?;
     fill_empty_maps(asset, &baked);
     Ok(())
 }

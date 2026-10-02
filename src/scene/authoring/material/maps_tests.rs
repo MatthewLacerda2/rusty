@@ -36,7 +36,7 @@ fn dir(test: &str) -> PathBuf {
 }
 
 fn png(dir: &Path, file: &str) -> String {
-    dir.join(file).to_string_lossy().into_owned()
+    format!("{}/{file}", dir.display())
 }
 
 fn width(path: &str) -> u32 {
