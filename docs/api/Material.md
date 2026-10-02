@@ -113,7 +113,8 @@ Material.Rebake("rusty_panel", 2048)          -- iterate at 256, ship at 2048
   same material. The baked PNGs are a cache the recipe regenerates.
 - `Material.Rebake(name [, resolution])` re-bakes from the stored recipe to the same
   paths; a `resolution` given is kept in the recipe for the next rebake. It is an
-  error when `name` is absent or has no `maps`.
+  error when `name` is absent or has no `maps`. The next frame draws the new maps
+  (#689).
 - A map key the material **already holds** is never overwritten by a bake — set by
   hand in the recipe, it wins; one the bake filled points at the same file next time.
 - Everything is checked before a file is written or the library changes: a bad `maps`

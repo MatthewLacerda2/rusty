@@ -21,6 +21,7 @@
 //! - [`ops`] — the op-set grouped by category, plus the per-node dispatcher.
 //! - [`hash`] — dependency-free deterministic value hashing for stochastic ops.
 //! - [`image_buf`] — the linear-RGBA buffer the runner works in (wrapping domain).
+//! - [`written`] — the log of PNGs written, so the renderer re-reads them (#689).
 
 pub mod bake;
 mod bake_set;
@@ -29,6 +30,7 @@ pub mod image_buf;
 pub mod ops;
 pub mod recipe;
 pub mod runner;
+pub mod written;
 
 pub use bake::Slot;
 pub use bake_set::bake_set;

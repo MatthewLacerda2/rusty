@@ -155,10 +155,12 @@ pub fn encode(img: &Image, slot: Slot) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     buf
 }
 
-/// Bake `img` to a `.png` at `path`, encoded for `slot`. Returns the path on success.
+/// Bake `img` to a `.png` at `path`, encoded for `slot`, and note the write so a
+/// renderer that already drew the old file re-reads it (#689). Returns the path.
 pub fn bake_to_png(img: &Image, slot: Slot, path: &str) -> Result<String, String> {
     let buf = encode(img, slot);
     buf.save(path).map_err(|e| e.to_string())?;
+    super::written::note_written(path);
     Ok(path.to_string())
 }
 
