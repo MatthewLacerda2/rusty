@@ -47,6 +47,7 @@ mod trigger_events;
 mod trigger_tests;
 mod world;
 
+pub use character::{can_stand, move_character, CharacterMove};
 pub use collision_events::{CollisionEvents, CollisionPair, Contact};
 pub use joints::JointBreak;
 pub use query::RayHit;

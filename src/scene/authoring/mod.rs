@@ -20,6 +20,7 @@ pub mod backdrop;
 pub mod camera;
 pub mod canvas;
 pub mod canvas_group;
+pub mod character_controller;
 pub mod collider;
 pub mod components;
 pub mod defaults;

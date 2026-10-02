@@ -9,9 +9,9 @@ use super::{Entity, PrefabLink};
 use crate::components::particle::LegacyEmitter;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
-    CanvasGroupComponent, ColliderComponent, ImageComponent, JointComponent,
-    LayoutElementComponent, LayoutGroupComponent, LightComponent, LineComponent, LodGroupComponent,
-    MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent,
+    CanvasGroupComponent, CharacterControllerComponent, ColliderComponent, ImageComponent,
+    JointComponent, LayoutElementComponent, LayoutGroupComponent, LightComponent, LineComponent,
+    LodGroupComponent, MaterialAsset, MaterialComponent, MeshComponent, NavMeshAgentComponent,
     ParticleEmitterComponent, RectMaskComponent, RectTransformComponent, RigidBodyComponent,
     ScriptComponent, SelectableComponent, TextComponent, TextureComponent, TrailComponent,
     TransformComponent, VisualCorrectionComponent,
@@ -81,6 +81,8 @@ pub(super) struct EntityRepr {
     #[serde(default)]
     joint: Option<JointComponent>,
     #[serde(default)]
+    character_controller: Option<CharacterControllerComponent>,
+    #[serde(default)]
     lod_group: Option<LodGroupComponent>,
     #[serde(default)]
     trail: Option<TrailComponent>,
@@ -135,6 +137,7 @@ impl From<EntityRepr> for Entity {
             layout_group: r.layout_group,
             layout_element: r.layout_element,
             joint: r.joint,
+            character_controller: r.character_controller,
             lod_group: r.lod_group,
             trail: r.trail,
             line: r.line,

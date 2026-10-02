@@ -2,16 +2,18 @@
 //! `mod.rs` holds the Lua Script and Animator cards; the physics-flavoured cards
 //! live apart to stay under the size cap: the Collider card in `collider`, the
 //! RigidBody card in `physics`, the NavMesh Agent card in `nav_agent`, the Joint
-//! card in `joint`.
+//! card in `joint`, the CharacterController card in `character_controller`.
 
 use egui_phosphor::regular as icon;
 use std::path::Path;
 
+mod character_controller;
 mod collider;
 mod joint;
 mod nav_agent;
 mod physics;
 
+pub use character_controller::draw_character_controller;
 pub use collider::draw_collider;
 pub use joint::draw_joint;
 pub use nav_agent::draw_nav_agent;
@@ -20,6 +22,13 @@ pub use physics::draw_rigidbody;
 use crate::editor::inspector::components::card::component_card;
 use crate::editor::theme;
 use crate::scene::authoring::animator as animator_ops;
+
+/// The body cards, in inspector order: RigidBody, Joint, CharacterController.
+pub fn draw_bodies(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool) {
+    draw_rigidbody(ui, world, id, is_dirty);
+    draw_joint(ui, world, id, is_dirty);
+    draw_character_controller(ui, world, id, is_dirty);
+}
 
 /// 3D. Script bindings — one card per attached script (#83). An entity can carry
 /// many scripts; each renders as its own removable Lua Script card.
