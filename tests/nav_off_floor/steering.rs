@@ -5,7 +5,7 @@ use glam::Vec3;
 use rusty::navigation::{is_at_target, NavigationGraph};
 use rusty::scene::Scene;
 
-use super::{assert_on_floor, default_scene, planar, FLOOR_HALF};
+use super::{assert_on_floor, default_scene, planar, reach, FLOOR_HALF};
 
 const DT: f32 = 1.0 / 60.0;
 
@@ -19,12 +19,6 @@ fn chase(scene: &mut Scene, graph: &NavigationGraph, enemy: u32, player: Vec3, t
         assert_on_floor(pos, &format!("chasing {player} (frame {frame})"));
     }
     scene.world.transform(enemy).unwrap().position
-}
-
-/// Enemy_1's authored stopping distance (1.5 m since #743): how far short of its
-/// path's end it rests, so every "arrived near X" bound below adds it.
-fn reach(scene: &Scene, enemy: u32) -> f32 {
-    scene.world.nav_agent(enemy).unwrap().stopping_distance
 }
 
 /// At rest, and arrived by the agent's own measure.
