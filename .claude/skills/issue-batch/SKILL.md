@@ -29,13 +29,10 @@ session running the batch is not the one sitting through each run, nor the one
 noticing each draft flip to ready (#664). It **exits on the first hand-back**
 (conflict, red, no run), on the machine failing, or when nothing is left, and
 that exit is what wakes you: read the report, deal with the hand-back, start it
-again. Start it with `--for 70` (#697): background commands are killed at two
-hours, and the deadline is only checked between pull requests, so the one in hand
-can still run up to the per-PR `--deadline` (45 min); 70 + 45 stays under the cap.
-When many coders push at once, runs wait for GitHub runners (2026-10-02: a run's
-first job started 13 minutes in, and #699 was handed back green-but-unfinished at
-45). Raise `--deadline` and lower `--for` together: `--for 50 --deadline 60`. The watch ends itself first, between pull requests, with the last line
-`watch ended: deadline reached …` — relaunch it as it was, nothing to read. It never resolves a conflict: a hand-back naming paths goes back to the
+again. Start it with `--for 70` (#697; `ci-merge` has why 70, and when to
+trade it for a longer per-PR `--deadline`). The watch ends itself first, between
+pull requests, with the last line `watch ended: deadline reached …` — relaunch it
+as it was, nothing to read. It never resolves a conflict: a hand-back naming paths goes back to the
 branch's author. `make queue PRS="a b c"` still takes named pull requests in the
 order given (a hand-back there skips the entry and the rest carry on), and
 `ARGS=--dry-run` shows what either would do and writes nothing.
@@ -328,6 +325,38 @@ Decisions: <anything already settled, or "none">.
 No helper script fills it: `RemoteTrigger` is a tool the orchestrator calls, not
 an API a script can reach, and five slots don't need one.
 
+### What the orchestrator keeps, and where
+
+Lessons scorsese's batches paid for (MatthewLacerda2/scorsese, 2026-10-02/03);
+they hold for any repo running this workflow.
+
+- **GitHub is the batch's state.** Open PRs, their draft/ready state and
+  comments, plus `RemoteTrigger list` for the routines, are enough to resume a
+  batch from nothing. The orchestrator's own notes (a routine table, which coder
+  holds which issue) are conveniences. Never keep anything **only** in `/tmp`:
+  the scratchpad lives there, and a reboot wipes it. A machine crash mid-batch
+  on scorsese took its queue list and routine table with it, and the batch
+  resumed from GitHub alone.
+- **Never wait on another process by `pgrep -f <text>`.** The waiting shell's
+  own command line contains the text, so it waits on itself forever (about 25
+  minutes lost on 2026-10-02). Wait on a PID you hold, or on the watch's own
+  exit. With one `make queue ARGS=--watch` there is nothing to chain: it takes
+  every ready PR, and the order lives on GitHub, not in a list.
+- **Watch each PR's head commit, not only its draft/ready state.** A rebased PR
+  stays *ready* the whole time, so a watcher keyed on state never sees the push.
+  The queue's watch keys on the head for exactly this reason; your own reading
+  of a re-pushed PR still waits for the coder's PR comment ("rebased, gates
+  green"). If a push should *not* be retaken yet, flip the PR back to draft
+  first: rusty's queue takes ready PRs, there is no `queue` label.
+- **Merge the broad PR last among those that share lists.** A PR that touches
+  every registry (a new first-class component, a new namespace) sends every
+  sibling appending to the same lists back with a conflict if it lands first.
+  On scorsese, 2026-10-03, one broad PR landing first handed back three small
+  ones, rebased one after another at about an hour apiece; small ones first
+  would have cost one hand-back, on the broad PR. Until the watch orders by
+  conflicts itself (#753), hold the broad PR in draft until its small siblings
+  have merged.
+
 ## Starting
 
 - Run `make blockers ARGS=--fix` once at the start of a batch: it records every
@@ -366,11 +395,11 @@ branch when `main` moves and cancels its own runs as it does, so a bot pull
 request often reads *not mergeable* between rebases; `make queue` never
 force-pushes one — it asks `@dependabot rebase` and waits for the new head.
 
-**`planning` is the absolute stop.** It means *not yet*, and no amount of the issue
-looking ready overrides it; `human` is the same in practice. Everything else is
-startable — **except an issue filed minutes ago that is still settling**: rusty
-does not file-and-start unless the work is a direct consequence of an
-already-decided issue. When in doubt about a fresh one, it is the user's call.
+**A stage label is the only absolute stop.** `planning` and `human` mean *not
+yet*, and no amount of the issue looking ready overrides that. Everything else is
+startable the moment it exists, including an issue filed a minute ago. An issue
+filed mid-batch can outrank the work in flight: when a new label-priority leader
+appears, it is the one started next.
 
 ## Briefing a subagent
 
