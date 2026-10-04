@@ -232,16 +232,18 @@ struct Pass {
     ground: Option<Vec3>,
 }
 
-/// Whether a pass that only touched floor lost its horizontal travel. A floor
-/// never blocks walking, but rapier 0.36's controller can: against a near-flat
-/// floor its "no slipping on a walkable slope" rule reads float noise in the
-/// downward (gravity) part as a slip and drops the whole slide, stalling the
-/// character for a tick. Without the downward part there is nothing to misread,
-/// and snap-to-ground still keeps the capsule on the floor.
+/// Whether a pass lost horizontal travel. A floor never blocks walking, but
+/// rapier 0.36's controller can: against a near-flat floor its "no slipping on
+/// a walkable slope" rule reads float noise in the downward (gravity) part as a
+/// slip and drops the whole slide, stalling the character for a tick, on open
+/// ground and sliding along a wall alike. Without the downward part there is
+/// nothing to misread, and snap-to-ground still keeps the capsule on the floor.
+/// A wall that took the travel takes it again on the rerun, so the rerun only
+/// ever gives back what the floor ate.
 fn stalled(motion: Vec3, pass: &Pass) -> bool {
     let wanted = Vec3::new(motion.x, 0.0, motion.z).length();
     let got = Vec3::new(pass.translation.x, 0.0, pass.translation.z).length();
-    pass.flags & (COLLIDED_SIDES | COLLIDED_ABOVE) == 0 && got < wanted * 0.99
+    got < wanted * 0.99
 }
 
 /// `motion` without its horizontal push into the steep surface `normal`.
