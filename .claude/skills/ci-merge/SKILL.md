@@ -257,7 +257,7 @@ otherwise fail at merge time:
   card that is now routed. Burn baselines down; never add to one.
 
 And one that is not a gate but bites the same way: **a branch adding a new
-top-level `src/<dir>/` must add it to the `UNFLOORED` list in `ci.yml`'s coverage
+top-level `src/<dir>/` must add it to the `UNFLOORED` list in `coverage.yml`'s
 ratchet step.** A missing directory leaks into every floored module's number —
 `audio`, `procgen` and `shadergen` each did exactly that.
 

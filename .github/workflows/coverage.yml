@@ -1,0 +1,112 @@
+name: coverage
+# The coverage ratchet, weekly (#750). A signal, never a gate (CLAUDE.md,
+# *Gates vs. signals*): it ratchets the floored modules — the deterministic sim
+# (app/scripting/physics/navigation) plus the script-facing `api` surface
+# (#350) — against the committed floors in `coverage-baseline.txt`, and a drop
+# below a floor is surfaced in the run summary without failing anything. The
+# platform layer (main.rs, render, dev) is exempt — see docs/testing.md.
+#
+# Its own workflow, off pull requests and off every merge (#750): it used to
+# run after each push to `main` (~15 min), and a batch merging ~40 pull
+# requests a day paid for ~40 ratchet tables nobody read in between. The
+# per-PR diff-cover comment went with it. Dispatch it on a branch to measure
+# that branch: `gh workflow run coverage.yml --ref <branch>`.
+#
+# `schedule:` fires only from the default branch, and GitHub disables it after
+# 60 days without repository activity; check the Actions tab if a week passes
+# with no run.
+on:
+  # Mondays, 05:23 UTC: off the hour, clear of `ci.yml`'s nightly `deny`
+  # (03:07), and two days after `mutants-sweep.yml` starts (Saturdays), so the
+  # two never cold-build on the account's runners at once.
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    # A red run means the instrument broke (llvm-cov, a flag), never that a
+    # floor dropped: the ratchet step does not exit non-zero on a regression.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show
+      - name: Add llvm-tools-preview (required by cargo-llvm-cov)
+        run: rustup component add llvm-tools-preview
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          # Its own key: instrumented builds carry different RUSTFLAGS. Read
+          # weekly, inside GitHub's seven-day eviction, so it stays warm.
+          shared-key: coverage
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: System libs for winit/wgpu builds
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+      # Lavapipe here too (#489), so the whole-crate summary measures render code
+      # the way build-test exercises it.
+      - name: Software Vulkan driver (lavapipe)
+        run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
+      - name: Install cargo-llvm-cov and cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,cargo-nextest
+      - name: Measure coverage (both feature sets, accumulated)
+        # Under nextest like build-test (#484), so the gpu test group applies here
+        # too; verified to give the same totals as `cargo llvm-cov` (test).
+        run: |
+          cargo llvm-cov clean --workspace
+          cargo llvm-cov nextest --no-report --locked
+          cargo llvm-cov nextest --no-report --features dev --locked
+      - name: Whole-crate summary
+        run: |
+          {
+            echo '### Coverage summary (whole crate)'
+            echo ''
+            echo '```'
+            cargo llvm-cov report --summary-only
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Ratchet module coverage against the committed baseline
+        # Per-module line coverage vs the floors in coverage-baseline.txt. The
+        # `regex` crate llvm-cov uses has no look-around, so each module is isolated
+        # by ignoring the other floored modules plus every unfloored src directory;
+        # `src/[^/]+\.rs` drops every top-level src file (main/lib/settings/…) so
+        # none can pollute the number (the #163 class of bug). UNFLOORED must list
+        # EVERY unfloored src/ directory — a new module missing from it leaks into
+        # every floored measurement (audio/procgen/shadergen had done exactly that).
+        # Informational: a drop below a floor is flagged but the step never exits
+        # non-zero (and the job is continue-on-error regardless), honouring
+        # "inform on quality, never block".
+        run: |
+          FLOORED='app scripting physics navigation api'
+          UNFLOORED='render|dev|asset|editor|components|core|ecs|scene|time|audio|procgen|shadergen|ui|shell'
+          {
+            echo '### Module coverage ratchet (informational, non-blocking)'
+            echo ''
+            echo '| Module | Floor | Current | Status |'
+            echo '|---|---|---|---|'
+            regressed=0
+            while read -r module floor; do
+              case "$module" in ''|\#*) continue ;; esac
+              others=$(echo "$FLOORED" \
+                | tr ' ' '\n' | grep -v "^${module}$" | paste -sd'|')
+              cur=$(cargo llvm-cov report --json --summary-only \
+                --ignore-filename-regex "src/(${others}|${UNFLOORED})/|src/[^/]+\.rs|src/bin/|tools/" \
+                | jq '.data[0].totals.lines.percent')
+              status='✅'
+              if awk "BEGIN{exit !(${cur} < ${floor})}"; then status='❌ regression'; regressed=1; fi
+              printf '| %s | %.2f | %.2f | %s |\n' "$module" "$floor" "$cur" "$status"
+            done < coverage-baseline.txt
+            echo ''
+            if [ "$regressed" = 1 ]; then
+              echo '> A module dropped below its committed floor. Informational — add'
+              echo '> tests, or, if the drop is intended, lower it in `coverage-baseline.txt`.'
+            else
+              echo '> All floored modules at or above their committed floor.'
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
