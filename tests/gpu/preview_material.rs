@@ -65,9 +65,9 @@ fn the_authored_shader_draws_with_its_stored_params() {
         r#"Shader.Bake({{ pass = "surface", name = {name:?}, blocks = {{ {{ id = "hit_flash" }} }} }})
            local id = Scene.CreateEntity("E")
            Material.SetShader(id, {name:?})
-           Material.SetShaderParam(id, "hit_flash.color", {{0, 1, 0}})
-           Material.SetShaderParam(id, "hit_flash.amount", 1)
-           MAT = "entity_" .. id .. "_material""#
+           MAT = "entity_" .. id .. "_material"
+           Material.SetAssetShaderParam(MAT, "hit_flash.color", {{0, 1, 0}})
+           Material.SetAssetShaderParam(MAT, "hit_flash.amount", 1)"#
     ))
     .expect("bake and assign the flash shader");
     let key = sess.eval("return MAT").expect("material key");

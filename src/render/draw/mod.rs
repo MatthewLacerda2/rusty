@@ -111,6 +111,11 @@ impl Renderer {
         self.refresh_textures();
         self.upload_scene_meshes(scene);
         self.surface_shaders.refresh();
+        // An entity whose last shader-param override was cleared draws with its
+        // material's shared group again; free the buffer and group it owned (#670).
+        let overrides = &scene.shader_overrides;
+        self.materials
+            .release_entities(scene.id(), |id| overrides.has(id));
         // The material maps the shader samples (albedo #201, metallic/roughness #202),
         // collected paths-only first to end the scene borrow before uploading.
         for path in active_material_map_paths(scene) {

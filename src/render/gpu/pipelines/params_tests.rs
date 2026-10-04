@@ -1,6 +1,7 @@
-//! Runtime shader params on the GPU (#399): a hit-flash amount set from Lua changes
-//! the pixel on the next frame, through a buffer write alone — no module rebuild, no
-//! new bind group — and each material keeps its own values. Skips with no adapter.
+//! Runtime shader params on the GPU (#399): a hit-flash amount set from Lua on a
+//! material asset changes the pixel on the next frame, through a buffer write alone —
+//! no module rebuild, no new bind group — and each material keeps its own values.
+//! Skips with no adapter.
 
 use std::cell::RefCell;
 
@@ -17,11 +18,16 @@ pub(super) const RES: u32 = 32;
 
 /// A red hit-flash surface shader baked where scripts and the renderer resolve it,
 /// under a name unique to this run; removed on drop.
-struct Flash(String);
+pub(super) struct Flash(pub(super) String);
 
 impl Flash {
-    fn bake() -> Self {
-        let name = format!("test_hit_flash_{}", std::process::id());
+    pub(super) fn bake() -> Self {
+        Self::bake_as("")
+    }
+
+    /// Baked under a name carrying `tag`, so tests sharing a process never share it.
+    pub(super) fn bake_as(tag: &str) -> Self {
+        let name = format!("test_hit_flash{tag}_{}", std::process::id());
         let params = [("color".to_string(), ParamValue::Vector(vec![1.0, 0.0, 0.0]))];
         let recipe = ShaderRecipe {
             pass: PassKind::Surface,
@@ -101,7 +107,9 @@ fn gpu_a_hit_flash_set_from_lua_changes_the_next_frame_by_a_buffer_write() {
 
     lua(
         &scene,
-        &format!(r#"Material.SetShaderParam({left}, "hit_flash.amount", 1)"#),
+        &format!(
+            r#"Material.SetAssetShaderParam("entity_{left}_material", "hit_flash.amount", 1)"#
+        ),
     );
     let [l1, r1] = halves(&mut renderer, &scene.borrow());
     assert!(
@@ -122,7 +130,9 @@ fn gpu_a_hit_flash_set_from_lua_changes_the_next_frame_by_a_buffer_write() {
 
     lua(
         &scene,
-        &format!(r#"Material.SetShaderParam({left}, "hit_flash.amount", 0)"#),
+        &format!(
+            r#"Material.SetAssetShaderParam("entity_{left}_material", "hit_flash.amount", 0)"#
+        ),
     );
     assert_eq!(
         halves(&mut renderer, &scene.borrow())[0],
@@ -130,3 +140,6 @@ fn gpu_a_hit_flash_set_from_lua_changes_the_next_frame_by_a_buffer_write() {
         "the flash fades back"
     );
 }
+
+#[path = "overrides_tests.rs"]
+mod overrides_tests;
