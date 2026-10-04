@@ -87,6 +87,16 @@ The files where everything collides are the ones every feature appends to:
 
 Two branches landing in any of those at once is the case to avoid.
 
+**`Cargo.toml` and `Cargo.lock` get one owner per wave.** Every dependency change
+rewrites the lockfile, and a lockfile conflict always needs a compile to trust, so
+it goes back to a coder, never a quick hand-fix. On 2026-10-04 the graphics-stack
+upgrade (#333, PR #767) was handed back three times. A lockfile change merged just
+before each rebase landed (mlua, then rapier, then #744's inspector rows), and each
+rebase was a full cold build. While a broad dependency branch is in flight or being
+rebased, name it the owner in every sibling's brief ("stay out of `Cargo.toml`"),
+and hold other lockfile-touching branches in draft until it merges. The next wave
+followed the rule, and the glam upgrade (#775) landed first time.
+
 ## Group the work before splitting it
 
 **Split by responsibility, not by parallelism.** If a parent's sub-issues all
