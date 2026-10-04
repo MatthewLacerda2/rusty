@@ -5,12 +5,27 @@ use glam::{Mat4, Vec3, Vec4};
 
 use super::{bounds, maps, record, NO_LAYER};
 use crate::components::{DecalBlend, MaterialAsset};
-use crate::scene::decal::{Decal, DecalSpec};
+use crate::scene::decal::{Decal, DecalPose, DecalSpec};
 
 const NONE: [u32; 4] = [NO_LAYER; 4];
 
 fn wall_hit(spec: DecalSpec) -> Decal {
     Decal::from_hit(Vec3::new(1.0, 2.0, 0.0), Vec3::Z, spec)
+}
+
+/// The record of `decal` at its spawn box, whole.
+fn rec(decal: &Decal, material: Option<&MaterialAsset>, layers: [u32; 4]) -> super::GpuDecal {
+    record(decal, &DecalPose::unowned(decal), material, layers)
+}
+
+#[test]
+fn the_fade_scales_the_coverage_that_scales_every_weight() {
+    let decal = wall_hit(DecalSpec::default());
+    let pose = DecalPose {
+        opacity: 0.25,
+        ..DecalPose::unowned(&decal)
+    };
+    assert_eq!(record(&decal, &pose, None, NONE).color[3], 0.25);
 }
 
 #[test]
@@ -20,7 +35,7 @@ fn a_decal_without_a_material_changes_only_the_albedo_by_its_texture() {
         texture: Some("hole.png".into()),
         ..Default::default()
     });
-    let r = record(&decal, None, NONE);
+    let r = rec(&decal, None, NONE);
     assert_eq!(r.color, [1.0, 0.0, 0.0, 0.5]);
     assert_eq!((r.right[3], r.up[3]), (1.0, 0.0), "albedo on, normal off");
     assert_eq!(&r.surface[2..], &[0.0, 0.0], "metallic and roughness off");
@@ -54,7 +69,7 @@ fn a_material_decal_carries_its_factors_maps_and_clamped_weights() {
         material: Some("blood".into()),
         ..Default::default()
     });
-    let r = record(&decal, Some(&blood), [3, 4, NO_LAYER, 5]);
+    let r = rec(&decal, Some(&blood), [3, 4, NO_LAYER, 5]);
     assert_eq!(r.color, [0.5, 0.0, 0.0, 0.4], "material colour × tint");
     assert_eq!(r.surface, [0.1, 0.2, 1.0, 1.0], "weights clamp to [0, 1]");
     assert_eq!(r.up[3], 0.0, "normal weight");
@@ -81,7 +96,7 @@ fn the_box_straddles_the_hit_and_projects_into_the_surface() {
         rotation_deg: 90.0,
         ..Default::default()
     });
-    let r = record(&decal, None, NONE);
+    let r = rec(&decal, None, NONE);
     let to_decal = Mat4::from_cols_array(&r.world_to_decal);
     let hit = to_decal.transform_point3(Vec3::new(1.0, 2.0, 0.0));
     assert!(hit.length() < 1e-5, "the hit is the box's centre: {hit}");
@@ -102,7 +117,7 @@ fn the_box_straddles_the_hit_and_projects_into_the_surface() {
 
 #[test]
 fn the_angle_fade_runs_fifteen_degrees_past_the_threshold() {
-    let r = record(&wall_hit(DecalSpec::default()), None, NONE);
+    let r = rec(&wall_hit(DecalSpec::default()), None, NONE);
     assert!((r.forward[3] - 60f32.to_radians().cos()).abs() < 1e-6);
     assert!((r.fade[1] - 75f32.to_radians().cos()).abs() < 1e-6);
     let flat = MaterialAsset {
@@ -112,7 +127,7 @@ fn the_angle_fade_runs_fifteen_degrees_past_the_threshold() {
         },
         ..MaterialAsset::default()
     };
-    let r = record(&wall_hit(DecalSpec::default()), Some(&flat), NONE);
+    let r = rec(&wall_hit(DecalSpec::default()), Some(&flat), NONE);
     assert!(r.fade[1].abs() < 1e-6, "the fade never runs past 90°");
 }
 
@@ -123,7 +138,7 @@ fn the_bounding_sphere_holds_the_whole_box() {
         depth: 1.0,
         ..Default::default()
     });
-    let (centre, radius) = bounds(&decal);
+    let (centre, radius) = bounds(&DecalPose::unowned(&decal));
     assert_eq!(centre, decal.position);
     assert!(
         (radius - 1.5).abs() < 1e-6,

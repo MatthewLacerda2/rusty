@@ -5,7 +5,7 @@
 use glam::Vec3;
 
 use crate::components::{DecalBlend, MaterialAsset};
-use crate::scene::decal::Decal;
+use crate::scene::decal::{Decal, DecalPose};
 
 /// `GpuDecal::layers` for a map the decal does not have.
 pub(crate) const NO_LAYER: u32 = u32::MAX;
@@ -54,15 +54,18 @@ pub(crate) fn maps(decal: &Decal, material: Option<&MaterialAsset>) -> DecalMaps
     }
 }
 
-/// `decal`'s GPU record, dressed by `material` (the library material it names, if
-/// any) and sampling the atlas `layers` of its [`maps`].
+/// `decal`'s GPU record at `pose` (#639), dressed by `material` (the library
+/// material it names, if any) and sampling the atlas `layers` of its [`maps`]. The
+/// pose's fade scales the coverage (`color.a`), which scales every blend weight.
 pub(crate) fn record(
     decal: &Decal,
+    pose: &DecalPose,
     material: Option<&MaterialAsset>,
     layers: [u32; 4],
 ) -> GpuDecal {
     let blend = material.map_or(DecalBlend::ALBEDO_ONLY, |m| m.decal.clamped());
-    let tint = decal.color;
+    let [r, g, b, a] = decal.color;
+    let tint = [r, g, b, a * pose.opacity];
     let (color, metallic, roughness) = match material {
         Some(m) => {
             let c = m.base_color;
@@ -75,11 +78,14 @@ pub(crate) fn record(
         }
         None => (tint, 0.0, 0.5),
     };
-    let axis = |v: Vec3, w: f32| (decal.rotation * v).extend(w).to_array();
+    let axis = |v: Vec3, w: f32| {
+        let along = pose.model.transform_vector3(v).normalize_or_zero();
+        along.extend(w).to_array()
+    };
     let fade_start = blend.angle_fade;
     let fade_end = (fade_start + ANGLE_FADE_SPAN).min(90.0);
     GpuDecal {
-        world_to_decal: decal.model_matrix().inverse().to_cols_array(),
+        world_to_decal: pose.model.inverse().to_cols_array(),
         right: axis(Vec3::X, blend.albedo),
         up: axis(Vec3::Y, blend.normal),
         forward: axis(Vec3::Z, fade_start.to_radians().cos()),
@@ -90,9 +96,9 @@ pub(crate) fn record(
     }
 }
 
-/// The sphere that bounds `decal`'s box, for cluster binning: centre and radius.
-pub(crate) fn bounds(decal: &Decal) -> (Vec3, f32) {
-    (decal.position, decal.size.length() * 0.5)
+/// The sphere that bounds the box at `pose`, for cluster binning: centre and radius.
+pub(crate) fn bounds(pose: &DecalPose) -> (Vec3, f32) {
+    (pose.centre(), pose.radius())
 }
 
 #[cfg(test)]

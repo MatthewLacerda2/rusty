@@ -10,13 +10,20 @@
 //!
 //! **Order.** Decals blend in spawn order (FIFO): a newer decal lands over an older
 //! one where they overlap, and the cap evicts the oldest first.
+//!
+//! **Lifecycle (#639).** A decal may stick to an *owner* entity (its box is kept in
+//! the owner's space and follows it), may have a lifetime with a fade-out, and has
+//! an id a script can remove it by. Ageing runs on the fixed sim tick
+//! ([`DecalSet::tick`]), never the wall clock; the registry is [`DecalSet`].
 
 use glam::camera::rh::view::look_to_mat4;
 use glam::{Mat4, Quat, Vec3};
 
-/// Maximum decals drawn per frame. Bullet holes/scorch accumulate, but old ones
-/// are evicted (FIFO) so the pass stays bounded; matches a typical FPS budget.
-pub const MAX_DECALS: usize = 256;
+mod pose;
+mod registry;
+
+pub use pose::DecalPose;
+pub use registry::{DecalSet, EVICTION_FADE, EVICTION_HEADROOM, MAX_DECALS};
 
 /// How a decal is stamped, beyond where: everything `Decals.Spawn` takes after the
 /// hit point and normal. [`Default`] is the positional form's defaults.
@@ -35,6 +42,13 @@ pub struct DecalSpec {
     /// The decal material (#638): a library material whose maps and `decal` block
     /// say what the decal changes. `None` changes only the albedo, by `texture`.
     pub material: Option<String>,
+    /// The entity the decal sticks to (#639): its box follows that entity's world
+    /// matrix, hides while it is inactive and is dropped when it is destroyed.
+    pub owner: Option<u32>,
+    /// Seconds of sim time the decal lives, or `None` to live until evicted.
+    pub lifetime: Option<f32>,
+    /// Seconds over which it fades out at the end of its `lifetime`.
+    pub fade: f32,
 }
 
 impl Default for DecalSpec {
@@ -46,6 +60,9 @@ impl Default for DecalSpec {
             color: [1.0; 4],
             texture: None,
             material: None,
+            owner: None,
+            lifetime: None,
+            fade: 0.0,
         }
     }
 }
@@ -53,9 +70,12 @@ impl Default for DecalSpec {
 /// One box-projector decal: an oriented volume + a texture projected through it.
 /// Spawned from a surface hit (point + normal); the box is oriented so its local
 /// −Z (the projection axis) points *into* the surface along the hit normal.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Decal {
-    /// World-space centre of the projector box.
+    /// The handle `Decals.Spawn` returns (#639); unique for the scene's life.
+    pub id: u32,
+    /// World-space centre of the projector box *at spawn*; an owned decal's box
+    /// is resolved each frame from its [`DecalOwner`] instead.
     pub position: Vec3,
     /// Box orientation. Local −Z is the projection direction (into the surface).
     pub rotation: Quat,
@@ -68,6 +88,25 @@ pub struct Decal {
     pub texture: Option<String>,
     /// The library material this decal stamps (#638), by name; see [`DecalSpec`].
     pub material: Option<String>,
+    /// The entity it sticks to and its box in that entity's space, if any.
+    pub owner: Option<DecalOwner>,
+    /// Sim seconds since it was stamped.
+    pub age: f32,
+    /// Age at which it is gone, if it ever is.
+    pub lifetime: Option<f32>,
+    /// Seconds of fade-out that end at `lifetime`.
+    pub fade: f32,
+    /// Fading out early (evicted by the cap or removed with a fade): no longer
+    /// counted against [`MAX_DECALS`].
+    pub retiring: bool,
+}
+
+/// What an owned decal sticks to: the entity, and the box (the unit cube's
+/// object→owner matrix) in that entity's space.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DecalOwner {
+    pub entity: u32,
+    pub local: Mat4,
 }
 
 impl Decal {
@@ -93,18 +132,53 @@ impl Decal {
         let depth = spec.depth.max(1.0e-4);
         let size = spec.size.max(1.0e-4);
         Self {
+            id: 0,
             position: point,
             rotation: rot,
             size: Vec3::new(size, size, depth),
             color: spec.color,
             texture: spec.texture,
             material: spec.material,
+            owner: None,
+            age: 0.0,
+            lifetime: spec.lifetime.map(|l| l.max(0.0)),
+            fade: spec.fade.max(0.0),
+            retiring: false,
         }
     }
 
     /// Object→world matrix mapping the unit cube `[-0.5, 0.5]³` to this box.
     pub fn model_matrix(&self) -> Mat4 {
         Mat4::from_scale_rotation_translation(self.size, self.rotation, self.position)
+    }
+
+    /// How much of the decal is left, `1` whole to `0` gone: the fade-out over the
+    /// last `fade` seconds of its lifetime.
+    pub fn opacity(&self) -> f32 {
+        match self.lifetime {
+            Some(end) if self.fade > 0.0 => ((end - self.age) / self.fade).clamp(0.0, 1.0),
+            Some(end) if self.age >= end => 0.0,
+            _ => 1.0,
+        }
+    }
+
+    /// Whether its lifetime has run out.
+    pub fn expired(&self) -> bool {
+        self.lifetime.is_some_and(|end| self.age >= end)
+    }
+
+    /// Start fading out now, gone in `seconds`, from wherever its opacity is (so a
+    /// decal already half faded keeps fading from half, never pops back to whole).
+    /// A decal already due to end sooner keeps its own schedule.
+    pub fn retire(&mut self, seconds: f32) {
+        self.retiring = true;
+        let seconds = seconds.max(0.0);
+        let end = self.age + seconds;
+        if self.lifetime.is_some_and(|own| own <= end) {
+            return;
+        }
+        self.fade = seconds / self.opacity().max(1.0e-3);
+        self.lifetime = Some(end);
     }
 }
 
@@ -117,20 +191,6 @@ fn quat_look_along(dir: Vec3) -> Quat {
     Quat::from_mat4(&look_to_mat4(Vec3::ZERO, f, up)).inverse()
 }
 
-impl crate::scene::Scene {
-    /// Spawn a box-projector decal at a surface hit (the point + outward normal
-    /// already produced by `Physics.Raycast`), dressed by `spec`. The registry is a
-    /// bounded FIFO so spam can't grow it without limit.
-    pub fn spawn_decal(&mut self, point: Vec3, normal: Vec3, spec: DecalSpec) {
-        let decal = Decal::from_hit(point, normal, spec);
-        if self.decals.len() >= MAX_DECALS {
-            self.decals.remove(0);
-        }
-        self.decals.push(decal);
-    }
-
-    /// Drop every live decal (e.g. on level reset).
-    pub fn clear_decals(&mut self) {
-        self.decals.clear();
-    }
-}
+#[cfg(test)]
+#[path = "decal_tests.rs"]
+mod tests;

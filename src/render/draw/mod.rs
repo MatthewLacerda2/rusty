@@ -46,13 +46,13 @@ impl Renderer {
         // Build + write the camera-independent lighting uniform once. The reflection
         // probe is picked relative to the primary camera (#244).
         self.upload_lighting(scene, camera.position);
-        // Every decal and its maps, once for the whole frame (#638); each camera
-        // bins them into its clusters.
-        self.upload_decals(scene);
-
         // Fill the world-matrix store once for the whole frame (#331): every pass and
         // camera reads it instead of walking parent chains; rendering mutates nothing.
         scene.refresh_world_matrices();
+
+        // Every decal and its maps, once for the whole frame (#638); each camera
+        // bins them into its clusters. After the store: owned decals read it (#639).
+        self.upload_decals(scene);
     }
 
     /// Renders the 3D scene into `view` (a per-view target/depth/post-FX bundle, #355),

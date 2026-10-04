@@ -85,8 +85,9 @@ pub struct Scene {
     /// Runtime box-projector decals (bullet holes, scorch, blood splats). These are
     /// ephemeral *visual* state spawned from raycast hits, NOT serialized scene
     /// data — the decal renderer reads them each frame and projects them onto the
-    /// surfaces they overlap. Bounded FIFO (oldest evicted past `MAX_DECALS`).
-    pub decals: Vec<crate::scene::decal::Decal>,
+    /// surfaces they overlap. Bounded FIFO (the oldest fades out past `MAX_DECALS`);
+    /// aged on the fixed tick (#639).
+    pub decals: crate::scene::decal::DecalSet,
     /// Scene-level light-probe dataset (#240): probe POSITIONS + grid layout live in
     /// the scene document; their baked L2 SH irradiance lives in the
     /// `<scene>.lighting.json` sidecar. Dynamic (non-static) objects sample the
@@ -138,7 +139,7 @@ impl Default for Scene {
             layers: LayerRegistry::default(),
             collision_matrix: CollisionMatrix::default(),
             materials: BTreeMap::new(),
-            decals: Vec::new(),
+            decals: Default::default(),
             probes: crate::scene::lighting::probe::ProbeVolume::new(),
             reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet::new(),
             pending_destroy: Vec::new(),

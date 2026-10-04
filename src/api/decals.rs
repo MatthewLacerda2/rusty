@@ -4,7 +4,8 @@
 //! scorch, blood splats). `Spawn` stamps a projector at a world point + surface
 //! normal — exactly the pair `Physics.Raycast` already hands a
 //! script — so decals stay decoupled from gameplay: the engine never decides
-//! *when* to mark a surface, the script does. `Clear` wipes them (level reset).
+//! *when* to mark a surface, the script does. `Spawn` returns the decal's id, which
+//! `Remove` takes (#639); `Clear` wipes them all (level reset).
 //!
 //! A decal is a projected *volume*, not a particle: gibs/blood spray are the
 //! separate GPU particle system (`Particles`), triggered on the same hit.
@@ -38,8 +39,9 @@ pub fn register<'scope>(
     // default 0.5), `texture` (albedo path, default a solid square), `rotation_deg`
     // (spin around the projection axis), and an r,g,b,a tint (default opaque white).
     // The box depth tracks `size` so the projector reaches through typical geometry.
-    // The `opts` table form takes the same values by name plus `depth` and the
-    // decal `material` (#638), the library material the decal stamps.
+    // The `opts` table form takes the same values by name plus `depth`, the decal
+    // `material` (#638), and its lifecycle (#639): the `owner` entity it sticks to,
+    // its `lifetime` and its `fade`. Either form returns the decal's id.
     put(
         &table,
         "Spawn",
@@ -57,12 +59,27 @@ pub fn register<'scope>(
                     )));
                 }
             }
-            scene.spawn_decal(point, normal, spec);
-            Ok(())
+            let owner = spec.owner;
+            scene.spawn_decal(point, normal, spec).ok_or_else(|| {
+                mlua::Error::RuntimeError(format!(
+                    "Decals.Spawn: no entity {} to stick to",
+                    owner.unwrap_or_default()
+                ))
+            })
         }),
     )?;
 
-    // Decals.Count() — number of live decals (after FIFO eviction).
+    // Decals.Remove(id, [fade]) — remove one decal now, or fade it out over `fade`
+    // seconds. Returns whether a live decal had that id.
+    put(
+        &table,
+        "Remove",
+        scope.create_function(|_, (id, fade): (u32, Option<f32>)| {
+            Ok(scene.borrow_mut().decals.remove(id, fade.unwrap_or(0.0)))
+        }),
+    )?;
+
+    // Decals.Count() — number of live decals, counting any still fading out.
     put(
         &table,
         "Count",
@@ -107,15 +124,18 @@ fn spec_from_positional(args: &[mlua::Value]) -> DecalSpec {
         rotation_deg: opt_num(args, 8).unwrap_or(0.0),
         color: [9, 10, 11, 12].map(|i| opt_num(args, i).unwrap_or(1.0)),
         texture: opt_str(args, 7),
-        material: None,
+        ..DecalSpec::default()
     }
 }
 
 /// The keys an `opts` table may hold.
-const OPTS: [&str; 6] = ["size", "depth", "rotation", "color", "texture", "material"];
+const OPTS: [&str; 9] = [
+    "size", "depth", "rotation", "color", "texture", "material", "owner", "lifetime", "fade",
+];
 
-/// The `opts` table form: the positional values by name, plus `depth` and the
-/// decal `material`. An unknown key is an error naming the valid ones.
+/// The `opts` table form: the positional values by name, plus `depth`, the decal
+/// `material` and the lifecycle (`owner`, `lifetime`, `fade`). An unknown key is an
+/// error naming the valid ones.
 fn spec_from_opts(opts: &mlua::Table) -> mlua::Result<DecalSpec> {
     for pair in opts.pairs::<String, mlua::Value>() {
         let (key, _) = pair?;
@@ -140,6 +160,9 @@ fn spec_from_opts(opts: &mlua::Table) -> mlua::Result<DecalSpec> {
         color,
         texture: opts.get("texture")?,
         material: opts.get("material")?,
+        owner: opts.get("owner")?,
+        lifetime: opts.get("lifetime")?,
+        fade: opts.get::<Option<f32>>("fade")?.unwrap_or(0.0),
     })
 }
 
