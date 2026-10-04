@@ -78,6 +78,7 @@ fn gather_takes_static_meshes_and_baked_in_lights_only() {
             range: 10.0,
             inner_cone: 0.0,
             outer_cone: 0.0,
+            cast_shadows: false,
             mode,
         };
         scene.world.set_light(id, Some(light));

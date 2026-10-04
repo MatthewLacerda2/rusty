@@ -10,6 +10,8 @@ inspector) routes through this exact same path, so the button and this verb neve
 | Function | Signature | Returns |
 |---|---|---|
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion], [perAxisCap])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
+| `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed])` | number of lightmaps written |
+| `Lighting.ClearLightmaps` *(dev-only)* | `()` | — |
 
 **Auto-placement** (deterministic — a pure function of the static scene, no RNG/clock,
 so the same level always yields the same layout):
@@ -35,3 +37,36 @@ Like the individual bakes, it is **dev-only** and needs a GPU/software adapter; 
 the placement still runs but the bakes skip gracefully (returns `false`, never errors —
 except reflections need a saved scene path to write their cubemaps beside). Save the scene
 afterward to persist the baked SH (`<scene>.lighting.json`) and the cubemap paths.
+
+### Lightmaps
+
+`Lighting.BakeLightmaps()` (#438) bakes per-texel lighting for **static geometry**: bounce
+light, the sky, emissive surfaces, and the direct light of `Baked` lights (see the light
+**Mode** in [`Light`](Light.md)). It is Unity's *Generate Lighting* for lightmaps; the
+editor's **"Bake Lightmaps"** button (scene inspector, next to "Bake Lighting") runs the
+exact same path.
+
+- **Who gets one.** Every active, **static**, opaque mesh with a **second UV map** (the
+  lightmap UV, glTF `TEXCOORD_1`). The built-in **Box** and **Plane** carry one; a Sphere,
+  a Cylinder or an imported mesh without one keeps probe / ambient lighting, unchanged.
+  Every static mesh still shades and bounces light onto the others. Dynamic objects keep
+  the light probes; bake those with `Lighting.Bake()` so both read the same lights.
+- **What it bakes.** A deterministic CPU path tracer: `samples` (default `64`) paths per
+  texel, `bounces` (default `3`) surfaces deep, seeded by `seed` (default `0`) — the same
+  scene and seed always write byte-identical lightmaps. `texelsPerUnit` (default `4`) is
+  the lightmap resolution per world unit (each lightmap is 4–512 texels square). No GPU is
+  needed; it runs headless.
+- **At runtime** a lightmapped surface takes its ambient term from the lightmap instead
+  of probes or the flat sky gradient, and skips the realtime direct light of `Baked`
+  lights (it is in the map). `Mixed` lights stay realtime on it; their bounce is baked.
+- **Where the files go.** One RGBM-encoded PNG per mesh in `<scene file>.lightmaps/`
+  (old ones there are removed first); the scene references them by entity, so **save the
+  scene** afterwards to keep them. Needs a saved scene path (errors otherwise).
+  `Lighting.ClearLightmaps()` drops the references (the files stay until the next bake).
+- **Moving or editing static geometry** after a bake leaves its lightmap stale; rebake.
+
+**Blender export.** The lightmap UV is the mesh's **second UV map**: add one in *Object Data
+Properties → UV Maps*, unwrap it with no overlapping islands (*Lightmap Pack*, or *Smart
+UV Project* with some island margin), keep the first map for textures, and export glTF 2.0
+with *UVs* enabled — Blender writes the second map as `TEXCOORD_1`. rusty never generates
+lightmap UVs at import.

@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::components::{Entity, MaterialAsset};
 use crate::scene::collision_matrix::CollisionMatrix;
 use crate::scene::layers::LayerRegistry;
+use crate::scene::lighting::lightmap::LightmapSet;
 use crate::scene::nav_settings::NavMeshSettings;
 use crate::scene::Scene;
 
@@ -86,6 +87,10 @@ pub struct SceneData {
     /// files, never inlined, like `skybox_path`. `#[serde(default)]` for pre-#244 scenes.
     #[serde(default)]
     pub reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet,
+    /// Which lightmap file each static mesh wears (#438). Paths only; the RGBM PNGs
+    /// sit beside the scene. Default-empty so pre-#438 scenes load with none.
+    #[serde(default, skip_serializing_if = "LightmapSet::is_empty")]
+    pub lightmaps: LightmapSet,
 }
 
 /// Read the live World's component values out into a serializable document.
@@ -109,6 +114,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         materials: scene.materials.clone(),
         probes: scene.probes.clone(),
         reflection_probes: scene.reflection_probes.clone(),
+        lightmaps: scene.lightmaps.clone(),
     }
 }
 
@@ -159,6 +165,7 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     // Reflection probes (positions + boxes + cubemap paths) come straight from the
     // scene doc; the cubemaps themselves are loaded lazily by the renderer (#244).
     scene.reflection_probes = data.reflection_probes;
+    scene.lightmaps = data.lightmaps;
 
     // Rebuild every skeleton from its model, then hang the saved attachments back
     // on their bones by name (#453) — before prefab propagation, which rebuilds a

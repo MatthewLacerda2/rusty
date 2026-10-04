@@ -9,7 +9,8 @@
 //! * `bvh` / `raster` / `trace` — ray acceleration, texel → surface point, and the
 //!   per-texel estimate (the units it stores are explained in `trace`);
 //! * `bake` — the parallel, seeded driver ([`bake`]);
-//! * `encode` — RGBM, how a lightmap is stored as an 8-bit PNG.
+//! * `encode` — RGBM, how a lightmap is stored as an 8-bit PNG;
+//! * `set` — the scene's references from entity to lightmap file ([`LightmapSet`]).
 //!
 //! The bake is a pure function of (scene, settings, seed): no clock, no unseeded RNG,
 //! and the result never depends on how many threads ran it.
@@ -20,12 +21,14 @@ mod encode;
 mod input;
 mod raster;
 mod rng;
+mod set;
 mod trace;
 
 pub use bake::{bake, BakeSettings, Lightmap};
 pub use encode::{decode_rgbm, encode_rgbm, encode_texels, RGBM_RANGE};
 pub use input::{BakeLight, BakeMesh, BakeScene, LightShape};
 pub use raster::{lightmap_size, MIN_RESOLUTION};
+pub use set::{LightmapEntry, LightmapSet};
 
 #[cfg(test)]
 mod gather_tests;

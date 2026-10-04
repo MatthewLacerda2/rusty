@@ -38,6 +38,7 @@ pub mod command_channel;
 pub mod console;
 pub mod harness;
 pub mod lighting_bake;
+pub mod lightmap_bake;
 pub mod lua_surface;
 pub mod mcp;
 pub mod preview;

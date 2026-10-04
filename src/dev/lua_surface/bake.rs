@@ -1,15 +1,17 @@
-//! src/dev/lua_surface/bake.rs — the GPU bake verbs: `Probe.Bake` (#241),
-//! `Reflection.Bake` (#245) and the one-button `Lighting.Bake` (#246).
+//! src/dev/lua_surface/bake.rs — the bake verbs: `Probe.Bake` (#241),
+//! `Reflection.Bake` (#245), the one-button `Lighting.Bake` (#246), and the lightmap
+//! pair `Lighting.BakeLightmaps` / `ClearLightmaps` (#438).
 //!
-//! Each drives a headless renderer, so each is added here, onto the namespace table
-//! `api` registered, rather than in `api` itself (#737). All three return `true` when
-//! a GPU bake ran and `false` when no adapter was available (skipped gracefully).
+//! Each is an authoring action, so each is added here, onto the namespace table `api`
+//! registered, rather than in `api` itself (#737). The three GPU bakes return `true`
+//! when a bake ran and `false` when no adapter was available (skipped gracefully); the
+//! lightmap bake runs on the CPU and returns how many lightmaps it wrote.
 
 use std::cell::RefCell;
 
 use mlua::Lua;
 
-use super::super::{lighting_bake, probe_bake, reflection_bake};
+use super::super::{lighting_bake, lightmap_bake, probe_bake, reflection_bake};
 use crate::api::{global_table, put, ApiScopedCtx, Reg};
 use crate::scene::Scene;
 
@@ -21,7 +23,8 @@ pub(super) fn register<'scope>(
 ) -> Reg {
     register_probe(lua, scope, ctx.scene)?;
     register_reflection(lua, scope, ctx.scene, ctx.scene_path)?;
-    register_lighting(lua, scope, ctx)
+    register_lighting(lua, scope, ctx)?;
+    register_lightmaps(lua, scope, ctx)
 }
 
 /// `Probe.Bake()`: capture each probe's static surroundings to a cubemap and project
@@ -101,4 +104,45 @@ fn bake_params(
         reflection_region: region.unwrap_or(d.reflection_region),
         reflection_cap: cap.unwrap_or(d.reflection_cap),
     }
+}
+
+/// `Lighting.BakeLightmaps([texelsPerUnit], [samples], [bounces], [seed])` bakes every
+/// static mesh with a lightmap UV and returns how many lightmaps it wrote (#438);
+/// `Lighting.ClearLightmaps()` drops them all, back to probe / ambient lighting. The
+/// same path as the editor's "Bake Lightmaps" button.
+fn register_lightmaps<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
+    ctx: &ApiScopedCtx<'scope>,
+) -> Reg {
+    use crate::scene::lighting::lightmap::BakeSettings;
+    type Args = (Option<f32>, Option<u32>, Option<u32>, Option<u64>);
+    let (scene, scene_path) = (ctx.scene, ctx.scene_path);
+    let table = global_table(lua, "Lighting")?;
+    put(
+        &table,
+        "BakeLightmaps",
+        scope.create_function(move |_, (density, samples, bounces, seed): Args| {
+            let d = BakeSettings::default();
+            let settings = BakeSettings {
+                texels_per_unit: density.unwrap_or(d.texels_per_unit).max(0.01),
+                samples: samples.unwrap_or(d.samples).max(1),
+                bounces: bounces.unwrap_or(d.bounces).max(1),
+                seed: seed.unwrap_or(d.seed),
+                ..d
+            };
+            let path = scene_path.borrow();
+            let mut scene = scene.borrow_mut();
+            lightmap_bake::bake_scene_lightmaps(&mut scene, path.as_deref(), &settings)
+                .map_err(mlua::Error::external)
+        }),
+    )?;
+    put(
+        &table,
+        "ClearLightmaps",
+        scope.create_function(move |_, ()| {
+            scene.borrow_mut().lightmaps.clear();
+            Ok(())
+        }),
+    )
 }
