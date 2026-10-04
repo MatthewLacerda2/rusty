@@ -168,6 +168,12 @@ fn append_primitive(
         .map(|t| t.into_f32().collect())
         .unwrap_or_else(|| vec![[0.0, 0.0]; positions.len()]);
 
+    // The lightmap UV (#438): Blender exports its second UV map as `TEXCOORD_1`.
+    let lightmap_uvs: Vec<[f32; 2]> = reader
+        .read_tex_coords(1)
+        .map(|t| t.into_f32().collect())
+        .unwrap_or_default();
+
     // Skin bindings are per-primitive and index into `skin.joints()` order.
     let joints: Vec<[u16; 4]> = reader
         .read_joints(0)
@@ -199,6 +205,7 @@ fn append_primitive(
         let uv = uvs.get(i).copied().unwrap_or([0.0, 0.0]);
         let mut vertex = MeshVertex::new(*position, normal, uv);
         vertex.tangent = tangents.get(i).copied().unwrap_or([1.0, 0.0, 0.0, 1.0]);
+        vertex.lightmap_uv = lightmap_uvs.get(i).copied().unwrap_or([0.0, 0.0]);
         if let (Some(j), Some(w)) = (joints.get(i), weights.get(i)) {
             let ji = [j[0] as u32, j[1] as u32, j[2] as u32, j[3] as u32];
             vertex = vertex.with_skin(ji, *w);

@@ -23,6 +23,7 @@ fn vertex_from_imported(v: &MeshVertex) -> Vertex {
         joint_indices: v.joint_indices,
         joint_weights: v.joint_weights,
         tangent: v.tangent,
+        lightmap_uv: v.lightmap_uv,
     }
 }
 

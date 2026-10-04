@@ -17,6 +17,9 @@ pub struct Vertex {
     pub joint_weights: [f32; 4],
     /// Normal-map tangent basis: `xyz` unit tangent, `w` handedness (±1) (#207).
     pub tangent: [f32; 4],
+    /// The lightmap UV (#438): glTF `TEXCOORD_1`, Blender's second UV map. All zeros
+    /// on a mesh without one, which the lightmap bake reads as "no lightmap".
+    pub lightmap_uv: [f32; 2],
 }
 
 impl Vertex {
@@ -28,6 +31,13 @@ impl Vertex {
             joint_indices: [0, 0, 0, 0],
             joint_weights: [1.0, 0.0, 0.0, 0.0],
             tangent: [1.0, 0.0, 0.0, 1.0],
+            lightmap_uv: [0.0, 0.0],
         }
+    }
+
+    /// The same vertex carrying a lightmap UV (#438).
+    pub fn with_lightmap_uv(mut self, uv: [f32; 2]) -> Self {
+        self.lightmap_uv = uv;
+        self
     }
 }
