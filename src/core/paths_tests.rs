@@ -38,6 +38,12 @@ fn a_short_name_does_not_lexically_match_its_long_name() {
 }
 
 #[test]
+fn only_the_drive_letter_ignores_case() {
+    assert_eq!(relative_to(r"C:\Users\Me\x.lua", r"C:\users\me"), None);
+    assert_eq!(relative_to("/tmp/WS/x.lua", "/tmp/ws"), None);
+}
+
+#[test]
 fn unix_paths_and_the_non_matches() {
     assert_eq!(
         relative_to("/tmp/ws/./project/x.lua", "/tmp/ws").as_deref(),
