@@ -292,9 +292,16 @@ want measured.
 | mutation | `make mutants-remote SCOPE=diff` (or path globs): `mutants-on-request.yml`, one runner, report and survivors' diffs printed in the terminal | `mutants-sweep.yml`, Saturdays, full sim in 24 shards, `mutants-report` summary + artifact; skipped when `main` has not moved since the last finished sweep |
 | coverage | `gh workflow run coverage.yml --ref <branch>` | `coverage.yml`, Mondays, ratchet table |
 
-**Ask for a scoped mutation run before readying a branch that adds mechanism**
-— arithmetic, a state machine, a boundary — and triage what it reports. Nothing
-runs it for you any more, so a branch nobody asked about is unmeasured, not clean.
+**Ask for a scoped mutation run on a branch that adds mechanism** — arithmetic,
+a state machine, a boundary — and triage what it reports. Nothing runs it for you
+any more, so a branch nobody asked about is unmeasured, not clean. **Dispatch it
+and ready the branch in the same step; never hold a green branch in draft for it.**
+A scoped run takes 30 minutes or more on one runner (51 mutants for #771's diff on
+2026-10-04 were still running past the half hour), and a signal that keeps a
+finished branch out of the queue has become a gate. The report arrives after the
+branch is the queue's, so survivors go where *Once ready, the branch is the
+queue's* sends everything found late: a comment on the issue, and a follow-up
+pull request off `main` when one is worth fixing.
 
 Three things about scope, all of which change how a clean report reads:
 
