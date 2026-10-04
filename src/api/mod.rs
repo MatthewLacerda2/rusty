@@ -7,8 +7,9 @@
 //! `Storage`, `Canvas`, `RectTransform`, `UI`, `Image`, `CanvasGroup`, `RectMask`, `Mask`,
 //! `BackdropFilter`, `Text`, `Shape`, `Selectable`,
 //! `LayoutGroup`, `LayoutElement`, `Joint`, `LODGroup`, `Trail`, `Line`,
-//! `Application`, plus the dev-only `Debug`)
-//! is registered from this tree onto the live Lua runtime.
+//! `Application`) is registered from this tree onto the live Lua runtime. Layers above
+//! the sim add their own namespaces through [`extend`]: `dev` installs `Debug` and the
+//! GPU bake verbs that way (#737), so the sim surface never imports the platform layer.
 //! `scripting`
 //! owns the runtime and lifecycle; `api` owns the surface. One surface, three
 //! callers — they never drift apart.
@@ -22,8 +23,6 @@ pub mod camera;
 pub mod canvas;
 pub mod canvas_group;
 pub mod character_controller;
-#[cfg(feature = "dev")]
-pub mod debug;
 pub mod decals;
 pub mod graphics;
 pub mod image;
@@ -77,6 +76,7 @@ mod ui_look;
 pub mod video;
 
 use std::cell::RefCell;
+use std::sync::RwLock;
 
 use mlua::{Function, Lua, Table};
 
@@ -203,8 +203,8 @@ pub fn register<'lua, 'scope>(
     camera::register(lua, scope, ctx)?;
     light::register(lua, scope, ctx.scene)?;
     probe::register(lua, scope, ctx.scene)?;
-    reflection::register(lua, scope, ctx.scene, ctx.scene_path)?;
-    lighting::register(lua, scope, ctx.scene, ctx.scene_path, ctx.nav)?;
+    reflection::register(lua, scope, ctx.scene)?;
+    lighting::register(lua)?;
     particle::register(lua, scope, ctx.scene)?;
     trail::register(lua, scope, ctx.scene)?;
     line::register(lua, scope, ctx.scene)?;
@@ -225,9 +225,27 @@ pub fn register<'lua, 'scope>(
     storage::register(lua, scope, ctx.storage)?;
     input::register_writable(lua, scope, ctx.input)?;
     application::register(lua, scope, ctx.application)?;
-    #[cfg(feature = "dev")]
-    debug::register(lua, scope, ctx)?;
+    // Last, so an extension can add verbs to a namespace registered above.
+    for ext in EXTENSIONS.read().map_err(|e| e.to_string())?.iter() {
+        ext(lua, scope, ctx)?;
+    }
     Ok(())
+}
+
+/// A registrar a layer above the sim adds to the surface: the same shape as
+/// [`register`], run after every built-in namespace on every scope.
+pub type Extension =
+    for<'lua, 'scope> fn(&'lua Lua, &mlua::Scope<'lua, 'scope>, &ApiScopedCtx<'scope>) -> Reg;
+
+static EXTENSIONS: RwLock<Vec<Extension>> = RwLock::new(Vec::new());
+
+/// Add `ext` to the surface every later [`register`] call installs (#737). This is how
+/// the platform layer contributes bindings without the sim importing it: the arrow
+/// runs `dev → api`. Process-wide; callers install once (see `dev::install_api`).
+pub fn extend(ext: Extension) {
+    if let Ok(mut exts) = EXTENSIONS.write() {
+        exts.push(ext);
+    }
 }
 
 /// The UI component namespaces that borrow only the scene: the graphic, its

@@ -2,8 +2,8 @@
 //! blank, and the docked panels are where the editor puts them. A smoke check, not a
 //! golden: fonts and anti-aliasing differ across platforms, so no pixel is pinned.
 
-use rusty::dev::editor_capture::{self, EditorCaptureOptions};
 use rusty::editor::theme::Theme;
+use rusty::shell::editor::capture::{self, EditorCaptureOptions};
 
 const W: u32 = 1280;
 const H: u32 = 720;
@@ -30,14 +30,14 @@ fn panel_share(img: &image::RgbaImage, x0: u32, x1: u32) -> f32 {
 #[test]
 fn the_default_scene_captures_with_its_panels() {
     let out = crate::temp::dir().join("editor.png");
-    let game = editor_capture::default_world();
+    let game = capture::default_world();
     let opts = EditorCaptureOptions {
         width: W,
         height: H,
         select: Some("Player".to_string()),
         ..Default::default()
     };
-    let written = editor_capture::capture(&game, &out, &opts).expect("capture runs");
+    let written = capture::capture(&game, &out, &opts).expect("capture runs");
     if !written {
         eprintln!("no GPU adapter — skipping the editor capture");
         return;
@@ -74,11 +74,11 @@ fn the_default_scene_captures_with_its_panels() {
 
 #[test]
 fn an_unknown_selection_is_an_error_not_a_blank_inspector() {
-    let game = editor_capture::default_world();
+    let game = capture::default_world();
     let opts = EditorCaptureOptions {
         select: Some("NoSuchEntity".to_string()),
         ..Default::default()
     };
-    let err = editor_capture::capture(&game, crate::temp::dir().join("x.png"), &opts);
+    let err = capture::capture(&game, crate::temp::dir().join("x.png"), &opts);
     assert!(err.unwrap_err().contains("NoSuchEntity"));
 }

@@ -97,9 +97,13 @@ pub fn load_game(scene_path: &str) -> GameWorld {
     let input = Rc::new(RefCell::new(InputState::new()));
     #[cfg_attr(not(feature = "dev"), allow(unused_mut))] // the dev probe install mutates it
     let mut game = GameWorld::new(scene, input, nav, console);
-    // Dev builds time the schedule so `Debug.Stats()` answers in a playtest (#433).
+    // Dev builds time the schedule so `Debug.Stats()` answers in a playtest (#433),
+    // and add `Debug.*` and the bake verbs to the console's surface (#737).
     #[cfg(feature = "dev")]
-    crate::dev::stats::install(&mut game);
+    {
+        crate::dev::stats::install(&mut game);
+        crate::dev::lua_surface::install_api();
+    }
     *game.script_manager().scene_path_cell().borrow_mut() = Some(scene_path.to_string());
 
     // Bind the persistent store to its file and load it once — this boundary read is

@@ -95,9 +95,11 @@ and direction guards, `CLAUDE.md` and these docs each kept.
   row lacks), `STALE_DEP` (the row lists an edge nothing uses), `CYCLE`, `SIM_LEAK`,
   and `UNDECLARED_MODULE` / `MISSING_MODULE`. Test code (`#[cfg(test)]` items and
   test-only module files) is exempt, as in the other guards.
-- **Known exceptions** are in `EXCEPTIONS`, each naming the open issue that removes
-  it: `api → dev` and `api → preview` (#737), `dev → editor` (#738). The lint reports
-  `STALE_EXCEPTION` once the edge is gone. There is no baseline beyond these rows.
+- **Known exceptions** go in `EXCEPTIONS`, each naming the open issue that removes
+  it; the lint reports `STALE_EXCEPTION` once the edge is gone. The list is empty:
+  #737 and #738 removed the two the lint landed with. A layer above the sim that adds
+  to the Lua surface does it through `api::extend`, as `dev` does for `Debug.*` and
+  the bake verbs, so the edge runs down, not up.
 
 A new import between modules is one edit to the row, in the same PR. If the edge
 breaks the order or leaves the sim, move the code down a layer instead.

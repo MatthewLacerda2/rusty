@@ -173,7 +173,7 @@ from the budget's acquire). A test in that module also fails if the filter in
 rule cannot drift apart.
 
 ## Editor captures (#731)
-`screenshot::capture` shows the game; **`dev::editor_capture`** shows the *editor* —
+`screenshot::capture` shows the game; **`shell::editor::capture`** shows the *editor* —
 the egui panels around the scene viewport — rendered offscreen to a PNG with no window,
 on lavapipe or any adapter. It is how an agent that changes the editor lets the operator
 see the change without launching it:
@@ -185,7 +185,7 @@ make editor-capture OUT=after.png ARGS="--select Player"
 
 Options: `--scene <path>` (default: the built-in default scene, in memory), `--select
 <name>`, `--play` (the Play-mode chrome; the sim is not stepped), `--game` (the Game
-tab), `--size <W>x<H>` (default 1600x900). From Rust, `editor_capture::capture(&game,
+tab), `--size <W>x<H>` (default 1600x900). From Rust, `capture::capture(&game,
 path, &EditorCaptureOptions { .. })` takes any `GameWorld`, and `capture_into` shares a
 `CaptureHost` across shots.
 
