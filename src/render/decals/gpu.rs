@@ -8,11 +8,11 @@ use std::collections::BTreeMap;
 use glam::Vec3;
 
 use super::atlas::DecalAtlas;
-use super::record::{self, GpuDecal, NO_LAYER};
+use super::record::{self, DecalMaps, GpuDecal, NO_LAYER};
 use crate::components::MaterialAsset;
 use crate::render::gpu::grow_buffer::GrowBuffer;
 use crate::render::Renderer;
-use crate::scene::decal::Decal;
+use crate::scene::decal::{Decal, DecalPose};
 use crate::scene::Scene;
 
 pub(crate) struct DecalBuffers {
@@ -39,18 +39,20 @@ impl DecalBuffers {
 
 impl Renderer {
     /// Upload the scene's decals, once per frame: load any new maps into the atlas,
-    /// then write every record, oldest first (the FIFO order they blend in).
+    /// then write every record, oldest first (the FIFO order they blend in). Each
+    /// decal draws at its pose this frame (#639): an owned one follows its owner
+    /// through the world-matrix store, which must already be refreshed, and one
+    /// whose owner is inactive or that has faded out is left out.
     pub(crate) fn upload_decals(&mut self, scene: &Scene) {
         let material = |d: &Decal| resolve(&scene.materials, d);
-        let maps: Vec<_> = scene
+        let drawn: Vec<(&Decal, DecalPose, DecalMaps)> = scene
             .decals
             .iter()
-            .map(|d| record::maps(d, material(d)))
+            .filter_map(|d| Some((d, scene.decal_pose(d)?, record::maps(d, material(d)))))
             .collect();
-        let paths: Vec<&str> = maps
+        let paths: Vec<&str> = drawn
             .iter()
-            .flatten()
-            .flatten()
+            .flat_map(|(_, _, maps)| maps.iter().flatten())
             .map(String::as_str)
             .collect();
         let misses = &mut self.texture_freshness.misses;
@@ -58,11 +60,9 @@ impl Renderer {
         self.global_bind_group_dirty |= d.atlas.prepare(&self.device, &self.queue, &paths, misses);
 
         let mut dropped = 0;
-        let records: Vec<GpuDecal> = scene
-            .decals
+        let records: Vec<GpuDecal> = drawn
             .iter()
-            .zip(&maps)
-            .map(|(decal, maps)| {
+            .map(|(decal, pose, maps)| {
                 let layers = maps.clone().map(|path| {
                     let Some(path) = path else {
                         return NO_LAYER;
@@ -71,10 +71,13 @@ impl Renderer {
                     dropped += u32::from(layer == NO_LAYER && !misses.contains(&path));
                     layer
                 });
-                record::record(decal, material(decal), layers)
+                record::record(decal, pose, material(decal), layers)
             })
             .collect();
-        d.spheres = scene.decals.iter().map(record::bounds).collect();
+        d.spheres = drawn
+            .iter()
+            .map(|(_, pose, _)| record::bounds(pose))
+            .collect();
         let bytes = bytemuck::cast_slice(&records);
         self.global_bind_group_dirty |= d.records.upload(&self.device, &self.queue, bytes);
         self.frame_counters.decal_maps_dropped = dropped;

@@ -69,7 +69,8 @@ impl GameWorld {
 /// transforms. Trails (#441) record right after it, so they sample where
 /// `LateUpdate` left each entity. `apply_destroys` (#323) is the tick's tail: it drains the
 /// deferred-destroy queue (firing `OnDisable`/`OnDestroy`) after every other
-/// system has seen the entity. The scene-load phase (#432) follows it, so a
+/// system has seen the entity; decals age right after it (#639), so a destroyed
+/// owner's decals go the same tick. The scene-load phase (#432) follows it, so a
 /// `Scene.Load` swaps the World only once the whole tick is done with it, right
 /// before `advance_frame`. The skin palette build (#453) runs in `Render`, after
 /// every stage that may move a bone. The post-animation writers, in order:
@@ -96,6 +97,7 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, follow_bones)
         .add_system(Stage::FixedUpdate, super::trails::tick_trails)
         .add_system(Stage::FixedUpdate, apply_destroys)
+        .add_system(Stage::FixedUpdate, super::decals::tick_decals)
         .add_system(Stage::FixedUpdate, super::scene_load::apply_scene_load)
         .add_system(Stage::FixedUpdate, advance_frame)
         .add_system(Stage::Render, build_skin_palettes);
