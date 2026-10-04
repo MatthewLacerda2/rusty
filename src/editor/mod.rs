@@ -9,6 +9,8 @@ pub mod bottom_panel;
 pub mod build_settings;
 mod content_browser;
 mod content_grid;
+#[cfg(feature = "dev")]
+mod dev_state;
 pub mod header;
 pub mod hierarchy;
 mod hierarchy_tree;
@@ -23,6 +25,8 @@ use crate::scripting::ConsoleLogs;
 
 pub use inspector::preview::{OrbitState, PreviewCache, PreviewMesh, PreviewRequest};
 
+#[cfg(feature = "dev")]
+pub use dev_state::DevEditorState;
 pub use viewport::{ViewportInteraction, ViewportTab};
 
 /// What the Inspector panel is currently showing. The three modes are mutually
@@ -121,14 +125,9 @@ pub struct EditorUi {
     /// `main.rs` before `draw` runs — mirrors `Frontend::viewport_texture_id`.
     pub preview_texture_id: Option<egui::TextureId>,
 
-    /// Live Lua REPL input line (dev builds only). The editor only collects the
-    /// submitted text here; the front-end (main.rs) drains `pending_repl` and runs
-    /// it through the single `dev::console` evaluator against the live runtime.
+    /// The dev-only editor state: the REPL line and the background lightmap bake.
     #[cfg(feature = "dev")]
-    pub repl_input: crate::dev::console::ReplInput,
-    /// A line the user submitted this frame, awaiting evaluation by the front-end.
-    #[cfg(feature = "dev")]
-    pub pending_repl: Option<String>,
+    pub dev: DevEditorState,
 }
 
 impl Default for EditorUi {
@@ -187,9 +186,7 @@ impl EditorUi {
             preview_texture_id: None,
 
             #[cfg(feature = "dev")]
-            repl_input: crate::dev::console::ReplInput::new(),
-            #[cfg(feature = "dev")]
-            pending_repl: None,
+            dev: DevEditorState::default(),
         }
     }
 
@@ -248,10 +245,8 @@ impl EditorUi {
         }
     }
 
-    // The editor draw entry point threads the live engine state (scene, console,
-    // nav, play flag) plus the per-frame HUD metrics; these are distinct mutable
-    // borrows that a parameter struct could not group without fighting the borrow
-    // checker. Legacy signature — left as-is pending the App/Resources migration.
+    // The live engine state (scene, console, nav, play flag) plus the frame's HUD
+    // metrics: distinct mutable borrows. Legacy signature, pending App/Resources.
     #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &mut self,
@@ -266,8 +261,7 @@ impl EditorUi {
     ) -> ViewportInteraction {
         self.apply_theme(ctx, *is_playing);
         self.scan_assets();
-        // Recomputed by the Preview tab this frame if it's showing (#352); left
-        // `None` otherwise so the front-end skips the extra offscreen render.
+        // Set by the Preview tab if it shows (#352); `None` skips its offscreen render.
         self.preview_request = None;
 
         // Push editor selection to scene (editor UI is the authority)

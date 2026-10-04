@@ -109,7 +109,7 @@ pub fn draw_play_console(editor: &mut EditorUi, ctx: &egui::Context, console: &m
         });
 }
 
-/// The REPL input line. On submit it stashes the text in `editor.pending_repl`;
+/// The REPL input line. On submit it stashes the text in `editor.dev.pending_repl`;
 /// the front-end drains that and runs it through the single `dev::console`
 /// evaluator against the live runtime (so windowed and headless can't drift).
 #[cfg(feature = "dev")]
@@ -118,7 +118,7 @@ fn draw_repl_input(editor: &mut EditorUi, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("lua>").monospace());
         let resp = ui.add(
-            egui::TextEdit::singleline(&mut editor.repl_input.buffer)
+            egui::TextEdit::singleline(&mut editor.dev.repl_input.buffer)
                 .desired_width(f32::INFINITY)
                 .hint_text(
                     // egui 0.36 no longer draws the hint in the field's font.
@@ -131,8 +131,8 @@ fn draw_repl_input(editor: &mut EditorUi, ui: &mut egui::Ui) {
         );
         let submit = resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
         if submit {
-            if let Some(line) = editor.repl_input.take_submit() {
-                editor.pending_repl = Some(line);
+            if let Some(line) = editor.dev.repl_input.take_submit() {
+                editor.dev.pending_repl = Some(line);
             }
             resp.request_focus();
         }

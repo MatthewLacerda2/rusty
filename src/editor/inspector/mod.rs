@@ -26,6 +26,8 @@ pub fn draw(
     console: &mut ConsoleLogs,
     nav: &mut NavigationGraph,
 ) {
+    #[cfg(feature = "dev")]
+    assets::scene::bake::poll(editor, ui.ctx(), scene, console);
     let t = editor.theme;
     if !editor.inspector_open {
         draw_collapsed(ui, t, &mut editor.inspector_open);

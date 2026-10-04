@@ -6,7 +6,7 @@ use crate::scene::authoring::{primitive_mesh_component, Primitive};
 
 /// A scene with a static floor Plane, a static Sphere (no lightmap UV) and a dynamic
 /// Box; returns it with the floor's and the sphere's ids.
-fn scene() -> (Scene, u32, u32) {
+pub(super) fn scene() -> (Scene, u32, u32) {
     let mut scene = Scene::new();
     let mut add = |name: &str, primitive, is_static| {
         let id = scene.add_entity(name.to_string());
@@ -22,7 +22,7 @@ fn scene() -> (Scene, u32, u32) {
     (scene, floor, ball)
 }
 
-fn quick() -> BakeSettings {
+pub(super) fn quick() -> BakeSettings {
     BakeSettings {
         texels_per_unit: 2.0,
         samples: 8,
@@ -34,7 +34,7 @@ fn quick() -> BakeSettings {
 }
 
 /// A fresh temp dir and a scene path inside it.
-fn scene_path(name: &str) -> String {
+pub(super) fn scene_path(name: &str) -> String {
     let dir = std::env::temp_dir().join(format!("rusty_lightmap_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();

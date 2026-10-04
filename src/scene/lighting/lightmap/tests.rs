@@ -31,7 +31,7 @@ pub(super) fn floor() -> BakeMesh {
 }
 
 /// A white 4×4 wall at x = 2 facing the floor (-X).
-fn wall() -> BakeMesh {
+pub(super) fn wall() -> BakeMesh {
     let p = |y, z| Vec3::new(2.0, y, z);
     quad(
         2,
@@ -41,7 +41,7 @@ fn wall() -> BakeMesh {
 }
 
 /// A sun travelling +X: head-on into the wall's front, grazing the floor at 0°.
-fn sun(mode_baked: bool) -> BakeLight {
+pub(super) fn sun(mode_baked: bool) -> BakeLight {
     BakeLight {
         shape: LightShape::Directional { direction: Vec3::X },
         radiance: Vec3::splat(3.0),

@@ -1,7 +1,9 @@
 //! The lightmap bake (#438): a [`BakeScene`] in, one [`Lightmap`] per receiving mesh
 //! out. Deterministic: every texel draws its samples from its own seeded stream, so
 //! the same scene, settings and seed give identical texels on any machine and with
-//! any number of threads. The texels are split across the machine's cores.
+//! any number of threads. The texels are split across the machine's cores, and a
+//! [`BakeProgress`] can watch them go by or stop the bake (#808) without changing a
+//! completed bake's bytes.
 
 use std::thread;
 
@@ -10,12 +12,17 @@ use glam::Vec3;
 use super::bvh::{Bvh, Tri};
 use super::filter::smooth;
 use super::input::BakeScene;
+use super::progress::BakeProgress;
 use super::raster::{dilate, lightmap_size, rasterize, world_per_uv, TexelPoint};
 use super::rng::Rng;
 use super::trace::{TexelLight, Tracer};
 
 /// Rings of empty texels dilation fills around each chart.
 const DILATE_PASSES: u32 = 3;
+
+/// Texels a worker traces between progress reports and cancel checks: small enough
+/// that a cancel lands at once, large enough that the shared counter stays cold.
+const REPORT_EVERY: usize = 64;
 
 /// The bake's knobs, Unity's Lightmapping settings in miniature.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -60,17 +67,37 @@ pub struct Lightmap {
 /// Bake every mesh in `scene` that has a usable lightmap UV. Meshes without one still
 /// occlude and bounce light; they just get no lightmap.
 pub fn bake(scene: &BakeScene, settings: &BakeSettings) -> Vec<Lightmap> {
+    // A progress nobody holds is never cancelled, so this always runs to the end.
+    bake_with_progress(scene, settings, &BakeProgress::default()).unwrap_or_default()
+}
+
+/// [`bake`], reporting texels traced into `progress` and stopping early when it is
+/// cancelled. `None` means cancelled; a bake that finishes is byte-identical to
+/// [`bake`]'s.
+pub fn bake_with_progress(
+    scene: &BakeScene,
+    settings: &BakeSettings,
+    progress: &BakeProgress,
+) -> Option<Vec<Lightmap>> {
     let bvh = Bvh::build(triangles(scene));
     let tracer = Tracer { scene, bvh: &bvh };
-    let mut out = Vec::new();
     // Every lightmap must fit an atlas page with its ring around it.
     let max = settings.max_resolution.min(super::atlas::MAX_PAGE - 2);
-    for (index, mesh) in scene.meshes.iter().enumerate() {
-        let Some(size) = lightmap_size(mesh, settings.texels_per_unit, max) else {
-            continue;
-        };
-        let points = rasterize(mesh, size);
-        let light = trace_all(&tracer, &points, index as u64, settings);
+    // Rasterize everything first, so the total is known before the first texel.
+    let charts: Vec<(usize, u32, Vec<TexelPoint>)> = scene
+        .meshes
+        .iter()
+        .enumerate()
+        .filter_map(|(index, mesh)| {
+            let size = lightmap_size(mesh, settings.texels_per_unit, max)?;
+            Some((index, size, rasterize(mesh, size)))
+        })
+        .collect();
+    progress.set_total(charts.iter().map(|(_, _, p)| p.len() as u64).sum());
+    let mut out = Vec::with_capacity(charts.len());
+    for (index, size, points) in charts {
+        let mesh = &scene.meshes[index];
+        let light = trace_all(&tracer, &points, index as u64, settings, progress)?;
         // Texels inside other geometry are dropped here and filled by dilation below.
         let (points, light): (Vec<TexelPoint>, Vec<TexelLight>) = points
             .into_iter()
@@ -94,7 +121,7 @@ pub fn bake(scene: &BakeScene, settings: &BakeSettings) -> Vec<Lightmap> {
             texels,
         });
     }
-    out
+    Some(out)
 }
 
 /// Every mesh's triangles, for the BVH.
@@ -111,26 +138,40 @@ fn triangles(scene: &BakeScene) -> Vec<Tri> {
 
 /// Trace `points` across the available cores, keeping their order. Each texel's
 /// stream is seeded by `(seed, mesh, texel index)`, never by which thread runs it.
+/// `None` when `progress` was cancelled before every texel was traced.
 fn trace_all(
     tracer: &Tracer,
     points: &[TexelPoint],
     mesh: u64,
     s: &BakeSettings,
-) -> Vec<TexelLight> {
+    progress: &BakeProgress,
+) -> Option<Vec<TexelLight>> {
     let one = |p: &TexelPoint| {
         let mut rng = Rng::new(s.seed, mesh, p.index as u64);
         tracer.texel(p.position, p.normal, s.samples, s.bounces, &mut rng)
     };
+    let run = |run: &[TexelPoint]| {
+        let mut out = Vec::with_capacity(run.len());
+        for batch in run.chunks(REPORT_EVERY) {
+            if progress.is_cancelled() {
+                break;
+            }
+            out.extend(batch.iter().map(one));
+            progress.advance(batch.len() as u64);
+        }
+        out
+    };
     let threads = thread::available_parallelism().map_or(1, |n| n.get());
     let chunk = points.len().div_ceil(threads).max(1);
-    thread::scope(|scope| {
+    let light: Vec<TexelLight> = thread::scope(|scope| {
         let workers: Vec<_> = points
             .chunks(chunk)
-            .map(|run| scope.spawn(move || run.iter().map(one).collect::<Vec<_>>()))
+            .map(|chunk| scope.spawn(move || run(chunk)))
             .collect();
         workers
             .into_iter()
             .flat_map(|w| w.join().expect("lightmap worker panicked"))
             .collect()
-    })
+    });
+    (light.len() == points.len()).then_some(light)
 }

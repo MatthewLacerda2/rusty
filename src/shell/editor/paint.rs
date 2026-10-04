@@ -75,7 +75,7 @@ impl EditorFrontend {
 /// console input line and the harness share `evaluate_line`.
 #[cfg(feature = "dev")]
 pub(super) fn drain_repl(editor_ui: &mut EditorUi, game: &GameWorld) {
-    if let Some(line) = editor_ui.pending_repl.take() {
+    if let Some(line) = editor_ui.dev.pending_repl.take() {
         // Hand `evaluate_line` the shared console cell (not a held borrow) so a typed
         // `print` / `Debug.*` can borrow it mid-eval without panicking (#208).
         let _ = crate::dev::console::evaluate_line(
