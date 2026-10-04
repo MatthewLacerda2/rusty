@@ -9,3 +9,27 @@ type-complexity-threshold = 250
 # the headless harness panic-free; test code may unwrap freely. This config lets
 # the ban apply to production paths only, without a per-test `#[allow]`.
 allow-unwrap-in-tests = true
+
+# The determinism ban (#757): the sim is a pure function of (seed, inputs, fixed dt),
+# so wall-clock reads and OS entropy break replay for every harness run. Clippy
+# matches the resolved item, so `use std::time::Instant as Clock` can't hide one.
+# Denied crate-wide in Cargo.toml's `[lints]`; the platform modules that need real
+# time opt out at their module root, and `make determinism` holds that opt-out to
+# the layer table's platform rows (tools/lint/src/layers/table.rs).
+disallowed-methods = [
+    { path = "std::time::Instant::now", reason = "wall clock: sim code takes time from the `Time` resource (#757)" },
+    { path = "std::time::Instant::elapsed", reason = "wall clock: sim code takes time from the `Time` resource (#757)" },
+    { path = "std::time::SystemTime::now", reason = "wall clock: sim code takes time from the `Time` resource (#757)" },
+    { path = "std::time::SystemTime::elapsed", reason = "wall clock: sim code takes time from the `Time` resource (#757)" },
+    { path = "getrandom::fill", reason = "OS entropy: sim code draws from the seeded `Random` resource (#757)" },
+    { path = "getrandom::u32", reason = "OS entropy: sim code draws from the seeded `Random` resource (#757)" },
+    { path = "getrandom::u64", reason = "OS entropy: sim code draws from the seeded `Random` resource (#757)" },
+    # `rand` is not a dependency today; listed so it is banned the day it becomes one.
+    { path = "rand::random", reason = "unseeded RNG: sim code draws from the seeded `Random` resource (#757)", allow-invalid = true },
+    { path = "rand::thread_rng", reason = "unseeded RNG: sim code draws from the seeded `Random` resource (#757)", allow-invalid = true },
+    { path = "rand::rng", reason = "unseeded RNG: sim code draws from the seeded `Random` resource (#757)", allow-invalid = true },
+]
+disallowed-types = [
+    { path = "std::time::Instant", reason = "wall clock: sim code takes time from the `Time` resource (#757)" },
+    { path = "std::time::SystemTime", reason = "wall clock: sim code takes time from the `Time` resource (#757)" },
+]

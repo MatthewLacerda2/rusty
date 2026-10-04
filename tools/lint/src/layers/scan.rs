@@ -3,7 +3,7 @@
 //! Test code is exempt (#724): an inline `#[cfg(test)]` item is skipped, and a file
 //! declared as `#[cfg(test)] mod x;` (with or without `#[path]`) is dropped together
 //! with every file it declares in turn. Not a parser — a coarse line scan, like the
-//! determinism and direction guards.
+//! direction guard.
 
 use std::collections::BTreeSet;
 use std::fs;

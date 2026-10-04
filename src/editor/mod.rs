@@ -1,3 +1,8 @@
+// Platform layer: the audio preview playhead and script-schema mtimes are wall-clock UI state.
+// Exempt from the sim's clock and RNG ban (#757); only the layer table's
+// platform rows may opt out (`make determinism`).
+#![allow(clippy::disallowed_methods, clippy::disallowed_types)]
+
 use std::fs;
 
 pub mod bottom_panel;

@@ -1,3 +1,8 @@
+// Platform layer: GPU timing and shader hot-reload mtimes are wall-clock.
+// Exempt from the sim's clock and RNG ban (#757); only the layer table's
+// platform rows may opt out (`make determinism`).
+#![allow(clippy::disallowed_methods, clippy::disallowed_types)]
+
 mod camera;
 pub(crate) mod clusters;
 mod debug_meshes;
