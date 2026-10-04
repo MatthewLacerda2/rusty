@@ -1,5 +1,5 @@
 # cargo-fuzz target crate (#119). Deliberately its OWN workspace (the empty
-# `[workspace]` table below) so the stable, pinned-1.94.1 root build, the size
+# `[workspace]` table below) so the stable, pinned-1.95.0 root build, the size
 # gate, the determinism guard, and cargo-deny never see it — libFuzzer is
 # nightly-only and must stay out of the shipping gates. Run it on demand:
 #   cargo +nightly fuzz run scene_deserialize
