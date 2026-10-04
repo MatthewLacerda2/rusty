@@ -31,7 +31,7 @@ use glam::{Mat3, Quat, Vec3};
 use rapier3d::prelude::*;
 
 use super::compound::{body_owner, world_pose};
-use super::convert::to_iso;
+use super::convert::to_pose;
 use super::world::PhysicsWorld;
 use crate::components::{JointComponent, JointKind};
 use crate::scene::Scene;
@@ -180,7 +180,7 @@ impl PhysicsWorld {
     /// the rapier joint, destroy the `Joint` component, and report it. Ascending
     /// joint-entity order.
     pub(super) fn break_joints(&mut self, scene: &mut Scene, dt: f32) -> Vec<JointBreak> {
-        let substep = dt / self.integration_parameters.num_solver_iterations.get() as f32;
+        let substep = dt / self.integration_parameters.num_solver_iterations as f32;
         if substep <= 0.0 {
             return Vec::new();
         }
@@ -192,8 +192,9 @@ impl PhysicsWorld {
             ) else {
                 continue;
             };
-            let force = live.impulses.fixed_rows::<3>(0).norm() / substep;
-            let torque = live.impulses.fixed_rows::<3>(3).norm() / substep;
+            let [fx, fy, fz, tx, ty, tz] = live.impulses;
+            let force = Vec3::new(fx, fy, fz).length() / substep;
+            let torque = Vec3::new(tx, ty, tz).length() / substep;
             if exceeds(force, joint.break_force) || exceeds(torque, joint.break_torque) {
                 broken.push(JointBreak { id, force, torque });
             }
@@ -209,9 +210,9 @@ impl PhysicsWorld {
 }
 
 /// The world frame `(pos, rot)` expressed in the frame of a body at `body`.
-fn local_frame((bpos, brot): (Vec3, Quat), pos: Vec3, rot: Quat) -> Isometry<Real> {
+fn local_frame((bpos, brot): (Vec3, Quat), pos: Vec3, rot: Quat) -> Pose {
     let inv = brot.inverse();
-    to_iso(inv * (pos - bpos), (inv * rot).normalize())
+    to_pose(inv * (pos - bpos), (inv * rot).normalize())
 }
 
 /// The rotation taking the joint frame to this entity's local space: X along

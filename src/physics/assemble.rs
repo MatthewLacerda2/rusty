@@ -15,7 +15,7 @@ use super::build::{
 };
 use super::character::upright_offset;
 use super::compound::{plan, relative_pose, world_pose, BodyPlan, WorldPose};
-use super::convert::{to_iso, to_na_vec};
+use super::convert::{to_pose, to_rp_vec};
 use super::material::apply_material;
 use super::world::PhysicsWorld;
 use crate::scene::Scene;
@@ -70,6 +70,7 @@ impl PhysicsWorld {
             &mut self.colliders,
             &mut self.impulse_joints,
             &mut self.multibody_joints,
+            &mut self.soft_bodies,
             true,
         );
     }
@@ -92,8 +93,8 @@ impl PhysicsWorld {
             BodyClass::Static => RigidBodyBuilder::fixed(),
             BodyClass::Kinematic => RigidBodyBuilder::kinematic_position_based(),
             BodyClass::Dynamic => RigidBodyBuilder::dynamic()
-                .linvel(to_na_vec(inp.velocity))
-                .angvel(to_na_vec(inp.angular_velocity))
+                .linvel(to_rp_vec(inp.velocity))
+                .angvel(to_rp_vec(inp.angular_velocity))
                 // `use_gravity = false` exempts the body from world gravity (#209).
                 .gravity_scale(gravity_scale(inp.use_gravity)),
         }
@@ -101,7 +102,7 @@ impl PhysicsWorld {
         // Discrete leaves it off. Honoured for every class — mainly dynamic, but a
         // kinematic body may opt in to be swept against dynamic bodies.
         .ccd_enabled(ccd_enabled(inp.collision_detection))
-        .position(to_iso(owner_pose.pos, owner_pose.rot));
+        .pose(to_pose(owner_pose.pos, owner_pose.rot));
         let body_handle = self.bodies.insert(body_builder.build());
         for (id, collider) in parts {
             let handle = self
@@ -132,7 +133,7 @@ impl PhysicsWorld {
                 inp.center * pose.scale,
             )
         } else {
-            to_iso(offset_pos, offset_rot)
+            to_pose(offset_pos, offset_rot)
         };
         collider.set_position(offset);
         collider.set_enabled(scene.world.is_active(id));
@@ -191,7 +192,7 @@ impl PhysicsWorld {
                 continue;
             };
             let (pos, rot) = relative_pose(&owner_pose, &pose);
-            let offset = to_iso(pos, rot);
+            let offset = to_pose(pos, rot);
             if collider.position_wrt_parent() != Some(&offset) {
                 collider.set_position_wrt_parent(offset);
             }

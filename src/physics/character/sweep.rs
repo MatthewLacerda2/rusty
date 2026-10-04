@@ -1,5 +1,5 @@
 //! src/physics/character/sweep.rs — one `Move`'s collide-and-slide: rapier's
-//! controller configured from the component, run over the live query pipeline,
+//! controller configured from the component, run over the live query view,
 //! and the collision flags and ground normal read off what it touched.
 
 use glam::Vec3;
@@ -12,7 +12,7 @@ use super::{capsule, CharacterMove};
 use crate::components::character_controller::{COLLIDED_ABOVE, COLLIDED_BELOW, COLLIDED_SIDES};
 use crate::components::CharacterControllerComponent;
 use crate::physics::build::interaction_groups;
-use crate::physics::convert::{from_na_vec, to_na_vec};
+use crate::physics::convert::{from_rp_vec, to_rp_vec};
 use crate::physics::query::is_live;
 use crate::physics::world::PhysicsWorld;
 use crate::scene::Scene;
@@ -87,14 +87,12 @@ impl PhysicsWorld {
     /// The normal of the ground just under the capsule at `pos`, if any: a short
     /// cast down past the skin, for a move that never hit the floor (walking
     /// flat).
-    fn ground_below(&self, m: &MoveCtx, pos: &Isometry<Real>) -> Option<Vec3> {
+    fn ground_below(&self, m: &MoveCtx, pos: &Pose) -> Option<Vec3> {
         let probe = ShapeCastOptions::with_max_time_of_impact(m.skin + GROUND_PROBE);
-        let (bodies, colliders) = (&self.bodies, &self.colliders);
-        let down = -Vector::y();
         let hit = self
-            .query_pipeline
-            .cast_shape(bodies, colliders, pos, &down, &m.shape, probe, m.filter);
-        hit.and_then(|(_, h)| from_na_vec(h.normal1.into_inner()).try_normalize())
+            .queries(m.filter)
+            .cast_shape(pos, -Vector::Y, &m.shape, probe);
+        hit.and_then(|(_, h)| from_rp_vec(h.normal1).try_normalize())
     }
 
     /// One run of rapier's controller for `motion`.
@@ -103,23 +101,20 @@ impl PhysicsWorld {
         let mut ground = None;
         let movement = m.controller.move_shape(
             FIXED_DELTA_TIME,
-            &self.bodies,
-            &self.colliders,
-            &self.query_pipeline,
+            &self.queries(m.filter),
             &m.shape,
             &m.start,
-            to_na_vec(motion),
-            m.filter,
+            to_rp_vec(motion),
             |hit| {
                 let flag = contact_flag(&hit.hit, m.half_segment);
                 if flag == COLLIDED_BELOW {
-                    ground = from_na_vec(hit.hit.normal1.into_inner()).try_normalize();
+                    ground = from_rp_vec(hit.hit.normal1).try_normalize();
                 }
                 flags |= flag;
             },
         );
         Pass {
-            translation: from_na_vec(movement.translation),
+            translation: from_rp_vec(movement.translation),
             grounded: movement.grounded,
             flags,
             ground,
@@ -136,21 +131,15 @@ impl PhysicsWorld {
         if pass.translation.y <= motion.y.max(0.0) + 1e-5 || ahead == Vec3::ZERO {
             return None;
         }
-        let center = from_na_vec(m.start.translation.vector) + pass.translation;
+        let center = from_rp_vec(m.start.translation) + pass.translation;
         let feet = center - Vec3::Y * (m.half_segment + m.radius);
         let drop = m.step + m.skin + GROUND_PROBE;
         let origin = feet + ahead * m.radius + Vec3::Y * drop;
-        let ray = Ray::new(to_na_vec(origin).into(), -Vector::y());
-        let (bodies, colliders) = (&self.bodies, &self.colliders);
-        let (_, hit) = self.query_pipeline.cast_ray_and_get_normal(
-            bodies,
-            colliders,
-            &ray,
-            drop * 2.0,
-            true,
-            m.filter,
-        )?;
-        let n = from_na_vec(hit.normal).try_normalize()?;
+        let ray = Ray::new(to_rp_vec(origin), -Vector::Y);
+        let (_, hit) = self
+            .queries(m.filter)
+            .cast_ray_and_get_normal(&ray, drop * 2.0, true)?;
+        let n = from_rp_vec(hit.normal).try_normalize()?;
         (n.y > FLAG_EPS && !m.walkable(n)).then_some(n)
     }
 
@@ -167,7 +156,7 @@ impl PhysicsWorld {
         let m = MoveCtx {
             controller: controller(cc, cap.radius),
             shape: cap.shape(),
-            start: Isometry::translation(cap.center.x, cap.center.y, cap.center.z),
+            start: Pose::from_translation(to_rp_vec(cap.center)),
             half_segment: cap.half_segment,
             radius: cap.radius,
             skin: cc.skin_width,
@@ -180,7 +169,7 @@ impl PhysicsWorld {
             // Again, without the push into the slope: it blocks like a wall.
             pass = self.pass(&m, off_slope(motion, steep));
         }
-        let end = Translation::from(to_na_vec(pass.translation)) * m.start;
+        let end = m.start.append_translation(to_rp_vec(pass.translation));
         let below = pass.ground.or_else(|| self.ground_below(&m, &end));
         let on_ground = pass.grounded || pass.flags & COLLIDED_BELOW != 0;
         if !(on_ground || below.is_some_and(|n| m.walkable(n))) {
@@ -200,7 +189,7 @@ impl PhysicsWorld {
 struct MoveCtx<'a> {
     controller: KinematicCharacterController,
     shape: Capsule,
-    start: Isometry<Real>,
+    start: Pose,
     half_segment: f32,
     radius: f32,
     skin: f32,

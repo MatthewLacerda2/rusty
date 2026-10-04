@@ -11,7 +11,7 @@ use rapier3d::prelude::*;
 
 use super::build::{build_shape, collider_inputs};
 use super::compound::world_pose;
-use super::convert::from_na_point;
+use super::convert::from_rp_vec;
 use crate::scene::Scene;
 
 /// Segments around a round shape's circumference.
@@ -42,7 +42,7 @@ pub fn collider_world_triangles(scene: &Scene, id: u32) -> Option<ColliderTriang
     let (points, triangles, convex) = tessellate(collider.shape())?;
     let vertices = points
         .into_iter()
-        .map(|p| pose.pos + pose.rot * from_na_point(p))
+        .map(|p| pose.pos + pose.rot * from_rp_vec(p))
         .collect();
     Some(ColliderTriangles {
         vertices,
@@ -51,7 +51,7 @@ pub fn collider_world_triangles(scene: &Scene, id: u32) -> Option<ColliderTriang
     })
 }
 
-type Tessellation = (Vec<Point<f32>>, Vec<[u32; 3]>, bool);
+type Tessellation = (Vec<Vector>, Vec<[u32; 3]>, bool);
 
 /// The local-space triangles of every shape `build_shape` produces.
 fn tessellate(shape: &dyn Shape) -> Option<Tessellation> {

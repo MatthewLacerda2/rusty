@@ -13,7 +13,7 @@
 //!   3. `sync_from_rapier`— write the integrated transforms + velocities back onto
 //!      the entities, and return the trigger and collision events scripts expect.
 //!
-//! glam <-> nalgebra conversion is confined to `convert`; the engine stays glam.
+//! Engine-glam <-> rapier-math conversion is confined to `convert`.
 
 use crate::core::collections::Map;
 
@@ -22,7 +22,7 @@ use rapier3d::prelude::*;
 use super::build::{body_state, gravity_scale, EntityBodyState};
 use super::collision_events::CollisionEvents;
 use super::compound::{world_to_local, BodyPlan};
-use super::convert::{from_iso, from_na_vec, to_iso, to_na_vec};
+use super::convert::{from_pose, from_rp_vec, to_pose, to_rp_vec};
 use super::joints::JointMap;
 use super::live::body_type;
 use super::trigger_events::{self, TriggerEvents};
@@ -30,19 +30,20 @@ use super::PhysicsEvents;
 use crate::scene::Scene;
 
 pub struct PhysicsWorld {
-    gravity: Vector<Real>,
+    gravity: Vector,
     pub(super) integration_parameters: IntegrationParameters,
     physics_pipeline: PhysicsPipeline,
     pub(super) islands: IslandManager,
-    broad_phase: DefaultBroadPhase,
+    /// Also the scene-query tree: `queries` borrows a view of it.
+    pub(super) broad_phase: DefaultBroadPhase,
     pub(super) narrow_phase: NarrowPhase,
     pub(super) bodies: RigidBodySet,
     pub(super) colliders: ColliderSet,
     pub(super) impulse_joints: ImpulseJointSet,
     pub(super) multibody_joints: MultibodyJointSet,
+    /// rapier's soft bodies; rusty has none, but the step takes the set.
+    pub(super) soft_bodies: SoftBodySet,
     ccd_solver: CCDSolver,
-    /// Exposed to the `physics` module (see `query`) for ray casts.
-    pub(super) query_pipeline: QueryPipeline,
     /// The body layout last built (#445): owner entity id -> the collider
     /// entities its body carries. Diffed each tick to rebuild changed bodies.
     pub(super) plan: BodyPlan,
@@ -71,7 +72,7 @@ impl PhysicsWorld {
     /// owner, carrying every collider attached to it (see `compound`).
     pub fn from_scene(scene: &Scene) -> Self {
         let mut world = Self {
-            gravity: vector![0.0, -9.81, 0.0],
+            gravity: Vector::new(0.0, -9.81, 0.0),
             integration_parameters: IntegrationParameters::default(),
             physics_pipeline: PhysicsPipeline::new(),
             islands: IslandManager::new(),
@@ -81,8 +82,8 @@ impl PhysicsWorld {
             colliders: ColliderSet::new(),
             impulse_joints: ImpulseJointSet::new(),
             multibody_joints: MultibodyJointSet::new(),
+            soft_bodies: SoftBodySet::new(),
             ccd_solver: CCDSolver::new(),
-            query_pipeline: QueryPipeline::new(),
             plan: BodyPlan::new(),
             id_to_body: Map::default(),
             collider_to_id: Map::default(),
@@ -95,8 +96,9 @@ impl PhysicsWorld {
         world.build_bodies(scene);
         world.resync_joints(scene);
         world.sync_enabled(scene);
-        // Prime the query pipeline so a raycast works before the first step.
-        world.query_pipeline.update(&world.bodies, &world.colliders);
+        // Prime the query tree so a raycast works before the first step.
+        let all: Vec<ColliderHandle> = world.colliders.iter().map(|(h, _)| h).collect();
+        world.refresh_query_tree(&all);
         world
     }
 
@@ -136,7 +138,7 @@ impl PhysicsWorld {
             // handoff, #466): the body changes in place at the entity's current
             // pose, so its colliders, joints and contacts survive.
             body.set_body_type(class, true);
-            body.set_position(to_iso(snap.pos, snap.rot), true);
+            body.set_position(to_pose(snap.pos, snap.rot), true);
         }
         // Re-apply the CCD mode each tick so `Physics.SetCollisionDetection`
         // toggled mid-play takes effect (mirrors the `gravity_scale` re-apply).
@@ -144,16 +146,16 @@ impl PhysicsWorld {
         if snap.kinematic {
             // A pure mover (Unity's kinematic Rigidbody): it goes exactly where
             // its Transform says, through anything in the way.
-            body.set_next_kinematic_position(to_iso(snap.pos, snap.rot));
+            body.set_next_kinematic_position(to_pose(snap.pos, snap.rot));
         } else if snap.is_static {
-            body.set_position(to_iso(snap.pos, snap.rot), true);
+            body.set_position(to_pose(snap.pos, snap.rot), true);
         } else {
             // Dynamic: trust rapier for pose, but let scripts inject linear and
             // angular velocity (SetVelocity / SetAngularVelocity / AddForce mutate
             // the component between ticks) and re-apply `use_gravity` so toggling
             // it at runtime takes effect.
-            body.set_linvel(to_na_vec(snap.vel), true);
-            body.set_angvel(to_na_vec(snap.angular_velocity), true);
+            body.set_linvel(to_rp_vec(snap.vel), true);
+            body.set_angvel(to_rp_vec(snap.angular_velocity), true);
             body.set_gravity_scale(gravity_scale(snap.use_gravity), true);
         }
     }
@@ -167,7 +169,7 @@ impl PhysicsWorld {
         let pre_solve = self.snapshot_velocities();
 
         self.physics_pipeline.step(
-            &self.gravity,
+            self.gravity,
             &self.integration_parameters,
             &mut self.islands,
             &mut self.broad_phase,
@@ -176,8 +178,8 @@ impl PhysicsWorld {
             &mut self.colliders,
             &mut self.impulse_joints,
             &mut self.multibody_joints,
+            &mut self.soft_bodies,
             &mut self.ccd_solver,
-            Some(&mut self.query_pipeline),
             &(),
             &(),
         );
@@ -226,7 +228,7 @@ impl PhysicsWorld {
         // step where its Transform put it, so writing it back would only add
         // world↔local rounding to every animated bone each tick.
         if body.is_dynamic() {
-            let (pos, rot) = from_iso(body.position());
+            let (pos, rot) = from_pose(body.position());
             let (local_pos, local_rot) = world_to_local(scene, owner, pos, rot);
             if let Some(mut t) = scene.world.transform_mut(owner) {
                 t.position = local_pos;
@@ -235,8 +237,8 @@ impl PhysicsWorld {
         }
         if let Some(mut rb) = scene.world.rigidbody_mut(owner) {
             if !rb.is_kinematic {
-                rb.velocity = from_na_vec(*body.linvel());
-                rb.angular_velocity = from_na_vec(*body.angvel());
+                rb.velocity = from_rp_vec(body.linvel());
+                rb.angular_velocity = from_rp_vec(body.angvel());
             }
         }
         for &id in ids {

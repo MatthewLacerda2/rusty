@@ -135,11 +135,10 @@ fn contact_coefficients(floor: PhysicsMaterial, ball: PhysicsMaterial) -> (f32, 
     let contact = world
         .narrow_phase
         .contact_pairs()
-        .flat_map(|p| p.manifolds.iter())
-        .flat_map(|m| m.data.solver_contacts.iter())
-        .next()
+        .flat_map(|p| p.solver_manifolds().iter())
+        .find(|m| !m.data.solver_contacts.is_empty())
         .expect("the resting sphere touches the floor");
-    (contact.friction, contact.restitution)
+    (contact.data.friction, contact.data.restitution)
 }
 
 fn material(friction: f32, bounce: f32, fc: CombineMode, bc: CombineMode) -> PhysicsMaterial {

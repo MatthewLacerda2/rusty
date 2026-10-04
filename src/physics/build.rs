@@ -250,9 +250,9 @@ fn build_mesh_shape(convex: bool, scale: Vec3, mesh: (&[[f32; 3]], &[u32])) -> O
     if positions.len() < 4 {
         return None;
     }
-    let points: Vec<Point<f32>> = positions
+    let points: Vec<Vector> = positions
         .iter()
-        .map(|p| Point::new(p[0] * scale.x, p[1] * scale.y, p[2] * scale.z))
+        .map(|p| Vector::new(p[0] * scale.x, p[1] * scale.y, p[2] * scale.z))
         .collect();
 
     if convex {
@@ -267,7 +267,9 @@ fn build_mesh_shape(convex: bool, scale: Vec3, mesh: (&[[f32; 3]], &[u32])) -> O
         if triangles.is_empty() {
             return None;
         }
-        Some(ColliderBuilder::trimesh(points, triangles).build())
+        ColliderBuilder::trimesh(points, triangles)
+            .ok()
+            .map(|b| b.build())
     }
 }
 
@@ -284,6 +286,7 @@ pub(super) fn interaction_groups(layer: u8, filter_mask: u32) -> InteractionGrou
     InteractionGroups::new(
         Group::from_bits_truncate(membership),
         Group::from_bits_truncate(filter_mask),
+        InteractionTestMode::And,
     )
 }
 

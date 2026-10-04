@@ -14,13 +14,13 @@
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::convert::{from_na_point, from_na_vec, to_na_vec};
+use super::convert::{from_rp_vec, to_rp_vec};
 use super::world::PhysicsWorld;
 
 /// Whether `collider` takes part in queries: it is enabled (a deactivated
 /// compound part is not) and so is the body carrying it (a deactivated owner
 /// disables its whole body). The flags are pushed each physics tick, the same
-/// cadence at which the query pipeline sees poses.
+/// cadence at which the query tree sees poses.
 pub(super) fn is_live(bodies: &RigidBodySet, collider: &Collider) -> bool {
     collider.is_enabled()
         && collider
@@ -52,6 +52,32 @@ pub(super) fn sort_hits(hits: &mut [RayHit]) {
 }
 
 impl PhysicsWorld {
+    /// A scene-query view of the live world under `filter`. rapier keeps the
+    /// query tree inside the broad phase, refreshed at the end of every step;
+    /// [`Self::refresh_query_tree`] covers moves made between steps.
+    pub(super) fn queries<'a>(&'a self, filter: QueryFilter<'a>) -> QueryPipeline<'a> {
+        self.broad_phase.as_query_pipeline(
+            self.narrow_phase.query_dispatcher(),
+            &self.bodies,
+            &self.colliders,
+            filter,
+        )
+    }
+
+    /// Re-seat `handles` in the query tree at their current poses, so a query
+    /// made before the next step sees them where they now are (scene load, a
+    /// bone-carried collider). The next step folds the change in as usual.
+    pub(super) fn refresh_query_tree(&mut self, handles: &[ColliderHandle]) {
+        for &handle in handles {
+            if let Some(collider) = self.colliders.get(handle) {
+                let aabb =
+                    collider.compute_broad_phase_aabb(&self.integration_parameters, &self.bodies);
+                self.broad_phase
+                    .set_aabb(&self.integration_parameters, handle, aabb);
+            }
+        }
+    }
+
     /// Closest collider hit by `ray` within `max_toi`, as (entity id, toi).
     pub fn cast_ray(&self, origin: Vec3, dir: Vec3, max_toi: f32) -> Option<(u32, f32)> {
         self.cast_ray_filtered(origin, dir, max_toi, |_| true)
@@ -97,11 +123,11 @@ impl PhysicsWorld {
         max_toi: f32,
         accept: impl Fn(u32) -> bool,
     ) -> Option<RayHit> {
-        let ray = Ray::new(to_na_vec(origin).into(), to_na_vec(dir.normalize()));
+        let ray = Ray::new(to_rp_vec(origin), to_rp_vec(dir.normalize()));
         let predicate = self.handle_accepts(&accept);
         let filter = QueryFilter::default().predicate(&predicate);
-        self.query_pipeline
-            .cast_ray_and_get_normal(&self.bodies, &self.colliders, &ray, max_toi, true, filter)
+        self.queries(filter)
+            .cast_ray_and_get_normal(&ray, max_toi, true)
             .and_then(|(handle, hit)| self.ray_hit(&ray, handle, hit))
     }
 
@@ -116,22 +142,14 @@ impl PhysicsWorld {
         max_toi: f32,
         accept: impl Fn(u32) -> bool,
     ) -> Vec<RayHit> {
-        let ray = Ray::new(to_na_vec(origin).into(), to_na_vec(dir.normalize()));
+        let ray = Ray::new(to_rp_vec(origin), to_rp_vec(dir.normalize()));
         let predicate = self.handle_accepts(&accept);
         let filter = QueryFilter::default().predicate(&predicate);
-        let mut hits = Vec::new();
-        self.query_pipeline.intersections_with_ray(
-            &self.bodies,
-            &self.colliders,
-            &ray,
-            max_toi,
-            true,
-            filter,
-            |handle, hit| {
-                hits.extend(self.ray_hit(&ray, handle, hit));
-                true
-            },
-        );
+        let mut hits: Vec<RayHit> = self
+            .queries(filter)
+            .intersect_ray(ray, max_toi, true)
+            .filter_map(|(handle, _, hit)| self.ray_hit(&ray, handle, hit))
+            .collect();
         sort_hits(&mut hits);
         hits
     }
@@ -141,25 +159,17 @@ impl PhysicsWorld {
     /// player's own capsule around the camera) is looked past rather than hit at 0.
     /// How the UI finds the wall in front of a world canvas (#429).
     pub fn first_surface_ahead(&self, origin: Vec3, dir: Vec3, max_toi: f32) -> Option<RayHit> {
-        let ray = Ray::new(to_na_vec(origin).into(), to_na_vec(dir.normalize()));
+        let ray = Ray::new(to_rp_vec(origin), to_rp_vec(dir.normalize()));
         let accept = |_: u32| true;
         let predicate = self.handle_accepts(&accept);
         let filter = QueryFilter::default()
             .exclude_sensors()
             .predicate(&predicate);
-        let mut hits = Vec::new();
-        self.query_pipeline.intersections_with_ray(
-            &self.bodies,
-            &self.colliders,
-            &ray,
-            max_toi,
-            true,
-            filter,
-            |handle, hit| {
-                hits.extend(self.ray_hit(&ray, handle, hit));
-                true
-            },
-        );
+        let mut hits: Vec<RayHit> = self
+            .queries(filter)
+            .intersect_ray(ray, max_toi, true)
+            .filter_map(|(handle, _, hit)| self.ray_hit(&ray, handle, hit))
+            .collect();
         sort_hits(&mut hits);
         hits.into_iter().find(|h| h.distance > 1e-3)
     }
@@ -173,24 +183,15 @@ impl PhysicsWorld {
         if length <= 1e-3 {
             return false;
         }
-        let ray = Ray::new(to_na_vec(from).into(), to_na_vec(delta / length));
+        let ray = Ray::new(to_rp_vec(from), to_rp_vec(delta / length));
         let predicate = self.handle_accepts(&accept);
         let filter = QueryFilter::default()
             .exclude_sensors()
             .predicate(&predicate);
-        let mut blocked = false;
-        self.query_pipeline.intersections_with_ray(
-            &self.bodies,
-            &self.colliders,
-            &ray,
-            length,
-            true,
-            filter,
-            |_, hit| {
-                blocked = hit.time_of_impact > 1e-3;
-                !blocked
-            },
-        );
+        let blocked = self
+            .queries(filter)
+            .intersect_ray(ray, length, true)
+            .any(|(_, _, hit)| hit.time_of_impact > 1e-3);
         blocked
     }
 
@@ -201,8 +202,8 @@ impl PhysicsWorld {
         Some(RayHit {
             id,
             distance: hit.time_of_impact,
-            point: from_na_point(ray.point_at(hit.time_of_impact)),
-            normal: from_na_vec(hit.normal),
+            point: from_rp_vec(ray.point_at(hit.time_of_impact)),
+            normal: from_rp_vec(hit.normal),
         })
     }
 

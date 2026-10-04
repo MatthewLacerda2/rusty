@@ -15,7 +15,7 @@ use crate::core::collections::Map;
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::convert::from_na_vec;
+use super::convert::from_rp_vec;
 use super::world::PhysicsWorld;
 
 /// One contact as seen by the entity receiving the callback.
@@ -159,9 +159,9 @@ impl PhysicsWorld {
             .filter(|(_, b)| !b.is_fixed())
             .map(|(h, b)| {
                 let v = BodyVelocity {
-                    lin: from_na_vec(*b.linvel()),
-                    ang: from_na_vec(*b.angvel()),
-                    com: from_na_vec(b.center_of_mass().coords),
+                    lin: from_rp_vec(b.linvel()),
+                    ang: from_rp_vec(b.angvel()),
+                    com: from_rp_vec(b.center_of_mass()),
                 };
                 (h, v)
             })
@@ -191,7 +191,7 @@ impl PhysicsWorld {
             let (Some(body1), Some(body2)) = bodies else {
                 continue;
             };
-            let Some((point, normal12)) = strongest_contact(pair) else {
+            let Some((point, normal12)) = strongest_contact(pair, &self.bodies) else {
                 continue;
             };
             let vel = |b| {
@@ -229,21 +229,25 @@ impl PhysicsWorld {
 /// resting contact steady while leaving speculative ones out.
 const TOUCH_TOLERANCE: f32 = 0.005;
 
-/// The pair's strongest touching contact: among manifolds with a touching
-/// solver point, the one with the largest solver impulse (ties keep the first),
-/// and its deepest point. Returns the world point and the manifold normal, which
-/// points from collider 1 toward collider 2. `None` when nothing touches.
-fn strongest_contact(pair: &ContactPair) -> Option<(Vec3, Vec3)> {
+/// The pair's strongest touching contact: among the solver's manifolds with a
+/// touching solver point, the one with the largest solver impulse (ties keep the
+/// first), and its deepest point. Returns the world point (the midpoint of the two
+/// surface points, rapier's effective contact point) and the manifold normal,
+/// which points from collider 1 toward collider 2. `None` when nothing touches.
+fn strongest_contact(pair: &ContactPair, bodies: &RigidBodySet) -> Option<(Vec3, Vec3)> {
     let deepest = |m: &ContactManifold| {
         m.data
             .solver_contacts
             .iter()
             .filter(|c| c.dist <= TOUCH_TOLERANCE)
             .min_by(|x, y| x.dist.total_cmp(&y.dist))
-            .map(|c| c.point)
+            .map(|c| {
+                let (p1, p2) = m.data.solver_contact_world_points(c, bodies);
+                (p1 + p2) * 0.5
+            })
     };
     let (manifold, point) = pair
-        .manifolds
+        .solver_manifolds()
         .iter()
         .filter_map(|m| Some((m, deepest(m)?)))
         .fold(
@@ -253,7 +257,7 @@ fn strongest_contact(pair: &ContactPair) -> Option<(Vec3, Vec3)> {
                 _ => Some(cand),
             },
         )?;
-    Some((from_na_vec(point.coords), from_na_vec(manifold.data.normal)))
+    Some((from_rp_vec(point), from_rp_vec(manifold.data.normal)))
 }
 
 /// Sum of a manifold's normal impulses (rapier's own helper trait is private).
