@@ -20,7 +20,7 @@ fn quad(uv: fn(f32, f32) -> [f32; 2]) -> Vec<[f32; 4]> {
 /// An open, smooth-shaded cylinder tube (radius 1, height 1) whose U wraps the
 /// circumference and V runs up the axis — the reference mesh: its exact MikkTSpace
 /// tangent is the circumferential direction dP/dU = (-sin θ, 0, -cos θ), right-handed.
-fn cylinder(segments: u32) -> (Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<[f32; 2]>, Vec<u32>) {
+fn cylinder(segments: u32) -> Mesh {
     let (mut pos, mut nrm, mut uv, mut idx) = (vec![], vec![], vec![], vec![]);
     for i in 0..=segments {
         let u = i as f32 / segments as f32;
@@ -36,7 +36,14 @@ fn cylinder(segments: u32) -> (Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<[f32; 2]>, Vec<
         // Outward-facing (counter-clockwise seen from outside).
         idx.extend_from_slice(&[a, b, a + 1, b, b + 1, a + 1]);
     }
-    (pos, nrm, uv, idx)
+    Mesh { pos, nrm, uv, idx }
+}
+
+struct Mesh {
+    pos: Vec<[f32; 3]>,
+    nrm: Vec<[f32; 3]>,
+    uv: Vec<[f32; 2]>,
+    idx: Vec<u32>,
 }
 
 #[test]
@@ -64,7 +71,7 @@ fn mirrored_u_flips_tangent_and_handedness() {
 
 #[test]
 fn cylinder_matches_its_analytic_reference_tangent() {
-    let (pos, nrm, uv, idx) = cylinder(32);
+    let Mesh { pos, nrm, uv, idx } = cylinder(32);
     let tangents = generate_tangents(&pos, &nrm, &uv, &idx);
     for (i, t) in tangents.iter().enumerate() {
         let (s, c) = (uv[i][0] * TAU).sin_cos();
@@ -80,7 +87,12 @@ fn cylinder_matches_its_analytic_reference_tangent() {
 #[test]
 fn every_tangent_is_unit_orthogonal_to_its_normal_with_signed_w() {
     // Normals tilted off the surface, so orthogonalization actually has work to do.
-    let (pos, mut nrm, uv, idx) = cylinder(12);
+    let Mesh {
+        pos,
+        mut nrm,
+        uv,
+        idx,
+    } = cylinder(12);
     for n in &mut nrm {
         *n = (Vec3::from_array(*n) + Vec3::new(0.3, 0.5, -0.2)).to_array();
     }

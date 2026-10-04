@@ -47,10 +47,7 @@ pub fn generate_tangents(
     mesh.tangents
         .into_iter()
         .zip(&normals)
-        .map(|(t, n)| {
-            t.filter(|t| is_unit_finite(t))
-                .unwrap_or_else(|| fallback(*n))
-        })
+        .map(|(t, n)| t.filter(is_unit_finite).unwrap_or_else(|| fallback(*n)))
         .collect()
 }
 
