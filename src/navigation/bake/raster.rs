@@ -22,17 +22,16 @@
 //! clips only into that rectangle's cells and gets the very solids a full bake
 //! would have there.
 
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 
 use super::super::NavigationGraph;
+use super::plane::{top_plane, Plane, TOP_EPS};
 use super::region::CellRect;
 use crate::physics::collider_world_triangles;
 use crate::scene::Scene;
 
 /// Fraction of the cell size the clip square is shrunk by on each side.
 const EDGE_EPS: f32 = 1e-4;
-/// Two triangle tops within this of each other count as the same top.
-const TOP_EPS: f32 = 1e-3;
 
 /// One solid interval in one cell column, as rasterised.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -41,6 +40,11 @@ pub(super) struct Solid {
     pub min: f32,
     pub max: f32,
     pub walkable: bool,
+    /// The plane the top follows across the cell (#781), `None` when no walkable
+    /// triangle forms it.
+    pub plane: Option<Plane>,
+    /// The highest lower walkable top merged under this one (`-∞` with none).
+    pub floor: f32,
 }
 
 /// A clipped polygon: at most 7 vertices (a triangle cut by four planes).
@@ -93,12 +97,14 @@ pub(super) fn rasterize_mesh(
     let mut column = ColumnSink::new(convex);
     for tri in triangles {
         let walkable = walkable(tri);
-        clip_into_cells(g, tri, region, |cell, min, max| {
+        clip_into_cells(g, tri, region, |cell, centre, min, max| {
             column.add(Solid {
                 cell,
                 min,
                 max,
                 walkable,
+                plane: walkable.then(|| Plane::of(tri, centre)).flatten(),
+                floor: f32::NEG_INFINITY,
             })
         });
     }
@@ -135,6 +141,7 @@ impl ColumnSink {
             let mut acc = group[0];
             for s in &group[1..] {
                 acc.min = acc.min.min(s.min);
+                acc.plane = top_plane((acc.max, acc.plane), (s.max, s.plane));
                 if s.max > acc.max + TOP_EPS {
                     acc.walkable = s.walkable;
                 } else if s.max >= acc.max - TOP_EPS {
@@ -156,12 +163,12 @@ fn faces_up(t: [Vec3; 3], max_slope: f32, convex: bool) -> bool {
 }
 
 /// Clip `tri` against every column of `region` it crosses, reporting
-/// `(cell, min_y, max_y)`.
+/// `(cell, cell centre, min_y, max_y)`.
 fn clip_into_cells(
     g: &NavigationGraph,
     tri: [Vec3; 3],
     region: CellRect,
-    mut emit: impl FnMut(u32, f32, f32),
+    mut emit: impl FnMut(u32, Vec2, f32, f32),
 ) {
     let Some(cells) = footprint(g, &tri).and_then(|f| f.intersection(region)) else {
         return;
@@ -196,7 +203,7 @@ fn clip_into_cells(
             }
             let ys = cell.0[..cell.1].iter().map(|v| v.y);
             let (min, max) = ys.fold((f32::MAX, f32::MIN), |(a, b), y| (a.min(y), b.max(y)));
-            emit(g.index(gx, gz) as u32, min, max);
+            emit(g.index(gx, gz) as u32, Vec2::new(cx, cz), min, max);
         }
     }
 }

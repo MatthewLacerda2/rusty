@@ -183,7 +183,9 @@ impl NavigationGraph {
     /// within the step/slope limits, enough headroom), so agents climb ramps and
     /// stairs but never slide up a wall face (#130). The agent then stands on the
     /// span it reached — the floor it walked onto, not whichever floor of that
-    /// column is highest (#454) — with its Transform `base_offset` above it (#666).
+    /// column is highest (#454) — at that floor's height under its XZ, so it follows
+    /// a ramp instead of riding its cell tops (#781), with its Transform
+    /// `base_offset` above it (#666).
     /// Off the navmesh it does not move. `body` is the agent's Transform position.
     fn slide(&self, agent: &mut NavMeshAgentComponent, body: Vec3, delta_time: f32) -> Vec3 {
         let current_pos = agent.feet(body);
@@ -214,7 +216,7 @@ impl NavigationGraph {
             None => agent.velocity.z = 0.0,
         }
 
-        final_pos.y = self.spans[on.index as usize].y;
+        final_pos.y = self.surface_y(on, final_pos.x, final_pos.z);
         agent.body(final_pos)
     }
 }

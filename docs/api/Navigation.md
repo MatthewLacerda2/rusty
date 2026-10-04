@@ -8,7 +8,9 @@ once, and paths climb stairs and ramps from one floor to the next in real `y`.
 The bake reads the **real geometry** of every active, static, non-trigger collider: the
 same shapes physics collides with (rotated boxes, ramps, spheres, capsules, convex hulls
 and triangle meshes), rasterised into each cell column. A ramp bakes as a slope, not a
-plateau at its highest point. **Where there is no collider there is no navmesh**: no
+plateau at its highest point: each span also keeps the plane of the surface across its
+cell, so a `NavMeshAgent` on a ramp stands on the slope under its feet and climbs it
+smoothly, not in one-cell steps (#781). **Where there is no collider there is no navmesh**: no
 implicit ground past the level's edge, and an empty scene bakes nothing (as in Unity).
 Carving `NavMeshObstacle`s cut their footprint out of it (see `NavMeshObstacle`),
 `NavMeshModifierVolume`s give parts of it a navigation area with its own cost (below), and

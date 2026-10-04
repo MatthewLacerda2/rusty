@@ -30,6 +30,7 @@ mod obstacle;
 mod offmesh;
 mod path;
 mod snap;
+mod surface;
 #[cfg(test)]
 pub(crate) mod test_support;
 #[cfg(test)]
@@ -56,3 +57,4 @@ pub use crate::scene::nav_settings::{
     NavMeshSettings, DEFAULT_AGENT_HEIGHT, DEFAULT_AGENT_RADIUS, DEFAULT_LINK_SPACING,
 };
 pub use snap::SNAP_RINGS;
+pub use surface::Surface;

@@ -17,6 +17,7 @@
 
 use super::super::{NavSpan, NavigationGraph};
 use super::columns::Columns;
+use super::plane::{top_plane, Plane, TOP_EPS};
 use super::raster::Solid;
 use super::region::CellRect;
 
@@ -33,6 +34,8 @@ impl NavigationGraph {
                 .then(a.min.total_cmp(&b.min))
                 .then(a.max.total_cmp(&b.max))
                 .then(a.walkable.cmp(&b.walkable))
+                .then(Plane::order(a.plane, b.plane))
+                .then(a.floor.total_cmp(&b.floor))
         });
         let mut out = Columns::with_capacity(region.cells());
         let mut next = 0;
@@ -58,6 +61,7 @@ fn open_spans(column: &[Solid], agent_height: f32) -> impl Iterator<Item = NavSp
             y: s.max,
             ceiling,
             area: super::super::WALKABLE_AREA,
+            surface: Plane::surface(s.plane, s.max, s.floor),
         })
     })
 }
@@ -69,12 +73,25 @@ fn merge_column(solids: &[Solid], flag_merge: f32, out: &mut Vec<Solid>) {
         match out.last_mut() {
             Some(last) if s.min <= last.max + TOUCH_EPS => {
                 let top = last.max.max(s.max);
+                last.plane = top_plane((last.max, last.plane), (s.max, s.plane));
+                last.floor = last.floor.max(s.floor).max(lower_floor(last, &s));
                 last.walkable = (last.walkable && last.max >= top - flag_merge)
                     || (s.walkable && s.max >= top - flag_merge);
                 last.max = top;
             }
             _ => out.push(s),
         }
+    }
+}
+
+/// The lower of two merging tops when it is walkable and clearly below the other:
+/// the floor the higher one's plane may not dig under (`-∞` otherwise).
+fn lower_floor(a: &Solid, b: &Solid) -> f32 {
+    let (low, high) = if a.max <= b.max { (a, b) } else { (b, a) };
+    if low.walkable && low.plane.is_some() && low.max < high.max - TOP_EPS {
+        low.max
+    } else {
+        f32::NEG_INFINITY
     }
 }
 
@@ -88,6 +105,8 @@ mod tests {
             min,
             max,
             walkable,
+            plane: None,
+            floor: f32::NEG_INFINITY,
         }
     }
 
