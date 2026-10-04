@@ -7,18 +7,20 @@ surface is lit** (#638) — its albedo, normal, metallic, roughness and occlusio
 So a decal is lit, shadowed and occluded exactly like the wall it lands on: blood
 goes dark in a dark corridor, a wet patch catches the flashlight's highlight, a
 bullet hole's rim catches the muzzle flash. Spawn it from the hit point and surface
-normal the cast already returns. The registry is a bounded FIFO (256) — oldest
-decals are evicted past the cap.
+normal the cast already returns, and pass the entity it hit as the `owner` so the
+mark moves with it. The registry is a bounded FIFO (256): past the cap the oldest
+decal fades out rather than vanishing.
 
 ```lua
 local hit, id, dist, px, py, pz, nx, ny, nz = Physics.Raycast(ox,oy,oz, dx,dy,dz, self_id)
-if hit then Decals.Spawn(px, py, pz, nx, ny, nz) end
+if hit then Decals.Spawn(px, py, pz, nx, ny, nz, { owner = id }) end
 ```
 
 | Function | Signature | Returns |
 |---|---|---|
-| `Decals.Spawn` | `(x,y,z, nx,ny,nz, [size], [texture], [rotation_deg], [r,g,b,a])` or `(x,y,z, nx,ny,nz, opts)` | — |
-| `Decals.Count` | `()` | live decal count |
+| `Decals.Spawn` | `(x,y,z, nx,ny,nz, [size], [texture], [rotation_deg], [r,g,b,a])` or `(x,y,z, nx,ny,nz, opts)` | the decal's id |
+| `Decals.Remove` | `(id, [fade])` | `true` if a live decal had that id |
+| `Decals.Count` | `()` | live decal count, including any still fading out |
 | `Decals.Clear` | `()` | — (drops every live decal) |
 
 **Positional form.** `size` (default `0.5`) is the stamp's width/height in world
@@ -31,8 +33,9 @@ only**.
 **`opts` form.** A table in place of the trailing arguments, every key optional:
 `size`, `depth` (how far the box reaches, centred on the hit), `rotation`
 (degrees), `color` (`{r, g, b, a}`), `texture`, and **`material`** — the name of a
-library material (`Material.DefineAsset`) the decal stamps. An unknown key, or a
-material that does not exist, is an error and stamps nothing.
+library material (`Material.DefineAsset`) the decal stamps — plus the lifecycle
+keys `owner`, `lifetime` and `fade` (below). An unknown key, a material that does
+not exist, or an `owner` entity that does not exist is an error and stamps nothing.
 
 ```lua
 Material.DefineAsset("blood", {
@@ -41,6 +44,37 @@ Material.DefineAsset("blood", {
   decal = { metallic = 0 },        -- leave the wall's metalness alone
 })
 Decals.Spawn(px, py, pz, nx, ny, nz, { material = "blood", size = 1.2, rotation = math.random(0, 359) })
+```
+
+### Sticking to what was hit, and ageing out
+
+- **`owner`** (an entity id): the decal sticks to that entity. Its box is kept in
+  the entity's space, so a bullet hole on a swinging door, a sliding crate or a
+  moving car stays on it. While the owner is inactive its decals are hidden (they
+  come back with it); when it is destroyed they are dropped. Any entity works,
+  including a skinned character's **bone** (bones are GameObjects): the mark
+  follows that bone rigidly, though it does not bend with the skin around a joint.
+  Without an owner a decal stays where it was stamped in world space.
+- **`lifetime`** (seconds): the decal is removed once it is this old. **`fade`**
+  (seconds, default `0`): it fades out over the last `fade` seconds of its
+  lifetime, so blood dries away and scorch cools instead of popping. Age is game
+  time on the fixed tick: it slows with `Time.SetTimeScale` and stops at scale `0`, and a replay ages
+  every decal identically. Decals age only in Play.
+- **`Decals.Remove(id, [fade])`** removes one decal now, or fades it out over
+  `fade` seconds. Ids are never reused, so a stale id simply returns `false`.
+- **The cap.** At most 256 decals are whole at once. Each new decal past that
+  starts the oldest whole one fading out over 0.5 s; a fading decal no longer
+  counts against the cap. Only if more than 64 are fading at once (above 128
+  stamps a second, sustained) is the oldest dropped outright, so the frame never
+  holds more than 320.
+
+```lua
+-- blood that dries off a moving enemy's arm after 20 s
+local hit, id, _, px, py, pz, nx, ny, nz = Physics.Raycast(ox,oy,oz, dx,dy,dz, self_id)
+if hit then
+  local splat = Decals.Spawn(px, py, pz, nx, ny, nz,
+    { material = "blood", owner = id, lifetime = 20, fade = 5 })
+end
 ```
 
 ### What a decal material changes
@@ -75,6 +109,8 @@ Weights clamp to `[0, 1]`, `angle_fade` to `[0, 90]`. A decal that changes only
   an overlay) shows no world decals, whatever its materials say.
 - **Order.** Decals blend in spawn order (FIFO): a newer decal lands over an older
   one where they overlap.
+- **Fading** scales the decal's coverage, so every channel it changes (albedo,
+  normal, metallic, roughness, occlusion) fades together.
 
 ### Limits and cost
 
