@@ -41,7 +41,7 @@ fn lighting_bake_on_an_empty_scene_returns_a_bool() {
 }
 
 #[test]
-fn probe_bake_returns_a_bool_and_skips_gracefully() {
+fn gpu_probe_bake_returns_a_bool_and_skips_gracefully() {
     let s = session();
     s.eval("Probe.FillGrid(0,0,0, 1,1,1, 1)").unwrap();
     let out = s.eval("return Probe.Bake()").unwrap();
