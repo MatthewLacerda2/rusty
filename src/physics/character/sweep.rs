@@ -23,9 +23,10 @@ const FLAG_EPS: f32 = 1e-3;
 /// How far below the capsule a grounded move looks for the ground's normal,
 /// beyond the skin.
 const GROUND_PROBE: f32 = 0.02;
-/// A floor normal within this of straight up (`1 - n.y`, about 0.08°) is flat
-/// enough for rapier's slope split (`normal × up`) to degenerate.
-const FLAT_FLOOR: f32 = 1e-6;
+/// A floor normal with `1 - n.y` under this (within ~2.5° of straight up) is
+/// near-flat: rapier's slope split (`normal × up`) is ill-conditioned there, and
+/// parry's near-contact normals on a flat face scatter by about a degree.
+const FLAT_FLOOR: f32 = 1e-3;
 
 /// rapier's controller, configured from the component. `radius` is the capsule's
 /// (scaled): autostep must find that much room on top of a step, so a step only

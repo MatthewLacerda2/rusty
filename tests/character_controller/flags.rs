@@ -83,3 +83,37 @@ fn edit_mode_moves_freely_and_tiny_moves_do_nothing() {
     let none = physics::move_character(None, &mut scene, 9999, Vec3::X);
     assert!(none.is_none(), "no controller, no move");
 }
+
+/// Walking a flat floor under scripted gravity covers (nearly) the full stride
+/// every tick. rapier 0.36's controller can read float noise in the downward
+/// part of the move as a slip on a near-flat floor and drop the whole slide,
+/// stalling the character for a tick (#754); the sweep reruns such a move flat.
+/// The 10% allowance is parry's contact-normal noise, which tilts the floor by a
+/// degree or two near contact and costs a stride ~2% on the odd tick (rapier
+/// 0.19 had the same noise, and hitched a diagonal walk to ~74% on one tick).
+#[test]
+fn walking_a_flat_floor_never_stalls() {
+    for velocity in [
+        Vec3::new(0.0, 0.0, 2.5),
+        Vec3::new(1.5, 0.0, -2.0),
+        Vec3::X * 5.0,
+    ] {
+        let mut scene = Scene::new();
+        add_floor(&mut scene);
+        let id = add_character(&mut scene, Vec3::Y * 0.5);
+        let mut physics = PhysicsWorld::from_scene(&scene);
+        walk_for(&mut physics, &mut scene, id, Vec3::ZERO, 30);
+        let mut vy = 0.0;
+        for tick in 0..120 {
+            let before = pos_of(&scene, id);
+            super::walk(&mut physics, &mut scene, id, velocity, &mut vy);
+            let stride = (pos_of(&scene, id) - before) * Vec3::new(1.0, 0.0, 1.0);
+            let wanted = velocity.length() * DT;
+            assert!(
+                stride.length() > wanted * 0.9,
+                "tick {tick} at {velocity}: moved {} of {wanted}",
+                stride.length()
+            );
+        }
+    }
+}
