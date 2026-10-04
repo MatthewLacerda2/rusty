@@ -92,6 +92,10 @@ name more.
 - Open a **draft** PR on the first commit. Title carries `(#N)`. Body: what
   changed / why / effect / decisions, `Closes #N` (one line per issue), and it ends
   with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
+- **A PR that leaves its issue open writes `Refs #N`, never `Closes #N`.** GitHub
+  closes on the keyword whatever the prose around it says: on 2026-10-04 PR #777
+  explained that #769 "stays open until one is chosen" and still closed it on
+  merge.
 - Commit messages end with
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Push often: a dead container takes its uncommitted work with it.
