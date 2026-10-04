@@ -96,7 +96,11 @@ fn a_shot_at_the_head_throws_the_body_the_way_the_shot_went() {
         dhead.x > dhips.x,
         "and tipped the body over: {dhead} vs {dhips}"
     );
-    assert!(dhead.z.abs() < 0.2 * dhead.x, "nowhere else: {dhead}");
+    // A collapsing ragdoll twists a little as it falls: rapier 0.36 drifts the
+    // head ~0.28 m sideways against a ~1.4 m throw (~11°), and the exact figure
+    // differs per CPU architecture (its SIMD solver rounds differently on x86
+    // and ARM). Under 30% (~17°) still rules out a throw to the side.
+    assert!(dhead.z.abs() < 0.3 * dhead.x, "nowhere else: {dhead}");
 }
 
 #[test]
