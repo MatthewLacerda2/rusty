@@ -82,8 +82,9 @@ fn mode_code(mode: ParticleRenderMode) -> u32 {
 }
 
 /// The `light` lane for an emitter: unlit, or lit by the probe field's average
-/// irradiance at `at` (the SH DC band — a puff has no normal) when a probe covers
-/// it, else by the flat ambient the shader reads from the lighting uniform.
+/// irradiance at `at` (the SH DC band — a puff has no normal) over π, the matte
+/// response the shader gives every other light (#807), when a probe covers it,
+/// else by the flat ambient the shader reads from the lighting uniform.
 pub(crate) fn emitter_light(
     scene: &Scene,
     emitter: &ParticleEmitterComponent,
@@ -93,9 +94,10 @@ pub(crate) fn emitter_light(
         return [0.0; 4];
     }
     match scene.probes.sample(at) {
-        // Y00 × its cosine-lobe factor π: the irradiance every direction shares.
+        // Y00 × its cosine-lobe factor π is the irradiance E every direction shares;
+        // a matte puff reflects E / π, so the two π cancel.
         Some(sh) => {
-            let dc = Vec3::from(sh.coeffs[0]) * 0.282_094_8 * std::f32::consts::PI;
+            let dc = Vec3::from(sh.coeffs[0]) * 0.282_094_8;
             [dc.x, dc.y, dc.z, 2.0]
         }
         None => [0.0, 0.0, 0.0, 1.0],

@@ -79,3 +79,20 @@ fn lit_flag_reaches_every_instance() {
     assert!(inst.iter().all(|i| i.light == [0.1, 0.2, 0.3, 2.0]));
     assert!(inst.iter().all(|i| i.sheet[3] == 0.75));
 }
+
+/// A lit emitter under a probe of a uniform sky of radiance L reads L, the matte
+/// response, not the irradiance πL (#807): the same scale as the flat ambient.
+#[test]
+fn a_probe_lights_a_puff_by_the_sky_radiance_not_its_irradiance() {
+    let mut scene = Scene::new();
+    let probe = scene.probes.add_probe(Vec3::ZERO);
+    // A uniform radiance L projects onto the DC band alone: c0 = L · Y00 · 4π.
+    let l = 0.5;
+    let c0 = l * 0.282_094_8 * 4.0 * std::f32::consts::PI;
+    scene.probes.probes[probe].sh.coeffs[0] = [c0; 3];
+    let mut emitter = ParticleEmitterComponent::default();
+    emitter.render.lit = true;
+    let light = emitter_light(&scene, &emitter, Vec3::ZERO);
+    assert!((light[0] - l).abs() < 1e-5, "probe ambient {light:?}");
+    assert_eq!(light[3], 2.0);
+}

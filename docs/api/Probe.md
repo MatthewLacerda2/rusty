@@ -24,6 +24,11 @@ Probes are addressed by **index** (0-based, in placement order), not by entity i
 | `Probe.Bake` *(dev-only)* | `()` | `true` if the bake ran, `false` if no GPU/software adapter was available (skipped) — the real multi-bounce GI bake |
 | `Probe.SampleIrradiance` | `(x, y, z, nx, ny, nz)` | `r, g, b` — interpolated probe irradiance for a surface normal at a world position (linear RGB; black when there are no probes) |
 
+`SampleIrradiance` returns irradiance E (a uniform sky of radiance L reads πL). A
+surface under the probe reflects `albedo / π · E`, the same Lambert response direct
+lights and baked lightmaps give, so a dynamic object under probes and a static one
+under a lightmap of the same surroundings render alike (#807).
+
 `Bake` is the real multi-bounce GI bake (#241, #285): for every probe it captures the
 STATIC scene to a cubemap from the probe's position (dynamic actors excluded) and
 projects that rendered radiance into L2 irradiance SH — so probes pick up the actual
