@@ -42,6 +42,8 @@ use crate::components::{JointComponent, JointKind};
 use crate::scene::Scene;
 
 #[cfg(test)]
+mod impulse_pair_tests;
+#[cfg(test)]
 mod impulse_tests;
 mod load;
 #[cfg(test)]
