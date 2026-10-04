@@ -103,6 +103,25 @@ mod tests {
         assert!((p.slope - Vec2::new(0.0, 0.3)).length() < 1e-6);
         let wall = [Vec3::ZERO, Vec3::X, Vec3::Y];
         assert_eq!(Plane::of(wall, Vec2::ZERO), None);
+        // A big wall whose normal keeps a rounding-level y is still a wall: the
+        // tolerance scales with the normal's length.
+        let big = [Vec3::ZERO, Vec3::X * 100.0, Vec3::new(0.0, 100.0, 1e-6)];
+        assert_eq!(Plane::of(big, Vec2::ZERO), None);
+    }
+
+    #[test]
+    fn tops_exactly_top_eps_apart_are_level() {
+        let up_z = Some(Plane {
+            y: 0.0,
+            slope: Vec2::new(0.0, 0.3),
+        });
+        let up_x = Some(Plane {
+            y: 0.0,
+            slope: Vec2::new(0.3, 0.0),
+        });
+        assert_eq!(top_plane((0.0, up_z), (TOP_EPS, flat(0.0))), up_z);
+        assert_eq!(top_plane((TOP_EPS, flat(0.0)), (0.0, up_z)), up_z);
+        assert_eq!(top_plane((0.0, up_z), (0.0, up_x)), up_z, "first on a tie");
     }
 
     #[test]
