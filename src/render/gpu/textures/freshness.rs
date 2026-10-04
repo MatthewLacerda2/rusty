@@ -78,7 +78,7 @@ impl Renderer {
             paths.iter().any(|p| p == key) || canonical(key).is_some_and(|c| written.contains(&c))
         };
         // The decal atlas keeps its own copy of each map (#638).
-        self.decals.atlas.forget(&is_stale);
+        self.decals.atlas.forget(is_stale);
         let before = self.gpu_textures.len();
         self.gpu_textures.retain(|key, _| !is_stale(key));
         let misses_before = self.texture_freshness.misses.len();
