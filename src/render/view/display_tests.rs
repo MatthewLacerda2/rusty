@@ -54,13 +54,13 @@ fn pass<'a>(
     })
 }
 
-/// What a shader reading `view` sees at texel (0,0), as an 8-bit red channel.
-fn sampled_red(device: &wgpu::Device, queue: &wgpu::Queue, view: &wgpu::TextureView) -> u8 {
+/// A pipeline drawing texel (0,0) of its one bound texture over an 8-bit target.
+fn copy_texel_pipeline(device: &wgpu::Device) -> wgpu::RenderPipeline {
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
         source: wgpu::ShaderSource::Wgsl(COPY_TEXEL.into()),
     });
-    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: None,
         layout: None,
         vertex: wgpu::VertexState {
@@ -80,7 +80,12 @@ fn sampled_red(device: &wgpu::Device, queue: &wgpu::Queue, view: &wgpu::TextureV
         multisample: Default::default(),
         multiview_mask: None,
         cache: None,
-    });
+    })
+}
+
+/// What a shader reading `view` sees at texel (0,0), as an 8-bit red channel.
+fn sampled_red(device: &wgpu::Device, queue: &wgpu::Queue, view: &wgpu::TextureView) -> u8 {
+    let pipeline = copy_texel_pipeline(device);
     let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: None,
         layout: &pipeline.get_bind_group_layout(0),
