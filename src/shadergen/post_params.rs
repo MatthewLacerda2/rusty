@@ -165,6 +165,10 @@ mod tests {
             absent.contains("damage_vignette.intensity"),
             "lists the params: {absent}"
         );
+        assert!(
+            absent.contains("is not a runtime param"),
+            "not called baked: {absent}"
+        );
         let arity = chain.set(&mut values, "damage_vignette.color", vec![1.0, 0.0]);
         assert!(arity.unwrap_err().contains("takes 3 number(s)"));
         assert!(values.is_empty(), "a refused write stores nothing");
@@ -180,6 +184,7 @@ mod tests {
             [1.0; 3]
         );
         assert!(catalog_default("posterize.levels").is_err());
+        assert!(catalog_default("damage_vignette.x.intensity").is_err());
         assert!(catalog_default("nope").is_err());
     }
 }
