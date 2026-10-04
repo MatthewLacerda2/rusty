@@ -93,6 +93,8 @@ egui-winit = { version = "0.27.2", default-features = false, features = ["clipbo
 egui-phosphor = { version = "0.5.0", optional = true }
 mlua = { version = "0.12", features = ["lua54", "vendored", "serialize"] }
 glam = { version = "0.25.0", features = ["bytemuck", "serde"] }
+# MikkTSpace tangents (#756): the basis normal maps are baked in. Pure, no deps.
+bevy_mikktspace = "1.0.0"
 hecs = { version = "0.10.5" }
 # The sim's hash maps (#764): FxHash has no per-process seed, so a map iterates in the
 # same order every run. Already in the tree through rapier and wgpu: same version.
