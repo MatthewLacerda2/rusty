@@ -45,10 +45,17 @@ to see what it said.
 ## The merge, one branch at a time
 
 `make queue ARGS=--watch` (#664) is how a batch runs it: started once, it takes
-every open pull request as it turns **ready**, highest priority first —
+every open pull request as it turns **ready**, **the one that textually
+conflicts with the fewest others in line first** (#753: `git merge-tree
+--write-tree` per pair of ready heads, no checkout). Reordering cannot make a
+conflict go away, but it decides how many hand-backs a set costs: the broad pull
+request lands last and takes the one rebase. A tie goes to the label —
 infrastructure → architecture → bug → foundation → feature, read from the pull
-request's labels and the issues it closes, then unlabelled, oldest first,
-Dependabot after all of them. A **hand-back skips that pull request and the
+request's labels and the issues it closes — then unlabelled, oldest first;
+Dependabot after all of them, whatever it conflicts with. When the count
+overrides the label the watch says so in one line (`watch: #A goes before #B,
+…`). A pair git cannot answer about counts as no conflict: the order is an
+optimisation and never stops the queue. A **hand-back skips that pull request and the
 watch keeps merging the rest** (#751): it prints one line,
 `queue: HANDED BACK #N: <why> …`, the moment it happens, and the handed-back
 head is remembered (under the checkout's git directory) and passed over, by

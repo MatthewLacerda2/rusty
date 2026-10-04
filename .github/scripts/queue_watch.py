@@ -37,12 +37,27 @@ It exits on:
   watch as a background command, and those are killed at two hours wherever
   they are — mid-push or mid-merge included.
 
-Which ready one goes first follows CLAUDE.md's priority, read from the
-pull request's own labels and the issues it closes (rusty labels issues, not
-pull requests): infrastructure → architecture → bug → foundation → feature,
-then anything else, oldest number first within a rank. Dependabot goes after
-every one of those. A pull request whose base is not `main` is never taken:
-the queue rebases onto `main`.
+Which ready one goes first (#753): **the one that textually conflicts with the
+fewest others in line**, then CLAUDE.md's priority, then age. Reordering cannot
+make two conflicting pull requests merge cleanly (whichever lands second still
+conflicts), but it decides *how many hand-backs* a set of them costs, and each
+is a rebase session. On scorsese, 2026-10-03, one broad pull request touching
+every registry landed first and handed back three small ones, rebased one after
+another at about an hour each; small ones first would have cost one hand-back,
+on the broad one (scorsese#738). So at each pick the watch counts, for every
+ready pull request, how many of the other ready ones it conflicts with
+([`clashing`]: `git merge-tree --write-tree` per pair, no checkout, no build).
+A remembered hand-back is not in line, so it counts against nobody. It **fails
+open**: a pair git cannot answer about counts as clean, so the worst case is
+plain label order; the order is an optimisation and never stops the queue. When
+the count changes who goes first, the watch says so in one line ([`reordered`]).
+
+The tiebreak is the label, read from the pull request's own labels and the
+issues it closes (rusty labels issues, not pull requests): infrastructure →
+architecture → bug → foundation → feature, then anything else, oldest number
+first within a rank. Dependabot goes after every one of those, whatever its
+conflicts, and its conflicts count against nobody: it rebases itself. A pull
+request whose base is not `main` is never taken: the queue rebases onto `main`.
 
 The decisions are pure functions over plain dictionaries; [`run`] takes every
 effect as an argument, so the loop is tested without a network.
@@ -51,6 +66,7 @@ effect as an argument, so the loop is tested without a network.
 from __future__ import annotations
 
 import json
+from itertools import combinations
 from pathlib import Path
 
 PRIORITY = ("infrastructure", "architecture", "bug", "foundation", "feature")
@@ -89,14 +105,29 @@ def names(labels) -> set[str]:
     return {label.get("name", "") for label in labels or []}
 
 
-def rank(pull: dict, issue_labels: dict[int, set[str]], bots: tuple[str, ...]) -> tuple[int, int, int]:
-    """The sort key: Dependabot last, then the best priority label, then age."""
+def rank(
+    pull: dict, issue_labels: dict[int, set[str]], bots: tuple[str, ...], counts: dict[int, int] | None = None
+) -> tuple[int, int, int, int]:
+    """The sort key: Dependabot last, then the fewest conflicts in line
+    (`counts`, from [`conflict_counts`]; none given is label order), then the
+    best priority label, then age."""
     labels = names(pull.get("labels"))
     for issue in pull.get("closingIssuesReferences") or []:
         labels |= issue_labels.get(issue.get("number"), set())
     best = min((PRIORITY.index(label) for label in labels if label in PRIORITY), default=len(PRIORITY))
-    bot = (pull.get("author") or {}).get("login") in bots
-    return int(bot), best, pull.get("number", 0)
+    number = pull.get("number", 0)
+    return int(is_bot(pull, bots)), (counts or {}).get(number, 0), best, number
+
+
+def is_bot(pull: dict, bots: tuple[str, ...]) -> bool:
+    return (pull.get("author") or {}).get("login") in bots
+
+
+def conflict_counts(numbers: list[int], clashes: set[frozenset[int]]) -> dict[int, int]:
+    """How many of the others in `numbers` each one conflicts with; a pair
+    naming a pull request no longer in line does not count."""
+    present = set(numbers)
+    return {n: sum(1 for pair in clashes if n in pair and pair <= present) for n in numbers}
 
 
 def passed_over(pull: dict, memory: dict[int, str], done: set[int]) -> bool:
@@ -115,11 +146,66 @@ def ready(pulls: list[dict], memory: dict[int, str], done: set[int]) -> list[dic
 
 
 def pick(
-    pulls: list[dict], issue_labels: dict[int, set[str]], memory: dict[int, str], done: set[int], bots: tuple[str, ...]
+    pulls: list[dict],
+    issue_labels: dict[int, set[str]],
+    memory: dict[int, str],
+    done: set[int],
+    bots: tuple[str, ...],
+    clashes: set[frozenset[int]] = frozenset(),
 ) -> dict | None:
-    """The next pull request to take, or `None`."""
+    """The next pull request to take, or `None`. `clashes` holds the pairs of
+    pull requests whose heads conflict ([`clashing`])."""
     waiting = ready(pulls, memory, done)
-    return min(waiting, key=lambda p: rank(p, issue_labels, bots)) if waiting else None
+    counts = conflict_counts([p.get("number") for p in waiting], clashes)
+    return min(waiting, key=lambda p: rank(p, issue_labels, bots, counts)) if waiting else None
+
+
+def reordered(chosen: dict | None, by_label: dict | None, counts: dict[int, int]) -> str | None:
+    """One line when the conflict count put `chosen` ahead of `by_label`, the
+    pull request labels alone would take; else `None`."""
+    if chosen is None or by_label is None or chosen is by_label:
+        return None
+    first, passed = chosen["number"], by_label["number"]
+    return (
+        f"watch: #{first} goes before #{passed}, which labels alone would take: #{first} conflicts"
+        f" with {counts.get(first, 0)} other(s) in line, #{passed} with {counts.get(passed, 0)}."
+    )
+
+
+def conflicted(status: int, output: str) -> bool:
+    """Whether `git merge-tree --write-tree` reported a conflict.
+
+    Exit 1 is not enough: git also exits 1 for a head it cannot find. A real
+    conflict prints the merged tree's id first, so that is asked for too;
+    anything else fails open.
+    """
+    first = output.split("\n", 1)[0].strip()
+    return status == 1 and len(first) in (40, 64) and all(c in "0123456789abcdef" for c in first)
+
+
+def clashing(pulls: list[dict], git, known: dict[frozenset[str], bool], bots: tuple[str, ...]) -> set[frozenset[int]]:
+    """The pairs of these pull requests whose heads textually conflict.
+
+    `git(*args)` returns `(status, stdout)`. Dependabot is left out ([`rank`]).
+    `known` remembers each pair of *heads*, so a poll that sees the same heads
+    asks git nothing. Heads this checkout lacks are fetched by sha, once,
+    together; a failed fetch is only more pairs that fail open ([`conflicted`]).
+    """
+    heads = {p["number"]: p.get("headRefOid", "") for p in pulls if not is_bot(p, bots)}
+    pairs = [(a, b) for a, b in combinations(sorted(heads), 2) if heads[a] and heads[b]]
+
+    def key(a: int, b: int) -> frozenset[str]:
+        return frozenset((heads[a], heads[b]))
+
+    unknown = [(a, b) for a, b in pairs if key(a, b) not in known]
+    if unknown:
+        wanted = sorted({heads[n] for pair in unknown for n in pair})
+        missing = [sha for sha in wanted if git("cat-file", "-e", f"{sha}^{{commit}}")[0] != 0]
+        if missing:
+            git("fetch", "--quiet", "origin", *missing)
+        for a, b in unknown:
+            known[key(a, b)] = conflicted(*git("merge-tree", "--write-tree", heads[a], heads[b]))
+    return {frozenset(pair) for pair in pairs if known.get(key(*pair), False)}
 
 
 def heads(pulls: list[dict]) -> dict[int, tuple[bool, str]]:
@@ -189,7 +275,8 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     and the exit status ([`status`]).
 
     `fx` carries every effect: `pulls()` (the open listing, or `None` when GitHub
-    failed), `issue_labels()`, `turn(number)` (one pull request through the
+    failed), `issue_labels()`, `clashes(pulls)` (the conflicting pairs among
+    those ready, [`clashing`]), `turn(number)` (one pull request through the
     queue, as [`merge-queue.take`]), `head(number)`, `clock()`, `sleep(seconds)`,
     `say(...)`, `memory` (a path), `bots`, and the end states: `merged`, `ends`
     (ended without a hand-back: green under `--no-merge`, previewed by a dry run)
@@ -219,8 +306,10 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         now = heads(pulls)
         if now != last:
             last, moved = now, fx.clock()
-        labels = fx.issue_labels() if len(ready(pulls, memory, done)) > 1 else {}
-        chosen = pick(pulls, labels, memory, done, fx.bots)
+        waiting = ready(pulls, memory, done)
+        labels = fx.issue_labels() if len(waiting) > 1 else {}
+        clashes = fx.clashes(waiting) if len(waiting) > 1 else set()
+        chosen = pick(pulls, labels, memory, done, fx.bots, clashes)
         if chosen is None:
             why = finished(pulls, fx.clock() - moved, opts.idle * 60)
             if opts.dry_run and not why:
@@ -231,6 +320,10 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             fx.sleep(opts.poll)
             continue
         number = chosen["number"]
+        counts = conflict_counts([p.get("number") for p in waiting], clashes)
+        line = reordered(chosen, pick(pulls, labels, memory, done, fx.bots), counts)
+        if line:
+            fx.say(line)
         fx.say(f"watch: taking #{number}.")
         result = fx.turn(number)
         results.append(result)
