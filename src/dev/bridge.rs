@@ -7,8 +7,9 @@
 //! Tables: Harness.{Step,StepUntil,Snapshot,Log,Expect,Frame,Stats,AssertBudget}, plus read helpers
 //! Scene.FindEntityByName / Transform.GetPosition / Animator.GetClip and the
 //! writable Input injection (Press/Release, MoveMouse, AddMouseDelta, Scroll,
-//! TypeText, SetAxis, SetPadConnected). Shooting is just pressing the SPACE key the
-//! player-controller script edge-detects — there is no separate click/shoot signal.
+//! TypeText, SetAxis, SetPadConnected). Shooting is just pressing `Mouse0` (left
+//! mouse), which the player-controller script edge-detects (Space jumps) — there is
+//! no separate click/shoot signal.
 
 use std::cell::RefCell;
 use std::rc::Rc;

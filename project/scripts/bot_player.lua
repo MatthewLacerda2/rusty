@@ -1,9 +1,9 @@
 -- project/scripts/bot_player.lua — DEV-ONLY bot-player (won't ship).
 --
 -- Attached to the Player, this script plays the game the way a human would: it drives
--- the WRITABLE Input from Update() — pressing the same W/A/S/D + arrow + SPACE keys
--- winit would inject — to navigate toward the enemy, aim the follow-camera at it, and
--- pull the trigger. It presses keys ONLY; the bundled player_controller turns those
+-- the WRITABLE Input from Update() — pressing the same W/A/S/D, arrow keys and left
+-- mouse button winit would inject — to navigate toward the enemy, aim the
+-- follow-camera at it, and pull the trigger. It presses keys ONLY; the bundled player_controller turns those
 -- presses into movement, camera follow, and the hitscan cast. So the bot exercises
 -- the exact same control path a human does, validating that the de-hardcoded
 -- player_controller.lua actually plays the demo. The match is a proximity demo: the
@@ -26,7 +26,7 @@ local ENEMY = "Enemy_1"
 local SHOOT_RANGE = 14.0    -- start firing once within this distance
 local ARRIVE_RANGE = 4.0    -- stop and settle once within this distance of the enemy
 local AIM_TOLERANCE = 6.0   -- degrees of yaw error we tolerate before shooting
-local SHOOT_KEY = "SPACE"   -- the trigger key the controller fires on (rising edge)
+local SHOOT_KEY = "Mouse0"  -- the trigger the controller fires on (rising edge)
 local SHOOT_COOLDOWN = 12   -- frames between shots (fire ~5x/second @ 60Hz)
 
 -- Wrap a degree delta into (-180, 180].
@@ -81,7 +81,7 @@ function Bot.Update(entity_id, delta_time)
     -- (the arrival check above returns otherwise), so hold W to keep advancing.
     Input.Press("W")
 
-    -- Pull the trigger when in range and on-target. Press SPACE for one frame so the
+    -- Pull the trigger when in range and on-target. Press Mouse0 for one frame so the
     -- controller sees a rising edge and fires; release it the rest of the cooldown so
     -- the next press re-triggers. The controller (not the bot) casts the hitscan.
     if Bot.cooldown > 0 then
@@ -95,7 +95,7 @@ function Bot.Update(entity_id, delta_time)
     end
 
     -- Run the shared controller with the input we just injected: it moves the Player,
-    -- trails the camera, and fires on the SPACE rising edge.
+    -- trails the camera, and fires on the Mouse0 rising edge.
     Controller.drive(Bot, entity_id, delta_time)
 end
 

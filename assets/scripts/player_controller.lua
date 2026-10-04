@@ -9,10 +9,13 @@
 --   * WASD moves the Player along the camera's ground plane at MOVE_SPEED, through
 --     its CharacterController (#451): walls block it, steps are climbed, and the
 --     script applies its own GRAVITY, since Move applies none.
+--   * Space jumps (#748): on its RISING edge, only while grounded, the vertical
+--     speed is set to JUMP_SPEED, which peaks ≈1.1 m up (CS's jump height). No
+--     jump mid-air, and holding Space does not bounce.
 --   * Arrow keys turn the follow-camera (yaw/pitch), pitch clamped to +/-80.
 --   * The camera trails the Player at -forward*FOLLOW_BACK + up*FOLLOW_UP.
---   * The shoot key casts a hitscan on its RISING edge (one cast per press),
---     firing Physics.Raycast from the camera along its forward.
+--   * Left mouse (SHOOT_KEY) casts a hitscan on its RISING edge (one cast per
+--     press), firing Physics.Raycast from the camera along its forward.
 --   * Start frames the camera behind the Player (yaw 90, pitch -10) — this used to
 --     be an engine-side snap keyed on the name "Player" (#450).
 --
@@ -23,18 +26,22 @@ local PlayerController = {}
 
 local MOVE_SPEED = 5.0      -- units/second of ground movement
 local GRAVITY = 20.0        -- units/second² the Player falls at
+local JUMP_HEIGHT = 1.1     -- metres the jump peaks at (CS's ≈45-unit jump)
+local JUMP_SPEED = math.sqrt(2.0 * GRAVITY * JUMP_HEIGHT) -- ≈6.6 units/second launch
 local GROUND_STICK = -1.0   -- vertical speed while grounded, keeping it pressed down
 local LOOK_SPEED = 90.0     -- degrees/second of camera turn
 local PITCH_LIMIT = 80.0    -- clamp camera pitch to +/- this
 local FOLLOW_BACK = 4.5     -- how far the camera trails behind the Player
 local FOLLOW_UP = 1.5       -- how high above the Player the camera sits
-local SHOOT_KEY = "SPACE"   -- the trigger key the windowed front-end maps Space to
+local JUMP_KEY = "SPACE"    -- jumps on its rising edge, while grounded
+local SHOOT_KEY = "Mouse0"  -- the trigger: the left mouse button
 local START_YAW = 90.0      -- initial camera yaw: looking down +Z, across the arena
 local START_PITCH = -10.0   -- initial camera pitch: tilted slightly down
 local START_BACK = 4.5      -- initial camera offset behind the Player (along -Z)
 local START_UP = 1.5        -- initial camera height above the Player
 
--- Move the Player along the camera's ground plane from WASD, falling under GRAVITY.
+-- Move the Player along the camera's ground plane from WASD, falling under GRAVITY
+-- and jumping on JUMP_KEY's rising edge while grounded.
 local function move(self, entity_id, dt)
     local fx, fy, fz = Camera.GetForward()
     local rx, ry, rz = Camera.GetRight()
@@ -50,8 +57,12 @@ local function move(self, entity_id, dt)
         dx, dz = mx * step, mz * step
     end
     local vy = self.vy or 0.0
-    if CharacterController.IsGrounded(entity_id) and vy < 0.0 then
+    local grounded = CharacterController.IsGrounded(entity_id)
+    if grounded and vy < 0.0 then
         vy = GROUND_STICK
+    end
+    if grounded and Input.GetKeyDown(JUMP_KEY) then
+        vy = JUMP_SPEED
     end
     vy = vy - GRAVITY * dt
     CharacterController.Move(entity_id, dx, vy * dt, dz)

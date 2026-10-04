@@ -117,6 +117,8 @@ mod nav_bounds_boot;
 #[cfg(feature = "dev")]
 mod pause_step;
 #[cfg(feature = "dev")]
+mod player_controller;
+#[cfg(feature = "dev")]
 mod proptest_harness;
 #[cfg(feature = "dev")]
 mod script_timers;
