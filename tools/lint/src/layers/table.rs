@@ -130,6 +130,7 @@ pub const LAYERS: &[Layer] = &[
             "render",
             "scene",
             "scripting",
+            "ui",
         ],
     ),
     platform(
@@ -183,26 +184,5 @@ pub struct Exception {
     pub issue: u32,
 }
 
-pub const EXCEPTIONS: &[Exception] = &[
-    // Dev-only Lua bindings (`Debug.*`, the `*.Bake` calls) reach the GPU-backed dev
-    // layer from the sim surface: a sim → platform leak, `api → dev → render`.
-    Exception {
-        from: "api",
-        to: "dev",
-        issue: ISSUE_API_DEV,
-    },
-    Exception {
-        from: "api",
-        to: "preview",
-        issue: ISSUE_API_DEV,
-    },
-    // `dev::editor_capture` (#731) drives the editor that itself imports `dev`.
-    Exception {
-        from: "dev",
-        to: "editor",
-        issue: ISSUE_DEV_EDITOR,
-    },
-];
-
-const ISSUE_API_DEV: u32 = 737;
-const ISSUE_DEV_EDITOR: u32 = 738;
+/// Empty since #737 and #738 removed the last two (`api → dev`/`preview`, `dev → editor`).
+pub const EXCEPTIONS: &[Exception] = &[];

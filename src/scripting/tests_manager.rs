@@ -106,6 +106,7 @@ fn load_entity_script_missing_file_returns_error() {
 #[cfg(feature = "dev")]
 #[test]
 fn play_state_cell_drives_debug_snapshot_play_state() {
+    crate::dev::lua_surface::install_api(); // `Debug` is dev's extension (#737)
     let m = live_manager();
     assert!(
         m.eval("Debug.Snapshot()")

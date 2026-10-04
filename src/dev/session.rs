@@ -60,6 +60,7 @@ impl Session {
         // Baked over the scene's own bounds (#452), as the windowed boot does.
         let nav = Rc::new(RefCell::new(NavigationGraph::from_scene(&scene.borrow())));
 
+        super::lua_surface::install_api();
         let mut world = GameWorld::new(scene, input, nav, console);
         // The boot scene is the `Scene.Save()` write-back target, so an
         // argument-less save from the agent persists back to the loaded file —

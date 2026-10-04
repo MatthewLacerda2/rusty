@@ -19,9 +19,9 @@
 
 use std::process::exit;
 
-use rusty::dev::editor_capture::{self, EditorCaptureOptions};
 use rusty::dev::session::Session;
 use rusty::editor::ViewportTab;
+use rusty::shell::editor::capture::{self, EditorCaptureOptions};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -29,9 +29,9 @@ fn main() {
     let written = match scene {
         Some(path) => {
             let session = Session::new(&path).unwrap_or_else(|e| fail(&e));
-            editor_capture::capture(session.world(), &out, &opts)
+            capture::capture(session.world(), &out, &opts)
         }
-        None => editor_capture::capture(&editor_capture::default_world(), &out, &opts),
+        None => capture::capture(&capture::default_world(), &out, &opts),
     };
     match written {
         Ok(true) => println!("editor-capture: wrote {out}"),

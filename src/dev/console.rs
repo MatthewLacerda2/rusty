@@ -101,6 +101,7 @@ mod tests {
     use std::rc::Rc;
 
     fn live_manager() -> (ScriptManager, Rc<RefCell<ConsoleLogs>>) {
+        crate::dev::lua_surface::install_api();
         let mut raw = Scene::new();
         raw.add_entity("Player".to_string());
         let scene = Rc::new(RefCell::new(raw));

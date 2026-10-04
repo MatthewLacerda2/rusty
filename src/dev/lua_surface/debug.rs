@@ -1,4 +1,4 @@
-//! src/api/debug.rs — `Debug` namespace (DEV-ONLY).
+//! src/dev/lua_surface/debug.rs — `Debug` namespace (DEV-ONLY).
 //!
 //! `Debug.Log/Warn/Error`, the structured scene-read `Debug.Snapshot` /
 //! `Debug.SnapshotEntity` (#180), the headless `Debug.Preview` asset shot (#353) and its
@@ -6,11 +6,11 @@
 //! the frame stats `Debug.Stats` (#433) — the agent's observation channels:
 //! structured, visual, and performance. Registered
 //! only in dev builds — stripped from the shipped game, like Unity `Debug.*` under
-//! `[Conditional]`. The whole module is gated behind the `dev` feature in `api::mod`.
+//! `[Conditional]`: it lives in `dev`, which installs it onto the surface (#737).
 
 use mlua::{Lua, Table};
 
-use super::{put, snapshot, ApiScopedCtx, Reg};
+use crate::api::{put, snapshot, ApiScopedCtx, Reg};
 use crate::dev::preview::{capture_asset, capture_material, PreviewOptions};
 use crate::preview::PreviewMesh;
 use crate::ui::UiView;

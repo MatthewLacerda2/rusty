@@ -1,14 +1,14 @@
-//! src/dev/editor_capture.rs — the whole editor, offscreen, to a PNG (#731).
+//! src/shell/editor/capture.rs — the whole editor, offscreen, to a PNG (#731).
 //!
-//! [`screenshot`](super::screenshot) shows what the *game* looks like; this shows what
+//! [`screenshot`](crate::dev::screenshot) shows what the *game* looks like; this shows what
 //! the *editor* looks like — the egui panels around the scene viewport — with no window,
 //! on lavapipe. It exists so an agent that changes the editor can attach before/after
 //! captures to its PR and the operator can review the change from a phone (#725 did
 //! this with a scratch example; this is that path, supported).
 //!
 //! **The same frame the editor draws, minus the window.** Each frame runs
-//! [`EditorUi::draw`] exactly as `shell::editor` does, renders the scene into the
-//! viewport rect the layout asked for (through a [`CaptureHost`], so it is the
+//! [`EditorUi::draw`] exactly as the [`EditorFrontend`](super::EditorFrontend) does,
+//! renders the scene into the viewport rect the layout asked for (through a [`CaptureHost`], so it is the
 //! screenshot's renderer), rebinds that target as the viewport's egui texture, and on
 //! the last frame paints egui into an offscreen target and reads it back.
 //!
@@ -23,9 +23,9 @@ use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
 
-use super::capture::CaptureHost;
 use crate::app::GameWorld;
 use crate::core::input::InputState;
+use crate::dev::capture::CaptureHost;
 use crate::editor::{EditorUi, ViewportTab};
 use crate::navigation::NavigationGraph;
 use crate::render::{readback, OFFSCREEN_FORMAT};

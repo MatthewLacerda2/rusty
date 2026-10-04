@@ -94,6 +94,7 @@ impl Harness {
         let nav = Rc::new(RefCell::new(nav));
         let console = Rc::new(RefCell::new(ConsoleLogs::new()));
 
+        super::lua_surface::install_api();
         let mut world = GameWorld::new(
             Rc::clone(&scene),
             Rc::clone(&input),

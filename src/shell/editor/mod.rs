@@ -6,6 +6,10 @@
 //! swapchain (#183). Built only with the `editor` Cargo feature, which is what keeps
 //! egui out of a shipped player.
 
+// The headless editor capture (#731) sits here, above `editor`, so the arrow runs
+// `editor → dev` only (#738).
+#[cfg(feature = "dev")]
+pub mod capture;
 mod cursor_release;
 mod game_focus;
 mod paint;
