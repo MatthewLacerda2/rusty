@@ -50,7 +50,8 @@ fragile Unity-style convenience that breaks the moment Blender isn't installed).
 glTF 2.0 is the first-class path; `.obj` covers static meshes. Levels of detail
 follow the Unity / Blender naming convention: objects named `Crate_LOD0`,
 `Crate_LOD1`, … import as one `Crate` carrying an `LODGroup` that shows one level at
-a time by on-screen size (see `docs/api/LODGroup.md`).
+a time by on-screen size (see `docs/api/LODGroup.md`). A mesh's second UV map (glTF
+`TEXCOORD_1`) is its lightmap UV for baked lighting ([`Lighting`](docs/api/Lighting.md)).
 
 ## Built to be played by an agent
 

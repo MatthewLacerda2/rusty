@@ -186,6 +186,7 @@ impl Renderer {
             cube: (&cube.view, &cube.sampler),
             clusters: &self.clusters,
             decals: &self.decals,
+            lightmaps: self.lightmaps.binding(),
         }
         .create(&self.device, &self.camera_lighting_layout);
     }

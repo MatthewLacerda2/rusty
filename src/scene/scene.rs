@@ -24,7 +24,7 @@ use crate::scene::world_cache::WorldMatrixCache;
 pub use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
     ColliderShape, CollisionDetection, CollisionResponse, DirtyFlag, EmitMode, Entity,
-    LightComponent, LightType, MaterialAsset, MaterialComponent, MeshComponent,
+    LightComponent, LightMode, LightType, MaterialAsset, MaterialComponent, MeshComponent,
     NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent, RenderMode,
     RigidBodyComponent, ScriptComponent, ScriptFieldValue, TextureComponent, Tonemap,
     TransformComponent, VisualCorrectionComponent,
@@ -99,6 +99,9 @@ pub struct Scene {
     /// applicable probe with box-projected parallax correction instead of the global
     /// skybox. The cubemaps themselves are baked by a later issue (#245).
     pub reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet,
+    /// Baked lightmaps (#438): which RGBM lightmap file each static mesh wears. A mesh
+    /// absent from it keeps probe / ambient lighting.
+    pub lightmaps: crate::scene::lighting::lightmap::LightmapSet,
     /// Ids queued for deferred destruction by play-mode `Scene.DestroyEntity`
     /// (#323); drained in `runtime::destroy_queue`. Transient, never serialized.
     pub pending_destroy: Vec<u32>,
@@ -142,6 +145,7 @@ impl Default for Scene {
             decals: Default::default(),
             probes: crate::scene::lighting::probe::ProbeVolume::new(),
             reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet::new(),
+            lightmaps: Default::default(),
             pending_destroy: Vec::new(),
             pending_load: None,
             persistent: std::collections::BTreeSet::new(),

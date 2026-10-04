@@ -160,6 +160,7 @@ mod tests {
                 inner_cone: 0.0,
                 outer_cone: 0.0,
                 cast_shadows: false,
+                mode: Default::default(),
             }),
         );
         scene.probes.add_probe(Vec3::ZERO);

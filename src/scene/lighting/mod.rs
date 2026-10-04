@@ -3,6 +3,7 @@
 //! probes, and the spherical-harmonics basis they all share.
 
 pub mod io;
+pub mod lightmap;
 pub mod placement;
 pub mod probe;
 pub mod probe_fill;

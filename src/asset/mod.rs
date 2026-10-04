@@ -149,6 +149,8 @@ pub(crate) mod fixtures_anim;
 #[cfg(test)]
 mod gltf_import_tests;
 #[cfg(test)]
+mod gltf_uv2_tests;
+#[cfg(test)]
 mod manifest_tests;
 #[cfg(test)]
 mod tests;

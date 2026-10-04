@@ -72,7 +72,9 @@ pub(crate) fn apply_scene_lights(lighting_uniform: &mut LightingUniform, scene: 
                 _pad1: 0.0,
                 color: light.color.to_array(),
                 intensity: light.intensity,
-                _pad2: [0.0; 4],
+                // `Baked` (#438): a lightmapped surface skips it, its lightmap holds it.
+                baked: f32::from(u8::from(light.mode.bakes_direct())),
+                _pad2: [0.0; 3],
             }),
             LightType::Point | LightType::Spotlight => {}
         }

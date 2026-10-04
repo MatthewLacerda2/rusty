@@ -4,13 +4,14 @@
 
 use crate::components::mesh::Vertex;
 
-const ATTRIBS: [wgpu::VertexAttribute; 6] = wgpu::vertex_attr_array![
+const ATTRIBS: [wgpu::VertexAttribute; 7] = wgpu::vertex_attr_array![
     0 => Float32x3,  // position
     1 => Float32x3,  // normal
     2 => Float32x2,  // tex_coords
     3 => Uint32x4,   // joint_indices
     4 => Float32x4,  // joint_weights
     5 => Float32x4,  // tangent (xyz + handedness)
+    6 => Float32x2,  // lightmap_uv (#438)
 ];
 
 /// The vertex-buffer layout every mesh pipeline binds at slot 0.

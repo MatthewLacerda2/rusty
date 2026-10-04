@@ -133,3 +133,7 @@ impl MeshComponent {
         Some((min, max))
     }
 }
+
+#[cfg(test)]
+#[path = "primitives_tests.rs"]
+mod primitives_tests;

@@ -37,9 +37,12 @@ struct EntityUniforms {
 struct InstanceData {
     model_matrix: mat4x4<f32>,
     use_sh: u32,
-    _ipad0: u32,
+    // Baked lightmap (#438): atlas page + 1 (0 for none), and the scale/offset from
+    // the mesh's lightmap UV into that page.
+    lightmap_page: u32,
     _ipad1: u32,
     _ipad2: u32,
+    lightmap_st: vec4<f32>,
     sh: array<vec4<f32>, 9>,
 };
 
@@ -84,6 +87,13 @@ var t_decal_color: texture_2d_array<f32>;
 var t_decal_data: texture_2d_array<f32>;
 @group(0) @binding(13)
 var s_decal: sampler;
+
+// Baked lightmap atlas pages (#438): linear RGBM, one layer per page, read at the
+// instance's page through its scale/offset; a 1x1 black page when none are baked.
+@group(0) @binding(14)
+var t_lightmaps: texture_2d_array<f32>;
+@group(0) @binding(15)
+var s_lightmaps: sampler;
 
 @group(1) @binding(0)
 var<uniform> entity: EntityUniforms;
@@ -169,6 +179,8 @@ struct VertexOutput {
     @location(3) world_tangent: vec4<f32>,
     // Which `instances` entry this fragment belongs to (#470), for its probe SH.
     @location(4) @interpolate(flat) instance: u32,
+    // Where this fragment sits in its lightmap page (#438), already scaled/offset.
+    @location(5) lightmap_uv: vec2<f32>,
 };
 
 @vertex
@@ -202,10 +214,14 @@ fn vs_main(model: VertexInput, @builtin(instance_index) instance: u32) -> Vertex
     out.world_tangent = vec4<f32>(world_tangent, model.tangent.w);
     out.clip_position = camera.view_proj * world_pos;
     out.instance = instance;
+    let st = instances[instance].lightmap_st;
+    out.lightmap_uv = model.lightmap_uv * st.xy + st.zw;
     return out;
 }
 
 const PI: f32 = 3.14159265359;
+// RGBM's range (#438); mirrors `RGBM_RANGE` in src/scene/lighting/lightmap/encode.rs.
+const LIGHTMAP_RGBM_RANGE: f32 = 8.0;
 
 fn DistributionGGX(N: vec3<f32>, H: vec3<f32>, roughness: f32) -> f32 {
     let a = roughness * roughness;
@@ -568,12 +584,20 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let F0 = mix(vec3<f32>(0.04), albedo, metallic);
 
-    // 1. Ambient lighting term. Non-static objects that a light probe covers
+    // 1. Ambient lighting term. A lightmapped static mesh reads its lightmap (#438).
+    // Non-static objects that a light probe covers
     // (`use_sh == 1`, #240) reconstruct DIRECTIONAL irradiance from their interpolated
     // SH probe; everything else falls back to the flat Hemispherical Sky-Ground
     // gradient. Both feed the same albedo * (1 - metallic) diffuse response.
     var ambient_irradiance: vec3<f32>;
-    if (instances[in.instance].use_sh == 1u) {
+    let lightmap_page = instances[in.instance].lightmap_page;
+    if (lightmap_page > 0u) {
+        // Baked lightmap (#438): bounce, sky, emission and `Baked` lights' direct light,
+        // stored RGBM as E / pi, so `* albedo` is the Lambert response a realtime light
+        // gives. `Level` sampling: the page is per instance, so this branch may diverge.
+        let lm = textureSampleLevel(t_lightmaps, s_lightmaps, in.lightmap_uv, lightmap_page - 1u, 0.0);
+        ambient_irradiance = lm.rgb * lm.a * LIGHTMAP_RGBM_RANGE;
+    } else if (instances[in.instance].use_sh == 1u) {
         ambient_irradiance = eval_sh(N, in.instance);
     } else {
         let sky_color = lighting.ambient.color;
@@ -585,10 +609,17 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let ao = ambient_occlusion(in.clip_position.xy) * surface.occlusion;
     var lighting_color = ambient_irradiance * albedo * (1.0 - metallic) * ao;
 
+    // A lightmapped surface skips `Baked` lights below: their direct light is already
+    // in its lightmap (#438). `Mixed` and `Realtime` lights stay live everywhere.
+    let skip_baked = lightmap_page > 0u;
+
     // 2. Directional lights (#434). Slot 0 is the sun, the one the cascades shadow.
     let shadow = calculate_shadow(in.world_position, N);
     for (var i = 0u; i < lighting.num_dir_lights; i = i + 1u) {
         let sun = lighting.dir_lights[i];
+        if (skip_baked && sun.baked > 0.5) {
+            continue;
+        }
         let radiance = sun.color * sun.intensity * select(1.0, shadow, i == 0u);
         lighting_color += calculate_pbr(N, V, normalize(-sun.direction), radiance, F0, metallic, roughness, albedo);
     }
@@ -598,6 +629,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let range = cluster_ranges[cluster];
     for (var i = 0u; i < range.y; i = i + 1u) {
         let light = local_lights[cluster_lights[range.x + i]];
+        if (skip_baked && light.baked > 0.5) {
+            continue;
+        }
         var radiance = local_light_radiance(light, in.world_position);
         if (all(radiance == vec3<f32>(0.0))) {
             continue;

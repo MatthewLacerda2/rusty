@@ -15,7 +15,7 @@
 
 use glam::Vec3;
 
-use crate::components::{LightComponent, LightType};
+use crate::components::{LightComponent, LightMode, LightType};
 
 /// Set the light's linear RGB colour.
 pub fn set_color(l: &mut LightComponent, rgb: Vec3) {
@@ -35,6 +35,11 @@ pub fn set_range(l: &mut LightComponent, value: f32) {
 /// Set the light's kind (typed — string parsing stays in the API adapter / card).
 pub fn set_type(l: &mut LightComponent, light_type: LightType) {
     l.light_type = light_type;
+}
+
+/// Set how the light takes part in baked lighting (Realtime / Mixed / Baked, #438).
+pub fn set_mode(l: &mut LightComponent, mode: LightMode) {
+    l.mode = mode;
 }
 
 /// Set the spotlight cone angles (degrees), keeping `inner ≤ outer` so the inner
@@ -67,6 +72,7 @@ mod tests {
             inner_cone: 30.0,
             outer_cone: 45.0,
             cast_shadows: false,
+            mode: Default::default(),
         };
         scene.world.set_light(id, Some(c));
         (scene, id)
@@ -81,6 +87,7 @@ mod tests {
         set_range(&mut e, -2.0);
         set_type(&mut e, LightType::Directional);
         set_cones(&mut e, 80.0, 40.0);
+        set_mode(&mut e, LightMode::Baked);
         let l = &*e;
         assert_eq!(l.color, Vec3::new(0.2, 0.4, 0.6));
         assert_eq!(l.intensity, 0.0, "intensity clamps to 0");
@@ -88,6 +95,7 @@ mod tests {
         assert_eq!(l.light_type, LightType::Directional);
         assert_eq!(l.outer_cone, 40.0);
         assert_eq!(l.inner_cone, 40.0, "inner clamps to outer");
+        assert_eq!(l.mode, LightMode::Baked);
     }
 
     #[test]

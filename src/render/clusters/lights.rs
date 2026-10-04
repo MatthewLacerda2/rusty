@@ -31,7 +31,8 @@ pub(crate) struct LocalLight {
     /// Its first tile in the shadow atlas (#468) — a spotlight's one, a point light's
     /// six cube faces in order — or [`NO_SHADOW`]. Set by the atlas plan each frame.
     pub shadow: u32,
-    pub _pad: f32,
+    /// 1.0 for a `Baked` light (#438): lightmapped surfaces skip its direct light.
+    pub baked: f32,
 }
 
 impl LocalLight {
@@ -52,7 +53,7 @@ impl LocalLight {
             inner_cone: light.inner_cone.to_radians().cos(),
             outer_cone: light.outer_cone.to_radians().cos(),
             shadow: NO_SHADOW,
-            _pad: 0.0,
+            baked: f32::from(u8::from(light.mode.bakes_direct())),
         })
     }
 

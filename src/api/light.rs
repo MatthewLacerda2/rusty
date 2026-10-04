@@ -1,7 +1,8 @@
 //! src/api/light.rs — `Light` namespace.
 //!
 //! Get/Set over an entity's optional `LightComponent`: colour, intensity, range,
-//! light type and whether it casts shadows. Every setter maps onto a real field the renderer reads
+//! light type, whether it casts shadows, and its mode (#438). Every setter maps onto a
+//! real field the renderer reads
 //! (`apply_scene_lights`), so a script tweak takes effect on the next frame's
 //! lighting uniform. There is no per-light "active" flag in the engine — a light
 //! is gated by its owning entity's `active` (a `Scene` concern), so this surface
@@ -13,7 +14,7 @@ use glam::Vec3;
 use mlua::Lua;
 
 use super::{put, Reg};
-use crate::components::LightType;
+use crate::components::{LightMode, LightType};
 use crate::scene::authoring::light as light_ops;
 use crate::scene::Scene;
 
@@ -30,6 +31,7 @@ pub fn register<'scope>(
     register_range(scope, &table, scene)?;
     register_type(scope, &table, scene)?;
     register_cast_shadows(scope, &table, scene)?;
+    register_mode(scope, &table, scene)?;
 
     lua.globals().set("Light", table).map_err(|e| e.to_string())
 }
@@ -185,6 +187,37 @@ fn register_cast_shadows<'scope>(
     )
 }
 
+/// `GetMode` / `SetMode` over the light's Realtime / Mixed / Baked mode (#438), by
+/// name. Unknown names on `SetMode` are ignored (the current mode is kept).
+fn register_mode<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "GetMode",
+        scope.create_function(|_, id: u32| {
+            let scene = scene.borrow();
+            let mode = scene.world.light(id).map(|l| l.mode.name());
+            Ok(mode.unwrap_or("None").to_string())
+        }),
+    )?;
+
+    put(
+        table,
+        "SetMode",
+        scope.create_function(|_, (id, name): (u32, String)| {
+            let mut scene = scene.borrow_mut();
+            if let (Some(mut c), Some(mode)) = (scene.world.light_mut(id), LightMode::parse(&name))
+            {
+                light_ops::set_mode(&mut c, mode);
+            }
+            Ok(())
+        }),
+    )
+}
+
 /// Canonical name for a [`LightType`] (the value `GetType` returns / `SetType` takes).
 fn type_name(t: &LightType) -> &'static str {
     match t {
@@ -207,91 +240,5 @@ fn parse_type(name: &str) -> Option<LightType> {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::cell::RefCell;
-
-    use super::*;
-    use crate::components::LightComponent;
-
-    /// Build a scene with one light-bearing entity; returns `(scene, id)`.
-    fn scene_with_light() -> (RefCell<Scene>, u32) {
-        let mut scene = Scene::default();
-        let id = scene.add_entity("Lamp".to_string());
-        scene.world.set_light(
-            id,
-            Some(LightComponent {
-                light_type: LightType::Point,
-                color: Vec3::ONE,
-                intensity: 1.5,
-                range: 10.0,
-                inner_cone: 30.0,
-                outer_cone: 45.0,
-                cast_shadows: false,
-            }),
-        );
-        (RefCell::new(scene), id)
-    }
-
-    #[test]
-    fn set_get_color_intensity_range_type() {
-        let (scene, id) = scene_with_light();
-        let lua = Lua::new();
-        lua.scope(|scope| {
-            register(&lua, scope, &scene).unwrap();
-
-            lua.load(format!("Light.SetColor({id}, 0.2, 0.4, 0.6)"))
-                .exec()
-                .unwrap();
-            lua.load(format!("Light.SetIntensity({id}, 3.0)"))
-                .exec()
-                .unwrap();
-            lua.load(format!("Light.SetRange({id}, 25.0)"))
-                .exec()
-                .unwrap();
-            lua.load(format!("Light.SetType({id}, 'Directional')"))
-                .exec()
-                .unwrap();
-            lua.load(format!("Light.SetCastShadows({id}, true)"))
-                .exec()
-                .unwrap();
-            Ok(())
-        })
-        .unwrap();
-
-        let e = scene.borrow();
-        let light = e.world.light(id).unwrap().clone();
-        assert_eq!(light.color, Vec3::new(0.2, 0.4, 0.6));
-        assert_eq!(light.intensity, 3.0);
-        assert_eq!(light.range, 25.0);
-        assert_eq!(light.light_type, LightType::Directional);
-        assert!(light.cast_shadows);
-    }
-
-    #[test]
-    fn clamps_negatives_and_ignores_unknown_type() {
-        let (scene, id) = scene_with_light();
-        let lua = Lua::new();
-        lua.scope(|scope| {
-            register(&lua, scope, &scene).unwrap();
-
-            lua.load(format!("Light.SetIntensity({id}, -5.0)"))
-                .exec()
-                .unwrap();
-            lua.load(format!("Light.SetRange({id}, -2.0)"))
-                .exec()
-                .unwrap();
-            lua.load(format!("Light.SetType({id}, 'Bogus')"))
-                .exec()
-                .unwrap();
-            Ok(())
-        })
-        .unwrap();
-
-        let e = scene.borrow();
-        let light = e.world.light(id).unwrap().clone();
-        assert_eq!(light.intensity, 0.0);
-        assert_eq!(light.range, 0.0);
-        // Unknown name kept the original Point type.
-        assert_eq!(light.light_type, LightType::Point);
-    }
-}
+#[path = "light_tests.rs"]
+mod light_tests;

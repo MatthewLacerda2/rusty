@@ -8,7 +8,7 @@
 use super::anim_data::AnimationClip;
 use glam::{Mat4, Quat, Vec3};
 
-/// One vertex of imported geometry: position, normal, a single UV channel and the
+/// One vertex of imported geometry: position, normal, the texture and lightmap UVs and the
 /// optional skin binding. `joint_indices` index into the sub-mesh's [`SkinData`]
 /// joints (and thus the GPU bone palette); `joint_weights` are the linear-blend
 /// weights. Unskinned vertices (every primitive, and any glTF mesh without a skin)
@@ -25,6 +25,9 @@ pub struct MeshVertex {
     /// From the glTF `TANGENT` accessor when present, else generated from positions +
     /// UVs at import. Defaults to the `+X` placeholder.
     pub tangent: [f32; 4],
+    /// The lightmap UV (#438), from glTF `TEXCOORD_1`; all zeros when the source has
+    /// no second UV map.
+    pub lightmap_uv: [f32; 2],
 }
 
 impl MeshVertex {
@@ -36,6 +39,7 @@ impl MeshVertex {
             joint_indices: [0, 0, 0, 0],
             joint_weights: [1.0, 0.0, 0.0, 0.0],
             tangent: [1.0, 0.0, 0.0, 1.0],
+            lightmap_uv: [0.0, 0.0],
         }
     }
 

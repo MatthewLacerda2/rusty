@@ -76,7 +76,8 @@ struct DirectionalLight {
     direction: vec3<f32>,
     color: vec3<f32>,
     intensity: f32,
-    _pad: f32,
+    // 1.0 for a `Baked` light (#438): a lightmapped surface skips its direct light.
+    baked: f32,
 };
 
 struct LightingUniforms {
@@ -119,7 +120,8 @@ struct LocalLight {
     // First tile in the shadow atlas (#468): a spotlight's one, a point light's six
     // cube faces (+X, -X, +Y, -Y, +Z, -Z); NO_SHADOW when it casts none.
     shadow: u32,
-    _pad_a: f32,
+    // 1.0 for a `Baked` light (#438): a lightmapped surface skips its direct light.
+    baked: f32,
 };
 
 // The light cluster `world` falls in: its screen tile (from `view_proj`) and its
@@ -305,7 +307,7 @@ fn sample_local_shadow(
 
 // Standard mesh vertex layout — position, normal, UVs, skeletal animation data
 // (four joint indices + blend weights; no joint cap, #455), and the tangent basis for normal
-// mapping (`xyz` unit tangent, `w` handedness sign).
+// mapping (`xyz` unit tangent, `w` handedness sign), then the lightmap UV.
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
@@ -313,6 +315,8 @@ struct VertexInput {
     @location(3) joint_indices: vec4<u32>,
     @location(4) joint_weights: vec4<f32>,
     @location(5) tangent: vec4<f32>,
+    // The lightmap UV (#438): glTF TEXCOORD_1; zeros on a mesh without one.
+    @location(6) lightmap_uv: vec2<f32>,
 };
 
 // A vertex's skinning matrix (#599): its four joint matrices blended by `weights`.

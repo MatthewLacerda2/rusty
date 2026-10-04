@@ -199,8 +199,13 @@ impl Renderer {
         let transparent = material.is_some_and(MaterialAsset::is_transparent);
         let model_matrix = scene.world_matrix(id);
         let mut uniform = super::uniforms::solid_entity_uniform(scene, id, material);
-        let instance =
-            super::uniforms::solid_instance(scene, id, model_matrix, self.capture_probe_bounce);
+        let instance = super::uniforms::solid_instance(
+            scene,
+            id,
+            model_matrix,
+            self.capture_probe_bounce,
+            self.lightmaps.resident(),
+        );
 
         // The active bone palette: the live animated pose when a clip plays (#80),
         // else the bind pose (#79). Primitives/static meshes leave it empty and bind

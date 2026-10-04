@@ -3,7 +3,7 @@ use glam::Vec3;
 
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::light as light_ops;
-use crate::scene::{LightComponent, LightType};
+use crate::scene::{LightComponent, LightMode, LightType};
 
 /// The skinned-mesh tools a Mesh card button asks for, deferred because they need
 /// the Scene.
@@ -72,6 +72,7 @@ pub fn draw_light(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_
     let mut remove = false;
     component_card(ui, icon::LIGHTBULB, "Light", Some(&mut remove), |ui| {
         draw_light_type(ui, world, id, &light, is_dirty);
+        draw_light_mode(ui, world, id, &light, is_dirty);
 
         let mut color_arr = [light.color.x, light.color.y, light.color.z];
         ui.horizontal(|ui| {
@@ -190,6 +191,34 @@ fn draw_light_type(
                         if let Some(mut l) = world.light_mut(id) {
                             light_ops::set_cones(&mut l, 30.0, 45.0);
                         }
+                    }
+                }
+            });
+    });
+}
+
+/// The Realtime / Mixed / Baked selector (#438), Unity's Light "Mode" field.
+fn draw_light_mode(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    light: &LightComponent,
+    is_dirty: &mut bool,
+) {
+    ui.horizontal(|ui| {
+        ui.label("Mode:");
+        egui::ComboBox::from_id_salt("LightModeSelector")
+            .selected_text(light.mode.name())
+            .show_ui(ui, |ui| {
+                for mode in LightMode::ALL {
+                    if ui
+                        .selectable_label(light.mode == mode, mode.name())
+                        .clicked()
+                    {
+                        if let Some(mut l) = world.light_mut(id) {
+                            light_ops::set_mode(&mut l, mode);
+                        }
+                        *is_dirty = true;
                     }
                 }
             });

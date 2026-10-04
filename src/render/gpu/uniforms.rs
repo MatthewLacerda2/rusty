@@ -75,7 +75,10 @@ pub(crate) struct DirectionalLightUniform {
     pub _pad1: f32,
     pub color: [f32; 3],
     pub intensity: f32,
-    pub _pad2: [f32; 4],
+    /// 1.0 for a `Baked` light (#438): a lightmapped surface already carries its
+    /// direct light, so it skips this one.
+    pub baked: f32,
+    pub _pad2: [f32; 3],
 }
 
 /// The most directional lights shaded at once (#434); slot 0 is the sun, the one
@@ -157,7 +160,8 @@ impl EntityUniform {
 }
 
 /// One instance of a forward draw (#470), read by `instance_index` from the group-1
-/// storage array: the entity's world matrix, and its light-probe SH (#240).
+/// storage array: the entity's world matrix, its light-probe SH (#240), and where its
+/// baked lightmap sits (#438).
 ///
 /// Only what legitimately differs between copies of one mesh + material lives here.
 /// Everything the fragment shader branches on before sampling a texture stays in the
@@ -172,7 +176,12 @@ pub(crate) struct InstanceData {
     // CPU — instead of the flat hemispherical ambient term. Each coefficient is an RGB
     // triple in `xyz` (4th lane unused) so the array stays `vec4`-aligned.
     pub use_sh: u32,
-    pub _pad: [u32; 3],
+    // The instance's baked lightmap (#438): its atlas page plus one (0 for none) and
+    // the scale/offset from the mesh's lightmap UV into that page (`uv * xy + zw`).
+    // Per instance, so lightmapped copies of a prop still share one draw.
+    pub lightmap_page: u32,
+    pub _pad: [u32; 2],
+    pub lightmap_st: [f32; 4],
     pub sh: [[f32; 4]; 9],
 }
 
@@ -182,7 +191,9 @@ impl InstanceData {
     pub(crate) const IDENTITY: Self = Self {
         model_matrix: glam::Mat4::IDENTITY.to_cols_array(),
         use_sh: 0,
-        _pad: [0; 3],
+        lightmap_page: 0,
+        _pad: [0; 2],
+        lightmap_st: [0.0; 4],
         sh: [[0.0; 4]; 9],
     };
 }

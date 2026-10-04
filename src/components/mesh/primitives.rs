@@ -23,10 +23,10 @@ pub fn generate_box(width: f32, height: f32, depth: f32) -> (Vec<Vertex>, Vec<u3
 
     for (i, &(p0, p1, p2, p3, norm)) in box_faces(w, h, d).iter().enumerate() {
         let base_idx = (i * 4) as u32;
-        vertices.push(Vertex::new(p0, norm, uv_coords[0]));
-        vertices.push(Vertex::new(p1, norm, uv_coords[1]));
-        vertices.push(Vertex::new(p2, norm, uv_coords[2]));
-        vertices.push(Vertex::new(p3, norm, uv_coords[3]));
+        for (p, uv) in [p0, p1, p2, p3].into_iter().zip(uv_coords) {
+            let lm = box_lightmap_uv(i, uv);
+            vertices.push(Vertex::new(p, norm, uv).with_lightmap_uv(lm));
+        }
 
         // Two triangles per quad face.
         let b = base_idx;
@@ -34,6 +34,21 @@ pub fn generate_box(width: f32, height: f32, depth: f32) -> (Vec<Vertex>, Vec<u3
     }
 
     fill_tangents(vertices, indices)
+}
+
+/// Gutter around each face's lightmap cell, as a fraction of the cell (#438), so
+/// bilinear filtering and the bake's dilation never bleed one face into the next.
+const LIGHTMAP_CELL_PAD: f32 = 0.06;
+
+/// Face `face`'s lightmap UV for its texture UV `uv` (#438): six non-overlapping cells
+/// on a 3 × 2 grid, so a Box is lightmappable with no authored second UV map.
+fn box_lightmap_uv(face: usize, uv: [f32; 2]) -> [f32; 2] {
+    let (col, row) = ((face % 3) as f32, (face / 3) as f32);
+    let span = 1.0 - 2.0 * LIGHTMAP_CELL_PAD;
+    [
+        (col + LIGHTMAP_CELL_PAD + uv[0] * span) / 3.0,
+        (row + LIGHTMAP_CELL_PAD + uv[1] * span) / 2.0,
+    ]
 }
 
 /// The 6 faces of a cube of half-extents `(w, h, d)`: each entry is the four corner
@@ -150,6 +165,11 @@ pub fn generate_plane(width: f32, depth: f32) -> (Vec<Vertex>, Vec<u32>) {
         Vertex::new(Vec3::new(w, 0.0, d), norm, [1.0, 1.0]),
         Vertex::new(Vec3::new(-w, 0.0, d), norm, [0.0, 1.0]),
     ];
+    // One quad over [0, 1]²: its texture UV is already a lightmap unwrap (#438).
+    let vertices = vertices
+        .into_iter()
+        .map(|v| v.with_lightmap_uv(v.tex_coords))
+        .collect();
 
     let indices = vec![0, 2, 1, 0, 3, 2];
 

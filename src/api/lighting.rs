@@ -1,11 +1,12 @@
-//! src/api/lighting.rs — `Lighting` namespace: the one-button bake.
+//! src/api/lighting.rs — `Lighting` namespace: the one-button bakes.
 //!
 //! `Lighting.Bake()` is the "place well + bake right now" workflow (#246): in one call
 //! it auto-places light probes and reflection probes from the static scene (unless a set
 //! is already manually authored), then runs the existing multi-bounce light-probe bake
 //! (#250, #285) and GGX reflection-probe bake (#252). It is the orchestration over the `Probe`
 //! and `Reflection` namespaces — manual placement on those stays available; this is the
-//! batteries-included path.
+//! batteries-included path. `Lighting.BakeLightmaps()` / `ClearLightmaps()` (#438) bake
+//! static geometry's lightmaps beside it, also from `dev`.
 //!
 //! The bake is dev-only (it drives a headless GPU and writes authoring artifacts), so
 //! this module registers only the table: `dev` installs `Bake` onto it through
