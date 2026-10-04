@@ -3,6 +3,10 @@
 //! between floors, and byte-identical replay. Levels are blocked out from primitive
 //! boxes only, as every engine test level is.
 
+// The bake-time measurements time the bake with the wall clock; the sim under test
+// never reads it. Integration tests sit outside the clock ban's gate (#757).
+#![allow(clippy::disallowed_methods, clippy::disallowed_types)]
+
 mod bridge;
 mod building;
 mod level;

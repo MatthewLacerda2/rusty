@@ -120,7 +120,9 @@ that hold them (`clippy::style`, `clippy::all`), so a sim module can't quietly g
 an `allow`; and it fails (`UNBANNED` / `UNDENIED`) when `clippy.toml` drops a banned
 item or `Cargo.toml` stops denying the lints. Which rows are platform comes from the
 layer table. Test code in a sim module is not exempt: a sim test has no reason to
-read the clock either.
+read the clock either. The integration suite (`tests/`) is outside the gate's scan,
+like test code in the other guards; a test that times a bake allows the lints on
+its own module (`tests/navigation_layered/mod.rs`).
 
 ## Dependency direction (`--direction`)
 The sim runs headless with no GPU and no UI, so the dependency arrow points one way:
