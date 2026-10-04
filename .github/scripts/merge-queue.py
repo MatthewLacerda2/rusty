@@ -13,7 +13,8 @@ scorsese (#486); its incidents are cited as scorsese#N.
 Invoked, never a service: it runs when somebody types `make queue`, on the pull
 requests they name, in the order they name them. `--dry-run` does every read
 and the local rebase, and writes nothing to GitHub. `--watch` (#664) names
-none: it takes each pull request as it turns ready, in label-priority order,
+none: it takes each pull request as it turns ready, the one conflicting with the
+fewest others in line first, then by label priority (#753),
 and is still invoked, never a service — a hand-back skips that pull request
 and it carries on (#751); it exits on the machine failing, when nothing is
 left, or between pull requests once its `--for` deadline passes
@@ -766,7 +767,7 @@ def parse(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--watch", action="store_true",
         help=(
-            "name no PR: take each one as it turns ready, by label priority; a hand-back is skipped and announced"
+            "name no PR: take each one as it turns ready, fewest conflicts in line first, then label priority; a hand-back is skipped and announced"
             f" ('{queue_watch.HANDED_BACK_LINE} #N'); exit when nothing is left: 1 if anything was handed back,"
             f" {queue_watch.MACHINE_STATUS} if the machine or GitHub failed"
         ),
@@ -848,6 +849,16 @@ def issue_labels() -> dict[int, set[str]]:
     return {i["number"]: queue_watch.names(i.get("labels")) for i in issues}
 
 
+def merge_tree_git(root: str, *args: str) -> tuple[int, str]:
+    """[`queue_watch.clashing`]'s `git`: status and output, `(-1, "")` when git
+    could not run at all (a pair it cannot answer fails open)."""
+    try:
+        done = git(*args, cwd=root)
+    except OSError:
+        return -1, ""
+    return done.returncode, done.stdout
+
+
 def unready(result: tuple[int, str, str]) -> tuple[int, str, str]:
     """[`take`]'s refusal of a draft or closed pull request, renamed for the
     watch: it raced the listing, and is not a hand-back to wake anyone for."""
@@ -864,6 +875,9 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
             "pr", "list", "--state", "open", "--limit", "200", "--json", queue_watch.LIST_FIELDS
         ),
         issue_labels=issue_labels,
+        clashes=functools.partial(
+            queue_watch.clashing, git=functools.partial(merge_tree_git, opts.root), known={}, bots=BOTS
+        ),
         turn=lambda number: unready(drain([number], lambda n: take(repo, n, opts))[0]),
         head=lambda number: (quietly("pr", "view", str(number), "--json", "headRefOid") or {}).get("headRefOid"),
         clock=time.monotonic,

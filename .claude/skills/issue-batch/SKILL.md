@@ -23,7 +23,8 @@ ten-minute CI run, and nothing rebases twice.
 
 **The merge queue is `make queue ARGS=--watch`** (the `ci-merge` skill has the
 detail): started once, in the background, it takes each pull request the moment
-it turns ready, highest label priority first, and rebases, pushes, waits for CI
+it turns ready, the one conflicting with the fewest others in line first, then
+by label priority (#753), and rebases, pushes, waits for CI
 on the new head, asks `make mergeable` and squash-merges, one at a time — so the
 session running the batch is not the one sitting through each run, nor the one
 noticing each draft flip to ready (#664). A **hand-back** (conflict, red, no
@@ -354,14 +355,6 @@ they hold for any repo running this workflow.
   of a re-pushed PR still waits for the coder's PR comment ("rebased, gates
   green"). If a push should *not* be retaken yet, flip the PR back to draft
   first: rusty's queue takes ready PRs, there is no `queue` label.
-- **Merge the broad PR last among those that share lists.** A PR that touches
-  every registry (a new first-class component, a new namespace) sends every
-  sibling appending to the same lists back with a conflict if it lands first.
-  On scorsese, 2026-10-03, one broad PR landing first handed back three small
-  ones, rebased one after another at about an hour apiece; small ones first
-  would have cost one hand-back, on the broad PR. Until the watch orders by
-  conflicts itself (#753), hold the broad PR in draft until its small siblings
-  have merged.
 
 ## Starting
 
