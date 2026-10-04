@@ -107,12 +107,16 @@ is wrong.
   needn't be serialized and can merge freely. **Except `docs/api/`:** the
   API-doc drift tests parse it, and a Markdown-only PR skips exactly those tests — so a
   PR touching it is serialized like code.
-- **Coding parallelises; merging does not.** Every branch behind another in the merge
-  queue pays a rebase per merge ahead of it, so the shape is **two branches in flight** —
-  one merging, one being written. The binding limit is **file collision**, not branch
-  count: two branches appending to the same enum or registry cost more than four in
-  separate modules. **One worktree per branch** under `.claude/worktrees/`, off the latest
-  `main`, removed the moment it merges, and **never a shared `CARGO_TARGET_DIR`** (worktrees
+- **Coding parallelises; merging does not.** How many branches are written at once
+  scales with **how separate their files are**: two branches appending to the same enum
+  or registry cost more than five in separate modules, because every branch behind
+  another in the merge queue pays a rebase per merge ahead of it, and only a colliding
+  rebase is expensive. The number in flight is decided by what is actually there — this
+  machine's disk and memory for local branches, the cloud sessions actually running for
+  the rest (they lift the local build limit) — with about five a suggestion, not a rule.
+  Merging stays **one at a time**, whatever the count. **One worktree per branch** under
+  `.claude/worktrees/`, off the latest `main`, removed the moment it merges, and **never
+  a shared `CARGO_TARGET_DIR`** (worktrees
   overwrite each other's artifacts and a green gate stops meaning this branch compiled).
   Split issues by responsibility, never by parallelism. The **`issue-batch` skill** has
   the arithmetic and the procedure.

@@ -174,9 +174,9 @@ POLL_SECONDS = 30
 # consistent; after this, the silence is the answer ([`mergeable.no_run`]).
 RUN_APPEARS_SECONDS = 300
 
-# The ceiling on one branch, in minutes: well past a cold run (the macOS and
-# Windows jobs are the slow ones), because giving up early hands back a branch
-# about to go green. Reaching it is a hand-back, never a merge.
+# The ceiling on one branch, in minutes: well past a cold run (the macOS job
+# is the slow one since Windows left the gate, #741), because giving up early
+# hands back a branch about to go green. Reaching it is a hand-back, never a merge.
 DEADLINE_MINUTES = 45
 
 # How long a merge call that failed in transit is given to show up as merged.

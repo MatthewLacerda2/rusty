@@ -19,8 +19,9 @@ on:
   # nightly check is how a new RUSTSEC reaches us between merges (RUSTSEC-2026-0257
   # was spotted that way), and `ci-gate` goes red with it. `build-test` and
   # `build-test-cross` do not: with the toolchain and Cargo.lock pinned, rebuilding
-  # an unchanged `main` re-proves what its `push` run already proved. Off the
-  # hour, where GitHub's scheduler is least backed up.
+  # an unchanged `main` re-proves what its `push` run already proved. (The
+  # nightly Windows run is a signal in `windows.yml`, #741.) Off the hour, where
+  # GitHub's scheduler is least backed up.
   schedule:
     - cron: '7 3 * * *'
   # A proof run of a branch: the gates, nothing else.
@@ -168,15 +169,17 @@ jobs:
         run: cargo test --manifest-path tools/lint/Cargo.toml --locked
 
   # Verify the wgpu cross-platform claim (issue #121): the same build + test on
-  # macOS (Metal) and Windows (D3D12), so the portability premise is checked, not
-  # assumed. Separate from `build-test` to avoid renaming that required check.
-  # `fail-fast: false` so one OS's failure doesn't cancel the other's result.
+  # macOS (Metal), the other shipped platform, so the portability premise is
+  # checked, not assumed. Separate from `build-test` to avoid renaming that
+  # required check. Windows is not a shipped platform yet, so its run is a signal
+  # in `windows.yml` (#741), outside this gate; keep the two jobs' steps in step.
+  # Still a one-entry matrix so the check keeps its `(macos-latest)` name.
   build-test-cross:
     needs: changes
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-latest]
     runs-on: ${{ matrix.os }}
     if: >-
       github.event_name == 'workflow_dispatch' ||
@@ -185,7 +188,7 @@ jobs:
         (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) &&
        needs.changes.outputs.code != 'false')
     env:
-      # Metal (macOS) and WARP (Windows) are always there; require them (#489).
+      # Metal is always there on macOS; require it (#489).
       RUSTY_REQUIRE_GPU: "1"
     steps:
       - uses: actions/checkout@v7
@@ -199,9 +202,9 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest
-      # macOS/Windows use their native backends and need no extra system libs; the
-      # apt step is Linux-only and lives on the `build-test` job above. Same runner
-      # and steps as build-test (#484); bash so Windows runs the same script.
+      # macOS uses its native backend and needs no extra system libs; the apt
+      # step is Linux-only and lives on the `build-test` job above. Same runner
+      # and steps as build-test (#484); bash so `windows.yml` can run the same script.
       - name: Test (engine, default)
         shell: bash
         run: |
