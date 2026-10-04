@@ -120,8 +120,9 @@ fn flat_overlay_uniform(tint: [f32; 4]) -> EntityUniform {
 /// The representative marker colour for a light probe, derived from its baked SH. We
 /// reconstruct diffuse irradiance toward world-up (`Sh9::eval(Vec3::Y)`) over π — what
 /// the shading path gives a white, upward-facing surface (#807) — so the tint reads as
-/// "what light is arriving from above" at the probe, on the scale the scene renders. A zero/unbaked probe → black; a bright probe → bright; a warm/cool bounce
-/// shows in the hue. The colour is tone-mapped (Reinhard) into `[0, 1]` so HDR
+/// "what light is arriving from above" at the probe, on the scale the scene renders. A
+/// zero/unbaked probe → black; a bright probe → bright; a warm/cool bounce shows in the
+/// hue. The colour is tone-mapped (Reinhard) into `[0, 1]` so HDR
 /// irradiance stays a legible tint instead of clipping to flat white; alpha is fixed.
 pub(crate) fn sh_marker_tint(sh: &Sh9) -> [f32; 4] {
     let lambert = sh.eval(Vec3::Y).max(Vec3::ZERO) / std::f32::consts::PI;
@@ -168,6 +169,19 @@ mod tests {
             assert!(*c > 0.0 && *c <= 1.0, "channel out of [0,1]: {c}");
         }
         assert_eq!(tint[3], 1.0);
+    }
+
+    /// The tint is on the scene's scale (#807): a probe of a uniform sky of radiance L
+    /// tints as a white floor under it renders, L, Reinhard-mapped to L / (L + 1) — not
+    /// the irradiance πL.
+    #[test]
+    fn a_uniform_sky_tints_by_its_radiance() {
+        let mut sh = Sh9::zero();
+        // A uniform radiance L projects onto the DC band alone: c0 = L · Y00 · 4π.
+        let l = 1.0;
+        sh.coeffs[0] = [l * 0.282_094_8 * 4.0 * std::f32::consts::PI; 3];
+        let tint = sh_marker_tint(&sh);
+        assert!((tint[0] - l / (l + 1.0)).abs() < 1e-4, "tint {tint:?}");
     }
 
     /// The hue survives: a probe that captured a warm (red-dominant) DC term reads
