@@ -50,6 +50,14 @@ pub(super) fn anchor_torque(joint: &ImpulseJoint, bodies: &RigidBodySet) -> Vec3
     let (Some(b1), Some(b2)) = (bodies.get(joint.body1()), bodies.get(joint.body2())) else {
         return Vec3::ZERO;
     };
+    let mut rows = rows(joint, b1, b2);
+    orthogonalize(&mut rows, inv_mass(b1, b2), inv_mass(b2, b1));
+    rows.iter().map(|r| r.torque * r.impulse).sum()
+}
+
+/// `joint`'s solver rows in rapier's order — angular locks, linear locks, angular
+/// limits, linear limits — before orthogonalization.
+fn rows(joint: &ImpulseJoint, b1: &RigidBody, b2: &RigidBody) -> Vec<Row> {
     let data = &joint.data;
     let f1 = *b1.position() * data.local_frame1;
     let f2 = *b2.position() * data.local_frame2;
@@ -65,23 +73,16 @@ pub(super) fn anchor_torque(joint: &ImpulseJoint, bodies: &RigidBodySet) -> Vec3
         .fold(f2.translation, |c, i| {
             c - basis.col(i) * lin_err.dot(basis.col(i))
         });
-    let (r1, r2) = (
-        anchor - b1.center_of_mass(),
-        f2.translation - b2.center_of_mass(),
-    );
+    let r1 = anchor - b1.center_of_mass();
+    let r2 = f2.translation - b2.center_of_mass();
     let ang_basis = ang_basis(f1.rotation, f2.rotation);
-    let lin_row = |i: usize, bounded, impulse| {
-        let a = basis.col(i);
-        let (ang1, ang2) = (r1.cross(a), r2.cross(a));
-        let torque = Vec3::ZERO; // a force at the anchor has no moment about it
-        Row {
-            lin: a,
-            ang1,
-            ang2,
-            torque,
-            bounded,
-            impulse,
-        }
+    let lin_row = |i: usize, bounded, impulse| Row {
+        lin: basis.col(i),
+        ang1: r1.cross(basis.col(i)),
+        ang2: r2.cross(basis.col(i)),
+        torque: Vec3::ZERO, // a force at the anchor has no moment about it
+        bounded,
+        impulse,
     };
     let ang_row = |axis: Vec3, bounded, impulse| Row {
         lin: Vec3::ZERO,
@@ -91,21 +92,23 @@ pub(super) fn anchor_torque(joint: &ImpulseJoint, bodies: &RigidBodySet) -> Vec3
         bounded,
         impulse,
     };
-    let mut rows = Vec::with_capacity(12);
-    for i in (3..6).filter(|&i| set(locked, i)) {
-        rows.push(ang_row(ang_basis.col(i - 3), false, joint.impulses[i]));
-    }
-    for i in (0..3).filter(|&i| set(locked, i)) {
-        rows.push(lin_row(i, false, joint.impulses[i]));
-    }
-    for i in (3..6).filter(|&i| set(limited, i)) {
-        rows.push(ang_row(basis.col(i - 3), true, data.limits[i].impulse));
-    }
-    for i in (0..3).filter(|&i| set(limited, i)) {
-        rows.push(lin_row(i, true, data.limits[i].impulse));
-    }
-    orthogonalize(&mut rows, inv_mass(b1, b2), inv_mass(b2, b1));
-    rows.iter().map(|r| r.torque * r.impulse).sum()
+    let locks = (3..6)
+        .filter(|&i| set(locked, i))
+        .map(|i| ang_row(ang_basis.col(i - 3), false, joint.impulses[i]))
+        .chain(
+            (0..3)
+                .filter(|&i| set(locked, i))
+                .map(|i| lin_row(i, false, joint.impulses[i])),
+        );
+    let limits = (3..6)
+        .filter(|&i| set(limited, i))
+        .map(|i| ang_row(basis.col(i - 3), true, data.limits[i].impulse))
+        .chain(
+            (0..3)
+                .filter(|&i| set(limited, i))
+                .map(|i| lin_row(i, true, data.limits[i].impulse)),
+        );
+    locks.chain(limits).collect()
 }
 
 /// rapier's `diff_conj1_2_tr(q1, q2)`, sign-matched to the shorter arc: the
