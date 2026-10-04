@@ -17,10 +17,12 @@
 //! connected body — which joins to one shared fixed "world" body).
 //!
 //! **Breaking.** After the step, [`PhysicsWorld::break_joints`] reads each joint's
-//! solver impulse. rapier keeps the impulse of one solver *substep*, so force =
-//! linear impulse / substep and torque = angular impulse / substep — the angular
-//! impulse about the joint's anchor, which rapier does not report directly
-//! ([`load`], #803). A
+//! load (Unity's `currentForce` / `currentTorque`): the impulse over the whole
+//! step / dt, the angular one about the joint's anchor ([`load`], #803). rapier
+//! reports only the last solver substep's impulse, which misses a one-off blast
+//! absorbed in substep 0, so the load is the larger of that substep's reading
+//! (/ substep) and the step's impulse estimated from the bodies' velocity change
+//! (/ dt, #806). A
 //! joint past a non-zero `break_force` / `break_torque` is removed and its
 //! `Joint` component destroyed (Unity), and reported for `OnJointBreak`.
 //!
@@ -32,12 +34,15 @@ use std::collections::BTreeMap;
 use glam::{Mat3, Quat, Vec3};
 use rapier3d::prelude::*;
 
+use super::collision_events::VelocitySnapshot;
 use super::compound::{body_owner, world_pose};
 use super::convert::to_pose;
 use super::world::PhysicsWorld;
 use crate::components::{JointComponent, JointKind};
 use crate::scene::Scene;
 
+#[cfg(test)]
+mod impulse_tests;
 mod load;
 #[cfg(test)]
 mod load_tests;
@@ -185,7 +190,13 @@ impl PhysicsWorld {
     /// Break every joint whose solver load this tick passed its threshold: drop
     /// the rapier joint, destroy the `Joint` component, and report it. Ascending
     /// joint-entity order.
-    pub(super) fn break_joints(&mut self, scene: &mut Scene, dt: f32) -> Vec<JointBreak> {
+    /// `pre` holds the bodies' velocities before the step.
+    pub(super) fn break_joints(
+        &mut self,
+        scene: &mut Scene,
+        pre: &VelocitySnapshot,
+        dt: f32,
+    ) -> Vec<JointBreak> {
         let substep = dt / self.integration_parameters.num_solver_iterations as f32;
         if substep <= 0.0 {
             return Vec::new();
@@ -199,8 +210,10 @@ impl PhysicsWorld {
                 continue;
             };
             let [fx, fy, fz, ..] = live.impulses;
-            let force = Vec3::new(fx, fy, fz).length() / substep;
+            let (lin, ang) = load::step_load(live, &self.bodies, pre, self.gravity, dt);
+            let force = (Vec3::new(fx, fy, fz).length() / substep).max(lin.length() / dt);
             let torque = load::anchor_torque(live, &self.bodies).length() / substep;
+            let torque = torque.max(ang.length() / dt);
             if exceeds(force, joint.break_force) || exceeds(torque, joint.break_torque) {
                 broken.push(JointBreak { id, force, torque });
             }

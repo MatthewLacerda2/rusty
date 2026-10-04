@@ -30,7 +30,7 @@ use super::PhysicsEvents;
 use crate::scene::Scene;
 
 pub struct PhysicsWorld {
-    gravity: Vector,
+    pub(super) gravity: Vector,
     pub(super) integration_parameters: IntegrationParameters,
     physics_pipeline: PhysicsPipeline,
     pub(super) islands: IslandManager,
@@ -196,7 +196,7 @@ impl PhysicsWorld {
         let contacts = self.collect_contact_pairs(&pre_solve);
         let collisions = CollisionEvents::from_contact_sets(&self.prev_collisions, contacts);
         self.prev_collisions = collisions.stayed_keys();
-        let joint_breaks = self.break_joints(scene, dt);
+        let joint_breaks = self.break_joints(scene, &pre_solve, dt);
         self.sync_from_rapier(scene);
         PhysicsEvents {
             triggers,

@@ -1,4 +1,5 @@
-//! src/physics/joints/load.rs — the torque a joint carries about its anchor (#803).
+//! src/physics/joints/load.rs — the load a joint carries: torque about its anchor
+//! (#803) and the impulse over the whole step (#806).
 //!
 //! rapier's `ImpulseJoint::impulses` is not the joint's wrench. Its solver
 //! orthogonalizes a joint's rows (modified Gram-Schmidt, in the bodies'
@@ -14,9 +15,24 @@
 //! applies to body 1 about the anchor. That is what Unity's `currentTorque`
 //! reports and `breakTorque` is compared against. A rapier upgrade that changes
 //! the rows fails the pins in `load_tests.rs`.
+//!
+//! **The step's impulse.** rapier writes back only the last solver substep's
+//! impulse (joints are not warm-started, so each substep starts from zero). A
+//! steady load is the same every substep, but a one-off one — a blast, a kick —
+//! is absorbed in substep 0 and never reported. rapier 0.36 has no per-substep
+//! hook, so [`step_load`] recovers the impulse over the whole step from the
+//! bodies instead, without touching the sim: each lock row's impulse is the
+//! velocity change the row saw beyond what gravity alone would give, over the
+//! row's effective mass. The orthogonalized lock rows are mutually orthogonal in
+//! the mass metric, so each row solves on its own. It counts everything that
+//! moved the bodies along the locked axes, so a body with other joints or
+//! contacts splits its load imperfectly; the caller keeps the larger of it and
+//! the last substep's reading, which is exact for a steady load (`impulse_tests.rs`).
 
 use glam::{Mat3, Quat, Vec3};
 use rapier3d::prelude::*;
+
+use crate::physics::collision_events::VelocitySnapshot;
 
 /// One solver row: its Jacobian per body, the torque about the anchor it applies
 /// to body 1 per unit impulse, and its impulse.
@@ -50,9 +66,78 @@ pub(super) fn anchor_torque(joint: &ImpulseJoint, bodies: &RigidBodySet) -> Vec3
     let (Some(b1), Some(b2)) = (bodies.get(joint.body1()), bodies.get(joint.body2())) else {
         return Vec3::ZERO;
     };
-    let mut rows = rows(joint, b1, b2);
-    orthogonalize(&mut rows, inv_mass(b1, b2), inv_mass(b2, b1));
+    let rows = solved_rows(joint, b1, b2).0;
     rows.iter().map(|r| r.torque * r.impulse).sum()
+}
+
+/// The linear and angular impulse (the angular one about the anchor) `joint`
+/// applied to its first body over the whole step, estimated from the bodies'
+/// velocity change since `pre` (see the module docs). Lock rows only: a limit's
+/// load comes from the last substep's reading. Zero when a body is gone.
+pub(super) fn step_load(
+    joint: &ImpulseJoint,
+    bodies: &RigidBodySet,
+    pre: &VelocitySnapshot,
+    gravity: Vec3,
+    dt: f32,
+) -> (Vec3, Vec3) {
+    let (Some(b1), Some(b2)) = (bodies.get(joint.body1()), bodies.get(joint.body2())) else {
+        return (Vec3::ZERO, Vec3::ZERO);
+    };
+    // The velocity change no gravity explains; none for a body the solver could
+    // not move (fixed, kinematic, asleep: rapier integrates none of them).
+    let surplus = |h: RigidBodyHandle, rb: &RigidBody| match pre.get(&h) {
+        Some(v) if rb.is_dynamic() && !rb.is_sleeping() => {
+            let free = v.lin + gravity * rb.gravity_scale() * dt;
+            (rb.linvel() - free, rb.angvel() - v.ang)
+        }
+        _ => (Vec3::ZERO, Vec3::ZERO),
+    };
+    let ((dv1, dw1), (dv2, dw2)) = (surplus(joint.body1(), b1), surplus(joint.body2(), b2));
+    let (rows, metric) = solved_rows(joint, b1, b2);
+    let mut load = (Vec3::ZERO, Vec3::ZERO);
+    for r in rows.iter().filter(|r| !r.bounded) {
+        let norm = metric.dot(r, r);
+        if norm == 0.0 {
+            continue;
+        }
+        // rapier's row velocity is lin·(v2 − v1) + ang2·w2 − ang1·w1, and an
+        // impulse λ on it changes that by −λ·|row|²; so λ = −Δ / |row|².
+        let seen = r.lin.dot(dv2 - dv1) + r.ang2.dot(dw2) - r.ang1.dot(dw1);
+        let impulse = -seen / norm;
+        load.0 += r.lin * impulse;
+        load.1 += r.torque * impulse;
+    }
+    load
+}
+
+/// `joint`'s rows orthogonalized as rapier's solver sees them, with the metric
+/// they are orthogonal in.
+fn solved_rows(joint: &ImpulseJoint, b1: &RigidBody, b2: &RigidBody) -> (Vec<Row>, Metric) {
+    let mut rows = rows(joint, b1, b2);
+    let metric = Metric::new(inv_mass(b1, b2), inv_mass(b2, b1));
+    orthogonalize(&mut rows, &metric);
+    (rows, metric)
+}
+
+/// The bodies' inverse-mass metric the solver orthogonalizes rows in.
+struct Metric {
+    im: Vec3,
+    ii1: AngularInertia,
+    ii2: AngularInertia,
+}
+
+impl Metric {
+    fn new((im1, ii1): (Vec3, AngularInertia), (im2, ii2): (Vec3, AngularInertia)) -> Self {
+        let im = im1 + im2;
+        Self { im, ii1, ii2 }
+    }
+
+    fn dot(&self, a: &Row, b: &Row) -> f32 {
+        a.lin.dot(self.im * b.lin)
+            + self.ii1.mul_vec(a.ang1).dot(b.ang1)
+            + self.ii2.mul_vec(a.ang2).dot(b.ang2)
+    }
 }
 
 /// `joint`'s solver rows in rapier's order — angular locks, linear locks, angular
@@ -133,15 +218,8 @@ fn cross_mat(v: Vec3) -> Mat3 {
 
 /// rapier's `finalize_constraints`: modified Gram-Schmidt in the inverse-mass
 /// metric, skipping bounded rows as a basis, carrying each row's torque along.
-fn orthogonalize(
-    rows: &mut [Row],
-    (im1, ii1): (Vec3, AngularInertia),
-    (im2, ii2): (Vec3, AngularInertia),
-) {
-    let im = im1 + im2;
-    let dot = |a: &Row, b: &Row| {
-        a.lin.dot(im * b.lin) + ii1.mul_vec(a.ang1).dot(b.ang1) + ii2.mul_vec(a.ang2).dot(b.ang2)
-    };
+fn orthogonalize(rows: &mut [Row], metric: &Metric) {
+    let dot = |a: &Row, b: &Row| metric.dot(a, b);
     for j in 0..rows.len() {
         let rj = rows[j];
         let dot_jj = dot(&rj, &rj);
