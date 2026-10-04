@@ -89,6 +89,7 @@ mod tests {
             y,
             ceiling: f32::INFINITY,
             area: 0,
+            surface: crate::navigation::Surface::FLAT,
         }
     }
 

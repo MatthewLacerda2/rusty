@@ -86,6 +86,7 @@ mod tests {
             y,
             ceiling,
             area: 0,
+            surface: crate::navigation::Surface::FLAT,
         };
         g.spans = vec![floor(0.0, 3.8), floor(4.0, 7.8), floor(8.0, f32::INFINITY)];
         g.cell_start = vec![0, 3];

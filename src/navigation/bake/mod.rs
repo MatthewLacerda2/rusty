@@ -28,6 +28,7 @@ mod erosion;
 mod heightfield;
 mod inputs;
 mod modifiers;
+mod plane;
 mod raster;
 mod region;
 mod state;

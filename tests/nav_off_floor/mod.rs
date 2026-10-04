@@ -23,9 +23,9 @@ pub const INNER: (f32, f32) = (
 pub const WALL_MARGIN: f32 = 1.0;
 /// Enemy_1's base offset: its body is 2 m tall and centred on its origin.
 pub const BASE_OFFSET: f32 = 1.0;
-/// A span's top is its cell's highest point, so on a ramp the feet ride up to one
-/// cell's rise above the surface.
-const RAMP_RIDE: f32 = layout::POOL_DEPTH / RAMP_RUN;
+/// How far the feet may sit off the ground: on a ramp too, they follow its surface,
+/// not their cell's highest point (#781).
+const GROUND_TOLERANCE: f32 = 0.02;
 
 /// The default scene as the editor boots it (built, then through its saved
 /// document), and Enemy_1's id in it.
@@ -47,7 +47,7 @@ pub fn assert_grounded(pos: Vec3, when: &str) {
     let feet = pos.y - BASE_OFFSET;
     let ground = ground_at(pos.x, pos.z).unwrap();
     assert!(
-        feet > ground - 0.02 && feet < ground + RAMP_RIDE + 0.02,
+        (feet - ground).abs() < GROUND_TOLERANCE,
         "{when}: feet at y = {feet}, the ground is at {ground} (sunk or floating)"
     );
 }
