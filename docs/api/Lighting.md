@@ -44,7 +44,10 @@ afterward to persist the baked SH (`<scene>.lighting.json`) and the cubemap path
 light, the sky, emissive surfaces, and the direct light of `Baked` lights (see the light
 **Mode** in [`Light`](Light.md)). It is Unity's *Generate Lighting* for lightmaps; the
 editor's **"Bake Lightmaps"** button (scene inspector, next to "Bake Lighting") runs the
-exact same path.
+exact same path, in the background (#808): the window stays live, a progress bar counts
+texels done, and **Cancel** stops the bake and keeps the previous lightmaps. The result is
+applied when the bake finishes, byte-identical to the script verb's; a bake whose scene
+was swapped out meanwhile is dropped. The script verb itself stays synchronous.
 
 - **Who gets one.** Every active, **static**, opaque mesh with a **second UV map** (the
   lightmap UV, glTF `TEXCOORD_1`). The built-in **Box** and **Plane** carry one; a Sphere,
