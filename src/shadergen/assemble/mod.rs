@@ -15,7 +15,7 @@
 //! - **postfx** — a self-contained fullscreen module: the scene-color bindings,
 //!   the fullscreen-triangle `vs_fullscreen`, and an `fs_main` that samples the
 //!   tonemapped color then folds the chosen blocks. This matches the fullscreen-fragment
-//!   shape of the postfx pass.
+//!   shape of the postfx pass; runtime params (#671) read the effect's group-1 uniform.
 //! - **ui** (#427, `ui`) — the UI shader (`ui.wgsl`) is the base, kept verbatim but
 //!   for `graphic()`, which folds the blocks over the graphic's shaded colour.
 //!
@@ -41,7 +41,7 @@ use std::fmt::Write as _;
 use emit::{chain, check_params, emit_helpers, emit_params, Instance};
 
 use super::blocks::{find, Stage};
-use super::params::{ParamLayout, UNIFORM_DECL};
+use super::params::{ParamLayout, POSTFX_UNIFORM_DECL, UNIFORM_DECL};
 use super::recipe::{PassKind, ShaderRecipe};
 use super::textures;
 
@@ -63,7 +63,7 @@ pub fn assemble(recipe: &ShaderRecipe, surface_base: &str) -> Result<String, Str
 }
 
 /// [`assemble`], also returning the module's runtime-param layout (#399) — the
-/// sidecar a bake writes beside it. Empty for postfx.
+/// sidecar a bake writes beside it.
 pub fn assemble_with_params(
     recipe: &ShaderRecipe,
     surface_base: &str,
@@ -158,6 +158,9 @@ fn assemble_postfx(recipe: &ShaderRecipe, resolved: &[Instance], layout: &ParamL
     out.push_str(POSTFX_SCAFFOLD);
 
     out.push_str("\n// ---- authored postfx blocks ----\n");
+    if !layout.params.is_empty() {
+        out.push_str(POSTFX_UNIFORM_DECL);
+    }
     emit_params(&mut out, resolved, layout);
     emit_helpers(&mut out, resolved);
 

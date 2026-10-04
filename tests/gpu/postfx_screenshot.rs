@@ -32,6 +32,7 @@ fn vc(exposure: f32) -> VisualCorrectionComponent {
         shadows: Default::default(),
         ssao: Default::default(),
         custom_effects: Vec::new(),
+        post_params: Default::default(),
     }
 }
 

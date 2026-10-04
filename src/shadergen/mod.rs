@@ -36,6 +36,8 @@
 //! - [`params`] — a surface shader's runtime params (#399): which block params a
 //!   material sets from scripts, their uniform slots, and the `<name>.params.json`
 //!   sidecar that records them.
+//! - [`post_params`] — the runtime params of a volume's postfx chain (#671): one
+//!   name resolved across every effect the volume runs.
 //! - [`textures`] — the extra texture slots a surface block may sample (#400): a
 //!   material-named pattern such as a baked noise map.
 
@@ -44,6 +46,7 @@ pub mod bake;
 pub mod blocks;
 pub mod compose;
 pub mod params;
+pub mod post_params;
 pub mod recipe;
 pub mod textures;
 pub mod validate;

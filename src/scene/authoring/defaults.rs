@@ -184,6 +184,7 @@ pub fn default_visual_correction() -> VisualCorrectionComponent {
         shadows: Default::default(),
         ssao: Default::default(),
         custom_effects: Vec::new(),
+        post_params: Default::default(),
     }
 }
 
