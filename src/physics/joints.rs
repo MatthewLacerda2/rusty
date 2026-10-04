@@ -18,7 +18,9 @@
 //!
 //! **Breaking.** After the step, [`PhysicsWorld::break_joints`] reads each joint's
 //! solver impulse. rapier keeps the impulse of one solver *substep*, so force =
-//! linear impulse / substep and torque = angular impulse / substep. A
+//! linear impulse / substep and torque = angular impulse / substep — the angular
+//! impulse about the joint's anchor, which rapier does not report directly
+//! ([`load`], #803). A
 //! joint past a non-zero `break_force` / `break_torque` is removed and its
 //! `Joint` component destroyed (Unity), and reported for `OnJointBreak`.
 //!
@@ -35,6 +37,10 @@ use super::convert::to_pose;
 use super::world::PhysicsWorld;
 use crate::components::{JointComponent, JointKind};
 use crate::scene::Scene;
+
+mod load;
+#[cfg(test)]
+mod load_tests;
 
 /// One joint that broke this tick: the joint entity and what broke it.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -192,9 +198,9 @@ impl PhysicsWorld {
             ) else {
                 continue;
             };
-            let [fx, fy, fz, tx, ty, tz] = live.impulses;
+            let [fx, fy, fz, ..] = live.impulses;
             let force = Vec3::new(fx, fy, fz).length() / substep;
-            let torque = Vec3::new(tx, ty, tz).length() / substep;
+            let torque = load::anchor_torque(live, &self.bodies).length() / substep;
             if exceeds(force, joint.break_force) || exceeds(torque, joint.break_torque) {
                 broken.push(JointBreak { id, force, torque });
             }
