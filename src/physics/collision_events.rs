@@ -135,8 +135,8 @@ impl CollisionEvents {
 /// A body's velocity state before the solve: linear, angular, world centre of mass.
 #[derive(Clone, Copy)]
 pub(super) struct BodyVelocity {
-    lin: Vec3,
-    ang: Vec3,
+    pub(super) lin: Vec3,
+    pub(super) ang: Vec3,
     com: Vec3,
 }
 
