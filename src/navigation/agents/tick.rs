@@ -59,13 +59,7 @@ impl NavigationGraph {
                 }
                 let steering = !agent.cached_path.is_empty() && !is_at_target(&agent, position);
                 let moved_with = agent.velocity;
-                // It faces where it steers; braking to rest, it holds its facing.
-                let heading = if steering {
-                    self.accelerate_toward_waypoint(&mut agent, position, delta_time)
-                } else {
-                    decelerate(&mut agent, delta_time);
-                    Vec2::ZERO
-                };
+                let heading = self.steer_or_brake(&mut agent, position, steering, delta_time);
                 if let Some(mut t) = scene.world.transform_mut(id) {
                     turn_toward(&mut agent, &mut t.rotation, heading, delta_time);
                 }
@@ -96,6 +90,23 @@ impl NavigationGraph {
                 col.aabb_max = max;
             }
         }
+    }
+
+    /// Steer toward the next waypoint, or brake to rest inside the stopping distance.
+    /// Returns where the agent faces: its steering direction, or zero (it holds its
+    /// facing) while braking.
+    fn steer_or_brake(
+        &self,
+        agent: &mut NavMeshAgentComponent,
+        position: Vec3,
+        steering: bool,
+        delta_time: f32,
+    ) -> Vec2 {
+        if steering {
+            return self.accelerate_toward_waypoint(agent, position, delta_time);
+        }
+        decelerate(agent, delta_time);
+        Vec2::ZERO
     }
 
     /// Accelerate the agent's velocity toward its next waypoint — its preferred
