@@ -12,7 +12,7 @@ use std::cell::RefCell;
 
 use mlua::{Table, Value};
 
-use super::lua_json::{json_to_lua, recipe_from_lua};
+use super::lua_json::{recipe_from_lua, to_lua};
 use super::{put, Reg};
 use crate::components::{UiBlend, UiGradient};
 use crate::scene::authoring::ui_look::{blend_name, parse_blend};
@@ -33,8 +33,8 @@ pub(super) struct GradientAccess {
 
 /// `Get/SetBlend` on `table`. The getter returns `"None"` without the component;
 /// an unknown name is ignored.
-pub(super) fn register_blend<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register_blend<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     access: BlendAccess,
@@ -61,8 +61,8 @@ pub(super) fn register_blend<'lua, 'scope>(
 }
 
 /// `Get/SetGradient` on `table`: see the module docs for the table's shape.
-pub(super) fn register_gradient<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register_gradient<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     access: GradientAccess,
@@ -75,8 +75,7 @@ pub(super) fn register_gradient<'lua, 'scope>(
             let Some(Some(g)) = get(&scene.borrow(), id) else {
                 return Ok(Value::Nil);
             };
-            let json = serde_json::to_value(&g).map_err(mlua::Error::external)?;
-            json_to_lua(lua, &json)
+            to_lua(lua, &g)
         }),
     )?;
     put(

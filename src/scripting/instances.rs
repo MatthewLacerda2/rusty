@@ -12,7 +12,7 @@ use mlua::{Lua, Table, Value};
 const KEY: &str = "rusty.script_instances";
 
 /// The index table, created on first use.
-fn index(lua: &Lua) -> mlua::Result<Table<'_>> {
+fn index(lua: &Lua) -> mlua::Result<Table> {
     match lua.named_registry_value::<Value>(KEY)? {
         Value::Table(t) => Ok(t),
         _ => {
@@ -32,7 +32,7 @@ pub(super) fn record(
     table: &Table,
 ) -> mlua::Result<()> {
     let index = index(lua)?;
-    let slots = match index.get::<_, Value>(id)? {
+    let slots = match index.get::<Value>(id)? {
         Value::Table(t) => t,
         _ => {
             let t = lua.create_table()?;
@@ -52,14 +52,14 @@ pub(super) fn forget(lua: &Lua, id: u32) -> mlua::Result<()> {
 }
 
 /// Entity `id`'s first script (lowest slot) named `name`, or `nil`.
-pub fn find<'lua>(lua: &'lua Lua, id: u32, name: &str) -> mlua::Result<Option<Table<'lua>>> {
-    let Value::Table(slots) = index(lua)?.get::<_, Value>(id)? else {
+pub fn find(lua: &Lua, id: u32, name: &str) -> mlua::Result<Option<Table>> {
+    let Value::Table(slots) = index(lua)?.get::<Value>(id)? else {
         return Ok(None);
     };
     let mut hits: Vec<(i64, Table)> = Vec::new();
     for pair in slots.pairs::<i64, Table>() {
         let (slot, entry) = pair?;
-        if entry.get::<_, String>("name")? == name {
+        if entry.get::<String>("name")? == name {
             hits.push((slot, entry.get("table")?));
         }
     }

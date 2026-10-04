@@ -40,11 +40,7 @@ pub fn measure_file(path: &str) -> Result<Profile, String> {
 }
 
 /// A whole report: the clip's row, its `sections`, and its `tracks`.
-pub fn report_table<'lua>(
-    lua: &'lua Lua,
-    profile: &Profile,
-    tracks: &[Layer],
-) -> mlua::Result<Table<'lua>> {
+pub fn report_table(lua: &Lua, profile: &Profile, tracks: &[Layer]) -> mlua::Result<Table> {
     let table = level_table(lua, &profile.whole)?;
     table.set("sections", sections_table(lua, &profile.sections)?)?;
     let rows = lua.create_table()?;
@@ -59,7 +55,7 @@ pub fn report_table<'lua>(
 }
 
 /// Section rows: a level row each, plus where it sits and what the song calls it.
-fn sections_table<'lua>(lua: &'lua Lua, sections: &[Span]) -> mlua::Result<Table<'lua>> {
+fn sections_table(lua: &Lua, sections: &[Span]) -> mlua::Result<Table> {
     let rows = lua.create_table()?;
     for span in sections {
         let row = level_table(lua, span)?;
@@ -72,7 +68,7 @@ fn sections_table<'lua>(lua: &'lua Lua, sections: &[Span]) -> mlua::Result<Table
 }
 
 /// One measured span as the level row described in the module doc.
-fn level_table<'lua>(lua: &'lua Lua, span: &Span) -> mlua::Result<Table<'lua>> {
+fn level_table(lua: &Lua, span: &Span) -> mlua::Result<Table> {
     let loudness = &span.loudness;
     let table = lua.create_table()?;
     table.set("mean", loudness.mean_dbfs)?;
@@ -91,12 +87,7 @@ fn level_table<'lua>(lua: &'lua Lua, span: &Span) -> mlua::Result<Table<'lua>> {
 }
 
 /// `{ low, mid, high }` — shares in percent, or a diff's moves in points.
-pub fn band_table<T: for<'l> mlua::IntoLua<'l>>(
-    lua: &Lua,
-    low: T,
-    mid: T,
-    high: T,
-) -> mlua::Result<Table<'_>> {
+pub fn band_table<T: mlua::IntoLua>(lua: &Lua, low: T, mid: T, high: T) -> mlua::Result<Table> {
     let table = lua.create_table()?;
     table.set("low", low)?;
     table.set("mid", mid)?;

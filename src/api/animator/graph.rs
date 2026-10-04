@@ -22,8 +22,8 @@ use mlua::Value;
 use super::{layers, put, Reg};
 
 /// Register the graph-control functions onto the `Animator` table.
-pub(super) fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     console: &'scope RefCell<ConsoleLogs>,
@@ -35,8 +35,8 @@ pub(super) fn register<'lua, 'scope>(
 
 /// `SetGraph` / `SetGraphEnabled` — assign (or clear, with `""`) the graph asset
 /// path, and toggle auto-evaluation. Both route through the shared authoring ops.
-fn register_set_graph<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_set_graph<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -70,8 +70,8 @@ fn register_set_graph<'lua, 'scope>(
 /// hard cut into the node's motion, adopting its loop flag and speed. `true` when
 /// the jump happened; `false` (with a console warning for a bad graph, unknown
 /// layer or unknown node) otherwise.
-fn register_play_node<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_play_node<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     console: &'scope RefCell<ConsoleLogs>,
@@ -120,8 +120,8 @@ fn register_play_node<'lua, 'scope>(
 /// `PlayAnimation` — play a clip by name directly, returning whether the entity's
 /// mesh actually carries a clip of that name (the honest, queryable sibling of the
 /// silently no-op'ing `Play`).
-fn register_play_animation<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_play_animation<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

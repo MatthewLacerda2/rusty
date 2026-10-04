@@ -91,9 +91,9 @@ fn apply_uses_override_then_default() {
     apply_field_values(&table, code, &overrides).unwrap();
 
     // Overridden field wins; untouched field falls back to schema default.
-    assert_eq!(table.get::<_, f64>("speed").unwrap(), 2.0);
-    assert!(table.get::<_, bool>("on").unwrap());
-    assert_eq!(table.get::<_, String>("title").unwrap(), "base");
+    assert_eq!(table.get::<f64>("speed").unwrap(), 2.0);
+    assert!(table.get::<bool>("on").unwrap());
+    assert_eq!(table.get::<String>("title").unwrap(), "base");
 }
 
 #[test]
@@ -102,5 +102,5 @@ fn apply_without_schema_is_a_noop() {
     let code = "return { Start = function() end }";
     let table: Table = lua.load(code).eval().unwrap();
     apply_field_values(&table, code, &BTreeMap::new()).unwrap();
-    assert!(table.get::<_, mlua::Value>("anything").unwrap().is_nil());
+    assert!(table.get::<mlua::Value>("anything").unwrap().is_nil());
 }

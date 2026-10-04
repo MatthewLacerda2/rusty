@@ -11,8 +11,8 @@ use crate::scene::authoring::particles as particle_ops;
 use crate::scene::Scene;
 
 /// Register the render setters onto the `Particles` table.
-pub(super) fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -22,8 +22,8 @@ pub(super) fn register<'lua, 'scope>(
 
 /// What each particle is drawn as: `SetRenderMode`, `GetRenderMode`, `SetStretch`,
 /// `SetMesh`.
-fn register_shape<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_shape<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -79,8 +79,8 @@ fn register_shape<'lua, 'scope>(
 }
 
 /// How each particle is shaded: `SetFlipbook`, `SetSoft`, `SetLit`.
-fn register_look<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_look<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

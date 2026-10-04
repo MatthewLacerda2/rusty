@@ -146,9 +146,9 @@ fn color(v: [f32; 6]) -> Vec4 {
 }
 
 /// Register the `Text` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: Scoped<'scope>,
     screen: &'scope RefCell<ScreenSize>,
     video: &'scope RefCell<VideoSettings>,
@@ -206,15 +206,15 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `name(id)` → `get(text)`, or Lua's default (`nil` / `false` / `0`) without a Text.
-fn getter<'lua, 'scope, R>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn getter<'scope, R>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: Scoped<'scope>,
     name: &str,
     get: impl Fn(&TextComponent) -> mlua::Result<R> + 'scope,
 ) -> Reg
 where
-    R: for<'a> mlua::IntoLua<'a> + Default,
+    R: mlua::IntoLua + Default,
 {
     put(
         table,
@@ -227,15 +227,15 @@ where
 }
 
 /// `name(id, value)` → `set(text, value)` when the entity has a Text.
-fn setter<'lua, 'scope, V>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn setter<'scope, V>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: Scoped<'scope>,
     name: &str,
     set: impl Fn(&mut TextComponent, V) + 'scope,
 ) -> Reg
 where
-    V: for<'a> mlua::FromLua<'a>,
+    V: mlua::FromLua,
 {
     put(
         table,

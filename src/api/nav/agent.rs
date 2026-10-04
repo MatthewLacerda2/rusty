@@ -15,9 +15,9 @@ use crate::scene::Scene;
 
 /// `NavMeshAgent.*` target / speed / radius accessors over the nav-agent component, and
 /// its path state (`path_state`, #458).
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     nav: &'scope RefCell<NavigationGraph>,
 ) -> Reg {
@@ -39,8 +39,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `SetTarget` / `GetTarget` over the agent's destination.
-fn register_agent_target<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_agent_target<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -72,8 +72,8 @@ fn register_agent_target<'lua, 'scope>(
 }
 
 /// Motion tuning: `SetSpeed` / `SetAcceleration`.
-fn register_agent_motion<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_agent_motion<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -103,8 +103,8 @@ fn register_agent_motion<'lua, 'scope>(
 }
 
 /// Footprint tuning: `SetStoppingDistance` / `SetRadius` / `Set`-`GetBaseOffset`.
-fn register_agent_size<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_agent_size<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -155,8 +155,8 @@ fn register_agent_size<'lua, 'scope>(
 }
 
 /// Runtime queries / toggle: `IsAtTarget`, `GetVelocity`, and `SetActive`.
-fn register_agent_queries<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_agent_queries<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -209,8 +209,8 @@ fn register_agent_queries<'lua, 'scope>(
 }
 
 /// Local avoidance (#463): `SetAvoidancePriority` / `SetAvoidanceEnabled`.
-fn register_agent_avoidance<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_agent_avoidance<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

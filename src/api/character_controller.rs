@@ -28,9 +28,9 @@ type Field<T> = (fn(&Cc) -> T, fn(&mut Cc, T));
 type Flags = (bool, bool, bool);
 
 /// Register the `CharacterController` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     physics: &'scope RefCell<Option<PhysicsWorld>>,
 ) -> Reg {
@@ -61,9 +61,9 @@ fn flags(mask: u8) -> Flags {
 }
 
 /// `Move`, `IsGrounded`, `GetCollisionFlags`, `GetGroundNormal`, `CanStand`.
-fn register_motion<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_motion<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
     physics: PhysicsCell<'scope>,
 ) -> Reg {
@@ -99,9 +99,9 @@ fn register_motion<'lua, 'scope>(
 }
 
 /// `Get<name>` / `Set<name>` over one `f32` field (`0` without a controller).
-fn f32_pair<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn f32_pair<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
     name: &str,
     (read, write): Field<f32>,
@@ -119,9 +119,9 @@ fn f32_pair<'lua, 'scope>(
 
 /// The capsule (`Height`, `Radius`, `Center`) and its tuning (`StepOffset`,
 /// `SlopeLimit`, `SkinWidth`, `MinMoveDistance`).
-fn register_shape<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_shape<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
     f32_pair(scope, t, scene, "Height", (|c| c.height, ops::set_height))?;

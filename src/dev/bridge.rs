@@ -67,7 +67,7 @@ fn register_harness_stepping(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lu
                 if !tick_unless_quit(&mut world.borrow_mut()) {
                     return Ok(false);
                 }
-                if pred.call::<_, bool>(())? {
+                if pred.call::<bool>(())? {
                     return Ok(true);
                 }
             }
@@ -263,7 +263,7 @@ fn inject<A>(
     f: impl Fn(&mut InputState, A) + 'static,
 ) -> LuaResult<()>
 where
-    A: for<'lua> mlua::FromLuaMulti<'lua>,
+    A: mlua::FromLuaMulti,
 {
     let world = world_of(harness);
     t.set(

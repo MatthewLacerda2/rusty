@@ -16,7 +16,7 @@ fn run(script: &str, check: impl FnOnce(&Lua, &super::Fixture)) {
     .unwrap();
 }
 
-fn eval<T: for<'l> mlua::FromLua<'l>>(lua: &Lua, expr: &str) -> T {
+fn eval<T: mlua::FromLua>(lua: &Lua, expr: &str) -> T {
     lua.load(format!("return {expr}")).eval().unwrap()
 }
 

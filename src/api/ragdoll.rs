@@ -17,9 +17,9 @@ use crate::scene::skeleton::RagdollOptions;
 use crate::scene::Scene;
 
 /// Register the `Ragdoll` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     physics: &'scope RefCell<Option<PhysicsWorld>>,
 ) -> Reg {
@@ -29,7 +29,7 @@ pub fn register<'lua, 'scope>(
         "Build",
         scope.create_function(|lua, (id, opts): (u32, Option<Table>)| {
             let mut options = RagdollOptions::default();
-            if let Some(mass) = opts.map(|o| o.get::<_, Option<f32>>("mass")).transpose()? {
+            if let Some(mass) = opts.map(|o| o.get::<Option<f32>>("mass")).transpose()? {
                 options.mass = mass.unwrap_or(options.mass).max(0.001);
             }
             let made = scene

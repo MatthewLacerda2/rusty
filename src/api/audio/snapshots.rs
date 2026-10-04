@@ -29,9 +29,9 @@ const PATCH_FIELDS: [&str; 7] = [
     "reverb_send",
 ];
 
-pub(super) fn register_snapshots<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &Table<'lua>,
+pub(super) fn register_snapshots<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &Table,
     audio: &'scope RefCell<AudioMaestro>,
     time: &'scope RefCell<Time>,
 ) -> Reg {
@@ -77,9 +77,9 @@ pub(super) fn register_snapshots<'lua, 'scope>(
 }
 
 /// `AddDuck` / `ClearDucks`.
-fn register_ducks<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &Table<'lua>,
+fn register_ducks<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &Table,
     audio: &'scope RefCell<AudioMaestro>,
 ) -> Reg {
     put(

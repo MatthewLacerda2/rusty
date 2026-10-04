@@ -14,9 +14,9 @@ use crate::api::{global_table, put, ApiScopedCtx, Reg};
 use crate::scene::Scene;
 
 /// Add `Bake` to the `Probe`, `Reflection` and `Lighting` tables.
-pub(super) fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     register_probe(lua, scope, ctx.scene)?;
@@ -26,9 +26,9 @@ pub(super) fn register<'lua, 'scope>(
 
 /// `Probe.Bake()`: capture each probe's static surroundings to a cubemap and project
 /// the bounce into SH (#241).
-fn register_probe<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_probe<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     put(
@@ -44,9 +44,9 @@ fn register_probe<'lua, 'scope>(
 /// `Reflection.Bake()` (#245): for each probe capture the static surroundings to a
 /// cubemap, GGX-prefilter it into a roughness mip chain, write the KTX2 next to the
 /// scene and point the probe at it. Errors when the scene is unsaved (nowhere to write).
-fn register_reflection<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_reflection<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     scene_path: &'scope RefCell<Option<String>>,
 ) -> Reg {
@@ -66,9 +66,9 @@ fn register_reflection<'lua, 'scope>(
 /// both sets (#246), through the same orchestration as the editor's "Bake Lighting"
 /// button. `true` when at least one bake ran on the GPU; errors only when a bake's own
 /// contract fails (reflections need a saved scene path).
-fn register_lighting<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_lighting<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     type BakeArgs = (Option<f32>, Option<f32>, Option<u32>);

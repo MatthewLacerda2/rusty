@@ -114,8 +114,8 @@ impl ScriptManager {
 
 /// `{ point = {x,y,z}, normal = {x,y,z}, relativeVelocity = {x,y,z}, impulse,
 /// otherBody }` — the contact a collision callback receives.
-fn contact_table<'lua>(lua: &'lua Lua, c: &Contact) -> mlua::Result<Table<'lua>> {
-    let vec = |v: Vec3| -> mlua::Result<Table<'lua>> {
+fn contact_table(lua: &Lua, c: &Contact) -> mlua::Result<Table> {
+    let vec = |v: Vec3| -> mlua::Result<Table> {
         let t = lua.create_table()?;
         t.set("x", v.x)?;
         t.set("y", v.y)?;

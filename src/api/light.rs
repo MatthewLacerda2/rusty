@@ -18,9 +18,9 @@ use crate::scene::authoring::light as light_ops;
 use crate::scene::Scene;
 
 /// Register the `Light` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -35,8 +35,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `GetColor` / `SetColor` over the light's linear RGB colour.
-fn register_color<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_color<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -65,8 +65,8 @@ fn register_color<'lua, 'scope>(
 }
 
 /// `GetIntensity` / `SetIntensity` (clamped ≥ 0).
-fn register_intensity<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_intensity<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -93,8 +93,8 @@ fn register_intensity<'lua, 'scope>(
 }
 
 /// `GetRange` / `SetRange` (clamped ≥ 0).
-fn register_range<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_range<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -122,8 +122,8 @@ fn register_range<'lua, 'scope>(
 
 /// `GetType` / `SetType` over the light's kind, by name. Unknown names on `SetType`
 /// are ignored (the current type is kept).
-fn register_type<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_type<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -158,8 +158,8 @@ fn register_type<'lua, 'scope>(
 
 /// `GetCastShadows` / `SetCastShadows`: whether a point or spot light casts shadows
 /// through the shadow atlas (#468). The sun always casts; it ignores the flag.
-fn register_cast_shadows<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_cast_shadows<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

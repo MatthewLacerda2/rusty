@@ -34,9 +34,9 @@ fn edit_areas(
 }
 
 /// The area table functions on `Navigation`.
-pub(super) fn register_navigation<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+pub(super) fn register_navigation<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: &'scope RefCell<Scene>,
     nav: &'scope RefCell<NavigationGraph>,
 ) -> Reg {
@@ -76,9 +76,9 @@ pub(super) fn register_navigation<'lua, 'scope>(
 }
 
 /// `GetAreaMask` / `SetAreaMask` on `NavMeshAgent`.
-pub(super) fn register_agent<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+pub(super) fn register_agent<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: u32| {

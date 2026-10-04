@@ -18,9 +18,9 @@ use super::{put, Reg};
 use crate::scene::Scene;
 
 /// Register the `Probe` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -33,8 +33,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `Add` / `Move` / `Remove` / `Clear` / `Count` over single probes.
-fn register_placement<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_placement<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -86,8 +86,8 @@ fn register_placement<'lua, 'scope>(
 /// `FillGrid` (bounds + spacing), `BakeAnalytic` (the deterministic stand-in fill),
 /// (the dev-only `Bake`, the real rendered-capture → SH bake of #241, is installed onto
 /// this table by `dev`, #737).
-fn register_fill<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_fill<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -122,8 +122,8 @@ fn register_fill<'lua, 'scope>(
 /// `SampleIrradiance(x,y,z, nx,ny,nz)` — the interpolated probe irradiance for a
 /// surface normal at a world position (what the shader reads), as linear RGB.
 /// Returns black when there are no probes.
-fn register_query<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_query<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

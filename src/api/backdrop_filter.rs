@@ -27,9 +27,9 @@ const SCALARS: [(&str, Get, Set); 3] = [
 ];
 
 /// Register the `BackdropFilter` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;

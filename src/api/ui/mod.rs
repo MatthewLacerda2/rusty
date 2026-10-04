@@ -30,9 +30,9 @@ use crate::ui::space::{rect_screen_bounds, space_of, CanvasSpace};
 use crate::ui::{layout, ScreenSize, UiRect, UiView};
 
 /// Register the `UI` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     (screen, video): (&'scope RefCell<ScreenSize>, &'scope RefCell<VideoSettings>),
     camera: &'scope RefCell<Camera>,
@@ -81,7 +81,7 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `{ x, y, width, height }` of an axis-aligned `(min, max)` box.
-fn box_table<'lua>(lua: &'lua Lua, (lo, hi): (Vec2, Vec2)) -> mlua::Result<Table<'lua>> {
+fn box_table(lua: &Lua, (lo, hi): (Vec2, Vec2)) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("x", lo.x)?;
     t.set("y", lo.y)?;
@@ -92,11 +92,7 @@ fn box_table<'lua>(lua: &'lua Lua, (lo, hi): (Vec2, Vec2)) -> mlua::Result<Table
 
 /// The Lua shape of a rect — the same keys as [`rect_value`]; `screen` (its
 /// screen-pixel box) is absent for a world-canvas rect behind the camera.
-fn rect_table<'lua>(
-    lua: &'lua Lua,
-    r: &UiRect,
-    screen: Option<(Vec2, Vec2)>,
-) -> mlua::Result<Table<'lua>> {
+fn rect_table(lua: &Lua, r: &UiRect, screen: Option<(Vec2, Vec2)>) -> mlua::Result<Table> {
     let t = box_table(lua, r.bounds())?;
     if let Some(screen) = screen {
         t.set("screen", box_table(lua, screen)?)?;

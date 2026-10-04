@@ -52,7 +52,7 @@ pub fn exposes_lifecycle(code: &str) -> bool {
     };
     LIFECYCLE_CALLBACKS
         .iter()
-        .any(|m| matches!(table.get::<_, Value>(*m), Ok(Value::Function(_))))
+        .any(|m| matches!(table.get::<Value>(*m), Ok(Value::Function(_))))
 }
 
 /// Display name (file stem) for a script path, for the Add Component menu label.

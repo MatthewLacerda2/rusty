@@ -21,9 +21,9 @@ use super::{put, Reg};
 use crate::core::application::{Application, WindowMode};
 
 /// Register the `Application` namespace onto `lua`, backed by the shared cell.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     app: &'scope RefCell<Application>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -55,8 +55,8 @@ fn edit(
 }
 
 /// `Get/SetProductName` and `Get/SetStartupScene`.
-fn register_names<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_names<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     app: &'scope RefCell<Application>,
 ) -> Reg {
@@ -91,8 +91,8 @@ fn register_names<'lua, 'scope>(
 
 /// `Get/SetWindowMode` — `"Windowed"` or `"Fullscreen"`. An unknown name is ignored
 /// and `SetWindowMode` returns `false`, like `Graphics.SetQuality`'s unknown tiers.
-fn register_window_mode<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_window_mode<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     app: &'scope RefCell<Application>,
 ) -> Reg {

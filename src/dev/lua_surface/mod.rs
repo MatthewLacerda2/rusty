@@ -27,9 +27,9 @@ pub fn install_api() {
 
 /// The [`api::Extension`] itself: `Debug`, then the bake verbs on the tables `api`
 /// already registered.
-fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     debug::register(lua, scope, ctx)?;

@@ -54,9 +54,9 @@ impl Ribbon {
 }
 
 /// Register the shared style verbs onto `t` for `which` component.
-pub(super) fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: &'scope RefCell<Scene>,
     which: Ribbon,
 ) -> Reg {
@@ -66,9 +66,9 @@ pub(super) fn register<'lua, 'scope>(
 }
 
 /// `GetWidth(id, t?)`, `SetWidth(id, start, end?)`, `SetWidthCurve(id, {{t, w}, …})`.
-fn register_width<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_width<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: &'scope RefCell<Scene>,
     which: Ribbon,
 ) -> Reg {
@@ -94,9 +94,9 @@ fn register_width<'lua, 'scope>(
 
 /// `GetColor(id, t?)` → r, g, b, a; `SetColor(id, r, g, b, a?)`;
 /// `SetColors(id, start rgba, end rgba)`.
-fn register_color<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_color<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: &'scope RefCell<Scene>,
     which: Ribbon,
 ) -> Reg {
@@ -122,9 +122,9 @@ fn register_color<'lua, 'scope>(
 
 /// `Get/SetTexture` (a path, `nil` clears), `Get/SetTextureMode` (`"Stretch"` /
 /// `"Tile"`), `Get/SetBlend` (`"Alpha"` / `"Additive"`). Unknown names are ignored.
-fn register_look<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_look<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: &'scope RefCell<Scene>,
     which: Ribbon,
 ) -> Reg {

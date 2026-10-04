@@ -19,8 +19,8 @@ type Scoped<'s> = &'s RefCell<Scene>;
 
 /// `GetPreferredSize(id) -> w, h` (wrapped at the element's current rect width) and
 /// `GetLayout(id) -> { width, height, lines, font_size, truncated }` (what draws).
-pub(super) fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: Scoped<'scope>,
     screen: &'scope RefCell<ScreenSize>,

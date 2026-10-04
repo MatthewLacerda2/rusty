@@ -13,16 +13,16 @@
 
 use std::cell::RefCell;
 
-use mlua::{Function, Lua, MultiValue, Table, ThreadStatus, Value};
+use mlua::{Function, Lua, MultiValue, Table, Value};
 
 use super::{put, Reg};
 use crate::scene::Scene;
 use crate::scripting::{wait, ConsoleLogs, Target, TimerScheduler, Wait, Work};
 
 /// Register the `Timer` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     timers: &'scope RefCell<TimerScheduler>,
     console: &'scope RefCell<ConsoleLogs>,
@@ -36,8 +36,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `Invoke` / `InvokeRepeating` / `CancelInvoke` / `IsInvoking`.
-fn register_invoke<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_invoke<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     timers: &'scope RefCell<TimerScheduler>,
@@ -92,8 +92,8 @@ fn register_invoke<'lua, 'scope>(
 }
 
 /// `Cancel` / `IsPending`: the handle-level verbs, for invokes and coroutines alike.
-fn register_handles<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_handles<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     timers: &'scope RefCell<TimerScheduler>,
 ) -> Reg {
@@ -111,8 +111,8 @@ fn register_handles<'lua, 'scope>(
 
 /// `StartCoroutine` / `StopAllCoroutines`. A started coroutine runs at once, up to
 /// its first yield (Unity's contract), and the scheduler resumes it from there.
-fn register_coroutines<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_coroutines<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     timers: &'scope RefCell<TimerScheduler>,
@@ -127,9 +127,9 @@ fn register_coroutines<'lua, 'scope>(
             let handle = timers.borrow_mut().alloc();
             let mut call = args.into_vec();
             call.insert(0, Value::Integer(i64::from(id)));
-            let first = match thread.resume::<_, MultiValue>(MultiValue::from_vec(call)) {
+            let first = match thread.resume::<MultiValue>(MultiValue::from_vec(call)) {
                 Err(e) => Err(e.to_string()),
-                Ok(_) if thread.status() != ThreadStatus::Resumable => return Ok(handle),
+                Ok(_) if !thread.is_resumable() => return Ok(handle),
                 Ok(y) => wait::parse(lua, y.into_iter().next().unwrap_or(Value::Nil)),
             };
             match first {

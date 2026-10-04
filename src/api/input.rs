@@ -19,9 +19,9 @@ use crate::core::input::InputState;
 
 /// Register the readable half of `Input` and the cursor request onto `lua`,
 /// creating the `Input` global table.
-pub fn register_readable<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register_readable<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     input: &'scope RefCell<InputState>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -69,9 +69,9 @@ pub fn register_readable<'lua, 'scope>(
 }
 
 /// The cursor request: the sim records it, the platform applies it to the OS cursor.
-fn register_cursor<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &mlua::Table<'lua>,
+fn register_cursor<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
     input: &'scope RefCell<InputState>,
 ) -> Reg {
     put(
@@ -104,9 +104,9 @@ fn register_cursor<'lua, 'scope>(
 
 /// The clipboard: the text the platform captured (or the game last set), and the
 /// write the platform copies to the OS clipboard after the tick.
-fn register_clipboard<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &mlua::Table<'lua>,
+fn register_clipboard<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
     input: &'scope RefCell<InputState>,
 ) -> Reg {
     put(
@@ -126,9 +126,9 @@ fn register_clipboard<'lua, 'scope>(
 
 /// The gamepad reads, and the one pad *output* (rumble): axes, connection, dead
 /// zones, and rumble requests the platform plays (a record headless).
-fn register_pad<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &mlua::Table<'lua>,
+fn register_pad<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
     input: &'scope RefCell<InputState>,
 ) -> Reg {
     put(
@@ -178,9 +178,9 @@ fn register_pad<'lua, 'scope>(
 
 /// Add the writable half of `Input`: injection that drives the shared input state
 /// so a script can play as the user. Extends the existing `Input` table.
-pub fn register_writable<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register_writable<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     input: &'scope RefCell<InputState>,
 ) -> Reg {
     let table = global_table(lua, "Input")?;
@@ -238,9 +238,9 @@ pub fn register_writable<'lua, 'scope>(
 
 /// Pad injection: axis values and pad (dis)connection, as a bot or the harness drives
 /// them. Logical, like `Press`: no dead zone, no keymap.
-fn register_pad_injection<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &mlua::Table<'lua>,
+fn register_pad_injection<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
     input: &'scope RefCell<InputState>,
 ) -> Reg {
     put(

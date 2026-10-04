@@ -38,7 +38,7 @@ impl ScriptManager {
         };
         let called = lua
             .registry_value::<Function>(&key)
-            .and_then(|f| f.call::<_, ()>(owner));
+            .and_then(|f| f.call::<()>(owner));
         if let Err(e) = called {
             self.log_error(owner, "Tween on_complete", &e.to_string());
         }

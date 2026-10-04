@@ -22,8 +22,8 @@ use crate::time::FIXED_DELTA_TIME;
 type AtPoint = (u32, f32, f32, f32, f32, f32, f32);
 
 /// Register `AddForceAtPosition` / `AddImpulseAtPosition` onto `Physics`.
-pub(super) fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     physics: &'scope RefCell<Option<PhysicsWorld>>,

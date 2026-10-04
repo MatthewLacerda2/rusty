@@ -66,9 +66,9 @@ const NAMES: [(&str, NameGet, NameSet); 4] = [
 ];
 
 /// Register the `LayoutGroup` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: Cell<'scope>,
 ) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
@@ -85,9 +85,9 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `Get/SetPadding`, `Get/SetSpacing`, `Get/SetCellSize`, `Get/SetConstraintCount`.
-fn register_numbers<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_numbers<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: Cell<'scope>,
 ) -> Reg {
     type Lbrt = (f32, f32, f32, f32);
@@ -107,9 +107,9 @@ fn register_numbers<'lua, 'scope>(
 
 /// `Get/SetControlChildSize`, `Get/SetChildForceExpand` (width, height) and
 /// `Get/SetStartVertical`.
-fn register_flags<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_flags<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: Cell<'scope>,
 ) -> Reg {
     let control = |g: &G| (g.control_child_width, g.control_child_height);
@@ -125,17 +125,17 @@ fn register_flags<'lua, 'scope>(
 
 /// Register `Get<suffix>(id)` → `get(group)` (Lua's defaults without a group) and
 /// `Set<suffix>(id, …)` → `set(group, …)` (a no-op without one).
-fn pair<'lua, 'scope, R, A>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn pair<'scope, R, A>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: Cell<'scope>,
     suffix: &str,
     get: impl Fn(&G) -> R + 'scope,
     set: impl Fn(&mut G, A) + 'scope,
 ) -> Reg
 where
-    R: for<'a> IntoLuaMulti<'a> + Default,
-    A: for<'a> FromLuaMulti<'a>,
+    R: IntoLuaMulti + Default,
+    A: FromLuaMulti,
 {
     let f = scope.create_function(move |_, id: u32| {
         Ok(scene

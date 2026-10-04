@@ -11,7 +11,7 @@ use super::ui_api::{ui_scene, with_ui_api};
 /// `UI.GetRect(id)`'s `x, y, width, height`.
 fn rect(lua: &mlua::Lua, id: u32) -> [f32; 4] {
     let r: Table = lua.load(format!("return UI.GetRect({id})")).eval().unwrap();
-    ["x", "y", "width", "height"].map(|k| r.get::<_, f32>(k).unwrap())
+    ["x", "y", "width", "height"].map(|k| r.get::<f32>(k).unwrap())
 }
 
 #[test]

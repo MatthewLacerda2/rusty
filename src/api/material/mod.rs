@@ -40,9 +40,9 @@ use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
 /// Register the `Material` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -94,8 +94,8 @@ fn with_material(
 }
 
 /// Scalar PBR knobs: `SetMetallic` / `SetRoughness`.
-fn register_scalars<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_scalars<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -129,8 +129,8 @@ fn register_scalars<'lua, 'scope>(
 
 /// Texture-map paths: `SetMetallicMap` / `SetRoughnessMap` / `SetTexture` /
 /// `SetNormalMap` / `SetEmissiveMap`.
-fn register_maps<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_maps<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -193,8 +193,8 @@ fn register_maps<'lua, 'scope>(
 /// Transparency controls (#242): `SetRenderMode` / `SetAlpha` / `SetAlphaCutoff`.
 /// Mode is a string — "Opaque" (default), "Cutout", or "Transparent" (case-
 /// insensitive); `alpha`/`cutoff` are clamped to `[0, 1]`.
-fn register_transparency<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_transparency<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

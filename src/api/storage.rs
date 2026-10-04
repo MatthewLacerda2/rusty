@@ -9,16 +9,15 @@
 use std::cell::RefCell;
 
 use mlua::{Lua, Table, Value as LuaValue};
-use serde_json::Value as JsonValue;
 
-use super::lua_json::json_to_lua;
+use super::lua_json::to_lua;
 use super::{put, Reg};
 use crate::core::storage::Storage;
 
 /// Register the `Storage` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     storage: &'scope RefCell<Storage>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -32,8 +31,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// Per-key accessors: `Set` / `Get` / `Has` / `Delete`.
-fn register_scalars<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_scalars<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     storage: &'scope RefCell<Storage>,
 ) -> Reg {
@@ -52,7 +51,7 @@ fn register_scalars<'lua, 'scope>(
         "Get",
         scope.create_function(|lua, (ns, key): (String, String)| {
             match storage.borrow().get(&ns, &key) {
-                Some(json) => json_to_lua(lua, &json),
+                Some(json) => to_lua(lua, &json),
                 None => Ok(LuaValue::Nil),
             }
         }),
@@ -74,8 +73,8 @@ fn register_scalars<'lua, 'scope>(
 }
 
 /// Whole-namespace blob accessors — store/read a structured table at once.
-fn register_namespaces<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_namespaces<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     storage: &'scope RefCell<Storage>,
 ) -> Reg {
@@ -84,7 +83,7 @@ fn register_namespaces<'lua, 'scope>(
         "GetTable",
         scope.create_function(
             |lua, ns: String| match storage.borrow().get_namespace(&ns) {
-                Some(json) => json_to_lua(lua, &json),
+                Some(json) => to_lua(lua, &json),
                 None => Ok(LuaValue::Nil),
             },
         ),
@@ -101,56 +100,9 @@ fn register_namespaces<'lua, 'scope>(
     )
 }
 
-/// Convert an mlua value into JSON for storage. Functions/userdata are rejected.
-fn lua_to_json(value: &LuaValue) -> Result<JsonValue, String> {
-    match value {
-        LuaValue::Nil => Ok(JsonValue::Null),
-        LuaValue::Boolean(b) => Ok(JsonValue::Bool(*b)),
-        LuaValue::Integer(i) => Ok((*i).into()),
-        LuaValue::Number(n) => Ok(serde_json::Number::from_f64(*n)
-            .map(JsonValue::Number)
-            .unwrap_or(JsonValue::Null)),
-        LuaValue::String(s) => Ok(JsonValue::String(
-            s.to_str().map_err(|e| e.to_string())?.to_owned(),
-        )),
-        LuaValue::Table(t) => table_to_json(t),
-        other => Err(format!(
-            "Storage cannot persist a Lua {}",
-            other.type_name()
-        )),
-    }
-}
-
-/// Convert a Lua table to JSON: a clean 1..n integer-keyed sequence becomes an
-/// array, anything else an object (numeric keys stringified).
-fn table_to_json(t: &Table) -> Result<JsonValue, String> {
-    let len = t.raw_len();
-    let total = t.clone().pairs::<LuaValue, LuaValue>().count();
-
-    if len == total && len > 0 {
-        let mut arr = Vec::with_capacity(len);
-        for i in 1..=len {
-            let v: LuaValue = t.raw_get(i).map_err(|e| e.to_string())?;
-            arr.push(lua_to_json(&v)?);
-        }
-        return Ok(JsonValue::Array(arr));
-    }
-
-    let mut map = serde_json::Map::new();
-    for pair in t.clone().pairs::<LuaValue, LuaValue>() {
-        let (k, v) = pair.map_err(|e| e.to_string())?;
-        let key = match k {
-            LuaValue::String(s) => s.to_str().map_err(|e| e.to_string())?.to_owned(),
-            LuaValue::Integer(i) => i.to_string(),
-            LuaValue::Number(n) => n.to_string(),
-            other => {
-                return Err(format!(
-                    "Storage table keys must be strings or numbers, got {}",
-                    other.type_name()
-                ))
-            }
-        };
-        map.insert(key, lua_to_json(&v)?);
-    }
-    Ok(JsonValue::Object(map))
+/// A script value as JSON for storage, through the shared serde bridge
+/// ([`lua_json`](super::lua_json)). Functions/userdata are rejected.
+fn lua_to_json(value: &LuaValue) -> Result<serde_json::Value, String> {
+    super::lua_json::lua_to_json(value)
+        .map_err(|e| format!("Storage cannot persist this value: {e}"))
 }

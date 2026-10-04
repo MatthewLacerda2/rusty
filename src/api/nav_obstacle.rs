@@ -23,9 +23,9 @@ type SceneCell<'s> = &'s RefCell<Scene>;
 type Field<T> = (fn(&Obstacle) -> T, fn(&mut Obstacle, T));
 
 /// Register the `NavMeshObstacle` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
@@ -49,9 +49,9 @@ fn write(scene: SceneCell, id: u32, op: impl FnOnce(&mut Obstacle)) {
 }
 
 /// `Get<name>` / `Set<name>` over one `f32` field (`0` without an obstacle).
-fn f32_pair<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn f32_pair<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
     name: &str,
     (read, set): Field<f32>,
@@ -66,9 +66,9 @@ fn f32_pair<'lua, 'scope>(
 }
 
 /// `Get<name>` / `Set<name>` over one `bool` field (`false` without an obstacle).
-fn bool_pair<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn bool_pair<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
     name: &str,
     (read, set): Field<bool>,
@@ -83,9 +83,9 @@ fn bool_pair<'lua, 'scope>(
 }
 
 /// `Get<name>` / `Set<name>` over one `Vec3` field, as `x, y, z`.
-fn vec3_pair<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn vec3_pair<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
     name: &str,
     (read, set): Field<Vec3>,
@@ -103,9 +103,9 @@ fn vec3_pair<'lua, 'scope>(
 }
 
 /// `Shape`, `Center`, `Size`, `Radius`, `Height`.
-fn register_shape<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_shape<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map(|o| o.shape.as_str())));
@@ -128,9 +128,9 @@ fn register_shape<'lua, 'scope>(
 
 /// `Active`, `Carving`, `CarveOnlyStationary`, `MoveThreshold`,
 /// `TimeToStationary`, and the runtime `IsCarving` / `GetVelocity`.
-fn register_carving<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_carving<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
     bool_pair(scope, t, scene, "Active", (|o| o.active, ops::set_active))?;

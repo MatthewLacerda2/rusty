@@ -30,9 +30,9 @@ use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the `Animator` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     console: &'scope RefCell<ConsoleLogs>,
 ) -> Reg {
@@ -55,8 +55,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `Play` / `Crossfade` — start a clip (crossfade simplifies to a plain play).
-fn register_play<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_play<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     console: &'scope RefCell<ConsoleLogs>,
@@ -97,8 +97,8 @@ fn register_play<'lua, 'scope>(
 
 /// `GetBone` — the bone GameObject of the entity's skeleton named `name` (#453),
 /// or `nil`. Bones are ordinary entities: parent to one, move it, add to it.
-fn register_get_bone<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_get_bone<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -112,8 +112,8 @@ fn register_get_bone<'lua, 'scope>(
 }
 
 /// `Stop` — halt playback on the entity's animator.
-fn register_stop<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_stop<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -133,8 +133,8 @@ fn register_stop<'lua, 'scope>(
 /// `Pause` / `Resume` — hold and release the playhead over the component's `freeze`
 /// flag (#313). Unlike `Stop`, `is_playing` stays set: the pose holds where it is
 /// and `Resume` continues from the same frame.
-fn register_pause_resume<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_pause_resume<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -165,8 +165,8 @@ fn register_pause_resume<'lua, 'scope>(
 
 /// `SetLooping` — wrap the playhead at the current clip's end so it repeats
 /// seamlessly (idle/run/walk cycles, #313). Off, the last frame holds as before.
-fn register_set_looping<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_set_looping<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -184,8 +184,8 @@ fn register_set_looping<'lua, 'scope>(
 }
 
 /// `SetBool` / `SetFloat` — write a typed graph parameter (#314).
-fn register_set_bool_float<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_set_bool_float<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     console: &'scope RefCell<ConsoleLogs>,
@@ -212,8 +212,8 @@ fn register_set_bool_float<'lua, 'scope>(
 /// `SetInt` / `SetTrigger` — the remaining parameter setters (#314). `SetTrigger`
 /// takes no value: it latches the one-shot true, and the graph evaluator (#316)
 /// auto-clears it when it consumes a transition.
-fn register_set_int_trigger<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_set_int_trigger<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     console: &'scope RefCell<ConsoleLogs>,

@@ -11,8 +11,8 @@ use crate::scene::authoring::camera as camera_ops;
 use crate::scene::Scene;
 
 /// Register the per-entity camera functions onto the `Camera` table.
-pub fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -50,8 +50,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `Get/SetTargetTexture`, then the target's settings.
-fn register_target<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_target<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -86,8 +86,8 @@ fn register_target<'lua, 'scope>(
 }
 
 /// `Get/SetTargetPostFx`, `Get/SetTargetUpdateEvery`.
-fn register_target_settings<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_target_settings<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

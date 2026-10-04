@@ -14,8 +14,8 @@ use crate::scene::skeleton::HitboxOptions;
 use crate::scene::Scene;
 
 /// Register `GenerateHitboxes` onto the `Physics` table.
-pub(super) fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -44,13 +44,13 @@ fn options(t: Option<Table>) -> mlua::Result<HitboxOptions> {
     let Some(t) = t else {
         return Ok(opts);
     };
-    if let Some(bones) = t.get::<_, Option<Vec<String>>>("bones")? {
+    if let Some(bones) = t.get::<Option<Vec<String>>>("bones")? {
         opts.bones = Some(bones);
     }
-    if let Some(min_size) = t.get::<_, Option<f32>>("min_size")? {
+    if let Some(min_size) = t.get::<Option<f32>>("min_size")? {
         opts.min_size = min_size;
     }
-    if let Some(layer) = t.get::<_, Option<String>>("layer")? {
+    if let Some(layer) = t.get::<Option<String>>("layer")? {
         opts.layer = layer;
     }
     Ok(opts)

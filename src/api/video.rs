@@ -22,9 +22,9 @@ use super::{put, Reg};
 use crate::core::video::VideoSettings;
 
 /// Register the `Video` namespace onto `lua`, backed by the shared settings cell.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     video: &'scope RefCell<VideoSettings>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -37,8 +37,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// Resolution get/set. `SetResolution(w, h)` clamps each axis to at least 1.
-fn register_resolution<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_resolution<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     video: &'scope RefCell<VideoSettings>,
 ) -> Reg {
@@ -63,8 +63,8 @@ fn register_resolution<'lua, 'scope>(
 }
 
 /// Vsync on/off get/set.
-fn register_vsync<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_vsync<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     video: &'scope RefCell<VideoSettings>,
 ) -> Reg {
@@ -84,8 +84,8 @@ fn register_vsync<'lua, 'scope>(
 }
 
 /// Fullscreen on/off get/set.
-fn register_fullscreen<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_fullscreen<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     video: &'scope RefCell<VideoSettings>,
 ) -> Reg {

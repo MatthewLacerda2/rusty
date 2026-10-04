@@ -19,7 +19,7 @@ fn with_input(input: &RefCell<InputState>, f: impl FnOnce(&Lua)) {
     .unwrap();
 }
 
-fn eval<T: for<'l> mlua::FromLuaMulti<'l>>(lua: &Lua, code: &str) -> T {
+fn eval<T: mlua::FromLuaMulti>(lua: &Lua, code: &str) -> T {
     lua.load(code).eval().unwrap()
 }
 

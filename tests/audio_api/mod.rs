@@ -53,6 +53,6 @@ fn fixture() -> Fixture {
     }
 }
 
-fn register<'lua, 'scope>(lua: &'lua Lua, scope: &mlua::Scope<'lua, 'scope>, f: &'scope Fixture) {
+fn register<'scope>(lua: &Lua, scope: &'scope mlua::Scope<'scope, '_>, f: &'scope Fixture) {
     rusty::api::audio::register(lua, scope, &f.scene, &f.audio, &f.time, &f.camera).unwrap();
 }

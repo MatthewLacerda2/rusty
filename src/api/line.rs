@@ -23,9 +23,9 @@ type SceneCell<'s> = &'s RefCell<Scene>;
 type IdPoint = (u32, usize, f32, f32, f32);
 
 /// Register the `Line` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
@@ -49,9 +49,9 @@ fn write(scene: SceneCell, id: u32, f: impl FnOnce(&mut LineComponent)) {
 
 /// `GetPositions` / `SetPositions` (a list of `{x, y, z}`), `GetPosition` /
 /// `SetPosition` (one 0-based point), `GetPositionCount` / `SetPositionCount`.
-fn register_positions<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_positions<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: u32| {
@@ -89,9 +89,9 @@ fn register_positions<'lua, 'scope>(
 }
 
 /// `GetUseWorldSpace` / `SetUseWorldSpace`, `GetLoop` / `SetLoop`.
-fn register_flags<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_flags<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: u32| {

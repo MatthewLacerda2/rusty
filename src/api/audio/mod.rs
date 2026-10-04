@@ -34,9 +34,9 @@ use crate::scene::Scene;
 use crate::time::Time;
 
 /// Register the `Audio` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     audio: &'scope RefCell<AudioMaestro>,
     time: &'scope RefCell<Time>,
@@ -87,8 +87,8 @@ fn source_clip_pos(scene: &RefCell<Scene>, id: u32) -> Option<(String, [f32; 3])
 }
 
 /// `Play` / `Stop` / `SetVolume` — drive an entity's own `AudioSource`.
-fn register_source_control<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_source_control<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     audio: &'scope RefCell<AudioMaestro>,
@@ -171,8 +171,8 @@ fn rolloff_arg(min: Option<f32>, max: Option<f32>) -> Result<Rolloff, String> {
 }
 
 /// `PlayAt` (fire-and-forget one-shot) + master-volume get/set.
-fn register_oneshot_and_master<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_oneshot_and_master<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     audio: &'scope RefCell<AudioMaestro>,
     time: &'scope RefCell<Time>,
@@ -217,8 +217,8 @@ fn register_oneshot_and_master<'lua, 'scope>(
 
 /// `GetSpeakerMode` / `SetSpeakerMode` — the output profile (`headphones` / `tv` /
 /// `home_theater`). Output shaping only: the sim never reads it.
-fn register_speaker_mode<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_speaker_mode<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     audio: &'scope RefCell<AudioMaestro>,
 ) -> Reg {
@@ -251,8 +251,8 @@ fn register_speaker_mode<'lua, 'scope>(
 /// occlusion muffle, `pan` is `[-1, 1]` (left→right), `occlusion` the smoothed
 /// factor in `[0, 1]` (#467). This is the agent-facing introspection (#213) for "how a source is
 /// heard right now" — pure math, identical with or without an audio device.
-fn register_spatial<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_spatial<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     audio: &'scope RefCell<AudioMaestro>,
