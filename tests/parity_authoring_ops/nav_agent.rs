@@ -99,3 +99,39 @@ fn base_offset_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Er
     assert_eq!((read, a.base_offset, b.base_offset), (1.0, 1.0, 1.0));
     Ok(())
 }
+
+#[test]
+fn turning_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
+    let scene = RefCell::new(Scene::new());
+    let via_lua = entity_with_agent(&mut scene.borrow_mut(), "ViaLua");
+    let via_op = entity_with_agent(&mut scene.borrow_mut(), "ViaOp");
+    let nav = RefCell::new(NavigationGraph::new(0.0, 20.0, 0.0, 20.0, 1.0));
+    let lua = Lua::new();
+    let read: (bool, f32, f32) = lua.scope(|s| {
+        rusty::api::nav::register(&lua, s, &scene, &nav).unwrap();
+        lua.load(format!(
+            "NavMeshAgent.SetUpdateRotation({via_lua}, false)
+             NavMeshAgent.SetAngularSpeed({via_lua}, 90)
+             NavMeshAgent.SetAngularAcceleration({via_lua}, 360)
+             return NavMeshAgent.GetUpdateRotation({via_lua}),
+                    NavMeshAgent.GetAngularSpeed({via_lua}),
+                    NavMeshAgent.GetAngularAcceleration({via_lua})"
+        ))
+        .eval()
+    })?;
+    {
+        let mut sc = scene.borrow_mut();
+        let mut e = sc.world.nav_agent_mut(via_op).unwrap();
+        nav_ops::set_update_rotation(&mut e, false);
+        nav_ops::set_angular_speed(&mut e, 90.0);
+        nav_ops::set_angular_acceleration(&mut e, 360.0);
+    }
+    let sc = scene.borrow();
+    let turning = |id| {
+        let a = sc.world.nav_agent(id).unwrap();
+        (a.update_rotation, a.angular_speed, a.angular_acceleration)
+    };
+    assert_eq!(read, (false, 90.0, 360.0));
+    assert_eq!(turning(via_lua), turning(via_op));
+    Ok(())
+}

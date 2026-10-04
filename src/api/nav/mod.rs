@@ -12,6 +12,7 @@ mod areas;
 mod offmesh;
 mod path_state;
 mod query;
+mod turning;
 
 use std::cell::RefCell;
 

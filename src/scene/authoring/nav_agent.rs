@@ -4,7 +4,7 @@
 //! `NavMeshAgentComponent` field by field: the `active` flag, the motion tuning
 //! (`speed` / `acceleration` / `stopping_distance`), the footprint `radius` and
 //! `base_offset`, the
-//! `target` destination, and the local-avoidance settings (#463).
+//! `target` destination, the local-avoidance settings (#463), and turning (#744).
 //!
 //! BOTH the editor's NavMesh Agent card and the Lua `NavMeshAgent.*` setters route
 //! through these, so the egui panel and the binding share one write (#287). The ops
@@ -36,6 +36,22 @@ pub fn set_acceleration(a: &mut NavMeshAgentComponent, acceleration: f32) {
 /// Set the agent's stopping distance.
 pub fn set_stopping_distance(a: &mut NavMeshAgentComponent, stopping_distance: f32) {
     a.stopping_distance = stopping_distance;
+}
+
+/// Set whether the agent turns itself to face where it steers (#744, Unity's
+/// `updateRotation`).
+pub fn set_update_rotation(a: &mut NavMeshAgentComponent, update: bool) {
+    a.update_rotation = update;
+}
+
+/// Set the agent's top yaw rate, degrees/second (Unity's `angularSpeed`).
+pub fn set_angular_speed(a: &mut NavMeshAgentComponent, angular_speed: f32) {
+    a.angular_speed = angular_speed;
+}
+
+/// Set how fast the agent's yaw rate ramps up and down, degrees/second².
+pub fn set_angular_acceleration(a: &mut NavMeshAgentComponent, angular_acceleration: f32) {
+    a.angular_acceleration = angular_acceleration;
 }
 
 /// Set the agent's footprint radius.
@@ -110,6 +126,9 @@ mod tests {
         set_avoidance_priority(&mut e, 12.0);
         set_avoidance_enabled(&mut e, false);
         set_auto_traverse_off_mesh_link(&mut e, false);
+        set_update_rotation(&mut e, false);
+        set_angular_speed(&mut e, 90.0);
+        set_angular_acceleration(&mut e, 360.0);
         e.cached_path = vec![Vec3::ONE];
         set_area_mask(&mut e, 0b101);
         assert!(e.cached_path.is_empty(), "a new mask re-plans");
@@ -125,6 +144,9 @@ mod tests {
         assert_eq!(a.avoidance_priority, 12);
         assert!(!a.avoidance_enabled);
         assert!(!a.auto_traverse_off_mesh_link);
+        assert!(!a.update_rotation);
+        assert_eq!(a.angular_speed, 90.0);
+        assert_eq!(a.angular_acceleration, 360.0);
     }
 
     #[test]

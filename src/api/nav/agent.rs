@@ -28,6 +28,7 @@ pub fn register<'scope>(
     register_agent_size(scope, &table, scene)?;
     register_agent_queries(scope, &table, scene)?;
     register_agent_avoidance(scope, &table, scene)?;
+    super::turning::register(scope, &table, scene)?;
     super::path_state::register_reads(scope, &table, scene)?;
     super::path_state::register_writes(scope, &table, scene, nav)?;
     super::offmesh::register_agent(scope, &table, scene)?;

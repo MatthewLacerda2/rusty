@@ -47,8 +47,9 @@ pub fn draw_nav_agent(
     }
 }
 
-/// The nav-agent scalar tuning rows (speed, acceleration, stopping distance, radius,
-/// base offset), each clamped and routed through its shared op.
+/// The nav-agent scalar tuning rows (speed, acceleration, angular speed and
+/// acceleration, stopping distance, radius, base offset), each clamped and routed
+/// through its shared op, then the Update Rotation toggle (#744).
 fn draw_agent_tuning(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -56,13 +57,25 @@ fn draw_agent_tuning(
     agent: &crate::components::NavMeshAgentComponent,
     is_dirty: &mut bool,
 ) {
-    let rows: [(&str, f32, _, NavOp); 5] = [
+    let rows: [(&str, f32, _, NavOp); 7] = [
         ("Speed:", agent.speed, 0.0..=100.0, nav_ops::set_speed),
         (
             "Acceleration:",
             agent.acceleration,
             0.0..=100.0,
             nav_ops::set_acceleration,
+        ),
+        (
+            "Angular Speed:",
+            agent.angular_speed,
+            0.0..=3600.0,
+            nav_ops::set_angular_speed,
+        ),
+        (
+            "Angular Acceleration:",
+            agent.angular_acceleration,
+            0.0..=36000.0,
+            nav_ops::set_angular_acceleration,
         ),
         (
             "Stopping Distance:",
@@ -85,6 +98,13 @@ fn draw_agent_tuning(
             }
             *is_dirty = true;
         }
+    }
+    let mut update = agent.update_rotation;
+    if ui.checkbox(&mut update, "Update Rotation").changed() {
+        if let Some(mut a) = world.nav_agent_mut(id) {
+            nav_ops::set_update_rotation(&mut a, update);
+        }
+        *is_dirty = true;
     }
 }
 

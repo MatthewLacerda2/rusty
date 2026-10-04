@@ -10,6 +10,10 @@ use super::OffMeshLinkData;
 
 /// Unity's default `avoidancePriority`: the middle of the 0–99 range.
 pub const DEFAULT_AVOIDANCE_PRIORITY: u8 = 50;
+/// Unity's default `angularSpeed`, degrees/second.
+pub const DEFAULT_ANGULAR_SPEED: f32 = 120.0;
+/// The default yaw-rate ramp, degrees/second²: 0 → 120°/s in 1/6 s.
+pub const DEFAULT_ANGULAR_ACCELERATION: f32 = 720.0;
 /// The highest (least important) avoidance priority, as in Unity.
 pub const MAX_AVOIDANCE_PRIORITY: u8 = 99;
 
@@ -76,6 +80,19 @@ pub struct NavMeshAgentComponent {
     /// allows area `i`. Every area by default.
     #[serde(default = "default_area_mask")]
     pub area_mask: u32,
+    /// Whether the agent turns itself to face where it steers (#744, Unity's
+    /// `updateRotation`, on by default). Off, rotation is left to scripts.
+    #[serde(default = "default_true")]
+    pub update_rotation: bool,
+    /// Top yaw rate while turning to face its heading, degrees/second (Unity's
+    /// `angularSpeed`, default 120).
+    #[serde(default = "default_angular_speed")]
+    pub angular_speed: f32,
+    /// How fast the yaw rate builds up and winds down, degrees/second² (#744; beyond
+    /// Unity, whose agent turns at a constant `angularSpeed`). The agent eases into
+    /// a turn and out of it onto its heading, without overshoot.
+    #[serde(default = "default_angular_acceleration")]
+    pub angular_acceleration: f32,
 
     // --- Cached pathfinding state (#126) ---
     //
@@ -115,6 +132,10 @@ pub struct NavMeshAgentComponent {
     /// How far (world units) auto-traversal has carried the agent along that link.
     #[serde(skip)]
     pub link_progress: f32,
+    /// The signed yaw rate the agent is turning at, degrees/second (+ is
+    /// counter-clockwise seen from above); zero when it isn't turning.
+    #[serde(skip)]
+    pub angular_velocity: f32,
 }
 
 impl NavMeshAgentComponent {
@@ -137,6 +158,14 @@ fn default_area_mask() -> u32 {
     u32::MAX
 }
 
+fn default_angular_speed() -> f32 {
+    DEFAULT_ANGULAR_SPEED
+}
+
+fn default_angular_acceleration() -> f32 {
+    DEFAULT_ANGULAR_ACCELERATION
+}
+
 fn default_true() -> bool {
     true
 }
@@ -156,6 +185,9 @@ impl Default for NavMeshAgentComponent {
             auto_traverse_off_mesh_link: true,
             base_offset: 0.0,
             area_mask: u32::MAX,
+            update_rotation: true,
+            angular_speed: DEFAULT_ANGULAR_SPEED,
+            angular_acceleration: DEFAULT_ANGULAR_ACCELERATION,
             cached_path: Vec::new(),
             path_cursor: 0,
             planned_target: Vec3::ZERO,
@@ -165,6 +197,7 @@ impl Default for NavMeshAgentComponent {
             path_links: Vec::new(),
             off_mesh_link: None,
             link_progress: 0.0,
+            angular_velocity: 0.0,
         }
     }
 }

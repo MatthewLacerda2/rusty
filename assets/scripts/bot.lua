@@ -24,12 +24,11 @@ function BotAI.Update(entity_id, delta_time)
     -- Dynamic path target tracking
     NavMeshAgent.SetTarget(entity_id, target_x, target_y, target_z)
 
-    -- Dynamic rotation towards movement velocity direction and clean animation transition
+    -- The agent turns itself to face where it steers, at its authored angular speed
+    -- (Update Rotation on the inspector card); the script only picks the animation.
     local vx, vy, vz = NavMeshAgent.GetVelocity(entity_id)
     local speed_sq = vx * vx + vz * vz
     if speed_sq > 0.01 then
-        local angle = math.atan2(vx, vz) * (180.0 / math.pi)
-        Transform.SetRotation(entity_id, 0.0, angle, 0.0)
         Animator.Play(entity_id, "Walk")
     else
         Animator.Play(entity_id, "Idle")
