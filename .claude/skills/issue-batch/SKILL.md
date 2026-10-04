@@ -9,17 +9,24 @@ The user rarely has one issue. They write plenty of them and then ask for them i
 batches, leaving how many and in what order to you. This is how a set of them gets
 worked without the batch costing more than the work.
 
-## Two branches in flight, pipelined
+## Coding scales with separation; merging stays one at a time
 
 Coding parallelises. **Merging does not** — rusty is one compiled crate, so merges
 are serialized, and the queue is the bottleneck.
 
 Every branch that is not first pays a rebase for each merge ahead of it. Over
-shared code that is **N(N−1)/2 rebases**: two branches cost one, three cost
-three, four cost six. A rebase buys no correctness.
+shared code that is **N(N−1)/2 colliding rebases**: two branches cost one, three
+cost three, four cost six. A rebase buys no correctness. Over separate files the
+same rebases are seconds of `git` each, so the count barely matters there.
 
-So: **one in the merge queue, one being written.** Nothing idles through a
-ten-minute CI run, and nothing rebases twice.
+So the number of branches in flight is set by **how separate their files are**
+(next section), then by what is actually available: this machine's disk and
+memory for local branches (*Each branch gets its own worktree*), and the cloud
+sessions actually running for the rest (*Cloud sessions are extra coders*).
+**About five** is a suggestion, not a rule — the 2026-10-02 batch ran six to
+eight cloud coders over one serialized queue, limited by file collisions, GitHub
+runners and the usage limit, not by this machine. The minimum shape is still
+**one in the merge queue, one being written**: nothing idles through a CI run.
 
 **The merge queue is `make queue ARGS=--watch`** (the `ci-merge` skill has the
 detail): started once, in the background, it takes each pull request the moment
@@ -159,12 +166,15 @@ bottleneck (hours-long foundation branches), never when the queue is.
   in-flight branch touches. The collision list above still decides that; cloud
   removes the build-slot limit, not the rebase cost.
 
-**How many:** at most **four branches in flight in total**, local and cloud
-together, no more than three of them local. Each one behind another still pays a
-rebase per merge ahead of it, and a full queue drains about one pull request per
-10–15 minutes (one CI run each, seen 2026-09-30): four finishing together leave the
-last waiting most of an hour with three rebases paid. Past four, the queue is the
-bottleneck and more coders only lengthen it.
+**How many:** as many as there are branches in **genuinely separate files** and
+sessions to run them — about five is a suggestion, not a cap (scorsese runs the
+same way). Local ones stay within this machine's limits above. Each one behind
+another still pays a rebase per merge ahead of it, and the queue drains about one
+pull request per 10–15 minutes (one CI run each, seen 2026-09-30), so five
+finishing together leave the last waiting about an hour. That wait is cheap when
+their files are separate and the coders have more to do; it is the collisions, not
+the count, that turn a queue into a session of conflict resolution. Merging stays
+one at a time however many are written.
 
 **Launching one — and proving it is one.** Not with the `Agent` tool's
 `isolation: "remote"`: in a local session that silently falls back to a local
@@ -198,8 +208,9 @@ PR, not the agent.
 green, so a PR must never be readied just to make CI run. On 2026-09-30 #520's session
 readied its PR to get Windows CI on a temporary 200-round test loop, and it merged with
 the loop still in (#559 reverted it). For a proof run on a draft, dispatch the
-workflow on the branch instead: `gh workflow run ci.yml --ref <branch>` runs
-the gates (`build-test`, `build-test-cross`, `deny`, `ci-gate`) and nothing else,
+workflow on the branch instead (`windows.yml` for Windows, a non-gating signal since
+#741): `gh workflow run ci.yml --ref <branch>` runs
+the gates (`build-test`, `build-test-cross` on macOS, `deny`, `ci-gate`) and nothing else,
 without readying anything. Mutation and coverage are not in `ci.yml` any more (#750):
 a branch that adds mechanism asks for a scoped mutation run instead
 (`make mutants-remote SCOPE=diff`, or a `mutants-on-request.yml` dispatch).

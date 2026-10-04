@@ -361,7 +361,7 @@ class Picking(unittest.TestCase):
             self.assertEqual(mergeable.runs_for([run(name)], SHA, "ci"), [])
 
     def test_a_matrix_job_counts_under_its_base_name(self):
-        self.assertEqual(mergeable.base("build-test-cross (windows-latest)"), "build-test-cross")
+        self.assertEqual(mergeable.base("build-test-cross (macos-latest)"), "build-test-cross")
 
     def test_a_skipped_run_is_not_a_failed_one(self):
         self.assertEqual(mergeable.failed_runs([run(conclusion="skipped")]), [])
@@ -393,6 +393,19 @@ class Workflows(unittest.TestCase):
             with self.subTest(workflow=workflow):
                 first = (WORKFLOW_DIR / file).read_text().splitlines()[0]
                 self.assertEqual(first, f"name: {workflow}")
+
+    def test_windows_is_a_signal_not_a_gate(self):
+        # #741: the merge never waits on Windows. It is its own workflow, which
+        # nothing here reads, and no `ci` job runs on a Windows runner.
+        self.assertNotIn("windows", mergeable.WORKFLOWS)
+        self.assertNotIn("windows-latest", (WORKFLOW_DIR / "ci.yml").read_text())
+        first = (WORKFLOW_DIR / "windows.yml").read_text().splitlines()[0]
+        self.assertEqual(first, "name: windows")
+
+    def test_macos_still_gates(self):
+        # The other shipped platform: in `ci-gate`'s `needs:` and on its runner.
+        self.assertIn("build-test-cross", gate_needs("ci.yml", "ci-gate"))
+        self.assertRegex((WORKFLOW_DIR / "ci.yml").read_text(), r"os: \[macos-latest\]")
 
     def test_build_test_still_has_the_step_the_drift_check_looks_for(self):
         text = (WORKFLOW_DIR / "ci.yml").read_text()

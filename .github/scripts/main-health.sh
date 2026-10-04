@@ -12,7 +12,7 @@
 # rebuild), so the fix PR closes the issue, not this script.
 set -euo pipefail
 
-WATCHED='ci lint mutants-sweep coverage'
+WATCHED='ci lint mutants-sweep coverage windows'
 LABEL=bug
 
 run=$(gh api "repos/$REPO/actions/runs/$RUN_ID")
@@ -39,9 +39,11 @@ shard_had_findings() {
   [[ $rc == 2 || $rc == 3 ]]
 }
 
-# Every other non-success job files. The signal jobs never fail on a finding —
-# `coverage` flags a floor drop without exiting non-zero, and `mutants-report`
-# only summarises — so their failure is always infrastructural.
+# Every other non-success job files. The weekly signal jobs never fail on a
+# finding — `coverage` flags a floor drop without exiting non-zero, and
+# `mutants-report` only summarises — so their failure is always
+# infrastructural. The nightly `windows` signal is the exception on purpose: a
+# red Windows build is the finding, and this issue is where it lands (#741).
 failed=()
 while IFS=$'\t' read -r name concl; do
   case "$concl" in success | skipped | neutral) continue ;; esac
@@ -110,7 +112,9 @@ if [[ $state == red && -z $issue ]]; then
     echo ''
     echo 'Informational signals (coverage, the weekly mutation sweep) file here only when they'
     echo 'fail to *run* — a crash, a timeout, a cancelled shard. Their findings (surviving mutants,'
-    echo 'a coverage drop) stay in their own reports. Later red runs comment here when the set of'
+    echo 'a coverage drop) stay in their own reports. The nightly Windows signal files when it'
+    echo 'goes red too: Windows is not a shipped platform, so this never blocked a merge, but it is'
+    echo 'how Windows rot is caught before it piles up (#741). Later red runs comment here when the set of'
     echo 'failing jobs changes. A green run leaves a note but does not close this: green can be'
     echo 'vacuous (a docs-only merge skips the build steps; the nightly does not rebuild), so close'
     echo 'it from the PR that fixes it.'

@@ -123,7 +123,7 @@ Where they actually run is not uniform, and it is worth knowing before you rely 
 |---|---|---|
 | `build-test` (ubuntu) | Mesa **lavapipe** (software Vulkan, #489) | run, on the CPU |
 | `build-test-cross` (macos) | real Metal GPU | run, against real VRAM |
-| `build-test-cross` (windows) | **WARP** (software) | run, against **system RAM** |
+| `build-test-windows` (`windows.yml`, a signal, #741) | **WARP** (software) | run, against **system RAM** |
 
 **CI requires an adapter.** Those jobs set `RUSTY_REQUIRE_GPU=1`, which turns one
 canary test (`render::test_gpu::tests::gpu_adapter_present_when_required`) from a skip into

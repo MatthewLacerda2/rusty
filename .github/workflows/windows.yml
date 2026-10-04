@@ -1,0 +1,82 @@
+name: windows
+# The Windows build+test as an informational signal (#741), not a gate. Windows
+# is a planned target, not a shipped one (CLAUDE.md, *Ships for macOS and Linux;
+# Windows comes later*), and this job was the long pole of every pull request
+# run, 2–3× the real gate, with the merge queue waiting on it. So it lives in
+# its own workflow: `ci-gate` never `needs:` it, and `mergeable.py` reads only
+# `ci` and `lint`, so a red or slow Windows run here never holds a merge.
+#
+# It still runs on every ready pull request touching code, so a Windows break
+# shows up beside the change that caused it; and nightly on `main`, where
+# `main-health.yml` files the issue when it fails to run or goes red — the same
+# path as the other signals. Not on `push`: the nightly covers `main`, and a
+# Windows run per merge held a runner for a check nothing waits on.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    # The same `code` test ci.yml's `changes` job applies: everything but
+    # Markdown, with the scripting-API reference counted as code (#525). A
+    # skipped run is fine here — nothing requires this workflow.
+    paths:
+      - '**'
+      - '!**/*.md'
+      - 'docs/api/**'
+  # Off the hour, and off ci.yml's 03:07 deny run.
+  schedule:
+    - cron: '37 3 * * *'
+  workflow_dispatch:
+
+# As in ci.yml (#482): a new push to a pull request cancels its stale run; every
+# other event keeps its own group, so each finishes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Same steps as ci.yml's `build-test-cross`; bash so Windows runs the same
+  # script. Drafts skip, as the gates do.
+  build-test-windows:
+    runs-on: windows-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    env:
+      # WARP is always there; require it (#489).
+      RUSTY_REQUIRE_GPU: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show
+      # Only `main` writes caches (#482) — here, the nightly run.
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: Test (engine, default)
+        shell: bash
+        run: |
+          rc=0
+          cargo nextest run --profile ci --locked || rc=$?
+          cp target/nextest/ci/junit.xml junit-default.xml || true
+          exit "$rc"
+      - name: Test (engine, dev features)
+        shell: bash
+        run: |
+          rc=0
+          cargo nextest run --profile ci --features dev --locked || rc=$?
+          cp target/nextest/ci/junit.xml junit-dev.xml || true
+          exit "$rc"
+      - name: Doctests (both feature sets)
+        shell: bash
+        run: |
+          cargo test --doc --locked
+          cargo test --doc --features dev --locked
+      - name: Test summary
+        if: always()
+        uses: test-summary/action@v2
+        with:
+          paths: junit-*.xml
+      - name: Test (lint xtask)
+        run: cargo test --manifest-path tools/lint/Cargo.toml --locked
