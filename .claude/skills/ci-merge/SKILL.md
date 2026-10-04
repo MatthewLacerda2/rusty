@@ -48,14 +48,20 @@ to see what it said.
 every open pull request as it turns **ready**, highest priority first —
 infrastructure → architecture → bug → foundation → feature, read from the pull
 request's labels and the issues it closes, then unlabelled, oldest first,
-Dependabot after all of them — and **exits** on the first hand-back, on the
-machine failing (below), or when nothing is left (no open pull request, or only
-drafts and handed-back heads, none moved for `--idle` minutes, default 90). A
-handed-back head is remembered (under the checkout's git directory) and passed
-over by later watches until it moves. It composes with every flag below; a
+Dependabot after all of them. A **hand-back skips that pull request and the
+watch keeps merging the rest** (#751): it prints one line,
+`queue: HANDED BACK #N: <why> …`, the moment it happens, and the handed-back
+head is remembered (under the checkout's git directory) and passed over, by
+this watch and later ones, until it moves — pushing a fix is the whole of
+re-queueing it. The watch **exits** on the machine failing (below), on its
+`--for` deadline, or when nothing is left (no open pull request, or only drafts
+and handed-back heads, none moved for `--idle` minutes, default 90). Its exit
+status says what to do: **0** nothing to read, **1** something was handed back
+(grep the output for `HANDED BACK`), **3** the machine or GitHub failed and
+nothing is known about the branches; the most urgent wins. It composes with every flag below; a
 batch runs `ARGS="--watch --no-check --for 70"`. **`--for MINUTES`** (#697) is
 the watch's own deadline: once it passes, the watch takes no new pull request,
-finishes the one in hand (merged or handed back) and exits cleanly with a last
+finishes the one in hand (merged or handed back) and exits with a last
 line `watch ended: deadline reached (…); N merged, nothing in hand.` That exit
 is not a report — **relaunch the watch** with the same arguments. It exists
 because a background command is killed at two hours wherever it is, a push or
@@ -85,8 +91,8 @@ worktree open:
 6. Squash-merge with the house-style title (`Title (#issue) (#pr)`) and
    `--match-head-commit`, so a push after the verdict makes GitHub refuse.
 
-It **hands back** — names why; with named pull requests it skips that entry and
-carries on, under `--watch` it exits — on a
+It **hands back** — names why, skips that entry and carries on, named pull
+requests and `--watch` alike — on a
 conflict (naming the paths; it never resolves one), a rebased head that fails
 the local check (never pushed), a red run, a run that never
 appears, a head somebody else moved, a draft, or a merge GitHub refused. A 502 on

@@ -34,24 +34,24 @@ class SlowWorld(loop.World):
 def run(listings, verdicts, *flags, take_minutes=0, **kw):
     with tempfile.TemporaryDirectory() as tmp:
         world = SlowWorld(tmp, listings, verdicts, take_minutes)
-        results, why, clean = watch.run(world.fx, loop.opts(*flags, **kw))
-        return world, results, why, clean
+        results, why, status = watch.run(world.fx, loop.opts(*flags, **kw))
+        return world, results, why, status
 
 
 class Deadline(unittest.TestCase):
     def test_past_the_deadline_a_ready_one_is_not_taken(self):
-        world, results, why, clean = run([[pr(1)]], {1: queue.MERGED}, "--for=0")
+        world, results, why, status = run([[pr(1)]], {1: queue.MERGED}, "--for=0")
         self.assertEqual(world.taken, [])
-        self.assertTrue(clean)
+        self.assertEqual(status, 0)
         self.assertTrue(why.startswith(watch.DEADLINE))
         self.assertIn("0 merged, nothing in hand", why)
 
     def test_a_deadline_passing_mid_take_finishes_the_take_first(self):
         verdicts = {1: queue.MERGED, 2: queue.MERGED}
-        world, results, why, clean = run([[pr(1), pr(2)]], verdicts, "--for=10", take_minutes=30)
+        world, results, why, status = run([[pr(1), pr(2)]], verdicts, "--for=10", take_minutes=30)
         self.assertEqual(world.taken, [1])
         self.assertEqual(results, [(1, queue.MERGED, "why")])
-        self.assertTrue(clean)
+        self.assertEqual(status, 0)
         self.assertIn("1 merged", why)
 
     def test_takes_go_on_until_the_deadline(self):
@@ -62,8 +62,8 @@ class Deadline(unittest.TestCase):
         self.assertEqual(world.taken, [1, 2])
 
     def test_waiting_on_drafts_ends_at_the_deadline_not_the_idle_limit(self):
-        world, _, why, clean = run([[pr(1, draft=True)]], {}, "--for=5", idle=90, poll=60)
-        self.assertTrue(clean)
+        world, _, why, status = run([[pr(1, draft=True)]], {}, "--for=5", idle=90, poll=60)
+        self.assertEqual(status, 0)
         self.assertTrue(why.startswith(watch.DEADLINE))
         self.assertLess(world.now, 90 * 60)
 
@@ -72,10 +72,10 @@ class Deadline(unittest.TestCase):
         self.assertEqual(world.taken, [1, 2])
         self.assertNotIn(watch.DEADLINE, why)
 
-    def test_a_hand_back_still_exits_as_one(self):
-        world, _, why, clean = run([[pr(1)]], {1: queue.HANDED_BACK}, "--for=1", take_minutes=30)
-        self.assertFalse(clean)
-        self.assertIn("#1 was handed back", why)
+    def test_a_hand_back_before_the_deadline_still_shows_in_the_status(self):
+        world, _, why, status = run([[pr(1)]], {1: queue.HANDED_BACK}, "--for=1", take_minutes=30)
+        self.assertEqual(status, watch.HANDED_BACK_STATUS)
+        self.assertTrue(why.startswith(watch.DEADLINE))
 
 
 class Arguments(unittest.TestCase):

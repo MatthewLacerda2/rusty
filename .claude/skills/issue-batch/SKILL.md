@@ -26,10 +26,13 @@ detail): started once, in the background, it takes each pull request the moment
 it turns ready, highest label priority first, and rebases, pushes, waits for CI
 on the new head, asks `make mergeable` and squash-merges, one at a time — so the
 session running the batch is not the one sitting through each run, nor the one
-noticing each draft flip to ready (#664). It **exits on the first hand-back**
-(conflict, red, no run), on the machine failing, or when nothing is left, and
-that exit is what wakes you: read the report, deal with the hand-back, start it
-again. Start it with `--for 70` (#697; `ci-merge` has why 70, and when to
+noticing each draft flip to ready (#664). A **hand-back** (conflict, red, no
+run) **skips that pull request and the watch carries on** with the rest (#751),
+printing `queue: HANDED BACK #N: …` as it happens; a fix pushed to the branch
+re-queues it. It exits on the machine failing, its deadline, or when nothing is
+left, with status 1 if anything was handed back and 3 if the machine or GitHub
+failed. Run it under a `Monitor` that wakes on `HANDED BACK` to hear of a
+hand-back at once; otherwise the exit wakes you. Start it with `--for 70` (#697; `ci-merge` has why 70, and when to
 trade it for a longer per-PR `--deadline`). The watch ends itself first, between
 pull requests, with the last line `watch ended: deadline reached …` — relaunch it
 as it was, nothing to read. It never resolves a conflict: a hand-back naming paths goes back to the
@@ -232,7 +235,8 @@ ARGS="--watch --no-check --for 70"` in the background** (from a worktree under
 `.claude/worktrees/`), relaunches it unchanged each time it exits on its
 deadline (`watch ended: deadline reached`, #697: the first overnight watch was
 killed at the two-hour background cap mid-CI-wait), and is otherwise woken only
-when the watch exits — never a
+by a `HANDED BACK` line (a `Monitor` on the watch's output) or when the watch
+exits — never a
 per-PR polling loop or a chain of `make queue PRS=N` runs (#664: the 2026-09-30
 batch spent about 69 queue invocations and dozens of hand-built watchers on
 that, and one chain was cancelled by mistake). Its loop per pull request:
@@ -262,12 +266,12 @@ that, and one chain was cancelled by mistake). Its loop per pull request:
    **The watch exits at once when no pull request is open at all**, which is the
    state right after a wave of coders launches and before their first drafts
    exist. Start it once a draft is up (or poll for the first ready one yourself).
-3. A hand-back is the queue's whole report, and the watch exits on it: fix a
-   conflict or a failed check on the branch (or brief its coder to), and start
-   the watch again right away — the other ready pull requests are waiting. The
-   handed-back head is passed over until it moves, so restarting never re-takes
-   an unfixed branch; once its fix is pushed the watch takes it again on its
-   own (`make queue PRS=N` takes it regardless). A one-line semantic
+3. A hand-back is the queue's whole report, and the watch keeps going without
+   it (#751): fix a conflict or a failed check on the branch (or brief its
+   coder to) while the other ready pull requests merge. The handed-back head is
+   passed over until it moves, so nobody re-takes an unfixed branch; once its
+   fix is pushed the running watch takes it again on its own (`make queue
+   PRS=N` takes it regardless). A one-line semantic
    break (a field a merge ahead added) is quickest fixed here — but with
    `--no-check` nothing compiles your resolution before CI does, so **grep every
    use of anything either side moved or renamed, and check the 300-line file and
