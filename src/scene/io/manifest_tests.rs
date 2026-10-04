@@ -2,7 +2,7 @@
 //! that nobody edited it.
 
 use super::{SeedManifest, SeedOutcome};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// A fresh workspace per test: its manifest path and one seeded file's path.
 fn workspace(name: &str) -> (PathBuf, PathBuf) {
@@ -12,14 +12,14 @@ fn workspace(name: &str) -> (PathBuf, PathBuf) {
     (root.join(".seeded"), root.join("scripts").join("bot.lua"))
 }
 
-fn seed(manifest: &PathBuf, dest: &PathBuf, bundled: &str) -> SeedOutcome {
+fn seed(manifest: &Path, dest: &Path, bundled: &str) -> SeedOutcome {
     let mut m = SeedManifest::load(manifest);
     let outcome = m.seed(dest, bundled.as_bytes(), "delete it");
     m.save().unwrap();
     outcome
 }
 
-fn read(path: &PathBuf) -> String {
+fn read(path: &Path) -> String {
     std::fs::read_to_string(path).unwrap()
 }
 
