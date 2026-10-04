@@ -22,7 +22,7 @@ fn play_session_scenario_wins_and_is_deterministic() {
     let scenario = Path::new("project/scenarios/play_session.lua");
     let run = |dir: &str| {
         let out = crate::temp::dir().join(dir);
-        let report = scenario::run(scenario, &out).expect("scenario runs");
+        let report = scenario::run_isolated(scenario, &out).expect("scenario runs");
         let json = std::fs::read_to_string(report.results_path).expect("results written");
         (report.passed, json)
     };

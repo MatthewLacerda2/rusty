@@ -22,8 +22,8 @@ use std::path::Path;
 
 pub use manifest::{SeedManifest, SeedOutcome, SEED_MANIFEST_PATH};
 pub use seed::{
-    build_default_scene, seed_default_scene, seed_default_scripts, DEFAULT_SCENE_PATH,
-    DEFAULT_SCRIPTS_DEST_DIR, DEFAULT_SCRIPTS_SOURCE_DIR,
+    build_default_scene, seed_default_scene, seed_default_scripts, seed_workspace,
+    DEFAULT_SCENE_PATH, DEFAULT_SCRIPTS_DEST_DIR, DEFAULT_SCRIPTS_SOURCE_DIR,
 };
 
 use crate::scene::serialize::{apply_scene_data, to_scene_data, SceneData};
@@ -53,10 +53,18 @@ pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
 }
 
 /// The scene document exactly as [`save_to_file`] writes it, so a seeded default and
-/// a saved one compare byte for byte.
+/// a saved one compare byte for byte. A script attached by absolute path inside the
+/// workspace (the working directory) is written relative to it, `/`-separated, so
+/// the file never embeds this machine's paths (#783).
 pub(crate) fn scene_json(scene: &Scene) -> Result<String, String> {
-    serde_json::to_string_pretty(&to_scene_data(scene))
-        .map_err(|e| format!("Failed to serialize scene: {}", e))
+    let mut data = to_scene_data(scene);
+    if let Ok(root) = std::env::current_dir() {
+        let scripts = data.entities.iter_mut().flat_map(|e| e.scripts.iter_mut());
+        for script in scripts {
+            script.path = crate::core::paths::relativize(&script.path, &root);
+        }
+    }
+    serde_json::to_string_pretty(&data).map_err(|e| format!("Failed to serialize scene: {}", e))
 }
 
 /// Load `path` into `scene`, REPLACING the current World (single active scene).
@@ -79,3 +87,7 @@ pub fn read_scene_file(path: &str) -> Result<SceneData, String> {
         .map_err(|e| format!("Failed to read scene file {}: {}", path, e))?;
     serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize scene {}: {}", path, e))
 }
+
+#[cfg(test)]
+#[path = "save_tests.rs"]
+mod save_tests;

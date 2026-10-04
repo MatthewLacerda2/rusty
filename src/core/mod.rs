@@ -6,6 +6,7 @@ pub mod frame_stats;
 pub mod gamepad;
 pub mod input;
 pub mod keymap;
+pub mod paths;
 pub mod quality;
 pub mod random;
 pub mod storage;

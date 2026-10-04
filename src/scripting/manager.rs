@@ -1,6 +1,7 @@
 use mlua::{Lua, RegistryKey};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use crate::api::ApiScopedCtx;
@@ -102,6 +103,10 @@ pub struct ScriptManager {
     /// The UI event system (#420): selection, hover and press state, shared with
     /// `Resources` (whose systems drive it) and the `UI` namespace. Reset every Play.
     pub(super) event_system: Rc<RefCell<EventSystem>>,
+    /// The workspace root a scene's relative script paths resolve against (#782).
+    /// Empty — the process's working directory — for the editor and the player;
+    /// the headless harness points it at a workspace it seeded itself.
+    workspace: PathBuf,
 }
 
 impl ScriptManager {
@@ -136,7 +141,19 @@ impl ScriptManager {
             stats: Rc::new(RefCell::new(FrameStats::default())),
             timers: Rc::new(RefCell::new(TimerScheduler::default())),
             event_system: Rc::new(RefCell::new(EventSystem::default())),
+            workspace: PathBuf::new(),
         }
+    }
+
+    /// Resolve the scene's relative script paths against `root` from now on.
+    pub fn set_workspace_root(&mut self, root: impl Into<PathBuf>) {
+        self.workspace = root.into();
+    }
+
+    /// Where the script at `path` lives: `path` under the workspace root, or
+    /// `path` itself when it is absolute.
+    pub fn resolve_script(&self, path: &str) -> PathBuf {
+        self.workspace.join(Path::new(path))
     }
 
     /// Initializes a fresh Lua environment. API namespaces are NOT registered

@@ -74,10 +74,11 @@ fn no_double_jump_mid_air() {
     assert!((player_y(&h) - ground).abs() < 0.05, "back on the floor");
 }
 
-/// Drives the bundled controller, counting the casts it fires into `SHOTS`. The API
-/// is registered afresh each tick, so the wrap is laid inside `Update`.
+/// Drives the bundled controller (the harness workspace's copy, #782), counting the
+/// casts it fires into `SHOTS`. The API is registered afresh each tick, so the wrap
+/// is laid inside `Update`.
 const SHOT_PROBE: &str = r#"
-local Controller = dofile("project/assets/scripts/player_controller.lua")
+local Controller = dofile("WORKSPACE/project/assets/scripts/player_controller.lua")
 local Probe = {}
 SHOTS = 0
 function Probe.Start(id) Controller.Start(id) end
@@ -94,7 +95,10 @@ fn left_mouse_shoots_once_per_press_and_space_does_not() {
     let dir = crate::temp::dir().join("rusty_player_shoot");
     std::fs::create_dir_all(&dir).unwrap();
     let probe = dir.join("shot_probe.lua");
-    std::fs::write(&probe, SHOT_PROBE).unwrap();
+    let workspace = Harness::workspace_of(&dir)
+        .to_string_lossy()
+        .replace('\\', "/");
+    std::fs::write(&probe, SHOT_PROBE.replace("WORKSPACE", &workspace)).unwrap();
     let h = Harness::new(&dir, "");
     let path = probe.to_str().unwrap();
     assert!(attach_player_bot(

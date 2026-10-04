@@ -76,12 +76,32 @@ pub struct Harness {
 impl Harness {
     /// Build a harness around the default scene — the one the editor seeds (#667) —
     /// and enter play mode. `bot_script` is the enemy brain path (empty to skip it).
+    ///
+    /// The run gets its own workspace, `<out_dir>/workspace`, seeded fresh from the
+    /// engine's bundled scripts, and the scene's relative script paths resolve there
+    /// (#782): a test judges the engine's scripts, never the developer's `./project`.
     pub fn new(out_dir: impl AsRef<Path>, bot_script: &str) -> Self {
-        // Headless runs don't boot through main.rs, so seed the bundled default
-        // scripts (the Player's controller + enemy brain) and the default scene's
-        // texture and shader into the project workspace here too, as the windowed
-        // boot does.
+        let workspace = Self::workspace_of(&out_dir);
+        crate::scene::seed_workspace(&workspace);
+        Self::in_workspace(out_dir, bot_script, workspace)
+    }
+
+    /// [`Harness::new`] on the user's own workspace, `./project` — what an agent
+    /// play-testing its game wants (the `play` binary). The bundled scripts are
+    /// seeded through the seed manifest, as the windowed boot does.
+    pub fn in_user_workspace(out_dir: impl AsRef<Path>, bot_script: &str) -> Self {
         crate::scene::seed_default_scripts();
+        Self::in_workspace(out_dir, bot_script, PathBuf::new())
+    }
+
+    /// The workspace a harness built in `out_dir` runs in: see [`Harness::new`].
+    pub fn workspace_of(out_dir: impl AsRef<Path>) -> PathBuf {
+        out_dir.as_ref().join("workspace")
+    }
+
+    fn in_workspace(out_dir: impl AsRef<Path>, bot_script: &str, workspace: PathBuf) -> Self {
+        // The default scene's texture and shader, seeded into `./project` only when
+        // missing; only screenshots read them.
         crate::scene::default_scene::seed_default_assets();
 
         let mut scene = Scene::new();
@@ -102,6 +122,7 @@ impl Harness {
             Rc::clone(&console),
         );
         // Headless harness always runs the simulation (play mode).
+        world.resources.script_manager.set_workspace_root(workspace);
         world.set_playing(true);
         let stats = super::stats::install(&mut world);
 

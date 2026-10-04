@@ -62,6 +62,36 @@ pub fn seed_default_scripts() {
     );
 }
 
+/// The tracked sample scripts (bot-players) scenarios attach, checked in under the
+/// workspace's own `project/scripts/`.
+pub const SAMPLE_SCRIPTS_DIR: &str = "project/scripts";
+
+/// Seed a workspace the caller owns at `root` (#782): the bundled scripts, the UI
+/// widget kit's scripts and the tracked samples, each written over whatever is
+/// there, so it always holds the engine's current source. The headless harness
+/// runs here, so a test never reads the developer's `./project`, where a stale or
+/// edited copy is kept on purpose. Relative paths in `root` resolve as in `./`.
+pub fn seed_workspace(root: &Path) {
+    use crate::scene::authoring::ui_widgets::{parts::SCRIPT_DIR, SCRIPT_SOURCE_DIR};
+    let dirs = [
+        (DEFAULT_SCRIPTS_SOURCE_DIR, DEFAULT_SCRIPTS_DEST_DIR),
+        (SCRIPT_SOURCE_DIR, SCRIPT_DIR),
+        (SAMPLE_SCRIPTS_DIR, SAMPLE_SCRIPTS_DIR),
+    ];
+    for (source, dest) in dirs {
+        let dest = root.join(dest);
+        let files = bundled_scripts(Path::new(source), &dest);
+        let written = std::fs::create_dir_all(&dest).and_then(|()| {
+            files
+                .iter()
+                .try_for_each(|(to, code)| std::fs::write(to, code))
+        });
+        if let Err(e) = written {
+            eprintln!("[Seed] seeding {} failed: {e}", dest.display());
+        }
+    }
+}
+
 /// The default scene document, byte for byte what Save would write for it.
 fn default_scene_bytes() -> Result<Vec<u8>, String> {
     let mut scene = Scene::new();

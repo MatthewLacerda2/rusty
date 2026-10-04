@@ -16,6 +16,13 @@
 - CI (`.github/workflows/ci.yml`) and `make test` run the engine suite with
   **cargo-nextest** plus `cargo test --doc`, both feature sets; the lint xtask keeps
   plain `cargo test`. See *The test runner* below.
+- A test never reads the developer's git-ignored `./project` (#782). `Harness::new`
+  runs in a workspace of its own, `<out_dir>/workspace`, seeded fresh from the
+  bundled scripts, and the scene's relative script paths resolve there; a test runs
+  a scenario with `scenario::run_isolated`. The `play` binary is the one harness
+  that runs `./project` (`Harness::in_user_workspace`): an agent play-tests its game.
+  A test's own scripts go in that workspace too, attached by workspace-relative
+  path, so its snapshot carries no machine path (#783).
 - A test builds an engine struct through a constructor or `..Default::default()`,
   never a literal naming every field, unless every field is the point of the test:
   a new field then breaks only the tests that use it (#663; e.g.

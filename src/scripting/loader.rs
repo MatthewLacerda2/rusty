@@ -10,10 +10,8 @@
 //! loads every script slot with no prior load attempt; `init_scripts` then
 //! runs `Awake` + `Start` before any `Update` of that tick.
 
-use std::collections::BTreeMap;
-use std::path::Path;
-
 use mlua::Table;
+use std::collections::BTreeMap;
 
 use crate::components::ScriptFieldValue;
 
@@ -38,12 +36,13 @@ impl ScriptManager {
         self.load_attempted.insert((entity_id, script_index));
         let lua = self.lua.as_ref().ok_or("Lua runtime not initialized")?;
 
-        if !Path::new(script_path).exists() {
+        let file = self.resolve_script(script_path);
+        if !file.exists() {
             return Err(format!("Script file not found: {}", script_path));
         }
 
-        let script_code = std::fs::read_to_string(script_path)
-            .map_err(|e| format!("Failed to read script: {}", e))?;
+        let script_code =
+            std::fs::read_to_string(&file).map_err(|e| format!("Failed to read script: {}", e))?;
 
         // Load the script chunk
         let chunk = lua.load(&script_code);
