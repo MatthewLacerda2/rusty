@@ -14,7 +14,7 @@ agent can read exactly what failed.
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
 | Module layering | `tools/lint -- --layers` | every `crate::<module>` import matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724) |
-| Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads and OS/unseeded RNG are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757) |
+| Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
 | Dependency direction | `tools/lint -- --direction` | the table's sim modules never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
 | Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`/`ui`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
@@ -112,6 +112,14 @@ unseeded RNG in it breaks replay for every harness run. **Clippy holds the ban**
 `disallowed-types`, each with the reason clippy prints, and `Cargo.toml`'s `[lints]`
 denies both. Clippy matches the **resolved** item, so `use std::time::Instant as
 Clock; Clock::now()` fails too — the old substring scan let that through.
+
+`std::collections::{HashMap, HashSet}` and `std::hash::RandomState` are on the same
+list (#764): std seeds its hasher from OS entropy per process, so a map's iteration
+order is an unseeded RNG that never shows up as a call. Sim code uses
+`core::collections::{Map, Set}` (FxHash, no seed; build with `Map::default()`), and a
+`BTreeMap` where the order is behaviour — what is stepped, spawned, emitted or
+serialised first. `tests/busy_replay` replays a busy scene in one process and across
+two, which is where a leaked order would show.
 
 The ban is crate-wide. The platform modules that need real time (`dev`, `editor`,
 `render`, `shell` today) opt out with

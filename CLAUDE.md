@@ -355,7 +355,8 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   table, not a file header, to answer "may X use Y?", and change the table in the same
   PR that adds a new module-to-module import.
 - **Determinism.** The sim is a pure function of (seed, inputs, fixed dt). Wall-clock
-  reads and unseeded RNG are banned from the sim modules (the table's `sim` rows); the
+  reads, unseeded RNG and `std`'s randomly seeded `HashMap`/`HashSet` are banned from
+  the sim modules (the table's `sim` rows; maps go through `core::collections`); the
   platform layer is exempt.
   Scripts run inside the sim too: the gameplay Lua VM has no `os`/`io`, and
   `math.random` routes to the seeded `Random` resource (`core::random`, #443).
@@ -392,7 +393,7 @@ Failures from `tools/lint` are written to `.lint/report.txt`. See **docs/linting
   in the layer table, when a table entry is stale, on any cycle, and when a sim
   module imports a platform one (so leaks through a middle module fail too). Test
   code is exempt. Known exceptions sit in the table, each with its open issue.
-- **Determinism guard** — clippy bans wall-clock / unseeded RNG crate-wide
+- **Determinism guard** — clippy bans wall-clock / unseeded RNG / `std` hash maps crate-wide
   (`clippy.toml`'s `disallowed-*`), and `make determinism` fails when anything but a
   platform module's root opts out; it protects the harness's reproducibility.
 - **Direction guard** (`make direction`) — fails when a sim module references
