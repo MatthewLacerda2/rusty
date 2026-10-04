@@ -179,7 +179,7 @@ fn draw_material_transparency(
             RenderMode::Cutout => "Cutout",
             RenderMode::Transparent => "Transparent",
         };
-        egui::ComboBox::from_id_source("RenderModeSelector")
+        egui::ComboBox::from_id_salt("RenderModeSelector")
             .selected_text(label)
             .show_ui(ui, |ui| {
                 for mode in [

@@ -43,8 +43,8 @@ impl CustomChain {
     ) -> Self {
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("PostFX Custom Layout"),
-            bind_group_layouts: &[io_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(io_layout)],
+            immediate_size: 0,
         });
         let (ldr_b, history) = Self::targets(device, format, width, height);
         Self {
@@ -139,7 +139,7 @@ impl EffectCache {
                 return Err(format!("{path} has no `{entry}` (not a postfx module?)"));
             }
         }
-        device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some(name),
             source: wgpu::ShaderSource::Naga(std::borrow::Cow::Owned(module)),
@@ -151,7 +151,7 @@ impl EffectCache {
             ("vs_fullscreen", "fs_main"),
             self.format,
         );
-        match pollster::block_on(device.pop_error_scope()) {
+        match pollster::block_on(scope.pop()) {
             Some(e) => Err(format!("{path} does not fit the post pass: {e}")),
             None => Ok(pipeline),
         }

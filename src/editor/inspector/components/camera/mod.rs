@@ -112,7 +112,7 @@ fn draw_projection(
             .add(
                 egui::DragValue::new(&mut near)
                     .speed(0.01)
-                    .clamp_range(0.01..=10.0),
+                    .range(0.01..=10.0),
             )
             .changed()
         {
@@ -129,7 +129,7 @@ fn draw_projection(
             .add(
                 egui::DragValue::new(&mut far)
                     .speed(1.0)
-                    .clamp_range(1.0..=1000.0),
+                    .range(1.0..=1000.0),
             )
             .changed()
         {
@@ -209,7 +209,7 @@ fn draw_stacking(
     let mut clear_flags = clear_flags;
     ui.horizontal(|ui| {
         ui.label("Clear Flags:");
-        egui::ComboBox::from_id_source("clear_flags")
+        egui::ComboBox::from_id_salt("clear_flags")
             .selected_text(match clear_flags {
                 ClearFlags::Skybox => "Skybox",
                 ClearFlags::SolidColor => "Solid Color",

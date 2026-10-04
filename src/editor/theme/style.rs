@@ -4,14 +4,14 @@
 
 use egui::epaint::Shadow;
 use egui::style::{ScrollStyle, WidgetVisuals};
-use egui::{Color32, FontFamily, FontId, Margin, Rounding, Stroke, Style, TextStyle};
+use egui::{Color32, CornerRadius, FontFamily, FontId, Margin, Stroke, Style, TextStyle};
 
 use super::{fonts, Theme};
 
 /// Corner radius of buttons, fields and rows.
-const WIDGET_RADIUS: f32 = 4.0;
+const WIDGET_RADIUS: u8 = 4;
 /// Corner radius of windows, menus and popups.
-const WINDOW_RADIUS: f32 = 8.0;
+const WINDOW_RADIUS: u8 = 8;
 
 pub(super) fn configure(t: &Theme, ctx: &egui::Context, style: &mut Style) {
     type_scale(ctx, style);
@@ -44,8 +44,8 @@ fn density(t: &Theme, style: &mut Style) {
     s.icon_width = 13.0;
     s.icon_width_inner = 7.0;
     s.icon_spacing = 5.0;
-    s.menu_margin = Margin::symmetric(t.space_xs, t.space_xs);
-    s.window_margin = Margin::same(t.space_md);
+    s.menu_margin = Margin::from(t.space_xs);
+    s.window_margin = Margin::from(t.space_md);
     s.combo_height = 260.0;
     s.scroll = ScrollStyle::thin();
 }
@@ -57,17 +57,19 @@ fn visuals(t: &Theme, style: &mut Style) {
     v.panel_fill = t.bg_tier1;
     v.window_fill = t.bg_tier2;
     v.window_stroke = Stroke::new(1.0, t.outline);
-    v.window_rounding = Rounding::same(WINDOW_RADIUS);
-    v.menu_rounding = Rounding::same(6.0);
-    v.window_shadow = shadow(16.0, 110);
-    v.popup_shadow = shadow(10.0, 90);
+    v.window_corner_radius = CornerRadius::same(WINDOW_RADIUS);
+    v.menu_corner_radius = CornerRadius::same(6);
+    v.window_shadow = shadow(16, 110);
+    v.popup_shadow = shadow(10, 90);
     v.extreme_bg_color = t.bg_tier0;
     v.faint_bg_color = t.bg_tier2;
     v.code_bg_color = t.bg_tier0;
     v.hyperlink_color = t.accent;
     v.warn_fg_color = t.warning;
     v.error_fg_color = t.danger;
-    v.text_cursor = Stroke::new(1.5, t.accent);
+    v.text_cursor.stroke = Stroke::new(1.5, t.accent);
+    // egui 0.27 drew a steady caret; keep it rather than egui's new blink default.
+    v.text_cursor.blink = false;
     v.slider_trailing_fill = true;
     v.indent_has_left_vline = true;
     v.collapsing_header_frame = false;
@@ -96,17 +98,17 @@ fn state(fill: Color32, edge: Color32, text: Color32) -> WidgetVisuals {
         bg_fill: fill,
         weak_bg_fill: fill,
         bg_stroke: Stroke::new(1.0, edge),
-        rounding: Rounding::same(WIDGET_RADIUS),
+        corner_radius: CornerRadius::same(WIDGET_RADIUS),
         fg_stroke: Stroke::new(1.0, text),
         expansion: 0.0,
     }
 }
 
-fn shadow(blur: f32, alpha: u8) -> Shadow {
+fn shadow(blur: u8, alpha: u8) -> Shadow {
     Shadow {
-        offset: egui::vec2(0.0, 4.0),
+        offset: [0, 4],
         blur,
-        spread: 0.0,
+        spread: 0,
         color: Color32::from_black_alpha(alpha),
     }
 }

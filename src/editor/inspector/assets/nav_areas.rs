@@ -20,7 +20,7 @@ pub fn draw(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph) {
         ui.horizontal(|ui| {
             ui.label(format!("{i}: {}", area.name));
             let drag = egui::DragValue::new(&mut cost).speed(0.1);
-            if ui.add(drag.clamp_range(MIN_AREA_COST..=1000.0)).changed() {
+            if ui.add(drag.range(MIN_AREA_COST..=1000.0)).changed() {
                 changed |= s.set_area_cost(&area.name, cost).is_some();
             }
         });

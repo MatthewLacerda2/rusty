@@ -27,7 +27,7 @@ fn drag_row(ui: &mut egui::Ui, label: &str, mut value: f32, range: (f32, f32)) -
         ui.label(label);
         let drag = egui::DragValue::new(&mut value)
             .speed(0.01)
-            .clamp_range(range.0..=range.1);
+            .range(range.0..=range.1);
         ui.add(drag).changed().then_some(value)
     })
     .inner
@@ -71,7 +71,7 @@ fn draw_preset(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, z: &Zo
     let mut picked = None;
     ui.horizontal(|ui| {
         ui.label("Preset:");
-        egui::ComboBox::from_id_source(("reverb_preset", id))
+        egui::ComboBox::from_id_salt(("reverb_preset", id))
             .selected_text(z.preset.name())
             .show_ui(ui, |ui| {
                 for preset in ReverbPreset::ALL {

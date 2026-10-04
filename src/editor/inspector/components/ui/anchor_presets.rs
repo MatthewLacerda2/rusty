@@ -6,7 +6,7 @@
 
 use crate::components::RectTransformComponent;
 use crate::scene::authoring::rect_transform::{AnchorPreset, AxisPreset};
-use egui::{Rect, Sense, Stroke};
+use egui::{Rect, Sense, Stroke, StrokeKind};
 
 /// Rows top to bottom, then stretch — Unity's order.
 const ROWS: [AxisPreset; 4] = [
@@ -33,33 +33,35 @@ pub fn picker(ui: &mut egui::Ui, r: &RectTransformComponent) -> Option<AnchorPre
         ui.button(label)
     });
     let button = button.inner;
-    let popup = ui.make_persistent_id("rusty.anchor_presets");
-    if button.clicked() {
-        ui.memory_mut(|m| m.toggle_popup(popup));
-    }
     let mut picked = None;
-    egui::popup_below_widget(ui, popup, &button, |ui| {
-        ui.label("Shift: also set pivot · Alt: also set position");
-        egui::Grid::new("anchor_preset_grid")
-            .spacing([4.0, 4.0])
-            .show(ui, |ui| {
-                for y in ROWS {
-                    for x in AxisPreset::ALL {
-                        let on = current == (Some(x), Some(y));
-                        if cell(ui, x, y, on).clicked() {
-                            let m = ui.input(|i| i.modifiers);
-                            picked = Some(AnchorPreset {
-                                x,
-                                y,
-                                set_pivot: m.shift,
-                                set_position: m.alt,
-                            });
+    // As egui 0.27's `popup_below_widget`: button-wide, justified, and any click
+    // (a picked cell included) closes it.
+    egui::Popup::from_toggle_button_response(&button)
+        .id(ui.make_persistent_id("rusty.anchor_presets"))
+        .layout(egui::Layout::top_down_justified(egui::Align::LEFT))
+        .width(button.rect.width())
+        .show(|ui| {
+            ui.label("Shift: also set pivot · Alt: also set position");
+            egui::Grid::new("anchor_preset_grid")
+                .spacing([4.0, 4.0])
+                .show(ui, |ui| {
+                    for y in ROWS {
+                        for x in AxisPreset::ALL {
+                            let on = current == (Some(x), Some(y));
+                            if cell(ui, x, y, on).clicked() {
+                                let m = ui.input(|i| i.modifiers);
+                                picked = Some(AnchorPreset {
+                                    x,
+                                    y,
+                                    set_pivot: m.shift,
+                                    set_position: m.alt,
+                                });
+                            }
                         }
+                        ui.end_row();
                     }
-                    ui.end_row();
-                }
-            });
-    });
+                });
+        });
     picked
 }
 
@@ -76,7 +78,12 @@ fn cell(ui: &mut egui::Ui, x: AxisPreset, y: AxisPreset, on: bool) -> egui::Resp
     let p = ui.painter();
     p.rect_filled(rect, 2.0, fill);
     let inner = rect.shrink(7.0);
-    p.rect_stroke(inner, 0.0, Stroke::new(1.0, t.text_secondary));
+    p.rect_stroke(
+        inner,
+        0.0,
+        Stroke::new(1.0, t.text_secondary),
+        StrokeKind::Middle,
+    );
     let colour = if on { t.accent } else { t.danger };
     let span = |a: AxisPreset| match a {
         AxisPreset::Min => (0.0, 0.0),

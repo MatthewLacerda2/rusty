@@ -157,7 +157,7 @@ fn draw_light_type(
             LightType::Spotlight => "Spot",
             LightType::Ambient => "Ambient",
         };
-        egui::ComboBox::from_id_source("LightTypeSelector")
+        egui::ComboBox::from_id_salt("LightTypeSelector")
             .selected_text(current_type_name)
             .show_ui(ui, |ui| {
                 if ui

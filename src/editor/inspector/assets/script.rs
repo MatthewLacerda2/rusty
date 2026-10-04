@@ -49,7 +49,7 @@ fn draw_code_editor(
 
     egui::ScrollArea::vertical()
         .max_height(200.0)
-        .id_source("ScriptEditScroll")
+        .id_salt("ScriptEditScroll")
         .show(ui, |ui| {
             ui.add(
                 egui::TextEdit::multiline(&mut editor.asset_script_content)
@@ -105,7 +105,7 @@ fn draw_attach_to_entity(
 
     let mut clicked_entity_id = None;
     let mut clicked_entity_name = String::new();
-    egui::ComboBox::from_id_source("AttachScriptToEntity")
+    egui::ComboBox::from_id_salt("AttachScriptToEntity")
         .selected_text(selected_ent_name)
         .show_ui(ui, |ui| {
             for id in scene.entity_ids() {

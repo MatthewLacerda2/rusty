@@ -75,7 +75,7 @@ impl ShadowRenderer {
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
             compare: Some(wgpu::CompareFunction::LessEqual),
             ..Default::default()
         })
@@ -124,8 +124,8 @@ impl ShadowRenderer {
     ) -> [wgpu::RenderPipeline; 2] {
         let plain = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Shadow Pipeline Layout"),
-            bind_group_layouts: &[global, entity],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(global), Some(entity)],
+            immediate_size: 0,
         });
         let clip = clip_layout(device, [global, entity, material]);
         [
@@ -210,8 +210,8 @@ pub(crate) fn clip_layout(
 ) -> wgpu::PipelineLayout {
     device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Shadow Clip Pipeline Layout"),
-        bind_group_layouts: &layouts,
-        push_constant_ranges: &[],
+        bind_group_layouts: &layouts.map(Some),
+        immediate_size: 0,
     })
 }
 
@@ -239,12 +239,14 @@ pub(crate) fn depth_pipeline(
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module: shader,
-            entry_point: "vs_shadow",
-            buffers: &[vertex_layout()],
+            entry_point: Some("vs_shadow"),
+            compilation_options: Default::default(),
+            buffers: &[Some(vertex_layout())],
         },
         fragment: fragment.map(|entry_point| wgpu::FragmentState {
             module: shader,
-            entry_point,
+            entry_point: Some(entry_point),
+            compilation_options: Default::default(),
             targets: &[],
         }),
         primitive: wgpu::PrimitiveState {
@@ -255,8 +257,8 @@ pub(crate) fn depth_pipeline(
         },
         depth_stencil: Some(wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth32Float,
-            depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::Less,
+            depth_write_enabled: Some(true),
+            depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState {
                 constant: 2, // Sloped depth bias to prevent shadow acne
@@ -265,6 +267,7 @@ pub(crate) fn depth_pipeline(
             },
         }),
         multisample: wgpu::MultisampleState::default(),
-        multiview: None,
+        multiview_mask: None,
+        cache: None,
     })
 }

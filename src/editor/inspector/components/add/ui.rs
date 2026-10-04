@@ -16,7 +16,7 @@ use crate::scene::authoring::{self, ComponentKind};
 pub(super) fn add_ui_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
     if !world.has_canvas(id) && ui.button(format!("{}  Canvas", icon::MONITOR)).clicked() {
         world.set_canvas(id, Some(CanvasComponent::default()));
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_rect_transform(id)
         && ui
@@ -24,11 +24,11 @@ pub(super) fn add_ui_components(ui: &mut egui::Ui, world: &mut crate::ecs::World
             .clicked()
     {
         world.set_rect_transform(id, Some(RectTransformComponent::default()));
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_image(id) && ui.button(format!("{}  Image", icon::IMAGE)).clicked() {
         authoring::add_with_requirements(world, id, ComponentKind::Image);
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_canvas_group(id)
         && ui
@@ -36,19 +36,19 @@ pub(super) fn add_ui_components(ui: &mut egui::Ui, world: &mut crate::ecs::World
             .clicked()
     {
         world.set_canvas_group(id, Some(CanvasGroupComponent::default()));
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_text(id) && ui.button(format!("{}  Text", icon::TEXT_T)).clicked() {
         authoring::add_with_requirements(world, id, ComponentKind::Text);
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_shape(id) && ui.button(format!("{}  Shape", icon::SHAPES)).clicked() {
         authoring::add_with_requirements(world, id, ComponentKind::Shape);
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_rect_mask(id) && ui.button(format!("{}  Rect Mask", icon::CROP)).clicked() {
         authoring::add_with_requirements(world, id, ComponentKind::RectMask);
-        ui.close_menu();
+        ui.close();
     }
     add_mask_components(ui, world, id);
     if !world.has_selectable(id)
@@ -57,7 +57,7 @@ pub(super) fn add_ui_components(ui: &mut egui::Ui, world: &mut crate::ecs::World
             .clicked()
     {
         authoring::add_with_requirements(world, id, ComponentKind::Selectable);
-        ui.close_menu();
+        ui.close();
     }
 }
 
@@ -82,7 +82,7 @@ fn add_mask_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32
     for (kind, has, glyph, name) in entries {
         if !has(world, id) && ui.button(format!("{glyph}  {name}")).clicked() {
             authoring::add_with_requirements(world, id, kind);
-            ui.close_menu();
+            ui.close();
         }
     }
 }
@@ -98,7 +98,7 @@ pub(super) fn add_layout_components(ui: &mut egui::Ui, world: &mut crate::ecs::W
             .clicked()
     {
         authoring::add_with_requirements(world, id, ComponentKind::LayoutGroup);
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_layout_element(id)
         && ui
@@ -106,6 +106,6 @@ pub(super) fn add_layout_components(ui: &mut egui::Ui, world: &mut crate::ecs::W
             .clicked()
     {
         authoring::add_with_requirements(world, id, ComponentKind::LayoutElement);
-        ui.close_menu();
+        ui.close();
     }
 }

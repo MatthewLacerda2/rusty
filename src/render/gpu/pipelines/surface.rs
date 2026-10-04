@@ -264,14 +264,14 @@ impl SurfaceShaders {
         }
         let fragment = wgpu::naga::ShaderStage::Fragment;
         let cuts = has(CUT_PREPASS, fragment) && has(CUT_SHADOW, fragment);
-        device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Surface Variant Shader"),
             source: wgpu::ShaderSource::Naga(std::borrow::Cow::Owned(module)),
         });
         let layouts = [&self.layout, &self.shadow_layout];
         let pipelines = super::surface_pipelines(device, &shader, self.format, layouts, cuts);
-        match pollster::block_on(device.pop_error_scope()) {
+        match pollster::block_on(scope.pop()) {
             Some(e) => Err(e.to_string()),
             None => Ok(pipelines),
         }

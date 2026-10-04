@@ -126,12 +126,8 @@ fn draw_rotation(ui: &mut egui::Ui, trans: &mut crate::components::TransformComp
 
 /// A single degree drag field clamped to [-180, 180]. Returns whether it changed.
 fn drag_angle(ui: &mut egui::Ui, value: &mut f32) -> bool {
-    ui.add(
-        egui::DragValue::new(value)
-            .speed(1.0)
-            .clamp_range(-180.0..=180.0),
-    )
-    .changed()
+    ui.add(egui::DragValue::new(value).speed(1.0).range(-180.0..=180.0))
+        .changed()
 }
 
 /// The Scale row (x/y/z drag fields). Returns whether any axis changed.
@@ -151,12 +147,8 @@ fn draw_scale(ui: &mut egui::Ui, trans: &mut crate::components::TransformCompone
 
 /// A single scale drag field clamped to [0.01, 20]. Returns whether it changed.
 fn drag_scale(ui: &mut egui::Ui, value: &mut f32) -> bool {
-    ui.add(
-        egui::DragValue::new(value)
-            .speed(0.05)
-            .clamp_range(0.01..=20.0),
-    )
-    .changed()
+    ui.add(egui::DragValue::new(value).speed(0.05).range(0.01..=20.0))
+        .changed()
 }
 
 /// The integrated parent-selection combo box directly under Transform.
@@ -170,7 +162,7 @@ fn draw_parent_selector(
     ui.horizontal(|ui| {
         ui.label("Parent:");
         let mut current_sel = selected_parent_name.to_string();
-        egui::ComboBox::from_id_source("ParentSelectionCombo")
+        egui::ComboBox::from_id_salt("ParentSelectionCombo")
             .selected_text(selected_parent_name.to_string())
             .show_ui(ui, |ui| {
                 if ui

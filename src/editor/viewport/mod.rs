@@ -58,7 +58,7 @@ pub struct ViewportInteraction {
 /// Scene tab so the caller can pick/drag; the Game tab is view-only.
 pub fn draw(
     editor: &mut crate::editor::EditorUi,
-    ctx: &egui::Context,
+    ui: &mut egui::Ui,
     texture: Option<egui::TextureId>,
     world: &crate::ecs::World,
 ) -> ViewportInteraction {
@@ -67,14 +67,14 @@ pub fn draw(
     let mut overlay = editor.ui_overlay;
 
     let response = egui::CentralPanel::default()
-        .frame(egui::Frame::none().fill(t.bg_tier0))
-        .show(ctx, |ui| {
+        .frame(egui::Frame::NONE.fill(t.bg_tier0))
+        .show(ui, |ui| {
             draw_tab_strip(ui, &mut tab, &mut overlay, t);
             let response = draw_image(ui, texture, t);
             if tab == ViewportTab::Scene && overlay {
                 let frame = rect_tool::OverlayFrame {
                     size: glam::Vec2::new(response.rect.width(), response.rect.height()),
-                    pixels_per_point: ctx.pixels_per_point(),
+                    pixels_per_point: ui.ctx().pixels_per_point(),
                 };
                 let painter = ui.painter_at(response.rect);
                 let selected = editor.selected_entity_id;
@@ -101,9 +101,9 @@ fn draw_tab_strip(
     overlay: &mut bool,
     t: crate::editor::theme::Theme,
 ) {
-    egui::Frame::none()
+    egui::Frame::NONE
         .fill(t.bg_tier1)
-        .inner_margin(egui::Margin::symmetric(t.space_sm, t.space_xs + 1.0))
+        .inner_margin(egui::vec2(t.space_sm, t.space_xs + 1.0))
         .stroke(egui::Stroke::new(1.0, t.border))
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width());

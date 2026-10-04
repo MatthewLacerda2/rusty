@@ -92,8 +92,8 @@ pub(crate) fn forward_layout(
 ) -> wgpu::PipelineLayout {
     device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Surface Variant Pipeline Layout"),
-        bind_group_layouts: &layouts,
-        push_constant_ranges: &[],
+        bind_group_layouts: &layouts.map(Some),
+        immediate_size: 0,
     })
 }
 
@@ -165,13 +165,13 @@ fn create_pipeline_layouts(
     ];
     let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Render Pipeline Layout"),
-        bind_group_layouts: &layouts,
-        push_constant_ranges: &[],
+        bind_group_layouts: &layouts.map(Some),
+        immediate_size: 0,
     });
     let line_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Line Pipeline Layout"),
-        bind_group_layouts: &layouts,
-        push_constant_ranges: &[],
+        bind_group_layouts: &layouts.map(Some),
+        immediate_size: 0,
     });
     (render_pipeline_layout, line_pipeline_layout)
 }
@@ -191,12 +191,14 @@ fn make_pipeline(
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module: shader,
-            entry_point: "vs_main",
-            buffers: &[vertex_layout()],
+            entry_point: Some("vs_main"),
+            compilation_options: Default::default(),
+            buffers: &[Some(vertex_layout())],
         },
         fragment: Some(wgpu::FragmentState {
             module: shader,
-            entry_point: "fs_main",
+            entry_point: Some("fs_main"),
+            compilation_options: Default::default(),
             targets: &[Some(wgpu::ColorTargetState {
                 format,
                 blend: Some(spec.blend),
@@ -211,13 +213,14 @@ fn make_pipeline(
         },
         depth_stencil: Some(wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth32Float,
-            depth_write_enabled: spec.depth_write_enabled,
-            depth_compare: spec.depth_compare,
+            depth_write_enabled: Some(spec.depth_write_enabled),
+            depth_compare: Some(spec.depth_compare),
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         }),
         multisample: wgpu::MultisampleState::default(),
-        multiview: None,
+        multiview_mask: None,
+        cache: None,
     })
 }
 
@@ -236,24 +239,27 @@ fn make_prepass(
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module: shader,
-            entry_point: "vs_main",
-            buffers: &[vertex_layout()],
+            entry_point: Some("vs_main"),
+            compilation_options: Default::default(),
+            buffers: &[Some(vertex_layout())],
         },
         fragment: Some(wgpu::FragmentState {
             module: shader,
-            entry_point: fragment,
+            entry_point: Some(fragment),
+            compilation_options: Default::default(),
             targets: &[],
         }),
         primitive: wgpu::PrimitiveState::default(),
         depth_stencil: Some(wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth32Float,
-            depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::Less,
+            depth_write_enabled: Some(true),
+            depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         }),
         multisample: wgpu::MultisampleState::default(),
-        multiview: None,
+        multiview_mask: None,
+        cache: None,
     })
 }
 

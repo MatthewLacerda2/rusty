@@ -184,7 +184,8 @@ fn draw_tile(ui: &mut egui::Ui, t: Theme, tile: &Tile) -> egui::Response {
         (t.bg_tier2, egui::Color32::TRANSPARENT)
     };
     let p = ui.painter();
-    p.rect(rect, 6.0, fill, egui::Stroke::new(1.0, edge));
+    let stroke = egui::Stroke::new(1.0, edge);
+    p.rect(rect, 6.0, fill, stroke, egui::StrokeKind::Middle);
     let center = egui::Align2::CENTER_CENTER;
     let glyph_pos = rect.center_top() + egui::vec2(0.0, 24.0);
     p.text(

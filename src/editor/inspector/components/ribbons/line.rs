@@ -65,7 +65,7 @@ fn draw_points(ui: &mut egui::Ui, points: &[glam::Vec3]) -> Option<Vec<glam::Vec
     let mut changed = false;
     let mut remove = None;
     egui::CollapsingHeader::new(format!("Positions ({})", points.len()))
-        .id_source("line_positions")
+        .id_salt("line_positions")
         .show(ui, |ui| {
             for (i, p) in edited.iter_mut().enumerate() {
                 ui.horizontal(|ui| {

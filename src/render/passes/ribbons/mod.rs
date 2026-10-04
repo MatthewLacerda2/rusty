@@ -82,8 +82,8 @@ impl RibbonRenderer {
         });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Ribbon Pipeline Layout"),
-            bind_group_layouts: &[&globals_layout, texture_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&globals_layout), Some(texture_layout)],
+            immediate_size: 0,
         });
         let pipeline = |blend, entry| Self::pipeline(device, &shader, &layout, (blend, entry));
         Self {
@@ -106,12 +106,14 @@ impl RibbonRenderer {
             layout: Some(layout),
             vertex: wgpu::VertexState {
                 module: shader,
-                entry_point: "vs_main",
-                buffers: &[RibbonVertex::desc()],
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[Some(RibbonVertex::desc())],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shader,
-                entry_point: fragment_entry,
+                entry_point: Some(fragment_entry),
+                compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: HDR_FORMAT,
                     blend: Some(blend),
@@ -128,13 +130,14 @@ impl RibbonRenderer {
             // translucent ribbons all blend.
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::LessEqual,
+                depth_write_enabled: Some(false),
+                depth_compare: Some(wgpu::CompareFunction::LessEqual),
                 stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
             }),
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
+            cache: None,
         })
     }
 

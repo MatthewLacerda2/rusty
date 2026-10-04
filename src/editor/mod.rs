@@ -270,8 +270,9 @@ impl EditorUi {
         // Push editor selection to scene (editor UI is the authority)
         scene.selected_entity_id = self.selected_entity_id;
 
+        let ui = &mut theme::chrome::root_ui(ctx);
         // 1. TOP HEADER PANEL (Controls engine state) — ALWAYS VISIBLE
-        header::draw(self, ctx, scene, console, is_playing);
+        header::draw(self, ui, scene, console, is_playing);
 
         // The side/bottom authoring panels are edit-mode only; during play the runtime
         // is live and the floating dev console takes over. The viewport stays in both
@@ -281,16 +282,16 @@ impl EditorUi {
             bottom_panel::draw_play_console(self, ctx, console);
         } else {
             // 2. LEFT PANEL: Scene Hierarchy
-            hierarchy::draw(self, ctx, scene);
+            hierarchy::draw(self, ui, scene);
             // 3. RIGHT PANEL: Properties Inspector
-            inspector::draw(self, ctx, scene, console, nav);
+            inspector::draw(self, ui, scene, console, nav);
             // 4. BOTTOM PANEL: Folder Explorer & Console Logs
-            bottom_panel::draw(self, ctx, scene, console);
+            bottom_panel::draw(self, ui, scene, console);
         }
 
         // 5. CENTRAL VIEWPORT: the Scene/Game tabbed scene image. Drawn last so it
         // fills the space the docked panels leave. Returns the pointer interaction the
         // front-end uses for click-to-select and the move gizmo on the Scene tab.
-        viewport::draw(self, ctx, viewport_texture, &scene.world)
+        viewport::draw(self, ui, viewport_texture, &scene.world)
     }
 }

@@ -43,9 +43,9 @@ pub fn component_card(
 /// The raised frame every inspector card sits in (components, the object header,
 /// the asset cards): one surface step above the panel, softly rounded.
 pub fn card_frame(t: &theme::Theme) -> egui::Frame {
-    egui::Frame::none()
+    egui::Frame::NONE
         .fill(t.bg_tier2)
-        .inner_margin(egui::Margin::symmetric(t.space_sm, 6.0))
-        .rounding(6.0)
+        .inner_margin(egui::vec2(t.space_sm, 6.0))
+        .corner_radius(6)
         .stroke(egui::Stroke::new(1.0, t.outline.linear_multiply(0.6)))
 }

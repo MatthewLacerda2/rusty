@@ -6,8 +6,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 
-use winit::event_loop::EventLoop;
-use winit::window::WindowBuilder;
+use winit::event_loop::ActiveEventLoop;
+use winit::window::Window;
 
 use super::frame::FrameClock;
 use super::{settings, Shell};
@@ -54,15 +54,16 @@ pub fn refresh_assets() -> crate::asset::audio::Refresh {
 
 /// Open the window at `size` with `title`.
 pub fn create_window(
-    event_loop: &EventLoop<()>,
+    event_loop: &ActiveEventLoop,
     title: &str,
     (width, height): (u32, u32),
-) -> Arc<winit::window::Window> {
+) -> Arc<Window> {
+    let attributes = Window::default_attributes()
+        .with_title(title)
+        .with_inner_size(winit::dpi::PhysicalSize::new(width, height));
     Arc::new(
-        WindowBuilder::new()
-            .with_title(title)
-            .with_inner_size(winit::dpi::PhysicalSize::new(width, height))
-            .build(event_loop)
+        event_loop
+            .create_window(attributes)
             .expect("the OS refused to create a window"),
     )
 }

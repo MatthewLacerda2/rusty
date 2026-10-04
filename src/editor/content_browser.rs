@@ -29,7 +29,7 @@ pub fn draw(
         ui.vertical(|ui| {
             ui.set_width(150.0);
             egui::ScrollArea::vertical()
-                .id_source("cb_sources")
+                .id_salt("cb_sources")
                 .max_height(140.0)
                 .show(ui, |ui| draw_folder_node(editor, ui, ROOT.to_string()));
         });
@@ -37,7 +37,7 @@ pub fn draw(
         // Right: asset tile grid.
         ui.vertical(|ui| {
             egui::ScrollArea::vertical()
-                .id_source("cb_grid")
+                .id_salt("cb_grid")
                 .max_height(140.0)
                 .show(ui, |ui| content_grid::draw(editor, scene, console, ui));
         });

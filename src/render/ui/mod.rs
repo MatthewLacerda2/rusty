@@ -103,8 +103,8 @@ impl UiRenderer {
         let batch_layout = effects::batch_layout(device);
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("UI Pipeline Layout"),
-            bind_group_layouts: &[&layout, &batch_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&layout), Some(&batch_layout)],
+            immediate_size: 0,
         });
         let mask_pipeline = effects::mask_gpu::mask_pipeline(device, &shader, &pipeline_layout);
         let blur_shader = registry.load(device, "ui_blur.wgsl", "UI Blur Shader");
@@ -263,7 +263,7 @@ fn white_texture(device: &wgpu::Device, queue: &wgpu::Queue) -> wgpu::TextureVie
     queue.write_texture(
         texture.as_image_copy(),
         &[255; 4],
-        wgpu::ImageDataLayout {
+        wgpu::TexelCopyBufferLayout {
             offset: 0,
             bytes_per_row: Some(4),
             rows_per_image: None,

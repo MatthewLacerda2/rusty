@@ -28,7 +28,7 @@ pub fn game_object_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
             .clicked()
         {
             spawn(editor, scene, "GameObject", None);
-            ui.close_menu();
+            ui.close();
         }
 
         ui.menu_button(format!("{}  3D Object", icon::CUBE), |ui| {
@@ -40,7 +40,7 @@ pub fn game_object_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
             ] {
                 if ui.button(format!("{glyph}  {label}")).clicked() {
                     spawn(editor, scene, label, Some(primitive));
-                    ui.close_menu();
+                    ui.close();
                 }
             }
         });
@@ -51,7 +51,7 @@ pub fn game_object_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
                     let parent = editor.selected_entity_id;
                     let id = ui_widgets::create_ui(scene, kind, parent);
                     select_new(editor, id);
-                    ui.close_menu();
+                    ui.close();
                 }
             }
         });
@@ -64,7 +64,7 @@ pub fn game_object_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
             ] {
                 if ui.button(format!("{glyph}  {label}")).clicked() {
                     spawn(editor, scene, label, Some(primitive));
-                    ui.close_menu();
+                    ui.close();
                 }
             }
         });

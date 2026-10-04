@@ -65,6 +65,7 @@ impl Renderer {
         solids: &[DrawBatch],
     ) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            multiview_mask: None,
             label: Some("SSAO Depth Prepass"),
             color_attachments: &[],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {

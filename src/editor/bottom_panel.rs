@@ -8,20 +8,21 @@ use crate::scripting::{ConsoleLogs, LogLevel};
 /// BOTTOM PANEL: Folder Explorer & Console Logs
 pub fn draw(
     editor: &mut EditorUi,
-    ctx: &egui::Context,
+    ui: &mut egui::Ui,
     scene: &mut Scene,
     console: &mut ConsoleLogs,
 ) {
     let t = editor.theme;
     if !editor.bottom_open {
-        draw_collapsed(ctx, t, &mut editor.bottom_open);
+        draw_collapsed(ui, t, &mut editor.bottom_open);
         return;
     }
-    egui::TopBottomPanel::bottom("Bottom Panel")
+    let frame = chrome::panel_frame(&t);
+    egui::Panel::bottom("Bottom Panel")
         .resizable(true)
-        .min_height(112.0)
-        .frame(chrome::panel_frame(&t))
-        .show(ctx, |ui| {
+        .min_size(112.0 + frame.inner_margin.sum().y)
+        .frame(frame)
+        .show(ui, |ui| {
             draw_tab_header(editor, console, ui);
             chrome::hairline(ui, &t);
 
@@ -68,12 +69,13 @@ fn draw_tab_header(editor: &mut EditorUi, console: &mut ConsoleLogs, ui: &mut eg
 }
 
 /// Collapsed state: a short rail with a caret that reopens the bottom panel.
-fn draw_collapsed(ctx: &egui::Context, t: crate::editor::theme::Theme, open: &mut bool) {
-    egui::TopBottomPanel::bottom("Bottom Rail")
+fn draw_collapsed(ui: &mut egui::Ui, t: crate::editor::theme::Theme, open: &mut bool) {
+    let frame = chrome::rail_frame(&t);
+    egui::Panel::bottom("Bottom Rail")
         .resizable(false)
-        .exact_height(28.0)
-        .frame(chrome::rail_frame(&t))
-        .show(ctx, |ui| {
+        .exact_size(28.0 + frame.inner_margin.sum().y)
+        .frame(frame)
+        .show(ui, |ui| {
             ui.horizontal(|ui| {
                 if chrome::icon_button(ui, icon::CARET_UP, "Expand").clicked() {
                     *open = true;
@@ -93,7 +95,7 @@ pub fn draw_play_console(editor: &mut EditorUi, ctx: &egui::Context, console: &m
     // Open bottom-left on first frame, then let the user move/resize it freely:
     // `default_pos` (one-time) replaces an every-frame `anchor` that snapped drags
     // back, and `resizable` + a min size give it handles without letting it collapse.
-    let bottom_left = egui::pos2(8.0, ctx.screen_rect().bottom() - 228.0);
+    let bottom_left = egui::pos2(8.0, ctx.content_rect().bottom() - 228.0);
     egui::Window::new(format!("{}  Developer Console", icon::TERMINAL_WINDOW))
         .resizable(true)
         .min_width(320.0)
@@ -134,7 +136,7 @@ fn draw_repl_input(editor: &mut EditorUi, ui: &mut egui::Ui) {
 fn draw_console(console: &mut ConsoleLogs, ui: &mut egui::Ui) {
     let t = crate::editor::theme::from_ui(ui);
     egui::ScrollArea::vertical()
-        .id_source("ConsoleScroll")
+        .id_salt("ConsoleScroll")
         .max_height(120.0)
         .show(ui, |ui| {
             if console.messages.is_empty() {

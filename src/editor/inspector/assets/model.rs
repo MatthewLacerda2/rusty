@@ -64,7 +64,7 @@ fn draw_import_settings(ui: &mut egui::Ui, editor: &mut EditorUi) {
         ui.add(
             egui::DragValue::new(&mut editor.asset_model_scale)
                 .speed(0.05)
-                .clamp_range(0.01..=100.0),
+                .range(0.01..=100.0),
         );
     });
 
@@ -76,7 +76,7 @@ fn draw_import_settings(ui: &mut egui::Ui, editor: &mut EditorUi) {
     ui.horizontal(|ui| {
         ui.label("Mesh Compression:");
         let mut compression = "Off";
-        egui::ComboBox::from_id_source("MeshCompressionCombo")
+        egui::ComboBox::from_id_salt("MeshCompressionCombo")
             .selected_text(compression)
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut compression, "Off", "Off");
@@ -142,7 +142,7 @@ fn sub_object_row(
         ));
         ui.checkbox(&mut generate, "Mesh Collider");
         if generate {
-            egui::ComboBox::from_id_source(format!("mesh_collider_kind_{id}"))
+            egui::ComboBox::from_id_salt(format!("mesh_collider_kind_{id}"))
                 .selected_text(if convex { "Convex" } else { "Trimesh" })
                 .show_ui(ui, |ui| {
                     ui.selectable_value(&mut convex, false, "Trimesh");

@@ -26,7 +26,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         let soft = ui
             .horizontal(|ui| {
                 ui.label("Feather:");
-                let drag = egui::DragValue::new(&mut feather).clamp_range(0.0..=f32::MAX);
+                let drag = egui::DragValue::new(&mut feather).range(0.0..=f32::MAX);
                 ui.add(drag).changed()
             })
             .inner;

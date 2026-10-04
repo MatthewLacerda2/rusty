@@ -76,8 +76,7 @@ fn draw_transition(ui: &mut egui::Ui, edit: &mut SelectableComponent) -> bool {
                 .horizontal(|ui| {
                     ui.label("Fade Duration:");
                     let drag = egui::DragValue::new(&mut edit.fade_duration).speed(0.01);
-                    ui.add(drag.clamp_range(0.0..=f32::MAX).suffix(" s"))
-                        .changed()
+                    ui.add(drag.range(0.0..=f32::MAX).suffix(" s")).changed()
                 })
                 .inner;
         }

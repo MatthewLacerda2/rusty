@@ -45,7 +45,7 @@ pub fn draw_node(
                 .clicked()
             {
                 save_as_prefab(scene, entity_id, &name);
-                ui.close_menu();
+                ui.close();
             }
         });
     };

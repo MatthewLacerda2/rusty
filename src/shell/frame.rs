@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 
 use crate::app::{GameWorld, PlayTransition};
 use crate::render::Renderer;
+use wgpu::CurrentSurfaceTexture;
 
 /// Wall-clock frame timing for the windowed loop: the raw delta handed to the sim and
 /// a once-a-second FPS counter the editor shows. Platform-side only — the sim never
@@ -124,10 +125,7 @@ pub fn quit_action(host: Host, requested: bool, playing: bool) -> QuitAction {
 
 /// Acquire the next swapchain frame, recovering from surface loss. Returns `None`
 /// when the frame should be skipped this redraw (recovered or exiting).
-pub fn acquire_frame(
-    elwt: &winit::event_loop::EventLoopWindowTarget<()>,
-    renderer: &mut Renderer,
-) -> Option<wgpu::SurfaceTexture> {
+pub fn acquire_frame(renderer: &mut Renderer) -> Option<wgpu::SurfaceTexture> {
     let surface_frame = renderer
         .surface
         .as_ref()
@@ -136,19 +134,21 @@ pub fn acquire_frame(
     // `Lost`/`Outdated` only recover by reconfiguring the surface — which never
     // happens on the per-frame path otherwise (only on Resized), so a surface lost
     // without a resize event would log forever.
+    // A suboptimal frame still presents, as it always did; the next resize or
+    // `Outdated` reconfigures. Out-of-memory is no longer a surface outcome (wgpu 30
+    // reports it as a device error), so nothing here exits.
     match surface_frame {
-        Ok(f) => Some(f),
-        Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+        CurrentSurfaceTexture::Success(f) | CurrentSurfaceTexture::Suboptimal(f) => Some(f),
+        CurrentSurfaceTexture::Lost | CurrentSurfaceTexture::Outdated => {
             // Reconfigure to the swapchain's own size (never a view's rect, #355).
             renderer.reconfigure_surface();
             None
         }
-        Err(wgpu::SurfaceError::OutOfMemory) => {
-            eprintln!("[WGPU] Surface out of memory — exiting");
-            elwt.exit();
-            None
-        }
-        Err(wgpu::SurfaceError::Timeout) => None,
+        // Skip the frame and try again: the window is hidden, the GPU is slow, or an
+        // error scope caught a validation error.
+        CurrentSurfaceTexture::Timeout
+        | CurrentSurfaceTexture::Occluded
+        | CurrentSurfaceTexture::Validation => None,
     }
 }
 

@@ -37,9 +37,10 @@ pub fn install(ctx: &Context) {
         (SEMIBOLD, INTER_SEMIBOLD),
         ("jetbrains-mono", JETBRAINS_MONO),
     ] {
-        fonts
-            .font_data
-            .insert(name.into(), FontData::from_static(bytes));
+        fonts.font_data.insert(
+            name.into(),
+            std::sync::Arc::new(FontData::from_static(bytes)),
+        );
     }
 
     // Each family leads with its face; egui's defaults stay behind it as fallback

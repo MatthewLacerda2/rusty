@@ -82,12 +82,12 @@ impl DecalRenderer {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Decal Pipeline Layout"),
             bind_group_layouts: &[
-                &globals_layout,
-                &decal_layout,
-                &depth_layout,
-                texture_layout,
+                Some(&globals_layout),
+                Some(&decal_layout),
+                Some(&depth_layout),
+                Some(texture_layout),
             ],
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let pipeline = Self::pipeline(device, &shader, &pipeline_layout);
@@ -180,12 +180,16 @@ impl DecalRenderer {
             layout: Some(layout),
             vertex: wgpu::VertexState {
                 module: shader,
-                entry_point: "vs_main",
-                buffers: &[crate::render::passes::decals_draw::decal_vertex_layout()],
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[Some(
+                    crate::render::passes::decals_draw::decal_vertex_layout(),
+                )],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shader,
-                entry_point: "fs_main",
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: HDR_FORMAT,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
@@ -203,7 +207,8 @@ impl DecalRenderer {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
+            cache: None,
         })
     }
 }

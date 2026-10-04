@@ -114,20 +114,26 @@ pub fn capture_into(
         log::warn!("[EditorCapture] no GPU/software adapter available — skipping capture");
         return Ok(false);
     };
-    let mut egui_renderer = egui_wgpu::Renderer::new(&renderer.device, OFFSCREEN_FORMAT, None, 1);
+    let mut egui_renderer = egui_wgpu::Renderer::new(
+        &renderer.device,
+        OFFSCREEN_FORMAT,
+        super::paint::EGUI_RENDERER,
+    );
     let ctx = egui::Context::default();
     let mut texture_id = None;
     let mut output = None;
     for frame in 0..opts.frames.max(1) {
-        ctx.begin_frame(raw_input(width, height, frame));
+        ctx.begin_pass(raw_input(width, height, frame));
         let size = draw_ui(&mut ui, &ctx, game, opts.playing, texture_id);
         render_viewport(host, &mut egui_renderer, game, &ui, size, &mut texture_id);
-        output = Some(ctx.end_frame());
+        output = Some(ctx.end_pass());
         // Upload font atlas / image deltas every frame: egui sends each only once.
         let renderer = host.renderer(width, height).expect("probed above");
         let out = output.as_ref().expect("just set");
-        for (id, delta) in &out.textures_delta.set {
-            egui_renderer.update_texture(&renderer.device, &renderer.queue, *id, delta);
+        for (id, deltas) in &out.textures_delta.set {
+            for delta in deltas {
+                egui_renderer.update_texture(&renderer.device, &renderer.queue, *id, delta);
+            }
         }
     }
     let output = output.expect("at least one frame");
@@ -250,20 +256,24 @@ fn paint(
     let mut encoder = device.create_command_encoder(&Default::default());
     egui_renderer.update_buffers(device, queue, &mut encoder, &jobs, &screen);
     {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Editor Capture Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &target_view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-        });
+        let mut pass = encoder
+            .begin_render_pass(&wgpu::RenderPassDescriptor {
+                multiview_mask: None,
+                label: Some("Editor Capture Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    depth_slice: None,
+                    view: &target_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            })
+            .forget_lifetime();
         egui_renderer.render(&mut pass, &jobs, &screen);
     }
     queue.submit(std::iter::once(encoder.finish()));

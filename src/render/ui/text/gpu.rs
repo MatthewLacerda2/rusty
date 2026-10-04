@@ -57,7 +57,7 @@ fn write(queue: &wgpu::Queue, texture: &wgpu::Texture, atlas: &GlyphAtlas) {
     queue.write_texture(
         texture.as_image_copy(),
         &atlas.pixels,
-        wgpu::ImageDataLayout {
+        wgpu::TexelCopyBufferLayout {
             offset: 0,
             bytes_per_row: Some(WIDTH),
             rows_per_image: None,

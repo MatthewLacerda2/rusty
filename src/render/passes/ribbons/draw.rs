@@ -138,8 +138,10 @@ fn effect_pass<'e>(
     view: &'e RenderView,
 ) -> wgpu::RenderPass<'e> {
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        multiview_mask: None,
         label: Some("Ribbon Pass"),
         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            depth_slice: None,
             view: &view.post_fx.scene_hdr.view,
             resolve_target: None,
             ops: wgpu::Operations {
