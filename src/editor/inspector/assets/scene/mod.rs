@@ -1,3 +1,19 @@
+#[cfg(feature = "dev")]
+pub mod bake;
+#[cfg(not(feature = "dev"))]
+mod bake {
+    /// No-op bake buttons in a ship build (the bakes are dev-only actions).
+    pub fn draw(
+        _: &mut egui::Ui,
+        _: &mut crate::editor::EditorUi,
+        _: &mut crate::scene::Scene,
+        _: &mut crate::scripting::ConsoleLogs,
+        _: &crate::navigation::NavigationGraph,
+        _: &str,
+    ) {
+    }
+}
+
 use crate::editor::EditorUi;
 use crate::navigation::{NavBounds, NavigationGraph};
 use crate::scene::Scene;
@@ -29,7 +45,7 @@ pub fn draw(
 
     draw_scene_operations(ui, editor, scene, console, path, filename);
     draw_navmesh(ui, scene, nav);
-    draw_bake_lighting(ui, scene, console, nav, path);
+    bake::draw(ui, editor, scene, console, nav, path);
 }
 
 /// The per-scene Navmesh bake settings section (#276): edit agent radius, agent height,
@@ -152,66 +168,6 @@ fn draw_nav_bounds(ui: &mut egui::Ui, bounds: &mut Option<NavBounds>, baked: Nav
         }
     }
     changed
-}
-
-/// The "Bake Lighting" button (#246): auto-place + bake both probe sets through the
-/// SAME orchestration the `Lighting.Bake()` script verb uses (editor↔API parity, no
-/// second path); beside it, "Bake Lightmaps" (#438) routes like `Lighting.BakeLightmaps`. Dev-only — the bake drives a headless GPU and writes authoring
-/// artifacts (the SH sidecar + KTX2 cubemaps), so it is absent from ship builds, just
-/// like the `Lighting.Bake` binding.
-#[cfg(feature = "dev")]
-fn draw_bake_lighting(
-    ui: &mut egui::Ui,
-    scene: &mut Scene,
-    console: &mut ConsoleLogs,
-    nav: &NavigationGraph,
-    path: &str,
-) {
-    ui.add_space(8.0);
-    let size = egui::Vec2::new(120.0, 24.0);
-    let (probes, lightmaps) = ui
-        .horizontal(|ui| {
-            let probes = egui::Button::new(format!("{}  Bake Lighting", icon::LIGHTBULB));
-            let probes = ui.add(probes.min_size(size));
-            let probes = probes.on_hover_text("Auto-place + bake light & reflection probes");
-            let maps = egui::Button::new(format!("{}  Bake Lightmaps", icon::MAP_TRIFOLD));
-            let maps = ui.add(maps.min_size(size));
-            let maps = maps.on_hover_text("Bake static meshes with a second UV map (#438)");
-            (probes.clicked(), maps.clicked())
-        })
-        .inner;
-    if lightmaps {
-        // The same path as `Lighting.BakeLightmaps()` (editor↔API parity).
-        let settings = crate::scene::lighting::lightmap::BakeSettings::default();
-        match crate::dev::lightmap_bake::bake_scene_lightmaps(scene, Some(path), &settings) {
-            Ok(n) => console.info(format!(
-                "Baked {n} lightmap(s); save the scene to keep them"
-            )),
-            Err(e) => console.error(format!("Bake Lightmaps failed: {e}")),
-        }
-    }
-    if !probes {
-        return;
-    }
-    let params = crate::dev::lighting_bake::LightingBakeParams::default();
-    match crate::dev::lighting_bake::bake_lighting(scene, Some(path), Some(nav), params) {
-        Ok(r) => console.info(format!(
-            "Baked lighting: {} light probe(s), {} reflection probe(s)",
-            r.light_probes, r.reflection_probes
-        )),
-        Err(e) => console.error(format!("Bake Lighting failed: {}", e)),
-    }
-}
-
-/// No-op `Bake Lighting` button in a ship build (the bake is a dev-only action).
-#[cfg(not(feature = "dev"))]
-fn draw_bake_lighting(
-    _ui: &mut egui::Ui,
-    _scene: &mut Scene,
-    _console: &mut ConsoleLogs,
-    _nav: &NavigationGraph,
-    _path: &str,
-) {
 }
 
 /// File metadata card: path, on-disk size, plus the entity count and skybox
