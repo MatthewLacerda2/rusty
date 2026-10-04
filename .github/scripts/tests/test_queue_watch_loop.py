@@ -33,8 +33,10 @@ class World:
 
     def __init__(self, tmp: str, listings: list, verdicts: dict[int, str]):
         self.listings, self.verdicts, self.now, self.taken = listings, verdicts, 0.0, []
+        self.clashes: set[frozenset[int]] = set()
         self.fx = argparse.Namespace(
-            pulls=self.pulls, issue_labels=dict, turn=self.turn, head=lambda n: f"pushed{n}",
+            pulls=self.pulls, issue_labels=dict, clashes=lambda pulls: self.clashes,
+            turn=self.turn, head=lambda n: f"pushed{n}",
             clock=lambda: self.now, sleep=self.sleep, say=lambda *a: None,
             memory=Path(tmp, watch.MEMORY), bots=queue.BOTS, merged=queue.MERGED,
             ends={queue.GREEN, queue.DRY}, stops={queue.STOPPED}, skips={queue.NOT_READY},
