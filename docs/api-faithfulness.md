@@ -302,8 +302,8 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `Spawn` | ✅ | renderer — `render/passes/decals_draw.rs` projects each decal; loads its texture |
-| `Clear` | ✅ | renderer — empties the projected set |
+| `Spawn` | ✅ | renderer — `render/decals/gpu.rs` uploads each decal and loads its maps into the decal atlas; the clusters bin it and `fs_main` folds it into the surface's material (#638) |
+| `Clear` | ✅ | renderer — empties the uploaded set |
 
 ### `Layers` — over `Entity.layer`
 
