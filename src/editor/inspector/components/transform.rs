@@ -187,3 +187,7 @@ fn draw_parent_selector(
             });
     });
 }
+
+#[cfg(test)]
+#[path = "transform_tests.rs"]
+mod tests;
