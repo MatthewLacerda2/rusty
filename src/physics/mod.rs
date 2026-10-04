@@ -40,6 +40,8 @@ mod material_tests;
 mod query;
 #[cfg(test)]
 mod query_active_tests;
+#[cfg(test)]
+mod query_tests;
 mod ragdoll;
 #[cfg(test)]
 mod raycast_tests;

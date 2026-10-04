@@ -6,6 +6,8 @@
 mod crouch;
 mod flags;
 mod stairs;
+mod steep;
+mod walls;
 
 use glam::{Quat, Vec3};
 use rusty::components::{CharacterControllerComponent, ColliderComponent, ColliderShape};

@@ -168,7 +168,8 @@ fn a_joint_breaks_past_its_force_and_not_before() {
     let (weak, id, breaks) = rated(5.0);
     assert_eq!(breaks.len(), 1, "breaks once: {breaks:?}");
     assert_eq!(breaks[0].id, id);
-    assert!(breaks[0].force > 5.0);
+    // The load it broke under is the cube's weight, in newtons.
+    assert!((breaks[0].force - 9.81).abs() < 0.05, "{breaks:?}");
     assert!(!weak.world.has_joint(id), "a broken joint is destroyed");
     assert!(pos(&weak, id).y < 4.5, "and the cube falls");
 }

@@ -57,7 +57,7 @@ fn is_blocked_by_a_step_over_the_step_offset() {
 
 /// A ramp rising along +x at `degrees`, its surface through the origin's
 /// ground line at x = 1.
-fn ramp_scene(degrees: f32) -> (Scene, u32) {
+pub(super) fn ramp_scene(degrees: f32) -> (Scene, u32) {
     let mut scene = Scene::new();
     add_floor(&mut scene);
     let rot = Quat::from_rotation_z(degrees.to_radians());

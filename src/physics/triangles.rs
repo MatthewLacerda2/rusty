@@ -127,4 +127,21 @@ mod tests {
             "a tilted box reaches above its flat half-height: {top}"
         );
     }
+
+    /// Off the origin and turned, every triangle still faces out of the box: the
+    /// pose moves each vertex, it never mirrors the shape inside out.
+    #[test]
+    fn an_off_origin_turned_box_keeps_its_triangles_facing_out() {
+        let mut scene = Scene::new();
+        let center = Vec3::new(5.0, 1.0, -3.0);
+        let turn = Quat::from_rotation_y(0.7) * Quat::from_rotation_x(0.2);
+        let id = boxed(&mut scene, Vec3::new(2.0, 1.0, 4.0), center, turn);
+        let tri = collider_world_triangles(&scene, id).expect("a box tessellates");
+        for [a, b, c] in tri.triangles {
+            let [a, b, c] = [a, b, c].map(|i| tri.vertices[i as usize]);
+            let normal = (b - a).cross(c - a);
+            let outward = (a + b + c) / 3.0 - center;
+            assert!(normal.dot(outward) > 0.0, "inward face {a} {b} {c}");
+        }
+    }
 }

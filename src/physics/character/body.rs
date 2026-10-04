@@ -84,3 +84,23 @@ impl PhysicsWorld {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A turned owner whose capsule sits on an offset, turned child: the capsule
+    /// rides at the child's offset plus its centre (turned with it), and its
+    /// rotation on the body undoes the owner's so it stays upright in the world.
+    #[test]
+    fn the_capsule_rides_its_offset_and_stays_upright() {
+        let owner = Quat::from_rotation_y(0.9);
+        let child = Quat::from_rotation_z(0.4);
+        let pos = Vec3::new(1.0, 2.0, -0.5);
+        let center = Vec3::new(0.0, 1.0, 0.25);
+        let pose = upright_offset(owner, pos, child, center);
+        let want = pos + child * center;
+        assert!((pose.translation - want).length() < 1e-5, "{pose:?}");
+        assert!((owner * pose.rotation).angle_between(Quat::IDENTITY) < 1e-5);
+    }
+}

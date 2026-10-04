@@ -21,8 +21,11 @@ fn collider(shape: ColliderShape) -> ColliderComponent {
     }
 }
 
+/// Where the ball drops, off the origin so a contact point's every axis counts.
+const BALL_XZ: Vec3 = Vec3::new(3.0, 0.0, -2.0);
+
 /// A static floor with its top face at `y = 0` and a dynamic unit-radius
-/// sphere 2 units above it. Returns `(scene, floor, ball)`.
+/// sphere 2 units above it at [`BALL_XZ`]. Returns `(scene, floor, ball)`.
 fn sphere_over_floor() -> (Scene, u32, u32) {
     let mut scene = Scene::new();
     let floor = scene.add_entity("Floor".to_string());
@@ -33,7 +36,7 @@ fn sphere_over_floor() -> (Scene, u32, u32) {
         .world
         .set_collider(floor, Some(collider(ColliderShape::Box { size })));
     let ball = scene.add_entity("Ball".to_string());
-    scene.world.transform_mut(ball).unwrap().position = Vec3::new(0.0, 2.0, 0.0);
+    scene.world.transform_mut(ball).unwrap().position = BALL_XZ + Vec3::Y * 2.0;
     let sphere = ColliderShape::Sphere { radius: 1.0 };
     scene.world.set_collider(ball, Some(collider(sphere)));
     scene.world.set_rigidbody(
@@ -96,11 +99,8 @@ fn landing_contact_reports_point_normal_and_impact() {
         .unwrap();
     let (_, other, c) = side;
     assert_eq!(other, floor);
-    assert!(c.point.x.abs() < 1e-3 && c.point.z.abs() < 1e-3, "{c:?}");
-    assert!(
-        c.point.y.abs() < 0.1,
-        "contact sits on the floor's top face: {c:?}"
-    );
+    // On the floor's top face, right under the ball.
+    assert!((c.point - BALL_XZ).abs().max_element() < 0.01, "{c:?}");
     assert!(
         (c.normal - Vec3::Y).length() < 1e-3,
         "the ball sees the floor push up"
