@@ -1,0 +1,138 @@
+# Mutation testing on request: exactly the code someone names, on GitHub's
+# runners, with a report readable without opening a log (#750).
+#
+# Pull requests carry no mutation job. Mutation is a signal — nothing it finds
+# may block a merge — and the per-PR job held runners the merge queue was
+# waiting on, for a report that could not change whether anything merged.
+# What replaces it is not silence: whoever just wrote tricky code asks for
+# exactly that code to be mutated, and reads the answer.
+#
+# The way in is `make mutants-remote SCOPE=...`, which dispatches this on the
+# current branch, waits, downloads the report and prints it
+# (`.github/scripts/mutants-remote.py`). By hand, or from a cloud session's
+# GitHub tools (`actions_run_trigger`), with the same two inputs:
+#
+#   gh workflow run mutants-on-request.yml --ref <branch> -f scope='<scope>'
+#
+# The scope is `diff` (this branch against `origin/main`) or path globs
+# (`src/physics/**`), read by `.github/scripts/mutants-scope.py`, whose
+# docstring says why both become `--in-diff`. The scope and the request id
+# `make mutants-remote` generates are in the run's name: a dispatch returns no
+# run id, so the id is how the command finds *its* run.
+#
+# Never a gate and never on a pull request. Unlike the weekly sweep it goes
+# red when it has no honest report to give — a path scope with nothing to
+# mutate, a baseline that does not build — because its caller must tell "no
+# survivors" from "no answer", and the run's conclusion is what it reads.
+# Survivors are a result and never turn it red.
+#
+# A `workflow_dispatch` workflow can be dispatched only once the file is on
+# the default branch; `--ref` then picks the code it runs against.
+name: mutants-on-request
+run-name: "mutants: ${{ inputs.scope }} [${{ inputs.request }}]"
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "`diff`, or space-separated path globs (src/physics/**)"
+        required: true
+        type: string
+      request:
+        description: An id for the caller to find this run by; any short string
+        required: false
+        default: by-hand
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  mutants:
+    runs-on: ubuntu-latest
+    # One runner: a request is a file or a branch's diff, usually tens of
+    # mutants at ~2 min each. A scope too big for the budget below is stopped
+    # by it, and the report says how many planned mutants it never reached.
+    timeout-minutes: 180
+    env:
+      # Measured from the job's start: slow setup leaves less, not overtime.
+      BUDGET_SECONDS: 9900   # 2 h 45
+    steps:
+      - name: Start the clock
+        run: echo "JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      # Full history: a `diff` scope needs `origin/main` and the merge base.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          # The weekly sweep saves this key from `main`; a request only reads it.
+          shared-key: mutants
+          save-if: false
+      - name: System libs for winit/wgpu builds
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+      - name: Install cargo-mutants
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+
+      - name: What was asked for
+        env:
+          SCOPE: ${{ inputs.scope }}
+        run: python3 .github/scripts/mutants-scope.py resolve "$SCOPE" --out plan.json --diff scope.diff
+
+      # `--list` builds nothing and answers in seconds, so the size of the
+      # request and what it covers are known before anything compiles.
+      - name: How much of it there is to mutate
+        id: plan
+        run: |
+          set -euo pipefail
+          # An empty diff (a branch that changed no Rust) plans nothing; it is
+          # not handed to cargo-mutants, which refuses an empty `--in-diff`.
+          if [ -s scope.diff ]; then
+            cargo mutants --list --json --in-diff scope.diff > planned.json
+          else
+            : > planned.json
+          fi
+          python3 .github/scripts/mutants-scope.py check plan.json planned.json > scope.txt \
+            || { cat scope.txt; echo "::error::$(cat scope.txt)"; exit 1; }
+          cat scope.txt
+          in_scope=$(python3 -c 'import json,sys; t=open(sys.argv[1]).read().strip(); print(len(json.loads(t)) if t else 0)' planned.json)
+          echo "in_scope=$in_scope" >> "$GITHUB_OUTPUT"
+
+      # Same dev-feature build, timeout multiplier and memory cap as the sweep
+      # (`mutants-sweep.yml` says why each). SIGINT at the budget is
+      # cargo-mutants' Ctrl-C: it stops cleanly and keeps what it measured.
+      - name: Mutate
+        id: mutate
+        if: steps.plan.outputs.in_scope != '0'
+        run: |
+          budget=$(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) ))
+          ulimit -v 8388608
+          rc=0
+          timeout --signal=INT --kill-after=60s "${budget}s" \
+            cargo mutants --no-shuffle --timeout-multiplier 3 --in-diff scope.diff \
+              -- --features dev || rc=$?
+          echo "status=$rc" >> "$GITHUB_OUTPUT"
+
+      # Red when cargo-mutants broke (any status but finished or stopped at
+      # its budget): then there is no honest report to write.
+      - name: Render the report
+        env:
+          IN_SCOPE: ${{ steps.plan.outputs.in_scope }}
+          STATUS: ${{ steps.mutate.outputs.status || '0' }}
+        run: |
+          python3 .github/scripts/mutants-report.py mutants.out scope.txt \
+            --in-scope "$IN_SCOPE" --exit "$STATUS" --out report
+          cat report/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the report
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutants-report
+          path: report/
+          if-no-files-found: error
+          retention-days: 14

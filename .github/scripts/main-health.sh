@@ -12,7 +12,7 @@
 # rebuild), so the fix PR closes the issue, not this script.
 set -euo pipefail
 
-WATCHED='ci lint'
+WATCHED='ci lint mutants-sweep coverage'
 LABEL=bug
 
 run=$(gh api "repos/$REPO/actions/runs/$RUN_ID")
@@ -26,10 +26,10 @@ if [[ " $WATCHED " != *" $wf "* ]] || [[ $branch != main ]] \
   exit 0
 fi
 
-# A nightly mutation shard that concluded non-success is a *finding* when
+# A weekly sweep shard that concluded non-success is a *finding* when
 # cargo-mutants finished (exit 2 = survivors, 3 = timeouts) — that is the
 # signal's own report, not an outage. Anything else (no artifact, a baseline
-# that did not build, the 6 h ceiling, a lost runner) left its mutants
+# that did not build, the shard's time budget, a lost runner) left its mutants
 # unmeasured: file it.
 shard_had_findings() {
   local dir rc
@@ -108,7 +108,7 @@ if [[ $state == red && -z $issue ]]; then
     echo ''
     details
     echo ''
-    echo 'Informational signals (coverage, the nightly mutation shards) file here only when they'
+    echo 'Informational signals (coverage, the weekly mutation sweep) file here only when they'
     echo 'fail to *run* — a crash, a timeout, a cancelled shard. Their findings (surviving mutants,'
     echo 'a coverage drop) stay in their own reports. Later red runs comment here when the set of'
     echo 'failing jobs changes. A green run leaves a note but does not close this: green can be'

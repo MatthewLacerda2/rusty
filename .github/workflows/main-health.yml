@@ -4,10 +4,12 @@ name: main-health
 # email. The logic — which failures count, the dedupe marker, when to comment —
 # lives in .github/scripts/main-health.sh.
 #
-# Watched: `ci` and `lint`, the two workflows whose gates guard `main`. Not
-# `docs`: its only failure today is the Pages deploy (Pages is not enabled —
-# #509, a human task), which would re-file on every merge, and the rustdoc build
-# it runs is already proven by lint.yml's rustdoc gate. Once #509 lands, adding
+# Watched: `ci` and `lint`, the two workflows whose gates guard `main`, and
+# the two weekly signals, `mutants-sweep` and `coverage` (#750), which file
+# only when they fail to *run* — main-health.sh says how a finding is told
+# apart. Not `docs`: its only failure today is the Pages deploy (Pages is not
+# enabled — #509, a human task), which would re-file on every merge, and the
+# rustdoc build it runs is already proven by lint.yml's rustdoc gate. Once #509 lands, adding
 # `docs` here and to WATCHED in the script is the whole change.
 #
 # Its own file rather than a job in ci.yml: `workflow_run` sees the *finished*
@@ -16,7 +18,7 @@ name: main-health
 # edits.
 on:
   workflow_run:
-    workflows: [ci, lint]
+    workflows: [ci, lint, mutants-sweep, coverage]
     types: [completed]
     branches: [main]
   # Replay any past run to see what this would file. Dry-run by default, so a
@@ -24,7 +26,7 @@ on:
   workflow_dispatch:
     inputs:
       run_id:
-        description: Id of a completed ci/lint run on main to evaluate
+        description: Id of a completed run of a watched workflow on main to evaluate
         required: true
       dry_run:
         description: Print the issue/comment instead of writing it
