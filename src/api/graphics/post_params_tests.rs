@@ -12,12 +12,13 @@ use crate::scene::authoring::defaults;
 use crate::scene::Scene;
 use crate::shadergen::{bake_recipe, ShaderRecipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
 
-/// A baked damage-vignette postfx module, unique to this test run; removed on drop.
+/// A baked damage-vignette postfx module, unique to this test and run (tests share
+/// a process under `cargo test`); removed on drop.
 struct Baked(String);
 
 impl Baked {
-    fn new() -> Self {
-        let name = format!("test_post_params_{}", std::process::id());
+    fn new(tag: &str) -> Self {
+        let name = format!("test_post_params_{tag}_{}", std::process::id());
         let json =
             format!(r#"{{"pass":"postfx","name":"{name}","blocks":[{{"id":"damage_vignette"}}]}}"#);
         let recipe = ShaderRecipe::from_json(&json).unwrap();
@@ -56,7 +57,7 @@ fn scene_running(effect: &str) -> RefCell<Scene> {
 
 #[test]
 fn values_land_on_the_volume_and_read_back() {
-    let baked = Baked::new();
+    let baked = Baked::new("values");
     let scene = scene_running(&baked.0);
     run(
         &scene,
@@ -76,7 +77,7 @@ fn values_land_on_the_volume_and_read_back() {
 
 #[test]
 fn a_param_the_effects_do_not_expose_is_an_error_naming_it() {
-    let baked = Baked::new();
+    let baked = Baked::new("errors");
     let scene = scene_running(&baked.0);
     for (call, want) in [
         (r#""damage_vignette.pulse_speed", 1"#, "is baked"),
