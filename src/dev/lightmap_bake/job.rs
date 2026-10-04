@@ -1,7 +1,7 @@
 //! A lightmap bake on a worker thread (#808), for the editor's Bake Lightmaps
 //! button: the window stays live while the CPU path tracer runs.
 //!
-//! [`LightmapBakeJob::start`] gathers the owned [`BakeScene`] on the caller's thread
+//! [`LightmapBakeJob::start`] gathers the owned `BakeScene` on the caller's thread
 //! (it borrows the ECS) and hands it to a worker; [`LightmapBakeJob::poll`], called
 //! each frame, applies the finished result back on the caller's thread through the
 //! same [`apply_lightmaps`] the synchronous `Lighting.BakeLightmaps()` uses. A
