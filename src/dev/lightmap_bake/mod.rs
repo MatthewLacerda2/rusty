@@ -1,4 +1,4 @@
-//! src/dev/lightmap_bake.rs — the lightmap bake as an authoring action (#438).
+//! src/dev/lightmap_bake/ — the lightmap bake as an authoring action (#438).
 //!
 //! The one path behind `Lighting.BakeLightmaps()` and the editor's "Bake Lightmaps"
 //! button, so the two never drift. It gathers the static scene, runs the CPU bake
@@ -12,6 +12,10 @@
 //! texels, so a rebake that changes a page changes its path and the renderer, which
 //! caches pages by path, loads the new one.
 //!
+//! The bake splits in three so the editor can run the middle on a worker thread
+//! ([`job`], #808): [`gather_bake_input`] borrows the scene, `bake` needs only
+//! the owned [`BakeScene`], and [`apply_lightmaps`] writes the result back.
+//!
 //! Allowed deps: scene (the bake and its data), image (PNG I/O).
 
 use std::path::{Path, PathBuf};
@@ -19,9 +23,12 @@ use std::path::{Path, PathBuf};
 use glam::Vec3;
 
 use crate::scene::lighting::lightmap::{
-    bake, encode_texels, pack, BakeScene, BakeSettings, LightmapEntry, LightmapSet,
+    bake, encode_texels, pack, BakeScene, BakeSettings, Lightmap, LightmapEntry, LightmapSet,
 };
 use crate::scene::Scene;
+
+pub mod job;
+pub use job::{BakeOutcome, LightmapBakeJob};
 
 /// Suffix of the folder beside a scene file that holds its lightmaps.
 pub const LIGHTMAP_DIR_SUFFIX: &str = ".lightmaps";
@@ -40,11 +47,27 @@ pub fn bake_scene_lightmaps(
     scene_path: Option<&str>,
     settings: &BakeSettings,
 ) -> Result<usize, String> {
-    let scene_path = scene_path.ok_or("save the scene before baking lightmaps")?;
-    scene.refresh_world_matrices();
-    let input = BakeScene::gather(scene, &texture_average);
-    let maps = bake(&input, settings);
+    let scene_path = scene_path.ok_or(UNSAVED)?;
+    let maps = bake(&gather_bake_input(scene), settings);
+    apply_lightmaps(scene, scene_path, &maps)
+}
 
+/// Why a bake cannot start: there is nowhere beside the scene to write.
+pub const UNSAVED: &str = "save the scene before baking lightmaps";
+
+/// The static scene flattened for the bake: owned data, free of the ECS.
+pub fn gather_bake_input(scene: &mut Scene) -> BakeScene {
+    scene.refresh_world_matrices();
+    BakeScene::gather(scene, &texture_average)
+}
+
+/// Write `maps` beside `scene_path` and point the scene at them, replacing the
+/// previous bake's pages. Returns how many lightmaps were written.
+pub fn apply_lightmaps(
+    scene: &mut Scene,
+    scene_path: &str,
+    maps: &[Lightmap],
+) -> Result<usize, String> {
     let dir = lightmap_dir(scene_path);
     clear_old_lightmaps(&dir)?;
     scene.lightmaps.clear();
@@ -52,7 +75,7 @@ pub fn bake_scene_lightmaps(
         return Ok(0);
     }
     std::fs::create_dir_all(&dir).map_err(|e| format!("lightmap folder: {e}"))?;
-    let atlas = pack(&maps);
+    let atlas = pack(maps);
     let mut set = LightmapSet::default();
     for (k, texels) in atlas.pages.iter().enumerate() {
         let bytes = encode_texels(texels);
@@ -127,5 +150,6 @@ fn texture_average(path: &str) -> Option<Vec3> {
 }
 
 #[cfg(test)]
-#[path = "lightmap_bake_tests.rs"]
-mod lightmap_bake_tests;
+mod job_tests;
+#[cfg(test)]
+mod tests;
