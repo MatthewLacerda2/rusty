@@ -34,6 +34,7 @@ mod postfx_params_screenshot;
 mod postfx_screenshot;
 mod preview_api;
 mod preview_material;
+mod probe_ambient_screenshot;
 mod render_texture_scene;
 mod render_texture_screenshot;
 mod ribbons_screenshot;

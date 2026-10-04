@@ -118,14 +118,14 @@ fn flat_overlay_uniform(tint: [f32; 4]) -> EntityUniform {
 }
 
 /// The representative marker colour for a light probe, derived from its baked SH. We
-/// reconstruct diffuse irradiance toward world-up (`Sh9::eval(Vec3::Y)`) — the same eval
-/// the shading path uses — so the tint reads as "what light is arriving from above" at
-/// the probe. A zero/unbaked probe → black; a bright probe → bright; a warm/cool bounce
+/// reconstruct diffuse irradiance toward world-up (`Sh9::eval(Vec3::Y)`) over π — what
+/// the shading path gives a white, upward-facing surface (#807) — so the tint reads as
+/// "what light is arriving from above" at the probe, on the scale the scene renders. A zero/unbaked probe → black; a bright probe → bright; a warm/cool bounce
 /// shows in the hue. The colour is tone-mapped (Reinhard) into `[0, 1]` so HDR
 /// irradiance stays a legible tint instead of clipping to flat white; alpha is fixed.
 pub(crate) fn sh_marker_tint(sh: &Sh9) -> [f32; 4] {
-    let irradiance = sh.eval(Vec3::Y).max(Vec3::ZERO);
-    let mapped = irradiance / (irradiance + Vec3::ONE);
+    let lambert = sh.eval(Vec3::Y).max(Vec3::ZERO) / std::f32::consts::PI;
+    let mapped = lambert / (lambert + Vec3::ONE);
     [mapped.x, mapped.y, mapped.z, 1.0]
 }
 

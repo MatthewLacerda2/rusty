@@ -588,7 +588,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Non-static objects that a light probe covers
     // (`use_sh == 1`, #240) reconstruct DIRECTIONAL irradiance from their interpolated
     // SH probe; everything else falls back to the flat Hemispherical Sky-Ground
-    // gradient. Both feed the same albedo * (1 - metallic) diffuse response.
+    // gradient. All three are E / pi, so they feed the same albedo * (1 - metallic)
+    // Lambert response.
     var ambient_irradiance: vec3<f32>;
     let lightmap_page = instances[in.instance].lightmap_page;
     if (lightmap_page > 0u) {
@@ -598,7 +599,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let lm = textureSampleLevel(t_lightmaps, s_lightmaps, in.lightmap_uv, lightmap_page - 1u, 0.0);
         ambient_irradiance = lm.rgb * lm.a * LIGHTMAP_RGBM_RANGE;
     } else if (instances[in.instance].use_sh == 1u) {
-        ambient_irradiance = eval_sh(N, in.instance);
+        // `eval_sh` returns irradiance E; a Lambert surface reflects albedo / pi * E,
+        // the same response `calculate_pbr` gives a direct light and the E / pi the
+        // lightmap and flat ambient already hold (#807).
+        ambient_irradiance = eval_sh(N, in.instance) / PI;
     } else {
         let sky_color = lighting.ambient.color;
         let ground_color = sky_color * 0.25; // ground is darker and cooler/desaturated
