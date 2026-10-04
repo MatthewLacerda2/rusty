@@ -282,28 +282,25 @@ Targets are deliberately differentiated:
 - **No floor on the platform layer** (the layer table's non-sim rows) — headless
   coverage there is low-value.
 
-It runs in two tiers, both non-blocking (mirroring mutation testing, below):
+It runs **weekly** (`coverage.yml`, Mondays, plus `workflow_dispatch`), never on
+a pull request and not after every merge (#750): one job re-measures each floored
+module and ratchets it against `coverage-baseline.txt`, landing as a job-summary
+table that flags any module below its floor. A drop never fails the run; a red
+run means the instrument broke, and `main-health` files it. To measure a branch,
+dispatch it there: `gh workflow run coverage.yml --ref <branch>`.
 
-| Run | Trigger | Scope | Where it lands |
-|---|---|---|---|
-| **PR run** (`coverage-pr`) | `pull_request`, `sim` filter | changed sim **lines** (`diff-cover`) | job summary **and** a sticky PR comment when changed lines are left uncovered |
-| **Ratchet** (`coverage`) | post-merge on `main` + `workflow_dispatch` | per-sim-module total vs `coverage-baseline.txt` | a job-summary table flagging any module below its floor |
+Why weekly: the ratchet moves slowly, and a batch merging ~40 pull requests a day
+paid for ~40 tables nobody read in between. The per-PR diff-cover comment went
+with the per-PR job; the honest question "did my new code get tested?" is
+answered locally, below, or by a scoped mutation run, which asks it harder.
 
-Why split it: the per-PR run scores only the lines the PR changed, so the agent
-gets a *fresh-context catch* — did the new sim code get tested? — and fixes it
-in-PR; the main run re-measures each whole module and ratchets it against the
-committed floor as the backstop. Unlike mutation, diff-scoping does **not** make
-the per-PR run cheap (the instrumented suite still runs in full), but it stays
-informational and is not a required check, so it never gates a merge and may even
-finish after one without stalling anything.
-
-Both jobs measure under nextest (`cargo llvm-cov nextest`, #484), so the `gpu`
+It measures under nextest (`cargo llvm-cov nextest`, #484), so the `gpu`
 group caps them like `build-test`. Checked when it was adopted: on the default
 feature set it produced the same totals as `cargo llvm-cov` to the line
 (70.48% regions / 70.97% lines), from ~850 small per-process profiles (~280 MB).
 
 Run it locally: `cargo llvm-cov nextest --summary-only` (add `--features dev` for the
-dev-only surface); for the per-PR view, `cargo llvm-cov report --cobertura
+dev-only surface); for the lines a branch changed, `cargo llvm-cov report --cobertura
 --output-path cov.xml` then `diff-cover cov.xml --compare-branch origin/main`.
 
 ## Mutation testing
@@ -312,22 +309,23 @@ suite actually *catches* bugs — the headline guardrail against green-but-vacuo
 agent-written tests. It mutates the core of the deterministic sim (`app`,
 `scripting`, `physics`, `navigation`; a deliberate subset of the layer table's sim
 rows), the pure-logic part where a silent bug hurts most, and
-reports the **surviving** mutants (a change no test failed on). It runs in two
-tiers, both **non-blocking** — mutation never gates a merge:
+reports the **surviving** mutants (a change no test failed on). It is
+**non-blocking** — mutation never gates a merge — and it runs on **no pull
+request** (#750). Two ways in:
 
 | Run | Trigger | Scope | Where it lands |
 |---|---|---|---|
-| **PR run** (`mutants-pr`) | `pull_request`, `sim` filter | `--in-diff` — only lines the PR changed (∩ the `--file` sim globs) | job summary **and** a sticky PR comment, so the coding agent fixes survivors in-PR |
-| **Full sweep** (`mutants`, sharded) | nightly `schedule` + a `workflow_dispatch` with `force_mutants` (a plain dispatch skips it, #705); skipped by `mutants-plan` when a finished sweep already covered `main`'s head (#506) or another sweep is still running (one at a time, #705) | full `--file` sim scope, split over a 10-shard matrix (`--shard k/10`) to stay under GitHub's 6 h job limit | `mutants-report` job: merged job summary (totals, unfinished shards, survivors) and the merged `mutants-report` artifact |
+| **On request** (`mutants-on-request.yml`) | `make mutants-remote SCOPE=...`, or a dispatch with a `scope` input | `diff` (the branch against `origin/main`) or path globs, turned into one `--in-diff` by `.github/scripts/mutants-scope.py`; one runner, a 2 h 45 budget | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`) |
+| **Full sweep** (`mutants-sweep.yml`, sharded) | weekly `schedule` (Saturdays) + `workflow_dispatch` (`force` re-sweeps a covered commit); skipped by `mutants-plan` when a finished sweep already covered `main`'s head (#506); one sweep at a time (#705) | the full `--file` sim scope over a 24-shard matrix (`--shard k/24`), each shard stopping itself at a 5 h 40 budget under GitHub's 6 h limit (#749) | `mutants-report` job: merged job summary (totals, unfinished shards, survivors) and the merged `mutants-report` artifact |
 
-Why split it: diff-scoping makes the per-PR run fast and every survivor
-attributable to a line the PR just wrote (the *fresh-context catch*), while the
-nightly sweep re-examines untouched code the diff run never mutates and
-tracks/ratchets the survivor backlog. Keeping both **informational** — surfaced
-where the agent acts on them rather than failing the build — is deliberate:
-`--in-diff` line-matching can drift after a rebase and timeouts can produce
-spurious "survivors," neither of which should redden CI. The per-PR sticky
-comment is cleared automatically once a re-push fixes the survivors.
+Why this shape: mutation is a signal, and a per-PR job held runners the merge
+queue was waiting on for a report that could not change whether anything merged.
+Whoever writes tricky mechanism asks for exactly that code to be mutated before
+readying it, and reads the answer; the weekly sweep re-examines everything else and
+tracks the survivor backlog. An on-request run goes red only when it has no honest
+answer (a path with nothing to mutate, a baseline that does not build); survivors
+are a result. A run stopped at its budget says how many planned mutants it never
+reached.
 
 **The mutation jobs stay on `cargo test`, not nextest** (#484). A mutant's cost is
 the crate rebuild, not the test run, so nextest's scheduling buys little there — while
@@ -338,10 +336,11 @@ driver, so the `gpu` group has nothing to bound. Revisit with
 `cargo mutants --test-tool nextest` plus a dedicated fail-fast profile if mutant
 test time ever dominates.
 
-Run it locally (the diff-scoped form mirrors the PR run):
+Prefer `make mutants-remote` (every mutant rebuilds the crate, which is hours of
+contention on a machine building sibling worktrees). Locally, the same question:
 ```
-git diff origin/main > pr.diff
-cargo mutants --in-diff pr.diff --file 'src/app/**/*.rs' -- --features dev   # ...plus the other sim modules
+git diff origin/main > branch.diff
+cargo mutants --in-diff branch.diff -- --features dev                        # what the branch changed
 cargo mutants --no-shuffle --timeout-multiplier 3 -- --features dev          # full sweep
 ```
 

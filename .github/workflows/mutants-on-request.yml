@@ -128,6 +128,9 @@ jobs:
           python3 .github/scripts/mutants-report.py mutants.out scope.txt \
             --in-scope "$IN_SCOPE" --exit "$STATUS" --out report
           cat report/report.md >> "$GITHUB_STEP_SUMMARY"
+          # And in the log, for a caller with no `gh` to download the artifact
+          # (a cloud session reads the job log through its GitHub tools).
+          cat report/report.md report/survivors.diff
 
       - name: Keep the report
         uses: actions/upload-artifact@v7

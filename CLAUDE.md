@@ -154,10 +154,11 @@ is wrong.
   *without* stalling the agents. A check that proves **correctness** — build, test, clippy,
   the determinism guard, the size gate — is a **hard gate**: green-to-merge, no exceptions. A
   check that *audits quality* — mutation testing, coverage — is an **informational signal**:
-  scoped to the diff per-PR for a fresh-context catch and run as a periodic full sweep on
-  `main` for the backstop, but it **never blocks a merge**. Nothing may silently slide, so an
-  informational signal only earns its keep when it's **surfaced where the agent acts on it** (a
-  job summary or PR comment read in-context), not buried in an artifact nobody opens. Don't
+  it runs **weekly** on `main` as the backstop, or **on request** over exactly what someone
+  names (`make mutants-remote SCOPE=diff`), never on a pull request (#750), and it **never
+  blocks a merge**. Nothing may silently slide, so an informational signal only earns its
+  keep when it's **surfaced where the agent acts on it** (a report printed in the terminal
+  or a job summary read in-context), not buried in an artifact nobody opens. Don't
   reach for a hard gate where an informational signal does the job.
 - **Agent velocity is first-class.** This workflow is agents driving the engine and each
   other, often unattended — throughput counts. Write code that is **readable by design and

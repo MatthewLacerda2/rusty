@@ -181,10 +181,10 @@ incidents behind each):
   directory since #525, so on a fresh run it does; the check stays as the guard.
 
 It ignores what is not a gate: `main-health` (a `workflow_run` on `main`), `docs`,
-and the coverage and mutation jobs. `mutants-pr` and `coverage-pr` run *inside*
-the `ci` run but outside `ci-gate`'s `needs:`, so a `ci` run still in progress
-counts as settled once `ci-gate` has concluded — a signal still running or red
-never holds `make mergeable` or `make queue` (#555). Its own tests run as `make scripts`, a gate, and in `lint.yml`.
+and the coverage and mutation workflows, none of which runs on a pull request
+(#750). A job inside a gated run but outside its gate's `needs:` decides nothing:
+a `ci` run still in progress counts as settled once `ci-gate` has concluded
+(#555). Its own tests run as `make scripts`, a gate, and in `lint.yml`.
 
 `gh pr checks N` is **not** a substitute. It has no commit column, so it cannot
 answer "did this run build the head I am about to merge?", and it blends runs — a
@@ -269,27 +269,31 @@ land quietly.
 
 ## The signals
 
-Mutation and coverage are **signals, never gates**. Neither can fail a build and
-**neither holds a merge**. Both run in CI on their own — there is nothing to
-remember to launch.
+Mutation and coverage are **signals, never gates**. Neither can fail a build,
+**neither holds a merge**, and **neither runs on a pull request** (#750): the
+operator's policy is about once a week, or when someone asks, over what they
+want measured.
 
-| | per pull request | the backstop |
+| | on request | weekly |
 |---|---|---|
-| mutation | `mutants-pr`, `--in-diff`, sticky comment | `mutants`, nightly, full sim in 10 shards, `mutants-report` summary + artifact; skipped on a night `main` has not moved (the last finished report still stands) |
-| coverage | `coverage-pr`, `diff-cover`, sticky comment | `coverage`, post-merge on `main`, ratchet table |
+| mutation | `make mutants-remote SCOPE=diff` (or path globs): `mutants-on-request.yml`, one runner, report and survivors' diffs printed in the terminal | `mutants-sweep.yml`, Saturdays, full sim in 24 shards, `mutants-report` summary + artifact; skipped when `main` has not moved since the last finished sweep |
+| coverage | `gh workflow run coverage.yml --ref <branch>` | `coverage.yml`, Mondays, ratchet table |
 
-Three things about their scope, all of which change how a clean report reads:
+**Ask for a scoped mutation run before readying a branch that adds mechanism**
+— arithmetic, a state machine, a boundary — and triage what it reports. Nothing
+runs it for you any more, so a branch nobody asked about is unmeasured, not clean.
 
-- **Mutation only ever touches `src/app`, `src/scripting`, `src/physics`,
-  `src/navigation`.** A survivor in `render`, `editor`, `api` or `asset` will never
-  be reported. Silence there means unmeasured, not clean.
-- **The `sim` paths filter can skip both jobs entirely.** If the branch touched no
-  sim source, no `tests/`, and neither `Cargo.toml`/`Cargo.lock`/`rust-toolchain.toml`,
-  `mutants-pr` and `coverage-pr` do not run. **No comment is not a clean bill** —
-  check the job actually ran, on the head SHA, the same way as everything else.
-- **The sticky comments delete themselves** when a re-push fixes the finding
-  (headers `mutants-diff` and `coverage-diff`). So an absent comment has three
-  possible meanings: clean, fixed, or never measured.
+Three things about scope, all of which change how a clean report reads:
+
+- **The weekly sweep only touches `src/app`, `src/scripting`, `src/physics`,
+  `src/navigation`.** A survivor in `render`, `editor`, `api` or `asset` is
+  reported only if someone names it in a scoped request. Silence there means
+  unmeasured, not clean.
+- **A scoped run names what it planned.** Its first line says how many mutants
+  the scope held and whether any came from outside it. A `diff` scope with
+  nothing to mutate (a branch that touched only tests) says so; it is not a pass.
+- **A run stopped at its budget says what it never reached.** Those mutants are
+  unmeasured. Ask again with a narrower scope.
 
 ### Triaging a survivor
 
@@ -310,10 +314,11 @@ mechanism at all. That is one finding about the tests, not a list of survivors.
 
 **Establish equivalence by applying the mutation and running the suite** — never
 by reasoning about symmetry. Reasoning has been wrong repeatedly; measurement has
-not. Reproduce a CI survivor locally with the same shape the job uses:
+not. Re-ask with a narrower scope (`make mutants-remote SCOPE=src/physics/raycast.rs`),
+or reproduce a survivor locally with the same shape the job uses:
 
-    git diff origin/main > pr.diff
-    cargo mutants --in-diff pr.diff --file 'src/physics/**/*.rs' -- --features dev
+    git diff origin/main > branch.diff
+    cargo mutants --in-diff branch.diff -- --features dev
 
 `cargo mutants --list` names the functions and builds nothing — reach for it before
 believing a structural explanation of a bad report.
@@ -340,8 +345,8 @@ as a survivor. Neither should redden CI, and neither should stop a merge.
 
 `coverage-baseline.txt` holds per-module line floors for `app`, `scripting`,
 `physics`, `navigation` and `api`. It is a **ratchet, not a gate**: the job that
-reads it runs post-merge on `main`, is `continue-on-error`, and prints a table
-flagging a drop without ever exiting non-zero. Raise a floor as coverage improves;
+reads it runs weekly (`coverage.yml`) and prints a table flagging a drop
+without ever exiting non-zero. Raise a floor as coverage improves;
 **never lower one silently to make a table green** — that is the one move it
 exists to make visible.
 
