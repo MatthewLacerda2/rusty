@@ -95,7 +95,9 @@ name more.
 - **A PR that leaves its issue open writes `Refs #N`, never `Closes #N`.** GitHub
   closes on the keyword whatever the prose around it says: on 2026-10-04 PR #777
   explained that #769 "stays open until one is chosen" and still closed it on
-  merge.
+  merge. The match ignores formatting, so never write the keyword next to a number
+  you don't mean to close, even quoted or in backticks: the retro PR that added this
+  rule closed #769 a second time by quoting it.
 - Commit messages end with
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Push often: a dead container takes its uncommitted work with it.
