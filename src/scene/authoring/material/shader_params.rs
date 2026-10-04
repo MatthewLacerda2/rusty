@@ -84,7 +84,19 @@ pub fn set_entity_shader_param(
     value: Vec<f32>,
 ) -> Result<(), String> {
     let (_, layout) = entity_layout(scene, id)?;
-    let (name, value) = checked(&layout, name, value)?;
+    set_entity_shader_param_with(scene, id, &layout, name, value)
+}
+
+/// [`set_entity_shader_param`] against an already-read `layout` — a tween (#661)
+/// resolves it once at start instead of reading the sidecar every tick.
+pub fn set_entity_shader_param_with(
+    scene: &mut Scene,
+    id: u32,
+    layout: &ParamLayout,
+    name: &str,
+    value: Vec<f32>,
+) -> Result<(), String> {
+    let (name, value) = checked(layout, name, value)?;
     scene.shader_overrides.set(id, name, value);
     Ok(())
 }
@@ -92,16 +104,28 @@ pub fn set_entity_shader_param(
 /// The value runtime shader param `name` draws with on entity `id`: its override,
 /// else its material's value, else the shader's baked default.
 pub fn entity_shader_param(scene: &mut Scene, id: u32, name: &str) -> Result<Vec<f32>, String> {
-    let (key, layout) = entity_layout(scene, id)?;
+    let (_, layout) = entity_layout(scene, id)?;
+    entity_shader_param_with(scene, id, &layout, name)
+}
+
+/// [`entity_shader_param`] against an already-read `layout`, without creating a
+/// material: an entity with none reads the baked default unless it overrides.
+pub fn entity_shader_param_with(
+    scene: &Scene,
+    id: u32,
+    layout: &ParamLayout,
+    name: &str,
+) -> Result<Vec<f32>, String> {
     let canonical = layout.name(layout.resolve(name)?);
-    match scene
+    if let Some(v) = scene
         .shader_overrides
         .of(id)
         .and_then(|o| o.get(&canonical))
     {
-        Some(v) => Ok(v.clone()),
-        None => shader_param(&scene.materials, &key, &layout, name),
+        return Ok(v.clone());
     }
+    let key = scene.world.material(id).map(|m| m.material.clone());
+    shader_param(&scene.materials, &key.unwrap_or_default(), layout, name)
 }
 
 /// Drop entity `id`'s override of `name`, or all of its overrides when `name` is

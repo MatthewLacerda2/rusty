@@ -3,11 +3,12 @@
 
 use glam::Vec4;
 
+use super::field::Field;
 use super::{Ease, Property, Tween};
 
 fn tween(duration: f64, loops: Option<u32>, yoyo: bool) -> Tween {
     Tween {
-        property: Property::Alpha,
+        property: Property::Field(Field::Alpha),
         from: None,
         to: Vec4::splat(10.0),
         duration,
@@ -74,15 +75,15 @@ fn eased_values_overshoot_past_the_target() {
 
 #[test]
 fn property_paths_resolve_and_report_their_arity() {
-    assert_eq!(Property::parse("Image.color").map(Property::arity), Some(4));
+    assert_eq!(Field::parse("Image.color").map(Field::arity), Some(4));
     assert_eq!(
-        Property::parse("Transform.position").map(Property::arity),
+        Field::parse("Transform.position").map(Field::arity),
         Some(3)
     );
     assert_eq!(
-        Property::parse("CanvasGroup.alpha").map(Property::path),
+        Field::parse("CanvasGroup.alpha").map(Field::path),
         Some("CanvasGroup.alpha")
     );
-    assert_eq!(Property::parse("CanvasGroup.Alpha"), None);
-    assert!(Property::paths().contains("RectTransform.anchored_position"));
+    assert_eq!(Field::parse("CanvasGroup.Alpha"), None);
+    assert!(Field::paths().contains("RectTransform.anchored_position"));
 }

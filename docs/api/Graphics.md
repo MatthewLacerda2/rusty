@@ -163,6 +163,9 @@ end
   effect before setting its params. `GetPostParam` answers with the stored value,
   else the effect's baked default; with no active volume, the block's catalog
   default.
+- **Tweening.** `Tween.To(volume, "Graphics.<name>", …)` eases a param of the
+  volume entity `volume` over time (#661) — a damage vignette fading back to 0 —
+  through the same check as `SetPostParam`; see [`Tween.md`](Tween.md).
 
 **FXAA** is the anti-aliasing pass at the very end of the chain, running on the
 tonemapped image just before it reaches the screen. It is **on by default** — a

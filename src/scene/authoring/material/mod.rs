@@ -23,8 +23,9 @@ use std::collections::BTreeMap;
 
 pub use maps::{bake_maps, rebake_maps, MAPS_DIR};
 pub use shader_params::{
-    clear_entity_shader_param, entity_shader_param, set_entity_shader_param, set_shader_param,
-    shader_layout, shader_param,
+    clear_entity_shader_param, entity_shader_param, entity_shader_param_with,
+    set_entity_shader_param, set_entity_shader_param_with, set_shader_param, shader_layout,
+    shader_param,
 };
 
 use crate::scene::{MaterialAsset, MaterialComponent, RenderMode, Scene};

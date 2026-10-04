@@ -240,9 +240,8 @@ Material.DefineAsset("grunt_mat", { shader = "enemy_hit" })   -- shared by every
 
 -- on hit: only this grunt flashes, the others sharing grunt_mat do not
 Material.SetShaderParam(enemy, "hit_flash.amount", 1)
--- each frame:
-local a = Material.GetShaderParam(enemy, "hit_flash.amount")
-Material.SetShaderParam(enemy, "hit_flash.amount", math.max(a - Time.deltaTime() * 10, 0))
+-- and let it fade out over a tenth of a second (a tween of this entity's override):
+Tween.To(enemy, "Material.hit_flash.amount", 0, 0.1, { from = 1 })
 -- or, once the flash is over, hand it back to the material:
 Material.ClearShaderParam(enemy, "hit_flash.amount")
 
@@ -266,6 +265,10 @@ Material.SetAssetShaderParam("grunt_mat", "fresnel_rim.strength", 2)
   the **material's** value (`shader_params` on the asset), which saves with the scene
   and which every entity without an override draws with; play mode changes the play
   copy, so it never leaks into the edit scene either.
+- **Tweening.** `Tween.To(id, "Material.<name>", …)` eases entity `id`'s
+  override over time (#661) — a hit flash fading, a dissolve on death — through the
+  same check as `SetShaderParam`; see [`Tween.md`](Tween.md). The shared material
+  value is not tweenable.
 - **Batching.** Entities without overrides keep drawing together as one instanced
   draw. Each entity with an override is a draw of its own (twenty enemies on one
   material with five flashing: six forward draws instead of one), so clear an
