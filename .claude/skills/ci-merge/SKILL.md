@@ -320,6 +320,16 @@ Three things about scope, all of which change how a clean report reads:
 Read the report when it lists survivors in code **this branch wrote**. A report
 with nothing in it, or whose survivors sit in untouched code, needs no reading.
 
+**Distrust any mutation report from before #785 for code the GPU tests reach.**
+Until then neither mutation workflow installed lavapipe, so every GPU test
+skipped and every mutant only they would catch read `MISSED` — `render`,
+anything a capture or `Debug.Preview` reaches, editor drawing. That covers
+every `mutants-on-request` run and every weekly sweep before #785 merged
+(e.g. `[333-a]`, run 37182346071: 66 missed, mostly `render::readback` and
+`RenderView`, all caught on lavapipe). Re-ask before acting on one. Runs
+after it set `RUSTY_REQUIRE_GPU=1`, so a lost driver fails the baseline and the
+run instead of quietly repeating this.
+
 Sort by cost:
 
 - **Fix what is cheap** while the code is still in hand.

@@ -57,6 +57,9 @@ jobs:
     env:
       # Measured from the job's start: slow setup leaves less, not overtime.
       BUDGET_SECONDS: 9900   # 2 h 45
+      # A missing adapter fails the canary test, so the baseline fails and the
+      # run goes red rather than reporting GPU-covered mutants as MISSED (#785).
+      RUSTY_REQUIRE_GPU: "1"
     steps:
       - name: Start the clock
         run: echo "JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
@@ -74,6 +77,13 @@ jobs:
           save-if: false
       - name: System libs for winit/wgpu builds
         run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+      # Mesa's software Vulkan driver, as in `ci.yml` (#489, #785). Without it
+      # wgpu finds no adapter, every GPU test skips, and every mutant in code
+      # only the GPU tests reach (render, captures) reports MISSED however well
+      # it is tested. `RUSTY_REQUIRE_GPU` (job env) turns a lost driver into a
+      # failed baseline instead of that silence.
+      - name: Software Vulkan driver (lavapipe)
+        run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
       - name: Install cargo-mutants
         uses: taiki-e/install-action@v2
         with:
@@ -104,7 +114,13 @@ jobs:
           echo "in_scope=$in_scope" >> "$GITHUB_OUTPUT"
 
       # Same dev-feature build, timeout multiplier and memory cap as the sweep
-      # (`mutants-sweep.yml` says why each). SIGINT at the budget is
+      # (`mutants-sweep.yml` says why each).
+      # cargo-mutants runs `cargo test`, not nextest, so the nextest `gpu`
+      # group does not apply; the in-process headless budget
+      # (`render/setup/budget.rs`, two renderers at once) is what bounds GPU
+      # tests here, as it does under any `cargo test` (#785). The per-mutant
+      # timeout is the baseline's test time times 3, so the slower GPU tests
+      # raise it on their own. SIGINT at the budget is
       # cargo-mutants' Ctrl-C: it stops cleanly and keeps what it measured.
       - name: Mutate
         id: mutate
