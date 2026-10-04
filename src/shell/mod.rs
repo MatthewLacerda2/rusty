@@ -19,6 +19,11 @@
 //! [`Frontend`] is not a plugin trait: it has exactly two compile-time
 //! implementations, one per binary, and exists so the loop is written once.
 
+// Platform layer: the frame loop measures real time to produce the sim's dt.
+// Exempt from the sim's clock and RNG ban (#757); only the layer table's
+// platform rows may opt out (`make determinism`).
+#![allow(clippy::disallowed_methods, clippy::disallowed_types)]
+
 pub mod audio;
 pub mod boot;
 mod focus;

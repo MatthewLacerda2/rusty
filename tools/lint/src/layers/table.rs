@@ -5,8 +5,9 @@
 //! of those must be declared **above** it. That order is what makes the graph
 //! acyclic; the only edges that may point down the list are between [`PEERS`].
 //! `sim` marks the deterministic simulation; everything a sim module imports must be
-//! sim too, so the determinism and direction guards scan this derived set instead
-//! of keeping copies (see [`super::sim_dirs`]).
+//! sim too. The direction guard scans this derived set, and the determinism gate
+//! lets only the platform rows opt out of clippy's clock ban, instead of either
+//! keeping copies (see [`super::sim_dirs`], [`super::platform_roots`]).
 //!
 //! The table is exact, not a ceiling: a dep nothing references any more is
 //! reported as stale, so this file never claims more than the code does.

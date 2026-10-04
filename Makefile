@@ -110,7 +110,7 @@ size: ## [gate] File-length cap, full scan (tools/lint)
 layers: ## [gate] Module imports match the declared layer table (tools/lint/src/layers/table.rs)
 	$(LINT) -- --layers
 
-determinism: ## [gate] No wall-clock / unseeded RNG in the sim modules
+determinism: ## [gate] Only platform module roots opt out of clippy's clock/RNG ban (clippy.toml)
 	$(LINT) -- --determinism
 
 direction: ## [gate] Sim modules never import render/editor/wgpu/egui

@@ -14,7 +14,7 @@ agent can read exactly what failed.
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
 | Module layering | `tools/lint -- --layers` | every `crate::<module>` import matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724) |
-| Sim determinism | `tools/lint -- --determinism` | no `Instant::now`/`SystemTime`/`rand::random` in the table's sim modules |
+| Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads and OS/unseeded RNG are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757) |
 | Dependency direction | `tools/lint -- --direction` | the table's sim modules never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
 | Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`/`ui`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
@@ -87,8 +87,9 @@ and direction guards, `CLAUDE.md` and these docs each kept.
   scripting owns).
 - **Rows mark the sim.** Everything a sim module imports must be sim as well, so
   `scene → shadergen → render` style leaks fail, not only direct ones. The
-  determinism and direction guards scan this derived set (`layers::sim_dirs`), and
-  `test-lint` pins it, so a module leaves the sim only through a reviewed edit.
+  direction guard scans this derived set (`layers::sim_dirs`), the determinism gate
+  lets only the other rows opt out of the clock ban (`layers::platform_roots`), and
+  `test-lint` pins the sim set, so a module leaves the sim only through a reviewed edit.
 - **Exact, not a ceiling.** The lint measures every non-comment `crate::<module>`
   reference outside test code and reports `UNDECLARED_DEP` (code uses an edge the
   row lacks), `STALE_DEP` (the row lists an edge nothing uses), `CYCLE`, `SIM_LEAK`,
@@ -100,6 +101,26 @@ and direction guards, `CLAUDE.md` and these docs each kept.
 
 A new import between modules is one edit to the row, in the same PR. If the edge
 breaks the order or leaves the sim, move the code down a layer instead.
+
+## Sim determinism (clippy + `--determinism`)
+The sim is a pure function of (seed, inputs, fixed dt), so a wall-clock read or an
+unseeded RNG in it breaks replay for every harness run. **Clippy holds the ban**
+(#757): `clippy.toml` lists `Instant`, `SystemTime`, their `now`/`elapsed`,
+`getrandom`'s entry points and `rand`'s global RNG under `disallowed-methods` /
+`disallowed-types`, each with the reason clippy prints, and `Cargo.toml`'s `[lints]`
+denies both. Clippy matches the **resolved** item, so `use std::time::Instant as
+Clock; Clock::now()` fails too — the old substring scan let that through.
+
+The ban is crate-wide. The platform modules that need real time (`dev`, `editor`,
+`render`, `shell` today) opt out with
+`#![allow(clippy::disallowed_methods, clippy::disallowed_types)]` at their `mod.rs`,
+with a one-line reason. `make determinism` keeps that escape hatch honest: it fails
+(`OPT_OUT`) when any other file under `src/` names those lints or allows the groups
+that hold them (`clippy::style`, `clippy::all`), so a sim module can't quietly gain
+an `allow`; and it fails (`UNBANNED` / `UNDENIED`) when `clippy.toml` drops a banned
+item or `Cargo.toml` stops denying the lints. Which rows are platform comes from the
+layer table. Test code in a sim module is not exempt: a sim test has no reason to
+read the clock either.
 
 ## Dependency direction (`--direction`)
 The sim runs headless with no GPU and no UI, so the dependency arrow points one way:

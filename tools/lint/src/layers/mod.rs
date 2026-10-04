@@ -3,7 +3,8 @@
 //! sim module importing a platform one, directly or through another module.
 //!
 //! Test code is exempt, as in the other guards. The table also feeds
-//! [`sim_dirs`], the one sim set the determinism and direction guards scan.
+//! [`sim_dirs`], the one sim set the direction guard scans, and [`platform_roots`],
+//! the only files the determinism gate lets opt out of clippy's clock ban.
 //!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --layers`
 //! Exit code 1 on any violation; report mirrored to `.lint/report.txt`.
@@ -27,6 +28,16 @@ pub fn sim_dirs() -> Vec<String> {
         .iter()
         .filter(|l| l.sim)
         .map(|l| format!("src/{}", l.module))
+        .collect()
+}
+
+/// The platform modules' roots (`src/<module>/mod.rs`): the only files that may opt
+/// out of the sim's clock and RNG ban (#757).
+pub fn platform_roots() -> Vec<String> {
+    table::LAYERS
+        .iter()
+        .filter(|l| !l.sim)
+        .map(|l| format!("src/{}/mod.rs", l.module))
         .collect()
 }
 

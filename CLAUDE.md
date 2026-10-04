@@ -387,8 +387,9 @@ Failures from `tools/lint` are written to `.lint/report.txt`. See **docs/linting
   in the layer table, when a table entry is stale, on any cycle, and when a sim
   module imports a platform one (so leaks through a middle module fail too). Test
   code is exempt. Known exceptions sit in the table, each with its open issue.
-- **Determinism guard** (`make determinism`) — fails on wall-clock / unseeded RNG
-  in the table's sim modules; it protects the harness's reproducibility.
+- **Determinism guard** — clippy bans wall-clock / unseeded RNG crate-wide
+  (`clippy.toml`'s `disallowed-*`), and `make determinism` fails when anything but a
+  platform module's root opts out; it protects the harness's reproducibility.
 - **Direction guard** (`make direction`) — fails when a sim module references
   `crate::render`, `crate::editor`, `wgpu` or `egui`; the arrow is render/editor → sim.
 - `make gates` refuses to run when cargo's target dir is outside the worktree — a

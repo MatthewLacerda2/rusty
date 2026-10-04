@@ -75,6 +75,9 @@ editor = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor"]
 # the sim modules' `#![deny(clippy::unwrap_used)]` stays module-scoped (#195).
 [lints.clippy]
 too_many_lines = "deny"
+# The determinism ban (#757); the banned items and the reason live in clippy.toml.
+disallowed_methods = "deny"
+disallowed_types = "deny"
 
 [dependencies]
 winit = { version = "0.29.10" }

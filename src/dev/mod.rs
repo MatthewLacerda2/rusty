@@ -26,6 +26,11 @@
 //! Status: harness + scenario runner implemented (issue #3); offscreen screenshot
 //! implemented (issue #7); bot-player example implemented (issue #10).
 
+// Platform layer: frame timing and screenshot timeouts measure real time.
+// Exempt from the sim's clock and RNG ban (#757); only the layer table's
+// platform rows may opt out (`make determinism`).
+#![allow(clippy::disallowed_methods, clippy::disallowed_types)]
+
 pub mod botplayer;
 pub mod bridge;
 pub mod capture;
