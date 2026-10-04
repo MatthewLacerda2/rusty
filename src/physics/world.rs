@@ -25,7 +25,7 @@ use super::compound::{world_to_local, BodyPlan};
 use super::convert::{from_pose, from_rp_vec, to_pose, to_rp_vec};
 use super::joints::JointMap;
 use super::live::body_type;
-use super::trigger_events::{self, TriggerEvents};
+use super::trigger_events::TriggerEvents;
 use super::PhysicsEvents;
 use crate::scene::Scene;
 
@@ -156,7 +156,13 @@ impl PhysicsWorld {
             // it at runtime takes effect.
             body.set_linvel(to_rp_vec(snap.vel), true);
             body.set_angvel(to_rp_vec(snap.angular_velocity), true);
-            body.set_gravity_scale(gravity_scale(snap.use_gravity), true);
+            let scale = gravity_scale(snap.use_gravity);
+            if body.gravity_scale() != scale {
+                // A full wake: rapier's setter only clears the sleep flag, so a
+                // body that slept while weightless would doze straight off again.
+                body.set_gravity_scale(scale, false);
+                body.wake_up(true);
+            }
         }
     }
 
@@ -184,8 +190,7 @@ impl PhysicsWorld {
             &(),
         );
 
-        let overlaps =
-            trigger_events::collect_overlap_pairs(&self.narrow_phase, &self.collider_to_id);
+        let overlaps = self.overlap_pairs();
         let triggers = TriggerEvents::from_overlap_sets(&self.prev_triggers, overlaps);
         self.prev_triggers = triggers.stayed.clone();
         let contacts = self.collect_contact_pairs(&pre_solve);

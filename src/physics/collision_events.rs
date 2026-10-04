@@ -234,17 +234,23 @@ const TOUCH_TOLERANCE: f32 = 0.005;
 /// first), and its deepest point. Returns the world point (the midpoint of the two
 /// surface points, rapier's effective contact point) and the manifold normal,
 /// which points from collider 1 toward collider 2. `None` when nothing touches.
+///
+/// "Touching" is measured at the poses the step ended on: rapier stores a
+/// contact's distance once per full narrow-phase update (at the start of a step)
+/// and recycles it, so the two surface points are resolved through the bodies'
+/// current poses and their gap along the normal is the live separation.
 fn strongest_contact(pair: &ContactPair, bodies: &RigidBodySet) -> Option<(Vec3, Vec3)> {
     let deepest = |m: &ContactManifold| {
         m.data
             .solver_contacts
             .iter()
-            .filter(|c| c.dist <= TOUCH_TOLERANCE)
-            .min_by(|x, y| x.dist.total_cmp(&y.dist))
             .map(|c| {
                 let (p1, p2) = m.data.solver_contact_world_points(c, bodies);
-                (p1 + p2) * 0.5
+                ((p2 - p1).dot(m.data.normal), (p1 + p2) * 0.5)
             })
+            .filter(|&(gap, _)| gap <= TOUCH_TOLERANCE)
+            .min_by(|x, y| x.0.total_cmp(&y.0))
+            .map(|(_, point)| point)
     };
     let (manifold, point) = pair
         .solver_manifolds()

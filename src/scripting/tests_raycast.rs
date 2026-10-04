@@ -32,10 +32,17 @@ fn three_value_callers_are_undisturbed() {
 #[test]
 fn sphere_cast_appends_the_contact_point_and_normal() {
     let (m, _, b) = spatial_runtime();
-    // A 0.5 m sphere from z=2 meets `b`'s z=9 face after 6.5 m of travel.
+    // A 0.5 m sphere from z=2 meets `b`'s z=9 face after 6.5 m of travel. The
+    // distance and point are a shape cast's, so they are compared to within
+    // parry's tolerance (rapier 0.36 lands a few float ulps past the face).
+    let script = "local hit, id, d, px, py, pz, nx, ny, nz, bone, name, root = \
+                  Physics.SphereCast(0,0,2, 0,0,1, 0.5) \
+                  local function near(x, want) return math.abs(x - want) < 1e-4 end \
+                  return hit, id, near(d, 6.5), near(px, 0), near(py, 0), near(pz, 9), \
+                  nx, ny, nz, bone, name, root";
     assert_eq!(
-        m.eval("Physics.SphereCast(0,0,2, 0,0,1, 0.5)").unwrap(),
-        format!("true, {b}, 6.5, 0, 0, 9, 0, 0, -1, nil, nil, {b}")
+        m.eval(script).unwrap(),
+        format!("true, {b}, true, true, true, true, 0, 0, -1, nil, nil, {b}")
     );
 }
 

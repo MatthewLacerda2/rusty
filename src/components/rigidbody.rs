@@ -10,14 +10,16 @@ use serde::{Deserialize, Serialize};
 /// `Rigidbody.collisionDetectionMode`, reduced to the two modes a game needs).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CollisionDetection {
-    /// Overlap is tested only at the tick's final pose. Cheap; correct for
-    /// slow/large bodies. The default for every body class.
+    /// Overlap is tested at the tick's poses; a fast dynamic body is still swept
+    /// against *static* geometry (rapier does that for every fast body). Cheap;
+    /// correct for slow/large bodies. The default for every body class.
     #[default]
     Discrete,
-    /// The body's motion is swept from its previous pose to its new pose within
-    /// the tick and stopped at the time of impact — rapier's CCD. Prevents a
-    /// fast, small body from tunnelling through thin geometry between two fixed
-    /// ticks (a 100 m/s bullet moves ~1.6 m per 60 Hz tick).
+    /// The sweep extends to *moving* (kinematic and dynamic) bodies: the motion
+    /// is swept from its previous pose to its new pose within the tick and
+    /// stopped at the time of impact — rapier's full CCD. Prevents a fast, small
+    /// body from tunnelling through a moving one between two fixed ticks (a
+    /// 100 m/s bullet moves ~1.6 m per 60 Hz tick).
     Continuous,
 }
 

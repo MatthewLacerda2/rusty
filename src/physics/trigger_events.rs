@@ -5,36 +5,56 @@
 //! information, but the diff keeps the edge definition tied to exactly the set
 //! `OnTrigger` already fires from, so enter/stay/exit can never disagree.
 //!
-//! `collect_overlap_pairs` gathers that current-tick set from rapier's narrow
-//! phase; it lives here (next to the diff that consumes it) rather than in
-//! `world.rs`, keeping the step lifecycle file focused and under the size cap.
-
-use crate::core::collections::Map;
+//! `PhysicsWorld::overlap_pairs` gathers that current-tick set; it lives here
+//! (next to the diff that consumes it) rather than in `world.rs`, keeping the
+//! step lifecycle file focused and under the size cap.
 
 use rapier3d::prelude::*;
 
 use super::build::order_pair;
+use super::query::is_live;
+use super::world::PhysicsWorld;
 
-/// Gather the overlapping trigger pairs as `(low, high)` entity-id tuples,
-/// sorted + deduped. Triggers are rapier sensors, so they live in the
-/// intersection graph only; solid contacts are `collision_events`' business
-/// (#448 retired the old "static counts as a trigger" stand-in). This is the
-/// current-tick set `TriggerEvents` diffs.
-pub(super) fn collect_overlap_pairs(
-    narrow_phase: &NarrowPhase,
-    collider_to_id: &Map<ColliderHandle, u32>,
-) -> Vec<(u32, u32)> {
-    let mut pairs: Vec<(u32, u32)> = narrow_phase
-        .intersection_pairs()
-        .filter(|&(_, _, intersecting)| intersecting)
-        .filter_map(|(h1, h2, _)| {
-            let (a, b) = (collider_to_id.get(&h1)?, collider_to_id.get(&h2)?);
-            Some(order_pair(*a, *b))
-        })
-        .collect();
-    pairs.sort_unstable();
-    pairs.dedup();
-    pairs
+impl PhysicsWorld {
+    /// The overlapping trigger pairs at the poses the step ended on, as sorted,
+    /// deduped `(low, high)` entity ids — the current-tick set `TriggerEvents`
+    /// diffs. Triggers are rapier sensors; solid contacts are
+    /// `collision_events`' business (#448).
+    ///
+    /// rapier's narrow phase runs at the *start* of a step, so its sensor pairs
+    /// describe where things were before the step moved them: a body walking
+    /// into a zone would enter a tick late. Instead each live sensor asks the
+    /// query tree (refreshed at the end of every step) what it overlaps now,
+    /// under the same layer groups and liveness rule (#521) as its pairs. A
+    /// collider never pairs with its own body, so that body is excluded.
+    pub(super) fn overlap_pairs(&self) -> Vec<(u32, u32)> {
+        let live = |_: ColliderHandle, c: &Collider| is_live(&self.bodies, c);
+        let mut pairs = Vec::new();
+        for (handle, sensor) in self.colliders.iter() {
+            let Some(&id) = self.collider_to_id.get(&handle) else {
+                continue;
+            };
+            if !sensor.is_sensor() || !is_live(&self.bodies, sensor) {
+                continue;
+            }
+            let mut filter = QueryFilter::default()
+                .groups(sensor.collision_groups())
+                .exclude_collider(handle);
+            filter.predicate = Some(&live);
+            if let Some(body) = sensor.parent() {
+                filter = filter.exclude_rigid_body(body);
+            }
+            let queries = self.queries(filter);
+            let hits = queries.intersect_shape(*sensor.position(), sensor.shape());
+            pairs.extend(hits.filter_map(|(other, _)| {
+                let &other = self.collider_to_id.get(&other)?;
+                Some(order_pair(id, other))
+            }));
+        }
+        pairs.sort_unstable();
+        pairs.dedup();
+        pairs
+    }
 }
 
 /// Trigger-overlap events for one physics tick. Every pair is `(low, high)`

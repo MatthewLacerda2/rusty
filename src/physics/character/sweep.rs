@@ -23,6 +23,9 @@ const FLAG_EPS: f32 = 1e-3;
 /// How far below the capsule a grounded move looks for the ground's normal,
 /// beyond the skin.
 const GROUND_PROBE: f32 = 0.02;
+/// A floor normal within this of straight up (`1 - n.y`, about 0.08°) is flat
+/// enough for rapier's slope split (`normal × up`) to degenerate.
+const FLAT_FLOOR: f32 = 1e-6;
 
 /// rapier's controller, configured from the component. `radius` is the capsule's
 /// (scaled): autostep must find that much room on top of a step, so a step only
@@ -95,10 +98,22 @@ impl PhysicsWorld {
         hit.and_then(|(_, h)| from_rp_vec(h.normal1).try_normalize())
     }
 
-    /// One run of rapier's controller for `motion`.
+    /// One run of rapier's controller for `motion`, rerun without its downward
+    /// part when rapier's near-flat-floor slip rule ate the walk (see [`stalled`]).
     fn pass(&self, m: &MoveCtx, motion: Vec3) -> Pass {
+        let (pass, flat_hit) = self.run(m, motion);
+        if motion.y < 0.0 && flat_hit && stalled(motion, &pass) {
+            return self.run(m, Vec3::new(motion.x, 0.0, motion.z)).0;
+        }
+        pass
+    }
+
+    /// One `move_shape`, and whether it touched a floor flat to within
+    /// [`FLAT_FLOOR`].
+    fn run(&self, m: &MoveCtx, motion: Vec3) -> (Pass, bool) {
         let mut flags = 0;
         let mut ground = None;
+        let mut flat_hit = false;
         let movement = m.controller.move_shape(
             FIXED_DELTA_TIME,
             &self.queries(m.filter),
@@ -109,16 +124,18 @@ impl PhysicsWorld {
                 let flag = contact_flag(&hit.hit, m.half_segment);
                 if flag == COLLIDED_BELOW {
                     ground = from_rp_vec(hit.hit.normal1).try_normalize();
+                    flat_hit |= hit.hit.normal1.y > 1.0 - FLAT_FLOOR;
                 }
                 flags |= flag;
             },
         );
-        Pass {
+        let pass = Pass {
             translation: from_rp_vec(movement.translation),
             grounded: movement.grounded,
             flags,
             ground,
-        }
+        };
+        (pass, flat_hit)
     }
 
     /// The steep slope a pass climbed, if it did. rapier lets a push into a
@@ -213,6 +230,18 @@ struct Pass {
     flags: u8,
     /// The normal of the last floor the sweep hit below the capsule.
     ground: Option<Vec3>,
+}
+
+/// Whether a pass that only touched floor lost its horizontal travel. A floor
+/// never blocks walking, but rapier 0.36's controller can: against a near-flat
+/// floor its "no slipping on a walkable slope" rule reads float noise in the
+/// downward (gravity) part as a slip and drops the whole slide, stalling the
+/// character for a tick. Without the downward part there is nothing to misread,
+/// and snap-to-ground still keeps the capsule on the floor.
+fn stalled(motion: Vec3, pass: &Pass) -> bool {
+    let wanted = Vec3::new(motion.x, 0.0, motion.z).length();
+    let got = Vec3::new(pass.translation.x, 0.0, pass.translation.z).length();
+    pass.flags & (COLLIDED_SIDES | COLLIDED_ABOVE) == 0 && got < wanted * 0.99
 }
 
 /// `motion` without its horizontal push into the steep surface `normal`.
