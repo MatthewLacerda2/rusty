@@ -143,6 +143,13 @@ getrandom = { version = "0.3", features = ["std"] }
 # references. Bump the rev in its own PR and record the new SYNTH_VERSION there.
 zimmer = { package = "scorsese-zimmer", git = "https://github.com/MatthewLacerda2/scorsese", rev = "342523ca32baf69d7423f8942953bb26d0a4b246" }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# The editor's Dock icon (#669): winit has no window icon on macOS, so it is set on
+# `NSApplication`. The same versions arboard already brings into the tree.
+objc2 = "0.6.4"
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSApplication", "NSImage", "NSResponder"] }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 # The Wayland half of the clipboard (#612), on the window's own `wl_display`; also
 # already in the tree through egui-winit.

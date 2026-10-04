@@ -12,6 +12,7 @@
 pub mod capture;
 mod cursor_release;
 mod game_focus;
+mod icon;
 mod paint;
 mod viewport;
 
@@ -278,7 +279,10 @@ pub fn launch() {
     let launch = Launch {
         title: "Rusty 3D Game Engine & Editor".to_string(),
         video_defaults: VideoSettings::default(),
-        frontend: |shell: &Shell, game: &GameWorld| EditorFrontend::new(shell, game, scene_path),
+        frontend: |shell: &Shell, game: &GameWorld| {
+            icon::apply(&shell.window);
+            EditorFrontend::new(shell, game, scene_path)
+        },
     };
     super::run(game, launch);
 }
