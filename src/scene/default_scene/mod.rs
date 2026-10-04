@@ -144,7 +144,9 @@ fn add_player(scene: &mut Scene) {
     attach_script(scene, id, PLAYER_CONTROLLER_SCRIPT);
 }
 
-/// Enemy_1 (id 5): a 2 m × 1.3 m box chasing the Player on the navmesh. Its body is
+/// Enemy_1 (id 5): a 2 m × 1.3 m box chasing the Player on the navmesh, from the +z
+/// spawn behind its cover crate; unscripted, it heads for the pool's middle (its
+/// authored target, the origin), down the north ramp. Its body is
 /// centred on its origin, so the agent stands it 1 m above its feet (#666). The agent
 /// is authored here, active, and `bot.lua` never overrides it (#743): its stopping
 /// distance is measured centre to centre, so it clears both bodies — the box's

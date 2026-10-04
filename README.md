@@ -90,10 +90,12 @@ the game for you, and only open a window when you want to.
 - `cargo doc --no-deps` — the Rust API reference.
 
 The first launch seeds a **default scene** into `project/scenes/default.scene`: a
-checkerboard floor, a Player, an Enemy_1 that chases it around a cover wall, a sun
-and a couple of props. Seeding also bakes the scene's checker texture
-(`project/assets/textures/`) and an example surface shader, `default_rim`, with its
-recipe (`project/assets/shaders/`). Files that already exist are never overwritten.
+greybox of fy_pool_day, built from boxes and planes — a walled yard with a sunken pool
+between two spawns (a ramp at each end, translucent water you walk through), a raised
+jacuzzi you jump into, and crates for cover. The Player starts at one end, and Enemy_1
+starts behind a crate at the other and chases it down one ramp and up the other.
+Seeding also bakes the scene's checker texture (`project/assets/textures/`) and an
+example surface shader, `default_rim`, with its recipe (`project/assets/shaders/`). Files that already exist are never overwritten.
 To get the current default scene back, delete `project/scenes/default.scene`.
 
 ## Shipping a build
