@@ -63,6 +63,7 @@ proptest! {
                         inner_cone: 30.0,
                         outer_cone: 45.0,
                         cast_shadows: false,
+                        mode: Default::default(),
                     }),
                 );
             }

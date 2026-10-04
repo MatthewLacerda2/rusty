@@ -21,6 +21,7 @@ fn entity_with_light(scene: &mut Scene, name: &str) -> u32 {
             inner_cone: 0.0,
             outer_cone: 0.0,
             cast_shadows: false,
+            mode: Default::default(),
         }),
     );
     id

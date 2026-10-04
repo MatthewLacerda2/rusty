@@ -80,7 +80,7 @@ pub use prefab::{
 pub use scene::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
     ColliderShape, CollisionDetection, CollisionResponse, DirtyFlag, EmitMode, Entity,
-    LightComponent, LightType, MaterialAsset, MaterialComponent, MeshComponent,
+    LightComponent, LightMode, LightType, MaterialAsset, MaterialComponent, MeshComponent,
     NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent, RenderMode,
     RigidBodyComponent, Scene, ScriptComponent, ScriptFieldValue, TextureComponent, Tonemap,
     TransformComponent, VisualCorrectionComponent, DEFAULT_AMBIENT_COLOR,

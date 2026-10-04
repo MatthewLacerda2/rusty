@@ -11,6 +11,7 @@ fn light(light_type: LightType) -> LightComponent {
         inner_cone: 20.0,
         outer_cone: 30.0,
         cast_shadows: false,
+        mode: Default::default(),
     }
 }
 

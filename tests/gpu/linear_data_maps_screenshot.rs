@@ -41,6 +41,7 @@ fn scene(material: MaterialAsset) -> Scene {
         inner_cone: 0.0,
         outer_cone: 0.0,
         cast_shadows: false,
+        mode: Default::default(),
     };
     s.world.set_light(lamp, Some(light));
     s

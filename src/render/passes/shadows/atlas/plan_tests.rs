@@ -28,6 +28,7 @@ fn light(kind: LightType, at: Vec3, intensity: f32) -> LocalLight {
         inner_cone: 20.0,
         outer_cone: 30.0,
         cast_shadows: true,
+        mode: Default::default(),
     };
     LocalLight::new(&transform, &light).expect("a local light")
 }

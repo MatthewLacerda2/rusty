@@ -24,7 +24,7 @@ use crate::scene::world_cache::WorldMatrixCache;
 pub use crate::components::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, ClearFlags, ColliderComponent,
     ColliderShape, CollisionDetection, CollisionResponse, DirtyFlag, EmitMode, Entity,
-    LightComponent, LightType, MaterialAsset, MaterialComponent, MeshComponent,
+    LightComponent, LightMode, LightType, MaterialAsset, MaterialComponent, MeshComponent,
     NavMeshAgentComponent, Particle, ParticleBlend, ParticleEmitterComponent, RenderMode,
     RigidBodyComponent, ScriptComponent, ScriptFieldValue, TextureComponent, Tonemap,
     TransformComponent, VisualCorrectionComponent,

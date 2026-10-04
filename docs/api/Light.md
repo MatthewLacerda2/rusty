@@ -1,7 +1,7 @@
 ## `Light`
 
 Read and tune an entity's `LightComponent` — colour, intensity, range, type and
-whether it casts shadows.
+whether it casts shadows, and its mode.
 Every setter maps onto a field the renderer reads when it packs the lighting
 uniform, so a change takes effect on the next frame. A light has no per-component
 "active" flag: it is gated by its owning entity's `active` (a `Scene` concern), so
@@ -17,9 +17,10 @@ no light.
 | `Light.GetRange` / `SetRange` | `(id)` / `(id, value)` | `number` (clamped ≥ 0) |
 | `Light.GetType` / `SetType` | `(id)` / `(id, name)` | `"Ambient"` / `"Directional"` / `"Point"` / `"Spotlight"` |
 | `Light.GetCastShadows` / `SetCastShadows` | `(id)` / `(id, on)` | `boolean` (default `false`; point and spot lights only) |
+| `Light.GetMode` / `SetMode` | `(id)` / `(id, name)` | `"Realtime"` / `"Mixed"` / `"Baked"` |
 
-`SetType` is case-insensitive; an unrecognized name is ignored (the current type
-is kept).
+`SetType` and `SetMode` are case-insensitive; an unrecognized name is ignored (the
+current value is kept).
 
 **How many lights shade.** Point and spot lights are rendered with clustered
 forward lighting (#434): there is no fixed slot count. Each camera shades up to
@@ -48,3 +49,13 @@ six of them. Every caster shadows
 into the atlas as it does into the cascades: cutout and dissolving materials clip
 their shadow, skinned meshes cast in their animated pose. Lit particles are not
 shadowed.
+
+**Mode** is Unity's Light Mode and decides what the lightmap bake
+(`Lighting.BakeLightmaps`) does with the light:
+
+- `Realtime` — direct light and shadows every frame; the bake ignores it.
+- `Mixed` *(default)* — Unity's *Baked Indirect*: realtime direct light and shadows,
+  plus its bounce baked into the lightmaps. No shadowmask.
+- `Baked` — direct light and bounce both baked. A lightmapped surface skips it at
+  runtime; a surface without a lightmap (dynamic, or no second UV map) still lights
+  from it live, so dynamic objects are never left dark by it.

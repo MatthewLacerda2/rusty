@@ -42,7 +42,7 @@ pub use character_controller::CharacterControllerComponent;
 pub use collider::{CapsuleAxis, ColliderComponent, ColliderShape, CombineMode, PhysicsMaterial};
 pub use entity::{Entity, PrefabLink};
 pub use joint::{JointComponent, JointKind};
-pub use light::{LightComponent, LightType};
+pub use light::{LightComponent, LightMode, LightType};
 pub use lod_group::{LodGroupComponent, LodLevel};
 pub use material::{DecalBlend, MaterialAsset, MaterialComponent, RenderMode};
 pub use mesh::{DirtyFlag, MeshComponent};
