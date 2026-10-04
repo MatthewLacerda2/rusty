@@ -15,7 +15,7 @@
 use std::collections::BTreeSet;
 
 use super::compound::world_pose;
-use super::convert::to_iso;
+use super::convert::to_pose;
 use super::world::PhysicsWorld;
 use crate::scene::Scene;
 
@@ -44,7 +44,7 @@ impl PhysicsWorld {
                 let Some(collider) = self.colliders.get_mut(handle) else {
                     continue;
                 };
-                let target = to_iso(pose.pos, pose.rot);
+                let target = to_pose(pose.pos, pose.rot);
                 if *collider.position() != target {
                     collider.set_position(target);
                     moved.push(handle);
@@ -52,8 +52,7 @@ impl PhysicsWorld {
             }
         }
         if !moved.is_empty() {
-            self.query_pipeline
-                .update_incremental(&self.colliders, &moved, &[], true);
+            self.refresh_query_tree(&moved);
         }
     }
 }

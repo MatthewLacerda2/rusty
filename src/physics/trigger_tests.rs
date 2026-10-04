@@ -80,3 +80,40 @@ fn step_surfaces_enter_stay_exit_edges() {
     // Gone: quiet again.
     assert!(world.step(&mut scene, DT).triggers.is_empty());
 }
+
+/// A trigger carried by a body never overlaps that body's own solid parts —
+/// rapier never pairs a body with itself, and the post-step overlap query
+/// (#754) keeps that rule — but still reports the solid it is pushed into.
+#[test]
+fn a_bodys_own_trigger_ignores_its_solid_parts() {
+    let mut scene = Scene::new();
+    let body = scene.add_entity("Body".to_string());
+    scene
+        .world
+        .set_collider(body, Some(box_collider(1.0, false)));
+    scene.world.set_rigidbody(
+        body,
+        Some(RigidBodyComponent {
+            is_kinematic: true,
+            use_gravity: false,
+            ..crate::scene::authoring::defaults::default_rigidbody()
+        }),
+    );
+    let sensor = scene.add_entity("Sensor".to_string());
+    scene.set_parent(sensor, Some(body)).unwrap();
+    scene
+        .world
+        .set_collider(sensor, Some(box_collider(2.0, true)));
+    let wall = scene.add_entity("Wall".to_string());
+    scene.world.transform_mut(wall).unwrap().position = Vec3::new(10.0, 0.0, 0.0);
+    scene.world.set_static(wall, true);
+    scene
+        .world
+        .set_collider(wall, Some(box_collider(1.0, false)));
+
+    let mut world = PhysicsWorld::from_scene(&scene);
+    assert!(world.step(&mut scene, DT).triggers.is_empty());
+    scene.world.transform_mut(body).unwrap().position = Vec3::new(9.0, 0.0, 0.0);
+    let ev = world.step(&mut scene, DT).triggers;
+    assert_eq!(ev.entered, vec![(sensor.min(wall), sensor.max(wall))]);
+}

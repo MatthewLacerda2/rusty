@@ -118,14 +118,18 @@ effect (rapier drives their motion from the transform), matching Unity.
 **Collision detection** (Unity: `Rigidbody.collisionDetectionMode`) chooses how a
 body's contacts are found each fixed tick:
 
-- **`"Discrete"`** (the default for every body class) tests overlap only at the
-  tick's final pose. Cheap and correct for slow or large bodies.
-- **`"Continuous"`** turns on CCD: the body's motion is swept from its previous
-  pose to its new pose within the tick and stopped at the time of impact. This is
-  what prevents **tunnelling** — a fast, small body (a bullet, a thrown prop)
-  crossing thin geometry entirely between two ticks so no overlap ever exists to
-  detect. A 100 m/s projectile moves ~1.6 m per 60 Hz tick, so anything thinner
-  than that is passed straight through under Discrete.
+- **`"Discrete"`** (the default for every body class) tests overlap at the tick's
+  poses, plus one safety net: a dynamic body moving fast enough to tunnel is
+  still swept against **static** geometry (rapier does this for every fast body),
+  so a bullet never passes through a static wall. Cheap and correct for slow or
+  large bodies. Unity's `Continuous`.
+- **`"Continuous"`** extends that sweep to **moving** bodies (kinematic and
+  dynamic): the body's motion is swept from its previous pose to its new pose
+  within the tick and stopped at the time of impact. This is what prevents
+  **tunnelling** through moving things — a fast, small body (a bullet, a thrown
+  prop) crossing a door, a platform or another prop entirely between two ticks.
+  A 100 m/s projectile moves ~1.6 m per 60 Hz tick, so a moving body thinner than
+  that is passed straight through under Discrete. Unity's `ContinuousDynamic`.
 
 Sweeping costs more, so flag only what is important or fast-moving for its size and
 leave everything else Discrete. A kinematic body is a pure mover, so Continuous

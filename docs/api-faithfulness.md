@@ -156,7 +156,7 @@ re-bake reflects it) and, at the bake itself, in `src/navigation/bake_tests.rs`
 | `AddForce` | ✅ | sim — folds impulse into `velocity` (read above); skips kinematic |
 | `AddForceAtPosition` / `AddImpulseAtPosition` | ✅ | sim — `physics/ragdoll.rs::impulse_response` turns the push into `velocity` / `angular_velocity` (read above) from the body's mass properties (`src/physics/live_tests.rs`, `tests/ragdoll/fall.rs`) |
 | `SetKinematic` | ✅ | sim — `physics/build.rs::class_of`; a mid-play switch reaches rapier through `physics/live.rs::body_type` in `world.rs::apply_body_state` (`set_kinematic_mid_play_stops_and_restarts_a_falling_body`) |
-| `SetCollisionDetection` | ✅ | sim — `physics/build.rs::ccd_enabled` / `world.rs` `enable_ccd` (proven by `physics/ccd_tests.rs`: Discrete tunnels, Continuous stops) |
+| `SetCollisionDetection` | ✅ | sim — `physics/build.rs::ccd_enabled` / `world.rs` `enable_ccd` (proven by `physics/ccd_tests.rs`: against a moving wall Discrete tunnels, Continuous stops; a static wall stops both since rapier 0.36, #754) |
 
 (The #311 spatial query surface — `Raycast`'s siblings `SphereCast`,
 `OverlapSphere`/`OverlapBox`/`OverlapCapsule`, `CheckSphere`/`CheckBox`,
@@ -570,7 +570,9 @@ one. The one write verb takes the faithful count from 72 to 73.
 / `GetCollisionDetection`): the setter maps `Continuous` onto rapier's per-body CCD
 switch (`ccd_enabled` at build, `enable_ccd` re-applied per tick), whose effect on
 the simulation is proven by `physics/ccd_tests.rs` — a fast sphere tunnels through a
-thin wall under Discrete and is stopped by it under Continuous. The one write verb
+thin wall under Discrete and is stopped by it under Continuous. (Since rapier 0.36,
+#754, every fast dynamic body is swept against static geometry, so the proof uses a
+kinematic wall: Continuous is what adds the sweep against moving bodies.) The one write verb
 takes the faithful count from 73 to 74.
 
 **#410** folded every `*Json` twin into its verb: `Texture.Bake`, `Shader.Bake`,

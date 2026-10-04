@@ -1,5 +1,5 @@
 //! src/physics/character/sweep.rs — one `Move`'s collide-and-slide: rapier's
-//! controller configured from the component, run over the live query pipeline,
+//! controller configured from the component, run over the live query view,
 //! and the collision flags and ground normal read off what it touched.
 
 use glam::Vec3;
@@ -12,7 +12,7 @@ use super::{capsule, CharacterMove};
 use crate::components::character_controller::{COLLIDED_ABOVE, COLLIDED_BELOW, COLLIDED_SIDES};
 use crate::components::CharacterControllerComponent;
 use crate::physics::build::interaction_groups;
-use crate::physics::convert::{from_na_vec, to_na_vec};
+use crate::physics::convert::{from_rp_vec, to_rp_vec};
 use crate::physics::query::is_live;
 use crate::physics::world::PhysicsWorld;
 use crate::scene::Scene;
@@ -23,6 +23,10 @@ const FLAG_EPS: f32 = 1e-3;
 /// How far below the capsule a grounded move looks for the ground's normal,
 /// beyond the skin.
 const GROUND_PROBE: f32 = 0.02;
+/// A floor normal with `1 - n.y` under this (within ~2.5° of straight up) is
+/// near-flat: rapier's slope split (`normal × up`) is ill-conditioned there, and
+/// parry's near-contact normals on a flat face scatter by about a degree.
+const FLAT_FLOOR: f32 = 1e-3;
 
 /// rapier's controller, configured from the component. `radius` is the capsule's
 /// (scaled): autostep must find that much room on top of a step, so a step only
@@ -87,43 +91,52 @@ impl PhysicsWorld {
     /// The normal of the ground just under the capsule at `pos`, if any: a short
     /// cast down past the skin, for a move that never hit the floor (walking
     /// flat).
-    fn ground_below(&self, m: &MoveCtx, pos: &Isometry<Real>) -> Option<Vec3> {
+    fn ground_below(&self, m: &MoveCtx, pos: &Pose) -> Option<Vec3> {
         let probe = ShapeCastOptions::with_max_time_of_impact(m.skin + GROUND_PROBE);
-        let (bodies, colliders) = (&self.bodies, &self.colliders);
-        let down = -Vector::y();
         let hit = self
-            .query_pipeline
-            .cast_shape(bodies, colliders, pos, &down, &m.shape, probe, m.filter);
-        hit.and_then(|(_, h)| from_na_vec(h.normal1.into_inner()).try_normalize())
+            .queries(m.filter)
+            .cast_shape(pos, -Vector::Y, &m.shape, probe);
+        hit.and_then(|(_, h)| from_rp_vec(h.normal1).try_normalize())
     }
 
-    /// One run of rapier's controller for `motion`.
+    /// One run of rapier's controller for `motion`, rerun without its downward
+    /// part when rapier's near-flat-floor slip rule ate the walk (see [`stalled`]).
     fn pass(&self, m: &MoveCtx, motion: Vec3) -> Pass {
+        let (pass, flat_hit) = self.run(m, motion);
+        if motion.y < 0.0 && flat_hit && stalled(motion, &pass) {
+            return self.run(m, Vec3::new(motion.x, 0.0, motion.z)).0;
+        }
+        pass
+    }
+
+    /// One `move_shape`, and whether it touched a floor flat to within
+    /// [`FLAT_FLOOR`].
+    fn run(&self, m: &MoveCtx, motion: Vec3) -> (Pass, bool) {
         let mut flags = 0;
         let mut ground = None;
+        let mut flat_hit = false;
         let movement = m.controller.move_shape(
             FIXED_DELTA_TIME,
-            &self.bodies,
-            &self.colliders,
-            &self.query_pipeline,
+            &self.queries(m.filter),
             &m.shape,
             &m.start,
-            to_na_vec(motion),
-            m.filter,
+            to_rp_vec(motion),
             |hit| {
                 let flag = contact_flag(&hit.hit, m.half_segment);
                 if flag == COLLIDED_BELOW {
-                    ground = from_na_vec(hit.hit.normal1.into_inner()).try_normalize();
+                    ground = from_rp_vec(hit.hit.normal1).try_normalize();
+                    flat_hit |= hit.hit.normal1.y > 1.0 - FLAT_FLOOR;
                 }
                 flags |= flag;
             },
         );
-        Pass {
-            translation: from_na_vec(movement.translation),
+        let pass = Pass {
+            translation: from_rp_vec(movement.translation),
             grounded: movement.grounded,
             flags,
             ground,
-        }
+        };
+        (pass, flat_hit)
     }
 
     /// The steep slope a pass climbed, if it did. rapier lets a push into a
@@ -136,21 +149,15 @@ impl PhysicsWorld {
         if pass.translation.y <= motion.y.max(0.0) + 1e-5 || ahead == Vec3::ZERO {
             return None;
         }
-        let center = from_na_vec(m.start.translation.vector) + pass.translation;
+        let center = from_rp_vec(m.start.translation) + pass.translation;
         let feet = center - Vec3::Y * (m.half_segment + m.radius);
         let drop = m.step + m.skin + GROUND_PROBE;
         let origin = feet + ahead * m.radius + Vec3::Y * drop;
-        let ray = Ray::new(to_na_vec(origin).into(), -Vector::y());
-        let (bodies, colliders) = (&self.bodies, &self.colliders);
-        let (_, hit) = self.query_pipeline.cast_ray_and_get_normal(
-            bodies,
-            colliders,
-            &ray,
-            drop * 2.0,
-            true,
-            m.filter,
-        )?;
-        let n = from_na_vec(hit.normal).try_normalize()?;
+        let ray = Ray::new(to_rp_vec(origin), -Vector::Y);
+        let (_, hit) = self
+            .queries(m.filter)
+            .cast_ray_and_get_normal(&ray, drop * 2.0, true)?;
+        let n = from_rp_vec(hit.normal).try_normalize()?;
         (n.y > FLAG_EPS && !m.walkable(n)).then_some(n)
     }
 
@@ -167,7 +174,7 @@ impl PhysicsWorld {
         let m = MoveCtx {
             controller: controller(cc, cap.radius),
             shape: cap.shape(),
-            start: Isometry::translation(cap.center.x, cap.center.y, cap.center.z),
+            start: Pose::from_translation(to_rp_vec(cap.center)),
             half_segment: cap.half_segment,
             radius: cap.radius,
             skin: cc.skin_width,
@@ -180,7 +187,7 @@ impl PhysicsWorld {
             // Again, without the push into the slope: it blocks like a wall.
             pass = self.pass(&m, off_slope(motion, steep));
         }
-        let end = Translation::from(to_na_vec(pass.translation)) * m.start;
+        let end = m.start.append_translation(to_rp_vec(pass.translation));
         let below = pass.ground.or_else(|| self.ground_below(&m, &end));
         let on_ground = pass.grounded || pass.flags & COLLIDED_BELOW != 0;
         if !(on_ground || below.is_some_and(|n| m.walkable(n))) {
@@ -200,7 +207,7 @@ impl PhysicsWorld {
 struct MoveCtx<'a> {
     controller: KinematicCharacterController,
     shape: Capsule,
-    start: Isometry<Real>,
+    start: Pose,
     half_segment: f32,
     radius: f32,
     skin: f32,
@@ -224,6 +231,18 @@ struct Pass {
     flags: u8,
     /// The normal of the last floor the sweep hit below the capsule.
     ground: Option<Vec3>,
+}
+
+/// Whether a pass that only touched floor lost its horizontal travel. A floor
+/// never blocks walking, but rapier 0.36's controller can: against a near-flat
+/// floor its "no slipping on a walkable slope" rule reads float noise in the
+/// downward (gravity) part as a slip and drops the whole slide, stalling the
+/// character for a tick. Without the downward part there is nothing to misread,
+/// and snap-to-ground still keeps the capsule on the floor.
+fn stalled(motion: Vec3, pass: &Pass) -> bool {
+    let wanted = Vec3::new(motion.x, 0.0, motion.z).length();
+    let got = Vec3::new(pass.translation.x, 0.0, pass.translation.z).length();
+    pass.flags & (COLLIDED_SIDES | COLLIDED_ABOVE) == 0 && got < wanted * 0.99
 }
 
 /// `motion` without its horizontal push into the steep surface `normal`.

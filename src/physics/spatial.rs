@@ -4,14 +4,14 @@
 //! volume or a specific collider in mind: overlaps ("what colliders are inside
 //! this sphere/box/capsule right now?"), the sphere-cast (a raycast with
 //! thickness), and the per-collider point queries (closest point, containment).
-//! Every query routes through the same live query pipeline the hitscan uses, so
+//! Every query routes through the same live query view the hitscan uses, so
 //! a script's area query and the engine's agree about the same world.
 
 use glam::{Quat, Vec3};
 use rapier3d::parry::query::ShapeCastOptions;
 use rapier3d::prelude::*;
 
-use super::convert::{from_na_point, from_na_vec, to_iso, to_na_vec};
+use super::convert::{from_rp_vec, to_pose, to_rp_vec};
 use super::query::{is_live, RayHit};
 use super::world::PhysicsWorld;
 
@@ -35,7 +35,7 @@ impl PhysicsWorld {
         half_extents: Vec3,
         accept: impl Fn(u32) -> bool,
     ) -> Vec<u32> {
-        self.overlap(center, &Cuboid::new(to_na_vec(half_extents)), &accept)
+        self.overlap(center, &Cuboid::new(to_rp_vec(half_extents)), &accept)
     }
 
     /// Like [`Self::overlap_sphere`] with a capsule spanning `a`→`b` — Unity's
@@ -47,7 +47,7 @@ impl PhysicsWorld {
         radius: f32,
         accept: impl Fn(u32) -> bool,
     ) -> Vec<u32> {
-        let capsule = Capsule::new(to_na_vec(a).into(), to_na_vec(b).into(), radius);
+        let capsule = Capsule::new(to_rp_vec(a), to_rp_vec(b), radius);
         self.overlap(Vec3::ZERO, &capsule, &accept)
     }
 
@@ -58,20 +58,11 @@ impl PhysicsWorld {
     fn overlap(&self, center: Vec3, shape: &dyn Shape, accept: &dyn Fn(u32) -> bool) -> Vec<u32> {
         let predicate = self.handle_accepts(accept);
         let filter = QueryFilter::default().predicate(&predicate);
-        let mut ids = Vec::new();
-        self.query_pipeline.intersections_with_shape(
-            &self.bodies,
-            &self.colliders,
-            &to_iso(center, Quat::IDENTITY),
-            shape,
-            filter,
-            |handle| {
-                if let Some(&id) = self.collider_to_id.get(&handle) {
-                    ids.push(id);
-                }
-                true
-            },
-        );
+        let mut ids: Vec<u32> = self
+            .queries(filter)
+            .intersect_shape(to_pose(center, Quat::IDENTITY), shape)
+            .filter_map(|(handle, _)| self.collider_to_id.get(&handle).copied())
+            .collect();
         ids.sort_unstable();
         ids
     }
@@ -104,19 +95,16 @@ impl PhysicsWorld {
     ) -> Option<RayHit> {
         let predicate = self.handle_accepts(&accept);
         let filter = QueryFilter::default().predicate(&predicate);
-        let (handle, hit) = self.query_pipeline.cast_shape(
-            &self.bodies,
-            &self.colliders,
-            &to_iso(origin, Quat::IDENTITY),
-            &to_na_vec(dir.normalize()),
+        let (handle, hit) = self.queries(filter).cast_shape(
+            &to_pose(origin, Quat::IDENTITY),
+            to_rp_vec(dir.normalize()),
             &Ball::new(radius),
             ShapeCastOptions::with_max_time_of_impact(max_toi),
-            filter,
         )?;
         // rapier's normal1 is the struck surface's, in world space. Its witness
         // point carries GJK slop; for a sphere the contact is exactly one
         // radius from the impact-time center, against the normal.
-        let normal = from_na_vec(hit.normal1.into_inner());
+        let normal = from_rp_vec(hit.normal1);
         let center = origin + dir.normalize() * hit.time_of_impact;
         Some(RayHit {
             id: *self.collider_to_id.get(&handle)?,
@@ -134,8 +122,8 @@ impl PhysicsWorld {
         let projection =
             collider
                 .shape()
-                .project_point(collider.position(), &to_na_vec(point).into(), true);
-        Some(from_na_point(projection.point))
+                .project_point(collider.position(), to_rp_vec(point), true);
+        Some(from_rp_vec(projection.point))
     }
 
     /// Whether `point` lies inside `id`'s live collider. `None` when the entity
@@ -145,7 +133,7 @@ impl PhysicsWorld {
         Some(
             collider
                 .shape()
-                .contains_point(collider.position(), &to_na_vec(point).into()),
+                .contains_point(collider.position(), to_rp_vec(point)),
         )
     }
 

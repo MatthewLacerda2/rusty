@@ -9,7 +9,7 @@ use crate::components::{CapsuleAxis, ColliderShape, PhysicsMaterial};
 use crate::ecs::World;
 use crate::physics::build::{capsule_dims, ColliderInputs};
 use crate::physics::compound::{relative_pose, world_pose};
-use crate::physics::convert::to_iso;
+use crate::physics::convert::to_pose;
 use crate::physics::world::PhysicsWorld;
 use crate::scene::Scene;
 
@@ -43,8 +43,8 @@ pub(in crate::physics) fn upright_offset(
     offset_pos: Vec3,
     offset_rot: Quat,
     center: Vec3,
-) -> Isometry<Real> {
-    to_iso(offset_pos + offset_rot * center, owner_rot.inverse())
+) -> Pose {
+    to_pose(offset_pos + offset_rot * center, owner_rot.inverse())
 }
 
 impl PhysicsWorld {
