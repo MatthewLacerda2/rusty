@@ -42,13 +42,15 @@ fn sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
 }
 
 /// Group 0: Camera (0), Lighting (1), Skybox Texture (2), Skybox Sampler (3), Reflection
-/// Probe Cube (4), Reflection Probe Sampler (5), and the light clusters (#434): the
-/// frame's point/spot lights (7), each cluster's light range (8) and the light-index
-/// list (9). Binding 6 is the shadow module's (see `shader.wgsl`). The cube is the active probe's baked,
+/// Probe Cube (4), Reflection Probe Sampler (5), the light clusters (#434): the
+/// frame's point/spot lights (7), each cluster's light and decal ranges (8) and the
+/// index list (9), and the decals (#638): their records (10), the decal atlas's
+/// sRGB (11) and raw (12) views and its sampler (13). Binding 6 is the shadow
+/// module's (see `shader.wgsl`). The cube is the active probe's baked,
 /// prefiltered cubemap (#245); the shader samples it (parallax-corrected, roughness->mip)
 /// when a probe applies and falls back to the 2D skybox otherwise.
 pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    use wgpu::TextureViewDimension::{Cube, D2};
+    use wgpu::TextureViewDimension::{Cube, D2Array, D2};
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Camera, Lighting, Skybox & Reflection Layout"),
         entries: &[
@@ -63,7 +65,19 @@ pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::Bind
             storage_entry(7, wgpu::ShaderStages::VERTEX_FRAGMENT),
             storage_entry(8, wgpu::ShaderStages::VERTEX_FRAGMENT),
             storage_entry(9, wgpu::ShaderStages::VERTEX_FRAGMENT),
+            storage_entry(10, wgpu::ShaderStages::FRAGMENT),
+            texture_entry(11, D2Array),
+            texture_entry(12, D2Array),
+            sampler_entry(13),
         ],
+    })
+}
+
+/// The scene depth target as a sampled texture (binding 0), for soft particles.
+pub(crate) fn create_scene_depth_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("Scene Depth Layout"),
+        entries: &[depth_entry(0, wgpu::TextureViewDimension::D2)],
     })
 }
 
@@ -116,7 +130,7 @@ pub(crate) fn storage_entry(
 }
 
 /// Group 2 (single-texture): Texture (0) & Sampler (1). Kept for `GpuTexture`'s own
-/// bind group, used by the particle/decal/skybox passes that bind one texture each.
+/// bind group, used by the particle/skybox passes that bind one texture each.
 pub(crate) fn create_texture_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Texture Layout"),

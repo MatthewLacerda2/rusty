@@ -9,6 +9,7 @@
 
 use crate::core::quality::QualityPreset;
 use crate::render::clusters::ClusterBuffers;
+use crate::render::decals::DecalBuffers;
 use crate::render::gpu::bind_layouts;
 use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::pipelines;
@@ -25,6 +26,8 @@ pub(crate) struct GlobalBindings {
     pub global_bind_group: wgpu::BindGroup,
     /// The light-cluster buffers group 0 binds (#434).
     pub clusters: ClusterBuffers,
+    /// The decal records and atlas group 0 binds (#638).
+    pub decals: DecalBuffers,
 }
 
 /// Shadow renderer, its cascade uniform buffer, and the main-pass bind group that
@@ -47,12 +50,13 @@ pub(crate) struct ForwardPasses {
     pub skybox_renderer: skybox::SkyboxRenderer,
 }
 
-/// Billboard particle, ribbon (#441) and box-projector decal passes; all reuse the renderer's
-/// `texture_layout` (group 1 / group 3 respectively).
+/// Billboard particle and ribbon (#441) passes; both reuse the renderer's
+/// `texture_layout`, and the particles sample the scene depth through
+/// `scene_depth_layout`.
 pub(crate) struct BillboardPasses {
     pub particle_renderer: crate::render::passes::particles::ParticleRenderer,
     pub ribbon_renderer: crate::render::passes::ribbons::RibbonRenderer,
-    pub decal_renderer: crate::render::passes::decals::DecalRenderer,
+    pub scene_depth_layout: wgpu::BindGroupLayout,
 }
 
 /// Every non-trivial GPU resource a [`Renderer`] needs, grouped by role. Built in
@@ -124,9 +128,9 @@ impl GpuResources {
     }
 }
 
-/// Billboard particle, ribbon (#441) and box-projector decal passes; all reuse the
-/// renderer's `texture_layout` (group 1 / group 3 respectively), and the particles
-/// also share the decal pass's scene-depth layout and the camera + lighting group 0 (#440).
+/// Billboard particle and ribbon (#441) passes; both reuse the renderer's
+/// `texture_layout`, and the particles also read the scene depth and the camera +
+/// lighting group 0 (#440).
 fn create_billboard_passes(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
@@ -135,11 +139,10 @@ fn create_billboard_passes(
     registry: &mut ShaderRegistry,
 ) -> BillboardPasses {
     use crate::render::passes::particles::{ParticleRenderer, SharedLayouts};
-    let decal_renderer =
-        crate::render::passes::decals::DecalRenderer::new(device, texture_layout, registry);
+    let scene_depth_layout = bind_layouts::create_scene_depth_layout(device);
     let layouts = SharedLayouts {
         texture: texture_layout,
-        depth: &decal_renderer.depth_layout,
+        depth: &scene_depth_layout,
         camera_lighting: camera_lighting_layout,
     };
     BillboardPasses {
@@ -150,7 +153,7 @@ fn create_billboard_passes(
             texture_layout,
             registry,
         ),
-        decal_renderer,
+        scene_depth_layout,
     }
 }
 
@@ -180,12 +183,14 @@ fn create_global_bindings(
     // ignores it (the `refl_has_cubemap` flag stays 0) and samples the 2D skybox instead.
     let cube = crate::render::ibl::cubemap::fallback_cube(device);
     let clusters = ClusterBuffers::new(device);
+    let decals = DecalBuffers::new(device);
     let global_bind_group = GlobalGroup {
         camera: &camera_buffer,
         lighting: &lighting_buffer,
         skybox: (&default_texture.view, &default_texture.sampler),
         cube: (&cube.view, &cube.sampler),
         clusters: &clusters,
+        decals: &decals,
     }
     .create(device, camera_lighting_layout);
 
@@ -194,6 +199,7 @@ fn create_global_bindings(
         lighting_buffer,
         global_bind_group,
         clusters,
+        decals,
     }
 }
 

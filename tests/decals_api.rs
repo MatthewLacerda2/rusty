@@ -29,7 +29,7 @@ fn spawn_with_defaults_then_clear() {
             assert_eq!(d.size.x, 0.5, "default stamp size");
             assert_eq!(d.size.z, 0.5, "default projection depth");
             assert_eq!(d.color, [1.0, 1.0, 1.0, 1.0], "default opaque white tint");
-            assert!(d.texture.is_none(), "default checker texture");
+            assert!(d.texture.is_none(), "default: a solid square");
         }
 
         lua.load("Decals.Clear()").exec().unwrap();

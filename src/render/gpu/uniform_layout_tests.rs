@@ -7,16 +7,20 @@ use std::mem::{offset_of, size_of};
 
 use super::uniforms::{CameraUniform, LightingUniform};
 use crate::render::clusters::LocalLight;
+use crate::render::decals::GpuDecal;
 use crate::render::passes::shadows::atlas::ShadowTile;
 use crate::shadergen::compose;
 
-const PROBE: &str = "#import common::{CameraUniforms, LightingUniforms, LocalLight, ShadowTile}\n\
+const PROBE: &str =
+    "#import common::{CameraUniforms, Decal, LightingUniforms, LocalLight, ShadowTile}\n\
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;\n\
 @group(0) @binding(1) var<uniform> lighting: LightingUniforms;\n\
 @group(0) @binding(7) var<storage, read> lights: array<LocalLight>;\n\
 @group(0) @binding(8) var<storage, read> tiles: array<ShadowTile>;\n\
+@group(0) @binding(10) var<storage, read> decals: array<Decal>;\n\
 @fragment fn fs_main() -> @location(0) vec4<f32> {\n\
-    return vec4<f32>(camera.time + lighting.ssr_active + lights[0].range + tiles[0].params.x);\n\
+    return vec4<f32>(camera.time + lighting.ssr_active + lights[0].range + tiles[0].params.x\n\
+        + decals[0].fade.x);\n\
 }\n";
 
 /// `(member offset by name, struct size)` of the WGSL struct named `name`.
@@ -111,4 +115,19 @@ fn shadow_tile_matches_wgsl_layout() {
         ("params", offset_of!(ShadowTile, params)),
     ];
     assert_layout("ShadowTile", &pairs, size_of::<ShadowTile>());
+}
+
+#[test]
+fn gpu_decal_matches_wgsl_layout() {
+    let pairs = [
+        ("world_to_decal", offset_of!(GpuDecal, world_to_decal)),
+        ("right", offset_of!(GpuDecal, right)),
+        ("up", offset_of!(GpuDecal, up)),
+        ("forward", offset_of!(GpuDecal, forward)),
+        ("color", offset_of!(GpuDecal, color)),
+        ("surface", offset_of!(GpuDecal, surface)),
+        ("fade", offset_of!(GpuDecal, fade)),
+        ("layers", offset_of!(GpuDecal, layers)),
+    ];
+    assert_layout("Decal", &pairs, size_of::<GpuDecal>());
 }

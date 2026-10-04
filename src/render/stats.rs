@@ -16,7 +16,8 @@ use crate::render::gpu::uniforms::MAX_DIRECTIONAL_LIGHTS;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RenderCounters {
     /// Geometry draw calls: solids, transparents, shadow casters, the SSAO depth
-    /// prepass, decals, particle batches and UI batches. Copies of one mesh + material are one instanced draw
+    /// prepass, particle batches and UI batches. Decals draw nothing of their own:
+    /// the surfaces they land on fold them in (#638). Copies of one mesh + material are one instanced draw
     /// (#470). Fullscreen post-FX and the skybox are not counted.
     pub draw_calls: u32,
     /// Triangles submitted by the solid, transparent, shadow and SSAO-prepass draws.
@@ -43,9 +44,19 @@ pub struct RenderCounters {
     /// Entries written to the cluster light lists (#434): how many (cluster,
     /// light) pairs the shaders may visit, summed over the camera stack.
     pub light_cluster_refs: u64,
-    /// CPU microseconds spent binning lights into clusters (#434), summed over
-    /// the camera stack. Wall-clock, so the one counter that varies run to run.
+    /// CPU microseconds spent binning lights and decals into clusters (#434,
+    /// #638), summed over the camera stack. Wall-clock, so the one counter that
+    /// varies run to run.
     pub light_bin_us: u64,
+    /// Decals binned into at least one cluster (#638), summed over the camera stack.
+    /// A stacked `DepthOnly` camera bins none.
+    pub decals_visible: u32,
+    /// Entries written to the cluster decal lists (#638): the (cluster, decal)
+    /// pairs the shaders may visit, summed over the camera stack.
+    pub decal_cluster_refs: u64,
+    /// Decal maps drawn without their texture because the decal atlas was full
+    /// (#638): more distinct maps in one frame than it has layers.
+    pub decal_maps_dropped: u32,
     /// Shadow-caster draw calls (cascades' static bake + dynamic, and the point/spot
     /// shadow atlas); an instanced run of casters sharing a mesh is one draw (#470).
     pub shadow_draws: u32,
@@ -100,6 +111,9 @@ impl RenderCounters {
             ("lights_culled", self.lights_culled.into()),
             ("light_cluster_refs", self.light_cluster_refs),
             ("light_bin_us", self.light_bin_us),
+            ("decals_visible", self.decals_visible.into()),
+            ("decal_cluster_refs", self.decal_cluster_refs),
+            ("decal_maps_dropped", self.decal_maps_dropped.into()),
             ("shadow_draws", self.shadow_draws.into()),
             ("shadowed_lights", self.shadowed_lights.into()),
             ("shadow_lights_dropped", self.shadow_lights_dropped.into()),
@@ -138,21 +152,16 @@ impl Renderer {
         self.shadow_renderer.drawn.clear();
     }
 
-    /// Count one camera's solids (mesh particles among them), decals and sprite
-    /// particle batches.
-    pub(crate) fn count_camera(
-        &mut self,
-        solids: &SolidResources,
-        decals: usize,
-        particles: ParticleDraws,
-    ) {
+    /// Count one camera's solids (mesh particles among them) and sprite particle
+    /// batches.
+    pub(crate) fn count_camera(&mut self, solids: &SolidResources, particles: ParticleDraws) {
         let c = &mut self.frame_counters;
         let batches = solids.draws.batches();
         c.add_draws(batches.map(|b| (b.num_indices, b.instances.len() as u32)));
         c.visible_entities += solids.draws.instances.len() as u32 - solids.mesh_particles;
         c.culled_entities += solids.culled;
         c.lod_hidden_entities += solids.lod_hidden;
-        c.draw_calls += decals as u32 + particles.draw_calls;
+        c.draw_calls += particles.draw_calls;
         c.particles_drawn += particles.instances + solids.mesh_particles;
     }
 

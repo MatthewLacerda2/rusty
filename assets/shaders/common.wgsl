@@ -1,5 +1,5 @@
 // assets/shaders/common.wgsl — shared GPU struct definitions and helpers imported by
-// the forward, shadow, skybox, particle, decal and post-FX passes via `#import "common"`.
+// the forward, shadow, skybox, particle and post-FX passes via `#import "common"`.
 
 // The scene's distance + height fog (#437). Mirrors the Rust `FogUniform`
 // byte-for-byte (naga_oil rejects imported names ending `_<digit>`, hence `_pad_a`).
@@ -149,6 +149,90 @@ fn local_light_radiance(light: LocalLight, world: vec3<f32>) -> vec3<f32> {
         cone = clamp((theta - light.outer_cone) / max(light.inner_cone - light.outer_cone, 1e-4), 0.0, 1.0);
     }
     return light.color * light.intensity * cone / (d * d + 1.0);
+}
+
+// ---- Surface decals (#638) ----
+// One decal of the frame, in the storage array at group 0 binding 10. Mirrors the
+// Rust `GpuDecal` byte-for-byte. Its box is the unit cube in decal space.
+struct Decal {
+    world_to_decal: mat4x4<f32>,
+    right: vec4<f32>,    // xyz the box's right axis (texture u), w the albedo weight
+    up: vec4<f32>,       // xyz its up axis (texture -v), w the normal weight
+    forward: vec4<f32>,  // xyz the axis out of the surface, w cos(angle fade start)
+    color: vec4<f32>,    // albedo tint, a coverage
+    surface: vec4<f32>,  // metallic, roughness, metallic weight, roughness weight
+    fade: vec4<f32>,     // x occlusion added, y cos(angle fade end)
+    layers: vec4<u32>,   // atlas layers: albedo, normal, metallic, roughness
+};
+
+// `Decal.layers` for a map the decal does not have.
+const NO_LAYER: u32 = 0xffffffffu;
+
+// The material inputs a decal changes, before any light is summed.
+struct DecalSurface {
+    albedo: vec3<f32>,
+    normal: vec3<f32>,
+    metallic: f32,
+    roughness: f32,
+    occlusion: f32,
+};
+
+// Fold decal `d` into surface `s` at `world`. `facing` is the surface's geometric
+// normal (for the angle fade); `dx`/`dy` are the screen derivatives of `world`,
+// taken in uniform control flow, which give every map sample its gradients from the
+// decal's own UVs (no smallest-mip fringe where the decal crosses a silhouette).
+// Albedo is read through the atlas's sRGB view, the other maps raw.
+fn apply_decal(
+    s: DecalSurface, d: Decal, world: vec3<f32>, facing: vec3<f32>,
+    dx: vec3<f32>, dy: vec3<f32>,
+    t_color: texture_2d_array<f32>, t_data: texture_2d_array<f32>, samp: sampler,
+) -> DecalSurface {
+    let local = (d.world_to_decal * vec4<f32>(world, 1.0)).xyz;
+    if (any(abs(local) > vec3<f32>(0.5))) {
+        return s;
+    }
+    // Whole while the surface faces the projector within the fade angle, gone a
+    // little past it, and gone near the box's caps.
+    let angle = clamp((dot(facing, d.forward.xyz) - d.fade.y) / max(d.forward.w - d.fade.y, 1e-4), 0.0, 1.0);
+    let caps = 1.0 - smoothstep(0.35, 0.5, abs(local.z));
+    let uv = vec2<f32>(local.x + 0.5, 0.5 - local.y);
+    let to_decal = mat3x3<f32>(d.world_to_decal[0].xyz, d.world_to_decal[1].xyz, d.world_to_decal[2].xyz);
+    let gx = to_decal * dx;
+    let gy = to_decal * dy;
+    let uv_dx = vec2<f32>(gx.x, -gx.y);
+    let uv_dy = vec2<f32>(gy.x, -gy.y);
+
+    var texel = vec4<f32>(1.0);
+    if (d.layers.x != NO_LAYER) {
+        texel = textureSampleGrad(t_color, samp, uv, i32(d.layers.x), uv_dx, uv_dy);
+    }
+    let coverage = texel.a * d.color.a * angle * caps;
+    if (coverage <= 0.001) {
+        return s;
+    }
+    var out = s;
+    out.albedo = mix(s.albedo, texel.rgb * d.color.rgb, coverage * d.right.w);
+    if (d.layers.y != NO_LAYER) {
+        // The decal's tangent frame laid onto the surface: its right axis flattened
+        // into the surface plane, so the bend follows a curved receiver.
+        let n = textureSampleGrad(t_data, samp, uv, i32(d.layers.y), uv_dx, uv_dy).xyz * 2.0 - 1.0;
+        let T = normalize(d.right.xyz - s.normal * dot(d.right.xyz, s.normal));
+        let B = cross(s.normal, T);
+        let bent = normalize(T * n.x + B * n.y + s.normal * n.z);
+        out.normal = normalize(mix(s.normal, bent, coverage * d.up.w));
+    }
+    var metallic = d.surface.x;
+    if (d.layers.z != NO_LAYER) {
+        metallic *= textureSampleGrad(t_data, samp, uv, i32(d.layers.z), uv_dx, uv_dy).b;
+    }
+    var roughness = d.surface.y;
+    if (d.layers.w != NO_LAYER) {
+        roughness *= textureSampleGrad(t_data, samp, uv, i32(d.layers.w), uv_dx, uv_dy).g;
+    }
+    out.metallic = mix(s.metallic, metallic, coverage * d.surface.z);
+    out.roughness = clamp(mix(s.roughness, roughness, coverage * d.surface.w), 0.04, 1.0);
+    out.occlusion = s.occlusion * mix(1.0, d.fade.x, coverage);
+    return out;
 }
 
 // `LocalLight.shadow` of a light with no tile in the shadow atlas (#468).

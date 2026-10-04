@@ -92,6 +92,10 @@ assembles byte-identical WGSL.
   Group 1 is the instanced layout (#470): the per-draw `EntityUniforms` plus a
   per-instance `instances` array (world matrix, probe SH). A surface variant baked
   before #470 was written against the old per-entity layout — re-bake it.
+  Surface decals (#638) are folded into `fs_main`'s material inputs before the
+  lighting, so a variant carries them like the standard shader. A surface variant
+  baked before #638 carries the old `fs_main` and **shows no decals** until it is
+  re-baked (it still draws correctly otherwise).
 - **`postfx`** — a self-contained **fullscreen-triangle** fragment program over the
   **tonemapped** scene color (`vs_fullscreen` + `fs_main`), the most self-contained
   pass; each block grades the sampled color, and sampling blocks may also tap

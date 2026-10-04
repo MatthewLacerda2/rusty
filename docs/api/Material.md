@@ -177,6 +177,26 @@ visible fallback.
 > or copy its factors as the starting point for your own. No external textures — the
 > factors stand alone, so the set stays tiny and license-clean.
 
+### Decals: `receive_decals` and `decal`
+
+Two recipe keys concern surface decals (#638, see `Decals.md`):
+
+- **`receive_decals`** (default `true`) — whether surfaces drawn with this material
+  take world decals: HDRP's *Receive Decals*. Set it `false` for characters and
+  props that move through bullet holes. Transparent materials never receive.
+- **`decal`** — what this material changes when a decal stamps it
+  (`Decals.Spawn(…, { material = name })`): per-channel blend weights `albedo`,
+  `normal`, `metallic`, `roughness` (default `1` each, clamped to `[0, 1]`), the
+  `occlusion` it adds (default `1`, none) and `angle_fade` in degrees (default `60`).
+  An unknown key inside it is an error.
+
+```lua
+Material.DefineAsset("enemy_skin", { base_color = {0.8, 0.6, 0.5}, receive_decals = false })
+Material.DefineAsset("wet", { roughness = 0.05, decal = { albedo = 0, normal = 0, metallic = 0 } })
+```
+
+Both are written to the scene file only when they differ from their defaults.
+
 ### Surface shaders
 
 A material **names the shader it renders with** — Unity's Material → Shader. The

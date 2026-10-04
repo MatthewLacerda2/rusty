@@ -76,13 +76,12 @@ mod tests {
     use super::ShaderRegistry;
     use crate::shadergen::validate::validate;
 
-    const SHIPPED: [&str; 8] = [
+    const SHIPPED: [&str; 7] = [
         "shader.wgsl",
         "skybox.wgsl",
         "sky_gradient.wgsl",
         "particles.wgsl",
         "ribbons.wgsl",
-        "decals.wgsl",
         "postfx.wgsl",
         "ui.wgsl",
     ];

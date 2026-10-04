@@ -6,6 +6,7 @@
 mod camera;
 pub(crate) mod clusters;
 mod debug_meshes;
+pub(crate) mod decals;
 mod draw;
 mod frustum;
 pub(crate) mod lod;
@@ -27,7 +28,7 @@ pub mod ui;
 // Moved submodules pulled back under short names so this module's body keeps
 // naming them directly (grouped by subfolder — see the convention in CLAUDE.md).
 use ibl::{cubemap, skybox};
-use passes::{decals, particles, shadows};
+use passes::{particles, shadows};
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -208,9 +209,12 @@ pub struct Renderer {
     /// The in-game UI pass (#418), drawn over the finished frame after post-FX.
     ui_renderer: ui::UiRenderer,
 
-    /// Box-projector decal pass (draws into the HDR target after solids/skybox,
-    /// reconstructing the underlying surface from the scene depth target).
-    decal_renderer: decals::DecalRenderer,
+    /// The frame's decals and their atlas (#638), bound in group 0 and folded into
+    /// the forward pass's material inputs.
+    decals: decals::DecalBuffers,
+
+    /// The scene-depth layout the soft particles sample the depth target through.
+    scene_depth_layout: wgpu::BindGroupLayout,
 
     /// When set, the forward pass gathers only `is_static` entities (#243). The
     /// static-cubemap capture toggles this on for its 6 faces and restores it after,

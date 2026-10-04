@@ -60,8 +60,8 @@ scene, edited in the Inspector's **Scene Settings → Fog** section (the same fi
 and the `Fog*` functions work whether or not the scene has a visual-correction
 volume. One shared shader function applies it to **every world-space pass** —
 opaque and transparent surfaces, unlit surfaces, alpha-blended and additive
-particles, decals — so smoke and bullet holes fade exactly like the wall behind
-them, and the sky blends to the fog colour at the horizon (fading out toward the
+particles — and decals are part of the surface they mark (#638), so smoke and
+bullet holes fade exactly like the wall behind them, and the sky blends to the fog colour at the horizon (fading out toward the
 zenith) so fogged geometry never silhouettes against a clear sky. It runs in linear
 HDR before post-FX; the in-game UI is never fogged.
 

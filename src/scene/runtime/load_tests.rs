@@ -66,15 +66,7 @@ fn swap_carries_survivors_with_their_ids() {
     s.dont_destroy_on_load(music);
     s.request_destroy(holder);
     s.request_destroy(speaker);
-    s.spawn_decal(
-        glam::Vec3::ZERO,
-        glam::Vec3::Y,
-        1.0,
-        1.0,
-        0.0,
-        [1.0; 4],
-        None,
-    );
+    s.spawn_decal(glam::Vec3::ZERO, glam::Vec3::Y, Default::default());
     let before = s.id();
 
     let survivors = s.load_survivors();

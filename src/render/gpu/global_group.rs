@@ -1,8 +1,10 @@
-//! The forward renderer's group 0 (camera, lighting, skybox, reflection cube and the
-//! light clusters), built in one place: at setup and whenever a resource it names
-//! is swapped (a new skybox or probe cube, a grown cluster buffer).
+//! The forward renderer's group 0 (camera, lighting, skybox, reflection cube, the
+//! light clusters and the decals), built in one place: at setup and whenever a
+//! resource it names is swapped (a new skybox or probe cube, a grown cluster or
+//! decal buffer, a grown decal atlas).
 
 use crate::render::clusters::ClusterBuffers;
+use crate::render::decals::DecalBuffers;
 
 /// What group 0 binds; see `bind_layouts::create_camera_lighting_layout`.
 pub(crate) struct GlobalGroup<'a> {
@@ -11,6 +13,7 @@ pub(crate) struct GlobalGroup<'a> {
     pub skybox: (&'a wgpu::TextureView, &'a wgpu::Sampler),
     pub cube: (&'a wgpu::TextureView, &'a wgpu::Sampler),
     pub clusters: &'a ClusterBuffers,
+    pub decals: &'a DecalBuffers,
 }
 
 impl GlobalGroup<'_> {
@@ -31,6 +34,10 @@ impl GlobalGroup<'_> {
             (7, lights.as_entire_binding()),
             (8, ranges.as_entire_binding()),
             (9, indices.as_entire_binding()),
+            (10, self.decals.records().as_entire_binding()),
+            (11, TextureView(&self.decals.atlas.color_view)),
+            (12, TextureView(&self.decals.atlas.data_view)),
+            (13, Sampler(&self.decals.atlas.sampler)),
         ];
         let entries: Vec<_> = resources
             .into_iter()

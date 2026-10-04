@@ -47,6 +47,10 @@ pub(crate) fn material_uniform(lit: bool, material: Option<&MaterialAsset>) -> E
     let use_cutout = u32::from(material.is_some_and(|m| m.render_mode == RenderMode::Cutout));
     let alpha_cutoff = material.map_or(0.5, |m| m.alpha_cutoff);
 
+    // Decals (#638) land on lit surfaces whose material takes them, never on glass.
+    let receive_decals =
+        u32::from(lit && material.is_none_or(|m| m.receive_decals && !m.is_transparent()));
+
     // Flat emissive factor (#222), 4th lane unused. Defaults to black with no material.
     let emissive = match material {
         Some(mat) => [mat.emissive[0], mat.emissive[1], mat.emissive[2], 0.0],
@@ -68,7 +72,7 @@ pub(crate) fn material_uniform(lit: bool, material: Option<&MaterialAsset>) -> E
         use_cutout,
         alpha_cutoff,
         bone_base: 0,
-        _pad: 0,
+        receive_decals,
     }
 }
 

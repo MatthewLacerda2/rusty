@@ -15,6 +15,7 @@ use glam::Vec3;
 use mlua::{Lua, Variadic};
 
 use super::{put, Reg};
+use crate::scene::decal::DecalSpec;
 use crate::scene::Scene;
 
 /// Default stamp size (world units) and projection depth when a script omits them.
@@ -30,26 +31,33 @@ pub fn register<'scope>(
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     // Decals.Spawn(x,y,z, nx,ny,nz, [size], [texture], [rotation_deg], [r,g,b,a])
+    // Decals.Spawn(x,y,z, nx,ny,nz, opts)
     //
     // Stamp a box-projector decal at world point (x,y,z) facing along the surface
     // normal (nx,ny,nz). Trailing args are optional: `size` (stamp width/height,
-    // default 0.5), `texture` (sprite path, default checker), `rotation_deg` (spin
-    // around the projection axis), and an r,g,b,a tint (default opaque white). The
-    // box depth tracks `size` so the projector reaches through typical geometry.
+    // default 0.5), `texture` (albedo path, default a solid square), `rotation_deg`
+    // (spin around the projection axis), and an r,g,b,a tint (default opaque white).
+    // The box depth tracks `size` so the projector reaches through typical geometry.
+    // The `opts` table form takes the same values by name plus `depth` and the
+    // decal `material` (#638), the library material the decal stamps.
     put(
         &table,
         "Spawn",
         scope.create_function(|_, args: Variadic<mlua::Value>| {
-            let p = spawn_params_from(&args)?;
-            scene.borrow_mut().spawn_decal(
-                p.point,
-                p.normal,
-                p.size,
-                p.size.max(DEFAULT_DEPTH),
-                p.rotation_deg,
-                p.color,
-                p.texture,
-            );
+            let (point, normal) = hit_from(&args)?;
+            let spec = match args.get(6) {
+                Some(mlua::Value::Table(opts)) => spec_from_opts(opts)?,
+                _ => spec_from_positional(&args),
+            };
+            let mut scene = scene.borrow_mut();
+            if let Some(name) = spec.material.as_deref() {
+                if !scene.materials.contains_key(name) {
+                    return Err(mlua::Error::RuntimeError(format!(
+                        "Decals.Spawn: no material named {name:?} (define it with Material.DefineAsset)"
+                    )));
+                }
+            }
+            scene.spawn_decal(point, normal, spec);
             Ok(())
         }),
     )?;
@@ -76,43 +84,62 @@ pub fn register<'scope>(
         .map_err(|e| e.to_string())
 }
 
-/// Parsed `Decals.Spawn` arguments.
-struct SpawnParams {
-    point: Vec3,
-    normal: Vec3,
-    size: f32,
-    rotation_deg: f32,
-    color: [f32; 4],
-    texture: Option<String>,
-}
-
-/// Parse the variadic `Spawn` args: 6 required floats (point + normal) then the
-/// optional `size`, `texture`, `rotation_deg`, and r,g,b,a tint.
-fn spawn_params_from(args: &[mlua::Value]) -> mlua::Result<SpawnParams> {
+/// The 6 required floats: the hit point and the surface normal.
+fn hit_from(args: &[mlua::Value]) -> mlua::Result<(Vec3, Vec3)> {
     if args.len() < 6 {
         return Err(mlua::Error::RuntimeError(
             "Decals.Spawn expects at least x,y,z,nx,ny,nz".to_string(),
         ));
     }
     let f = |i: usize| -> mlua::Result<f32> { num_at(args, i) };
-    let point = Vec3::new(f(0)?, f(1)?, f(2)?);
-    let normal = Vec3::new(f(3)?, f(4)?, f(5)?);
+    Ok((
+        Vec3::new(f(0)?, f(1)?, f(2)?),
+        Vec3::new(f(3)?, f(4)?, f(5)?),
+    ))
+}
+
+/// The positional form's optional `size`, `texture`, `rotation_deg` and r,g,b,a.
+fn spec_from_positional(args: &[mlua::Value]) -> DecalSpec {
     let size = opt_num(args, 6).unwrap_or(DEFAULT_SIZE);
-    let texture = opt_str(args, 7);
-    let rotation_deg = opt_num(args, 8).unwrap_or(0.0);
-    let color = [
-        opt_num(args, 9).unwrap_or(1.0),
-        opt_num(args, 10).unwrap_or(1.0),
-        opt_num(args, 11).unwrap_or(1.0),
-        opt_num(args, 12).unwrap_or(1.0),
-    ];
-    Ok(SpawnParams {
-        point,
-        normal,
+    DecalSpec {
         size,
-        rotation_deg,
+        depth: size.max(DEFAULT_DEPTH),
+        rotation_deg: opt_num(args, 8).unwrap_or(0.0),
+        color: [9, 10, 11, 12].map(|i| opt_num(args, i).unwrap_or(1.0)),
+        texture: opt_str(args, 7),
+        material: None,
+    }
+}
+
+/// The keys an `opts` table may hold.
+const OPTS: [&str; 6] = ["size", "depth", "rotation", "color", "texture", "material"];
+
+/// The `opts` table form: the positional values by name, plus `depth` and the
+/// decal `material`. An unknown key is an error naming the valid ones.
+fn spec_from_opts(opts: &mlua::Table) -> mlua::Result<DecalSpec> {
+    for pair in opts.pairs::<String, mlua::Value>() {
+        let (key, _) = pair?;
+        if !OPTS.contains(&key.as_str()) {
+            return Err(mlua::Error::RuntimeError(format!(
+                "Decals.Spawn: unknown option {key:?}; expected one of {}",
+                OPTS.join(", ")
+            )));
+        }
+    }
+    let size = opts.get::<Option<f32>>("size")?.unwrap_or(DEFAULT_SIZE);
+    let color = match opts.get::<Option<Vec<f32>>>("color")? {
+        Some(c) => [0, 1, 2, 3].map(|i| c.get(i).copied().unwrap_or(1.0)),
+        None => [1.0; 4],
+    };
+    Ok(DecalSpec {
+        size,
+        depth: opts
+            .get::<Option<f32>>("depth")?
+            .unwrap_or(size.max(DEFAULT_DEPTH)),
+        rotation_deg: opts.get::<Option<f32>>("rotation")?.unwrap_or(0.0),
         color,
-        texture,
+        texture: opts.get("texture")?,
+        material: opts.get("material")?,
     })
 }
 
