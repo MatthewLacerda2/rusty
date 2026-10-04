@@ -14,9 +14,10 @@ Invoked, never a service: it runs when somebody types `make queue`, on the pull
 requests they name, in the order they name them. `--dry-run` does every read
 and the local rebase, and writes nothing to GitHub. `--watch` (#664) names
 none: it takes each pull request as it turns ready, in label-priority order,
-and is still invoked, never a service — it exits on the first hand-back, on
-the machine failing, when nothing is left, or between pull requests once its
-`--for` deadline passes ([`queue_watch`]).
+and is still invoked, never a service — a hand-back skips that pull request
+and it carries on (#751); it exits on the machine failing, when nothing is
+left, or between pull requests once its `--for` deadline passes
+([`queue_watch`]).
 
 ## Why it does not skip a run instead
 
@@ -764,7 +765,11 @@ def parse(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("prs", metavar="PR", type=int, nargs="*", help="pull request numbers, merged in the order given")
     parser.add_argument(
         "--watch", action="store_true",
-        help="name no PR: take each one as it turns ready, by label priority; exit on the first hand-back or when nothing is left",
+        help=(
+            "name no PR: take each one as it turns ready, by label priority; a hand-back is skipped and announced"
+            f" ('{queue_watch.HANDED_BACK_LINE} #N'); exit when nothing is left: 1 if anything was handed back,"
+            f" {queue_watch.MACHINE_STATUS} if the machine or GitHub failed"
+        ),
     )
     parser.add_argument(
         "--idle", type=float, default=queue_watch.IDLE_MINUTES, metavar="MINUTES",
@@ -883,7 +888,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
     repo = mergeable.gh("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
     if opts.watch:
-        results, why, clean = queue_watch.run(effects(repo, opts), opts)
+        results, why, status = queue_watch.run(effects(repo, opts), opts)
     else:
         results = drain(ordered(opts.prs), lambda number: take(repo, number, opts))
     print()
@@ -891,8 +896,7 @@ def main(argv: list[str] | None = None) -> int:
         say(line)
     if opts.watch:
         say(f"watch ended: {why}")
-        if not clean:
-            return 1
+        return status
     return 0 if all(state in (MERGED, GREEN, DRY) for _, state, _ in results) else 1
 
 

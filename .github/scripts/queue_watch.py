@@ -9,15 +9,22 @@ highest-priority ready one through the queue's unchanged pipeline
 ([`merge-queue.take`]), and lists again.
 
 Still invoked, never a service: somebody starts it, it runs on this machine,
-and it **exits on the first thing that needs judgement**, so whoever started it
-in the background is woken:
+and it **exits only when it cannot usefully go on**, so whoever started it in
+the background is woken then. A hand-back is not one of those (#751):
 
 - **a hand-back** (conflict, failed local check, red CI, no run, a refused
-  merge). It exits rather than skipping on: the hand-back is the report, and
-  the ready pull requests behind it wait for the next start, a few minutes
-  away. The handed-back head is remembered ([`MEMORY`]) and passed over until
-  it moves, so restarting the watch never re-takes an unfixed branch; a fix
-  pushed to it makes it eligible again. `make queue PRS=N` ignores the memory;
+  merge) **skips that pull request and the watch keeps merging the rest**. Until
+  #751 it exited, and every ready pull request behind it waited for the
+  orchestrator to read the report and relaunch — one branch's problem stalled
+  the batch. The handed-back head is remembered ([`MEMORY`]) and passed over
+  until it moves, so a fix pushed to it is the whole of re-queueing it, in this
+  watch or a later one; `make queue PRS=N` ignores the memory. The starter still
+  hears at once: each hand-back prints one line beginning [`HANDED_BACK_LINE`]
+  (a `Monitor` on the output can wake on it), and the exit status at the end
+  says one happened ([`status`]), as scorsese's does (scorsese#615, #690).
+
+It exits on:
+
 - **the machine failing** (#584's stop, or GitHub unreachable for [`FAILS`]
   listings in a row);
 - **nothing left**: no open pull request, or none ready and no head among the
@@ -25,8 +32,8 @@ in the background is woken:
 - **its own deadline** (`--for MINUTES`, #697): past it, the watch takes no new
   pull request. It is checked only between takes, never during one, so the one
   in hand finishes (merged or handed back) and the exit always lands between
-  pull requests. A clean exit with its own last line ([`DEADLINE`]): whoever
-  started the watch relaunches it. It exists because the orchestrator runs the
+  pull requests. An exit with its own last line ([`DEADLINE`]) and status 0
+  unless something was handed back: whoever started the watch relaunches it. It exists because the orchestrator runs the
   watch as a background command, and those are killed at two hours wherever
   they are — mid-push or mid-merge included.
 
@@ -65,6 +72,16 @@ LIST_FIELDS = "number,isDraft,headRefOid,baseRefName,author,labels,closingIssues
 
 # Where the remembered hand-backs live, under the checkout's git directory.
 MEMORY = "merge-queue/handed-back.json"
+
+# How each hand-back's line begins, the moment it happens: grep for this.
+HANDED_BACK_LINE = "HANDED BACK"
+
+# The exit statuses (#751, after scorsese#615), the most urgent one wins:
+# 1 says read the hand-back lines; 3 says the machine or GitHub failed, and
+# nothing is known to be wrong with any branch. 0 is everything else, the
+# `--for` deadline included (relaunch it, nothing to read).
+HANDED_BACK_STATUS = 1
+MACHINE_STATUS = 3
 
 
 def names(labels) -> set[str]:
@@ -136,6 +153,18 @@ def deadline_reached(results: list[tuple[int, str, str]], minutes: float, merged
     return f"{DEADLINE} ({minutes:g} minutes); {count} merged, nothing in hand. Relaunch the watch."
 
 
+def status(handed: list[int], machine: bool) -> int:
+    """The watch's exit status: the most urgent thing its starter has to do."""
+    if machine:
+        return MACHINE_STATUS
+    return HANDED_BACK_STATUS if handed else 0
+
+
+def handed_back(number: int, why: str) -> str:
+    """The line a hand-back prints as it happens, beginning [`HANDED_BACK_LINE`]."""
+    return f"{HANDED_BACK_LINE} #{number}: {why} Passed over until its head moves; the watch carries on."
+
+
 def forget_closed(memory: dict[int, str], pulls: list[dict]) -> dict[int, str]:
     """The memory without pull requests that are no longer open."""
     open_ = {p.get("number") for p in pulls}
@@ -155,9 +184,9 @@ def remember(path: Path, memory: dict[int, str]) -> None:
     path.write_text(json.dumps({str(n): sha for n, sha in sorted(memory.items())}, indent=1) + "\n")
 
 
-def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, bool]:
-    """Watch until something needs a person. Returns the results, why it ended,
-    and whether that ending is a clean one (nothing left, or a dry run done).
+def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
+    """Watch until nothing is left to do. Returns the results, why it ended,
+    and the exit status ([`status`]).
 
     `fx` carries every effect: `pulls()` (the open listing, or `None` when GitHub
     failed), `issue_labels()`, `turn(number)` (one pull request through the
@@ -165,23 +194,24 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, bool]:
     `say(...)`, `memory` (a path), `bots`, and the end states: `merged`, `ends`
     (ended without a hand-back: green under `--no-merge`, previewed by a dry run)
     `stops` (the machine's failure, [`merge-queue.Stopped`]) and `skips` (it
-    turned draft or closed after the listing). Anything else is a hand-back.
+    turned draft or closed after the listing). Anything else is a hand-back: it is
+    remembered, announced ([`handed_back`]) and passed over.
     `opts.for_minutes` (`--for`) is checked at the top of each pass, so only
     between takes.
     """
-    results, done, failed = [], set(), 0
+    results, done, failed, handed = [], set(), 0, []
     memory = recall(fx.memory)
     last, moved = None, fx.clock()
     started = moved
     while True:
         if overdue(started, fx.clock(), opts.for_minutes):
             remember(fx.memory, memory)
-            return results, deadline_reached(results, opts.for_minutes, fx.merged), True
+            return results, deadline_reached(results, opts.for_minutes, fx.merged), status(handed, False)
         pulls = fx.pulls()
         if pulls is None:
             failed += 1
             if failed >= FAILS:
-                return results, f"GitHub failed {FAILS} listings in a row; stopped.", False
+                return results, f"GitHub failed {FAILS} listings in a row; stopped.", status(handed, True)
             fx.sleep(opts.poll)
             continue
         failed = 0
@@ -197,7 +227,7 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, bool]:
                 why = "dry run: every ready pull request has been previewed."
             if why:
                 remember(fx.memory, memory)
-                return results, why, True
+                return results, why, status(handed, False)
             fx.sleep(opts.poll)
             continue
         number = chosen["number"]
@@ -213,13 +243,12 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, bool]:
             fx.sleep(opts.poll)
         elif state in fx.stops:
             remember(fx.memory, memory)
-            return results, f"the machine failed on #{number}, not the branch; nothing is remembered against it.", False
+            return results, (
+                f"the machine failed on #{number}, not the branch; nothing is remembered against it."
+            ), status(handed, True)
         else:
             memory[number] = fx.head(number) or chosen.get("headRefOid", "")
-            remember(fx.memory, memory)
-            return results, (
-                f"#{number} was handed back. Its head is passed over until it moves;"
-                f" `make queue PRS={number}` takes it regardless."
-            ), False
+            handed.append(number)
+            fx.say(handed_back(number, result[2]))
         remember(fx.memory, memory)
         last = None  # the merge moved `main` and the listing; look afresh
