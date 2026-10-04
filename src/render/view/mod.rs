@@ -267,3 +267,7 @@ impl RenderView {
 #[cfg(test)]
 #[path = "tests.rs"]
 mod view_tests;
+
+#[cfg(test)]
+#[path = "display_tests.rs"]
+mod display_tests;

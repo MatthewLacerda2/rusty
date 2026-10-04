@@ -76,4 +76,17 @@ mod tests {
             assert!(face.glyph_index(icon).is_none(), "Inter maps {icon:?}");
         }
     }
+
+    /// `install` registers the families the editor names; egui loads them a pass later.
+    #[test]
+    fn install_registers_the_semibold_and_icon_families() {
+        let ctx = egui::Context::default();
+        super::install(&ctx);
+        let mut out = ctx.run_ui(Default::default(), |_| {});
+        out.textures_delta.clear();
+        let semibold = egui::FontFamily::Name(super::SEMIBOLD.into());
+        assert_eq!(super::semibold(&ctx, 14.0).family, semibold);
+        let icons = egui::FontFamily::Name("phosphor".into());
+        assert!(ctx.fonts(|f| f.families().contains(&icons)));
+    }
 }

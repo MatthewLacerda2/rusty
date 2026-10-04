@@ -4,11 +4,6 @@
 [advisories]
 yanked = "warn"
 ignore = [
-  # `paste` is unmaintained (archived upstream) but only reaches us transitively,
-  # as a proc-macro, via rapier3d → nalgebra/parry3d → simba (wgpu dropped it in
-  # #333). No safe upgrade on that path and it is NOT a vulnerability. Revisit with
-  # the rapier upgrade. Real RUSTSEC vulnerabilities still fail the deny job.
-  "RUSTSEC-2024-0436",
   # `ttf-parser` is unmaintained. It is a direct dependency since #419 (GPOS
   # kerning for UI `Text`) and also arrives through ab_glyph (ours, and winit →
   # sctk-adwaita). It parses the project's own font assets, not untrusted input,
