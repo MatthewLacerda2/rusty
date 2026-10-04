@@ -9,10 +9,10 @@ use crate::shadergen::{bake_recipe, ShaderRecipe, DEFAULT_OUT_DIR, ENGINE_SHADER
 
 /// A shader baked from `pass` + `block` under a name unique to this test and run
 /// (tests share a process under `cargo test`); removed on drop.
-struct Baked(String);
+pub(super) struct Baked(pub(super) String);
 
 impl Baked {
-    fn new(pass: &str, block: &str, tag: &str) -> Self {
+    pub(super) fn new(pass: &str, block: &str, tag: &str) -> Self {
         let name = format!("test_tween_{tag}_{}", std::process::id());
         let json = format!(r#"{{"pass":"{pass}","name":"{name}","blocks":[{{"id":"{block}"}}]}}"#);
         let recipe = ShaderRecipe::from_json(&json).unwrap();
@@ -30,7 +30,7 @@ impl Drop for Baked {
 }
 
 /// `expr` rounded to 3 decimals (f32 steps sum inexactly).
-fn eval(m: &super::manager::ScriptManager, expr: &str) -> String {
+pub(super) fn eval(m: &super::manager::ScriptManager, expr: &str) -> String {
     m.eval(&format!("math.floor(({expr}) * 1000 + 0.5) / 1000"))
         .unwrap()
 }
