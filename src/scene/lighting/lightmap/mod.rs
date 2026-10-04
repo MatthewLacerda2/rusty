@@ -1,0 +1,33 @@
+//! src/scene/lighting/lightmap/ — baked lightmaps for static geometry (#438).
+//!
+//! Static meshes with a second UV map (glTF `TEXCOORD_1`) get a per-texel lightmap:
+//! bounce light, sky, emissive surfaces and the direct light of `Baked` lights, from
+//! a CPU path tracer. Dynamic objects keep the light probes, so the two stay one
+//! lighting. The pieces:
+//!
+//! * `input` — the static scene flattened for the bake ([`BakeScene::gather`]);
+//! * `bvh` / `raster` / `trace` — ray acceleration, texel → surface point, and the
+//!   per-texel estimate (the units it stores are explained in `trace`);
+//! * `bake` — the parallel, seeded driver ([`bake`]);
+//! * `encode` — RGBM, how a lightmap is stored as an 8-bit PNG.
+//!
+//! The bake is a pure function of (scene, settings, seed): no clock, no unseeded RNG,
+//! and the result never depends on how many threads ran it.
+
+mod bake;
+mod bvh;
+mod encode;
+mod input;
+mod raster;
+mod rng;
+mod trace;
+
+pub use bake::{bake, BakeSettings, Lightmap};
+pub use encode::{decode_rgbm, encode_rgbm, encode_texels, RGBM_RANGE};
+pub use input::{BakeLight, BakeMesh, BakeScene, LightShape};
+pub use raster::{lightmap_size, MIN_RESOLUTION};
+
+#[cfg(test)]
+mod gather_tests;
+#[cfg(test)]
+mod tests;
