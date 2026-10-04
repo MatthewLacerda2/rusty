@@ -22,6 +22,10 @@ fn tables_become_objects_arrays_or_both() {
     assert_eq!(j("return { c = { 1.0, 0.5 } }"), json!({"c": [1.0, 0.5]}));
     assert_eq!(j("return {}"), json!({}), "an empty table is an object");
     assert_eq!(
+        j("return { a = {}, b = { {} } }"),
+        json!({"a": {}, "b": [{}]})
+    );
+    assert_eq!(
         j("return { 1, 2, a = 3 }"),
         json!({"1": 1, "2": 2, "a": 3}),
         "mixed keeps every key"

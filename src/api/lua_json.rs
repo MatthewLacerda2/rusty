@@ -44,8 +44,24 @@ pub fn recipe_json(value: &Value) -> Result<serde_json::Value, String> {
 
 /// Any Lua value as a `serde_json::Value`, with the table rules above.
 pub fn lua_to_json(value: &Value) -> Result<serde_json::Value, String> {
-    serde_json::to_value(value.to_serializable().detect_mixed_tables(true))
-        .map_err(|e| e.to_string())
+    let mut json = serde_json::to_value(value.to_serializable().detect_mixed_tables(true))
+        .map_err(|e| e.to_string())?;
+    empty_arrays_to_objects(&mut json);
+    Ok(json)
+}
+
+/// mlua's mixed-table detection reads an empty table as `[]`; rusty has always
+/// answered `{}`. A Lua table yields an empty array only when it is empty, so
+/// rewriting every `[]` restores that answer exactly.
+fn empty_arrays_to_objects(json: &mut serde_json::Value) {
+    match json {
+        serde_json::Value::Array(items) if items.is_empty() => {
+            *json = serde_json::Value::Object(serde_json::Map::new());
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(empty_arrays_to_objects),
+        serde_json::Value::Object(map) => map.values_mut().for_each(empty_arrays_to_objects),
+        _ => {}
+    }
 }
 
 /// Any serializable value as a plain Lua value (`nil` for null, no array metatable).
