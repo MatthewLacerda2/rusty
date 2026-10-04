@@ -67,7 +67,7 @@ fn a_move_that_never_hits_the_ramp_still_reads_its_normal() {
         let mut physics = PhysicsWorld::from_scene(&scene);
         for tick in 0..20 {
             let motion = dir * 3.0 * DT;
-            let hit = physics::move_character(Some(&mut physics), &mut scene, id, motion);
+            let hit = physics::move_character(Some(&physics), &mut scene, id, motion);
             let hit = hit.unwrap();
             physics.step(&mut scene, DT);
             assert!(hit.grounded, "{dir} tick {tick}: airborne");
