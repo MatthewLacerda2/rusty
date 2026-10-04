@@ -31,19 +31,22 @@ fn spawn(scene: &mut Scene, pos: Vec3, agent: NavMeshAgentComponent) -> u32 {
     id
 }
 
-/// Kill agents.rs "replace * with /" in velocity blend (line 146).
-/// factor = (accel * dt).min(1) ≈ 0.167; with `/` factor is inverted → ×6 speed.
-/// After one frame: dx correct ≈ 0.014, wrong ≈ 0.500.
+/// Kill "replace * with /" in the velocity step. Acceleration is m/s² (#742): one
+/// tick from rest reaches `a·dt` and moves `a·dt²` = 10/3600 ≈ 0.00278; with `/` the
+/// step is `a/dt` (600 m/s, capped at speed 5) and moves 5/60 ≈ 0.083.
 #[test]
-fn velocity_blend_multiplies_not_divides() {
+fn velocity_step_multiplies_not_divides() {
     let start = Vec3::new(1.0, 0.0, 1.0);
     let target = Vec3::new(10.0, 0.0, 1.0);
     let mut scene = Scene::new();
     let id = spawn(&mut scene, start, agent_toward(target));
     open_graph().tick_nav_agents(&mut scene, 1.0 / 60.0);
     let dx = scene.world.transform(id).unwrap().position.x - 1.0;
-    assert!(dx > 0.005, "agent moved forward: dx={dx:.5}");
-    assert!(dx < 0.05, "no over-acceleration (* not /): dx={dx:.5}");
+    let expected = 10.0 / 3600.0;
+    assert!(
+        (dx - expected).abs() < 1e-5,
+        "dx={dx:.6}, want a·dt²={expected:.6}"
+    );
 }
 
 /// Kill "replace > with <" in stopping condition (line 109).

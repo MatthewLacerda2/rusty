@@ -6,7 +6,7 @@ use glam::{Vec2, Vec3};
 
 use super::super::avoidance::{self, AvoidanceAgent};
 use super::super::obstacle::avoidance_obstacles;
-use super::super::NavigationGraph;
+use super::super::{path_length, NavigationGraph};
 use super::link::auto_traverse;
 use super::state::is_at_target;
 use crate::scene::{NavMeshAgentComponent, Scene};
@@ -16,8 +16,9 @@ use crate::scene::{NavMeshAgentComponent, Scene};
 struct Ticked {
     id: u32,
     position: Vec3,
-    /// Outside its stopping distance, so it moves this frame.
-    steering: bool,
+    /// Steering toward its target, or still braking inside its stopping distance:
+    /// either way it moves this frame.
+    moving: bool,
 }
 
 fn xz(v: Vec3) -> Vec2 {
@@ -56,7 +57,7 @@ impl NavigationGraph {
                     self.refresh_path(&mut agent, feet);
                 }
                 let steering = !agent.cached_path.is_empty() && !is_at_target(&agent, position);
-                let moved_with = if steering { agent.velocity } else { Vec3::ZERO };
+                let moved_with = agent.velocity;
                 if steering {
                     self.accelerate_toward_waypoint(&mut agent, position, delta_time);
                 } else {
@@ -66,7 +67,7 @@ impl NavigationGraph {
                 ticked.push(Ticked {
                     id,
                     position,
-                    steering,
+                    moving: steering || agent.velocity != Vec3::ZERO,
                 });
             }
             scene.world.set_nav_agent(id, Some(agent));
@@ -77,7 +78,7 @@ impl NavigationGraph {
         inputs.extend(avoidance_obstacles(scene));
         let velocities = avoidance::solve(&inputs, delta_time);
         for (t, v) in ticked.iter().zip(velocities) {
-            if t.steering {
+            if t.moving {
                 self.integrate(scene, t, Vec3::new(v.x, 0.0, v.y), delta_time);
             }
             // Keep entity's collider bounds aligned with transform positioning
@@ -93,6 +94,10 @@ impl NavigationGraph {
 
     /// Accelerate the agent's velocity toward its next waypoint — its preferred
     /// velocity this frame. Planar (XZ): horizontal speed is unaffected by climbing.
+    /// `acceleration` is a constant rate in m/s² (Unity's): the velocity moves toward
+    /// the desired one by at most `acceleration * dt` per tick and lands on it. Near
+    /// the end of its path the agent brakes at that same rate, so it comes to rest at
+    /// its stopping distance instead of stopping dead (Unity's `autoBraking`).
     fn accelerate_toward_waypoint(
         &self,
         agent: &mut NavMeshAgentComponent,
@@ -111,11 +116,14 @@ impl NavigationGraph {
         to_next_dir.y = 0.0;
         let to_next_dir = to_next_dir.normalize_or_zero();
 
-        // Accelerate steering velocity (kept planar; y is snapped, not integrated).
-        let desired_vel = to_next_dir * agent.speed;
-        let diff_vel = desired_vel - agent.velocity;
-        agent.velocity += diff_vel * (agent.acceleration * delta_time).min(1.0);
-        agent.velocity.y = 0.0;
+        // Brake once the path left is within `stopping_distance + v²/(2a)`.
+        let room = (path_left(agent, feet, next_step) - agent.stopping_distance).max(0.0);
+        let speed = agent
+            .speed
+            .min(braking_speed(agent.acceleration, room, delta_time));
+        let desired = xz(to_next_dir * speed);
+        let steered = move_towards(xz(agent.velocity), desired, agent.acceleration * delta_time);
+        agent.velocity = Vec3::new(steered.x, 0.0, steered.y);
     }
 
     /// An agent on an off-mesh link (#462) neither steers nor avoids: the engine
@@ -210,10 +218,41 @@ fn avoidance_input(
     }
 }
 
-/// Decelerate to zero velocity when inside the stopping distance.
+/// The path still ahead of an agent whose feet are at `feet` and whose next
+/// waypoint is `next`: to it, then along every corner after it.
+fn path_left(agent: &NavMeshAgentComponent, feet: Vec3, next: Vec3) -> f32 {
+    let rest = agent.cached_path.get(agent.path_cursor..).unwrap_or(&[]);
+    feet.distance(next) + path_length(rest)
+}
+
+/// The fastest speed from which braking at `acceleration` in steps of `dt` still
+/// stops within `room`. Shedding `a·dt` a tick from `v` covers `v²/(2a) + v·dt/2`;
+/// solving that for `v` keeps the step from overshooting the continuous `√(2a·room)`.
+fn braking_speed(acceleration: f32, room: f32, dt: f32) -> f32 {
+    let half_step = 0.5 * acceleration * dt;
+    (half_step * half_step + 2.0 * acceleration * room).sqrt() - half_step
+}
+
+/// Brake toward rest inside the stopping distance, at the agent's acceleration
+/// (m/s²). The agent keeps moving with what is left, so the reported velocity is
+/// the one it really moves at.
 fn decelerate(agent: &mut NavMeshAgentComponent, delta_time: f32) {
-    agent.velocity -= agent.velocity * (agent.acceleration * delta_time).min(1.0);
-    if agent.velocity.length_squared() < 0.001 {
-        agent.velocity = Vec3::ZERO;
+    let v = move_towards(
+        xz(agent.velocity),
+        Vec2::ZERO,
+        agent.acceleration * delta_time,
+    );
+    agent.velocity = Vec3::new(v.x, 0.0, v.y);
+}
+
+/// `from` moved toward `to` by at most `max_delta`, landing on it exactly when
+/// within reach (glam's `move_towards`, which this glam predates).
+fn move_towards(from: Vec2, to: Vec2, max_delta: f32) -> Vec2 {
+    let gap = to - from;
+    let len = gap.length();
+    if len <= max_delta || len <= f32::EPSILON {
+        to
+    } else {
+        from + gap / len * max_delta.max(0.0)
     }
 }

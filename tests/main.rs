@@ -41,6 +41,7 @@ mod light_probes;
 mod lod_group_api;
 mod material_authoring;
 mod material_library;
+mod nav_accel;
 mod nav_agents_values;
 mod nav_avoidance;
 mod nav_avoidance_door;

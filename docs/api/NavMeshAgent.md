@@ -6,13 +6,13 @@ Per-entity navmesh agent control.
 |---|---|---|
 | `NavMeshAgent.SetTarget` | `(id, x, y, z)` | — |
 | `NavMeshAgent.GetTarget` | `(id)` | `x, y, z` |
-| `NavMeshAgent.SetSpeed` | `(id, speed)` | — |
-| `NavMeshAgent.SetAcceleration` | `(id, acceleration)` | — |
-| `NavMeshAgent.SetStoppingDistance` | `(id, distance)` | — |
+| `NavMeshAgent.SetSpeed` | `(id, speed)` | — top speed, m/s |
+| `NavMeshAgent.SetAcceleration` | `(id, acceleration)` | — m/s², for speeding up and braking alike (see *Moving and stopping*) |
+| `NavMeshAgent.SetStoppingDistance` | `(id, distance)` | — how far from its path's end it comes to rest, measured from its feet (centre, not body edge) |
 | `NavMeshAgent.SetRadius` | `(id, radius)` | — |
 | `NavMeshAgent.SetBaseOffset` / `GetBaseOffset` | `(id, offset)` / `(id)` | how far the entity's origin sits above the agent's feet (Unity's `baseOffset`, default `0`) |
 | `NavMeshAgent.IsAtTarget` | `(id)` | `bool` — its feet are within `StoppingDistance` of where its path ends (the target projected onto the navmesh) |
-| `NavMeshAgent.GetVelocity` | `(id)` | `x, y, z` |
+| `NavMeshAgent.GetVelocity` | `(id)` | `x, y, z` — the velocity it is really moving at; `0, 0, 0` once at rest |
 | `NavMeshAgent.SetActive` | `(id, active)` | — |
 | `NavMeshAgent.SetAvoidancePriority` | `(id, priority)` | — (0–99, clamped; lower = more important) |
 | `NavMeshAgent.SetAvoidanceEnabled` | `(id, enabled)` | — |
@@ -27,6 +27,19 @@ Per-entity navmesh agent control.
 | `NavMeshAgent.CompleteOffMeshLink` | `(id)` | `bool` — puts the agent on the link's end and resumes its path; `false` when it is on no link |
 | `NavMeshAgent.GetAutoTraverseOffMeshLink` / `SetAutoTraverseOffMeshLink` | `(id)` / `(id, bool)` | whether the engine crosses links for it (default `true`) |
 | `NavMeshAgent.GetAreaMask` / `SetAreaMask` | `(id)` / `(id, mask)` | the areas it may enter (Unity's `areaMask`): bit `i` allows area `i`; `-1` (the default) is every area. A new mask re-plans on the next tick |
+
+### Moving and stopping (#742)
+
+As in Unity, `acceleration` is a constant rate in **m/s²**: from rest the agent reaches
+`speed` in `speed / acceleration` seconds (3.5 m/s at 8 m/s² takes ≈ 0.44 s) and then
+holds it exactly. It **brakes at the same rate** before arriving (Unity's
+`autoBraking`, always on): once the path left is within
+`stopping distance + speed² / (2 · acceleration)` it slows, and comes to rest at its
+stopping distance. An agent caught inside its stopping distance while still moving
+(its target came to it) keeps moving as it brakes. `acceleration = 0` never speeds up.
+
+The stopping distance is measured centre to centre, so for an enemy that should not
+touch its target, author at least its own half-width plus the target's radius.
 
 ### Areas (#460)
 
