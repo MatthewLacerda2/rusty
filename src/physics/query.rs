@@ -14,7 +14,6 @@
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::convert::{from_rp_vec, to_rp_vec};
 use super::world::PhysicsWorld;
 
 /// Whether `collider` takes part in queries: it is enabled (a deactivated
@@ -123,7 +122,7 @@ impl PhysicsWorld {
         max_toi: f32,
         accept: impl Fn(u32) -> bool,
     ) -> Option<RayHit> {
-        let ray = Ray::new(to_rp_vec(origin), to_rp_vec(dir.normalize()));
+        let ray = Ray::new(origin, dir.normalize());
         let predicate = self.handle_accepts(&accept);
         let filter = QueryFilter::default().predicate(&predicate);
         self.queries(filter)
@@ -142,7 +141,7 @@ impl PhysicsWorld {
         max_toi: f32,
         accept: impl Fn(u32) -> bool,
     ) -> Vec<RayHit> {
-        let ray = Ray::new(to_rp_vec(origin), to_rp_vec(dir.normalize()));
+        let ray = Ray::new(origin, dir.normalize());
         let predicate = self.handle_accepts(&accept);
         let filter = QueryFilter::default().predicate(&predicate);
         let mut hits: Vec<RayHit> = self
@@ -159,7 +158,7 @@ impl PhysicsWorld {
     /// player's own capsule around the camera) is looked past rather than hit at 0.
     /// How the UI finds the wall in front of a world canvas (#429).
     pub fn first_surface_ahead(&self, origin: Vec3, dir: Vec3, max_toi: f32) -> Option<RayHit> {
-        let ray = Ray::new(to_rp_vec(origin), to_rp_vec(dir.normalize()));
+        let ray = Ray::new(origin, dir.normalize());
         let accept = |_: u32| true;
         let predicate = self.handle_accepts(&accept);
         let filter = QueryFilter::default()
@@ -183,7 +182,7 @@ impl PhysicsWorld {
         if length <= 1e-3 {
             return false;
         }
-        let ray = Ray::new(to_rp_vec(from), to_rp_vec(delta / length));
+        let ray = Ray::new(from, delta / length);
         let predicate = self.handle_accepts(&accept);
         let filter = QueryFilter::default()
             .exclude_sensors()
@@ -202,8 +201,8 @@ impl PhysicsWorld {
         Some(RayHit {
             id,
             distance: hit.time_of_impact,
-            point: from_rp_vec(ray.point_at(hit.time_of_impact)),
-            normal: from_rp_vec(hit.normal),
+            point: ray.point_at(hit.time_of_impact),
+            normal: hit.normal,
         })
     }
 

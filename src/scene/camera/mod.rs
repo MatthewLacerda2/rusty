@@ -4,6 +4,7 @@
 //! listener follows it) is plain glam data, so it lives sim-side; the renderer
 //! only reads it and builds its per-frame camera stack from it (#494).
 
+use glam::camera::rh::proj::directx;
 use glam::{Mat4, Vec3};
 
 mod projection;
@@ -85,11 +86,11 @@ impl Camera {
         let far = self.far.max(self.near + 0.001);
         match self.projection {
             Projection::Perspective => {
-                Mat4::perspective_rh(self.fov.to_radians(), aspect, self.near, far)
+                directx::perspective(self.fov.to_radians(), aspect, self.near, far)
             }
             Projection::Orthographic { size } => {
                 let (h, w) = (size.max(0.001), size.max(0.001) * aspect);
-                Mat4::orthographic_rh(-w, w, -h, h, self.near, far)
+                directx::orthographic(-w, w, -h, h, self.near, far)
             }
         }
     }

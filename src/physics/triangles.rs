@@ -11,7 +11,6 @@ use rapier3d::prelude::*;
 
 use super::build::{build_shape, collider_inputs};
 use super::compound::world_pose;
-use super::convert::from_rp_vec;
 use crate::scene::Scene;
 
 /// Segments around a round shape's circumference.
@@ -42,7 +41,7 @@ pub fn collider_world_triangles(scene: &Scene, id: u32) -> Option<ColliderTriang
     let (points, triangles, convex) = tessellate(collider.shape())?;
     let vertices = points
         .into_iter()
-        .map(|p| pose.pos + pose.rot * from_rp_vec(p))
+        .map(|p| pose.pos + pose.rot * p)
         .collect();
     Some(ColliderTriangles {
         vertices,

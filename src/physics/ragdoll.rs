@@ -20,7 +20,6 @@
 
 use glam::Vec3;
 
-use super::convert::{from_rp_vec, to_rp_vec};
 use super::world::PhysicsWorld;
 use crate::scene::Scene;
 
@@ -51,7 +50,7 @@ impl PhysicsWorld {
     /// for a kinematic body, the motion it was driven through last step.
     pub fn body_velocity(&self, id: u32) -> Option<(Vec3, Vec3)> {
         let body = self.bodies.get(*self.id_to_body.get(&id)?)?;
-        Some((from_rp_vec(body.linvel()), from_rp_vec(body.angvel())))
+        Some((body.linvel(), body.angvel()))
     }
 
     /// The `(linear, angular)` velocity change an `impulse` (N·s) at world
@@ -66,10 +65,10 @@ impl PhysicsWorld {
             return None;
         }
         let com = body.position() * props.local_com;
-        let j = to_rp_vec(impulse);
-        let torque = (to_rp_vec(point) - com).cross(j);
+        let j = impulse;
+        let torque = (point - com).cross(j);
         let dw = props.world_inv_inertia(body.rotation()) * torque;
-        Some((impulse * props.inv_mass, from_rp_vec(dw)))
+        Some((impulse * props.inv_mass, dw))
     }
 }
 

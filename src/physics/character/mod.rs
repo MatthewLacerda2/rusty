@@ -31,7 +31,6 @@ use rapier3d::prelude::*;
 
 use super::build::capsule_dims;
 use super::compound::{world_pose, world_to_local};
-use super::convert::to_rp_vec;
 use super::query::is_live;
 use super::world::PhysicsWorld;
 use crate::components::{CapsuleAxis, CharacterControllerComponent};
@@ -106,7 +105,7 @@ pub fn can_stand(physics: Option<&PhysicsWorld>, scene: &Scene, id: u32, height:
     let live = |_: ColliderHandle, c: &Collider| is_live(&world.bodies, c);
     let filter = world.character_filter(scene, id, &live);
     let shape = next.shape();
-    let pos = Pose::from_translation(to_rp_vec(center));
+    let pos = Pose::from_translation(center);
     let blocked = world
         .queries(filter)
         .intersect_shape(pos, &shape)

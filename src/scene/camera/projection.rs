@@ -9,6 +9,7 @@
 //! screen is a sim input (`ui::ScreenSize`), so a projection is a pure function of
 //! (camera, screen size).
 
+use glam::camera::rh::view::look_at_mat4;
 use glam::{Mat4, Vec2, Vec3};
 
 use super::Camera;
@@ -41,7 +42,7 @@ impl ScreenPoint {
 impl Camera {
     /// The world → view matrix (the view looks down its local -Z, y up).
     pub fn view_matrix(&self) -> Mat4 {
-        Mat4::look_at_rh(self.position, self.position + self.forward(), Vec3::Y)
+        look_at_mat4(self.position, self.position + self.forward(), Vec3::Y)
     }
 
     /// The camera's own frame → world: local +X is right, +Y up, -Z forward.

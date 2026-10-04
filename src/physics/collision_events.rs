@@ -15,7 +15,6 @@ use crate::core::collections::Map;
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::convert::from_rp_vec;
 use super::world::PhysicsWorld;
 
 /// One contact as seen by the entity receiving the callback.
@@ -159,9 +158,9 @@ impl PhysicsWorld {
             .filter(|(_, b)| !b.is_fixed())
             .map(|(h, b)| {
                 let v = BodyVelocity {
-                    lin: from_rp_vec(b.linvel()),
-                    ang: from_rp_vec(b.angvel()),
-                    com: from_rp_vec(b.center_of_mass()),
+                    lin: b.linvel(),
+                    ang: b.angvel(),
+                    com: b.center_of_mass(),
                 };
                 (h, v)
             })
@@ -263,7 +262,7 @@ fn strongest_contact(pair: &ContactPair, bodies: &RigidBodySet) -> Option<(Vec3,
                 _ => Some(cand),
             },
         )?;
-    Some((from_rp_vec(point), from_rp_vec(manifold.data.normal)))
+    Some((point, manifold.data.normal))
 }
 
 /// Sum of a manifold's normal impulses (rapier's own helper trait is private).

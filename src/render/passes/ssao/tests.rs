@@ -1,5 +1,6 @@
 //! The SSAO plan (#436): when the passes run, and what the shader is told.
 
+use glam::camera::rh::proj::directx;
 use glam::{Mat4, Vec3};
 
 use super::{SsaoFrame, SsaoPlan};
@@ -51,7 +52,7 @@ fn the_uniform_carries_the_look_and_the_tier() {
         vc.ssao.intensity = 2.0;
     });
     let plan = SsaoPlan::for_scene(&scene, QualityPreset::Medium).unwrap();
-    let view_proj = Mat4::perspective_rh(1.0, 1.5, 0.1, 100.0);
+    let view_proj = directx::perspective(1.0, 1.5, 0.1, 100.0);
     let frame = SsaoFrame {
         plan,
         view_proj,

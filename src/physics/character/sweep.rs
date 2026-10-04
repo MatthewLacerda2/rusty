@@ -12,7 +12,6 @@ use super::{capsule, CharacterMove};
 use crate::components::character_controller::{COLLIDED_ABOVE, COLLIDED_BELOW, COLLIDED_SIDES};
 use crate::components::CharacterControllerComponent;
 use crate::physics::build::interaction_groups;
-use crate::physics::convert::{from_rp_vec, to_rp_vec};
 use crate::physics::query::is_live;
 use crate::physics::world::PhysicsWorld;
 use crate::scene::Scene;
@@ -96,7 +95,7 @@ impl PhysicsWorld {
         let hit = self
             .queries(m.filter)
             .cast_shape(pos, -Vector::Y, &m.shape, probe);
-        hit.and_then(|(_, h)| from_rp_vec(h.normal1).try_normalize())
+        hit.and_then(|(_, h)| h.normal1.try_normalize())
     }
 
     /// One run of rapier's controller for `motion`, rerun without its downward
@@ -120,18 +119,18 @@ impl PhysicsWorld {
             &self.queries(m.filter),
             &m.shape,
             &m.start,
-            to_rp_vec(motion),
+            motion,
             |hit| {
                 let flag = contact_flag(&hit.hit, m.half_segment);
                 if flag == COLLIDED_BELOW {
-                    ground = from_rp_vec(hit.hit.normal1).try_normalize();
+                    ground = hit.hit.normal1.try_normalize();
                     flat_hit |= hit.hit.normal1.y > 1.0 - FLAT_FLOOR;
                 }
                 flags |= flag;
             },
         );
         let pass = Pass {
-            translation: from_rp_vec(movement.translation),
+            translation: movement.translation,
             grounded: movement.grounded,
             flags,
             ground,
@@ -149,15 +148,15 @@ impl PhysicsWorld {
         if pass.translation.y <= motion.y.max(0.0) + 1e-5 || ahead == Vec3::ZERO {
             return None;
         }
-        let center = from_rp_vec(m.start.translation) + pass.translation;
+        let center = m.start.translation + pass.translation;
         let feet = center - Vec3::Y * (m.half_segment + m.radius);
         let drop = m.step + m.skin + GROUND_PROBE;
         let origin = feet + ahead * m.radius + Vec3::Y * drop;
-        let ray = Ray::new(to_rp_vec(origin), -Vector::Y);
+        let ray = Ray::new(origin, -Vector::Y);
         let (_, hit) = self
             .queries(m.filter)
             .cast_ray_and_get_normal(&ray, drop * 2.0, true)?;
-        let n = from_rp_vec(hit.normal).try_normalize()?;
+        let n = hit.normal.try_normalize()?;
         (n.y > FLAG_EPS && !m.walkable(n)).then_some(n)
     }
 
@@ -174,7 +173,7 @@ impl PhysicsWorld {
         let m = MoveCtx {
             controller: controller(cc, cap.radius),
             shape: cap.shape(),
-            start: Pose::from_translation(to_rp_vec(cap.center)),
+            start: Pose::from_translation(cap.center),
             half_segment: cap.half_segment,
             radius: cap.radius,
             skin: cc.skin_width,
@@ -187,7 +186,7 @@ impl PhysicsWorld {
             // Again, without the push into the slope: it blocks like a wall.
             pass = self.pass(&m, off_slope(motion, steep));
         }
-        let end = m.start.append_translation(to_rp_vec(pass.translation));
+        let end = m.start.append_translation(pass.translation);
         let below = pass.ground.or_else(|| self.ground_below(&m, &end));
         let on_ground = pass.grounded || pass.flags & COLLIDED_BELOW != 0;
         if !(on_ground || below.is_some_and(|n| m.walkable(n))) {

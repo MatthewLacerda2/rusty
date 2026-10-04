@@ -15,7 +15,7 @@ use super::build::{
 };
 use super::character::upright_offset;
 use super::compound::{plan, relative_pose, world_pose, BodyPlan, WorldPose};
-use super::convert::{to_pose, to_rp_vec};
+use super::convert::to_pose;
 use super::material::apply_material;
 use super::world::PhysicsWorld;
 use crate::scene::Scene;
@@ -93,8 +93,8 @@ impl PhysicsWorld {
             BodyClass::Static => RigidBodyBuilder::fixed(),
             BodyClass::Kinematic => RigidBodyBuilder::kinematic_position_based(),
             BodyClass::Dynamic => RigidBodyBuilder::dynamic()
-                .linvel(to_rp_vec(inp.velocity))
-                .angvel(to_rp_vec(inp.angular_velocity))
+                .linvel(inp.velocity)
+                .angvel(inp.angular_velocity)
                 // `use_gravity = false` exempts the body from world gravity (#209).
                 .gravity_scale(gravity_scale(inp.use_gravity)),
         }

@@ -14,6 +14,7 @@
 //!
 //! Pure CPU math on `glam` types, unit-tested below; the pass consumes it.
 
+use glam::camera::rh::{proj::directx, view::look_at_mat4};
 use glam::{Mat4, Vec3};
 
 use crate::components::ShadowSettings;
@@ -96,7 +97,7 @@ pub fn fit(
 fn light_view(dir: Vec3) -> Mat4 {
     let dir = dir.normalize();
     let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
-    Mat4::look_at_rh(Vec3::ZERO, dir, up)
+    look_at_mat4(Vec3::ZERO, dir, up)
 }
 
 /// The bounding sphere of the camera frustum between view depths `near` and `far`.
@@ -124,7 +125,7 @@ fn snapped_volume(light_view: Mat4, centre: Vec3, radius: f32, split: f32, size:
     // Light view looks down -Z: the volume spans view z from `z + half + PULLBACK`
     // (toward the light) to `z - half` (past the sphere), as ortho near/far distances.
     let (near, far) = (-z - half - PULLBACK, -z + half);
-    let proj = Mat4::orthographic_rh(x - half, x + half, y - half, y + half, near, far);
+    let proj = directx::orthographic(x - half, x + half, y - half, y + half, near, far);
     Cascade {
         light_space: proj * light_view,
         split,
