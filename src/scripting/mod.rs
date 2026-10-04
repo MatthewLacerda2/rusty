@@ -66,6 +66,8 @@ mod tests_transitions;
 #[cfg(test)]
 mod tests_triggers;
 #[cfg(test)]
+mod tests_tween_shader_reads;
+#[cfg(test)]
 mod tests_tween_shaders;
 #[cfg(test)]
 mod tests_tweens;
