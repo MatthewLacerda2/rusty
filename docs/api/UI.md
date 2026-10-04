@@ -34,6 +34,8 @@ name it on a graphic, and drive its runtime params the way
 ```lua
 UI.SetShader(panel, "hud_dissolve")
 UI.SetShaderParam(panel, "dissolve.amount", 0.5)   -- half burnt away
+-- or ease it over time on the UI's unscaled clock (#661, see Tween.md):
+Tween.To(panel, "UI.dissolve.amount", 1, 0.6, { unscaled = true })
 ```
 
 The model — what a ui shader changes, the unscaled clock, fallback — is in

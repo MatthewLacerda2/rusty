@@ -134,13 +134,33 @@ pub fn set_post_param(
     name: &str,
     value: Vec<f32>,
 ) -> Result<(), String> {
-    PostChain::load(&vc.custom_effects).set(&mut vc.post_params, name, value)
+    set_post_param_with(vc, &PostChain::load(&vc.custom_effects), name, value)
+}
+
+/// [`set_post_param`] against an already-read `chain` of the volume's effects — a
+/// tween (#661) resolves it once at start instead of reading sidecars every tick.
+pub fn set_post_param_with(
+    vc: &mut VisualCorrectionComponent,
+    chain: &PostChain,
+    name: &str,
+    value: Vec<f32>,
+) -> Result<(), String> {
+    chain.set(&mut vc.post_params, name, value)
 }
 
 /// The value runtime param `name` of the volume's effects draws with: the stored one,
 /// else the effect's baked default. Strict like [`set_post_param`].
 pub fn post_param(vc: &VisualCorrectionComponent, name: &str) -> Result<Vec<f32>, String> {
-    PostChain::load(&vc.custom_effects).get(&vc.post_params, name)
+    post_param_with(vc, &PostChain::load(&vc.custom_effects), name)
+}
+
+/// [`post_param`] against an already-read `chain`.
+pub fn post_param_with(
+    vc: &VisualCorrectionComponent,
+    chain: &PostChain,
+    name: &str,
+) -> Result<Vec<f32>, String> {
+    chain.get(&vc.post_params, name)
 }
 
 /// A bare module file stem: non-empty, no path separator, not hidden or `..`.

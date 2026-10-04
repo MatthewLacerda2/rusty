@@ -17,7 +17,9 @@
 //! `on_complete`.
 
 pub(crate) mod ease;
+mod field;
 pub(crate) mod property;
+mod shader_param;
 mod step;
 
 use glam::Vec4;

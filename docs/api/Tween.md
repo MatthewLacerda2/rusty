@@ -16,8 +16,8 @@ missing or inactive entity, or on a component the entity lacks, is an error.
 | `Tween.KillAll` | `(id)` — stop every tween animating the entity. | — |
 | `Tween.IsPlaying` | `(handle)` | `true` while that tween (or any tween of that sequence, including one still in its delay) has not finished or been killed |
 
-**Properties** are `"Component.field"` paths. Only these are animatable — a typo
-is an error listing them. A one-number property takes a number; the others take
+**Properties** are `"Component.field"` paths. Only these (and the runtime shader
+params below) are animatable — a typo is an error listing them. A one-number property takes a number; the others take
 a table of exactly that many numbers:
 
 - `{x, y, z}`: `Transform.position`, `Transform.scale`, and `Transform.rotation`
@@ -28,6 +28,32 @@ a table of exactly that many numbers:
 - `{r, g, b}`: `Light.color`
 - a number: `CanvasGroup.alpha`, `Image.fill_amount`, `Text.font_size`,
   `Light.intensity`, `Light.range`, `Camera.fov`, `AudioSource.volume`
+
+**Runtime shader params** (#661) tween too, as the namespace word followed by the
+param's name — `block.param`, or `block.index.param` when the block repeats — so
+a value as wide as the param (a number, or `{…}` of 2–4):
+
+| Path | Drives | Same as |
+|---|---|---|
+| `"Material.<name>"`, e.g. `"Material.hit_flash.amount"` | entity `id`'s **own override** — one enemy flashes, not every one sharing its material | `Material.SetShaderParam(id, name, v)` |
+| `"UI.<name>"`, e.g. `"UI.dissolve.amount"` | every graphic of `id` drawn with its ui shader | `UI.SetShaderParam(id, name, v)` |
+| `"Graphics.<name>"`, e.g. `"Graphics.damage_vignette.intensity"` | the post-processing volume **on entity `id`** | `Graphics.SetPostParam(name, v)` on that volume |
+
+The shader's layout is resolved once, at `Tween.To`: a param the shader bakes, a
+typo, an entity with no material / graphic / volume, or no shader named yet is an
+error there (listing the runtime params), never a silent no-op. Each step writes
+through the setter's own op. A tween ends quietly if the component goes, or — for
+`UI.` — the graphic is switched to another shader. UI shaders animate on unscaled
+time, so `unscaled = true` is the natural pairing for a `UI.` tween.
+
+```lua
+-- On hit: flash this enemy and let it fade.
+Tween.KillAll(enemy)
+Tween.To(enemy, "Material.hit_flash.amount", 0, 0.15, { from = 1, ease = "quad_out" })
+
+-- On damage: spike the vignette, then let it settle.
+Tween.To(volume, "Graphics.damage_vignette.intensity", 0, 0.8, { from = 1 })
+```
 
 Each value is written through the same authoring op as the component's own
 setter (`CanvasGroup.SetAlpha`, `Image.SetColor`, …), so it is clamped the same

@@ -63,25 +63,17 @@ pub(super) fn parse(
         duration,
     } = args;
     require_active(scene, id)?;
-    let property = Property::parse(&path).ok_or_else(|| {
-        runtime(&format!(
-            "unknown tween property `{path}`; animatable: {}",
-            Property::paths()
-        ))
-    })?;
-    if property.get(scene, id).is_none() {
-        let component = path.split('.').next().unwrap_or_default();
-        return Err(runtime(&format!("entity {id} has no {component}")));
-    }
+    let property = Property::parse(scene, id, &path).map_err(|e| runtime(&e))?;
     if !(duration.is_finite() && duration >= 0.0) {
         return Err(runtime("tween duration must be a number >= 0"));
     }
+    let to = to_vec4(&property, target)?;
     let mut spec = Spec {
         owner: id,
         tween: Tween {
             property,
             from: None,
-            to: to_vec4(property, target)?,
+            to,
             duration,
             ease: Ease::Linear,
             loops: Some(1),
@@ -160,7 +152,7 @@ fn read_opt(lua: &Lua, key: &str, value: Value, spec: &mut Spec) -> mlua::Result
                 Clock::Scaled
             };
         }
-        "from" => t.from = Some(to_vec4(t.property, value)?),
+        "from" => t.from = Some(to_vec4(&t.property, value)?),
         "on_complete" => {
             let f: mlua::Function = lua.unpack(value)?;
             t.on_complete = Some(lua.create_registry_value(f)?);
@@ -172,7 +164,7 @@ fn read_opt(lua: &Lua, key: &str, value: Value, spec: &mut Spec) -> mlua::Result
 
 /// A tween value: a number for a one-number property, else a `{x, y[, z[, w]]}`
 /// array with exactly as many numbers as the property has.
-fn to_vec4(property: Property, value: Value) -> mlua::Result<Vec4> {
+fn to_vec4(property: &Property, value: Value) -> mlua::Result<Vec4> {
     let arity = property.arity();
     let nums: Vec<f32> = match value {
         Value::Integer(n) => vec![n as f32],

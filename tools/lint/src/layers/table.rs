@@ -67,6 +67,7 @@ pub const LAYERS: &[Layer] = &[
             "navigation",
             "physics",
             "scene",
+            "shadergen",
             "time",
             "ui",
         ],
