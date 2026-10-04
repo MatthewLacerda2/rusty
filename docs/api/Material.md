@@ -26,8 +26,11 @@ picture whatever the lighting.
 | `Material.SetAlpha` | `(id, a)` — base-color alpha in `[0,1]`; the blend factor for a `Transparent` material (ignored by Opaque/Cutout) |
 | `Material.SetAlphaCutoff` | `(id, c)` — alpha-test threshold in `[0,1]` for `Cutout`: fragments below it are discarded (default 0.5) |
 | `Material.SetShader` | `(id, name)` — render with the authored surface shader `name` (see *Surface shaders* below); `""` clears it back to the standard shader |
-| `Material.SetShaderParam` | `(id, name, value)` — set a runtime param of the material's surface shader (`"hit_flash.amount"`, see *Runtime shader params* below); `value` is a number or an array of numbers; errors on a param the shader does not expose at runtime |
-| `Material.GetShaderParam` | `(id, name)` → the param's current value (a number, or an array for a vector param): the one set, else the shader's baked default |
+| `Material.SetShaderParam` | `(id, name, value)` — override a runtime param of the material's surface shader (`"hit_flash.amount"`, see *Runtime shader params* below) **for entity `id` alone**; its material stays shared and unchanged. `value` is a number or an array of numbers; errors on a param the shader does not expose at runtime |
+| `Material.GetShaderParam` | `(id, name)` → the value entity `id` draws with (a number, or an array for a vector param): its override, else its material's value, else the shader's baked default |
+| `Material.ClearShaderParam` | `(id [, name])` — drop entity `id`'s override of `name`, or all of its overrides; it draws with its material's values again |
+| `Material.SetAssetShaderParam` | `(asset, name, value)` — set a runtime param on the **material asset** named `asset` (Unity's `sharedMaterial`): every entity using it sees it, unless it overrides the param; saves with the scene. Errors on an absent asset |
+| `Material.GetAssetShaderParam` | `(asset, name)` → the asset's value: the one set, else the shader's baked default |
 | `Material.SetShaderTexture` | `(id, slot, path)` — point an extra texture slot of the material's surface shader (`"mask"`, see *Shader textures* below) at a texture path (a PNG or an `rt:<name>` render texture); `nil` or `""` clears it back to white; errors on an unknown slot |
 
 ### Standalone material assets
@@ -199,27 +202,32 @@ Material.SetShader(enemy, "enemy_toon")   -- or `shader = "enemy_toon"` in a rec
 - **Re-baking** a shader in a running session rebuilds it: the bake → look →
   iterate loop needs no restart.
 - `Debug.Snapshot`'s `material` block reports it as `shader` (`null` = standard),
-  the runtime param values set on it as `shader_params`, and its shader textures as
+  the runtime param values set on the material as `shader_params`, and its shader textures as
   `shader_textures`.
 
 ### Runtime shader params
 
 Some surface block params are **runtime** (see `Shader.md`): instead of being baked
-into the shader, they are read from the material, so a script drives them every
-frame — Unity's `material.SetFloat`. A hit flash that fades, a rim that glows with a
+into the shader, they are read at draw time, so a script drives them every frame —
+Unity's `material.SetFloat`. A hit flash that fades, a rim that glows with a
 shield's charge:
 
 ```lua
 Shader.Bake({ pass = "surface", name = "enemy_hit",
               blocks = { { id = "toon_ramp" },
                          { id = "hit_flash", params = { color = {1, 0.2, 0.1} } } } })
-Material.SetShader(enemy, "enemy_hit")
+Material.DefineAsset("grunt_mat", { shader = "enemy_hit" })   -- shared by every grunt
 
--- on hit:
+-- on hit: only this grunt flashes, the others sharing grunt_mat do not
 Material.SetShaderParam(enemy, "hit_flash.amount", 1)
 -- each frame:
 local a = Material.GetShaderParam(enemy, "hit_flash.amount")
 Material.SetShaderParam(enemy, "hit_flash.amount", math.max(a - Time.deltaTime() * 10, 0))
+-- or, once the flash is over, hand it back to the material:
+Material.ClearShaderParam(enemy, "hit_flash.amount")
+
+-- the shared value, for every grunt at once (a squad-wide shield glow):
+Material.SetAssetShaderParam("grunt_mat", "fresnel_rim.strength", 2)
 ```
 
 - **Names** are `"<block>.<param>"`, or `"<block>.<index>.<param>"` (the block's
@@ -229,10 +237,19 @@ Material.SetShaderParam(enemy, "hit_flash.amount", math.max(a - Time.deltaTime()
   number of values is an error naming it and listing the runtime params the shader
   has. A single number fills every lane of a vector param (`color = 0.5`). The
   material must name a baked surface shader first.
-- **Per material.** The value lives on the material asset (`shader_params`), so it
-  saves with the scene and every entity sharing the material sees it. Play mode
-  changes the play copy, so a flash in play never leaks into the edit scene. To flash
-  one enemy alone, give it its own material.
+- **Per entity, or per material** — Unity's `renderer.material` /
+  `MaterialPropertyBlock` beside `sharedMaterial`. `SetShaderParam(id, …)` writes an
+  **override** for that entity only: it wins over the material's value for that
+  entity, and the material stays shared, so ten grunts on one `grunt_mat` flash one
+  at a time. Overrides are **runtime-only**: never saved, gone when the entity is
+  destroyed, when a scene loads, and on Stop. `SetAssetShaderParam(asset, …)` writes
+  the **material's** value (`shader_params` on the asset), which saves with the scene
+  and which every entity without an override draws with; play mode changes the play
+  copy, so it never leaks into the edit scene either.
+- **Batching.** Entities without overrides keep drawing together as one instanced
+  draw. Each entity with an override is a draw of its own (twenty enemies on one
+  material with five flashing: six forward draws instead of one), so clear an
+  override once its effect is over.
 - **Cheap.** A change is a small buffer write the next frame draws with. Nothing is
   re-baked or recompiled.
 - A param you never set draws with its baked default (the recipe's value, else the
