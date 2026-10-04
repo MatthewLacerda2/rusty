@@ -40,15 +40,19 @@ name more.
   `actions_run_trigger` does the same). It runs the gates and nothing else.
   Never dispatch `mutants-sweep.yml`: that is the full sweep, five runners for
   most of a day the batch's gates need (#705).
-- **A branch that adds mechanism asks for a scoped mutation run before it is
-  readied** (#750): nothing runs mutation per pull request any more. Dispatch
+- **A branch that adds mechanism asks for a scoped mutation run** (#750):
+  nothing runs mutation per pull request any more. Dispatch
   `mutants-on-request.yml` on your branch with input `scope` set to `diff` (or
   path globs like `src/physics/**`): `make mutants-remote SCOPE=diff` with
-  `gh`, or the GitHub MCP `actions_run_trigger` without it. The report and the
-  survivors' diffs are at the end of its `mutants` job log (`get_job_logs`).
-  Triage what it finds as `ci-merge` *Triaging a survivor* says: fix the cheap
-  ones in the branch, say in the PR what you left and why. Wait on it with a
-  `send_later` check-in, as above.
+  `gh`, or the GitHub MCP `actions_run_trigger` without it. **Dispatch it when
+  your gates are green and mark the PR ready in the same step: never keep a
+  finished PR in draft waiting for it.** It takes 30+ minutes, and it is a
+  signal, not a gate. Schedule one `send_later` check-in to read the report
+  (the survivors' diffs are at the end of its `mutants` job log,
+  `get_job_logs`), triage it as `ci-merge` *Triaging a survivor* says, and put
+  the result in a comment on the issue. Since the branch is the queue's by
+  then, a survivor worth fixing becomes a follow-up PR off `main`, never a push
+  to the readied branch.
 - **Once ready, the branch is the merge queue's.** Don't push to it again, and
   cancel any `send_later` check-in that would. The queue rebases, pushes and
   merges it, and it refuses to merge a head it did not watch, so a late push
