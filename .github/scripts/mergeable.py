@@ -63,11 +63,11 @@ whatever its age.
 
 ## A run is settled when its gate is, not when its signals are
 
-`mutants-pr` and `coverage-pr` run inside the `ci` run but outside
-`ci-gate`'s `needs:` — informational signals that never block a merge. A
-mutation run can outlast the gates by far, so reading the *run's* status would
-hold a green pull request, and the whole queue behind it, until it ends
-(#555). An unfinished run is judged by its gate job instead ([`by_gate`]):
+A job inside a gated run but outside its gate's `needs:` decides nothing. Until
+#750 those were `mutants-pr` and `coverage-pr`, informational signals inside
+the `ci` run; a mutation run could outlast the gates by far, so reading the
+*run's* status held a green pull request, and the whole queue behind it, until
+it ended (#555). No signal runs on a pull request now, but the rule stands. An unfinished run is judged by its gate job instead ([`by_gate`]):
 once the gate concludes, its conclusion is the run's, and a signal still
 running or red is named but decides nothing. A gate that has not concluded is
 still a run in flight; a finished run keeps GitHub's own conclusion.
@@ -204,10 +204,10 @@ def superseded(runs: list[dict]) -> list[dict]:
 def by_gate(run: dict, jobs: dict[int, list[dict]], workflow: str) -> dict:
     """`run`, settled by its gate job when the run itself has not (#555).
 
-    A run stays `in_progress` while any of its jobs does, and the signal jobs
-    (`mutants-pr`, `coverage-pr`) share the `ci` run without being in
-    `ci-gate`'s `needs:`. They never block a merge (CLAUDE.md, *Gates vs.
-    signals*), so an unfinished run is read as settled — status and conclusion
+    A run stays `in_progress` while any of its jobs does, and a job outside
+    `ci-gate`'s `needs:` (until #750, the `mutants-pr` and `coverage-pr`
+    signals) shares the `ci` run. Such a job never blocks a merge
+    (CLAUDE.md, *Gates vs. signals*), so an unfinished run is read as settled — status and conclusion
     both the gate's — the moment the gate concludes, and a signal still running
     or red changes nothing. The gate `needs:` every gated job, so a concluded
     gate means they concluded too.

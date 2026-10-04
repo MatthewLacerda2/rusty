@@ -23,7 +23,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue blockers editor-capture
+.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue blockers mutants-remote editor-capture
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -156,7 +156,7 @@ deny: ## [gate] Advisories, bans, sources, licenses (cargo-deny)
 # The merge helpers' own tests: stdlib `unittest`, no build, well under a
 # second — and a gate, because `mergeable` is the only thing between a red PR
 # and `main` while it has no required checks (#491).
-scripts: ## [gate] Tests of the merge helpers in .github/scripts
+scripts: ## [gate] Tests of the merge and mutation helpers in .github/scripts
 	python3 -m unittest discover --start-directory .github/scripts/tests --quiet
 
 # Did CI really run, and pass, on this PR's head commit? Both workflows' gates,
@@ -180,6 +180,21 @@ queue: ## Rebase, wait for CI, squash-merge each in turn. make queue PRS="524 52
 # Lists them and exits 1; ARGS=--fix records them. Run at the start of a batch.
 blockers: ## Prose-only "Blocked by #N" GitHub never recorded. ARGS=--fix records them
 	@python3 .github/scripts/blockers.py $(ARGS)
+
+# ---- signals (#750) ---------------------------------------------------------
+
+# Mutation testing on GitHub's runners, over exactly what SCOPE names: `diff`
+# (this branch against origin/main) or path globs. Dispatches
+# mutants-on-request.yml on the pushed branch, waits, and prints the report and
+# the survivors' diffs. A signal, never a gate: survivors exit 0, and only "no
+# report" (a red, cancelled or missing run) exits 1. No PR runs mutation any
+# more, so ask for this before readying a branch that adds mechanism.
+mutants-remote: ## Mutation on GitHub's runners, scoped. make mutants-remote SCOPE=diff or SCOPE='src/physics/**'
+	@test -n "$(SCOPE)" || { \
+		echo "mutants-remote: what should be mutated? SCOPE=diff, or path globs" >&2; \
+		echo "                e.g. make mutants-remote SCOPE='src/navigation/**'" >&2; \
+		exit 1; }
+	@python3 .github/scripts/mutants-remote.py '$(SCOPE)'
 
 # The whole editor, headless, to a PNG (#731): what an editor-visible PR attaches.
 # Needs a GPU or lavapipe. ARGS passes the binary's options (--select, --play, ...).

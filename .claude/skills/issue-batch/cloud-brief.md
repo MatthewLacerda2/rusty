@@ -37,9 +37,18 @@ name more.
   merges a ready PR the moment its CI is green.
 - For a proof run on a draft, dispatch the workflow on the branch instead of
   readying: `gh workflow run ci.yml --ref <branch>` (without `gh`, the GitHub MCP
-  `actions_run_trigger` does the same). It runs the gates (and `coverage`), not the mutation sweep. Never pass
-  `force_mutants`: that starts the ~3.5 h full mutation sweep on five runners
-  the batch's gates need (#705).
+  `actions_run_trigger` does the same). It runs the gates and nothing else.
+  Never dispatch `mutants-sweep.yml`: that is the full sweep, five runners for
+  most of a day the batch's gates need (#705).
+- **A branch that adds mechanism asks for a scoped mutation run before it is
+  readied** (#750): nothing runs mutation per pull request any more. Dispatch
+  `mutants-on-request.yml` on your branch with input `scope` set to `diff` (or
+  path globs like `src/physics/**`): `make mutants-remote SCOPE=diff` with
+  `gh`, or the GitHub MCP `actions_run_trigger` without it. The report and the
+  survivors' diffs are at the end of its `mutants` job log (`get_job_logs`).
+  Triage what it finds as `ci-merge` *Triaging a survivor* says: fix the cheap
+  ones in the branch, say in the PR what you left and why. Wait on it with a
+  `send_later` check-in, as above.
 - **Once ready, the branch is the merge queue's.** Don't push to it again, and
   cancel any `send_later` check-in that would. The queue rebases, pushes and
   merges it, and it refuses to merge a head it did not watch, so a late push
@@ -71,7 +80,7 @@ name more.
   (scorsese #686, 2026-10-03: a hand-merged list that `cargo fmt --check`
   refused, found by CI instead of the session). After resolving any conflict,
   run `cargo fmt --all`.
-- Don't run `cargo mutants`.
+- Don't run `cargo mutants` locally; ask for a scoped run (above).
 
 ## Protocol
 

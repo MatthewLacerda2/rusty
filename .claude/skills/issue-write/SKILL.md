@@ -23,8 +23,8 @@ an issue run unattended, overnight, with nobody to ask.
 **Evidence beats assertion.** An issue that quotes a measurement, a gate's own
 output, a real file on disk or a line of the codebase is one nobody has to
 re-derive. "`docs/api-faithfulness.md` lists `SetX` as ✅ and no system reads that
-field" is worth more than "the API should be honest". So is a surviving mutant the
-`mutants-pr` comment named, a module sitting on its floor in
+field" is worth more than "the API should be honest". So is a surviving mutant a
+mutation report named, a module sitting on its floor in
 `coverage-baseline.txt`, a line still in `tools/lint/parity_baseline.txt`.
 
 **Point with symbols and paths, not line numbers.** `physics::build::collider_inputs`

@@ -196,10 +196,12 @@ green, so a PR must never be readied just to make CI run. On 2026-09-30 #520's s
 readied its PR to get Windows CI on a temporary 200-round test loop, and it merged with
 the loop still in (#559 reverted it). For a proof run on a draft, dispatch the
 workflow on the branch instead: `gh workflow run ci.yml --ref <branch>` runs
-the gates (`build-test`, `build-test-cross`, `deny`, `ci-gate`) and the ~15-min
-`coverage` ratchet without readying anything. Never add `-f force_mutants=true` to a proof run: that
-input starts the full mutation sweep, five runners for ~3.5 h taken from every
-other PR's gates (#705).
+the gates (`build-test`, `build-test-cross`, `deny`, `ci-gate`) and nothing else,
+without readying anything. Mutation and coverage are not in `ci.yml` any more (#750):
+a branch that adds mechanism asks for a scoped mutation run instead
+(`make mutants-remote SCOPE=diff`, or a `mutants-on-request.yml` dispatch).
+Never dispatch `mutants-sweep.yml` for a branch: that is the full sweep, five
+runners for most of a day taken from every other PR's gates (#705).
 
 **A cloud session is never woken by its own background work.** A routine session
 that starts a build in the background and ends its turn to wait sits idle forever —
@@ -416,8 +418,9 @@ read cold. Beyond that:
   running the batch.
 - Tell it not to start a heavy build while two siblings are already compiling,
   to give it half the cores (`CARGO_BUILD_JOBS`) while one is,
-  and not to run `cargo mutants` locally at all during a batch — CI runs it
-  diff-scoped per pull request anyway.
+  and not to run `cargo mutants` locally at all during a batch: when the branch
+  adds mechanism, it asks for a scoped run on GitHub's runners instead
+  (`make mutants-remote SCOPE=diff`; nothing runs mutation per pull request, #750).
 - **Scratch filenames must carry the issue number.** The scratchpad is shared
   between sibling agents, and a collision swaps one pull request's description
   for another's.

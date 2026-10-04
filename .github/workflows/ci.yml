@@ -4,49 +4,34 @@ on:
     types: [opened, reopened, synchronize, ready_for_review]
   # GitHub fires `merge_group` when a PR is queued via the merge queue; CI must
   # run on it so the required checks validate the speculative merged state before
-  # it lands. The gating jobs below opt in via their `if`; the report-only
-  # coverage/mutants jobs deliberately do not, to keep the queue lean.
+  # it lands. The gating jobs below opt in via their `if`.
   merge_group:
-  # `coverage` runs here — post-merge on `main`, never on `pull_request`: it takes
-  # ~15 min and, being non-blocking, only ever sat on a PR as a phantom "still
-  # running" long after the gating checks were green, which read as a stuck PR. On
-  # `main` it still produces the ratchet/baseline data without stalling any PR or
-  # the queue. Mutation testing is split differently (see the two `mutants*` jobs):
-  # a fast, diff-scoped, informational run *does* run per-PR so the coding agent
-  # gets a fresh-context catch, while the full-sim sweep moved to the nightly
-  # `schedule` below — the report-only backstop. A manual dispatch (a proof run
-  # on a branch) runs the gates and `coverage`, and sweeps only when
-  # `force_mutants` asks (#705).
+  # Gates only (#750). Mutation and coverage are signals and have their own
+  # workflows, off pull requests and off every merge: `mutants-sweep.yml` and
+  # `coverage.yml` run weekly, and `mutants-on-request.yml` mutates exactly what
+  # someone names (`make mutants-remote SCOPE=...`). A signal that ran here held
+  # runners the merge queue was waiting on, for a report that could not change
+  # whether anything merged.
   push:
     branches: [main]
-  # Nightly full-sim mutation sweep (the `mutants` job): re-examines untouched code
-  # the per-PR diff run never mutates and tracks/ratchets the survivor backlog.
   # Which gating jobs also run on the schedule is a decision, not a side effect
   # (#480): `deny` does — advisories land against code that has not changed, so a
   # nightly check is how a new RUSTSEC reaches us between merges (RUSTSEC-2026-0257
   # was spotted that way), and `ci-gate` goes red with it. `build-test` and
   # `build-test-cross` do not: with the toolchain and Cargo.lock pinned, rebuilding
-  # an unchanged `main` re-proves what its `push` run already proved.
+  # an unchanged `main` re-proves what its `push` run already proved. Off the
+  # hour, where GitHub's scheduler is least backed up.
   schedule:
-    - cron: '0 3 * * *'
+    - cron: '7 3 * * *'
+  # A proof run of a branch: the gates, nothing else.
   workflow_dispatch:
-    inputs:
-      # A dispatch runs the full mutation sweep only when this is set (#705): a
-      # proof run of a branch wants the gates, not ~3.5 h of five runners. Set,
-      # it also overrides the nightly's skip of an already-swept commit (#506)
-      # (e.g. after changing the sweep itself).
-      force_mutants:
-        description: Run the full mutation sweep (a dispatch skips it otherwise), even if a finished sweep already covered this commit
-        type: boolean
-        default: false
 
 # Cancel superseded runs (#482): a new push to a PR makes its previous run stale,
 # so that run is cancelled instead of finishing beside the new one. Only
 # `pull_request` runs share a group; every other event (push to `main`, the
 # nightly schedule, merge_group, manual) is keyed on its own run id, so each of
 # those runs finishes — a shared group would still let a newer run replace a
-# *pending* one, even with cancel-in-progress off. `ci-pr-closed.yml` joins a
-# PR's group when the PR closes or merges, cancelling a run nobody reads (#705).
+# *pending* one, even with cancel-in-progress off.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -60,30 +45,23 @@ jobs:
   # docs-only PR as unmergeable (issue #218). So we keep the cheap-docs-PR path by
   # guarding the required job's steps on `code`, never by skipping the job itself.
   # See the merging note in CLAUDE.md.
-  #
-  # `sim` narrows further: it's true only when the PR touches code that can change
-  # mutation-test outcomes on the four deterministic sim modules — their source, the
-  # integration tests that exercise them, or the dependency/toolchain pins. The slow
-  # `mutants` sweep is gated on it so a docs/CI/tooling/non-sim-src PR no longer pays
-  # for a full ~15-min mutation run that could not have changed anything it measures.
   changes:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.filter.outputs.code || 'true' }}
-      sim: ${{ steps.filter.outputs.sim || 'true' }}
     steps:
       # On `pull_request` paths-filter reads the changed files from the API and
       # needs no clone; on `push` it diffs `github.event.before..HEAD` in a local
       # repo, so without this checkout it dies with git exit 128 — which failed
-      # every post-merge run and kept `coverage` from ever running (#480).
+      # every post-merge run (#480).
       # paths-filter fetches `before` itself if the shallow clone lacks it.
       - uses: actions/checkout@v7
         if: github.event_name == 'push'
       - uses: dorny/paths-filter@v4
         id: filter
         # Runs on PRs (diff vs. base) and on push to main (diff of the merge
-        # commit) so the post-merge coverage job can skip docs-only merges just
-        # as the gating steps do per-PR.
+        # commit), so a docs-only merge skips the build steps just as a
+        # docs-only PR does.
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         with:
           filters: |
@@ -92,15 +70,6 @@ jobs:
               # The API-doc drift tests parse it: an edit to it alone is code (#525),
               # one file per namespace since #569.
               - 'docs/api/**'
-            sim:
-              - 'src/app/**'
-              - 'src/scripting/**'
-              - 'src/physics/**'
-              - 'src/navigation/**'
-              - 'tests/**'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-              - 'rust-toolchain.toml'
 
   # The Linux build+test. Kept as its own job (not folded into the OS matrix
   # below) so the `build-test` status-check name — referenced by the branch
@@ -260,194 +229,6 @@ jobs:
       - name: Test (lint xtask)
         run: cargo test --manifest-path tools/lint/Cargo.toml --locked
 
-  # Per-PR coverage signal — diff-scoped, informational (the coverage analog of
-  # mutants-pr, #194/#157). Unlike mutation, cargo-llvm-cov can't cheaply scope the
-  # *measurement* to a diff — the instrumented suite still runs in full — but the
-  # *report* is scoped to the lines this PR changed via `diff-cover`, so the agent
-  # sees exactly whether its new sim code is tested (the fresh-context catch).
-  # Non-blocking and not a required check, so it never gates a merge and may even
-  # finish after one without stalling anything. Gated by the cheap `sim` filter.
-  coverage-pr:
-    needs: changes
-    runs-on: ubuntu-latest
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.draft == false &&
-      needs.changes.outputs.sim != 'false'
-    continue-on-error: true
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          # Full history so diff-cover can diff the changed lines against the base.
-          fetch-depth: 0
-      - name: Toolchain (from rust-toolchain.toml)
-        run: rustup show
-      - name: Add llvm-tools-preview (required by cargo-llvm-cov)
-        run: rustup component add llvm-tools-preview
-      - name: Cache cargo registry + target
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: coverage
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: System libs for winit/wgpu builds
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
-      - name: Install cargo-llvm-cov and cargo-nextest
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-llvm-cov,cargo-nextest
-      - name: Install diff-cover
-        run: pipx install diff-cover
-      - name: Measure coverage (both feature sets, accumulated)
-        # Under nextest like build-test (#484), so the gpu test group applies here
-        # too; verified to give the same totals as `cargo llvm-cov` (test).
-        run: |
-          cargo llvm-cov clean --workspace
-          cargo llvm-cov nextest --no-report --locked
-          cargo llvm-cov nextest --no-report --features dev --locked
-      - name: Cobertura report (sim modules only)
-        # Same ignore-regex as the main job: restrict to app/scripting/physics/
-        # navigation so diff-cover only ever scores changed *sim* lines. The
-        # `src/[^/]+\.rs` term drops every top-level src file (main/lib/settings/…)
-        # — none are sim, all sim code lives in subdirectories — so a new top-level
-        # file can't silently pollute the number (the #163 class of bug).
-        # src/audio/rodio_backend.rs is the real output-device shim (tests run against
-        # NullBackend, so it's untestable by design); ignore just that file while the
-        # testable maestro/decode/introspection audio logic stays in scope.
-        run: |
-          cargo llvm-cov report --cobertura --output-path cobertura-sim.xml \
-            --ignore-filename-regex 'src/(render|dev|api|asset|editor|components|core|ecs|scene|time)/|src/audio/rodio_backend\.rs|src/[^/]+\.rs|src/bin/|tools/'
-      - name: Diff coverage of changed sim lines
-        id: diffcov
-        # --fail-under 100 makes diff-cover exit non-zero when any changed sim line
-        # is uncovered; we capture that as the "gaps" signal, not as a build failure.
-        run: |
-          BASE='origin/${{ github.event.pull_request.base.ref }}'
-          if diff-cover cobertura-sim.xml --compare-branch "$BASE" \
-               --markdown-report coverage-diff.md --fail-under 100; then
-            echo 'has_gaps=false' >> "$GITHUB_OUTPUT"
-          else
-            echo 'has_gaps=true' >> "$GITHUB_OUTPUT"
-          fi
-      - name: Summarize diff coverage (job summary + comment body)
-        if: always()
-        run: |
-          {
-            echo '### Diff coverage — changed sim lines (informational, non-blocking)'
-            echo ''
-            cat coverage-diff.md 2>/dev/null || echo 'No coverage information for the changed lines.'
-          } | tee comment.md >> "$GITHUB_STEP_SUMMARY"
-      - name: Post diff-coverage comment
-        if: always() && steps.diffcov.outputs.has_gaps == 'true'
-        uses: marocchino/sticky-pull-request-comment@v3
-        with:
-          header: coverage-diff
-          path: comment.md
-      - name: Clear stale diff-coverage comment
-        # Idempotent: once a re-push covers the changed lines, drop the comment.
-        if: always() && steps.diffcov.outputs.has_gaps != 'true'
-        uses: marocchino/sticky-pull-request-comment@v3
-        with:
-          header: coverage-diff
-          delete: true
-
-  coverage:
-    needs: changes
-    runs-on: ubuntu-latest
-    # Post-merge on main (or manual), not per-PR — see the `push` trigger note; the
-    # per-PR fresh-context signal is the diff-scoped `coverage-pr` job above.
-    # Skips docs-only merges via the `code` filter.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && needs.changes.outputs.code != 'false')
-    # Informational signal, never a merge blocker (CLAUDE.md gates-vs-signals).
-    # On `main` it ratchets the floored modules — the deterministic sim (app/
-    # scripting/physics/navigation) plus the script-facing `api` surface (#350) —
-    # against the committed floors in `coverage-baseline.txt`: a drop below a
-    # floor is surfaced here but does not fail the build. The platform layer
-    # (main.rs, render, dev) is exempt — see docs/testing.md. `continue-on-error`
-    # keeps even a regression non-blocking.
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v7
-      - name: Toolchain (from rust-toolchain.toml)
-        run: rustup show
-      - name: Add llvm-tools-preview (required by cargo-llvm-cov)
-        run: rustup component add llvm-tools-preview
-      - name: Cache cargo registry + target
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: coverage
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: System libs for winit/wgpu builds
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
-      # Lavapipe here too (#489), so the whole-crate summary measures render code
-      # the way build-test now exercises it. coverage-pr skips it: it only scores
-      # changed sim lines, which rendering does not reach.
-      - name: Software Vulkan driver (lavapipe)
-        run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
-      - name: Install cargo-llvm-cov and cargo-nextest
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-llvm-cov,cargo-nextest
-      - name: Measure coverage (both feature sets, accumulated)
-        # Under nextest like build-test (#484), so the gpu test group applies here
-        # too; verified to give the same totals as `cargo llvm-cov` (test).
-        run: |
-          cargo llvm-cov clean --workspace
-          cargo llvm-cov nextest --no-report --locked
-          cargo llvm-cov nextest --no-report --features dev --locked
-      - name: Whole-crate summary
-        run: |
-          {
-            echo '### Coverage summary (whole crate)'
-            echo ''
-            echo '```'
-            cargo llvm-cov report --summary-only
-            echo '```'
-          } | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Ratchet module coverage against the committed baseline
-        # Per-module line coverage vs the floors in coverage-baseline.txt. The
-        # `regex` crate llvm-cov uses has no look-around, so each module is isolated
-        # by ignoring the other floored modules plus every unfloored src directory;
-        # `src/[^/]+\.rs` drops every top-level src file (main/lib/settings/…) so
-        # none can pollute the number (the #163 class of bug). UNFLOORED must list
-        # EVERY unfloored src/ directory — a new module missing from it leaks into
-        # every floored measurement (audio/procgen/shadergen had done exactly that).
-        # Informational: a drop below a floor is flagged but the step never exits
-        # non-zero (and the job is continue-on-error regardless), honouring
-        # "inform on quality, never block".
-        run: |
-          FLOORED='app scripting physics navigation api'
-          UNFLOORED='render|dev|asset|editor|components|core|ecs|scene|time|audio|procgen|shadergen|ui|shell'
-          {
-            echo '### Module coverage ratchet (informational, non-blocking)'
-            echo ''
-            echo '| Module | Floor | Current | Status |'
-            echo '|---|---|---|---|'
-            regressed=0
-            while read -r module floor; do
-              case "$module" in ''|\#*) continue ;; esac
-              others=$(echo "$FLOORED" \
-                | tr ' ' '\n' | grep -v "^${module}$" | paste -sd'|')
-              cur=$(cargo llvm-cov report --json --summary-only \
-                --ignore-filename-regex "src/(${others}|${UNFLOORED})/|src/[^/]+\.rs|src/bin/|tools/" \
-                | jq '.data[0].totals.lines.percent')
-              status='✅'
-              if awk "BEGIN{exit !(${cur} < ${floor})}"; then status='❌ regression'; regressed=1; fi
-              printf '| %s | %.2f | %.2f | %s |\n' "$module" "$floor" "$cur" "$status"
-            done < coverage-baseline.txt
-            echo ''
-            if [ "$regressed" = 1 ]; then
-              echo '> A module dropped below its committed floor. Informational — add'
-              echo '> tests, or, if the drop is intended, lower it in `coverage-baseline.txt`.'
-            else
-              echo '> All floored modules at or above their committed floor.'
-            fi
-          } | tee -a "$GITHUB_STEP_SUMMARY"
-
   # The one gating job that also runs nightly — see the `schedule` trigger note.
   deny:
     needs: changes
@@ -510,364 +291,3 @@ jobs:
             esac
           done
           echo 'all gating jobs passed (success or skipped)'
-
-  # Per-PR mutation run — fast, diff-scoped, informational. Mutates only the lines
-  # this PR changed within the deterministic sim modules (--in-diff ∩ --file), so
-  # the cost scales with the change, not the whole codebase. Survivors are surfaced
-  # in the PR's own context — a job-summary block plus a sticky PR comment — so the
-  # coding agent fixes them in-PR; that routing is what makes "informational" bite
-  # without a hard gate. `continue-on-error` keeps it from ever blocking a merge,
-  # and the cheap `sim` paths-filter short-circuits PRs that touch no sim code.
-  # The timeout bounds a runaway (#705): over 42 finished runs the median was
-  # ~1 min and the 95th percentile 37 min, but two held a runner for 103 and
-  # 240 min while merge gates queued. Past 90 min the job is cut off and the PR
-  # simply gets no mutation report — it is informational either way.
-  mutants-pr:
-    needs: changes
-    runs-on: ubuntu-latest
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.draft == false &&
-      needs.changes.outputs.sim != 'false'
-    continue-on-error: true
-    timeout-minutes: 90
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          # Full history so we can diff against the PR base to build the --in-diff patch.
-          fetch-depth: 0
-      - name: Toolchain (from rust-toolchain.toml)
-        run: rustup show
-      - name: Cache cargo registry + target
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: mutants
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: System libs for winit/wgpu builds
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
-      - name: Install cargo-mutants
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-mutants
-      - name: Build the PR diff (changed lines vs. merge-base)
-        run: git diff ${{ github.event.pull_request.base.sha }}...HEAD > pr.diff
-      - name: Mutation test (changed sim lines only, informational)
-        id: mutate
-        # --in-diff restricts mutants to the lines this PR changed; the --file sim
-        # globs keep it from mutating anything outside the deterministic sim even
-        # if the diff strays. Same dev-feature build, timeout guard and memory
-        # cap as the sweep.
-        run: |
-          ulimit -v 8388608
-          cargo mutants --no-shuffle --timeout-multiplier 3 --in-diff pr.diff \
-            --file 'src/app/**/*.rs' \
-            --file 'src/scripting/**/*.rs' \
-            --file 'src/physics/**/*.rs' \
-            --file 'src/navigation/**/*.rs' \
-            -- --features dev
-      - name: Summarize survivors (job summary + comment body)
-        id: prep
-        if: always()
-        # cargo-mutants exits non-zero when mutants survive, so this and the steps
-        # below run with `if: always()`. Build the same block for the run summary
-        # and the sticky comment; flag whether there were any survivors.
-        # "Nothing was in scope" must never read as "everything was caught" (#482):
-        # the tested count comes from `outcomes.json`, and a zero is only reported as
-        # "no mutants in scope" when the mutation step itself succeeded.
-        env:
-          MUTATE: ${{ steps.mutate.outcome }}
-        run: |
-          MISSED=mutants.out/missed.txt
-          OUTCOMES=mutants.out/outcomes.json
-          total=0
-          if [ -f "$OUTCOMES" ]; then
-            total=$(jq '.total_mutants // 0' "$OUTCOMES")
-            caught=$(jq '.caught // 0' "$OUTCOMES")
-            missed=$(jq '.missed // 0' "$OUTCOMES")
-            timeout=$(jq '.timeout // 0' "$OUTCOMES")
-            unviable=$(jq '.unviable // 0' "$OUTCOMES")
-          fi
-          {
-            echo '### Mutation testing — diff-scoped (informational, non-blocking)'
-            echo ''
-            if [ -s "$MISSED" ]; then
-              echo 'These **changed** sim lines were mutated and no test caught it. Strengthen the tests covering them:'
-              echo ''
-              echo '```'
-              cat "$MISSED"
-              echo '```'
-            elif [ "$MUTATE" != success ] && [ "${timeout:-0}" -eq 0 ]; then
-              # A failure that no survivor or timeout explains: the build or the
-              # unmutated baseline broke, so whatever count exists was not measured.
-              echo "⚠️ cargo-mutants failed without a survivor or timeout to explain it (step: \`$MUTATE\`) — nothing was measured. See the job log."
-            elif [ "$total" -eq 0 ]; then
-              echo 'No mutants in scope: this PR changes no mutable sim lines, so nothing was tested. ➖'
-            else
-              echo "No surviving mutants in the changed sim lines: $total tested — $caught caught, $timeout timed out, $unviable unviable. ✅"
-            fi
-            if [ -s "$MISSED" ] && [ -f "$OUTCOMES" ]; then
-              echo ''
-              echo "$total tested — $caught caught, $missed missed, $timeout timed out, $unviable unviable."
-            fi
-          } | tee comment.md >> "$GITHUB_STEP_SUMMARY"
-          if [ -s "$MISSED" ]; then
-            echo 'has_survivors=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'has_survivors=false' >> "$GITHUB_OUTPUT"
-          fi
-      - name: Post surviving-mutant comment
-        if: always() && steps.prep.outputs.has_survivors == 'true'
-        uses: marocchino/sticky-pull-request-comment@v3
-        with:
-          header: mutants-diff
-          path: comment.md
-      - name: Clear stale survivor comment
-        # Idempotent: when a re-push fixes the survivors, drop the old comment so the
-        # PR doesn't carry a stale list.
-        if: always() && steps.prep.outputs.has_survivors != 'true'
-        uses: marocchino/sticky-pull-request-comment@v3
-        with:
-          header: mutants-diff
-          delete: true
-      - name: Upload surviving-mutant report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: mutants-pr-report
-          path: mutants.out/
-
-  # Decides whether tonight's sweep would measure anything new (#506). On a night
-  # with no merges `main` has not moved, and the report of the last *finished*
-  # sweep of this commit is still the current answer — re-running it holds five
-  # runners for ~7 h to reproduce it. "Finished" means `mutants-report` saw every
-  # shard complete and wrote `sweep-complete` into its artifact; a sweep with a
-  # cut-off shard left mutants unmeasured and does not count. Fails open: if the
-  # lookup itself errors, the sweep runs (a wasted night beats a silent gap), and
-  # this job never fails, so a skipped sweep reads as `skipped` — not red — to
-  # main-health. `force_mutants` on a manual dispatch bypasses the lookup.
-  #
-  # A dispatch reaches this job only with `force_mutants` (#705): a plain
-  # dispatch is a proof run of the gates, and sweeping a branch commit — never
-  # swept before, so never skipped — took five runners for ~3.5 h on every one.
-  #
-  # One sweep at a time, repo-wide (#705): if another run's sweep shards are
-  # still going, this run skips its own rather than taking five more runners
-  # from the merge gates; the next night sweeps whatever `main` is by then.
-  # This is a lookup, not a `concurrency` group, because a group on the
-  # `mutants` matrix would serialise its own shards and cancel all but one
-  # pending, and a group on this job releases as soon as it finishes. Forced
-  # sweeps obey it too — re-dispatch once the running sweep ends.
-  mutants-plan:
-    runs-on: ubuntu-latest
-    if: >-
-      github.event_name == 'schedule' ||
-      (github.event_name == 'workflow_dispatch' && inputs.force_mutants)
-    permissions:
-      contents: read
-      actions: read   # list this workflow's past runs and read their artifacts
-    outputs:
-      sweep: ${{ steps.plan.outputs.sweep }}
-    steps:
-      - name: Look for a finished sweep of this commit
-        id: plan
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
-          RUN_ID: ${{ github.run_id }}
-          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force_mutants }}
-        run: |
-          decide() {
-            echo "sweep=$1" >> "$GITHUB_OUTPUT"
-            echo "$2" | tee -a "$GITHUB_STEP_SUMMARY"
-          }
-          # Is another run's sweep still holding shards? Any commit, any branch.
-          if ! live=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?status=in_progress&per_page=100" \
-                --jq ".workflow_runs[] | select(.id != $RUN_ID) | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.id) \\(.html_url)\""); then
-            echo '::warning::could not list running runs; sweeping to be safe'
-            live=''
-          fi
-          while read -r id url; do
-            [ -n "$id" ] || continue
-            if gh api "repos/$REPO/actions/runs/$id/jobs?per_page=100" \
-                --jq '.jobs[] | select((.name | startswith("mutants (")) and .status != "completed") | .id' | grep -q .; then
-              decide false "Mutation sweep skipped: $url is still sweeping, and only one sweep runs at a time."
-              exit 0
-            fi
-          done <<< "$live"
-          if [ "$FORCE" = true ]; then
-            decide true "Mutation sweep forced by \`force_mutants\`."; exit 0
-          fi
-          # Newest first; the run in progress is not `completed`, so never matches.
-          if ! runs=$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$SHA&status=completed&per_page=100" \
-                --jq '.workflow_runs[] | select(.event == "schedule" or .event == "workflow_dispatch") | "\(.id) \(.html_url)"'); then
-            echo '::warning::could not list past runs; sweeping to be safe'
-            decide true "Mutation sweep runs: the past-run lookup failed."; exit 0
-          fi
-          while read -r id url; do
-            [ -n "$id" ] || continue
-            dir=$(mktemp -d)
-            gh run download "$id" -R "$REPO" -n mutants-report -D "$dir" >/dev/null 2>&1 || continue
-            if [ -f "$dir/sweep-complete" ]; then
-              decide false "Mutation sweep skipped: \`$SHA\` was fully swept by $url — its \`mutants-report\` is still current. Dispatch with \`force_mutants\` to re-run."
-              exit 0
-            fi
-          done <<< "$runs"
-          decide true "Mutation sweep runs: no finished sweep covers \`$SHA\` yet."
-
-  # Nightly full-sim mutation sweep — the report-only backstop. Unlike the per-PR
-  # diff run, this re-mutates the *entire* deterministic sim (app/scripting/physics/
-  # navigation), re-examining untouched code the diff run never touches and
-  # tracking/ratcheting the survivor backlog (#158–#161). Runs on the nightly
-  # `schedule` or a `force_mutants` dispatch; never on a PR, never blocking. No `needs: changes`:
-  # there is no PR/push diff to filter on a scheduled/manual run, so it always
-  # sweeps the full set.
-  #
-  # Sharded (#480). Unsharded, the sweep hit GitHub's 6 h job ceiling on every run
-  # and never produced a report: ~1,000 mutants at ~2 min each (every mutant
-  # rebuilds the single crate, then runs the dev suite) is ~33 runner-hours.
-  # Ten shards of ~100 mutants each run ~3.5 h — headroom for the sim to grow by
-  # half again before a shard nears the ceiling. Resize with
-  # `cargo mutants --list --file <the globs below> | wc -l`, which builds nothing.
-  # `round-robin` spreads each file's mutants over every shard, so no shard draws
-  # a whole slow module; a single crate rebuilds fully per mutant regardless, so
-  # the default `slice` sharding's build locality buys nothing here.
-  # `max-parallel` leaves most of the account's concurrent-job allowance free for
-  # PR runs of an overnight batch; wall-clock time is irrelevant to a nightly
-  # report. `mutants-report` merges the shards into one summary.
-  #
-  # Skipped when `mutants-plan` finds a finished sweep of this very commit (#506).
-  mutants:
-    needs: mutants-plan
-    runs-on: ubuntu-latest
-    if: needs.mutants-plan.outputs.sweep == 'true'
-    continue-on-error: true
-    # GitHub's 6 h ceiling, spelled out: the shard sizing above budgets against
-    # it (~3.5 h observed), and `mutants-report` names a shard it cuts off.
-    timeout-minutes: 360
-    strategy:
-      fail-fast: false
-      max-parallel: 5
-      matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    steps:
-      - uses: actions/checkout@v7
-      - name: Toolchain (from rust-toolchain.toml)
-        run: rustup show
-      - name: Cache cargo registry + target
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: mutants
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: System libs for winit/wgpu builds
-        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
-      - name: Install cargo-mutants
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-mutants
-      - name: Mutation test (one shard of the full deterministic sim, report-only)
-        # Build/test with the dev feature so the headless-harness sim tests run
-        # too. Scoped by --file to the sim modules; the timeout multiplier guards
-        # against mutants that induce infinite loops. The exit code is recorded
-        # so `mutants-report` can tell a finished shard (0 clean, 2 survivors,
-        # 3 timeouts) from one that was cut off or never got past its baseline.
-        #
-        # `ulimit -v` caps every process at 8 GiB of address space, half the
-        # runner's 16 GB (#674). A mutant that turns a loop infinite *and*
-        # allocating (a `Vec::push` that never stops) fills RAM in seconds,
-        # long before the per-mutant timeout. That is the likeliest reading of
-        # the 2026-10-01 sweep: shard 1's runner got "received a shutdown
-        # signal" 4 min into a mutant whose test limit was 172 s, and the shard
-        # was lost with no report. Capped, the test binary dies on its own allocation and
-        # cargo-mutants counts the mutant caught. Local proof: the dev build
-        # and suite pass under the cap; real usage is far below it.
-        run: |
-          ulimit -v 8388608
-          rc=0
-          cargo mutants --no-shuffle --timeout-multiplier 3 \
-            --shard '${{ matrix.shard }}/${{ strategy.job-total }}' --sharding round-robin \
-            --file 'src/app/**/*.rs' \
-            --file 'src/scripting/**/*.rs' \
-            --file 'src/physics/**/*.rs' \
-            --file 'src/navigation/**/*.rs' \
-            -- --features dev || rc=$?
-          mkdir -p mutants.out
-          echo "$rc" > mutants.out/exit-code
-          exit "$rc"
-      - name: Record the shard count for the merge job
-        if: always()
-        run: |
-          mkdir -p mutants.out
-          echo '${{ strategy.job-total }}' > mutants.out/shard-total
-      - name: Upload this shard's report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: mutants-shard-${{ matrix.shard }}
-          path: mutants.out/
-
-  # Merges the shard reports into the one sweep report: a job summary (totals,
-  # unfinished shards, the survivor list) and a single `mutants-report` artifact.
-  # A shard that did not finish is named, because its mutants are unmeasured —
-  # silence from it is not a clean bill.
-  mutants-report:
-    needs: mutants
-    # Runs whenever the sweep ran — even if shards failed — but not when
-    # `mutants-plan` skipped it: there is nothing to merge.
-    if: always() && needs.mutants.result != 'skipped'
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - name: Download every shard's report
-        uses: actions/download-artifact@v8
-        with:
-          pattern: mutants-shard-*
-          path: shards
-      - name: Merge shards and summarize
-        run: |
-          mkdir -p mutants.out
-          for kind in caught missed timeout unviable; do
-            cat shards/*/"$kind".txt 2>/dev/null | sort > "mutants.out/$kind.txt" || true
-          done
-          total=$(cat shards/*/shard-total 2>/dev/null | head -n1 || true)
-          unfinished=''
-          for k in $(seq 0 $(( ${total:-0} - 1 ))); do
-            rc=$(cat "shards/mutants-shard-$k/exit-code" 2>/dev/null || echo none)
-            case "$rc" in 0|2|3) ;; *) unfinished="$unfinished $k(exit:$rc)" ;; esac
-          done
-          count() { grep -c . "mutants.out/$1.txt" || true; }
-          {
-            echo '### Mutation sweep — full deterministic sim (informational, non-blocking)'
-            echo ''
-            echo '| caught | missed | timeout | unviable |'
-            echo '|---|---|---|---|'
-            echo "| $(count caught) | $(count missed) | $(count timeout) | $(count unviable) |"
-            echo ''
-            if [ -z "$total" ]; then
-              echo '> ❌ No shard uploaded a report — nothing was measured.'
-            elif [ -n "$unfinished" ]; then
-              echo "> ⚠️ Shards that did not finish (of $total):$unfinished — their mutants are unmeasured, not clean. \`exit:none\` means the shard was cut off or failed before its run: check its log for the 6 h ceiling (resize the matrix) or a lost runner (\`received a shutdown signal\`, a one-off unless it recurs)."
-            else
-              echo "> All $total shards finished."
-              # The marker `mutants-plan` looks for (#506): this commit is covered.
-              echo "$total" > mutants.out/sweep-complete
-            fi
-            if [ -s mutants.out/missed.txt ]; then
-              echo ''
-              echo '<details><summary>Surviving mutants</summary>'
-              echo ''
-              echo '```'
-              cat mutants.out/missed.txt
-              echo '```'
-              echo '</details>'
-            fi
-          } | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Upload the merged sweep report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: mutants-report
-          path: mutants.out/
