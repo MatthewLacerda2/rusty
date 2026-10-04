@@ -9,6 +9,11 @@ it **here**, once, not in the next prompt.
 MCP tools (`issue_read`, `create_pull_request`, `update_pull_request`,
 `add_issue_comment`); load them with ToolSearch.
 
+**A bug you find is yours to deal with.** Fix it in this branch when it's in
+your way or small, or file an issue with the evidence (the `issue-write` skill)
+and keep going. Either way it never goes unrecorded: the operator expects coders
+to file issues mid-batch.
+
 ## Check the issue's blockers yourself
 
 Before writing code, read the issue body for "Blocked by" and check each blocker's state on GitHub. The orchestrator checks GitHub's recorded relationships, and a blocker that exists only in prose slips past it. If a blocker is still open, stand down as the ~3-attempts rule says (comment on the issue, no branch) and say which issue should go first. (#399 on 2026-09-30.)
@@ -61,6 +66,11 @@ name more.
   rather than falling back to `cargo test`: CI runs nextest, and its per-test
   process isolation and the `gpu` test group are what the gate measures.
 - Rebase onto the latest `origin/main` before readying.
+- **Rebasing a PR that is already ready: run the full `make gates` before you
+  push.** A push to a ready PR is a CI run, and a red one is a broken claim
+  (scorsese #686, 2026-10-03: a hand-merged list that `cargo fmt --check`
+  refused, found by CI instead of the session). After resolving any conflict,
+  run `cargo fmt --all`.
 - Don't run `cargo mutants`.
 
 ## Protocol

@@ -76,10 +76,10 @@ Those are findings, and findings are cheap to lose.
 **File rather than fix** when the thing found is outside the branch in hand.
 A branch that grows to cover everything it noticed is a branch nobody can review.
 
-**Do not file and start in the same breath** — unless the work is a direct
-consequence of an already-decided issue. An idea still being shaped has to settle
-before anyone codes it. (This is rusty's rule and it is stricter than "absent a
-stage label, it is startable"; both are in `CLAUDE.md` and this one wins.)
+**A stage label is the only absolute stop.** `planning` and `human` mean *not
+yet*. Everything else is startable the moment it exists, including an issue filed
+a minute ago. So an idea still being shaped gets `planning` when it is filed;
+leaving the label off is the statement that it is ready.
 
 **Assign the user the moment work begins.** Unassigned means fair game; assigned
 means in progress.
@@ -91,8 +91,8 @@ means in progress.
 - `planning` — still being discussed with the user. **Never started**, by any means.
 - `human` — needs a human in the loop end to end. It is a type label here, but
   **treat it as not-ready**: do not start it.
-- *(neither)* — anyone can tell an agent "do issue N", subject to its blockers and
-  to the file-and-start rule above.
+- *(neither)* — startable the moment it exists: anyone can tell an agent "do
+  issue N", subject only to its blockers.
 
 **The judgement lives in the label**, so put it on honestly. Broad or vague is
 what `planning` is for. A Claude-written issue **must** carry `planning` if it

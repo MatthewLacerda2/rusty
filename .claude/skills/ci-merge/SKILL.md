@@ -61,10 +61,11 @@ is not a report — **relaunch the watch** with the same arguments. It exists
 because a background command is killed at two hours wherever it is, a push or
 a merge included. The deadline is checked only before taking a pull request,
 so the take in hand can outlast it by up to the per-PR `--deadline` (45 min):
-`--for 70` keeps 70 + 45 under that cap (110 did not — corrected 2-Oct-2026), so every exit lands
-between pull requests. The deadline is checked only before a take, so a take
-started at minute 109 still runs to its end — usually minutes, at worst its
-own `--deadline` (45) of CI waiting. `make queue PRS="a b c"` takes named
+`--for 70` keeps 70 + 45 under that cap, so every exit lands between pull
+requests. When many coders push at once, runs wait for GitHub runners
+(2026-10-02: a run's first job started 13 minutes in, and #699 was handed back
+green-but-unfinished at 45); then raise `--deadline` and lower `--for` together,
+keeping the sum under two hours: `--for 50 --deadline 60`. `make queue PRS="a b c"` takes named
 pull requests instead, in the order given. Either way, the loop is one pull
 request at a time — so no agent sits through a ten-minute run holding a
 worktree open:

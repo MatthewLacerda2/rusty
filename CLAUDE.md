@@ -185,10 +185,11 @@ is wrong.
   **assign the user to that issue** so it's visibly taken — everyone can see it's being
   worked on right now, not just sitting in the backlog. An unassigned issue is fair game;
   an assigned one is in progress.
-- **Never file an issue and start it in the same breath** — unless the work is a *direct
-  consequence* of another, already-decided issue, or a clear win under *Take the
-  initiative*. Filing-then-immediately-implementing
-  defeats planning: an idea still being shaped has to settle before anyone codes it.
+- **A stage label is the only absolute stop.** `planning` and `human` mean *not yet*,
+  and no amount of the issue looking ready overrides them. Everything else is startable
+  the moment it exists, including an issue filed a minute ago, mid-batch or not. An idea
+  still being shaped is what `planning` is for: the judgement lives in the label, so
+  asking it again when work begins adds nothing.
 - **Issue-less PRs are allowed only** for documentation updates or bug fixes; everything
   else starts as an issue.
 - **File what you notice.** Claude may open an issue unprompted for anything that will
