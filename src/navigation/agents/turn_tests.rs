@@ -100,3 +100,37 @@ fn wraps_to_the_shortest_arc() {
     assert_eq!(wrap_degrees(-270.0), 90.0);
     assert_eq!(wrap_degrees(45.0), 45.0);
 }
+
+/// Spinning at 60°/s with its heading 0.5° ahead, this tick's step (0.8°) would
+/// pass it: it lands on the heading instead, keeping the rate it really turned at
+/// (30°/s), either way round.
+#[test]
+fn lands_on_the_heading_instead_of_passing_it() {
+    for sign in [1.0f32, -1.0] {
+        let mut a = NavMeshAgentComponent {
+            angular_velocity: 60.0 * sign,
+            ..Default::default()
+        };
+        let target = (0.5 * sign).to_radians();
+        let yaws = turn(&mut a, Vec2::new(target.sin(), target.cos()), 1);
+        assert!((yaws[0] - 0.5 * sign).abs() < 1e-4, "{}", yaws[0]);
+        assert!(
+            (a.angular_velocity - 30.0 * sign).abs() < 1e-2,
+            "{}",
+            a.angular_velocity
+        );
+    }
+}
+
+/// Spinning at 60°/s onto a still heading it already faces, it can only shed
+/// α·dt (12°/s) this tick, so it carries on past rather than stopping dead.
+#[test]
+fn momentum_carries_past_an_exact_heading() {
+    let mut a = NavMeshAgentComponent {
+        angular_velocity: 60.0,
+        ..Default::default()
+    };
+    let yaws = turn(&mut a, Vec2::new(0.0, 1.0), 1);
+    assert!((yaws[0] - 0.8).abs() < 1e-4, "{}", yaws[0]);
+    assert_eq!(a.angular_velocity, 48.0);
+}

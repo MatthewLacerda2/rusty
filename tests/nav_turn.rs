@@ -106,3 +106,22 @@ fn faces_the_steering_direction_not_the_dodge() {
         "facing strayed {lag}° from the steering direction"
     );
 }
+
+/// A scene saved before #744 has no turning fields: they load as Unity's defaults
+/// (turning on, 120°/s) and the 720°/s² ramp.
+#[test]
+fn older_scenes_load_the_turning_defaults() {
+    let mut json = serde_json::to_value(NavMeshAgentComponent {
+        update_rotation: false,
+        angular_speed: 1.0,
+        angular_acceleration: 1.0,
+        ..agent(0.0)
+    })
+    .unwrap();
+    for key in ["update_rotation", "angular_speed", "angular_acceleration"] {
+        json.as_object_mut().unwrap().remove(key);
+    }
+    let a: NavMeshAgentComponent = serde_json::from_value(json).unwrap();
+    assert!(a.update_rotation);
+    assert_eq!((a.angular_speed, a.angular_acceleration), (120.0, 720.0));
+}

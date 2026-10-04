@@ -118,3 +118,15 @@ fn ui_elements_report_their_components_and_computed_rect() {
     );
     assert!(v["entities"][0]["ui_rect"].is_object());
 }
+
+#[test]
+fn nav_agent_reports_its_turning() {
+    let mut scene = Scene::new();
+    let id = create_entity(&mut scene, "Bot", None);
+    add_component(&mut scene, id, ComponentKind::NavMeshAgent);
+    let ent = &world_value(&scene, &cam(), 0, false, SCREEN)["entities"][0];
+    let agent = &ent["nav_agent"];
+    assert_eq!(agent["update_rotation"].as_bool(), Some(true));
+    assert_eq!(agent["angular_speed"].as_f64(), Some(120.0));
+    assert_eq!(agent["angular_acceleration"].as_f64(), Some(720.0));
+}
