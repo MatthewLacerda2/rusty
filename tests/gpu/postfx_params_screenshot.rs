@@ -1,7 +1,8 @@
 //! Runtime postfx params pixel test (#671): a script's `Graphics.SetPostParam`
 //! drives a baked damage vignette's intensity, and the corner of the frame follows
-//! it with no re-bake — the module, its pipeline and the bake generation stay put;
-//! only the volume's value (a uniform write) changes between frames.
+//! it with no re-bake — the module's files stay untouched; only the volume's value
+//! (a uniform write) changes between frames. Its own files, not the process-wide
+//! bake generation, which a neighbouring test's bake moves (#794).
 
 use std::cell::RefCell;
 
@@ -9,9 +10,7 @@ use mlua::Lua;
 use rusty::core::quality::QualityPreset;
 use rusty::dev::capture::CaptureHost;
 use rusty::scene::Scene;
-use rusty::shadergen::{
-    bake_generation, bake_recipe, ShaderRecipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR,
-};
+use rusty::shadergen::{bake_recipe, ShaderRecipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
 
 use super::fog_scene::{shot, srgb8, wall_scene};
 
@@ -36,6 +35,14 @@ fn scene() -> RefCell<Scene> {
         .unwrap()
         .custom_effects = vec![NAME.into()];
     RefCell::new(scene)
+}
+
+/// When the module and its params sidecar were last written: a bake rewrites both.
+fn written() -> [Option<std::time::SystemTime>; 2] {
+    ["wgsl", "params.json"].map(|ext| {
+        let path = format!("{DEFAULT_OUT_DIR}/{NAME}.{ext}");
+        std::fs::metadata(path).and_then(|m| m.modified()).ok()
+    })
 }
 
 /// Run `script` against the `Graphics` namespace.
@@ -66,12 +73,13 @@ fn corner_at(host: &mut CaptureHost, scene: &RefCell<Scene>, intensity: f32) -> 
 fn a_script_set_intensity_moves_the_vignette_edge_without_a_rebake() {
     let scene = scene();
     let mut host = CaptureHost::new();
-    let generation = bake_generation();
+    let baked = written();
     let Some(off) = corner_at(&mut host, &scene, 0.0) else {
         return;
     };
     let half = corner_at(&mut host, &scene, 0.5).unwrap();
     let full = corner_at(&mut host, &scene, 1.0).unwrap();
+    let after = written();
     std::fs::remove_file(format!("{DEFAULT_OUT_DIR}/{NAME}.wgsl")).ok();
     std::fs::remove_file(format!("{DEFAULT_OUT_DIR}/{NAME}.params.json")).ok();
 
@@ -88,9 +96,6 @@ fn a_script_set_intensity_moves_the_vignette_edge_without_a_rebake() {
         half[1] < off[1] && half[1] > full[1],
         "0.5 sits between: {half:?}"
     );
-    assert_eq!(
-        bake_generation(),
-        generation,
-        "a param write never re-bakes"
-    );
+    assert!(baked[0].is_some(), "the module was baked");
+    assert_eq!(after, baked, "a param write never re-bakes");
 }

@@ -15,12 +15,14 @@
 //! all four UI entry points, then built under a validation error scope. A module
 //! that is missing, fails to compose, is not a ui module, or fails wgpu validation is
 //! logged **once** and its graphics draw with the standard shader — never a crash.
-//! A bake anywhere in the process (`shadergen::bake_generation`) drops the cache, so
-//! a re-baked shader is picked up next frame.
+//! After a bake anywhere in the process (`shadergen::bake_generation`) each variant
+//! re-reads its module and params sidecar, and only one whose files changed is
+//! dropped: a re-baked shader is picked up next frame, every other one stays built.
 //!
 //! The per-graphic uniforms each view packs every frame are in `uniforms`.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 pub(crate) mod shaded;
 mod uniforms;
@@ -43,6 +45,16 @@ struct Variant {
     screen: HashMap<(wgpu::TextureFormat, UiBlend), wgpu::RenderPipeline>,
 }
 
+/// What a variant was built from — its module's path, source and params sidecar —
+/// or `None` when no module answers to its name.
+type Source = Option<(PathBuf, String, Option<String>)>;
+
+fn source(name: &str) -> Source {
+    let path = params::resolve_module(&[DEFAULT_OUT_DIR, ENGINE_SHADER_DIR], name)?;
+    let sidecar = std::fs::read_to_string(params::sidecar_path(&path)).ok();
+    Some((path.clone(), std::fs::read_to_string(path).ok()?, sidecar))
+}
+
 /// The variant cache and the layouts its pipelines share. One per `UiRenderer`.
 pub(crate) struct UiShaders {
     shade_layout: wgpu::BindGroupLayout,
@@ -51,8 +63,9 @@ pub(crate) struct UiShaders {
     screen_layout: wgpu::PipelineLayout,
     world_layout: wgpu::PipelineLayout,
     generation: u64,
-    /// `None` records a failure, logged once until the next bake.
-    variants: HashMap<String, Option<Variant>>,
+    /// Each with its [`Source`]; `None` records a failure, logged once until the
+    /// module changes.
+    variants: HashMap<String, (Source, Option<Variant>)>,
     /// Variant builds so far — a runtime param change must never add one.
     builds: usize,
 }
@@ -114,23 +127,24 @@ impl UiShaders {
     fn variant(&mut self, device: &wgpu::Device, name: &str) -> Option<&Variant> {
         if !self.variants.contains_key(name) {
             self.builds += 1;
-            let built = self.build(device, name).map_err(|e| {
+            let source = source(name);
+            let built = self.build(device, name, &source).map_err(|e| {
                 log::warn!("ui shader {name:?}: {e}; drawing with the standard UI shader");
             });
-            self.variants.insert(name.to_owned(), built.ok());
+            self.variants.insert(name.to_owned(), (source, built.ok()));
         }
-        self.variants.get(name)?.as_ref()
+        self.variants.get(name)?.1.as_ref()
     }
 
-    /// Compose `name`'s module, check it is a ui module, and build its world
-    /// pipeline under a validation error scope, so wgpu refuses instead of panicking.
-    fn build(&self, device: &wgpu::Device, name: &str) -> Result<Variant, String> {
-        let dirs = [DEFAULT_OUT_DIR, ENGINE_SHADER_DIR];
-        let path = params::resolve_module(&dirs, name)
-            .ok_or_else(|| format!("no `{name}.wgsl` in {}", dirs.join(" or ")))?;
-        let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    /// Compose `name`'s module from its `source`, check it is a ui module, and build
+    /// its world pipeline under a validation error scope, so wgpu refuses instead of
+    /// panicking.
+    fn build(&self, device: &wgpu::Device, name: &str, source: &Source) -> Result<Variant, String> {
+        let (path, wgsl, _) = source.as_ref().ok_or_else(|| {
+            format!("no `{name}.wgsl` in {DEFAULT_OUT_DIR} or {ENGINE_SHADER_DIR}")
+        })?;
         let mut composer = compose::composer_with_common(ENGINE_SHADER_DIR)?;
-        let module = compose::compose(&mut composer, &source, &path.to_string_lossy())?;
+        let module = compose::compose(&mut composer, wgsl, &path.to_string_lossy())?;
         for entry in ["vs_main", "fs_main", "vs_world", "fs_world"] {
             if !module.entry_points.iter().any(|e| e.name == entry) {
                 return Err(format!(
@@ -138,7 +152,7 @@ impl UiShaders {
                 ));
             }
         }
-        let params = ParamLayout::read_beside(&path)?;
+        let params = ParamLayout::read_beside(path)?;
         let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("UI Variant Shader"),
@@ -169,22 +183,24 @@ impl UiShaders {
     /// and after a failure, when its graphics fell back to the standard shader.
     #[cfg(test)]
     pub(crate) fn built(&self, name: &str) -> bool {
-        self.variants.get(name).is_some_and(Option::is_some)
+        self.variants.get(name).is_some_and(|(_, v)| v.is_some())
     }
 
-    /// Drop every variant when a bake happened since they were built.
+    /// After a bake since the last look, drop every variant whose module or params
+    /// changed on disk (re-baked, appeared, vanished), so it rebuilds on next use.
     fn refresh(&mut self) {
         let generation = bake_generation();
         if generation != self.generation {
             self.generation = generation;
-            self.variants.clear();
+            self.variants
+                .retain(|name, (built_from, _)| *built_from == source(name));
         }
     }
 
     /// Build every loaded variant's screen pipelines for `format` if absent, one per
     /// blend mode.
     pub(super) fn ensure_screen(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat) {
-        for variant in self.variants.values_mut().flatten() {
+        for variant in self.variants.values_mut().filter_map(|(_, v)| v.as_mut()) {
             for mode in UiBlend::ALL {
                 if !variant.screen.contains_key(&(format, mode)) {
                     let shader = ("UI Variant", &variant.module, &self.screen_layout);
@@ -214,6 +230,7 @@ impl UiShaders {
             let variant = self
                 .variants
                 .get(&batch.shade.as_ref()?.shader.name)?
+                .1
                 .as_ref()?;
             let pipeline = match pass {
                 UiPass::Screen(format) => variant.screen.get(&(format, batch.blend))?,

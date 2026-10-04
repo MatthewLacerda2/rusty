@@ -1,7 +1,8 @@
 //! Custom ui shaders through the real UI pass (#427): a missing or non-ui shader
 //! falls back to the standard one, a runtime param is a buffer write (no rebuild), a
-//! re-bake is picked up next frame, a RectMask still clips a custom-shaded graphic,
-//! and a shaded graphic gets its own batch. Skips with no adapter.
+//! re-bake is picked up next frame while another shader's bake rebuilds nothing
+//! (#794), a RectMask still clips a custom-shaded graphic, and a shaded graphic gets
+//! its own batch. Skips with no adapter.
 
 use std::cell::RefCell;
 
@@ -75,6 +76,24 @@ fn gpu_a_rebake_is_picked_up_next_frame() {
     assert!(shot(&mut renderer, &mut view, &scene).px(32, 32)[0] < 15);
     let _shown = Baked::new("rebake", &[("wipe", &[("progress", 1.0)])]);
     assert!(shot(&mut renderer, &mut view, &scene).px(32, 32)[0] > 240);
+}
+
+#[test]
+fn gpu_a_bake_of_another_shader_rebuilds_no_variant() {
+    // #794: a bake re-reads every variant's module and drops only a changed one, so
+    // a neighbouring test's bake under one-process `cargo test` rebuilds nothing here.
+    let Some(mut renderer) = headless_or_skip(RES, RES) else {
+        return;
+    };
+    let kept = Baked::new("kept", &[("wipe", &[("progress", 1.0)])]);
+    let (scene, _, _) = scene(Some(&kept.0));
+    let mut view = None;
+    assert!(shot(&mut renderer, &mut view, &scene).px(32, 32)[0] > 240);
+    let builds = renderer.ui_renderer.shaders.builds();
+    let _unrelated = Baked::new("unrelated", &[("scanlines", &[])]);
+    assert!(shot(&mut renderer, &mut view, &scene).px(32, 32)[0] > 240);
+    assert!(renderer.ui_renderer.shaders.built(&kept.0));
+    assert_eq!(renderer.ui_renderer.shaders.builds(), builds, "no rebuild");
 }
 
 #[test]
