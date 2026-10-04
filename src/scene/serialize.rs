@@ -138,6 +138,8 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
 
     let bone_parents = crate::scene::skeleton::take_bone_parents(&mut data.entities);
     scene.world.clear();
+    // The overrides named the replaced World's entities; they are runtime-only (#670).
+    scene.shader_overrides.clear_all();
     for entity in data.entities {
         scene.world.insert_entity(entity);
     }

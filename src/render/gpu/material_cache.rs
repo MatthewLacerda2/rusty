@@ -20,9 +20,17 @@
 //! material binds the shared all-zero buffer and batches by maps exactly as before. A
 //! param change is a `write_buffer` into the owned buffer: the group, the pipeline and
 //! the WGSL are untouched.
+//!
+//! **Per-entity overrides (#670).** An entity overriding one of those params (Unity's
+//! `MaterialPropertyBlock`) owns a buffer of its own, keyed by (scene, entity), holding
+//! its material's values with its overrides on top — and so a group of its own, a draw
+//! of its own. Entities without overrides keep sharing the material's group and
+//! batching together. An entity's buffer and groups are released the frame after its
+//! last override is cleared, and their slots reused.
 
 use std::collections::HashMap;
 
+use crate::scene::SceneId;
 use crate::shadergen::params::PackedParams;
 
 /// Group-2 textures: the five maps plus one per extra shader texture slot (#400).
@@ -32,16 +40,26 @@ pub(crate) const MATERIAL_TEXTURES: usize = 5 + crate::shadergen::textures::SLOT
 /// texture slots (`mask`), in that order.
 pub(crate) type MapSignature = [String; MATERIAL_TEXTURES];
 
-/// A group's identity: its maps, and the material owning its param buffer (if any).
-pub(crate) type GroupKey = (MapSignature, Option<String>);
+/// Who owns a param buffer: a material (by library key), or one entity overriding
+/// its material's values (#670).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum ParamOwner {
+    Material(String),
+    Entity(SceneId, u32),
+}
+
+/// A group's identity: its maps, and who owns its param buffer (if anyone).
+pub(crate) type GroupKey = (MapSignature, Option<ParamOwner>);
 
 pub(crate) struct MaterialCache {
     index: HashMap<GroupKey, usize>,
-    groups: Vec<wgpu::BindGroup>,
+    /// Built groups by index; a released entity's slot is `None` until reused.
+    groups: Vec<Option<wgpu::BindGroup>>,
+    free: Vec<usize>,
     /// The params every material without runtime params binds (all zero).
     zero_params: wgpu::Buffer,
-    /// Each runtime-param material's buffer, with the values last written to it.
-    params: HashMap<String, (wgpu::Buffer, PackedParams)>,
+    /// Each owner's buffer, with the values last written to it.
+    params: HashMap<ParamOwner, (wgpu::Buffer, PackedParams)>,
 }
 
 impl MaterialCache {
@@ -49,6 +67,7 @@ impl MaterialCache {
         Self {
             index: HashMap::new(),
             groups: Vec::new(),
+            free: Vec::new(),
             zero_params,
             params: HashMap::new(),
         }
@@ -61,18 +80,43 @@ impl MaterialCache {
 
     /// Store `group` for `key`, returning its index.
     pub(crate) fn insert(&mut self, key: GroupKey, group: wgpu::BindGroup) -> usize {
-        let i = self.groups.len();
-        self.groups.push(group);
+        let i = match self.free.pop() {
+            Some(i) => i,
+            None => {
+                self.groups.push(None);
+                self.groups.len() - 1
+            }
+        };
+        self.groups[i] = Some(group);
         self.index.insert(key, i);
         i
     }
 
     pub(crate) fn group(&self, i: usize) -> &wgpu::BindGroup {
-        &self.groups[i]
+        self.groups[i]
+            .as_ref()
+            .expect("a released group is never drawn")
+    }
+
+    /// Release scene `scene`'s entity-owned buffers and groups whose entity no longer
+    /// `overrides` (#670) — run before the frame resolves any index, so a freed slot
+    /// is never one a batch of this frame points at.
+    pub(crate) fn release_entities(&mut self, scene: SceneId, overrides: impl Fn(u32) -> bool) {
+        let stale = |o: &ParamOwner| matches!(o, ParamOwner::Entity(s, id) if *s == scene && !overrides(*id));
+        self.params.retain(|owner, _| !stale(owner));
+        let (groups, free) = (&mut self.groups, &mut self.free);
+        self.index.retain(|(_, owner), i| {
+            let keep = !owner.as_ref().is_some_and(stale);
+            if !keep {
+                groups[*i] = None;
+                free.push(*i);
+            }
+            keep
+        });
     }
 
     /// The param buffer `owner` binds: its own, else the shared zero one.
-    pub(crate) fn params_buffer(&self, owner: Option<&str>) -> &wgpu::Buffer {
+    pub(crate) fn params_buffer(&self, owner: Option<&ParamOwner>) -> &wgpu::Buffer {
         owner
             .and_then(|o| self.params.get(o))
             .map_or(&self.zero_params, |(buffer, _)| buffer)
@@ -84,7 +128,7 @@ impl MaterialCache {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        owner: &str,
+        owner: &ParamOwner,
         values: PackedParams,
     ) {
         if let Some((buffer, last)) = self.params.get_mut(owner) {
@@ -101,7 +145,7 @@ impl MaterialCache {
             mapped_at_creation: false,
         });
         queue.write_buffer(&buffer, 0, bytemuck::cast_slice(&values));
-        self.params.insert(owner.to_owned(), (buffer, values));
+        self.params.insert(owner.clone(), (buffer, values));
     }
 
     /// Drop every group (their param buffers stay), so the next lookup rebuilds each
@@ -110,11 +154,18 @@ impl MaterialCache {
     pub(crate) fn forget_groups(&mut self) {
         self.index.clear();
         self.groups.clear();
+        self.free.clear();
     }
 
-    /// Distinct material groups built so far.
+    /// Distinct material groups alive now.
     #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
-        self.groups.len()
+        self.groups.iter().flatten().count()
+    }
+
+    /// Param buffers alive now (materials' and entities').
+    #[cfg(test)]
+    pub(crate) fn params_len(&self) -> usize {
+        self.params.len()
     }
 }

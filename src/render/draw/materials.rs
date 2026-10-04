@@ -11,9 +11,22 @@
 use std::rc::Rc;
 
 use crate::components::MaterialAsset;
-use crate::render::gpu::material_cache::MATERIAL_TEXTURES;
+use crate::render::gpu::material_cache::{ParamOwner, MATERIAL_TEXTURES};
 use crate::render::{GpuTexture, Renderer};
+use crate::scene::shader_overrides::ParamValues;
+use crate::scene::{Scene, SceneId};
 use crate::shadergen::textures;
+
+/// One drawn entity's own param values (#670): its scene, its id, its overrides.
+pub(crate) type EntityParams<'a> = (SceneId, u32, &'a ParamValues);
+
+/// Entity `id`'s overrides in `scene`, in the form [`Renderer::material_index`] takes.
+pub(crate) fn entity_params(scene: &Scene, id: u32) -> Option<EntityParams<'_>> {
+    scene
+        .shader_overrides
+        .of(id)
+        .map(|own| (scene.id(), id, own))
+}
 
 impl Renderer {
     /// The material cache index for `material` — `(library key, asset)` — drawn with
@@ -22,17 +35,32 @@ impl Renderer {
     /// signature, so a late-loaded texture gets a fresh group (#207). When the
     /// pipeline's shader has runtime params, the material's values are packed into
     /// its own param buffer first (#399).
+    ///
+    /// `overrides` is the drawn entity's own values (#670): when it has any and the
+    /// shader has runtime params, the entity owns a buffer holding the material's
+    /// values with its overrides on top, and a group of its own.
     pub(crate) fn material_index(
         &mut self,
         material: Option<(&str, &MaterialAsset)>,
         pipeline: usize,
+        overrides: Option<EntityParams>,
     ) -> usize {
         let owner = material.and_then(|(key, asset)| {
             let layout = self.surface_shaders.params(pipeline)?;
-            let values = layout.pack(&asset.shader_params);
+            let (owner, values) = match overrides {
+                Some((scene, id, own)) => {
+                    let mut merged = asset.shader_params.clone();
+                    merged.extend(own.iter().map(|(k, v)| (k.clone(), v.clone())));
+                    (ParamOwner::Entity(scene, id), layout.pack(&merged))
+                }
+                None => (
+                    ParamOwner::Material(key.to_owned()),
+                    layout.pack(&asset.shader_params),
+                ),
+            };
             self.materials
-                .write_params(&self.device, &self.queue, key, values);
-            Some(key.to_owned())
+                .write_params(&self.device, &self.queue, &owner, values);
+            Some(owner)
         });
         let paths = material_texture_paths(material.map(|(_, asset)| asset));
         let key = (
@@ -51,7 +79,7 @@ impl Renderer {
                 false => map,
             }
         });
-        let group = self.material_bind_group(&maps, key.1.as_deref());
+        let group = self.material_bind_group(&maps, key.1.as_ref());
         self.materials.insert(key, group)
     }
 
@@ -88,7 +116,7 @@ impl Renderer {
     pub(crate) fn material_bind_group(
         &self,
         maps: &[Rc<GpuTexture>; MATERIAL_TEXTURES],
-        owner: Option<&str>,
+        owner: Option<&ParamOwner>,
     ) -> wgpu::BindGroup {
         let mut entries = vec![wgpu::BindGroupEntry {
             binding: 1,

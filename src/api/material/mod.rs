@@ -14,8 +14,9 @@
 //!    uses it by pointing its `MaterialComponent.material` at that name. Round-trips
 //!    through `SceneData` like any library asset.
 //! 3. **Surface shader** (#396, #399) — `SetShader` names the material's authored
-//!    surface shader; `SetShaderParam` / `GetShaderParam` (`shader_params`) drive the
-//!    params it exposes at runtime; `SetShaderTexture` (`shader_textures`, #400) names
+//!    surface shader; `SetAssetShaderParam` / `GetAssetShaderParam` (`shader_params`)
+//!    drive the params it exposes at runtime, and `SetShaderParam` / `GetShaderParam` /
+//!    `ClearShaderParam` override them for one entity (#670); `SetShaderTexture` (`shader_textures`, #400) names
 //!    the texture an extra shader slot (`mask`) samples.
 //!
 //! Both are THIN adapters (#287): each setter resolves a library key (the entity's via

@@ -1,10 +1,11 @@
 //! src/editor/inspector/components/material/shader_params.rs — the Material card's runtime
 //! shader params (#399): one row per param the material's surface shader exposes at
-//! runtime, `Material.SetShaderParam`'s twin.
+//! runtime, `Material.SetAssetShaderParam`'s twin (per-entity overrides, #670, are
+//! runtime-only and not shown).
 //!
 //! A thin egui client like the rest of the card: it reads each value through
 //! `authoring::material::shader_param` (the stored value, else the baked default) and
-//! writes through `set_shader_param`, the op the Lua binding calls. Below them, one
+//! writes through `set_shader_param`, the op the asset binding calls. Below them, one
 //! path field per extra shader texture slot (`mask`, #400) —
 //! `Material.SetShaderTexture`'s twin.
 

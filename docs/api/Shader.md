@@ -250,8 +250,9 @@ UI.SetShaderParam(callScreen, "hologram.strength", 0.6)
 ### Runtime params (surface, postfx)
 
 A surface param marked **runtime** above is not baked as a constant: the shader
-reads it from the material, and `Material.SetShaderParam(id, "hit_flash.amount", 1)`
-changes it with no re-bake (see `Material.md`). Its recipe value is the default a
+reads it at draw time, and `Material.SetShaderParam(id, "hit_flash.amount", 1)`
+changes it for one entity (`Material.SetAssetShaderParam` for every entity sharing
+the material) with no re-bake (see `Material.md`). Its recipe value is the default a
 material starts from. A bake also writes `<name>.params.json` beside the module,
 recording each runtime param's name and slot, so the engine resolves names without
 reading WGSL. One shader holds at most 16 runtime params; more is a bake error.

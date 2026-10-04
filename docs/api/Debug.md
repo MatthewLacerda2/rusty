@@ -42,7 +42,7 @@ named asset from the scene's material library (anything `Material.DefineAsset` d
 or a glTF import brought in) on the stand-in mesh — the same picture its Inspector
 Material card shows in its Preview tab. It is the assembled result, every map at once:
 albedo, metallic/roughness, normal and emissive maps, the render mode, and the authored
-`shader` with its stored runtime params (`Material.SetShaderParam` values, else the
+`shader` with its stored runtime params (`Material.SetAssetShaderParam` values, else the
 baked defaults) and its extra texture slots such as `mask`. An `rt:<name>` render
 texture in any slot samples **white** here: the preview scene is isolated and has no
 camera drawing that texture. A name the library doesn't hold raises, naming it.

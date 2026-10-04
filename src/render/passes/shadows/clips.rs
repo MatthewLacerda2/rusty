@@ -16,6 +16,7 @@
 use std::collections::HashMap;
 
 use crate::components::RenderMode;
+use crate::render::draw::materials::entity_params;
 use crate::render::gpu::pipelines::surface::STANDARD;
 use crate::render::Renderer;
 use crate::scene::Scene;
@@ -67,7 +68,7 @@ impl Renderer {
             }
             let clip = Clip {
                 pipeline: if cuts { pipeline } else { STANDARD },
-                material: self.material_index(Some(entry), pipeline),
+                material: self.material_index(Some(entry), pipeline, entity_params(scene, id)),
             };
             clips.insert(id, CasterClip { clip, cutout });
         }

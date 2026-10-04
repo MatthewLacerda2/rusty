@@ -116,7 +116,7 @@ impl Renderer {
         let key = BatchKey {
             pipeline,
             mesh,
-            material: self.material_index(entry, pipeline),
+            material: self.material_index(entry, pipeline, None),
             uniform: material_uniform(true, material).words(),
         };
         let glass = material.is_some_and(MaterialAsset::is_transparent);

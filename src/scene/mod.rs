@@ -41,6 +41,7 @@ pub mod runtime;
 #[allow(clippy::module_inception)]
 pub mod scene;
 pub mod serialize;
+pub mod shader_overrides;
 pub mod skeleton;
 pub mod snapshot;
 pub mod world_cache;

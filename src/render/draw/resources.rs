@@ -213,7 +213,11 @@ impl Renderer {
         let key = BatchKey {
             pipeline,
             mesh: mesh_id,
-            material: self.material_index(entry, pipeline),
+            material: self.material_index(
+                entry,
+                pipeline,
+                super::materials::entity_params(scene, id),
+            ),
             uniform: uniform.words(),
         };
         let item = DrawItem {
