@@ -5,7 +5,7 @@
 //! boot, through the seed manifest (#746): a file nobody edited follows the engine's
 //! current default, an edited one is kept.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::manifest::{SeedManifest, SEED_MANIFEST_PATH};
 use super::scene_json;
@@ -36,12 +36,11 @@ pub fn build_default_scene(scene: &mut Scene) -> String {
 /// Returns the seeded path so the caller can load it as the boot scene.
 pub fn seed_default_scene() -> String {
     default_scene::seed_default_assets();
-    let mut scene = Scene::new();
-    default_scene::build(&mut scene, default_scene::BOT_SCRIPT);
-    match scene_json(&scene) {
+    match default_scene_bytes() {
         Ok(json) => {
             let hint = "File ▸ Reset Scene, or delete the file, to take the new one";
-            seed_files(&[(Path::new(DEFAULT_SCENE_PATH), json.into_bytes())], hint);
+            let files = [(Path::new(DEFAULT_SCENE_PATH).to_path_buf(), json)];
+            seed_files(Path::new(SEED_MANIFEST_PATH), &files, hint);
         }
         Err(e) => eprintln!("[Scene] seeding the default scene failed: {e}"),
     }
@@ -54,8 +53,26 @@ pub fn seed_default_scene() -> String {
 /// engine-owned and rewritten (see `authoring::ui_widgets::seed`).
 pub fn seed_default_scripts() {
     crate::scene::authoring::ui_widgets::seed();
-    let Ok(entries) = std::fs::read_dir(DEFAULT_SCRIPTS_SOURCE_DIR) else {
-        return;
+    let source = Path::new(DEFAULT_SCRIPTS_SOURCE_DIR);
+    let files = bundled_scripts(source, Path::new(DEFAULT_SCRIPTS_DEST_DIR));
+    seed_files(
+        Path::new(SEED_MANIFEST_PATH),
+        &files,
+        "delete it to take the new one",
+    );
+}
+
+/// The default scene document, byte for byte what Save would write for it.
+fn default_scene_bytes() -> Result<Vec<u8>, String> {
+    let mut scene = Scene::new();
+    default_scene::build(&mut scene, default_scene::BOT_SCRIPT);
+    scene_json(&scene).map(String::into_bytes)
+}
+
+/// Every `.lua` under `source`, paired with its destination under `dest`.
+fn bundled_scripts(source: &Path, dest: &Path) -> Vec<(PathBuf, Vec<u8>)> {
+    let Ok(entries) = std::fs::read_dir(source) else {
+        return Vec::new();
     };
     let mut files = Vec::new();
     for path in entries.flatten().map(|e| e.path()) {
@@ -64,20 +81,20 @@ pub fn seed_default_scripts() {
             continue;
         };
         if let Ok(bytes) = std::fs::read(&path) {
-            files.push((Path::new(DEFAULT_SCRIPTS_DEST_DIR).join(name), bytes));
+            files.push((dest.join(name), bytes));
         }
     }
-    seed_files(&files, "delete it to take the new one");
+    files
 }
 
 /// Seed each `(destination, bundled bytes)` pair under one manifest load and save.
-fn seed_files<P: AsRef<Path>>(files: &[(P, Vec<u8>)], hint: &str) {
-    let mut manifest = SeedManifest::load(SEED_MANIFEST_PATH);
+fn seed_files(manifest_path: &Path, files: &[(PathBuf, Vec<u8>)], hint: &str) {
+    let mut manifest = SeedManifest::load(manifest_path);
     for (dest, bundled) in files {
-        manifest.seed(dest.as_ref(), bundled, hint);
+        manifest.seed(dest, bundled, hint);
     }
     if let Err(e) = manifest.save() {
-        eprintln!("[Seed] writing {SEED_MANIFEST_PATH} failed: {e}");
+        eprintln!("[Seed] writing {} failed: {e}", manifest_path.display());
     }
 }
 
