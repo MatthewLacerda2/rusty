@@ -29,6 +29,7 @@ mod particle_modes_screenshot;
 mod particle_scene;
 mod particle_soft_lit_screenshot;
 mod postfx_blocks_screenshot;
+mod postfx_params_screenshot;
 mod postfx_screenshot;
 mod preview_api;
 mod preview_material;

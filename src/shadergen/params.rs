@@ -17,6 +17,10 @@
 //! A **ui** shader (#427) packs the same slots into its per-graphic uniform
 //! ([`UI_UNIFORM_DECL`]) behind a small header (the graphic's rect and the clock),
 //! and the values live on the graphic instead of a material.
+//!
+//! A **postfx** shader (#671) reads the same 16 slots from its own uniform at
+//! [`POSTFX_UNIFORM_DECL`] (group 1, beside the chain's shared IO group), and the
+//! values live on the post-processing volume — see [`super::post_params`].
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -44,6 +48,10 @@ pub const UNIFORM_DECL: &str = "struct ShaderParams {\n    v: array<vec4<f32>, 1
 /// runtime-param slots — one per graphic, at a dynamic offset.
 pub const UI_UNIFORM_DECL: &str = "struct UiShade {\n    origin_x: vec4<f32>,\n    axis_y_size: vec4<f32>,\n    time: vec4<f32>,\n    v: array<vec4<f32>, 16>,\n};\n@group(3) @binding(0) var<uniform> shader_params: UiShade;\n";
 
+/// The WGSL a postfx variant with runtime params declares (#671): the same slots as
+/// [`UNIFORM_DECL`], in the effect's own bind group after the chain's IO group.
+pub const POSTFX_UNIFORM_DECL: &str = "struct ShaderParams {\n    v: array<vec4<f32>, 16>,\n};\n@group(1) @binding(0) var<uniform> shader_params: ShaderParams;\n";
+
 /// One runtime param: which block instance and param it is, its uniform slot, its
 /// lane count, and its baked default (the recipe's value, else the block's).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -66,16 +74,12 @@ pub struct ParamLayout {
 
 impl ParamLayout {
     /// Allocate a slot per runtime param of `instances`, in recipe then catalog
-    /// order. Empty for postfx (no material or graphic to hold the values). Errors
-    /// past [`PARAM_SLOTS`].
+    /// order. Errors past [`PARAM_SLOTS`].
     pub fn from_instances(
         pass: PassKind,
         instances: &[(&'static Block, &BlockSel)],
     ) -> Result<Self, String> {
         let mut params = Vec::new();
-        if pass == PassKind::Postfx {
-            return Ok(Self { params });
-        }
         for (index, (block, sel)) in instances.iter().enumerate() {
             for p in block.params.iter().filter(|p| p.runtime) {
                 if params.len() == PARAM_SLOTS {
@@ -162,24 +166,7 @@ impl ParamLayout {
     }
 
     fn unknown(&self, name: &str) -> String {
-        let block = name.split('.').next().unwrap_or_default();
-        let baked = PassKind::ALL
-            .into_iter()
-            .filter_map(|pass| find(pass, block))
-            .flat_map(|b| b.params)
-            .any(|p| !p.runtime && name.ends_with(&format!(".{}", p.name)));
-        let what = if baked {
-            "is baked, not a runtime param"
-        } else {
-            "is not a runtime param of this shader"
-        };
-        let names = self.names();
-        let list = if names.is_empty() {
-            "(none)".to_owned()
-        } else {
-            names.join(", ")
-        };
-        format!("shader param {name:?} {what}; runtime params: {list}")
+        unknown_param(name, &self.names())
     }
 
     /// Fit `value` to `s`: exactly `arity` numbers, or one broadcast to every lane.
@@ -220,6 +207,28 @@ impl ParamLayout {
             Err(e) => Err(e.to_string()),
         }
     }
+}
+
+/// The error for a name no runtime param answers to: whether the catalog bakes a
+/// param of that name, and the runtime params there are (`names`).
+pub(crate) fn unknown_param(name: &str, names: &[String]) -> String {
+    let block = name.split('.').next().unwrap_or_default();
+    let baked = PassKind::ALL
+        .into_iter()
+        .filter_map(|pass| find(pass, block))
+        .flat_map(|b| b.params)
+        .any(|p| !p.runtime && name.ends_with(&format!(".{}", p.name)));
+    let what = if baked {
+        "is baked, not a runtime param"
+    } else {
+        "is not a runtime param of this shader"
+    };
+    let list = if names.is_empty() {
+        "(none)".to_owned()
+    } else {
+        names.join(", ")
+    };
+    format!("shader param {name:?} {what}; runtime params: {list}")
 }
 
 /// `<dir>/<name>.params.json` for `<dir>/<name>.wgsl`.

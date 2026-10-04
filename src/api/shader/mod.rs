@@ -178,7 +178,7 @@ mod tests {
         );
         assert_eq!(
             (default, arity, runtime),
-            (block.params[0].default, 1, false)
+            (block.params[0].default, 1, true)
         );
     }
 

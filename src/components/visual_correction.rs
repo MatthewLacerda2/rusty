@@ -4,6 +4,8 @@
 //! the legacy `core/scene.rs`, then extended (phase-3) so the renderer's post-FX
 //! chain (color correction, bloom, motion blur, real SSR) actually reads them.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 /// Tonemapping operator applied as the final color-correction step.
@@ -66,6 +68,13 @@ pub struct VisualCorrectionComponent {
     /// loads older scenes with none.
     #[serde(default)]
     pub custom_effects: Vec<String>,
+    /// Runtime params of the authored effects (#671), by the name a script set them
+    /// under (`"damage_vignette.intensity"` → `[0.7]`): Unity's volume-profile
+    /// overrides, without the blending. Every effect in `custom_effects` whose layout
+    /// resolves a name draws with its value; the rest keep their baked defaults.
+    /// `#[serde(default)]` loads older scenes with none.
+    #[serde(default)]
+    pub post_params: BTreeMap<String, Vec<f32>>,
 }
 
 /// How the sun's cascaded shadow map covers the view (#435) — HDRP's Shadows volume
@@ -172,6 +181,8 @@ struct VisualCorrectionFile {
     ssao: SsaoSettings,
     #[serde(default)]
     custom_effects: Vec<String>,
+    #[serde(default)]
+    post_params: BTreeMap<String, Vec<f32>>,
 }
 
 impl From<VisualCorrectionFile> for VisualCorrectionComponent {
@@ -196,6 +207,7 @@ impl From<VisualCorrectionFile> for VisualCorrectionComponent {
             shadows: f.shadows,
             ssao: f.ssao,
             custom_effects: f.custom_effects,
+            post_params: f.post_params,
         }
     }
 }
@@ -249,6 +261,15 @@ mod tests {
         let back: VisualCorrectionComponent =
             serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
         assert_eq!(back.custom_effects, ["crt", "vignette_red"]);
+    }
+
+    #[test]
+    fn post_params_default_empty_and_round_trip() {
+        assert!(load("").post_params.is_empty());
+        let vc = load(r#", "post_params": {"damage_vignette.intensity": [0.7]}"#);
+        let back: VisualCorrectionComponent =
+            serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
+        assert_eq!(back.post_params["damage_vignette.intensity"], [0.7]);
     }
 
     #[test]

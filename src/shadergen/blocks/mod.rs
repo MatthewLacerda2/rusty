@@ -44,8 +44,8 @@ pub struct Param {
     /// Settable per material at runtime (#399): a surface param read from the
     /// material's param uniform instead of a baked `const`, so a script can drive it
     /// (a hit flash fading, a rim glowing with shield charge). A ui param is set per
-    /// graphic the same way (#427). Postfx params are never runtime — a postfx pass
-    /// has no material.
+    /// graphic the same way (#427), and a postfx param per post-processing volume
+    /// (#671, `Graphics.SetPostParam`).
     pub runtime: bool,
 }
 
@@ -155,12 +155,17 @@ mod tests {
     }
 
     #[test]
-    fn postfx_params_are_never_runtime() {
-        let runtime = catalog(PassKind::Postfx)
-            .iter()
-            .flat_map(|b| b.params)
-            .any(|p| p.runtime);
-        assert!(!runtime, "a postfx pass has no material to hold the value");
+    fn postfx_strengths_are_runtime() {
+        // #671: the amount a script fades (a hurt vignette following health) is live.
+        let live = |id, name| {
+            find(PassKind::Postfx, id)
+                .and_then(|b| b.params.iter().find(|p| p.name == name))
+                .is_some_and(|p| p.runtime)
+        };
+        assert!(live("damage_vignette", "intensity"));
+        assert!(live("chromatic_aberration", "strength"));
+        assert!(live("radial_blur", "strength"));
+        assert!(!live("posterize", "levels"), "structural params stay baked");
     }
 
     #[test]

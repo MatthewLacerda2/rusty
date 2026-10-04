@@ -2,7 +2,7 @@
 
 Live control over the engine's **existing** post-FX and quality knobs, so a script
 can drive its own settings logic. The per-volume getters/setters target the first
-**active** `VisualCorrectionComponent` (color/bloom/SSR/shadows/SSAO/custom effects) and the first **active**
+**active** `VisualCorrectionComponent` (color/bloom/SSR/shadows/SSAO/custom effects and their params) and the first **active**
 `CameraComponent` (motion blur) in the scene — the same volume `build_post_params`
 packs into the GPU uniform each frame, so a write here takes effect next frame.
 Getters return a neutral default when no active volume/camera exists.
@@ -36,6 +36,7 @@ Getters return a neutral default when no active volume/camera exists.
 | `Graphics.GetSsaoRadius` / `SetSsaoRadius` | `()` / `(units)` | `number` (world units, clamped ≥ 0.01, **default `0.5`**) |
 | `Graphics.GetSsaoIntensity` / `SetSsaoIntensity` | `()` / `(value)` | `number` (clamped 0–4, **default `1`**) |
 | `Graphics.GetCustomEffects` / `SetCustomEffects` | `()` / `({names})` | array of baked postfx module names, in run order (**default empty**; empty with no active volume) |
+| `Graphics.GetPostParam` / `SetPostParam` | `(name)` / `(name, value)` | a custom effect's runtime param: `number`, or an array for a vector param (the effect's baked default until set; the block's catalog default with no active volume, where a set raises an error) |
 
 **Gamma** is a display-gamma *tweak*, not the output encode: the render target
 (window, Game view, and headless screenshot alike) is sRGB and encodes linear →
@@ -127,13 +128,41 @@ Graphics.SetCustomEffects({})           -- off again
   binding 3 is **the previous frame's** result of this chain, for feedback effects
   (black on the first frame and after a resize; after the list was empty for a
   while, the last frame it ran); bindings 0, 4 and 5 are the post
-  params, scene depth and skybox, as for the built-in passes.
+  params, scene depth and skybox, as for the built-in passes; group 1 is the
+  module's runtime params (see *Post params* below).
 - **Where it lives.** The list is saved with the volume, and the Inspector's
   **Custom Effects** section (add by name, reorder, remove) edits the same field. No
   active volume, no custom effects.
 - **Cost.** One fullscreen pass per effect, plus one copy that keeps the history
   (and, with FXAA off, one more that lands the result on screen). An empty list
   costs nothing.
+
+**Post params** (#671) drive a custom effect's **runtime** block params per frame —
+the strengths a game fades with gameplay (`*` in `Shader.md`'s postfx list):
+
+```lua
+Shader.Bake({ pass = "postfx", name = "hurt",
+  blocks = { { id = "damage_vignette", params = { color = {0.8, 0, 0} } } } })
+Graphics.SetCustomEffects({ "hurt" })
+function Update()
+  Graphics.SetPostParam("damage_vignette.intensity", 1 - health / maxHealth)
+end
+```
+
+- **Where they live.** On the active volume (`post_params`, saved with the scene
+  like its other knobs), Unity's volume-profile overrides without the blending. A
+  set is a uniform write the next frame packs — never a re-bake.
+- **Names** are `"<block>.<param>"`, or `"<block>.<index>.<param>"` (the block's
+  position in its recipe, required when it appears more than once) — the scheme
+  `Material.SetShaderParam` uses. One name addresses the **whole list**: every
+  listed effect whose recipe has that runtime param draws with the value.
+- **Strict.** `SetPostParam` raises an error, and stores nothing, for a name no
+  listed effect exposes at runtime (it names the culprit, says when the param is
+  baked, and lists the runtime params there are), a wrong number of values (one
+  number broadcasts to every lane), or no active volume. So list and bake the
+  effect before setting its params. `GetPostParam` answers with the stored value,
+  else the effect's baked default; with no active volume, the block's catalog
+  default.
 
 **FXAA** is the anti-aliasing pass at the very end of the chain, running on the
 tonemapped image just before it reaches the screen. It is **on by default** — a

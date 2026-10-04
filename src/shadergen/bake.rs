@@ -8,8 +8,8 @@
 //! 3. [`validate`](super::validate)s it by composing through `naga_oil` against
 //!    `common` (the gate — a module that won't compose is **never written**), and
 //! 4. writes `<out_dir>/<name>.wgsl`, the file the engine's `ShaderRegistry` loads
-//!    by name, and — for a surface or ui recipe — its runtime-param layout beside it
-//!    as `<name>.params.json` (#399).
+//!    by name, and its runtime-param layout beside it
+//!    as `<name>.params.json` (#399; postfx too since #671).
 //!
 //! The engine's committed shader set (`engine_shaders`, normally
 //! `assets/shaders`) is read-only here — it supplies the surface base and the
@@ -69,12 +69,10 @@ pub fn bake_recipe(
 
     std::fs::create_dir_all(out_dir).map_err(|e| BakeError::Write(e.to_string()))?;
     let path = format!("{out_dir}/{}.wgsl", recipe.name);
-    if recipe.pass != PassKind::Postfx {
-        let json =
-            serde_json::to_string_pretty(&params).map_err(|e| BakeError::Write(e.to_string()))?;
-        let sidecar = sidecar_path(std::path::Path::new(&path));
-        std::fs::write(sidecar, json).map_err(|e| BakeError::Write(e.to_string()))?;
-    }
+    let json =
+        serde_json::to_string_pretty(&params).map_err(|e| BakeError::Write(e.to_string()))?;
+    let sidecar = sidecar_path(std::path::Path::new(&path));
+    std::fs::write(sidecar, json).map_err(|e| BakeError::Write(e.to_string()))?;
     std::fs::write(&path, &module).map_err(|e| BakeError::Write(e.to_string()))?;
     GENERATION.fetch_add(1, Ordering::Relaxed);
     Ok(path)

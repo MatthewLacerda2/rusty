@@ -2,6 +2,9 @@
 //! blur, the composite (tonemap + grade), the authored effects (#397), then FXAA —
 //! or a plain copy — that writes the finished image to the target.
 
+use std::collections::BTreeMap;
+
+use super::custom::{CustomChain, Effect};
 use super::{PfxTarget, PostFx, PostParams};
 
 impl PostFx {
@@ -20,6 +23,7 @@ impl PostFx {
             bloom: bloom_enabled,
             fxaa: fxaa_enabled,
             custom,
+            post_params,
         } = passes;
         queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
         self.custom.prepare(device, &custom);
@@ -37,6 +41,7 @@ impl PostFx {
         // for that pass to sample; otherwise it writes the output directly, so the
         // plain path is byte-for-byte what the chain produced before those existed.
         let effects = self.custom.loaded(&custom);
+        CustomChain::write_params(queue, &effects, &post_params);
         let composite_bg = self.io_bind_group(
             device,
             &self.scene_hdr.view,
@@ -49,7 +54,7 @@ impl PostFx {
         Self::fullscreen(
             &mut encoder,
             &self.composite_pipeline,
-            &composite_bg,
+            &[&composite_bg],
             composite_target,
         );
         let finished = self.run_custom(device, &mut encoder, &ctx, &effects);
@@ -70,7 +75,7 @@ impl PostFx {
                 ctx.depth_view,
                 ctx.skybox_view,
             );
-            Self::fullscreen(&mut encoder, pipeline, &bg, ctx.output);
+            Self::fullscreen(&mut encoder, pipeline, &[&bg], ctx.output);
         }
 
         queue.submit(std::iter::once(encoder.finish()));
@@ -84,13 +89,13 @@ impl PostFx {
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         ctx: &PostFxContext<'_>,
-        effects: &[&wgpu::RenderPipeline],
+        effects: &[&Effect],
     ) -> &'s PfxTarget {
         let (mut src, mut dst) = (&self.ldr, &self.custom.ldr_b);
         if effects.is_empty() {
             return src;
         }
-        for pipeline in effects {
+        for effect in effects {
             let bg = self.io_bind_group(
                 device,
                 &src.view,
@@ -98,7 +103,7 @@ impl PostFx {
                 ctx.depth_view,
                 ctx.skybox_view,
             );
-            Self::fullscreen(encoder, pipeline, &bg, &dst.view);
+            Self::fullscreen(encoder, &effect.pipeline, &[&bg, &effect.params], &dst.view);
             (src, dst) = (dst, src);
         }
         encoder.copy_texture_to_texture(
@@ -131,7 +136,7 @@ impl PostFx {
         Self::fullscreen(
             encoder,
             &self.bright_pipeline,
-            &bright_bg,
+            &[&bright_bg],
             &self.bloom_a.view,
         );
 
@@ -142,7 +147,12 @@ impl PostFx {
             depth_view,
             skybox_view,
         );
-        Self::fullscreen(encoder, &self.blur_pipeline, &blur_bg, &self.bloom_b.view);
+        Self::fullscreen(
+            encoder,
+            &self.blur_pipeline,
+            &[&blur_bg],
+            &self.bloom_b.view,
+        );
     }
 
     /// Composite this frame's scene once more into `ctx.output` — graded,
@@ -162,7 +172,7 @@ impl PostFx {
             ctx.depth_view,
             ctx.skybox_view,
         );
-        Self::fullscreen(encoder, &self.composite_pipeline, &bg, ctx.output);
+        Self::fullscreen(encoder, &self.composite_pipeline, &[&bg], ctx.output);
     }
 
     /// The format the chain writes its output in (what [`PostFx::composite_into`]
@@ -213,10 +223,11 @@ impl PostFx {
         })
     }
 
+    /// One fullscreen triangle into `target`, `groups` bound from group 0 up.
     fn fullscreen(
         encoder: &mut wgpu::CommandEncoder,
         pipeline: &wgpu::RenderPipeline,
-        bind_group: &wgpu::BindGroup,
+        groups: &[&wgpu::BindGroup],
         target: &wgpu::TextureView,
     ) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -236,7 +247,9 @@ impl PostFx {
             occlusion_query_set: None,
         });
         pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, bind_group, &[]);
+        for (i, group) in groups.iter().enumerate() {
+            pass.set_bind_group(i as u32, *group, &[]);
+        }
         pass.draw(0..3, 0..1);
     }
 }
@@ -252,6 +265,8 @@ pub struct PostPasses {
     pub fxaa: bool,
     /// Authored post-FX modules to run after tonemapping, in order (#397).
     pub custom: Vec<String>,
+    /// Their runtime params, by name (#671): the active volume's `post_params`.
+    pub post_params: BTreeMap<String, Vec<f32>>,
 }
 
 /// The per-frame views the chain reads/writes, bundled to keep `run` under the

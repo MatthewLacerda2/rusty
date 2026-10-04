@@ -4,9 +4,12 @@
 //! This is the bridge from the editor's "dead knobs" to the GPU: every field the
 //! inspector exposes ends up packed here and read by `postfx.wgsl`.
 
+use std::collections::BTreeMap;
+
 use glam::Mat4;
 
 use super::{PostParams, PostPasses};
+use crate::components::VisualCorrectionComponent;
 use crate::core::quality::QualityPreset;
 use crate::scene::Scene;
 
@@ -91,12 +94,23 @@ pub fn post_passes(scene: &Scene, bloom: bool) -> PostPasses {
         bloom,
         fxaa: fxaa_enabled(scene),
         custom: custom_effects(scene),
+        post_params: post_param_values(scene),
     }
 }
 
 /// The authored post-FX modules of the first active volume (#397) — the same volume
 /// [`build_post_params`] reads — in the order they run. None without a volume.
 pub fn custom_effects(scene: &Scene) -> Vec<String> {
+    with_active_volume(scene, |vc| vc.custom_effects.clone()).unwrap_or_default()
+}
+
+/// The runtime params of those effects (#671), from the same volume. Empty without one.
+pub fn post_param_values(scene: &Scene) -> BTreeMap<String, Vec<f32>> {
+    with_active_volume(scene, |vc| vc.post_params.clone()).unwrap_or_default()
+}
+
+/// `f` over the first active visual-correction volume of an active entity.
+fn with_active_volume<R>(scene: &Scene, f: impl Fn(&VisualCorrectionComponent) -> R) -> Option<R> {
     scene
         .world
         .ids_with_visual_correction()
@@ -104,9 +118,8 @@ pub fn custom_effects(scene: &Scene) -> Vec<String> {
         .filter(|&id| scene.world.is_active(id))
         .find_map(|id| {
             let vc = scene.world.visual_correction(id)?;
-            vc.active.then(|| vc.custom_effects.clone())
+            vc.active.then(|| f(&vc))
         })
-        .unwrap_or_default()
 }
 
 /// Whether the FXAA pass runs this frame (#360).
@@ -163,6 +176,7 @@ mod tests {
             shadows: Default::default(),
             ssao: Default::default(),
             custom_effects: Vec::new(),
+            post_params: Default::default(),
         }
     }
 

@@ -26,6 +26,11 @@
 //! were removed because the volume already owns those knobs (`Graphics.SetExposure`
 //! and friends, applied in HDR where they belong), so this catalog holds only looks
 //! the built-in grade can't make.
+//!
+//! Params marked `runtime` (the strengths and the damage colour, #671) are read from
+//! the module's param uniform instead of a baked `const`, so a script drives them
+//! per frame on the volume with `Graphics.SetPostParam`; structural params (counts,
+//! radii, levels, pulse speed) stay baked.
 
 use super::{Block, Param, Stage};
 
@@ -64,7 +69,7 @@ pub const BLOCKS: &[Block] = &[
                 name: "strength",
                 default: 0.5,
                 arity: 1,
-                runtime: false,
+                runtime: true,
             },
             Param {
                 name: "radius",
@@ -93,7 +98,7 @@ pub const BLOCKS: &[Block] = &[
                 name: "strength",
                 default: 0.2,
                 arity: 1,
-                runtime: false,
+                runtime: true,
             },
         ],
         helper: "fn pfx_scanline(c: vec3<f32>, uv: vec2<f32>, count: f32, strength: f32) -> vec3<f32> {\n    let s = sin(uv.y * count * 3.14159265);\n    let line = 1.0 - strength * (0.5 - 0.5 * s);\n    return c * line;\n}",
@@ -124,7 +129,7 @@ pub const BLOCKS: &[Block] = &[
             name: "strength",
             default: 0.06,
             arity: 1,
-            runtime: false,
+            runtime: true,
         }],
         helper: "fn pfx_film_grain(c: vec3<f32>, uv: vec2<f32>, strength: f32) -> vec3<f32> {\n    let px = vec2<u32>(uv / source_texel());\n    var h = (px.x * 73856093u) ^ (px.y * 19349663u) ^ (bitcast<u32>(game_time()) * 83492791u);\n    h = (h ^ (h >> 16u)) * 2246822519u;\n    h = (h ^ (h >> 13u)) * 3266489917u;\n    h = h ^ (h >> 16u);\n    let n = f32(h) / 4294967295.0 - 0.5;\n    return max(c + vec3<f32>(n * strength), vec3<f32>(0.0));\n}",
         call: "pfx_film_grain({prev}, uv{args})",
@@ -140,13 +145,13 @@ pub const BLOCKS: &[Block] = &[
                 name: "color",
                 default: 1.0,
                 arity: 3,
-            runtime: false,
+            runtime: true,
             },
             Param {
                 name: "intensity",
                 default: 0.5,
                 arity: 1,
-            runtime: false,
+            runtime: true,
             },
             Param {
                 name: "pulse_speed",
@@ -168,7 +173,7 @@ pub const BLOCKS: &[Block] = &[
             name: "strength",
             default: 0.01,
             arity: 1,
-            runtime: false,
+            runtime: true,
         }],
         helper: "fn pfx_chromatic_aberration(c: vec3<f32>, uv: vec2<f32>, strength: f32) -> vec3<f32> {\n    let off = (uv - vec2<f32>(0.5)) * strength;\n    let base = source_tap(uv);\n    let r = source_tap(uv + off).r - base.r;\n    let b = source_tap(uv - off).b - base.b;\n    return max(c + vec3<f32>(r, 0.0, b), vec3<f32>(0.0));\n}",
         call: "pfx_chromatic_aberration({prev}, uv{args})",
@@ -183,7 +188,7 @@ pub const BLOCKS: &[Block] = &[
             name: "amount",
             default: 0.5,
             arity: 1,
-            runtime: false,
+            runtime: true,
         }],
         helper: "fn pfx_sharpen(c: vec3<f32>, uv: vec2<f32>, amount: f32) -> vec3<f32> {\n    let t = source_texel();\n    let ring = source_tap(uv + vec2<f32>(t.x, 0.0)) + source_tap(uv - vec2<f32>(t.x, 0.0)) + source_tap(uv + vec2<f32>(0.0, t.y)) + source_tap(uv - vec2<f32>(0.0, t.y));\n    let detail = source_tap(uv) - ring * 0.25;\n    return max(c + detail * amount, vec3<f32>(0.0));\n}",
         call: "pfx_sharpen({prev}, uv{args})",
@@ -199,7 +204,7 @@ pub const BLOCKS: &[Block] = &[
                 name: "strength",
                 default: 0.05,
                 arity: 1,
-            runtime: false,
+            runtime: true,
             },
             Param {
                 name: "center",

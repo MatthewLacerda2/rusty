@@ -187,9 +187,11 @@ into the lit color; postfx blocks grade the sampled scene color.
   `chromatic_aberration {strength = 0.01}` (R and B split radially from the
   centre, `strength` as a fraction of the distance to it); `sharpen {amount =
   0.5}` (5-tap unsharp mask); `radial_blur {strength = 0.05, center = 0.5}`
-  (8 taps toward `center` in uv — speed/impact streaks). Block params are baked
-  constants: a script can't drive `intensity` per frame yet (runtime volume
-  params are a follow-up), so swap between baked variants for now. Exposure, saturation and contrast are **not**
+  (8 taps toward `center` in uv — speed/impact streaks). Params marked `*` are
+  **runtime**, driven per frame on the volume with `Graphics.SetPostParam` (see
+  below): `vignette.strength*`, `scanline.strength*`, `film_grain.strength*`,
+  `damage_vignette.color*` and `.intensity*`, `chromatic_aberration.strength*`,
+  `sharpen.amount*`, `radial_blur.strength*`; the rest are baked. Exposure, saturation and contrast are **not**
   blocks: the volume already grades them in HDR (`Graphics.SetExposure`,
   `SetSaturation`, `SetContrast`), so a recipe naming them is refused as an unknown
   block (#397).
@@ -245,7 +247,7 @@ UI.SetShader(callScreen, "holo_call")
 UI.SetShaderParam(callScreen, "hologram.strength", 0.6)
 ```
 
-### Runtime params (surface)
+### Runtime params (surface, postfx)
 
 A surface param marked **runtime** above is not baked as a constant: the shader
 reads it from the material, and `Material.SetShaderParam(id, "hit_flash.amount", 1)`
@@ -253,7 +255,10 @@ changes it with no re-bake (see `Material.md`). Its recipe value is the default 
 material starts from. A bake also writes `<name>.params.json` beside the module,
 recording each runtime param's name and slot, so the engine resolves names without
 reading WGSL. One shader holds at most 16 runtime params; more is a bake error.
-Postfx params are never runtime (a postfx pass has no material). A **ui** shader's
+A **postfx** shader's runtime params live on the post-processing volume instead
+(#671): `Graphics.SetPostParam("damage_vignette.intensity", 0.7)` sets it for every
+effect the active volume runs that has it (see `Graphics.md`); the module reads them
+from its own group-1 uniform. A **ui** shader's
 runtime params work the same way, per graphic: `UI.SetShaderParam(id,
 "dissolve.amount", 0.5)` (see `UI.md`).
 

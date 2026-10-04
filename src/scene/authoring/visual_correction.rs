@@ -4,8 +4,8 @@
 //! `VisualCorrectionComponent` field by field: the master `active` flag, bloom
 //! (active / intensity / threshold), color grading (exposure / contrast / saturation
 //! / gamma / tonemap), SSR (active / quality / temporal upsampling), shadows and SSAO
-//! (active / radius / intensity, #436) and the authored post-FX list (#397),
-//! including the
+//! (active / radius / intensity, #436), the authored post-FX list (#397) and its
+//! runtime params (#671), including the
 //! validation each write owns (the `≥ 0` clamps on bloom intensity/threshold, the
 //! `≥ 0.01` clamp on gamma).
 //!
@@ -17,6 +17,7 @@
 //! Pure.
 
 use crate::components::{ShadowSettings, SsaoSettings, Tonemap, VisualCorrectionComponent};
+use crate::shadergen::post_params::PostChain;
 
 /// Set the master visual-correction `active` flag.
 pub fn set_active(vc: &mut VisualCorrectionComponent, active: bool) {
@@ -123,6 +124,25 @@ pub fn set_custom_effects(
     Ok(())
 }
 
+/// Set runtime param `name` of the volume's authored effects (#671), checked against
+/// the layouts of the modules in `custom_effects`: a name none of them exposes at
+/// runtime, or a wrong number of values, is an error naming it and nothing is
+/// written. One number broadcasts to every lane. A buffer write for the renderer,
+/// never a re-bake.
+pub fn set_post_param(
+    vc: &mut VisualCorrectionComponent,
+    name: &str,
+    value: Vec<f32>,
+) -> Result<(), String> {
+    PostChain::load(&vc.custom_effects).set(&mut vc.post_params, name, value)
+}
+
+/// The value runtime param `name` of the volume's effects draws with: the stored one,
+/// else the effect's baked default. Strict like [`set_post_param`].
+pub fn post_param(vc: &VisualCorrectionComponent, name: &str) -> Result<Vec<f32>, String> {
+    PostChain::load(&vc.custom_effects).get(&vc.post_params, name)
+}
+
 /// A bare module file stem: non-empty, no path separator, not hidden or `..`.
 fn is_module_name(name: &str) -> bool {
     !name.is_empty() && !name.starts_with('.') && !name.contains(['/', '\\'])
@@ -153,6 +173,7 @@ mod tests {
             shadows: Default::default(),
             ssao: Default::default(),
             custom_effects: Vec::new(),
+            post_params: Default::default(),
         };
         scene.world.set_visual_correction(id, Some(c));
         (scene, id)
