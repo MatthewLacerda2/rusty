@@ -1,6 +1,7 @@
 //! The atlas's static-tile bookkeeping (#694): what re-bakes, and what a bake forgets.
 
-use glam::{Mat4, Vec3};
+use glam::camera::rh::view::look_at_mat4;
+use glam::Vec3;
 
 use super::StaticTiles;
 use crate::render::passes::shadows::atlas::Tile;
@@ -9,7 +10,7 @@ use crate::scene::SceneId;
 /// A tile at `origin`, `size` texels across, seen from `eye`.
 fn tile(origin: [u32; 2], size: u32, eye: Vec3) -> Tile {
     Tile {
-        view_proj: Mat4::look_at_rh(eye, Vec3::ZERO, Vec3::Y),
+        view_proj: look_at_mat4(eye, Vec3::ZERO, Vec3::Y),
         origin,
         size,
         texel: 0.01,

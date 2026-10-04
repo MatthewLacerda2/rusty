@@ -1,12 +1,13 @@
 //! Frustum extraction / AABB culling tests, including the pop-a-shadow guard (#330).
 
 use super::{transform_aabb, Frustum};
+use glam::camera::rh::{proj::directx, view::look_at_mat4};
 use glam::{Mat4, Vec3};
 
 /// A perspective camera at the origin looking down -Z, aspect 1, 60° vfov.
 fn camera_frustum() -> Frustum {
-    let view = Mat4::look_at_rh(Vec3::ZERO, Vec3::new(0.0, 0.0, -1.0), Vec3::Y);
-    let proj = Mat4::perspective_rh(60_f32.to_radians(), 1.0, 0.1, 100.0);
+    let view = look_at_mat4(Vec3::ZERO, Vec3::new(0.0, 0.0, -1.0), Vec3::Y);
+    let proj = directx::perspective(60_f32.to_radians(), 1.0, 0.1, 100.0);
     Frustum::from_view_proj(proj * view)
 }
 
@@ -14,8 +15,8 @@ fn camera_frustum() -> Frustum {
 /// a 60×60 ortho box looking at the origin from `-dir * 45`.
 fn light_frustum(light_dir: Vec3) -> Frustum {
     let dir = light_dir.normalize();
-    let view = Mat4::look_at_rh(-dir * 45.0, Vec3::ZERO, Vec3::Y);
-    let proj = Mat4::orthographic_rh(-30.0, 30.0, -30.0, 30.0, 1.0, 100.0);
+    let view = look_at_mat4(-dir * 45.0, Vec3::ZERO, Vec3::Y);
+    let proj = directx::orthographic(-30.0, 30.0, -30.0, 30.0, 1.0, 100.0);
     Frustum::from_view_proj(proj * view)
 }
 

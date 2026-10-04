@@ -11,7 +11,7 @@ use glam::{Quat, Vec3};
 use rapier3d::parry::query::ShapeCastOptions;
 use rapier3d::prelude::*;
 
-use super::convert::{from_rp_vec, to_pose, to_rp_vec};
+use super::convert::to_pose;
 use super::query::{is_live, RayHit};
 use super::world::PhysicsWorld;
 
@@ -35,7 +35,7 @@ impl PhysicsWorld {
         half_extents: Vec3,
         accept: impl Fn(u32) -> bool,
     ) -> Vec<u32> {
-        self.overlap(center, &Cuboid::new(to_rp_vec(half_extents)), &accept)
+        self.overlap(center, &Cuboid::new(half_extents), &accept)
     }
 
     /// Like [`Self::overlap_sphere`] with a capsule spanning `a`→`b` — Unity's
@@ -47,7 +47,7 @@ impl PhysicsWorld {
         radius: f32,
         accept: impl Fn(u32) -> bool,
     ) -> Vec<u32> {
-        let capsule = Capsule::new(to_rp_vec(a), to_rp_vec(b), radius);
+        let capsule = Capsule::new(a, b, radius);
         self.overlap(Vec3::ZERO, &capsule, &accept)
     }
 
@@ -97,14 +97,14 @@ impl PhysicsWorld {
         let filter = QueryFilter::default().predicate(&predicate);
         let (handle, hit) = self.queries(filter).cast_shape(
             &to_pose(origin, Quat::IDENTITY),
-            to_rp_vec(dir.normalize()),
+            dir.normalize(),
             &Ball::new(radius),
             ShapeCastOptions::with_max_time_of_impact(max_toi),
         )?;
         // rapier's normal1 is the struck surface's, in world space. Its witness
         // point carries GJK slop; for a sphere the contact is exactly one
         // radius from the impact-time center, against the normal.
-        let normal = from_rp_vec(hit.normal1);
+        let normal = hit.normal1;
         let center = origin + dir.normalize() * hit.time_of_impact;
         Some(RayHit {
             id: *self.collider_to_id.get(&handle)?,
@@ -119,22 +119,17 @@ impl PhysicsWorld {
     /// `None` when the entity has no collider in the live world.
     pub fn closest_point_on(&self, id: u32, point: Vec3) -> Option<Vec3> {
         let collider = self.collider_of(id)?;
-        let projection =
-            collider
-                .shape()
-                .project_point(collider.position(), to_rp_vec(point), true);
-        Some(from_rp_vec(projection.point))
+        let projection = collider
+            .shape()
+            .project_point(collider.position(), point, true);
+        Some(projection.point)
     }
 
     /// Whether `point` lies inside `id`'s live collider. `None` when the entity
     /// has no collider in the live world.
     pub fn collider_contains_point(&self, id: u32, point: Vec3) -> Option<bool> {
         let collider = self.collider_of(id)?;
-        Some(
-            collider
-                .shape()
-                .contains_point(collider.position(), to_rp_vec(point)),
-        )
+        Some(collider.shape().contains_point(collider.position(), point))
     }
 
     /// The live collider built for entity `id` (the entity that owns the

@@ -15,6 +15,7 @@
 //! does not fit is **dropped**: it shades unshadowed and is counted in
 //! `RenderCounters::shadow_lights_dropped`, never silently.
 
+use glam::camera::rh::{proj::directx, view::look_to_mat4};
 use glam::{Mat4, Vec3};
 
 use crate::render::clusters::{LocalLight, KIND_SPOT};
@@ -190,13 +191,13 @@ pub(crate) fn light_views(light: &LocalLight) -> Vec<Mat4> {
     if light.kind == KIND_SPOT {
         let dir = Vec3::from(light.direction);
         let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
-        let proj = Mat4::perspective_rh(spot_fov(light), 1.0, near, far);
-        return vec![proj * Mat4::look_to_rh(position, dir, up)];
+        let proj = directx::perspective(spot_fov(light), 1.0, near, far);
+        return vec![proj * look_to_mat4(position, dir, up)];
     }
-    let proj = Mat4::perspective_rh(std::f32::consts::FRAC_PI_2, 1.0, near, far);
+    let proj = directx::perspective(std::f32::consts::FRAC_PI_2, 1.0, near, far);
     CUBE_FACES
         .iter()
-        .map(|&(dir, up)| proj * Mat4::look_to_rh(position, dir, up))
+        .map(|&(dir, up)| proj * look_to_mat4(position, dir, up))
         .collect()
 }
 

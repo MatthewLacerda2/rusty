@@ -22,7 +22,7 @@ use rapier3d::prelude::*;
 use super::build::{body_state, gravity_scale, EntityBodyState};
 use super::collision_events::CollisionEvents;
 use super::compound::{world_to_local, BodyPlan};
-use super::convert::{from_pose, from_rp_vec, to_pose, to_rp_vec};
+use super::convert::{from_pose, to_pose};
 use super::joints::JointMap;
 use super::live::body_type;
 use super::trigger_events::TriggerEvents;
@@ -154,8 +154,8 @@ impl PhysicsWorld {
             // angular velocity (SetVelocity / SetAngularVelocity / AddForce mutate
             // the component between ticks) and re-apply `use_gravity` so toggling
             // it at runtime takes effect.
-            body.set_linvel(to_rp_vec(snap.vel), true);
-            body.set_angvel(to_rp_vec(snap.angular_velocity), true);
+            body.set_linvel(snap.vel, true);
+            body.set_angvel(snap.angular_velocity, true);
             let scale = gravity_scale(snap.use_gravity);
             if body.gravity_scale() != scale {
                 // A full wake: rapier's setter only clears the sleep flag, so a
@@ -242,8 +242,8 @@ impl PhysicsWorld {
         }
         if let Some(mut rb) = scene.world.rigidbody_mut(owner) {
             if !rb.is_kinematic {
-                rb.velocity = from_rp_vec(body.linvel());
-                rb.angular_velocity = from_rp_vec(body.angvel());
+                rb.velocity = body.linvel();
+                rb.angular_velocity = body.angvel();
             }
         }
         for &id in ids {

@@ -7,6 +7,7 @@
 //! data, no GPU types (#494). Decals are ephemeral scene state (not an `Entity`
 //! component), so they stay off the `--components` gate.
 
+use glam::camera::rh::view::look_to_mat4;
 use glam::{Mat4, Quat, Vec3};
 
 /// Maximum decals drawn per frame. Bullet holes/scorch accumulate, but old ones
@@ -81,5 +82,5 @@ fn quat_look_along(dir: Vec3) -> Quat {
     let f = dir.normalize_or_zero();
     let up = if f.y.abs() > 0.99 { Vec3::X } else { Vec3::Y };
     // look_to_rh builds a view rotation; its inverse orients an object's −Z to dir.
-    Quat::from_mat4(&Mat4::look_to_rh(Vec3::ZERO, f, up)).inverse()
+    Quat::from_mat4(&look_to_mat4(Vec3::ZERO, f, up)).inverse()
 }
