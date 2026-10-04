@@ -78,8 +78,8 @@ impl Renderer {
                     instance: InstanceData {
                         model_matrix: model.to_cols_array(),
                         use_sh,
-                        _pad: [0; 3],
                         sh,
+                        ..InstanceData::IDENTITY
                     },
                 };
                 if glass {

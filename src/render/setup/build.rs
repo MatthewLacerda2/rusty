@@ -12,6 +12,7 @@ use crate::render::clusters::ClusterBuffers;
 use crate::render::decals::DecalBuffers;
 use crate::render::gpu::bind_layouts;
 use crate::render::gpu::global_group::GlobalGroup;
+use crate::render::gpu::lightmaps::Lightmaps;
 use crate::render::gpu::pipelines;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::postfx::HDR_FORMAT;
@@ -28,6 +29,8 @@ pub(crate) struct GlobalBindings {
     pub clusters: ClusterBuffers,
     /// The decal records and atlas group 0 binds (#638).
     pub decals: DecalBuffers,
+    /// The baked lightmap pages group 0 binds (#438).
+    pub lightmaps: Lightmaps,
 }
 
 /// Shadow renderer, its cascade uniform buffer, and the main-pass bind group that
@@ -184,6 +187,7 @@ fn create_global_bindings(
     let cube = crate::render::ibl::cubemap::fallback_cube(device);
     let clusters = ClusterBuffers::new(device);
     let decals = DecalBuffers::new(device);
+    let lightmaps = Lightmaps::new(device);
     let global_bind_group = GlobalGroup {
         camera: &camera_buffer,
         lighting: &lighting_buffer,
@@ -191,6 +195,7 @@ fn create_global_bindings(
         cube: (&cube.view, &cube.sampler),
         clusters: &clusters,
         decals: &decals,
+        lightmaps: lightmaps.binding(),
     }
     .create(device, camera_lighting_layout);
 
@@ -200,6 +205,7 @@ fn create_global_bindings(
         global_bind_group,
         clusters,
         decals,
+        lightmaps,
     }
 }
 

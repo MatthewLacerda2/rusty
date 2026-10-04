@@ -76,7 +76,8 @@ struct DirectionalLight {
     direction: vec3<f32>,
     color: vec3<f32>,
     intensity: f32,
-    _pad: f32,
+    // 1.0 for a `Baked` light (#438): a lightmapped surface skips its direct light.
+    baked: f32,
 };
 
 struct LightingUniforms {
@@ -119,7 +120,8 @@ struct LocalLight {
     // First tile in the shadow atlas (#468): a spotlight's one, a point light's six
     // cube faces (+X, -X, +Y, -Y, +Z, -Z); NO_SHADOW when it casts none.
     shadow: u32,
-    _pad_a: f32,
+    // 1.0 for a `Baked` light (#438): a lightmapped surface skips its direct light.
+    baked: f32,
 };
 
 // The light cluster `world` falls in: its screen tile (from `view_proj`) and its

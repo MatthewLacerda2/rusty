@@ -29,6 +29,7 @@ fn quick() -> BakeSettings {
         bounces: 1,
         seed: 1,
         max_resolution: 16,
+        filter_radius: 1,
     }
 }
 
@@ -41,20 +42,23 @@ fn scene_path(name: &str) -> String {
 }
 
 #[test]
-fn bakes_the_lightmappable_static_mesh_and_references_its_file() {
+fn bakes_the_lightmappable_static_mesh_and_references_its_page() {
     let (mut scene, floor, ball) = scene();
     let path = scene_path("refs");
     assert_eq!(
         bake_scene_lightmaps(&mut scene, Some(&path), &quick()),
         Ok(1)
     );
-    let file = scene
+    let entry = scene
         .lightmaps
         .get(floor)
         .expect("the floor is lightmapped");
+    let file = &scene.lightmaps.pages[entry.page as usize];
+    let name = file.rsplit('/').next().unwrap();
+    assert!(file.contains("level.scene.lightmaps/"), "{file}");
     assert!(
-        file.ends_with("level.scene.lightmaps/lightmap_1.png"),
-        "{file}"
+        name.starts_with("lightmap_0_") && name.ends_with(".png"),
+        "{name}"
     );
     assert!(
         scene.lightmaps.get(ball).is_none(),
@@ -69,9 +73,10 @@ fn the_same_seed_writes_the_same_bytes() {
     let (mut scene, floor, _) = scene();
     let path = scene_path("bytes");
     bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();
-    let first = std::fs::read(scene.lightmaps.get(floor).unwrap()).unwrap();
+    assert!(scene.lightmaps.get(floor).is_some());
+    let first = std::fs::read(&scene.lightmaps.pages[0]).unwrap();
     bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();
-    let second = std::fs::read(scene.lightmaps.get(floor).unwrap()).unwrap();
+    let second = std::fs::read(&scene.lightmaps.pages[0]).unwrap();
     assert_eq!(first, second);
 }
 
@@ -80,7 +85,7 @@ fn a_rebake_drops_lightmaps_that_no_longer_apply() {
     let (mut scene, floor, _) = scene();
     let path = scene_path("stale");
     bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();
-    let old = scene.lightmaps.get(floor).unwrap().to_string();
+    let old = scene.lightmaps.pages[0].clone();
     scene.world.set_static(floor, false);
     assert_eq!(
         bake_scene_lightmaps(&mut scene, Some(&path), &quick()),

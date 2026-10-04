@@ -56,6 +56,7 @@ pub(super) fn settings() -> BakeSettings {
         bounces: 2,
         seed: 7,
         max_resolution: 16,
+        filter_radius: 0,
     }
 }
 

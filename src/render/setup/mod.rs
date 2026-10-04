@@ -188,6 +188,7 @@ impl Renderer {
             global_bind_group: global.global_bind_group,
             global_bind_group_dirty: false,
             clusters: global.clusters,
+            lightmaps: global.lightmaps,
             draw_buffers,
             materials: crate::render::gpu::material_cache::MaterialCache::new(textures.zero_params),
             surface_shaders,

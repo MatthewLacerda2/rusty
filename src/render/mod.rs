@@ -128,6 +128,8 @@ pub struct Renderer {
     global_bind_group_dirty: bool,
     /// The light-cluster buffers group 0 binds (#434), refilled per camera.
     clusters: clusters::ClusterBuffers,
+    /// The baked lightmap pages group 0 binds (#438), rebound when the scene's change.
+    pub(crate) lightmaps: gpu::lightmaps::Lightmaps,
     /// The packed per-frame draw data every solid draw binds as group 1 (#470): per-draw
     /// uniforms, bone palettes and instances, rewritten per camera.
     draw_buffers: gpu::draw_buffers::DrawBuffers,

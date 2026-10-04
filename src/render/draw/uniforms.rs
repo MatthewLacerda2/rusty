@@ -76,19 +76,24 @@ pub(crate) fn material_uniform(lit: bool, material: Option<&MaterialAsset>) -> E
     }
 }
 
-/// One solid's instance: its world matrix and, when a light probe covers it, the SH
-/// its ambient term reads (see [`entity_probe_sh`]).
+/// One solid's instance: its world matrix, the SH its ambient term reads when a light
+/// probe covers it (see [`entity_probe_sh`]), and its baked lightmap when it has one
+/// and `lightmaps` (the pages are bound) holds (#438).
 pub(crate) fn solid_instance(
     scene: &Scene,
     id: u32,
     model_matrix: Mat4,
     light_static_from_probes: bool,
+    lightmaps: bool,
 ) -> InstanceData {
     let (use_sh, sh) = entity_probe_sh(scene, id, model_matrix, light_static_from_probes);
+    let lightmap = scene.lightmaps.get(id).filter(|_| lightmaps);
     InstanceData {
         model_matrix: model_matrix.to_cols_array(),
         use_sh,
-        _pad: [0; 3],
+        lightmap_page: lightmap.map_or(0, |l| l.page + 1),
+        _pad: [0; 2],
+        lightmap_st: lightmap.map_or([0.0; 4], |l| l.scale_offset),
         sh,
     }
 }

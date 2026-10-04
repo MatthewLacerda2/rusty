@@ -8,10 +8,11 @@ use std::thread;
 use glam::Vec3;
 
 use super::bvh::{Bvh, Tri};
+use super::filter::smooth;
 use super::input::BakeScene;
-use super::raster::{dilate, lightmap_size, rasterize, TexelPoint};
+use super::raster::{dilate, lightmap_size, rasterize, world_per_uv, TexelPoint};
 use super::rng::Rng;
-use super::trace::Tracer;
+use super::trace::{TexelLight, Tracer};
 
 /// Rings of empty texels dilation fills around each chart.
 const DILATE_PASSES: u32 = 3;
@@ -27,18 +28,22 @@ pub struct BakeSettings {
     pub bounces: u32,
     /// The seed every texel's sample stream derives from.
     pub seed: u64,
-    /// Largest lightmap edge, in texels.
+    /// Largest lightmap edge, in texels (at most an atlas page, less its ring).
     pub max_resolution: u32,
+    /// Radius, in texels, of the Gaussian that smooths the baked bounce (Unity's
+    /// indirect filter); 0 leaves it raw. Baked direct light is never filtered.
+    pub filter_radius: u32,
 }
 
 impl Default for BakeSettings {
     fn default() -> Self {
         Self {
-            texels_per_unit: 4.0,
-            samples: 64,
+            texels_per_unit: 8.0,
+            samples: 128,
             bounces: 3,
             seed: 0,
             max_resolution: 512,
+            filter_radius: 3,
         }
     }
 }
@@ -58,17 +63,28 @@ pub fn bake(scene: &BakeScene, settings: &BakeSettings) -> Vec<Lightmap> {
     let bvh = Bvh::build(triangles(scene));
     let tracer = Tracer { scene, bvh: &bvh };
     let mut out = Vec::new();
+    // Every lightmap must fit an atlas page with its ring around it.
+    let max = settings.max_resolution.min(super::atlas::MAX_PAGE - 2);
     for (index, mesh) in scene.meshes.iter().enumerate() {
-        let Some(size) = lightmap_size(mesh, settings.texels_per_unit, settings.max_resolution)
-        else {
+        let Some(size) = lightmap_size(mesh, settings.texels_per_unit, max) else {
             continue;
         };
         let points = rasterize(mesh, size);
-        let values = trace_all(&tracer, &points, index as u64, settings);
+        let light = trace_all(&tracer, &points, index as u64, settings);
+        // Texels inside other geometry are dropped here and filled by dilation below.
+        let (points, light): (Vec<TexelPoint>, Vec<TexelLight>) = points
+            .into_iter()
+            .zip(light)
+            .filter(|(_, l)| l.valid)
+            .unzip();
+        let indirect: Vec<Vec3> = light.iter().map(|l| l.indirect).collect();
+        let texel_world = world_per_uv(mesh).unwrap_or(1.0) / size as f32;
+        let radius = settings.filter_radius;
+        let indirect = smooth(&points, &indirect, size, radius, texel_world);
         let mut texels = vec![Vec3::ZERO; (size * size) as usize];
         let mut filled = vec![false; texels.len()];
-        for (point, value) in points.iter().zip(values) {
-            texels[point.index] = value;
+        for ((point, light), indirect) in points.iter().zip(light).zip(indirect) {
+            texels[point.index] = indirect + light.direct;
             filled[point.index] = true;
         }
         dilate(&mut texels, &mut filled, size, DILATE_PASSES);
@@ -95,7 +111,12 @@ fn triangles(scene: &BakeScene) -> Vec<Tri> {
 
 /// Trace `points` across the available cores, keeping their order. Each texel's
 /// stream is seeded by `(seed, mesh, texel index)`, never by which thread runs it.
-fn trace_all(tracer: &Tracer, points: &[TexelPoint], mesh: u64, s: &BakeSettings) -> Vec<Vec3> {
+fn trace_all(
+    tracer: &Tracer,
+    points: &[TexelPoint],
+    mesh: u64,
+    s: &BakeSettings,
+) -> Vec<TexelLight> {
     let one = |p: &TexelPoint| {
         let mut rng = Rng::new(s.seed, mesh, p.index as u64);
         tracer.texel(p.position, p.normal, s.samples, s.bounces, &mut rng)

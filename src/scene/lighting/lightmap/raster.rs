@@ -24,6 +24,13 @@ pub(super) struct TexelPoint {
 /// `[MIN_RESOLUTION, max]`. `None` when the lightmap UVs enclose no area (no second
 /// UV map): that mesh keeps probe / ambient lighting.
 pub fn lightmap_size(mesh: &BakeMesh, texels_per_unit: f32, max: u32) -> Option<u32> {
+    let edge = world_per_uv(mesh)? * texels_per_unit;
+    Some((edge.ceil() as u32).clamp(MIN_RESOLUTION, max.max(MIN_RESOLUTION)))
+}
+
+/// World units spanned by one unit of `mesh`'s lightmap UV (the square root of world
+/// area over UV area); `None` when the lightmap UVs enclose no area.
+pub(super) fn world_per_uv(mesh: &BakeMesh) -> Option<f32> {
     let (mut world, mut uv) = (0.0f32, 0.0f32);
     for t in mesh.indices.chunks_exact(3) {
         let [a, b, c] = [t[0], t[1], t[2]].map(|i| i as usize);
@@ -36,11 +43,7 @@ pub fn lightmap_size(mesh: &BakeMesh, texels_per_unit: f32, max: u32) -> Option<
         );
         uv += (ub - ua).perp_dot(uc - ua).abs() * 0.5;
     }
-    if uv < 1e-8 || world <= 0.0 {
-        return None;
-    }
-    let edge = (world / uv).sqrt() * texels_per_unit;
-    Some((edge.ceil() as u32).clamp(MIN_RESOLUTION, max.max(MIN_RESOLUTION)))
+    (uv >= 1e-8 && world > 0.0).then(|| (world / uv).sqrt())
 }
 
 /// Every texel of a `size`² lightmap a triangle of `mesh` covers. A texel two

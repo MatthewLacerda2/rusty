@@ -24,6 +24,21 @@ use super::rng::Rng;
 const SURFACE_OFFSET: f32 = 1e-3;
 /// Nearest hit a ray accepts.
 const T_MIN: f32 = 1e-4;
+/// The share of a texel's rays that may start out on back faces before the texel is
+/// judged to be inside geometry (Unity's backface tolerance, inverted).
+const BACKFACE_TOLERANCE: f32 = 0.5;
+
+/// One texel's light, split so the bake can smooth the noisy part only.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct TexelLight {
+    pub indirect: Vec3,
+    pub direct: Vec3,
+    /// False when most of the texel's rays start out hitting back faces: it sits
+    /// inside other geometry (a floor texel under a crate), so its light is
+    /// meaningless and the bake fills it from its neighbours instead (Unity's
+    /// backface tolerance).
+    pub valid: bool,
+}
 
 /// The static scene ready to trace.
 pub(super) struct Tracer<'a> {
@@ -32,8 +47,9 @@ pub(super) struct Tracer<'a> {
 }
 
 impl Tracer<'_> {
-    /// The lightmap value at `position` facing `normal`: the bounce and sky over
-    /// `samples` paths `bounces` deep, plus the direct light of `Baked` lights.
+    /// The lightmap value at `position` facing `normal`, in its two parts: the bounce
+    /// and sky over `samples` paths `bounces` deep, and the direct light of `Baked`
+    /// lights. The bake filters the first and adds the second.
     pub(super) fn texel(
         &self,
         position: Vec3,
@@ -41,27 +57,39 @@ impl Tracer<'_> {
         samples: u32,
         bounces: u32,
         rng: &mut Rng,
-    ) -> Vec3 {
+    ) -> TexelLight {
         let origin = position + normal * SURFACE_OFFSET;
-        let mut sum = Vec3::ZERO;
+        let (mut sum, mut inside) = (Vec3::ZERO, 0);
         for _ in 0..samples {
-            sum += self.path(origin, normal, bounces, rng);
+            let (radiance, backface) = self.path(origin, normal, bounces, rng);
+            sum += radiance;
+            inside += u32::from(backface);
         }
-        let indirect = sum / samples.max(1) as f32;
-        indirect + self.direct(origin, normal, true) / PI
+        TexelLight {
+            indirect: sum / samples.max(1) as f32,
+            direct: self.direct(origin, normal, true) / PI,
+            valid: (inside as f32) < samples as f32 * BACKFACE_TOLERANCE,
+        }
     }
 
-    /// The radiance one cosine-weighted path from `origin` brings back.
-    fn path(&self, mut origin: Vec3, mut normal: Vec3, bounces: u32, rng: &mut Rng) -> Vec3 {
+    /// The radiance one cosine-weighted path from `origin` brings back, and whether
+    /// its first ray hit a back face.
+    fn path(
+        &self,
+        mut origin: Vec3,
+        mut normal: Vec3,
+        bounces: u32,
+        rng: &mut Rng,
+    ) -> (Vec3, bool) {
         let (mut radiance, mut throughput) = (Vec3::ZERO, Vec3::ONE);
-        for _ in 0..bounces.max(1) {
+        for depth in 0..bounces.max(1) {
             let dir = cosine_sample(normal, rng);
             let Some(hit) = self.bvh.closest(origin, dir, T_MIN, f32::MAX) else {
                 radiance += throughput * self.sky(dir);
                 break;
             };
             let Some((point, hit_normal, mesh)) = self.surface(&hit, dir) else {
-                break; // back face: nothing comes through
+                return (radiance, depth == 0); // back face: nothing comes through
             };
             let m = &self.scene.meshes[mesh];
             radiance +=
@@ -69,7 +97,7 @@ impl Tracer<'_> {
             throughput *= m.albedo;
             (origin, normal) = (point, hit_normal);
         }
-        radiance
+        (radiance, false)
     }
 
     /// The offset hit point, its shading normal and mesh — `None` on a back face.

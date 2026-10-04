@@ -51,18 +51,26 @@ exact same path.
   a Cylinder or an imported mesh without one keeps probe / ambient lighting, unchanged.
   Every static mesh still shades and bounces light onto the others. Dynamic objects keep
   the light probes; bake those with `Lighting.Bake()` so both read the same lights.
-- **What it bakes.** A deterministic CPU path tracer: `samples` (default `64`) paths per
-  texel, `bounces` (default `3`) surfaces deep, seeded by `seed` (default `0`) — the same
-  scene and seed always write byte-identical lightmaps. `texelsPerUnit` (default `4`) is
-  the lightmap resolution per world unit (each lightmap is 4–512 texels square). No GPU is
-  needed; it runs headless.
+- **What it bakes.** A deterministic CPU path tracer: `samples` (default `128`) paths
+  per texel, `bounces` (default `3`) surfaces deep, seeded by `seed` (default `0`) — the
+  same scene and seed always write byte-identical lightmaps, however many cores ran it.
+  `texelsPerUnit` (default `8`) is the lightmap resolution per world unit (each mesh's
+  lightmap is 4–512 texels square). The bounce is smoothed with a 3-texel edge-aware
+  Gaussian (Unity's indirect filter) that never crosses a crease; baked direct light is
+  not filtered, so its shadows stay sharp. A texel buried inside other geometry (floor
+  under a crate) is filled from its neighbours rather than baked black. No GPU is needed;
+  it runs headless.
 - **At runtime** a lightmapped surface takes its ambient term from the lightmap instead
   of probes or the flat sky gradient, and skips the realtime direct light of `Baked`
   lights (it is in the map). `Mixed` lights stay realtime on it; their bounce is baked.
-- **Where the files go.** One RGBM-encoded PNG per mesh in `<scene file>.lightmaps/`
-  (old ones there are removed first); the scene references them by entity, so **save the
-  scene** afterwards to keep them. Needs a saved scene path (errors otherwise).
-  `Lighting.ClearLightmaps()` drops the references (the files stay until the next bake).
+  Lightmapped copies of one prop still draw as one instanced call.
+- **Where the files go.** The lightmaps are packed into square **atlas pages** (the
+  smallest power of two that holds them all, up to 1024², then as many 1024² pages as it
+  takes), each an RGBM-encoded PNG in `<scene file>.lightmaps/` (old pages there are
+  removed first). The scene stores the page list and, per entity, its page and
+  scale/offset (Unity's lightmap index + scale/offset), so **save the scene** afterwards
+  to keep them. Needs a saved scene path (errors otherwise). `Lighting.ClearLightmaps()`
+  drops the references (the files stay until the next bake).
 - **Moving or editing static geometry** after a bake leaves its lightmap stale; rebake.
 
 **Blender export.** The lightmap UV is the mesh's **second UV map**: add one in *Object Data

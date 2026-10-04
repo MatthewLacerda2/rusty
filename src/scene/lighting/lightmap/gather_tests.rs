@@ -97,3 +97,31 @@ fn gather_takes_static_meshes_and_baked_in_lights_only() {
         "a Box has UV2"
     );
 }
+
+#[test]
+fn the_filter_smooths_grain_but_not_across_a_crease() {
+    use super::filter::smooth;
+    use super::raster::TexelPoint;
+    // A 4×1 strip: three texels facing up, the last facing sideways (a crease).
+    let point = |i: usize, normal| TexelPoint {
+        index: i,
+        position: Vec3::new(i as f32, 0.0, 0.0),
+        normal,
+    };
+    let points = [
+        point(0, Vec3::Y),
+        point(1, Vec3::Y),
+        point(2, Vec3::Y),
+        point(3, Vec3::X),
+    ];
+    let grain = [Vec3::ZERO, Vec3::splat(3.0), Vec3::ZERO, Vec3::splat(9.0)];
+    let out = smooth(&points, &grain, 4, 1, 1.0);
+    assert!(out[1].x < 3.0 && out[0].x > 0.0, "grain spreads: {out:?}");
+    assert_eq!(out[3], grain[3], "nothing crosses the crease");
+    assert!(out[2].x < 3.0, "nor leaks back over it: {out:?}");
+    assert_eq!(
+        smooth(&points, &grain, 4, 0, 1.0),
+        grain.to_vec(),
+        "radius 0 is raw"
+    );
+}
