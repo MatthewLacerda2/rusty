@@ -89,6 +89,10 @@ pub trait Frontend {
     /// See every window event before the shell routes it (the editor feeds egui).
     fn on_window_event(&mut self, _shell: &Shell, _event: &WindowEvent) {}
 
+    /// Raw mouse motion while the window has focus, whoever has input (the editor
+    /// feeds egui's look-around).
+    fn on_mouse_motion(&mut self, _delta: (f64, f64)) {}
+
     /// Whether input (keys, mouse, text, the cursor request) reaches the game right
     /// now. The player: always. The editor: only in Play with the Game view focused.
     fn game_has_input(&self, _game: &GameWorld) -> bool {

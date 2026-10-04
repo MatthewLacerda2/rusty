@@ -5,7 +5,8 @@
 //! [`Shell`] and the frontend are built there, from a [`Launch`] the frontend's
 //! `launch()` prepared. Every event after that is routed exactly as before: window
 //! events through the frontend and [`super::handle_window_event`], raw mouse motion
-//! to the game while it has input, a redraw request each time the loop goes idle.
+//! to the frontend (the editor's Scene-view look, #745) and to the game while it has
+//! input, a redraw request each time the loop goes idle.
 
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
@@ -83,11 +84,15 @@ where
     }
 
     fn device_event(&mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent) {
-        let Some((shell, frontend)) = self.running.as_ref() else {
+        let Some((shell, frontend)) = self.running.as_mut() else {
             return;
         };
         if let DeviceEvent::MouseMotion { delta } = event {
-            if shell.window_focused && frontend.game_has_input(&self.game) {
+            if !shell.window_focused {
+                return;
+            }
+            frontend.on_mouse_motion(delta);
+            if frontend.game_has_input(&self.game) {
                 input::write_mouse_motion(delta, &self.game);
             }
         }

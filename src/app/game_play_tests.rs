@@ -1,4 +1,4 @@
-//! Unit tests for the play/stop boundary in `GameWorld` (game.rs): pitch clamping,
+//! Unit tests for the play/stop boundary in `GameWorld` (game.rs):
 //! the transition state machine, the scaled-dt threading, and the
 //! snapshot-capture-on-Play / restore-on-Stop invariant. Determinism contract:
 //! fixed dt, no wall-clock, no RNG.
@@ -31,25 +31,6 @@ fn temp_path(name: &str) -> String {
         .join(name)
         .to_string_lossy()
         .into_owned()
-}
-
-#[test]
-fn editor_fly_pitch_clamps_at_eighty() {
-    let mut gw = empty_world();
-    gw.camera().borrow_mut().pitch = 79.5;
-    gw.input().borrow_mut().set_key_state("UP", true);
-    for _ in 0..120 {
-        gw.tick(DT);
-    }
-    assert!((gw.camera().borrow().pitch - 80.0).abs() < 1e-4);
-
-    let mut gw = empty_world();
-    gw.camera().borrow_mut().pitch = -79.5;
-    gw.input().borrow_mut().set_key_state("DOWN", true);
-    for _ in 0..120 {
-        gw.tick(DT);
-    }
-    assert!((gw.camera().borrow().pitch + 80.0).abs() < 1e-4);
 }
 
 #[test]

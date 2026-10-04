@@ -2,8 +2,9 @@
 //!
 //! The 3D scene is rendered to an offscreen texture (`Renderer::viewport_view`) and
 //! shown here inside an `egui::Image` in the central panel, with two tabs over it:
-//! **Scene** (the free-fly editor camera, with click-to-select + the move gizmo) and
-//! **Game** (the active `CameraComponent`'s view — what the player sees). The panel
+//! **Scene** (the editor's own camera, [`scene_camera`], navigated with Unity's
+//! controls by [`scene_nav`] — plus click-to-select and the move gizmo) and **Game**
+//! (the active `CameraComponent`'s view — what the player sees). The panel
 //! owns no GPU state; the shell's editor frontend registers the texture and feeds the [`egui::TextureId`]
 //! in, and reads the returned [`ViewportInteraction`] back to drive picking/gizmo.
 //! The Scene tab's **UI** toggle draws the screen-space canvases over the scene and
@@ -12,6 +13,8 @@
 pub mod gizmo;
 pub mod pick;
 pub mod rect_tool;
+pub mod scene_camera;
+pub mod scene_nav;
 
 use egui_phosphor::regular as icon;
 
@@ -20,7 +23,7 @@ use crate::editor::theme::chrome;
 /// Which view the viewport tab strip is showing.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ViewportTab {
-    /// Free-fly editor camera with gizmos + selection overlays.
+    /// The editor's own Scene camera with gizmos + selection overlays.
     Scene,
     /// The active `CameraComponent`'s view — what ships.
     Game,
@@ -60,7 +63,7 @@ pub fn draw(
     editor: &mut crate::editor::EditorUi,
     ui: &mut egui::Ui,
     texture: Option<egui::TextureId>,
-    world: &crate::ecs::World,
+    scene: &crate::scene::Scene,
 ) -> ViewportInteraction {
     let t = editor.theme;
     let mut tab = editor.viewport_tab;
@@ -71,6 +74,11 @@ pub fn draw(
         .show(ui, |ui| {
             draw_tab_strip(ui, &mut tab, &mut overlay, t);
             let response = draw_image(ui, texture, t);
+            if tab == ViewportTab::Scene {
+                navigate(editor, &response, scene);
+            } else {
+                editor.scene_view.looking = false;
+            }
             if tab == ViewportTab::Scene && overlay {
                 let frame = rect_tool::OverlayFrame {
                     size: glam::Vec2::new(response.rect.width(), response.rect.height()),
@@ -78,6 +86,7 @@ pub fn draw(
                 };
                 let painter = ui.painter_at(response.rect);
                 let selected = editor.selected_entity_id;
+                let world = &scene.world;
                 rect_tool::overlay::paint(&painter, response.rect.min, &frame, world, selected, &t);
             }
             response
@@ -86,7 +95,7 @@ pub fn draw(
 
     editor.viewport_tab = tab;
     editor.ui_overlay = overlay;
-    let interaction = build_interaction(tab, &response);
+    let interaction = build_interaction(tab, &response, editor.scene_view.navigating);
     // Record the image rect's pixel size so the front-end resizes the offscreen
     // target to match (points scaled by the egui pixels-per-point).
     editor.viewport_image_size = response.rect.size();
@@ -148,9 +157,41 @@ fn draw_image(
     }
 }
 
+/// Drive the Scene camera from this frame's input on the image (#745): the held
+/// gesture, scroll, and F to frame the selection while hovered.
+fn navigate(
+    editor: &mut crate::editor::EditorUi,
+    response: &egui::Response,
+    scene: &crate::scene::Scene,
+) {
+    let nav = scene_nav::read(response, response.is_pointer_button_down_on());
+    if nav.gesture.is_some() {
+        // The Scene view takes the keyboard, so WASD never types into a field.
+        response.request_focus();
+    }
+    scene_nav::apply(&mut editor.scene_view.camera, &nav);
+    editor.scene_view.navigating = nav.gesture.is_some() || response.ctx.input(|i| i.modifiers.alt);
+    editor.scene_view.looking = nav.gesture == Some(scene_nav::Gesture::Look);
+    let frame_key = response.ctx.input(|i| i.key_pressed(egui::Key::F));
+    if frame_key && response.hovered() && !response.ctx.text_edit_focused() {
+        let bounds = editor
+            .selected_entity_id
+            .and_then(|id| scene_nav::selection_bounds(scene, id));
+        if let Some((center, radius)) = bounds {
+            editor.scene_view.camera.frame(center, radius);
+        }
+    }
+}
+
 /// Translate the image's egui response into the front-end-facing interaction, with
-/// pointer positions made relative to the image's top-left.
-fn build_interaction(tab: ViewportTab, response: &egui::Response) -> ViewportInteraction {
+/// pointer positions made relative to the image's top-left. While the Scene camera
+/// navigates (a gesture held, or Alt down), LMB is the camera's: no pick, no gizmo.
+fn build_interaction(
+    tab: ViewportTab,
+    response: &egui::Response,
+    navigating: bool,
+) -> ViewportInteraction {
+    let tools = !(navigating && tab == ViewportTab::Scene);
     let origin = response.rect.min;
     let hover_local = response
         .hover_pos()
@@ -161,10 +202,10 @@ fn build_interaction(tab: ViewportTab, response: &egui::Response) -> ViewportInt
         origin,
         size: response.rect.size(),
         hover_local,
-        clicked: response.clicked(),
-        dragging: response.dragged(),
+        clicked: tools && response.clicked(),
+        dragging: tools && response.dragged_by(egui::PointerButton::Primary),
         drag_delta: response.drag_delta(),
-        drag_started: response.drag_started(),
+        drag_started: tools && response.drag_started_by(egui::PointerButton::Primary),
         pointer_pressed: response.ctx.input(|i| i.pointer.any_pressed()),
     }
 }

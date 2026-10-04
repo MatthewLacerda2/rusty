@@ -151,7 +151,7 @@ impl GameWorld {
         // Publish input written since the last tick as this tick's edges (#416).
         self.resources.input.borrow_mut().begin_tick();
         // `advance` records raw `dt` (unscaled) and the scaled `delta_time`.
-        // The game sim integrates the scaled value; the editor camera uses raw.
+        // The game sim integrates the scaled value.
         let scaled_dt = {
             let mut time = self.resources.time.borrow_mut();
             time.advance(dt);
@@ -165,7 +165,6 @@ impl GameWorld {
             self.resources.frame_dt = scaled_dt;
             self.run_schedule_frame();
         } else {
-            self.editor_fly(dt);
             // No schedule in edit mode, but a bone the designer moved still skins (#453).
             self.world.scene.borrow_mut().build_skin_palettes();
         }
@@ -179,7 +178,7 @@ impl GameWorld {
     /// paused, no-step frame: the world is frozen, but a Play/Stop pressed while paused
     /// must still take effect (Stop → `exit_play` restores the edit snapshot). Returns
     /// the transition so the platform layer can grab/release the cursor exactly as a
-    /// normal `tick` would. No clock advance, no schedule run, no editor fly.
+    /// normal `tick` would. No clock advance, no schedule run.
     pub fn poll_transition(&mut self) -> PlayTransition {
         self.handle_transition()
     }

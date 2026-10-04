@@ -208,11 +208,7 @@ fn render_viewport(
     let scene = game.scene().borrow();
     let scene_tab = ui.viewport_tab == ViewportTab::Scene;
     view.ui.screen_in_editor = scene_tab && ui.ui_overlay;
-    let camera = if scene_tab {
-        game.camera().borrow().clone()
-    } else {
-        crate::scene::game_camera_from_scene(&game.camera().borrow(), &scene)
-    };
+    let camera = super::viewport::viewport_camera(ui, game, &scene, ui.viewport_tab);
     renderer.render(view, &scene, &camera, &target, scene_tab);
     super::viewport::rebind_egui_texture(egui_renderer, &renderer.device, texture_id, view);
 }
