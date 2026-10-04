@@ -32,22 +32,32 @@ pub struct RunReport {
     pub passed: bool,
 }
 
-/// Load and run `scenario_path` headlessly, writing results into `out_dir`.
+/// Load and run `scenario_path` headlessly, writing results into `out_dir`, on the
+/// user's workspace (`./project`): a scenario play-tests the game being built.
 pub fn run(scenario_path: &Path, out_dir: &Path) -> Result<RunReport, String> {
+    run_on(scenario_path, out_dir, true)
+}
+
+/// [`run`] on a workspace of the run's own, seeded from the engine's bundled
+/// scripts (see `Harness::new`) — for tests, which must not read `./project` (#782).
+pub fn run_isolated(scenario_path: &Path, out_dir: &Path) -> Result<RunReport, String> {
+    run_on(scenario_path, out_dir, false)
+}
+
+fn run_on(scenario_path: &Path, out_dir: &Path, user: bool) -> Result<RunReport, String> {
     let code = std::fs::read_to_string(scenario_path)
         .map_err(|e| format!("Failed to read scenario {}: {}", scenario_path.display(), e))?;
 
-    // Seed the bundled default scripts before deciding what to attach, so the very
-    // first run and every rerun see the same files — otherwise the enemy brain would
-    // be absent on the first run and present afterwards, breaking byte-determinism.
-    crate::scene::seed_default_scripts();
-
-    let bot = if Path::new(DEFAULT_BOT_SCRIPT).exists() {
-        DEFAULT_BOT_SCRIPT
+    // Both harnesses seed the bundled scripts before the scene attaches them, so
+    // the very first run and every rerun see the same files — otherwise the enemy
+    // brain would be absent on the first run and present afterwards, breaking
+    // byte-determinism.
+    let harness = if user {
+        Harness::in_user_workspace(out_dir, DEFAULT_BOT_SCRIPT)
     } else {
-        ""
+        Harness::new(out_dir, DEFAULT_BOT_SCRIPT)
     };
-    let harness = Rc::new(RefCell::new(Harness::new(out_dir, bot)));
+    let harness = Rc::new(RefCell::new(harness));
 
     let lua = Lua::new();
     super::bridge::register(&lua, &harness).map_err(|e| format!("Lua bridge error: {}", e))?;

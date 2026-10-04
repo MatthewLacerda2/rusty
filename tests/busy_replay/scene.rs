@@ -34,10 +34,14 @@ function B.OnCollisionEnter(id, other) print(string.format("[busy] hit %d %d", i
 return B
 "#;
 
-fn write(dir: &std::path::Path, name: &str, body: &str) -> String {
-    let path = dir.join(name);
-    std::fs::write(&path, body).expect("write script");
-    path.to_string_lossy().into_owned()
+/// Where the busy scripts sit, relative to the harness's workspace root — the form
+/// a scene stores a script path in on every OS (#783), so two runs in two scratch
+/// directories snapshot the same paths.
+const DIRECTOR_PATH: &str = "project/assets/scripts/busy_director.lua";
+const BOX_PATH: &str = "project/assets/scripts/busy_box.lua";
+
+fn write(workspace: &std::path::Path, path: &str, body: &str) {
+    std::fs::write(workspace.join(path), body).expect("write script");
 }
 
 fn add_box(scene: &mut Scene, pos: Vec3, script: &str) {
@@ -91,25 +95,20 @@ fn add_agent(scene: &mut Scene, from: Vec3, to: Vec3) {
 }
 
 /// The harness on the default scene plus the busy additions, stepped `frames` ticks.
-/// Returns the world snapshot and the `[busy]` console lines, as one string, with
-/// this run's scratch directory (in the script paths) masked so runs compare.
+/// Returns the world snapshot and the `[busy]` console lines, as one string.
 pub fn run(dir: &str, frames: u32) -> String {
     let out = crate::temp::dir().join(dir);
-    std::fs::create_dir_all(&out).expect("temp dir");
-    let director = write(&out, "busy_director.lua", DIRECTOR);
-    let crate_script = write(&out, "busy_box.lua", BOX);
-    let h = Harness::new(&out, &director);
+    let h = Harness::new(&out, DIRECTOR_PATH);
+    let workspace = Harness::workspace_of(&out);
+    write(&workspace, DIRECTOR_PATH, DIRECTOR);
+    write(&workspace, BOX_PATH, BOX);
     {
         // Play is entered on the first tick, so these are in the scene it snapshots.
         let world = h.world.borrow();
         let mut scene = world.scene().borrow_mut();
         for i in 0..16 {
             let (x, z) = ((i % 4) as f32 * 0.7 - 1.0, (i / 4) as f32 * 0.7 - 1.0);
-            add_box(
-                &mut scene,
-                Vec3::new(x, 2.0 + i as f32 * 0.45, z),
-                &crate_script,
-            );
+            add_box(&mut scene, Vec3::new(x, 2.0 + i as f32 * 0.45, z), BOX_PATH);
         }
         for i in 0..6 {
             let s = i as f32 * 1.5 - 4.0;
@@ -128,6 +127,5 @@ pub fn run(dir: &str, frames: u32) -> String {
         .map(|m| m.0.as_str())
         .filter(|m| m.contains("[busy]") || m.contains("Error"))
         .collect();
-    let run = format!("{}\n{}", h.snapshot(), lines.join("\n"));
-    run.replace(&*out.to_string_lossy(), "<out>")
+    format!("{}\n{}", h.snapshot(), lines.join("\n"))
 }

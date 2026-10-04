@@ -65,7 +65,7 @@ fn injected_input_replays_identically() {
     let path = dir.join("scenario.lua");
     std::fs::write(&path, SCENARIO).unwrap();
     let run = |out: &str| {
-        let report = scenario::run(&path, &dir.join(out)).expect("scenario runs");
+        let report = scenario::run_isolated(&path, &dir.join(out)).expect("scenario runs");
         assert!(report.passed, "scenario expectations pass");
         std::fs::read_to_string(report.results_path).unwrap()
     };

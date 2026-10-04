@@ -106,6 +106,8 @@ mod frame_stats;
 #[cfg(feature = "dev")]
 mod harness_determinism;
 #[cfg(feature = "dev")]
+mod harness_workspace;
+#[cfg(feature = "dev")]
 mod input_harness;
 #[cfg(feature = "dev")]
 mod lua_determinism;

@@ -89,7 +89,7 @@ fn a_scenario_asserts_budgets_through_the_harness_table() {
          Harness.AssertBudget{ entities = 0 }\n",
     )
     .unwrap();
-    let report = rusty::dev::scenario::run(&scenario, &dir).unwrap();
+    let report = rusty::dev::scenario::run_isolated(&scenario, &dir).unwrap();
     assert!(!report.passed, "the zero-entity budget must fail the run");
     let results: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(report.results_path).unwrap()).unwrap();
