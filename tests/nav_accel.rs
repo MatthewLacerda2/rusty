@@ -118,3 +118,29 @@ fn braking_inside_the_stopping_distance_still_moves() {
     );
     assert!((speed(&scene, id) - v).abs() < 1e-5);
 }
+
+/// An agent that has arrived stands its ground: it is not steering, so it does
+/// not dodge a passer-by (only steering agents solve avoidance) even while it
+/// still holds the path it arrived on.
+#[test]
+fn an_arrived_agent_does_not_dodge() {
+    let home = Vec3::new(10.0, 0.0, 10.0);
+    let mut arrived = agent(3.5, 8.0, 0.2);
+    arrived.target = home;
+    arrived.planned_target = home;
+    arrived.cached_path = vec![home];
+    let mut scene = Scene::new();
+    let a = scene.add_entity("arrived".to_string());
+    scene.world.transform_mut(a).unwrap().position = home;
+    scene.world.set_nav_agent(a, Some(arrived));
+    let mut walker = agent(3.5, 8.0, 0.2);
+    walker.target = Vec3::new(18.0, 0.0, 10.1);
+    let b = scene.add_entity("walker".to_string());
+    scene.world.transform_mut(b).unwrap().position = Vec3::new(2.0, 0.0, 10.1);
+    scene.world.set_nav_agent(b, Some(walker));
+    let graph = NavigationGraph::new(0.0, 20.0, 0.0, 20.0, 1.0);
+    for _ in 0..300 {
+        graph.tick_nav_agents(&mut scene, DT);
+    }
+    assert_eq!(scene.world.transform(a).unwrap().position, home, "dodged");
+}
