@@ -84,3 +84,43 @@ fn quat_look_along(dir: Vec3) -> Quat {
     // look_to_rh builds a view rotation; its inverse orients an object's −Z to dir.
     Quat::from_mat4(&look_to_mat4(Vec3::ZERO, f, up)).inverse()
 }
+
+impl crate::scene::Scene {
+    /// Spawn a box-projector decal at a surface hit (the point + outward normal
+    /// already produced by `Physics.Raycast`). `size` is the
+    /// stamp's width/height in world units; `depth` how far the box projects
+    /// through the surface; `rotation_deg` spins the stamp around its axis;
+    /// `color` tints the texel (alpha scales the blend); `texture` is the decal
+    /// sprite (or the default checker). The registry is a bounded FIFO so spam
+    /// can't grow it without limit.
+    #[allow(clippy::too_many_arguments)]
+    pub fn spawn_decal(
+        &mut self,
+        point: Vec3,
+        normal: Vec3,
+        size: f32,
+        depth: f32,
+        rotation_deg: f32,
+        color: [f32; 4],
+        texture: Option<String>,
+    ) {
+        let decal = crate::scene::decal::Decal::from_hit(
+            point,
+            normal,
+            size.max(1.0e-4),
+            depth.max(1.0e-4),
+            rotation_deg,
+            color,
+            texture,
+        );
+        if self.decals.len() >= crate::scene::decal::MAX_DECALS {
+            self.decals.remove(0);
+        }
+        self.decals.push(decal);
+    }
+
+    /// Drop every live decal (e.g. on level reset).
+    pub fn clear_decals(&mut self) {
+        self.decals.clear();
+    }
+}

@@ -120,6 +120,8 @@ pub struct Scene {
     /// chain itself. Not serialized — it is derived, per-frame runtime state. See
     /// `world_cache.rs` for the fill algorithm and the freshness contract.
     pub(crate) world_cache: WorldMatrixCache,
+    /// Per-entity runtime shader-param overrides (#670). Runtime-only, never serialized.
+    pub shader_overrides: crate::scene::shader_overrides::ShaderOverrides,
 }
 
 impl Default for Scene {
@@ -145,6 +147,7 @@ impl Default for Scene {
             shader_time: 0.0,
             ui_time: 0.0,
             world_cache: WorldMatrixCache::default(),
+            shader_overrides: Default::default(),
         }
     }
 }
@@ -166,44 +169,6 @@ impl Scene {
         self.id = SceneId::next();
     }
 
-    /// Spawn a box-projector decal at a surface hit (the point + outward normal
-    /// already produced by `Physics.Raycast`). `size` is the
-    /// stamp's width/height in world units; `depth` how far the box projects
-    /// through the surface; `rotation_deg` spins the stamp around its axis;
-    /// `color` tints the texel (alpha scales the blend); `texture` is the decal
-    /// sprite (or the default checker). The registry is a bounded FIFO so spam
-    /// can't grow it without limit.
-    #[allow(clippy::too_many_arguments)]
-    pub fn spawn_decal(
-        &mut self,
-        point: Vec3,
-        normal: Vec3,
-        size: f32,
-        depth: f32,
-        rotation_deg: f32,
-        color: [f32; 4],
-        texture: Option<String>,
-    ) {
-        let decal = crate::scene::decal::Decal::from_hit(
-            point,
-            normal,
-            size.max(1.0e-4),
-            depth.max(1.0e-4),
-            rotation_deg,
-            color,
-            texture,
-        );
-        if self.decals.len() >= crate::scene::decal::MAX_DECALS {
-            self.decals.remove(0);
-        }
-        self.decals.push(decal);
-    }
-
-    /// Drop every live decal (e.g. on level reset).
-    pub fn clear_decals(&mut self) {
-        self.decals.clear();
-    }
-
     pub fn add_entity(&mut self, name: String) -> u32 {
         self.world.spawn(name)
     }
@@ -211,6 +176,7 @@ impl Scene {
     pub fn destroy_entity(&mut self, id: u32) {
         self.despawn_skeleton(id); // its bones, and what hangs from them (#453)
         self.world.despawn(id);
+        self.shader_overrides.clear(id, None);
         if self.selected_entity_id == Some(id) {
             self.selected_entity_id = None;
         }

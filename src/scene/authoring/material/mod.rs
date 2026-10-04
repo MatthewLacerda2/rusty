@@ -17,13 +17,17 @@
 //! Pure: no wall-clock, no RNG.
 
 mod maps;
+mod shader_params;
 
 use std::collections::BTreeMap;
 
 pub use maps::{bake_maps, rebake_maps, MAPS_DIR};
+pub use shader_params::{
+    clear_entity_shader_param, entity_shader_param, set_entity_shader_param, set_shader_param,
+    shader_layout, shader_param,
+};
 
 use crate::scene::{MaterialAsset, MaterialComponent, RenderMode, Scene};
-use crate::shadergen::params::{self, ParamLayout};
 
 /// The scene's material library: library key -> shared asset. Matches
 /// `Scene.materials`; aliased here so callers name one type.
@@ -182,51 +186,6 @@ pub fn set_shader_texture(
         };
     }
     Ok(())
-}
-
-/// The runtime-param layout of material `key`'s shader (#399), read from the
-/// shader's `<name>.params.json` where the renderer resolves the module. Errors
-/// when the material is missing, names no shader, or the shader is not baked.
-pub fn shader_layout(materials: &MaterialLibrary, key: &str) -> Result<ParamLayout, String> {
-    let shader = materials
-        .get(key)
-        .and_then(|m| m.shader.as_deref())
-        .ok_or_else(|| format!("material {key:?} has no shader (Material.SetShader first)"))?;
-    params::load(shader)
-}
-
-/// Set runtime shader param `name` (#399) on material `key`, checked against its
-/// shader's `layout`: an unknown or baked param, or a wrong number of values, is an
-/// error naming it. One number broadcasts to every lane. Stored by canonical name,
-/// so `"hit_flash.amount"` and `"hit_flash.0.amount"` are one value.
-pub fn set_shader_param(
-    materials: &mut MaterialLibrary,
-    key: &str,
-    layout: &ParamLayout,
-    name: &str,
-    value: Vec<f32>,
-) -> Result<(), String> {
-    let slot = layout.resolve(name)?;
-    let value = layout.coerce(slot, value)?;
-    if let Some(m) = materials.get_mut(key) {
-        m.shader_params.insert(layout.name(slot), value);
-    }
-    Ok(())
-}
-
-/// The value runtime shader param `name` draws with on material `key`: the stored
-/// one, else the shader's baked default.
-pub fn shader_param(
-    materials: &MaterialLibrary,
-    key: &str,
-    layout: &ParamLayout,
-    name: &str,
-) -> Result<Vec<f32>, String> {
-    let slot = layout.resolve(name)?;
-    let stored = materials
-        .get(key)
-        .and_then(|m| m.shader_params.get(&layout.name(slot)));
-    Ok(stored.cloned().unwrap_or_else(|| slot.default.clone()))
 }
 
 #[cfg(test)]

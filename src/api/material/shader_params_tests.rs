@@ -1,6 +1,7 @@
-//! `Material.SetShaderParam` / `GetShaderParam` (#399): values land on the material
-//! under their canonical name, read back (defaults included), and a param the shader
-//! does not expose at runtime is an error naming it.
+//! `Material.SetAssetShaderParam` / `GetAssetShaderParam` (#399, #670): values land on
+//! the material under their canonical name, read back (defaults included), and a param
+//! the shader does not expose at runtime is an error naming it — from the asset and
+//! the per-entity verbs alike.
 
 use std::cell::RefCell;
 
@@ -13,10 +14,10 @@ use crate::shadergen::{bake_recipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
 
 /// Bake a toon + hit-flash surface shader under a name unique to this test run,
 /// into the workspace the API resolves from; removed on drop.
-struct Baked(String);
+pub(super) struct Baked(pub(super) String);
 
 impl Baked {
-    fn new(tag: &str) -> Self {
+    pub(super) fn new(tag: &str) -> Self {
         let name = format!("test_params_{tag}_{}", std::process::id());
         let blocks = ["toon_ramp", "hit_flash"].map(|id| BlockSel {
             id: id.into(),
@@ -41,7 +42,7 @@ impl Drop for Baked {
 }
 
 /// A scene with one entity whose material names `shader`; returns (scene, id).
-fn scene_with(shader: &str) -> (RefCell<Scene>, u32) {
+pub(super) fn scene_with(shader: &str) -> (RefCell<Scene>, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("E".into());
     let key = mat_ops::ensure_material_key(&mut scene, id).unwrap();
@@ -50,7 +51,7 @@ fn scene_with(shader: &str) -> (RefCell<Scene>, u32) {
 }
 
 /// Run `script` against the `Material` namespace, returning its error if any.
-fn run(scene: &RefCell<Scene>, script: &str) -> Result<(), String> {
+pub(super) fn run(scene: &RefCell<Scene>, script: &str) -> Result<(), String> {
     let lua = Lua::new();
     lua.scope(|s| {
         super::super::register(&lua, s, scene).unwrap();
@@ -63,20 +64,22 @@ fn run(scene: &RefCell<Scene>, script: &str) -> Result<(), String> {
 fn set_stores_by_canonical_name_and_get_reads_it_back() {
     let shader = Baked::new("set");
     let (scene, id) = scene_with(&shader.0);
+    let key = scene.borrow().world.material(id).unwrap().material.clone();
     run(
         &scene,
         &format!(
-            r#"assert(Material.GetShaderParam({id}, "hit_flash.amount") == 0)
-               Material.SetShaderParam({id}, "hit_flash.1.amount", 0.75)
-               Material.SetShaderParam({id}, "hit_flash.color", {{1, 0, 0}})
+            r#"local m = "{key}"
+               assert(Material.GetAssetShaderParam(m, "hit_flash.amount") == 0)
+               Material.SetAssetShaderParam(m, "hit_flash.1.amount", 0.75)
+               Material.SetAssetShaderParam(m, "hit_flash.color", {{1, 0, 0}})
+               assert(Material.GetAssetShaderParam(m, "hit_flash.amount") == 0.75)
                assert(Material.GetShaderParam({id}, "hit_flash.amount") == 0.75)
-               assert(Material.GetShaderParam({id}, "hit_flash.color")[2] == 0)"#
+               assert(Material.GetAssetShaderParam(m, "hit_flash.color")[2] == 0)"#
         ),
     )
     .unwrap();
     let scene = scene.borrow();
-    let key = &scene.world.material(id).unwrap().material;
-    let stored = &scene.materials[key].shader_params;
+    let stored = &scene.materials[&key].shader_params;
     assert_eq!(stored["hit_flash.amount"], [0.75]);
     assert_eq!(stored["hit_flash.color"], [1.0, 0.0, 0.0]);
     assert_eq!(stored.len(), 2, "one value per param, whatever name set it");
@@ -92,8 +95,13 @@ fn a_baked_or_unknown_param_or_bad_value_is_an_error_naming_it() {
         (r#""hit_flash.color", {1, 2}"#, "takes 3"),
         (r#""hit_flash.amount", "x""#, "number"),
     ] {
-        let err = run(&scene, &format!("Material.SetShaderParam({id}, {call})")).unwrap_err();
-        assert!(err.contains(want), "{call}: {err}");
+        for verb in [
+            format!("SetShaderParam({id}"),
+            format!(r#"SetAssetShaderParam("entity_{id}_material""#),
+        ] {
+            let err = run(&scene, &format!("Material.{verb}, {call})")).unwrap_err();
+            assert!(err.contains(want), "{verb} {call}: {err}");
+        }
     }
 }
 
