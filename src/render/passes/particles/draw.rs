@@ -106,6 +106,24 @@ impl Renderer {
         }
     }
 
+    /// Build the view's cached scene-depth bind group if absent (first frame that
+    /// needs it, or after the view's resize invalidated it). The depth view only
+    /// changes on resize, so it is reused across frames and cameras (#210).
+    pub(crate) fn ensure_scene_depth_bind_group(&self, view: &mut RenderView) {
+        if view.scene_depth_bind_group.is_some() {
+            return;
+        }
+        view.scene_depth_bind_group =
+            Some(self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("Scene Depth Bind Group"),
+                layout: &self.scene_depth_layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&view.depth_view),
+                }],
+            }));
+    }
+
     /// Pack the (already back-to-front) runs into one instance array, merging
     /// neighbouring runs with the same blend + texture into one draw.
     fn batch_runs(&mut self, runs: Vec<EmitterRun>) -> (Vec<ParticleInstance>, Vec<ParticleBatch>) {

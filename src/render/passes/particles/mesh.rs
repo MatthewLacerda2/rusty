@@ -16,7 +16,7 @@ use crate::components::{MaterialAsset, ParticleEmitterComponent, ParticleRenderM
 use crate::render::draw::batch::{BatchKey, DrawItem};
 use crate::render::draw::sort::view_depth;
 use crate::render::draw::uniforms::{material_uniform, probe_sh_at};
-use crate::render::{InstanceData, MeshId, Renderer};
+use crate::render::{EntityUniform, InstanceData, MeshId, Renderer};
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
 use crate::scene::serialize::asset_mesh_component;
 use crate::scene::{Camera, MeshComponent, Scene};
@@ -113,11 +113,16 @@ impl Renderer {
         }
         let shader = material.and_then(|m| m.shader.as_deref());
         let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
+        // Debris flies through decal boxes; it never takes their stamp (#638).
+        let uniform = EntityUniform {
+            receive_decals: 0,
+            ..material_uniform(true, material)
+        };
         let key = BatchKey {
             pipeline,
             mesh,
             material: self.material_index(entry, pipeline, None),
-            uniform: material_uniform(true, material).words(),
+            uniform: uniform.words(),
         };
         let glass = material.is_some_and(MaterialAsset::is_transparent);
         Some((key, num_indices, glass))

@@ -101,6 +101,7 @@ fn asset_from_json_value(
     refuse_unknown_keys(&value)?;
     let mut asset: MaterialAsset = serde_json::from_value(value).map_err(|e| e.to_string())?;
     asset.maps_recipe = maps;
+    asset.decal = asset.decal.clamped();
     Ok((asset, validated))
 }
 
@@ -124,15 +125,18 @@ fn shader_textures(value: Option<serde_json::Value>) -> Result<Vec<(String, Stri
 /// serialized form is the list of valid keys. (`MaterialAsset` itself stays
 /// lenient: it is also the scene-file shape, which must tolerate old keys.)
 fn refuse_unknown_keys(value: &serde_json::Value) -> Result<(), String> {
+    // Valid, though an empty asset never writes them: the lifted keys and the
+    // fields omitted while they hold their defaults.
+    const UNWRITTEN: [&str; 4] = ["shader_textures", "maps", "receive_decals", "decal"];
     let known = serde_json::to_value(MaterialAsset::default()).map_err(|e| e.to_string())?;
     let (Some(given), Some(known)) = (value.as_object(), known.as_object()) else {
         return Ok(());
     };
-    match given.keys().find(|k| !known.contains_key(*k)) {
+    let is_known = |k: &String| known.contains_key(k) || UNWRITTEN.contains(&k.as_str());
+    match given.keys().find(|k| !is_known(k)) {
         Some(key) => {
-            // The lifted keys are valid too, though an empty asset never writes them.
             let mut valid: Vec<&str> = known.keys().map(String::as_str).collect();
-            valid.extend(["shader_textures", "maps"]);
+            valid.extend(UNWRITTEN);
             Err(format!(
                 "unknown material key {key:?}; expected one of {}",
                 valid.join(", ")

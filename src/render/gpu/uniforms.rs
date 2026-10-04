@@ -138,10 +138,12 @@ pub(crate) struct EntityUniform {
     pub alpha_cutoff: f32,
     // Index of this draw's joint 0 in the frame's bone-palette storage array (#455):
     // the vertex shader reads `bones[bone_base + joint]`. `0` is the shared identity
-    // matrix every non-skinned draw uses. The pad completes the 16-byte run;
-    // `EntityUniforms` in shader.wgsl mirrors this field order byte-for-byte.
+    // matrix every non-skinned draw uses. `EntityUniforms` in shader.wgsl mirrors this
+    // field order byte-for-byte.
     pub bone_base: u32,
-    pub _pad: u32,
+    // `1` when this draw folds in the decals of its cluster (#638): a lit, non-
+    // transparent surface whose material receives decals. Completes the 16-byte run.
+    pub receive_decals: u32,
 }
 
 impl EntityUniform {

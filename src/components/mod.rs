@@ -44,7 +44,7 @@ pub use entity::{Entity, PrefabLink};
 pub use joint::{JointComponent, JointKind};
 pub use light::{LightComponent, LightType};
 pub use lod_group::{LodGroupComponent, LodLevel};
-pub use material::{MaterialAsset, MaterialComponent, RenderMode};
+pub use material::{DecalBlend, MaterialAsset, MaterialComponent, RenderMode};
 pub use mesh::{DirtyFlag, MeshComponent};
 pub use nav_agent::{
     NavMeshAgentComponent, NavPathStatus, DEFAULT_AVOIDANCE_PRIORITY, MAX_AVOIDANCE_PRIORITY,

@@ -85,14 +85,16 @@ print(s.frames, s.fixed_update_ms.avg, s.systems.update_scripts.max, s.entities.
 | `fixed_update_ms` / `update_ms` / `late_update_ms` / `render_stage_ms` | CPU ms per schedule stage. `render_stage_ms` is the `Render` *stage* (draw-data prep), not the GPU |
 | `systems.<name>` | CPU ms per registered system (`update_scripts`, `step_physics`, `tick_nav`, …) |
 | `entities` / `rigid_bodies` / `nav_agents` / `particles` / `scripts` | world counters: live entities, RigidBody components, NavMeshAgents, live particles, loaded script instances |
-| `draw_calls` | geometry draw calls: solids (mesh particles among them), transparents, shadow casters, the SSAO depth prepass, decals, sprite-particle batches, UI batches (post-FX and skybox excluded). Copies of one mesh + material are **one instanced call** (#470), so this tracks distinct looks, not entity count |
+| `draw_calls` | geometry draw calls: solids (mesh particles among them), transparents, shadow casters, the SSAO depth prepass, sprite-particle batches, UI batches (post-FX and skybox excluded; decals draw nothing of their own, #638). Copies of one mesh + material are **one instanced call** (#470), so this tracks distinct looks, not entity count |
 | `triangles` | triangles submitted by the solid, transparent, shadow and SSAO-prepass draws, every instance counted |
 | `visible_entities` / `culled_entities` | mesh entities drawn / skipped by the frustum cull, summed over the camera stack |
 | `lod_hidden_entities` | mesh entities skipped because their `LODGroup` showed another level (#472), summed over the camera stack |
 | `lights` / `lights_dropped` | active lights, and those left unlit: directional lights past 4, every ambient but the last, and per camera the point/spot lights in view past the clustered budget of 256 (the farthest go first, #434) |
 | `lights_visible` / `lights_culled` | point/spot lights binned into at least one light cluster / outside a camera's view and skipped before binning, so they cost nothing (#434); summed over the camera stack |
 | `light_cluster_refs` | entries in the cluster light lists (#434): the (cluster, light) pairs shaders may visit, summed over the camera stack — the clustered lighting's workload |
-| `light_bin_us` | CPU **microseconds** spent binning lights into clusters (#434), summed over the camera stack — wall-clock |
+| `light_bin_us` | CPU **microseconds** spent binning lights and decals into clusters (#434, #638), summed over the camera stack — wall-clock |
+| `decals_visible` / `decal_cluster_refs` | decals binned into at least one cluster / the (cluster, decal) pairs shaders may visit (#638), summed over the camera stack; a stacked `DepthOnly` camera (a viewmodel) bins none |
+| `decal_maps_dropped` | decal maps drawn without their texture this frame because more distinct maps were in use than the decal atlas's 32 layers (#638) |
 | `shadow_draws` / `ui_draws` | shadow-caster draw calls (one per caster mesh, instanced, #470; the sun's cascades and the point/spot shadow atlas) / UI batches |
 | `shadowed_lights` / `shadow_lights_dropped` | point/spot lights given a shadow in the atlas this frame / ones that cast shadows and reach the view but found no room, so they shade unshadowed (the least important go first, #468) |
 | `shadow_atlas_tiles` / `shadow_atlas_texels` | atlas tiles drawn (one per spotlight, six per point light) / the texels they cover, out of 2048² = 4194304 (#468) |

@@ -185,6 +185,7 @@ impl Renderer {
             skybox: (skybox_view, skybox_sampler),
             cube: (&cube.view, &cube.sampler),
             clusters: &self.clusters,
+            decals: &self.decals,
         }
         .create(&self.device, &self.camera_lighting_layout);
     }

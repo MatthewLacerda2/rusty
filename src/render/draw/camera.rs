@@ -22,7 +22,7 @@ use crate::render::lod::LodSelection;
 use crate::render::passes::particles::ParticleDraws;
 use crate::render::passes::ssao::{SsaoFrame, SsaoPlan};
 use crate::render::{CameraUniform, Frustum, RenderView, Renderer};
-use crate::scene::{Camera, Scene};
+use crate::scene::{Camera, ClearFlags, Scene};
 
 /// One stage of a camera's frame.
 pub(crate) type CameraPass = fn(&mut Renderer, &mut RenderView, &mut CameraCtx);
@@ -31,10 +31,9 @@ pub(crate) type CameraPass = fn(&mut Renderer, &mut RenderView, &mut CameraCtx);
 /// module doc); the name is for tests and reading, not lookup.
 pub(crate) const CAMERA_PASSES: &[(&str, CameraPass)] = &[
     ("camera_uniform", upload_camera),
-    ("light_clusters", bin_lights),
+    ("clusters", bin_clusters),
     ("solids", batch_solids),
     ("scene", scene_pass),
-    ("decals", decals),
     ("transparent", transparent),
     ("world_ui", world_ui),
     ("effects", effects),
@@ -119,9 +118,12 @@ fn upload_camera(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
         .write_buffer(&r.camera_buffer, 0, bytemuck::bytes_of(&ctx.uniform));
 }
 
-/// Bin the frame's point and spot lights into this camera's clusters (#434).
-fn bin_lights(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
-    r.bin_lights(&ctx.clusters);
+/// Bin the frame's point and spot lights (#434) and its decals (#638) into this
+/// camera's clusters. A `DepthOnly` camera stacked on another (a viewmodel, an
+/// overlay) bins no decals: world decals never land on the viewmodel.
+fn bin_clusters(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
+    let overlay = !ctx.is_first && ctx.cam.clear_flags == ClearFlags::DepthOnly;
+    r.bin_clusters(&ctx.clusters, !overlay);
 }
 
 /// This camera's solids (the culling mask differs per camera) as instanced draws
@@ -142,13 +144,7 @@ fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     r.execute_scene_pass(view, frame, &ctx.solids.draws.opaque, &overlays);
 }
 
-/// Decals over the lit surfaces, before transparents and particles so they sit on
-/// the surface, not over the sparks.
-fn decals(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    r.draw_decals(view, ctx.scene, ctx.cam);
-}
-
-/// Translucent solids (#242), back-to-front over opaque + decals.
+/// Translucent solids (#242), back-to-front over the opaque ones.
 fn transparent(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     r.draw_transparent(view, &ctx.solids.draws.transparent);
 }
@@ -165,7 +161,7 @@ fn effects(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
 }
 
 fn count(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
-    r.count_camera(&ctx.solids, ctx.scene.decals.len(), ctx.effects);
+    r.count_camera(&ctx.solids, ctx.effects);
 }
 
 /// Composite + post-process once, over the final camera's HDR target.

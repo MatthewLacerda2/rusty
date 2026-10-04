@@ -1,4 +1,4 @@
-#import common::{CameraUniforms, LightingUniforms, LocalLight, NO_SHADOW, ShadowTile, VertexInput, apply_fog, blend_joints, cluster_index, local_light_radiance, local_shadow_tile, procedural_sky, sample_local_shadow}
+#import common::{CameraUniforms, Decal, DecalSurface, LightingUniforms, LocalLight, NO_SHADOW, ShadowTile, VertexInput, apply_decal, apply_fog, blend_joints, cluster_index, local_light_radiance, local_shadow_tile, procedural_sky, sample_local_shadow}
 
 struct EntityUniforms {
     model_matrix: mat4x4<f32>,
@@ -23,10 +23,10 @@ struct EntityUniforms {
     use_cutout: u32,
     alpha_cutoff: f32,
     // Where this draw's joint 0 sits in `bones` (#455); 0 is the shared identity.
-    // The pad completes the 16-byte run; mirrors `EntityUniform`
-    // (src/render/gpu/uniforms.rs) byte-for-byte.
+    // Mirrors `EntityUniform` (src/render/gpu/uniforms.rs) byte-for-byte.
     bone_base: u32,
-    _pad0: u32,
+    // 1 when this draw folds in its cluster's decals (#638).
+    receive_decals: u32,
 };
 
 // One instance of an instanced draw (#470), indexed by `instance_index`. Mirrors
@@ -71,6 +71,19 @@ var<storage, read> local_lights: array<LocalLight>;
 var<storage, read> cluster_ranges: array<vec2<u32>>;
 @group(0) @binding(9)
 var<storage, read> cluster_lights: array<u32>;
+
+// Surface decals (#638): the frame's decals, and the atlas their maps live in, read
+// through its sRGB view (albedo) and its raw view (normal, metallic, roughness). A
+// cluster's decals follow the light ranges in `cluster_ranges`, indexing
+// `cluster_lights` like its lights do.
+@group(0) @binding(10)
+var<storage, read> decals: array<Decal>;
+@group(0) @binding(11)
+var t_decal_color: texture_2d_array<f32>;
+@group(0) @binding(12)
+var t_decal_data: texture_2d_array<f32>;
+@group(0) @binding(13)
+var s_decal: sampler;
 
 @group(1) @binding(0)
 var<uniform> entity: EntityUniforms;
@@ -123,6 +136,22 @@ var t_ao: texture_2d<f32>;
 var t_shadow_atlas: texture_depth_2d;
 @group(3) @binding(5)
 var<storage, read> shadow_tiles: array<ShadowTile>;
+
+// Fold the decals binned into `cluster` into `s`, oldest first (FIFO, #638): each
+// newer decal lands over the older ones. Derivatives are taken here, before the
+// cluster's own loop, so the walk may diverge per pixel.
+fn fold_decals(s: DecalSurface, cluster: u32, world: vec3<f32>, facing: vec3<f32>) -> DecalSurface {
+    let dx = dpdx(world);
+    let dy = dpdy(world);
+    let dims = camera.clusters.dims;
+    let range = cluster_ranges[dims.x * dims.y * dims.z + cluster];
+    var out = s;
+    for (var i = 0u; i < range.y; i = i + 1u) {
+        let d = decals[cluster_lights[range.x + i]];
+        out = apply_decal(out, d, world, facing, dx, dy, t_decal_color, t_decal_data, s_decal);
+    }
+    return out;
+}
 
 fn ambient_occlusion(frag: vec2<f32>) -> f32 {
     let last = textureDimensions(t_ao) - vec2<u32>(1u);
@@ -519,11 +548,23 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
     let V = normalize(camera.camera_pos - in.world_position);
 
-    let albedo = base_color.rgb;
     // glTF metallic-roughness packs metallic in BLUE, roughness in GREEN. Each scalar
     // multiplies its map channel when the flag is set, else acts alone (#202).
-    let metallic = clamp(entity.metallic * select(1.0, textureSample(t_metallic, s_diffuse, in.tex_coords).b, entity.use_metallic_map == 1u), 0.0, 1.0);
-    let roughness = clamp(entity.roughness * select(1.0, textureSample(t_roughness, s_diffuse, in.tex_coords).g, entity.use_roughness_map == 1u), 0.04, 1.0);
+    let surface_metallic = clamp(entity.metallic * select(1.0, textureSample(t_metallic, s_diffuse, in.tex_coords).b, entity.use_metallic_map == 1u), 0.0, 1.0);
+    let surface_roughness = clamp(entity.roughness * select(1.0, textureSample(t_roughness, s_diffuse, in.tex_coords).g, entity.use_roughness_map == 1u), 0.04, 1.0);
+
+    // 0. Surface decals (#638): this cluster's decals change the material inputs
+    // before any light is summed, so a decal is lit, shadowed and occluded like the
+    // surface it lands on. The angle fade reads the geometric normal.
+    let cluster = cluster_index(camera.clusters, camera.view_proj, in.world_position);
+    var surface = DecalSurface(base_color.rgb, N, surface_metallic, surface_roughness, 1.0);
+    if (entity.receive_decals == 1u) {
+        surface = fold_decals(surface, cluster, in.world_position, normalize(in.world_normal));
+    }
+    N = surface.normal;
+    let albedo = surface.albedo;
+    let metallic = surface.metallic;
+    let roughness = surface.roughness;
 
     let F0 = mix(vec3<f32>(0.04), albedo, metallic);
 
@@ -541,7 +582,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         ambient_irradiance = ambient_grad * lighting.ambient.intensity;
     }
     // SSAO (#436) darkens only the indirect light: ambient here, env reflection below.
-    let ao = ambient_occlusion(in.clip_position.xy);
+    let ao = ambient_occlusion(in.clip_position.xy) * surface.occlusion;
     var lighting_color = ambient_irradiance * albedo * (1.0 - metallic) * ao;
 
     // 2. Directional lights (#434). Slot 0 is the sun, the one the cascades shadow.
@@ -554,7 +595,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     // 3. Point and spot lights, only those binned into this fragment's cluster (#434),
     // each shadowed through the atlas when it casts (#468).
-    let range = cluster_ranges[cluster_index(camera.clusters, camera.view_proj, in.world_position)];
+    let range = cluster_ranges[cluster];
     for (var i = 0u; i < range.y; i = i + 1u) {
         let light = local_lights[cluster_lights[range.x + i]];
         var radiance = local_light_radiance(light, in.world_position);

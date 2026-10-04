@@ -11,12 +11,15 @@
 //! deserialization of pre-#201 scenes that stored the material inline per entity;
 //! `MaterialAsset::from_legacy` migrates one across.
 
+mod decal;
+
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
 use super::TextureComponent;
 use crate::procgen::TextureRecipe;
+pub use decal::DecalBlend;
 
 fn default_base_color() -> [f32; 3] {
     [1.0, 1.0, 1.0]
@@ -32,6 +35,14 @@ fn default_alpha() -> f32 {
 
 fn default_alpha_cutoff() -> f32 {
     0.5
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
 }
 
 /// How a material's surface is composited — Unity's "Rendering Mode" (#242). Plain
@@ -117,6 +128,17 @@ pub struct MaterialAsset {
     /// (`Material.Rebake`). `None` — and absent from the scene file — by default.
     #[serde(default, rename = "maps", skip_serializing_if = "Option::is_none")]
     pub maps_recipe: Option<TextureRecipe>,
+    /// Whether surfaces drawn with this material take world decals (#638), HDRP's
+    /// "Receive Decals". Turn it off for characters and props that move through
+    /// bullet holes. Transparent materials never receive decals. Defaults to `true`
+    /// and is written to the scene file only when off.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub receive_decals: bool,
+    /// What this material changes when a decal stamps it (#638): per-channel blend
+    /// weights and the angle fade. Read only by `Decals.Spawn { material = … }`;
+    /// absent from the scene file while it holds the defaults.
+    #[serde(default, skip_serializing_if = "DecalBlend::is_default")]
+    pub decal: DecalBlend,
 }
 
 impl Default for MaterialAsset {
@@ -138,6 +160,8 @@ impl Default for MaterialAsset {
             shader_params: BTreeMap::new(),
             shader_textures: BTreeMap::new(),
             maps_recipe: None,
+            receive_decals: true,
+            decal: DecalBlend::default(),
         }
     }
 }

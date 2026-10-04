@@ -56,7 +56,7 @@ impl Renderer {
             use_cutout: 0,
             alpha_cutoff: 0.0,
             bone_base: 0,
-            _pad: 0,
+            receive_decals: 0,
         };
 
         let entity_buf = self
