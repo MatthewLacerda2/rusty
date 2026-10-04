@@ -116,4 +116,19 @@ mod tests {
         assert!((g.surface_y(s, 1.0, -3.0) - 0.85).abs() < 1e-6, "clamped");
         assert!((g.surface_y(s, 1.2, 1.25) - 1.075).abs() < 1e-6);
     }
+
+    #[test]
+    fn surface_y_clamps_to_half_the_spacing() {
+        let mut g = NavigationGraph::new(0.0, 4.0, 0.0, 4.0, 2.0);
+        let r = g.span_range(1, 1);
+        g.spans[r.start].surface = ramp();
+        let s = SpanRef {
+            gx: 1,
+            gz: 1,
+            index: r.start as u32,
+        };
+        // Cell (1, 1) is centred at (2, 2) and reaches 1 m to each side.
+        assert!((g.surface_y(s, 2.0, 1.1) + 0.42).abs() < 1e-6);
+        assert!((g.surface_y(s, 2.0, -1.0) + 0.45).abs() < 1e-6, "clamped");
+    }
 }

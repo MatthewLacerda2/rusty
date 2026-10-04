@@ -135,6 +135,22 @@ mod tests {
     }
 
     #[test]
+    fn a_floor_must_lie_more_than_top_eps_below() {
+        let flat = Some(Plane {
+            y: 0.0,
+            slope: glam::Vec2::ZERO,
+        });
+        let low = Solid {
+            plane: flat,
+            ..solid(-0.1, 0.0, true)
+        };
+        let level = solid(-0.1, TOP_EPS, true);
+        assert_eq!(lower_floor(&low, &level), f32::NEG_INFINITY, "level tops");
+        let above = solid(-0.1, 2.0 * TOP_EPS, true);
+        assert_eq!(lower_floor(&above, &low), 0.0, "either order");
+    }
+
+    #[test]
     fn a_gap_keeps_two_solids() {
         let mut out = Vec::new();
         merge_column(
