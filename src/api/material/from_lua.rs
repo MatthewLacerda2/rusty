@@ -231,4 +231,26 @@ mod tests {
             "{err}"
         );
     }
+
+    #[test]
+    fn the_decal_block_and_receive_flag_decode_and_clamp() {
+        let lua = Lua::new();
+        let recipe = r#"return { receive_decals = false,
+            decal = { normal = 0, roughness = 3, angle_fade = 120 } }"#;
+        let (asset, _) = asset_from_lua(&lua.load(recipe).eval().unwrap()).unwrap();
+        assert!(!asset.receive_decals);
+        assert_eq!(asset.decal.normal, 0.0);
+        assert_eq!(asset.decal.roughness, 1.0, "weights clamp to [0, 1]");
+        assert_eq!(asset.decal.angle_fade, 90.0, "the angle clamps to 90°");
+        assert_eq!(
+            asset.decal.albedo, 1.0,
+            "an omitted weight keeps its default"
+        );
+        let typo: Value = lua
+            .load("return { decal = { rougness = 1 } }")
+            .eval()
+            .unwrap();
+        let err = asset_from_lua(&typo).err().expect("typo refused");
+        assert!(err.contains("rougness"), "{err}");
+    }
 }
