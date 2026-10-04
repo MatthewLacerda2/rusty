@@ -120,7 +120,13 @@ fn draw_repl_input(editor: &mut EditorUi, ui: &mut egui::Ui) {
         let resp = ui.add(
             egui::TextEdit::singleline(&mut editor.repl_input.buffer)
                 .desired_width(f32::INFINITY)
-                .hint_text("e.g. print(Transform.GetPosition(Scene.FindEntityByName(\"Player\")))")
+                .hint_text(
+                    // egui 0.36 no longer draws the hint in the field's font.
+                    egui::RichText::new(
+                        "e.g. print(Transform.GetPosition(Scene.FindEntityByName(\"Player\")))",
+                    )
+                    .monospace(),
+                )
                 .font(egui::TextStyle::Monospace),
         );
         let submit = resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));

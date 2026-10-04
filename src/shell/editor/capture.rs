@@ -15,7 +15,9 @@
 //! **Deterministic by construction:** a fixed size, a fixed pixel scale (1×), a fixed
 //! frame count and a synthetic egui clock. Several frames are needed because egui loads
 //! fonts registered in one frame on the *next*, and sizes some panels from the frame
-//! before; [`DEFAULT_FRAMES`] covers both. The sim is never stepped.
+//! before; [`DEFAULT_FRAMES`] covers both. The clock steps a whole second a frame,
+//! longer than any egui animation (a window's fade-in, #333), so the painted frame
+//! shows the settled UI a user sees. The sim is never stepped.
 //!
 //! No adapter → `Ok(false)`, the same skip contract as every headless capture.
 
@@ -37,6 +39,8 @@ pub const DEFAULT_WIDTH: u32 = 1600;
 pub const DEFAULT_HEIGHT: u32 = 900;
 /// Frames drawn before the one painted: fonts land on frame 2, panel sizes settle by 3.
 pub const DEFAULT_FRAMES: u32 = 4;
+/// The synthetic clock's step: every animation has finished by the next frame.
+const FRAME_SECONDS: f64 = 1.0;
 
 /// What to capture: the size, the frame count and the UI state to apply first.
 #[derive(Clone, Debug)]
@@ -152,8 +156,8 @@ fn raw_input(width: u32, height: u32, frame: u32) -> egui::RawInput {
     let size = egui::vec2(width as f32, height as f32);
     egui::RawInput {
         screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
-        time: Some(f64::from(frame) / 60.0),
-        predicted_dt: 1.0 / 60.0,
+        time: Some(f64::from(frame) * FRAME_SECONDS),
+        predicted_dt: FRAME_SECONDS as f32,
         ..Default::default()
     }
 }
@@ -210,19 +214,7 @@ fn render_viewport(
         crate::scene::game_camera_from_scene(&game.camera().borrow(), &scene)
     };
     renderer.render(view, &scene, &camera, &target, scene_tab);
-    let filter = wgpu::FilterMode::Linear;
-    match texture_id {
-        Some(id) => egui_renderer.update_egui_texture_from_wgpu_texture(
-            &renderer.device,
-            &target,
-            filter,
-            *id,
-        ),
-        None => {
-            *texture_id =
-                Some(egui_renderer.register_native_texture(&renderer.device, &target, filter))
-        }
-    }
+    super::viewport::rebind_egui_texture(egui_renderer, &renderer.device, texture_id, view);
 }
 
 /// Tessellate `output` and paint it over a cleared `width × height` offscreen target.

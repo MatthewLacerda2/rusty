@@ -1,6 +1,11 @@
 //! The editor's typefaces (#668): Inter for the UI, JetBrains Mono for the console
 //! and code, Phosphor for icons. All three are embedded, so the editor looks the
 //! same on every machine. Licences sit next to the files in `assets/fonts/`.
+//!
+//! The Inter files carry no Private Use Area codepoints (#333): Inter maps hundreds,
+//! and since Phosphor 2.1 (egui-phosphor 0.6+) the icons sit in that same range, so
+//! Inter, which leads the family, drew its own glyphs in place of the icons. Phosphor
+//! cannot lead instead: it maps `a`–`z` to the blanks its ligatures are built from.
 
 use egui::{Context, FontData, FontDefinitions, FontFamily, FontId};
 
@@ -57,4 +62,18 @@ pub fn install(ctx: &Context) {
     mono.insert(0, "jetbrains-mono".into());
     mono.push("phosphor".into());
     ctx.set_fonts(fonts);
+}
+
+#[cfg(test)]
+mod tests {
+    /// An updated Inter that maps the Private Use Area again would hide every icon.
+    #[test]
+    fn inter_leaves_the_icon_codepoints_to_phosphor() {
+        let icon = egui_phosphor::regular::FOLDER.chars().next().unwrap();
+        for bytes in [super::INTER, super::INTER_SEMIBOLD] {
+            let face = ttf_parser::Face::parse(bytes, 0).unwrap();
+            assert!(face.glyph_index('A').is_some());
+            assert!(face.glyph_index(icon).is_none(), "Inter maps {icon:?}");
+        }
+    }
 }
