@@ -3,14 +3,12 @@ local BotAI = {}
 
 BotAI.health = 100.0
 
+-- The NavMeshAgent's speed, acceleration and stopping distance are authored on
+-- Enemy_1's component (the inspector card), as is where it stands: the script reads
+-- them, it never overrides them.
 function BotAI.Start(entity_id)
-    Transform.SetPosition(entity_id, 8.0, 1.0, 8.0)
-    NavMeshAgent.SetActive(entity_id, true)
-    NavMeshAgent.SetSpeed(entity_id, 3.5)
-    NavMeshAgent.SetAcceleration(entity_id, 8.0)
-    NavMeshAgent.SetStoppingDistance(entity_id, 0.5) -- Stop 0.5 units away from player
     Animator.Play(entity_id, "Walk")
-    print("[Lua] Bot initialized at position (8, 1, 8) with NavMeshAgent")
+    print("[Lua] Bot initialized")
 end
 
 function BotAI.Update(entity_id, delta_time)

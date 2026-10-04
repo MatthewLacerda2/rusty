@@ -41,9 +41,14 @@ pub struct NavMeshAgentComponent {
     pub active: bool,
     pub radius: f32,
     pub target: Vec3,
+    /// Top speed, m/s.
     pub speed: f32,
+    /// How fast the agent speeds up and brakes, a constant rate in m/s² (Unity's
+    /// meaning, #742): 0 → `speed` takes `speed / acceleration` seconds.
     pub acceleration: f32,
+    /// How far from its path's end (feet to end, centre to centre) it comes to rest.
     pub stopping_distance: f32,
+    /// The planar velocity the agent is moving at, m/s; zero once at rest.
     pub velocity: Vec3,
     /// Local-avoidance importance, 0–99 (Unity's `avoidancePriority`): the
     /// **lower** the number, the more important the agent. An agent ignores

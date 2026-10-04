@@ -71,6 +71,26 @@ fn the_built_scene_survives_its_saved_document() {
     );
 }
 
+/// Enemy_1's agent is authored ready to chase, and stops where neither body
+/// overlaps the other even corner-on: half its box's diagonal plus the Player's
+/// capsule radius stays inside the stopping distance (#743).
+#[test]
+fn the_enemy_stops_clear_of_the_player() {
+    let scene = built();
+    let (enemy, player) = (5, 2);
+    let agent = scene.world.nav_agent(enemy).unwrap();
+    assert!(agent.active, "authored active, not switched on by bot.lua");
+    let box_half = scene.world.transform(enemy).unwrap().scale.x * 0.5;
+    let p_scale = scene.world.transform(player).unwrap().scale;
+    let p_radius = scene.world.character_controller(player).unwrap().radius * p_scale.x;
+    let corner = box_half * std::f32::consts::SQRT_2;
+    assert!(
+        corner + p_radius < agent.stopping_distance,
+        "{}",
+        agent.stopping_distance
+    );
+}
+
 /// The enemy's straight line to the Player crosses its cover wall, so its first
 /// chase has to path round it.
 #[test]

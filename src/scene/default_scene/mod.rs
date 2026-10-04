@@ -39,6 +39,9 @@ pub use seed::{seed_default_assets, seed_default_assets_into};
 pub const PLAYER_CONTROLLER_SCRIPT: &str = "project/assets/scripts/player_controller.lua";
 /// The bundled enemy brain the editor's default scene attaches to Enemy_1.
 pub const BOT_SCRIPT: &str = "project/assets/scripts/bot.lua";
+/// How far from the Player (centre to centre) Enemy_1 stops: its 0.65 m half-width
+/// plus the Player's 0.5 m radius plus clearance, so the two never overlap (#743).
+pub const ENEMY_STOPPING_DISTANCE: f32 = 1.5;
 
 /// Build the default scene into `scene`. `bot_script` is Enemy_1's Lua brain; empty
 /// leaves it unscripted (the harness's default, so a test drives the enemy itself).
@@ -160,7 +163,10 @@ fn add_walls(scene: &mut Scene) {
 }
 
 /// Enemy_1 (id 5): a 2 m × 1.3 m box chasing the Player on the navmesh. Its body is
-/// centred on its origin, so the agent stands it 1 m above its feet (#666).
+/// centred on its origin, so the agent stands it 1 m above its feet (#666). The agent
+/// is authored here, active, and `bot.lua` never overrides it (#743): its stopping
+/// distance is measured centre to centre, so it clears both bodies — the box's
+/// corner (half-diagonal ≈ 0.92 m) plus the Player's 0.5 m radius, with room to spare.
 fn add_enemy(scene: &mut Scene, bot_script: &str) {
     let id = create_entity(scene, "Enemy_1", Some(Primitive::Box));
     place(
@@ -179,10 +185,11 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
     add_component(scene, id, ComponentKind::NavMeshAgent);
     {
         let mut a = scene.world.nav_agent_mut(id).unwrap();
+        nav_agent::set_active(&mut a, true);
         nav_agent::set_radius(&mut a, 0.65);
         nav_agent::set_speed(&mut a, 3.5);
         nav_agent::set_acceleration(&mut a, 8.0);
-        nav_agent::set_stopping_distance(&mut a, 0.5);
+        nav_agent::set_stopping_distance(&mut a, ENEMY_STOPPING_DISTANCE);
         nav_agent::set_base_offset(&mut a, 1.0);
         nav_agent::set_target(&mut a, Vec3::ZERO);
     }

@@ -45,3 +45,9 @@ pub fn assert_on_floor(pos: Vec3, when: &str) {
 pub fn planar(a: Vec3, b: Vec3) -> f32 {
     Vec3::new(a.x - b.x, 0.0, a.z - b.z).length()
 }
+
+/// Enemy_1's authored stopping distance (1.5 m since #743): how far short of its
+/// path's end it rests, so every "arrived near X" bound adds it.
+pub fn reach(scene: &rusty::scene::Scene, enemy: u32) -> f32 {
+    scene.world.nav_agent(enemy).unwrap().stopping_distance
+}

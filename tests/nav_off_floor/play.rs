@@ -11,7 +11,7 @@ use rusty::core::input::InputState;
 use rusty::navigation::NavigationGraph;
 use rusty::scripting::ConsoleLogs;
 
-use super::{assert_on_floor, default_scene, planar, FLOOR_HALF};
+use super::{assert_on_floor, default_scene, planar, reach, FLOOR_HALF};
 
 const DT: f32 = 1.0 / 60.0;
 
@@ -39,6 +39,7 @@ fn play(world: &mut GameWorld, player_id: u32, enemy: u32, player: Vec3, ticks: 
 fn default_scene_bot_stays_on_the_floor_when_the_player_flies_off_it() {
     rusty::scene::seed_default_scripts();
     let (scene, enemy) = default_scene();
+    let reach = reach(&scene, enemy);
     let player_id = scene.find_entity_by_name("Player").expect("Player");
     let nav = NavigationGraph::from_scene(&scene);
     let mut world = GameWorld::new(
@@ -50,9 +51,15 @@ fn default_scene_bot_stays_on_the_floor_when_the_player_flies_off_it() {
     world.set_playing(true);
 
     let off = play(&mut world, player_id, enemy, Vec3::new(25.0, 1.5, 8.0), 600);
-    assert!(off.x > FLOOR_HALF - 1.5, "stopped short of the edge: {off}");
+    assert!(
+        off.x > FLOOR_HALF - 0.75 - reach,
+        "stopped short of the edge: {off}"
+    );
 
     let home = Vec3::new(0.0, 1.5, -6.0);
     let back = play(&mut world, player_id, enemy, home, 900);
-    assert!(planar(back, home) < 1.0, "could not climb back: {back}");
+    assert!(
+        planar(back, home) < reach + 0.1,
+        "could not climb back: {back}"
+    );
 }

@@ -5,7 +5,7 @@ use glam::Vec3;
 use rusty::navigation::{is_at_target, NavigationGraph};
 use rusty::scene::Scene;
 
-use super::{assert_on_floor, default_scene, planar, FLOOR_HALF};
+use super::{assert_on_floor, default_scene, planar, reach, FLOOR_HALF};
 
 const DT: f32 = 1.0 / 60.0;
 
@@ -21,7 +21,7 @@ fn chase(scene: &mut Scene, graph: &NavigationGraph, enemy: u32, player: Vec3, t
     scene.world.transform(enemy).unwrap().position
 }
 
-/// Stopped dead, and arrived by the agent's own measure.
+/// At rest, and arrived by the agent's own measure.
 fn assert_stopped(scene: &Scene, enemy: u32, pos: Vec3, when: &str) {
     let agent = scene.world.nav_agent(enemy).unwrap();
     assert_eq!(agent.velocity, Vec3::ZERO, "{when}: still pushing at {pos}");
@@ -35,7 +35,11 @@ fn bot_stops_at_the_floor_edge_and_follows_the_player_back() {
 
     // The Player flies 6 m past the +x edge, 1.5 m up.
     let off = chase(&mut scene, &graph, enemy, Vec3::new(25.0, 1.5, 8.0), 600);
-    assert!(off.x > FLOOR_HALF - 1.5, "stopped short of the edge: {off}");
+    let reach = reach(&scene, enemy);
+    assert!(
+        off.x > FLOOR_HALF - 0.75 - reach,
+        "stopped short of the edge: {off}"
+    );
     assert!(
         (off.z - 8.0).abs() < 0.6,
         "the edge point nearest the Player: {off}"
@@ -45,7 +49,10 @@ fn bot_stops_at_the_floor_edge_and_follows_the_player_back() {
     // Back on the floor: the bot follows and arrives under the flying Player.
     let home = Vec3::new(0.0, 1.5, -6.0);
     let back = chase(&mut scene, &graph, enemy, home, 900);
-    assert!(planar(back, home) < 1.0, "did not follow back: {back}");
+    assert!(
+        planar(back, home) < reach + 0.1,
+        "did not follow back: {back}"
+    );
     assert_stopped(&scene, enemy, back, "back under the Player");
 }
 
@@ -58,9 +65,10 @@ fn bot_walks_along_the_edge_instead_of_pushing_into_it() {
     // Straight at the Player leaves the floor at its +x edge near z = 6; the bot
     // must instead walk to the edge point nearest the Player, far down the edge.
     let end = chase(&mut scene, &graph, enemy, Vec3::new(25.0, 1.5, -12.0), 900);
+    let reach = reach(&scene, enemy);
     assert!(end.x > FLOOR_HALF - 1.5, "left the edge: {end}");
     assert!(
-        (end.z + 12.0).abs() < 0.6,
+        (end.z + 12.0).abs() < reach + 0.1,
         "jammed partway along the edge: {end}"
     );
     assert_stopped(&scene, enemy, end, "down the edge");
