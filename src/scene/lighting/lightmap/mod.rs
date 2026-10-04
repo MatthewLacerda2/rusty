@@ -9,7 +9,8 @@
 //! * `bvh` / `raster` / `trace` — ray acceleration, texel → surface point, and the
 //!   per-texel estimate (the units it stores are explained in `trace`);
 //! * `filter` — the edge-aware Gaussian that smooths the baked bounce;
-//! * `bake` — the parallel, seeded driver ([`bake`]);
+//! * `bake` — the parallel, seeded driver ([`bake`]), watched and stopped through
+//!   `progress` ([`BakeProgress`], #808);
 //! * `atlas` — packing the lightmaps into equal-size pages ([`pack`]);
 //! * `encode` — RGBM, how a page is stored as an 8-bit PNG;
 //! * `set` — the scene's pages and each entity's place in them ([`LightmapSet`]).
@@ -23,15 +24,17 @@ mod bvh;
 mod encode;
 mod filter;
 mod input;
+mod progress;
 mod raster;
 mod rng;
 mod set;
 mod trace;
 
 pub use atlas::{pack, LightmapAtlas, MAX_PAGE};
-pub use bake::{bake, BakeSettings, Lightmap};
+pub use bake::{bake, bake_with_progress, BakeSettings, Lightmap};
 pub use encode::{decode_rgbm, encode_rgbm, encode_texels, RGBM_RANGE};
 pub use input::{BakeLight, BakeMesh, BakeScene, LightShape};
+pub use progress::BakeProgress;
 pub use raster::{lightmap_size, MIN_RESOLUTION};
 pub use set::{LightmapEntry, LightmapSet};
 
@@ -39,5 +42,7 @@ pub use set::{LightmapEntry, LightmapSet};
 mod atlas_tests;
 #[cfg(test)]
 mod gather_tests;
+#[cfg(test)]
+mod progress_tests;
 #[cfg(test)]
 mod tests;
