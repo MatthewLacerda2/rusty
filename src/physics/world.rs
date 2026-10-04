@@ -15,7 +15,7 @@
 //!
 //! glam <-> nalgebra conversion is confined to `convert`; the engine stays glam.
 
-use std::collections::HashMap;
+use crate::core::collections::Map;
 
 use rapier3d::prelude::*;
 
@@ -47,12 +47,12 @@ pub struct PhysicsWorld {
     /// entities its body carries. Diffed each tick to rebuild changed bodies.
     pub(super) plan: BodyPlan,
     /// body-owner entity id -> rigid-body handle.
-    pub(super) id_to_body: HashMap<u32, RigidBodyHandle>,
+    pub(super) id_to_body: Map<u32, RigidBodyHandle>,
     /// collider handle -> the entity that owns the *collider* (not the body's
     /// root), so a hit on a compound reports which part was hit.
-    pub(super) collider_to_id: HashMap<ColliderHandle, u32>,
+    pub(super) collider_to_id: Map<ColliderHandle, u32>,
     /// collider entity id -> its collider handle (inverse of `collider_to_id`).
-    pub(super) id_to_collider: HashMap<u32, ColliderHandle>,
+    pub(super) id_to_collider: Map<u32, ColliderHandle>,
     /// Last tick's trigger-overlap pairs, diffed each step to recover the
     /// enter/exit edges (#310). Starts empty, so a play session's first
     /// overlapping tick is an "enter".
@@ -84,9 +84,9 @@ impl PhysicsWorld {
             ccd_solver: CCDSolver::new(),
             query_pipeline: QueryPipeline::new(),
             plan: BodyPlan::new(),
-            id_to_body: HashMap::new(),
-            collider_to_id: HashMap::new(),
-            id_to_collider: HashMap::new(),
+            id_to_body: Map::default(),
+            collider_to_id: Map::default(),
+            id_to_collider: Map::default(),
             prev_triggers: Vec::new(),
             prev_collisions: Vec::new(),
             joints: JointMap::new(),

@@ -8,20 +8,19 @@
 //! The log holds one entry per distinct path, so it stays as small as the set of
 //! baked files.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 /// Each written path with the generation of its latest write; the counter is the
-/// newest generation handed out.
-static WRITES: Mutex<(u64, Option<HashMap<String, u64>>)> = Mutex::new((0, None));
+/// newest generation handed out. Ordered, so [`written_since`] lists paths by name.
+static WRITES: Mutex<(u64, BTreeMap<String, u64>)> = Mutex::new((0, BTreeMap::new()));
 
 /// Record that the image at `path` was just written.
 pub fn note_written(path: &str) {
     let mut writes = WRITES.lock().unwrap_or_else(|e| e.into_inner());
     writes.0 += 1;
     let generation = writes.0;
-    let paths = writes.1.get_or_insert_with(HashMap::new);
-    paths.insert(path.to_string(), generation);
+    writes.1.insert(path.to_string(), generation);
 }
 
 /// The newest write generation, and every path written after generation `seen`. A
@@ -31,8 +30,11 @@ pub fn written_since(seen: u64) -> (u64, Vec<String>) {
     if writes.0 == seen {
         return (seen, Vec::new());
     }
-    let paths = writes.1.iter().flatten();
-    let fresh = paths.filter(|(_, &g)| g > seen).map(|(p, _)| p.clone());
+    let fresh = writes
+        .1
+        .iter()
+        .filter(|(_, &g)| g > seen)
+        .map(|(p, _)| p.clone());
     (writes.0, fresh.collect())
 }
 

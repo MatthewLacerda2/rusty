@@ -9,7 +9,7 @@
 //! (stochastic ops draw from [`super::hash`]), so the same recipe always yields the
 //! same buffer — the foundation of the byte-identical-bake guarantee.
 
-use std::collections::HashMap;
+use crate::core::collections::Map;
 
 use super::image_buf::Image;
 use super::ops::eval_node;
@@ -66,7 +66,7 @@ pub fn evaluate_many(recipe: &TextureRecipe, targets: &[&str]) -> Result<Vec<Ima
         return Err(RunError::Empty);
     }
 
-    let by_id: HashMap<&str, usize> = recipe
+    let by_id: Map<&str, usize> = recipe
         .nodes
         .iter()
         .enumerate()
@@ -83,7 +83,7 @@ pub fn evaluate_many(recipe: &TextureRecipe, targets: &[&str]) -> Result<Vec<Ima
         })
         .collect::<Result<Vec<usize>, _>>()?;
 
-    let mut cache: HashMap<usize, Image> = HashMap::new();
+    let mut cache: Map<usize, Image> = Map::default();
     let mut state = vec![Visit::Unseen; recipe.nodes.len()];
     for &i in &indices {
         eval_index(recipe, &by_id, i, &mut cache, &mut state)?;
@@ -105,9 +105,9 @@ enum Visit {
 /// Recursively evaluate node `idx` (and its inputs first), memoizing into `cache`.
 fn eval_index(
     recipe: &TextureRecipe,
-    by_id: &HashMap<&str, usize>,
+    by_id: &Map<&str, usize>,
     idx: usize,
-    cache: &mut HashMap<usize, Image>,
+    cache: &mut Map<usize, Image>,
     state: &mut [Visit],
 ) -> Result<(), RunError> {
     if state[idx] == Visit::Done {

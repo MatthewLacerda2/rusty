@@ -13,13 +13,13 @@
 //! resulting palette is mesh-local — exactly what the GPU skinning path expects.
 
 use super::mesh_data::{JointTransform, SkinData};
+use crate::core::collections::Map;
 use glam::{Mat4, Quat, Vec3};
-use std::collections::HashMap;
 
 /// Global (model-space) transforms of every node, composed down the scene
 /// hierarchy from each root. glTF stores only local transforms.
-pub fn node_globals(document: &gltf::Document) -> HashMap<usize, Mat4> {
-    let mut globals = HashMap::new();
+pub fn node_globals(document: &gltf::Document) -> Map<usize, Mat4> {
+    let mut globals = Map::default();
     for scene in document.scenes() {
         for node in scene.nodes() {
             walk(&node, Mat4::IDENTITY, &mut globals);
@@ -28,7 +28,7 @@ pub fn node_globals(document: &gltf::Document) -> HashMap<usize, Mat4> {
     globals
 }
 
-fn walk(node: &gltf::Node, parent: Mat4, out: &mut HashMap<usize, Mat4>) {
+fn walk(node: &gltf::Node, parent: Mat4, out: &mut Map<usize, Mat4>) {
     let global = parent * Mat4::from_cols_array_2d(&node.transform().matrix());
     out.insert(node.index(), global);
     for child in node.children() {
@@ -38,8 +38,8 @@ fn walk(node: &gltf::Node, parent: Mat4, out: &mut HashMap<usize, Mat4>) {
 
 /// Map each node to its parent node index (only nodes that have a parent appear).
 /// glTF stores children, not parents, so we invert the hierarchy once.
-fn node_parents(document: &gltf::Document) -> HashMap<usize, usize> {
-    let mut parents = HashMap::new();
+fn node_parents(document: &gltf::Document) -> Map<usize, usize> {
+    let mut parents = Map::default();
     for node in document.nodes() {
         for child in node.children() {
             parents.insert(child.index(), node.index());
@@ -65,10 +65,10 @@ fn local_transform(node: &gltf::Node) -> JointTransform {
 pub fn skins_by_mesh(
     document: &gltf::Document,
     buffers: &[gltf::buffer::Data],
-) -> HashMap<usize, SkinData> {
+) -> Map<usize, SkinData> {
     let globals = node_globals(document);
     let parents = node_parents(document);
-    let mut out = HashMap::new();
+    let mut out = Map::default();
 
     for node in document.nodes() {
         let (Some(mesh), Some(skin)) = (node.mesh(), node.skin()) else {
@@ -92,13 +92,13 @@ pub fn skins_by_mesh(
 fn build_skin(
     skin: &gltf::Skin,
     buffers: &[gltf::buffer::Data],
-    globals: &HashMap<usize, Mat4>,
-    parents: &HashMap<usize, usize>,
+    globals: &Map<usize, Mat4>,
+    parents: &Map<usize, usize>,
     mesh_inverse: Mat4,
 ) -> SkinData {
     let joint_nodes: Vec<usize> = skin.joints().map(|j| j.index()).collect();
     // node index → joint slot, so parent lookups land on a slot within this skin.
-    let slot_of: HashMap<usize, usize> = joint_nodes
+    let slot_of: Map<usize, usize> = joint_nodes
         .iter()
         .enumerate()
         .map(|(slot, &node)| (node, slot))

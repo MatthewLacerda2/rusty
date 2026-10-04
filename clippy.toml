@@ -32,4 +32,9 @@ disallowed-methods = [
 disallowed-types = [
     { path = "std::time::Instant", reason = "wall clock: sim code takes time from the `Time` resource (#757)" },
     { path = "std::time::SystemTime", reason = "wall clock: sim code takes time from the `Time` resource (#757)" },
+    # std's maps seed their hasher from OS entropy per process, so iteration order
+    # differs run to run (CLAUDE.md, *Determinism*). Sim code uses `core::collections`.
+    { path = "std::collections::HashMap", reason = "random per-process iteration order: sim code uses `crate::core::collections::Map`, or a `BTreeMap` where order is behaviour (CLAUDE.md Determinism, #764)" },
+    { path = "std::collections::HashSet", reason = "random per-process iteration order: sim code uses `crate::core::collections::Set`, or a `BTreeSet` where order is behaviour (CLAUDE.md Determinism, #764)" },
+    { path = "std::hash::RandomState", reason = "OS-seeded hasher: sim code hashes with `crate::core::collections` (CLAUDE.md Determinism, #764)" },
 ]

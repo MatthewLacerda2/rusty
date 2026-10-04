@@ -14,7 +14,9 @@
 //! ids are a monotone counter and the event `tick` is supplied by the caller — no
 //! wall clock or unseeded RNG, so nothing here threatens replay.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
+
+use crate::core::collections::Map;
 
 use glam::Vec3;
 
@@ -59,7 +61,7 @@ pub struct AudioMaestro {
     /// never reads it.
     pub(super) speaker_mode: SpeakerMode,
     /// Live entity voices, keyed by owning entity id (one voice per source).
-    pub(super) entity_voices: HashMap<u32, LiveVoice>,
+    pub(super) entity_voices: Map<u32, LiveVoice>,
     /// Live `PlayAt` one-shots, reaped once the backend reports them finished.
     pub(super) oneshots: BTreeMap<VoiceId, OneShot>,
     /// The listener + clock state of the last per-frame mix; a voice started between
@@ -92,7 +94,7 @@ impl AudioMaestro {
             backend,
             master_volume: 1.0,
             speaker_mode: SpeakerMode::default(),
-            entity_voices: HashMap::new(),
+            entity_voices: Map::default(),
             oneshots: BTreeMap::new(),
             env: MixEnv::default(),
             mixer: Mixer::default(),

@@ -98,6 +98,8 @@ mod application_quit;
 #[cfg(feature = "dev")]
 mod bot_player_session;
 #[cfg(feature = "dev")]
+mod busy_replay;
+#[cfg(feature = "dev")]
 mod frame_stats;
 #[cfg(feature = "dev")]
 mod harness_determinism;

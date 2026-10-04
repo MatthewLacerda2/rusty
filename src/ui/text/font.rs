@@ -11,7 +11,7 @@
 //! formats) — what modern fonts ship — falling back to the legacy `kern` table.
 //! Full shaping (ligatures, marks, RTL, CJK) is out of scope (`docs/ui.md`).
 
-use std::collections::HashMap;
+use crate::core::collections::Map;
 use std::sync::{Arc, Mutex, OnceLock};
 
 use ab_glyph::{Font, FontArc, GlyphId, PxScale};
@@ -26,7 +26,7 @@ pub struct FontData {
     /// GPOS lookup indices the `kern` feature names (empty: use the `kern` table).
     kern_lookups: Vec<u16>,
     /// Pair kerning already resolved, in font units.
-    kern_memo: Mutex<HashMap<(u16, u16), f32>>,
+    kern_memo: Mutex<Map<(u16, u16), f32>>,
 }
 
 /// A shared handle to a loaded font.
@@ -40,7 +40,7 @@ impl FontData {
             font,
             bytes,
             kern_lookups,
-            kern_memo: Mutex::new(HashMap::new()),
+            kern_memo: Mutex::new(Map::default()),
         })
     }
 
@@ -84,11 +84,11 @@ impl FontData {
     }
 }
 
-type Cache = Mutex<HashMap<Option<String>, FontHandle>>;
+type Cache = Mutex<Map<Option<String>, FontHandle>>;
 
 fn cache() -> &'static Cache {
     static CACHE: OnceLock<Cache> = OnceLock::new();
-    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+    CACHE.get_or_init(|| Mutex::new(Map::default()))
 }
 
 /// The bundled default font.

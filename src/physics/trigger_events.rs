@@ -9,7 +9,7 @@
 //! phase; it lives here (next to the diff that consumes it) rather than in
 //! `world.rs`, keeping the step lifecycle file focused and under the size cap.
 
-use std::collections::HashMap;
+use crate::core::collections::Map;
 
 use rapier3d::prelude::*;
 
@@ -22,7 +22,7 @@ use super::build::order_pair;
 /// current-tick set `TriggerEvents` diffs.
 pub(super) fn collect_overlap_pairs(
     narrow_phase: &NarrowPhase,
-    collider_to_id: &HashMap<ColliderHandle, u32>,
+    collider_to_id: &Map<ColliderHandle, u32>,
 ) -> Vec<(u32, u32)> {
     let mut pairs: Vec<(u32, u32)> = narrow_phase
         .intersection_pairs()

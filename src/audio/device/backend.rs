@@ -17,7 +17,7 @@
 //! Generic over kira's `Backend` so tests render the whole graph headlessly
 //! (`capture.rs`); the shell uses kira's cpal backend.
 
-use std::collections::HashMap;
+use crate::core::collections::Map;
 use std::sync::Arc;
 
 use kira::backend::{Backend, DefaultBackend};
@@ -39,7 +39,7 @@ pub struct KiraBackend<B: Backend = DefaultBackend> {
     manager: AudioManager<B>,
     groups: GroupTracks,
     output: OutputStage,
-    voices: HashMap<VoiceId, Arc<VoiceControl>>,
+    voices: Map<VoiceId, Arc<VoiceControl>>,
     cache: ClipCache,
 }
 
@@ -68,7 +68,7 @@ impl<B: Backend> KiraBackend<B> {
             groups: GroupTracks::new(&mut manager)?,
             manager,
             output,
-            voices: HashMap::new(),
+            voices: Map::default(),
             cache: ClipCache::new(),
         })
     }

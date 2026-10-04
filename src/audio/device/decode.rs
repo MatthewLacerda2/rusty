@@ -15,7 +15,7 @@
 //!
 //! [`ClipSound`]: super::voice::ClipSound
 
-use std::collections::HashMap;
+use crate::core::collections::Map;
 use std::sync::Arc;
 
 /// Decoded PCM for one clip: interleaved `f32` samples + format. Cheap to clone
@@ -70,7 +70,7 @@ impl CachedClip {
 /// lazily on first play and are reused thereafter.
 #[derive(Default)]
 pub struct ClipCache {
-    clips: HashMap<String, Option<CachedClip>>,
+    clips: Map<String, Option<CachedClip>>,
 }
 
 impl ClipCache {
