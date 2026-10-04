@@ -19,7 +19,7 @@ pub(super) const EGUI_RENDERER: egui_wgpu::RendererOptions = egui_wgpu::Renderer
 impl EditorFrontend {
     /// End the egui frame and paint the whole dashboard as a load-pass over `target`.
     pub(super) fn paint(&mut self, shell: &Shell, target: &wgpu::TextureView) {
-        let full_output = self.egui_ctx.end_pass();
+        let mut full_output = self.egui_ctx.end_pass();
         let paint_jobs = self
             .egui_ctx
             .tessellate(full_output.shapes, full_output.pixels_per_point);
@@ -66,6 +66,8 @@ impl EditorFrontend {
         for id in &full_output.textures_delta.free {
             self.egui_renderer.free_texture(id);
         }
+        // All applied; egui asserts no delta is dropped unhandled.
+        full_output.textures_delta.clear();
     }
 }
 

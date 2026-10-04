@@ -129,12 +129,14 @@ pub fn capture_into(
         output = Some(ctx.end_pass());
         // Upload font atlas / image deltas every frame: egui sends each only once.
         let renderer = host.renderer(width, height).expect("probed above");
-        let out = output.as_ref().expect("just set");
+        let out: &mut egui::FullOutput = output.as_mut().expect("just set");
         for (id, deltas) in &out.textures_delta.set {
             for delta in deltas {
                 egui_renderer.update_texture(&renderer.device, &renderer.queue, *id, delta);
             }
         }
+        // Handled: egui asserts every delta is consumed. Frees are moot for one shot.
+        out.textures_delta.clear();
     }
     let output = output.expect("at least one frame");
     let renderer = host.renderer(width, height).expect("probed above");
