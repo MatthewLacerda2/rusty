@@ -2,7 +2,7 @@
 //! every docked panel is built from, so the hierarchy, inspector, bottom panel and
 //! viewport read as one editor.
 
-use egui::{Frame, Margin, Response, RichText, Stroke, Ui};
+use egui::{Frame, Response, RichText, Stroke, Ui};
 
 use super::{fonts, Theme};
 
@@ -11,15 +11,15 @@ const TITLE_SIZE: f32 = 12.5;
 
 /// The frame of a docked panel: panel fill, edged by the dark gutter.
 pub fn panel_frame(t: &Theme) -> Frame {
-    Frame::none()
+    Frame::NONE
         .fill(t.bg_tier1)
-        .inner_margin(Margin::symmetric(t.space_sm, t.space_xs + 2.0))
+        .inner_margin(egui::vec2(t.space_sm, t.space_xs + 2.0))
         .stroke(Stroke::new(1.0, t.border))
 }
 
 /// The frame of a collapsed panel's rail.
 pub fn rail_frame(t: &Theme) -> Frame {
-    Frame::none()
+    Frame::NONE
         .fill(t.bg_tier1)
         .inner_margin(t.space_xs)
         .stroke(Stroke::new(1.0, t.border))
@@ -76,4 +76,17 @@ pub fn tab(ui: &mut Ui, t: &Theme, selected: bool, text: &str) -> Response {
             .hline(r.x_range(), y, Stroke::new(2.0, t.outline));
     }
     resp
+}
+
+/// The root [`Ui`] the docked panels are laid out in: the whole viewport on the
+/// background layer, as `egui::Context::run_ui` hands its callback. egui ≥ 0.30
+/// shows panels inside a `Ui`, while the shell drives the pass with a bare context.
+pub fn root_ui(ctx: &egui::Context) -> Ui {
+    Ui::new(
+        ctx.clone(),
+        egui::Id::new((ctx.viewport_id(), "rusty.editor_root")),
+        egui::UiBuilder::new()
+            .layer_id(egui::LayerId::background())
+            .max_rect(ctx.viewport_rect()),
+    )
 }

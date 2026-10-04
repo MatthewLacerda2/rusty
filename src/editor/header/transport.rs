@@ -3,7 +3,7 @@
 //! button and the editor-wide tint ([`crate::editor::theme::Theme::for_play_mode`]),
 //! not by a mode label.
 
-use egui::{Button, Rect, RichText, Rounding, Ui};
+use egui::{Button, CornerRadius, Rect, RichText, Ui, UiBuilder};
 use egui_phosphor::regular as icon;
 
 use crate::editor::theme::Theme;
@@ -25,12 +25,13 @@ pub(super) fn draw(editor: &mut EditorUi, ui: &mut Ui, scene: &mut Scene, is_pla
     let row = Rect::from_min_size(row.min, egui::vec2(row.width(), ROW_HEIGHT));
     ui.allocate_rect(row, egui::Sense::hover());
 
-    let mut left = ui.child_ui(row, egui::Layout::left_to_right(egui::Align::Center));
+    let layout = egui::Layout::left_to_right(egui::Align::Center);
+    let mut left = ui.new_child(UiBuilder::new().max_rect(row).layout(layout));
     left.label(RichText::new(icon::FILM_SLATE).color(t.text_secondary));
     left.label(RichText::new(scene_name(editor)).color(t.text_secondary));
 
     let group = Rect::from_center_size(row.center(), egui::vec2(BUTTON.x * 2.0 + 2.0, BUTTON.y));
-    let mut center = ui.child_ui(group, egui::Layout::left_to_right(egui::Align::Center));
+    let mut center = ui.new_child(UiBuilder::new().max_rect(group).layout(layout));
     center.spacing_mut().item_spacing.x = 2.0;
     transport(editor, &mut center, scene, is_playing, &t);
 }
@@ -53,11 +54,11 @@ fn transport(
     };
     let play = Button::new(RichText::new(icon::PLAY).size(14.0).color(play_text))
         .fill(play_fill)
-        .rounding(Rounding {
-            nw: 4.0,
-            sw: 4.0,
-            ne: 0.0,
-            se: 0.0,
+        .corner_radius(CornerRadius {
+            nw: 4,
+            sw: 4,
+            ne: 0,
+            se: 0,
         })
         .min_size(BUTTON);
     let play = ui.add(play).on_hover_text(format!("Play ({shortcut})"));
@@ -74,11 +75,11 @@ fn transport(
     };
     let stop_btn = Button::new(RichText::new(icon::STOP).size(14.0).color(stop_text))
         .fill(t.bg_hover)
-        .rounding(Rounding {
-            nw: 0.0,
-            sw: 0.0,
-            ne: 4.0,
-            se: 4.0,
+        .corner_radius(CornerRadius {
+            nw: 0,
+            sw: 0,
+            ne: 4,
+            se: 4,
         })
         .min_size(BUTTON);
     if ui

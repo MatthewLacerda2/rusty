@@ -34,7 +34,7 @@ fn draw_import_settings(ui: &mut egui::Ui, editor: &mut EditorUi) {
 
     ui.horizontal(|ui| {
         ui.label("Wrap Mode:");
-        egui::ComboBox::from_id_source("ImgWrapMode")
+        egui::ComboBox::from_id_salt("ImgWrapMode")
             .selected_text(&editor.asset_image_wrap)
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut editor.asset_image_wrap, "Repeat".to_string(), "Repeat");
@@ -49,7 +49,7 @@ fn draw_import_settings(ui: &mut egui::Ui, editor: &mut EditorUi) {
 
     ui.horizontal(|ui| {
         ui.label("Filter Mode:");
-        egui::ComboBox::from_id_source("ImgFilterMode")
+        egui::ComboBox::from_id_salt("ImgFilterMode")
             .selected_text(&editor.asset_image_filter)
             .show_ui(ui, |ui| {
                 ui.selectable_value(
@@ -85,7 +85,7 @@ fn draw_apply_to_entity(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Sc
     let selected_ent_name = "Select Entity...".to_string();
 
     let mut clicked_entity_id = None;
-    egui::ComboBox::from_id_source("ApplyTextureToEntity")
+    egui::ComboBox::from_id_salt("ApplyTextureToEntity")
         .selected_text(selected_ent_name)
         .show_ui(ui, |ui| {
             for id in scene.entity_ids() {

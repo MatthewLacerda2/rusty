@@ -153,7 +153,7 @@ fn draw_tonemap(
     let mut tonemap = vc.tonemap;
     ui.horizontal(|ui| {
         ui.label("  Tonemap:");
-        egui::ComboBox::from_id_source("tonemap")
+        egui::ComboBox::from_id_salt("tonemap")
             .selected_text(format!("{tonemap:?}"))
             .show_ui(ui, |ui| {
                 for (value, label) in [

@@ -26,6 +26,7 @@
 
 pub mod audio;
 pub mod boot;
+mod event_loop;
 mod focus;
 pub mod frame;
 pub mod input;
@@ -38,8 +39,8 @@ pub mod editor;
 use std::sync::Arc;
 use std::time::Instant;
 
-use winit::event::{DeviceEvent, ElementState, Event, KeyEvent, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget};
+use winit::event::{ElementState, KeyEvent, WindowEvent};
+use winit::event_loop::ActiveEventLoop;
 use winit::keyboard::{KeyCode, PhysicalKey};
 
 use crate::app::{GameWorld, PlayTransition};
@@ -47,6 +48,7 @@ use crate::core::keymap::Keymap;
 use crate::core::video::VideoSettings;
 use crate::render::Renderer;
 
+pub use event_loop::{run, Launch};
 use frame::{FrameClock, Host, QuitAction};
 
 /// The frontend-independent window state threaded through the event loop.
@@ -123,46 +125,10 @@ pub trait Frontend {
     );
 }
 
-/// Run the event loop until the window closes or the game quits. Persists the
-/// settings and flushes `Storage` however the loop exits.
-pub fn run<F: Frontend + 'static>(
-    event_loop: EventLoop<()>,
-    mut shell: Shell,
-    mut game: GameWorld,
-    mut frontend: F,
-) {
-    let _ = event_loop.run(move |event, elwt| {
-        elwt.set_control_flow(ControlFlow::Poll);
-        match event {
-            Event::WindowEvent {
-                window_id,
-                ref event,
-            } if window_id == shell.window.id() => {
-                frontend.on_window_event(&shell, event);
-                handle_window_event(event, elwt, &mut shell, &mut game, &mut frontend);
-            }
-            Event::DeviceEvent {
-                event: DeviceEvent::MouseMotion { delta },
-                ..
-            } if shell.window_focused && frontend.game_has_input(&game) => {
-                input::write_mouse_motion(delta, &game);
-            }
-            Event::AboutToWait => shell.window.request_redraw(),
-            // Quit boundary: persist the store however the loop is exiting (window
-            // close, `Application.Quit`, surface OOM). A no-op when the store is pathless.
-            Event::LoopExiting => {
-                settings::persist(&shell, &game);
-                game.resources.flush_storage();
-            }
-            _ => {}
-        }
-    });
-}
-
 /// Dispatch one window event for our window.
-fn handle_window_event<F: Frontend>(
+pub(super) fn handle_window_event<F: Frontend>(
     event: &WindowEvent,
-    elwt: &EventLoopWindowTarget<()>,
+    elwt: &ActiveEventLoop,
     shell: &mut Shell,
     game: &mut GameWorld,
     frontend: &mut F,
@@ -219,7 +185,7 @@ fn handle_window_event<F: Frontend>(
 /// quit request, apply scripted video settings, then let the frontend draw onto the
 /// swapchain.
 fn run_frame<F: Frontend>(
-    elwt: &EventLoopWindowTarget<()>,
+    elwt: &ActiveEventLoop,
     shell: &mut Shell,
     game: &mut GameWorld,
     frontend: &mut F,
@@ -255,14 +221,14 @@ fn run_frame<F: Frontend>(
     // this tick to the surface + window before drawing.
     settings::apply_pending(shell, game);
 
-    let Some(surface) = frame::acquire_frame(elwt, &mut shell.renderer) else {
+    let Some(surface) = frame::acquire_frame(&mut shell.renderer) else {
         return;
     };
     let target = surface
         .texture
         .create_view(&wgpu::TextureViewDescriptor::default());
     frontend.draw(shell, game, &surface.texture, &target);
-    surface.present();
+    shell.renderer.queue.present(surface);
 }
 
 /// Write this frame's gamepad snapshot into the sim, before it ticks.

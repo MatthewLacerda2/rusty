@@ -126,9 +126,12 @@ impl Theme {
     /// Apply colors, spacing and the type scale to the egui style, and publish the
     /// tokens into context memory for `&Ui`-only readers ([`from_ui`]).
     pub fn apply(&self, ctx: &Context) {
-        let mut s = (*ctx.style()).clone();
+        // The editor is dark-only: pin the theme so egui never swaps in its light
+        // style when the OS reports a light theme.
+        ctx.set_theme(egui::Theme::Dark);
+        let mut s = (*ctx.style_of(egui::Theme::Dark)).clone();
         style::configure(self, ctx, &mut s);
-        ctx.set_style(s);
+        ctx.set_style_of(egui::Theme::Dark, s);
         ctx.data_mut(|d| d.insert_temp(token_id(), *self));
     }
 }

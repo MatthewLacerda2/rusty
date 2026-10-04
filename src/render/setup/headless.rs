@@ -47,7 +47,7 @@ impl Renderer {
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: HEADLESS_BACKENDS,
-            ..Default::default()
+            ..wgpu::InstanceDescriptor::new_without_display_handle()
         });
 
         // No `compatible_surface` — pure offscreen. Allow a software/fallback
@@ -57,30 +57,29 @@ impl Renderer {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: None,
                 force_fallback_adapter: false,
+                apply_limit_buckets: false,
             })
             .await
         {
-            Some(a) => a,
-            None => {
-                instance
-                    .request_adapter(&wgpu::RequestAdapterOptions {
-                        power_preference: wgpu::PowerPreference::LowPower,
-                        compatible_surface: None,
-                        force_fallback_adapter: true,
-                    })
-                    .await?
-            }
+            Ok(a) => a,
+            Err(_) => instance
+                .request_adapter(&wgpu::RequestAdapterOptions {
+                    power_preference: wgpu::PowerPreference::LowPower,
+                    compatible_surface: None,
+                    force_fallback_adapter: true,
+                    apply_limit_buckets: false,
+                })
+                .await
+                .ok()?,
         };
 
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::default(),
-                    label: Some("Headless Screenshot Device"),
-                },
-                None,
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
+                label: Some("Headless Screenshot Device"),
+                ..Default::default()
+            })
             .await
             .ok()?;
 
@@ -105,6 +104,7 @@ fn offscreen_config(width: u32, height: u32) -> wgpu::SurfaceConfiguration {
         width,
         height,
         present_mode: wgpu::PresentMode::Fifo,
+        color_space: wgpu::SurfaceColorSpace::Auto,
         alpha_mode: wgpu::CompositeAlphaMode::Auto,
         view_formats: vec![],
         desired_maximum_frame_latency: 2,

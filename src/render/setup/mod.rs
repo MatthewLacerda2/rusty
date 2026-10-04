@@ -21,9 +21,11 @@ impl Renderer {
         let size = window.inner_size();
 
         // 1. Create wgpu Instance
+        // The window's display handle goes in with the instance: the GL backend
+        // needs it to present (Wayland especially); Vulkan and Metal ignore it.
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
-            ..Default::default()
+            ..wgpu::InstanceDescriptor::new_with_display_handle(Box::new(window.clone()))
         });
 
         // 2. Create Surface & Adapter
@@ -35,22 +37,21 @@ impl Renderer {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
+                apply_limit_buckets: false,
             })
             .await
-            .ok_or_else(|| {
-                "no compatible GPU adapter found (check your graphics drivers)".to_string()
+            .map_err(|e| {
+                format!("no compatible GPU adapter found (check your graphics drivers): {e}")
             })?;
 
         // 3. Create Device & Queue
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::default(),
-                    label: None,
-                },
-                None,
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
+                label: None,
+                ..Default::default()
+            })
             .await
             .map_err(|e| format!("failed to create a GPU device: {e}"))?;
 
@@ -248,6 +249,7 @@ fn surface_config(
         width: size.width,
         height: size.height,
         present_mode: wgpu::PresentMode::Fifo,
+        color_space: wgpu::SurfaceColorSpace::Auto,
         alpha_mode: caps.alpha_modes[0],
         view_formats: vec![],
         desired_maximum_frame_latency: 2,

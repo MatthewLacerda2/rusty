@@ -11,15 +11,21 @@ use crate::render::RenderView;
 use crate::scene::Scene;
 use crate::shell::Shell;
 
-/// (Re)bind a freshly-rendered offscreen `target_view` to a stable egui texture id so
-/// the `egui::Image` samples this frame's render — registering it lazily on first use.
-/// Shared by the viewport and Inspector-preview render paths (#183, #352).
-fn rebind_egui_texture(
+/// (Re)bind a freshly-rendered offscreen `view` to a stable egui texture id so the
+/// `egui::Image` samples this frame's render — registering it lazily on first use.
+/// Shared by the viewport, the Inspector-preview render paths (#183, #352) and the
+/// headless capture. egui samples display-encoded bytes, so it gets the target's
+/// display view, never the sRGB one (#333).
+pub(super) fn rebind_egui_texture(
     egui_renderer: &mut egui_wgpu::Renderer,
     device: &wgpu::Device,
     id_slot: &mut Option<egui::TextureId>,
-    target_view: &wgpu::TextureView,
+    view: &RenderView,
 ) {
+    let Some(target_view) = view.display_view() else {
+        return;
+    };
+    let target_view = &target_view;
     match id_slot {
         Some(id) => egui_renderer.update_egui_texture_from_wgpu_texture(
             device,
@@ -94,7 +100,7 @@ impl EditorFrontend {
             &mut self.egui_renderer,
             &renderer.device,
             &mut self.viewport_texture_id,
-            &target_view,
+            view,
         );
     }
 
@@ -142,7 +148,7 @@ impl EditorFrontend {
             &mut self.egui_renderer,
             &renderer.device,
             &mut self.preview_texture_id,
-            &target_view,
+            view,
         );
     }
 

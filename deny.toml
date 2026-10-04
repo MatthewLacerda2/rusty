@@ -4,25 +4,19 @@
 [advisories]
 yanked = "warn"
 ignore = [
-  # `paste` is unmaintained (archived upstream) but only reaches us transitively
-  # via wgpu → wgpu-hal → metal; there is no safe upgrade and it is NOT a
-  # vulnerability. Real RUSTSEC vulnerabilities still fail the deny job.
+  # `paste` is unmaintained (archived upstream) but only reaches us transitively,
+  # as a proc-macro, via rapier3d → nalgebra/parry3d → simba (wgpu dropped it in
+  # #333). No safe upgrade on that path and it is NOT a vulnerability. Revisit with
+  # the rapier upgrade. Real RUSTSEC vulnerabilities still fail the deny job.
   "RUSTSEC-2024-0436",
-  # `ttf-parser` is unmaintained but only reaches us transitively via
-  # ab_glyph (UI `Text`, #419; also egui/epaint) and winit → sctk-adwaita. It
-  # parses the project's own font assets, not untrusted input; the advisory offers no safe
-  # upgrade on this path and it is NOT a vulnerability. Real RUSTSEC
-  # vulnerabilities still fail the deny job.
+  # `ttf-parser` is unmaintained. It is a direct dependency since #419 (GPOS
+  # kerning for UI `Text`) and also arrives through ab_glyph (ours, and winit →
+  # sctk-adwaita). It parses the project's own font assets, not untrusted input,
+  # and it is NOT a vulnerability. Since #333 egui no longer pulls it. Exit
+  # condition: drop this when the UI text stack moves to a maintained parser
+  # (e.g. `skrifa`/`read-fonts`, which egui 0.36 already uses) and winit's
+  # sctk-adwaita follows. Real RUSTSEC vulnerabilities still fail the deny job.
   "RUSTSEC-2026-0192",
-  # `quick-xml` 0.39 DoS advisories (quadratic duplicate-attribute check;
-  # unbounded namespace allocation). Both require an attacker feeding untrusted
-  # XML to the parser. Our only consumer is `wayland-scanner`, a build-time code
-  # generator parsing the protocol XML vendored inside the wayland-protocols
-  # crates — trusted, static input; nothing at runtime. No upgrade path:
-  # wayland-scanner (latest 0.31.10) pins quick-xml 0.39 (fix is in 0.41).
-  # Drop these when the wayland stack releases against quick-xml >= 0.41.
-  "RUSTSEC-2026-0194",
-  "RUSTSEC-2026-0195",
 ]
 
 [bans]
@@ -40,8 +34,9 @@ allow = [
   # clipboard path (clipboard-win, error-code).
   "BSL-1.0",
   # Permissive font licenses for the default fonts egui's `epaint` bundles
-  # (SIL Open Font License, Ubuntu Font License). They cover font assets, not code.
-  "OFL-1.1", "LicenseRef-UFL-1.0",
+  # (SIL Open Font License, Ubuntu Font Licence — SPDX `Ubuntu-font-1.0` since egui
+  # 0.36). They cover font assets, not code.
+  "OFL-1.1", "Ubuntu-font-1.0",
 ]
 confidence-threshold = 0.8
 # Skip our own unpublished crate (`publish = false`); it has no license field and

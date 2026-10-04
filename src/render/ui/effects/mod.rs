@@ -149,8 +149,10 @@ pub(crate) fn color_pass<'e>(
     load: wgpu::LoadOp<wgpu::Color>,
 ) -> wgpu::RenderPass<'e> {
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        multiview_mask: None,
         label: Some(label),
         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            depth_slice: None,
             view: target,
             resolve_target: None,
             ops: wgpu::Operations {

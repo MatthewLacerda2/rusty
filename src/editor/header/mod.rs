@@ -1,3 +1,5 @@
+use egui::containers::menu::MenuConfig;
+use egui::PopupCloseBehavior;
 use egui_phosphor::regular as icon;
 
 mod scene_io;
@@ -14,26 +16,26 @@ use crate::scripting::ConsoleLogs;
 /// creation and quality live in the menus; the toolbar row is just play-state.
 pub fn draw(
     editor: &mut EditorUi,
-    ctx: &egui::Context,
+    ui: &mut egui::Ui,
     scene: &mut Scene,
     console: &mut ConsoleLogs,
     is_playing: &mut bool,
 ) {
     let t = editor.theme;
-    egui::TopBottomPanel::top("Header Panel")
+    egui::Panel::top("Header Panel")
         .frame(
-            egui::Frame::none()
+            egui::Frame::NONE
                 .fill(t.bg_tier1)
-                .inner_margin(egui::Margin::symmetric(t.space_sm, t.space_xs))
+                .inner_margin(egui::vec2(t.space_sm, t.space_xs))
                 .stroke(egui::Stroke::new(1.0, t.border)),
         )
-        .show(ctx, |ui| {
+        .show(ui, |ui| {
             draw_menu_bar(editor, ui, scene, console);
             ui.add_space(2.0);
             transport::draw(editor, ui, scene, is_playing);
         });
 
-    draw_about_window(editor, ctx);
+    draw_about_window(editor, ui.ctx());
 }
 
 /// File / GameObject / Config / About menus.
@@ -43,7 +45,10 @@ fn draw_menu_bar(
     scene: &mut Scene,
     console: &mut ConsoleLogs,
 ) {
-    egui::menu::bar(ui, |ui| {
+    // egui 0.27 menus stayed open until an item closed them or the user clicked
+    // outside; keep that so the Config menu's toggles don't dismiss it.
+    let config = MenuConfig::new().close_behavior(PopupCloseBehavior::CloseOnClickOutside);
+    egui::MenuBar::new().config(config).ui(ui, |ui| {
         file_menu(editor, ui, scene, console);
 
         // The GameObject menu — the Unity-style home for creating objects (#255).
@@ -54,7 +59,7 @@ fn draw_menu_bar(
         ui.menu_button("About", |ui| {
             if ui.button("About rusty").clicked() {
                 editor.show_about = true;
-                ui.close_menu();
+                ui.close();
             }
         });
     });
@@ -70,28 +75,28 @@ fn file_menu(
     ui.menu_button("File", |ui| {
         if ui.button(format!("{}  New Scene", icon::FILE)).clicked() {
             scene_io::new_scene(editor, scene, console);
-            ui.close_menu();
+            ui.close();
         }
         if ui
             .button(format!("{}  Reset Scene", icon::ARROW_COUNTER_CLOCKWISE))
             .clicked()
         {
             scene_io::reset_scene(editor, scene, console);
-            ui.close_menu();
+            ui.close();
         }
         if ui
             .button(format!("{}  Load Scene", icon::FOLDER_OPEN))
             .clicked()
         {
             scene_io::load_scene(editor, scene, console);
-            ui.close_menu();
+            ui.close();
         }
         if ui
             .button(format!("{}  Save Scene", icon::FLOPPY_DISK))
             .clicked()
         {
             scene_io::save_scene(editor, scene, console);
-            ui.close_menu();
+            ui.close();
         }
         ui.separator();
         if ui
@@ -99,7 +104,7 @@ fn file_menu(
             .clicked()
         {
             editor.show_build_settings = true;
-            ui.close_menu();
+            ui.close();
         }
     });
 }
@@ -130,7 +135,7 @@ fn config_menu(editor: &mut EditorUi, ui: &mut egui::Ui) {
             // makes the inspector fall through to its scene-settings view.
             editor.selected_entity_id = None;
             editor.selected_asset_path = None;
-            ui.close_menu();
+            ui.close();
         }
     });
 }

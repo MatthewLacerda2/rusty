@@ -5,7 +5,7 @@
 //! disc and the four anchor triangles. A read-only element (see the module docs
 //! of `rect_tool`) is drawn in the muted colour with no handles.
 
-use egui::{Color32, Painter, Pos2, Shape, Stroke};
+use egui::{Color32, Painter, Pos2, Shape, Stroke, StrokeKind};
 use glam::Vec2;
 
 use super::geometry::{self, Handle};
@@ -70,7 +70,7 @@ fn paint_handles(
             _ => {
                 let r = egui::Rect::from_center_size(p, egui::vec2(7.0, 7.0));
                 painter.rect_filled(r, 0.0, fill);
-                painter.rect_stroke(r, 0.0, Stroke::new(1.0, colour));
+                painter.rect_stroke(r, 0.0, Stroke::new(1.0, colour), StrokeKind::Middle);
             }
         }
     }

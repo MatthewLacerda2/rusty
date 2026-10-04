@@ -194,6 +194,18 @@ impl RenderView {
             .map(|t| t.create_view(&wgpu::TextureViewDescriptor::default()))
     }
 
+    /// The owned colour target seen in display space — its non-sRGB twin, which holds
+    /// the display-encoded bytes — for a sampler that expects those rather than linear
+    /// values: egui's (#333). A device without view-format support gets the plain view
+    /// (the image then shows darker, as the UI pass's fallback blends off).
+    pub fn display_view(&self) -> Option<wgpu::TextureView> {
+        let target = self.color_target.as_ref()?;
+        Some(target.create_view(&wgpu::TextureViewDescriptor {
+            format: self.ui_format,
+            ..Default::default()
+        }))
+    }
+
     /// Have the next render draw the in-game UI through `output` (a view of the
     /// frame the caller passes to `render`, and its format) — for a targetless view
     /// that presents, like the standalone player's swapchain (#418). Views owning a

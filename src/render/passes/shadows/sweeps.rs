@@ -59,7 +59,7 @@ impl ShadowRenderer {
 
     /// Copy the frame's cascade layers from the static bake into the active array.
     fn copy_static_layers(&self, encoder: &mut wgpu::CommandEncoder) {
-        let layer = |texture| wgpu::ImageCopyTexture {
+        let layer = |texture| wgpu::TexelCopyTextureInfo {
             texture,
             mip_level: 0,
             origin: wgpu::Origin3d::ZERO,
@@ -91,6 +91,7 @@ pub(super) fn depth_pass<'a>(
         wgpu::LoadOp::Load
     };
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        multiview_mask: None,
         label: Some(label),
         color_attachments: &[],
         depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {

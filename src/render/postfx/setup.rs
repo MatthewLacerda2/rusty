@@ -68,8 +68,8 @@ impl PostFx {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("PostFX Pipeline Layout"),
-            bind_group_layouts: &[io_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(io_layout)],
+            immediate_size: 0,
         });
         let pass = |fs: &str, format| {
             let entries = ("vs_fullscreen", fs);
@@ -194,12 +194,14 @@ impl PostFx {
             layout: Some(layout),
             vertex: wgpu::VertexState {
                 module: shader,
-                entry_point: vs_entry,
+                entry_point: Some(vs_entry),
+                compilation_options: Default::default(),
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shader,
-                entry_point: fs_entry,
+                entry_point: Some(fs_entry),
+                compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format,
                     blend: Some(wgpu::BlendState::REPLACE),
@@ -209,7 +211,8 @@ impl PostFx {
             primitive: wgpu::PrimitiveState::default(),
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
+            cache: None,
         })
     }
 

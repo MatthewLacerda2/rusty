@@ -68,15 +68,15 @@ fn submit_copy(
         label: Some("Readback Copy Encoder"),
     });
     encoder.copy_texture_to_buffer(
-        wgpu::ImageCopyTexture {
+        wgpu::TexelCopyTextureInfo {
             texture,
             mip_level: 0,
             origin: wgpu::Origin3d::ZERO,
             aspect: wgpu::TextureAspect::All,
         },
-        wgpu::ImageCopyBuffer {
+        wgpu::TexelCopyBufferInfo {
             buffer,
-            layout: wgpu::ImageDataLayout {
+            layout: wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(padded_bytes_per_row),
                 rows_per_image: Some(size.height),
@@ -100,10 +100,13 @@ fn map_and_unpad(
     slice.map_async(wgpu::MapMode::Read, move |res| {
         let _ = tx.send(res);
     });
-    device.poll(wgpu::Maintain::Wait);
+    let _ = device.poll(wgpu::PollType::wait_indefinitely());
     let _ = rx.recv();
 
-    let mapped = slice.get_mapped_range();
+    // The buffer was mapped just above, so this only fails on a wgpu bug.
+    let mapped = slice
+        .get_mapped_range()
+        .expect("the readback buffer was just mapped");
     let mut pixels = Vec::with_capacity((unpadded_bytes_per_row * height) as usize);
     for row in mapped.chunks(padded_bytes_per_row as usize) {
         pixels.extend_from_slice(&row[..unpadded_bytes_per_row as usize]);

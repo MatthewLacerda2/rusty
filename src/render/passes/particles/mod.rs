@@ -77,12 +77,12 @@ impl ParticleRenderer {
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Particle Pipeline Layout"),
             bind_group_layouts: &[
-                &globals_layout,
-                layouts.texture,
-                layouts.depth,
-                layouts.camera_lighting,
+                Some(&globals_layout),
+                Some(layouts.texture),
+                Some(layouts.depth),
+                Some(layouts.camera_lighting),
             ],
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let alpha_pipeline = Self::pipeline(
@@ -139,12 +139,14 @@ impl ParticleRenderer {
             layout: Some(layout),
             vertex: wgpu::VertexState {
                 module: shader,
-                entry_point: "vs_main",
-                buffers: &[ParticleInstance::desc()],
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[Some(ParticleInstance::desc())],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shader,
-                entry_point: fragment_entry,
+                entry_point: Some(fragment_entry),
+                compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: HDR_FORMAT,
                     blend: Some(blend),
@@ -162,13 +164,14 @@ impl ParticleRenderer {
             // as the soft-particle texture.
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::LessEqual,
+                depth_write_enabled: Some(false),
+                depth_compare: Some(wgpu::CompareFunction::LessEqual),
                 stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
             }),
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
+            cache: None,
         })
     }
 

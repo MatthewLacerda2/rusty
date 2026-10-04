@@ -353,7 +353,7 @@ rehydration that rebuilds meshes/colliders/skeletons), surfacing panics, hangs,
 and unguarded `unwrap`s.
 
 libFuzzer is **nightly-only**, so `fuzz/` is its own workspace — deliberately
-out of the pinned-`1.94.1` build, the size/determinism gates, and `cargo-deny`.
+out of the pinned-`1.95.0` build, the size/determinism gates, and `cargo-deny`.
 It is **local-first / on-demand**:
 
 ```

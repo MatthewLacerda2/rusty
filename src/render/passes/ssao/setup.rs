@@ -14,8 +14,8 @@ impl SsaoRenderer {
         let shader = registry.load(device, "ssao.wgsl", "SSAO Shader");
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("SSAO Pipeline Layout"),
-            bind_group_layouts: &[&layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&layout)],
+            immediate_size: 0,
         });
         let pipeline = |label, entry_point| {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -23,10 +23,12 @@ impl SsaoRenderer {
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
-                    entry_point: "vs_fullscreen",
+                    entry_point: Some("vs_fullscreen"),
+                    compilation_options: Default::default(),
                     buffers: &[],
                 },
                 fragment: Some(wgpu::FragmentState {
+                    compilation_options: Default::default(),
                     module: &shader,
                     entry_point,
                     targets: &[Some(AO_FORMAT.into())],
@@ -34,13 +36,14 @@ impl SsaoRenderer {
                 primitive: wgpu::PrimitiveState::default(),
                 depth_stencil: None,
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
+                cache: None,
             })
         };
         let (no_ao_texture, no_ao) = white_texture(device, queue);
         Self {
-            ao_pipeline: pipeline("SSAO Occlusion Pipeline", "fs_ao"),
-            blur_pipeline: pipeline("SSAO Blur Pipeline", "fs_blur"),
+            ao_pipeline: pipeline("SSAO Occlusion Pipeline", Some("fs_ao")),
+            blur_pipeline: pipeline("SSAO Blur Pipeline", Some("fs_blur")),
             layout,
             _no_ao_texture: no_ao_texture,
             no_ao,
@@ -56,8 +59,10 @@ impl SsaoRenderer {
         target: &wgpu::TextureView,
     ) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            multiview_mask: None,
             label: Some(if blur { "SSAO Blur Pass" } else { "SSAO Pass" }),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                depth_slice: None,
                 view: target,
                 resolve_target: None,
                 ops: wgpu::Operations {
@@ -161,7 +166,7 @@ fn white_texture(device: &wgpu::Device, queue: &wgpu::Queue) -> (wgpu::Texture, 
     queue.write_texture(
         texture.as_image_copy(),
         &[255],
-        wgpu::ImageDataLayout {
+        wgpu::TexelCopyBufferLayout {
             offset: 0,
             bytes_per_row: Some(1),
             rows_per_image: None,

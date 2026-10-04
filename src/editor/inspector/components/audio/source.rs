@@ -87,7 +87,7 @@ fn draw_output(
     let mut picked = None;
     ui.horizontal(|ui| {
         ui.label("Output:");
-        egui::ComboBox::from_id_source(("audio_output", id))
+        egui::ComboBox::from_id_salt(("audio_output", id))
             .selected_text(current)
             .show_ui(ui, |ui| {
                 let custom = (!DEFAULT_GROUPS.contains(&current)).then_some(current);
@@ -201,7 +201,7 @@ fn clamped(
 ) -> bool {
     ui.horizontal(|ui| {
         ui.label(label);
-        ui.add(egui::DragValue::new(value).speed(0.01).clamp_range(range))
+        ui.add(egui::DragValue::new(value).speed(0.01).range(range))
             .changed()
     })
     .inner

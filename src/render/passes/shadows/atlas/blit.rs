@@ -76,31 +76,34 @@ fn pipeline(
 ) -> wgpu::RenderPipeline {
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Shadow Atlas Blit Pipeline Layout"),
-        bind_group_layouts: layouts,
-        push_constant_ranges: &[],
+        bind_group_layouts: &layouts.iter().copied().map(Some).collect::<Vec<_>>(),
+        immediate_size: 0,
     });
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("Shadow Atlas Blit Pipeline"),
         layout: Some(&layout),
         vertex: wgpu::VertexState {
             module: shader,
-            entry_point: "vs_fullscreen",
+            entry_point: Some("vs_fullscreen"),
+            compilation_options: Default::default(),
             buffers: &[],
         },
         fragment: Some(wgpu::FragmentState {
             module: shader,
-            entry_point: fs_entry,
+            entry_point: Some(fs_entry),
+            compilation_options: Default::default(),
             targets: &[],
         }),
         primitive: wgpu::PrimitiveState::default(),
         depth_stencil: Some(wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth32Float,
-            depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::Always,
+            depth_write_enabled: Some(true),
+            depth_compare: Some(wgpu::CompareFunction::Always),
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         }),
         multisample: wgpu::MultisampleState::default(),
-        multiview: None,
+        multiview_mask: None,
+        cache: None,
     })
 }

@@ -124,8 +124,8 @@ impl BlurPipelines {
         let layout = crate::render::gpu::bind_layouts::create_texture_layout(device);
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("UI Blur Pipeline Layout"),
-            bind_group_layouts: &[&layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&layout)],
+            immediate_size: 0,
         });
         Self {
             shader,
@@ -145,18 +145,21 @@ impl BlurPipelines {
                 layout: Some(&self.pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &self.shader,
-                    entry_point: "vs_full",
+                    entry_point: Some("vs_full"),
+                    compilation_options: Default::default(),
                     buffers: &[],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &self.shader,
-                    entry_point: entry,
+                    entry_point: Some(entry),
+                    compilation_options: Default::default(),
                     targets: &[Some(format.into())],
                 }),
                 primitive: wgpu::PrimitiveState::default(),
                 depth_stencil: None,
                 multisample: wgpu::MultisampleState::default(),
-                multiview: None,
+                multiview_mask: None,
+                cache: None,
             })
         };
         let pair = (build("fs_down"), build("fs_up"));

@@ -83,12 +83,14 @@ pub(crate) fn mask_pipeline(
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module: shader,
-            entry_point: "vs_main",
-            buffers: &[crate::render::ui::vertex::vertex_layout()],
+            entry_point: Some("vs_main"),
+            compilation_options: Default::default(),
+            buffers: &[Some(crate::render::ui::vertex::vertex_layout())],
         },
         fragment: Some(wgpu::FragmentState {
             module: shader,
-            entry_point: "fs_mask",
+            entry_point: Some("fs_mask"),
+            compilation_options: Default::default(),
             targets: &[Some(wgpu::ColorTargetState {
                 format: MASK_FORMAT,
                 blend: Some(wgpu::BlendState {
@@ -101,7 +103,8 @@ pub(crate) fn mask_pipeline(
         primitive: wgpu::PrimitiveState::default(),
         depth_stencil: None,
         multisample: wgpu::MultisampleState::default(),
-        multiview: None,
+        multiview_mask: None,
+        cache: None,
     })
 }
 

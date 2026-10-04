@@ -16,7 +16,7 @@ pub(super) fn draw_projection_mode(
     let mut next = None;
     ui.horizontal(|ui| {
         ui.label("Projection:");
-        egui::ComboBox::from_id_source("camera_projection")
+        egui::ComboBox::from_id_salt("camera_projection")
             .selected_text(camera_ops::projection_name(cam.projection))
             .show_ui(ui, |ui| {
                 let size = match cam.projection {
@@ -37,7 +37,7 @@ pub(super) fn draw_projection_mode(
             ui.label("Ortho Size:");
             let drag = egui::DragValue::new(&mut size)
                 .speed(0.1)
-                .clamp_range(0.01..=1000.0);
+                .range(0.01..=1000.0);
             if ui.add(drag).changed() {
                 next = Some(Projection::Orthographic { size });
             }
@@ -83,10 +83,10 @@ pub(super) fn draw_target(
         ui.label("Size:");
         let max = camera_ops::MAX_TARGET_SIZE;
         changed |= ui
-            .add(egui::DragValue::new(&mut w).clamp_range(1..=max))
+            .add(egui::DragValue::new(&mut w).range(1..=max))
             .changed();
         changed |= ui
-            .add(egui::DragValue::new(&mut h).clamp_range(1..=max))
+            .add(egui::DragValue::new(&mut h).range(1..=max))
             .changed();
     });
     if changed {
@@ -103,7 +103,7 @@ pub(super) fn draw_target(
     let mut every = t.update_every;
     ui.horizontal(|ui| {
         ui.label("Update Every N Frames:");
-        let drag = egui::DragValue::new(&mut every).clamp_range(1..=120);
+        let drag = egui::DragValue::new(&mut every).range(1..=120);
         if ui.add(drag).changed() {
             write(world, id, is_dirty, |c| {
                 camera_ops::set_target_update_every(c, every)

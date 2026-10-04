@@ -220,8 +220,10 @@ impl PostFx {
         target: &wgpu::TextureView,
     ) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            multiview_mask: None,
             label: Some("PostFX Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                depth_slice: None,
                 view: target,
                 resolve_target: None,
                 ops: wgpu::Operations {

@@ -31,8 +31,10 @@ impl Renderer {
             });
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                multiview_mask: None,
                 label: Some("Transparent Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    depth_slice: None,
                     view: &view.post_fx.scene_hdr.view,
                     resolve_target: None,
                     ops: wgpu::Operations {

@@ -95,17 +95,16 @@ impl Renderer {
         let editor_mode = frame.editor_mode;
         let clear = frame.clear;
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            multiview_mask: None,
             label: Some("Scene Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                depth_slice: None,
                 // Scene draws into the HDR offscreen target (post-FX composites later).
                 // A `DepthOnly` camera loads existing color; others clear backdrop (#93).
                 view: &view.post_fx.scene_hdr.view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: match clear.color {
-                        Some(c) => wgpu::LoadOp::Clear(c),
-                        None => wgpu::LoadOp::Load,
-                    },
+                    load: clear.color.map_or(wgpu::LoadOp::Load, wgpu::LoadOp::Clear),
                     store: wgpu::StoreOp::Store,
                 },
             })],

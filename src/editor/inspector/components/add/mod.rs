@@ -48,12 +48,12 @@ fn add_audio(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
             .clicked()
     {
         world.set_audio(id, Some(AudioSourceComponent::default()));
-        ui.close_menu();
+        ui.close();
     }
     let zone = format!("{}  Audio Reverb Zone", icon::WAVEFORM);
     if !world.has_reverb_zone(id) && ui.button(zone).clicked() {
         authoring::add_with_requirements(world, id, ComponentKind::ReverbZone);
-        ui.close_menu();
+        ui.close();
     }
 }
 
@@ -63,15 +63,15 @@ fn add_audio(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
 fn add_lighting_combat(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
     if !world.has_light(id) && ui.button("Light Component").clicked() {
         world.set_light(id, Some(authoring::default_light()));
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_animator(id) && ui.button("Animator Component").clicked() {
         world.set_animator(id, Some(authoring::default_animator()));
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_collider(id) && ui.button("Collider Component").clicked() {
         world.set_collider(id, Some(authoring::default_collider()));
-        ui.close_menu();
+        ui.close();
     }
 }
 
@@ -82,39 +82,39 @@ fn add_lighting_combat(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32
 fn add_physics_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
     if !world.has_rigidbody(id) && ui.button("RigidBody Component").clicked() {
         world.set_rigidbody(id, Some(authoring::default_rigidbody()));
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_material(id) && ui.button("Material / Texture Component").clicked() {
         attach_default_material(world, id);
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_nav_agent(id) && ui.button("NavMesh Agent Component").clicked() {
         world.set_nav_agent(id, Some(authoring::default_nav_agent()));
-        ui.close_menu();
+        ui.close();
     }
     let cone = format!("{}  NavMesh Obstacle", icon::TRAFFIC_CONE);
     if !world.has_nav_obstacle(id) && ui.button(cone).clicked() {
         authoring::add_with_requirements(world, id, ComponentKind::NavMeshObstacle);
-        ui.close_menu();
+        ui.close();
     }
     let ladder = format!("{}  Off-Mesh Link", icon::LADDER_SIMPLE);
     if !world.has_offmesh_link(id) && ui.button(ladder).clicked() {
         authoring::add_with_requirements(world, id, ComponentKind::OffMeshLink);
-        ui.close_menu();
+        ui.close();
     }
     let volume = format!("{}  NavMesh Modifier Volume", icon::SELECTION);
     if !world.has_nav_modifier(id) && ui.button(volume).clicked() {
         authoring::add_with_requirements(world, id, ComponentKind::NavMeshModifierVolume);
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_joint(id) && ui.button(format!("{}  Joint", icon::LINK)).clicked() {
         authoring::add_with_requirements(world, id, ComponentKind::Joint);
-        ui.close_menu();
+        ui.close();
     }
     let walker = format!("{}  Character Controller", icon::PERSON_SIMPLE_WALK);
     if !world.has_character_controller(id) && ui.button(walker).clicked() {
         authoring::add_with_requirements(world, id, ComponentKind::CharacterController);
-        ui.close_menu();
+        ui.close();
     }
 }
 
@@ -136,7 +136,7 @@ fn attach_default_material(world: &mut crate::ecs::World, id: u32) {
 fn add_render_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
     if !world.has_camera(id) && ui.button("Camera Component").clicked() {
         world.set_camera(id, Some(authoring::default_camera()));
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_particles(id)
         && ui
@@ -144,7 +144,7 @@ fn add_render_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u
             .clicked()
     {
         world.set_particles(id, Some(ParticleEmitterComponent::default()));
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_trail(id)
         && ui
@@ -152,7 +152,7 @@ fn add_render_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u
             .clicked()
     {
         authoring::add_with_requirements(world, id, ComponentKind::Trail);
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_line(id)
         && ui
@@ -160,11 +160,11 @@ fn add_render_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u
             .clicked()
     {
         authoring::add_with_requirements(world, id, ComponentKind::Line);
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_visual_correction(id) && ui.button("Visual Correction Component").clicked() {
         authoring::add_with_requirements(world, id, ComponentKind::VisualCorrection);
-        ui.close_menu();
+        ui.close();
     }
     if !world.has_lod_group(id)
         && ui
@@ -172,7 +172,7 @@ fn add_render_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u
             .clicked()
     {
         authoring::add_with_requirements(world, id, ComponentKind::LodGroup);
-        ui.close_menu();
+        ui.close();
     }
 }
 
@@ -199,7 +199,7 @@ fn add_script_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
                     ..Default::default()
                 });
             }
-            ui.close_menu();
+            ui.close();
         }
     }
 }

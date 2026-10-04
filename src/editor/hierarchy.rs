@@ -7,17 +7,18 @@ use crate::scene::Scene;
 /// LEFT PANEL: Scene Hierarchy — a VS Code Explorer-style collapsible tree. Object
 /// creation lives in the menu bar's GameObject menu (#255); the panel keeps only a
 /// Destroy affordance for the current selection above the tree.
-pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
+pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     let t = editor.theme;
     if !editor.hierarchy_open {
-        draw_collapsed(ctx, t, &mut editor.hierarchy_open);
+        draw_collapsed(ui, t, &mut editor.hierarchy_open);
         return;
     }
-    egui::SidePanel::left("Hierarchy Panel")
+    let frame = chrome::panel_frame(&t);
+    egui::Panel::left("Hierarchy Panel")
         .resizable(true)
-        .width_range(154.0..=340.0)
-        .frame(chrome::panel_frame(&t))
-        .show(ctx, |ui| {
+        .size_range((154.0 + frame.inner_margin.sum().x)..=340.0)
+        .frame(frame)
+        .show(ui, |ui| {
             let title = (icon::TREE_STRUCTURE, "Hierarchy");
             if chrome::panel_header(ui, &t, title.0, title.1, icon::CARET_LEFT) {
                 editor.hierarchy_open = false;
@@ -45,12 +46,13 @@ pub fn draw(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
 }
 
 /// Collapsed state: a thin rail with a caret that reopens the hierarchy panel.
-fn draw_collapsed(ctx: &egui::Context, t: crate::editor::theme::Theme, open: &mut bool) {
-    egui::SidePanel::left("Hierarchy Rail")
+fn draw_collapsed(ui: &mut egui::Ui, t: crate::editor::theme::Theme, open: &mut bool) {
+    let frame = chrome::rail_frame(&t);
+    egui::Panel::left("Hierarchy Rail")
         .resizable(false)
-        .exact_width(26.0)
-        .frame(chrome::rail_frame(&t))
-        .show(ctx, |ui| {
+        .exact_size(26.0 + frame.inner_margin.sum().x)
+        .frame(frame)
+        .show(ui, |ui| {
             if chrome::icon_button(ui, icon::CARET_RIGHT, "Expand").clicked() {
                 *open = true;
             }

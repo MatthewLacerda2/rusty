@@ -53,8 +53,8 @@ pub(crate) fn build_entry(
             HDR_FORMAT,
             Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::LessEqual,
+                depth_write_enabled: Some(false),
+                depth_compare: Some(wgpu::CompareFunction::LessEqual),
                 stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
             }),
@@ -65,12 +65,14 @@ pub(crate) fn build_entry(
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module,
-            entry_point: vs,
-            buffers: &[vertex_layout()],
+            entry_point: Some(vs),
+            compilation_options: Default::default(),
+            buffers: &[Some(vertex_layout())],
         },
         fragment: Some(wgpu::FragmentState {
             module,
-            entry_point: fs,
+            entry_point: Some(fs),
+            compilation_options: Default::default(),
             targets: &[Some(wgpu::ColorTargetState {
                 format,
                 blend: Some(blend_state(mode)),
@@ -80,6 +82,7 @@ pub(crate) fn build_entry(
         primitive: wgpu::PrimitiveState::default(),
         depth_stencil: depth,
         multisample: wgpu::MultisampleState::default(),
-        multiview: None,
+        multiview_mask: None,
+        cache: None,
     })
 }

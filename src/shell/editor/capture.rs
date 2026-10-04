@@ -15,7 +15,9 @@
 //! **Deterministic by construction:** a fixed size, a fixed pixel scale (1×), a fixed
 //! frame count and a synthetic egui clock. Several frames are needed because egui loads
 //! fonts registered in one frame on the *next*, and sizes some panels from the frame
-//! before; [`DEFAULT_FRAMES`] covers both. The sim is never stepped.
+//! before; [`DEFAULT_FRAMES`] covers both. The clock steps a whole second a frame,
+//! longer than any egui animation (a window's fade-in, #333), so the painted frame
+//! shows the settled UI a user sees. The sim is never stepped.
 //!
 //! No adapter → `Ok(false)`, the same skip contract as every headless capture.
 
@@ -37,6 +39,8 @@ pub const DEFAULT_WIDTH: u32 = 1600;
 pub const DEFAULT_HEIGHT: u32 = 900;
 /// Frames drawn before the one painted: fonts land on frame 2, panel sizes settle by 3.
 pub const DEFAULT_FRAMES: u32 = 4;
+/// The synthetic clock's step: every animation has finished by the next frame.
+const FRAME_SECONDS: f64 = 1.0;
 
 /// What to capture: the size, the frame count and the UI state to apply first.
 #[derive(Clone, Debug)]
@@ -114,21 +118,29 @@ pub fn capture_into(
         log::warn!("[EditorCapture] no GPU/software adapter available — skipping capture");
         return Ok(false);
     };
-    let mut egui_renderer = egui_wgpu::Renderer::new(&renderer.device, OFFSCREEN_FORMAT, None, 1);
+    let mut egui_renderer = egui_wgpu::Renderer::new(
+        &renderer.device,
+        OFFSCREEN_FORMAT,
+        super::paint::EGUI_RENDERER,
+    );
     let ctx = egui::Context::default();
     let mut texture_id = None;
     let mut output = None;
     for frame in 0..opts.frames.max(1) {
-        ctx.begin_frame(raw_input(width, height, frame));
+        ctx.begin_pass(raw_input(width, height, frame));
         let size = draw_ui(&mut ui, &ctx, game, opts.playing, texture_id);
         render_viewport(host, &mut egui_renderer, game, &ui, size, &mut texture_id);
-        output = Some(ctx.end_frame());
+        output = Some(ctx.end_pass());
         // Upload font atlas / image deltas every frame: egui sends each only once.
         let renderer = host.renderer(width, height).expect("probed above");
-        let out = output.as_ref().expect("just set");
-        for (id, delta) in &out.textures_delta.set {
-            egui_renderer.update_texture(&renderer.device, &renderer.queue, *id, delta);
+        let out: &mut egui::FullOutput = output.as_mut().expect("just set");
+        for (id, deltas) in &out.textures_delta.set {
+            for delta in deltas {
+                egui_renderer.update_texture(&renderer.device, &renderer.queue, *id, delta);
+            }
         }
+        // Handled: egui asserts every delta is consumed. Frees are moot for one shot.
+        out.textures_delta.clear();
     }
     let output = output.expect("at least one frame");
     let renderer = host.renderer(width, height).expect("probed above");
@@ -144,8 +156,8 @@ fn raw_input(width: u32, height: u32, frame: u32) -> egui::RawInput {
     let size = egui::vec2(width as f32, height as f32);
     egui::RawInput {
         screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
-        time: Some(f64::from(frame) / 60.0),
-        predicted_dt: 1.0 / 60.0,
+        time: Some(f64::from(frame) * FRAME_SECONDS),
+        predicted_dt: FRAME_SECONDS as f32,
         ..Default::default()
     }
 }
@@ -202,19 +214,7 @@ fn render_viewport(
         crate::scene::game_camera_from_scene(&game.camera().borrow(), &scene)
     };
     renderer.render(view, &scene, &camera, &target, scene_tab);
-    let filter = wgpu::FilterMode::Linear;
-    match texture_id {
-        Some(id) => egui_renderer.update_egui_texture_from_wgpu_texture(
-            &renderer.device,
-            &target,
-            filter,
-            *id,
-        ),
-        None => {
-            *texture_id =
-                Some(egui_renderer.register_native_texture(&renderer.device, &target, filter))
-        }
-    }
+    super::viewport::rebind_egui_texture(egui_renderer, &renderer.device, texture_id, view);
 }
 
 /// Tessellate `output` and paint it over a cleared `width × height` offscreen target.
@@ -250,20 +250,24 @@ fn paint(
     let mut encoder = device.create_command_encoder(&Default::default());
     egui_renderer.update_buffers(device, queue, &mut encoder, &jobs, &screen);
     {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Editor Capture Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &target_view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-        });
+        let mut pass = encoder
+            .begin_render_pass(&wgpu::RenderPassDescriptor {
+                multiview_mask: None,
+                label: Some("Editor Capture Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    depth_slice: None,
+                    view: &target_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            })
+            .forget_lifetime();
         egui_renderer.render(&mut pass, &jobs, &screen);
     }
     queue.submit(std::iter::once(encoder.finish()));

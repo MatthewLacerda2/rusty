@@ -62,10 +62,9 @@ mod tests {
 
     #[test]
     fn slots_sit_after_the_param_uniform_in_binding_order() {
-        let mut next = super::super::params::PARAM_BINDING + 1;
-        for s in SLOTS {
-            assert_eq!(s.binding, next, "{}", s.name);
-            next += 1;
+        let first = super::super::params::PARAM_BINDING + 1;
+        for (expected, s) in (first..).zip(SLOTS) {
+            assert_eq!(s.binding, expected, "{}", s.name);
         }
     }
 

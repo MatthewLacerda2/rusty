@@ -16,11 +16,10 @@ mod paint;
 mod viewport;
 
 use winit::event::WindowEvent;
-use winit::event_loop::EventLoop;
 use winit::keyboard::KeyCode;
 
 use super::frame::Host;
-use super::{boot, Frontend, Shell};
+use super::{boot, Frontend, Launch, Shell};
 use crate::app::{GameWorld, PlayTransition};
 use crate::core::application::BUILD_SETTINGS_PATH;
 use crate::core::input::CursorState;
@@ -69,12 +68,12 @@ impl EditorFrontend {
             &shell.window,
             Some(shell.window.scale_factor() as f32),
             None,
+            None,
         );
         let egui_renderer = egui_wgpu::Renderer::new(
             &shell.renderer.device,
             shell.renderer.config.format,
-            None,
-            1,
+            paint::EGUI_RENDERER,
         );
         let mut editor_ui = EditorUi::new();
         editor_ui.current_scene_path = Some(scene_path);
@@ -227,7 +226,7 @@ impl Frontend for EditorFrontend {
         target: &wgpu::TextureView,
     ) {
         let raw_input = self.egui_winit.take_egui_input(&shell.window);
-        self.egui_ctx.begin_frame(raw_input);
+        self.egui_ctx.begin_pass(raw_input);
 
         self.editor_ui.preview_texture_id = self.preview_texture_id;
         let interaction = self.draw_dashboard(shell, game);
@@ -266,15 +265,10 @@ pub fn launch() {
         game.console().borrow_mut().error(err);
     }
 
-    let defaults = VideoSettings::default();
-    let event_loop = EventLoop::new().expect("the OS refused an event loop");
-    let window = boot::create_window(
-        &event_loop,
-        "Rusty 3D Game Engine & Editor",
-        defaults.resolution(),
-    );
-    let renderer = boot::init_renderer(&window);
-    let shell = Shell::new(window, renderer, &game, defaults);
-    let frontend = EditorFrontend::new(&shell, &game, scene_path);
-    super::run(event_loop, shell, game, frontend);
+    let launch = Launch {
+        title: "Rusty 3D Game Engine & Editor".to_string(),
+        video_defaults: VideoSettings::default(),
+        frontend: |shell: &Shell, game: &GameWorld| EditorFrontend::new(shell, game, scene_path),
+    };
+    super::run(game, launch);
 }

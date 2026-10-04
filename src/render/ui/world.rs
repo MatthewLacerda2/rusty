@@ -74,8 +74,8 @@ impl WorldUiPipeline {
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("World UI Pipeline Layout"),
-            bind_group_layouts: &[shared[0], shared[1], &layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(shared[0]), Some(shared[1]), Some(&layout)],
+            immediate_size: 0,
         });
         let shader = ("World UI Pipeline", shader, &pipeline_layout);
         let build = |mode| pipeline::build(device, shader, UiPass::World, mode);
@@ -207,8 +207,10 @@ fn world_pass<'e>(
     view: &'e RenderView,
 ) -> wgpu::RenderPass<'e> {
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        multiview_mask: None,
         label: Some("World UI Pass"),
         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+            depth_slice: None,
             view: &view.post_fx.scene_hdr.view,
             resolve_target: None,
             ops: keep(),

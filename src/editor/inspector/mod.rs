@@ -21,21 +21,22 @@ use std::collections::BTreeMap;
 /// RIGHT PANEL: Properties Inspector
 pub fn draw(
     editor: &mut EditorUi,
-    ctx: &egui::Context,
+    ui: &mut egui::Ui,
     scene: &mut Scene,
     console: &mut ConsoleLogs,
     nav: &mut NavigationGraph,
 ) {
     let t = editor.theme;
     if !editor.inspector_open {
-        draw_collapsed(ctx, t, &mut editor.inspector_open);
+        draw_collapsed(ui, t, &mut editor.inspector_open);
         return;
     }
-    egui::SidePanel::right("Inspector Panel")
+    let frame = chrome::panel_frame(&t);
+    egui::Panel::right("Inspector Panel")
         .resizable(true)
-        .width_range(182.0..=380.0)
-        .frame(chrome::panel_frame(&t))
-        .show(ctx, |ui| {
+        .size_range((182.0 + frame.inner_margin.sum().x)..=380.0)
+        .frame(frame)
+        .show(ui, |ui| {
             let glyph = icon::SLIDERS_HORIZONTAL;
             if chrome::panel_header(ui, &t, glyph, "Inspector", icon::CARET_RIGHT) {
                 editor.inspector_open = false;
@@ -59,12 +60,13 @@ pub fn draw(
 }
 
 /// Collapsed state: a thin rail with a caret that reopens the inspector panel.
-fn draw_collapsed(ctx: &egui::Context, t: crate::editor::theme::Theme, open: &mut bool) {
-    egui::SidePanel::right("Inspector Rail")
+fn draw_collapsed(ui: &mut egui::Ui, t: crate::editor::theme::Theme, open: &mut bool) {
+    let frame = chrome::rail_frame(&t);
+    egui::Panel::right("Inspector Rail")
         .resizable(false)
-        .exact_width(26.0)
-        .frame(chrome::rail_frame(&t))
-        .show(ctx, |ui| {
+        .exact_size(26.0 + frame.inner_margin.sum().x)
+        .frame(frame)
+        .show(ui, |ui| {
             if chrome::icon_button(ui, icon::CARET_LEFT, "Expand").clicked() {
                 *open = true;
             }
@@ -190,7 +192,7 @@ fn draw_layer_combo(
             .get(layer as usize)
             .cloned()
             .unwrap_or_default();
-        egui::ComboBox::from_id_source("entity_layer")
+        egui::ComboBox::from_id_salt("entity_layer")
             .selected_text(selected)
             .show_ui(ui, |ui| {
                 for (i, label) in layer_labels.iter().enumerate() {

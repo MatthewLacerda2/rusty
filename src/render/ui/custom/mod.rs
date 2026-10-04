@@ -89,8 +89,8 @@ impl UiShaders {
         let layout = |label, groups: &[&wgpu::BindGroupLayout]| {
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some(label),
-                bind_group_layouts: groups,
-                push_constant_ranges: &[],
+                bind_group_layouts: &groups.iter().copied().map(Some).collect::<Vec<_>>(),
+                immediate_size: 0,
             })
         };
         Self {
@@ -139,7 +139,7 @@ impl UiShaders {
             }
         }
         let params = ParamLayout::read_beside(&path)?;
-        device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("UI Variant Shader"),
             source: wgpu::ShaderSource::Naga(std::borrow::Cow::Owned(module)),
@@ -148,7 +148,7 @@ impl UiShaders {
         let world = UiBlend::ALL
             .map(|mode| pipeline::build(device, shader, UiPass::World, mode))
             .into();
-        match pollster::block_on(device.pop_error_scope()) {
+        match pollster::block_on(scope.pop()) {
             Some(e) => Err(e.to_string()),
             None => Ok(Variant {
                 module,

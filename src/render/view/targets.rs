@@ -63,9 +63,9 @@ pub(super) fn create_color_target(
         view_formats,
     };
     if alias != format {
-        device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
         let texture = device.create_texture(&desc(&aliased));
-        if pollster::block_on(device.pop_error_scope()).is_none() {
+        if pollster::block_on(scope.pop()).is_none() {
             return (texture, alias);
         }
     }

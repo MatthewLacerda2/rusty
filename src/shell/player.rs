@@ -6,10 +6,8 @@
 //! in-game UI straight onto the swapchain with no chrome, and the game gets all input. `Application.Quit()`
 //! closes the window; the loop's exit flushes `Storage` first.
 
-use winit::event_loop::EventLoop;
-
 use super::frame::Host;
-use super::{boot, Frontend, Shell};
+use super::{boot, Frontend, Launch, Shell};
 use crate::app::GameWorld;
 use crate::core::application::{BuildSettings, WindowMode, BUILD_SETTINGS_PATH};
 use crate::core::video::VideoSettings;
@@ -103,12 +101,12 @@ pub fn launch() {
         .set_build(build.clone());
     game.boot_standalone();
 
-    let defaults = video_defaults(&build);
-    let event_loop = EventLoop::new().expect("the OS refused an event loop");
-    let window = boot::create_window(&event_loop, &build.product_name, defaults.resolution());
-    let renderer = boot::init_renderer(&window);
-    let shell = Shell::new(window, renderer, &game, defaults);
-    super::run(event_loop, shell, game, PlayerFrontend::default());
+    let launch = Launch {
+        video_defaults: video_defaults(&build),
+        title: build.product_name,
+        frontend: |_: &Shell, _: &GameWorld| PlayerFrontend::default(),
+    };
+    super::run(game, launch);
 }
 
 #[cfg(test)]
