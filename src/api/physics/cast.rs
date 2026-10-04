@@ -82,7 +82,7 @@ fn cast_result(scene: &Scene, hit: Option<RayHit>) -> CastResult {
 }
 
 /// `{x, y, z}` as a Lua table.
-fn vec_table<'lua>(lua: &'lua mlua::Lua, v: Vec3) -> mlua::Result<Table<'lua>> {
+fn vec_table(lua: &mlua::Lua, v: Vec3) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("x", v.x)?;
     t.set("y", v.y)?;
@@ -92,7 +92,7 @@ fn vec_table<'lua>(lua: &'lua mlua::Lua, v: Vec3) -> mlua::Result<Table<'lua>> {
 
 /// One `RaycastAll` entry: `{id, distance, point = {x,y,z}, normal = {x,y,z},
 /// bone, bone_name, root}` — `bone`/`bone_name` absent off a skeleton.
-fn hit_table<'lua>(lua: &'lua mlua::Lua, scene: &Scene, hit: &RayHit) -> mlua::Result<Table<'lua>> {
+fn hit_table(lua: &mlua::Lua, scene: &Scene, hit: &RayHit) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("id", hit.id)?;
     if let Some(bone) = scene.hit_bone(hit.id) {
@@ -107,8 +107,8 @@ fn hit_table<'lua>(lua: &'lua mlua::Lua, scene: &Scene, hit: &RayHit) -> mlua::R
 }
 
 /// Register `Raycast`, `SphereCast` and `RaycastAll` onto the `Physics` table.
-pub(super) fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     physics: &'scope RefCell<Option<PhysicsWorld>>,
@@ -119,8 +119,8 @@ pub(super) fn register<'lua, 'scope>(
 }
 
 /// `Raycast` — query-only cast returning a [`CastResult`].
-fn register_raycast<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_raycast<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     physics: &'scope RefCell<Option<PhysicsWorld>>,
@@ -155,8 +155,8 @@ fn register_raycast<'lua, 'scope>(
 /// first accepted collider touched by a sphere swept along the ray. Same
 /// [`CastResult`] as `Raycast`; distance is how far the sphere's center
 /// traveled before impact, the point is the contact on the struck surface.
-fn register_spherecast<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_spherecast<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     physics: &'scope RefCell<Option<PhysicsWorld>>,
@@ -187,8 +187,8 @@ fn register_spherecast<'lua, 'scope>(
 /// `RaycastAll(ox,oy,oz, dx,dy,dz, max_distance [, layer_mask])` — every
 /// accepted collider along the ray, as an array of hit tables sorted by
 /// distance (ties by entity id). Empty with no live physics world.
-fn register_raycast_all<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_raycast_all<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     physics: &'scope RefCell<Option<PhysicsWorld>>,

@@ -21,9 +21,9 @@ use crate::scripting::{TimerScheduler, Wait, Work};
 use spec::{Args, Spec};
 
 /// Register the `Tween` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     timers: &'scope RefCell<TimerScheduler>,
 ) -> Reg {
@@ -100,7 +100,7 @@ fn schedule(
 /// tween `{id, property, target, duration, opts...}` that starts when everything
 /// before it has ended — or, with `join = true`, when the previous tween started.
 /// Every item is validated before any is scheduled.
-fn sequence<'lua>(lua: &'lua Lua, scene: &Scene, steps: Table<'lua>) -> mlua::Result<Vec<Spec>> {
+fn sequence(lua: &Lua, scene: &Scene, steps: Table) -> mlua::Result<Vec<Spec>> {
     let (mut cursor, mut last_start) = (0.0_f64, 0.0_f64);
     let mut specs = Vec::new();
     for (i, step) in steps.sequence_values::<Value>().enumerate() {

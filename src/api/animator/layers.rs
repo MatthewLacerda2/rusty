@@ -19,8 +19,8 @@ use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the layer functions onto the `Animator` table.
-pub(super) fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     console: &'scope RefCell<ConsoleLogs>,
@@ -34,7 +34,7 @@ pub(super) fn lookup(anim: &AnimatorComponent, layer: &Value) -> Option<usize> {
     let index = match layer {
         Value::Integer(i) => usize::try_from(*i).ok()?,
         Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 => *n as usize,
-        Value::String(s) => return anim.layer_index(s.to_str().ok()?),
+        Value::String(s) => return anim.layer_index(&s.to_str().ok()?),
         _ => return None,
     };
     (index <= anim.layers.len()).then_some(index)
@@ -57,8 +57,8 @@ pub(super) fn resolve(anim: &mut AnimatorComponent, layer: &Value) -> Option<usi
 /// (as in Unity), so layer 0 is refused with a warning, as is an unknown layer.
 /// `GetLayerWeight(id, layer)` — the live weight (`1` for the base layer), or
 /// `nil` for an unknown layer.
-fn register_layer_weight<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_layer_weight<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     console: &'scope RefCell<ConsoleLogs>,
@@ -108,8 +108,8 @@ fn register_layer_weight<'lua, 'scope>(
 /// `GetCurrentNode(id [, layer])` — the active graph node's name in `layer`
 /// (default: the base layer), or `nil` when there is no animator, no such layer,
 /// or the evaluator hasn't bound it yet.
-fn register_get_current_node<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_get_current_node<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

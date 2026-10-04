@@ -23,9 +23,9 @@ use crate::navigation::{NavBounds, NavMeshSettings, NavigationGraph};
 use crate::scene::Scene;
 
 /// Register the `Navigation` and `NavMeshAgent` namespaces onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     nav: &'scope RefCell<NavigationGraph>,
 ) -> Reg {
@@ -35,9 +35,9 @@ pub fn register<'lua, 'scope>(
 
 /// `Navigation.GetNextPathStep` over the shared nav graph, plus the per-scene navmesh
 /// bake-settings getters/setters (#276).
-fn register_navigation<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_navigation<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     nav: &'scope RefCell<NavigationGraph>,
 ) -> Reg {
@@ -69,8 +69,8 @@ fn register_navigation<'lua, 'scope>(
 }
 
 /// The read-only getters over `scene.nav_settings` (#276, + `agent_height` #278).
-fn register_settings_getters<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_settings_getters<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -108,8 +108,8 @@ fn register_settings_getters<'lua, 'scope>(
 /// passages and pulls the surface off walls. `agent_height` is live too (#278): the re-bake
 /// drops spans whose open space is below the height, so a taller agent loses access
 /// to low overhangs / crawlspaces.
-fn register_settings_setters<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_settings_setters<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     nav: &'scope RefCell<NavigationGraph>,
@@ -146,8 +146,8 @@ fn register_settings_setters<'lua, 'scope>(
 /// whether they were authored. `SetBounds` authors an override (Unity's nav volume) and
 /// `ClearBounds` returns to deriving them from the static geometry; both re-bake, as the
 /// scene inspector's Navmesh section does (editor↔API parity).
-fn register_bounds<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_bounds<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     nav: &'scope RefCell<NavigationGraph>,

@@ -14,8 +14,8 @@ use crate::scene::Scene;
 /// Global quality preset value get/set over the shared resource cell. Lives here (not
 /// `mod.rs`) to keep that file under the size cap; reaches `quality_name`/`parse_quality`
 /// directly.
-pub(super) fn register_quality<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register_quality<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     quality: &'scope RefCell<QualityPreset>,
 ) -> Reg {

@@ -17,8 +17,8 @@ use crate::scene::authoring;
 use crate::scene::Scene;
 
 /// Register every prefab/asset verb onto the (already-created) `Scene` `table`.
-pub fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -28,8 +28,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `SavePrefab` + the two spawn verbs (`Instantiate` linked, `InstantiateUnpacked`).
-fn register_save_and_spawn<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_save_and_spawn<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -89,8 +89,8 @@ fn instantiate(
 /// revert, reimport, and the list-overrides read verb. All take the instance ROOT id.
 /// `RecordPrefabOverrides` is the renamed-for-clarity former `ApplyPrefabChanges` —
 /// "record on the instance" vs. the true apply-to-source verbs below (#268).
-fn register_overrides<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_overrides<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -135,8 +135,8 @@ fn register_overrides<'lua, 'scope>(
 /// `.prefab` on disk (so other instances pick the change up on reload/reimport), then
 /// clear them on the instance. Whole-object (`ApplyPrefabToSource(rootId)`) and per-
 /// field (`ApplyPrefabFieldToSource(entityId, jsonPointer)`) forms.
-fn register_apply_to_source<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_apply_to_source<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

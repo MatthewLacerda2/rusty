@@ -23,9 +23,9 @@ use crate::scene::Scene;
 type SceneCell<'s> = &'s RefCell<Scene>;
 
 /// Register the `OffMeshLink` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     nav: &'scope RefCell<NavigationGraph>,
 ) -> Reg {
@@ -52,9 +52,9 @@ fn write(scene: SceneCell, id: u32, op: impl FnOnce(&mut Link)) {
 }
 
 /// `GetStart` / `SetStart` and `GetEnd` / `SetEnd`, as `x, y, z` local offsets.
-fn register_ends<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_ends<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
     type End = (fn(&Link) -> Vec3, fn(&mut Link, Vec3));
@@ -79,9 +79,9 @@ fn register_ends<'lua, 'scope>(
 
 /// `Active`, `Bidirectional`, `Area` (#460) and `Cost` (negative: the link's length
 /// at its area's cost).
-fn register_options<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_options<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
     type Flag = (fn(&Link) -> bool, fn(&mut Link, bool));

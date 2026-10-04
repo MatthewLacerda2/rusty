@@ -21,8 +21,8 @@ fn err(msg: String) -> mlua::Error {
 }
 
 /// Register the collider shape + material accessors onto the `Physics` table.
-pub(super) fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -32,8 +32,8 @@ pub(super) fn register<'lua, 'scope>(
 
 /// `GetColliderShape(id)` → a `{ kind = .., .. }` table (or `nil` without a
 /// collider); `SetColliderShape(id, shape)` takes the same table back.
-fn register_shape<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_shape<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -60,7 +60,7 @@ fn register_shape<'lua, 'scope>(
     )
 }
 
-fn shape_to_table<'lua>(lua: &'lua Lua, shape: &ColliderShape) -> mlua::Result<Table<'lua>> {
+fn shape_to_table(lua: &Lua, shape: &ColliderShape) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     match shape {
         ColliderShape::Box { size } => {
@@ -99,7 +99,7 @@ fn shape_to_table<'lua>(lua: &'lua Lua, shape: &ColliderShape) -> mlua::Result<T
 /// A strictly positive, finite extent named `key` of the shape table.
 fn extent(t: &Table, key: &str) -> mlua::Result<f32> {
     let v: f32 = t
-        .get::<_, Option<f32>>(key)?
+        .get::<Option<f32>>(key)?
         .ok_or_else(|| err(format!("SetColliderShape: missing {key:?}")))?;
     if v.is_finite() && v > 0.0 {
         Ok(v)
@@ -124,7 +124,7 @@ fn shape_from_table(t: &Table) -> mlua::Result<ColliderShape> {
             height: extent(t, "height")?,
         },
         "Capsule" => {
-            let axis = match t.get::<_, Option<String>>("axis")? {
+            let axis = match t.get::<Option<String>>("axis")? {
                 None => CapsuleAxis::default(),
                 Some(a) => CapsuleAxis::parse(&a).ok_or_else(|| {
                     err(format!(
@@ -150,8 +150,8 @@ fn shape_from_table(t: &Table) -> mlua::Result<ColliderShape> {
 /// `GetPhysicsMaterial(id)` → `friction, bounciness, friction_combine,
 /// bounce_combine` (the defaults without a collider);
 /// `SetPhysicsMaterial(id, friction, bounciness [, friction_combine [, bounce_combine]])`.
-fn register_material<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_material<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

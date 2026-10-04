@@ -73,11 +73,11 @@ fn the_agent_mask_and_the_masked_queries_keep_out_of_an_area() {
         let path: Table = lua
             .load("return Navigation.CalculatePath(2, 0, 2, 8, 0, 2, NavMeshAgent.GetAreaMask(id))")
             .eval()?;
-        assert_eq!(path.get::<_, String>("status")?, "partial", "fire blocks");
+        assert_eq!(path.get::<String>("status")?, "partial", "fire blocks");
         let open: Table = lua
             .load("return Navigation.CalculatePath(2, 0, 2, 8, 0, 2)")
             .eval()?;
-        assert_eq!(open.get::<_, String>("status")?, "complete");
+        assert_eq!(open.get::<String>("status")?, "complete");
         let (hit,): (bool,) = lua
             .load("return Navigation.Raycast(2, 0, 2, 8, 0, 2, -1 ~ 4)")
             .eval()?;

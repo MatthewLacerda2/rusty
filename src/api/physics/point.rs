@@ -16,8 +16,8 @@ use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
 /// Register the point-query family onto the `Physics` table.
-pub(super) fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     physics: &'scope RefCell<Option<PhysicsWorld>>,
@@ -31,8 +31,8 @@ pub(super) fn register<'lua, 'scope>(
 /// collider to the query point (Unity `Collider.ClosestPoint`; a point inside
 /// is its own closest point). found=false ⇒ no live collider for that entity
 /// (edit mode, or no collider) and the query point echoes back.
-fn register_closest<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_closest<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     physics: &'scope RefCell<Option<PhysicsWorld>>,
 ) -> Reg {
@@ -54,8 +54,8 @@ fn register_closest<'lua, 'scope>(
 
 /// `ContainsPoint` — whether the point lies inside the entity's live collider;
 /// `false` when the entity has no live collider (edit mode, or no collider).
-fn register_contains<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_contains<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     physics: &'scope RefCell<Option<PhysicsWorld>>,
 ) -> Reg {
@@ -76,8 +76,8 @@ fn register_contains<'lua, 'scope>(
 /// collider's cached world-space AABB, recomputed by the scene on transform
 /// edits, load, and each physics step. found=false ⇒ the entity has no
 /// collider component and the six extents are 0.
-fn register_bounds<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_bounds<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

@@ -51,7 +51,7 @@ pub fn register(lua: &Lua) -> Reg {
 
 /// Build the manifest under [`ASSET_ROOT`] and marshal it into a Lua array of
 /// per-file tables.
-fn manifest_table(lua: &Lua) -> mlua::Result<Table<'_>> {
+fn manifest_table(lua: &Lua) -> mlua::Result<Table> {
     let manifest = build_manifest(Path::new(ASSET_ROOT));
     let assets = lua.create_table()?;
     for (i, entry) in manifest.assets.iter().enumerate() {
@@ -61,7 +61,7 @@ fn manifest_table(lua: &Lua) -> mlua::Result<Table<'_>> {
 }
 
 /// `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... } }`.
-fn refresh_table<'lua>(lua: &'lua Lua, report: &Refresh) -> mlua::Result<Table<'lua>> {
+fn refresh_table(lua: &Lua, report: &Refresh) -> mlua::Result<Table> {
     let converted = lua.create_table()?;
     for (i, (_, wav)) in report.converted.iter().enumerate() {
         converted.raw_set(i + 1, wav.to_string_lossy())?;
@@ -80,7 +80,7 @@ fn refresh_table<'lua>(lua: &'lua Lua, report: &Refresh) -> mlua::Result<Table<'
 }
 
 /// One file's record: `path`, `materialCount`, and an array of `subObjects`.
-fn asset_entry_table<'lua>(lua: &'lua Lua, entry: &AssetEntry) -> mlua::Result<Table<'lua>> {
+fn asset_entry_table(lua: &Lua, entry: &AssetEntry) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.raw_set("path", entry.path.as_str())?;
     t.raw_set("materialCount", entry.material_count)?;
@@ -94,7 +94,7 @@ fn asset_entry_table<'lua>(lua: &'lua Lua, entry: &AssetEntry) -> mlua::Result<T
 
 /// One sub-object's record: `id`, the round-trippable `reference`, its footprint
 /// `size` (and `min`/`max` AABB when present), and `materialCount`.
-fn sub_object_table<'lua>(lua: &'lua Lua, sub: &SubObjectEntry) -> mlua::Result<Table<'lua>> {
+fn sub_object_table(lua: &Lua, sub: &SubObjectEntry) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.raw_set("id", sub.id.as_str())?;
     t.raw_set("reference", sub.reference.as_str())?;
@@ -110,7 +110,7 @@ fn sub_object_table<'lua>(lua: &'lua Lua, sub: &SubObjectEntry) -> mlua::Result<
 
 /// A `{ x, y, z }` table — the structured form a footprint needs (a scalar triple
 /// can't be a nested field the way `Transform.GetPosition`'s multi-return can).
-fn vec3_table(lua: &Lua, x: f32, y: f32, z: f32) -> mlua::Result<Table<'_>> {
+fn vec3_table(lua: &Lua, x: f32, y: f32, z: f32) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.raw_set("x", x)?;
     t.raw_set("y", y)?;

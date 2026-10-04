@@ -152,9 +152,9 @@ pub struct ApiScopedCtx<'scope> {
 
 /// The navigation namespaces: `Navigation` + `NavMeshAgent`, `NavMeshObstacle`,
 /// `NavMeshModifierVolume` (#460) and `OffMeshLink`.
-fn register_navigation<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_navigation<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     nav::register(lua, scope, ctx.scene, ctx.nav)?;
@@ -167,9 +167,9 @@ fn register_navigation<'lua, 'scope>(
 /// the engine resources via `ctx`. This is the one place the whole script
 /// surface is wired up, shared by gameplay scripts, the console REPL and
 /// bot-players.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     transform::register(lua, scope, ctx.scene)?;
@@ -235,7 +235,7 @@ pub fn register<'lua, 'scope>(
 /// A registrar a layer above the sim adds to the surface: the same shape as
 /// [`register`], run after every built-in namespace on every scope.
 pub type Extension =
-    for<'lua, 'scope> fn(&'lua Lua, &mlua::Scope<'lua, 'scope>, &ApiScopedCtx<'scope>) -> Reg;
+    for<'scope> fn(&Lua, &'scope mlua::Scope<'scope, '_>, &ApiScopedCtx<'scope>) -> Reg;
 
 static EXTENSIONS: RwLock<Vec<Extension>> = RwLock::new(Vec::new());
 
@@ -250,9 +250,9 @@ pub fn extend(ext: Extension) {
 
 /// The UI component namespaces that borrow only the scene: the graphic, its
 /// group, clips and backdrop (#418, #426, #428), and the layout pair (#421).
-fn register_ui_components<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_ui_components<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     image::register(lua, scope, scene)?;
@@ -272,6 +272,6 @@ pub(crate) fn put(table: &Table, name: &str, f: mlua::Result<Function>) -> Reg {
 }
 
 /// Fetch an existing global table so we can extend it in place.
-pub(crate) fn global_table<'lua>(lua: &'lua Lua, name: &str) -> Result<Table<'lua>, String> {
+pub(crate) fn global_table(lua: &Lua, name: &str) -> Result<Table, String> {
     lua.globals().get(name).map_err(|e| e.to_string())
 }

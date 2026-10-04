@@ -11,8 +11,8 @@ use crate::scene::Scene;
 
 /// `SetCustomEffects({names})` replaces the list (an invalid name is a Lua error and
 /// nothing changes); `GetCustomEffects()` returns it, empty without an active volume.
-pub(super) fn register_custom_effects<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register_custom_effects<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

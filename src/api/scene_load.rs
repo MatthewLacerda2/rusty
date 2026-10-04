@@ -17,8 +17,8 @@ use super::{put, Reg};
 use crate::scene::Scene;
 
 /// Register the scene-loading verbs onto the (already-created) `Scene` `table`.
-pub fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     scene_path: &'scope RefCell<Option<String>>,

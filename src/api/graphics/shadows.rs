@@ -12,8 +12,8 @@ use crate::scene::Scene;
 
 /// Cascade count and shadow distance. The getters report the engine defaults when
 /// no volume is active, since that is what the renderer then uses.
-pub(super) fn register_shadows<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register_shadows<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

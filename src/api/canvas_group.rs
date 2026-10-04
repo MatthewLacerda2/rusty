@@ -33,9 +33,9 @@ const BOOLS: [(&str, BoolGet, BoolSet); 2] = [
 ];
 
 /// Register the `CanvasGroup` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -66,8 +66,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `Get<suffix>(id) -> bool` / `Set<suffix>(id, bool)`.
-fn register_bool<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_bool<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     suffix: &str,

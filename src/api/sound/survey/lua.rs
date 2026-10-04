@@ -18,7 +18,7 @@ use super::{Document, PatchSurvey, SetRollup, SetSurvey, SourceRow};
 use crate::api::lua_json::recipe_json;
 
 /// Survey the documents `set` lists and build the report table.
-pub fn survey<'lua>(lua: &'lua Lua, set: Table<'lua>) -> mlua::Result<Table<'lua>> {
+pub fn survey(lua: &Lua, set: Table) -> mlua::Result<Table> {
     let documents = set
         .sequence_values::<Value>()
         .enumerate()
@@ -49,7 +49,7 @@ fn document(position: usize, entry: &Value) -> Document {
             Ok(text) if text.trim_start().starts_with('{') => {
                 (format!("#{position}"), recipe_json(entry))
             }
-            Ok(path) => (path.to_owned(), read(path)),
+            Ok(path) => (path.to_owned(), read(&path)),
             Err(e) => (format!("#{position}"), Err(e.to_string())),
         },
         other => (format!("#{position}"), recipe_json(other)),
@@ -61,11 +61,11 @@ fn read(path: &str) -> Result<Json, String> {
     serde_json::from_str(&text).map_err(|e| format!("invalid JSON: {e}"))
 }
 
-fn rows<'lua, T>(
-    lua: &'lua Lua,
+fn rows<T>(
+    lua: &Lua,
     items: &[T],
-    row: impl Fn(&'lua Lua, &T) -> mlua::Result<Table<'lua>>,
-) -> mlua::Result<Table<'lua>> {
+    row: impl Fn(&Lua, &T) -> mlua::Result<Table>,
+) -> mlua::Result<Table> {
     lua.create_sequence_from(
         items
             .iter()
@@ -74,7 +74,7 @@ fn rows<'lua, T>(
     )
 }
 
-fn patch_row<'lua>(lua: &'lua Lua, patch: &PatchSurvey) -> mlua::Result<Table<'lua>> {
+fn patch_row(lua: &Lua, patch: &PatchSurvey) -> mlua::Result<Table> {
     let row = lua.create_table()?;
     row.set("name", patch.name.as_str())?;
     row.set("source", patch.source)?;
@@ -84,7 +84,7 @@ fn patch_row<'lua>(lua: &'lua Lua, patch: &PatchSurvey) -> mlua::Result<Table<'l
     Ok(row)
 }
 
-fn song_row<'lua>(lua: &'lua Lua, song: &SongSurvey) -> mlua::Result<Table<'lua>> {
+fn song_row(lua: &Lua, song: &SongSurvey) -> mlua::Result<Table> {
     let row = lua.create_table()?;
     row.set("name", song.name.as_str())?;
     row.set("bpm", song.bpm)?;
@@ -102,7 +102,7 @@ fn song_row<'lua>(lua: &'lua Lua, song: &SongSurvey) -> mlua::Result<Table<'lua>
     Ok(row)
 }
 
-fn track_row<'lua>(lua: &'lua Lua, track: &TrackSurvey, seconds: f32) -> mlua::Result<Table<'lua>> {
+fn track_row(lua: &Lua, track: &TrackSurvey, seconds: f32) -> mlua::Result<Table> {
     let row = lua.create_table()?;
     row.set("name", track.name.as_str())?;
     row.set("source", track.source)?;
@@ -116,7 +116,7 @@ fn track_row<'lua>(lua: &'lua Lua, track: &TrackSurvey, seconds: f32) -> mlua::R
     Ok(row)
 }
 
-fn rollup<'lua>(lua: &'lua Lua, rollup: &SetRollup) -> mlua::Result<Table<'lua>> {
+fn rollup(lua: &Lua, rollup: &SetRollup) -> mlua::Result<Table> {
     let out = lua.create_table()?;
     out.set("patches", rollup.patches)?;
     out.set("songs", rollup.songs)?;
@@ -132,7 +132,7 @@ fn rollup<'lua>(lua: &'lua Lua, rollup: &SetRollup) -> mlua::Result<Table<'lua>>
     Ok(out)
 }
 
-fn source_row<'lua>(lua: &'lua Lua, source: &SourceRow) -> mlua::Result<Table<'lua>> {
+fn source_row(lua: &Lua, source: &SourceRow) -> mlua::Result<Table> {
     let row = lua.create_table()?;
     row.set("source", source.source)?;
     row.set("patches", source.patches)?;
@@ -146,7 +146,7 @@ fn source_row<'lua>(lua: &'lua Lua, source: &SourceRow) -> mlua::Result<Table<'l
 }
 
 /// A `{ low, high }` span.
-fn range(lua: &Lua, (low, high): (f32, f32)) -> mlua::Result<Table<'_>> {
+fn range(lua: &Lua, (low, high): (f32, f32)) -> mlua::Result<Table> {
     let span = lua.create_table()?;
     span.set("low", low)?;
     span.set("high", high)?;
@@ -154,7 +154,7 @@ fn range(lua: &Lua, (low, high): (f32, f32)) -> mlua::Result<Table<'_>> {
 }
 
 /// A register as `{ low, high }` in MIDI, plus its note names (`"E1-A5"`).
-fn register(lua: &Lua, register: Register) -> mlua::Result<Table<'_>> {
+fn register(lua: &Lua, register: Register) -> mlua::Result<Table> {
     let span = range(lua, (register.low, register.high))?;
     span.set("names", register.to_string())?;
     Ok(span)

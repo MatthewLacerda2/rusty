@@ -38,14 +38,11 @@ fn navigation_queries_return_their_documented_shapes() {
         let path: Table = lua
             .load("return Navigation.CalculatePath(2, 0, 2, 8, 0, 7)")
             .eval()?;
-        assert_eq!(path.get::<_, String>("status")?, "complete");
+        assert_eq!(path.get::<String>("status")?, "complete");
         let corners: Table = path.get("corners")?;
         assert_eq!(corners.raw_len(), 2, "one straight run");
         let end: Table = corners.get(2)?;
-        assert_eq!(
-            (end.get::<_, f32>("x")?, end.get::<_, f32>("z")?),
-            (8.0, 7.0)
-        );
+        assert_eq!((end.get::<f32>("x")?, end.get::<f32>("z")?), (8.0, 7.0));
         let length: f32 = path.get("length")?;
         assert!((length - 61f32.sqrt()).abs() < 1e-4);
         let helper: f32 = lua

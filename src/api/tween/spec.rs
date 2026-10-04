@@ -40,20 +40,20 @@ impl Spec {
 }
 
 /// The positional part of a tween: `(id, property, target, duration)`.
-pub(super) struct Args<'lua> {
+pub(super) struct Args {
     pub(super) id: u32,
     pub(super) path: String,
-    pub(super) target: Value<'lua>,
+    pub(super) target: Value,
     pub(super) duration: f64,
 }
 
 /// Validate `args` + `opts` against the live scene. `in_sequence` also accepts a
 /// sequence item's own keys (its positional `1..=4` and `join`).
-pub(super) fn parse<'lua>(
-    lua: &'lua Lua,
+pub(super) fn parse(
+    lua: &Lua,
     scene: &Scene,
-    args: Args<'lua>,
-    opts: Option<Table<'lua>>,
+    args: Args,
+    opts: Option<Table>,
     in_sequence: bool,
 ) -> mlua::Result<Spec> {
     let Args {
@@ -104,12 +104,7 @@ pub(super) fn parse<'lua>(
     Ok(spec)
 }
 
-fn read_opts<'lua>(
-    lua: &'lua Lua,
-    opts: &Table<'lua>,
-    spec: &mut Spec,
-    in_sequence: bool,
-) -> mlua::Result<()> {
+fn read_opts(lua: &Lua, opts: &Table, spec: &mut Spec, in_sequence: bool) -> mlua::Result<()> {
     for pair in opts.clone().pairs::<Value, Value>() {
         let (key, value) = pair?;
         let positional = matches!(key, Value::Integer(1..=4)) && in_sequence;
@@ -120,6 +115,7 @@ fn read_opts<'lua>(
             return Err(runtime("tween options are named fields"));
         };
         let key = key.to_str()?;
+        let key: &str = &key;
         let allowed = OPTS.contains(&key) || (in_sequence && key == "join");
         if !allowed {
             return Err(runtime(&format!(
@@ -132,12 +128,7 @@ fn read_opts<'lua>(
     Ok(())
 }
 
-fn read_opt<'lua>(
-    lua: &'lua Lua,
-    key: &str,
-    value: Value<'lua>,
-    spec: &mut Spec,
-) -> mlua::Result<()> {
+fn read_opt(lua: &Lua, key: &str, value: Value, spec: &mut Spec) -> mlua::Result<()> {
     let t = &mut spec.tween;
     match key {
         "ease" => {

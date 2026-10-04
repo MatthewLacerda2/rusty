@@ -40,9 +40,9 @@ use crate::scene::authoring::visual_correction as vc_ops;
 use crate::scene::Scene;
 
 /// Register the `Graphics` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     quality: &'scope RefCell<QualityPreset>,
 ) -> Reg {
@@ -67,8 +67,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// Bloom: active / intensity / threshold over the active visual-correction volume.
-fn register_bloom<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_bloom<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -116,8 +116,8 @@ fn register_bloom<'lua, 'scope>(
 }
 
 /// Color grading: `Set`/`Get` for exposure and contrast.
-fn register_exposure_contrast<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_exposure_contrast<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -151,8 +151,8 @@ fn register_exposure_contrast<'lua, 'scope>(
 }
 
 /// Color grading: `Set`/`Get` for saturation and gamma.
-fn register_saturation_gamma<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_saturation_gamma<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -186,8 +186,8 @@ fn register_saturation_gamma<'lua, 'scope>(
 }
 
 /// Tonemap operator: `SetTonemap` / `GetTonemap` (defaulting to Aces).
-fn register_tonemap<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_tonemap<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -212,8 +212,8 @@ fn register_tonemap<'lua, 'scope>(
 }
 
 /// Screen-space reflections: active + quality string (gated by the High preset).
-fn register_ssr<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_ssr<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

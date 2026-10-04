@@ -11,8 +11,8 @@ use crate::scene::authoring::fog as fog_ops;
 use crate::scene::{FogMode, FogSettings, Scene};
 
 /// Mode, colour, and the five scalar knobs.
-pub(super) fn register_fog<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register_fog<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -24,8 +24,8 @@ pub(super) fn register_fog<'lua, 'scope>(
 }
 
 /// `{Get,Set}FogMode` (by name) and `{Get,Set}FogColor` (`r, g, b`).
-fn register_mode_color<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_mode_color<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -81,8 +81,8 @@ const SCALARS: [(&str, Get, Set); 5] = [
 ];
 
 /// Register `GetFog<name>` / `SetFog<name>` over one scalar field.
-fn scalar<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn scalar<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     name: &str,

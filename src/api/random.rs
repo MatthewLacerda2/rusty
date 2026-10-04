@@ -14,9 +14,9 @@ use super::{put, Reg};
 use crate::core::random::Random;
 
 /// Register the `Random` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     rng: &'scope RefCell<Random>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -70,11 +70,7 @@ pub fn register<'lua, 'scope>(
 /// `Random.Range(min, max)`: two Lua **integers** draw an integer in
 /// `[min, max)` (max exclusive); any float argument draws a float in
 /// `[min, max)`. Unity's two overloads, told apart by Lua's number subtype.
-fn range<'lua>(
-    rng: &RefCell<Random>,
-    min: Value<'lua>,
-    max: Value<'lua>,
-) -> mlua::Result<Value<'lua>> {
+fn range(rng: &RefCell<Random>, min: Value, max: Value) -> mlua::Result<Value> {
     match (&min, &max) {
         (Value::Integer(a), Value::Integer(b)) => {
             Ok(Value::Integer(rng.borrow_mut().range_i64(*a, *b)))

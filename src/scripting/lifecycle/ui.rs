@@ -49,7 +49,7 @@ impl ScriptManager {
             self.entity_scripts
                 .get(&key)
                 .and_then(|inst| lua.registry_value::<Table>(&inst.table).ok())
-                .is_some_and(|t| t.get::<_, mlua::Function>(name).is_ok())
+                .is_some_and(|t| t.get::<mlua::Function>(name).is_ok())
         })
     }
 
@@ -80,7 +80,7 @@ impl ScriptManager {
 }
 
 /// `{ direction, x, y }` — the Move's unit direction (y-up) and its name.
-fn move_table<'lua>(lua: &'lua Lua, e: &PointerEvent) -> mlua::Result<Table<'lua>> {
+fn move_table(lua: &Lua, e: &PointerEvent) -> mlua::Result<Table> {
     let d = e.delta;
     let name = match (d.x as i32, d.y as i32) {
         (0, 1) => "Up",
@@ -97,8 +97,8 @@ fn move_table<'lua>(lua: &'lua Lua, e: &PointerEvent) -> mlua::Result<Table<'lua
 
 /// `{ button, position = {x, y}, delta = {x, y}, target, canvas_position = {x, y}
 /// (absent off the canvas), canvas_delta = {x, y} }`.
-fn event_table<'lua>(lua: &'lua Lua, e: &PointerEvent) -> mlua::Result<Table<'lua>> {
-    let point = |v: Vec2| -> mlua::Result<Table<'lua>> {
+fn event_table(lua: &Lua, e: &PointerEvent) -> mlua::Result<Table> {
+    let point = |v: Vec2| -> mlua::Result<Table> {
         let t = lua.create_table()?;
         t.set("x", v.x)?;
         t.set("y", v.y)?;

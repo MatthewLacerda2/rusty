@@ -18,8 +18,8 @@ use crate::scene::authoring::ui_shader as ops;
 use crate::scene::Scene;
 
 /// Register the four verbs onto the `UI` `table`.
-pub fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -28,8 +28,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `SetShader` / `GetShader`.
-fn register_name<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_name<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -55,8 +55,8 @@ fn register_name<'lua, 'scope>(
 }
 
 /// `SetShaderParam` / `GetShaderParam`.
-fn register_params<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_params<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

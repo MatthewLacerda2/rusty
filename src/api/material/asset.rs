@@ -37,8 +37,8 @@ use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
 /// Register the standalone asset-authoring verbs onto the `Material` `table`.
-pub fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

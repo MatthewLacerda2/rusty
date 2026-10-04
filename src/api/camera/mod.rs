@@ -18,9 +18,9 @@ use super::{put, ApiScopedCtx, Reg};
 use crate::scene::Camera;
 
 /// Register the `Camera` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -38,8 +38,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `GetPosition` / `SetPosition` plus the `GetForward` / `GetRight` basis vectors.
-fn register_position<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_position<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     camera: &'scope RefCell<Camera>,
 ) -> Reg {
@@ -84,8 +84,8 @@ fn register_position<'lua, 'scope>(
 }
 
 /// `GetYaw` / `SetYaw` and `GetPitch` / `SetPitch` (pitch clamped to ±89°).
-fn register_orientation<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_orientation<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     camera: &'scope RefCell<Camera>,
 ) -> Reg {
@@ -119,8 +119,8 @@ fn register_orientation<'lua, 'scope>(
 }
 
 /// `GetFov` / `SetFov` (fov clamped to 1..179°).
-fn register_fov<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_fov<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     camera: &'scope RefCell<Camera>,
 ) -> Reg {
@@ -143,8 +143,8 @@ fn register_fov<'lua, 'scope>(
 /// pixels (bottom-left, y-up), or the canvas's reference units when a canvas id is
 /// given; `depth` ≤ 0 is behind the camera. `ScreenToWorldRay(x, y)` → the ray's
 /// origin and unit direction through a UI screen pixel.
-fn register_projection<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_projection<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {

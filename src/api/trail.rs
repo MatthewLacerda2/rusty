@@ -20,9 +20,9 @@ use crate::scene::Scene;
 type SceneCell<'s> = &'s RefCell<Scene>;
 
 /// Register the `Trail` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
@@ -46,9 +46,9 @@ fn write(scene: SceneCell, id: u32, f: impl FnOnce(&mut TrailComponent)) {
 
 /// `IsEmitting` / `SetEmitting`, `GetTime` / `SetTime`,
 /// `GetMinVertexDistance` / `SetMinVertexDistance`.
-fn register_settings<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_settings<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f =
@@ -79,9 +79,9 @@ fn register_settings<'lua, 'scope>(
 
 /// `Clear`, `GetPositionCount`, `GetPositions` (a list of `{x, y, z}`, oldest
 /// first, world space).
-fn register_points<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_points<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: u32| {

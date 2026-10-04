@@ -18,7 +18,7 @@ use zimmer::level::Difference;
 use super::level::{band_table, measure_file};
 
 /// Measure the clips at `a` and `b` and report how `a` differs from `b`.
-pub fn diff<'lua>(lua: &'lua Lua, a: &str, b: &str) -> mlua::Result<Table<'lua>> {
+pub fn diff(lua: &Lua, a: &str, b: &str) -> mlua::Result<Table> {
     let whole = |path: &str| {
         measure_file(path)
             .map(|profile| profile.whole)

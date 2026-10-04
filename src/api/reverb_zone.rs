@@ -22,9 +22,9 @@ type SceneCell<'s> = &'s RefCell<Scene>;
 const KEYS: [&str; 4] = ["decay_time", "pre_delay", "damping", "wet"];
 
 /// Register the `AudioReverbZone` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
@@ -57,9 +57,9 @@ fn set(scene: SceneCell, id: u32, f: impl FnOnce(&mut ReverbZoneComponent)) -> m
 }
 
 /// `Get/SetMinDistance`, `Get/SetMaxDistance`.
-fn register_radii<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_radii<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map(|z| z.min_distance)));
@@ -77,9 +77,9 @@ fn register_radii<'lua, 'scope>(
 }
 
 /// `GetPreset`, `SetPreset`, `GetPresets`.
-fn register_preset<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_preset<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map(|z| z.preset.name())));
@@ -100,9 +100,9 @@ fn register_preset<'lua, 'scope>(
 }
 
 /// `GetParams`, `SetParams`.
-fn register_params<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_params<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |lua, id: u32| {
@@ -122,7 +122,7 @@ fn register_params<'lua, 'scope>(
 }
 
 /// `p` as a Lua table keyed by [`KEYS`].
-pub(crate) fn params_table<'lua>(lua: &'lua Lua, p: &ReverbParams) -> mlua::Result<Table<'lua>> {
+pub(crate) fn params_table(lua: &Lua, p: &ReverbParams) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("decay_time", p.decay_time)?;
     t.set("pre_delay", p.pre_delay)?;

@@ -35,26 +35,26 @@ impl Wait {
 }
 
 /// `Timer.WaitForSeconds(t)`: `t` seconds of scaled time.
-pub(crate) fn seconds<'lua>(lua: &'lua Lua, t: f64) -> mlua::Result<Table<'lua>> {
+pub(crate) fn seconds(lua: &Lua, t: f64) -> mlua::Result<Table> {
     tagged(lua, SECONDS, Value::Number(t))
 }
 
 /// `Timer.WaitForSecondsRealtime(t)`: `t` seconds of unscaled time.
-pub(crate) fn realtime<'lua>(lua: &'lua Lua, t: f64) -> mlua::Result<Table<'lua>> {
+pub(crate) fn realtime(lua: &Lua, t: f64) -> mlua::Result<Table> {
     tagged(lua, REALTIME, Value::Number(t))
 }
 
 /// `Timer.WaitForFixedUpdate()`: the next fixed tick.
-pub(crate) fn fixed(lua: &Lua) -> mlua::Result<Table<'_>> {
+pub(crate) fn fixed(lua: &Lua) -> mlua::Result<Table> {
     tagged(lua, FIXED, Value::Nil)
 }
 
 /// `Timer.WaitUntil(fn)`: until `fn()` is truthy.
-pub(crate) fn until<'lua>(lua: &'lua Lua, f: mlua::Function<'lua>) -> mlua::Result<Table<'lua>> {
+pub(crate) fn until(lua: &Lua, f: mlua::Function) -> mlua::Result<Table> {
     tagged(lua, UNTIL, Value::Function(f))
 }
 
-fn tagged<'lua>(lua: &'lua Lua, kind: &str, arg: Value<'lua>) -> mlua::Result<Table<'lua>> {
+fn tagged(lua: &Lua, kind: &str, arg: Value) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set(TAG, kind)?;
     t.set("arg", arg)?;

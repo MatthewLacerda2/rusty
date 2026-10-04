@@ -103,9 +103,9 @@ const GRADIENT: GradientAccess = GradientAccess {
 };
 
 /// Register the `Image` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -132,8 +132,8 @@ fn with_image(scene: &RefCell<Scene>, id: u32, f: impl FnOnce(&mut ImageComponen
 }
 
 /// `Get<suffix>(id) -> x, y, z, w` (zeros without an Image) / `Set<suffix>(id, x, y, z, w)`.
-fn register_vec4<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_vec4<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     suffix: &str,
@@ -160,8 +160,8 @@ fn register_vec4<'lua, 'scope>(
 }
 
 /// `Get<suffix>(id) -> name` (`"None"` without an Image) / `Set<suffix>(id, name)`.
-fn register_name<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_name<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     suffix: &str,
@@ -191,8 +191,8 @@ fn register_name<'lua, 'scope>(
 }
 
 /// `Get<suffix>(id) -> bool` (`false` without an Image) / `Set<suffix>(id, bool)`.
-fn register_bool<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_bool<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     suffix: &str,
@@ -218,8 +218,8 @@ fn register_bool<'lua, 'scope>(
 }
 
 /// `Get/SetTexture` (a path, or `nil` for a solid colour) and `Get/SetFillAmount`.
-fn register_texture_and_amount<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_texture_and_amount<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

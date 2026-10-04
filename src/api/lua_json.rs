@@ -1,29 +1,27 @@
-//! src/api/lua_json.rs — marshal a Lua table into a `serde_json::Value`.
+//! src/api/lua_json.rs — rusty's settings for mlua's serde bridge (`LuaSerdeExt`).
 //!
-//! mlua's `serde` feature is not enabled in this project, so any recipe-table API
-//! (`Texture.Bake`, `Material.DefineAsset`) bridges Lua → struct by hand: convert the
-//! Lua table to a `serde_json::Value`, then `serde_json::from_value` into the target
-//! struct so the field decoding lives ONCE in that struct's serde derive. This module
-//! is the shared converter both surfaces call, so the table→JSON heuristic is written
-//! once rather than per namespace.
+//! The conversion itself is mlua's (#755); this module only fixes the options every
+//! caller shares, so a recipe, a `Storage` value and a UI look all cross the Lua ↔
+//! serde boundary the same way:
 //!
-//! The heuristic: a Lua table becomes a JSON **array** when it is a dense `1..=len`
-//! integer sequence (so `inputs` / `color_a` / `base_color` ride as arrays), else a
-//! JSON **object** keyed by its string keys (node/op/material fields). That matches how
-//! a recipe authored in Lua and one loaded from `.json` describe the same document.
+//! - **Lua → serde**: a table is an array when its keys are all positive integers
+//!   (a nil hole is a JSON `null`), else an object whose integer keys become strings;
+//!   an empty table is an object. Functions, threads and userdata are an error.
+//! - **serde → Lua**: `null` and `None` are plain `nil` (not mlua's `null`
+//!   sentinel) and arrays carry no metatable, so a script sees ordinary tables.
 //!
 //! Every recipe verb (`Texture.Bake`, `Shader.Bake`, `Sound.Bake`,
 //! `Material.DefineAsset`, …) takes its recipe through [`recipe_from_lua`], which
 //! accepts **either** form — a Lua table or the recipe's JSON string (#410) — so
-//! there is one verb per operation, not a table verb plus a `*Json` twin.
+//! there is one verb per operation, not a table verb plus a `*Json` twin. Both go
+//! through `serde_json::Value`, so a bad key reads the same whichever form carried it.
 
-use mlua::{Table, Value};
+use mlua::{Lua, LuaSerdeExt, Value};
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 
-/// Decode a recipe argument into `T`: a Lua **table** (marshalled through
-/// [`table_to_json`]) or a **JSON string** (the on-disk form). Both forms reach
-/// `T`'s serde derive through the same `from_value` call, so a bad key produces
-/// the same error whichever form carried it.
+/// Decode a recipe argument into `T`: a Lua **table** or a **JSON string** (the
+/// on-disk form). Both reach `T`'s serde derive through the same `from_value` call.
 pub fn recipe_from_lua<T: DeserializeOwned>(value: &Value) -> Result<T, String> {
     serde_json::from_value(recipe_json(value)?).map_err(|e| e.to_string())
 }
@@ -33,9 +31,9 @@ pub fn recipe_from_lua<T: DeserializeOwned>(value: &Value) -> Result<T, String> 
 /// fields out first). Anything but a table or a string is an error naming both.
 pub fn recipe_json(value: &Value) -> Result<serde_json::Value, String> {
     match value {
-        Value::Table(t) => table_to_json(t),
+        Value::Table(_) => lua_to_json(value),
         Value::String(s) => {
-            serde_json::from_str(s.to_str().map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+            serde_json::from_str(&s.to_str().map_err(|e| e.to_string())?).map_err(|e| e.to_string())
         }
         other => Err(format!(
             "recipe must be a table or a JSON string, got {}",
@@ -44,166 +42,37 @@ pub fn recipe_json(value: &Value) -> Result<serde_json::Value, String> {
     }
 }
 
-/// Convert a Lua `table` into a `serde_json::Value`. Errors carry a message the
-/// REPL/script surfaces verbatim.
-pub fn table_to_json(table: &Table) -> Result<serde_json::Value, String> {
-    let len = table.raw_len();
-    if len > 0 && is_pure_sequence(table, len) {
-        let mut arr = Vec::with_capacity(len);
-        for i in 1..=len {
-            let v: Value = table.raw_get(i).map_err(|e| e.to_string())?;
-            arr.push(value_to_json(&v)?);
-        }
-        return Ok(serde_json::Value::Array(arr));
-    }
-
-    let mut map = serde_json::Map::new();
-    for pair in table.clone().pairs::<Value, Value>() {
-        let (k, v) = pair.map_err(|e| e.to_string())?;
-        let key = match k {
-            Value::String(s) => s.to_str().map_err(|e| e.to_string())?.to_string(),
-            Value::Integer(i) => i.to_string(),
-            other => return Err(format!("unsupported recipe key: {other:?}")),
-        };
-        map.insert(key, value_to_json(&v)?);
-    }
-    Ok(serde_json::Value::Object(map))
+/// Any Lua value as a `serde_json::Value`, with the table rules above.
+pub fn lua_to_json(value: &Value) -> Result<serde_json::Value, String> {
+    let mut json = serde_json::to_value(value.to_serializable().detect_mixed_tables(true))
+        .map_err(|e| e.to_string())?;
+    empty_arrays_to_objects(&mut json);
+    Ok(json)
 }
 
-/// Convert one Lua value to a `serde_json::Value`. Tables recurse through
-/// [`table_to_json`]; non-finite numbers are an error (they can't survive JSON).
-fn value_to_json(value: &Value) -> Result<serde_json::Value, String> {
-    match value {
-        Value::Nil => Ok(serde_json::Value::Null),
-        Value::Boolean(b) => Ok(serde_json::Value::Bool(*b)),
-        Value::Integer(i) => Ok(serde_json::Value::from(*i)),
-        Value::Number(n) => serde_json::Number::from_f64(*n)
-            .map(serde_json::Value::Number)
-            .ok_or_else(|| "non-finite number in recipe".to_string()),
-        Value::String(s) => Ok(serde_json::Value::String(
-            s.to_str().map_err(|e| e.to_string())?.to_string(),
-        )),
-        Value::Table(t) => table_to_json(t),
-        other => Err(format!("unsupported Lua value in recipe: {other:?}")),
+/// mlua's mixed-table detection reads an empty table as `[]`; rusty has always
+/// answered `{}`. A Lua table yields an empty array only when it is empty, so
+/// rewriting every `[]` restores that answer exactly.
+fn empty_arrays_to_objects(json: &mut serde_json::Value) {
+    match json {
+        serde_json::Value::Array(items) if items.is_empty() => {
+            *json = serde_json::Value::Object(serde_json::Map::new());
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(empty_arrays_to_objects),
+        serde_json::Value::Object(map) => map.values_mut().for_each(empty_arrays_to_objects),
+        _ => {}
     }
 }
 
-/// A table is a "pure sequence" when keys `1..=len` all exist and there are no extra
-/// string keys — i.e. a plain array, not a mixed table.
-fn is_pure_sequence(table: &Table, len: usize) -> bool {
-    for i in 1..=len {
-        let v: Value = match table.raw_get(i) {
-            Ok(v) => v,
-            Err(_) => return false,
-        };
-        if matches!(v, Value::Nil) {
-            return false;
-        }
-    }
-    let len = len as i64;
-    // No non-integer keys beyond the sequence.
-    table
-        .clone()
-        .pairs::<Value, Value>()
-        .filter_map(Result::ok)
-        .all(|(k, _)| matches!(k, Value::Integer(i) if (1..=len).contains(&i)))
-}
-
-/// The reverse of [`table_to_json`]: a JSON value as a Lua value (arrays become
-/// `1..=n` sequences, objects string-keyed tables, `null` nil).
-pub fn json_to_lua<'lua>(
-    lua: &'lua mlua::Lua,
-    value: &serde_json::Value,
-) -> mlua::Result<Value<'lua>> {
-    use serde_json::Value as JsonValue;
-    use Value as LuaValue;
-    Ok(match value {
-        JsonValue::Null => LuaValue::Nil,
-        JsonValue::Bool(b) => LuaValue::Boolean(*b),
-        JsonValue::Number(n) => match n.as_i64() {
-            Some(i) => LuaValue::Integer(i),
-            None => LuaValue::Number(n.as_f64().unwrap_or(0.0)),
-        },
-        JsonValue::String(s) => LuaValue::String(lua.create_string(s)?),
-        JsonValue::Array(items) => {
-            let t = lua.create_table()?;
-            for (i, item) in items.iter().enumerate() {
-                t.raw_set(i + 1, json_to_lua(lua, item)?)?;
-            }
-            LuaValue::Table(t)
-        }
-        JsonValue::Object(map) => {
-            let t = lua.create_table()?;
-            for (k, v) in map {
-                t.raw_set(k.as_str(), json_to_lua(lua, v)?)?;
-            }
-            LuaValue::Table(t)
-        }
-    })
+/// Any serializable value as a plain Lua value (`nil` for null, no array metatable).
+pub fn to_lua<T: Serialize + ?Sized>(lua: &Lua, value: &T) -> mlua::Result<Value> {
+    let options = mlua::serde::SerializeOptions::new()
+        .set_array_metatable(false)
+        .serialize_none_to_null(false)
+        .serialize_unit_to_null(false);
+    lua.to_value_with(value, options)
 }
 
 #[cfg(test)]
-mod tests {
-    use mlua::Lua;
-
-    use super::*;
-
-    #[test]
-    fn object_table_round_trips_keys() {
-        let lua = Lua::new();
-        let t: Table = lua
-            .load(r#"return { metallic = 0.5, render_mode = "Cutout" }"#)
-            .eval()
-            .unwrap();
-        let json = table_to_json(&t).unwrap();
-        assert_eq!(json["metallic"], serde_json::json!(0.5));
-        assert_eq!(json["render_mode"], serde_json::json!("Cutout"));
-    }
-
-    #[test]
-    fn dense_sequence_becomes_an_array() {
-        let lua = Lua::new();
-        let t: Table = lua.load(r#"return {0.1, 0.2, 0.3}"#).eval().unwrap();
-        let json = table_to_json(&t).unwrap();
-        assert_eq!(json, serde_json::json!([0.1, 0.2, 0.3]));
-    }
-
-    #[test]
-    fn a_table_and_its_json_string_decode_alike() {
-        #[derive(serde::Deserialize, Debug, PartialEq)]
-        #[serde(deny_unknown_fields)]
-        struct R {
-            a: f32,
-            b: Vec<u8>,
-        }
-        let lua = Lua::new();
-        let table: Value = lua.load("return { a = 0.5, b = {1, 2} }").eval().unwrap();
-        let json: Value = lua.load(r#"return '{"a":0.5,"b":[1,2]}'"#).eval().unwrap();
-        let from_table: R = recipe_from_lua(&table).unwrap();
-        assert_eq!(from_table, recipe_from_lua::<R>(&json).unwrap());
-
-        let bad_table: Value = lua.load("return { a = 1, bb = {} }").eval().unwrap();
-        let bad_json: Value = lua.load(r#"return '{"a":1,"bb":[]}'"#).eval().unwrap();
-        let (e1, e2) = (
-            recipe_from_lua::<R>(&bad_table).unwrap_err(),
-            recipe_from_lua::<R>(&bad_json).unwrap_err(),
-        );
-        assert_eq!(e1, e2, "both forms name the bad key the same way");
-        assert!(e1.contains("bb"), "{e1}");
-
-        let num: Value = lua.load("return 3").eval().unwrap();
-        let err = recipe_from_lua::<R>(&num).unwrap_err();
-        assert!(err.contains("table or a JSON string"), "{err}");
-    }
-
-    #[test]
-    fn nested_arrays_inside_objects() {
-        let lua = Lua::new();
-        let t: Table = lua
-            .load(r#"return { base_color = {1.0, 0.5, 0.25} }"#)
-            .eval()
-            .unwrap();
-        let json = table_to_json(&t).unwrap();
-        assert_eq!(json["base_color"], serde_json::json!([1.0, 0.5, 0.25]));
-    }
-}
+#[path = "lua_json_tests.rs"]
+mod tests;

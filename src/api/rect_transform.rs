@@ -40,9 +40,9 @@ const PAIRS: [(&str, Getter, Setter); 5] = [
 ];
 
 /// Register the `RectTransform` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     screen: (&'scope RefCell<ScreenSize>, &'scope RefCell<VideoSettings>),
 ) -> Reg {
@@ -59,8 +59,8 @@ pub fn register<'lua, 'scope>(
 
 /// `Get<suffix>(id) -> x, y` (`0, 0` without a RectTransform) and
 /// `Set<suffix>(id, x, y)` (a no-op without one).
-fn register_pair<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_pair<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     suffix: &str,
@@ -93,8 +93,8 @@ fn register_pair<'lua, 'scope>(
 /// `SetAnchorPreset(id, x, y, setPivot?, setPosition?)`: `x` is `left` / `center`
 /// / `right` / `stretch`, `y` is `bottom` / `middle` / `top` / `stretch`. A no-op
 /// without a RectTransform; an unknown name is an error.
-fn register_preset<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_preset<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     (screen, video): (&'scope RefCell<ScreenSize>, &'scope RefCell<VideoSettings>),
@@ -133,8 +133,8 @@ type AnchorFlag = fn(&mut RectTransformComponent, bool);
 /// `ClearWorldAnchor(id)`, `GetWorldAnchor(id)` (a table, or `nil` for a
 /// non-marker), and the options `SetWorldAnchorClamp(id, clamp, padding)`,
 /// `SetWorldAnchorRotate(id, on)`, `SetWorldAnchorHideWhenBehind(id, on)`.
-fn register_world_anchor<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_world_anchor<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -180,8 +180,8 @@ fn register_world_anchor<'lua, 'scope>(
 }
 
 /// `GetWorldAnchor(id)`: the marker's anchor as a table, or `nil` for a non-marker.
-fn register_get_world_anchor<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_get_world_anchor<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

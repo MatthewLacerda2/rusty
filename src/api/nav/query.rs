@@ -19,11 +19,11 @@ use crate::navigation::{path_length, NavPath, NavPathStatus, NavigationGraph};
 type PathArgs = (f32, f32, f32, f32, f32, f32, Option<i64>);
 
 /// A path as its Lua table.
-pub(super) fn path_table<'lua>(
-    lua: &'lua Lua,
+pub(super) fn path_table(
+    lua: &Lua,
     status: NavPathStatus,
     corners: &[Vec3],
-) -> mlua::Result<Table<'lua>> {
+) -> mlua::Result<Table> {
     let list = lua.create_table()?;
     for (i, c) in corners.iter().enumerate() {
         let t = lua.create_table()?;
@@ -51,8 +51,8 @@ fn corners_of(path: &Table) -> mlua::Result<Vec<Vec3>> {
 }
 
 /// Register the queries onto the `Navigation` table.
-pub(super) fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     nav: &'scope RefCell<NavigationGraph>,
 ) -> Reg {

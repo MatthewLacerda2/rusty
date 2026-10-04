@@ -33,9 +33,9 @@ use crate::time::FIXED_DELTA_TIME;
 
 /// Register the rigidbody half of `Physics` (velocity/force/kinematic) onto
 /// `lua`, creating the `Physics` global table.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -53,8 +53,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `GetVelocity` / `SetVelocity` over the entity's rigidbody.
-fn register_velocity<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_velocity<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -88,8 +88,8 @@ fn register_velocity<'lua, 'scope>(
 /// `GetAngularVelocity` / `SetAngularVelocity` (radians/sec per axis, Unity
 /// `Rigidbody.angularVelocity`) over the entity's rigidbody. The setter no-ops on
 /// kinematic/static bodies at the physics layer, mirroring `AddForce` and Unity.
-fn register_angular<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_angular<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -123,8 +123,8 @@ fn register_angular<'lua, 'scope>(
 /// `GetCollisionDetection` / `SetCollisionDetection` (Unity
 /// `Rigidbody.collisionDetectionMode`, the two-mode subset). The mode is the
 /// string `"Discrete"` or `"Continuous"`; an unknown string is a script error.
-fn register_collision_detection<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_collision_detection<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -162,8 +162,8 @@ fn register_collision_detection<'lua, 'scope>(
 
 /// `AddForce` (continuous force, Unity `ForceMode.Force`) / `SetKinematic` over the
 /// entity's rigidbody.
-fn register_force<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_force<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -205,9 +205,9 @@ fn register_force<'lua, 'scope>(
 /// queries (`ClosestPoint`/`ContainsPoint`/`GetBounds`). All route through the
 /// live rapier/parry `PhysicsWorld` — the same query pipeline the engine uses —
 /// so a script's query and the engine's return identical answers.
-pub fn register_hitscan<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register_hitscan<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     physics: &'scope RefCell<Option<PhysicsWorld>>,
 ) -> Reg {

@@ -13,9 +13,9 @@ use super::super::{put, Reg};
 use crate::audio::AudioMaestro;
 
 /// `GetReverbState`.
-pub(super) fn register_reverb<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &Table<'lua>,
+pub(super) fn register_reverb<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &Table,
     audio: &'scope RefCell<AudioMaestro>,
 ) -> Reg {
     put(

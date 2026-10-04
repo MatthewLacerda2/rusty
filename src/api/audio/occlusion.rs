@@ -46,9 +46,9 @@ fn patched(mut settings: OcclusionSettings, patch: &Table) -> mlua::Result<Occlu
 }
 
 /// `SetOcclusionSettings` / `GetOcclusionSettings` and the per-source toggle.
-pub(super) fn register_occlusion<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &Table<'lua>,
+pub(super) fn register_occlusion<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &Table,
     scene: &'scope RefCell<Scene>,
     audio: &'scope RefCell<AudioMaestro>,
 ) -> Reg {

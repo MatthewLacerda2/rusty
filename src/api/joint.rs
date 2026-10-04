@@ -26,9 +26,9 @@ type Field<T> = (fn(&JointComponent) -> T, fn(&mut JointComponent, T));
 type IdRange = (u32, f32, f32);
 
 /// Register the `Joint` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
@@ -50,9 +50,9 @@ fn set(scene: SceneCell, id: u32, f: &dyn Fn(&mut JointComponent)) {
 }
 
 /// `Get<name>` / `Set<name>` over one `f32` field (`0` without a Joint).
-fn f32_pair<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn f32_pair<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
     name: &str,
     (read, write): Field<f32>,
@@ -67,9 +67,9 @@ fn f32_pair<'lua, 'scope>(
 }
 
 /// `Get<name>` / `Set<name>` over one `bool` field (`false` without a Joint).
-fn bool_pair<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn bool_pair<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
     name: &str,
     (read, write): Field<bool>,
@@ -84,9 +84,9 @@ fn bool_pair<'lua, 'scope>(
 }
 
 /// `Get<name>` → `x, y, z` / `Set<name>(id, x, y, z)` over one `Vec3` field.
-fn vec3_pair<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn vec3_pair<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
     name: &str,
     (read, write): Field<Vec3>,
@@ -105,9 +105,9 @@ fn vec3_pair<'lua, 'scope>(
 
 /// `Get/SetKind`, `Get/SetConnectedBody`, the anchors, the axes and
 /// `Get/SetEnableCollision`.
-fn register_shape<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_shape<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map(|j| j.kind.name())));
@@ -144,9 +144,9 @@ fn register_shape<'lua, 'scope>(
 
 /// `Get/SetUseLimits`, `Get/SetLimits` (min, max degrees), `Get/SetSwingLimit`,
 /// `Get/SetSwing2Limit`, `Get/SetBreakForce`, `Get/SetBreakTorque`.
-fn register_limits<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_limits<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     bool_pair(

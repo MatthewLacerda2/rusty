@@ -14,7 +14,7 @@ use crate::shadergen::recipe::PassKind;
 /// for `pass`. `textures` lists the extra texture slots the block samples (#400) —
 /// the `shader_textures` keys a material using it should name. `stage` is `"color"`
 /// or `"uv"` (#401): a uv block moves the UVs before any map is sampled.
-pub fn blocks_table(lua: &Lua, pass: PassKind) -> mlua::Result<Table<'_>> {
+pub fn blocks_table(lua: &Lua, pass: PassKind) -> mlua::Result<Table> {
     lua.create_sequence_from(
         catalog(pass)
             .iter()
@@ -23,7 +23,7 @@ pub fn blocks_table(lua: &Lua, pass: PassKind) -> mlua::Result<Table<'_>> {
     )
 }
 
-fn block_table<'lua>(lua: &'lua Lua, b: &Block) -> mlua::Result<Table<'lua>> {
+fn block_table(lua: &Lua, b: &Block) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("id", b.id)?;
     t.set("desc", b.desc)?;
@@ -45,7 +45,7 @@ fn block_table<'lua>(lua: &'lua Lua, b: &Block) -> mlua::Result<Table<'lua>> {
     Ok(t)
 }
 
-fn param_table<'lua>(lua: &'lua Lua, p: &Param) -> mlua::Result<Table<'lua>> {
+fn param_table(lua: &Lua, p: &Param) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("name", p.name)?;
     t.set("arity", p.arity)?;
@@ -56,7 +56,7 @@ fn param_table<'lua>(lua: &'lua Lua, p: &Param) -> mlua::Result<Table<'lua>> {
 
 /// A scalar for arity 1; a vector param's broadcast default as a ready-to-paste
 /// array (`{0.5, 0.5, 0.5}`), the shape the recipe takes it in.
-fn default<'lua>(lua: &'lua Lua, p: &Param) -> mlua::Result<Value<'lua>> {
+fn default(lua: &Lua, p: &Param) -> mlua::Result<Value> {
     let d = f64::from(p.default);
     if p.arity == 1 {
         return Ok(Value::Number(d));

@@ -21,9 +21,9 @@ use crate::scene::Scene;
 use crate::ui::ScreenSize;
 
 /// Register the `Canvas` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     screen: &'scope RefCell<ScreenSize>,
     video: &'scope RefCell<VideoSettings>,
@@ -48,8 +48,8 @@ pub fn register<'lua, 'scope>(
 
 /// `GetSortOrder` / `SetSortOrder` and `GetRenderMode` / `SetRenderMode` (by name;
 /// an unknown name is ignored).
-fn register_order_and_mode<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_order_and_mode<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -97,8 +97,8 @@ fn register_order_and_mode<'lua, 'scope>(
 
 /// The scaler: `Get/SetReferenceResolution` (each axis ≥ 1) and
 /// `Get/SetMatchWidthOrHeight` (clamped to `[0, 1]`).
-fn register_scaler<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_scaler<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -148,8 +148,8 @@ type Scalar = (fn(&CanvasComponent) -> f32, fn(&mut CanvasComponent, f32));
 
 /// The world / camera canvas knobs: `Get/SetPixelsPerUnit`, `Get/SetPlaneDistance`,
 /// `Get/SetSway` (scalars) and `Get/SetTilt` (an `x, y` pair of degrees).
-fn register_world<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_world<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

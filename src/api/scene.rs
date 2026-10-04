@@ -30,9 +30,9 @@ use crate::scene::authoring::{self, ComponentKind, Primitive};
 use crate::scene::Scene;
 
 /// Register the `Scene` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
     scene_path: &'scope RefCell<Option<String>>,
     is_playing: &'scope RefCell<bool>,
@@ -52,8 +52,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `FindEntityByName` + `CreateEntity`.
-fn register_lookup_create<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_lookup_create<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -81,8 +81,8 @@ fn register_lookup_create<'lua, 'scope>(
 }
 
 /// `Deactivate` (Unity's deferred destroy) + `DestroyEntity` (real removal).
-fn register_destroy<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_destroy<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     is_playing: &'scope RefCell<bool>,
@@ -127,8 +127,8 @@ fn register_destroy<'lua, 'scope>(
 }
 
 /// `AddComponent` / `RemoveComponent` over the Add Component menu's set.
-fn register_components<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_components<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -164,8 +164,8 @@ fn register_components<'lua, 'scope>(
 }
 
 /// `SetParent` / `ClearParent` (the `parent_id` graph, cycle-checked by `Scene`).
-fn register_parenting<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_parenting<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -195,8 +195,8 @@ fn register_parenting<'lua, 'scope>(
 /// `Save([path])` — persist the live world. No path writes back to the current
 /// scene file (the shared `scene_path` cell); an explicit path writes there and
 /// also becomes the new current scene file (mirroring the editor's Save As).
-fn register_save<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_save<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
     scene_path: &'scope RefCell<Option<String>>,

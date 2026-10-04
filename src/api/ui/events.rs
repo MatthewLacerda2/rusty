@@ -20,9 +20,9 @@ use crate::ui::space::{canvas_to_screen, rect_screen_bounds};
 use crate::ui::{EventSystem, UiLayout, UiRect, UiView};
 
 /// Add the event verbs to the `UI` table [`super::register`] created.
-pub fn register_events<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register_events<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     let table = &global_table(lua, "UI")?;
@@ -78,8 +78,8 @@ pub fn register_events<'lua, 'scope>(
 }
 
 /// `FindSelectable(id, direction)` — where navigation from `id` would go.
-fn register_find<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_find<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
@@ -114,12 +114,12 @@ fn centre_px(layout: &UiLayout, r: &UiRect, view: &UiView) -> Option<Vec2> {
 /// `{ {id, name, state, interactable, selected, rect = {x, y, width, height}}, … }`
 /// for every visible Selectable, in draw order; `rect` in screen pixels (absent for
 /// a world-canvas Selectable behind the camera).
-fn list<'lua>(
-    lua: &'lua Lua,
+fn list(
+    lua: &Lua,
     world: &World,
     (layout, view): (&UiLayout, &UiView),
     events: &EventSystem,
-) -> mlua::Result<Table<'lua>> {
+) -> mlua::Result<Table> {
     let out = lua.create_table()?;
     for (id, rect) in layout.iter() {
         if !world.has_selectable(id) || !is_visible(world, id) {

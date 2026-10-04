@@ -18,8 +18,8 @@ use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the IK functions onto the `Animator` table.
-pub(super) fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     console: &'scope RefCell<ConsoleLogs>,
@@ -57,8 +57,8 @@ fn add(scene: &RefCell<Scene>, console: &RefCell<ConsoleLogs>, id: u32, c: IkCon
 
 /// `AddTwoBoneIK(id, name, root, mid, tip)` and
 /// `AddAimIK(id, name, bones [, { weights, axis, clamp, weight }])`.
-fn register_add<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_add<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     console: &'scope RefCell<ConsoleLogs>,
@@ -96,7 +96,7 @@ fn register_add<'lua, 'scope>(
 
 /// Read `{ weights = {..}, axis = {x, y, z}, clamp = degrees, weight = w }`.
 fn aim_options(c: &mut IkConstraint, t: &Table) -> mlua::Result<()> {
-    if let Some(w) = t.get::<_, Option<f32>>("weight")? {
+    if let Some(w) = t.get::<Option<f32>>("weight")? {
         c.weight = w.clamp(0.0, 1.0);
     }
     let IkChain::Aim {
@@ -108,21 +108,21 @@ fn aim_options(c: &mut IkConstraint, t: &Table) -> mlua::Result<()> {
     else {
         return Ok(());
     };
-    if let Some(w) = t.get::<_, Option<Vec<f32>>>("weights")? {
+    if let Some(w) = t.get::<Option<Vec<f32>>>("weights")? {
         *weights = w;
     }
-    if let Some([x, y, z]) = t.get::<_, Option<[f32; 3]>>("axis")? {
+    if let Some([x, y, z]) = t.get::<Option<[f32; 3]>>("axis")? {
         *axis = Vec3::new(x, y, z);
     }
-    if let Some(degrees) = t.get::<_, Option<f32>>("clamp")? {
+    if let Some(degrees) = t.get::<Option<f32>>("clamp")? {
         *clamp_degrees = degrees.max(0.0);
     }
     Ok(())
 }
 
 /// `RemoveIK(id, name)` — drop the constraint, putting back what it last wrote.
-fn register_remove<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_remove<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -162,8 +162,8 @@ fn with_ik(
 
 /// `SetIKTarget(id, name, x, y, z)`, `SetIKTargetEntity(id, name, target)`,
 /// `SetIKHint(id, name, x, y, z)`, `SetIKHintEntity(id, name, hint)`.
-fn register_targets<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_targets<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     console: &'scope RefCell<ConsoleLogs>,
@@ -205,8 +205,8 @@ fn register_targets<'lua, 'scope>(
 }
 
 /// `SetIKWeight(id, name, w)` (clamped to `[0, 1]`) and `GetIKWeight(id, name)`.
-fn register_weight<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_weight<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     console: &'scope RefCell<ConsoleLogs>,

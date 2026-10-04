@@ -22,8 +22,8 @@ fn position(scene: &Scene, id: u32) -> Vec3 {
 }
 
 /// The read-only path state.
-pub(super) fn register_reads<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register_reads<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -76,8 +76,8 @@ pub(super) fn register_reads<'lua, 'scope>(
 }
 
 /// `Warp` and `ResetPath`: the two ways a script interrupts the path.
-pub(super) fn register_writes<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register_writes<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     nav: &'scope RefCell<NavigationGraph>,

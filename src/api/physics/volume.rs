@@ -18,8 +18,8 @@ use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
 /// Register the overlap/check family onto the `Physics` table.
-pub(super) fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     physics: &'scope RefCell<Option<PhysicsWorld>>,
@@ -62,8 +62,8 @@ fn box_ids(
 }
 
 /// `OverlapSphere` (id array) and `CheckSphere` (boolean fast-path).
-fn register_sphere<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_sphere<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     physics: &'scope RefCell<Option<PhysicsWorld>>,
@@ -88,8 +88,8 @@ fn register_sphere<'lua, 'scope>(
 
 /// `OverlapBox` (id array) and `CheckBox` (boolean fast-path). Half-extents,
 /// like Unity's `halfExtents`; the box is axis-aligned.
-fn register_box<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_box<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     physics: &'scope RefCell<Option<PhysicsWorld>>,
@@ -127,8 +127,8 @@ fn register_box<'lua, 'scope>(
 
 /// `OverlapCapsule` — the capsule spans the two sphere centers `p0`→`p1` with
 /// `radius`, mirroring Unity's point0/point1/radius form.
-fn register_capsule<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_capsule<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     physics: &'scope RefCell<Option<PhysicsWorld>>,

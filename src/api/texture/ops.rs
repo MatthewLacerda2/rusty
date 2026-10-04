@@ -8,7 +8,7 @@ use mlua::{Lua, Table, Value};
 use crate::procgen::recipe::{Lit, OpInfo, OpParam, OPS};
 
 /// `{ {op, category, inputs, params = { {name, type, default, required, values?} } }, … }`.
-pub fn ops_table(lua: &Lua) -> mlua::Result<Table<'_>> {
+pub fn ops_table(lua: &Lua) -> mlua::Result<Table> {
     lua.create_sequence_from(
         OPS.iter()
             .map(|info| op_table(lua, info))
@@ -16,7 +16,7 @@ pub fn ops_table(lua: &Lua) -> mlua::Result<Table<'_>> {
     )
 }
 
-fn op_table<'lua>(lua: &'lua Lua, info: &OpInfo) -> mlua::Result<Table<'lua>> {
+fn op_table(lua: &Lua, info: &OpInfo) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("op", info.op)?;
     t.set("category", info.category)?;
@@ -30,7 +30,7 @@ fn op_table<'lua>(lua: &'lua Lua, info: &OpInfo) -> mlua::Result<Table<'lua>> {
     Ok(t)
 }
 
-fn param_table<'lua>(lua: &'lua Lua, p: &OpParam) -> mlua::Result<Table<'lua>> {
+fn param_table(lua: &Lua, p: &OpParam) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("name", p.name)?;
     t.set("type", p.ty)?;
@@ -47,7 +47,7 @@ fn param_table<'lua>(lua: &'lua Lua, p: &OpParam) -> mlua::Result<Table<'lua>> {
     Ok(t)
 }
 
-fn lit(lua: &Lua, l: Lit) -> mlua::Result<Value<'_>> {
+fn lit(lua: &Lua, l: Lit) -> mlua::Result<Value> {
     Ok(match l {
         Lit::Number(n) => Value::Number(f64::from(n)),
         Lit::Integer(i) => Value::Integer(i64::from(i)),

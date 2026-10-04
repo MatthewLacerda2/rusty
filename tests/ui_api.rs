@@ -66,13 +66,13 @@ fn a_scripted_rect_change_shows_in_get_rect_at_once() {
             .load(format!("return UI.GetRect({child})"))
             .eval()
             .unwrap();
-        assert_eq!(r.get::<_, f32>("x").unwrap(), 10.0);
-        assert_eq!(r.get::<_, f32>("y").unwrap(), 10.0);
-        assert_eq!(r.get::<_, f32>("width").unwrap(), 1900.0);
-        assert_eq!(r.get::<_, f32>("height").unwrap(), 80.0);
-        assert_eq!(r.get::<_, u32>("canvas").unwrap(), canvas);
+        assert_eq!(r.get::<f32>("x").unwrap(), 10.0);
+        assert_eq!(r.get::<f32>("y").unwrap(), 10.0);
+        assert_eq!(r.get::<f32>("width").unwrap(), 1900.0);
+        assert_eq!(r.get::<f32>("height").unwrap(), 80.0);
+        assert_eq!(r.get::<u32>("canvas").unwrap(), canvas);
         let screen: Table = r.get("screen").unwrap();
-        assert_eq!(screen.get::<_, f32>("width").unwrap(), 1900.0);
+        assert_eq!(screen.get::<f32>("width").unwrap(), 1900.0);
         let corners: Table = r.get("corners").unwrap();
         assert_eq!(corners.raw_len(), 4);
         let (w, h): (f32, f32) = lua.load("return UI.GetScreenSize()").eval().unwrap();

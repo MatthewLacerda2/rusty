@@ -21,7 +21,7 @@ use crate::navigation::{complete_off_mesh_link, NavMeshSettings, NavigationGraph
 use crate::scene::authoring::nav_agent as nav_ops;
 use crate::scene::Scene;
 
-fn point<'lua>(lua: &'lua Lua, p: Vec3) -> mlua::Result<Table<'lua>> {
+fn point(lua: &Lua, p: Vec3) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("x", p.x)?;
     t.set("y", p.y)?;
@@ -30,7 +30,7 @@ fn point<'lua>(lua: &'lua Lua, p: Vec3) -> mlua::Result<Table<'lua>> {
 }
 
 /// A link as its Lua table.
-fn link_table<'lua>(lua: &'lua Lua, l: &OffMeshLinkData) -> mlua::Result<Table<'lua>> {
+fn link_table(lua: &Lua, l: &OffMeshLinkData) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("type", l.kind.as_str())?;
     t.set("startPos", point(lua, l.start)?)?;
@@ -40,9 +40,9 @@ fn link_table<'lua>(lua: &'lua Lua, l: &OffMeshLinkData) -> mlua::Result<Table<'
 }
 
 /// The agent's link state and the script's two levers on it.
-pub(super) fn register_agent<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+pub(super) fn register_agent<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let current = move |id: u32| scene.borrow().world.nav_agent(id)?.off_mesh_link;
@@ -83,9 +83,9 @@ pub(super) fn register_agent<'lua, 'scope>(
 
 /// `Navigation.GetOffMeshLinks` and the generation settings' getters and setters
 /// (`DropHeight`, `JumpDistance`, `JumpHeight`, `LinkSpacing`), which re-bake.
-pub(super) fn register_navigation<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+pub(super) fn register_navigation<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: &'scope RefCell<Scene>,
     nav: &'scope RefCell<NavigationGraph>,
 ) -> Reg {

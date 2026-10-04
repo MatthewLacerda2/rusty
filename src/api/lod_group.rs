@@ -21,9 +21,9 @@ use crate::scene::Scene;
 type SceneCell<'s> = &'s RefCell<Scene>;
 
 /// Register the `LODGroup` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
@@ -45,9 +45,9 @@ fn set<T>(scene: SceneCell, id: u32, f: impl FnOnce(&mut LodGroupComponent) -> T
 }
 
 /// `Get/SetSize`, `GetLevelCount`, `AddLevel`, `RemoveLevel`.
-fn register_group<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_group<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |_, id: u32| Ok(get(scene, id).map_or(0.0, |g| g.size)));
@@ -70,9 +70,9 @@ fn register_group<'lua, 'scope>(
 }
 
 /// `Get/SetLevelHeight`, `Get/SetRenderers`.
-fn register_levels<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn register_levels<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: SceneCell<'scope>,
 ) -> Reg {
     let f = scope.create_function(move |_, (id, level): (u32, usize)| {

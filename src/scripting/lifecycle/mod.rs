@@ -54,23 +54,17 @@ impl ScriptManager {
     /// lifecycle table, look up `hook`, call it with `args`, log a Lua error to
     /// the console. A script that doesn't define `hook` is silently skipped
     /// (every callback is optional).
-    fn call_hook<'lua>(
-        &self,
-        lua: &'lua Lua,
-        key: (u32, usize),
-        hook: &str,
-        args: impl mlua::IntoLuaMulti<'lua>,
-    ) {
+    fn call_hook(&self, lua: &Lua, key: (u32, usize), hook: &str, args: impl mlua::IntoLuaMulti) {
         let Some(inst) = self.entity_scripts.get(&key) else {
             return;
         };
         let Ok(table) = lua.registry_value::<Table>(&inst.table) else {
             return;
         };
-        let Ok(func) = table.get::<_, mlua::Function>(hook) else {
+        let Ok(func) = table.get::<mlua::Function>(hook) else {
             return;
         };
-        if let Err(e) = func.call::<_, ()>(args) {
+        if let Err(e) = func.call::<()>(args) {
             self.console.borrow_mut().error(format!(
                 "[Lua Error] {} on entity {} failed: {}",
                 hook, key.0, e

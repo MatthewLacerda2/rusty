@@ -60,7 +60,7 @@ pub fn parse_fields(code: &str) -> Vec<ScriptField> {
     let Ok(table) = lua.load(code).eval::<Table>() else {
         return Vec::new();
     };
-    let Ok(fields) = table.get::<_, Table>("fields") else {
+    let Ok(fields) = table.get::<Table>("fields") else {
         return Vec::new();
     };
     let mut out: Vec<ScriptField> = fields
@@ -111,7 +111,7 @@ fn parse_field(name: String, meta: Value) -> Option<ScriptField> {
         Value::String(s) => Some(scalar(
             name,
             FieldKind::Text,
-            ScriptFieldValue::Text(s.to_str().unwrap_or_default().to_owned()),
+            ScriptFieldValue::Text(s.to_str().map(|s| s.to_owned()).unwrap_or_default()),
         )),
         _ => None,
     }
@@ -131,18 +131,18 @@ fn scalar(name: String, kind: FieldKind, default: ScriptFieldValue) -> ScriptFie
 
 /// Parse a full `{ type=, range=, default=, tooltip=, header= }` metadata table.
 fn parse_meta_table(name: String, t: &Table) -> ScriptField {
-    let default_val = t.get::<_, Value>("default").ok();
+    let default_val = t.get::<Value>("default").ok();
     let kind = t
-        .get::<_, String>("type")
+        .get::<String>("type")
         .ok()
         .and_then(|s| kind_from_str(&s))
         .or_else(|| default_val.as_ref().and_then(kind_from_value))
         .unwrap_or(FieldKind::Number);
 
     let range = t
-        .get::<_, Table>("range")
+        .get::<Table>("range")
         .ok()
-        .and_then(|r| Some((r.get::<_, f64>(1).ok()?, r.get::<_, f64>(2).ok()?)));
+        .and_then(|r| Some((r.get::<f64>(1).ok()?, r.get::<f64>(2).ok()?)));
 
     let default = default_val
         .and_then(|v| value_as(kind, &v))
@@ -153,8 +153,8 @@ fn parse_meta_table(name: String, t: &Table) -> ScriptField {
         kind,
         range,
         default,
-        tooltip: t.get::<_, String>("tooltip").ok(),
-        header: t.get::<_, String>("header").ok(),
+        tooltip: t.get::<String>("tooltip").ok(),
+        header: t.get::<String>("header").ok(),
     }
 }
 

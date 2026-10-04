@@ -16,8 +16,8 @@ use crate::scene::authoring::camera as camera_ops;
 use crate::scene::Scene;
 
 /// Camera motion blur: active + sample count over the active camera component.
-pub(super) fn register_motion_blur<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register_motion_blur<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -58,8 +58,8 @@ pub(super) fn register_motion_blur<'lua, 'scope>(
 
 /// FXAA: the anti-aliasing pass at the end of the post-FX chain (#360), over the
 /// active camera component — the same write path the editor's Camera card uses.
-pub(super) fn register_fxaa<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register_fxaa<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

@@ -23,9 +23,9 @@ type E = LayoutElementComponent;
 type Size = (Option<f32>, Option<f32>);
 
 /// Register the `LayoutElement` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: Cell<'scope>,
 ) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
@@ -61,17 +61,17 @@ pub fn register<'lua, 'scope>(
 
 /// Register `Get<suffix>(id)` → `get(element)` (Lua's defaults without one) and
 /// `Set<suffix>(id, …)` → `set(element, …)` (a no-op without one).
-fn pair<'lua, 'scope, R, A>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    t: &Table<'lua>,
+fn pair<'scope, R, A>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    t: &Table,
     scene: Cell<'scope>,
     suffix: &str,
     get: impl Fn(&E) -> R + 'scope,
     set: impl Fn(&mut E, A) + 'scope,
 ) -> Reg
 where
-    R: for<'a> IntoLuaMulti<'a> + Default,
-    A: for<'a> FromLuaMulti<'a>,
+    R: IntoLuaMulti + Default,
+    A: FromLuaMulti,
 {
     let f = scope.create_function(move |_, id: u32| {
         Ok(scene

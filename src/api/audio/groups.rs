@@ -27,9 +27,9 @@ fn set(audio: &RefCell<AudioMaestro>, name: &str, patch: GroupPatch) -> mlua::Re
 }
 
 /// `GetGroups` / `CreateGroup` / `GetGroupState`, then the setters.
-pub(super) fn register_groups<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &Table<'lua>,
+pub(super) fn register_groups<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &Table,
     audio: &'scope RefCell<AudioMaestro>,
 ) -> Reg {
     put(
@@ -69,9 +69,9 @@ pub(super) fn register_groups<'lua, 'scope>(
 }
 
 /// `SetGroupVolume` / `SetGroupMute` / `SetGroupReverbSend`.
-fn register_levels<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &Table<'lua>,
+fn register_levels<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &Table,
     audio: &'scope RefCell<AudioMaestro>,
 ) -> Reg {
     put(
@@ -119,9 +119,9 @@ fn register_levels<'lua, 'scope>(
 }
 
 /// `SetGroupLowPass` / `SetGroupHighPass`.
-fn register_filters<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &Table<'lua>,
+fn register_filters<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &Table,
     audio: &'scope RefCell<AudioMaestro>,
 ) -> Reg {
     put(
@@ -159,9 +159,9 @@ fn register_filters<'lua, 'scope>(
 /// `SetOutputGroup` / `GetOutputGroup` — the mixer group an entity's `AudioSource`
 /// plays through (`""` is Master). Read when its voice starts, so a change reroutes
 /// the next `Play`.
-pub(super) fn register_output<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
-    table: &Table<'lua>,
+pub(super) fn register_output<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &Table,
     scene: &'scope RefCell<Scene>,
     audio: &'scope RefCell<AudioMaestro>,
 ) -> Reg {
@@ -192,7 +192,7 @@ pub(super) fn register_output<'lua, 'scope>(
 }
 
 /// A group's live state as the table `GetGroupState` returns.
-fn state_table<'lua>(lua: &'lua Lua, state: &GroupState) -> mlua::Result<Table<'lua>> {
+fn state_table(lua: &Lua, state: &GroupState) -> mlua::Result<Table> {
     let s = &state.settings;
     let t = lua.create_table()?;
     t.set("name", state.name.as_str())?;

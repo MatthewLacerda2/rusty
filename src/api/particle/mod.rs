@@ -22,9 +22,9 @@ use crate::scene::authoring::particles as particle_ops;
 use crate::scene::Scene;
 
 /// Register the `Particles` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -42,8 +42,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// One-off emissions: `Emit` (count) and `Burst` (the configured burst count).
-fn register_emission<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_emission<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -85,8 +85,8 @@ fn register_emission<'lua, 'scope>(
 }
 
 /// Emitter tuning: `SetActive` (gate) and `SetRate` (continuous rate).
-fn register_tuning<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_tuning<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -116,8 +116,8 @@ fn register_tuning<'lua, 'scope>(
 }
 
 /// The #439 shape setters: `SetShape` and `SetDirection` (the shape's axis).
-fn register_shape<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_shape<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -162,8 +162,8 @@ fn register_shape<'lua, 'scope>(
 }
 
 /// The #439 start-value setters: ranges, colour, and sub-emitters.
-fn register_start<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_start<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -212,8 +212,8 @@ fn register_start<'lua, 'scope>(
 }
 
 /// Live state: `IsActive`, `GetCount`, and `Clear`.
-fn register_state<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_state<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

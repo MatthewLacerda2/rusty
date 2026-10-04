@@ -12,9 +12,9 @@ use super::{put, Reg};
 use crate::scene::Scene;
 
 /// Register the `Transform` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -30,8 +30,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `GetPosition` / `SetPosition` (set re-syncs the entity's collider).
-fn register_position<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_position<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -63,8 +63,8 @@ fn register_position<'lua, 'scope>(
 }
 
 /// `GetRotation` / `SetRotation` over euler angles (set re-syncs the collider).
-fn register_rotation<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_rotation<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -96,8 +96,8 @@ fn register_rotation<'lua, 'scope>(
 }
 
 /// `GetScale` / `SetScale` (set re-syncs the entity's collider).
-fn register_scale<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_scale<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
@@ -129,8 +129,8 @@ fn register_scale<'lua, 'scope>(
 }
 
 /// `MoveTowards` — step toward a target, snapping when within `step` (or ~0).
-fn register_move_towards<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_move_towards<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

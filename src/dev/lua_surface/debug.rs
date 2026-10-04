@@ -16,9 +16,9 @@ use crate::preview::PreviewMesh;
 use crate::ui::UiView;
 
 /// Register the `Debug` namespace onto `lua` (dev builds only).
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -33,8 +33,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// `Debug.Log/Warn/Error` — append to the shared console buffer.
-fn register_logging<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_logging<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     console: &'scope std::cell::RefCell<crate::scripting::ConsoleLogs>,
 ) -> Reg {
@@ -67,8 +67,8 @@ fn register_logging<'lua, 'scope>(
 /// `Debug.Stats()` — the frame stats (#433) as a table: `frames`, each metric's
 /// `{last, min, avg, max, samples}`, and `systems` (per-system CPU ms). Filled by the
 /// dev layer's schedule probe; empty (`frames = 0`) where none is installed.
-fn register_stats<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_stats<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     stats: &'scope std::cell::RefCell<crate::core::frame_stats::FrameStats>,
 ) -> Reg {
@@ -108,8 +108,8 @@ fn register_preview(lua: &Lua, table: &Table) -> Reg {
 /// so this one borrows the scene to look `name` up (a name it doesn't hold raises),
 /// then renders the copy in the same isolated preview scene as the Inspector's
 /// Material card. Same options and the same `nil`-without-a-GPU return.
-fn register_preview_material<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_preview_material<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope std::cell::RefCell<crate::scene::Scene>,
 ) -> Reg {
@@ -136,12 +136,12 @@ fn preview_options(opts: Option<&Table>) -> mlua::Result<PreviewOptions> {
     let Some(opts) = opts else {
         return Ok(defaults);
     };
-    let mesh = match opts.get::<_, Option<String>>("mesh")? {
+    let mesh = match opts.get::<Option<String>>("mesh")? {
         Some(name) => parse_mesh(&name)?,
         None => defaults.mesh,
     };
     let resolution = opts
-        .get::<_, Option<u32>>("resolution")?
+        .get::<Option<u32>>("resolution")?
         .unwrap_or(defaults.resolution);
     Ok(PreviewOptions { mesh, resolution })
 }
@@ -161,8 +161,8 @@ fn parse_mesh(name: &str) -> mlua::Result<PreviewMesh> {
 
 /// `Debug.Snapshot([opts])` (whole world) and `Debug.SnapshotEntity(id)` (one entity) —
 /// the structured scene-read, returned as a pretty JSON string the agent parses.
-fn register_snapshot<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_snapshot<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
@@ -177,7 +177,7 @@ fn register_snapshot<'lua, 'scope>(
         "Snapshot",
         scope.create_function(move |_, opts: Option<Table>| {
             // `{ bones = true }` includes skeleton bones, left out by default (#453).
-            let bones = opts.and_then(|o| o.get::<_, Option<bool>>("bones").ok().flatten());
+            let bones = opts.and_then(|o| o.get::<Option<bool>>("bones").ok().flatten());
             let value = snapshot::world_value_with(
                 &scene.borrow(),
                 &camera.borrow(),

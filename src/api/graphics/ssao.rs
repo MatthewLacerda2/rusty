@@ -13,8 +13,8 @@ use crate::scene::Scene;
 /// Active flag, radius and intensity. AO lives on the volume, so without an active
 /// one `GetSsaoActive` reports `false` (nothing runs) and the other getters report
 /// the defaults a new volume would start with.
-pub(super) fn register_ssao<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register_ssao<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {

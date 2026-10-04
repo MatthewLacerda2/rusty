@@ -17,9 +17,9 @@ use super::{put, Reg};
 use crate::time::Time;
 
 /// Register the `Time` namespace onto `lua`.
-pub fn register<'lua, 'scope>(
-    lua: &'lua Lua,
-    scope: &mlua::Scope<'lua, 'scope>,
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
     time: &'scope RefCell<Time>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -29,8 +29,8 @@ pub fn register<'lua, 'scope>(
 }
 
 /// The read-only clock accessors plus the `time_scale` get/set pair.
-fn register_clock<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_clock<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     time: &'scope RefCell<Time>,
 ) -> Reg {
@@ -84,8 +84,8 @@ fn register_clock<'lua, 'scope>(
 /// Pause / step / resume (issue #283): the loop-level control verbs the windowed
 /// frame loop reads each frame, plus `IsPaused` / `PendingSteps` readers so the
 /// control state is observable through the same surface.
-fn register_pause_step<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+fn register_pause_step<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     time: &'scope RefCell<Time>,
 ) -> Reg {

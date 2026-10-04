@@ -6,22 +6,22 @@
 //! owner is inactive or gone are dropped first — Unity stops coroutines when their
 //! GameObject deactivates, and rusty applies that one rule to invokes too.
 
-use mlua::{Function, Lua, MultiValue, Table, Thread, ThreadStatus, Value};
+use mlua::{Function, Lua, MultiValue, Table, Thread, Value};
 
 use super::super::manager::ScriptManager;
 use super::{wait, Target, Wait, Work};
 
 /// What a due job will do, pulled out of the scheduler so no borrow of it is held
 /// while Lua runs (scripts re-enter the `Timer` namespace).
-enum Step<'lua> {
+enum Step {
     Call {
-        func: Option<Function<'lua>>,
+        func: Option<Function>,
         name: Option<String>,
         interval: Option<f64>,
     },
     Resume {
-        thread: Thread<'lua>,
-        until: Option<Function<'lua>>,
+        thread: Thread,
+        until: Option<Function>,
     },
     /// A tween: sample and write its property (`tween/step.rs`).
     Tween,
@@ -75,7 +75,7 @@ impl ScriptManager {
         }
     }
 
-    fn take_step<'lua>(&self, lua: &'lua Lua, handle: u64) -> Option<(u32, Step<'lua>)> {
+    fn take_step(&self, lua: &Lua, handle: u64) -> Option<(u32, Step)> {
         let timers = self.timers.borrow();
         let job = timers.get(handle)?;
         let step = match &job.work {
@@ -121,7 +121,7 @@ impl ScriptManager {
                 return;
             }
         };
-        if let Err(e) = func.call::<_, ()>(owner) {
+        if let Err(e) = func.call::<()>(owner) {
             self.log_error(owner, "Invoke", &e.to_string());
         }
         let mut timers = self.timers.borrow_mut();
@@ -137,31 +137,26 @@ impl ScriptManager {
     }
 
     /// The first function named `name` on `owner`'s scripts, in script-index order.
-    fn named_callback<'lua>(
-        &self,
-        lua: &'lua Lua,
-        owner: u32,
-        name: &str,
-    ) -> Option<Function<'lua>> {
+    fn named_callback(&self, lua: &Lua, owner: u32, name: &str) -> Option<Function> {
         self.entity_scripts
             .range((owner, 0)..=(owner, usize::MAX))
             .filter_map(|(_, inst)| lua.registry_value::<Table>(&inst.table).ok())
-            .find_map(|t| t.get::<_, Function>(name).ok())
+            .find_map(|t| t.get::<Function>(name).ok())
     }
 
     /// Resume a coroutine whose wait is over (asking its `WaitUntil` predicate
     /// first), then re-arm it on whatever it yields next, or retire it.
     fn resume(&self, lua: &Lua, handle: u64, owner: u32, thread: Thread, until: Option<Function>) {
         if let Some(pred) = until {
-            match pred.call::<_, bool>(()) {
+            match pred.call::<bool>(()) {
                 Ok(false) => return,
                 Ok(true) => {}
                 Err(e) => return self.retire(handle, owner, &e.to_string()),
             }
         }
-        match thread.resume::<_, MultiValue>(()) {
+        match thread.resume::<MultiValue>(()) {
             Err(e) => self.retire(handle, owner, &e.to_string()),
-            Ok(_) if thread.status() != ThreadStatus::Resumable => {
+            Ok(_) if !thread.is_resumable() => {
                 self.timers.borrow_mut().cancel(handle);
             }
             Ok(yielded) => {

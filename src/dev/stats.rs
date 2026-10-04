@@ -126,8 +126,8 @@ pub fn record_render(stats: &mut FrameStats, counters: &RenderCounters, cpu_ms: 
 
 /// The stats as the Lua table `Debug.Stats()` / `Harness.Stats()` return:
 /// `{ frames = n, <metric> = {last, min, avg, max, samples}, …, systems = { <name> = … } }`.
-pub fn to_lua<'lua>(lua: &'lua mlua::Lua, stats: &FrameStats) -> mlua::Result<mlua::Table<'lua>> {
-    let series = |s: &Series| -> mlua::Result<mlua::Table<'lua>> {
+pub fn to_lua(lua: &mlua::Lua, stats: &FrameStats) -> mlua::Result<mlua::Table> {
+    let series = |s: &Series| -> mlua::Result<mlua::Table> {
         let t = lua.create_table()?;
         t.set("last", s.last)?;
         t.set("min", s.min)?;

@@ -50,7 +50,7 @@ pub fn song_from_lua(value: &Value) -> Result<Song, String> {
 pub fn note_from_value(note: &Value) -> Result<f32, String> {
     match note {
         Value::String(s) => {
-            parse_note(s.to_str().map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+            parse_note(&s.to_str().map_err(|e| e.to_string())?).map_err(|e| e.to_string())
         }
         Value::Integer(i) => Ok(*i as f32),
         Value::Number(n) => Ok(*n as f32),
@@ -73,7 +73,7 @@ pub fn opts_from_table(opts: Option<&Table>) -> Result<NoteOpts, String> {
     for pair in table.clone().pairs::<Value, Value>() {
         let (key, _) = pair.map_err(|e| e.to_string())?;
         let known =
-            matches!(&key, Value::String(k) if k.to_str().is_ok_and(|k| OPTS_KEYS.contains(&k)));
+            matches!(&key, Value::String(k) if k.to_str().is_ok_and(|k| OPTS_KEYS.contains(&&*k)));
         if !known {
             return Err(format!(
                 "unknown opts key {key:?}; expected one of {}",
@@ -99,7 +99,7 @@ pub fn opts_from_table(opts: Option<&Table>) -> Result<NoteOpts, String> {
 
 /// Read `opts.glide = { semitones, seconds }`, if present.
 fn glide_from_table(opts: &Table) -> Result<Option<Glide>, String> {
-    let glide = match opts.get::<_, Value>("glide").map_err(|e| e.to_string())? {
+    let glide = match opts.get::<Value>("glide").map_err(|e| e.to_string())? {
         Value::Nil => return Ok(None),
         Value::Table(t) => t,
         other => return Err(format!("opts.glide must be a table, got {other:?}")),
@@ -117,7 +117,7 @@ fn glide_from_table(opts: &Table) -> Result<Option<Glide>, String> {
 
 /// Read an optional numeric field, reporting the key when the value is not a number.
 fn get_number(table: &Table, key: &str) -> Result<Option<f64>, String> {
-    match table.get::<_, Value>(key).map_err(|e| e.to_string())? {
+    match table.get::<Value>(key).map_err(|e| e.to_string())? {
         Value::Nil => Ok(None),
         Value::Integer(i) => Ok(Some(i as f64)),
         Value::Number(n) => Ok(Some(n)),
@@ -132,7 +132,7 @@ mod tests {
     use super::*;
     use zimmer::patch::{FilterKind, Source};
 
-    fn eval_table<'a>(lua: &'a Lua, src: &str) -> Table<'a> {
+    fn eval_table(lua: &Lua, src: &str) -> Table {
         lua.load(src).eval().expect("the table evaluates")
     }
 

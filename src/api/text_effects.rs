@@ -15,8 +15,8 @@ use crate::scene::authoring::text as ops;
 use crate::scene::Scene;
 
 /// `Get<suffix>(id)` / `Set<suffix>(id, …)` for every effect row.
-pub(super) fn register<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
     effects: &[Effect],
@@ -56,8 +56,8 @@ pub(super) fn register<'lua, 'scope>(
 
 /// `GetAutoSize(id) -> enabled, min, max` / `SetAutoSize(id, enabled[, min, max])`
 /// (omitted bounds keep their values).
-pub(super) fn register_auto_size<'lua, 'scope>(
-    scope: &mlua::Scope<'lua, 'scope>,
+pub(super) fn register_auto_size<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
     table: &Table,
     scene: &'scope RefCell<Scene>,
 ) -> Reg {
