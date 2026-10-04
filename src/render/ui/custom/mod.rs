@@ -165,6 +165,13 @@ impl UiShaders {
         self.builds
     }
 
+    /// Whether `name`'s variant is cached and built — `false` before its first frame
+    /// and after a failure, when its graphics fell back to the standard shader.
+    #[cfg(test)]
+    pub(crate) fn built(&self, name: &str) -> bool {
+        self.variants.get(name).is_some_and(Option::is_some)
+    }
+
     /// Drop every variant when a bake happened since they were built.
     fn refresh(&mut self) {
         let generation = bake_generation();

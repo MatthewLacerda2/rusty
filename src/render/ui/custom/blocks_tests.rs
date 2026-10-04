@@ -7,6 +7,21 @@ use super::fixture::{look, scene, shot, Baked, RECT, RES};
 /// The rect's centre pixel.
 const MID: (u32, u32) = (32, 32);
 
+/// #769: an unresolved shader is visible to the test (`built` is false) and still
+/// draws an opaque frame with the graphic in standard white — so an all-zero shot can
+/// never come from a missing or half-written bake.
+#[test]
+fn gpu_an_unresolved_ui_shader_draws_standard_and_is_reported() {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+        return;
+    };
+    let (scene, _, _) = scene(Some("test_ui_never_baked"));
+    let shot = shot(&mut renderer, &mut None, &scene);
+    assert!(!renderer.ui_renderer.shaders.built("test_ui_never_baked"));
+    assert_eq!(shot.px(MID.0, MID.1), [255; 4], "standard white");
+    assert_eq!(shot.px(0, 0), [0, 0, 0, 255], "opaque backdrop");
+}
+
 #[test]
 fn gpu_scanlines_darken_every_other_band() {
     let blocks: &[(&str, &[(&str, f32)])] =

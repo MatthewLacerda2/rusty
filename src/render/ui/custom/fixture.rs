@@ -142,14 +142,20 @@ pub(super) fn shot(renderer: &mut Renderer, view: &mut Option<RenderView>, scene
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
     renderer.render(view, scene, &cam, &out, false);
     let target = view.color_target().expect("target");
-    Shot(readback::read_texture_rgba8(
-        &renderer.device,
-        &renderer.queue,
-        target,
-        RES,
-        RES,
-    ))
+    let pixels = readback::read_texture_rgba8(&renderer.device, &renderer.queue, target, RES, RES);
+    assert!(pixels.chunks(4).any(|p| p[3] > 0), "{DROPPED}");
+    Shot(pixels)
 }
+
+/// Why an all-zero-alpha shot is not a shader's fault (#769). Every frame is opaque
+/// (the sky; the backdrop over it), and a ui shader that fails to resolve falls back
+/// to the standard one, so its graphic still draws. A readback with no alpha anywhere
+/// means none of the frame's GPU work landed: the device failed the command buffers
+/// and the backend reported nothing (wgpu's Metal backend counts a failed command
+/// buffer as completed and never surfaces it).
+const DROPPED: &str = "the GPU dropped the frame: no pixel has any alpha, not even the \
+    opaque backdrop. Not a ui-shader or block bug: the device failed the command \
+    buffers silently (#769)";
 
 /// Bake `blocks`, shade a fresh scene with it at UI clock `time`, and shoot it.
 pub(super) fn look(tag: &str, blocks: &[(&str, &[(&str, f32)])], time: f32) -> Option<Shot> {
@@ -157,5 +163,11 @@ pub(super) fn look(tag: &str, blocks: &[(&str, &[(&str, f32)])], time: f32) -> O
     let baked = Baked::new(tag, blocks);
     let (mut scene, _, _) = scene(Some(&baked.0));
     scene.ui_time = time;
-    Some(shot(&mut renderer, &mut None, &scene))
+    let shot = shot(&mut renderer, &mut None, &scene);
+    assert!(
+        renderer.ui_renderer.shaders.built(&baked.0),
+        "ui shader {:?} did not build, so the graphic drew with the standard shader",
+        baked.0
+    );
+    Some(shot)
 }
