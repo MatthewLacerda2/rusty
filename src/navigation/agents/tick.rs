@@ -9,6 +9,7 @@ use super::super::obstacle::avoidance_obstacles;
 use super::super::{path_length, NavigationGraph};
 use super::link::auto_traverse;
 use super::state::is_at_target;
+use super::turn::turn_toward;
 use crate::scene::{NavMeshAgentComponent, Scene};
 
 /// An agent that took part in this frame's tick, carried from the steering pass
@@ -58,10 +59,15 @@ impl NavigationGraph {
                 }
                 let steering = !agent.cached_path.is_empty() && !is_at_target(&agent, position);
                 let moved_with = agent.velocity;
-                if steering {
-                    self.accelerate_toward_waypoint(&mut agent, position, delta_time);
+                // It faces where it steers; braking to rest, it holds its facing.
+                let heading = if steering {
+                    self.accelerate_toward_waypoint(&mut agent, position, delta_time)
                 } else {
                     decelerate(&mut agent, delta_time);
+                    Vec2::ZERO
+                };
+                if let Some(mut t) = scene.world.transform_mut(id) {
+                    turn_toward(&mut agent, &mut t.rotation, heading, delta_time);
                 }
                 inputs.push(avoidance_input(&agent, position, moved_with, steering));
                 ticked.push(Ticked {
@@ -98,18 +104,19 @@ impl NavigationGraph {
     /// the desired one by at most `acceleration * dt` per tick and lands on it. Near
     /// the end of its path the agent brakes at that same rate, so it comes to rest at
     /// its stopping distance instead of stopping dead (Unity's `autoBraking`).
+    /// Returns the steering direction (XZ, unit; zero on a link): where it faces.
     fn accelerate_toward_waypoint(
         &self,
         agent: &mut NavMeshAgentComponent,
         current_pos: Vec3,
         delta_time: f32,
-    ) {
+    ) -> Vec2 {
         // Query the next waypoint from the agent's cached path,
         // re-planning with A* only when the cache is invalid (#126).
         let feet = agent.feet(current_pos);
         let next_step = self.cached_next_step(agent, feet);
         if agent.off_mesh_link.is_some() {
-            return; // reached a link: it stands still until the link is crossed
+            return Vec2::ZERO; // reached a link: it stands still until it is crossed
         }
         // Steer on the XZ plane so a tall step doesn't inflate the move distance.
         let mut to_next_dir = next_step - current_pos;
@@ -124,6 +131,7 @@ impl NavigationGraph {
         let desired = xz(to_next_dir * speed);
         let steered = move_towards(xz(agent.velocity), desired, agent.acceleration * delta_time);
         agent.velocity = Vec3::new(steered.x, 0.0, steered.y);
+        xz(to_next_dir)
     }
 
     /// An agent on an off-mesh link (#462) neither steers nor avoids: the engine
@@ -136,6 +144,7 @@ impl NavigationGraph {
         position: Vec3,
         delta_time: f32,
     ) {
+        agent.angular_velocity = 0.0; // it holds its facing on the link
         let moved = agent
             .auto_traverse_off_mesh_link
             .then(|| auto_traverse(&mut agent, position, delta_time));
@@ -228,7 +237,7 @@ fn path_left(agent: &NavMeshAgentComponent, feet: Vec3, next: Vec3) -> f32 {
 /// The fastest speed from which braking at `acceleration` in steps of `dt` still
 /// stops within `room`. Shedding `a·dt` a tick from `v` covers `v²/(2a) + v·dt/2`;
 /// solving that for `v` keeps the step from overshooting the continuous `√(2a·room)`.
-fn braking_speed(acceleration: f32, room: f32, dt: f32) -> f32 {
+pub(super) fn braking_speed(acceleration: f32, room: f32, dt: f32) -> f32 {
     let half_step = 0.5 * acceleration * dt;
     (half_step * half_step + 2.0 * acceleration * room).sqrt() - half_step
 }

@@ -160,6 +160,9 @@ pub(crate) fn nav_agent_value(n: &NavMeshAgentComponent) -> Value {
         "auto_traverse_off_mesh_link": n.auto_traverse_off_mesh_link,
         "on_off_mesh_link": n.off_mesh_link.is_some(),
         "area_mask": n.area_mask,
+        "update_rotation": n.update_rotation,
+        "angular_speed": n.angular_speed,
+        "angular_acceleration": n.angular_acceleration,
     })
 }
 

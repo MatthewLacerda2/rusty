@@ -14,6 +14,9 @@ Per-entity navmesh agent control.
 | `NavMeshAgent.IsAtTarget` | `(id)` | `bool` — its feet are within `StoppingDistance` of where its path ends (the target projected onto the navmesh) |
 | `NavMeshAgent.GetVelocity` | `(id)` | `x, y, z` — the velocity it is really moving at; `0, 0, 0` once at rest |
 | `NavMeshAgent.SetActive` | `(id, active)` | — |
+| `NavMeshAgent.GetUpdateRotation` / `SetUpdateRotation` | `(id)` / `(id, bool)` | whether the agent turns to face where it steers (Unity's `updateRotation`, default `true`; see *Turning*) |
+| `NavMeshAgent.GetAngularSpeed` / `SetAngularSpeed` | `(id)` / `(id, degrees)` | top turn rate, degrees/second (Unity's `angularSpeed`, default `120`) |
+| `NavMeshAgent.GetAngularAcceleration` / `SetAngularAcceleration` | `(id)` / `(id, degrees)` | how fast the turn rate builds up and winds down, degrees/second² (default `720`) |
 | `NavMeshAgent.SetAvoidancePriority` | `(id, priority)` | — (0–99, clamped; lower = more important) |
 | `NavMeshAgent.SetAvoidanceEnabled` | `(id, enabled)` | — |
 | `NavMeshAgent.HasPath` | `(id)` | `bool` — the agent holds a planned path |
@@ -40,6 +43,20 @@ stopping distance. An agent caught inside its stopping distance while still movi
 
 The stopping distance is measured centre to centre, so for an enemy that should not
 touch its target, author at least its own half-width plus the target's radius.
+
+### Turning (#744)
+
+With `UpdateRotation` on (the default) the agent turns itself to face its **steering
+direction**, toward the next corner of its path, as Unity's agent does. Avoidance
+dodges and wall slides bend where it moves, not where it looks, so its facing stays
+steady. It turns about Y only (any authored tilt is kept), the short way round. The turn
+rate builds up at `AngularAcceleration`, is capped at `AngularSpeed`, and winds down in
+time to stop on the heading without overshoot: at the defaults a 180° turn takes about
+1.7 s. An agent that is braking to rest, stopped, without a path or on an off-mesh link
+holds its facing; turning toward its target then (to aim) is the script's job.
+`AngularSpeed = 0` or `AngularAcceleration = 0` never turns. With `UpdateRotation` off
+the engine never touches its rotation: the escape hatch for a strafing enemy whose
+script aims it.
 
 ### Areas (#460)
 

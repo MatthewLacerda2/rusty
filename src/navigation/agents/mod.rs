@@ -5,6 +5,7 @@ pub mod state;
 #[cfg(test)]
 mod state_tests;
 mod tick;
+mod turn;
 
 use super::{NavPath, NavigationGraph};
 use crate::scene::NavMeshAgentComponent;
