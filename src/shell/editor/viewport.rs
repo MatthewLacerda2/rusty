@@ -53,8 +53,8 @@ pub(super) fn target_size(size: egui::Vec2, pixels_per_point: f32) -> Option<(u3
 impl EditorFrontend {
     /// Render the 3D scene into the offscreen viewport target sized to the panel's
     /// image rect, then (re)bind it to the stable egui texture id (#183). The active
-    /// tab selects the camera + mode: **Scene** = the free-fly editor camera with
-    /// gizmos/grid; **Game** = the active camera entity's view, what the player sees.
+    /// tab selects the camera + mode: **Scene** = the editor's own Scene camera with
+    /// gizmos/grid (#745); **Game** = the active camera entity's view, what the player sees.
     pub(super) fn render_viewport_scene(
         &mut self,
         shell: &mut Shell,
@@ -90,11 +90,7 @@ impl EditorFrontend {
         let scene = game.scene().borrow();
         let scene_tab = interaction.tab == ViewportTab::Scene;
         view.ui.screen_in_editor = scene_tab && self.editor_ui.ui_overlay;
-        let camera = if scene_tab {
-            game.camera().borrow().clone()
-        } else {
-            crate::scene::game_camera_from_scene(&game.camera().borrow(), &scene)
-        };
+        let camera = viewport_camera(&self.editor_ui, game, &scene, interaction.tab);
         renderer.render(view, &scene, &camera, &target_view, scene_tab);
         rebind_egui_texture(
             &mut self.egui_renderer,
@@ -178,7 +174,7 @@ impl EditorFrontend {
             return;
         };
         let aspect = if size.y > 0.0 { size.x / size.y } else { 1.0 };
-        let camera = game.camera().borrow().clone();
+        let camera = ui.scene_view.camera.camera();
         let ray = pick::ray_from_ndc(&camera, aspect, ndc_x, ndc_y);
         let mut scene = game.scene().borrow_mut();
         let frame = OverlayFrame {
@@ -220,6 +216,21 @@ impl EditorFrontend {
             ui.selected_asset_path = None;
             scene.selected_entity_id = hit;
         }
+    }
+}
+
+/// The camera a viewport tab renders from: the Scene tab's own pose, or the scene's
+/// active camera entity (falling back to the game camera) on the Game tab. Shared
+/// with the headless capture.
+pub(super) fn viewport_camera(
+    ui: &EditorUi,
+    game: &GameWorld,
+    scene: &Scene,
+    tab: ViewportTab,
+) -> crate::scene::Camera {
+    match tab {
+        ViewportTab::Scene => ui.scene_view.camera.camera(),
+        ViewportTab::Game => crate::scene::game_camera_from_scene(&game.camera().borrow(), scene),
     }
 }
 

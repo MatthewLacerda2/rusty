@@ -9,6 +9,7 @@
 //!   --out <png>         where to write (default `editor-capture.png`)
 //!   --scene <path>      a `.scene` file to open (default: the built-in default scene)
 //!   --select <name>     select this entity first (the Inspector shows its cards)
+//!   --frame             frame the selection in the Scene view (the F key)
 //!   --play              draw the Play-mode chrome (the sim is not stepped)
 //!   --game              show the Game tab instead of the Scene tab
 //!   --size <W>x<H>      capture size (default 1600x900)
@@ -54,6 +55,7 @@ fn parse(args: &[String]) -> Result<(String, Option<String>, EditorCaptureOption
             "--out" => out = value()?,
             "--scene" => scene = Some(value()?),
             "--select" => opts.select = Some(value()?),
+            "--frame" => opts.frame_selected = true,
             "--play" => opts.playing = true,
             "--game" => opts.tab = ViewportTab::Game,
             "--size" => {

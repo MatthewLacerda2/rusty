@@ -1,4 +1,4 @@
-//! Unit tests for `GameWorld` (game.rs): editor-mode fly camera, play/stop
+//! Unit tests for `GameWorld` (game.rs): the shared handles, play/stop
 //! transitions, the scaled-dt threading, and the snapshot capture/restore boundary.
 //! All drive the real `tick`, honouring the determinism contract (fixed dt, no
 //! wall-clock, no RNG).
@@ -23,8 +23,6 @@ fn empty_world() -> GameWorld {
     world_with(Scene::new())
 }
 
-const DT: f32 = 1.0 / 60.0;
-
 #[test]
 fn accessors_expose_shared_handles() {
     let gw = empty_world();
@@ -48,80 +46,4 @@ fn set_playing_flips_state() {
     assert!(gw.is_playing());
     gw.set_playing(false);
     assert!(!gw.is_playing());
-}
-
-#[test]
-fn editor_fly_translates_forward_on_w() {
-    let mut gw = empty_world();
-    let start = gw.camera().borrow().position;
-    let fwd = gw.camera().borrow().forward();
-    gw.input().borrow_mut().set_key_state("W", true);
-    gw.tick(DT);
-    let moved = gw.camera().borrow().position - start;
-    // W moves +forward by 10 units/sec * dt.
-    let expected = fwd * 10.0 * DT;
-    assert!(
-        moved.abs_diff_eq(expected, 1e-5),
-        "moved {moved:?} expected {expected:?}"
-    );
-}
-
-#[test]
-fn editor_fly_s_and_w_cancel() {
-    let mut gw = empty_world();
-    let start = gw.camera().borrow().position;
-    gw.input().borrow_mut().set_key_state("W", true);
-    gw.input().borrow_mut().set_key_state("S", true);
-    gw.tick(DT);
-    // Opposing keys net zero movement (no normalize of a zero vector either).
-    assert!(gw.camera().borrow().position.abs_diff_eq(start, 1e-6));
-}
-
-#[test]
-fn editor_fly_strafe_uses_right_axis() {
-    let mut gw = empty_world();
-    let right = gw.camera().borrow().right();
-    let start = gw.camera().borrow().position;
-    gw.input().borrow_mut().set_key_state("D", true);
-    gw.tick(DT);
-    let moved = gw.camera().borrow().position - start;
-    assert!(moved.abs_diff_eq(right * 10.0 * DT, 1e-5));
-    // A strafes the opposite way.
-    let mut gw = empty_world();
-    let start = gw.camera().borrow().position;
-    gw.input().borrow_mut().set_key_state("A", true);
-    gw.tick(DT);
-    let moved = gw.camera().borrow().position - start;
-    assert!(moved.dot(right) < 0.0);
-}
-
-#[test]
-fn editor_fly_yaw_and_pitch_track_arrow_keys() {
-    let mut gw = empty_world();
-    let (yaw0, pitch0) = {
-        let c = gw.camera().borrow();
-        (c.yaw, c.pitch)
-    };
-    gw.input().borrow_mut().set_key_state("RIGHT", true);
-    gw.input().borrow_mut().set_key_state("UP", true);
-    gw.tick(DT);
-    let c = gw.camera().borrow();
-    // 90 deg/sec each; RIGHT increases yaw, UP increases pitch.
-    assert!((c.yaw - (yaw0 + 90.0 * DT)).abs() < 1e-4);
-    assert!((c.pitch - (pitch0 + 90.0 * DT)).abs() < 1e-4);
-}
-
-#[test]
-fn editor_fly_left_and_down_decrease_angles() {
-    let mut gw = empty_world();
-    let (yaw0, pitch0) = {
-        let c = gw.camera().borrow();
-        (c.yaw, c.pitch)
-    };
-    gw.input().borrow_mut().set_key_state("LEFT", true);
-    gw.input().borrow_mut().set_key_state("DOWN", true);
-    gw.tick(DT);
-    let c = gw.camera().borrow();
-    assert!((c.yaw - (yaw0 - 90.0 * DT)).abs() < 1e-4);
-    assert!((c.pitch - (pitch0 - 90.0 * DT)).abs() < 1e-4);
 }

@@ -28,6 +28,7 @@ use std::rc::Rc;
 use crate::app::GameWorld;
 use crate::core::input::InputState;
 use crate::dev::capture::CaptureHost;
+use crate::editor::viewport::scene_nav::selection_bounds;
 use crate::editor::{EditorUi, ViewportTab};
 use crate::navigation::NavigationGraph;
 use crate::render::{readback, OFFSCREEN_FORMAT};
@@ -51,6 +52,8 @@ pub struct EditorCaptureOptions {
     pub frames: u32,
     /// Select the entity with this name first (the Inspector shows its cards).
     pub select: Option<String>,
+    /// Frame the selection in the Scene view first, as the F key does (#745).
+    pub frame_selected: bool,
     /// Draw the chrome as in Play mode (accent tint, floating console). The sim is
     /// not entered or stepped: this is the look, not a playtest.
     pub playing: bool,
@@ -65,6 +68,7 @@ impl Default for EditorCaptureOptions {
             height: DEFAULT_HEIGHT,
             frames: DEFAULT_FRAMES,
             select: None,
+            frame_selected: false,
             playing: false,
             tab: ViewportTab::Scene,
         }
@@ -113,6 +117,11 @@ pub fn capture_into(
     if let Some(name) = &opts.select {
         let id = game.scene().borrow().find_entity_by_name(name);
         ui.selected_entity_id = Some(id.ok_or_else(|| format!("no entity named {name:?}"))?);
+    }
+    let framed = ui.selected_entity_id.filter(|_| opts.frame_selected);
+    let bounds = framed.and_then(|id| selection_bounds(&game.scene().borrow(), id));
+    if let Some((center, radius)) = bounds {
+        ui.scene_view.camera.frame(center, radius);
     }
     let Some(renderer) = host.renderer(width, height) else {
         log::warn!("[EditorCapture] no GPU/software adapter available — skipping capture");
@@ -208,11 +217,7 @@ fn render_viewport(
     let scene = game.scene().borrow();
     let scene_tab = ui.viewport_tab == ViewportTab::Scene;
     view.ui.screen_in_editor = scene_tab && ui.ui_overlay;
-    let camera = if scene_tab {
-        game.camera().borrow().clone()
-    } else {
-        crate::scene::game_camera_from_scene(&game.camera().borrow(), &scene)
-    };
+    let camera = super::viewport::viewport_camera(ui, game, &scene, ui.viewport_tab);
     renderer.render(view, &scene, &camera, &target, scene_tab);
     super::viewport::rebind_egui_texture(egui_renderer, &renderer.device, texture_id, view);
 }

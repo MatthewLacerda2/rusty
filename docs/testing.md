@@ -191,8 +191,9 @@ make editor-capture OUT=after.png ARGS="--select Player"
 ```
 
 Options: `--scene <path>` (default: the built-in default scene, in memory), `--select
-<name>`, `--play` (the Play-mode chrome; the sim is not stepped), `--game` (the Game
-tab), `--size <W>x<H>` (default 1600x900). From Rust, `capture::capture(&game,
+<name>`, `--frame` (frame the selection in the Scene view, as the F key does), `--play`
+(the Play-mode chrome; the sim is not stepped), `--game` (the Game tab), `--size <W>x<H>`
+(default 1600x900). From Rust, `capture::capture(&game,
 path, &EditorCaptureOptions { .. })` takes any `GameWorld`, and `capture_into` shares a
 `CaptureHost` across shots.
 

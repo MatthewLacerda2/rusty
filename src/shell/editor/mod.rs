@@ -188,6 +188,12 @@ impl Frontend for EditorFrontend {
         let _ = self.egui_winit.on_window_event(&shell.window, event);
     }
 
+    /// Raw mouse motion feeds egui too, so Scene-view look keeps turning while the
+    /// cursor is locked (#745).
+    fn on_mouse_motion(&mut self, delta: (f64, f64)) {
+        self.egui_winit.on_mouse_motion(delta);
+    }
+
     /// The game hears input only while playing with the Game view focused.
     fn game_has_input(&self, game: &GameWorld) -> bool {
         game.is_playing() && self.game_focused
@@ -204,8 +210,12 @@ impl Frontend for EditorFrontend {
         self.focus_on_transition(transition);
     }
 
-    /// The game's request, unless Esc freed the cursor (#576).
+    /// The game's request, unless Esc freed the cursor (#576). RMB mouse look in the
+    /// Scene view hides and locks it, as Unity does (#745).
     fn cursor(&self, game: &GameWorld) -> CursorState {
+        if self.editor_ui.scene_view.looking {
+            return CursorState::PLAY;
+        }
         let requested = game.input().borrow().cursor();
         self.cursor_release
             .effective(requested, self.game_has_input(game))
