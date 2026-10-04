@@ -72,3 +72,7 @@ pub(super) fn register_post_params<'scope>(
         }),
     )
 }
+
+#[cfg(test)]
+#[path = "post_params_tests.rs"]
+mod post_params_tests;
