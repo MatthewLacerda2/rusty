@@ -23,7 +23,7 @@
 //! [`CursorState`] here; the platform layer applies it to the OS cursor. The
 //! clipboard works the same way ([`clipboard`](crate::core::clipboard), #612).
 
-use std::collections::{HashMap, HashSet};
+use crate::core::collections::{Map, Set};
 
 use crate::core::clipboard::ClipboardRecord;
 use crate::core::gamepad::PadRecords;
@@ -54,8 +54,8 @@ impl CursorState {
 /// `pending` between ticks, published as `current` by [`InputState::begin_tick`].
 #[derive(Clone, Debug, Default)]
 struct TickInput {
-    down: HashSet<String>,
-    up: HashSet<String>,
+    down: Set<String>,
+    up: Set<String>,
     mouse_delta: (f64, f64),
     scroll: f64,
     text: String,
@@ -63,15 +63,15 @@ struct TickInput {
 
 #[derive(Clone, Debug)]
 pub struct InputState {
-    keys_down: HashSet<String>,
+    keys_down: Set<String>,
     /// Game-view pixels, origin top-left (the platform maps window → game view).
     mouse_position: (f64, f64),
     pending: TickInput,
     current: TickInput,
     cursor: CursorState,
     /// Named axes as last written; copied into `current_axes` at the tick boundary.
-    pending_axes: HashMap<String, f32>,
-    current_axes: HashMap<String, f32>,
+    pending_axes: Map<String, f32>,
+    current_axes: Map<String, f32>,
     /// Connected pads, dead zones and rumble requests (#471).
     pub pads: PadRecords,
     /// The clipboard text captured at a boundary, and the game's write (#612).
@@ -81,13 +81,13 @@ pub struct InputState {
 impl Default for InputState {
     fn default() -> Self {
         Self {
-            keys_down: HashSet::new(),
+            keys_down: Set::default(),
             mouse_position: (0.0, 0.0),
             pending: TickInput::default(),
             current: TickInput::default(),
             cursor: CursorState::FREE,
-            pending_axes: HashMap::new(),
-            current_axes: HashMap::new(),
+            pending_axes: Map::default(),
+            current_axes: Map::default(),
             pads: PadRecords::default(),
             clipboard: ClipboardRecord::default(),
         }

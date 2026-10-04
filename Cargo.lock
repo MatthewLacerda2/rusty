@@ -2697,6 +2697,7 @@ dependencies = [
  "pollster",
  "proptest",
  "rapier3d",
+ "rustc-hash 2.1.2",
  "scorsese-zimmer",
  "serde",
  "serde_json",

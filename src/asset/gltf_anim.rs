@@ -7,8 +7,8 @@
 //! `gltf` crate + `glam`, never wgpu/egui/mlua.
 
 use super::anim_data::{AnimationClip, Interpolation, JointTrack, Track};
+use crate::core::collections::Map;
 use glam::{Quat, Vec3};
-use std::collections::HashMap;
 
 /// Read every animation in the document into clips bound to `joint_nodes` (the skin's
 /// joint slots, by glTF node index). Clips with no track for any of these joints are
@@ -18,7 +18,7 @@ pub fn clips_for_skin(
     buffers: &[gltf::buffer::Data],
     joint_nodes: &[usize],
 ) -> Vec<AnimationClip> {
-    let slot_of: HashMap<usize, usize> = joint_nodes
+    let slot_of: Map<usize, usize> = joint_nodes
         .iter()
         .enumerate()
         .map(|(slot, &node)| (node, slot))
@@ -38,7 +38,7 @@ fn clip_from_animation(
     animation: &gltf::Animation,
     index: usize,
     buffers: &[gltf::buffer::Data],
-    slot_of: &HashMap<usize, usize>,
+    slot_of: &Map<usize, usize>,
     joint_count: usize,
 ) -> AnimationClip {
     let name = animation

@@ -1,5 +1,6 @@
 pub mod application;
 pub mod clipboard;
+pub mod collections;
 pub mod curve;
 pub mod frame_stats;
 pub mod gamepad;

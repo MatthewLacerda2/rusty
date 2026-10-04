@@ -31,7 +31,7 @@ mod orca_tests;
 #[cfg(test)]
 mod tests;
 
-use std::collections::HashMap;
+use crate::core::collections::Map;
 
 use glam::Vec2;
 
@@ -112,8 +112,8 @@ fn cell_of(p: Vec2) -> (i32, i32) {
 
 /// Bucket agent indices by a grid of `NEIGHBOR_DISTANCE`-sized cells, so a query
 /// only scans the 3×3 block around it. Buckets fill in index order.
-fn build_grid(agents: &[AvoidanceAgent]) -> HashMap<(i32, i32), Vec<usize>> {
-    let mut grid: HashMap<(i32, i32), Vec<usize>> = HashMap::new();
+fn build_grid(agents: &[AvoidanceAgent]) -> Map<(i32, i32), Vec<usize>> {
+    let mut grid: Map<(i32, i32), Vec<usize>> = Map::default();
     for (i, a) in agents.iter().enumerate() {
         grid.entry(cell_of(a.position)).or_default().push(i);
     }
@@ -124,7 +124,7 @@ fn build_grid(agents: &[AvoidanceAgent]) -> HashMap<(i32, i32), Vec<usize>> {
 /// (ties by index).
 fn neighbors(
     agents: &[AvoidanceAgent],
-    grid: &HashMap<(i32, i32), Vec<usize>>,
+    grid: &Map<(i32, i32), Vec<usize>>,
     i: usize,
 ) -> Vec<usize> {
     let me = agents[i].position;

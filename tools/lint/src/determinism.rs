@@ -1,7 +1,9 @@
 //! Determinism gate — protects the headless harness's bit-determinism.
 //!
 //! The simulation must be a pure function of (seed, inputs, fixed dt). Wall-clock
-//! reads and unseeded RNG break replayability, so they are banned from the sim.
+//! reads and unseeded RNG break replayability, so they are banned from the sim —
+//! and so are `std`'s hash maps, whose OS-seeded hasher is an unseeded RNG that
+//! decides their iteration order (#764).
 //! **Clippy enforces the ban** (#757): `clippy.toml` lists the banned items under
 //! `disallowed-methods` / `disallowed-types` and `Cargo.toml` denies both lints.
 //! Clippy matches resolved paths, so an alias (`use std::time::Instant as Clock`)
@@ -35,6 +37,9 @@ const BANNED: &[&str] = &[
     "rand::rng",
     "std::time::Instant",
     "std::time::SystemTime",
+    "std::collections::HashMap",
+    "std::collections::HashSet",
+    "std::hash::RandomState",
 ];
 
 /// The `Cargo.toml` `[lints.clippy]` lines that turn the ban into an error.

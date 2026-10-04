@@ -8,7 +8,7 @@
 //! cutoffs and the send move with kira's 10 ms tween, so a snapshot stepped once a
 //! frame never clicks.
 
-use std::collections::HashMap;
+use crate::core::collections::Map;
 
 use kira::backend::Backend;
 use kira::effect::filter::{FilterBuilder, FilterHandle, FilterMode};
@@ -42,7 +42,7 @@ pub struct GroupTrack {
 
 /// Every group's track plus the reverb bus they send to.
 pub struct GroupTracks {
-    tracks: HashMap<GroupId, GroupTrack>,
+    tracks: Map<GroupId, GroupTrack>,
     reverb: ReverbBus,
 }
 
@@ -50,7 +50,7 @@ impl GroupTracks {
     /// The reverb bus (dry: no zone yet), ready for groups to be added.
     pub fn new<B: Backend>(manager: &mut AudioManager<B>) -> Option<Self> {
         Some(Self {
-            tracks: HashMap::new(),
+            tracks: Map::default(),
             reverb: ReverbBus::new(manager, &ReverbParams::DRY)?,
         })
     }

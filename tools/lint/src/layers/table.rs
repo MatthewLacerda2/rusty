@@ -39,8 +39,8 @@ pub const LAYERS: &[Layer] = &[
     // The data the sim runs on.
     sim("core", &[]),
     sim("time", &[]),
-    sim("asset", &[]),
-    sim("procgen", &[]),
+    sim("asset", &["core"]),
+    sim("procgen", &["core"]),
     // Shader authoring; GPU-free composition lives here so `render` imports it (#722).
     sim("shadergen", &[]),
     sim("components", &["asset", "core", "procgen"]),
@@ -53,8 +53,8 @@ pub const LAYERS: &[Layer] = &[
     ),
     // The in-game UI's layout runs headless inside the sim (#417).
     sim("ui", &["components", "core", "ecs", "scene"]),
-    sim("physics", &["components", "ecs", "scene", "time"]),
-    sim("navigation", &["components", "physics", "scene"]),
+    sim("physics", &["components", "core", "ecs", "scene", "time"]),
+    sim("navigation", &["components", "core", "physics", "scene"]),
     // `scripting` and `api` are one layer (see PEERS): scripting installs the Lua
     // surface, and the surface reads runtime state scripting owns.
     sim(

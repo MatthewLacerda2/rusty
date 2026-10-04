@@ -21,7 +21,7 @@
 //! differ from identity are stored, so a default (unremapped) install persists an
 //! empty object. Loaded at startup, editable at runtime.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use serde_json::{Map, Value};
 
@@ -36,8 +36,8 @@ pub const KEYBINDINGS_KEY: &str = "bindings";
 #[derive(Clone, Debug, Default)]
 pub struct Keymap {
     /// Only non-identity overrides are stored; a physical key with no entry maps to
-    /// itself.
-    overrides: HashMap<String, String>,
+    /// itself. Ordered, because [`Keymap::to_json`] writes them out in this order.
+    overrides: BTreeMap<String, String>,
 }
 
 impl Keymap {

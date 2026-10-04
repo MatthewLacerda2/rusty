@@ -10,7 +10,7 @@
 //! largest solver impulse, and its deepest point. Only contacts that actually
 //! touch count — rapier's speculative ones are ignored (`TOUCH_TOLERANCE`).
 
-use std::collections::HashMap;
+use crate::core::collections::Map;
 
 use glam::Vec3;
 use rapier3d::prelude::*;
@@ -148,7 +148,7 @@ impl BodyVelocity {
 }
 
 /// Pre-solve velocities of every moving body, read by the contact collector.
-pub(super) type VelocitySnapshot = HashMap<RigidBodyHandle, BodyVelocity>;
+pub(super) type VelocitySnapshot = Map<RigidBodyHandle, BodyVelocity>;
 
 impl PhysicsWorld {
     /// Capture every non-fixed body's velocity before the pipeline solves the
@@ -172,7 +172,7 @@ impl PhysicsWorld {
     /// key, each with its strongest contact. A disabled collider or body generates no contacts, so the pairs
     /// follow the same liveness rule as the queries (#521).
     pub(super) fn collect_contact_pairs(&self, pre: &VelocitySnapshot) -> Vec<CollisionPair> {
-        let body_owner: HashMap<RigidBodyHandle, u32> =
+        let body_owner: Map<RigidBodyHandle, u32> =
             self.id_to_body.iter().map(|(&id, &h)| (h, id)).collect();
         let owner_of = |c: ColliderHandle| {
             let parent = self.colliders.get(c).and_then(|c| c.parent());

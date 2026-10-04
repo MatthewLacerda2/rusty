@@ -5,16 +5,16 @@
 //! size is read from the file's header once and cached per path — like fonts
 //! (`ui::text::font`). A missing or unreadable file measures zero.
 
-use std::collections::HashMap;
+use crate::core::collections::Map;
 use std::sync::{Mutex, OnceLock};
 
 use glam::Vec2;
 
-type Cache = Mutex<HashMap<String, Vec2>>;
+type Cache = Mutex<Map<String, Vec2>>;
 
 fn cache() -> &'static Cache {
     static CACHE: OnceLock<Cache> = OnceLock::new();
-    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+    CACHE.get_or_init(|| Mutex::new(Map::default()))
 }
 
 /// The texture at `path`'s size in texels, zero when it cannot be read.
