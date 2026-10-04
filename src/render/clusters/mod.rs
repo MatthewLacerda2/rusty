@@ -48,3 +48,6 @@ mod bin_tests;
 #[cfg(test)]
 #[path = "gpu_tests.rs"]
 mod gpu_tests;
+#[cfg(test)]
+#[path = "spheres_tests.rs"]
+mod spheres_tests;

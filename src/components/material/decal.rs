@@ -87,3 +87,37 @@ impl DecalBlend {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::components::MaterialAsset;
+
+    #[test]
+    fn an_omitted_decal_key_takes_its_default() {
+        let blend: DecalBlend = serde_json::from_str(r#"{ "normal": 0.0 }"#).unwrap();
+        assert_eq!(blend.normal, 0.0);
+        assert_eq!(blend.angle_fade, 60.0);
+        assert_eq!(blend.albedo, 1.0);
+    }
+
+    #[test]
+    fn the_decal_fields_are_written_only_when_they_differ_from_the_defaults() {
+        let plain = serde_json::to_string(&MaterialAsset::default()).unwrap();
+        assert!(!plain.contains("decal"), "{plain}");
+        let shy = MaterialAsset {
+            receive_decals: false,
+            decal: DecalBlend {
+                angle_fade: 30.0,
+                ..DecalBlend::default()
+            },
+            ..MaterialAsset::default()
+        };
+        let json = serde_json::to_string(&shy).unwrap();
+        assert!(json.contains(r#""receive_decals":false"#), "{json}");
+        assert!(json.contains(r#""angle_fade":30.0"#), "{json}");
+        let back: MaterialAsset = serde_json::from_str(&json).unwrap();
+        assert!(!back.receive_decals);
+        assert_eq!(back.decal, shy.decal);
+    }
+}

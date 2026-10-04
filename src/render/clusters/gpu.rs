@@ -107,7 +107,7 @@ impl Renderer {
 
 /// The range and index lists the shader reads: the lights' ranges, then the
 /// decals' shifted past the lights' indices, and both index lists back to back.
-fn concat(lights: &Binned, decals: &Binned) -> (Vec<[u32; 2]>, Vec<u32>) {
+pub(super) fn concat(lights: &Binned, decals: &Binned) -> (Vec<[u32; 2]>, Vec<u32>) {
     let base = lights.indices.len() as u32;
     let mut ranges = Vec::with_capacity(2 * CLUSTER_COUNT);
     ranges.extend_from_slice(&lights.ranges);
