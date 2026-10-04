@@ -16,10 +16,10 @@ fn built() -> Scene {
 fn the_cast_keeps_its_names_and_ids() {
     let scene = built();
     let cast = [
-        ("Floor_Plane", 1),
+        ("Pool_Floor", 1),
         ("Player", 2),
-        ("Obstacle_Wall_Left", 3),
-        ("Obstacle_Wall_Right", 4),
+        ("Ramp_South", 3),
+        ("Ramp_North", 4),
         ("Enemy_1", 5),
         ("Sun", 6),
     ];
@@ -89,24 +89,6 @@ fn the_enemy_stops_clear_of_the_player() {
         "{}",
         agent.stopping_distance
     );
-}
-
-/// The enemy's straight line to the Player crosses its cover wall, so its first
-/// chase has to path round it.
-#[test]
-fn the_cover_wall_stands_between_enemy_and_player() {
-    let scene = built();
-    let at = |name| {
-        let id = scene.find_entity_by_name(name).unwrap();
-        scene.world.transform(id).unwrap().clone()
-    };
-    let (enemy, player, wall) = (at("Enemy_1"), at("Player"), at("Obstacle_Wall_Left"));
-    let half = wall.scale * 0.5;
-    let crosses = (0..=100).any(|i| {
-        let p = enemy.position.lerp(player.position, i as f32 / 100.0);
-        (p.x - wall.position.x).abs() < half.x && (p.z - wall.position.z).abs() < half.z
-    });
-    assert!(crosses, "the wall is off the enemy's line");
 }
 
 #[test]

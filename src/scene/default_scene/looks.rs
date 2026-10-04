@@ -11,18 +11,21 @@ use std::collections::BTreeMap;
 use crate::procgen::recipe::{Node, OpKind};
 use crate::procgen::TextureRecipe;
 use crate::scene::authoring::material::{self as mat, MaterialLibrary};
-use crate::scene::MaterialAsset;
+use crate::scene::{MaterialAsset, RenderMode};
 use crate::shadergen::recipe::ParamValue;
 use crate::shadergen::{BlockSel, PassKind, ShaderRecipe};
 
-/// The checkerboard floor material; it carries the checker recipe (its `maps`), so
-/// `Material.Rebake("checker")` regenerates the texture.
+/// The pool's tiles (its floor, ramps and the jacuzzi basin): the material that
+/// carries the checker recipe (its `maps`), so `Material.Rebake("checker")`
+/// regenerates the texture.
 pub const FLOOR: &str = "checker";
+pub const DECK: &str = "deck";
 pub const PLAYER: &str = "plastic_blue";
 pub const WALL: &str = "concrete";
 pub const ENEMY: &str = "enemy_red";
 pub const CRATE: &str = "crate";
-pub const METAL: &str = "metal";
+/// Translucent blue over the pool and the jacuzzi (#242's transparent mode).
+pub const WATER: &str = "water";
 
 /// Where the checker bakes: `<MAPS_DIR>/<FLOOR>_base_color.png`, the path
 /// `authoring::material::bake_maps` writes for the floor material.
@@ -77,12 +80,13 @@ struct Look {
 }
 
 const LOOKS: &[Look] = &[
-    look(FLOOR, [0.86, 0.88, 0.92], 0.0, 0.85, true),
+    look(FLOOR, [0.8, 0.9, 0.98], 0.0, 0.3, true),
+    look(DECK, [0.86, 0.8, 0.68], 0.0, 0.9, true),
     look(PLAYER, [0.3, 0.6, 1.0], 0.0, 0.35, false),
     look(WALL, [0.78, 0.74, 0.68], 0.0, 0.9, true),
     look(ENEMY, [0.85, 0.12, 0.12], 0.1, 0.45, false),
     look(CRATE, [0.72, 0.5, 0.3], 0.0, 0.7, true),
-    look(METAL, [0.9, 0.9, 0.92], 1.0, 0.22, false),
+    look(WATER, [0.2, 0.55, 0.85], 0.0, 0.05, false),
 ];
 
 const fn look(
@@ -120,4 +124,6 @@ pub(super) fn define_all(materials: &mut MaterialLibrary) {
         }
     }
     mat::set_shader(materials, ENEMY, SHADER_NAME.to_string());
+    mat::set_render_mode(materials, WATER, RenderMode::Transparent);
+    mat::set_alpha(materials, WATER, 0.45);
 }

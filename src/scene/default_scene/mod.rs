@@ -9,20 +9,28 @@
 //! `add_component`, the per-component `set_*` ops, `authoring::material`) — the same
 //! path the editor and the Lua API take — never a parallel one.
 //!
-//! The layout demonstrates what already works:
-//! - Enemy_1 starts behind a cover wall, so its first chase paths **around** it;
-//! - a crate and a metal sphere sit on the floor for contact shadows;
-//! - a handful of material looks: the checkerboard floor, tinted-checker walls and
-//!   crate, glossy plastic, polished metal, and the enemy's baked rim shader.
+//! The layout is a greybox of **fy_pool_day**, Counter-Strike's fight yard (#747),
+//! built from boxes and planes only: a walled yard, a sunken pool between the two
+//! spawns with a ramp at each end, translucent water with no collider, a raised
+//! jacuzzi you jump into, and crates for cover. It exercises layered navigation
+//! (the bot chases down one ramp and up the other), character-controller slopes,
+//! and shadows at level scale. Enemy_1 starts behind a crate, so its first chase
+//! paths **around** it.
 //!
-//! The straight line from the Player to Enemy_1 stays clear up to 4 m from the enemy:
-//! the bot-player (`project/scripts/bot_player.lua`) walks it with no pathing.
+//! The straight line from the Player to Enemy_1 stays walkable and clear up to 4 m
+//! from the enemy: the bot-player (`project/scripts/bot_player.lua`) walks it with
+//! no pathing, down one ramp, across the bottom and up the other.
 //!
-//! Submodules: `looks` (materials, the checker recipe, the default shader recipe),
-//! `seed` (bakes those into `project/assets/` — the only I/O here).
+//! Submodules: `layout` (every measurement, shared with the tests), `yard` (deck,
+//! walls, crates), `pool` (pool, ramps, water, jacuzzi), `looks` (materials, the
+//! checker recipe, the default shader recipe), `seed` (bakes those into
+//! `project/assets/` — the only I/O here).
 
+pub mod layout;
 mod looks;
+mod pool;
 mod seed;
+mod yard;
 
 use glam::{Quat, Vec3};
 
@@ -47,16 +55,29 @@ pub const ENEMY_STOPPING_DISTANCE: f32 = 1.5;
 /// leaves it unscripted (the harness's default, so a test drives the enemy itself).
 /// Pure: no I/O, no RNG — the maps and shader it names are seeded separately.
 ///
-/// Ids are stable (Floor 1, Player 2, walls 3–4, Enemy_1 5, Sun 6, props 7–8).
+/// Ids are stable (Pool_Floor 1, Player 2, ramps 3–4, Enemy_1 5, Sun 6); the deck,
+/// walls, water, jacuzzi and crates follow from 7.
 pub fn build(scene: &mut Scene, bot_script: &str) {
     looks::define_all(&mut scene.materials);
-    add_floor(scene);
+    pool::add_floor(scene);
     add_player(scene);
-    add_walls(scene);
+    pool::add_ramps(scene);
     add_enemy(scene, bot_script);
     add_sun(scene);
-    add_props(scene);
+    yard::add_deck(scene);
+    yard::add_walls(scene);
+    pool::add_water(scene);
+    pool::add_jacuzzi(scene);
+    yard::add_crates(scene);
     scene.update_all_colliders();
+}
+
+/// A static box spanning `min`..`max` wearing `material`, with a unit box collider
+/// the transform scales.
+fn block(scene: &mut Scene, name: &str, min: Vec3, max: Vec3, material: &str) -> u32 {
+    let at = ((min + max) * 0.5, max - min);
+    let unit = ColliderShape::Box { size: Vec3::ONE };
+    solid(scene, name, Primitive::Box, at, unit, material)
 }
 
 /// A static mesh primitive at `pos`/`scale` wearing `material`, with a collider of
@@ -108,21 +129,6 @@ fn character(scene: &mut Scene, id: u32, height: f32, radius: f32) {
     cc::set_radius(&mut c, radius);
 }
 
-/// Floor (id 1): a 15 m plane scaled 2.5 — ±18.75 m, the nav tests' arena.
-fn add_floor(scene: &mut Scene) {
-    let size = Vec3::new(15.0, 0.1, 15.0);
-    let at = (Vec3::ZERO, Vec3::new(2.5, 1.0, 2.5));
-    let shape = ColliderShape::Box { size };
-    solid(
-        scene,
-        "Floor_Plane",
-        Primitive::Plane,
-        at,
-        shape,
-        looks::FLOOR,
-    );
-}
-
 /// Player (id 2): a 1.6 m × 0.5 m cylinder — the unit primitive scaled, its capsule
 /// scaling with it.
 fn add_player(scene: &mut Scene) {
@@ -130,7 +136,7 @@ fn add_player(scene: &mut Scene) {
     place(
         scene,
         id,
-        Vec3::new(0.0, 1.5, -6.0),
+        Vec3::from(layout::PLAYER_SPAWN),
         Vec3::new(1.0, 1.6, 1.0),
     );
     character(scene, id, 1.0, 0.5);
@@ -138,31 +144,9 @@ fn add_player(scene: &mut Scene) {
     attach_script(scene, id, PLAYER_CONTROLLER_SCRIPT);
 }
 
-/// Walls (ids 3, 4). The left one is Enemy_1's cover: it crosses the enemy's straight
-/// line to the Player, so its first chase goes round an end.
-fn add_walls(scene: &mut Scene) {
-    let unit = || ColliderShape::Box { size: Vec3::ONE };
-    let cover = (Vec3::new(7.5, 1.0, 6.0), Vec3::new(4.0, 2.0, 0.6));
-    solid(
-        scene,
-        "Obstacle_Wall_Left",
-        Primitive::Box,
-        cover,
-        unit(),
-        looks::WALL,
-    );
-    let right = (Vec3::new(-3.0, 1.0, 4.0), Vec3::new(4.0, 2.0, 1.0));
-    solid(
-        scene,
-        "Obstacle_Wall_Right",
-        Primitive::Box,
-        right,
-        unit(),
-        looks::WALL,
-    );
-}
-
-/// Enemy_1 (id 5): a 2 m × 1.3 m box chasing the Player on the navmesh. Its body is
+/// Enemy_1 (id 5): a 2 m × 1.3 m box chasing the Player on the navmesh, from the +z
+/// spawn behind its cover crate; unscripted, it heads for the pool's middle (its
+/// authored target, the origin), down the north ramp. Its body is
 /// centred on its origin, so the agent stands it 1 m above its feet (#666). The agent
 /// is authored here, active, and `bot.lua` never overrides it (#743): its stopping
 /// distance is measured centre to centre, so it clears both bodies — the box's
@@ -172,7 +156,7 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
     place(
         scene,
         id,
-        Vec3::new(8.0, 1.0, 8.0),
+        Vec3::from(layout::ENEMY_SPAWN),
         Vec3::new(1.3, 2.0, 1.3),
     );
     character(scene, id, 1.0, 0.5);
@@ -199,8 +183,8 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
     }
 }
 
-/// Sun (id 6): a warm directional light from high to one side, so every prop drops
-/// a shadow across the checker.
+/// Sun (id 6): a warm directional light from high to one side, so the walls and
+/// crates drop shadows across the deck and into the pool.
 fn add_sun(scene: &mut Scene) {
     let id = create_entity(scene, "Sun", Some(Primitive::DirectionalLight));
     scene.world.set_static(id, true);
@@ -214,23 +198,7 @@ fn add_sun(scene: &mut Scene) {
     authoring::light::set_intensity(&mut l, 1.2);
 }
 
-/// Props (ids 7, 8): a crate and a polished sphere resting on the floor, off the
-/// Player's and the enemy's routes.
-fn add_props(scene: &mut Scene) {
-    let crate_at = (Vec3::new(-6.0, 0.5, -1.0), Vec3::ONE);
-    let unit = ColliderShape::Box { size: Vec3::ONE };
-    solid(scene, "Crate", Primitive::Box, crate_at, unit, looks::CRATE);
-    let ball_at = (Vec3::new(-3.5, 0.75, -2.5), Vec3::splat(0.75));
-    let ball = ColliderShape::Sphere { radius: 1.0 };
-    solid(
-        scene,
-        "Metal_Sphere",
-        Primitive::Sphere,
-        ball_at,
-        ball,
-        looks::METAL,
-    );
-}
-
+#[cfg(test)]
+mod layout_tests;
 #[cfg(test)]
 mod tests;

@@ -1,6 +1,7 @@
 //! The whole frame through `GameWorld` — `bot.lua`, the CharacterController's
 //! physics body and the navigation tick together — so nothing downstream of the nav
-//! move (defect 5 in #666: physics overriding it) sinks or blocks the bot.
+//! move (defect 5 in #666: physics overriding it) sinks or blocks the bot, on the
+//! deck or down the pool's ramps (#747).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -11,12 +12,15 @@ use rusty::core::input::InputState;
 use rusty::navigation::NavigationGraph;
 use rusty::scripting::ConsoleLogs;
 
-use super::{assert_on_floor, default_scene, planar, reach, FLOOR_HALF};
+use super::{
+    assert_grounded, assert_in_pool_only_by_ramp, default_scene, home, planar, pool_middle, reach,
+    INNER, WALL_MARGIN,
+};
 
 const DT: f32 = 1.0 / 60.0;
 
-/// Play `ticks` frames with the Player pinned at `player` (flying: no gravity in the
-/// default scene); returns where Enemy_1 ends.
+/// Play `ticks` frames with the Player pinned at `player` (re-placed every frame, so
+/// it hovers); returns where Enemy_1 ends.
 fn play(world: &mut GameWorld, player_id: u32, enemy: u32, player: Vec3, ticks: u32) -> Vec3 {
     for frame in 0..ticks {
         let scene = Rc::clone(world.scene());
@@ -28,7 +32,9 @@ fn play(world: &mut GameWorld, player_id: u32, enemy: u32, player: Vec3, ticks: 
             .position = player;
         world.tick(DT);
         let pos = scene.borrow().world.transform(enemy).unwrap().position;
-        assert_on_floor(pos, &format!("playing toward {player} (frame {frame})"));
+        let when = format!("playing toward {player} (frame {frame})");
+        assert_grounded(pos, &when);
+        assert_in_pool_only_by_ramp(pos, &when);
     }
     let scene = world.scene().borrow();
     let pos = scene.world.transform(enemy).unwrap().position;
@@ -36,7 +42,7 @@ fn play(world: &mut GameWorld, player_id: u32, enemy: u32, player: Vec3, ticks: 
 }
 
 #[test]
-fn default_scene_bot_stays_on_the_floor_when_the_player_flies_off_it() {
+fn default_scene_bot_stays_in_the_yard_and_follows_through_the_pool() {
     rusty::scene::seed_default_scripts();
     let (scene, enemy) = default_scene();
     let reach = reach(&scene, enemy);
@@ -50,16 +56,20 @@ fn default_scene_bot_stays_on_the_floor_when_the_player_flies_off_it() {
     );
     world.set_playing(true);
 
-    let off = play(&mut world, player_id, enemy, Vec3::new(25.0, 1.5, 8.0), 600);
+    let off = play(&mut world, player_id, enemy, Vec3::new(17.0, 1.5, 8.0), 600);
     assert!(
-        off.x > FLOOR_HALF - 0.75 - reach,
-        "stopped short of the edge: {off}"
+        off.x > INNER.0 - WALL_MARGIN - 0.75 - reach,
+        "stopped short of the wall: {off}"
     );
 
-    let home = Vec3::new(0.0, 1.5, -6.0);
-    let back = play(&mut world, player_id, enemy, home, 900);
+    let down = play(&mut world, player_id, enemy, pool_middle(), 900);
     assert!(
-        planar(back, home) < reach + 0.1,
-        "could not climb back: {back}"
+        planar(down, pool_middle()) < reach + 0.1,
+        "never got down into the pool: {down}"
+    );
+    let back = play(&mut world, player_id, enemy, home(), 900);
+    assert!(
+        planar(back, home()) < reach + 0.1,
+        "could not climb back out: {back}"
     );
 }
