@@ -14,7 +14,7 @@
 //! **Lifecycle (#639).** A decal may stick to an *owner* entity (its box is kept in
 //! the owner's space and follows it), may have a lifetime with a fade-out, and has
 //! an id a script can remove it by. Ageing runs on the fixed sim tick
-//! ([`DecalSet::tick`]), never the wall clock; the registry is in [`registry`].
+//! ([`DecalSet::tick`]), never the wall clock; the registry is [`DecalSet`].
 
 use glam::camera::rh::view::look_to_mat4;
 use glam::{Mat4, Quat, Vec3};
