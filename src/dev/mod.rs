@@ -22,6 +22,7 @@
 //!   snapshot    — world -> JSON observation
 //!   lua_surface — `Debug.*` and the `*.Bake` verbs, installed onto the Lua surface (#737)
 //!   stats       — frame stats: the schedule timing probe + render counters (#433)
+//!   bench       — the stress scene and report behind `make bench` (#835)
 //!
 //! Status: harness + scenario runner implemented (issue #3); offscreen screenshot
 //! implemented (issue #7); bot-player example implemented (issue #10).
@@ -31,6 +32,7 @@
 // platform rows may opt out (`make determinism`).
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
+pub mod bench;
 pub mod botplayer;
 pub mod bridge;
 pub mod capture;

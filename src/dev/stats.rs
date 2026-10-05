@@ -23,9 +23,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;
 
+use super::capture::RenderedFrame;
 use crate::app::{GameWorld, Resources, Stage, SystemProbe, World};
 use crate::core::frame_stats::{FrameStats, Series};
-use crate::render::RenderCounters;
 
 /// The metric each per-frame stage's CPU time is recorded under.
 fn stage_key(stage: Stage) -> &'static str {
@@ -115,17 +115,25 @@ pub fn install(world: &mut GameWorld) -> Rc<RefCell<FrameStats>> {
     stats
 }
 
-/// Fold one rendered frame's counters, and the CPU ms the renderer spent recording
-/// it, into `stats`.
-pub fn record_render(stats: &mut FrameStats, counters: &RenderCounters, cpu_ms: f64) {
-    for (key, value) in counters.pairs() {
+/// Fold one rendered frame into `stats`: its counters, the CPU ms the renderer spent
+/// recording it, and — where the adapter has timestamps — its GPU ms in total
+/// (`gpu_ms`) and per pass kind (#835). Without timestamps no GPU key is written.
+pub fn record_render(stats: &mut FrameStats, frame: &RenderedFrame) {
+    for (key, value) in frame.counters.pairs() {
         stats.record(key, value as f64);
     }
-    stats.record("renderer_ms", cpu_ms);
+    stats.record("renderer_ms", frame.cpu_ms);
+    if let Some(gpu) = &frame.gpu {
+        stats.record("gpu_ms", gpu.total_ms());
+        for (pass, ms) in &gpu.passes {
+            stats.record_gpu_pass(pass.name(), *ms);
+        }
+    }
 }
 
 /// The stats as the Lua table `Debug.Stats()` / `Harness.Stats()` return:
-/// `{ frames = n, <metric> = {last, min, avg, max, samples}, …, systems = { <name> = … } }`.
+/// `{ frames = n, <metric> = {last, min, avg, max, samples}, …, systems = { <name> = … },
+/// gpu_passes = { <pass> = … } }` — `gpu_passes` only where GPU time was measured.
 pub fn to_lua(lua: &mlua::Lua, stats: &FrameStats) -> mlua::Result<mlua::Table> {
     let series = |s: &Series| -> mlua::Result<mlua::Table> {
         let t = lua.create_table()?;
@@ -146,6 +154,14 @@ pub fn to_lua(lua: &mlua::Lua, stats: &FrameStats) -> mlua::Result<mlua::Table> 
         systems.set(name.as_str(), series(s)?)?;
     }
     out.set("systems", systems)?;
+    // Absent, not empty, where the adapter has no timestamps (#835).
+    if !stats.gpu_passes.is_empty() {
+        let passes = lua.create_table()?;
+        for (name, s) in &stats.gpu_passes {
+            passes.set(name.as_str(), series(s)?)?;
+        }
+        out.set("gpu_passes", passes)?;
+    }
     Ok(out)
 }
 

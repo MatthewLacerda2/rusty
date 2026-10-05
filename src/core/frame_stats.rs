@@ -53,6 +53,9 @@ pub struct FrameStats {
     pub metrics: BTreeMap<String, Series>,
     /// Per-system CPU milliseconds, by system name — diagnostic, not budgetable.
     pub systems: BTreeMap<String, Series>,
+    /// GPU milliseconds per render-pass kind, by its stable name (#835). Empty where
+    /// the adapter has no timestamps — absent, never zero.
+    pub gpu_passes: BTreeMap<String, Series>,
 }
 
 /// Whether `key` names a wall-clock timing (non-deterministic) rather than a count.
@@ -69,6 +72,11 @@ impl FrameStats {
     /// Record `ms` of CPU time for the system named `name` this frame.
     pub fn record_system(&mut self, name: &str, ms: f64) {
         record_into(&mut self.systems, name, ms);
+    }
+
+    /// Record `ms` of GPU time for the render passes of kind `name` this frame.
+    pub fn record_gpu_pass(&mut self, name: &str, ms: f64) {
+        record_into(&mut self.gpu_passes, name, ms);
     }
 
     /// One metric's summary, if it was ever recorded.
@@ -95,9 +103,10 @@ impl FrameStats {
         }
     }
 
-    /// The stats as JSON: `{ frames, metrics: {key: series}, systems: {…} }`. With
-    /// `timings` false only the deterministic counts are kept (no `_ms` metric, no
-    /// per-system times), which is what a replay-stable `results.json` can carry.
+    /// The stats as JSON: `{ frames, metrics: {key: series}, systems: {…},
+    /// gpu_passes: {…} }`. With `timings` false only the deterministic counts are
+    /// kept (no `_ms` metric, no per-system or per-pass times), which is what a
+    /// replay-stable `results.json` can carry. `gpu_passes` is absent when empty.
     pub fn to_json(&self, timings: bool) -> Value {
         let metrics: BTreeMap<&String, &Series> = self
             .metrics
@@ -107,6 +116,9 @@ impl FrameStats {
         let mut out = json!({ "frames": self.frames, "metrics": metrics });
         if timings {
             out["systems"] = json!(self.systems);
+            if !self.gpu_passes.is_empty() {
+                out["gpu_passes"] = json!(self.gpu_passes);
+            }
         }
         out
     }

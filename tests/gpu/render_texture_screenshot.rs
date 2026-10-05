@@ -32,7 +32,11 @@ fn an_image_shows_what_a_second_camera_sees() {
         "screen right half: got {:?}",
         px(96, 64)
     );
-    let (counters, _) = host.last_frame.expect("a frame was drawn");
+    let counters = host
+        .last_frame
+        .as_ref()
+        .expect("a frame was drawn")
+        .counters;
     assert_eq!(counters.render_texture_draws, 1);
 }
 
@@ -53,7 +57,11 @@ fn without_its_camera_the_image_shows_no_picture() {
     }
     let img = image::open(&path).expect("png").to_rgb8();
     assert!(!is_red(img.get_pixel(32, 64).0), "no camera, no box");
-    let (counters, _) = host.last_frame.expect("a frame was drawn");
+    let counters = host
+        .last_frame
+        .as_ref()
+        .expect("a frame was drawn")
+        .counters;
     assert_eq!(counters.render_texture_draws, 0);
 }
 
@@ -70,7 +78,13 @@ fn update_every_skips_frames_between_draws() {
         if !shot.expect("capture must not error") {
             return;
         }
-        draws.push(host.last_frame.expect("frame").0.render_texture_draws);
+        draws.push(
+            host.last_frame
+                .as_ref()
+                .expect("frame")
+                .counters
+                .render_texture_draws,
+        );
         // The held picture still shows on the frames that skip the draw.
         let img = image::open(&path).expect("png").to_rgb8();
         assert!(is_red(img.get_pixel(32, 64).0), "frame {}", draws.len());
@@ -99,6 +113,10 @@ fn a_material_map_shows_it_on_an_in_world_monitor() {
     let img = image::open(&path).expect("png").to_rgb8();
     let centre = img.get_pixel(SIZE / 2, SIZE / 2).0;
     assert!(is_red(centre), "monitor centre: got {centre:?}");
-    let (counters, _) = host.last_frame.expect("a frame was drawn");
+    let counters = host
+        .last_frame
+        .as_ref()
+        .expect("a frame was drawn")
+        .counters;
     assert_eq!(counters.render_texture_draws, 1);
 }

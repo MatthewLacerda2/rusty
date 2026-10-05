@@ -34,7 +34,7 @@ impl ShadowRenderer {
             let volumes: Vec<Mat4> = tiles.iter().map(|t| t.view_proj).collect();
             let batches = self.prepare_casters(frame, lod, Sweep::AtlasDynamic, &volumes);
             let view = &self.atlas.view;
-            let mut pass = depth_pass(encoder, "Shadow Atlas Pass", view, true);
+            let mut pass = depth_pass(encoder, frame, "Shadow Atlas Pass", view, true);
             for (i, (tile, batches)) in tiles.iter().zip(&batches).enumerate() {
                 focus(&mut pass, tile);
                 self.atlas.blit.copy(&mut pass);
@@ -68,7 +68,7 @@ impl ShadowRenderer {
         let batches = self.prepare_casters(frame, &finest, Sweep::AtlasStatic, &volumes);
         {
             let view = &self.atlas.static_view;
-            let mut pass = depth_pass(encoder, "Shadow Atlas Static Pass", view, false);
+            let mut pass = depth_pass(encoder, frame, "Shadow Atlas Static Pass", view, false);
             for (&i, batches) in stale.iter().zip(&batches) {
                 focus(&mut pass, &tiles[i]);
                 self.atlas.blit.clear(&mut pass);

@@ -4,6 +4,7 @@
 use super::{SsaoFrame, SsaoTargets};
 use crate::render::draw::batch::DrawBatch;
 use crate::render::gpu::pipelines::surface::SolidPass;
+use crate::render::timing::GpuPass;
 use crate::render::{RenderView, Renderer};
 
 impl Renderer {
@@ -29,10 +30,11 @@ impl Renderer {
         self.queue
             .write_buffer(&targets.uniform, 0, bytemuck::bytes_of(&frame.uniform()));
         self.record_prepass(encoder, &targets.depth, solids);
-        self.ssao
-            .fullscreen(encoder, false, &targets.ao_group, &targets.raw);
-        self.ssao
-            .fullscreen(encoder, true, &targets.blur_group, &targets.ao);
+        let timer = &self.gpu_timer;
+        let ao = (&targets.ao_group, &targets.raw);
+        self.ssao.fullscreen(encoder, false, ao, timer);
+        let blur = (&targets.blur_group, &targets.ao);
+        self.ssao.fullscreen(encoder, true, blur, timer);
 
         let (w, h) = targets.raw_size;
         let c = &mut self.frame_counters;
@@ -76,7 +78,7 @@ impl Renderer {
                 }),
                 stencil_ops: None,
             }),
-            timestamp_writes: None,
+            timestamp_writes: self.gpu_timer.writes(GpuPass::Ssao),
             occlusion_query_set: None,
         });
         pass.set_bind_group(0, &self.global_bind_group, &[]);

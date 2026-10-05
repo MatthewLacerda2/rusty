@@ -30,7 +30,18 @@
 
 use std::path::Path;
 
-use crate::render::{readback, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
+use crate::render::{readback, GpuTimes, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
+use crate::scene::{Camera, Scene};
+
+/// What one captured frame cost (#433, #835).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RenderedFrame {
+    pub counters: RenderCounters,
+    /// CPU ms `Renderer::render` took to record the frame.
+    pub cpu_ms: f64,
+    /// GPU ms per render pass; `None` where the adapter has no timestamps.
+    pub gpu: Option<GpuTimes>,
+}
 
 /// A renderer + view held across captures, so N shots cost one device.
 ///
@@ -51,9 +62,9 @@ pub struct CaptureHost {
     /// Whether an adapter request has already been made. Stops a GPU-less box from
     /// paying for a failed adapter probe on every single shot.
     probed: bool,
-    /// The last shot's render counters and the CPU ms `Renderer::render` took to
-    /// record it (#433) — what a harness screenshot folds into the frame stats.
-    pub last_frame: Option<(RenderCounters, f64)>,
+    /// What the last [`draw`](Self::draw) cost — what a harness screenshot folds
+    /// into the frame stats (#433).
+    pub last_frame: Option<RenderedFrame>,
 }
 
 impl CaptureHost {
@@ -100,6 +111,37 @@ impl CaptureHost {
             self.renderer = pollster::block_on(Renderer::new_headless(width, height));
         }
         self.renderer.as_mut()
+    }
+
+    /// Render `scene` from `camera` into the host's view at `width` x `height`, and
+    /// wait for the GPU to finish it. An offline frame, so its GPU times are read
+    /// back at once instead of a frame or two later. `Ok(None)` without an adapter.
+    pub fn draw(
+        &mut self,
+        scene: &Scene,
+        camera: &Camera,
+        width: u32,
+        height: u32,
+    ) -> Result<Option<RenderedFrame>, String> {
+        let Some((renderer, view)) = self.frame(width, height) else {
+            return Ok(None);
+        };
+        let target = view
+            .color_target_view()
+            .ok_or_else(|| "capture view owns no colour target".to_string())?;
+        // The editor's exact render path (editor_mode = false: no gizmos/grid),
+        // timed for the frame stats: the dev layer may read the clock.
+        let start = std::time::Instant::now();
+        renderer.render(view, scene, camera, &target, false);
+        let cpu_ms = start.elapsed().as_secs_f64() * 1000.0;
+        renderer.wait_idle();
+        let frame = RenderedFrame {
+            counters: renderer.frame_counters,
+            cpu_ms,
+            gpu: renderer.take_gpu_times(),
+        };
+        self.last_frame = Some(frame.clone());
+        Ok(Some(frame))
     }
 
     /// Copy the view's colour target back to the CPU and encode it as a PNG at `path`.

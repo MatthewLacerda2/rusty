@@ -16,6 +16,7 @@ use crate::components::particle::ParticleBlend;
 use crate::components::ParticleRenderMode;
 use crate::render::draw::sort::back_to_front;
 use crate::render::gpu::uniforms::FogUniform;
+use crate::render::timing::GpuPass;
 use crate::render::{GpuTexture, RenderView, Renderer};
 use crate::scene::Camera;
 use crate::scene::Scene;
@@ -190,7 +191,7 @@ impl Renderer {
                     depth_ops: None,
                     stencil_ops: None,
                 }),
-                timestamp_writes: None,
+                timestamp_writes: self.gpu_timer.writes(GpuPass::Particles),
                 occlusion_query_set: None,
             });
 

@@ -83,6 +83,7 @@ impl Renderer {
             true => Vec::new(),
             false => texture_cameras(camera, scene),
         };
+        self.gpu_timer.begin_frame();
         self.sync_render_textures(view, &textures);
         self.prepare_frame(view, scene, camera);
 
@@ -112,6 +113,7 @@ impl Renderer {
             self.draw_ui(view);
         }
         self.finish_counters(view);
+        self.gpu_timer.end_frame(&self.device, &self.queue);
     }
 
     /// Upload/refresh per-frame GPU assets (meshes, textures, skybox) shared by every

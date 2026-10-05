@@ -16,6 +16,7 @@ use crate::components::{ParticleBlend, RibbonStyle};
 use crate::render::draw::sort::{back_to_front, view_depth};
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::passes::particles::ParticleDraws;
+use crate::render::timing::GpuPass;
 use crate::render::{GpuTexture, RenderView, Renderer};
 use crate::scene::{Camera, Scene};
 
@@ -116,7 +117,7 @@ impl Renderer {
                 label: Some("Ribbon Encoder"),
             });
         {
-            let mut pass = effect_pass(&mut encoder, view);
+            let mut pass = effect_pass(&mut encoder, view, self.gpu_timer.writes(GpuPass::Ribbons));
             pass.set_bind_group(0, &rr.globals_bind_group, &[]);
             pass.set_vertex_buffer(0, vertices.slice(..));
             pass.set_index_buffer(indices.slice(..), wgpu::IndexFormat::Uint32);
@@ -136,6 +137,7 @@ impl Renderer {
 fn effect_pass<'e>(
     encoder: &'e mut wgpu::CommandEncoder,
     view: &'e RenderView,
+    timestamp_writes: Option<wgpu::RenderPassTimestampWrites<'_>>,
 ) -> wgpu::RenderPass<'e> {
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         multiview_mask: None,
@@ -157,7 +159,7 @@ fn effect_pass<'e>(
             }),
             stencil_ops: None,
         }),
-        timestamp_writes: None,
+        timestamp_writes,
         occlusion_query_set: None,
     })
 }

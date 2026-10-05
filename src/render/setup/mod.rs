@@ -148,6 +148,7 @@ impl Renderer {
         let draw_buffers =
             crate::render::gpu::draw_buffers::DrawBuffers::new(&device, &entity_bones_layout);
         let default_cube = crate::render::ibl::cubemap::fallback_cube(&device);
+        let gpu_timer = crate::render::timing::GpuTimer::new(&device, &queue);
         let surface_shaders = crate::render::gpu::pipelines::surface::SurfaceShaders::new(
             crate::render::gpu::pipelines::forward_layout(
                 &device,
@@ -221,6 +222,7 @@ impl Renderer {
             static_capture: false,
             capture_probe_bounce: false,
             frame_counters: Default::default(),
+            gpu_timer,
             render_texture_ids: Default::default(),
             _gpu_permit: gpu_permit,
         }

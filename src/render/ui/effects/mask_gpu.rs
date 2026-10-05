@@ -140,7 +140,12 @@ impl Renderer {
                     continue;
                 };
                 let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
-                let mut pass = color_pass(&mut encoder, "UI Mask Pass", target, clear);
+                let mut pass = color_pass(
+                    &mut encoder,
+                    ("UI Mask Pass", &self.gpu_timer),
+                    target,
+                    clear,
+                );
                 pass.set_pipeline(&ui.mask_pipeline);
                 pass.set_vertex_buffer(0, canvas.buffer.slice(..));
                 pass.set_bind_group(0, ui.source_group(&draw.source), &[]);

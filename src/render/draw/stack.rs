@@ -88,6 +88,7 @@ impl Renderer {
             depth_view: &view.depth_view,
             skybox_view,
             output,
+            timer: &self.gpu_timer,
         };
         view.post_fx
             .run(&self.device, &self.queue, ctx, post_params, passes);

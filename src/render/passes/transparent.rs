@@ -14,6 +14,7 @@
 
 use crate::render::draw::batch::DrawBatch;
 use crate::render::gpu::pipelines::surface::SolidPass;
+use crate::render::timing::GpuPass;
 use crate::render::{RenderView, Renderer};
 
 impl Renderer {
@@ -53,7 +54,7 @@ impl Renderer {
                     }),
                     stencil_ops: None,
                 }),
-                timestamp_writes: None,
+                timestamp_writes: self.gpu_timer.writes(GpuPass::Transparent),
                 occlusion_query_set: None,
             });
             self.record_transparent(&mut pass, items);

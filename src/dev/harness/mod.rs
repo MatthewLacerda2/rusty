@@ -13,6 +13,7 @@
 //! the tick), so a scenario replays identically every run.
 //!
 //! A run produces: <out_dir>/results.json + <out_dir>/console.log + <out_dir>/stats.json.
+//! The rendering verbs (`Screenshot`, `Render`) live in `render`.
 //!
 //! Frame stats (#433): the harness installs the dev-layer timing probe, so every run
 //! records CPU ms per stage/system and world counters (render counters too, on the
@@ -32,6 +33,8 @@ use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::{ConsoleLogs, LogLevel};
+
+mod render;
 
 /// The simulation timestep. 60 Hz, fixed — the source of determinism.
 pub const FIXED_DT: f32 = 1.0 / 60.0;
@@ -147,6 +150,11 @@ impl Harness {
         }
     }
 
+    /// Where the run writes its results (and `Harness.Bench` keeps its report).
+    pub fn out_dir(&self) -> &Path {
+        &self.out_dir
+    }
+
     /// Current play-mode frame count.
     pub fn frame(&self) -> u64 {
         self.world.borrow().play_frame()
@@ -175,41 +183,6 @@ impl Harness {
     /// JSON snapshot of the current world state.
     pub fn snapshot(&self) -> Value {
         super::snapshot::snapshot(&self.world.borrow())
-    }
-
-    /// Render the current scene/camera offscreen and write a PNG to `path`.
-    ///
-    /// Returns `true` if a frame was captured, `false` if no GPU/software adapter
-    /// is available (skipped gracefully — never panics). Logs the outcome.
-    pub fn screenshot(&mut self, path: impl AsRef<Path>) -> bool {
-        let path = path.as_ref().to_path_buf();
-        let result = super::screenshot::capture_world_into(
-            &mut self.capture,
-            &self.world.borrow(),
-            &path,
-            super::screenshot::DEFAULT_WIDTH,
-            super::screenshot::DEFAULT_HEIGHT,
-        );
-        if let (Ok(true), Some((counters, ms))) = (&result, self.capture.last_frame.take()) {
-            super::stats::record_render(&mut self.stats.borrow_mut(), &counters, ms);
-        }
-        match result {
-            Ok(true) => {
-                self.log(format!("Screenshot written: {}", path.display()));
-                true
-            }
-            Ok(false) => {
-                self.log(format!(
-                    "Screenshot skipped (no GPU adapter): {}",
-                    path.display()
-                ));
-                false
-            }
-            Err(e) => {
-                self.console.borrow_mut().error(format!("[Harness] {e}"));
-                false
-            }
-        }
     }
 
     /// Check each `(metric, limit)` budget against the worst frame recorded so far,

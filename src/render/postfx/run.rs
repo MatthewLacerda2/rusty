@@ -2,10 +2,9 @@
 //! blur, the composite (tonemap + grade), the authored effects (#397), then FXAA —
 //! or a plain copy — that writes the finished image to the target.
 
-use std::collections::BTreeMap;
-
 use super::custom::{CustomChain, Effect};
-use super::{PfxTarget, PostFx, PostParams};
+use super::{PfxTarget, PostFx, PostFxContext, PostParams, PostPasses};
+use crate::render::timing::GpuPass;
 
 impl PostFx {
     /// Run the full chain. `depth_view` is the scene depth (for SSR + motion blur),
@@ -33,7 +32,7 @@ impl PostFx {
         });
 
         if bloom_enabled {
-            self.run_bloom(device, &mut encoder, ctx.depth_view, ctx.skybox_view);
+            self.run_bloom(device, &mut encoder, &ctx);
         }
 
         // Composite reads scene HDR + bloom_b (final blur result) + depth + skybox.
@@ -51,12 +50,8 @@ impl PostFx {
         );
         let followed = fxaa_enabled || !effects.is_empty();
         let composite_target = if followed { &self.ldr.view } else { ctx.output };
-        Self::fullscreen(
-            &mut encoder,
-            &self.composite_pipeline,
-            &[&composite_bg],
-            composite_target,
-        );
+        let composite = (&self.composite_pipeline, ctx.timer.writes(GpuPass::PostFx));
+        Self::fullscreen(&mut encoder, composite, &[&composite_bg], composite_target);
         let finished = self.run_custom(device, &mut encoder, &ctx, &effects);
 
         // FXAA: tonemapped LDR in, anti-aliased output out. The aux/depth/skybox
@@ -75,7 +70,8 @@ impl PostFx {
                 ctx.depth_view,
                 ctx.skybox_view,
             );
-            Self::fullscreen(&mut encoder, pipeline, &[&bg], ctx.output);
+            let last = (pipeline, ctx.timer.writes(GpuPass::PostFx));
+            Self::fullscreen(&mut encoder, last, &[&bg], ctx.output);
         }
 
         queue.submit(std::iter::once(encoder.finish()));
@@ -103,7 +99,8 @@ impl PostFx {
                 ctx.depth_view,
                 ctx.skybox_view,
             );
-            Self::fullscreen(encoder, &effect.pipeline, &[&bg, &effect.params], &dst.view);
+            let pass = (&effect.pipeline, ctx.timer.writes(GpuPass::PostFx));
+            Self::fullscreen(encoder, pass, &[&bg, &effect.params], &dst.view);
             (src, dst) = (dst, src);
         }
         encoder.copy_texture_to_texture(
@@ -120,9 +117,9 @@ impl PostFx {
         &self,
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
-        depth_view: &wgpu::TextureView,
-        skybox_view: &wgpu::TextureView,
+        ctx: &PostFxContext<'_>,
     ) {
+        let (depth_view, skybox_view) = (ctx.depth_view, ctx.skybox_view);
         // The aux "bloom" binding (slot 3) is unused by the bright/blur passes, so
         // it points at scene_hdr (never a render target here) to avoid a sampled-
         // texture / color-target usage conflict.
@@ -133,12 +130,8 @@ impl PostFx {
             depth_view,
             skybox_view,
         );
-        Self::fullscreen(
-            encoder,
-            &self.bright_pipeline,
-            &[&bright_bg],
-            &self.bloom_a.view,
-        );
+        let bright = (&self.bright_pipeline, ctx.timer.writes(GpuPass::PostFx));
+        Self::fullscreen(encoder, bright, &[&bright_bg], &self.bloom_a.view);
 
         let blur_bg = self.io_bind_group(
             device,
@@ -147,12 +140,8 @@ impl PostFx {
             depth_view,
             skybox_view,
         );
-        Self::fullscreen(
-            encoder,
-            &self.blur_pipeline,
-            &[&blur_bg],
-            &self.bloom_b.view,
-        );
+        let blur = (&self.blur_pipeline, ctx.timer.writes(GpuPass::PostFx));
+        Self::fullscreen(encoder, blur, &[&blur_bg], &self.bloom_b.view);
     }
 
     /// Composite this frame's scene once more into `ctx.output` — graded,
@@ -172,7 +161,9 @@ impl PostFx {
             ctx.depth_view,
             ctx.skybox_view,
         );
-        Self::fullscreen(encoder, &self.composite_pipeline, &[&bg], ctx.output);
+        // The UI's backdrop source, so its time is the UI's.
+        let composite = (&self.composite_pipeline, ctx.timer.writes(GpuPass::Ui));
+        Self::fullscreen(encoder, composite, &[&bg], ctx.output);
     }
 
     /// The format the chain writes its output in (what [`PostFx::composite_into`]
@@ -223,10 +214,11 @@ impl PostFx {
         })
     }
 
-    /// One fullscreen triangle into `target`, `groups` bound from group 0 up.
+    /// One fullscreen triangle into `target`, `groups` bound from group 0 up, with
+    /// the pass's timestamp writes (#835).
     fn fullscreen(
         encoder: &mut wgpu::CommandEncoder,
-        pipeline: &wgpu::RenderPipeline,
+        (pipeline, timestamp_writes): Timed<'_>,
         groups: &[&wgpu::BindGroup],
         target: &wgpu::TextureView,
     ) {
@@ -243,7 +235,7 @@ impl PostFx {
                 },
             })],
             depth_stencil_attachment: None,
-            timestamp_writes: None,
+            timestamp_writes,
             occlusion_query_set: None,
         });
         pass.set_pipeline(pipeline);
@@ -254,25 +246,8 @@ impl PostFx {
     }
 }
 
-/// Which optional passes run this frame. Bundled rather than passed as loose bools so
-/// `run` stays under the 6-arg threshold — and so two same-typed flags can't be
-/// swapped silently at the call site.
-#[derive(Clone, Debug)]
-pub struct PostPasses {
-    /// Run the bright-pass + blur that feed the composite's bloom add.
-    pub bloom: bool,
-    /// Run the final anti-aliasing pass (#360).
-    pub fxaa: bool,
-    /// Authored post-FX modules to run after tonemapping, in order (#397).
-    pub custom: Vec<String>,
-    /// Their runtime params, by name (#671): the active volume's `post_params`.
-    pub post_params: BTreeMap<String, Vec<f32>>,
-}
-
-/// The per-frame views the chain reads/writes, bundled to keep `run` under the
-/// 6-arg clippy threshold.
-pub struct PostFxContext<'a> {
-    pub depth_view: &'a wgpu::TextureView,
-    pub skybox_view: &'a wgpu::TextureView,
-    pub output: &'a wgpu::TextureView,
-}
+/// A pass's pipeline and its timestamp writes.
+type Timed<'a> = (
+    &'a wgpu::RenderPipeline,
+    Option<wgpu::RenderPassTimestampWrites<'a>>,
+);

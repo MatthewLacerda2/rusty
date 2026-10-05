@@ -7,6 +7,7 @@ use crate::render::gpu::draw_buffers::DrawBuffers;
 use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::pipelines::surface::SolidPass;
 use crate::render::passes::ssao::SsaoFrame;
+use crate::render::timing::GpuPass;
 use crate::render::{RenderView, Renderer};
 use crate::scene::ClearFlags;
 
@@ -118,7 +119,7 @@ impl Renderer {
                 }),
                 stencil_ops: None,
             }),
-            timestamp_writes: None,
+            timestamp_writes: self.gpu_timer.writes(GpuPass::Forward),
             occlusion_query_set: None,
         });
 
