@@ -32,7 +32,7 @@ not the engine calling third-party APIs: tooling that reaches an external servic
 ## Start here
 - **README.md** — what the engine is and what you can do with it.
 - **docs/** — `linting.md` (the gate), `testing.md`, `api/` (the Lua API game scripts
-  use: `api/index.md`, then one file per namespace), `ui.md` (the in-game UI model). The Rust API reference is generated: `cargo doc --no-deps`.
+  use: `api/index.md`, then one file per namespace), `ui.md` (the in-game UI model), `providers.md` (bringing a provider key, and the budget). The Rust API reference is generated: `cargo doc --no-deps`.
 - **auxmd.md** *(gitignored)* — the operator's short-term scratchpad; read it if a
   session points you there.
 
@@ -360,6 +360,14 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   platform layer is exempt.
   Scripts run inside the sim too: the gameplay Lua VM has no `os`/`io`, and
   `math.random` routes to the seeded `Random` resource (`core::random`, #443).
+- **Provider calls are authoring, never gameplay.** A paid, networked call (a
+  vendor generating audio, say) lives behind `src/dev/providers/` only (#383): `dev`
+  builds only, refused during Play (the determinism guard scans for clocks, not
+  sockets, so this rule is what keeps the network out of the sim), held to the
+  project's `budget` against its running `spent`, and never made by a test — every
+  provider sits behind a trait and tests use mocks. Every cost figure is an
+  estimate. Keys come from the environment or a gitignored `.env`; see
+  `docs/providers.md`.
 - **Use `glam`** for all math; keep egui / wgpu / mlua decoupled.
 - **Single crate.**
 - **Ships for macOS and Linux; Windows comes later.** Those two are the platforms rusty
