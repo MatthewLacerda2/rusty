@@ -35,7 +35,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub use camera::{build_camera_stack, texture_cameras, TextureCamera};
-pub use frustum::{transform_aabb, Frustum};
+pub use frustum::{transform_aabb, Frustum, SkinBounds};
 pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
 pub use ibl::probe_bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
 pub use ibl::probe_bounce::{BounceReport, CONVERGENCE_EPSILON, MAX_BOUNCES};
@@ -62,6 +62,9 @@ pub struct GpuMesh {
     /// it by the entity's world matrix (8 corners, O(1)) each frame instead of ever
     /// re-walking the vertices.
     pub local_aabb: (glam::Vec3, glam::Vec3),
+    /// Per-joint bind-pose boxes, computed at the same upload: a skinned entity's
+    /// animated bound is built from them and its palette each frame (#833).
+    pub skin_bounds: SkinBounds,
 }
 
 /// Stable identity for a mesh's GPU geometry, derived from its *source*
