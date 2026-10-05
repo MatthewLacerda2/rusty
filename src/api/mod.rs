@@ -173,9 +173,11 @@ pub fn register<'scope>(
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     transform::register(lua, scope, ctx.scene)?;
-    // `Assets` borrows no engine state (it walks the project asset root on each
-    // call), so it stays a plain static registrar even under the scoped surface.
+    // `Assets` mostly borrows no engine state (it walks the project asset root on
+    // each call), so it stays a plain static registrar; only the import-setting
+    // setter that re-imports the scene's meshes (#831) is scoped.
     assets::register(lua)?;
+    assets::register_scoped(lua, scope, ctx.scene)?;
     // `Texture` (#270) also borrows no engine state — it reads a recipe and writes a
     // PNG file — so it likewise registers as a plain static namespace.
     texture::register(lua)?;

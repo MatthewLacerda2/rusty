@@ -4,8 +4,8 @@
 //!   aimed at the wall: no light reaches the floor directly (it is outside the cone),
 //!   so before the bake it renders black. After `bake_scene_lightmaps`, the floor's
 //!   lightmap carries the wall's bounce and the same view renders visibly lit.
-//! * **No lightmap UV, no change.** A Sphere has no second UV map, so no lightmap:
-//!   its pixels render exactly as before the bake.
+//! * **No lightmap UV, no change.** A Sphere stripped of its lightmap UV (an imported
+//!   mesh without one) gets no lightmap: its pixels render exactly as before the bake.
 //!
 //! Skips (passes without asserting) when no GPU / software adapter is present.
 
@@ -22,13 +22,14 @@ const SIZE: u32 = 64;
 /// Add a static primitive at `position` scaled by `scale`; returns its id.
 fn add(scene: &mut Scene, primitive: Primitive, position: Vec3, scale: Vec3) -> u32 {
     let id = scene.add_entity(format!("{primitive:?}"));
-    scene
-        .world
-        .set_mesh(id, primitive_mesh_component(primitive));
+    let mut mesh = primitive_mesh_component(primitive);
+    if let (Primitive::Sphere, Some(m)) = (primitive, &mut mesh) {
+        m.vertices.iter_mut().for_each(|v| v.lightmap_uv = [0.0; 2]);
+    }
+    scene.world.set_mesh(id, mesh);
     scene.world.set_static(id, true);
     let mut t = scene.world.transform_mut(id).unwrap();
-    t.position = position;
-    t.scale = scale;
+    (t.position, t.scale) = (position, scale);
     id
 }
 
@@ -83,10 +84,7 @@ fn bake(scene: &mut Scene, name: &str) {
         filter_radius: 2,
     };
     let baked = bake_scene_lightmaps(scene, Some(&path), &settings).unwrap();
-    assert_eq!(
-        baked, 2,
-        "the floor and the wall; the sphere has no lightmap UV"
-    );
+    assert_eq!(baked, 2, "the floor and the wall, not the stripped sphere");
 }
 
 /// `scene` seen from `camera`; `None` without an adapter.

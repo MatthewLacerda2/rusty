@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use super::lightmap_uv::LightmapUvSettings;
 use super::mesh_data::ImportedAsset;
 use super::ImportError;
 
@@ -57,6 +58,10 @@ pub struct ImportSettings {
     /// key means "no collider"; `BTreeMap` keeps the sidecar JSON stably ordered.
     #[serde(default)]
     pub colliders: BTreeMap<String, MeshColliderKind>,
+    /// Generate Lightmap UVs (#831): whether the importer unwraps a lightmap UV, and
+    /// how. Off by default, as in Unity.
+    #[serde(default)]
+    pub lightmap_uvs: LightmapUvSettings,
 }
 
 fn default_scale() -> f32 {
@@ -73,6 +78,7 @@ impl Default for ImportSettings {
             import_normals: default_true(),
             sub_objects: Vec::new(),
             colliders: BTreeMap::new(),
+            lightmap_uvs: LightmapUvSettings::default(),
         }
     }
 }
@@ -83,6 +89,15 @@ impl ImportSettings {
         self.sub_objects = asset.sub_mesh_ids();
         self
     }
+}
+
+/// Set a model's Generate Lightmap UVs settings (#831), clamped to Unity's ranges,
+/// keeping the rest of its sidecar. The one setter the model inspector and
+/// `Assets.SetLightmapUVSettings` share; the next import of the file applies it.
+pub fn set_lightmap_uvs(source: &Path, settings: LightmapUvSettings) -> Result<(), ImportError> {
+    let mut stored = load(source)?;
+    stored.lightmap_uvs = settings.clamped();
+    save(source, &stored)
 }
 
 /// The sidecar path for a source file: `crates.glb` → `crates.glb.meta`.

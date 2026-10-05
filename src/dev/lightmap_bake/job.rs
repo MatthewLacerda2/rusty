@@ -10,7 +10,7 @@
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 
-use super::{apply_lightmaps, gather_bake_input, UNSAVED};
+use super::{apply_lightmaps, gather_bake_input, warn_missing_uvs, UNSAVED};
 use crate::scene::lighting::lightmap::{bake_with_progress, BakeProgress, BakeSettings, Lightmap};
 use crate::scene::Scene;
 
@@ -30,6 +30,8 @@ pub struct LightmapBakeJob {
     progress: Arc<BakeProgress>,
     worker: Option<JoinHandle<Option<Vec<Lightmap>>>>,
     scene_path: String,
+    /// Static meshes the bake gathered, for the missing-lightmap-UV report (#831).
+    static_meshes: usize,
 }
 
 impl LightmapBakeJob {
@@ -42,6 +44,7 @@ impl LightmapBakeJob {
     ) -> Result<Self, String> {
         let scene_path = scene_path.ok_or(UNSAVED)?.to_string();
         let input = gather_bake_input(scene);
+        let static_meshes = input.meshes.len();
         let progress = Arc::new(BakeProgress::default());
         let watch = Arc::clone(&progress);
         let worker = thread::Builder::new()
@@ -52,6 +55,7 @@ impl LightmapBakeJob {
             progress,
             worker: Some(worker),
             scene_path,
+            static_meshes,
         })
     }
 
@@ -93,10 +97,13 @@ impl LightmapBakeJob {
         }
         let joined = self.worker.take()?.join();
         Some(match joined {
-            Ok(Some(maps)) => match apply_lightmaps(scene, &self.scene_path, &maps) {
-                Ok(n) => BakeOutcome::Baked(n),
-                Err(e) => BakeOutcome::Failed(e),
-            },
+            Ok(Some(maps)) => {
+                warn_missing_uvs(self.static_meshes, maps.len());
+                match apply_lightmaps(scene, &self.scene_path, &maps) {
+                    Ok(n) => BakeOutcome::Baked(n),
+                    Err(e) => BakeOutcome::Failed(e),
+                }
+            }
             Ok(None) => BakeOutcome::Cancelled,
             Err(_) => BakeOutcome::Failed("the bake worker panicked".into()),
         })

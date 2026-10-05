@@ -50,8 +50,12 @@ applied when the bake finishes, byte-identical to the script verb's; a bake whos
 was swapped out meanwhile is dropped. The script verb itself stays synchronous.
 
 - **Who gets one.** Every active, **static**, opaque mesh with a **second UV map** (the
-  lightmap UV, glTF `TEXCOORD_1`). The built-in **Box** and **Plane** carry one; a Sphere,
-  a Cylinder or an imported mesh without one keeps probe / ambient lighting, unchanged.
+  lightmap UV: glTF `TEXCOORD_1`, or one generated at import by the model's **Generate
+  Lightmap UVs** setting, see [`Assets`](Assets.md#generate-lightmap-uvs)). Every built-in
+  primitive carries one (the Sphere and Cylinder through that same unwrap); an imported
+  mesh without one keeps probe / ambient lighting, and the bake logs once how many static
+  meshes were left out that way: *"N static meshes have no lightmap UV — enable Generate
+  Lightmap UVs"*.
   Every static mesh still shades and bounces light onto the others. Dynamic objects keep
   the light probes; bake those with `Lighting.Bake()` so both read the same lights.
 - **What it bakes.** A deterministic CPU path tracer: `samples` (default `128`) paths
@@ -79,5 +83,5 @@ was swapped out meanwhile is dropped. The script verb itself stays synchronous.
 **Blender export.** The lightmap UV is the mesh's **second UV map**: add one in *Object Data
 Properties → UV Maps*, unwrap it with no overlapping islands (*Lightmap Pack*, or *Smart
 UV Project* with some island margin), keep the first map for textures, and export glTF 2.0
-with *UVs* enabled — Blender writes the second map as `TEXCOORD_1`. rusty never generates
-lightmap UVs at import.
+with *UVs* enabled — Blender writes the second map as `TEXCOORD_1`. Or skip all that and
+tick the model's **Generate Lightmap UVs** (Unity's checkbox): rusty unwraps one at import.

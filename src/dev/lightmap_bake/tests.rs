@@ -4,21 +4,26 @@
 use super::*;
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
 
-/// A scene with a static floor Plane, a static Sphere (no lightmap UV) and a dynamic
-/// Box; returns it with the floor's and the sphere's ids.
+/// A scene with a static floor Plane, a static Sphere stripped of its lightmap UV (an
+/// imported mesh without `TEXCOORD_1`) and a dynamic Box; returns it with the floor's
+/// and the sphere's ids.
 pub(super) fn scene() -> (Scene, u32, u32) {
     let mut scene = Scene::new();
-    let mut add = |name: &str, primitive, is_static| {
+    let mut add = |name: &str, mut mesh: Option<crate::scene::MeshComponent>, is_static| {
         let id = scene.add_entity(name.to_string());
-        scene
-            .world
-            .set_mesh(id, primitive_mesh_component(primitive));
+        if name == "Ball" {
+            let ball = mesh.as_mut().expect("a sphere mesh");
+            ball.vertices
+                .iter_mut()
+                .for_each(|v| v.lightmap_uv = [0.0; 2]);
+        }
+        scene.world.set_mesh(id, mesh);
         scene.world.set_static(id, is_static);
         id
     };
-    let floor = add("Floor", Primitive::Plane, true);
-    let ball = add("Ball", Primitive::Sphere, true);
-    add("Crate", Primitive::Box, false);
+    let floor = add("Floor", primitive_mesh_component(Primitive::Plane), true);
+    let ball = add("Ball", primitive_mesh_component(Primitive::Sphere), true);
+    add("Crate", primitive_mesh_component(Primitive::Box), false);
     (scene, floor, ball)
 }
 
@@ -111,4 +116,20 @@ fn references_survive_a_save_and_load() {
 fn an_unsaved_scene_cannot_bake() {
     let (mut scene, _, _) = scene();
     assert!(bake_scene_lightmaps(&mut scene, None, &quick()).is_err());
+}
+
+#[test]
+fn the_bake_counts_static_meshes_left_without_a_lightmap_uv() {
+    let (mut scene, _, _) = scene();
+    let input = gather_bake_input(&mut scene);
+    let maps = bake(&input, &quick());
+    let report = missing_uv_report(input.meshes.len(), maps.len());
+    assert_eq!(
+        report.as_deref(),
+        Some("1 static mesh has no lightmap UV — enable Generate Lightmap UVs")
+    );
+    assert_eq!(missing_uv_report(2, 2), None);
+    assert!(missing_uv_report(3, 0)
+        .unwrap()
+        .starts_with("3 static meshes have"));
 }

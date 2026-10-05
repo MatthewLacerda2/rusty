@@ -1,7 +1,8 @@
 //! The built-in primitives' lightmap UVs (#438): a Box and a Plane are lightmappable
-//! out of the box, with every lightmap UV inside [0, 1] and no two faces sharing one.
+//! out of the box (a Sphere and a Cylinder through the #831 unwrap), with every
+//! lightmap UV inside [0, 1] and no two faces sharing one.
 
-use super::primitives::{generate_box, generate_plane, generate_sphere};
+use super::primitives::{generate_box, generate_cylinder, generate_plane, generate_sphere};
 
 /// The lightmap-UV bounding rectangle of each quad (four vertices per face).
 fn face_rects(vertices: &[super::Vertex]) -> Vec<([f32; 2], [f32; 2])> {
@@ -49,7 +50,11 @@ fn plane_lightmap_uv_is_its_texture_uv() {
 }
 
 #[test]
-fn sphere_has_no_lightmap_uv() {
-    let (vertices, _) = generate_sphere(1.0, 8, 8);
-    assert!(vertices.iter().all(|v| v.lightmap_uv == [0.0, 0.0]));
+fn sphere_and_cylinder_get_a_generated_lightmap_uv() {
+    let cylinder = generate_cylinder(glam::Vec3::ZERO, glam::Vec3::Y, 0.5, 12).0;
+    for vertices in [generate_sphere(1.0, 8, 8).0, cylinder] {
+        let uvs = vertices.iter().flat_map(|v| v.lightmap_uv);
+        assert!(uvs.clone().all(|c| (0.0..=1.0).contains(&c)));
+        assert!(uvs.into_iter().any(|c| c > 0.0), "#831 unwraps them");
+    }
 }

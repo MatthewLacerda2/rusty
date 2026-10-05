@@ -20,6 +20,7 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     draw_sub_objects(ui, path);
 
     draw_import_settings(ui, editor);
+    draw_lightmap_uvs(ui, scene, path);
 
     ui.add_space(15.0);
     ui.separator();
@@ -85,6 +86,38 @@ fn draw_import_settings(ui: &mut egui::Ui, editor: &mut EditorUi) {
                 ui.selectable_value(&mut compression, "High", "High");
             });
     });
+}
+
+/// Generate Lightmap UVs (#831): Unity's checkbox and its two knobs, kept in the
+/// `.meta` sidecar. A finished edit (a click, a released drag, a typed value) goes
+/// through the verb `Assets.SetLightmapUVSettings` uses, re-importing the model's
+/// meshes in the scene; mid-drag only the sidecar is written, so dragging a knob
+/// over a big level never re-imports it every frame.
+fn draw_lightmap_uvs(ui: &mut egui::Ui, scene: &mut Scene, path: &str) {
+    let source = Path::new(path);
+    let stored = crate::asset::sidecar::load(source)
+        .unwrap_or_default()
+        .lightmap_uvs;
+    let mut s = stored;
+    let mut commit = ui
+        .checkbox(&mut s.generate, "Generate Lightmap UVs")
+        .changed();
+    if s.generate {
+        let mut knob = |ui: &mut egui::Ui, label: &str, value: &mut f32, max: f32| {
+            ui.horizontal(|ui| {
+                ui.label(label);
+                let r = ui.add(egui::DragValue::new(value).speed(0.5).range(0.0..=max));
+                commit |= r.drag_stopped() || (r.changed() && !r.dragged());
+            });
+        };
+        knob(ui, "Hard Angle:", &mut s.hard_angle, 180.0);
+        knob(ui, "Pack Margin:", &mut s.pack_margin, 64.0);
+    }
+    if commit {
+        let _ = crate::scene::asset_instance::set_lightmap_uv_settings(scene, path, s);
+    } else if s != stored {
+        let _ = crate::asset::sidecar::set_lightmap_uvs(source, s);
+    }
 }
 
 /// List the addressable sub-objects the source file exposes (`path::<id>`) and,

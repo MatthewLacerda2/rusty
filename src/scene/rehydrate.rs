@@ -114,6 +114,34 @@ pub fn rehydrate_entity_mesh(entity: &mut Entity) {
     }
 }
 
+/// Re-import the geometry of every unskinned mesh in `scene` instanced from the model
+/// at `path`, so a changed import setting (Generate Lightmap UVs, #831) shows at once
+/// rather than on the next load. Skinned meshes keep theirs: the setting never
+/// touches them, and their rig is bound to live bones. Returns how many were rebuilt.
+pub fn reimport_model(scene: &mut crate::scene::Scene, path: &str) -> usize {
+    let prefix = format!("{path}{}", asset::REF_SEPARATOR);
+    let mut rebuilt = 0;
+    for id in scene.world.ids_with_mesh() {
+        let Some(mut mesh) = scene.world.mesh_mut(id) else {
+            continue;
+        };
+        let from_model = mesh
+            .asset_ref
+            .as_deref()
+            .is_some_and(|r| r.starts_with(&prefix));
+        if !from_model || mesh.skin.is_some() {
+            continue;
+        }
+        let fresh = rehydrate_asset_mesh(&mesh.asset_ref);
+        if fresh.skin.is_none() && !fresh.vertices.is_empty() {
+            (mesh.vertices, mesh.indices) = (fresh.vertices, fresh.indices);
+            mesh.is_dirty.set(true);
+            rebuilt += 1;
+        }
+    }
+    rebuilt
+}
+
 /// Build an `"Asset"` mesh component from a path-based reference, importing its
 /// geometry up front. The reference is the only identity stored; on save the
 /// vertices are dropped and re-imported from it (see `rehydrate_meshes`). Returns

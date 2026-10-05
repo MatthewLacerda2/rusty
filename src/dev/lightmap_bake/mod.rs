@@ -48,8 +48,31 @@ pub fn bake_scene_lightmaps(
     settings: &BakeSettings,
 ) -> Result<usize, String> {
     let scene_path = scene_path.ok_or(UNSAVED)?;
-    let maps = bake(&gather_bake_input(scene), settings);
+    let input = gather_bake_input(scene);
+    let maps = bake(&input, settings);
+    warn_missing_uvs(input.meshes.len(), maps.len());
     apply_lightmaps(scene, scene_path, &maps)
+}
+
+/// The bake summary's one-time nudge (#831): how many static meshes got no lightmap
+/// for want of a lightmap UV, or `None` when every one got one. Each static mesh with
+/// a usable lightmap UV bakes exactly one lightmap, so the difference is the rest.
+pub fn missing_uv_report(static_meshes: usize, lightmaps: usize) -> Option<String> {
+    let n = static_meshes.saturating_sub(lightmaps);
+    let (noun, verb) = if n == 1 {
+        ("mesh", "has")
+    } else {
+        ("meshes", "have")
+    };
+    (n > 0)
+        .then(|| format!("{n} static {noun} {verb} no lightmap UV — enable Generate Lightmap UVs"))
+}
+
+/// Log [`missing_uv_report`], once per bake.
+fn warn_missing_uvs(static_meshes: usize, lightmaps: usize) {
+    if let Some(report) = missing_uv_report(static_meshes, lightmaps) {
+        log::warn!("[LightmapBake] {report}");
+    }
 }
 
 /// Why a bake cannot start: there is nowhere beside the scene to write.

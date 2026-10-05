@@ -18,6 +18,8 @@ import are skipped; a missing root yields an empty list. Output is deterministic
 | `Assets.Manifest` | `()` | array of asset tables (see shape below) |
 | `Assets.List` | `()` | alias for `Assets.Manifest` |
 | `Assets.Refresh` | `()` | `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... } }` — imports what arrived (below) |
+| `Assets.GetLightmapUVSettings` | `(path)` | `{ generate, hardAngle, packMargin }` — a model's Generate Lightmap UVs setting (below) |
+| `Assets.SetLightmapUVSettings` | `(path, { generate?, hardAngle?, packMargin? })` | how many of the scene's meshes it re-imported |
 
 Returned shape (Lua, 1-indexed arrays):
 
@@ -59,4 +61,33 @@ sibling already exists (a refresh never overwrites a file) or when it does not d
 local r = Assets.Refresh()
 for _, wav in ipairs(r.converted) do print("imported " .. wav) end
 for _, s in ipairs(r.skipped) do print(s.path .. ": " .. s.reason) end
+```
+
+### Generate Lightmap UVs
+
+Unity's model-import checkbox of the same name (#831), and the model inspector's
+**Generate Lightmap UVs** box: the importer unwraps a non-overlapping second UV set, so
+a mesh exported without one (no glTF `TEXCOORD_1`) still gets a lightmap from
+[`Lighting.BakeLightmaps()`](Lighting.md#lightmaps). It is stored per model in the
+`<file>.meta` sidecar, off by default as in Unity. When on, the generated unwrap
+**replaces** an authored `TEXCOORD_1`; when off, an authored one is used as-is.
+
+- `generate` — the checkbox.
+- `hardAngle` — degrees, 0–180, default `88`: faces meeting at a sharper angle than this
+  are split into separate charts (Unity's *Hard Angle*).
+- `packMargin` — texels between charts, 1–64, default `4`, measured at the bake's default
+  `texelsPerUnit` (8), so it holds whatever the mesh's size; a bake at a higher
+  resolution gets proportionally more (Unity's *Pack Margin*).
+
+`SetLightmapUVSettings` changes only the keys it is given (each clamped to its range),
+writes the sidecar, and re-imports every mesh in the open scene instanced from that
+model, so the change shows at once — the same verb the inspector's box runs. A file
+with no sidecar yet gets one. Skinned meshes are never unwrapped (they are never
+lightmapped). The unwrap is deterministic: the same mesh and settings always give the
+same UVs, so a bake stays byte-identical across machines.
+
+```lua
+Assets.SetLightmapUVSettings("project/levels/warehouse.glb", { generate = true })
+print(Assets.GetLightmapUVSettings("project/levels/warehouse.glb").hardAngle)  -- 88
+Lighting.BakeLightmaps()
 ```
