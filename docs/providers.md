@@ -90,3 +90,12 @@ Every generated asset is in one of three states:
 | `sketch` | A brief with nothing generated yet. It plays silence and is not an error: it's the normal state of a line someone is still writing. |
 | `generated` | The file for this exact brief exists. |
 | `stale` | A file exists for an earlier version of the brief, but not for this one. It is **not** regenerated on its own. The agent decides when to spend. |
+
+## The verbs
+
+| Verb | Vendor | Makes | Priced by |
+|---|---|---|---|
+| [`Speech.Generate`](api/Speech.md) (#386) | ElevenLabs text-to-speech | `speech-<hash>.wav` | characters × the model's rate (Flash 5¢ / 1000, multilingual v2 and v3 10¢), rounded up |
+
+Rates are scorsese's dated tables (`scorsese_providers::prices`), read off the
+vendor's page on the date they carry; moving the scorsese pin is how they change.

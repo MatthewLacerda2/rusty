@@ -3,6 +3,7 @@
 
 mod budget;
 mod generated;
+mod speech;
 
 use std::cell::RefCell;
 use std::path::PathBuf;
