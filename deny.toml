@@ -1,6 +1,12 @@
 # The CI `deny` job is a BLOCKING gate (no continue-on-error): a new RUSTSEC
 # advisory or a non-allow-listed license fails the build. Override only by adding
 # a reviewed, deliberate `ignore`/`allow` entry here — never by relaxing CI.
+# The graph is every feature, not the default set: `dev` brings dependencies of its
+# own (the provider client, #383) that a default-features scan never sees, and a
+# license nobody checked is a license nobody allowed.
+[graph]
+all-features = true
+
 [advisories]
 yanked = "warn"
 ignore = [
@@ -41,8 +47,13 @@ private = { ignore = true }
 # the Unlicense — an OSI-approved public-domain dedication. Allowed for that one
 # crate rather than added to the list above, so a new Unlicense dependency is still
 # a reviewed decision.
+#
+# `webpki-roots` (Mozilla's CA bundle, compiled in by `ureq`'s `rustls` for the
+# dev-only provider client, #383) is under CDLA-Permissive-2.0, a permissive *data*
+# license for the certificate list. Allowed for that one crate, for the same reason.
 exceptions = [
   { crate = "midly", allow = ["Unlicense"] },
+  { crate = "webpki-roots", allow = ["CDLA-Permissive-2.0"] },
 ]
 
 [sources]

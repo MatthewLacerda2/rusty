@@ -23,6 +23,7 @@
 //!   lua_surface — `Debug.*` and the `*.Bake` verbs, installed onto the Lua surface (#737)
 //!   stats       — frame stats: the schedule timing probe + render counters (#433)
 //!   bench       — the stress scene and report behind `make bench` (#835)
+//!   providers   — the boundary paid, networked calls live behind: key, budget, edit-mode only (#383)
 //!
 //! Status: harness + scenario runner implemented (issue #3); offscreen screenshot
 //! implemented (issue #7); bot-player example implemented (issue #10).
@@ -45,6 +46,7 @@ pub mod lua_surface;
 pub mod mcp;
 pub mod preview;
 pub mod probe_bake;
+pub mod providers;
 pub mod reflection_bake;
 pub mod scenario;
 pub mod screenshot;

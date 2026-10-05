@@ -64,7 +64,7 @@ path = "tests/main.rs"
 [features]
 default = ["editor"]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
-dev = []
+dev = ["dep:scorsese-providers"]
 # The egui editor (#431): `src/editor` and the shell's editor frontend. Default-on so
 # `cargo run` opens the editor; a shipped player builds with `--no-default-features`.
 editor = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor"]
@@ -142,6 +142,12 @@ getrandom = { version = "0.3", features = ["std"] }
 # this pin on purpose. No I/O inside it: rusty writes the files and resolves patch
 # references. Bump the rev in its own PR and record the new SYNTH_VERSION there.
 zimmer = { package = "scorsese-zimmer", git = "https://github.com/MatthewLacerda2/scorsese", rev = "342523ca32baf69d7423f8942953bb26d0a4b246" }
+# The provider boundary (#383): scorsese's providers crate — the key resolver, the
+# budget ceiling, dated price tables and the vendors' HTTP client (`ureq` + `rustls`)
+# — behind `src/dev/providers/`. Optional and enabled only by `dev`, so ship and
+# player builds carry no HTTP client. Same rev as zimmer, which it depends on:
+# move the two pins together, or the tree gains a second zimmer.
+scorsese-providers = { git = "https://github.com/MatthewLacerda2/scorsese", rev = "342523ca32baf69d7423f8942953bb26d0a4b246", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # The editor's Dock icon (#669): winit has no window icon on macOS, so it is set on

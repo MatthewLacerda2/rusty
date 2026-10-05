@@ -25,6 +25,10 @@ ehthumbs.db
 
 #Project Specifics
 auxmd.md
+# Provider keys (#383): yours, never committed. `.env.example` names the variables.
+.env
+# The project's provider budget and what it has spent (#383): local to this machine.
+/project/provider_budget.json
 # Ignore the local project tree, but keep the committed sample scenarios and the
 # example bot-player scripts (the harness's fixtures). The parent must be re-included
 # before the children.
