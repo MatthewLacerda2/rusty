@@ -48,6 +48,9 @@ mod raycast_tests;
 mod spatial;
 #[cfg(test)]
 mod spatial_tests;
+mod through;
+#[cfg(test)]
+mod through_tests;
 mod triangles;
 mod trigger_events;
 #[cfg(test)]
@@ -58,6 +61,7 @@ pub use character::{can_stand, move_character, CharacterMove};
 pub use collision_events::{CollisionEvents, CollisionPair, Contact};
 pub use joints::JointBreak;
 pub use query::RayHit;
+pub use through::RayCrossing;
 pub use triangles::{collider_world_triangles, ColliderTriangles};
 pub use trigger_events::TriggerEvents;
 pub use world::PhysicsWorld;
