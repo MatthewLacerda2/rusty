@@ -93,6 +93,6 @@ fn labels_parse_loosely_and_prefabs_exist_for_all_but_canvas() {
     assert_eq!(UiWidget::Canvas.prefab_path(), None);
     assert_eq!(
         UiWidget::Dropdown.prefab_path().as_deref(),
-        Some("project/prefabs/ui/Dropdown.prefab")
+        Some("assets/prefabs/ui/Dropdown.prefab")
     );
 }

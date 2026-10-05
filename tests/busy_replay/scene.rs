@@ -37,8 +37,8 @@ return B
 /// Where the busy scripts sit, relative to the harness's workspace root — the form
 /// a scene stores a script path in on every OS (#783), so two runs in two scratch
 /// directories snapshot the same paths.
-const DIRECTOR_PATH: &str = "project/assets/scripts/busy_director.lua";
-const BOX_PATH: &str = "project/assets/scripts/busy_box.lua";
+const DIRECTOR_PATH: &str = "assets/scripts/busy_director.lua";
+const BOX_PATH: &str = "assets/scripts/busy_box.lua";
 
 fn write(workspace: &std::path::Path, path: &str, body: &str) {
     std::fs::write(workspace.join(path), body).expect("write script");

@@ -10,8 +10,8 @@
 //! and `UI.Create` call [`create_ui`], and [`seed`] writes the same trees as
 //! `.prefab`s for `Scene.Instantiate`.
 //!
-//! **Engine-owned directories.** [`seed`] rewrites `project/assets/scripts/ui/`
-//! and `project/prefabs/ui/` from the engine on every boot, so they never go stale;
+//! **Engine-owned directories.** [`seed`] rewrites the project's
+//! `assets/scripts/ui/` and `assets/prefabs/ui/` from the engine on every boot, so they never go stale;
 //! a game that forks a widget copies its script (or prefab) to another path.
 
 mod basic;
@@ -26,10 +26,8 @@ use std::path::Path;
 use crate::scene::prefab::extract_prefab;
 use crate::scene::Scene;
 
-/// Where the engine's widget scripts ship (tracked).
-pub const SCRIPT_SOURCE_DIR: &str = "engine/scripts/ui";
-/// Where [`seed`] writes the widget prefabs.
-pub const PREFAB_DIR: &str = "project/prefabs/ui";
+/// Where [`seed`] writes the widget prefabs, relative to the project root.
+pub const PREFAB_DIR: &str = "assets/prefabs/ui";
 
 /// Every entry of the Create ▸ UI menu, in menu order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -150,20 +148,14 @@ fn first_root_canvas(scene: &Scene) -> Option<u32> {
         .find(|&c| world.parent_id(c).is_none_or(|p| !under_canvas(scene, p)))
 }
 
-/// Rewrite the engine-owned widget directories: the scripts from
-/// [`SCRIPT_SOURCE_DIR`], and one prefab per widget built fresh. Called on boot
+/// Rewrite the engine-owned widget directories: the scripts embedded from
+/// `engine/scripts/ui/` (`scene::io::bundled`), and one prefab per widget built fresh. Called on boot
 /// (and by tests); failures are skipped, like the other seeders.
 pub fn seed() {
     let scripts = parts::SCRIPT_DIR;
     std::fs::create_dir_all(scripts).ok();
-    if let Ok(entries) = std::fs::read_dir(SCRIPT_SOURCE_DIR) {
-        for path in entries.flatten().map(|e| e.path()) {
-            if path.extension().and_then(|e| e.to_str()) == Some("lua") {
-                if let (Some(name), Ok(code)) = (path.file_name(), std::fs::read(&path)) {
-                    write_if_changed(&Path::new(scripts).join(name), &code);
-                }
-            }
-        }
+    for (name, code) in crate::scene::io::bundled::UI_SCRIPTS {
+        write_if_changed(&Path::new(scripts).join(name), code.as_bytes());
     }
     std::fs::create_dir_all(PREFAB_DIR).ok();
     for kind in UiWidget::ALL {

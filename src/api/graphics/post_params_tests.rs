@@ -10,7 +10,7 @@ use mlua::Lua;
 use crate::core::quality::QualityPreset;
 use crate::scene::authoring::defaults;
 use crate::scene::Scene;
-use crate::shadergen::{bake_recipe, ShaderRecipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
 
 /// A baked damage-vignette postfx module, unique to this test and run (tests share
 /// a process under `cargo test`); removed on drop.
@@ -22,7 +22,7 @@ impl Baked {
         let json =
             format!(r#"{{"pass":"postfx","name":"{name}","blocks":[{{"id":"damage_vignette"}}]}}"#);
         let recipe = ShaderRecipe::from_json(&json).unwrap();
-        bake_recipe(&recipe, ENGINE_SHADER_DIR, DEFAULT_OUT_DIR).unwrap();
+        bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).unwrap();
         Self(name)
     }
 }

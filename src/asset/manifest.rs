@@ -66,7 +66,7 @@ impl SubObjectEntry {
 #[derive(Clone, Debug, PartialEq)]
 pub struct AssetEntry {
     /// The source file path (the same string the references embed), e.g.
-    /// `project/models/crates.glb`.
+    /// `assets/models/crates.glb`.
     pub path: String,
     /// The file's addressable sub-objects, in file order.
     pub sub_objects: Vec<SubObjectEntry>,

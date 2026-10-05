@@ -54,7 +54,7 @@ pub use collision_matrix::CollisionMatrix;
 pub use fog::{FogMode, FogSettings};
 pub use identity::SceneId;
 pub use io::{
-    build_default_scene, is_scene_path, load_from_file, read_scene_file, save_to_file,
+    build_default_scene, bundled, is_scene_path, load_from_file, read_scene_file, save_to_file,
     seed_default_scene, seed_default_scripts, seed_workspace, DEFAULT_SCENE_PATH,
     DEFAULT_SCRIPTS_DEST_DIR, SCENE_EXTENSION,
 };

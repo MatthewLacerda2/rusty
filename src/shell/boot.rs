@@ -1,4 +1,4 @@
-//! src/shell/boot.rs — the boot steps both frontends share: the project workspace,
+//! src/shell/boot.rs — the boot steps both frontends share: the project seed,
 //! the window, the renderer, the simulation, audio, and the assembled [`Shell`].
 
 use std::cell::RefCell;
@@ -20,19 +20,10 @@ use crate::render::Renderer;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
-/// Set up the git-ignored project folder structure and seed the bundled scripts and
-/// the default scene. Idempotent: existing files are left untouched.
+/// Seed the open project (`core::project::open` made it the working directory and
+/// created its skeleton) with the bundled scripts and the default scene, then run an
+/// asset refresh. Idempotent: what the user edited is kept (the seed manifest, #746).
 pub fn seed_project_workspace() {
-    for dir in [
-        "project/assets/textures",
-        "project/assets/models",
-        "project/assets/audio",
-        "project/scenes",
-        // Authored shaders (#272) bake here; a `ShaderRegistry` loads them by name.
-        crate::shadergen::DEFAULT_OUT_DIR,
-    ] {
-        std::fs::create_dir_all(dir).ok();
-    }
     // The bundled GAME scripts (player_controller.lua, bot.lua) and the demo scene
     // that uses them; the play loop itself runs no gameplay.
     crate::scene::seed_default_scripts();
@@ -42,9 +33,9 @@ pub fn seed_project_workspace() {
     }
 }
 
-/// The project tree an asset refresh sweeps (the content browser's root): an `.mp3`
-/// anywhere under it is converted to `.wav` (#385).
-pub const ASSET_ROOT: &str = "project";
+/// The project tree an asset refresh sweeps (the content browser's root, Unity's
+/// `Assets/`): an `.mp3` anywhere under it is converted to `.wav` (#385).
+pub const ASSET_ROOT: &str = crate::core::project::ASSETS_DIR;
 
 /// Import what arrived in the project since the last look (Unity's asset refresh):
 /// today that is MP3 → WAV. Runs at boot and, in the editor, on window focus.

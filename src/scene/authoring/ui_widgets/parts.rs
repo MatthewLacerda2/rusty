@@ -14,7 +14,7 @@ use crate::components::{
 use crate::scene::Scene;
 
 /// Where the engine's widget scripts are seeded (engine-owned: rewritten on boot).
-pub const SCRIPT_DIR: &str = "project/assets/scripts/ui";
+pub const SCRIPT_DIR: &str = "assets/scripts/ui";
 
 /// Unity's default UI colours: white panels, dark grey text.
 pub const WHITE: Vec4 = Vec4::ONE;

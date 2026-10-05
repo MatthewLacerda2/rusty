@@ -81,7 +81,7 @@ impl Default for EditorCaptureOptions {
 
 /// The editor's default scene in a fresh edit-mode world — what `cargo run` opens on a
 /// new project, built in memory like the harness does (its textures and shader seeded
-/// into the project workspace). Neither the sim nor any script runs.
+/// into the open project). Neither the sim nor any script runs.
 pub fn default_world() -> GameWorld {
     crate::scene::seed_default_scripts();
     crate::scene::default_scene::seed_default_assets();

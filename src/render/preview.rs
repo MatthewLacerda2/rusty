@@ -12,7 +12,7 @@ use super::gpu::pipelines::create_pipelines;
 use super::{RenderView, Renderer};
 use crate::scene::Camera;
 use crate::scene::Scene;
-use crate::shadergen::{compose, ENGINE_SHADER_DIR};
+use crate::shadergen::{compose, engine_shader_dir};
 
 impl Renderer {
     /// Render `scene` with the forward pipeline temporarily rebuilt from
@@ -66,7 +66,7 @@ impl Renderer {
     /// path the #272 authoring bake validates through, `shadergen::compose`).
     fn compose_preview_shader(&self, shader_path: &str) -> Option<wgpu::ShaderModule> {
         let source = std::fs::read_to_string(shader_path).ok()?;
-        let mut composer = compose::composer_with_common(ENGINE_SHADER_DIR).ok()?;
+        let mut composer = compose::composer_with_common(engine_shader_dir()).ok()?;
         let naga_module = compose::compose(&mut composer, &source, shader_path).ok()?;
         Some(
             self.device

@@ -94,31 +94,23 @@ impl Session {
     }
 }
 
-/// Resolve the boot scene from a session bin's CLI args, applying `--project` first.
+/// Open the project and resolve the boot scene from a session bin's CLI args.
 ///
 /// Shared by the `session` and `session-mcp` bins so they parse arguments
 /// identically. The accepted forms are:
-///   - `--project <dir>` — `chdir` into a project directory **before** booting, so
-///     the relative asset/scene paths the engine reads resolve against it. On a bad
+///   - `--project <dir>` — the game project to open (`core::project::open`, #829):
+///     its root becomes the working directory, so the scene and asset paths the
+///     engine reads resolve against it. Without it, `./project`. On a bad
 ///     directory this prints to stderr and exits 2.
 ///   - `--empty`         — start from a blank scene (returns an empty boot path).
-///   - `<scene-path>`    — boot that specific scene.
+///   - `<scene-path>`    — boot that specific scene (relative to the project root).
 ///   - none              — boot (and seed) the bundled default scene.
 ///
-/// `--project` may precede any of the scene forms; it is consumed first and the rest
-/// is interpreted as the scene argument.
+/// `--project` may sit anywhere; it is taken out first and the rest is read as the
+/// scene argument.
 pub fn boot_scene_from_args(args: &[String]) -> String {
-    let mut rest = args;
-    if let [first, dir, tail @ ..] = rest {
-        if first == "--project" {
-            if let Err(e) = std::env::set_current_dir(dir) {
-                eprintln!("session: failed to enter project dir {dir}: {e}");
-                std::process::exit(2);
-            }
-            rest = tail;
-        }
-    }
-
+    let mut rest = args.to_vec();
+    crate::core::project::open_from_args(&mut rest);
     match rest.first().map(String::as_str) {
         Some("--empty") => String::new(),
         Some(path) => path.to_string(),

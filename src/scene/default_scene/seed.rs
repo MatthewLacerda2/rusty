@@ -1,7 +1,7 @@
 //! src/scene/default_scene/seed.rs — bake the default scene's texture and shader
-//! into the project workspace (#667).
+//! into the open project (#667).
 //!
-//! The scene names `project/assets/textures/checker_base_color.png` and the
+//! The scene names `assets/textures/checker_base_color.png` and the
 //! `default_rim` surface shader; this writes them, each only when missing, so a
 //! hand-edited or re-baked copy is never overwritten (as for the seeded scripts).
 //! The shader's recipe is written beside it as `default_rim.recipe.json`, so it can be
@@ -17,9 +17,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use super::looks::{checker_recipe, shader_recipe, FLOOR, SHADER_NAME};
 use crate::scene::authoring::material::{bake_maps, MAPS_DIR};
 use crate::scene::MaterialAsset;
-use crate::shadergen::{bake_recipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
-/// Seed the default texture and shader into `project/assets/`. A failure is logged
+/// Seed the default texture and shader into `assets/`. A failure is logged
 /// and boot carries on: the floor then draws the missing-texture checker and the
 /// enemy the standard shader.
 pub fn seed_default_assets() {
@@ -57,7 +57,7 @@ fn seed_shader(dir: &Path) -> Result<(), String> {
     let staging = Staging::new(dir)?;
     let recipe = shader_recipe();
     let out = staging.0.to_string_lossy();
-    bake_recipe(&recipe, ENGINE_SHADER_DIR, &out).map_err(|e| e.to_string())?;
+    bake_recipe(&recipe, engine_shader_dir(), &out).map_err(|e| e.to_string())?;
     let json_name = format!("{SHADER_NAME}.recipe.json");
     std::fs::write(staging.0.join(&json_name), recipe.to_json()?).map_err(|e| e.to_string())?;
     // The module last: the renderer keys on `<name>.wgsl`, so its params are there first.

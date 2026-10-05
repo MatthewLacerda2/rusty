@@ -141,7 +141,7 @@ fn identical_material_is_reused_conflict_is_uniquified() {
 
 #[test]
 fn is_prefab_path_recognises_extension() {
-    assert!(is_prefab_path("project/prefabs/Enemy.prefab"));
+    assert!(is_prefab_path("assets/prefabs/Enemy.prefab"));
     assert!(is_prefab_path("X.PREFAB"));
     assert!(!is_prefab_path("foo.scene"));
 }

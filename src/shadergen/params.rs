@@ -29,7 +29,7 @@ use serde::{Deserialize, Serialize};
 
 use super::blocks::{find, Block};
 use super::recipe::{BlockSel, ParamValue, PassKind};
-use super::{DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use super::{engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// Runtime param slots per material: one `vec4` each, so 16 slots = 64 floats.
 pub const PARAM_SLOTS: usize = 16;
@@ -249,7 +249,7 @@ pub fn resolve_module(dirs: &[&str], name: &str) -> Option<PathBuf> {
 
 /// The runtime params of shader `name` (surface or ui), as the renderer will resolve it.
 pub fn load(name: &str) -> Result<ParamLayout, String> {
-    let dirs = [DEFAULT_OUT_DIR, ENGINE_SHADER_DIR];
+    let dirs = [DEFAULT_OUT_DIR, engine_shader_dir()];
     let path = resolve_module(&dirs, name)
         .ok_or_else(|| format!("no shader named {name:?} (bake it with Shader.Bake)"))?;
     ParamLayout::read_beside(&path)

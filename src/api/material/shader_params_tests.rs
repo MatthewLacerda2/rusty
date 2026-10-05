@@ -10,7 +10,7 @@ use mlua::Lua;
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 use crate::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
-use crate::shadergen::{bake_recipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// Bake a toon + hit-flash surface shader under a name unique to this test run,
 /// into the workspace the API resolves from; removed on drop.
@@ -28,7 +28,7 @@ impl Baked {
             name: name.clone(),
             blocks: blocks.to_vec(),
         };
-        bake_recipe(&recipe, ENGINE_SHADER_DIR, DEFAULT_OUT_DIR).unwrap();
+        bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).unwrap();
         Self(name)
     }
 }

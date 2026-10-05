@@ -22,7 +22,7 @@ fn a_seeded_prefab_instantiates_into_a_working_widget() {
     let mut ui = Ui::new(|_| {});
     let canvas = ui.eval("UI.Create('Canvas')");
     let b = ui.eval(&format!(
-        "Scene.Instantiate('project/prefabs/ui/Button.prefab', {canvas})"
+        "Scene.Instantiate('assets/prefabs/ui/Button.prefab', {canvas})"
     ));
     ui.tick(1);
     ui.eval(&format!(

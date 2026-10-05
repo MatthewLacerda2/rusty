@@ -11,7 +11,7 @@ use crate::components::{CanvasComponent, ImageComponent, RectTransformComponent,
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::{Camera, Scene};
 use crate::shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
-use crate::shadergen::{bake_recipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// The shot's size in pixels (and the canvas's in reference units).
 pub(super) const RES: u32 = 64;
@@ -38,7 +38,7 @@ impl Baked {
             name: name.clone(),
             blocks: blocks.collect(),
         };
-        bake_recipe(&recipe, ENGINE_SHADER_DIR, DEFAULT_OUT_DIR).expect("ui bake succeeds");
+        bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).expect("ui bake succeeds");
         Self(name)
     }
 }

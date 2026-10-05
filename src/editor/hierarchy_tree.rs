@@ -71,7 +71,7 @@ pub fn draw_node(
     }
 }
 
-/// Extract `entity_id`'s subtree to `project/prefabs/{name}.prefab` via the shared
+/// Extract `entity_id`'s subtree to `assets/prefabs/{name}.prefab` via the shared
 /// `scene::save_prefab` verb (the same path `Scene.SavePrefab` takes). The folder is
 /// created on demand; the entity name is sanitised into a filesystem-safe stem.
 fn save_as_prefab(scene: &Scene, entity_id: u32, name: &str) {

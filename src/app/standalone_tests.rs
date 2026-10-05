@@ -65,11 +65,11 @@ fn application_build_settings_round_trip_through_lua() {
     gw.tick(DT);
     let eval = |line: &str| gw.script_manager().eval(line).unwrap();
     eval("Application.SetProductName('Neon')");
-    eval("Application.SetStartupScene('project/scenes/menu.scene')");
+    eval("Application.SetStartupScene('assets/scenes/menu.scene')");
     assert_eq!(eval("Application.GetProductName()"), "Neon");
     assert_eq!(
         eval("Application.GetStartupScene()"),
-        "project/scenes/menu.scene"
+        "assets/scenes/menu.scene"
     );
     assert_eq!(eval("Application.SetWindowMode('Fullscreen')"), "true");
     assert_eq!(eval("Application.SetWindowMode('Borderless')"), "false");

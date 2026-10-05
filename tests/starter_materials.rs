@@ -1,5 +1,5 @@
 //! Starter material library (#173): the engine ships a small set of ready-to-go
-//! glTF-PBR materials under `project/materials/starter.gltf`. They must be
+//! glTF-PBR materials under `assets/materials/starter.gltf`. They must be
 //! discoverable and referable from scenes the SAME way user/imported materials are
 //! — no engine special-casing. This test drives the ordinary asset path: the
 //! manifest discovers them, the importer reads their PBR factors, and they round-trip
@@ -8,9 +8,17 @@
 use rusty::asset::{build_manifest, import_file};
 use rusty::scene::authoring::material_asset_from_import;
 use rusty::scene::{apply_scene_data, to_scene_data, MaterialComponent, Scene};
-use std::path::Path;
+use std::path::PathBuf;
 
-const STARTER: &str = "project/materials/starter.gltf";
+use rusty::scene::bundled::STARTER_MATERIALS_PATH as STARTER;
+
+/// A project seeded the way every project is, so the starter file is where a game
+/// finds it.
+fn seeded_project(name: &str) -> PathBuf {
+    let root = crate::temp::dir().join(name);
+    rusty::scene::seed_workspace(&root, None);
+    root
+}
 
 /// The four starter materials and the physically-plausible factors they ship with.
 /// (name, metallic, roughness, emits-light)
@@ -23,13 +31,14 @@ const EXPECTED: &[(&str, f32, f32, bool)] = &[
 
 #[test]
 fn starter_materials_are_discoverable_via_manifest() {
-    // `Assets.Manifest()` walks `project/`; the starter file must show up there,
-    // exposing one material per addressable sub-object — exactly like any user model.
-    let manifest = build_manifest(Path::new("project"));
+    // `Assets.Manifest()` walks the project's `assets/`; the starter file must show
+    // up there, exposing one material per addressable sub-object — like any model.
+    let root = seeded_project("rusty_starter_manifest");
+    let manifest = build_manifest(&root.join("assets"));
     let entry = manifest
         .assets
         .iter()
-        .find(|a| a.path.replace('\\', "/") == STARTER)
+        .find(|a| a.path.replace('\\', "/").ends_with(STARTER))
         .expect("starter.gltf is discovered under the project asset root");
     assert_eq!(
         entry.material_count,
@@ -49,7 +58,8 @@ fn starter_materials_resolve_as_library_references_round_trip() {
     // Build library entries the SAME way the editor's glTF import does: key each by
     // the deterministic `<path>::<name>`, convert via `material_asset_from_import`,
     // and attach a thin `MaterialComponent` reference — the user-material path.
-    let asset = import_file(Path::new(STARTER)).expect("starter.gltf imports");
+    let root = seeded_project("rusty_starter_roundtrip");
+    let asset = import_file(&root.join(STARTER)).expect("starter.gltf imports");
     let mut scene = Scene::new();
     let mut ids = Vec::new();
     for data in &asset.materials {

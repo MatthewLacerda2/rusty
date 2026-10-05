@@ -1,25 +1,24 @@
-//! src/scene/io/seed.rs — seed the engine's defaults into the project workspace.
+//! src/scene/io/seed.rs — seed the engine's defaults into the open project.
 //!
-//! The default scene (built in Rust by `default_scene::build`, #667) and the bundled
-//! scripts (`engine/scripts/*.lua`) are seeded into the gitignored `project/` on
-//! boot, through the seed manifest (#746): a file nobody edited follows the engine's
-//! current default, an edited one is kept.
+//! The default scene (built in Rust by `default_scene::build`, #667), the bundled
+//! scripts and the starter materials (embedded, see `bundled`, #829) are seeded into
+//! the project on boot, through the seed manifest (#746): a file nobody edited
+//! follows the engine's current default, an edited one is kept. Every path here is
+//! relative to the project root, the working directory (`core::project`).
 
 use std::path::{Path, PathBuf};
 
+use super::bundled::{self, STARTER_MATERIALS, STARTER_MATERIALS_PATH};
 use super::manifest::{SeedManifest, SEED_MANIFEST_PATH};
 use super::scene_json;
 use crate::scene::{default_scene, Scene};
 
-/// Where the default scene is seeded into the gitignored project workspace.
-pub const DEFAULT_SCENE_PATH: &str = "project/scenes/default.scene";
+/// Where the default scene is seeded in the project.
+pub const DEFAULT_SCENE_PATH: &str = "assets/scenes/default.scene";
 
-/// Tracked authoritative copies of the bundled default scripts (the player
-/// controller + the enemy brain) that ship WITH the engine.
-pub const DEFAULT_SCRIPTS_SOURCE_DIR: &str = "engine/scripts";
-/// Where the bundled scripts are seeded into the gitignored project workspace, so
-/// scenes referencing `project/assets/scripts/<name>.lua` resolve on boot.
-pub const DEFAULT_SCRIPTS_DEST_DIR: &str = "project/assets/scripts";
+/// Where the bundled scripts are seeded, so scenes referencing
+/// `assets/scripts/<name>.lua` resolve on boot.
+pub const DEFAULT_SCRIPTS_DEST_DIR: &str = "assets/scripts";
 
 /// Build the engine's current default scene into a fresh `scene`, replacing what was
 /// there, and return its path. File ▸ Reset Scene goes through here, never through
@@ -31,7 +30,7 @@ pub fn build_default_scene(scene: &mut Scene) -> String {
     DEFAULT_SCENE_PATH.to_string()
 }
 
-/// Seed the default scene into the project workspace on boot, through the seed
+/// Seed the default scene into the open project on boot, through the seed
 /// manifest. Its texture and shader are seeded every time, each only if missing.
 /// Returns the seeded path so the caller can load it as the boot scene.
 pub fn seed_default_scene() -> String {
@@ -47,14 +46,14 @@ pub fn seed_default_scene() -> String {
     DEFAULT_SCENE_PATH.to_string()
 }
 
-/// Seed the bundled default scripts (`engine/scripts/*.lua`) into
-/// `project/assets/scripts/` on boot, through the seed manifest. Idempotent.
-/// The UI widget kit's scripts and prefabs are seeded too — those directories are
-/// engine-owned and rewritten (see `authoring::ui_widgets::seed`).
+/// Seed the bundled default scripts and the starter materials into the project on
+/// boot, through the seed manifest. Idempotent. The UI widget kit's scripts and
+/// prefabs are seeded too — those directories are engine-owned and rewritten (see
+/// `authoring::ui_widgets::seed`).
 pub fn seed_default_scripts() {
     crate::scene::authoring::ui_widgets::seed();
-    let source = Path::new(DEFAULT_SCRIPTS_SOURCE_DIR);
-    let files = bundled_scripts(source, Path::new(DEFAULT_SCRIPTS_DEST_DIR));
+    let mut files = embedded(bundled::SCRIPTS, Path::new(DEFAULT_SCRIPTS_DEST_DIR));
+    files.push((STARTER_MATERIALS_PATH.into(), STARTER_MATERIALS.to_vec()));
     seed_files(
         Path::new(SEED_MANIFEST_PATH),
         &files,
@@ -62,34 +61,37 @@ pub fn seed_default_scripts() {
     );
 }
 
-/// The tracked sample scripts (bot-players) scenarios attach, checked in under the
-/// workspace's own `project/scripts/`.
-pub const SAMPLE_SCRIPTS_DIR: &str = "project/scripts";
-
-/// Seed a workspace the caller owns at `root` (#782): the bundled scripts, the UI
-/// widget kit's scripts and the tracked samples, each written over whatever is
-/// there, so it always holds the engine's current source. The headless harness
-/// runs here, so a test never reads the developer's `./project`, where a stale or
-/// edited copy is kept on purpose. Relative paths in `root` resolve as in `./`.
-pub fn seed_workspace(root: &Path) {
-    use crate::scene::authoring::ui_widgets::{parts::SCRIPT_DIR, SCRIPT_SOURCE_DIR};
-    let dirs = [
-        (DEFAULT_SCRIPTS_SOURCE_DIR, DEFAULT_SCRIPTS_DEST_DIR),
-        (SCRIPT_SOURCE_DIR, SCRIPT_DIR),
-        (SAMPLE_SCRIPTS_DIR, SAMPLE_SCRIPTS_DIR),
-    ];
-    for (source, dest) in dirs {
-        let dest = root.join(dest);
-        let files = bundled_scripts(Path::new(source), &dest);
-        let written = std::fs::create_dir_all(&dest).and_then(|()| {
-            files
-                .iter()
-                .try_for_each(|(to, code)| std::fs::write(to, code))
-        });
+/// Seed a workspace the caller owns at `root` (#782): the `.lua` files of `samples`
+/// (a project's scripts folder, e.g. the test-fixture project's), then the bundled
+/// scripts, the UI widget kit's scripts and the starter materials, each written over
+/// whatever is there, so it always holds the engine's current source. The headless
+/// harness runs here, so a test never reads a developer's project, where a stale or
+/// edited copy is kept on purpose.
+pub fn seed_workspace(root: &Path, samples: Option<&Path>) {
+    use crate::scene::authoring::ui_widgets::parts::SCRIPT_DIR;
+    let scripts = root.join(DEFAULT_SCRIPTS_DEST_DIR);
+    let mut files = samples.map_or_else(Vec::new, |dir| lua_files(dir, &scripts));
+    files.extend(embedded(bundled::SCRIPTS, &scripts));
+    files.extend(embedded(bundled::UI_SCRIPTS, &root.join(SCRIPT_DIR)));
+    files.push((
+        root.join(STARTER_MATERIALS_PATH),
+        STARTER_MATERIALS.to_vec(),
+    ));
+    for (to, bytes) in files {
+        let parent = to.parent().unwrap_or(root);
+        let written = std::fs::create_dir_all(parent).and_then(|()| std::fs::write(&to, bytes));
         if let Err(e) = written {
-            eprintln!("[Seed] seeding {} failed: {e}", dest.display());
+            eprintln!("[Seed] seeding {} failed: {e}", to.display());
         }
     }
+}
+
+/// Each embedded `(file name, source)` paired with its destination under `dest`.
+pub(crate) fn embedded(files: &[(&str, &str)], dest: &Path) -> Vec<(PathBuf, Vec<u8>)> {
+    files
+        .iter()
+        .map(|(name, code)| (dest.join(name), code.as_bytes().to_vec()))
+        .collect()
 }
 
 /// The default scene document, byte for byte what Save would write for it.
@@ -100,7 +102,7 @@ fn default_scene_bytes() -> Result<Vec<u8>, String> {
 }
 
 /// Every `.lua` under `source`, paired with its destination under `dest`.
-fn bundled_scripts(source: &Path, dest: &Path) -> Vec<(PathBuf, Vec<u8>)> {
+fn lua_files(source: &Path, dest: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     let Ok(entries) = std::fs::read_dir(source) else {
         return Vec::new();
     };

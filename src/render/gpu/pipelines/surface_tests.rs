@@ -10,7 +10,7 @@ use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, material as mat_ops, Primitive};
 use crate::scene::{Camera, RenderMode, Scene};
 use crate::shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
-use crate::shadergen::{bake_recipe, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_recipe, engine_shader_dir};
 
 const RES: u32 = 32;
 
@@ -33,7 +33,7 @@ fn bake(dir: &str, name: &str, pass: PassKind, color: [f32; 3]) {
         name: name.into(),
         blocks,
     };
-    bake_recipe(&recipe, ENGINE_SHADER_DIR, dir).expect("bake succeeds");
+    bake_recipe(&recipe, engine_shader_dir(), dir).expect("bake succeeds");
 }
 
 /// A lit sphere whose material names `shader` (`""` = the standard one) in `mode`.

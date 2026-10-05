@@ -29,8 +29,8 @@ pub const WATER: &str = "water";
 
 /// Where the checker bakes: `<MAPS_DIR>/<FLOOR>_base_color.png`, the path
 /// `authoring::material::bake_maps` writes for the floor material.
-pub const CHECKER_MAP: &str = "project/assets/textures/checker_base_color.png";
-/// The default surface shader's module name: `project/assets/shaders/<name>.wgsl`.
+pub const CHECKER_MAP: &str = "assets/textures/checker_base_color.png";
+/// The default surface shader's module name: `assets/shaders/<name>.wgsl`.
 pub const SHADER_NAME: &str = "default_rim";
 
 /// The checkerboard: two soft greys, 16 tiles across a 512 px tile. Neutral, so a

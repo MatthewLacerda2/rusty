@@ -62,7 +62,7 @@ fn draw_tab_header(editor: &mut EditorUi, console: &mut ConsoleLogs, ui: &mut eg
                     console.messages.clear();
                 }
             } else if ui.button(format!("{}  Root", icon::HOUSE)).clicked() {
-                editor.current_dir = "project".to_string();
+                editor.current_dir = crate::editor::content_browser::ROOT.to_string();
             }
         });
     });

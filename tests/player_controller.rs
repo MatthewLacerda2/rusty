@@ -78,7 +78,7 @@ fn no_double_jump_mid_air() {
 /// casts it fires into `SHOTS`. The API is registered afresh each tick, so the wrap
 /// is laid inside `Update`.
 const SHOT_PROBE: &str = r#"
-local Controller = dofile("WORKSPACE/project/assets/scripts/player_controller.lua")
+local Controller = dofile("WORKSPACE/assets/scripts/player_controller.lua")
 local Probe = {}
 SHOTS = 0
 function Probe.Start(id) Controller.Start(id) end

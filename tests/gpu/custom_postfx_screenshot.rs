@@ -10,7 +10,7 @@
 use rusty::components::CameraComponent;
 use rusty::dev::capture::CaptureHost;
 use rusty::scene::Scene;
-use rusty::shadergen::{bake_recipe, ShaderRecipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use rusty::shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
 
 use super::fog_scene::{centre, srgb8, wall_scene};
 
@@ -21,7 +21,7 @@ fn bake_green(name: &str) {
     );
     bake_recipe(
         &ShaderRecipe::from_json(&json).unwrap(),
-        ENGINE_SHADER_DIR,
+        engine_shader_dir(),
         DEFAULT_OUT_DIR,
     )
     .expect("bake");

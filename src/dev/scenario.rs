@@ -3,8 +3,8 @@
 //! A scenario is a normal `.lua` file (tagged dev-only) that drives the headless
 //! harness through the SAME observe/act surface an agent uses. The loop is:
 //!
-//!   1. write   `project/scenarios/<name>.lua`
-//!   2. run     `cargo run --bin play --features dev -- <scenario> <out_dir>`
+//!   1. write   `scenarios/<name>.lua` in the game project
+//!   2. run     `cargo run --bin play --features dev -- --project <dir> <scenario> <out_dir>`
 //!   3. read    `<out_dir>/results.json` + `console.log`
 //!
 //! Example scenario:
@@ -33,13 +33,13 @@ pub struct RunReport {
 }
 
 /// Load and run `scenario_path` headlessly, writing results into `out_dir`, on the
-/// user's workspace (`./project`): a scenario play-tests the game being built.
+/// open project (`core::project`): a scenario play-tests the game being built.
 pub fn run(scenario_path: &Path, out_dir: &Path) -> Result<RunReport, String> {
     run_on(scenario_path, out_dir, true)
 }
 
 /// [`run`] on a workspace of the run's own, seeded from the engine's bundled
-/// scripts (see `Harness::new`) — for tests, which must not read `./project` (#782).
+/// scripts (see `Harness::new`) — for tests, which must not read a developer's project (#782).
 pub fn run_isolated(scenario_path: &Path, out_dir: &Path) -> Result<RunReport, String> {
     run_on(scenario_path, out_dir, false)
 }

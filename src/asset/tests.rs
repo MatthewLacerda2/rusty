@@ -186,11 +186,11 @@ fn import_sub_mesh_by_reference() {
 #[test]
 fn asset_ref_round_trips() {
     let r = AssetRef {
-        path: "project/models/crates.glb".to_string(),
+        path: "assets/models/crates.glb".to_string(),
         sub_object: "Barrel".to_string(),
     };
     let s = r.to_string_ref();
-    assert_eq!(s, "project/models/crates.glb::Barrel");
+    assert_eq!(s, "assets/models/crates.glb::Barrel");
     assert_eq!(AssetRef::parse(&s).unwrap(), r);
 }
 

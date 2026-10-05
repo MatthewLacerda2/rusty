@@ -60,6 +60,16 @@ pub fn tick_unless_quit(world: &mut GameWorld) -> bool {
     true
 }
 
+/// The engine checkout's test-fixture project (#829): the committed scenarios, the
+/// bot-player script and build settings, opened with `--project` like any other.
+pub const FIXTURE_PROJECT: &str = "tests/fixtures/project";
+
+/// [`FIXTURE_PROJECT`] in the checkout this binary belongs to, from any directory.
+pub fn fixture_project() -> PathBuf {
+    let engine = crate::core::project::engine_dir();
+    engine.parent().unwrap_or(engine).join(FIXTURE_PROJECT)
+}
+
 /// The headless harness: owns the world and the run record.
 pub struct Harness {
     pub world: Rc<RefCell<GameWorld>>,
@@ -81,17 +91,19 @@ impl Harness {
     /// and enter play mode. `bot_script` is the enemy brain path (empty to skip it).
     ///
     /// The run gets its own workspace, `<out_dir>/workspace`, seeded fresh from the
-    /// engine's bundled scripts, and the scene's relative script paths resolve there
-    /// (#782): a test judges the engine's scripts, never the developer's `./project`.
+    /// test-fixture project's scripts ([`fixture_project`]) and the engine's bundled
+    /// ones, and the scene's relative script paths resolve there (#782): a test
+    /// judges the engine's scripts, never a developer's project.
     pub fn new(out_dir: impl AsRef<Path>, bot_script: &str) -> Self {
         let workspace = Self::workspace_of(&out_dir);
-        crate::scene::seed_workspace(&workspace);
+        let samples = fixture_project().join(crate::scene::DEFAULT_SCRIPTS_DEST_DIR);
+        crate::scene::seed_workspace(&workspace, Some(&samples));
         Self::in_workspace(out_dir, bot_script, workspace)
     }
 
-    /// [`Harness::new`] on the user's own workspace, `./project` — what an agent
-    /// play-testing its game wants (the `play` binary). The bundled scripts are
-    /// seeded through the seed manifest, as the windowed boot does.
+    /// [`Harness::new`] on the open project (`core::project`, the working directory)
+    /// — what an agent play-testing its game wants (the `play` binary). The bundled
+    /// scripts are seeded through the seed manifest, as the windowed boot does.
     pub fn in_user_workspace(out_dir: impl AsRef<Path>, bot_script: &str) -> Self {
         crate::scene::seed_default_scripts();
         Self::in_workspace(out_dir, bot_script, PathBuf::new())
@@ -103,8 +115,8 @@ impl Harness {
     }
 
     fn in_workspace(out_dir: impl AsRef<Path>, bot_script: &str, workspace: PathBuf) -> Self {
-        // The default scene's texture and shader, seeded into `./project` only when
-        // missing; only screenshots read them.
+        // The default scene's texture and shader, seeded into the working directory
+        // only when missing; only screenshots read them.
         crate::scene::default_scene::seed_default_assets();
 
         let mut scene = Scene::new();

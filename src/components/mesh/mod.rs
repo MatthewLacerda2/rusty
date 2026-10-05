@@ -56,7 +56,7 @@ pub struct MeshComponent {
     /// authored source file (see `asset_ref`). GPU buffers are never persisted.
     pub primitive_type: String,
     /// Path-based reference into an imported source file, `path::sub_object`
-    /// (e.g. `project/models/crates.glb::Barrel`). Present iff
+    /// (e.g. `assets/models/crates.glb::Barrel`). Present iff
     /// `primitive_type == "Asset"`; the scene layer re-imports it on load. This is
     /// the only identity stored — the `.meta` sidecar holds settings, never this.
     #[serde(default, skip_serializing_if = "Option::is_none")]

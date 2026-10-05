@@ -12,7 +12,7 @@ use super::fixture::{element, lua, scene, shade, shot, Baked, RES};
 use crate::components::RectMaskComponent;
 use crate::render::test_gpu::headless_or_skip;
 use crate::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
-use crate::shadergen::{bake_recipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
 #[test]
 fn gpu_a_missing_or_non_ui_shader_draws_with_the_standard_one() {
@@ -28,7 +28,7 @@ fn gpu_a_missing_or_non_ui_shader_draws_with_the_standard_one() {
             params: Default::default(),
         }],
     };
-    bake_recipe(&recipe, ENGINE_SHADER_DIR, DEFAULT_OUT_DIR).unwrap();
+    bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).unwrap();
     let _cleanup = Baked(surface.clone());
     for name in ["no_such_ui_shader", surface.as_str()] {
         let (scene, _, _) = scene(Some(name));

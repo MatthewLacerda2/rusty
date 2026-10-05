@@ -11,7 +11,7 @@ use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, material as mat_ops, Primitive};
 use crate::scene::{Camera, Scene};
 use crate::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
-use crate::shadergen::{bake_recipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// One baked single-block surface shader, unique to this run; removed on drop.
 struct Baked(String);
@@ -27,7 +27,7 @@ impl Baked {
                 params: Default::default(),
             }],
         };
-        bake_recipe(&recipe, ENGINE_SHADER_DIR, DEFAULT_OUT_DIR).expect("bake succeeds");
+        bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).expect("bake succeeds");
         Self(name)
     }
 }

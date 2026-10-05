@@ -9,7 +9,7 @@ fn a_windows_path_under_its_root_comes_out_slash_separated() {
     let root = format!(r"{RUN}\rusty_busy_a");
     assert_eq!(
         relative_to(&path, &root).as_deref(),
-        Some("project/assets/scripts/busy_director.lua")
+        Some("assets/scripts/busy_director.lua")
     );
 }
 

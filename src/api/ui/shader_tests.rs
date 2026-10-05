@@ -10,7 +10,7 @@ use mlua::Lua;
 use crate::components::{ImageComponent, TextComponent};
 use crate::scene::{Camera, Scene};
 use crate::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
-use crate::shadergen::{bake_recipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// A dissolve ui shader baked under a name unique to this run; removed on drop.
 struct Baked(String);
@@ -26,7 +26,7 @@ impl Baked {
                 params: Default::default(),
             }],
         };
-        bake_recipe(&recipe, ENGINE_SHADER_DIR, DEFAULT_OUT_DIR).unwrap();
+        bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).unwrap();
         Self(name)
     }
 }

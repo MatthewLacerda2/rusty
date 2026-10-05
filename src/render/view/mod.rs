@@ -124,7 +124,7 @@ impl RenderView {
         let height = height.max(1);
         // A throwaway registry compiles this view's post-FX module. Views are created
         // rarely (once per consumer, not per frame), so the compile cost is one-time.
-        let mut registry = ShaderRegistry::new("engine/shaders");
+        let mut registry = ShaderRegistry::new(crate::shadergen::engine_shader_dir());
         let post_fx = PostFx::new(device, width, height, format, bloom_divisor, &mut registry);
         let (depth_texture, depth_view) = create_depth(device, width, height);
         let target = owns_target.then(|| create_color_target(device, format, width, height));

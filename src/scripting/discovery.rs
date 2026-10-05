@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn label_is_the_file_stem() {
-        assert_eq!(script_label("project/assets/scripts/bot.lua"), "bot");
+        assert_eq!(script_label("assets/scripts/bot.lua"), "bot");
         assert_eq!(script_label("player_controller.lua"), "player_controller");
     }
 

@@ -1,5 +1,5 @@
 //! The harness runs a workspace of its own (#782): a stale or edited copy of a
-//! bundled script — what a developer's git-ignored `./project` keeps on purpose —
+//! bundled script — what a developer's project keeps on purpose —
 //! never reaches a test.
 
 use rusty::dev::harness::Harness;

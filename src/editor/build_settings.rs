@@ -1,7 +1,7 @@
 //! src/editor/build_settings.rs — the File → Build Settings window (#431).
 //!
 //! Edits a draft of the project's [`BuildSettings`] (startup scene, product name,
-//! window mode) and writes it to the tracked `project/build_settings.json` on Save.
+//! window mode) and writes it to the tracked `build_settings.json` on Save.
 //! The API twin is the `Application` namespace's setters — one operation, two callers.
 
 use egui_phosphor::regular as icon;

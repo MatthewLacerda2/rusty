@@ -19,7 +19,7 @@ fn attach_player_bot_tags_the_player() {
 
 #[test]
 fn play_session_scenario_wins_and_is_deterministic() {
-    let scenario = Path::new("project/scenarios/play_session.lua");
+    let scenario = Path::new("tests/fixtures/project/scenarios/play_session.lua");
     let run = |dir: &str| {
         let out = crate::temp::dir().join(dir);
         let report = scenario::run_isolated(scenario, &out).expect("scenario runs");

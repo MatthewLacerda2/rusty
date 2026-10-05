@@ -34,7 +34,7 @@ use super::cache::UiViewCache;
 use super::pipeline::{self, UiPass};
 use crate::components::UiBlend;
 use crate::shadergen::params::{self, ParamLayout};
-use crate::shadergen::{bake_generation, compose, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_generation, compose, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// One built variant.
 struct Variant {
@@ -50,7 +50,7 @@ struct Variant {
 type Source = Option<(PathBuf, String, Option<String>)>;
 
 fn source(name: &str) -> Source {
-    let path = params::resolve_module(&[DEFAULT_OUT_DIR, ENGINE_SHADER_DIR], name)?;
+    let path = params::resolve_module(&[DEFAULT_OUT_DIR, engine_shader_dir()], name)?;
     let sidecar = std::fs::read_to_string(params::sidecar_path(&path)).ok();
     Some((path.clone(), std::fs::read_to_string(path).ok()?, sidecar))
 }
@@ -140,10 +140,11 @@ impl UiShaders {
     /// its world pipeline under a validation error scope, so wgpu refuses instead of
     /// panicking.
     fn build(&self, device: &wgpu::Device, name: &str, source: &Source) -> Result<Variant, String> {
-        let (path, wgsl, _) = source.as_ref().ok_or_else(|| {
-            format!("no `{name}.wgsl` in {DEFAULT_OUT_DIR} or {ENGINE_SHADER_DIR}")
-        })?;
-        let mut composer = compose::composer_with_common(ENGINE_SHADER_DIR)?;
+        let engine = engine_shader_dir();
+        let (path, wgsl, _) = source
+            .as_ref()
+            .ok_or_else(|| format!("no `{name}.wgsl` in {DEFAULT_OUT_DIR} or {engine}"))?;
+        let mut composer = compose::composer_with_common(engine)?;
         let module = compose::compose(&mut composer, wgsl, &path.to_string_lossy())?;
         for entry in ["vs_main", "fs_main", "vs_world", "fs_world"] {
             if !module.entry_points.iter().any(|e| e.name == entry) {

@@ -27,28 +27,26 @@ ehthumbs.db
 auxmd.md
 # Provider keys (#383): yours, never committed. `.env.example` names the variables.
 .env
-# The project's provider budget and what it has spent (#383): local to this machine.
-/project/provider_budget.json
-# Ignore the local project tree, but keep the committed sample scenarios and the
-# example bot-player scripts (the harness's fixtures). The parent must be re-included
-# before the children.
-/project/*
-!/project/scenarios/
-/project/scenarios/*
-!/project/scenarios/*.lua
-# A scenario with scripts of its own keeps them in its folder (the bench, #835).
-!/project/scenarios/*/
-/project/scenarios/*/*
-!/project/scenarios/*/*.lua
-!/project/scripts/
-/project/scripts/*
-!/project/scripts/*.lua
-# The project's build settings (#431): startup scene, product name, window mode.
-!/project/build_settings.json
-# Ship the starter material library (#173) — glTF-PBR material assets, no textures.
-!/project/materials/
-/project/materials/*
-!/project/materials/*.gltf
+# A developer's local game project: what every binary opens when no `--project`
+# is given (#829). Games live in their own folders and repos, never in this one.
+/project/
+
+# The test-fixture project (#829): only its committed fixtures are tracked, never
+# what the engine seeds into it when it is opened.
+/tests/fixtures/project/*
+!/tests/fixtures/project/scenarios/
+!/tests/fixtures/project/build_settings.json
+!/tests/fixtures/project/assets/
+/tests/fixtures/project/assets/*
+!/tests/fixtures/project/assets/scripts/
+/tests/fixtures/project/assets/scripts/*
+!/tests/fixtures/project/assets/scripts/bot_player.lua
+
+# In-process tests run with the checkout as their working directory, so what they
+# seed or bake (project-relative paths) lands here. The engine's own content is
+# engine/, so nothing tracked lives under these.
+/assets/
+/.seeded
 
 # Lint reports
 .lint/

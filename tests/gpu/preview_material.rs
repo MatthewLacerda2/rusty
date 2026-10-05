@@ -73,7 +73,7 @@ fn the_authored_shader_draws_with_its_stored_params() {
     let key = sess.eval("return MAT").expect("material key");
     let pixel = centre(&sess, key.trim(), "flash.png");
     for ext in ["wgsl", "params.json"] {
-        let _ = std::fs::remove_file(format!("project/assets/shaders/{name}.{ext}"));
+        let _ = std::fs::remove_file(format!("assets/shaders/{name}.{ext}"));
     }
     let Some([r, g, b]) = pixel else {
         eprintln!("no GPU adapter — skipping the render half");

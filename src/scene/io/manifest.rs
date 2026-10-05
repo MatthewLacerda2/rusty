@@ -1,6 +1,6 @@
 //! src/scene/io/manifest.rs — the seed manifest (#746).
 //!
-//! The project workspace (`project/`, gitignored) is seeded from the engine's bundled
+//! The open project (`core::project`) is seeded from the engine's bundled
 //! defaults. Seeding only when a file is missing let a workspace go stale: an engine
 //! fix to the default scene or `bot.lua` never reached it. The manifest records the
 //! hash of every file as it was seeded, which is the proof needed to refresh it:
@@ -24,8 +24,8 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-/// The manifest's place in the project workspace.
-pub const SEED_MANIFEST_PATH: &str = "project/.seeded";
+/// The manifest's place, relative to the project root.
+pub const SEED_MANIFEST_PATH: &str = ".seeded";
 
 /// What [`SeedManifest::seed`] did with one file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
