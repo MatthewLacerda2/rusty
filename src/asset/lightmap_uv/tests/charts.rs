@@ -55,3 +55,17 @@ fn the_margin_is_measured_at_the_bakes_default_resolution() {
     let bake = crate::scene::lighting::lightmap::BakeSettings::default();
     assert_eq!(REFERENCE_TEXELS_PER_UNIT, bake.texels_per_unit);
 }
+
+#[test]
+fn knobs_clamp_to_unitys_ranges_and_nan_falls_back() {
+    let wild = LightmapUvSettings {
+        generate: true,
+        hard_angle: 500.0,
+        pack_margin: f32::NAN,
+    };
+    let c = wild.clamped();
+    assert_eq!(
+        (c.generate, c.hard_angle, c.pack_margin),
+        (true, 180.0, 4.0)
+    );
+}

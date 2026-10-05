@@ -61,12 +61,21 @@ impl Default for LightmapUvSettings {
 }
 
 impl LightmapUvSettings {
-    /// The settings with each knob clamped to Unity's range.
+    /// The settings with each knob clamped to Unity's range; a non-finite knob (a NaN
+    /// from a script) falls back to its default.
     pub fn clamped(self) -> Self {
+        let d = Self::default();
+        let knob = |v: f32, fallback: f32, lo, hi| {
+            if v.is_finite() {
+                v.clamp(lo, hi)
+            } else {
+                fallback
+            }
+        };
         Self {
             generate: self.generate,
-            hard_angle: self.hard_angle.clamp(0.0, 180.0),
-            pack_margin: self.pack_margin.clamp(1.0, 64.0),
+            hard_angle: knob(self.hard_angle, d.hard_angle, 0.0, 180.0),
+            pack_margin: knob(self.pack_margin, d.pack_margin, 1.0, 64.0),
         }
     }
 }
