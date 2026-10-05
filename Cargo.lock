@@ -3356,6 +3356,7 @@ dependencies = [
  "proptest",
  "rapier3d",
  "rustc-hash 2.1.2",
+ "scorsese-core",
  "scorsese-providers",
  "scorsese-zimmer",
  "serde",

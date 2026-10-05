@@ -50,3 +50,38 @@ your vendor dashboard for the real bill.
   harness depends on.
 - **No test makes a real call.** Every provider sits behind a trait, and tests use
   mocks.
+
+## Generated assets
+
+What a provider makes lands in `project/assets/generated/`, named for **the hash
+of the brief that made it** (#384):
+
+```
+project/assets/generated/<kind>-<sha256 of the brief>.<ext>
+project/assets/generated/<kind>-<sha256 of the brief>.<ext>.json
+```
+
+A *brief* is everything a generation asks for: the prompt, the voice, the model,
+the duration, the seed. It lives in the document that uses the asset, so it is
+versioned with the project. The folder itself is gitignored, because any file in it
+can be made again from its brief (at a cost).
+
+- **Nothing is paid for twice.** Asking for a brief whose file is already there
+  returns that file and makes no call. Editing a prompt back to an earlier wording
+  finds the earlier file again.
+- **The hash is of the brief, not the output.** The brief is serialised
+  canonically before it is hashed: keys sorted, and absent and `null` fields
+  left out. A re-saved brief, or one whose type gained an optional field since,
+  keeps its address.
+- **The sidecar** (`<file>.json`) records what made the file: the brief in that
+  canonical form, its kind, the UTC day it was generated, and the estimated cost in
+  cents. It never records a key or an account. Hashing its `kind` and `brief`
+  gives back the digest in the file name.
+
+Every generated asset is in one of three states:
+
+| State | Meaning |
+|---|---|
+| `sketch` | A brief with nothing generated yet. It plays silence and is not an error: it's the normal state of a line someone is still writing. |
+| `generated` | The file for this exact brief exists. |
+| `stale` | A file exists for an earlier version of the brief, but not for this one. It is **not** regenerated on its own. The agent decides when to spend. |
