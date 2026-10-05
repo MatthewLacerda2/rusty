@@ -151,7 +151,10 @@ fn write_page(
     image
         .save(&path)
         .map_err(|e| format!("write {}: {e}", path.display()))?;
-    Ok(path.to_string_lossy().into_owned())
+    // The scene document stores `/` paths on every OS, like its other assets (#819).
+    Ok(path
+        .to_string_lossy()
+        .replace(std::path::MAIN_SEPARATOR, "/"))
 }
 
 /// FNV-1a over the texels, folded to 32 bits: the file name's content tag.
