@@ -257,11 +257,12 @@ report in the terminal:
 - **the run** — 60 warm-up frames, then 600 measured ones, each stepped and rendered
   at 1280x720 (`Harness.LoadStress{…}` then `Harness.Bench(600)`).
 - **the report** — per row the average and p95: `frame_ms` (the sim's CPU time),
-  `renderer_ms` (CPU time recording the frame), `gpu_ms` and `gpu.<pass>` (GPU time,
-  see `Debug.Stats`), `draw_calls`, `triangles`, `culled_entities`, `lights_dropped`,
-  `lights_culled`, and the systems `update_scripts`, `tick_nav`, `step_physics`,
-  `animate`. Every GPU pass prints every run (0 when it did not run), so the rows are
-  stable.
+  `renderer_ms` (CPU time recording the frame), `gpu_ms` and `gpu.<pass>` (GPU time
+  at a fixed reference clock, below), `gpu_raw_ms` (GPU time as measured) and
+  `gpu_clock_pct` (the clock it ran at, % of the reference), `draw_calls`,
+  `triangles`, `culled_entities`, `lights_dropped`, `lights_culled`, and the systems
+  `update_scripts`, `tick_nav`, `step_physics`, `animate`. Every GPU pass prints
+  every run (0 when it did not run), so the rows are stable.
 - **before and after** — the report is kept in `out/bench/bench.json` (and
   `bench.txt`), and each run prints every row's change against the last one. To
   measure an optimisation: `make bench`, change, `make bench`.
@@ -280,6 +281,35 @@ error) and must run before the first `Step`, so the spawned scripts load when pl
 starts. `Harness.Bench(n)` works on any scenario: it steps and renders `n` frames,
 prints the report, keeps it in the run's out dir and returns `{ frames, metrics =
 { <row> = { avg, p95 } } }`.
+
+### GPU time and the GPU clock (#862)
+A laptop GPU does not run at one speed. On Apple silicon the governor re-picks the
+clock many times a second from how busy the GPU has been: an M4 moves between 338
+and 1470 MHz during one bench run, and a fanless one on battery in Low Power Mode
+settles near 1000 MHz under sustained load. The bench's frames leave the GPU idle
+while the CPU steps the sim, so the clock follows the idle time, and **a lighter
+frame can run at a lower clock and read slower**: #833 cut the triangles by 71% and
+its raw GPU p95 rose from ~8 to ~12 ms. The same frame drawn 600 times reads
+anywhere from 4.1 to 15.9 ms; its time tracks 1/clock (correlation 0.97–1.00), and
+time × clock stays within 2%.
+
+So the bench divides the clock out. A fixed arithmetic dispatch (the probe,
+`dev::bench::clock`) is timed right before and right after every frame; its
+duration depends only on the clock, so each frame's GPU times are scaled by
+`reference ÷ probe` to **ms at the reference clock** (an M4's top clock: on that
+machine, ms at full speed). That is what `gpu_ms` and `gpu.<pass>` report, and what
+to compare before and after a change. Run to run it agrees within a few percent
+where the raw time swings by tens of percent; read `gpu_raw_ms` for the real time
+at whatever clock the governor picked, and `gpu_clock_pct` for that clock.
+
+What it does not do: the scaling is linear, and a frame's memory-bound part does
+not slow down with the GPU clock, so a few percent of noise remain, more when two
+runs ran at very different clocks. A GPU-time change smaller than ~5% is not
+resolved; repeat the runs alternately (before, after, before, after) to see one.
+On another GPU the reference ms are that machine's own unit: compare them only with
+runs on the same machine. Pinning the clock does not work: there is no user API
+for it, and keeping the GPU fully busy only holds the top clock for a second or two
+before the power limit pulls it back.
 
 ## API-doc drift gate
 `tests/api_doc_drift.rs` (dev-only, #280) is a **hard gate** that keeps

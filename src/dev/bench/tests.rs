@@ -86,5 +86,34 @@ fn gpu_bench_reports_frame_render_and_counter_rows() {
     if timed {
         assert!(row("gpu.forward").is_some_and(|s| s.avg > 0.0));
         assert!(row("gpu.ribbons").is_some(), "every pass has a row");
+        assert!(row("gpu_raw_ms").is_some_and(|s| s.avg > 0.0));
+        assert!(row("gpu_clock_pct").is_some_and(|s| s.avg > 0.0));
     }
+}
+
+/// GPU rows are the frame's times scaled by the clock speed the probe read; the
+/// raw total and the clock get rows of their own. A frame the probe missed has no
+/// GPU rows, so an unscaled time never mixes in.
+#[test]
+fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
+    use crate::render::{GpuPass, GpuTimes};
+    let gpu = GpuTimes {
+        passes: vec![(GpuPass::Shadows, 2.0), (GpuPass::Forward, 6.0)],
+    };
+    let frame = RenderedFrame {
+        gpu: Some(gpu),
+        ..RenderedFrame::default()
+    };
+    let stats = FrameStats::default();
+    let mut samples = Samples::default();
+    sample(&mut samples, &stats, Some(&frame), Some(0.5));
+    sample(&mut samples, &stats, Some(&frame), None);
+    let report = samples.report();
+    let avg = |k: &str| report.metrics.iter().find(|(m, _)| m == k).unwrap().1.avg;
+    assert_eq!(avg("gpu_ms"), 4.0);
+    assert_eq!(avg("gpu.shadows"), 1.0);
+    assert_eq!(avg("gpu.forward"), 3.0);
+    assert_eq!(avg("gpu.ui"), 0.0);
+    assert_eq!(avg("gpu_raw_ms"), 8.0);
+    assert_eq!(avg("gpu_clock_pct"), 50.0);
 }

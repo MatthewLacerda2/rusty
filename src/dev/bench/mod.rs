@@ -10,11 +10,17 @@
 //! (`out/bench/` under `make bench`) and each run prints its change against the one
 //! before, so measuring an optimisation is: run, change, run.
 //!
+//! **GPU rows are clock-normalised** (`clock`, #862): a fixed probe timed beside
+//! every frame divides out the GPU governor's clock, so `gpu_ms` and `gpu.<pass>`
+//! move with the work, not with how idle the GPU was. `gpu_raw_ms` is the time as
+//! measured and `gpu_clock_pct` the clock it ran at.
+//!
 //! It is an informational signal, never a gate: timings are this machine's, and a
 //! CI runner's software GPU makes them meaningless. Only the counts are portable.
 //! The scene is deterministic (fixed dt, seeded scripts, no RNG in placement), so
 //! two runs on one machine measure the same frames.
 
+mod clock;
 mod lua;
 mod report;
 mod rig;
@@ -25,6 +31,7 @@ use std::path::Path;
 pub use lua::register;
 pub use report::{Report, Samples, Summary};
 
+use self::clock::ClockProbe;
 use super::capture::RenderedFrame;
 use super::harness::Harness;
 use crate::core::frame_stats::FrameStats;
@@ -42,35 +49,60 @@ const COUNTERS: [&str; 5] = [
 const SYSTEMS: [&str; 4] = ["update_scripts", "tick_nav", "step_physics", "animate"];
 
 /// Step and render `ticks` frames (fewer if the game quits), sampling each one.
+/// The clock probe runs right before and right after each frame's GPU work.
 pub fn measure(harness: &mut Harness, ticks: u32) -> Report {
     let mut samples = Samples::default();
+    let probe = harness
+        .renderer()
+        .and_then(|r| ClockProbe::new(&r.device, &r.queue));
+    // The first dispatch pays for setting the pipeline up: not a reading.
+    time_probe(probe.as_ref(), harness);
     for _ in 0..ticks {
         if harness.world.borrow().quit_requested() {
             break;
         }
         harness.step(1);
+        let before = time_probe(probe.as_ref(), harness);
         let frame = harness.render_frame();
-        sample(&mut samples, &harness.stats.borrow(), frame.as_ref());
+        let after = time_probe(probe.as_ref(), harness);
+        let speed = clock::speed(before, after);
+        sample(&mut samples, &harness.stats.borrow(), frame.as_ref(), speed);
         samples.end_frame();
     }
     samples.report()
 }
 
+fn time_probe(probe: Option<&ClockProbe>, harness: &mut Harness) -> Option<f64> {
+    let probe = probe?;
+    let renderer = harness.renderer()?;
+    probe.time(&renderer.device, &renderer.queue)
+}
+
 /// One frame's row values: the sim's CPU time, what rendering it cost, its
 /// counters and the heavy systems' times. Every GPU pass is sampled every frame
-/// (zero when it did not run), so the rows are the same from run to run.
-fn sample(samples: &mut Samples, stats: &FrameStats, frame: Option<&RenderedFrame>) {
+/// (zero when it did not run), so the rows are the same from run to run. GPU
+/// times are scaled by the frame's clock `speed`; a frame the probe missed has
+/// no GPU rows.
+fn sample(
+    samples: &mut Samples,
+    stats: &FrameStats,
+    frame: Option<&RenderedFrame>,
+    speed: Option<f64>,
+) {
     if let Some(s) = stats.get("frame_ms") {
         samples.push("frame_ms", s.last);
     }
     if let Some(frame) = frame {
         samples.push("renderer_ms", frame.cpu_ms);
-        if let Some(gpu) = &frame.gpu {
-            samples.push("gpu_ms", gpu.total_ms());
+        if let (Some(gpu), Some(speed)) = (&frame.gpu, speed) {
+            samples.push("gpu_ms", gpu.total_ms() * speed);
             for pass in GpuPass::ALL {
                 let ms = gpu.passes.iter().find(|(p, _)| *p == pass);
-                samples.push(&format!("gpu.{}", pass.name()), ms.map_or(0.0, |m| m.1));
+                let ms = ms.map_or(0.0, |m| m.1 * speed);
+                samples.push(&format!("gpu.{}", pass.name()), ms);
             }
+            samples.push("gpu_raw_ms", gpu.total_ms());
+            samples.push("gpu_clock_pct", speed * 100.0);
         }
         for (key, value) in frame.counters.pairs() {
             if COUNTERS.contains(&key) {
@@ -96,6 +128,11 @@ pub fn run(harness: &mut Harness, ticks: u32) -> Report {
         text.push_str("(no GPU or software adapter: nothing was rendered)\n");
     } else if !report.metrics.iter().any(|(k, _)| k == "gpu_ms") {
         text.push_str("(this adapter has no timestamp queries: no GPU times)\n");
+    } else {
+        text.push_str(
+            "(gpu_ms, gpu.<pass>: ms at the reference clock; gpu_raw_ms as measured, \
+             at gpu_clock_pct of it)\n",
+        );
     }
     println!("{text}");
     if let Err(e) = write(&out_dir, &report, &text) {
