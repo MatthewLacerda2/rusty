@@ -117,6 +117,46 @@ pub fn capture_into(
     opts: &EditorCaptureOptions,
 ) -> Result<bool, String> {
     let (width, height) = (opts.width.max(1), opts.height.max(1));
+    let ui = &mut initial_ui(game, opts)?;
+    let Some(renderer) = host.renderer(width, height) else {
+        log::warn!("[EditorCapture] no GPU/software adapter available — skipping capture");
+        return Ok(false);
+    };
+    let mut egui_renderer = egui_wgpu::Renderer::new(
+        &renderer.device,
+        OFFSCREEN_FORMAT,
+        super::paint::EGUI_RENDERER,
+    );
+    let ctx = egui::Context::default();
+    let mut texture_id = None;
+    let mut output = None;
+    for frame in 0..opts.frames.max(1) {
+        ctx.begin_pass(raw_input(width, height, frame));
+        let size = draw_ui(ui, &ctx, game, opts.playing, texture_id);
+        render_viewport(host, &mut egui_renderer, game, ui, size, &mut texture_id);
+        output = Some(ctx.end_pass());
+        // Upload font atlas / image deltas every frame: egui sends each only once.
+        let renderer = host.renderer(width, height).expect("probed above");
+        let out: &mut egui::FullOutput = output.as_mut().expect("just set");
+        for (id, deltas) in &out.textures_delta.set {
+            for delta in deltas {
+                egui_renderer.update_texture(&renderer.device, &renderer.queue, *id, delta);
+            }
+        }
+        // Handled: egui asserts every delta is consumed. Frees are moot for one shot.
+        out.textures_delta.clear();
+    }
+    let output = output.expect("at least one frame");
+    let renderer = host.renderer(width, height).expect("probed above");
+    let target = paint(renderer, &mut egui_renderer, &ctx, output, width, height);
+    let pixels =
+        readback::read_texture_rgba8(&renderer.device, &renderer.queue, &target, width, height);
+    readback::write_png(path, width, height, &pixels)?;
+    Ok(true)
+}
+
+/// A fresh editor with `opts`' tab, selection and framing applied.
+fn initial_ui(game: &GameWorld, opts: &EditorCaptureOptions) -> Result<EditorUi, String> {
     let mut ui = EditorUi::new();
     ui.viewport_tab = opts.tab;
     if let Some(name) = &opts.select {
@@ -137,41 +177,7 @@ pub fn capture_into(
     if let Some((center, radius)) = bounds {
         ui.scene_view.camera.frame(center, radius);
     }
-    let Some(renderer) = host.renderer(width, height) else {
-        log::warn!("[EditorCapture] no GPU/software adapter available — skipping capture");
-        return Ok(false);
-    };
-    let mut egui_renderer = egui_wgpu::Renderer::new(
-        &renderer.device,
-        OFFSCREEN_FORMAT,
-        super::paint::EGUI_RENDERER,
-    );
-    let ctx = egui::Context::default();
-    let mut texture_id = None;
-    let mut output = None;
-    for frame in 0..opts.frames.max(1) {
-        ctx.begin_pass(raw_input(width, height, frame));
-        let size = draw_ui(&mut ui, &ctx, game, opts.playing, texture_id);
-        render_viewport(host, &mut egui_renderer, game, &ui, size, &mut texture_id);
-        output = Some(ctx.end_pass());
-        // Upload font atlas / image deltas every frame: egui sends each only once.
-        let renderer = host.renderer(width, height).expect("probed above");
-        let out: &mut egui::FullOutput = output.as_mut().expect("just set");
-        for (id, deltas) in &out.textures_delta.set {
-            for delta in deltas {
-                egui_renderer.update_texture(&renderer.device, &renderer.queue, *id, delta);
-            }
-        }
-        // Handled: egui asserts every delta is consumed. Frees are moot for one shot.
-        out.textures_delta.clear();
-    }
-    let output = output.expect("at least one frame");
-    let renderer = host.renderer(width, height).expect("probed above");
-    let target = paint(renderer, &mut egui_renderer, &ctx, output, width, height);
-    let pixels =
-        readback::read_texture_rgba8(&renderer.device, &renderer.queue, &target, width, height);
-    readback::write_png(path, width, height, &pixels)?;
-    Ok(true)
+    Ok(ui)
 }
 
 /// A frame's input: the fixed screen rect and a synthetic 60 Hz clock, nothing else.
