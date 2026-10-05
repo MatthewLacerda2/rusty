@@ -109,6 +109,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import time
 
 # The workflows that gate a merge, each as (gate job, gated jobs). A gated job
 # is one the gate's `needs:` collapses, `changes` aside — `changes` succeeds on
@@ -153,12 +154,55 @@ FAILED, RUNNING, ABSENT, UNBUILT, PASSED = (
 )
 
 
-def gh(*args: str) -> object:
-    """`gh` with `--json`-shaped output, parsed. Fatal if `gh` itself fails."""
-    done = subprocess.run(["gh", *args], capture_output=True, text=True, check=False)
-    if done.returncode != 0:
-        sys.exit(f"mergeable: gh {' '.join(args)}: {done.stderr.strip()}")
-    return json.loads(done.stdout)
+# What `gh` prints when the network failed, not the request: worth asking again
+# (#847: one TLS handshake timeout ended a whole overnight watch).
+TRANSIENT = (
+    "tls handshake timeout",
+    "i/o timeout",
+    "timeout awaiting",
+    "connection reset",
+    "connection refused",
+    "unexpected eof",
+    "no such host",
+    "temporary failure in name resolution",
+    "network is unreachable",
+    "http 502",
+    "http 503",
+    "http 504",
+)
+
+# Seconds slept before each retry of a transient failure; about a minute in all.
+RETRIES = (5, 15, 40)
+
+
+class Unreachable(Exception):
+    """GitHub stayed unreachable through every retry: nothing is known."""
+
+
+def transient(stderr: str) -> bool:
+    """Whether `gh` failed for the network's reasons rather than the request's."""
+    low = stderr.lower()
+    return any(sign in low for sign in TRANSIENT)
+
+
+def gh(*args: str, runner=subprocess.run, sleep=time.sleep) -> object:
+    """`gh` with `--json`-shaped output, parsed.
+
+    A transient failure is retried ([`RETRIES`]) and raises [`Unreachable`]
+    once they run out; any other failure is fatal at once, because asking
+    again would get the same answer.
+    """
+    for wait in (*RETRIES, None):
+        done = runner(["gh", *args], capture_output=True, text=True, check=False)
+        if done.returncode == 0:
+            return json.loads(done.stdout)
+        failure = f"gh {' '.join(args)}: {done.stderr.strip()}"
+        if not transient(done.stderr):
+            sys.exit(f"mergeable: {failure}")
+        if wait is None:
+            raise Unreachable(failure)
+        sleep(wait)
+    raise AssertionError("unreachable: the loop returns or raises")
 
 
 def base(job_name: str) -> str:
@@ -520,9 +564,12 @@ def main() -> int:
         sys.exit("usage: mergeable.py PULL_REQUEST_NUMBER")
     number = sys.argv[1]
 
-    repo = gh("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
-    pull = gh("pr", "view", number, "--json", PULL_FIELDS)
-    runs, jobs = evidence(repo, pull["headRefOid"])
+    try:
+        repo = gh("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
+        pull = gh("pr", "view", number, "--json", PULL_FIELDS)
+        runs, jobs = evidence(repo, pull["headRefOid"])
+    except Unreachable as down:
+        sys.exit(f"mergeable: GitHub unreachable after {len(RETRIES)} retries: {down}")
 
     ok, lines = judge(pull, runs, jobs, paths(pull))
     head, *rest = lines
