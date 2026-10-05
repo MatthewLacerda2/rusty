@@ -83,7 +83,7 @@ impl OverlapGrid {
         let finite = lo.is_finite() && hi.is_finite();
         let fits = lo.abs().max_element().max(hi.abs().max_element()) < i32::MAX as f32;
         (finite && fits && span <= MAX_CELLS)
-            .then(|| ((lo.x as i32, lo.y as i32), (hi.x as i32, hi.y as i32)))
+            .then_some(((lo.x as i32, lo.y as i32), (hi.x as i32, hi.y as i32)))
     }
 }
 
