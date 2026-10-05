@@ -11,7 +11,7 @@
 //!                       (default `editor-capture.png`)
 //!   --scene <path>      a `.scene` file in the project (default: the built-in default)
 //!   --select <name>     select this entity first (the Inspector shows its cards)
-//!   --select-asset <p>  select this asset file first (the Inspector shows its card)
+//!   --select-asset <p>  an asset file in the project to select first (its card)
 //!   --frame             frame the selection in the Scene view (the F key)
 //!   --play              draw the Play-mode chrome (the sim is not stepped)
 //!   --game              show the Game tab instead of the Scene tab
