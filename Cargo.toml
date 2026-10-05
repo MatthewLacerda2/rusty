@@ -64,7 +64,7 @@ path = "tests/main.rs"
 [features]
 default = ["editor"]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
-dev = ["dep:scorsese-providers"]
+dev = ["dep:scorsese-providers", "dep:scorsese-core"]
 # The egui editor (#431): `src/editor` and the shell's editor frontend. Default-on so
 # `cargo run` opens the editor; a shipped player builds with `--no-default-features`.
 editor = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor"]
@@ -148,6 +148,11 @@ zimmer = { package = "scorsese-zimmer", git = "https://github.com/MatthewLacerda
 # player builds carry no HTTP client. Same rev as zimmer, which it depends on:
 # move the two pins together, or the tree gains a second zimmer.
 scorsese-providers = { git = "https://github.com/MatthewLacerda2/scorsese", rev = "342523ca32baf69d7423f8942953bb26d0a4b246", optional = true }
+# Its core crate, named directly for one function: `hash_bytes` (sha256 → hex), the
+# hasher scorsese names its bakes and briefs with, so a generated asset's address
+# (#384) is the same answer in both trees. Already in the lockfile through the line
+# above; same rev, same `dev` gate. Nothing of its `Project` model is used.
+scorsese-core = { git = "https://github.com/MatthewLacerda2/scorsese", rev = "342523ca32baf69d7423f8942953bb26d0a4b246", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # The editor's Dock icon (#669): winit has no window icon on macOS, so it is set on

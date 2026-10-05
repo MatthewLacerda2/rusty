@@ -24,9 +24,12 @@
 //!   tests here use mocks, and nothing in this module touches a network.
 //!
 //! Every verb that spends goes through [`permit`] first and, once the vendor has
-//! answered, [`Permit::record`]s what it spent.
+//! answered, [`Permit::record`]s what it spent. What it made is addressed by the
+//! hash of its brief ([`generated`]), so asking twice finds the file and spends
+//! nothing.
 
 mod credentials;
+pub mod generated;
 pub mod ledger;
 mod refusal;
 

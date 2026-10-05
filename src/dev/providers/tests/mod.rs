@@ -2,6 +2,7 @@
 //! network call: nothing in the module can.
 
 mod budget;
+mod generated;
 
 use std::cell::RefCell;
 use std::path::PathBuf;
