@@ -25,6 +25,7 @@ pub mod audio;
 pub mod gltf_anim;
 pub mod gltf_import;
 pub mod gltf_skin;
+pub mod lightmap_uv;
 pub mod lod;
 pub mod manifest;
 pub mod mesh_data;
@@ -36,6 +37,7 @@ pub use anim_data::{AnimationClip, Interpolation, JointTrack, Track};
 pub use animation_graph::{
     AnimationGraph, Condition, GraphEdge, GraphError, GraphNode, NumericOp, ParameterDeclaration,
 };
+pub use lightmap_uv::LightmapUvSettings;
 pub use manifest::{build_manifest, AssetEntry, AssetManifest, SubObjectEntry};
 pub use mesh_data::{ImportedAsset, JointTransform, MaterialData, MeshVertex, SkinData, SubMesh};
 pub use sidecar::{import_and_sync_sidecar, ImportSettings, MeshColliderKind};
@@ -88,9 +90,29 @@ fn extension(path: &str) -> String {
 }
 
 /// Import a whole source file into its addressable sub-meshes + materials,
-/// dispatching on the extension. Pure: no sidecar I/O (see
-/// [`import_and_sync_sidecar`] for the variant that maintains the `.meta` cache).
+/// dispatching on the extension, then apply the import settings its `.meta` sidecar
+/// records (Generate Lightmap UVs, #831). Reads the sidecar, never writes it (see
+/// [`import_and_sync_sidecar`] for the variant that maintains the `.meta` cache); a
+/// file with no sidecar imports with the defaults.
 pub fn import_file(path: &Path) -> Result<ImportedAsset, ImportError> {
+    let mut asset = parse_file(path)?;
+    let settings = sidecar::load(path).unwrap_or_else(|e| {
+        log::warn!(
+            "[Asset] {}: {e}; importing with default settings",
+            path.display()
+        );
+        ImportSettings::default()
+    });
+    if settings.lightmap_uvs.generate {
+        for sub in &mut asset.sub_meshes {
+            lightmap_uv::apply(sub, &settings.lightmap_uvs);
+        }
+    }
+    Ok(asset)
+}
+
+/// Parse a source file into sub-meshes + materials by its extension, as authored.
+fn parse_file(path: &Path) -> Result<ImportedAsset, ImportError> {
     let ext = path
         .extension()
         .and_then(|e| e.to_str())
