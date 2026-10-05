@@ -3,7 +3,7 @@ use wgpu::util::DeviceExt;
 
 use std::collections::HashSet;
 
-use super::{GpuMesh, MeshId, Renderer};
+use super::{GpuMesh, MeshId, Renderer, SkinBounds};
 use crate::components::mesh::Vertex;
 use crate::scene::Scene;
 
@@ -70,6 +70,7 @@ impl Renderer {
         // the vertices per frame (#330). Re-derived on every re-upload so an edited mesh's
         // bounds stay correct.
         let local_aabb = local_aabb(vertices);
+        let skin_bounds = SkinBounds::from_vertices(vertices);
 
         // Re-use resident buffers when the new data still fits (the dirty-path
         // case: same geometry re-uploaded). Both buffers carry COPY_DST so they
@@ -80,6 +81,7 @@ impl Renderer {
             {
                 existing.num_indices = num_indices;
                 existing.local_aabb = local_aabb;
+                existing.skin_bounds = skin_bounds;
                 self.queue.write_buffer(&existing.vertex_buffer, 0, v_bytes);
                 self.queue.write_buffer(&existing.index_buffer, 0, i_bytes);
                 return;
@@ -109,6 +111,7 @@ impl Renderer {
                 index_buffer,
                 num_indices,
                 local_aabb,
+                skin_bounds,
             },
         );
     }

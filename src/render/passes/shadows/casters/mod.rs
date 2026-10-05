@@ -30,7 +30,7 @@ use crate::render::gpu::draw_buffers::{push_palette, JointMatrix};
 use crate::render::gpu::material_cache::MaterialCache;
 use crate::render::gpu::pipelines::surface::SurfaceShaders;
 use crate::render::lod::LodSelection;
-use crate::render::{transform_aabb, Frustum, GpuMesh, MeshId};
+use crate::render::{Frustum, GpuMesh, MeshId};
 use crate::scene::Scene;
 pub(super) use buffer::CasterBuffer;
 use buffer::CasterData;
@@ -203,10 +203,9 @@ impl ShadowRenderer {
                 continue;
             };
             let world = scene.world_matrix(id);
-            // Skinned casters are never culled — their AABB is the rest pose, which an
-            // animation can exceed; a wrongly-culled caster would drop its shadow (#330).
-            let bounds = (!mesh.is_skinned())
-                .then(|| transform_aabb(gpu_mesh.local_aabb.0, gpu_mesh.local_aabb.1, world));
+            // A skinned caster is bounded by its posed skeleton (#833); one whose pose
+            // cannot be bounded is never culled — a wrongly-culled caster drops its shadow.
+            let bounds = gpu_mesh.world_bounds(&mesh, world);
             let bone_base = push_palette(&mut joints, mesh.active_palette());
             let mut caster = CasterData::new(world, bone_base);
             if let Some((cutoff, textured)) = clip.and_then(|c| c.cutout) {
@@ -267,8 +266,8 @@ impl ShadowRenderer {
     }
 }
 
-/// One caster before culling: its draw, its instance data and its world bounds (`None` when skinned —
-/// never culled).
+/// One caster before culling: its draw, its instance data and its world bounds (`None`
+/// when they cannot be bounded — never culled).
 struct Candidate {
     key: CasterKey,
     num_indices: u32,

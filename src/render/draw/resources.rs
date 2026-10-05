@@ -9,7 +9,7 @@ use super::sort::{back_to_front, view_depth};
 use crate::components::MaterialAsset;
 use crate::render::gpu::draw_buffers::{group1, push_palette, FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
-use crate::render::{transform_aabb, Frustum, MeshId, Renderer};
+use crate::render::{Frustum, MeshId, Renderer};
 use crate::scene::Scene;
 
 /// One camera's solids as instanced draws (#470), split into the two passes a frame
@@ -155,27 +155,21 @@ impl Renderer {
     }
 
     /// Whether `entity` is fully outside `frustum` and can be skipped this pass (#330).
-    /// Transforms the mesh's cached local AABB by the entity's world matrix (O(1)) and
-    /// tests it. An entity with no mesh, or whose geometry is not resident on the GPU yet
-    /// (no cached AABB), is never culled here — the downstream sync produces no draw for it
-    /// anyway, and culling a not-yet-uploaded mesh could wrongly hide it on its first frame.
+    /// Tests the mesh's world bounds — its cached local AABB under the entity's world
+    /// matrix, or its animated bound when skinned (#833). An entity with no mesh, whose
+    /// geometry is not resident on the GPU yet, or whose pose cannot be bounded, is never
+    /// culled here — the downstream sync produces no draw for a non-resident mesh anyway,
+    /// and culling a not-yet-uploaded mesh could wrongly hide it on its first frame.
     fn is_culled(&self, scene: &Scene, id: u32, frustum: &Frustum) -> bool {
         let Some(mesh) = scene.world.mesh(id) else {
             return false;
         };
-        // Skinned meshes are never culled here — their AABB is the rest pose (#330).
-        if mesh.is_skinned() {
-            return false;
-        }
         let Some(gpu_mesh) = self.gpu_meshes.get(&MeshId::from_mesh(&mesh)) else {
             return false;
         };
-        let (min, max) = transform_aabb(
-            gpu_mesh.local_aabb.0,
-            gpu_mesh.local_aabb.1,
-            scene.world_matrix(id),
-        );
-        !frustum.intersects_aabb(min, max)
+        gpu_mesh
+            .world_bounds(&mesh, scene.world_matrix(id))
+            .is_some_and(|(min, max)| !frustum.intersects_aabb(min, max))
     }
 
     /// One solid's draw item: its batch key (mesh, material group, per-draw

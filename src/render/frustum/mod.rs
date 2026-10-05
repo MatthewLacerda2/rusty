@@ -1,4 +1,5 @@
-//! src/render/frustum.rs — view-frustum extraction and AABB culling (#330).
+//! src/render/frustum/ — view-frustum extraction and AABB culling (#330), and the
+//! animated bound that lets skinned meshes be culled too (`skinned`, #833).
 //!
 //! Frustum culling skips the CPU submission work (uniform sync, bind-group binds, the
 //! draw call) for entities the camera cannot see, so per-frame cost tracks the *visible*
@@ -81,6 +82,11 @@ pub fn transform_aabb(local_min: Vec3, local_max: Vec3, world: Mat4) -> (Vec3, V
     (min, max)
 }
 
+mod skinned;
+
+pub use skinned::SkinBounds;
+
 #[cfg(test)]
-#[path = "frustum_tests.rs"]
-mod frustum_tests;
+mod gpu_tests;
+#[cfg(test)]
+mod tests;
