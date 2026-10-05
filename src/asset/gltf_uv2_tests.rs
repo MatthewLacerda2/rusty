@@ -64,3 +64,52 @@ fn a_mesh_without_texcoord_1_has_zero_lightmap_uvs() {
     let mesh = import_pair("rusty_uv2_none", "quad", quad_mode_gltf(4, &[0, 1, 2]));
     assert!(mesh.vertices.iter().all(|v| v.lightmap_uv == [0.0, 0.0]));
 }
+
+/// The bake's input for one imported mesh, placed at the origin under a white sky.
+fn bake_input(mesh: &SubMesh) -> crate::scene::lighting::lightmap::BakeScene {
+    use crate::scene::lighting::lightmap::{BakeMesh, BakeScene};
+    let field = |f: fn(&super::MeshVertex) -> glam::Vec3| mesh.vertices.iter().map(f).collect();
+    BakeScene {
+        meshes: vec![BakeMesh {
+            entity: 1,
+            positions: field(|v| v.position.into()),
+            normals: field(|_| glam::Vec3::Z),
+            lightmap_uvs: mesh.vertices.iter().map(|v| v.lightmap_uv.into()).collect(),
+            indices: mesh.indices.clone(),
+            albedo: glam::Vec3::ONE,
+            emissive: glam::Vec3::ZERO,
+        }],
+        lights: Vec::new(),
+        sky: glam::Vec3::ONE,
+    }
+}
+
+#[test]
+fn ticking_generate_lightmap_uvs_makes_a_mesh_without_texcoord_1_bake() {
+    use crate::scene::lighting::lightmap::{bake, BakeSettings};
+    let settings = BakeSettings {
+        samples: 4,
+        ..Default::default()
+    };
+    let plain = import_pair(
+        "rusty_uv2_gen_off",
+        "quad",
+        quad_mode_gltf(4, &[0, 1, 2, 0, 2, 3]),
+    );
+    assert!(bake(&bake_input(&plain), &settings).is_empty());
+
+    let dir = std::env::temp_dir().join("rusty_uv2_gen_on");
+    std::fs::create_dir_all(&dir).unwrap();
+    let on = super::LightmapUvSettings {
+        generate: true,
+        ..Default::default()
+    };
+    super::sidecar::set_lightmap_uvs(&dir.join("quad.gltf"), on).unwrap();
+    let mesh = import_pair(
+        "rusty_uv2_gen_on",
+        "quad",
+        quad_mode_gltf(4, &[0, 1, 2, 0, 2, 3]),
+    );
+    assert!(mesh.vertices.iter().any(|v| v.lightmap_uv != [0.0, 0.0]));
+    assert_eq!(bake(&bake_input(&mesh), &settings).len(), 1);
+}

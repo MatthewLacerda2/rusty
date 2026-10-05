@@ -7,8 +7,12 @@
 //! mesh (#207). No GPU types — the renderer uploads the result (#494).
 
 use super::Vertex;
+use crate::asset::lightmap_uv::{unwrap_vertices, LightmapUvSettings};
 use crate::asset::tangents::generate_tangents;
 use glam::Vec3;
+
+mod cylinder;
+pub use cylinder::generate_cylinder;
 
 /// Generates a 3D box centered at the origin
 pub fn generate_box(width: f32, height: f32, depth: f32) -> (Vec<Vertex>, Vec<u32>) {
@@ -139,17 +143,11 @@ pub fn generate_sphere(radius: f32, rings: u32, sectors: u32) -> (Vec<Vertex>, V
             let idx2 = (r + 1) * (sectors + 1) + s;
             let idx3 = (r + 1) * (sectors + 1) + (s + 1);
 
-            indices.push(idx0);
-            indices.push(idx1);
-            indices.push(idx3);
-
-            indices.push(idx0);
-            indices.push(idx3);
-            indices.push(idx2);
+            indices.extend_from_slice(&[idx0, idx1, idx3, idx0, idx3, idx2]);
         }
     }
 
-    fill_tangents(vertices, indices)
+    fill_tangents_unwrapped(vertices, indices)
 }
 
 /// Generates a flat quad aligned on the XZ plane
@@ -176,113 +174,14 @@ pub fn generate_plane(width: f32, depth: f32) -> (Vec<Vertex>, Vec<u32>) {
     fill_tangents(vertices, indices)
 }
 
-/// Generates a cylinder between two arbitrary 3D points
-pub fn generate_cylinder(
-    p1: Vec3,
-    p2: Vec3,
-    radius: f32,
-    segments: u32,
-) -> (Vec<Vertex>, Vec<u32>) {
-    let mut vertices = Vec::new();
-    let mut indices = Vec::new();
-
-    let d_vec = p2 - p1;
-    let dir = d_vec.normalize();
-
-    // Create orthonormal basis (dir, u, v)
-    let u = if dir.x.abs() < 0.9 {
-        dir.cross(Vec3::X).normalize()
-    } else {
-        dir.cross(Vec3::Y).normalize()
-    };
-    let v = dir.cross(u).normalize();
-
-    // 1. Tube wall, 2. bottom cap (−dir at p1), 3. top cap (+dir at p2).
-    push_cylinder_tube(
-        &mut vertices,
-        &mut indices,
-        (p1, p2),
-        (u, v),
-        radius,
-        segments,
-    );
-    push_cylinder_cap(
-        &mut vertices,
-        &mut indices,
-        (p1, -dir, true),
-        (u, v),
-        radius,
-        segments,
-    );
-    push_cylinder_cap(
-        &mut vertices,
-        &mut indices,
-        (p2, dir, false),
-        (u, v),
-        radius,
-        segments,
-    );
-
+/// [`fill_tangents`] after a generated lightmap UV (#831), the unwrap Generate
+/// Lightmap UVs gives a model: a Sphere or a Cylinder has no flat layout to author.
+fn fill_tangents_unwrapped(vertices: Vec<Vertex>, indices: Vec<u32>) -> (Vec<Vertex>, Vec<u32>) {
+    let with_uv = |v: &Vertex, uv| v.with_lightmap_uv(uv);
+    let s = LightmapUvSettings::default();
+    let unwrapped = unwrap_vertices(&vertices, &indices, |v| v.position, with_uv, &s);
+    let (vertices, indices) = unwrapped.unwrap_or((vertices, indices));
     fill_tangents(vertices, indices)
-}
-
-/// Append the cylinder's side wall: paired bottom/top ring vertices and the
-/// triangles connecting consecutive segments.
-fn push_cylinder_tube(
-    vertices: &mut Vec<Vertex>,
-    indices: &mut Vec<u32>,
-    ends: (Vec3, Vec3),
-    basis: (Vec3, Vec3),
-    radius: f32,
-    segments: u32,
-) {
-    let (p1, p2) = ends;
-    let (u, v) = basis;
-    for i in 0..=segments {
-        let theta = (i as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
-        let radial_dir = u * theta.cos() + v * theta.sin();
-        let p_offset = radial_dir * radius;
-        let uv_x = (i as f32) / (segments as f32);
-        // Bottom vertex (on P1 plane), then top vertex (on P2 plane).
-        vertices.push(Vertex::new(p1 + p_offset, radial_dir, [uv_x, 0.0]));
-        vertices.push(Vertex::new(p2 + p_offset, radial_dir, [uv_x, 1.0]));
-    }
-    for i in 0..segments {
-        let (b0, t0, b1, t1) = (i * 2, i * 2 + 1, (i + 1) * 2, (i + 1) * 2 + 1);
-        indices.extend_from_slice(&[b0, b1, t0, t0, b1, t1]);
-    }
-}
-
-/// Append one disk cap. `cap` is `(center, outward normal, flip_winding)`: the bottom
-/// cap winds (center, i+1, i) so the face points outward, the top cap (center, i, i+1).
-fn push_cylinder_cap(
-    vertices: &mut Vec<Vertex>,
-    indices: &mut Vec<u32>,
-    cap: (Vec3, Vec3, bool),
-    basis: (Vec3, Vec3),
-    radius: f32,
-    segments: u32,
-) {
-    let (center, normal, flip) = cap;
-    let (u, v) = basis;
-    let center_idx = vertices.len() as u32;
-    vertices.push(Vertex::new(center, normal, [0.5, 0.5]));
-    let ring_start = vertices.len() as u32;
-    for i in 0..=segments {
-        let theta = (i as f32) * 2.0 * std::f32::consts::PI / (segments as f32);
-        let (cos_t, sin_t) = (theta.cos(), theta.sin());
-        let radial_dir = u * cos_t + v * sin_t;
-        let p_offset = radial_dir * radius;
-        let uv = [0.5 + 0.5 * cos_t, 0.5 + 0.5 * sin_t];
-        vertices.push(Vertex::new(center + p_offset, normal, uv));
-    }
-    for i in 0..segments {
-        if flip {
-            indices.extend_from_slice(&[center_idx, ring_start + i + 1, ring_start + i]);
-        } else {
-            indices.extend_from_slice(&[center_idx, ring_start + i, ring_start + i + 1]);
-        }
-    }
 }
 
 /// Overwrite each vertex's `tangent` with the basis derived from positions + UVs. The

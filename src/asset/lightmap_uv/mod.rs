@@ -140,26 +140,35 @@ pub fn apply(sub: &mut SubMesh, settings: &LightmapUvSettings) {
     if sub.skin.is_some() {
         return;
     }
-    let positions: Vec<[f32; 3]> = sub.vertices.iter().map(|v| v.position).collect();
-    let Some(unwrap) = unwrap(&positions, &sub.indices, settings) else {
-        return;
-    };
-    sub.vertices = remap(&sub.vertices, &unwrap, |v, uv| MeshVertex {
-        lightmap_uv: uv,
-        ..*v
-    });
-    sub.indices = unwrap.indices;
+    let with_uv = |v: &MeshVertex, lightmap_uv| MeshVertex { lightmap_uv, ..*v };
+    if let Some((vertices, indices)) = unwrap_vertices(
+        &sub.vertices,
+        &sub.indices,
+        |v| v.position,
+        with_uv,
+        settings,
+    ) {
+        (sub.vertices, sub.indices) = (vertices, indices);
+    }
 }
 
-/// Rebuild a vertex list from an [`Unwrap`]: each new vertex is its source vertex
-/// with the generated lightmap UV written by `with_uv`.
-pub fn remap<V>(vertices: &[V], unwrap: &Unwrap, with_uv: impl Fn(&V, [f32; 2]) -> V) -> Vec<V> {
-    unwrap
-        .source
-        .iter()
-        .zip(&unwrap.uvs)
+/// [`unwrap`] any vertex type: read each vertex's position with `position`, and
+/// rebuild the split vertex list, each new vertex its source with the generated UV
+/// written by `with_uv`. `None` when there is nothing to unwrap.
+pub fn unwrap_vertices<V>(
+    vertices: &[V],
+    indices: &[u32],
+    position: impl Fn(&V) -> [f32; 3],
+    with_uv: impl Fn(&V, [f32; 2]) -> V,
+    settings: &LightmapUvSettings,
+) -> Option<(Vec<V>, Vec<u32>)> {
+    let positions: Vec<[f32; 3]> = vertices.iter().map(position).collect();
+    let u = unwrap(&positions, indices, settings)?;
+    let out = u.source.iter().zip(&u.uvs);
+    let out = out
         .map(|(&s, &uv)| with_uv(&vertices[s as usize], uv))
-        .collect()
+        .collect();
+    Some((out, u.indices))
 }
 
 #[cfg(test)]
