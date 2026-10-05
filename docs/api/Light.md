@@ -50,12 +50,24 @@ into the atlas as it does into the cascades: cutout and dissolving materials cli
 their shadow, skinned meshes cast in their animated pose. Lit particles are not
 shadowed.
 
-**Mode** is Unity's Light Mode and decides what the lightmap bake
-(`Lighting.BakeLightmaps`) does with the light:
+**Mode** is Unity's Light Mode and decides what the bakes (`Lighting.BakeLightmaps`
+for static surfaces, the light-probe bake for dynamic objects) do with the light, and
+whether it is drawn live:
 
-- `Realtime` — direct light and shadows every frame; the bake ignores it.
-- `Mixed` *(default)* — Unity's *Baked Indirect*: realtime direct light and shadows,
-  plus its bounce baked into the lightmaps. No shadowmask.
-- `Baked` — direct light and bounce both baked. A lightmapped surface skips it at
-  runtime; a surface without a lightmap (dynamic, or no second UV map) still lights
-  from it live, so dynamic objects are never left dark by it.
+| Mode | Static, lightmapped surfaces | Dynamic objects (probe-lit) | Realtime shadows |
+|---|---|---|---|
+| `Realtime` | live direct light only, no bounce | live direct light only, no bounce | yes, if it casts shadows |
+| `Mixed` *(default)* | live direct light + baked bounce | live direct light + bounce from the probes | yes, if it casts shadows |
+| `Baked` | direct light and bounce from the lightmap | direct light and bounce from the probes only | no |
+
+- `Realtime` — direct light and shadows every frame; neither bake sees it, so it
+  bounces nowhere (a muzzle flash, a flickering lamp).
+- `Mixed` — Unity's *Baked Indirect*: realtime direct light and shadows, plus its
+  bounce baked into the lightmaps and the light probes. No shadowmask. The light
+  that should cast sharp shadows on actors.
+- `Baked` — costs nothing at runtime: it is never drawn live, anywhere. Static
+  surfaces get it from their lightmap; dynamic objects get its direct light and its
+  bounce from the light probes, whose bake adds the light's own direct light per
+  probe (shadowed by static geometry). So a dynamic object lights from it only once
+  probes are baked, softly, and it casts no realtime shadow; a static surface without
+  a lightmap (no second UV map) does not receive it at all.

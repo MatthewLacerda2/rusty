@@ -167,3 +167,7 @@ impl crate::render::Renderer {
         lighting_uniform
     }
 }
+
+#[cfg(test)]
+#[path = "lighting_tests.rs"]
+mod lighting_tests;

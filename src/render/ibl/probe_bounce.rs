@@ -180,3 +180,7 @@ pub fn pass_converged(prev: &[Sh9], next: &[Sh9], epsilon: f32) -> bool {
 #[cfg(test)]
 #[path = "probe_bounce_tests.rs"]
 mod probe_bounce_tests;
+
+#[cfg(test)]
+#[path = "probe_modes_tests.rs"]
+mod probe_modes_tests;
