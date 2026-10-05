@@ -57,6 +57,7 @@ pub(super) fn settings() -> BakeSettings {
         seed: 7,
         max_resolution: 16,
         filter_radius: 0,
+        directional: true,
     }
 }
 

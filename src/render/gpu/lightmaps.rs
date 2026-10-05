@@ -10,12 +10,19 @@
 //! texels), so the cache never serves a stale page. A page that fails to load, or
 //! pages of different sizes, leave the scene unlit by lightmaps (probe / ambient
 //! fallback) rather than half-bound.
+//!
+//! A directional bake (#810) adds its direction pages as a second array at binding 16,
+//! read through the same sampler with the same page index and UV. They are bound only
+//! beside a bound colour array whose page count and size they match; otherwise the
+//! zeroed fallback stands in, whose zero directionality leaves the lightmap as is.
 
 use std::collections::HashMap;
 use std::rc::Rc;
 
 /// One uploaded page array.
 pub(crate) struct LightmapArray {
+    /// Page edge and page count, to match direction pages to colour pages.
+    shape: (u32, u32),
     texture: wgpu::Texture,
     view: wgpu::TextureView,
     sampler: wgpu::Sampler,
@@ -23,9 +30,11 @@ pub(crate) struct LightmapArray {
 
 /// What group 0 binds for lightmaps, and the arrays built so far.
 pub(crate) struct Lightmaps {
-    /// The page list of the array bound now (empty: the fallback).
-    bound: Vec<String>,
+    /// The colour and direction page lists bound now (empty: the fallback).
+    bound: (Vec<String>, Vec<String>),
     current: Option<Rc<LightmapArray>>,
+    directions: Option<Rc<LightmapArray>>,
+    /// Arrays by page list, colour and direction alike.
     cache: HashMap<Vec<String>, Option<Rc<LightmapArray>>>,
     /// A 1×1×1 black array, bound when the scene has no lightmaps.
     fallback: LightmapArray,
@@ -37,34 +46,50 @@ impl Lightmaps {
     pub(crate) fn new(device: &wgpu::Device) -> Self {
         let fallback = create(device, 1, 1);
         Self {
-            bound: Vec::new(),
+            bound: (Vec::new(), Vec::new()),
             current: None,
+            directions: None,
             cache: HashMap::new(),
             fallback,
         }
     }
 
-    /// Bind the array of `pages`, loading it on first sight. Returns whether the
+    /// Bind the arrays of `pages` and their `directions` (#810; empty for a
+    /// non-directional bake), loading each on first sight. Returns whether the
     /// binding changed, so the caller rebuilds group 0.
     pub(crate) fn bind(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         pages: &[String],
+        directions: &[String],
     ) -> bool {
-        if self.bound == pages {
+        if self.bound.0 == pages && self.bound.1 == directions {
             return false;
         }
-        self.bound = pages.to_vec();
-        self.current = match pages.is_empty() {
-            true => None,
-            false => self
-                .cache
-                .entry(pages.to_vec())
-                .or_insert_with(|| load(device, queue, pages).map(Rc::new))
-                .clone(),
-        };
+        self.bound = (pages.to_vec(), directions.to_vec());
+        self.current = self.array(device, queue, pages);
+        let shape = self.current.as_ref().map(|a| a.shape);
+        self.directions = self
+            .array(device, queue, directions)
+            .filter(|d| Some(d.shape) == shape);
         true
+    }
+
+    /// The (cached) array of `pages`; `None` for no pages or one that won't load.
+    fn array(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        pages: &[String],
+    ) -> Option<Rc<LightmapArray>> {
+        if pages.is_empty() {
+            return None;
+        }
+        self.cache
+            .entry(pages.to_vec())
+            .or_insert_with(|| load(device, queue, pages).map(Rc::new))
+            .clone()
     }
 
     /// Whether a lightmap array is bound: when not, instances must not read it.
@@ -72,10 +97,17 @@ impl Lightmaps {
         self.current.is_some()
     }
 
-    /// The bound array's view and sampler (the fallback's when none is).
-    pub(crate) fn binding(&self) -> (&wgpu::TextureView, &wgpu::Sampler) {
+    /// Whether direction pages are bound beside it (#810).
+    pub(crate) fn directional(&self) -> bool {
+        self.directions.is_some()
+    }
+
+    /// The bound colour and direction views and their sampler (the fallback's when
+    /// none is).
+    pub(crate) fn binding(&self) -> (&wgpu::TextureView, &wgpu::TextureView, &wgpu::Sampler) {
         let array = self.current.as_deref().unwrap_or(&self.fallback);
-        (&array.view, &array.sampler)
+        let directions = self.directions.as_deref().unwrap_or(&self.fallback);
+        (&array.view, &directions.view, &array.sampler)
     }
 }
 
@@ -168,6 +200,7 @@ fn create(device: &wgpu::Device, size: u32, layers: u32) -> LightmapArray {
         ..Default::default()
     });
     LightmapArray {
+        shape: (size, layers),
         texture,
         view,
         sampler,

@@ -14,8 +14,13 @@ pub(crate) struct GlobalGroup<'a> {
     pub cube: (&'a wgpu::TextureView, &'a wgpu::Sampler),
     pub clusters: &'a ClusterBuffers,
     pub decals: &'a DecalBuffers,
-    /// The baked lightmap pages and their sampler (#438).
-    pub lightmaps: (&'a wgpu::TextureView, &'a wgpu::Sampler),
+    /// The baked lightmap pages (#438), their direction pages (#810) and the
+    /// sampler both read through.
+    pub lightmaps: (
+        &'a wgpu::TextureView,
+        &'a wgpu::TextureView,
+        &'a wgpu::Sampler,
+    ),
 }
 
 impl GlobalGroup<'_> {
@@ -41,7 +46,8 @@ impl GlobalGroup<'_> {
             (12, TextureView(&self.decals.atlas.data_view)),
             (13, Sampler(&self.decals.atlas.sampler)),
             (14, TextureView(self.lightmaps.0)),
-            (15, Sampler(self.lightmaps.1)),
+            (15, Sampler(self.lightmaps.2)),
+            (16, TextureView(self.lightmaps.1)),
         ];
         let entries: Vec<_> = resources
             .into_iter()

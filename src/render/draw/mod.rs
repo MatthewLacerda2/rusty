@@ -42,10 +42,12 @@ impl Renderer {
         // Load the active reflection probe's baked cubemap for the primary camera (#245),
         // so the forward pass reflects that prefiltered cube instead of the skybox.
         self.update_reflection_cube(scene, camera.position);
-        // The scene's baked lightmap pages (#438): rebinding group 0 only on a change.
+        // The scene's baked lightmap pages (#438) and their direction pages (#810):
+        // rebinding group 0 only on a change.
+        let set = &scene.lightmaps;
         if self
             .lightmaps
-            .bind(&self.device, &self.queue, &scene.lightmaps.pages)
+            .bind(&self.device, &self.queue, &set.pages, &set.directions)
         {
             self.global_bind_group_dirty = true;
         }

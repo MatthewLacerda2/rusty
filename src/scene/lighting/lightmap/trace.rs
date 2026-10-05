@@ -11,6 +11,10 @@
 //! face returns that surface's emission plus `albedo / π` times its direct light (a
 //! shadow ray per light), and keeps bouncing, `bounces` surfaces deep. A back face
 //! returns nothing, so light never leaks through a closed wall.
+//!
+//! Alongside each part the tracer sums where the light came from (#810): every ray's
+//! direction weighted by the luminance it brought back, so the bake can store the
+//! dominant incoming direction that lets normal maps reshape the lightmap.
 
 use std::f32::consts::{PI, TAU};
 
@@ -33,6 +37,10 @@ const BACKFACE_TOLERANCE: f32 = 0.5;
 pub(super) struct TexelLight {
     pub indirect: Vec3,
     pub direct: Vec3,
+    /// Luminance-weighted sum of the directions `indirect` and `direct` arrived
+    /// from, in the same units: `|indirect_dir| <= luminance(indirect)` (#810).
+    pub indirect_dir: Vec3,
+    pub direct_dir: Vec3,
     /// False when most of the texel's rays start out hitting back faces: it sits
     /// inside other geometry (a floor texel under a crate), so its light is
     /// meaningless and the bake fills it from its neighbours instead (Unity's
@@ -59,45 +67,54 @@ impl Tracer<'_> {
         rng: &mut Rng,
     ) -> TexelLight {
         let origin = position + normal * SURFACE_OFFSET;
-        let (mut sum, mut inside) = (Vec3::ZERO, 0);
+        let (mut sum, mut dir_sum, mut inside) = (Vec3::ZERO, Vec3::ZERO, 0);
         for _ in 0..samples {
-            let (radiance, backface) = self.path(origin, normal, bounces, rng);
+            let (radiance, dir, backface) = self.path(origin, normal, bounces, rng);
             sum += radiance;
+            dir_sum += dir * luminance(radiance);
             inside += u32::from(backface);
         }
+        let n = samples.max(1) as f32;
+        let (direct, direct_dir) = self.direct(origin, normal, true);
         TexelLight {
-            indirect: sum / samples.max(1) as f32,
-            direct: self.direct(origin, normal, true) / PI,
+            indirect: sum / n,
+            direct: direct / PI,
+            indirect_dir: dir_sum / n,
+            direct_dir: direct_dir / PI,
             valid: (inside as f32) < samples as f32 * BACKFACE_TOLERANCE,
         }
     }
 
-    /// The radiance one cosine-weighted path from `origin` brings back, and whether
-    /// its first ray hit a back face.
+    /// The radiance one cosine-weighted path from `origin` brings back, the
+    /// direction its first ray left in, and whether that ray hit a back face.
     fn path(
         &self,
         mut origin: Vec3,
         mut normal: Vec3,
         bounces: u32,
         rng: &mut Rng,
-    ) -> (Vec3, bool) {
+    ) -> (Vec3, Vec3, bool) {
         let (mut radiance, mut throughput) = (Vec3::ZERO, Vec3::ONE);
+        let mut first = Vec3::ZERO;
         for depth in 0..bounces.max(1) {
             let dir = cosine_sample(normal, rng);
+            if depth == 0 {
+                first = dir;
+            }
             let Some(hit) = self.bvh.closest(origin, dir, T_MIN, f32::MAX) else {
                 radiance += throughput * self.sky(dir);
                 break;
             };
             let Some((point, hit_normal, mesh)) = self.surface(&hit, dir) else {
-                return (radiance, depth == 0); // back face: nothing comes through
+                return (radiance, first, depth == 0); // back face: nothing comes through
             };
             let m = &self.scene.meshes[mesh];
-            radiance +=
-                throughput * (m.emissive + m.albedo * self.direct(point, hit_normal, false) / PI);
+            let lit = self.direct(point, hit_normal, false).0;
+            radiance += throughput * (m.emissive + m.albedo * lit / PI);
             throughput *= m.albedo;
             (origin, normal) = (point, hit_normal);
         }
-        (radiance, false)
+        (radiance, first, false)
     }
 
     /// The offset hit point, its shading normal and mesh — `None` on a back face.
@@ -116,11 +133,12 @@ impl Tracer<'_> {
         Some((point + n * SURFACE_OFFSET, n, tri.mesh as usize))
     }
 
-    /// The direct irradiance at `point` facing `normal`, shadowed. `baked_only` keeps
+    /// The direct irradiance at `point` facing `normal`, shadowed, and the
+    /// luminance-weighted sum of the directions it arrived from. `baked_only` keeps
     /// just the `Baked` lights (a receiving texel's own direct light); a bounce hit
     /// sees every baked-in light.
-    fn direct(&self, point: Vec3, normal: Vec3, baked_only: bool) -> Vec3 {
-        let mut e = Vec3::ZERO;
+    fn direct(&self, point: Vec3, normal: Vec3, baked_only: bool) -> (Vec3, Vec3) {
+        let (mut e, mut dir) = (Vec3::ZERO, Vec3::ZERO);
         for light in &self.scene.lights {
             if baked_only && !light.bakes_direct {
                 continue;
@@ -129,10 +147,11 @@ impl Tracer<'_> {
                 let cos = normal.dot(to_light);
                 if cos > 0.0 && !self.bvh.occluded(point, to_light, T_MIN, distance) {
                     e += received * cos;
+                    dir += to_light * luminance(received * cos);
                 }
             }
         }
-        e
+        (e, dir)
     }
 
     /// What a ray escaping along `dir` sees: the forward shader's ambient gradient.
@@ -140,6 +159,11 @@ impl Tracer<'_> {
         let ground = self.scene.sky * 0.25;
         ground.lerp(self.scene.sky, dir.y * 0.5 + 0.5)
     }
+}
+
+/// Rec. 709 luminance: how much a colour weighs when averaging light directions.
+pub(super) fn luminance(c: Vec3) -> f32 {
+    c.dot(Vec3::new(0.2126, 0.7152, 0.0722))
 }
 
 /// Unit direction to `light`, distance to it, and the radiance arriving at `point`

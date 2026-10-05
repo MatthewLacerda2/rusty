@@ -77,5 +77,11 @@ fn lightmap_bake_needs_a_saved_scene_and_counts_what_it_wrote() {
         s.eval("return Lighting.BakeLightmaps(2, 4, 1, 9)").unwrap(),
         "0"
     );
+    // `directional` (#810) is the optional fifth argument.
+    assert_eq!(
+        s.eval("return Lighting.BakeLightmaps(2, 4, 1, 9, false)")
+            .unwrap(),
+        "0"
+    );
     s.eval("Lighting.ClearLightmaps()").unwrap();
 }

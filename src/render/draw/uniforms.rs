@@ -7,6 +7,7 @@
 use glam::Mat4;
 
 use crate::components::{MaterialAsset, RenderMode};
+use crate::render::gpu::lightmaps::Lightmaps;
 use crate::render::{EntityUniform, InstanceData};
 use crate::scene::Scene;
 
@@ -78,21 +79,23 @@ pub(crate) fn material_uniform(lit: bool, material: Option<&MaterialAsset>) -> E
 
 /// One solid's instance: its world matrix, the SH its ambient term reads when a light
 /// probe covers it (see [`entity_probe_sh`]), and its baked lightmap when it has one
-/// and `lightmaps` (the pages are bound) holds (#438).
+/// and `lightmaps` has its pages bound (#438), directional when their direction
+/// pages are bound too (#810).
 pub(crate) fn solid_instance(
     scene: &Scene,
     id: u32,
     model_matrix: Mat4,
     light_static_from_probes: bool,
-    lightmaps: bool,
+    lightmaps: &Lightmaps,
 ) -> InstanceData {
     let (use_sh, sh) = entity_probe_sh(scene, id, model_matrix, light_static_from_probes);
-    let lightmap = scene.lightmaps.get(id).filter(|_| lightmaps);
+    let lightmap = scene.lightmaps.get(id).filter(|_| lightmaps.resident());
     InstanceData {
         model_matrix: model_matrix.to_cols_array(),
         use_sh,
         lightmap_page: lightmap.map_or(0, |l| l.page + 1),
-        _pad: [0; 2],
+        lightmap_directional: u32::from(lightmap.is_some() && lightmaps.directional()),
+        _pad: 0,
         lightmap_st: lightmap.map_or([0.0; 4], |l| l.scale_offset),
         sh,
     }

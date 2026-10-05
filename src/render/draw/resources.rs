@@ -198,7 +198,7 @@ impl Renderer {
             id,
             model_matrix,
             self.capture_probe_bounce,
-            self.lightmaps.resident(),
+            &self.lightmaps,
         );
 
         // The active bone palette: the live animated pose when a clip plays (#80),

@@ -180,7 +180,10 @@ pub(crate) struct InstanceData {
     // the scale/offset from the mesh's lightmap UV into that page (`uv * xy + zw`).
     // Per instance, so lightmapped copies of a prop still share one draw.
     pub lightmap_page: u32,
-    pub _pad: [u32; 2],
+    // 1 when the lightmap's direction page is bound (#810): normal maps then
+    // reshape the baked light.
+    pub lightmap_directional: u32,
+    pub _pad: u32,
     pub lightmap_st: [f32; 4],
     pub sh: [[f32; 4]; 9],
 }
@@ -192,7 +195,8 @@ impl InstanceData {
         model_matrix: glam::Mat4::IDENTITY.to_cols_array(),
         use_sh: 0,
         lightmap_page: 0,
-        _pad: [0; 2],
+        lightmap_directional: 0,
+        _pad: 0,
         lightmap_st: [0.0; 4],
         sh: [[0.0; 4]; 9],
     };

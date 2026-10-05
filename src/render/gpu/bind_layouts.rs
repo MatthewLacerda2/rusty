@@ -46,7 +46,7 @@ fn sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
 /// frame's point/spot lights (7), each cluster's light and decal ranges (8) and the
 /// index list (9), and the decals (#638): their records (10), the decal atlas's
 /// sRGB (11) and raw (12) views and its sampler (13), and the baked lightmap pages (14)
-/// with their sampler (15, #438). Binding 6 is the shadow module's (see `shader.wgsl`).
+/// with their sampler (15, #438) and direction pages (16, #810). Binding 6 is the shadow module's (see `shader.wgsl`).
 /// The cube is the active probe's baked, prefiltered cubemap (#245); the shader samples it (parallax-corrected, roughness->mip)
 /// when a probe applies and falls back to the 2D skybox otherwise.
 pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
@@ -71,6 +71,7 @@ pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::Bind
             sampler_entry(13),
             texture_entry(14, D2Array),
             sampler_entry(15),
+            texture_entry(16, D2Array),
         ],
     })
 }

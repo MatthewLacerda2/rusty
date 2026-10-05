@@ -12,6 +12,7 @@
 
 mod cascaded_shadows_screenshot;
 mod custom_postfx_screenshot;
+mod directional_lightmap_screenshot;
 #[cfg(feature = "editor")]
 mod editor_capture;
 mod emissive_factor_screenshot;

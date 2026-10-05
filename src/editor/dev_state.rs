@@ -12,4 +12,8 @@ pub struct DevEditorState {
     pub pending_repl: Option<String>,
     /// The lightmap bake running in the background, if any (#808).
     pub lightmap_bake: Option<super::inspector::assets::scene::bake::ActiveBake>,
+    /// The settings the "Bake Lightmaps" button bakes with; the card edits
+    /// `directional` (#810). Editor-session state until the scene owns its lighting
+    /// settings (#832).
+    pub lightmap_settings: crate::scene::lighting::lightmap::BakeSettings,
 }

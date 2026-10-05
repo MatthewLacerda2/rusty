@@ -35,6 +35,7 @@ pub(super) fn quick() -> BakeSettings {
         seed: 1,
         max_resolution: 16,
         filter_radius: 1,
+        directional: true,
     }
 }
 
@@ -110,6 +111,29 @@ fn references_survive_a_save_and_load() {
     loaded.load_from_file(&path).unwrap();
     assert_eq!(loaded.lightmaps, scene.lightmaps);
     assert!(loaded.lightmaps.get(floor).is_some());
+}
+
+#[test]
+fn a_directional_bake_writes_a_direction_page_per_colour_page() {
+    let (mut scene, _, _) = scene();
+    let path = scene_path("directions");
+    bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();
+    let set = scene.lightmaps.clone();
+    assert_eq!(set.directions.len(), set.pages.len());
+    let name = set.directions[0].rsplit('/').next().unwrap();
+    assert!(name.starts_with("lightmap_dir_0_"), "{name}");
+    let (dir, colour) = (image::open(&set.directions[0]), image::open(&set.pages[0]));
+    assert_eq!(dir.unwrap().width(), colour.unwrap().width());
+    let flat = BakeSettings {
+        directional: false,
+        ..quick()
+    };
+    bake_scene_lightmaps(&mut scene, Some(&path), &flat).unwrap();
+    assert!(scene.lightmaps.directions.is_empty() && !scene.lightmaps.pages.is_empty());
+    assert!(
+        !Path::new(&set.directions[0]).exists(),
+        "the old page is removed"
+    );
 }
 
 #[test]

@@ -10,7 +10,8 @@
 //! `<scene file>.lightmaps/lightmap_<page>_<tag>.png`, one folder per scene, emptied
 //! of old pages first so a rebake never leaves stale ones behind. `<tag>` hashes the
 //! texels, so a rebake that changes a page changes its path and the renderer, which
-//! caches pages by path, loads the new one.
+//! caches pages by path, loads the new one. A directional bake (#810) writes each
+//! page's direction page beside it as `lightmap_dir_<page>_<tag>.png` (plain RGBA8).
 //!
 //! The bake splits in three so the editor can run the middle on a worker thread
 //! ([`job`], #808): [`gather_bake_input`] borrows the scene, `bake` needs only
@@ -23,7 +24,8 @@ use std::path::{Path, PathBuf};
 use glam::Vec3;
 
 use crate::scene::lighting::lightmap::{
-    bake, encode_texels, pack, BakeScene, BakeSettings, Lightmap, LightmapEntry, LightmapSet,
+    bake, encode_directions, encode_texels, pack, BakeScene, BakeSettings, Lightmap, LightmapEntry,
+    LightmapSet,
 };
 use crate::scene::Scene;
 
@@ -99,21 +101,15 @@ pub fn apply_lightmaps(
     }
     std::fs::create_dir_all(&dir).map_err(|e| format!("lightmap folder: {e}"))?;
     let atlas = pack(maps);
+    let size = atlas.page_size;
     let mut set = LightmapSet::default();
     for (k, texels) in atlas.pages.iter().enumerate() {
-        let bytes = encode_texels(texels);
-        let path = dir.join(format!("lightmap_{k}_{:08x}.png", fnv1a(&bytes)));
-        let size = atlas.page_size;
-        let image =
-            image::RgbaImage::from_raw(size, size, bytes).ok_or("lightmap page size mismatch")?;
-        image
-            .save(&path)
-            .map_err(|e| format!("write {}: {e}", path.display()))?;
-        // The scene document stores `/` paths on every OS, like its other assets.
-        let page = path
-            .to_string_lossy()
-            .replace(std::path::MAIN_SEPARATOR, "/");
+        let page = write_page(&dir, "lightmap", k, size, encode_texels(texels))?;
         set.pages.push(page);
+    }
+    for (k, dirs) in atlas.directions.iter().enumerate() {
+        let page = write_page(&dir, "lightmap_dir", k, size, encode_directions(dirs))?;
+        set.directions.push(page);
     }
     set.entries = atlas
         .placements
@@ -125,14 +121,37 @@ pub fn apply_lightmaps(
         })
         .collect();
     log::info!(
-        "[LightmapBake] {} lightmaps in {} page(s) of {}² in {}",
+        "[LightmapBake] {} lightmaps in {} page(s) of {}²{} in {}",
         maps.len(),
         set.pages.len(),
         atlas.page_size,
+        if set.directions.is_empty() {
+            ""
+        } else {
+            " (directional)"
+        },
         dir.display()
     );
     scene.lightmaps = set;
     Ok(maps.len())
+}
+
+/// Write one `size`² RGBA8 page as `<dir>/<prefix>_<k>_<tag>.png` and return the
+/// path the scene stores.
+fn write_page(
+    dir: &Path,
+    prefix: &str,
+    k: usize,
+    size: u32,
+    bytes: Vec<u8>,
+) -> Result<String, String> {
+    let path = dir.join(format!("{prefix}_{k}_{:08x}.png", fnv1a(&bytes)));
+    let image =
+        image::RgbaImage::from_raw(size, size, bytes).ok_or("lightmap page size mismatch")?;
+    image
+        .save(&path)
+        .map_err(|e| format!("write {}: {e}", path.display()))?;
+    Ok(path.to_string_lossy().into_owned())
 }
 
 /// FNV-1a over the texels, folded to 32 bits: the file name's content tag.
