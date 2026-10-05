@@ -89,7 +89,8 @@ print(s.frames, s.fixed_update_ms.avg, s.systems.update_scripts.max, s.entities.
 | `triangles` | triangles submitted by the solid, transparent, shadow and SSAO-prepass draws, every instance counted |
 | `visible_entities` / `culled_entities` | mesh entities drawn / skipped by the frustum cull, summed over the camera stack |
 | `lod_hidden_entities` | mesh entities skipped because their `LODGroup` showed another level (#472), summed over the camera stack |
-| `lights` / `lights_dropped` | active lights, and those left unlit: directional lights past 4, every ambient but the last, and per camera the point/spot lights in view past the clustered budget of 256 (the farthest go first, #434) |
+| `lights` / `lights_dropped` | active lights, and those left unlit: realtime directional lights past 4, every ambient but the last, and per camera the point/spot lights in view past the clustered budget of 64 (the least contributing go first, #434, #834) |
+| `cluster_lights_dropped` | (cluster, light) entries cut because more than 32 point/spot lights reached one cluster, the least contributing there first (#834); non-zero means some corner of the view is over the per-pixel budget |
 | `lights_visible` / `lights_culled` | point/spot lights binned into at least one light cluster / outside a camera's view and skipped before binning, so they cost nothing (#434); summed over the camera stack |
 | `light_cluster_refs` | entries in the cluster light lists (#434): the (cluster, light) pairs shaders may visit, summed over the camera stack — the clustered lighting's workload |
 | `light_bin_us` | CPU **microseconds** spent binning lights and decals into clusters (#434, #638), summed over the camera stack — wall-clock |

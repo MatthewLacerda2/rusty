@@ -5,7 +5,7 @@
 
 use glam::Vec3;
 
-use super::bin::{bin_spheres, Binned};
+use super::bin::{bin_spheres, Binned, Budget};
 use super::gpu::concat;
 use super::grid::AabbCache;
 use super::{ClusterGrid, CLUSTER_COUNT};
@@ -14,7 +14,12 @@ use crate::scene::Camera;
 /// Bin `spheres` for a camera at the origin looking down -Z, keeping `budget`.
 fn bin(spheres: &[(Vec3, f32)], budget: usize) -> Binned {
     let grid = ClusterGrid::new(&Camera::new(Vec3::ZERO, -90.0, 0.0), 16.0 / 9.0);
-    bin_spheres(&grid, spheres, budget, &mut AabbCache::default())
+    bin_spheres(
+        &grid,
+        spheres,
+        &Budget::nearest(budget),
+        &mut AabbCache::default(),
+    )
 }
 
 /// A sphere `distance` straight ahead.

@@ -24,9 +24,15 @@ current value is kept).
 
 **How many lights shade.** Point and spot lights are rendered with clustered
 forward lighting (#434): there is no fixed slot count. Each camera shades up to
-**256** point/spot lights in its view; past that, the ones farthest from the camera
-are dropped and counted in `Debug.Stats().lights_dropped`. A light outside the view
-costs nothing. A light's **range** is a hard cut-off and also how far it reaches into
+**64** point/spot lights in its view, and any one pixel at most **32** of them (the
+view is cut into clusters, and each cluster lists at most 32; #834). Past either
+budget the lights that **contribute least** are dropped — brightness (intensity ×
+colour luminance) weighed by how close their range comes, so a bright lamp across
+the room outranks a dim one beside the camera. Ties go to the earlier entity, so
+the same scene always drops the same lights. Camera drops are counted in
+`Debug.Stats().lights_dropped`, cluster drops in `cluster_lights_dropped` (non-zero
+means some corner of the view is over budget). `Baked` lights never take part. A
+light outside the view costs nothing. A light's **range** is a hard cut-off and also how far it reaches into
 the cluster grid, so a tight range is the cheap one. Up to **4** directional lights
 shade at once; the last active one is the sun that casts the cascaded shadows. Only
 the last active ambient light counts.

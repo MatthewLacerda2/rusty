@@ -38,10 +38,11 @@ use crate::core::frame_stats::FrameStats;
 use crate::render::GpuPass;
 
 /// The render counters a bench row reports, in order.
-const COUNTERS: [&str; 5] = [
+const COUNTERS: [&str; 6] = [
     "draw_calls",
     "triangles",
     "lights_dropped",
+    "cluster_lights_dropped",
     "culled_entities",
     "lights_culled",
 ];

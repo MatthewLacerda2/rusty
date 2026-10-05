@@ -8,7 +8,7 @@
 
 use std::time::Instant;
 
-use super::bin::{bin_spheres, Binned};
+use super::bin::{bin_spheres, Binned, Budget};
 use super::grid::AabbCache;
 use super::{bin, ClusterGrid, LocalLight, CLUSTER_COUNT};
 use crate::render::gpu::grow_buffer::GrowBuffer;
@@ -84,7 +84,7 @@ impl Renderer {
         let c = &mut self.clusters;
         let lights = bin(grid, &c.frame_lights, &mut c.aabbs);
         let spheres: &[_] = if decals { &self.decals.spheres } else { &[] };
-        let stamps = bin_spheres(grid, spheres, spheres.len(), &mut c.aabbs);
+        let stamps = bin_spheres(grid, spheres, &Budget::nearest(spheres.len()), &mut c.aabbs);
         let (ranges, indices) = concat(&lights, &stamps);
         let (device, queue) = (&self.device, &self.queue);
         let mut grown = c
@@ -98,6 +98,7 @@ impl Renderer {
         counters.lights_visible += lights.visible;
         counters.lights_culled += lights.culled;
         counters.lights_dropped += lights.dropped;
+        counters.cluster_lights_dropped += lights.cluster_dropped;
         counters.light_cluster_refs += lights.indices.len() as u64;
         counters.decals_visible += stamps.visible;
         counters.decal_cluster_refs += stamps.indices.len() as u64;
