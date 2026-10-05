@@ -125,7 +125,7 @@ pub fn bake_with_progress(
 }
 
 /// Every mesh's triangles, for the BVH.
-fn triangles(scene: &BakeScene) -> Vec<Tri> {
+pub(super) fn triangles(scene: &BakeScene) -> Vec<Tri> {
     let mut tris = Vec::new();
     for (m, mesh) in scene.meshes.iter().enumerate() {
         for (k, t) in mesh.indices.chunks_exact(3).enumerate() {

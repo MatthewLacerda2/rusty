@@ -27,7 +27,7 @@ impl Renderer {
         let fitted = cascades::fit(
             camera,
             aspect,
-            sun_direction(scene),
+            sun_direction(scene, self.static_capture),
             &shadow_settings(scene),
             ShadowRenderer::CASCADE_SIZE,
         );
@@ -85,15 +85,16 @@ impl Renderer {
 }
 
 /// The direction the scene's (last) active directional light shines, or the default
-/// sun's when there is none.
-fn sun_direction(scene: &Scene) -> Vec3 {
+/// sun's when there is none. Only lights the frame (or a bake `capture`) draws live
+/// count (#809), so the cascades follow the light in the uniform's slot 0.
+fn sun_direction(scene: &Scene, capture: bool) -> Vec3 {
     let mut dir = Vec3::new(-0.5, -1.0, -0.3).normalize();
     for id in scene.world.ids_with_light() {
         if !scene.world.is_active(id) {
             continue;
         }
         let light = scene.world.light(id).expect("id came from ids_with_light");
-        if light.light_type == LightType::Directional {
+        if light.light_type == LightType::Directional && light.mode.renders_live(capture) {
             let transform = scene.world.transform(id).expect("mandatory Transform");
             dir = (transform.rotation * Vec3::NEG_Z).normalize();
         }

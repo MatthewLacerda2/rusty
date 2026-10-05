@@ -614,7 +614,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var lighting_color = ambient_irradiance * albedo * (1.0 - metallic) * ao;
 
     // A lightmapped surface skips `Baked` lights below: their direct light is already
-    // in its lightmap (#438). `Mixed` and `Realtime` lights stay live everywhere.
+    // in its lightmap (#438). Only a probe/reflection bake capture uploads them at all
+    // (#809); a frame draws `Mixed` and `Realtime` lights only.
     let skip_baked = lightmap_page > 0u;
 
     // 2. Directional lights (#434). Slot 0 is the sun, the one the cascades shadow.
