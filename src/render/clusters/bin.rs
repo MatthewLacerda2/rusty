@@ -68,6 +68,7 @@ impl Budget<'_> {
 }
 
 /// One cluster's entry for one sphere, and how much it matters there.
+#[derive(Clone, Copy, Default)]
 struct Pair {
     cluster: u32,
     item: u32,
@@ -151,16 +152,19 @@ pub(crate) fn bin_spheres(
             out.culled += 1;
         }
     }
-    out.cluster_dropped = cut_clusters(&mut pairs, budget.per_cluster);
-    fill_lists(&mut out, &pairs);
+    fill_lists(&mut out, &pairs, budget.per_cluster);
     out
 }
 
-/// Counting-sort the pairs into per-cluster ranges; stable, so each cluster lists
-/// its items in ascending order.
-fn fill_lists(out: &mut Binned, pairs: &[Pair]) {
+/// Counting-sort the pairs into per-cluster lists, each in ascending index order;
+/// stable, so a run already is. A cluster with more than `cap` keeps the `cap`
+/// that score highest there, the index breaking ties ([`cut_lists`]).
+fn fill_lists(out: &mut Binned, pairs: &[Pair], cap: usize) {
     for p in pairs {
         out.ranges[p.cluster as usize][1] += 1;
+    }
+    if out.ranges.iter().any(|r| r[1] as usize > cap) {
+        return cut_lists(out, pairs, cap);
     }
     let mut offset = 0;
     for range in &mut out.ranges {
@@ -176,35 +180,40 @@ fn fill_lists(out: &mut Binned, pairs: &[Pair]) {
     }
 }
 
-/// Cut every cluster listing more than `cap` items down to the `cap` that score
-/// highest there, the index breaking ties; returns the entries cut. The survivors
-/// keep each cluster's ascending order. Free when no cluster is over.
-fn cut_clusters(pairs: &mut Vec<Pair>, cap: usize) -> u32 {
-    if pairs.len() <= cap {
-        return 0;
+/// [`fill_lists`] when some cluster is over `cap` (`ranges` holding the counts):
+/// sort the pairs by cluster, cut each list over `cap` to its top `cap` and count
+/// the rest in `cluster_dropped`.
+fn cut_lists(out: &mut Binned, pairs: &[Pair], cap: usize) {
+    let mut cursor = Vec::with_capacity(CLUSTER_COUNT);
+    let mut offset = 0;
+    for range in &out.ranges {
+        cursor.push(offset);
+        offset += range[1] as usize;
     }
-    let mut counts = vec![0usize; CLUSTER_COUNT];
-    pairs.iter().for_each(|p| counts[p.cluster as usize] += 1);
-    if counts.iter().all(|&n| n <= cap) {
-        return 0;
+    let mut sorted = vec![Pair::default(); pairs.len()];
+    for p in pairs {
+        let at = &mut cursor[p.cluster as usize];
+        sorted[*at] = *p;
+        *at += 1;
     }
-    let before = pairs.len();
-    pairs.sort_by(|a, b| {
-        let by_score = b.score.total_cmp(&a.score).then(a.item.cmp(&b.item));
-        a.cluster.cmp(&b.cluster).then(by_score)
-    });
-    let mut run = (u32::MAX, 0);
-    pairs.retain(|p| {
-        run = if run.0 == p.cluster {
-            (p.cluster, run.1 + 1)
-        } else {
-            (p.cluster, 1)
-        };
-        run.1 <= cap
-    });
-    pairs.sort_by_key(|p| (p.cluster, p.item));
-    (before - pairs.len()) as u32
+    out.indices = Vec::with_capacity(pairs.len());
+    let mut start = 0;
+    for range in &mut out.ranges {
+        let list = &mut sorted[start..start + range[1] as usize];
+        start += list.len();
+        let keep = list.len().min(cap);
+        if keep < list.len() {
+            list.select_nth_unstable_by(keep, |a, b| {
+                b.score.total_cmp(&a.score).then(a.item.cmp(&b.item))
+            });
+            list[..keep].sort_unstable_by_key(|p| p.item);
+            out.cluster_dropped += (list.len() - keep) as u32;
+        }
+        *range = [out.indices.len() as u32, keep as u32];
+        out.indices.extend(list[..keep].iter().map(|p| p.item));
+    }
 }
+
 /// The sphere in view space and the tile/slice box it projects to, or `None` when
 /// it lies wholly outside the frustum (or has no reach).
 fn candidate(grid: &ClusterGrid, item: u32, (center, radius): (Vec3, f32)) -> Option<Candidate> {
