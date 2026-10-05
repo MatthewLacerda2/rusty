@@ -47,6 +47,13 @@ impl Harness {
         }
     }
 
+    /// The renderer the harness draws with (built on first use at the screenshot
+    /// size), for a caller that queues GPU work of its own (the bench's clock hold,
+    /// #862). `None` without a GPU or software adapter.
+    pub fn renderer(&mut self) -> Option<&mut crate::render::Renderer> {
+        self.capture.renderer(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+    }
+
     /// Render the current scene/camera offscreen at the screenshot size, writing
     /// nothing, and fold the frame's cost into the stats. `None` when no GPU or
     /// software adapter is available (a skip, as for a screenshot) or on an error,
