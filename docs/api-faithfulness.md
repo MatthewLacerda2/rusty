@@ -336,7 +336,7 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 | Setter | Status | Read-site |
 |---|---|---|
 | `Quit` | ✅ | platform — the shell's frame loop takes the request (`shell::frame::quit_action`): the player exits, the editor stops Play; the harness stops stepping (`dev::harness::tick_unless_quit`, `tests/application_quit.rs`) |
-| `SetStartupScene` | ✅ | round-trip — written to `build_settings.json` (editor); the player loads that scene at boot (`shell::player::launch`) |
+| `SetStartupScene` | ✅ | round-trip — written to `project.rusty` (editor); the player loads that scene at boot (`shell::player::launch`) |
 | `SetProductName` | ✅ | round-trip — same file; the player's window title |
 | `SetWindowMode` | ✅ | round-trip — same file; the player's first-launch fullscreen default (`shell::player::video_defaults`) |
 

@@ -112,7 +112,8 @@ like Unity's and Unreal's:
 <project>/
   assets/              the game: scenes/, scripts/, prefabs/, models/, textures/,
                        audio/, materials/, shaders/ (Unity's Assets/)
-  build_settings.json  startup scene, product name, window mode
+  project.rusty        marks the folder as a project: the engine commit it was
+                       last opened with, and the build settings
   scenarios/           headless play-test scenarios (optional)
   cache/  saved/       regenerable output and save data; each ignores itself in git
 ```
@@ -121,6 +122,19 @@ Every path the project stores — a scene's scripts and meshes, the startup scen
 is relative to the project root (`assets/scripts/bot.lua`), so the folder can move
 or be cloned anywhere. A project made before this layout (the old `./project`
 folder, paths starting `project/`) is migrated once, the first time it is opened.
+
+`project.rusty` is the project's one engine-owned file, like Unreal's `.uproject`
+or Unity's `ProjectVersion.txt`. It records the **engine commit** the project was
+last opened with (embedded in each engine build) and the build settings. When the
+running engine is a different commit, opening says so: one `[Project]` line on
+stderr, and a warning in the editor console. Then it proceeds, and the editor and
+the agent sessions (`session`, `session-mcp`) record the running commit, so a
+broken scene after an engine update reads as version skew, not as a bug in the
+game. The player, `play` and `editor-capture` only check, never write. A dirty
+build (`<commit>-dirty`) counts as its commit, and a build made without git
+(`unknown`) can't be compared, so neither warns. A project from before this file
+gets it on its first edit-open, its old `build_settings.json` folded in.
+
 The engine's own content (shaders, the bundled scripts) is not part of a project:
 it ships with the engine (`engine/`), and the scripts and starter materials are
 seeded into each project from the binary.
@@ -145,7 +159,7 @@ cargo build --release --bin player --no-default-features
 
 `--no-default-features` drops the `editor` feature, so egui and the editor UI are not
 compiled in (and `dev` is off, so neither is the harness or console). The player
-reads its project's `build_settings.json` — the startup scene, the product name (window
+reads the build settings in its project's `project.rusty` — the startup scene, the product name (window
 title) and the first-launch window mode — which you edit in the editor under
 **File → Build Settings** or from a script through the `Application` namespace. It
 boots that scene straight into Play and exits when the game calls

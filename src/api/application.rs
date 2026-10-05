@@ -10,7 +10,7 @@
 //!
 //! The build-settings setters are the API twin of the editor's File → Build Settings
 //! window (the parity rule). In the editor they write the tracked
-//! `build_settings.json`; in the player and the harness the cell is unbound,
+//! `project.rusty`; in the player and the harness the cell is unbound,
 //! so a setter changes the in-memory value only.
 
 use std::cell::RefCell;
