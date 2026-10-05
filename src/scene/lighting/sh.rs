@@ -85,6 +85,16 @@ impl Sh9 {
         }
     }
 
+    /// Add `other`'s coefficients to this probe's: the SH of two light sources is
+    /// the sum of their SHs.
+    pub fn accumulate(&mut self, other: &Sh9) {
+        for (a, b) in self.coeffs.iter_mut().zip(other.coeffs) {
+            for c in 0..3 {
+                a[c] += b[c];
+            }
+        }
+    }
+
     /// Reconstruct diffuse irradiance for a surface normal, applying the cosine-lobe
     /// convolution. The result is clamped to non-negative (SH ringing can dip below
     /// zero). Mirrors the shader-side `eval_sh`, so the headless analytic path and the

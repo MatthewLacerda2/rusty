@@ -64,9 +64,11 @@ impl LocalLight {
     }
 }
 
-/// Every active point and spot light in the scene, in entity order, each with
-/// whether it asks for a shadow (`LightComponent::cast_shadows`, #468).
-pub(crate) fn local_lights(scene: &Scene) -> Vec<(LocalLight, bool)> {
+/// Every active point and spot light in the scene that the frame (or, with
+/// `capture`, a bake capture) draws live (`LightMode::renders_live`, #809), in entity
+/// order, each with whether it asks for a shadow (`LightComponent::cast_shadows`,
+/// #468). The one place `Baked` local lights leave the realtime path.
+pub(crate) fn local_lights(scene: &Scene, capture: bool) -> Vec<(LocalLight, bool)> {
     scene
         .world
         .ids_with_light()
@@ -74,6 +76,9 @@ pub(crate) fn local_lights(scene: &Scene) -> Vec<(LocalLight, bool)> {
         .filter(|&id| scene.world.is_active(id))
         .filter_map(|id| {
             let light = scene.world.light(id)?;
+            if !light.mode.renders_live(capture) {
+                return None;
+            }
             let transform = scene.world.transform(id)?;
             Some((LocalLight::new(&transform, &light)?, light.cast_shadows))
         })

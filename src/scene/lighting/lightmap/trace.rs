@@ -23,7 +23,7 @@ use super::rng::Rng;
 /// Ray offset along the surface normal, against self-intersection, in world units.
 const SURFACE_OFFSET: f32 = 1e-3;
 /// Nearest hit a ray accepts.
-const T_MIN: f32 = 1e-4;
+pub(super) const T_MIN: f32 = 1e-4;
 /// The share of a texel's rays that may start out on back faces before the texel is
 /// judged to be inside geometry (Unity's backface tolerance, inverted).
 const BACKFACE_TOLERANCE: f32 = 0.5;
@@ -145,7 +145,7 @@ impl Tracer<'_> {
 /// Unit direction to `light`, distance to it, and the radiance arriving at `point`
 /// (before the cosine), with the forward shader's falloff: `1 / (d² + 1)` inside
 /// `range`, and the spot's linear inner-to-outer cone fade. `None` out of reach.
-fn arrival(light: &BakeLight, point: Vec3) -> Option<(Vec3, f32, Vec3)> {
+pub(super) fn arrival(light: &BakeLight, point: Vec3) -> Option<(Vec3, f32, Vec3)> {
     match light.shape {
         LightShape::Directional { direction } => Some((-direction, f32::MAX, light.radiance)),
         LightShape::Point { position, range } => {

@@ -14,6 +14,13 @@
 //!     (max per-coefficient SH delta over the whole field) — the next bounce is too
 //!     dim to matter.
 //!
+//! Once the solve stops, the direct light of `Baked` lights is added to every probe
+//! analytically (`scene::lighting::lightmap::baked_direct_sh`, #809): those lights
+//! never render live, so the probes are how dynamic objects receive them, and a
+//! capture only ever sees lit surfaces, never a light. It is added after the loop, so
+//! the bounce captures (which re-light static surfaces from the field) never count it
+//! twice. `Realtime` lights stay out of every capture (`LightMode::renders_live`).
+//!
 //! The loop is a pure function of (static scene, probe positions, resolution); the
 //! convergence decision (`pass_converged`) is GPU-free and unit-tested directly, so
 //! the early-out logic is covered even on an adapter-less host. Render layer: exempt
@@ -22,6 +29,7 @@
 use glam::Vec3;
 
 use crate::render::Renderer;
+use crate::scene::lighting::lightmap::{baked_direct_sh, BakeScene};
 use crate::scene::lighting::sh::Sh9;
 use crate::scene::Scene;
 
@@ -52,9 +60,17 @@ impl Renderer {
     /// SH in place on `scene.probes`. Bounce 1 captures direct light only; each later
     /// bounce re-lights the static scene with the previous pass's probe field, adding
     /// one indirect bounce. Stops at [`MAX_BOUNCES`] or when a pass adds less than
-    /// [`CONVERGENCE_EPSILON`] energy, whichever comes first. With no probes it is a
+    /// [`CONVERGENCE_EPSILON`] energy, whichever comes first; then every probe gains
+    /// the direct light of the scene's `Baked` lights (#809). With no probes it is a
     /// no-op. Returns a [`BounceReport`] describing the termination.
     pub fn bake_probes_multibounce(&mut self, scene: &mut Scene, resolution: u32) -> BounceReport {
+        let report = self.solve_bounces(scene, resolution);
+        add_baked_direct(scene);
+        report
+    }
+
+    /// The bounce iteration itself: the captured (surface) light only.
+    fn solve_bounces(&mut self, scene: &mut Scene, resolution: u32) -> BounceReport {
         let positions: Vec<Vec3> = scene.probes.probes.iter().map(|p| p.position).collect();
         if positions.is_empty() {
             return BounceReport {
@@ -117,6 +133,24 @@ impl Renderer {
 fn write_field(scene: &mut Scene, field: &[Sh9]) {
     for (probe, &sh) in scene.probes.probes.iter_mut().zip(field) {
         probe.sh = sh;
+    }
+}
+
+/// Add the direct light of the scene's `Baked` lights to every probe (#809), shadowed
+/// by the static meshes the lightmap bake sees.
+fn add_baked_direct(scene: &mut Scene) {
+    let positions: Vec<Vec3> = scene.probes.probes.iter().map(|p| p.position).collect();
+    if positions.is_empty() {
+        return;
+    }
+    let statics = BakeScene::gather(scene, &|_| None);
+    for (probe, direct) in scene
+        .probes
+        .probes
+        .iter_mut()
+        .zip(baked_direct_sh(&statics, &positions))
+    {
+        probe.sh.accumulate(&direct);
     }
 }
 

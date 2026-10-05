@@ -51,8 +51,16 @@ pub(crate) fn apply_reflection_probe(
 /// Fill the ambient and directional slots from the active light entities. The last
 /// ambient wins. Directional lights fill [`MAX_DIRECTIONAL_LIGHTS`] slots in entity
 /// order, except that the last one (the shadow pass's sun) always takes slot 0.
-/// Point and spot lights go to the cluster lights instead (#434).
-pub(crate) fn apply_scene_lights(lighting_uniform: &mut LightingUniform, scene: &Scene) {
+/// Point and spot lights go to the cluster lights instead (#434). Only the
+/// directional lights [`LightMode::renders_live`] keeps for a frame or a bake
+/// `capture` are uploaded (#809); the ambient ignores modes.
+///
+/// [`LightMode::renders_live`]: crate::components::LightMode::renders_live
+pub(crate) fn apply_scene_lights(
+    lighting_uniform: &mut LightingUniform,
+    scene: &Scene,
+    capture: bool,
+) {
     let mut dirs = Vec::new();
     for id in scene.world.ids_with_light() {
         if !scene.world.is_active(id) {
@@ -67,16 +75,19 @@ pub(crate) fn apply_scene_lights(lighting_uniform: &mut LightingUniform, scene: 
                     intensity: light.intensity,
                 };
             }
-            LightType::Directional => dirs.push(DirectionalLightUniform {
-                direction: (transform.rotation * Vec3::NEG_Z).to_array(),
-                _pad1: 0.0,
-                color: light.color.to_array(),
-                intensity: light.intensity,
-                // `Baked` (#438): a lightmapped surface skips it, its lightmap holds it.
-                baked: f32::from(u8::from(light.mode.bakes_direct())),
-                _pad2: [0.0; 3],
-            }),
-            LightType::Point | LightType::Spotlight => {}
+            LightType::Directional if light.mode.renders_live(capture) => {
+                dirs.push(DirectionalLightUniform {
+                    direction: (transform.rotation * Vec3::NEG_Z).to_array(),
+                    _pad1: 0.0,
+                    color: light.color.to_array(),
+                    intensity: light.intensity,
+                    // `Baked` (#438), only ever uploaded in a bake capture: a
+                    // lightmapped surface skips it, its lightmap holds it.
+                    baked: f32::from(u8::from(light.mode.bakes_direct())),
+                    _pad2: [0.0; 3],
+                })
+            }
+            LightType::Directional | LightType::Point | LightType::Spotlight => {}
         }
     }
     if let Some(sun) = dirs.pop() {
@@ -130,8 +141,10 @@ impl crate::render::Renderer {
             0,
             bytemuck::bytes_of(&lighting_uniform),
         );
-        self.clusters
-            .stage(crate::render::clusters::local_lights(scene));
+        self.clusters.stage(crate::render::clusters::local_lights(
+            scene,
+            self.static_capture,
+        ));
         self.begin_counters(scene);
     }
 
@@ -142,7 +155,7 @@ impl crate::render::Renderer {
     /// reflects the procedural sky the sky pass draws.
     fn build_lighting_uniform(&self, scene: &Scene, camera_pos: Vec3) -> LightingUniform {
         let mut lighting_uniform = default_lighting_uniform(scene);
-        apply_scene_lights(&mut lighting_uniform, scene);
+        apply_scene_lights(&mut lighting_uniform, scene, self.static_capture);
         apply_ssr_settings(&mut lighting_uniform, scene);
         apply_reflection_probe(&mut lighting_uniform, scene, camera_pos);
         if self.reflection_cube.is_some() {

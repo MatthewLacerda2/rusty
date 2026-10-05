@@ -16,12 +16,15 @@ pub enum LightType {
 
 /// How a light takes part in baked lighting (#438) — Unity's Light Mode.
 ///
-/// * `Realtime` — direct light and shadows every frame; the lightmap bake ignores it.
+/// * `Realtime` — direct light and shadows every frame; neither the lightmap bake nor
+///   the probe bake sees it, so it bounces nowhere.
 /// * `Mixed` — Unity's *Baked Indirect*: realtime direct light and shadows, plus its
-///   bounce baked into lightmaps. The default, because it is what every light did
-///   before modes existed (rendered live, bounced into the probe bake).
-/// * `Baked` — direct and bounce both baked; lightmapped surfaces skip it at runtime,
-///   so it costs nothing there. Surfaces without a lightmap still light from it live.
+///   bounce baked into lightmaps and light probes. The default, because it is what
+///   every light did before modes existed (rendered live, bounced into the probe bake).
+/// * `Baked` — direct and bounce both baked, and never drawn live (#809): static
+///   surfaces get it from their lightmap, dynamic objects from the light probes (whose
+///   bake adds its direct light). It costs nothing at runtime and casts no realtime
+///   shadow.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LightMode {
     Realtime,
@@ -59,6 +62,18 @@ impl LightMode {
     pub fn bakes_indirect(self) -> bool {
         self != LightMode::Realtime
     }
+
+    /// Whether the renderer's light loop draws this light (#809). In a frame,
+    /// `Realtime` and `Mixed`: a `Baked` light reaches surfaces only through lightmaps
+    /// and probes. In a bake `capture` (the probe and reflection bakes'
+    /// `capture_static_cubemap`), the lights whose bounce is baked: `Mixed` and `Baked`.
+    pub fn renders_live(self, capture: bool) -> bool {
+        if capture {
+            self.bakes_indirect()
+        } else {
+            self != LightMode::Baked
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -95,6 +110,13 @@ mod tests {
         assert!(!LightMode::Realtime.bakes_indirect() && !LightMode::Realtime.bakes_direct());
         assert!(LightMode::Mixed.bakes_indirect() && !LightMode::Mixed.bakes_direct());
         assert!(LightMode::Baked.bakes_indirect() && LightMode::Baked.bakes_direct());
+    }
+
+    #[test]
+    fn frames_drop_baked_lights_and_captures_drop_realtime_ones() {
+        let live = |capture| LightMode::ALL.map(|m| m.renders_live(capture));
+        assert_eq!(live(false), [true, true, false]);
+        assert_eq!(live(true), [false, true, true]);
     }
 
     #[test]
