@@ -156,4 +156,6 @@ fn texture_average(path: &str) -> Option<Vec3> {
 #[cfg(test)]
 mod job_tests;
 #[cfg(test)]
+mod survivor_tests;
+#[cfg(test)]
 mod tests;
