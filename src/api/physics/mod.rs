@@ -7,8 +7,8 @@
 //! overlaps (`Overlap*`/`Check*`) in `volume`, per-collider point queries
 //! (`ClosestPoint`/`ContainsPoint`/`GetBounds`) in `point`, and the collider's
 //! authorable shape + physics material (#447) in `collider`, the per-bone
-//! hitbox generator (#464) in `hitbox`, and forces / impulses at a point (#466)
-//! in `impulse`.
+//! hitbox generator (#464) in `hitbox`, forces / impulses at a point (#466)
+//! in `impulse`, and the layer collision matrix (#827) in `matrix`.
 //! `register` creates the `Physics` table; `register_hitscan` extends it once
 //! the live physics handle is available.
 
@@ -16,6 +16,7 @@ mod cast;
 mod collider;
 mod hitbox;
 mod impulse;
+mod matrix;
 mod point;
 mod volume;
 
@@ -46,6 +47,7 @@ pub fn register<'scope>(
     register_collision_detection(scope, &table, scene)?;
     collider::register(scope, &table, scene)?;
     hitbox::register(scope, &table, scene)?;
+    matrix::register(scope, &table, scene)?;
 
     lua.globals()
         .set("Physics", table)

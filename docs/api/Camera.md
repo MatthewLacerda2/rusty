@@ -43,6 +43,7 @@ return `nil` without a camera; setters are then no-ops.
 | Function | Signature | Returns |
 |---|---|---|
 | `Camera.GetProjection` / `SetProjection` | `(id)` / `(id, name [, size])` | `name, size` — `"Perspective"` (size `nil`) or `"Orthographic"`; `size` is half the view's height in world units (Unity's `orthographicSize`, > 0; omitted keeps the current one, else 5) |
+| `Camera.GetCullingMask` / `SetCullingMask` | `(id)` / `(id, mask)` | the layers it draws, one bit per layer (Unity's `cullingMask`; default all). Any integer is kept to its low 32 bits, so `-1` (`~0`) is everything |
 | `Camera.GetTargetTexture` / `SetTargetTexture` | `(id)` / `(id, name [, width, height])` | `name, width, height`, or `nil` for a screen camera; `nil` / `""` clears the target. Sides clamp to 1..4096; omitted ones keep the current size, else 256 |
 | `Camera.GetTargetPostFx` / `SetTargetPostFx` | `(id)` / `(id, bool)` | full post-FX chain (default) or tonemap only; `nil` / no-op without a target |
 | `Camera.GetTargetUpdateEvery` / `SetTargetUpdateEvery` | `(id)` / `(id, n)` | redraw every `n`th frame (≥ 1, default 1); `nil` / no-op without a target |

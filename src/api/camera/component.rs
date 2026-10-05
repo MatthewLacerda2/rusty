@@ -1,5 +1,6 @@
 //! src/api/camera/component.rs — the `Camera` functions that take an entity id and
-//! tune its `CameraComponent` (#430): projection and render-texture target. Every
+//! tune its `CameraComponent` (#430): projection, culling mask (#827) and
+//! render-texture target. Every
 //! setter routes through `scene::authoring::camera`, the ops the inspector's Camera
 //! card uses. Getters return `nil` without a camera; setters are then no-ops.
 
@@ -46,7 +47,31 @@ pub fn register<'scope>(
             Ok(())
         }),
     )?;
+    register_culling_mask(scope, table, scene)?;
     register_target(scope, table, scene)
+}
+
+/// `Get/SetCullingMask`: one bit per layer, Unity's `Camera.cullingMask`. The mask
+/// is taken as any Lua integer and kept to its low 32 bits, so `-1` (`~0`) is
+/// "everything", as in Unity.
+fn register_culling_mask<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "GetCullingMask",
+        scope.create_function(|_, id: u32| Ok(read(scene, id, |c| c.culling_mask))),
+    )?;
+    put(
+        table,
+        "SetCullingMask",
+        scope.create_function(|_, (id, mask): (u32, i64)| {
+            write(scene, id, |c| camera_ops::set_culling_mask(c, mask as u32));
+            Ok(())
+        }),
+    )
 }
 
 /// `Get/SetTargetTexture`, then the target's settings.

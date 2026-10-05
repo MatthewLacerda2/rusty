@@ -39,6 +39,7 @@ mod ik;
 mod input_api;
 mod joint_api;
 mod layers_api;
+mod layers_from_lua;
 mod light_probes;
 mod lod_group_api;
 mod material_authoring;
