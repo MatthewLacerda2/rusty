@@ -10,7 +10,7 @@
 //! (`out/bench/` under `make bench`) and each run prints its change against the one
 //! before, so measuring an optimisation is: run, change, run.
 //!
-//! **GPU rows are clock-normalised** ([`clock`], #862): a fixed probe timed beside
+//! **GPU rows are clock-normalised** (`clock`, #862): a fixed probe timed beside
 //! every frame divides out the GPU governor's clock, so `gpu_ms` and `gpu.<pass>`
 //! move with the work, not with how idle the GPU was. `gpu_raw_ms` is the time as
 //! measured and `gpu_clock_pct` the clock it ran at.
