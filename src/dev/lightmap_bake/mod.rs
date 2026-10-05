@@ -86,7 +86,11 @@ pub fn apply_lightmaps(
         image
             .save(&path)
             .map_err(|e| format!("write {}: {e}", path.display()))?;
-        set.pages.push(path.to_string_lossy().into_owned());
+        // The scene document stores `/` paths on every OS, like its other assets.
+        let page = path
+            .to_string_lossy()
+            .replace(std::path::MAIN_SEPARATOR, "/");
+        set.pages.push(page);
     }
     set.entries = atlas
         .placements
