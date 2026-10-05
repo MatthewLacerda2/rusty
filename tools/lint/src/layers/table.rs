@@ -124,6 +124,7 @@ pub const LAYERS: &[Layer] = &[
         &[
             "api",
             "app",
+            "asset",
             "components",
             "core",
             "navigation",

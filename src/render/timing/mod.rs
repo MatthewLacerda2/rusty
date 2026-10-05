@@ -22,9 +22,14 @@
 //! resolved, and the stats carry no GPU field at all — absent, not zero. Only the
 //! headless renderer asks for the feature: nothing reads the window's timings yet.
 //!
-//! A pass's time runs from the start of its vertex work to the end of its fragment
-//! work. On a tiled GPU consecutive passes can overlap a little, so the per-pass
-//! sum (`gpu_ms`) can slightly exceed the frame's wall-clock GPU span.
+//! **Exclusive time.** A pass's timestamps bracket its vertex work to its fragment
+//! work, and GPUs overlap neighbours — a tiled GPU (Apple's) starts the next pass's
+//! vertices while this one's fragments still run, so raw spans each swallow the
+//! pass before them and summing them counts that time twice. Each pass is
+//! therefore charged only from where the work before it ended (or from its own
+//! start, if later) to its own end. The passes then add up to the frame's GPU busy
+//! time (`gpu_ms`), and a heavy pass shows as heavy instead of smearing into the
+//! light ones queued behind it.
 
 mod readback;
 
@@ -98,13 +103,17 @@ impl GpuTimes {
         self.passes.iter().map(|(_, ms)| ms).sum()
     }
 
-    /// Sum resolved `ticks` — a begin/end pair per entry of `passes` — into
-    /// milliseconds per pass kind. `period_ns` is nanoseconds per tick. A pair whose
-    /// end reads before its begin counts zero.
+    /// Sum resolved `ticks` — a begin/end pair per entry of `passes`, in the order
+    /// the passes were queued — into exclusive milliseconds per pass kind (see the
+    /// module doc). `period_ns` is nanoseconds per tick. A pass that ends before the
+    /// work queued ahead of it counts zero.
     pub fn from_ticks(ticks: &[u64], passes: &[GpuPass], period_ns: f64) -> Self {
         let mut ms = [None::<f64>; GpuPass::ALL.len()];
+        let mut done = 0u64; // where the work queued so far ended
         for (pair, pass) in ticks.chunks_exact(2).zip(passes) {
-            let elapsed = pair[1].saturating_sub(pair[0]) as f64 * period_ns / 1e6;
+            let (begin, end) = (pair[0].max(done), pair[1]);
+            done = done.max(end);
+            let elapsed = end.saturating_sub(begin) as f64 * period_ns / 1e6;
             let slot = &mut ms[*pass as usize];
             *slot = Some(slot.unwrap_or(0.0) + elapsed);
         }

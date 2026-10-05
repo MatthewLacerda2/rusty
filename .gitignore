@@ -32,6 +32,10 @@ auxmd.md
 !/project/scenarios/
 /project/scenarios/*
 !/project/scenarios/*.lua
+# A scenario with scripts of its own keeps them in its folder (the bench, #835).
+!/project/scenarios/*/
+/project/scenarios/*/*
+!/project/scenarios/*/*.lua
 !/project/scripts/
 /project/scripts/*
 !/project/scripts/*.lua

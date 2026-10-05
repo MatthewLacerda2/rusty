@@ -109,7 +109,7 @@ impl Report {
 
 /// A value at a precision that suits its size: ms to the microsecond, counts whole.
 fn num(v: f64) -> String {
-    if v.fract() == 0.0 && v.abs() >= 1.0 {
+    if v.fract() == 0.0 {
         format!("{v:.0}")
     } else {
         format!("{v:.3}")

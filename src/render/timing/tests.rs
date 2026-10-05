@@ -2,8 +2,8 @@ use super::{GpuPass, GpuTimer, GpuTimes};
 
 #[test]
 fn ticks_sum_per_pass_kind_in_frame_order() {
-    // Two shadow sweeps and a forward pass, at 1 ns per tick.
-    let ticks = [0, 1_000_000, 5_000_000, 5_500_000, 2_000_000, 4_000_000];
+    // Two shadow sweeps and a forward pass, back to back, at 1 ns per tick.
+    let ticks = [0, 1_000_000, 1_000_000, 1_500_000, 2_000_000, 4_000_000];
     let passes = [GpuPass::Shadows, GpuPass::Shadows, GpuPass::Forward];
     let times = GpuTimes::from_ticks(&ticks, &passes, 1.0);
     assert_eq!(
@@ -14,9 +14,25 @@ fn ticks_sum_per_pass_kind_in_frame_order() {
 }
 
 #[test]
-fn the_tick_period_scales_and_a_backwards_pair_counts_zero() {
-    let times = GpuTimes::from_ticks(&[10, 20, 50, 40], &[GpuPass::Ui, GpuPass::Ssao], 1e5);
-    // 10 ticks of 0.1 ms; the SSAO pair ends before it begins.
+fn an_overlapping_pass_is_charged_only_past_the_work_ahead_of_it() {
+    // Forward runs 0..10; post-FX starts its vertices at 2 but cannot finish its
+    // fragments before forward's, ending at 11: it costs 1, not 9, and the frame 11.
+    let ticks = [0, 10, 2, 11, 12, 13];
+    let passes = [GpuPass::Forward, GpuPass::PostFx, GpuPass::Ui];
+    let times = GpuTimes::from_ticks(&ticks, &passes, 1e6);
+    let want = [
+        (GpuPass::Forward, 10.0),
+        (GpuPass::PostFx, 1.0),
+        (GpuPass::Ui, 1.0),
+    ];
+    assert_eq!(times.passes, want);
+    assert_eq!(times.total_ms(), 12.0);
+}
+
+#[test]
+fn the_tick_period_scales_and_a_pass_ending_early_counts_zero() {
+    // 10 ticks of 0.1 ms; the SSAO pass ends inside the UI pass queued before it.
+    let times = GpuTimes::from_ticks(&[10, 20, 12, 18], &[GpuPass::Ui, GpuPass::Ssao], 1e5);
     assert_eq!(times.passes, vec![(GpuPass::Ssao, 0.0), (GpuPass::Ui, 1.0)]);
 }
 

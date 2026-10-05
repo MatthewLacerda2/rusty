@@ -58,7 +58,7 @@ fn spec_from_lua(lua: &Lua, opts: Option<Table>) -> LuaResult<StressSpec> {
             "enemies" => spec.enemies = int()?,
             "lights" => spec.lights = int()?,
             "flickering" => spec.flickering = int()?,
-            "shadow_every" => spec.shadow_every = int()?,
+            "shadowed" => spec.shadowed = int()?,
             "decals" => spec.decals = int()?,
             "particle_systems" => spec.particle_systems = int()?,
             "enemy_script" => spec.enemy_script = string(&value)?,

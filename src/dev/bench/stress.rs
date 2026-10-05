@@ -26,8 +26,9 @@ pub struct StressSpec {
     pub lights: u32,
     /// How many of those lights run `flicker_script` (muzzle flashes).
     pub flickering: u32,
-    /// Every n-th light casts shadows (0: none do).
-    pub shadow_every: u32,
+    /// How many lights, from the first, cast shadows: half point lights (six
+    /// atlas tiles each), half spots (one).
+    pub shadowed: u32,
     /// Decals stamped; the registry keeps at most `MAX_DECALS`.
     pub decals: u32,
     pub particle_systems: u32,
@@ -42,7 +43,7 @@ impl Default for StressSpec {
             enemies: 50,
             lights: 32,
             flickering: 8,
-            shadow_every: 4,
+            shadowed: 6,
             decals: 256,
             particle_systems: 4,
             enemy_script: String::new(),
@@ -60,8 +61,16 @@ pub struct Spawned {
     pub particle_systems: u32,
 }
 
-/// Spawn `spec` into `scene` (already holding the yard).
+/// Where the Player stands: 3 m in from its spawn, so the follow camera 4.5 m
+/// behind it is inside the yard and looks down its length at the whole scene.
+pub const PLAYER_AT: Vec3 = Vec3::new(0.0, 1.5, -15.0);
+
+/// Spawn `spec` into `scene` (already holding the yard), and stand the Player at
+/// [`PLAYER_AT`].
 pub fn load(scene: &mut Scene, spec: &StressSpec) -> Spawned {
+    if let Some(player) = scene.find_entity_by_name("Player") {
+        scene.world.transform_mut(player).unwrap().position = PLAYER_AT;
+    }
     let mut spawned = Spawned::default();
     for i in 0..spec.enemies {
         soldier(scene, i, &spec.enemy_script);
@@ -69,8 +78,7 @@ pub fn load(scene: &mut Scene, spec: &StressSpec) -> Spawned {
     }
     for i in 0..spec.lights {
         let flicker = (i < spec.flickering).then_some(spec.flicker_script.as_str());
-        let shadowed = spec.shadow_every > 0 && i % spec.shadow_every == 0;
-        light(scene, i, shadowed, flicker);
+        light(scene, i, i < spec.shadowed, flicker);
         spawned.lights += 1;
     }
     for i in 0..spec.decals {

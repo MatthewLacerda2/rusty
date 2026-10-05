@@ -104,13 +104,41 @@ print(s.frames, s.fixed_update_ms.avg, s.systems.update_scripts.max, s.entities.
 | `render_texture_draws` | cameras drawn into render textures this frame (#430) — their geometry is already in `draw_calls` / `triangles`; a camera skipped (unreferenced, or between its `update_every` frames) is not counted |
 | `ui_mask_passes` / `ui_blur_passes` | UI `Mask` coverage textures rendered (#428) / fullscreen passes of the UI backdrop blur, its composite included — `0` with no backdrop visible (#426) |
 | `renderer_ms` | CPU ms `Renderer::render` took to record the frame |
+| `gpu_ms` | GPU ms the frame's render passes kept the GPU busy (#835): the sum of `gpu_passes` below. **Only where the adapter has timestamp queries** (Metal, most Vulkan GPUs; not lavapipe) — elsewhere the key is absent, never `0` |
+| `gpu_passes.<pass>` | GPU ms per kind of render pass, in the same `{ last, min, avg, max, samples }` shape, under stable names (below). Absent as a whole without timestamps |
+
+**GPU time per pass (#835).** Each render pass writes a GPU timestamp at its start
+and end; the renderer resolves them after the frame and reads them back without
+ever stalling it (the live loop gets them a frame or two later; the harness waits
+for its frames anyway, so each reports its own). The passes are grouped by kind,
+each kind's passes summed, under names that never change so two reports diff:
+
+| `gpu_passes` key | What it covers |
+|---|---|
+| `shadows` | the sun's cascades (static bake + dynamic casters) and the point/spot shadow atlas |
+| `ssao` | the SSAO depth prepass, occlusion and blur |
+| `forward` | the opaque scene pass: solids, decals folded in, skybox — every camera's, render-texture cameras included |
+| `transparent` | translucent solids |
+| `ribbons` | trails and lines |
+| `particles` | particle systems |
+| `post_fx` | bloom, the composite, authored effects, FXAA |
+| `ui` | world and screen UI, Mask textures and the backdrop blur |
+
+A kind appears once a frame ran it (`samples` counts those frames). GPUs overlap
+neighbouring passes — a tiled GPU starts the next pass's vertices while the last
+one's fragments still run — so each pass is charged its **exclusive** time: from
+where the work queued before it ended (or its own start, if later) to its own end.
+The kinds therefore add up to `gpu_ms`, and a heavy pass shows as heavy instead of
+smearing into the light ones behind it. Like every `_ms` key, these are wall-clock
+and differ run to run, and they are this GPU's: compare them on one machine.
 
 Keys ending in `_ms`, and `light_bin_us`, are **wall-clock** and differ run to run; everything else is a
 count and is deterministic for a deterministic run. The timings are measured *around*
 the sim by the dev layer and never fed back into it, so reading them cannot change a
-replay. Render counters appear only on frames something rendered through the headless
-renderer (a harness `Harness.Screenshot`); a run that never renders reports timings and
-world counters only. Before any Play frame, `frames` is `0` and no metric is present.
+replay. Render counters (and GPU times) appear only on frames something rendered through the
+headless renderer (a harness `Harness.Screenshot`, or `Harness.Render`, which draws
+without writing a PNG); a run that never renders reports timings and world counters
+only. Before any Play frame, `frames` is `0` and no metric is present.
 
 Scenarios get the same table as `Harness.Stats()` and can turn it into pass/fail with
 `Harness.AssertBudget{ draw_calls = 2000, fixed_update_ms = 4 }` — see *Performance
