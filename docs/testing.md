@@ -149,6 +149,12 @@ the skip contract above is unchanged.
 lavapipe — `sudo apt-get install -y mesa-vulkan-drivers libvulkan1` — and the same
 tests render there as in Linux CI. Set `RUSTY_REQUIRE_GPU=1` to be sure they did.
 
+**Runner image.** Linux jobs run on `ubuntu-latest`, which moves from Ubuntu 24.04
+to 26.04 on 2026-10-19. Both `ci.yml` and `lint.yml` were proven on `ubuntu-26.04`
+ahead of the move (#868): the apt list resolves unchanged, lavapipe is Mesa 26.0.8,
+and a cold-cache build ran every GPU test there. If Linux CI goes red right after that
+date with no related change, suspect the image first.
+
 Two of the three CI adapters are software renderers, so a green run proves the render
 path is correct on a conformant driver, not that it performs or behaves identically on
 real hardware — Metal on macOS is the one real GPU. Pair anything load-bearing with an
