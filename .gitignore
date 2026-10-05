@@ -35,7 +35,7 @@ auxmd.md
 # what the engine seeds into it when it is opened.
 /tests/fixtures/project/*
 !/tests/fixtures/project/scenarios/
-!/tests/fixtures/project/build_settings.json
+!/tests/fixtures/project/project.rusty
 !/tests/fixtures/project/assets/
 /tests/fixtures/project/assets/*
 !/tests/fixtures/project/assets/scripts/

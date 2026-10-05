@@ -1,12 +1,13 @@
 //! src/editor/build_settings.rs — the File → Build Settings window (#431).
 //!
 //! Edits a draft of the project's [`BuildSettings`] (startup scene, product name,
-//! window mode) and writes it to the tracked `build_settings.json` on Save.
+//! window mode) and writes it to the project's tracked `project.rusty` on Save.
 //! The API twin is the `Application` namespace's setters — one operation, two callers.
 
 use egui_phosphor::regular as icon;
 
-use crate::core::application::{Application, BuildSettings, WindowMode, BUILD_SETTINGS_PATH};
+use crate::core::application::{Application, BuildSettings, WindowMode};
+use crate::core::project::PROJECT_FILE;
 use crate::editor::EditorUi;
 use crate::scripting::ConsoleLogs;
 
@@ -39,7 +40,7 @@ pub fn draw(
         });
     if save {
         match app.set_build(draft.clone()) {
-            Ok(()) => console.info(format!("Build settings saved to {BUILD_SETTINGS_PATH}")),
+            Ok(()) => console.info(format!("Build settings saved to {PROJECT_FILE}")),
             Err(err) => console.error(err),
         }
     }

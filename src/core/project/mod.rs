@@ -14,7 +14,8 @@
 //! <project>/
 //!   assets/              the game: scenes, scripts, prefabs, models, textures,
 //!                        audio, materials, authored shaders (Unity's Assets/)
-//!   build_settings.json  engine-owned project settings
+//!   project.rusty        marks the folder as a project: the engine commit it was
+//!                        last opened with, and the build settings (#853)
 //!   .seeded              the seed manifest (#746)
 //!   cache/               anything the engine can regenerate (Unity's Library/)
 //!   saved/               the player's save data (Unreal's Saved/)
@@ -26,11 +27,15 @@
 //! The engine's own content (shaders, bundled scripts, the preview model) is not the
 //! project's: it is found by [`engine_dir`], wherever the project is.
 
+mod file;
 mod locate;
 mod migrate;
 
 use std::path::{Path, PathBuf};
 
+pub use file::{
+    EngineCheck, ProjectFile, ENGINE_COMMIT, LEGACY_BUILD_SETTINGS, PROJECT_FILE, UNKNOWN_COMMIT,
+};
 pub use locate::{engine_dir, engine_path, locate, packaged_project};
 
 /// The project's content folder, relative to its root (Unity's `Assets/`).
@@ -75,21 +80,55 @@ pub fn create_skeleton(dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Open the project at `dir`: create its skeleton, migrate a legacy layout, and make
-/// it the working directory. Returns the absolute root. Call it once, at startup,
-/// before anything reads a project path — and resolve any other relative path the
-/// command line named first ([`std::path::absolute`]), since the working directory
-/// moves.
-pub fn open(dir: &Path) -> Result<PathBuf, String> {
+/// How a binary opens its project: whether it may bring `project.rusty` up to date.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Access {
+    /// The editor and the agent sessions: create a missing `project.rusty` (folding a
+    /// legacy `build_settings.json` in) and record the running engine's commit.
+    Edit,
+    /// The player, scenario runs and captures: check the engine, write nothing. A
+    /// shipped game never rewrites its project, and a run over the tracked fixture
+    /// project leaves the checkout clean.
+    Run,
+}
+
+/// What [`open`] found.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Opened {
+    /// The project root, absolute; now the working directory.
+    pub root: PathBuf,
+    /// The engine the project was last opened with against the running one. Opening
+    /// prints its warning on stderr; a frontend with a UI also shows it.
+    pub engine: EngineCheck,
+}
+
+/// Open the project at `dir`: create its skeleton, migrate a legacy layout, check
+/// (and with [`Access::Edit`] record) the engine in `project.rusty`, and make it the
+/// working directory. Call it once, at startup, before anything reads a project path
+/// — and resolve any other relative path the command line named first
+/// ([`std::path::absolute`]), since the working directory moves.
+///
+/// Progress goes to stderr: `session-mcp`'s stdout carries only JSON-RPC.
+pub fn open(dir: &Path, access: Access) -> Result<Opened, String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let root = std::fs::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    for line in migrate::legacy_layout(&root)? {
-        println!("[Project] {line}");
-    }
+    let mut lines = migrate::legacy_layout(&root)?;
     create_skeleton(&root)?;
+    let engine = match access {
+        Access::Edit => {
+            let (engine, recorded) = file::record(&root)?;
+            lines.extend(recorded);
+            engine
+        }
+        Access::Run => file::inspect(&root)?,
+    };
     std::env::set_current_dir(&root).map_err(|e| format!("{}: {e}", root.display()))?;
-    println!("[Project] Opened {}", root.display());
-    Ok(root)
+    lines.push(format!("Opened {}", root.display()));
+    lines.extend(engine.warning());
+    for line in lines {
+        eprintln!("[Project] {line}");
+    }
+    Ok(Opened { root, engine })
 }
 
 /// The open project's root: the working directory, which [`open`] made the root.
@@ -120,8 +159,8 @@ pub fn take_flag(args: &mut Vec<String>) -> Result<Option<PathBuf>, String> {
 /// What every binary does first: take `--project` from `args`, find the project
 /// ([`locate`]) and [`open`] it. Exits with status 2 and one line on stderr when the
 /// flag is malformed or the folder can't be opened — a binary can't run without it.
-pub fn open_from_args(args: &mut Vec<String>) -> PathBuf {
-    let opened = take_flag(args).and_then(|named| open(&locate(named)));
+pub fn open_from_args(args: &mut Vec<String>, access: Access) -> Opened {
+    let opened = take_flag(args).and_then(|named| open(&locate(named), access));
     opened.unwrap_or_else(|e| {
         eprintln!("[Project] cannot open the project: {e}");
         std::process::exit(2);

@@ -22,8 +22,8 @@ use winit::keyboard::KeyCode;
 use super::frame::Host;
 use super::{boot, Frontend, Launch, Shell};
 use crate::app::{GameWorld, PlayTransition};
-use crate::core::application::BUILD_SETTINGS_PATH;
 use crate::core::input::CursorState;
+use crate::core::project::{Opened, PROJECT_FILE};
 use crate::core::video::VideoSettings;
 use crate::editor::{EditorUi, ViewportInteraction, ViewportTab};
 use crate::render::RenderView;
@@ -261,19 +261,22 @@ impl Frontend for EditorFrontend {
 }
 
 /// Boot the editor on the seeded default scene and run until the window closes.
-pub fn launch() {
+/// `opened` is what opening the project found; an engine mismatch is logged to the
+/// editor console as well as stderr.
+pub fn launch(opened: &Opened) {
     println!("[Engine] Starting rusty 3D engine...");
     boot::seed_project_workspace();
     let scene_path = crate::scene::DEFAULT_SCENE_PATH.to_string();
     let game = boot::load_game(&scene_path);
     // Bound: the File → Build Settings window and `Application.Set*` write the file.
-    let opened = game
-        .resources
-        .application
-        .borrow_mut()
-        .open(BUILD_SETTINGS_PATH);
-    if let Err(err) = opened {
+    let bound = game.resources.application.borrow_mut().open(PROJECT_FILE);
+    if let Err(err) = bound {
         game.console().borrow_mut().error(err);
+    }
+    if let Some(warning) = opened.engine.warning() {
+        game.console()
+            .borrow_mut()
+            .warn(format!("[Project] {warning}"));
     }
 
     let launch = Launch {

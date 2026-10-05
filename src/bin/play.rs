@@ -15,6 +15,7 @@
 use std::path::{absolute, PathBuf};
 use std::process::exit;
 
+use rusty::core::project::Access;
 use rusty::dev::scenario;
 
 fn main() {
@@ -27,7 +28,7 @@ fn main() {
     // Both are named from the launch directory; opening the project moves it.
     let from_here = |p: &str| absolute(p).unwrap_or_else(|_| PathBuf::from(p));
     let (scenario_path, out_dir) = (from_here(scenario_path), from_here(out_dir));
-    let opened = rusty::core::project::open(&rusty::core::project::locate(project));
+    let opened = rusty::core::project::open(&rusty::core::project::locate(project), Access::Run);
     if let Err(e) = opened {
         eprintln!("play: cannot open the project: {e}");
         exit(2);

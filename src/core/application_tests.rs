@@ -75,7 +75,7 @@ fn bound_instance_writes_through_on_every_setter() {
 #[test]
 fn loaded_instance_never_writes_the_file() {
     let path = temp_path("loaded");
-    std::fs::write(&path, BuildSettings::default().to_json()).unwrap();
+    std::fs::write(&path, ProjectFile::default().to_json()).unwrap();
     let mut app = Application::new();
     app.load(&path).unwrap();
     app.update(|b| b.product_name = "Changed".into()).unwrap();
@@ -84,6 +84,23 @@ fn loaded_instance_never_writes_the_file() {
         BuildSettings::read(&path).unwrap().product_name,
         DEFAULT_PRODUCT_NAME
     );
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn saving_the_settings_keeps_the_recorded_engine() {
+    let path = temp_path("engine");
+    let recorded = ProjectFile {
+        engine_commit: "0123abcd".into(),
+        ..ProjectFile::default()
+    };
+    recorded.write(&path).unwrap();
+    let mut app = Application::new();
+    app.open(&path).unwrap();
+    app.update(|b| b.product_name = "Neon".into()).unwrap();
+    let file = ProjectFile::read(&path).unwrap().unwrap();
+    assert_eq!(file.engine_commit, "0123abcd");
+    assert_eq!(file.build.product_name, "Neon");
     let _ = std::fs::remove_file(&path);
 }
 
