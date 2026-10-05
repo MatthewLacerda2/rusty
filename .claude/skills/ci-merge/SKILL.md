@@ -126,6 +126,14 @@ worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standin
   branch someone else pushed to, and it rebases (and cancels its own runs) by
   itself. The queue comments `@dependabot rebase` when one is behind, waits for a
   head on `main`'s tip, and judges that.
+- **A watch runs the script it started with** (#824). Python reads the queue's
+  code once, at launch, so after merging any change to
+  `.github/scripts/merge-queue.py`, `queue_watch.py` or `mergeable.py`, stop
+  the watch (safe while it only waits on CI; never mid-push or mid-merge),
+  update its worktree to `origin/main`, and relaunch it. Otherwise the old code
+  keeps deciding merges: on 2026-10-04 #751 (skip a hand-back) and #753
+  (fewest-conflicts order) both landed under a watch still running the code
+  they replaced.
 - By hand, the same loop is: rebase in the branch's worktree, `cargo check`
   both feature sets and `make size`, push with `--force-with-lease`, wait,
   `make mergeable PR=N`, squash-merge. Prefer the queue.
@@ -245,6 +253,19 @@ rebase back to the branch's author when resolving it needs to know *why* the cod
 is shaped as it is — a new variant that should join a documented grouping, two
 prose paragraphs that need ordering, a signature that has grown a parameter, a
 system whose stage placement was argued for.
+
+**A `Cargo.lock` conflict is never hand-merged** (#824). Two lockfiles merged
+hunk by hunk can resolve to a dependency graph neither side ever built. The
+procedure, mid-rebase: take `main`'s lockfile (`git checkout --ours Cargo.lock`;
+during a rebase *ours* is the upstream side), let cargo re-add the branch's own
+edges with `cargo update -p <only the crates this branch moves>` (never a blanket
+`cargo update`, which drags every other crate forward too), then `cargo check
+--locked --all-targets` and `make deny` before pushing. A rebase that touched
+`Cargo.lock` is one whose resolution needs a compile, so under `--no-check` it
+goes back to a coder, never a quick orchestrator fix. On 2026-10-04 the wgpu
+upgrade (#333, PR #767) was handed back three times on `Cargo.lock`; each rebase
+coder resolved it by exactly these steps, which until then lived only in their
+briefs.
 
 After a rebase, re-check any claim the branch made **about the base it measured
 against** — the "Gates" paragraph in the description, a survivor count, a coverage

@@ -212,8 +212,9 @@ that branch. The cloud session has GitHub MCP tools (`create_pull_request`,
 **The pull request is the report.** A cloud session cannot message this one back.
 Brief it to open a draft on its first commit, push often (a dead container takes
 its uncommitted work with it), write decisions and hand-backs into the description
-and an issue comment, and mark the PR ready when its gates are green. Watch the
-PR, not the agent.
+and an issue comment, and mark the PR ready when its gates are green, then end.
+Its job stops there (#823): no check-in, no waiting on CI, no push to a ready
+branch. Watch the PR, not the agent.
 
 **Ready means finished.** The batch merges a ready PR the moment its gates are
 green, so a PR must never be readied just to make CI run. On 2026-09-30 #520's session
@@ -232,9 +233,9 @@ runners for most of a day taken from every other PR's gates (#705).
 that starts a build in the background and ends its turn to wait sits idle forever —
 #485's first session did exactly that for an hour, gates half-run, PR still a draft.
 Brief every cloud session to run builds and gates in the **foreground** (long
-timeouts, split across calls), and to schedule its own check-in with `send_later`
-(the `Claude_Code_Remote` MCP tool) before ending a turn to wait on CI. From here,
-`worker_status: idle` on `list_runs` with a draft PR is the stall's signature; the
+timeouts, split across calls), and never to wait on CI: it readies and ends, and
+the queue does the waiting. From here, a finished routine with its PR still a
+draft and no hand-back reason in the description is the stall's signature; the
 fix is a fresh routine briefed to finish the pushed branch.
 
 **The container's disk is finite too:** before #483 folded `tests/` into one binary,
@@ -265,6 +266,9 @@ that, and one chain was cancelled by mistake). Its loop per pull request:
 
 1. Read the description. Check the decisions against the issue, and note any
    human-only checks (a window, speakers) as a checklist; don't hold for them.
+   If the coder dispatched a scoped mutation run, read its report when it
+   finishes (`ci-merge`, *Triaging a survivor*); launch a follow-up routine only
+   for survivors in code the branch wrote (#823).
 2. **The watch does** rebase → check → push → wait → merge; don't hand-roll
    that loop. The queue rebases in a throwaway worktree, runs
    `cargo check --locked --all-targets` with `dev` and `--no-default-features`
@@ -288,6 +292,11 @@ that, and one chain was cancelled by mistake). Its loop per pull request:
    **The watch exits at once when no pull request is open at all**, which is the
    state right after a wave of coders launches and before their first drafts
    exist. Start it once a draft is up (or poll for the first ready one yourself).
+   Beside it, one `Monitor` tracks the coders' pull requests: poll
+   `gh pr list --state all --search "created:>=<batch start>"` every ~90 s and
+   emit a line only on a transition (opened as draft → ready → merged or
+   closed), never the unchanged list. That is the whole of watching the coders;
+   no per-PR `until` loops.
 3. A hand-back is the queue's whole report, and the watch keeps going without
    it (#751): fix a conflict or a failed check on the branch (or brief its
    coder to) while the other ready pull requests merge. The handed-back head is
@@ -298,19 +307,13 @@ that, and one chain was cancelled by mistake). Its loop per pull request:
    `--no-check` nothing compiles your resolution before CI does, so **grep every
    use of anything either side moved or renamed, and check the 300-line file and
    50-line function caps**, before pushing. On 2026-10-02 a hand-resolved #700
-   kept a variable #699 still used, and only the coder's check-in caught it. A
+   kept a variable #699 still used, and only a later CI round caught it. A
    resolution that needs a compile to trust (a file split, a dispatcher over the
-   cap, two systems' order) goes to a cloud routine instead.
-   **A coder's own check-in may push while the queue holds its PR**; the queue
-   hands it back as "somebody else pushed". Wait for that coder's PR comment,
-   then `make queue PRS=N`. A many-hunk
-   conflict goes back to **the session that wrote the branch**, which still holds
-   its design: the coder's `send_later` check-in is a routine bound to its
-   persistent session, so `update` that routine's prompt with the rebase request
-   (paths, what merged, "force-push authorised"), `run` it, then disable it so its
-   scheduled fire does not repeat the request. #660 came back that way after #659,
-   27 hunks resolved in one pass with a new test for the interaction. No check-in
-   routine left: a fresh routine briefed to rebase the pushed branch.
+   cap, two systems' order, a `Cargo.lock`) goes to a cloud routine instead: a
+   fresh one briefed to rebase or fix the pushed branch, pointing at the PR's
+   description (its *Seam* and decisions) for the design, with "force-push
+   authorised". Coders never push to a ready branch on their own (#823), so a
+   push the queue did not make is one you briefed.
 4. After merging: remove the worktree and its `target/`, re-read the board, and
    start the next piece of work.
 
@@ -329,7 +332,7 @@ local agent is timing builds; it skews the numbers.
 
 **Every cloud brief carries** step 0 inline, then a pointer to
 [`cloud-brief.md`](cloud-brief.md) — the standing rules (foreground builds,
-`send_later`, ready means finished, the repo's rules, the PR protocol, "do not
+ending at ready, the repo's rules, the PR's *Gates* and *Seam* sections, "do not
 merge") live there, versioned with this skill (#568) — and only what is specific
 to its issue. `RemoteTrigger` echoes a prompt back three times, so standing text
 copied into each one fills the orchestrator's context; a change to the rules goes
@@ -344,8 +347,8 @@ end with "LOCAL — aborted" and that output.
 Then read `.claude/skills/issue-batch/cloud-brief.md` and follow it.
 
 Issue(s): #N — <one line>. Branch: `N-short-slug`.
-Builds on: <what merged that it must build on; line numbers in issues go stale
-within hours>.
+Builds on: <what merged that it must build on, as "PR #N, Seam" where that
+PR wrote one; line numbers in issues go stale within hours>.
 Siblings in flight: <branch/issue → the files it edits; stay out of them>.
 Decisions: <anything already settled, or "none">.
 ```
