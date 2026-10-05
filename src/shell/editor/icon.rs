@@ -9,10 +9,10 @@
 use winit::window::{Icon, Window};
 
 /// The window icon: winit hands it to X11's `_NET_WM_ICON`.
-const WINDOW_ICON_PNG: &[u8] = include_bytes!("../../../assets/icon/rusty-256.png");
+const WINDOW_ICON_PNG: &[u8] = include_bytes!("../../../engine/icon/rusty-256.png");
 /// The Dock icon: 512 px fills a 256 pt Retina Dock tile.
 #[cfg(any(target_os = "macos", test))]
-const DOCK_ICON_PNG: &[u8] = include_bytes!("../../../assets/icon/rusty-512.png");
+const DOCK_ICON_PNG: &[u8] = include_bytes!("../../../engine/icon/rusty-512.png");
 
 /// Give `window` (and, on macOS, the app's Dock tile) the rusty logo.
 pub fn apply(window: &Window) {

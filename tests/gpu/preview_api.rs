@@ -11,7 +11,7 @@ use rusty::dev::session::Session;
 
 /// A committed shader, so the arm that matters most for #353 (see what a baked `.wgsl`
 /// actually renders) is the one covered end to end.
-const SHADER: &str = "assets/shaders/shader.wgsl";
+const SHADER: &str = "engine/shaders/shader.wgsl";
 
 fn session() -> Session {
     Session::new("").expect("session boots in edit mode")

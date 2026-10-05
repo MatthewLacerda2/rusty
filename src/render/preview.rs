@@ -12,11 +12,11 @@ use super::gpu::pipelines::create_pipelines;
 use super::{RenderView, Renderer};
 use crate::scene::Camera;
 use crate::scene::Scene;
-use crate::shadergen::{compose, ENGINE_SHADER_DIR};
+use crate::shadergen::{compose, engine_shader_dir};
 
 impl Renderer {
     /// Render `scene` with the forward pipeline temporarily rebuilt from
-    /// `shader_path`'s compiled module instead of `assets/shaders/shader.wgsl` — the
+    /// `shader_path`'s compiled module instead of `engine/shaders/shader.wgsl` — the
     /// Preview tab's Shader-asset arm ("the chosen preview mesh... shaded by the
     /// selected module", #352). Reuses `create_pipelines` verbatim (same bind-group
     /// layouts, same vertex/fragment entry points as every other forward pipeline) so
@@ -60,13 +60,13 @@ impl Renderer {
     }
 
     /// Read and compose `shader_path` against the engine's one shared `common.wgsl`
-    /// (`assets/shaders/common.wgsl` — every shader's `#import "common"` target,
+    /// (`engine/shaders/common.wgsl` — every shader's `#import "common"` target,
     /// regardless of where the previewed file itself lives), returning `None` rather
     /// than panicking on a missing file or a composition error (the non-panicking
     /// path the #272 authoring bake validates through, `shadergen::compose`).
     fn compose_preview_shader(&self, shader_path: &str) -> Option<wgpu::ShaderModule> {
         let source = std::fs::read_to_string(shader_path).ok()?;
-        let mut composer = compose::composer_with_common(ENGINE_SHADER_DIR).ok()?;
+        let mut composer = compose::composer_with_common(engine_shader_dir()).ok()?;
         let naga_module = compose::compose(&mut composer, &source, shader_path).ok()?;
         Some(
             self.device

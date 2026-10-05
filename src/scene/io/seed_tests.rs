@@ -33,11 +33,11 @@ fn building_the_default_scene_replaces_what_was_there() {
 fn only_bundled_lua_scripts_are_seeded_and_recorded() {
     let root = crate::test_temp::dir().join("seed_scripts");
     std::fs::remove_dir_all(&root).ok();
-    let (source, dest) = (root.join("bundled"), root.join("project").join("scripts"));
+    let (source, dest) = (root.join("bundled"), root.join("assets").join("scripts"));
     std::fs::create_dir_all(&source).unwrap();
     std::fs::write(source.join("bot.lua"), "-- brain").unwrap();
     std::fs::write(source.join("notes.txt"), "not a script").unwrap();
-    let files = super::bundled_scripts(&source, &dest);
+    let files = super::lua_files(&source, &dest);
     let manifest = root.join(".seeded");
     super::seed_files(&manifest, &files, "delete it");
     assert_eq!(
@@ -65,10 +65,35 @@ fn the_seeded_default_scene_loads_back() {
 
 #[test]
 fn scene_paths_are_told_by_their_extension() {
-    assert!(super::super::is_scene_path("project/scenes/default.scene"));
+    assert!(super::super::is_scene_path("assets/scenes/default.scene"));
     assert!(super::super::is_scene_path("A.SCENE"));
-    assert!(!super::super::is_scene_path(
-        "project/assets/scripts/bot.lua"
-    ));
+    assert!(!super::super::is_scene_path("assets/scripts/bot.lua"));
     assert!(!super::super::is_scene_path("scene"));
+}
+
+#[test]
+fn the_embedded_seeds_are_exactly_the_engine_folders_scripts() {
+    use super::super::bundled::{SCRIPTS, UI_SCRIPTS};
+    let on_disk = |dir: &str| {
+        let dir = crate::core::project::engine_dir().join(dir);
+        let mut names: Vec<String> = std::fs::read_dir(dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.ends_with(".lua"))
+            .collect();
+        names.sort();
+        names
+    };
+    let listed = |files: &[(&str, &str)]| files.iter().map(|f| f.0.to_string()).collect::<Vec<_>>();
+    assert_eq!(
+        listed(SCRIPTS),
+        on_disk("scripts"),
+        "add it to bundled::SCRIPTS"
+    );
+    assert_eq!(
+        listed(UI_SCRIPTS),
+        on_disk("scripts/ui"),
+        "add it to bundled::UI_SCRIPTS"
+    );
 }

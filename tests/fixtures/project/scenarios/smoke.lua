@@ -1,7 +1,8 @@
--- project/scenarios/smoke.lua — the canonical headless smoke test.
+-- scenarios/smoke.lua — the canonical headless smoke test.
 --
 -- Run it with:
---   cargo run --bin play --features dev -- project/scenarios/smoke.lua out/
+--   cargo run --bin play --features dev -- --project tests/fixtures/project \
+--       tests/fixtures/project/scenarios/smoke.lua out/
 --
 -- It drives the demo world the editor shows (Player = 2, Enemy_1 = 5) entirely
 -- headlessly: press a key, skip a couple seconds of ticks with one StepUntil, then

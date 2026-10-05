@@ -12,7 +12,7 @@ use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, material as mat_ops, Primitive};
 use crate::scene::{Camera, Scene};
 use crate::shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
-use crate::shadergen::{bake_recipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
 pub(super) const RES: u32 = 32;
 
@@ -37,7 +37,7 @@ impl Flash {
                 params: params.into_iter().collect(),
             }],
         };
-        bake_recipe(&recipe, ENGINE_SHADER_DIR, DEFAULT_OUT_DIR).expect("bake succeeds");
+        bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).expect("bake succeeds");
         Self(name)
     }
 }

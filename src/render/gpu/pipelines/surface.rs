@@ -2,8 +2,8 @@
 //! shader draws with (#396): Unity's Material → Shader.
 //!
 //! A material names a surface shader (`MaterialAsset::shader`, e.g. `"enemy_toon"`);
-//! the module is `<name>.wgsl` in the authored workspace (`project/assets/shaders`,
-//! where `Shader.Bake` writes), else the engine set (`assets/shaders`). A surface
+//! the module is `<name>.wgsl` in the authored workspace (`assets/shaders`,
+//! where `Shader.Bake` writes), else the engine set (`engine/shaders`). A surface
 //! variant keeps the forward contract by construction (#272: same `VertexInput`, bind
 //! groups and entry points), so only the shader module differs: its pipelines reuse
 //! the forward pipeline layout, and a variant is two pipelines — opaque and
@@ -38,7 +38,7 @@ use std::time::SystemTime;
 
 use crate::shadergen::assemble::{CUT_PREPASS, CUT_SHADOW};
 use crate::shadergen::params::ParamLayout;
-use crate::shadergen::{compose, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{compose, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// The pipeline id of the renderer's standard forward shader.
 pub(crate) const STANDARD: usize = 0;
@@ -114,7 +114,7 @@ impl SurfaceShaders {
             layout,
             shadow_layout,
             format,
-            dirs: vec![DEFAULT_OUT_DIR.into(), ENGINE_SHADER_DIR.into()],
+            dirs: vec![DEFAULT_OUT_DIR.into(), engine_shader_dir().into()],
             index: HashMap::new(),
             slots: Vec::new(),
             builds: 0,
@@ -246,7 +246,7 @@ impl SurfaceShaders {
     /// pipelines under a validation error scope, so wgpu refuses instead of panicking.
     fn build(&self, device: &wgpu::Device, path: &PathBuf) -> Result<SurfacePipelines, String> {
         let source = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        let mut composer = compose::composer_with_common(ENGINE_SHADER_DIR)?;
+        let mut composer = compose::composer_with_common(engine_shader_dir())?;
         let module = compose::compose(&mut composer, &source, &path.to_string_lossy())?;
         let has = |entry: &str, stage| {
             module

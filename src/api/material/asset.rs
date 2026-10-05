@@ -14,7 +14,7 @@
 //!   recipe is a Lua table **or** its JSON string (the on-disk form, #410), so a saved
 //!   recipe re-defines through the same verb without a round-trip through Lua.
 //!   A `maps` texture recipe (#409) is baked first, to
-//!   `project/assets/textures/<name>_<slot>.png`, filling the map paths the recipe
+//!   `assets/textures/<name>_<slot>.png`, filling the map paths the recipe
 //!   left empty; a failed bake defines nothing.
 //! - `Material.Rebake(name [, resolution])` — re-bake the stored `maps` recipe,
 //!   optionally at a new resolution the recipe then keeps.

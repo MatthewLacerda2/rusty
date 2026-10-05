@@ -10,7 +10,7 @@ use crate::render::Renderer;
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::Scene;
 use crate::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
-use crate::shadergen::{bake_recipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// A dissolve surface shader and a mask PNG, unique to this run; removed on drop.
 pub(crate) struct Dissolve {
@@ -38,7 +38,7 @@ impl Dissolve {
                 params: Default::default(),
             }],
         };
-        bake_recipe(&recipe, ENGINE_SHADER_DIR, DEFAULT_OUT_DIR).expect("bake succeeds");
+        bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).expect("bake succeeds");
         let path = crate::test_temp::dir().join(format!("{shader}_mask.png"));
         mask.save(&path).expect("mask written");
         let mask = path.to_string_lossy().into_owned();

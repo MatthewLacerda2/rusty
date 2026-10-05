@@ -2,7 +2,7 @@
 //! pipelines. Skips with no adapter.
 
 use crate::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
-use crate::shadergen::{bake_recipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// A scrolled cut (#648) builds its depth pipelines: its shadow cut reads
 /// `camera.time`, which the shadow pass binds — wgpu would refuse it otherwise and
@@ -19,7 +19,7 @@ fn gpu_a_scrolled_dissolve_builds_its_cut_pipelines() {
         name: name.clone(),
         blocks: blocks.to_vec(),
     };
-    bake_recipe(&recipe, ENGINE_SHADER_DIR, DEFAULT_OUT_DIR).expect("bake succeeds");
+    bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).expect("bake succeeds");
     let r = crate::render::test_gpu::headless_or_skip(16, 16);
     let built = r.map(|mut r| {
         let id = r.surface_shaders.pipeline_id(&r.device, Some(&name));

@@ -5,7 +5,7 @@
 
 use super::tests_timers::{counted, rig, tick};
 use crate::scene::authoring::defaults;
-use crate::shadergen::{bake_recipe, ShaderRecipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
 
 /// A shader baked from `pass` + `block` under a name unique to this test and run
 /// (tests share a process under `cargo test`); removed on drop.
@@ -16,7 +16,7 @@ impl Baked {
         let name = format!("test_tween_{tag}_{}", std::process::id());
         let json = format!(r#"{{"pass":"{pass}","name":"{name}","blocks":[{{"id":"{block}"}}]}}"#);
         let recipe = ShaderRecipe::from_json(&json).unwrap();
-        bake_recipe(&recipe, ENGINE_SHADER_DIR, DEFAULT_OUT_DIR).unwrap();
+        bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).unwrap();
         Self(name)
     }
 }

@@ -1,5 +1,5 @@
 //! Where a provider key comes from: the process environment first, then a `.env`
-//! at the root of the checkout that fills gaps and never overrides (#383).
+//! at the project root or above it that fills gaps and never overrides (#383).
 //!
 //! scorsese's resolver also reads a per-machine settings file; rusty does not, by
 //! decision: the module is `dev`-only, so a shipped build has nobody for that file
@@ -12,8 +12,8 @@ use scorsese_providers::credentials::{Environment, Provider, Secret};
 
 use super::Refusal;
 
-/// The process environment, plus the `.env` at the workspace root (the working
-/// directory, the one holding `project/`) or the nearest one above it.
+/// The process environment, plus the `.env` at the project root (the working
+/// directory, #829) or the nearest one above it.
 pub fn environment() -> Environment {
     let root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     Environment::discover(&root)
@@ -31,7 +31,7 @@ pub fn resolve(provider: Provider, environment: &Environment) -> Result<Secret, 
     let mut looked_in = format!("the {variable} variable");
     match environment.dotenv() {
         Some(dotenv) => looked_in.push_str(&format!(", {}", dotenv.display())),
-        None => looked_in.push_str(", a .env at the workspace root (there is none)"),
+        None => looked_in.push_str(", a .env at the project root or above (there is none)"),
     }
     Err(Refusal::MissingKey {
         provider: provider.label(),

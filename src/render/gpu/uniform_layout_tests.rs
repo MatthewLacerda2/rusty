@@ -25,7 +25,7 @@ const PROBE: &str =
 
 /// `(member offset by name, struct size)` of the WGSL struct named `name`.
 fn wgsl_struct(name: &str) -> (Vec<(String, usize)>, usize) {
-    let mut composer = compose::composer_with_common("assets/shaders").unwrap();
+    let mut composer = compose::composer_with_common("engine/shaders").unwrap();
     let module = compose::compose(&mut composer, PROBE, "probe.wgsl").unwrap();
     let found = module
         .types

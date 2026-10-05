@@ -7,7 +7,7 @@ use super::blocks::catalog;
 use super::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use super::validate::validate;
 
-const ENGINE_SHADERS: &str = "assets/shaders";
+const ENGINE_SHADERS: &str = "engine/shaders";
 
 fn sel(id: &str, params: &[(&str, ParamValue)]) -> BlockSel {
     let params = params

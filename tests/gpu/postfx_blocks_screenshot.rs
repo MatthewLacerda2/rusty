@@ -7,7 +7,7 @@ use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::capture::CaptureHost;
 use rusty::scene::Scene;
-use rusty::shadergen::{bake_recipe, ShaderRecipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use rusty::shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
 
 use super::fog_scene::{shot, wall_scene};
 
@@ -16,7 +16,7 @@ fn bake(name: &str, block: &str) {
     let json = format!(r#"{{"pass":"postfx","name":"{name}","blocks":[{block}]}}"#);
     bake_recipe(
         &ShaderRecipe::from_json(&json).unwrap(),
-        ENGINE_SHADER_DIR,
+        engine_shader_dir(),
         DEFAULT_OUT_DIR,
     )
     .expect("bake");

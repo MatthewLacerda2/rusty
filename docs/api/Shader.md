@@ -9,7 +9,7 @@ The bake **validates the assembled module by composing it through `naga_oil`** �
 **same loader path the engine uses** (`ShaderRegistry`, with `common.wgsl`
 registered) — and **rejects a module that won't compile, writing no file**. So a bad
 shader is caught at authoring time and never ships. On success the module is written
-to the authored-shader workspace (`project/assets/shaders/<name>.wgsl` by default),
+to the authored-shader workspace (`assets/shaders/<name>.wgsl` by default),
 registered by name. A **surface** module is then used by naming it on a material —
 `Material.SetShader(id, "enemy_toon")` or a recipe's `shader` key (see `Material.md`);
 re-baking it in a running session rebuilds it on the next frame. A **ui** module is
@@ -29,7 +29,7 @@ passes, bindings, or render features).
 | `Shader.Blocks` | `(pass)` | the curated blocks for `pass` (`"surface"` \| `"postfx"` \| `"ui"`): `{ {id, desc, params = { {name, default, arity, runtime} }, textures = {slot…}, stage }, … }` — `stage` is `"color"` or `"uv"` |
 
 `recipe` is a table **or** its serialized JSON string (from `Shader.ToJson`, or a
-saved `.json`) — both forms decode alike, with the same errors. `out_dir` defaults to `project/assets/shaders`. Use `Shader.Validate` to
+saved `.json`) — both forms decode alike, with the same errors. `out_dir` defaults to `assets/shaders`. Use `Shader.Validate` to
 compose-check a recipe before committing to a bake, and `Shader.Blocks` to discover
 the catalog rather than guess block ids or params.
 
@@ -286,7 +286,7 @@ texture reads as the linear values its camera shaded.
 Shader.Bake({ pass = "surface", name = "enemy_die",
               blocks = { { id = "dissolve", params = { edge_color = {1, 0.4, 0.1} } } } })
 Material.SetShader(enemy, "enemy_die")
-Material.SetShaderTexture(enemy, "mask", "project/assets/textures/noise.png")
+Material.SetShaderTexture(enemy, "mask", "assets/textures/noise.png")
 -- each frame while dying:
 Material.SetShaderParam(enemy, "dissolve.amount", t)   -- 0 → 1
 ```
@@ -310,7 +310,7 @@ Shader.Bake({
     { id = "toon_ramp", params = { steps = 3.0 } },
     { id = "fresnel_rim", params = { color = {1.0, 0.2, 0.1}, power = 4.0 } },
   },
-})  -- → "project/assets/shaders/enemy_toon.wgsl" (validated, ready to load)
+})  -- → "assets/shaders/enemy_toon.wgsl" (validated, ready to load)
 Material.SetShader(enemy, "enemy_toon")  -- the enemy's material now renders with it
 ```
 

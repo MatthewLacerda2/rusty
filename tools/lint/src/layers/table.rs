@@ -42,7 +42,7 @@ pub const LAYERS: &[Layer] = &[
     sim("asset", &["core"]),
     sim("procgen", &["core"]),
     // Shader authoring; GPU-free composition lives here so `render` imports it (#722).
-    sim("shadergen", &[]),
+    sim("shadergen", &["core"]),
     sim("components", &["asset", "core", "procgen"]),
     sim("ecs", &["components"]),
     // A sim `Resource` stepped by sim time; its device thread never reads a clock.
@@ -106,7 +106,7 @@ pub const LAYERS: &[Layer] = &[
         ],
     ),
     // The platform layer: real time, the GPU, windows and the editor live here.
-    platform("preview", &["asset", "components", "scene"]),
+    platform("preview", &["asset", "components", "core", "scene"]),
     platform(
         "render",
         &[
@@ -167,7 +167,6 @@ pub const LAYERS: &[Layer] = &[
             "render",
             "scene",
             "scripting",
-            "shadergen",
             "time",
         ],
     ),

@@ -18,9 +18,9 @@ use super::{put, Reg};
 use crate::asset::audio::{refresh, Refresh};
 use crate::asset::{build_manifest, AssetEntry, SubObjectEntry};
 
-/// The project asset root the manifest walks — the same `project` tree the content
-/// browser's Sources panel roots at.
-const ASSET_ROOT: &str = "project";
+/// The project asset root the manifest walks — the open project's `assets/`, the
+/// same tree the content browser's Sources panel roots at.
+const ASSET_ROOT: &str = crate::core::project::ASSETS_DIR;
 
 /// Register the `Assets` namespace onto `lua`.
 pub fn register(lua: &Lua) -> Reg {

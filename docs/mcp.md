@@ -73,9 +73,10 @@ cargo run --bin session-mcp --features dev -- --attach          # default socket
 cargo run --bin session-mcp --features dev -- --attach <addr>   # explicit socket
 ```
 
-`--project <dir>` (embed mode) changes the working directory to a project before
-booting, so the engine's relative asset/scene paths resolve against it. It may precede
-any scene form.
+`--project <dir>` (embed mode) opens that game project (README § Game projects): its
+folder becomes the working directory, so the engine's project-relative asset and scene
+paths resolve against it. Without it the bridge opens `./project`. It may sit before
+or after the scene argument, and a scene path is relative to the project root.
 
 `--attach` resolves the **same** socket address the window binds (so they always agree):
 on unix `$RUSTY_CMD_SOCK`, else `$XDG_RUNTIME_DIR/rusty.sock`, else `/tmp/rusty.sock`;

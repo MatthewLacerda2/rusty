@@ -7,7 +7,7 @@ use super::assemble::assemble_with_params;
 use super::params::{ParamLayout, PARAM_SLOTS};
 use super::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use super::validate::validate;
-use super::{bake_recipe, ENGINE_SHADER_DIR};
+use super::{bake_recipe, engine_shader_dir};
 
 fn surface(blocks: &[(&str, &[(&str, ParamValue)])]) -> ShaderRecipe {
     let blocks = blocks
@@ -28,7 +28,7 @@ fn surface(blocks: &[(&str, &[(&str, ParamValue)])]) -> ShaderRecipe {
 }
 
 fn assemble(r: &ShaderRecipe) -> Result<(String, ParamLayout), String> {
-    let base = std::fs::read_to_string(format!("{ENGINE_SHADER_DIR}/shader.wgsl")).unwrap();
+    let base = std::fs::read_to_string(format!("{}/shader.wgsl", engine_shader_dir())).unwrap();
     assemble_with_params(r, &base)
 }
 
@@ -49,7 +49,7 @@ fn runtime_params_read_the_uniform_and_baked_ones_stay_const() {
     );
     assert!(wgsl.contains("@group(2) @binding(6) var<uniform> shader_params"));
     assert!(wgsl.contains("srf_hit_flash(srf_toon_ramp(lighting_color, in, toon_ramp_0_steps), in, shader_params.v[0].xyz, shader_params.v[1].x)"));
-    validate(ENGINE_SHADER_DIR, &wgsl).expect("a runtime-param variant composes");
+    validate(engine_shader_dir(), &wgsl).expect("a runtime-param variant composes");
     assert_eq!(layout.names(), ["hit_flash.color", "hit_flash.amount"]);
     assert_eq!(
         layout.params[0].default,
@@ -128,7 +128,7 @@ fn a_surface_bake_writes_the_layout_beside_the_module() {
     let out = dir.to_str().unwrap();
     let mut r = surface(&[("hit_flash", &[])]);
     r.name = "flash".into();
-    let path = bake_recipe(&r, ENGINE_SHADER_DIR, out).unwrap();
+    let path = bake_recipe(&r, engine_shader_dir(), out).unwrap();
     let layout = ParamLayout::read_beside(std::path::Path::new(&path)).unwrap();
     assert_eq!(layout.names(), ["hit_flash.color", "hit_flash.amount"]);
     // A module with no sidecar (baked before #399) has no runtime params.

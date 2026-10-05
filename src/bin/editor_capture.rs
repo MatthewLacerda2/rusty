@@ -6,10 +6,12 @@
 //!   make editor-capture OUT=before.png ARGS="--select Player"
 //!
 //! Options (all optional):
-//!   --out <png>         where to write (default `editor-capture.png`)
-//!   --scene <path>      a `.scene` file to open (default: the built-in default scene)
+//!   --project <dir>     the game project to open (default `./project`, #829)
+//!   --out <png>         where to write, from the launch directory
+//!                       (default `editor-capture.png`)
+//!   --scene <path>      a `.scene` file in the project (default: the built-in default)
 //!   --select <name>     select this entity first (the Inspector shows its cards)
-//!   --select-asset <p>  select this asset file first (the Inspector shows its card)
+//!   --select-asset <p>  an asset file in the project to select first (its card)
 //!   --frame             frame the selection in the Scene view (the F key)
 //!   --play              draw the Play-mode chrome (the sim is not stepped)
 //!   --game              show the Game tab instead of the Scene tab
@@ -26,8 +28,13 @@ use rusty::editor::ViewportTab;
 use rusty::shell::editor::capture::{self, EditorCaptureOptions};
 
 fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let mut args: Vec<String> = std::env::args().skip(1).collect();
+    let project = rusty::core::project::take_flag(&mut args).unwrap_or_else(|e| fail(&e));
     let (out, scene, opts) = parse(&args).unwrap_or_else(|e| fail(&e));
+    // `--out` is named from the launch directory; opening the project moves it.
+    let out = std::path::absolute(&out).map_or(out, |p| p.to_string_lossy().into_owned());
+    let opened = rusty::core::project::open(&rusty::core::project::locate(project));
+    opened.unwrap_or_else(|e| fail(&e));
     let written = match scene {
         Some(path) => {
             let session = Session::new(&path).unwrap_or_else(|e| fail(&e));

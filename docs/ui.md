@@ -248,9 +248,9 @@ the author typed silently vanishes. There is no layout engine beyond that.
 
 **Fonts.** `.ttf` / `.otf` files referenced by path, parsed with `ab_glyph` and cached
 for the process; a path that does not load falls back to the default with one
-warning. The bundled default is **Instrument Sans** (`assets/fonts/`), under the SIL
+warning. The bundled default is **Instrument Sans** (`engine/fonts/`), under the SIL
 Open Font License 1.1 — its license text ships beside it
-(`assets/fonts/InstrumentSans-OFL.txt`) and must travel with any build that includes
+(`engine/fonts/InstrumentSans-OFL.txt`) and must travel with any build that includes
 the font. `cargo deny` checks crate licenses, not assets, so keep font licenses here.
 
 **Shaping: kerning only (Latin).** Glyphs map one-to-one from characters and pairs
@@ -617,11 +617,11 @@ by editing its components or forks its behaviour by copying its script.
   Text and each widget) and `UI.Create(kind, [parent])` build the same tree through
   one path (`scene::authoring::ui_widgets`): under the selected entity when it is
   inside a canvas, else under the scene's first root canvas, else under a new
-  `Canvas`. Every widget also ships as a prefab, `project/prefabs/ui/<Kind>.prefab`
+  `Canvas`. Every widget also ships as a prefab, `assets/prefabs/ui/<Kind>.prefab`
   (`Button.prefab`, `Scroll View.prefab`, …), for `Scene.Instantiate(path, parent)`.
-- **Where they live.** The scripts ship in `assets/scripts/ui/` and are seeded,
-  with the prefabs, on every boot into `project/assets/scripts/ui/` and
-  `project/prefabs/ui/`. **Those two directories are engine-owned and rewritten**
+- **Where they live.** The scripts ship in `engine/scripts/ui/` and are seeded,
+  with the prefabs, on every boot into `assets/scripts/ui/` and
+  `assets/prefabs/ui/`. **Those two directories are engine-owned and rewritten**
   so they never go stale: to fork a widget, copy its script (or prefab) elsewhere
   and point the entity at the copy.
 - **Wiring one up.** A widget raises its events by calling function fields its

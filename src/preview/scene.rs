@@ -24,9 +24,11 @@ use crate::scene::authoring::{self, Primitive};
 use crate::scene::{LightComponent, LightType, Scene};
 
 /// The bundled preview mesh (#352): a hardcoded `.obj`, never a project asset — it
-/// lives in the engine's own `assets/` tree (unlike `project/assets/`, which is all
-/// the Content Browser scans), so it never shows up as a browsable asset.
-pub const SUZANNE_PATH: &str = "assets/models/suzanne.obj";
+/// lives in the engine's own content (`engine/`, found from any project), never in
+/// the project's `assets/` the Content Browser scans, so it is never browsable.
+pub fn suzanne_path() -> String {
+    crate::core::project::engine_path("models/suzanne.obj")
+}
 
 /// Which mesh the Preview tab shows the subject on (models render as themselves
 /// instead — see [`PreviewSubject::Model`]).
@@ -161,14 +163,14 @@ fn spawn_preview_mesh(scene: &mut Scene, mesh: PreviewMesh) -> u32 {
 /// inspector's "Instantiate into Scene" button uses (#352 leans on existing plumbing
 /// rather than a bespoke embedded-mesh loader).
 fn spawn_suzanne(scene: &mut Scene) -> u32 {
-    let asset = match asset::import_and_sync_sidecar(Path::new(SUZANNE_PATH)) {
+    let asset = match asset::import_and_sync_sidecar(Path::new(&suzanne_path())) {
         Ok(a) => a,
         Err(_) => return authoring::create_entity(scene, "PreviewMesh", Some(Primitive::Sphere)),
     };
     let Some(sub) = asset.sub_meshes.first() else {
         return authoring::create_entity(scene, "PreviewMesh", Some(Primitive::Sphere));
     };
-    let reference = format!("{SUZANNE_PATH}{}{}", asset::REF_SEPARATOR, sub.id);
+    let reference = format!("{}{}{}", suzanne_path(), asset::REF_SEPARATOR, sub.id);
     authoring::instantiate_asset(
         scene,
         &reference,

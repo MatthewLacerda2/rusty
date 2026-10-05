@@ -1,6 +1,6 @@
 //! src/scene/default_scene/ — the default scene, built in Rust (#667).
 //!
-//! The ONE layout the editor seeds into `project/scenes/default.scene` on first
+//! The ONE layout the editor seeds into `assets/scenes/default.scene` on first
 //! launch and the headless harness plays, so what an agent tests is what the user
 //! sees. A scene this small (a few primitives, a light, two scripts) gains nothing
 //! from being a data file, and as code it moves with the engine instead of rotting.
@@ -18,13 +18,13 @@
 //! paths **around** it.
 //!
 //! The straight line from the Player to Enemy_1 stays walkable and clear up to 4 m
-//! from the enemy: the bot-player (`project/scripts/bot_player.lua`) walks it with
+//! from the enemy: the bot-player (`assets/scripts/bot_player.lua`) walks it with
 //! no pathing, down one ramp, across the bottom and up the other.
 //!
 //! Submodules: `layout` (every measurement, shared with the tests), `yard` (deck,
 //! walls, crates), `pool` (pool, ramps, water, jacuzzi), `looks` (materials, the
 //! checker recipe, the default shader recipe), `seed` (bakes those into
-//! `project/assets/` — the only I/O here).
+//! `assets/` — the only I/O here).
 
 pub mod layout;
 mod looks;
@@ -44,9 +44,9 @@ pub use looks::{checker_recipe, shader_recipe, CHECKER_MAP, SHADER_NAME};
 pub use seed::{seed_default_assets, seed_default_assets_into};
 
 /// The bundled player brain (movement + camera + weapon), attached to the Player.
-pub const PLAYER_CONTROLLER_SCRIPT: &str = "project/assets/scripts/player_controller.lua";
+pub const PLAYER_CONTROLLER_SCRIPT: &str = "assets/scripts/player_controller.lua";
 /// The bundled enemy brain the editor's default scene attaches to Enemy_1.
-pub const BOT_SCRIPT: &str = "project/assets/scripts/bot.lua";
+pub const BOT_SCRIPT: &str = "assets/scripts/bot.lua";
 /// How far from the Player (centre to centre) Enemy_1 stops: its 0.65 m half-width
 /// plus the Player's 0.5 m radius plus clearance, so the two never overlap (#743).
 pub const ENEMY_STOPPING_DISTANCE: f32 = 1.5;

@@ -56,12 +56,16 @@ pub use recipe::{BlockSel, PassKind, ShaderRecipe};
 
 /// The engine's committed shader set — read-only at bake time: it supplies the
 /// surface base (`shader.wgsl`) and the `common` module a bake validates against.
-pub const ENGINE_SHADER_DIR: &str = "assets/shaders";
+/// Absolute, so it resolves from any project (#829): see `core::project::engine_dir`.
+pub fn engine_shader_dir() -> &'static str {
+    static DIR: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    DIR.get_or_init(|| crate::core::project::engine_path("shaders"))
+}
 
-/// The default output dir for authored shaders: the gitignored project workspace,
-/// the same pattern as authored textures/scripts. A material naming a baked surface
-/// variant renders with it (#396); bakes never touch the committed engine set.
-pub const DEFAULT_OUT_DIR: &str = "project/assets/shaders";
+/// The default output dir for authored shaders, relative to the project root: the
+/// same pattern as authored textures/scripts. A material naming a baked surface
+/// variant renders with it (#396); bakes never touch the engine's set.
+pub const DEFAULT_OUT_DIR: &str = "assets/shaders";
 
 #[cfg(test)]
 mod gameplay_tests;

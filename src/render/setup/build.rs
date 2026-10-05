@@ -85,7 +85,7 @@ impl GpuResources {
     /// per-view targets (depth + post-FX chain) are no longer built here — each
     /// [`crate::render::RenderView`] owns its own (#355).
     pub(crate) fn build(device: &wgpu::Device, queue: &wgpu::Queue) -> Self {
-        let mut registry = ShaderRegistry::new("assets/shaders");
+        let mut registry = ShaderRegistry::new(crate::shadergen::engine_shader_dir());
         let camera_lighting_layout = bind_layouts::create_camera_lighting_layout(device);
         let entity_bones_layout = bind_layouts::create_entity_bones_layout(device);
         let textures = create_textures(device, queue);

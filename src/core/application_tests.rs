@@ -33,7 +33,7 @@ fn malformed_file_is_an_error() {
 #[test]
 fn json_roundtrips() {
     let b = BuildSettings {
-        startup_scene: "project/scenes/menu.scene".into(),
+        startup_scene: "assets/scenes/menu.scene".into(),
         product_name: "Neon".into(),
         window_mode: WindowMode::Fullscreen,
     };

@@ -1,7 +1,7 @@
 //! src/core/paths.rs — paths relative to a workspace root (#782, #783).
 //!
-//! A scene names its scripts by paths relative to the workspace root (the directory
-//! holding `project/`), written with `/` on every OS, so a scene saved on one
+//! A scene names its scripts by paths relative to the project root (#829, the
+//! working directory once `core::project::open` ran), written with `/` on every OS, so a scene saved on one
 //! machine — or by one test run — names the same files on the next. These helpers
 //! turn an absolute path under a root back into that form.
 

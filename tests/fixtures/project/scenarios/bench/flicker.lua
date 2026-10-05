@@ -1,4 +1,4 @@
--- project/scenarios/bench/flicker.lua — a light that flickers like a muzzle flash (#835).
+-- tests/fixtures/project/scenarios/bench/flicker.lua — a light that flickers like a muzzle flash (#835).
 --
 -- Bursts of a few frames at four times its intensity, then dark, at seeded
 -- intervals: automatic fire, as far as the lighting is concerned.

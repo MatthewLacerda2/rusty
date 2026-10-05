@@ -15,7 +15,7 @@ pub mod orbit;
 pub mod scene;
 
 pub use orbit::OrbitState;
-pub use scene::{build_preview_scene, PreviewMesh, PreviewSubject, SUZANNE_PATH};
+pub use scene::{build_preview_scene, suzanne_path, PreviewMesh, PreviewSubject};
 
 /// The preview subject for a file extension, or `None` for a kind with no preview
 /// story (audio/scene/prefab/lua/unsupported). The single dispatch table both

@@ -1,7 +1,8 @@
--- project/scenarios/play_session.lua — drive a full bot-played session, headless.
+-- scenarios/play_session.lua — drive a full bot-played session, headless.
 --
 -- Run it with:
---   cargo run --bin play --features dev -- project/scenarios/play_session.lua out/
+--   cargo run --bin play --features dev -- --project tests/fixtures/project \
+--       tests/fixtures/project/scenarios/play_session.lua out/
 --
 -- This is the issue-#10 end-to-end agentic loop: attach the DEV-ONLY bot-player to the
 -- Player, let it play the demo match on its own (navigate -> aim -> close on the enemy),
@@ -21,7 +22,7 @@ Harness.Expect(enemy ~= nil, "demo scene has an Enemy_1 entity")
 
 -- Wire the bot onto the Player BEFORE the first Step: scripts load when the world
 -- enters play mode on the first tick.
-local attached = Harness.AttachPlayerBot("project/scripts/bot_player.lua")
+local attached = Harness.AttachPlayerBot("assets/scripts/bot_player.lua")
 Harness.Expect(attached, "bot_player.lua attached to the Player")
 
 -- Ground-plane distance between the Player and the enemy.

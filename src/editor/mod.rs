@@ -142,7 +142,7 @@ impl EditorUi {
             selected_entity_id: None,
             selected_asset_path: None,
             current_scene_path: None,
-            current_dir: "project".to_string(),
+            current_dir: crate::editor::content_browser::ROOT.to_string(),
             is_dirty: true,
             assets_scripts: Vec::new(),
             assets_textures: Vec::new(),
@@ -222,7 +222,7 @@ impl EditorUi {
         self.assets_textures.clear();
 
         // Scan scripts
-        if let Ok(entries) = fs::read_dir("project/assets/scripts") {
+        if let Ok(entries) = fs::read_dir("assets/scripts") {
             for entry in entries.flatten() {
                 if let Some(path_str) = entry.path().to_str() {
                     if path_str.ends_with(".lua") {
@@ -233,7 +233,7 @@ impl EditorUi {
         }
 
         // Scan textures
-        if let Ok(entries) = fs::read_dir("project/assets/textures") {
+        if let Ok(entries) = fs::read_dir("assets/textures") {
             for entry in entries.flatten() {
                 if let Some(path_str) = entry.path().to_str() {
                     let path_lower = path_str.to_lowercase();

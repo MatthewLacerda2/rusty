@@ -38,7 +38,7 @@ use crate::shadergen::assemble::assemble;
 use crate::shadergen::bake::base_source;
 use crate::shadergen::recipe::PassKind;
 use crate::shadergen::validate::validate;
-use crate::shadergen::{bake_recipe, ShaderRecipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
 use from_lua::parse_recipe;
 
 /// Register the `Shader` namespace onto `lua`.
@@ -89,18 +89,18 @@ pub fn register(lua: &Lua) -> Reg {
 
 /// Assemble + validate + write a parsed recipe, surfacing any error to Lua. The
 /// engine shader dir is fixed (read-only base + `common`); `out_dir` defaults to
-/// the project workspace.
+/// the project's `assets/shaders`.
 fn bake(recipe: &ShaderRecipe, out_dir: Option<String>) -> mlua::Result<String> {
     let out = out_dir.as_deref().unwrap_or(DEFAULT_OUT_DIR);
-    bake_recipe(recipe, ENGINE_SHADER_DIR, out)
+    bake_recipe(recipe, engine_shader_dir(), out)
         .map_err(|e| mlua::Error::RuntimeError(e.to_string()))
 }
 
 /// Assemble + compose-check a recipe without writing; returns the entry points.
 fn dry_run(recipe: &ShaderRecipe) -> Result<Vec<String>, String> {
-    let base = base_source(recipe.pass, ENGINE_SHADER_DIR)?;
+    let base = base_source(recipe.pass, engine_shader_dir())?;
     let module = assemble(recipe, &base)?;
-    validate(ENGINE_SHADER_DIR, &module)
+    validate(engine_shader_dir(), &module)
 }
 
 /// Parse a pass tag from Lua (`"surface"` | `"postfx"` | `"ui"`).

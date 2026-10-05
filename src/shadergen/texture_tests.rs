@@ -8,7 +8,7 @@ use super::assemble::assemble;
 use super::recipe::{BlockSel, PassKind, ShaderRecipe};
 use super::validate::validate;
 
-const ENGINE_SHADERS: &str = "assets/shaders";
+const ENGINE_SHADERS: &str = "engine/shaders";
 const MASK_DECL: &str = "@group(2) @binding(7) var t_mask: texture_2d<f32>;";
 
 fn surface(ids: &[&str]) -> String {

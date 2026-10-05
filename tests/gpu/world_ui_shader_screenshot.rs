@@ -5,7 +5,7 @@
 use glam::{Vec2, Vec4};
 use rusty::components::{CanvasComponent, CanvasRenderMode, RectMaskComponent, UiShader};
 use rusty::shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
-use rusty::shadergen::{bake_recipe, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use rusty::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
 use super::world_ui_scene::{canvas, dark_scene, dominant, fill, image};
 use super::world_ui_screenshot::shot;
@@ -26,7 +26,7 @@ impl Holo {
                 params: params.into_iter().collect(),
             }],
         };
-        bake_recipe(&recipe, ENGINE_SHADER_DIR, DEFAULT_OUT_DIR).expect("ui bake");
+        bake_recipe(&recipe, engine_shader_dir(), DEFAULT_OUT_DIR).expect("ui bake");
         Self(name)
     }
 }

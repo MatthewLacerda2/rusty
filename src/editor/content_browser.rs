@@ -11,7 +11,8 @@ use crate::editor::EditorUi;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
-pub(crate) const ROOT: &str = "project";
+/// The project folder the browser roots at: its `assets/` (Unity's Project window).
+pub(crate) const ROOT: &str = crate::core::project::ASSETS_DIR;
 
 /// Entry point: breadcrumb + search, then the split tree / grid view.
 pub fn draw(

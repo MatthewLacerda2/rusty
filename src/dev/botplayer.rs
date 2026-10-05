@@ -5,14 +5,14 @@
 //! its Update() — i.e. it presses the same keys a human would. Run it headless via
 //! the harness at max speed and read the summary (won/lost, time, errors).
 //!
-//! The actual bots live in `project/scripts/*.lua`, like any other script. This file
+//! The actual bots live in `assets/scripts/*.lua`, like any other script. This file
 //! only documents the pattern and hosts the small shared helpers the harness needs to
 //! wire a bot onto the Player at run time.
 
 use crate::scene::{Scene, ScriptComponent};
 
 /// Canonical path to the example bot-player script (attached to the Player).
-pub const PLAYER_BOT_SCRIPT: &str = "project/scripts/bot_player.lua";
+pub const PLAYER_BOT_SCRIPT: &str = "assets/scripts/bot_player.lua";
 
 /// Attach a bot-player script to the entity named `Player` in `scene`.
 ///

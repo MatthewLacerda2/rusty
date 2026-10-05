@@ -93,7 +93,7 @@ asset of that name.
 Instead of baking each map with `Texture.Bake`/`Texture.BakeSet` and passing the
 paths, give the material its **multi-output texture recipe** as `maps` (the same
 document `Texture.BakeSet` takes, `outputs` and all). `DefineAsset` bakes it once to
-`project/assets/textures/<name>_<slot>.png` and fills the matching map keys (the
+`assets/textures/<name>_<slot>.png` and fills the matching map keys (the
 `Texture.BakeSet` result table in `Texture.md` lists which slot fills which key —
 `metallic_roughness` fills both `metallic_map` and `roughness_map`):
 
@@ -167,12 +167,12 @@ visible fallback.
 
 > **Starter materials.** The engine ships a small ready-to-go set so a new scene has
 > sane PBR values to grab instead of starting from raw factors. They live as an
-> ordinary glTF asset at `project/materials/starter.gltf` — **no special-casing**: it
+> ordinary glTF asset at `assets/materials/starter.gltf` — **no special-casing**: it
 > is discovered by `Assets.Manifest()` and imported through the same path as any user
 > model. The four materials are `Matte` (rough dielectric), `Metal` (polished
 > conductor), `Plastic` (smooth coloured dielectric), and `Emissive` (a glowing
 > dielectric). Instantiating the file populates the library with keys
-> `project/materials/starter.gltf::Matte` (and so on for `Metal` / `Plastic` /
+> `assets/materials/starter.gltf::Matte` (and so on for `Metal` / `Plastic` /
 > `Emissive`); point any entity's `MaterialComponent` at one of those keys to reuse it,
 > or copy its factors as the starting point for your own. No external textures — the
 > factors stand alone, so the set stays tiny and license-clean.
@@ -201,8 +201,8 @@ Both are written to the scene file only when they differ from their defaults.
 
 A material **names the shader it renders with** — Unity's Material → Shader. The
 name is a surface module baked by `Shader.Bake` (see `Shader.md`): `"enemy_toon"`
-resolves to `project/assets/shaders/enemy_toon.wgsl` (where bakes land), else
-`assets/shaders/enemy_toon.wgsl`. No name (the default) is the standard forward
+resolves to the project's `assets/shaders/enemy_toon.wgsl` (where bakes land), else
+the engine's `engine/shaders/enemy_toon.wgsl`. No name (the default) is the standard forward
 shader.
 
 ```lua
@@ -285,7 +285,7 @@ noise for `dissolve`, a grime map for `detail_overlay` (see `Shader.md`, *Extra
 textures*): Unity's `material.SetTexture("_Mask", …)`.
 
 ```lua
-Material.SetShaderTexture(enemy, "mask", "project/assets/textures/noise.png")
+Material.SetShaderTexture(enemy, "mask", "assets/textures/noise.png")
 -- or in a recipe:
 Material.DefineAsset("enemy_die", { shader = "enemy_die",
                                     shader_textures = { mask = "noise.png" } })

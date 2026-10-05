@@ -96,7 +96,7 @@ fn scene_has_no_baked_skybox_and_one_directional_light() {
 fn texture_subject_sets_base_color_map() {
     let scene = build_preview_scene(
         PreviewMesh::Sphere,
-        &PreviewSubject::Texture("project/assets/textures/rock.png".to_string()),
+        &PreviewSubject::Texture("assets/textures/rock.png".to_string()),
     );
     let material = scene
         .materials
@@ -104,7 +104,7 @@ fn texture_subject_sets_base_color_map() {
         .expect("material attached");
     assert_eq!(
         material.base_color_map.as_deref(),
-        Some("project/assets/textures/rock.png")
+        Some("assets/textures/rock.png")
     );
 }
 

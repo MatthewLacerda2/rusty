@@ -1,6 +1,6 @@
 //! The editor's typefaces (#668): Inter for the UI, JetBrains Mono for the console
 //! and code, Phosphor for icons. All three are embedded, so the editor looks the
-//! same on every machine. Licences sit next to the files in `assets/fonts/`.
+//! same on every machine. Licences sit next to the files in `engine/fonts/`.
 //!
 //! The Inter files carry no Private Use Area codepoints (#333): Inter maps hundreds,
 //! and since Phosphor 2.1 (egui-phosphor 0.6+) the icons sit in that same range, so
@@ -9,9 +9,9 @@
 
 use egui::{Context, FontData, FontDefinitions, FontFamily, FontId};
 
-const INTER: &[u8] = include_bytes!("../../../assets/fonts/Inter-Regular.ttf");
-const INTER_SEMIBOLD: &[u8] = include_bytes!("../../../assets/fonts/Inter-SemiBold.ttf");
-const JETBRAINS_MONO: &[u8] = include_bytes!("../../../assets/fonts/JetBrainsMono-Regular.ttf");
+const INTER: &[u8] = include_bytes!("../../../engine/fonts/Inter-Regular.ttf");
+const INTER_SEMIBOLD: &[u8] = include_bytes!("../../../engine/fonts/Inter-SemiBold.ttf");
+const JETBRAINS_MONO: &[u8] = include_bytes!("../../../engine/fonts/JetBrainsMono-Regular.ttf");
 
 /// The family name of Inter SemiBold, used for panel titles and card headers.
 const SEMIBOLD: &str = "inter-semibold";

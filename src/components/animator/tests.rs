@@ -169,8 +169,8 @@ fn graph_reference_defaults_to_none_and_round_trips_by_path() {
     assert!(!serde_json::to_string(&anim).unwrap().contains("graph"));
 
     let mut anim = idle();
-    anim.graph = Some("project/anims/guard.animgraph".to_string());
+    anim.graph = Some("assets/anims/guard.animgraph".to_string());
     let json = serde_json::to_string(&anim).unwrap();
     let back: AnimatorComponent = serde_json::from_str(&json).unwrap();
-    assert_eq!(back.graph.as_deref(), Some("project/anims/guard.animgraph"));
+    assert_eq!(back.graph.as_deref(), Some("assets/anims/guard.animgraph"));
 }

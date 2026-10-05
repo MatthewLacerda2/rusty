@@ -7,6 +7,7 @@ pub mod gamepad;
 pub mod input;
 pub mod keymap;
 pub mod paths;
+pub mod project;
 pub mod quality;
 pub mod random;
 pub mod storage;

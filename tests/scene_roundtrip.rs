@@ -99,7 +99,7 @@ fn legacy_single_script_scene_loads_into_scripts_vec() {
         .scripts_mut(id)
         .unwrap()
         .push(rusty::scene::ScriptComponent {
-            path: "project/assets/scripts/bot.lua".to_string(),
+            path: "assets/scripts/bot.lua".to_string(),
             is_loaded: false,
             ..Default::default()
         });
@@ -121,7 +121,7 @@ fn legacy_single_script_scene_loads_into_scripts_vec() {
     loaded.load_from_file(&path).unwrap();
     let scripts = loaded.world.scripts(id).unwrap();
     assert_eq!(scripts.len(), 1);
-    assert_eq!(scripts[0].path, "project/assets/scripts/bot.lua");
+    assert_eq!(scripts[0].path, "assets/scripts/bot.lua");
 }
 
 #[test]

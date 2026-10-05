@@ -106,8 +106,8 @@ pub struct MaterialAsset {
     #[serde(default = "default_alpha_cutoff")]
     pub alpha_cutoff: f32,
     /// The authored surface shader this material renders with (#396): a module name
-    /// resolved as `<name>.wgsl` in `project/assets/shaders` (where `Shader.Bake`
-    /// writes), then `assets/shaders`. `None` is the standard forward shader.
+    /// resolved as `<name>.wgsl` in `assets/shaders` (where `Shader.Bake`
+    /// writes), then `engine/shaders`. `None` is the standard forward shader.
     /// `#[serde(default)]`, so pre-#396 scenes load unchanged.
     #[serde(default)]
     pub shader: Option<String>,

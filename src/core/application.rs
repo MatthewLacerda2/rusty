@@ -28,11 +28,11 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 /// The tracked project file the build settings live in.
-pub const BUILD_SETTINGS_PATH: &str = "project/build_settings.json";
+pub const BUILD_SETTINGS_PATH: &str = "build_settings.json";
 
 /// The startup scene when none is configured: the seeded demo scene. Kept equal to
 /// `scene::DEFAULT_SCENE_PATH` (a unit test pins it) without `core` importing `scene`.
-pub const DEFAULT_STARTUP_SCENE: &str = "project/scenes/default.scene";
+pub const DEFAULT_STARTUP_SCENE: &str = "assets/scenes/default.scene";
 
 /// The product name when none is configured.
 pub const DEFAULT_PRODUCT_NAME: &str = "rusty game";

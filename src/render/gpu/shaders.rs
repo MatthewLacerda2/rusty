@@ -25,7 +25,7 @@ pub struct ShaderRegistry {
 }
 
 impl ShaderRegistry {
-    /// Build a registry rooted at `base` (e.g. `"assets/shaders"`).
+    /// Build a registry rooted at `base` (e.g. `"engine/shaders"`).
     /// Reads and registers `<base>/common.wgsl` as the `"common"` module.
     ///
     /// # Panics
@@ -91,7 +91,7 @@ mod tests {
     /// CI — the GPU screenshot test only exercises this path on macOS/Windows.
     #[test]
     fn all_shaders_compose() {
-        let mut registry = ShaderRegistry::new("assets/shaders");
+        let mut registry = ShaderRegistry::new("engine/shaders");
         for name in SHIPPED {
             let module = registry.compose(name);
             assert!(
@@ -106,10 +106,10 @@ mod tests {
     /// composed entry points, and a module one rejects the other rejects too.
     #[test]
     fn bake_validation_and_load_compose_identically() {
-        let mut registry = ShaderRegistry::new("assets/shaders");
+        let mut registry = ShaderRegistry::new("engine/shaders");
         for name in SHIPPED {
-            let source = std::fs::read_to_string(format!("assets/shaders/{name}")).unwrap();
-            let baked = validate("assets/shaders", &source).expect("bake validates");
+            let source = std::fs::read_to_string(format!("engine/shaders/{name}")).unwrap();
+            let baked = validate("engine/shaders", &source).expect("bake validates");
             let loaded: Vec<String> = registry
                 .compose(name)
                 .entry_points
@@ -121,7 +121,7 @@ mod tests {
 
         let dir = std::env::temp_dir().join(format!("rusty-722-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::copy("assets/shaders/common.wgsl", dir.join("common.wgsl")).unwrap();
+        std::fs::copy("engine/shaders/common.wgsl", dir.join("common.wgsl")).unwrap();
         // Names a `common` struct that does not exist: naga rejects the unknown type.
         let bad = "#import common::{CameraUniforms}\n\
             @group(0) @binding(0) var<uniform> camera: NoSuchStruct;\n\

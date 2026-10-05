@@ -1,7 +1,7 @@
 ## `Storage`
 
 A namespaced, JSON-backed key-value store that survives across runs — the engine's
-PlayerPrefs analog, backed by `project/storage.json` (human-readable so an agent can
+PlayerPrefs analog, backed by the project's `saved/storage.json` (human-readable so an agent can
 diff a save in a PR). A value may be a scalar **or** a structured table.
 
 | Function | Signature | Returns |

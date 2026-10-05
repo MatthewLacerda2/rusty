@@ -1,6 +1,6 @@
 //! src/dev/bench/ — measure before optimising (#835).
 //!
-//! `make bench` runs `project/scenarios/bench/bench.lua`: it loads the
+//! `make bench` runs `tests/fixtures/project/scenarios/bench/bench.lua`: it loads the
 //! shooter-shaped stress scene ([`stress`]) onto the default yard, warms up, then
 //! `Harness.Bench(n)` steps and renders `n` frames, sampling each one, and prints
 //! a short report — frame, render and GPU ms (average and p95), GPU ms per pass,

@@ -9,7 +9,7 @@ use super::assemble::assemble;
 use super::recipe::{BlockSel, PassKind, ShaderRecipe};
 use super::validate::validate;
 
-const ENGINE_SHADERS: &str = "assets/shaders";
+const ENGINE_SHADERS: &str = "engine/shaders";
 
 fn recipe(pass: PassKind, ids: &[&str]) -> ShaderRecipe {
     ShaderRecipe {

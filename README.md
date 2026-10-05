@@ -82,7 +82,7 @@ the game for you, and only open a window when you want to.
 - `cargo run` — the editor.
 - `cargo run --bin player` — the standalone player: the project's startup scene,
   straight into Play, full-window, no editor (see *Shipping a build* below).
-- `cargo run --bin play --features dev -- <scenario.lua> <out_dir>` — the headless
+- `cargo run --bin play --features dev -- [--project <dir>] <scenario.lua> <out_dir>` — the headless
   harness; writes `results.json` + `console.log` (and any screenshots) to `<out_dir>`.
 - `make editor-capture OUT=editor.png` — the editor over the default scene, headless,
   to a PNG (see [`docs/testing.md`](docs/testing.md) § Editor captures).
@@ -90,14 +90,50 @@ the game for you, and only open a window when you want to.
   Code over MCP (see [`docs/mcp.md`](docs/mcp.md)).
 - `cargo doc --no-deps` — the Rust API reference.
 
-The first launch seeds a **default scene** into `project/scenes/default.scene`: a
+## Game projects
+
+A game is a **project folder** that lives anywhere — its own directory, its own git
+repo — and the engine opens it, the way Unity opens a project folder. Every binary
+takes `--project <dir>`:
+
+```sh
+cargo run -- --project ~/games/horde            # the editor
+cargo run --bin player -- --project ~/games/horde
+cargo run --bin play --features dev -- --project ~/games/horde \
+    ~/games/horde/scenarios/smoke.lua out/
+```
+
+Without `--project` a binary opens `./project` (created if missing). Opening a folder
+that doesn't exist yet creates it: that is *New Project*. The engine writes the
+folder and nothing else — no `git init`; version control is yours. A project looks
+like Unity's and Unreal's:
+
+```text
+<project>/
+  assets/              the game: scenes/, scripts/, prefabs/, models/, textures/,
+                       audio/, materials/, shaders/ (Unity's Assets/)
+  build_settings.json  startup scene, product name, window mode
+  scenarios/           headless play-test scenarios (optional)
+  cache/  saved/       regenerable output and save data; each ignores itself in git
+```
+
+Every path the project stores — a scene's scripts and meshes, the startup scene —
+is relative to the project root (`assets/scripts/bot.lua`), so the folder can move
+or be cloned anywhere. A project made before this layout (the old `./project`
+folder, paths starting `project/`) is migrated once, the first time it is opened.
+The engine's own content (shaders, the bundled scripts) is not part of a project:
+it ships with the engine (`engine/`), and the scripts and starter materials are
+seeded into each project from the binary.
+
+The first launch seeds a **default scene** into `assets/scenes/default.scene`: a
 greybox of fy_pool_day, built from boxes and planes — a walled yard with a sunken pool
 between two spawns (a ramp at each end, translucent water you walk through), a raised
 jacuzzi you jump into, and crates for cover. The Player starts at one end, and Enemy_1
 starts behind a crate at the other and chases it down one ramp and up the other.
-Seeding also bakes the scene's checker texture (`project/assets/textures/`) and an
-example surface shader, `default_rim`, with its recipe (`project/assets/shaders/`). Files that already exist are never overwritten.
-To get the current default scene back, delete `project/scenes/default.scene`.
+Seeding also bakes the scene's checker texture (`assets/textures/`) and an
+example surface shader, `default_rim`, with its recipe (`assets/shaders/`). Files you
+edited are never overwritten. To get the current default scene back, delete
+`assets/scenes/default.scene` (or use File ▸ Reset Scene).
 
 ## Shipping a build
 
@@ -109,15 +145,24 @@ cargo build --release --bin player --no-default-features
 
 `--no-default-features` drops the `editor` feature, so egui and the editor UI are not
 compiled in (and `dev` is off, so neither is the harness or console). The player
-reads `project/build_settings.json` — the startup scene, the product name (window
+reads its project's `build_settings.json` — the startup scene, the product name (window
 title) and the first-launch window mode — which you edit in the editor under
 **File → Build Settings** or from a script through the `Application` namespace. It
 boots that scene straight into Play and exits when the game calls
 `Application.Quit()` (a main-menu Quit button) or the window closes, saving
 `Storage` on the way out.
 
-The binary expects the project folder (`project/`, `assets/`) beside it, as it is in
-the repository. Packaging those assets and building installers is not covered yet.
+A shipped game is laid out with its project and the engine's content beside the
+binary; the player finds both from wherever it is launched:
+
+```text
+MyGame/                       MyGame.app/Contents/
+  player                        MacOS/player
+  engine/   (from rusty)        Resources/engine/
+  project/  (the game)          Resources/project/
+```
+
+`--project <dir>` still overrides. Packaging and installers are not covered yet.
 
 For the engine's architecture and the conventions agents follow, see
 [`CLAUDE.md`](CLAUDE.md); for the commit gate, testing, and the Lua scripting API, see

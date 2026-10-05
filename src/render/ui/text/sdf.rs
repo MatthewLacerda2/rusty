@@ -191,7 +191,7 @@ mod tests {
 
     #[test]
     fn the_shader_decodes_with_the_same_spread() {
-        let wgsl = include_str!("../../../../assets/shaders/ui.wgsl");
+        let wgsl = include_str!("../../../../engine/shaders/ui.wgsl");
         assert!(wgsl.contains(&format!("const SPREAD: f32 = {SPREAD:.1};")));
     }
 

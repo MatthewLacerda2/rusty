@@ -117,9 +117,6 @@ fn play_is_checked_before_the_key() {
 }
 
 #[test]
-fn the_ledger_lives_in_the_project_folder() {
-    assert_eq!(
-        ledger::path(),
-        PathBuf::from("project/provider_budget.json")
-    );
+fn the_ledger_lives_at_the_project_root() {
+    assert_eq!(ledger::path(), PathBuf::from("provider_budget.json"));
 }

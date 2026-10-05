@@ -27,7 +27,7 @@ use naga_oil::compose::Composer;
 
 use super::{PfxTarget, PostFx};
 use crate::shadergen::params::{PackedParams, ParamLayout};
-use crate::shadergen::{bake_generation, compose, DEFAULT_OUT_DIR, ENGINE_SHADER_DIR};
+use crate::shadergen::{bake_generation, compose, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// One loaded authored effect: its pipeline, its runtime-param layout, and the
 /// uniform buffer + group-1 bind group that layout is packed into.
@@ -172,7 +172,7 @@ impl EffectCache {
         let source = std::fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
         let composer = match &mut self.composer {
             Some(c) => c,
-            slot => slot.insert(compose::composer_with_common(ENGINE_SHADER_DIR)?),
+            slot => slot.insert(compose::composer_with_common(engine_shader_dir())?),
         };
         let module = compose::compose(composer, &source, &path)
             .map_err(|e| format!("{path} failed to compose: {e}"))?;

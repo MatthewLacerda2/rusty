@@ -11,10 +11,11 @@
 //!
 //! Default scene (there is always at least one):
 //!   - Built in Rust by `scene::default_scene::build` (#667).
-//!   - Seeded into  project/scenes/  on boot with the bundled scripts, because
-//!     /project/ is the gitignored runtime workspace (`seed`, through the seed
-//!     `manifest` so unedited files follow engine fixes, #746).
+//!   - Seeded into the project's `assets/scenes/` on boot with the bundled scripts
+//!     (`seed`, through the seed `manifest` so unedited files follow engine fixes,
+//!     #746; the seeds are embedded in the binary, `bundled`, #829).
 
+pub mod bundled;
 mod manifest;
 mod seed;
 
@@ -23,7 +24,7 @@ use std::path::Path;
 pub use manifest::{SeedManifest, SeedOutcome, SEED_MANIFEST_PATH};
 pub use seed::{
     build_default_scene, seed_default_scene, seed_default_scripts, seed_workspace,
-    DEFAULT_SCENE_PATH, DEFAULT_SCRIPTS_DEST_DIR, DEFAULT_SCRIPTS_SOURCE_DIR,
+    DEFAULT_SCENE_PATH, DEFAULT_SCRIPTS_DEST_DIR,
 };
 
 use crate::scene::serialize::{apply_scene_data, to_scene_data, SceneData};

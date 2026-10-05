@@ -1,5 +1,5 @@
 //! The harness runs a workspace of its own (#782): a stale or edited copy of a
-//! bundled script — what a developer's git-ignored `./project` keeps on purpose —
+//! bundled script — what a developer's project keeps on purpose —
 //! never reaches a test.
 
 use rusty::dev::harness::Harness;
@@ -33,7 +33,7 @@ fn a_stale_player_controller_in_the_workspace_is_replaced_by_the_bundled_one() {
         "the stale copy ran instead of the bundled one"
     );
     assert!(!ran("Error"), "a script failed: {:?}", console.messages);
-    let bundled = std::fs::read("assets/scripts/player_controller.lua").unwrap();
+    let bundled = std::fs::read("engine/scripts/player_controller.lua").unwrap();
     assert_eq!(
         std::fs::read(&planted).unwrap(),
         bundled,

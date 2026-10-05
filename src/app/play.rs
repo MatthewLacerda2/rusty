@@ -3,7 +3,7 @@
 //! Each free function is an engine "system" operating on the `GameWorld`. There is
 //! NO gameplay here: no control scheme, no weapon, no damage constants. The player
 //! controller and the weapon are bundled GAME scripts
-//! (`assets/scripts/player_controller.lua`, `bot.lua`) attached to entities; the
+//! (`engine/scripts/player_controller.lua`, `bot.lua`) attached to entities; the
 //! systems below only run engine logic (nav, physics, scripts, animator). No
 //! system looks an entity up by name (#450): where the play camera starts and what
 //! any entity does are scene and script decisions.

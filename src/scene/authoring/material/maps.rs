@@ -20,7 +20,7 @@ use crate::scene::MaterialAsset;
 
 /// Where `Material.DefineAsset` / `Material.Rebake` write baked maps: the project's
 /// texture workspace, beside hand-made textures.
-pub const MAPS_DIR: &str = "project/assets/textures";
+pub const MAPS_DIR: &str = "assets/textures";
 
 /// Bake `asset`'s maps recipe (named `name`) into `dir` and fill its empty map
 /// fields with the written paths. A material with no recipe is left as is. On

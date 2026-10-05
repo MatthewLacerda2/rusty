@@ -30,7 +30,7 @@ use serde_json::{Map, Value};
 /// Default on-disk location for the windowed app's store (the gitignored runtime
 /// workspace, alongside the seeded scenes). The harness/tests leave the store
 /// pathless instead.
-pub const DEFAULT_STORAGE_PATH: &str = "project/storage.json";
+pub const DEFAULT_STORAGE_PATH: &str = "saved/storage.json";
 
 /// A namespaced, JSON-backed key-value store. The top level maps a namespace name
 /// to a JSON object of its keys.

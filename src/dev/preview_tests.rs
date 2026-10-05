@@ -7,8 +7,8 @@ use super::*;
 
 /// A real, committed asset of each previewable kind, so the dispatch is exercised
 /// against the repo rather than made-up paths.
-const MODEL: &str = "assets/models/suzanne.obj";
-const SHADER: &str = "assets/shaders/shader.wgsl";
+const MODEL: &str = "engine/models/suzanne.obj";
+const SHADER: &str = "engine/shaders/shader.wgsl";
 
 #[test]
 fn unknown_extension_is_a_caller_error_not_an_empty_picture() {

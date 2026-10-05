@@ -1,4 +1,4 @@
--- project/scenarios/bench/enemy.lua — a bench soldier's brain (#835).
+-- tests/fixtures/project/scenarios/bench/enemy.lua — a bench soldier's brain (#835).
 --
 -- The per-tick work a shooter enemy does, without the combat: it patrols the yard,
 -- re-picking a point every couple of seconds (seeded `math.random`, so every run

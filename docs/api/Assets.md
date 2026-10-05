@@ -1,7 +1,7 @@
 ## `Assets`
 
 The project's importable assets — the "see what I can place" half of authoring.
-`Assets.Manifest()` (alias `Assets.List()`) walks the `project` asset root, imports
+`Assets.Manifest()` (alias `Assets.List()`) walks the open project's `assets/` folder, imports
 every model file (`.gltf`/`.glb`/`.obj`), and returns a structured catalogue of the
 addressable sub-objects inside each file plus their footprint (so the agent can lay
 things out without overlap) and material count. Unlike the rest of the surface,
@@ -24,12 +24,12 @@ Returned shape (Lua, 1-indexed arrays):
 ```lua
 {
   {
-    path = "project/models/crates.glb",
+    path = "assets/models/crates.glb",
     materialCount = 2,            -- materials in the file's shared table
     subObjects = {
       {
         id = "Sedan",
-        reference = "project/models/crates.glb::Sedan",  -- round-trips with AssetRef
+        reference = "assets/models/crates.glb::Sedan",  -- round-trips with AssetRef
         materialCount = 1,         -- 0 or 1 (a sub-mesh uses at most one material)
         size = { x = 4.2, y = 1.5, z = 1.8 },            -- AABB extent (max - min)
         min  = { x = -2.1, y = 0.0, z = -0.9 },          -- absent if the mesh is empty
@@ -42,8 +42,8 @@ Returned shape (Lua, 1-indexed arrays):
 
 ### `Assets.Refresh`
 
-Unity's `AssetDatabase.Refresh()`: import whatever arrived in the `project` tree since
-the last look. Today that is audio: every `.mp3` anywhere under `project` is decoded
+Unity's `AssetDatabase.Refresh()`: import whatever arrived in the project's `assets/` tree since
+the last look. Today that is audio: every `.mp3` anywhere under `assets/` is decoded
 once, its encoder delay and padding trimmed, written as a 16-bit PCM `.wav` beside it
 (same name, same channels and sample rate), and the `.mp3` is removed, so a built game
 carries WAV, never MP3. OGG is never converted. The editor runs the same refresh at

@@ -1,7 +1,7 @@
 //! src/shadergen/tests.rs — spine-level tests for shader authoring (#272).
 //!
 //! These exercise the whole leg end-to-end against the engine's real committed
-//! shader set (`assets/shaders`, read-only here) but write baked output to a temp
+//! shader set (`engine/shaders`, read-only here) but write baked output to a temp
 //! dir, so the shipped set + the `all_shaders_compose` guard stay untouched. The
 //! load-bearing tests are: a baked surface AND postfx variant compose cleanly
 //! through `naga_oil` (the validate-at-bake guarantee, GPU-free → runs in CI); an
@@ -15,7 +15,7 @@ use super::bake::{bake_recipe, BakeError};
 use super::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use super::validate::validate;
 
-const ENGINE_SHADERS: &str = "assets/shaders";
+const ENGINE_SHADERS: &str = "engine/shaders";
 
 /// A unique temp dir per test name, so parallel test runs never collide.
 fn temp_out(tag: &str) -> std::path::PathBuf {

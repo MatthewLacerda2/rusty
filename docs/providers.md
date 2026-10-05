@@ -11,8 +11,10 @@ while authoring, the same way it uses baked lighting.
 
 rusty never ships or shares an account. You bring your own key:
 
-1. Copy `.env.example` to `.env` at the workspace root (the folder holding
-   `project/`). `.env` is gitignored.
+1. Copy `.env.example` to `.env` at your game project's root, or any folder above
+   it (the engine checkout, when the project is its local `./project`). Keep `.env`
+   out of git: the engine's `.gitignore` covers it, and a game repo should ignore it
+   too.
 2. Fill in the variable, e.g. `ELEVENLABS_API_KEY=sk_...`.
 
 An exported environment variable wins over `.env`. The file only fills gaps, so
@@ -22,7 +24,9 @@ names the variable and every place that was checked.
 ## The budget
 
 Each project keeps a budget and a running total of what it has spent, in
-`project/provider_budget.json` (gitignored, created on the first call):
+`provider_budget.json` at the project root (#829), created on the first call. It is
+the project's own setting, not regenerable output, so it sits at the root rather
+than under `cache/`:
 
 ```json
 {
@@ -53,18 +57,19 @@ your vendor dashboard for the real bill.
 
 ## Generated assets
 
-What a provider makes lands in `project/assets/generated/`, named for **the hash
+What a provider makes lands in `assets/generated/`, named for **the hash
 of the brief that made it** (#384):
 
 ```
-project/assets/generated/<kind>-<sha256 of the brief>.<ext>
-project/assets/generated/<kind>-<sha256 of the brief>.<ext>.json
+assets/generated/<kind>-<sha256 of the brief>.<ext>
+assets/generated/<kind>-<sha256 of the brief>.<ext>.json
 ```
 
 A *brief* is everything a generation asks for: the prompt, the voice, the model,
 the duration, the seed. It lives in the document that uses the asset, so it is
-versioned with the project. The folder itself is gitignored, because any file in it
-can be made again from its brief (at a cost).
+versioned with the project. Any file in the folder can be made again from its brief
+(at a cost). Whether a game's own repo versions the folder or ignores it is still
+open (#866): today nothing ignores it.
 
 - **Nothing is paid for twice.** Asking for a brief whose file is already there
   returns that file and makes no call. Editing a prompt back to an earlier wording
