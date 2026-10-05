@@ -146,7 +146,7 @@ fn soldier(scene: &mut Scene, i: u32, script: &str) {
 /// hanging over the pool and deck, pointing down.
 fn light(scene: &mut Scene, i: u32, shadowed: bool, flicker: Option<&str>) {
     let row = (i / 2) as f32;
-    let side = if (i / 2) % 2 == 0 { 1.0 } else { -1.0 };
+    let side = alternate(i / 2);
     let z = -YARD_HALF.1 + 2.5 + row * 2.6;
     let (primitive, pos) = match i % 2 {
         0 => (Primitive::PointLight, Vec3::new(side * 13.5, 2.5, z)),
@@ -173,11 +173,11 @@ fn light(scene: &mut Scene, i: u32, shadowed: bool, flicker: Option<&str>) {
 fn decal_spot(i: u32) -> (Vec3, Vec3) {
     let along = -20.0 + (i * 13 % 400) as f32 * 0.1;
     if i % 3 == 2 {
-        let x = if i % 2 == 0 { 14.75 } else { -14.75 };
+        let x = alternate(i) * 14.75;
         let y = 0.5 + (i * 7 % 25) as f32 * 0.1;
         return (Vec3::new(x, y, along), Vec3::new(-x.signum(), 0.0, 0.0));
     }
-    let x = (if i % 2 == 0 { 1.0 } else { -1.0 }) * (5.5 + (i * 5 % 85) as f32 * 0.1);
+    let x = alternate(i) * (5.5 + (i * 5 % 85) as f32 * 0.1);
     (Vec3::new(x, 0.0, along), Vec3::Y)
 }
 
@@ -194,6 +194,15 @@ fn smoke(scene: &mut Scene, i: u32) {
         particles::set_lifetime(&mut p, Range { min: 2.0, max: 4.0 });
         particles::set_speed(&mut p, Range { min: 0.6, max: 1.4 });
         particles::set_spread(&mut p, 0.4);
+    }
+}
+
+/// `1` for even `i`, `-1` for odd: which side of the yard.
+fn alternate(i: u32) -> f32 {
+    if i.is_multiple_of(2) {
+        1.0
+    } else {
+        -1.0
     }
 }
 
