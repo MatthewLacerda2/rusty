@@ -23,13 +23,20 @@ Before writing code, read the issue body for "Blocked by" and check each blocker
 `CLAUDE.md`, your issue(s), and `.claude/skills/ci-merge/SKILL.md`. The prompt may
 name more.
 
-## Never wait on background work without a wake-up
+## Your job ends at "ready"
+
+A coder's session ends when its pull request is **ready**. Everything after that
+(waiting on CI, rebasing, merging, reading a mutation report) belongs to the
+orchestrator and the merge queue (#823). There is no check-in to schedule and
+nothing to wait for.
 
 - Run builds, tests and `make gates` in the **foreground**, with long timeouts,
   split across calls when needed. A session that starts a build in the background
   and ends its turn to wait is never woken.
-- If you must wait on CI, schedule your own check-in with `send_later` (the
-  `Claude_Code_Remote` MCP tool) **before** ending the turn.
+- **Never schedule a `send_later` check-in.** Each one is a fresh cloud session
+  reading state the orchestrator already has, and on 2026-10-04 check-ins were
+  most of the late churn: green branches sat in draft waiting on them, and one
+  pushed to a branch the queue already held.
 
 ## Ready means finished
 
@@ -40,25 +47,17 @@ name more.
   `actions_run_trigger` does the same). It runs the gates and nothing else.
   Never dispatch `mutants-sweep.yml`: that is the full sweep, five runners for
   most of a day the batch's gates need (#705).
-- **A branch that adds mechanism asks for a scoped mutation run** (#750):
-  nothing runs mutation per pull request any more. Dispatch
-  `mutants-on-request.yml` on your branch with input `scope` set to `diff` (or
-  path globs like `src/physics/**`): `make mutants-remote SCOPE=diff` with
-  `gh`, or the GitHub MCP `actions_run_trigger` without it. **Dispatch it when
-  your gates are green and mark the PR ready in the same step: never keep a
-  finished PR in draft waiting for it.** It takes 30+ minutes, and it is a
-  signal, not a gate. Schedule one `send_later` check-in to read the report
-  (the survivors' diffs are at the end of its `mutants` job log,
-  `get_job_logs`), triage it as `ci-merge` *Triaging a survivor* says, and put
-  the result in a comment on the issue. Since the branch is the queue's by
-  then, a survivor worth fixing becomes a follow-up PR off `main`, never a push
-  to the readied branch.
-- **Once ready, the branch is the merge queue's.** Don't push to it again, and
-  cancel any `send_later` check-in that would. The queue rebases, pushes and
-  merges it, and it refuses to merge a head it did not watch, so a late push
-  costs a full CI round. The one exception is fixing your own red CI. Anything
-  else you find afterwards — a mutation survivor, a missing test — goes in a
-  comment on the issue, for a follow-up PR off `main`. (#560 on 2026-09-30: a
+- **A branch that adds mechanism asks for a scoped mutation run** (#750), and
+  readies **in the same step**: dispatch `mutants-on-request.yml` on your branch
+  with input `scope` set to `diff` (or path globs like `src/physics/**`) —
+  `make mutants-remote SCOPE=diff` with `gh`, or the GitHub MCP
+  `actions_run_trigger` without it — then mark the PR ready and end. Say in the
+  PR that you dispatched it. The orchestrator reads the report when it finishes
+  and launches a follow-up only for survivors in code this branch wrote.
+- **Once ready, the branch is the merge queue's. Never push to it again**, not
+  to rebase and not to fix your own red CI: a red or conflicting ready PR comes
+  back to the orchestrator as a hand-back, and it briefs a fix. Anything you
+  notice after readying goes in a comment on the issue. (#560 on 2026-09-30: a
   test-only push landed mid-queue and the queue handed the PR back.)
 
 ## The repo's rules that trip cloud coders
@@ -79,12 +78,24 @@ name more.
   rather than falling back to `cargo test`: CI runs nextest, and its per-test
   process isolation and the `gpu` test group are what the gate measures.
 - Rebase onto the latest `origin/main` before readying.
-- **Rebasing a PR that is already ready: run the full `make gates` before you
-  push.** A push to a ready PR is a CI run, and a red one is a broken claim
-  (scorsese #686, 2026-10-03: a hand-merged list that `cargo fmt --check`
-  refused, found by CI instead of the session). After resolving any conflict,
-  run `cargo fmt --all`.
 - Don't run `cargo mutants` locally; ask for a scoped run (above).
+- **A refactor that claims no behaviour change proves it by comparison**:
+  capture the output before (a scene dump, a bake, a capture, a test's printed
+  values), and show it identical after, in the PR.
+- **Bless by name.** Re-bless a snapshot or capture by its test name, never all
+  at once, and look at every PNG you bless.
+
+## What the description carries
+
+Beyond what changed, why, the effect and the decisions:
+
+- **A `Gates` line:** what ran green, on which head commit, and what didn't run
+  and why (no real GPU, a human check). After a rebase it is re-run or marked
+  stale.
+- **A `Seam` section** when the PR creates something later branches build on:
+  the types, functions, files and invariants a sibling should use. The
+  orchestrator's next brief points at "PR #N, *Seam*" instead of re-describing
+  merged work, so write it for a coder who has never seen your branch.
 
 ## Protocol
 
@@ -101,7 +112,7 @@ name more.
 - Commit messages end with
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Push often: a dead container takes its uncommitted work with it.
-- Green gates and a rebased branch → mark the PR **ready for review**.
+- Green gates and a rebased branch → mark the PR **ready for review**, and end.
 - **Do NOT merge.**
 - ≈3 attempts at the same failure, or a decision that is genuinely the user's:
   leave the PR as draft with the reason in its description, comment on the issue,
