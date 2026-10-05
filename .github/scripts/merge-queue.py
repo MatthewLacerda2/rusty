@@ -826,6 +826,14 @@ def parse(argv: list[str]) -> argparse.Namespace:
     return opts
 
 
+def unreachable(down: Exception) -> list[str]:
+    """A stop's lines when GitHub stayed down through `mergeable.gh`'s retries."""
+    return [
+        f"GitHub unreachable after {len(mergeable.RETRIES)} retries: {down}",
+        "Nothing is known about this branch; relaunch the watch once GitHub answers.",
+    ]
+
+
 def drain(numbers: list[int], turn) -> list[tuple[int, str, str]]:
     """Each pull request's `turn` in order, until the machine fails ([`Stopped`]).
 
@@ -835,7 +843,10 @@ def drain(numbers: list[int], turn) -> list[tuple[int, str, str]]:
     results = []
     for at, number in enumerate(numbers):
         try:
-            results.append(turn(number))
+            try:
+                results.append(turn(number))
+            except mergeable.Unreachable as down:
+                raise Stopped(unreachable(down)) from down
         except Stopped as stop:
             say(f"#{number}: {stop.lines[0]}", *stop.lines[1:])
             results.append((number, STOPPED, stop.lines[0]))
@@ -913,7 +924,11 @@ def main(argv: list[str] | None = None) -> int:
         if refused:
             say(f"refusing to start: {refused[0]}", *refused[1:])
             return 1
-    repo = mergeable.gh("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
+    try:
+        repo = mergeable.gh("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
+    except mergeable.Unreachable as down:
+        say(*unreachable(down))
+        return queue_watch.MACHINE_STATUS
     if opts.watch:
         results, why, status = queue_watch.run(effects(repo, opts), opts)
     else:
