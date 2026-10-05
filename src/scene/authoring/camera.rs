@@ -6,8 +6,9 @@
 //! motion-blur fields, the projection and the render-texture target (#430).
 //!
 //! The editor's Camera card routes every field write through these (#287). The Lua
-//! `Camera.*` namespace drives the *render* `Camera` (yaw/pitch/position/fov of the
-//! viewport), NOT this per-entity component, so it shares no field with this card.
+//! `Camera.*` namespace mostly drives the *render* `Camera` (yaw/pitch/position/fov
+//! of the viewport); its per-entity functions (projection, culling mask, render
+//! target — #430, #827) take an id and write this component through these ops.
 //! The component's motion-blur fields ARE also written from `Graphics.*`
 //! (`SetMotionBlurActive` / `SetMotionBlurSamples`); those route through
 //! [`set_motion_blur_active`] / [`set_motion_blur_samples`] here, so the card and the

@@ -21,12 +21,25 @@ A layer drives three things:
   meshes, particles and trails on the layers it leaves out. This is how a stacked
   viewmodel camera draws only the gun and the world camera everything else.
 
-Layer names, the collision matrix and culling masks are set in the editor only for
-now; their Lua calls are tracked in #827.
+All three are scriptable (#827), with Unity's names and placement: a slot's name
+with `Layers.SetName`, the matrix with
+[`Physics.IgnoreLayerCollision`](Physics.md#layer-collision-matrix-827), a camera's
+mask with [`Camera.SetCullingMask`](Camera.md#camera-entities-projection-and-render-textures-430).
+They write the same values as the editor and persist with the scene.
+
+```lua
+-- A viewmodel: the gun on its own layer, drawn only by the stacked gun camera.
+Layers.SetName(8, "Viewmodel")
+local vm = Layers.NameToIndex("Viewmodel")
+Layers.SetLayer(gun, vm)
+Camera.SetCullingMask(worldCam, ~(1 << vm))
+Camera.SetCullingMask(gunCam, 1 << vm)
+```
 
 | Function | Signature | Returns |
 |---|---|---|
 | `Layers.GetLayer` | `(id)` | layer index (`0` if the entity is missing) |
 | `Layers.SetLayer` | `(id, index)` | — |
 | `Layers.GetName` | `(index)` | the slot's name, or `Layer N` if unnamed |
+| `Layers.SetName` | `(index, name)` | — (slot 0 stays `"Default"`: a no-op; a blank name clears the slot; errors outside `0..31`) |
 | `Layers.NameToIndex` | `(name)` | layer index, or `nil` if unknown |

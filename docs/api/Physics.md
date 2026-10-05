@@ -37,6 +37,8 @@ every number after `hit` is `0` and the rest are `nil`.
 | `Physics.SetColliderShape` | `(id, shape)` | — (`shape` is the same table; errors on a bad one) |
 | `Physics.GetPhysicsMaterial` | `(id)` | `friction, bounciness, friction_combine, bounce_combine` |
 | `Physics.SetPhysicsMaterial` | `(id, friction, bounciness [, friction_combine [, bounce_combine]])` | — |
+| `Physics.IgnoreLayerCollision` | `(a, b [, ignore = true])` | — (layer indices `0..31`; `false` makes the pair collide again) |
+| `Physics.GetIgnoreLayerCollision` | `(a, b)` | `bool` — `true` when layers `a` and `b` don't collide |
 | `Physics.GenerateHitboxes` | `(id [, { bones = {..}, min_size = n, layer = "Hitbox" }])` | `{ [bone_name] = hitbox_id, .. }`; errors without a skinned mesh |
 
 The optional trailing `ignore_id` skips one entity in the cast — pass the shooter's
@@ -148,6 +150,23 @@ and know it is grounded uses a [`CharacterController`](CharacterController.md),
 and its script applies gravity itself. An entity with a collider but **no
 rigidbody** is likewise a kinematic mover. The flag is honoured at body build and
 each tick, so toggling it at runtime takes effect.
+
+### Layer collision matrix (#827)
+
+Unity's `Physics.IgnoreLayerCollision`: the script side of the **Layer Collision
+Matrix** in Scene Settings (see [Layers](Layers.md)). The matrix is symmetric, so
+`(a, b)` and `(b, a)` are the same cell, and `a == b` is a layer against itself. The
+change applies **immediately**, as in Unity: live colliders pick it up before the next
+physics step and a `CharacterController` on its next move. It saves with the scene.
+Queries ignore the matrix — a cast's `layer_mask` decides what it hits. An index
+outside `0..31` is a script error.
+
+```lua
+-- Gibs and shell casings never block the player.
+local debris = Layers.NameToIndex("Debris")
+Physics.IgnoreLayerCollision(debris, Layers.NameToIndex("Player"))
+Physics.IgnoreLayerCollision(debris, debris)
+```
 
 ### Collider shape and physics material (#447)
 
