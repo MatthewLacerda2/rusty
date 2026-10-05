@@ -133,5 +133,7 @@ impl MeshComponent {
 }
 
 #[cfg(test)]
+mod box_lightmap_tests;
+#[cfg(test)]
 #[path = "primitives_tests.rs"]
 mod primitives_tests;
