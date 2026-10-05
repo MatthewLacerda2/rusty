@@ -3,6 +3,7 @@
 
 use super::{SsaoRenderer, AO_FORMAT};
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::timing::{GpuPass, GpuTimer};
 
 impl SsaoRenderer {
     pub(crate) fn new(
@@ -50,13 +51,13 @@ impl SsaoRenderer {
         }
     }
 
-    /// Record one fullscreen pass of `pipeline` over `group` into `target`.
+    /// Record one fullscreen pass of `pipeline` over `group` into `target`, timed.
     pub(super) fn fullscreen(
         &self,
         encoder: &mut wgpu::CommandEncoder,
         blur: bool,
-        group: &wgpu::BindGroup,
-        target: &wgpu::TextureView,
+        (group, target): (&wgpu::BindGroup, &wgpu::TextureView),
+        timer: &GpuTimer,
     ) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             multiview_mask: None,
@@ -71,7 +72,7 @@ impl SsaoRenderer {
                 },
             })],
             depth_stencil_attachment: None,
-            timestamp_writes: None,
+            timestamp_writes: timer.writes(GpuPass::Ssao),
             occlusion_query_set: None,
         });
         let pipeline = if blur {

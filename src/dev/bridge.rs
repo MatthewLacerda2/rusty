@@ -4,7 +4,8 @@
 //! from the gameplay scripts inside `GameWorld` — the scenario drives the world from
 //! the outside (Step/StepUntil), it does not run as an entity behaviour.
 //!
-//! Tables: Harness.{Step,StepUntil,Snapshot,Log,Expect,Frame,Stats,AssertBudget}, plus read helpers
+//! Tables: Harness.{Step,StepUntil,Snapshot,Log,Expect,Frame,Stats,AssertBudget,Screenshot,
+//! Render,LoadStress,Bench}, plus read helpers
 //! Scene.FindEntityByName / Transform.GetPosition / Animator.GetClip and the
 //! writable Input injection (Press/Release, MoveMouse, AddMouseDelta, Scroll,
 //! TypeText, SetAxis, SetPadConnected). Shooting is just pressing `Mouse0` (left
@@ -40,6 +41,7 @@ fn register_harness(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     register_harness_stepping(lua, harness, &t)?;
     register_harness_reporting(lua, harness, &t)?;
     register_harness_actions(lua, harness, &t)?;
+    super::bench::register(lua, harness, &t)?;
     lua.globals().set("Harness", t)
 }
 
@@ -148,6 +150,14 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
     t.set(
         "Screenshot",
         lua.create_function(move |_, path: String| Ok(h.borrow_mut().screenshot(path)))?,
+    )?;
+
+    // Render() -> bool. Draws the current frame offscreen, writing nothing, so its
+    // cost (render counters, renderer_ms, GPU time) lands in Stats (#835).
+    let h = Rc::clone(harness);
+    t.set(
+        "Render",
+        lua.create_function(move |_, ()| Ok(h.borrow_mut().render_frame().is_some()))?,
     )?;
 
     // AttachPlayerBot(path) -> bool. Tag the Player with a bot-player script so the

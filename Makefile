@@ -23,7 +23,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue blockers mutants-remote editor-capture
+.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue blockers mutants-remote editor-capture bench
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -201,3 +201,12 @@ mutants-remote: ## Mutation on GitHub's runners, scoped. make mutants-remote SCO
 OUT ?= editor-capture.png
 editor-capture: ## Render the editor to a PNG headlessly. make editor-capture OUT=after.png ARGS="--select Player"
 	cargo run --quiet --features dev --bin editor-capture -- --out $(OUT) $(ARGS)
+
+# The shooter-shaped stress scene (#835): 50 skinned soldiers on the navmesh, 32
+# lights, a full decal registry, smoke. Prints frame / render / GPU ms (avg and p95),
+# GPU ms per pass, the counters and the heavy systems, with each row's change against
+# the last run (kept in out/bench/bench.json). A signal, never a gate: the timings are
+# this machine's. A release build, so the numbers are a shipped game's; the first run
+# compiles one. docs/testing.md has the details.
+bench: ## Benchmark the stress scene (release build), with the change against the last run
+	cargo run --release --quiet --features dev --bin play -- project/scenarios/bench/bench.lua out/bench

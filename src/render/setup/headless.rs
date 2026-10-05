@@ -73,9 +73,11 @@ impl Renderer {
                 .ok()?,
         };
 
+        // Timestamps where the adapter has them: the frame stats' GPU time (#835).
+        let timestamps = adapter.features() & wgpu::Features::TIMESTAMP_QUERY;
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
-                required_features: wgpu::Features::empty(),
+                required_features: timestamps,
                 required_limits: wgpu::Limits::default(),
                 label: Some("Headless Screenshot Device"),
                 ..Default::default()

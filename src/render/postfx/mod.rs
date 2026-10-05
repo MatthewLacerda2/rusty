@@ -11,11 +11,12 @@
 //! ~30fps (Low: no SSR/motion-blur, half-size bloom).
 
 mod custom;
+mod inputs;
 pub(crate) mod params;
 mod run;
 mod setup;
 
-pub use run::{PostFxContext, PostPasses};
+pub use inputs::{PostFxContext, PostPasses};
 
 use glam::Mat4;
 

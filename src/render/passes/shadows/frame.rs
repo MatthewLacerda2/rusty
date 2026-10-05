@@ -54,6 +54,7 @@ impl Renderer {
             clips: &clips,
             materials: &self.materials,
             surfaces: &self.surface_shaders,
+            timer: &self.gpu_timer,
         };
         self.shadow_renderer
             .render_cascades(&mut encoder, &frame, lod);

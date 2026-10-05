@@ -121,6 +121,8 @@ pub(super) struct CasterFrame<'a> {
     pub clips: &'a HashMap<u32, CasterClip>,
     pub materials: &'a MaterialCache,
     pub surfaces: &'a SurfaceShaders,
+    /// The renderer's GPU pass timer: every sweep is a `shadows` pass (#835).
+    pub timer: &'a crate::render::timing::GpuTimer,
 }
 
 impl ShadowRenderer {

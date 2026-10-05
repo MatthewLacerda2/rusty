@@ -28,6 +28,7 @@ use self::backdrop::UiBackdrop;
 use super::cache::UiViewCache;
 use super::mesh::{UiBatch, UiClip};
 use crate::render::gpu::grow_buffer::GrowBuffer;
+use crate::render::timing::{GpuPass, GpuTimer};
 use crate::render::Renderer;
 
 /// One batch's slot of the view's batch uniform — matches `ui.wgsl`'s `UiBatch`.
@@ -141,10 +142,10 @@ pub(crate) fn batch_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
 }
 
 /// A colour-only render pass over `target`, loading or clearing it — the overlay,
-/// mask and blur passes.
+/// mask and blur passes, timed as `ui` (#835).
 pub(crate) fn color_pass<'e>(
     encoder: &'e mut wgpu::CommandEncoder,
-    label: &str,
+    (label, timer): (&str, &GpuTimer),
     target: &'e wgpu::TextureView,
     load: wgpu::LoadOp<wgpu::Color>,
 ) -> wgpu::RenderPass<'e> {
@@ -161,7 +162,7 @@ pub(crate) fn color_pass<'e>(
             },
         })],
         depth_stencil_attachment: None,
-        timestamp_writes: None,
+        timestamp_writes: timer.writes(GpuPass::Ui),
         occlusion_query_set: None,
     })
 }

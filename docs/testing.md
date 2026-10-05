@@ -239,6 +239,46 @@ Harness.AssertBudget{ draw_calls = 2000, lights_dropped = 0, fixed_update_ms = 4
   so a replay stays byte-identical; `<out_dir>/stats.json` holds everything, per-system
   timings included.
 - Budgets are **opt-in per scenario**, never a CI gate of their own.
+- `Harness.Render()` draws the current frame without writing a PNG — the cheap way to
+  get render counters and GPU time (`gpu_ms`, `gpu_passes`, #835) every tick.
+
+## Benchmark: `make bench` (#835)
+Measure before optimising: `make bench` runs `project/scenarios/bench/bench.lua`, a
+**shooter-shaped worst case** on the default fy_pool_day yard, and prints a short
+report in the terminal:
+
+- **the scene** — 50 skinned soldiers (a procedural 16-bone, ~12k-triangle rig with a
+  walk cycle and hitboxes) walking the navmesh with a Lua brain each (patrol + a
+  line-of-sight raycast per tick, `bench/enemy.lua`); 32 realtime point and spot
+  lights, 8 flickering like muzzle flashes (`bench/flicker.lua`) and 6 casting
+  shadows; a full decal registry (256); four smoke columns; the sun's shadows. The
+  Player stands 3 m in from its spawn, so the camera looks down the whole yard.
+- **the run** — 60 warm-up frames, then 600 measured ones, each stepped and rendered
+  at 1280x720 (`Harness.LoadStress{…}` then `Harness.Bench(600)`).
+- **the report** — per row the average and p95: `frame_ms` (the sim's CPU time),
+  `renderer_ms` (CPU time recording the frame), `gpu_ms` and `gpu.<pass>` (GPU time,
+  see `Debug.Stats`), `draw_calls`, `triangles`, `culled_entities`, `lights_dropped`,
+  `lights_culled`, and the systems `update_scripts`, `tick_nav`, `step_physics`,
+  `animate`. Every GPU pass prints every run (0 when it did not run), so the rows are
+  stable.
+- **before and after** — the report is kept in `out/bench/bench.json` (and
+  `bench.txt`), and each run prints every row's change against the last one. To
+  measure an optimisation: `make bench`, change, `make bench`.
+
+It is a **release** build (the first run compiles one, a few minutes), so the numbers
+are a shipped game's. It is an **informational signal, never a gate**, and not in
+`make gates`: the timings are this machine's, and CI's software GPU has no timestamps
+and would make them meaningless anyway. The counts (`draw_calls`, `triangles`, …) are
+deterministic — same scene, same seeded scripts, fixed dt — so they match from run to
+run and machine to machine; the timings compare only on one machine. Without
+timestamp queries the GPU rows are absent and the report says so.
+
+`Harness.LoadStress([opts])` takes `enemies`, `lights`, `flickering`, `shadowed`,
+`decals`, `particle_systems`, `enemy_script` and `flicker_script` (an unknown key is an
+error) and must run before the first `Step`, so the spawned scripts load when play
+starts. `Harness.Bench(n)` works on any scenario: it steps and renders `n` frames,
+prints the report, keeps it in the run's out dir and returns `{ frames, metrics =
+{ <row> = { avg, p95 } } }`.
 
 ## API-doc drift gate
 `tests/api_doc_drift.rs` (dev-only, #280) is a **hard gate** that keeps

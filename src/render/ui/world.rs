@@ -27,6 +27,7 @@ use super::pipeline::{self, UiPass};
 use crate::components::UiBlend;
 use crate::render::gpu::grow_buffer::GrowBuffer;
 use crate::render::gpu::uniforms::FogUniform;
+use crate::render::timing::{GpuPass, GpuTimer};
 use crate::render::{RenderView, Renderer};
 use crate::scene::Camera;
 use crate::ui::CanvasSpace;
@@ -181,7 +182,7 @@ impl Renderer {
                 label: Some("World UI Encoder"),
             });
         {
-            let mut pass = world_pass(&mut encoder, view);
+            let mut pass = world_pass(&mut encoder, view, &self.gpu_timer);
             let mut blend = None;
             for &(i, offset) in draws {
                 let canvas = view.ui.canvas(i);
@@ -205,6 +206,7 @@ impl Renderer {
 fn world_pass<'e>(
     encoder: &'e mut wgpu::CommandEncoder,
     view: &'e RenderView,
+    timer: &GpuTimer,
 ) -> wgpu::RenderPass<'e> {
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         multiview_mask: None,
@@ -220,7 +222,7 @@ fn world_pass<'e>(
             depth_ops: Some(keep()),
             stencil_ops: None,
         }),
-        timestamp_writes: None,
+        timestamp_writes: timer.writes(GpuPass::Ui),
         occlusion_query_set: None,
     })
 }

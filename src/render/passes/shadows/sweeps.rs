@@ -8,6 +8,7 @@ use super::cascades::Cascade;
 use super::casters::{CasterFrame, Sweep};
 use super::ShadowRenderer;
 use crate::render::lod::LodSelection;
+use crate::render::timing::GpuPass;
 
 impl ShadowRenderer {
     /// Record the frame's shadow sweeps: re-bake the static layers whose light volume
@@ -35,7 +36,7 @@ impl ShadowRenderer {
             let batches = self.prepare_casters(frame, &finest, Sweep::Static, &volumes);
             for (&i, batches) in stale.iter().zip(&batches) {
                 let view = &self.static_layers[i];
-                let mut pass = depth_pass(encoder, "Shadow Static Pass", view, true);
+                let mut pass = depth_pass(encoder, frame, "Shadow Static Pass", view, true);
                 self.draw_casters(&mut pass, frame, batches, Sweep::Static, i);
             }
             for i in stale {
@@ -52,7 +53,7 @@ impl ShadowRenderer {
                 continue;
             }
             let view = &self.active_layers[i];
-            let mut pass = depth_pass(encoder, "Shadow Dynamic Pass", view, false);
+            let mut pass = depth_pass(encoder, frame, "Shadow Dynamic Pass", view, false);
             self.draw_casters(&mut pass, frame, batches, Sweep::Dynamic, i);
         }
     }
@@ -78,9 +79,10 @@ impl ShadowRenderer {
 }
 
 /// A depth-only pass over one cascade layer: cleared for a bake, loaded for the
-/// dynamic casters drawn over the copied statics.
+/// dynamic casters drawn over the copied statics. Timed as `shadows` (#835).
 pub(super) fn depth_pass<'a>(
     encoder: &'a mut wgpu::CommandEncoder,
+    frame: &CasterFrame,
     label: &str,
     view: &'a wgpu::TextureView,
     clear: bool,
@@ -102,7 +104,7 @@ pub(super) fn depth_pass<'a>(
             }),
             stencil_ops: None,
         }),
-        timestamp_writes: None,
+        timestamp_writes: frame.timer.writes(GpuPass::Shadows),
         occlusion_query_set: None,
     })
 }

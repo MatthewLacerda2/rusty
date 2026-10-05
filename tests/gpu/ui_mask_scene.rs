@@ -97,6 +97,10 @@ pub fn shoot(
         return None;
     }
     let img = image::open(&path).expect("png").to_rgb8();
-    let (counters, _) = host.last_frame.expect("a frame was drawn");
+    let counters = host
+        .last_frame
+        .as_ref()
+        .expect("a frame was drawn")
+        .counters;
     Some((img, counters))
 }

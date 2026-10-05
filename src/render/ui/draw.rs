@@ -125,7 +125,12 @@ impl Renderer {
                 label: Some("UI Encoder"),
             });
         {
-            let mut pass = color_pass(&mut encoder, "UI Pass", target, wgpu::LoadOp::Load);
+            let mut pass = color_pass(
+                &mut encoder,
+                ("UI Pass", &self.gpu_timer),
+                target,
+                wgpu::LoadOp::Load,
+            );
             let mut bound = None;
             for (i, canvas) in screen() {
                 pass.set_vertex_buffer(0, canvas.buffer.slice(..));

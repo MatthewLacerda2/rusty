@@ -17,6 +17,7 @@ mod setup;
 mod stats;
 #[cfg(test)]
 pub(crate) mod test_gpu;
+pub(crate) mod timing;
 mod view;
 
 pub mod gpu;
@@ -41,6 +42,7 @@ pub use ibl::probe_bounce::{BounceReport, CONVERGENCE_EPSILON, MAX_BOUNCES};
 pub use ibl::reflection_bake::DEFAULT_REFLECTION_RESOLUTION;
 pub use setup::headless::OFFSCREEN_FORMAT;
 pub use stats::RenderCounters;
+pub use timing::{GpuPass, GpuTimes};
 pub use view::RenderView;
 
 // GPU uniform memory layouts live in `gpu/uniforms.rs` (split out to keep files under
@@ -234,6 +236,8 @@ pub struct Renderer {
 
     /// What the last `render` call submitted (#433) — read by the dev layer's stats.
     pub frame_counters: RenderCounters,
+    /// GPU time per render pass (#835): disabled without `TIMESTAMP_QUERY`.
+    pub(crate) gpu_timer: timing::GpuTimer,
 
     /// Every registered render texture's current allocation id, by path, and the
     /// last id handed out (#430) — the material cache's key for `"rt:"` maps.

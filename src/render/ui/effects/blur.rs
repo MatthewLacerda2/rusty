@@ -22,6 +22,7 @@ use std::collections::HashMap;
 
 use super::backdrop::blur_level;
 use crate::render::postfx::PostFxContext;
+use crate::render::timing::GpuTimer;
 use crate::render::{RenderView, Renderer};
 use crate::ui::CanvasSpace;
 
@@ -217,6 +218,7 @@ impl Renderer {
             depth_view: &view.depth_view,
             skybox_view: skybox.unwrap_or(&self.default_texture.view),
             output: &targets.downs[0].view,
+            timer: &self.gpu_timer,
         };
         view.post_fx.composite_into(&self.device, &mut encoder, ctx);
         let passes = self.encode_chain(&mut encoder, targets, deepest, &levels);
@@ -245,7 +247,7 @@ impl Renderer {
                 &src.view,
                 &self.ui_renderer.sampler,
             );
-            fullscreen(encoder, pipeline, &group, dst);
+            fullscreen(encoder, (pipeline, &self.gpu_timer), &group, dst);
             passes += 1;
         };
         for k in 1..=deepest as usize {
@@ -266,12 +268,12 @@ impl Renderer {
 /// One fullscreen-triangle pass of `pipeline` sampling `group` into `target`.
 fn fullscreen(
     encoder: &mut wgpu::CommandEncoder,
-    pipeline: &wgpu::RenderPipeline,
+    (pipeline, timer): (&wgpu::RenderPipeline, &GpuTimer),
     group: &wgpu::BindGroup,
     target: &wgpu::TextureView,
 ) {
     let clear = wgpu::LoadOp::Clear(wgpu::Color::BLACK);
-    let mut pass = super::color_pass(encoder, "UI Blur Pass", target, clear);
+    let mut pass = super::color_pass(encoder, ("UI Blur Pass", timer), target, clear);
     pass.set_pipeline(pipeline);
     pass.set_bind_group(0, group, &[]);
     pass.draw(0..3, 0..1);

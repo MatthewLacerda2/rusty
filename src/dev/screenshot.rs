@@ -43,24 +43,13 @@ pub fn capture_into(
     width: u32,
     height: u32,
 ) -> Result<bool, String> {
-    let Some((renderer, view)) = host.frame(width, height) else {
+    if host.draw(scene, camera, width, height)?.is_none() {
         log::warn!(
             "[Screenshot] no GPU/software adapter available — skipping capture of {}",
             path.as_ref().display()
         );
         return Ok(false);
-    };
-    let Some(target_view) = view.color_target_view() else {
-        return Err("capture view owns no colour target".to_string());
-    };
-
-    // Reuse the editor's exact render path (editor_mode = false: no gizmos/grid).
-    // Timed for the frame stats (#433): the dev layer may read the clock.
-    let start = std::time::Instant::now();
-    renderer.render(view, scene, camera, &target_view, false);
-    let cpu_ms = start.elapsed().as_secs_f64() * 1000.0;
-    host.last_frame = Some((renderer.frame_counters, cpu_ms));
-
+    }
     host.write_png(path)?;
     Ok(true)
 }
