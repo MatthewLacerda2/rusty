@@ -73,7 +73,8 @@ line `watch ended: deadline reached (…); N merged, nothing in hand.` That exit
 is not a report — **relaunch the watch** with the same arguments. It exists
 because a background command is killed at two hours wherever it is, a push or
 a merge included. The deadline is checked only before taking a pull request,
-so the take in hand can outlast it by up to the per-PR `--deadline` (45 min):
+so the take in hand can outlast it by up to the per-PR `--deadline` (45 min),
+which a Dependabot pull request's rebase wait and CI wait share (#825):
 `--for 70` keeps 70 + 45 under that cap, so every exit lands between pull
 requests. When many coders push at once, runs wait for GitHub runners
 (2026-10-02: a run's first job started 13 minutes in, and #699 was handed back
@@ -125,7 +126,18 @@ worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standin
 - **Dependabot branches are never force-pushed** — Dependabot stops maintaining a
   branch someone else pushed to, and it rebases (and cancels its own runs) by
   itself. The queue comments `@dependabot rebase` when one is behind, waits for a
-  head on `main`'s tip, and judges that.
+  head on `main`'s tip, and judges that, all inside one `--deadline` (#825).
+- **The watch never takes a Dependabot pull request that edits
+  `.github/workflows/`** (#825). The actions entry only proposes majors, and
+  they edit workflows a pull-request run never executes (`mutants-sweep.yml`,
+  `coverage.yml`, `windows.yml`, `main-health.yml`), so its green run proves
+  nothing about them. The watch prints `queue: HELD #N: Dependabot edits …`
+  once per head and goes on; it is not a hand-back and does not change the exit
+  status. Read the bump's changelog for breaking changes, dispatch each workflow
+  it touches on the branch (`gh workflow run <file> --ref <branch>`, or MCP
+  `actions_run_trigger`; for `mutants-sweep.yml` only when no batch needs the
+  runners), and once they are green merge it by name: `make queue PRS=N` does
+  not hold it. A cargo bump (lockfile only) is taken as before.
 - **A watch runs the script it started with** (#824). Python reads the queue's
   code once, at launch, so after merging any change to
   `.github/scripts/merge-queue.py`, `queue_watch.py` or `mergeable.py`, stop

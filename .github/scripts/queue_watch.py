@@ -59,6 +59,17 @@ first within a rank. Dependabot goes after every one of those, whatever its
 conflicts, and its conflicts count against nobody: it rebases itself. A pull
 request whose base is not `main` is never taken: the queue rebases onto `main`.
 
+**A Dependabot pull request that edits `.github/workflows/` is never taken**
+([`held`], #825). The actions entry in `dependabot.yml` only ever proposes
+majors (the workflows pin `@v4`, which floats the rest), and those bumps edit
+workflows a pull-request run never executes (the sweep, coverage, Windows,
+main-health), so a green run proves nothing about them. The watch says so once
+per head, in a line beginning [`HELD_LINE`], and goes on; the orchestrator
+reviews the bump, dispatches the workflows it touches on the branch, and merges
+it by name (`make queue PRS=N`, which does not ask). This rather than dropping
+the bumps from `dependabot.yml`: the PR still arrives with its changelog and its
+diff, and the hold costs nothing until one does.
+
 The decisions are pure functions over plain dictionaries; [`run`] takes every
 effect as an argument, so the loop is tested without a network.
 """
@@ -84,7 +95,14 @@ FAILS = 10
 DEADLINE = "deadline reached"
 
 # What `gh pr list` is asked for, and the issues whose labels give the priority.
-LIST_FIELDS = "number,isDraft,headRefOid,baseRefName,author,labels,closingIssuesReferences"
+# `files` is what [`held`] reads.
+LIST_FIELDS = "number,isDraft,headRefOid,baseRefName,author,labels,closingIssuesReferences,files"
+
+# A bot pull request touching anything under here waits for the orchestrator.
+WORKFLOWS = ".github/workflows/"
+
+# How the line saying so begins ([`held`]): not a hand-back, nothing to wake for.
+HELD_LINE = "HELD"
 
 # Where the remembered hand-backs live, under the checkout's git directory.
 MEMORY = "merge-queue/handed-back.json"
@@ -130,6 +148,22 @@ def conflict_counts(numbers: list[int], clashes: set[frozenset[int]]) -> dict[in
     return {n: sum(1 for pair in clashes if n in pair and pair <= present) for n in numbers}
 
 
+def held(pull: dict, bots: tuple[str, ...]) -> list[str]:
+    """The workflows a Dependabot pull request edits, which keep the watch off
+    it (#825); empty for anyone else's, or a bot's that edits none."""
+    if not is_bot(pull, bots):
+        return []
+    return sorted(p for p in (f.get("path", "") for f in pull.get("files") or []) if p.startswith(WORKFLOWS))
+
+
+def held_line(pull: dict, workflows: list[str]) -> str:
+    """The one line a held pull request gets per head, beginning [`HELD_LINE`]."""
+    return (
+        f"{HELD_LINE} #{pull.get('number')}: Dependabot edits {', '.join(workflows)}, which a pull-request"
+        " run does not prove. Review it, dispatch those workflows on its branch, then `make queue PRS=N`."
+    )
+
+
 def passed_over(pull: dict, memory: dict[int, str], done: set[int]) -> bool:
     """Whether a ready pull request is skipped: its head was handed back and has
     not moved, or this run already ended it without merging (dry run, `--no-merge`)."""
@@ -137,11 +171,12 @@ def passed_over(pull: dict, memory: dict[int, str], done: set[int]) -> bool:
     return number in done or memory.get(number) == pull.get("headRefOid")
 
 
-def ready(pulls: list[dict], memory: dict[int, str], done: set[int]) -> list[dict]:
+def ready(pulls: list[dict], memory: dict[int, str], done: set[int], bots: tuple[str, ...]) -> list[dict]:
     """The pull requests the watch may take now, unordered."""
     return [
         p for p in pulls
-        if not p.get("isDraft") and p.get("baseRefName", "main") == "main" and not passed_over(p, memory, done)
+        if not p.get("isDraft") and p.get("baseRefName", "main") == "main"
+        and not passed_over(p, memory, done) and not held(p, bots)
     ]
 
 
@@ -155,7 +190,7 @@ def pick(
 ) -> dict | None:
     """The next pull request to take, or `None`. `clashes` holds the pairs of
     pull requests whose heads conflict ([`clashing`])."""
-    waiting = ready(pulls, memory, done)
+    waiting = ready(pulls, memory, done, bots)
     counts = conflict_counts([p.get("number") for p in waiting], clashes)
     return min(waiting, key=lambda p: rank(p, issue_labels, bots, counts)) if waiting else None
 
@@ -286,7 +321,7 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     `opts.for_minutes` (`--for`) is checked at the top of each pass, so only
     between takes.
     """
-    results, done, failed, handed = [], set(), 0, []
+    results, done, failed, handed, told = [], set(), 0, [], set()
     memory = recall(fx.memory)
     last, moved = None, fx.clock()
     started = moved
@@ -306,7 +341,12 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         now = heads(pulls)
         if now != last:
             last, moved = now, fx.clock()
-        waiting = ready(pulls, memory, done)
+        for pull in pulls:
+            workflows = held(pull, fx.bots)
+            if workflows and (pull.get("number"), pull.get("headRefOid")) not in told:
+                told.add((pull.get("number"), pull.get("headRefOid")))
+                fx.say(held_line(pull, workflows))
+        waiting = ready(pulls, memory, done, fx.bots)
         labels = fx.issue_labels() if len(waiting) > 1 else {}
         clashes = fx.clashes(waiting) if len(waiting) > 1 else set()
         chosen = pick(pulls, labels, memory, done, fx.bots, clashes)

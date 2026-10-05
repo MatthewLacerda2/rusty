@@ -4,6 +4,9 @@
 version: 2
 updates:
   # Actions pinned at majors (checkout@v4, rust-cache@v2, …) with nobody watching.
+  # A major tag floats the rest, so this entry only ever proposes majors, and
+  # they edit workflows no pull-request run executes: the merge queue's watch
+  # holds the PR for the orchestrator to dispatch them first (#825).
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
