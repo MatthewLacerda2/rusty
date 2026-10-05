@@ -60,7 +60,8 @@ watch keeps merging the rest** (#751): it prints one line,
 `queue: HANDED BACK #N: <why> …`, the moment it happens, and the handed-back
 head is remembered (under the checkout's git directory) and passed over, by
 this watch and later ones, until it moves — pushing a fix is the whole of
-re-queueing it. The watch **exits** on the machine failing (below), on its
+re-queueing it. **A new run attempt on that head counts as moving** (#869): `gh
+run rerun --failed ID` re-queues it, no push, no relaunch. The watch **exits** on the machine failing (below), on its
 `--for` deadline, or when nothing is left (no open pull request, or only drafts
 and handed-back heads, none moved for `--idle` minutes, default 90). Its exit
 status says what to do: **0** nothing to read, **1** something was handed back
@@ -107,7 +108,12 @@ conflict (naming the paths; it never resolves one), a rebased head that fails
 the local check (never pushed), a red run, a run that never
 appears, a head somebody else moved, a draft, or a merge GitHub refused. A 502 on
 the merge call is followed by asking whether it merged. Exit status is non-zero
-if anything was handed back.
+if anything was handed back. **A runner outage is not a red run** (#869): when the
+only jobs not green are `cancelled` (or a gate failed because the job it gates
+was), nothing compiled and nothing failed, so the queue re-runs those runs once
+(`gh run rerun --failed`) inside the same `--deadline`, and hands back only if they
+come back cancelled again, as `runners unavailable …`. That hand-back needs no
+push: once GitHub's runners are back, re-run the run and the watch retakes it.
 
 It **stops the whole queue** — one message, the rest named *not taken* — when a
 check fails for the machine's reasons: out of disk or memory, or rustc or the

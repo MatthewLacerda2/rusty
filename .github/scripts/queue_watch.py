@@ -18,7 +18,10 @@ the background is woken then. A hand-back is not one of those (#751):
   orchestrator to read the report and relaunch — one branch's problem stalled
   the batch. The handed-back head is remembered ([`MEMORY`]) and passed over
   until it moves, so a fix pushed to it is the whole of re-queueing it, in this
-  watch or a later one; `make queue PRS=N` ignores the memory. The starter still
+  watch or a later one; `make queue PRS=N` ignores the memory. **A new run
+  attempt on that head counts as moving** (#869): the runs on it are
+  remembered too ([`RUNS_MEMORY`], [`rerun_heads`]), so `gh run rerun` after a
+  runner outage, or a flaky job re-run by hand, re-queues it without a push. The starter still
   hears at once: each hand-back prints one line beginning [`HANDED_BACK_LINE`]
   (a `Monitor` on the output can wake on it), and the exit status at the end
   says one happened ([`status`]), as scorsese's does (scorsese#615, #690).
@@ -106,6 +109,10 @@ HELD_LINE = "HELD"
 
 # Where the remembered hand-backs live, under the checkout's git directory.
 MEMORY = "merge-queue/handed-back.json"
+
+# Beside it, the runs on each remembered head as [`attempts`] spells them, so a
+# re-run of the same head reads as movement (#869).
+RUNS_MEMORY = "handed-back-runs.json"
 
 # How each hand-back's line begins, the moment it happens: grep for this.
 HANDED_BACK_LINE = "HANDED BACK"
@@ -292,6 +299,36 @@ def forget_closed(memory: dict[int, str], pulls: list[dict]) -> dict[int, str]:
     return {n: sha for n, sha in memory.items() if n in open_}
 
 
+def attempts(runs: list[dict]) -> str:
+    """The runs on a head as one comparable string: each run's id and attempt.
+    A re-run bumps an attempt; a new run (a dispatch, a fresh `ready`) adds an id."""
+    return " ".join(sorted(f"{r.get('id')}.{r.get('run_attempt', 1)}" for r in runs))
+
+
+def rerun_heads(pulls: list[dict], memory: dict[int, str], marks: dict[int, str], runs_now) -> list[int]:
+    """The remembered hand-backs whose unmoved head has run again since (#869).
+
+    `marks` holds [`attempts`] as each was handed back; `runs_now(number, sha)`
+    asks GitHub for today's, `None` when it could not answer (no news, so
+    still passed over). Asked only for ready pull requests whose head is the
+    remembered one. An entry with no mark (remembered before #869, or GitHub
+    failed at the hand-back) takes today's as its mark.
+    """
+    again = []
+    for pull in pulls:
+        number, sha = pull.get("number"), pull.get("headRefOid")
+        if pull.get("isDraft") or memory.get(number) != sha:
+            continue
+        now = runs_now(number, sha)
+        if now is None:
+            continue
+        if number not in marks:
+            marks[number] = now
+        elif marks[number] != now:
+            again.append(number)
+    return again
+
+
 def recall(path: Path) -> dict[int, str]:
     """The remembered hand-backs; a missing or unreadable file is none."""
     try:
@@ -312,7 +349,8 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     `fx` carries every effect: `pulls()` (the open listing, or `None` when GitHub
     failed), `issue_labels()`, `clashes(pulls)` (the conflicting pairs among
     those ready, [`clashing`]), `turn(number)` (one pull request through the
-    queue, as [`merge-queue.take`]), `head(number)`, `clock()`, `sleep(seconds)`,
+    queue, as [`merge-queue.take`]), `head(number)`, `attempts(number, sha)`
+    (the runs on that head, [`attempts`], or `None`), `clock()`, `sleep(seconds)`,
     `say(...)`, `memory` (a path), `bots`, and the end states: `merged`, `ends`
     (ended without a hand-back: green under `--no-merge`, previewed by a dry run)
     `stops` (the machine's failure, [`merge-queue.Stopped`]) and `skips` (it
@@ -322,12 +360,17 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     between takes.
     """
     results, done, failed, handed, told = [], set(), 0, [], set()
-    memory = recall(fx.memory)
+    memory, marks = recall(fx.memory), recall(fx.memory.with_name(RUNS_MEMORY))
+
+    def save() -> None:
+        remember(fx.memory, memory)
+        remember(fx.memory.with_name(RUNS_MEMORY), {n: m for n, m in marks.items() if n in memory})
+
     last, moved = None, fx.clock()
     started = moved
     while True:
         if overdue(started, fx.clock(), opts.for_minutes):
-            remember(fx.memory, memory)
+            save()
             return results, deadline_reached(results, opts.for_minutes, fx.merged), status(handed, False)
         pulls = fx.pulls()
         if pulls is None:
@@ -338,6 +381,10 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             continue
         failed = 0
         memory = forget_closed(memory, pulls)
+        for number in rerun_heads(pulls, memory, marks, fx.attempts):
+            memory.pop(number, None)
+            marks.pop(number, None)
+            fx.say(f"watch: #{number} has run again on its handed-back head; back in line.")
         now = heads(pulls)
         if now != last:
             last, moved = now, fx.clock()
@@ -355,7 +402,7 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             if opts.dry_run and not why:
                 why = "dry run: every ready pull request has been previewed."
             if why:
-                remember(fx.memory, memory)
+                save()
                 return results, why, status(handed, False)
             fx.sleep(opts.poll)
             continue
@@ -375,13 +422,17 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         elif state in fx.skips:
             fx.sleep(opts.poll)
         elif state in fx.stops:
-            remember(fx.memory, memory)
+            save()
             return results, (
                 f"the machine failed on #{number}, not the branch; nothing is remembered against it."
             ), status(handed, True)
         else:
             memory[number] = fx.head(number) or chosen.get("headRefOid", "")
+            marks.pop(number, None)
+            mark = fx.attempts(number, memory[number])
+            if mark is not None:
+                marks[number] = mark
             handed.append(number)
             fx.say(handed_back(number, result[2]))
-        remember(fx.memory, memory)
+        save()
         last = None  # the merge moved `main` and the listing; look afresh

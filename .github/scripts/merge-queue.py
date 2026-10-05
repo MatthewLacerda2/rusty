@@ -122,6 +122,16 @@ judges that tree, so nothing a hand-back leaves behind can make a later merge
 unsound (scorsese#495). Each hand-back is named in the summary, and the exit
 status is non-zero if there was any.
 
+## A runner outage is re-run, not handed back
+
+When GitHub's hosted runners stop being acquired, every run in flight comes
+back red at once with nothing compiled (2026-10-05, #869): the only jobs not
+green are `cancelled`, or a gate that failed because the job it gates was. That
+is GitHub's failure, not the branch's, so [`wait_for`] re-runs those runs once
+(`gh run rerun --failed`, [`rerun_step`]) and keeps waiting inside the same
+`--deadline`; only a second cancellation hands back, as [`RUNNERS`]. A red with
+any job `failure` besides a gate is the code's, and hands back at once as ever.
+
 ## GitHub's answer about a state is not always the state
 
 The runs listing is eventually consistent ([`progress`]'s grace), a force-push
@@ -236,6 +246,11 @@ MAIN_GAINED = ("log", "--no-renames", "--name-only", "--format=>%H", "origin/mai
 DOCS_ONLY = "`main` moved only by Markdown; not rebased, the run on record stands (#587)"
 
 WAIT, GO, STOP = "wait", "go", "stop"
+# Red for the runners' reasons only ([`mergeable.outage`], #869): re-run it once.
+RERUN = "rerun"
+
+# How the hand-back after that one re-run begins: GitHub's failure, not the branch's.
+RUNNERS = "runners unavailable"
 
 # What the summary calls each ending. Merged, green and dry are separate so the
 # report never claims a merge it did not make.
@@ -344,9 +359,33 @@ def sighted(pull: dict, runs: list[dict]) -> set[str]:
     }
 
 
+def rerun_step(stalled: list[dict], rerun: dict[int, int], short: str) -> tuple[str, list[str]]:
+    """What to do about runs red only for the runners (#869): re-run them,
+    wait for the re-run to show, or hand back as [`RUNNERS`].
+
+    `rerun` maps each run this wait re-ran to the attempt it had then. A run
+    not in it is re-run ([`RERUN`]); one whose listed attempt is not past
+    that is the listing lagging the re-run, and waits; one already re-run
+    and red again is the hand-back. Once per run, inside the same deadline.
+    """
+    names = ", ".join(sorted({f"`{r.get('name')}`" for r in stalled}))
+    if any(r.get("id") not in rerun for r in stalled):
+        return RERUN, [
+            f"{names} on {short} came back cancelled with nothing failed: GitHub's runners, not the branch.",
+            "Re-running the cancelled jobs once (#869).",
+        ]
+    if any(r.get("run_attempt", 1) <= rerun[r.get("id")] for r in stalled):
+        return WAIT, [f"the re-run of {names} on {short} has not shown up yet."]
+    return STOP, [
+        f"{RUNNERS}: {names} on {short} was cancelled again after one re-run, with nothing failed.",
+        "The branch is not known to be wrong. Once GitHub's runners are back, re-run it"
+        " (`gh run rerun --failed ID`): a new run attempt re-queues it, no push needed.",
+    ]
+
+
 def progress(
     pull: dict, runs: list[dict], jobs: dict[int, list[dict]], files: list[str], waited: float,
-    seen: frozenset[str] | set[str] = frozenset(),
+    seen: frozenset[str] | set[str] = frozenset(), rerun: dict[int, int] | None = None,
 ) -> tuple[str, list[str]]:
     """Whether to wait, merge, or hand this branch back — and why.
 
@@ -358,11 +397,15 @@ def progress(
     absence — no run, or only runs that built nothing — waits out
     [`RUN_APPEARS_SECONDS`], because the commit was pushed seconds ago and
     scorsese watched the runs listing omit a live run beside a skipped one.
+    A red that is only cancelled jobs is the runners' ([`rerun_step`]).
     """
     if pull.get("isDraft"):
         return STOP, ["the pull request is a draft.", "CI does not check drafts. Mark it ready before queueing it."]
 
     sha = pull.get("headRefOid", "")
+    stalled = mergeable.outage(pull, runs, jobs)
+    if stalled:
+        return rerun_step(stalled, rerun or {}, sha[:7])
     states = [
         mergeable.assess(pull, w, mergeable.runs_for(runs, sha, w), jobs) for w in mergeable.WORKFLOWS
     ]
@@ -663,9 +706,10 @@ def wait_for(
     Never treats an absent check as a settled one — [`progress`] tells them
     apart, and [`head_state`] does the same one level up. What has been
     [`sighted`] on `sha` is remembered across polls, so a run the listing
-    drops is waited for rather than declared lost (#592).
+    drops is waited for rather than declared lost (#592). A red only the
+    runners caused is re-run once ([`rerun_step`]) on the same clock.
     """
-    began, seen = time.monotonic(), set()
+    began, seen, rerun = time.monotonic(), set(), {}
     while True:
         pull = look(number)
         waited = time.monotonic() - began
@@ -675,8 +719,12 @@ def wait_for(
         if state == GO:
             runs, jobs = mergeable.evidence(repo, sha)
             seen |= sighted(pull, runs)
-            state, lines = progress(pull, runs, jobs, mergeable.paths(pull), waited, seen)
-            if state != WAIT:
+            state, lines = progress(pull, runs, jobs, mergeable.paths(pull), waited, seen, rerun)
+            if state == RERUN:
+                refused = rerun_failed(mergeable.outage(pull, runs, jobs), rerun)
+                if refused:
+                    return STOP, [f"{RUNNERS}, and the re-run was refused: {refused}", *lines]
+            elif state != WAIT:
                 return state, lines
         if waited > deadline:
             return STOP, [
@@ -686,6 +734,19 @@ def wait_for(
             ]
         say(f"#{number}: {lines[0]}")
         time.sleep(poll)
+
+
+def rerun_failed(stalled: list[dict], rerun: dict[int, int]) -> str | None:
+    """`gh run rerun --failed` on each run, recording the attempt it had;
+    GitHub's refusal, or `None` once all of them were asked."""
+    for run in stalled:
+        done = subprocess.run(
+            ["gh", "run", "rerun", "--failed", str(run["id"])], capture_output=True, text=True, check=False
+        )
+        if done.returncode != 0:
+            return done.stderr.strip() or f"gh run rerun exited {done.returncode}"
+        rerun[run["id"]] = run.get("run_attempt", 1)
+    return None
 
 
 def dry(repo: str, pull: dict, fresh: str, notes: list[str]) -> tuple[int, str, str]:
@@ -883,6 +944,16 @@ def merge_tree_git(root: str, *args: str) -> tuple[int, str]:
     return done.returncode, done.stdout
 
 
+def head_runs(repo: str, sha: str) -> str | None:
+    """[`queue_watch.attempts`] of the gating runs on `sha`, `None` when GitHub
+    failed: what tells a re-run of a handed-back head from no news (#869)."""
+    listed = quietly("api", f"repos/{repo}/actions/runs?head_sha={sha}&per_page=100")
+    if listed is None:
+        return None
+    runs = listed.get("workflow_runs", [])
+    return queue_watch.attempts([r for w in mergeable.WORKFLOWS for r in mergeable.runs_for(runs, sha, w)])
+
+
 def unready(result: tuple[int, str, str]) -> tuple[int, str, str]:
     """[`take`]'s refusal of a draft or closed pull request, renamed for the
     watch: it raced the listing, and is not a hand-back to wake anyone for."""
@@ -904,6 +975,7 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
         ),
         turn=lambda number: unready(drain([number], lambda n: take(repo, n, opts))[0]),
         head=lambda number: (quietly("pr", "view", str(number), "--json", "headRefOid") or {}).get("headRefOid"),
+        attempts=lambda number, sha: head_runs(repo, sha),
         clock=time.monotonic,
         sleep=time.sleep,
         say=say,
