@@ -117,7 +117,7 @@ Graphics.SetCustomEffects({})           -- off again
   posterize bands) are smoothed like the scene's. Each entry is one fullscreen pass;
   names may repeat.
 - **Names** are what `Shader.Bake` was given (the file is `<name>.wgsl` in the
-  default authored-shader dir, `project/assets/shaders`). `SetCustomEffects` raises
+  default authored-shader dir, `assets/shaders`). `SetCustomEffects` raises
   an error — and changes nothing — for an empty name or one that is a path (`/`,
   `\`, a leading `.`). A name not baked yet is accepted.
 - **Fail-safe.** A module that is missing, fails to compile, or doesn't fit the post

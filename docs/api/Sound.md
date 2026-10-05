@@ -97,7 +97,7 @@ local clip = Sound.Bake({
   filter = { kind = "lowpass", cutoff = 300, resonance = 0.5, env_octaves = 4.4,
              adsr = { a = 0.0, d = 0.05, s = 0.0, r = 0.05 } },
   fx     = { { fx = "reverb", size = 0.4, damp = 0.6, mix = 0.15 } },
-}, "C2", "project/assets/sounds/gunshot.wav", { duration = 0.12, seed = 9 })
+}, "C2", "assets/sounds/gunshot.wav", { duration = 0.12, seed = 9 })
 
 Audio.PlayAt(clip, muzzle.x, muzzle.y, muzzle.z, 0.9)
 ```
@@ -129,7 +129,7 @@ local theme = {
   bpm = 120,
   seed = 7,
   tracks = {
-    { name = "bass", patch = "project/assets/sounds/bass.json", gain = 0.8 },
+    { name = "bass", patch = "assets/sounds/bass.json", gain = 0.8 },
     { name = "lead", patch = { source = { kind = "karplus", damping = 0.996,
                                           brightness = 0.5 },
                                amp = { a = 0.001, d = 0.3, s = 0.0, r = 0.2 } },
@@ -144,7 +144,7 @@ local theme = {
   arrangement = { "verse", "verse" },
 }
 
-local clip = Sound.BakeSong(theme, "project/assets/sounds/theme.wav")
+local clip = Sound.BakeSong(theme, "assets/sounds/theme.wav")
 Audio.PlayAt(clip, 0, 0, 0, 1.0)
 ```
 
@@ -192,7 +192,7 @@ always did.
 
 ```lua
 Sound.BakeSong({ bpm = 96, tail = "wrap", --[[ tracks, patterns, arrangement ]] },
-               "project/assets/sounds/combat_bed.wav")
+               "assets/sounds/combat_bed.wav")
 ```
 
 | Field | Values | Effect |
@@ -236,8 +236,8 @@ comparing against.
 | `tracks` | The mix **track by track** — a list of rows with the fields above plus `name` and that track's own `sections`. |
 
 ```lua
-local clip, level = Sound.Bake(pistol, "C2", "project/assets/sounds/pistol.wav")
-local step = Sound.Level("project/assets/sounds/footstep.wav")
+local clip, level = Sound.Bake(pistol, "C2", "assets/sounds/pistol.wav")
+local step = Sound.Level("assets/sounds/footstep.wav")
 print(("pistol %.1f dBFS, footstep %.1f dBFS"):format(level.mean, step.mean))
 ```
 
@@ -287,13 +287,13 @@ A field is `nil` when either side had nothing to compare (a silence has no level
 no balance); `nil` is not zero.
 
 ```lua
-local _, level = Sound.BakeSong(theme, "project/assets/sounds/theme.wav")
+local _, level = Sound.BakeSong(theme, "assets/sounds/theme.wav")
 for _, t in ipairs(level.tracks) do
   print(("%-6s mean %.1f  low %d%%  mid %d%%  high %d%%"):format(
     t.name, t.mean or -math.huge, t.bands and t.bands.low or 0,
     t.bands and t.bands.mid or 0, t.bands and t.bands.high or 0))
 end
-local d = Sound.Diff("project/assets/sounds/theme.wav", "project/assets/sounds/theme.prev.wav")
+local d = Sound.Diff("assets/sounds/theme.wav", "assets/sounds/theme.prev.wav")
 print(("%.1f dB vs the previous bake"):format(d.mean))
 ```
 
@@ -328,9 +328,9 @@ anything else is a patch. Inline entries are named `#1`, `#2`, … by position.
 
 ```lua
 local report = Sound.Survey({
-  "project/assets/sounds/impact_wood.json",
-  "project/assets/sounds/impact_metal.json",
-  "project/assets/sounds/impact_dirt.json",
+  "assets/sounds/impact_wood.json",
+  "assets/sounds/impact_metal.json",
+  "assets/sounds/impact_dirt.json",
 })
 for _, row in ipairs(report.rollup.sources) do
   print(row.source, row.patches, row.cutoff and row.cutoff.low, row.cutoff and row.cutoff.high)

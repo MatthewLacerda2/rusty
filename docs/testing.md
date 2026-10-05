@@ -5,7 +5,7 @@
 | Unit tests | `#[cfg(test)] mod tests` in the same file | `cargo nextest run` |
 | Integration tests | `tests/*.rs`, one binary rooted at `tests/main.rs` | `cargo nextest run` (or `cargo nextest run -E 'binary(integration)' <filter>`) |
 | Doctests | `///` examples | `cargo test --doc` (nextest does not run them) |
-| Harness scenarios | `project/scenarios/*.lua` (dev-only) | the headless `play` binary |
+| Harness scenarios | a project's `scenarios/*.lua` (dev-only); the engine's own in `tests/fixtures/project/scenarios/` | the headless `play` binary, `--project <dir>` |
 
 ## Rules
 - Test and fixture files are capped at **150 lines** by the size gate
@@ -16,11 +16,18 @@
 - CI (`.github/workflows/ci.yml`) and `make test` run the engine suite with
   **cargo-nextest** plus `cargo test --doc`, both feature sets; the lint xtask keeps
   plain `cargo test`. See *The test runner* below.
-- A test never reads the developer's git-ignored `./project` (#782). `Harness::new`
-  runs in a workspace of its own, `<out_dir>/workspace`, seeded fresh from the
-  bundled scripts, and the scene's relative script paths resolve there; a test runs
-  a scenario with `scenario::run_isolated`. The `play` binary is the one harness
-  that runs `./project` (`Harness::in_user_workspace`): an agent play-tests its game.
+- A test never reads a developer's game project (#782). `Harness::new` runs in a
+  workspace of its own, `<out_dir>/workspace`, seeded fresh from the test-fixture
+  project's scripts and the bundled ones, and the scene's relative script paths
+  resolve there; a test runs a scenario with `scenario::run_isolated`. The `play`
+  binary is the one harness that runs a real project (`--project <dir>`, default
+  `./project`; `Harness::in_user_workspace`): an agent play-tests its game.
+- **The test-fixture project** is `tests/fixtures/project/` (#829): the committed
+  scenarios, the bot-player script and build settings, opened like any other
+  project — `cargo run --bin play --features dev -- --project tests/fixtures/project
+  tests/fixtures/project/scenarios/smoke.lua out/`. What the engine seeds into it
+  when opened is git-ignored. In-process tests run with the checkout as their
+  working directory, so anything they seed lands under the git-ignored `/assets/`.
   A test's own scripts go in that workspace too, attached by workspace-relative
   path, so its snapshot carries no machine path (#783).
 - A test builds an engine struct through a constructor or `..Default::default()`,

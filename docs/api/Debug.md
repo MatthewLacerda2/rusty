@@ -28,7 +28,7 @@ to a PNG, **headlessly**. That closes the authoring loop for shaders in particul
 local png = Debug.Preview(Shader.Bake(recipe), "out/preview.png")
 
 -- a texture on the cube instead of the default sphere, at 256²
-Debug.Preview("project/assets/brick.png", "out/brick.png", { mesh = "cube", resolution = 256 })
+Debug.Preview("assets/brick.png", "out/brick.png", { mesh = "cube", resolution = 256 })
 ```
 
 **Previewable kinds** — the same set the Inspector tab accepts, dispatched on the file
@@ -177,7 +177,7 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
   "components": ["Mesh", "Material", "Collider"],   // optional-component inventory
   "transform": { "pos": [x,y,z], "rot": [x,y,z], "scale": [x,y,z] },  // rot = Euler°
   "bounds": { "min": [x,y,z], "max": [x,y,z] },     // world-space AABB, or null
-  "scripts": ["project/scripts/foo.lua"],
+  "scripts": ["assets/scripts/foo.lua"],
   "mesh":      { "primitive_type": "Box", "asset_ref": "models/crates.glb::Barrel" },
   "material":  { "color": [r,g,b], "metallic": .., "roughness": .., "texture": "..",
                  "metallic_map": null, "roughness_map": null },

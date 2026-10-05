@@ -100,7 +100,7 @@
         ]
       },
       "script": {
-        "path": "project/assets/scripts/player_controller.lua",
+        "path": "assets/scripts/player_controller.lua",
         "is_loaded": false
       },
       "animator": null,
@@ -337,7 +337,7 @@
       },
       "texture": null,
       "script": {
-        "path": "project/assets/scripts/bot.lua",
+        "path": "assets/scripts/bot.lua",
         "is_loaded": false
       },
       "animator": {
