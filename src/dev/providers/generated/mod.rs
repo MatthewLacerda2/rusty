@@ -31,11 +31,10 @@ pub use brief::{canonical, digest, digest_of, fingerprint, Brief};
 pub(crate) use sidecar::civil_date;
 pub use sidecar::{today, Sidecar};
 
-/// Where generated assets live, relative to the working directory. The one place
-/// this module names it: per-project folders (#829) move this line and nothing else.
-/// Gitignored with the rest of the project tree: a generated file is reproducible
-/// from its brief plus money, and the brief is what belongs in version control.
-pub const GENERATED_DIR: &str = "project/assets/generated";
+/// Where generated assets live, relative to the project root, which is the working
+/// directory (#829). The one place this module names it. Whether a game's repo
+/// versions these files is still open (#866).
+pub const GENERATED_DIR: &str = "assets/generated";
 
 /// Where a brief's output lives, relative to the working directory.
 pub fn address<B: Brief + ?Sized>(brief: &B) -> serde_json::Result<PathBuf> {

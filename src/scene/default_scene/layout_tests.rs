@@ -105,7 +105,7 @@ fn the_spawn_line_is_open_and_the_enemy_starts_behind_cover() {
 /// The bundled controller's camera offset behind the Player, read from the script
 /// itself so the test moves with it: the larger of the start and follow offsets.
 fn camera_back() -> f32 {
-    let script = include_str!("../../../assets/scripts/player_controller.lua");
+    let script = include_str!("../../../engine/scripts/player_controller.lua");
     let value = |name: &str| -> f32 {
         let line = script
             .lines()
