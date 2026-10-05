@@ -5,7 +5,7 @@
 //! Input Field. Each widget is a small tree of first-class primitives
 //! (`RectTransform`, `Image`, `Text`, `Selectable`, `RectMask`, `LayoutGroup`, …)
 //! whose behaviour is an engine-shipped Lua **script component**
-//! (`assets/scripts/ui/*.lua`) — not a first-class component, so games restyle or
+//! (`engine/scripts/ui/*.lua`) — not a first-class component, so games restyle or
 //! fork it freely. The trees are built here, once: the editor's Create ▸ UI menu
 //! and `UI.Create` call [`create_ui`], and [`seed`] writes the same trees as
 //! `.prefab`s for `Scene.Instantiate`.
@@ -27,7 +27,7 @@ use crate::scene::prefab::extract_prefab;
 use crate::scene::Scene;
 
 /// Where the engine's widget scripts ship (tracked).
-pub const SCRIPT_SOURCE_DIR: &str = "assets/scripts/ui";
+pub const SCRIPT_SOURCE_DIR: &str = "engine/scripts/ui";
 /// Where [`seed`] writes the widget prefabs.
 pub const PREFAB_DIR: &str = "project/prefabs/ui";
 

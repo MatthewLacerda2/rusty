@@ -16,7 +16,7 @@ use crate::shadergen::{compose, ENGINE_SHADER_DIR};
 
 impl Renderer {
     /// Render `scene` with the forward pipeline temporarily rebuilt from
-    /// `shader_path`'s compiled module instead of `assets/shaders/shader.wgsl` — the
+    /// `shader_path`'s compiled module instead of `engine/shaders/shader.wgsl` — the
     /// Preview tab's Shader-asset arm ("the chosen preview mesh... shaded by the
     /// selected module", #352). Reuses `create_pipelines` verbatim (same bind-group
     /// layouts, same vertex/fragment entry points as every other forward pipeline) so
@@ -60,7 +60,7 @@ impl Renderer {
     }
 
     /// Read and compose `shader_path` against the engine's one shared `common.wgsl`
-    /// (`assets/shaders/common.wgsl` — every shader's `#import "common"` target,
+    /// (`engine/shaders/common.wgsl` — every shader's `#import "common"` target,
     /// regardless of where the previewed file itself lives), returning `None` rather
     /// than panicking on a missing file or a composition error (the non-panicking
     /// path the #272 authoring bake validates through, `shadergen::compose`).

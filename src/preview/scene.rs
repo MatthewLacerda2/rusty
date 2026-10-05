@@ -26,7 +26,7 @@ use crate::scene::{LightComponent, LightType, Scene};
 /// The bundled preview mesh (#352): a hardcoded `.obj`, never a project asset — it
 /// lives in the engine's own `assets/` tree (unlike `project/assets/`, which is all
 /// the Content Browser scans), so it never shows up as a browsable asset.
-pub const SUZANNE_PATH: &str = "assets/models/suzanne.obj";
+pub const SUZANNE_PATH: &str = "engine/models/suzanne.obj";
 
 /// Which mesh the Preview tab shows the subject on (models render as themselves
 /// instead — see [`PreviewSubject::Model`]).

@@ -26,7 +26,7 @@ pub fn validate(base: &str, module: &str) -> Result<Vec<String>, String> {
 mod tests {
     use super::*;
 
-    const BASE: &str = "assets/shaders";
+    const BASE: &str = "engine/shaders";
 
     #[test]
     fn a_trivial_postfx_module_composes() {

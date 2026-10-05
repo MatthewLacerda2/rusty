@@ -14,7 +14,7 @@ const RES: u32 = 32;
 
 /// The engine's own forward shader — a module guaranteed to compose, so the override
 /// path is exercised rather than its fallback.
-const SHADER: &str = "assets/shaders/shader.wgsl";
+const SHADER: &str = "engine/shaders/shader.wgsl";
 
 /// A preview render view (own target + depth + post-FX) sized to the test resolution.
 fn preview_view(renderer: &Renderer) -> RenderView {

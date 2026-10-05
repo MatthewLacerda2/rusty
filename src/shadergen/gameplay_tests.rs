@@ -8,7 +8,7 @@ use super::assemble::assemble;
 use super::recipe::{BlockSel, PassKind, ShaderRecipe};
 use super::validate::validate;
 
-const ENGINE_SHADERS: &str = "assets/shaders";
+const ENGINE_SHADERS: &str = "engine/shaders";
 const NEW: [&str; 4] = ["pulse_glow", "uv_scroll", "triplanar_detail", "hologram"];
 
 fn surface(ids: &[&str]) -> String {

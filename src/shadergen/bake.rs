@@ -12,7 +12,7 @@
 //!    as `<name>.params.json` (#399; postfx too since #671).
 //!
 //! The engine's committed shader set (`engine_shaders`, normally
-//! `assets/shaders`) is read-only here — it supplies the surface base and the
+//! `engine/shaders`) is read-only here — it supplies the surface base and the
 //! `common` module to validate against. The baked output goes to a separate
 //! `out_dir` (the authored-content workspace, e.g. `project/assets/shaders`), so a
 //! bake never mutates the shipped set. For the engine to *load* a baked variant,

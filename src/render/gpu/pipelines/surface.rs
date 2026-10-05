@@ -3,7 +3,7 @@
 //!
 //! A material names a surface shader (`MaterialAsset::shader`, e.g. `"enemy_toon"`);
 //! the module is `<name>.wgsl` in the authored workspace (`project/assets/shaders`,
-//! where `Shader.Bake` writes), else the engine set (`assets/shaders`). A surface
+//! where `Shader.Bake` writes), else the engine set (`engine/shaders`). A surface
 //! variant keeps the forward contract by construction (#272: same `VertexInput`, bind
 //! groups and entry points), so only the shader module differs: its pipelines reuse
 //! the forward pipeline layout, and a variant is two pipelines — opaque and

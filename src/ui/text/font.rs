@@ -2,7 +2,7 @@
 //!
 //! A font is a `.ttf` / `.otf` file referenced by path, like a texture; `None` is
 //! the bundled default (Instrument Sans, SIL OFL 1.1 — the license sits beside it
-//! in `assets/fonts/`). Parsed fonts are cached for the process by path, so the
+//! in `engine/fonts/`). Parsed fonts are cached for the process by path, so the
 //! sim's layout and the renderer's atlas read the very same glyph ids. A path that
 //! does not load falls back to the default (with one warning), so a text never
 //! vanishes over a typo.
@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use ab_glyph::{Font, FontArc, GlyphId, PxScale};
 
 /// The bundled default font's bytes.
-const DEFAULT_FONT: &[u8] = include_bytes!("../../../assets/fonts/InstrumentSans-Regular.ttf");
+const DEFAULT_FONT: &[u8] = include_bytes!("../../../engine/fonts/InstrumentSans-Regular.ttf");
 
 /// One loaded font: the parsed face plus its kerning lookups.
 pub struct FontData {

@@ -56,7 +56,7 @@ pub use recipe::{BlockSel, PassKind, ShaderRecipe};
 
 /// The engine's committed shader set — read-only at bake time: it supplies the
 /// surface base (`shader.wgsl`) and the `common` module a bake validates against.
-pub const ENGINE_SHADER_DIR: &str = "assets/shaders";
+pub const ENGINE_SHADER_DIR: &str = "engine/shaders";
 
 /// The default output dir for authored shaders: the gitignored project workspace,
 /// the same pattern as authored textures/scripts. A material naming a baked surface

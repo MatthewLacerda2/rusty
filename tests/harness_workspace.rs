@@ -33,7 +33,7 @@ fn a_stale_player_controller_in_the_workspace_is_replaced_by_the_bundled_one() {
         "the stale copy ran instead of the bundled one"
     );
     assert!(!ran("Error"), "a script failed: {:?}", console.messages);
-    let bundled = std::fs::read("assets/scripts/player_controller.lua").unwrap();
+    let bundled = std::fs::read("engine/scripts/player_controller.lua").unwrap();
     assert_eq!(
         std::fs::read(&planted).unwrap(),
         bundled,

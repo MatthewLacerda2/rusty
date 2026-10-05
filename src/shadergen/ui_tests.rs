@@ -10,7 +10,7 @@ use super::blocks::catalog;
 use super::recipe::{BlockSel, PassKind, ShaderRecipe};
 use super::validate::validate;
 
-const ENGINE_SHADERS: &str = "assets/shaders";
+const ENGINE_SHADERS: &str = "engine/shaders";
 
 fn recipe(ids: &[&str]) -> ShaderRecipe {
     ShaderRecipe {

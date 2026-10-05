@@ -1,7 +1,7 @@
 //! src/scene/io/seed.rs — seed the engine's defaults into the project workspace.
 //!
 //! The default scene (built in Rust by `default_scene::build`, #667) and the bundled
-//! scripts (`assets/scripts/*.lua`) are seeded into the gitignored `project/` on
+//! scripts (`engine/scripts/*.lua`) are seeded into the gitignored `project/` on
 //! boot, through the seed manifest (#746): a file nobody edited follows the engine's
 //! current default, an edited one is kept.
 
@@ -16,7 +16,7 @@ pub const DEFAULT_SCENE_PATH: &str = "project/scenes/default.scene";
 
 /// Tracked authoritative copies of the bundled default scripts (the player
 /// controller + the enemy brain) that ship WITH the engine.
-pub const DEFAULT_SCRIPTS_SOURCE_DIR: &str = "assets/scripts";
+pub const DEFAULT_SCRIPTS_SOURCE_DIR: &str = "engine/scripts";
 /// Where the bundled scripts are seeded into the gitignored project workspace, so
 /// scenes referencing `project/assets/scripts/<name>.lua` resolve on boot.
 pub const DEFAULT_SCRIPTS_DEST_DIR: &str = "project/assets/scripts";
@@ -47,7 +47,7 @@ pub fn seed_default_scene() -> String {
     DEFAULT_SCENE_PATH.to_string()
 }
 
-/// Seed the bundled default scripts (`assets/scripts/*.lua`) into
+/// Seed the bundled default scripts (`engine/scripts/*.lua`) into
 /// `project/assets/scripts/` on boot, through the seed manifest. Idempotent.
 /// The UI widget kit's scripts and prefabs are seeded too — those directories are
 /// engine-owned and rewritten (see `authoring::ui_widgets::seed`).
