@@ -3,6 +3,7 @@
 //! that frame, and a CharacterController walks through hitboxes.
 
 pub mod rig;
+mod through;
 
 use std::cell::RefCell;
 use std::rc::Rc;

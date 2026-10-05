@@ -90,19 +90,30 @@ fn vec_table(lua: &mlua::Lua, v: Vec3) -> mlua::Result<Table> {
     Ok(t)
 }
 
+/// Set who a hit struck on `t`: `id`, its `bone`/`bone_name` (absent off a
+/// skeleton) and `root` (#464). Shared by `RaycastAll` and `RaycastThrough`.
+pub(super) fn set_owner(t: &Table, scene: &Scene, id: u32) -> mlua::Result<()> {
+    t.set("id", id)?;
+    if let Some(bone) = scene.hit_bone(id) {
+        t.set("bone", bone)?;
+        t.set("bone_name", scene.world.name(bone).map(|n| n.clone()))?;
+    }
+    t.set("root", scene.root_of(id))
+}
+
+/// Set where a hit landed on `t`: `distance`, `point = {x,y,z}`, `normal = {x,y,z}`.
+pub(super) fn set_surface(lua: &mlua::Lua, t: &Table, hit: &RayHit) -> mlua::Result<()> {
+    t.set("distance", hit.distance)?;
+    t.set("point", vec_table(lua, hit.point)?)?;
+    t.set("normal", vec_table(lua, hit.normal)?)
+}
+
 /// One `RaycastAll` entry: `{id, distance, point = {x,y,z}, normal = {x,y,z},
 /// bone, bone_name, root}` — `bone`/`bone_name` absent off a skeleton.
 fn hit_table(lua: &mlua::Lua, scene: &Scene, hit: &RayHit) -> mlua::Result<Table> {
     let t = lua.create_table()?;
-    t.set("id", hit.id)?;
-    if let Some(bone) = scene.hit_bone(hit.id) {
-        t.set("bone", bone)?;
-        t.set("bone_name", scene.world.name(bone).map(|n| n.clone()))?;
-    }
-    t.set("root", scene.root_of(hit.id))?;
-    t.set("distance", hit.distance)?;
-    t.set("point", vec_table(lua, hit.point)?)?;
-    t.set("normal", vec_table(lua, hit.normal)?)?;
+    set_owner(&t, scene, hit.id)?;
+    set_surface(lua, &t, hit)?;
     Ok(t)
 }
 

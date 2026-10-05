@@ -8,7 +8,8 @@
 //! (`ClosestPoint`/`ContainsPoint`/`GetBounds`) in `point`, and the collider's
 //! authorable shape + physics material (#447) in `collider`, the per-bone
 //! hitbox generator (#464) in `hitbox`, forces / impulses at a point (#466)
-//! in `impulse`, and the layer collision matrix (#827) in `matrix`.
+//! in `impulse`, the layer collision matrix (#827) in `matrix`, and the
+//! enter/exit penetration cast (`RaycastThrough`, #830) in `through`.
 //! `register` creates the `Physics` table; `register_hitscan` extends it once
 //! the live physics handle is available.
 
@@ -18,6 +19,7 @@ mod hitbox;
 mod impulse;
 mod matrix;
 mod point;
+mod through;
 mod volume;
 
 use std::cell::RefCell;
@@ -216,6 +218,7 @@ pub fn register_hitscan<'scope>(
     let table = global_table(lua, "Physics")?;
 
     cast::register(scope, &table, scene, physics)?;
+    through::register(scope, &table, scene, physics)?;
     volume::register(scope, &table, scene, physics)?;
     point::register(scope, &table, scene, physics)?;
     impulse::register(scope, &table, scene, physics)?;

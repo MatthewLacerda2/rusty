@@ -25,6 +25,7 @@ every number after `hit` is `0` and the rest are `nil`.
 | `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root` |
 | `Physics.SphereCast` | `(ox, oy, oz, dx, dy, dz, radius [, ignore_id [, layer_mask]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root` |
 | `Physics.RaycastAll` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask])` | array of `{id, distance, point = {x,y,z}, normal = {x,y,z}, bone, bone_name, root}`, nearest first |
+| `Physics.RaycastThrough` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask])` | array of `{id, bone, bone_name, root, thickness, enter = {distance, point, normal}, exit = {distance, point, normal} or nil}`, nearest entry first |
 | `Physics.OverlapSphere` | `(cx, cy, cz, radius [, layer_mask])` | array of entity ids |
 | `Physics.OverlapBox` | `(cx, cy, cz, hx, hy, hz [, layer_mask])` | array of entity ids |
 | `Physics.OverlapCapsule` | `(x0, y0, z0, x1, y1, z1, radius [, layer_mask])` | array of entity ids |
@@ -74,8 +75,8 @@ exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` 
   point is where the sphere touched the struck surface.
 - **`RaycastAll`** reports *every* collider the ray crosses within `max_distance`,
   sorted by distance (equal distances by entity id, so the order is
-  deterministic). Each entry is where the ray *enters* that collider — the
-  building block for wallbangs / over-penetration, which walk the list in Lua.
+  deterministic). Each entry is where the ray *enters* that collider; for how
+  much material it crossed (wallbangs), use `RaycastThrough`.
   A ray that starts inside a collider reports it at distance `0` (zero normal).
   Like the overlaps it takes an optional `layer_mask` but no `ignore_id` — skip
   the shooter's own id while walking the list.
@@ -84,6 +85,38 @@ exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` 
   for _, h in ipairs(Physics.RaycastAll(ox,oy,oz, dx,dy,dz, 100)) do
     if h.id ~= self_id then
       Decals.Spawn(h.point.x, h.point.y, h.point.z, h.normal.x, h.normal.y, h.normal.z)
+    end
+  end
+  ```
+- **`RaycastThrough`** (#830) is `RaycastAll` with exits: one entry per stretch
+  of solid the ray passes through, with where it went in (`enter`), where it came
+  out (`exit`) and the material between (`thickness`, metres along the ray) — what
+  a wallbang or over-penetration prices its damage on. No direct Unity
+  equivalent; same arguments, filtering, sort order and `id`/`bone`/`bone_name`/
+  `root` fields as `RaycastAll`. Normals face out of the solid: back along the
+  ray at `enter`, along it at `exit`.
+  - Each exit is found against *that* collider's own shape, so overlapping or
+    nested colliders pair correctly.
+  - A **mesh collider** (non-convex, e.g. a building exported as one mesh) can be
+    crossed several times — wall, room, wall — and lists each crossing as its
+    own entry, **so the same `id` may appear more than once**. Its faces are
+    paired by winding (outward-facing, as glTF exports them); walls thinner than
+    0.1 mm read as a single face and are skipped.
+  - A ray that **ends inside** a solid has `exit = nil`, and `thickness` runs to
+    `max_distance`.
+  - A ray that **starts inside** one enters at distance `0`, at the origin, with
+    the normal facing back along the ray (Unity's convention for a cast that
+    starts in a collider).
+  - **Triggers** are listed like any collider (smoke blocks sight), so skip them
+    — or leave their layer out of the mask — when pricing bullets.
+
+  ```lua
+  local power = 1.0                       -- penetration budget; game data, not engine
+  for _, s in ipairs(Physics.RaycastThrough(ox,oy,oz, dx,dy,dz, 100, SHOT)) do
+    if s.root ~= self_id then
+      Damage(s.root, 30 * power)
+      power = power - s.thickness * Resistance(s.id)  -- e.g. 0.5 per metre of wood
+      if power <= 0 or not s.exit then break end
     end
   end
   ```
@@ -277,8 +310,8 @@ card) fits one collider per bone of `id`'s skinned mesh and returns
 **Hits name the bone and the character.** `Raycast` / `SphereCast` return the
 struck `bone` (the hit entity itself when it is a bone, else its nearest bone
 ancestor; `nil` off a skeleton), its `bone_name` (the glTF joint name) and `root`, the top of the hit entity's hierarchy
-(Unity's `Transform.root`: the character). `RaycastAll` entries carry `bone`,
-`bone_name` and `root`.
+(Unity's `Transform.root`: the character). `RaycastAll` and `RaycastThrough`
+entries carry `bone`, `bone_name` and `root`.
 
 **Convention: the capsule moves, the hitboxes take the shots.** Put the
 character's movement capsule (its `CharacterController` or collider) on a layer
