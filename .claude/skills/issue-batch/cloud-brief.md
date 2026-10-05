@@ -65,18 +65,18 @@ nothing to wait for.
 - `tests/` is **one integration binary** rooted at `tests/main.rs`; a new test file
   is a module under it. Test files are capped at **150 lines** (source at 300).
 - A test that renders is named `gpu_*` (in-crate) or lives under `tests/gpu/`
-  (integration). Install lavapipe to run them:
-  `sudo apt-get install -y mesa-vulkan-drivers libvulkan1`.
+  (integration). They run on lavapipe, which the SessionStart hook installs
+  along with `cargo-nextest` and `cargo-deny` (#826). If its log
+  (`session-start: <step> FAIL`) shows a step failed, do what that line says
+  before trusting a green run: without the driver, GPU tests skip silently.
 - **An editor-visible PR attaches captures.** If the branch changes what the editor
   draws (a panel, an inspector card, the theme), run `make editor-capture` on `main`
   and on the branch (`ARGS="--select <entity>"` to open its inspector) and show both
   in the PR description, the way `docs/testing.md` § Editor captures says. Never
   leave a PNG on the branch that merges. (#731; #725 did it by hand.)
 - `make gates` (foreground) before readying.
-- If `cargo nextest` is missing in the container, install the prebuilt binary
-  (`curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ~/.cargo/bin`)
-  rather than falling back to `cargo test`: CI runs nextest, and its per-test
-  process isolation and the `gpu` test group are what the gate measures.
+- Never fall back to `cargo test`: CI runs nextest, and its per-test process
+  isolation and the `gpu` test group are what the gate measures.
 - Rebase onto the latest `origin/main` before readying.
 - Don't run `cargo mutants` locally; ask for a scoped run (above).
 - **A refactor that claims no behaviour change proves it by comparison**:
