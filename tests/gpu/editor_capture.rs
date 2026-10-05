@@ -82,3 +82,60 @@ fn an_unknown_selection_is_an_error_not_a_blank_inspector() {
     let err = capture::capture(&game, crate::temp::dir().join("x.png"), &opts);
     assert!(err.unwrap_err().contains("NoSuchEntity"));
 }
+
+/// The inspector column's pixels (right fifth, middle half of the height).
+fn inspector(img: &image::RgbaImage) -> Vec<[u8; 4]> {
+    let (w, h) = img.dimensions();
+    let rows = h / 4..h * 3 / 4;
+    rows.flat_map(|y| (w - w / 5..w).map(move |x| img.get_pixel(x, y).0))
+        .collect()
+}
+
+#[test]
+fn selecting_a_scene_asset_opens_its_inspector_card() {
+    let dir = crate::temp::dir();
+    let asset = dir.join("level.scene");
+    std::fs::write(&asset, "{}").expect("write the asset");
+    let game = capture::default_world();
+    let mut host = rusty::dev::capture::CaptureHost::new();
+    let mut shot = |name: &str, select_asset: Option<String>| {
+        let out = dir.join(name);
+        let opts = EditorCaptureOptions {
+            width: W,
+            height: H,
+            select_asset,
+            ..Default::default()
+        };
+        let written = capture::capture_into(&mut host, &game, &out, &opts).expect("captures");
+        written.then(|| image::open(&out).expect("a readable PNG").to_rgba8())
+    };
+    let Some(settings) = shot("settings.png", None) else {
+        eprintln!("no GPU adapter — skipping the editor capture");
+        return;
+    };
+    let card = shot("card.png", Some(asset.display().to_string())).expect("same adapter");
+    // Nothing selected shows the scene settings; the asset swaps in its card.
+    assert_ne!(
+        inspector(&settings),
+        inspector(&card),
+        "inspector unchanged"
+    );
+}
+
+#[test]
+fn a_missing_asset_or_a_double_selection_is_an_error() {
+    let game = capture::default_world();
+    let out = crate::temp::dir().join("x.png");
+    let missing = EditorCaptureOptions {
+        select_asset: Some("no/such.scene".to_string()),
+        ..Default::default()
+    };
+    let err = capture::capture(&game, &out, &missing).unwrap_err();
+    assert!(err.contains("no/such.scene"), "{err}");
+    let both = EditorCaptureOptions {
+        select: Some("Player".to_string()),
+        ..missing
+    };
+    let err = capture::capture(&game, &out, &both).unwrap_err();
+    assert!(err.contains("both"), "{err}");
+}

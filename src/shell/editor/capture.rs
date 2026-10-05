@@ -52,6 +52,9 @@ pub struct EditorCaptureOptions {
     pub frames: u32,
     /// Select the entity with this name first (the Inspector shows its cards).
     pub select: Option<String>,
+    /// Select the asset at this path first (the Inspector shows its card: a scene's
+    /// bake buttons, an image or audio preview, a prefab). Exclusive with `select`.
+    pub select_asset: Option<String>,
     /// Frame the selection in the Scene view first, as the F key does (#745).
     pub frame_selected: bool,
     /// Draw the chrome as in Play mode (accent tint, floating console). The sim is
@@ -68,6 +71,7 @@ impl Default for EditorCaptureOptions {
             height: DEFAULT_HEIGHT,
             frames: DEFAULT_FRAMES,
             select: None,
+            select_asset: None,
             frame_selected: false,
             playing: false,
             tab: ViewportTab::Scene,
@@ -95,7 +99,8 @@ pub fn default_world() -> GameWorld {
 /// Capture the editor over `game`'s scene to a PNG at `path`.
 ///
 /// `Ok(true)` when written, `Ok(false)` when the box has no GPU/software adapter, `Err`
-/// for a `select` name the scene doesn't hold or an I/O / encode failure.
+/// for a `select` name the scene doesn't hold, a `select_asset` path that doesn't
+/// exist, both selections at once, or an I/O / encode failure.
 pub fn capture(
     game: &GameWorld,
     path: impl AsRef<Path>,
@@ -117,6 +122,15 @@ pub fn capture_into(
     if let Some(name) = &opts.select {
         let id = game.scene().borrow().find_entity_by_name(name);
         ui.selected_entity_id = Some(id.ok_or_else(|| format!("no entity named {name:?}"))?);
+    }
+    if let Some(path) = &opts.select_asset {
+        if opts.select.is_some() {
+            return Err("select an entity or an asset, not both".to_string());
+        }
+        if !Path::new(path).exists() {
+            return Err(format!("no asset at {path:?}"));
+        }
+        ui.selected_asset_path = Some(path.clone());
     }
     let framed = ui.selected_entity_id.filter(|_| opts.frame_selected);
     let bounds = framed.and_then(|id| selection_bounds(&game.scene().borrow(), id));
