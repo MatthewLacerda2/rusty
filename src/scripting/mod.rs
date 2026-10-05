@@ -36,6 +36,8 @@ pub(crate) use timers::{tween, wait, Clock, Target, Wait, Work};
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_assets;
+#[cfg(test)]
 mod tests_awake;
 #[cfg(test)]
 mod tests_collider;

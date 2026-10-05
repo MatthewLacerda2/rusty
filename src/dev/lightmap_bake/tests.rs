@@ -117,3 +117,19 @@ fn an_unsaved_scene_cannot_bake() {
     let (mut scene, _, _) = scene();
     assert!(bake_scene_lightmaps(&mut scene, None, &quick()).is_err());
 }
+
+#[test]
+fn the_bake_counts_static_meshes_left_without_a_lightmap_uv() {
+    let (mut scene, _, _) = scene();
+    let input = gather_bake_input(&mut scene);
+    let maps = bake(&input, &quick());
+    let report = missing_uv_report(input.meshes.len(), maps.len());
+    assert_eq!(
+        report.as_deref(),
+        Some("1 static mesh has no lightmap UV — enable Generate Lightmap UVs")
+    );
+    assert_eq!(missing_uv_report(2, 2), None);
+    assert!(missing_uv_report(3, 0)
+        .unwrap()
+        .starts_with("3 static meshes have"));
+}

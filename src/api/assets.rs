@@ -9,14 +9,19 @@
 //! `import_sub_mesh`, so the instantiate verb can place exactly what the manifest
 //! names. `Assets.Refresh()` is the editor's auto-refresh on demand: it imports what
 //! arrived since the last look (MP3 → WAV, #385).
+//! `Assets.GetLightmapUVSettings` / `SetLightmapUVSettings` (#831) read and write a
+//! model's Generate Lightmap UVs import setting, the model inspector's checkbox.
 
+use std::cell::RefCell;
 use std::path::Path;
 
 use mlua::{Lua, Table};
 
-use super::{put, Reg};
+use super::{global_table, put, Reg};
 use crate::asset::audio::{refresh, Refresh};
 use crate::asset::{build_manifest, AssetEntry, SubObjectEntry};
+use crate::asset::{sidecar, LightmapUvSettings};
+use crate::scene::Scene;
 
 /// The project asset root the manifest walks — the open project's `assets/`, the
 /// same tree the content browser's Sources panel roots at.
@@ -44,9 +49,57 @@ pub fn register(lua: &Lua) -> Reg {
         lua.create_function(|lua, ()| refresh_table(lua, &refresh(Path::new(ASSET_ROOT)))),
     )?;
 
+    put(
+        &table,
+        "GetLightmapUVSettings",
+        lua.create_function(|lua, path: String| {
+            let stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
+            lightmap_uv_table(lua, &stored.lightmap_uvs)
+        }),
+    )?;
+
     lua.globals()
         .set("Assets", table)
         .map_err(|e| e.to_string())
+}
+
+/// Add the verbs that borrow the scene onto `Assets`: `SetLightmapUVSettings(path,
+/// t)` writes the keys `t` names (the rest keep their value) through the verb the
+/// model inspector uses, re-importing the model's meshes in the scene, and returns
+/// how many it re-imported.
+pub fn register_scoped<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    let table = global_table(lua, "Assets")?;
+    put(
+        &table,
+        "SetLightmapUVSettings",
+        scope.create_function(move |_, (path, t): (String, Table)| {
+            let stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
+            let mut s = stored.lightmap_uvs;
+            s.generate = t.get::<Option<bool>>("generate")?.unwrap_or(s.generate);
+            s.hard_angle = t.get::<Option<f32>>("hardAngle")?.unwrap_or(s.hard_angle);
+            s.pack_margin = t.get::<Option<f32>>("packMargin")?.unwrap_or(s.pack_margin);
+            let mut scene = scene.borrow_mut();
+            crate::scene::asset_instance::set_lightmap_uv_settings(&mut scene, &path, s)
+                .map_err(mlua::Error::RuntimeError)
+        }),
+    )
+}
+
+/// `{ generate, hardAngle, packMargin }`.
+fn lightmap_uv_table(lua: &Lua, s: &LightmapUvSettings) -> mlua::Result<Table> {
+    let t = lua.create_table()?;
+    t.raw_set("generate", s.generate)?;
+    t.raw_set("hardAngle", s.hard_angle)?;
+    t.raw_set("packMargin", s.pack_margin)?;
+    Ok(t)
+}
+
+fn runtime(e: impl ToString) -> mlua::Error {
+    mlua::Error::RuntimeError(e.to_string())
 }
 
 /// Build the manifest under [`ASSET_ROOT`] and marshal it into a Lua array of

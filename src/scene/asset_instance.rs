@@ -143,3 +143,21 @@ fn sync_collider(scene: &mut Scene, id: u32, path: &str, asset: &ImportedAsset, 
 #[cfg(test)]
 #[path = "asset_instance_tests.rs"]
 mod asset_instance_tests;
+
+/// Set a model's Generate Lightmap UVs settings (#831) in its `.meta` sidecar and
+/// re-import every mesh in `scene` instanced from it, so the change shows at once
+/// (Unity's *Apply*). The one verb the model inspector and
+/// `Assets.SetLightmapUVSettings` share. Returns how many meshes were re-imported.
+pub fn set_lightmap_uv_settings(
+    scene: &mut Scene,
+    path: &str,
+    settings: asset::LightmapUvSettings,
+) -> Result<usize, String> {
+    asset::sidecar::set_lightmap_uvs(std::path::Path::new(path), settings)
+        .map_err(|e| e.to_string())?;
+    Ok(crate::scene::rehydrate::reimport_model(scene, path))
+}
+
+#[cfg(test)]
+#[path = "asset_instance_lightmap_tests.rs"]
+pub(crate) mod lightmap_test_support;

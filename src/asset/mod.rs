@@ -165,7 +165,7 @@ pub fn import_sub_mesh(reference: &str) -> Result<SubMesh, ImportError> {
 }
 
 #[cfg(test)]
-mod fixtures;
+pub(crate) mod fixtures;
 #[cfg(test)]
 pub(crate) mod fixtures_anim;
 #[cfg(test)]
