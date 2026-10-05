@@ -251,9 +251,10 @@ Harness.AssertBudget{ draw_calls = 2000, lights_dropped = 0, fixed_update_ms = 4
   get render counters and GPU time (`gpu_ms`, `gpu_passes`, #835) every tick.
 
 ## Benchmark: `make bench` (#835)
-Measure before optimising: `make bench` runs `project/scenarios/bench/bench.lua`, a
-**shooter-shaped worst case** on the default fy_pool_day yard, and prints a short
-report in the terminal:
+Measure before optimising: `make bench` runs
+`tests/fixtures/project/scenarios/bench/bench.lua` in the fixture project
+(`play --project tests/fixtures/project`, #829), a **shooter-shaped worst case** on
+the default fy_pool_day yard, and prints a short report in the terminal:
 
 - **the scene** — 50 skinned soldiers (a procedural 16-bone, ~12k-triangle rig with a
   walk cycle and hitboxes) walking the navmesh with a Lua brain each (patrol + a

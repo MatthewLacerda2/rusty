@@ -209,4 +209,4 @@ editor-capture: ## Render the editor to a PNG headlessly. make editor-capture OU
 # this machine's. A release build, so the numbers are a shipped game's; the first run
 # compiles one. docs/testing.md has the details.
 bench: ## Benchmark the stress scene (release build), with the change against the last run
-	cargo run --release --quiet --features dev --bin play -- project/scenarios/bench/bench.lua out/bench
+	cargo run --release --quiet --features dev --bin play -- --project tests/fixtures/project tests/fixtures/project/scenarios/bench/bench.lua out/bench

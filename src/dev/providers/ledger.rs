@@ -1,6 +1,6 @@
 //! The project's budget and what it has spent, persisted beside the project (#383).
 //!
-//! One small JSON file, `project/provider_budget.json`, gitignored: what the project
+//! One small JSON file, `provider_budget.json` at the project root: what the project
 //! *wanted* to spend (`budget_cents`) and what it *already* spent (`spent_cents`).
 //! Per project and cumulative, never per call or per session: a per-call limit is
 //! the mistake scorsese made and had to fix (scorsese#237), where one overnight run
@@ -14,11 +14,8 @@ use serde::{Deserialize, Serialize};
 
 use super::Refusal;
 
-/// The project folder. The one place this module names it, so the move to
-/// per-project folders (#829) changes this line and nothing else.
-const PROJECT_ROOT: &str = "project";
-
-/// The budget file's name inside the project folder.
+/// The budget file, relative to the project root (the working directory, #829). It
+/// sits at the root, not under `cache/`: the budget is authored, not regenerable.
 const FILE_NAME: &str = "provider_budget.json";
 
 /// The budget a project starts with before anyone writes one: US$5. Low enough that
@@ -27,7 +24,7 @@ pub const DEFAULT_BUDGET_CENTS: u64 = 500;
 
 /// Where the current project keeps its ledger.
 pub fn path() -> PathBuf {
-    Path::new(PROJECT_ROOT).join(FILE_NAME)
+    PathBuf::from(FILE_NAME)
 }
 
 /// What a project may spend, and what it has, in estimated US cents.

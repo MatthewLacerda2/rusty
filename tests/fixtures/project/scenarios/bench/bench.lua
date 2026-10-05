@@ -1,8 +1,9 @@
--- project/scenarios/bench/bench.lua — the shooter-shaped stress run behind `make bench` (#835).
+-- tests/fixtures/project/scenarios/bench/bench.lua — the shooter-shaped stress run behind `make bench` (#835).
 --
 -- Run it with:
 --   make bench
---   (= cargo run --release --features dev --bin play -- project/scenarios/bench/bench.lua out/bench)
+--   (= cargo run --release --features dev --bin play -- --project tests/fixtures/project
+--      tests/fixtures/project/scenarios/bench/bench.lua out/bench)
 --
 -- Loads the worst case a shooter level asks of the engine onto the default yard
 -- (fy_pool_day): 50 skinned, animated soldiers walking the navmesh with a Lua brain
@@ -15,7 +16,8 @@
 -- runs on one machine measure the same frames. The timings are this machine's;
 -- only the counts compare across machines. A signal, never a gate.
 
-local HERE = "project/scenarios/bench/"
+-- Script paths are project-relative: the fixture project is the working directory.
+local HERE = "scenarios/bench/"
 local WARMUP = 60    -- 1 s: scripts start, agents set off, shadow caches bake
 local FRAMES = 600   -- 10 s @ 1/60
 
