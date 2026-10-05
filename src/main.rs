@@ -4,7 +4,9 @@
 //! loop, and its editor frontend adds the egui dashboard. The standalone player is
 //! `src/bin/player.rs`; both share the same shell (#431).
 //!
-//!   cargo run -- --project <dir>
+//! ```text
+//! cargo run -- --project <dir>
+//! ```
 //!
 //! opens the game project at `<dir>` (default `./project`, created if missing; #829).
 

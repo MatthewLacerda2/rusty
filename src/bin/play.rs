@@ -1,7 +1,9 @@
 //! src/bin/play.rs — headless scenario runner (dev-only, `--features dev`).
 //!
+//! ```text
 //! Usage:
 //!   cargo run --bin play --features dev -- [--project <dir>] <scenario.lua> <out_dir>
+//! ```
 //!
 //! The scenario plays the game project at `<dir>` (default `./project`, #829); the
 //! two paths are read from where the command was run, before the project opens.
