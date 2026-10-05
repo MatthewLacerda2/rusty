@@ -191,7 +191,8 @@ make editor-capture OUT=after.png ARGS="--select Player"
 ```
 
 Options: `--scene <path>` (default: the built-in default scene, in memory), `--select
-<name>`, `--frame` (frame the selection in the Scene view, as the F key does), `--play`
+<name>`, `--select-asset <path>` (open an asset's Inspector card — a `.scene`'s bake
+buttons, an image, audio or prefab card; exclusive with `--select`), `--frame` (frame the selection in the Scene view, as the F key does), `--play`
 (the Play-mode chrome; the sim is not stepped), `--game` (the Game tab), `--size <W>x<H>`
 (default 1600x900). From Rust, `capture::capture(&game,
 path, &EditorCaptureOptions { .. })` takes any `GameWorld`, and `capture_into` shares a
