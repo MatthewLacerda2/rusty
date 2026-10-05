@@ -101,3 +101,34 @@ fn the_spawn_line_is_open_and_the_enemy_starts_behind_cover() {
         "the cover crate is off the enemy's line"
     );
 }
+
+/// The bundled controller's camera offset behind the Player, read from the script
+/// itself so the test moves with it: the larger of the start and follow offsets.
+fn camera_back() -> f32 {
+    let script = include_str!("../../../assets/scripts/player_controller.lua");
+    let value = |name: &str| -> f32 {
+        let line = script
+            .lines()
+            .find(|l| l.starts_with(&format!("local {name} =")));
+        let rhs = line.expect(name).split('=').nth(1).unwrap();
+        rhs.split("--").next().unwrap().trim().parse().expect(name)
+    };
+    value("START_BACK").max(value("FOLLOW_BACK"))
+}
+
+/// The follow camera starts behind the Player, facing +z: it must start inside the
+/// yard, clear of every wall by a margin, or the first frame stares into one (#852).
+#[test]
+fn the_follow_camera_starts_clear_of_every_wall() {
+    let scene = built();
+    let camera = Vec3::from(PLAYER_SPAWN) - Vec3::Z * camera_back();
+    for name in ["Wall_South", "Wall_North", "Wall_West", "Wall_East"] {
+        let t = transform(&scene, name);
+        let gap = (camera - t.position).abs() - t.scale * 0.5;
+        assert!(
+            gap.x.max(gap.z) >= 1.5,
+            "{name}: the camera starts {gap} off it"
+        );
+    }
+    assert!(ground_at(camera.x, camera.z).is_some(), "outside the yard");
+}

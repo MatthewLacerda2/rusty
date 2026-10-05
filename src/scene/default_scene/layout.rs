@@ -45,8 +45,10 @@ pub const RIM_THICK: f32 = 0.3;
 /// The basin's floor, a shallow tub inside the rim.
 pub const BASIN_TOP: f32 = 0.3;
 
-/// Where the Player starts, at the −z spawn, dropped onto the deck.
-pub const PLAYER_SPAWN: [f32; 3] = [0.0, 1.5, -18.0];
+/// Where the Player starts, at the −z spawn, dropped onto the deck. Far enough in
+/// from `Wall_South` that the follow camera, 4.5 m behind, starts 2 m clear of the
+/// wall's inner face (#852).
+pub const PLAYER_SPAWN: [f32; 3] = [0.0, 1.5, -15.5];
 /// Where Enemy_1 starts, at the +z spawn; its origin is 1 m above its feet.
 pub const ENEMY_SPAWN: [f32; 3] = [0.0, 1.0, 20.0];
 
