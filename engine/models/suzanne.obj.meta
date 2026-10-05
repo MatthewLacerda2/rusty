@@ -4,5 +4,10 @@
   "sub_objects": [
     "unnamed_object"
   ],
-  "colliders": {}
+  "colliders": {},
+  "lightmap_uvs": {
+    "generate": false,
+    "hard_angle": 88.0,
+    "pack_margin": 4.0
+  }
 }
