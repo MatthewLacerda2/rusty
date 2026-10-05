@@ -416,7 +416,10 @@ any other ready pull request, through the same serialized queue, at the **lowest
 priority** — after every labelled issue in flight. Dependabot rebases its own
 branch when `main` moves and cancels its own runs as it does, so a bot pull
 request often reads *not mergeable* between rebases; `make queue` never
-force-pushes one — it asks `@dependabot rebase` and waits for the new head.
+force-pushes one — it asks `@dependabot rebase` and waits for the new head. A
+GitHub Actions bump (it edits `.github/workflows/`) is the exception: the watch
+holds it with a `HELD` line, and it merges only after you dispatch the
+workflows it touches (`ci-merge` has the steps, #825).
 
 **A stage label is the only absolute stop.** `planning` and `human` mean *not
 yet*, and no amount of the issue looking ready overrides that. Everything else is

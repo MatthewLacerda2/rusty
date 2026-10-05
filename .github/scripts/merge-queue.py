@@ -111,7 +111,9 @@ standing in. The summary names them instead.
 force-push from here would make Dependabot stop maintaining the branch, so a
 bot pull request that is behind is asked to rebase — `@dependabot rebase` — and
 the queue waits for a head that sits on `main`'s tip ([`bot_head`]), then
-judges that head like any other.
+judges that head like any other. The rebase wait and the CI wait share **one**
+`--deadline` ([`left`], #825): two deadlines back to back would let one bot pull
+request outlast the watch's `--for` budget (`ci-merge` has the arithmetic).
 
 ## A hand-back skips the entry; it does not stop the queue
 
@@ -624,6 +626,13 @@ def advance(
             git("worktree", "remove", "--force", work, cwd=root)
 
 
+def left(deadline_minutes: float, spent: float) -> float:
+    """Seconds of a `--deadline` still unspent after `spent` seconds, never
+    negative: what a bot pull request's CI wait gets once [`bot_head`] has
+    waited for Dependabot's rebase out of the same clock (#825)."""
+    return max(0.0, deadline_minutes * 60 - spent)
+
+
 def bot_head(number: int, head: str, root: str, opts: argparse.Namespace) -> tuple[str | None, list[str]]:
     """Dependabot's own rebase, waited for: a head on `main`'s tip, or why not.
 
@@ -671,7 +680,7 @@ def wait_for(
                 return state, lines
         if waited > deadline:
             return STOP, [
-                f"still waiting on {sha[:7]} after {deadline / 60:.0f} minutes.",
+                f"still waiting on {sha[:7]} after {waited / 60:.0f} minutes.",
                 *lines,
                 "Handed back with the run still out. Nothing is red; nothing is green either.",
             ]
@@ -708,6 +717,7 @@ def take(repo: str, number: int, opts: argparse.Namespace) -> tuple[int, str, st
     branch, head = pull["headRefName"], pull["headRefOid"]
     git("fetch", "--quiet", "origin", "main", cwd=opts.root)
     git("fetch", "--quiet", "origin", head, cwd=opts.root)
+    began = time.monotonic()
     if is_bot(pull):
         say(f"#{number} ({branch}): Dependabot's branch; it rebases itself.")
         fresh, notes = bot_head(number, head, opts.root, opts)
@@ -728,7 +738,10 @@ def take(repo: str, number: int, opts: argparse.Namespace) -> tuple[int, str, st
     else:
         say(f"#{number}: {notes[0] if notes else 'already on `main`; the run on record is a run on it.'}")
 
-    state, lines = wait_for(repo, number, fresh, head, opts.deadline * 60, opts.poll)
+    # A bot's rebase wait came out of the same `--deadline`; a rebase from
+    # here is local work, and its CI wait gets the whole deadline as before.
+    spent = time.monotonic() - began if is_bot(pull) else 0.0
+    state, lines = wait_for(repo, number, fresh, head, left(opts.deadline, spent), opts.poll)
     say(f"#{number}: {lines[0]}", *lines[1:])
     if state != GO:
         return number, HANDED_BACK, lines[0]
@@ -790,7 +803,7 @@ def parse(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--deadline", type=float, default=DEADLINE_MINUTES, metavar="MINUTES",
-        help=f"give up waiting on one branch after this long (default {DEADLINE_MINUTES})",
+        help=f"give up waiting on one branch after this long; Dependabot's rebase and CI share it (default {DEADLINE_MINUTES})",
     )
     parser.add_argument(
         "--poll", type=float, default=POLL_SECONDS, metavar="SECONDS",
