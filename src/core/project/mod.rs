@@ -183,3 +183,7 @@ pub fn open_from_args(args: &mut Vec<String>, access: Access) -> Opened {
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "migrate_tests.rs"]
+mod migrate_tests;
