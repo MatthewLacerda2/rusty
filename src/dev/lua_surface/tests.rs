@@ -85,3 +85,23 @@ fn lightmap_bake_needs_a_saved_scene_and_counts_what_it_wrote() {
     );
     s.eval("Lighting.ClearLightmaps()").unwrap();
 }
+
+#[test]
+fn an_incomplete_speech_brief_returns_nil_and_why_so_a_batch_goes_on() {
+    // No voice: refused locally, before any key, budget or network.
+    let s = session();
+    let out = s
+        .eval("local p, why = Speech.Generate({ text = 'Reloading!' }); return tostring(p) .. '|' .. why")
+        .unwrap();
+    assert!(out.starts_with("nil|") && out.contains("`voice`"), "{out}");
+}
+
+#[test]
+fn speech_generate_during_play_raises() {
+    let s = session();
+    *s.world().script_manager().play_state_cell().borrow_mut() = true;
+    let err = s
+        .eval("return Speech.Generate({ text = 'Flank left!', voice = 'v' })")
+        .unwrap_err();
+    assert!(err.contains("Play"), "{err}");
+}

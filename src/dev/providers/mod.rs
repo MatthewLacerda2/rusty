@@ -32,6 +32,7 @@ mod credentials;
 pub mod generated;
 pub mod ledger;
 mod refusal;
+pub mod speech;
 
 #[cfg(test)]
 mod tests;
