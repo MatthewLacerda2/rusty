@@ -36,7 +36,7 @@ class World:
         self.clashes: set[frozenset[int]] = set()
         self.fx = argparse.Namespace(
             pulls=self.pulls, issue_labels=dict, clashes=lambda pulls: self.clashes,
-            turn=self.turn, head=lambda n: f"pushed{n}",
+            turn=self.turn, head=lambda n: f"pushed{n}", attempts=lambda n, sha: "",
             clock=lambda: self.now, sleep=self.sleep, say=lambda *a: None,
             memory=Path(tmp, watch.MEMORY), bots=queue.BOTS, merged=queue.MERGED,
             ends={queue.GREEN, queue.DRY}, stops={queue.STOPPED}, skips={queue.NOT_READY},
