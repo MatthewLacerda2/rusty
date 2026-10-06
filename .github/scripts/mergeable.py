@@ -257,12 +257,15 @@ def by_gate(run: dict, jobs: dict[int, list[dict]], workflow: str) -> dict:
     or red changes nothing. The gate `needs:` every gated job, so a concluded
     gate means they concluded too.
 
-    Only an *unfinished* run is read this way. A completed run keeps GitHub's
+    A run whose jobs belong to a newer attempt than the run says is read as
+    that attempt, unfinished ([`latest`], #881). Otherwise only an
+    *unfinished* run is read this way. A completed run keeps GitHub's
     conclusion: the signals are `continue-on-error`, so they cannot redden it,
     and a red run beside a green gate is still a refusal. A gate that has not
     concluded, or was skipped (a cancelled run), leaves the run as reported:
     running is running, absent is not passing.
     """
+    run = latest(run, jobs)
     if run.get("status") == "completed":
         return run
     gate = WORKFLOWS[workflow][0]
@@ -270,6 +273,28 @@ def by_gate(run: dict, jobs: dict[int, list[dict]], workflow: str) -> dict:
         if j.get("name") == gate and j.get("conclusion") not in (None, "skipped"):
             return {**run, "status": "completed", "conclusion": j["conclusion"]}
     return run
+
+
+def attempt(item: dict) -> int:
+    """The run attempt a run or job belongs to; GitHub omits it on a first."""
+    return item.get("run_attempt") or 1
+
+
+def latest(run: dict, jobs: dict[int, list[dict]]) -> dict:
+    """`run` as its latest attempt, when its jobs know a newer one than it does (#881).
+
+    The runs listing can describe an older attempt than the run's own jobs
+    listing, which [`evidence`] reads for the latest attempt alone (GitHub's
+    default `filter=latest`): on 2026-10-06 the watch handed back #864 over run 37365886365's
+    cancelled attempt 2, while its jobs already showed attempt 3 green. A run
+    is judged by its latest attempt, so such a run is re-read as that attempt,
+    unsettled: [`by_gate`] then settles it by that attempt's gate, and a gate
+    still going is a run still going.
+    """
+    newest = max((attempt(j) for j in jobs.get(run.get("id"), [])), default=attempt(run))
+    if newest <= attempt(run):
+        return run
+    return {**run, "run_attempt": newest, "status": "in_progress", "conclusion": None}
 
 
 def by_gates(runs: list[dict], jobs: dict[int, list[dict]], workflow: str) -> list[dict]:
