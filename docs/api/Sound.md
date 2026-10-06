@@ -7,6 +7,11 @@ rendered note of a noise / Karplus / FM patch — and the returned path drops st
 into `Audio.PlayAt` or an `AudioSource`'s `clip`, so a sound the agent invented is
 audible in the same script that made it.
 
+Bake first: it is free, and a recipe reproduces byte-for-byte. A sound whose
+realism *is* the point (a door with a latch, glass, gravel, cloth, a casing on
+concrete) is beyond synthesis. That is what the paid, dev-only
+[`Sfx.Generate`](Sfx.md) is for, and its page says when to reach for which.
+
 **The synthesiser is zimmer**, from [scorsese](https://github.com/MatthewLacerda2/scorsese)
 (#413) — an external crate, not a module of rusty. It is a git dependency pinned to
 one commit in `Cargo.toml`, so rusty's bakes change only when someone moves that pin

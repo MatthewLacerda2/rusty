@@ -124,9 +124,11 @@ fn play_state_cell_drives_debug_snapshot_play_state() {
     );
 }
 
-// `Speech` spends money, so it is a `dev` extension (#386): a ship build has no table.
+// `Speech` and `Sfx` spend money, so they are `dev` extensions (#386, #388): a ship
+// build has neither table.
 #[cfg(not(feature = "dev"))]
 #[test]
 fn a_ship_build_has_no_speech_namespace() {
     assert_eq!(live_manager().eval("type(Speech)").unwrap(), "nil");
+    assert_eq!(live_manager().eval("type(Sfx)").unwrap(), "nil");
 }

@@ -3,6 +3,7 @@
 
 mod budget;
 mod generated;
+mod sfx;
 mod speech;
 
 use std::cell::RefCell;

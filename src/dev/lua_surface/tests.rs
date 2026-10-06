@@ -105,3 +105,27 @@ fn speech_generate_during_play_raises() {
         .unwrap_err();
     assert!(err.contains("Play"), "{err}");
 }
+
+#[test]
+fn an_sfx_brief_without_a_length_returns_nil_and_why() {
+    let s = session();
+    let out = s
+        .eval(
+            "local p, why = Sfx.Generate({ text = 'door slam' }); return tostring(p) .. '|' .. why",
+        )
+        .unwrap();
+    assert!(
+        out.starts_with("nil|") && out.contains("`seconds`"),
+        "{out}"
+    );
+}
+
+#[test]
+fn sfx_generate_during_play_raises() {
+    let s = session();
+    *s.world().script_manager().play_state_cell().borrow_mut() = true;
+    let err = s
+        .eval("return Sfx.Generate({ text = 'door slam', seconds = 2 })")
+        .unwrap_err();
+    assert!(err.contains("Play"), "{err}");
+}
