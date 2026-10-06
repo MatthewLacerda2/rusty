@@ -14,6 +14,12 @@ your way or small, or file an issue with the evidence (the `issue-write` skill)
 and keep going. Either way it never goes unrecorded: the operator expects coders
 to file issues mid-batch.
 
+**Need a sibling's tool for your own proof? Patch it locally, don't commit it.**
+If your PR's captures or measurements need something another in-flight issue is
+building (a CLI flag, a capture option), apply the smallest uncommitted patch to
+take them, and say so in the PR. On 2026-10-05 #831 committed its own copy of #848's
+`--select-asset`, and the second of the two to merge had a conflict.
+
 ## Check the issue's blockers yourself
 
 Before writing code, read the issue body for "Blocked by" and check each blocker's state on GitHub. The orchestrator checks GitHub's recorded relationships, and a blocker that exists only in prose slips past it. If a blocker is still open, stand down as the ~3-attempts rule says (comment on the issue, no branch) and say which issue should go first. (#399 on 2026-09-30.)
