@@ -71,3 +71,18 @@ fn relativize_resolves_through_the_filesystem_and_leaves_the_rest() {
     assert_eq!(relativize("project/x.lua", &root), "project/x.lua");
     std::fs::remove_dir_all(&root).ok();
 }
+
+#[test]
+fn the_verbatim_prefix_is_stripped_so_a_slash_join_reads_on_windows() {
+    // #904: `engine_path` joined `/shaders/...` onto `\\?\D:\...`, which Windows reads
+    // literally.
+    let engine = strip_verbatim(r"\\?\D:\a\rusty\rusty\engine");
+    assert_eq!(engine, r"D:\a\rusty\rusty\engine");
+    assert_eq!(
+        strip_verbatim(r"\\?\UNC\host\share\engine"),
+        r"\\host\share\engine"
+    );
+    for plain in [r"D:\a\engine", r"\\host\share", "/home/u/engine", "engine"] {
+        assert_eq!(strip_verbatim(plain), plain);
+    }
+}

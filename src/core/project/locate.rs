@@ -54,7 +54,7 @@ pub fn packaged_project() -> Option<PathBuf> {
 
 fn exe_dir() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
-    let exe = std::fs::canonicalize(&exe).unwrap_or(exe);
+    let exe = crate::core::paths::canonicalize(&exe).unwrap_or(exe);
     exe.parent().map(Path::to_path_buf)
 }
 

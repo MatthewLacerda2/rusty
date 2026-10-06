@@ -111,7 +111,8 @@ pub struct Opened {
 /// Progress goes to stderr: `session-mcp`'s stdout carries only JSON-RPC.
 pub fn open(dir: &Path, access: Access) -> Result<Opened, String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-    let root = std::fs::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let root =
+        crate::core::paths::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let mut lines = migrate::legacy_layout(&root)?;
     create_skeleton(&root)?;
     let engine = match access {
