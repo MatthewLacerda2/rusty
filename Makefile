@@ -23,7 +23,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue blockers mutants-remote editor-capture bench
+.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue blockers reclaim mutants-remote editor-capture bench
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -180,6 +180,14 @@ queue: ## Rebase, wait for CI, squash-merge each in turn. make queue PRS="524 52
 # Lists them and exits 1; ARGS=--fix records them. Run at the start of a batch.
 blockers: ## Prose-only "Blocked by #N" GitHub never recorded. ARGS=--fix records them
 	@python3 .github/scripts/blockers.py $(ARGS)
+
+# Each worktree's target/ holds GBs, and removing it by hand per merged branch
+# gets skipped under load (#913). Removes every worktree under .claude/worktrees/
+# whose PR merged or closed, target/ first; never one with uncommitted changes,
+# unpushed commits or a lock, which it names. Prints the rest's target/ sizes and
+# free disk before and after. ARGS=--dry-run lists without deleting.
+reclaim: ## Remove merged worktrees (and their target/), report disk. ARGS=--dry-run lists only
+	@python3 .github/scripts/reclaim.py $(ARGS)
 
 # ---- signals (#750) ---------------------------------------------------------
 

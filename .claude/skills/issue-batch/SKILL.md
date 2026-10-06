@@ -159,6 +159,9 @@ different machine, re-measure rather than trust them):
 **Reclaim the moment a branch merges** — `rm -rf .claude/worktrees/<dir>/target`
 and remove the worktree. Disposal is what keeps disk from becoming the overnight
 failure.
+`make reclaim` does it for every merged or closed branch at once, refuses any
+worktree with uncommitted or unpushed work, and reports free disk; run it at each
+wave (`ARGS=--dry-run` to look first) (#913).
 
 ## Cloud sessions are extra coders, not extra merges
 
