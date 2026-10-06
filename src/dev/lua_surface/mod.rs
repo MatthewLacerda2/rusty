@@ -1,9 +1,10 @@
 //! src/dev/lua_surface/mod.rs — the dev-only part of the Lua surface (#737).
 //!
 //! `Debug.*`, the GPU bake verbs (`Lighting.Bake`, `Reflection.Bake`, `Probe.Bake`,
-//! `Lighting.Generate`) and the provider verb `Speech.Generate` (#386) belong to the one
-//! API surface, but they render or spend, so they live here in the platform layer and
-//! are installed onto the surface through [`api::extend`]. The arrow runs
+//! `Lighting.Generate`) and the provider verbs `Speech.Generate` (#386) and
+//! `Sfx.Generate` (#388) belong to the one API surface, but they render or spend, so
+//! they live here in the platform layer and are installed onto the surface through
+//! [`api::extend`]. The arrow runs
 //! `dev → api` only: the sim surface never compiles the renderer. A script sees the
 //! same namespaces it always did.
 //!
@@ -14,6 +15,7 @@
 mod bake;
 mod debug;
 mod generate;
+mod sfx;
 mod speech;
 
 use std::sync::Once;
@@ -29,7 +31,7 @@ pub fn install_api() {
 }
 
 /// The [`api::Extension`] itself: `Debug`, then the bake verbs on the tables `api`
-/// already registered, then `Speech` (#386).
+/// already registered, then `Speech` (#386) and `Sfx` (#388).
 fn register<'scope>(
     lua: &Lua,
     scope: &'scope mlua::Scope<'scope, '_>,
@@ -38,7 +40,8 @@ fn register<'scope>(
     debug::register(lua, scope, ctx)?;
     bake::register(lua, scope, ctx)?;
     generate::register(lua, scope, ctx)?;
-    speech::register(lua, scope, ctx)
+    speech::register(lua, scope, ctx)?;
+    sfx::register(lua, scope, ctx)
 }
 
 #[cfg(test)]

@@ -265,6 +265,7 @@ One file per namespace, in reference order:
 - [`Shader`](Shader.md)
 - [`Sound`](Sound.md)
 - [`Speech`](Speech.md)
+- [`Sfx`](Sfx.md)
 - [`Navigation`](Navigation.md)
 - [`NavMeshAgent`](NavMeshAgent.md)
 - [`NavMeshObstacle`](NavMeshObstacle.md)
