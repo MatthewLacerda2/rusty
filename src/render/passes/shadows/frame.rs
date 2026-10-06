@@ -8,6 +8,7 @@ use glam::Vec3;
 use super::casters::CasterFrame;
 use super::{atlas, cascades, CascadeUniform, ShadowRenderer};
 use crate::components::{LightType, ShadowSettings};
+use crate::render::clusters::{self, ClusterGrid};
 use crate::render::lod::LodSelection;
 use crate::render::Renderer;
 use crate::scene::{Camera, Scene};
@@ -68,9 +69,12 @@ impl Renderer {
 impl Renderer {
     /// Place the staged local lights' shadows in the atlas as `camera` (at `aspect`)
     /// sees them, upload the lights with their tiles, and count what fit (#468).
+    /// Only lights the camera's light budget keeps are planned (#873).
     fn plan_shadow_atlas(&mut self, camera: &Camera, aspect: f32) {
         let view_proj = camera.build_view_projection(aspect);
-        let plan = atlas::plan(&self.clusters.staged(), view_proj, camera.position);
+        let grid = ClusterGrid::new(camera, aspect);
+        let requests = clusters::shadow_requests(&grid, &self.clusters.staged());
+        let plan = atlas::plan(&requests, view_proj, camera.position);
         for &(light, first_tile) in &plan.shadows {
             self.clusters.set_shadow(light, first_tile);
         }

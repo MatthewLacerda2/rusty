@@ -182,4 +182,7 @@ mod plan_tests;
 mod static_tests;
 
 #[cfg(test)]
+#[path = "budget_tests.rs"]
+mod budget_tests;
+#[cfg(test)]
 mod contact_tests;

@@ -28,7 +28,7 @@ mod gpu;
 mod grid;
 mod lights;
 
-pub(crate) use bin::bin;
+pub(crate) use bin::{bin, shadow_requests};
 pub(crate) use gpu::ClusterBuffers;
 pub(crate) use grid::ClusterGrid;
 pub(crate) use lights::{local_lights, LocalLight, KIND_SPOT};

@@ -1,8 +1,10 @@
 //! Which point and spot lights get a shadow this frame, and where (#468).
 //!
 //! Pure CPU: the frame's local lights and the base camera in, the atlas tiles out.
-//! A light that asks for a shadow (`cast_shadows`) and reaches into the view is a
-//! candidate. Candidates are ranked by **importance**, how much of the screen the
+//! A light that wants a shadow and reaches into the view is a candidate. The
+//! caller decides "wants": it casts (`cast_shadows`) and the camera's light budget
+//! keeps it (`clusters::shadow_requests`, #873), so a light that is never shaded
+//! never takes tiles. Candidates are ranked by **importance**, how much of the screen the
 //! light can cover times its intensity, the most important first. Each one asks
 //! for a tile size from its screen coverage (Unity URP's per-light resolution tier,
 //! picked automatically), never larger than the tile of a more important light.

@@ -90,12 +90,35 @@ struct Candidate {
 pub(crate) fn bin(grid: &ClusterGrid, lights: &[LocalLight], cache: &mut AabbCache) -> Binned {
     let spheres: Vec<_> = lights.iter().map(LocalLight::sphere).collect();
     let brightness: Vec<_> = lights.iter().map(LocalLight::brightness).collect();
-    let budget = Budget {
+    bin_spheres(grid, &spheres, &light_budget(&brightness), cache)
+}
+
+/// `lights`, each with whether it wants a shadow seen through `grid` (#873): it
+/// asks for one and survives the camera's cut, so [`bin`] keeps it and it is
+/// shaded. The shadow atlas plans these alone, so a light the budget drops never
+/// wins tiles it would not use.
+pub(crate) fn shadow_requests(
+    grid: &ClusterGrid,
+    lights: &[(LocalLight, bool)],
+) -> Vec<(LocalLight, bool)> {
+    let spheres: Vec<_> = lights.iter().map(|(l, _)| l.sphere()).collect();
+    let brightness: Vec<_> = lights.iter().map(|(l, _)| l.brightness()).collect();
+    let mut out: Vec<_> = lights.iter().map(|&(l, _)| (l, false)).collect();
+    for c in camera_cut(grid, &spheres, &light_budget(&brightness)).0 {
+        let i = c.item as usize;
+        out[i].1 = lights[i].1;
+    }
+    out
+}
+
+/// The lights' budget (#834): [`MAX_VISIBLE_LIGHTS`] per camera and
+/// [`MAX_CLUSTER_LIGHTS`] per cluster, ranked by `brightness`.
+fn light_budget(brightness: &[f32]) -> Budget<'_> {
+    Budget {
         per_camera: MAX_VISIBLE_LIGHTS,
         per_cluster: MAX_CLUSTER_LIGHTS,
-        brightness: Some(&brightness),
-    };
-    bin_spheres(grid, &spheres, &budget, cache)
+        brightness: Some(brightness),
+    }
 }
 
 /// Bin `spheres` (centre, radius) into `grid`'s clusters within `budget`. Each
@@ -107,21 +130,13 @@ pub(crate) fn bin_spheres(
     budget: &Budget,
     cache: &mut AabbCache,
 ) -> Binned {
-    let mut candidates: Vec<Candidate> = (0..spheres.len() as u32)
-        .filter_map(|i| candidate(grid, i, spheres[i as usize]))
-        .collect();
+    let (candidates, culled, dropped) = camera_cut(grid, spheres, budget);
     let mut out = Binned {
         ranges: vec![[0, 0]; CLUSTER_COUNT],
-        culled: (spheres.len() - candidates.len()) as u32,
+        culled,
+        dropped,
         ..Default::default()
     };
-    if candidates.len() > budget.per_camera {
-        let key = |c: &Candidate| budget.view_score(c);
-        candidates.sort_by(|a, b| key(b).total_cmp(&key(a)).then(a.item.cmp(&b.item)));
-        out.dropped = (candidates.len() - budget.per_camera) as u32;
-        candidates.truncate(budget.per_camera);
-        candidates.sort_by_key(|c| c.item);
-    }
     if candidates.is_empty() {
         return out;
     }
@@ -154,6 +169,28 @@ pub(crate) fn bin_spheres(
     }
     fill_lists(&mut out, &pairs, budget.per_cluster);
     out
+}
+
+/// The spheres in `grid`'s view that `budget`'s per-camera cut keeps, in index
+/// order, with how many lay outside the view and how many the cut dropped.
+fn camera_cut(
+    grid: &ClusterGrid,
+    spheres: &[(Vec3, f32)],
+    budget: &Budget,
+) -> (Vec<Candidate>, u32, u32) {
+    let mut candidates: Vec<Candidate> = (0..spheres.len() as u32)
+        .filter_map(|i| candidate(grid, i, spheres[i as usize]))
+        .collect();
+    let culled = (spheres.len() - candidates.len()) as u32;
+    let mut dropped = 0;
+    if candidates.len() > budget.per_camera {
+        let key = |c: &Candidate| budget.view_score(c);
+        candidates.sort_by(|a, b| key(b).total_cmp(&key(a)).then(a.item.cmp(&b.item)));
+        dropped = (candidates.len() - budget.per_camera) as u32;
+        candidates.truncate(budget.per_camera);
+        candidates.sort_by_key(|c| c.item);
+    }
+    (candidates, culled, dropped)
 }
 
 /// Counting-sort the pairs into per-cluster lists, each in ascending index order;
