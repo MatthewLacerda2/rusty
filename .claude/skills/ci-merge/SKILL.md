@@ -371,6 +371,19 @@ every `mutants-on-request` run and every weekly sweep before #785 merged
 after it set `RUSTY_REQUIRE_GPU=1`, so a lost driver fails the baseline and the
 run instead of quietly repeating this.
 
+**Code behind GPU timestamps is never measured on CI.** Lavapipe has no
+`TIMESTAMP_QUERY`, so the `gpu_ms` / `gpu_passes` path (#835) and the bench's
+clock normalisation (#862) run only on a real GPU. Every mutant there reads
+`MISSED` on any runner. Pin the pure arithmetic (exclusive time, the report
+delta) with ordinary tests. Treat the rest as Metal-only: re-measure it on the
+operator's Mac (`make bench`, alternating before and after) whenever it changes,
+and don't file its survivors as gaps (#889).
+
+**A capture that answers "no adapter" fails under `RUSTY_REQUIRE_GPU=1`** since
+#885 (PR #899). Before that, a mutant that made `CaptureHost::draw` or
+`capture_into` report no adapter turned every screenshot test into a silent
+skip, and it read `MISSED` on runs that otherwise rendered.
+
 Sort by cost:
 
 - **Fix what is cheap** while the code is still in hand.
