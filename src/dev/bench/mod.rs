@@ -159,3 +159,7 @@ fn write(out_dir: &Path, report: &Report, text: &str) -> std::io::Result<()> {
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "run_tests.rs"]
+mod run_tests;

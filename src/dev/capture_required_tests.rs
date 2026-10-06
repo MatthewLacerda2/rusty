@@ -58,9 +58,13 @@ fn gpu_capture_renders_when_required() {
         Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0),
     );
     let frame = host.draw(&scene, &cam, 8, 8).expect("draw must not error");
+    let frame = frame.expect("RUSTY_REQUIRE_GPU=1 but draw produced no frame");
+    // Recording a tiny frame takes a fraction of a millisecond to a few dozen: in
+    // ms, not seconds or µs (#889).
+    let ms = frame.cpu_ms;
     assert!(
-        frame.is_some(),
-        "{REQUIRE_GPU_ENV}=1 but draw produced no frame"
+        0.01 < ms && ms < 1000.0,
+        "cpu_ms {ms} is not in milliseconds"
     );
     let path = crate::test_temp::dir().join("rusty_capture_required.png");
     let wrote = screenshot::capture_into(&mut host, &scene, &cam, &path, 8, 8);

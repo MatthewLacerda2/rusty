@@ -10,6 +10,7 @@
 //!
 //! [`Renderer`]: rusty::render::Renderer
 
+mod bloom_screenshot;
 mod cascaded_shadows_screenshot;
 mod custom_postfx_screenshot;
 mod directional_lightmap_screenshot;
