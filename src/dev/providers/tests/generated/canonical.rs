@@ -91,3 +91,46 @@ fn today_is_a_utc_calendar_day() {
     assert_eq!(civil_date(11_016), "2000-02-29");
     assert_eq!(today().len(), 10);
 }
+
+#[test]
+fn today_counts_whole_days_since_the_epoch() {
+    let file = root("today").join("stamp");
+    std::fs::write(&file, b"").unwrap();
+    let modified = std::fs::metadata(&file).unwrap().modified().unwrap();
+    let day = modified
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        / 86_400;
+    let today = today();
+    // Either side of midnight between the write and the read.
+    assert!(
+        today == civil_date(day) || today == civil_date(day + 1),
+        "today() is {today}, the file was written on {}",
+        civil_date(day)
+    );
+}
+
+#[test]
+fn civil_date_matches_a_day_by_day_gregorian_walk_to_2401() {
+    let leap = |y: u64| y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+    let (mut year, mut month, mut day, mut n) = (1970, 1, 1, 0);
+    while year < 2401 {
+        assert_eq!(civil_date(n), format!("{year:04}-{month:02}-{day:02}"));
+        let length = match month {
+            2 if leap(year) => 29,
+            2 => 28,
+            4 | 6 | 9 | 11 => 30,
+            _ => 31,
+        };
+        day += 1;
+        if day > length {
+            (day, month) = (1, month + 1);
+        }
+        if month > 12 {
+            (month, year) = (1, year + 1);
+        }
+        n += 1;
+    }
+    assert_eq!(n, 157_420, "the walk covered every day to 2401-01-01");
+}
