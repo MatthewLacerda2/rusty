@@ -40,7 +40,10 @@ printing `queue: HANDED BACK #N: …` as it happens; a fix pushed to the branch
 re-queues it. It exits on the machine failing, its deadline, or when nothing is
 left, with status 1 if anything was handed back and 3 if the machine or GitHub
 failed. Run it under a `Monitor` that wakes on `HANDED BACK` to hear of a
-hand-back at once; otherwise the exit wakes you. Start it with `--for 70` (#697; `ci-merge` has why 70, and when to
+hand-back at once; otherwise the exit wakes you. The watch also prints a
+line per pull-request transition (`watch: #N opened as a draft`, `turned
+ready`, `back to draft`, `closed`; #909), so that one `Monitor` on its output
+is the orchestrator's whole view: no separate pull-request poller. Start it with `--for 70` (#697; `ci-merge` has why 70, and when to
 trade it for a longer per-PR `--deadline`). The watch ends itself first, between
 pull requests, with the last line `watch ended: deadline reached …` — relaunch it
 as it was, nothing to read. It never resolves a conflict: a hand-back naming paths goes back to the
@@ -295,11 +298,8 @@ that, and one chain was cancelled by mistake). Its loop per pull request:
    **The watch exits at once when no pull request is open at all**, which is the
    state right after a wave of coders launches and before their first drafts
    exist. Start it once a draft is up (or poll for the first ready one yourself).
-   Beside it, one `Monitor` tracks the coders' pull requests: poll
-   `gh pr list --state all --search "created:>=<batch start>"` every ~90 s and
-   emit a line only on a transition (opened as draft → ready → merged or
-   closed), never the unchanged list. That is the whole of watching the coders;
-   no per-PR `until` loops.
+   The watch's own transition lines (#909) are the whole of watching the
+   coders: no second `gh pr list` poller, no per-PR `until` loops.
 3. A hand-back is the queue's whole report, and the watch keeps going without
    it (#751): fix a conflict or a failed check on the branch (or brief its
    coder to) while the other ready pull requests merge. The handed-back head is

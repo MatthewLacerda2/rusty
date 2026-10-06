@@ -73,6 +73,14 @@ it by name (`make queue PRS=N`, which does not ask). This rather than dropping
 the bumps from `dependabot.yml`: the PR still arrives with its changelog and its
 diff, and the hold costs nothing until one does.
 
+**It also says what changed on the board** (#909): one line per pull request
+that opened (as a draft or ready), turned ready, went back to draft, or closed
+without this watch merging it ([`transitions`]). The first listing after a
+launch says nothing, so a relaunch does not replay the board. Before this the
+orchestrator ran a second monitor, a `gh pr list` poller, to hear of a coder's
+draft or its flip to ready; with these lines one `Monitor` on the watch's
+output is the whole view.
+
 The decisions are pure functions over plain dictionaries; [`run`] takes every
 effect as an argument, so the loop is tested without a network.
 """
@@ -255,6 +263,30 @@ def heads(pulls: list[dict]) -> dict[int, tuple[bool, str]]:
     return {p.get("number"): (bool(p.get("isDraft")), p.get("headRefOid", "")) for p in pulls}
 
 
+def transitions(
+    before: dict[int, tuple[bool, str]] | None, after: dict[int, tuple[bool, str]], landed: set[int]
+) -> list[str]:
+    """One line per pull request that changed between two [`heads`] listings
+    (#909). `before` is `None` on the first listing, which announces nothing;
+    a pull request in `landed` (this watch merged it) is not reported closed.
+    Each line has its own word to grep: `opened`, `turned ready`, `back to
+    draft`, `closed`."""
+    if before is None:
+        return []
+    lines = []
+    for number in sorted(before.keys() | after.keys()):
+        if number not in before:
+            lines.append(f"watch: #{number} opened as {'a draft' if after[number][0] else 'ready'}.")
+        elif number not in after:
+            if number not in landed:
+                lines.append(f"watch: #{number} closed, not merged by this watch.")
+        elif before[number][0] and not after[number][0]:
+            lines.append(f"watch: #{number} turned ready.")
+        elif after[number][0] and not before[number][0]:
+            lines.append(f"watch: #{number} back to draft.")
+    return lines
+
+
 def finished(pulls: list[dict], quiet: float, idle: float) -> str | None:
     """Why to exit with nothing to take, or `None` to keep watching.
 
@@ -351,7 +383,7 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     those ready, [`clashing`]), `turn(number)` (one pull request through the
     queue, as [`merge-queue.take`]), `head(number)`, `attempts(number, sha)`
     (the runs on that head, [`attempts`], or `None`), `clock()`, `sleep(seconds)`,
-    `say(...)`, `memory` (a path), `bots`, and the end states: `merged`, `ends`
+    `say(...)` (also each board change, [`transitions`]), `memory` (a path), `bots`, and the end states: `merged`, `ends`
     (ended without a hand-back: green under `--no-merge`, previewed by a dry run)
     `stops` (the machine's failure, [`merge-queue.Stopped`]) and `skips` (it
     turned draft or closed after the listing). Anything else is a hand-back: it is
@@ -359,14 +391,14 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     `opts.for_minutes` (`--for`) is checked at the top of each pass, so only
     between takes.
     """
-    results, done, failed, handed, told = [], set(), 0, [], set()
+    results, done, failed, handed, told, landed = [], set(), 0, [], set(), set()
     memory, marks = recall(fx.memory), recall(fx.memory.with_name(RUNS_MEMORY))
 
     def save() -> None:
         remember(fx.memory, memory)
         remember(fx.memory.with_name(RUNS_MEMORY), {n: m for n, m in marks.items() if n in memory})
 
-    last, moved = None, fx.clock()
+    last, seen, moved = None, None, fx.clock()
     started = moved
     while True:
         if overdue(started, fx.clock(), opts.for_minutes):
@@ -386,6 +418,9 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             marks.pop(number, None)
             fx.say(f"watch: #{number} has run again on its handed-back head; back in line.")
         now = heads(pulls)
+        for line in transitions(seen, now, landed):
+            fx.say(line)
+        seen = now
         if now != last:
             last, moved = now, fx.clock()
         for pull in pulls:
@@ -417,6 +452,7 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         state = result[1]
         if state == fx.merged:
             memory.pop(number, None)
+            landed.add(number)
         elif state in fx.ends:
             done.add(number)
         elif state in fx.skips:
