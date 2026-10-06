@@ -20,6 +20,7 @@
 //!   screenshot  — offscreen render -> PNG (the GPU "eyes"); skips if no adapter
 //!   preview     — headless asset preview -> PNG (eyes on *assets*, #353)
 //!   snapshot    — world -> JSON observation
+//!   generate_lighting — Generate Lighting: lightmaps, then probes, then written (#832)
 //!   lua_surface — `Debug.*` and the `*.Bake` verbs, installed onto the Lua surface (#737)
 //!   stats       — frame stats: the schedule timing probe + render counters (#433)
 //!   bench       — the stress scene and report behind `make bench` (#835)
@@ -39,6 +40,7 @@ pub mod bridge;
 pub mod capture;
 pub mod command_channel;
 pub mod console;
+pub mod generate_lighting;
 pub mod harness;
 pub mod lighting_bake;
 pub mod lightmap_bake;

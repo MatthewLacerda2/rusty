@@ -19,6 +19,7 @@ use crate::components::{Entity, MaterialAsset};
 use crate::scene::collision_matrix::CollisionMatrix;
 use crate::scene::layers::LayerRegistry;
 use crate::scene::lighting::lightmap::LightmapSet;
+use crate::scene::lighting::LightingSettings;
 use crate::scene::nav_settings::NavMeshSettings;
 use crate::scene::Scene;
 
@@ -91,6 +92,10 @@ pub struct SceneData {
     /// sit beside the scene. Default-empty so pre-#438 scenes load with none.
     #[serde(default, skip_serializing_if = "LightmapSet::is_empty")]
     pub lightmaps: LightmapSet,
+    /// The lightmap bake's knobs (#832). Left out while every one is at its default,
+    /// so older scenes and untouched ones read and write unchanged.
+    #[serde(default, skip_serializing_if = "LightingSettings::is_default")]
+    pub lighting_settings: LightingSettings,
 }
 
 /// Read the live World's component values out into a serializable document.
@@ -115,6 +120,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         probes: scene.probes.clone(),
         reflection_probes: scene.reflection_probes.clone(),
         lightmaps: scene.lightmaps.clone(),
+        lighting_settings: scene.lighting_settings,
     }
 }
 
@@ -166,6 +172,7 @@ pub fn apply_scene_data(scene: &mut Scene, mut data: SceneData) {
     // scene doc; the cubemaps themselves are loaded lazily by the renderer (#244).
     scene.reflection_probes = data.reflection_probes;
     scene.lightmaps = data.lightmaps;
+    scene.lighting_settings = data.lighting_settings;
 
     // Rebuild every skeleton from its model, then hang the saved attachments back
     // on their bones by name (#453) — before prefab propagation, which rebuilds a

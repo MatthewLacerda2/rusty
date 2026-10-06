@@ -24,8 +24,10 @@ const DILATE_PASSES: u32 = 3;
 /// that a cancel lands at once, large enough that the shared counter stays cold.
 const REPORT_EVERY: usize = 64;
 
-/// The bake's knobs, Unity's Lightmapping settings in miniature.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// The bake's knobs, Unity's Lightmapping settings in miniature. The scene stores
+/// them in its lighting settings (#832); a field a scene file omits takes its default.
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 pub struct BakeSettings {
     /// Lightmap texels per world unit (Unity's "Lightmap Resolution").
     pub texels_per_unit: f32,

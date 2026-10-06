@@ -12,6 +12,7 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 use super::super::{lighting_bake, lightmap_bake, probe_bake, reflection_bake};
+use super::generate::Overrides;
 use crate::api::{global_table, put, ApiScopedCtx, Reg};
 use crate::scene::Scene;
 
@@ -66,8 +67,8 @@ fn register_reflection<'scope>(
 }
 
 /// `Lighting.Bake([probeSpacing], [reflectionRegion], [cap])`: auto-place then bake
-/// both sets (#246), through the same orchestration as the editor's "Bake Lighting"
-/// button. `true` when at least one bake ran on the GPU; errors only when a bake's own
+/// both sets (#246), the probe step of the editor's Generate Lighting button (#832).
+/// `true` when at least one bake ran on the GPU; errors only when a bake's own
 /// contract fails (reflections need a saved scene path).
 fn register_lighting<'scope>(
     lua: &Lua,
@@ -108,16 +109,16 @@ fn bake_params(
 
 /// `Lighting.BakeLightmaps([texelsPerUnit], [samples], [bounces], [seed],
 /// [directional])` bakes every static mesh with a lightmap UV and returns how many
-/// lightmaps it wrote (#438); `directional` (default `true`, #810) adds the direction
-/// pages that let normal maps reshape baked light.
+/// lightmaps it wrote (#438); `directional` (#810) adds the direction pages that let
+/// normal maps reshape baked light. An argument left out takes the scene's lighting
+/// settings (#832).
 /// `Lighting.ClearLightmaps()` drops them all, back to probe / ambient lighting. The
-/// same path as the editor's "Bake Lightmaps" button.
+/// lightmap step of the editor's Generate Lighting button (#832).
 fn register_lightmaps<'scope>(
     lua: &Lua,
     scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
-    use crate::scene::lighting::lightmap::BakeSettings;
     type Args = (
         Option<f32>,
         Option<u32>,
@@ -131,16 +132,15 @@ fn register_lightmaps<'scope>(
         &table,
         "BakeLightmaps",
         scope.create_function(
-            move |_, (density, samples, bounces, seed, directional): Args| {
-                let d = BakeSettings::default();
-                let settings = BakeSettings {
-                    texels_per_unit: density.unwrap_or(d.texels_per_unit).max(0.01),
-                    samples: samples.unwrap_or(d.samples).max(1),
-                    bounces: bounces.unwrap_or(d.bounces).max(1),
-                    seed: seed.unwrap_or(d.seed),
-                    directional: directional.unwrap_or(d.directional),
-                    ..d
+            move |_, (texels_per_unit, samples, bounces, seed, directional): Args| {
+                let overrides = Overrides {
+                    texels_per_unit,
+                    samples,
+                    bounces,
+                    seed,
+                    directional,
                 };
+                let settings = overrides.apply(scene.borrow().lighting_settings.lightmaps);
                 let path = scene_path.borrow();
                 let mut scene = scene.borrow_mut();
                 lightmap_bake::bake_scene_lightmaps(&mut scene, path.as_deref(), &settings)

@@ -6,12 +6,13 @@
 //! (#250, #285) and GGX reflection-probe bake (#252). It is the orchestration over the `Probe`
 //! and `Reflection` namespaces — manual placement on those stays available; this is the
 //! batteries-included path. `Lighting.BakeLightmaps()` / `ClearLightmaps()` (#438) bake
-//! static geometry's lightmaps beside it, also from `dev`.
+//! static geometry's lightmaps beside it, and `Lighting.Generate()` (#832) runs both
+//! in order and writes the result, also from `dev`.
 //!
-//! The bake is dev-only (it drives a headless GPU and writes authoring artifacts), so
-//! this module registers only the table: `dev` installs `Bake` onto it through
-//! [`super::extend`] (#737), beside the editor's "Bake Lighting" button that runs the
-//! same orchestration. In a ship build the `Lighting` table is present but empty,
+//! The bakes are dev-only (they drive a headless GPU and write authoring artifacts),
+//! so this module registers only the table: `dev` installs the verbs onto it through
+//! [`super::extend`] (#737), beside the editor's Generate Lighting button that runs
+//! the same orchestration. In a ship build the `Lighting` table is present but empty,
 //! matching the stripped agentic layer.
 
 use mlua::Lua;

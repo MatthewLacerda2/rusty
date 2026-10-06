@@ -16,11 +16,13 @@
 //!     #746; the seeds are embedded in the binary, `bundled`, #829).
 
 pub mod bundled;
+mod lighting_block;
 mod manifest;
 mod seed;
 
 use std::path::Path;
 
+pub use lighting_block::{save_lighting, LightingSave};
 pub use manifest::{SeedManifest, SeedOutcome, SEED_MANIFEST_PATH};
 pub use seed::{
     build_default_scene, seed_default_scene, seed_default_scripts, seed_workspace,
