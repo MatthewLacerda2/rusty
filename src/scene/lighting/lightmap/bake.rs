@@ -15,7 +15,7 @@ use super::input::BakeScene;
 use super::progress::BakeProgress;
 use super::raster::{dilate, lightmap_size, rasterize, world_per_uv, TexelPoint};
 use super::rng::Rng;
-use super::trace::{TexelLight, Tracer};
+use super::trace::{luminance, TexelLight, Tracer};
 
 /// Rings of empty texels dilation fills around each chart.
 const DILATE_PASSES: u32 = 3;
@@ -40,6 +40,10 @@ pub struct BakeSettings {
     /// Radius, in texels, of the Gaussian that smooths the baked bounce (Unity's
     /// indirect filter); 0 leaves it raw. Baked direct light is never filtered.
     pub filter_radius: u32,
+    /// Also bake each texel's dominant incoming light direction (#810, Unity's
+    /// *Directional* mode), so normal maps reshape baked light. Off saves the
+    /// direction pages' memory; the colour lightmaps are the same either way.
+    pub directional: bool,
 }
 
 impl Default for BakeSettings {
@@ -51,6 +55,7 @@ impl Default for BakeSettings {
             seed: 0,
             max_resolution: 512,
             filter_radius: 3,
+            directional: true,
         }
     }
 }
@@ -62,6 +67,10 @@ pub struct Lightmap {
     pub entity: u32,
     pub size: u32,
     pub texels: Vec<Vec3>,
+    /// Per texel (#810), the dominant direction its light arrives from, scaled by
+    /// its directionality: length 1 when it all comes from one way, 0 when it comes
+    /// evenly from everywhere. Empty when the bake was not [`BakeSettings::directional`].
+    pub directions: Vec<Vec3>,
 }
 
 /// Bake every mesh in `scene` that has a usable lightmap UV. Meshes without one still
@@ -104,24 +113,66 @@ pub fn bake_with_progress(
             .zip(light)
             .filter(|(_, l)| l.valid)
             .unzip();
-        let indirect: Vec<Vec3> = light.iter().map(|l| l.indirect).collect();
         let texel_world = world_per_uv(mesh).unwrap_or(1.0) / size as f32;
-        let radius = settings.filter_radius;
-        let indirect = smooth(&points, &indirect, size, radius, texel_world);
-        let mut texels = vec![Vec3::ZERO; (size * size) as usize];
-        let mut filled = vec![false; texels.len()];
-        for ((point, light), indirect) in points.iter().zip(light).zip(indirect) {
-            texels[point.index] = indirect + light.direct;
-            filled[point.index] = true;
-        }
-        dilate(&mut texels, &mut filled, size, DILATE_PASSES);
+        let (texels, directions) = assemble(&points, &light, size, texel_world, settings);
         out.push(Lightmap {
             entity: mesh.entity,
             size,
             texels,
+            directions,
         });
     }
     Some(out)
+}
+
+/// One chart's traced texels as its `size`² lightmap and, for a directional bake,
+/// its direction map: the bounce (and its directions) smoothed, the direct light
+/// added, then both dilated past the chart's edge.
+fn assemble(
+    points: &[TexelPoint],
+    light: &[TexelLight],
+    size: u32,
+    texel_world: f32,
+    settings: &BakeSettings,
+) -> (Vec<Vec3>, Vec<Vec3>) {
+    let indirect: Vec<Vec3> = light.iter().map(|l| l.indirect).collect();
+    let radius = settings.filter_radius;
+    let indirect = smooth(points, &indirect, size, radius, texel_world);
+    // The bounce's directions are smoothed by the same kernel as its colour, so
+    // the direction page is no noisier than the lightmap it reshapes.
+    let indirect_dir: Vec<Vec3> = match settings.directional {
+        true => {
+            let dirs: Vec<Vec3> = light.iter().map(|l| l.indirect_dir).collect();
+            smooth(points, &dirs, size, radius, texel_world)
+        }
+        false => vec![Vec3::ZERO; points.len()],
+    };
+    let mut texels = vec![Vec3::ZERO; (size * size) as usize];
+    let mut directions = vec![Vec3::ZERO; texels.len()];
+    let mut filled = vec![false; texels.len()];
+    for (k, (point, light)) in points.iter().zip(light).enumerate() {
+        texels[point.index] = indirect[k] + light.direct;
+        directions[point.index] = dominant(indirect[k], indirect_dir[k], light);
+        filled[point.index] = true;
+    }
+    if settings.directional {
+        dilate(&mut directions, &mut filled.clone(), size, DILATE_PASSES);
+    } else {
+        directions.clear();
+    }
+    dilate(&mut texels, &mut filled, size, DILATE_PASSES);
+    (texels, directions)
+}
+
+/// A texel's dominant incoming direction scaled by its directionality: the
+/// luminance-weighted mean of the directions its (smoothed) bounce and its direct
+/// light arrived from. Black texels have none.
+fn dominant(indirect: Vec3, indirect_dir: Vec3, light: &TexelLight) -> Vec3 {
+    let weight = luminance(indirect + light.direct);
+    if weight <= 0.0 {
+        return Vec3::ZERO;
+    }
+    ((indirect_dir + light.direct_dir) / weight).clamp_length_max(1.0)
 }
 
 /// Every mesh's triangles, for the BVH.

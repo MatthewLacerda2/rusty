@@ -82,6 +82,7 @@ fn bake(scene: &mut Scene, name: &str) {
         seed: 3,
         max_resolution: 32,
         filter_radius: 2,
+        directional: true,
     };
     let baked = bake_scene_lightmaps(scene, Some(&path), &settings).unwrap();
     assert_eq!(baked, 2, "the floor and the wall, not the stripped sphere");

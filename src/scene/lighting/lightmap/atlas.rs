@@ -11,6 +11,9 @@
 //! filtering at a chart's border never reads a neighbour's light. Packing is a shelf
 //! packer over the lightmaps sorted largest first (ties by order), so the same
 //! bake always yields the same atlas.
+//!
+//! A directional bake (#810) packs its direction maps into a second page set with the
+//! very same layout, so one page index and scale/offset address both.
 
 use glam::Vec3;
 
@@ -29,6 +32,9 @@ pub struct LightmapAtlas {
     pub page_size: u32,
     /// Each page's linear texels, row-major, `page_size`² of them.
     pub pages: Vec<Vec<Vec3>>,
+    /// The direction pages (#810), one per colour page, packed identically. Empty
+    /// unless every lightmap carries directions.
+    pub directions: Vec<Vec<Vec3>>,
     /// Per input lightmap, in order: its entity, page, and the scale/offset that maps
     /// its lightmap UV into the page (`uv * st.xy + st.zw`).
     pub placements: Vec<(u32, u32, [f32; 4])>,
@@ -51,10 +57,24 @@ pub fn pack(maps: &[Lightmap]) -> LightmapAtlas {
         page_size *= 2;
     };
     let mut pages = vec![vec![Vec3::ZERO; (page_size * page_size) as usize]; page_count];
+    let directional = !maps.is_empty() && maps.iter().all(|m| !m.directions.is_empty());
+    let mut directions = match directional {
+        true => pages.clone(),
+        false => Vec::new(),
+    };
     let mut placements = Vec::with_capacity(maps.len());
     for (i, map) in maps.iter().enumerate() {
         let (page, x, y) = corners[i];
-        blit(&mut pages[page as usize], page_size, map, sizes[i], x, y);
+        let at = Corner {
+            page_size,
+            size: sizes[i],
+            x,
+            y,
+        };
+        at.blit(&mut pages[page as usize], &map.texels, map.size);
+        if directional {
+            at.blit(&mut directions[page as usize], &map.directions, map.size);
+        }
         let (scale, edge) = (sizes[i] as f32 / page_size as f32, page_size as f32);
         placements.push((
             map.entity,
@@ -65,6 +85,7 @@ pub fn pack(maps: &[Lightmap]) -> LightmapAtlas {
     LightmapAtlas {
         page_size,
         pages,
+        directions,
         placements,
     }
 }
@@ -90,17 +111,29 @@ fn shelve(order: &[usize], sizes: &[u32], page: u32) -> (Vec<(u32, u32, u32)>, u
     (corners, count)
 }
 
-/// Copy `map` (its top-left `size`² texels) into `page` at `(x, y)`, then extend its
-/// edge one texel outward into the ring.
-fn blit(page: &mut [Vec3], page_size: u32, map: &Lightmap, size: u32, x: u32, y: u32) {
-    let at = |row: u32, col: u32| {
-        map.texels[(row.min(size - 1) * map.size + col.min(size - 1)) as usize]
-    };
-    for row in 0..size + 2 * PAD {
-        for col in 0..size + 2 * PAD {
-            let (src_row, src_col) = (row.saturating_sub(PAD), col.saturating_sub(PAD));
-            let (px, py) = (x + col - PAD, y + row - PAD);
-            page[(py * page_size + px) as usize] = at(src_row, src_col);
+/// Where one lightmap lands: its top-left `size`² texels go to `(x, y)` on a
+/// `page_size` page.
+struct Corner {
+    page_size: u32,
+    size: u32,
+    x: u32,
+    y: u32,
+}
+
+impl Corner {
+    /// Copy `texels` (a `map_size`-wide lightmap) into `page`, then extend its edge
+    /// one texel outward into the ring.
+    fn blit(&self, page: &mut [Vec3], texels: &[Vec3], map_size: u32) {
+        let (size, x, y) = (self.size, self.x, self.y);
+        let at = |row: u32, col: u32| {
+            texels[(row.min(size - 1) * map_size + col.min(size - 1)) as usize]
+        };
+        for row in 0..size + 2 * PAD {
+            for col in 0..size + 2 * PAD {
+                let (src_row, src_col) = (row.saturating_sub(PAD), col.saturating_sub(PAD));
+                let (px, py) = (x + col - PAD, y + row - PAD);
+                page[(py * self.page_size + px) as usize] = at(src_row, src_col);
+            }
         }
     }
 }

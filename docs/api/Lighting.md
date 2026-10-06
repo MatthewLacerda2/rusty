@@ -10,7 +10,7 @@ inspector) routes through this exact same path, so the button and this verb neve
 | Function | Signature | Returns |
 |---|---|---|
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion], [perAxisCap])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
-| `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed])` | number of lightmaps written |
+| `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed], [directional])` | number of lightmaps written |
 | `Lighting.ClearLightmaps` *(dev-only)* | `()` | — |
 
 **Auto-placement** (deterministic — a pure function of the static scene, no RNG/clock,
@@ -67,6 +67,16 @@ was swapped out meanwhile is dropped. The script verb itself stays synchronous.
   not filtered, so its shadows stay sharp. A texel buried inside other geometry (floor
   under a crate) is filled from its neighbours rather than baked black. No GPU is needed;
   it runs headless.
+- **Directional** (#810, Unity's *Directional Mode*). By default the bake also stores,
+  per texel, the **dominant direction** its light arrives from and how strongly it leans
+  that way (its *directionality*: 1 when it all comes from one side, 0 when it comes
+  evenly from everywhere). The bounce's directions are smoothed by the same filter as its
+  colour. At runtime a lightmapped surface reshapes its baked light by how its
+  **normal-mapped** normal faces that direction, so bumps, tiles and panel seams read
+  under baked light as they do under realtime light; a surface without a normal map
+  shades exactly as a non-directional bake would. `directional = false` (or the editor's
+  **"Directional lightmaps"** checkbox under the bake buttons) skips the direction pages
+  to save their memory; the colour lightmaps are byte-identical either way.
 - **At runtime** a lightmapped surface takes its ambient term from the lightmap instead
   of probes or the flat sky gradient, and skips the realtime direct light of `Baked`
   lights (it is in the map). `Mixed` lights stay realtime on it; their bounce is baked.
@@ -74,7 +84,9 @@ was swapped out meanwhile is dropped. The script verb itself stays synchronous.
 - **Where the files go.** The lightmaps are packed into square **atlas pages** (the
   smallest power of two that holds them all, up to 1024², then as many 1024² pages as it
   takes), each an RGBM-encoded PNG in `<scene file>.lightmaps/` (old pages there are
-  removed first). The scene stores the page list and, per entity, its page and
+  removed first). A directional bake writes a `lightmap_dir_<page>_*.png` beside each
+  page: plain RGBA8, RGB the direction mapped to 0–1 and A the directionality, packed
+  exactly like its colour page. The scene stores the page list and, per entity, its page and
   scale/offset (Unity's lightmap index + scale/offset), so **save the scene** afterwards
   to keep them. Needs a saved scene path (errors otherwise). `Lighting.ClearLightmaps()`
   drops the references (the files stay until the next bake).

@@ -106,8 +106,10 @@ fn bake_params(
     }
 }
 
-/// `Lighting.BakeLightmaps([texelsPerUnit], [samples], [bounces], [seed])` bakes every
-/// static mesh with a lightmap UV and returns how many lightmaps it wrote (#438);
+/// `Lighting.BakeLightmaps([texelsPerUnit], [samples], [bounces], [seed],
+/// [directional])` bakes every static mesh with a lightmap UV and returns how many
+/// lightmaps it wrote (#438); `directional` (default `true`, #810) adds the direction
+/// pages that let normal maps reshape baked light.
 /// `Lighting.ClearLightmaps()` drops them all, back to probe / ambient lighting. The
 /// same path as the editor's "Bake Lightmaps" button.
 fn register_lightmaps<'scope>(
@@ -116,26 +118,35 @@ fn register_lightmaps<'scope>(
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     use crate::scene::lighting::lightmap::BakeSettings;
-    type Args = (Option<f32>, Option<u32>, Option<u32>, Option<u64>);
+    type Args = (
+        Option<f32>,
+        Option<u32>,
+        Option<u32>,
+        Option<u64>,
+        Option<bool>,
+    );
     let (scene, scene_path) = (ctx.scene, ctx.scene_path);
     let table = global_table(lua, "Lighting")?;
     put(
         &table,
         "BakeLightmaps",
-        scope.create_function(move |_, (density, samples, bounces, seed): Args| {
-            let d = BakeSettings::default();
-            let settings = BakeSettings {
-                texels_per_unit: density.unwrap_or(d.texels_per_unit).max(0.01),
-                samples: samples.unwrap_or(d.samples).max(1),
-                bounces: bounces.unwrap_or(d.bounces).max(1),
-                seed: seed.unwrap_or(d.seed),
-                ..d
-            };
-            let path = scene_path.borrow();
-            let mut scene = scene.borrow_mut();
-            lightmap_bake::bake_scene_lightmaps(&mut scene, path.as_deref(), &settings)
-                .map_err(mlua::Error::external)
-        }),
+        scope.create_function(
+            move |_, (density, samples, bounces, seed, directional): Args| {
+                let d = BakeSettings::default();
+                let settings = BakeSettings {
+                    texels_per_unit: density.unwrap_or(d.texels_per_unit).max(0.01),
+                    samples: samples.unwrap_or(d.samples).max(1),
+                    bounces: bounces.unwrap_or(d.bounces).max(1),
+                    seed: seed.unwrap_or(d.seed),
+                    directional: directional.unwrap_or(d.directional),
+                    ..d
+                };
+                let path = scene_path.borrow();
+                let mut scene = scene.borrow_mut();
+                lightmap_bake::bake_scene_lightmaps(&mut scene, path.as_deref(), &settings)
+                    .map_err(mlua::Error::external)
+            },
+        ),
     )?;
     put(
         &table,

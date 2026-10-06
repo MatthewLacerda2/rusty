@@ -22,6 +22,11 @@ pub struct LightmapSet {
     /// The atlas pages (RGBM PNGs, all the same size), in page order.
     #[serde(default)]
     pub pages: Vec<String>,
+    /// The direction pages of a directional bake (#810), one per colour page and
+    /// packed the same, so an entry's page and scale/offset address both. Empty when
+    /// the bake was not directional: the lightmap then ignores normal maps.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub directions: Vec<String>,
     #[serde(default)]
     pub entries: Vec<LightmapEntry>,
 }
@@ -39,6 +44,7 @@ impl LightmapSet {
     /// Forget every lightmap: every mesh falls back to probe / ambient lighting.
     pub fn clear(&mut self) {
         self.pages.clear();
+        self.directions.clear();
         self.entries.clear();
     }
 }
@@ -56,6 +62,7 @@ mod tests {
         };
         let mut set = LightmapSet {
             pages: vec!["a.png".into(), "b.png".into()],
+            directions: vec!["a_dir.png".into(), "b_dir.png".into()],
             entries: vec![entry(3, 0), entry(5, 1)],
         };
         assert_eq!(set.get(5).map(|e| e.page), Some(1));
@@ -63,6 +70,6 @@ mod tests {
         let json = serde_json::to_string(&set).unwrap();
         assert_eq!(serde_json::from_str::<LightmapSet>(&json).unwrap(), set);
         set.clear();
-        assert!(set.is_empty() && set.pages.is_empty());
+        assert!(set.is_empty() && set.pages.is_empty() && set.directions.is_empty());
     }
 }

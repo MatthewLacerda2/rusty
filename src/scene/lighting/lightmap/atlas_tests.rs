@@ -12,6 +12,7 @@ fn map(entity: u32, size: u32, value: f32) -> Lightmap {
         entity,
         size,
         texels: vec![Vec3::splat(value); (size * size) as usize],
+        directions: Vec::new(),
     }
 }
 

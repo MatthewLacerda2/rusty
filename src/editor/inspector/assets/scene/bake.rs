@@ -6,7 +6,8 @@
 //! The lightmap bake runs in the background (#808), as Unity's does: the button
 //! starts a [`LightmapBakeJob`], the card shows its progress with a Cancel button,
 //! and [`poll`] applies the result on the UI thread when the worker finishes. The
-//! script verb stays synchronous.
+//! script verb stays synchronous. A "Directional lightmaps" checkbox (#810) sets the
+//! bake's `directional` setting, as `Lighting.BakeLightmaps`' fifth argument does.
 
 use std::time::Duration;
 
@@ -15,7 +16,6 @@ use egui_phosphor::regular as icon;
 use crate::dev::lightmap_bake::{BakeOutcome, LightmapBakeJob};
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
-use crate::scene::lighting::lightmap::BakeSettings;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
@@ -52,6 +52,13 @@ pub fn draw(
             (probes.clicked(), maps.clicked())
         })
         .inner;
+    let idle = editor.dev.lightmap_bake.is_none();
+    let directional = &mut editor.dev.lightmap_settings.directional;
+    ui.add_enabled(
+        idle,
+        egui::Checkbox::new(directional, "Directional lightmaps"),
+    )
+    .on_hover_text("Bake light directions too, so normal maps show under baked light (#810)");
     if lightmaps {
         start(editor, scene, console, path);
     }
@@ -71,7 +78,7 @@ pub fn draw(
 
 /// Start a background bake of the live scene, its pages written beside `path`.
 fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs, path: &str) {
-    match LightmapBakeJob::start(scene, Some(path), BakeSettings::default()) {
+    match LightmapBakeJob::start(scene, Some(path), editor.dev.lightmap_settings) {
         Ok(job) => {
             console.info("Baking lightmaps in the background…".into());
             let scene = editor.current_scene_path.clone();

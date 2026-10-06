@@ -40,7 +40,8 @@ struct InstanceData {
     // Baked lightmap (#438): atlas page + 1 (0 for none), and the scale/offset from
     // the mesh's lightmap UV into that page.
     lightmap_page: u32,
-    _ipad1: u32,
+    // 1 when the lightmap's direction page is bound (#810).
+    lightmap_directional: u32,
     _ipad2: u32,
     lightmap_st: vec4<f32>,
     sh: array<vec4<f32>, 9>,
@@ -94,6 +95,10 @@ var s_decal: sampler;
 var t_lightmaps: texture_2d_array<f32>;
 @group(0) @binding(15)
 var s_lightmaps: sampler;
+// Their direction pages (#810), same layers and UVs: RGB the dominant incoming
+// direction in [0,1], A its directionality; a 1x1 zero page when not baked.
+@group(0) @binding(16)
+var t_lightmap_dirs: texture_2d_array<f32>;
 
 @group(1) @binding(0)
 var<uniform> entity: EntityUniforms;
@@ -222,6 +227,28 @@ fn vs_main(model: VertexInput, @builtin(instance_index) instance: u32) -> Vertex
 const PI: f32 = 3.14159265359;
 // RGBM's range (#438); mirrors `RGBM_RANGE` in src/scene/lighting/lightmap/encode.rs.
 const LIGHTMAP_RGBM_RANGE: f32 = 8.0;
+
+// Directional lightmaps (#810): reshape baked irradiance by how the shading normal `N`
+// faces the dominant incoming direction, relative to the geometric normal `Ng` the
+// bake saw (Unity's half-Lambert rebalance). `dir` is the decoded direction page texel:
+// direction scaled by directionality, so a texel lit evenly from all round (0) or a
+// surface whose normal map is flat (N == Ng) keeps its lightmap exactly.
+fn lightmap_direction_rebalance(dir: vec3<f32>, N: vec3<f32>, Ng: vec3<f32>) -> f32 {
+    let shaded = dot(N, dir) * 0.5 + 0.5;
+    let baked = dot(Ng, dir) * 0.5 + 0.5;
+    return shaded / max(baked, 1e-3);
+}
+
+// A direction page texel back to the direction scaled by its directionality; mirrors
+// `decode_direction` in src/scene/lighting/lightmap/encode.rs.
+fn decode_lightmap_direction(texel: vec4<f32>) -> vec3<f32> {
+    let d = texel.xyz * 2.0 - 1.0;
+    let len = length(d);
+    if (len < 1e-4) {
+        return vec3<f32>(0.0);
+    }
+    return d / len * texel.a;
+}
 
 fn DistributionGGX(N: vec3<f32>, H: vec3<f32>, roughness: f32) -> f32 {
     let a = roughness * roughness;
@@ -598,6 +625,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         // gives. `Level` sampling: the page is per instance, so this branch may diverge.
         let lm = textureSampleLevel(t_lightmaps, s_lightmaps, in.lightmap_uv, lightmap_page - 1u, 0.0);
         ambient_irradiance = lm.rgb * lm.a * LIGHTMAP_RGBM_RANGE;
+        if (instances[in.instance].lightmap_directional == 1u) {
+            // The normal-mapped (and decal-perturbed) N reshapes the baked light.
+            let texel = textureSampleLevel(t_lightmap_dirs, s_lightmaps, in.lightmap_uv, lightmap_page - 1u, 0.0);
+            let dir = decode_lightmap_direction(texel);
+            ambient_irradiance *= lightmap_direction_rebalance(dir, N, normalize(in.world_normal));
+        }
     } else if (instances[in.instance].use_sh == 1u) {
         // `eval_sh` returns irradiance E; a Lambert surface reflects albedo / pi * E,
         // the same response `calculate_pbr` gives a direct light and the E / pi the
