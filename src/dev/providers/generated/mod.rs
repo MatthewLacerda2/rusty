@@ -31,6 +31,8 @@ pub use brief::{canonical, digest, digest_of, fingerprint, Brief};
 pub(crate) use sidecar::civil_date;
 pub use sidecar::{today, Sidecar};
 
+use crate::asset::audio::{decode_bytes, wav};
+
 /// Where generated assets live, relative to the project root, which is the working
 /// directory (#829). The one place this module names it. Whether a game's repo
 /// versions these files is still open (#866).
@@ -140,4 +142,15 @@ where
     let (bytes, estimate_cents) = generate(brief)?;
     let address = store(root, brief, &bytes, estimate_cents, generated_on)?;
     Ok(Realised::Generated(address))
+}
+
+/// A vendor's MP3 as a WAV, encoder delay and padding trimmed (#385), so what lands
+/// is a file the engine plays and loops like a bake. `Err` is the decoder's reason.
+pub fn to_wav(mp3: Vec<u8>) -> Result<Vec<u8>, String> {
+    let audio = decode_bytes(mp3)?;
+    Ok(wav::encode(
+        audio.channels,
+        audio.sample_rate,
+        &audio.samples,
+    ))
 }

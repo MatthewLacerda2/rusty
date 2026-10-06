@@ -32,6 +32,7 @@ mod credentials;
 pub mod generated;
 pub mod ledger;
 mod refusal;
+pub mod sfx;
 pub mod speech;
 
 #[cfg(test)]
@@ -44,6 +45,18 @@ pub use ledger::Ledger;
 pub use refusal::Refusal;
 pub use scorsese_providers::credentials::{Environment, Provider, Secret};
 pub use scorsese_providers::prices;
+
+/// Where one generation happens: the folder generated files are addressed under
+/// (the working directory outside tests), the sim's play state, the key's
+/// environment, the project's budget file, and today's date for the sidecar.
+#[derive(Debug, Clone, Copy)]
+pub struct Context<'a> {
+    pub root: &'a Path,
+    pub playing: bool,
+    pub environment: &'a Environment,
+    pub ledger: &'a Path,
+    pub today: &'a str,
+}
 
 /// Leave to spend: the key to call with, and the ledger the spending is charged to.
 ///

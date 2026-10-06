@@ -18,7 +18,6 @@
 mod brief;
 
 use std::fmt;
-use std::path::Path;
 
 use scorsese_providers::api::elevenlabs::refusal::Refusal as VendorRefusal;
 use scorsese_providers::api::elevenlabs::speech::{Speak, Speech};
@@ -27,8 +26,8 @@ use scorsese_providers::api::http::HttpError;
 pub use brief::{Draft, Incomplete, SpeechBrief, DEFAULT_MODEL};
 
 use super::generated::{self, Realised};
-use super::{permit, prices, Environment, Provider, Refusal, Secret};
-use crate::asset::audio::{decode_bytes, wav};
+pub use super::Context;
+use super::{permit, prices, Provider, Refusal, Secret};
 
 /// Somewhere a line can be spoken. **The call that spends**, and the seam every
 /// test replaces: no test ever holds the real one.
@@ -74,18 +73,6 @@ pub fn estimate_cents(brief: &SpeechBrief) -> Result<u64, SpeechError> {
     prices::speech(brief.model, brief.text.chars().count())
         .map(|estimate| estimate.cents)
         .map_err(|unpriced| SpeechError::Vendor(unpriced.to_string()))
-}
-
-/// Where one generation happens: the folder generated files are addressed under
-/// (the working directory outside tests), the sim's play state, the key's
-/// environment, the project's budget file, and today's date for the sidecar.
-#[derive(Debug, Clone, Copy)]
-pub struct Context<'a> {
-    pub root: &'a Path,
-    pub playing: bool,
-    pub environment: &'a Environment,
-    pub ledger: &'a Path,
-    pub today: &'a str,
 }
 
 /// Why a line did not come back as a file.
@@ -158,16 +145,7 @@ pub fn generate(
         // Recorded the moment the vendor answers: from here on the money is spent,
         // whatever becomes of the bytes.
         permit.record(at.ledger)?;
-        Ok((to_wav(mp3)?, estimate))
+        let wav = generated::to_wav(mp3).map_err(SpeechError::Unplayable)?;
+        Ok((wav, estimate))
     })
-}
-
-/// The vendor's MP3 as a WAV, encoder delay and padding trimmed (#385).
-fn to_wav(mp3: Vec<u8>) -> Result<Vec<u8>, SpeechError> {
-    let audio = decode_bytes(mp3).map_err(SpeechError::Unplayable)?;
-    Ok(wav::encode(
-        audio.channels,
-        audio.sample_rate,
-        &audio.samples,
-    ))
 }
