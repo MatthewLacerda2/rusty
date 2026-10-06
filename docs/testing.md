@@ -417,7 +417,7 @@ request** (#750). Two ways in:
 
 | Run | Trigger | Scope | Where it lands |
 |---|---|---|---|
-| **On request** (`mutants-on-request.yml`) | `make mutants-remote SCOPE=...`, or a dispatch with a `scope` input | `diff` (the branch against `origin/main`) or path globs, turned into one `--in-diff` by `.github/scripts/mutants-scope.py`; one runner, a 2 h 45 budget | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`) |
+| **On request** (`mutants-on-request.yml`) | `make mutants-remote SCOPE=...`, or a dispatch with a `scope` input | `diff` (the branch against `origin/main`) or path globs, turned into one `--in-diff` by `.github/scripts/mutants-scope.py`; one runner, a 2 h 45 budget | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`); `report.md` also as one comment on the branch's open PR, edited in place by later runs (#912) |
 | **Full sweep** (`mutants-sweep.yml`, sharded) | weekly `schedule` (Saturdays) + `workflow_dispatch` (`force` re-sweeps a covered commit); skipped by `mutants-plan` when a finished sweep already covered `main`'s head (#506); one sweep at a time (#705) | the full `--file` sim scope over a 24-shard matrix (`--shard k/24`), each shard stopping itself at a 5 h 40 budget under GitHub's 6 h limit (#749) | `mutants-report` job: merged job summary (totals, unfinished shards, survivors) and the merged `mutants-report` artifact |
 
 Why this shape: mutation is a signal, and a per-PR job held runners the merge

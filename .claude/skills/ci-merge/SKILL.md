@@ -330,7 +330,7 @@ want measured.
 
 | | on request | weekly |
 |---|---|---|
-| mutation | `make mutants-remote SCOPE=diff` (or path globs): `mutants-on-request.yml`, one runner, report and survivors' diffs printed in the terminal | `mutants-sweep.yml`, Saturdays, full sim in 24 shards, `mutants-report` summary + artifact; skipped when `main` has not moved since the last finished sweep |
+| mutation | `make mutants-remote SCOPE=diff` (or path globs): `mutants-on-request.yml`, one runner, report and survivors' diffs printed in the terminal, and the report posted as one comment on the branch's open PR (#912) | `mutants-sweep.yml`, Saturdays, full sim in 24 shards, `mutants-report` summary + artifact; skipped when `main` has not moved since the last finished sweep |
 | coverage | `gh workflow run coverage.yml --ref <branch>` | `coverage.yml`, Mondays, ratchet table |
 
 **Ask for a scoped mutation run on a branch that adds mechanism** — arithmetic,
