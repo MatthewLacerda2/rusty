@@ -68,7 +68,7 @@ status says what to do: **0** nothing to read, **1** something was handed back
 (grep the output for `HANDED BACK`), **3** the machine or GitHub failed and
 nothing is known about the branches; the most urgent wins. A transient `gh`
 failure (a TLS timeout, a reset, a 502) is retried for about a minute first, so
-only a GitHub that stays down ends a watch, and then with **3** (#847). It composes with every flag below; a
+only a GitHub that stays down ends a watch, and then with **3** (#847). The queue's own `git fetch` and force-push retry the same way, keeping the lease on the head the take began from (#875): a git SSL timeout is a **3**, never a hand-back. It composes with every flag below; a
 batch runs `ARGS="--watch --no-check --for 70"`. **`--for MINUTES`** (#697) is
 the watch's own deadline: once it passes, the watch takes no new pull request,
 finishes the one in hand (merged or handed back) and exits with a last

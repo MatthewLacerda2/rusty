@@ -99,7 +99,11 @@ The rebase happens in a **throwaway, detached worktree this script creates and
 removes** under the system temp dir — never in a worktree somebody is working
 in. The push is
 `--force-with-lease` against the head the pull request had when its turn
-began, so a push from anywhere else refuses rather than being overwritten. The
+began, so a push from anywhere else refuses rather than being overwritten.
+Its `git` calls to GitHub (`fetch`, `push`) retry a network failure on
+`mergeable.gh`'s backoff with that same lease ([`remote`], #875), and one
+still failing after the last stops the queue as the machine's failure, never
+a hand-back remembered against the branch. The
 merge is `--match-head-commit`, so GitHub refuses it if the head moved after
 the verdict.
 
@@ -278,6 +282,53 @@ class Stopped(Exception):
 def git(*args: str, cwd: str | None = None) -> subprocess.CompletedProcess:
     """`git`, captured and never fatal. Callers read `returncode` themselves."""
     return subprocess.run(["git", *args], capture_output=True, text=True, check=False, cwd=cwd)
+
+
+# What `git` prints when the network failed, not the request (#875: one SSL
+# timeout on a force-push handed back a healthy branch). Beside `gh`'s wording
+# ([`mergeable.TRANSIENT`]), which git shares in part.
+GIT_TRANSIENT = (
+    "ssl connection timeout",
+    "could not resolve host",
+    "connection timed out",
+    "operation timed out",
+    "failed to connect to",
+    "early eof",
+    "the remote end hung up unexpectedly",
+    "rpc failed",
+    "gnutls_handshake() failed",
+)
+
+
+def git_transient(stderr: str) -> bool:
+    """Whether `git` failed for the network's reasons rather than the request's."""
+    low = stderr.lower()
+    return mergeable.transient(stderr) or any(sign in low for sign in GIT_TRANSIENT)
+
+
+def remote(*args: str, cwd: str | None = None) -> subprocess.CompletedProcess:
+    """[`git`] for a call that talks to GitHub (`fetch`, `push`, `ls-remote`).
+
+    A transient failure is asked again, exactly as given, on `mergeable.gh`'s
+    backoff ([`mergeable.RETRIES`]); still failing after the last raises
+    [`mergeable.Unreachable`], which [`drain`] turns into a machine stop. Any
+    other result is returned for the caller to read, as [`git`]'s is.
+    """
+    for wait in (*mergeable.RETRIES, None):
+        done = git(*args, cwd=cwd)
+        if done.returncode == 0 or not git_transient(done.stderr):
+            return done
+        if wait is None:
+            raise mergeable.Unreachable(f"git {' '.join(args)}: {done.stderr.strip()}")
+        time.sleep(wait)
+    raise AssertionError("unreachable: the loop returns or raises")
+
+
+def remote_head(branch: str, cwd: str) -> str | None:
+    """`branch`'s head on GitHub, `None` when git could not say."""
+    listed = remote("ls-remote", "origin", f"refs/heads/{branch}", cwd=cwd)
+    words = listed.stdout.split() if listed.returncode == 0 else []
+    return words[0] if words else None
 
 
 def ordered(numbers: list[int]) -> list[int]:
@@ -613,7 +664,7 @@ def needs_check(pull: dict, opts: argparse.Namespace) -> bool:
 
 def on_tip(sha: str, root: str) -> bool:
     """Whether `sha` already contains `origin/main`'s tip (fetched by the caller)."""
-    git("fetch", "--quiet", "origin", sha, cwd=root)
+    remote("fetch", "--quiet", "origin", sha, cwd=root)
     return git("merge-base", "--is-ancestor", "origin/main", sha, cwd=root).returncode == 0
 
 
@@ -654,11 +705,16 @@ def advance(
                 if broken:
                     return None, broken
             if push and push_needed(head, fresh):
-                pushed = git(
+                # Every retry carries the same lease: the head this take began
+                # from, never one read back mid-retry (#875).
+                pushed = remote(
                     "push", f"--force-with-lease=refs/heads/{branch}:{head}",
                     "origin", f"HEAD:refs/heads/{branch}", cwd=work,
                 )
-                if pushed.returncode != 0:
+                # A push that landed before its reply was lost is refused on the
+                # retry, its lease now stale against itself: GitHub already
+                # holds exactly this head, so it is pushed.
+                if pushed.returncode != 0 and remote_head(branch, work) != fresh:
                     return None, [
                         f"the force-push of {branch} was refused: {pushed.stderr.strip()}",
                         "The lease held the head this queue started from, so"
@@ -776,8 +832,8 @@ def take(repo: str, number: int, opts: argparse.Namespace) -> tuple[int, str, st
         return number, HANDED_BACK, A_DRAFT
 
     branch, head = pull["headRefName"], pull["headRefOid"]
-    git("fetch", "--quiet", "origin", "main", cwd=opts.root)
-    git("fetch", "--quiet", "origin", head, cwd=opts.root)
+    remote("fetch", "--quiet", "origin", "main", cwd=opts.root)
+    remote("fetch", "--quiet", "origin", head, cwd=opts.root)
     began = time.monotonic()
     if is_bot(pull):
         say(f"#{number} ({branch}): Dependabot's branch; it rebases itself.")
