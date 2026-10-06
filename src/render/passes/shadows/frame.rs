@@ -120,3 +120,7 @@ fn shadow_settings(scene: &Scene) -> ShadowSettings {
         })
         .unwrap_or_default()
 }
+
+#[cfg(test)]
+#[path = "sun_tests.rs"]
+mod sun_tests;
