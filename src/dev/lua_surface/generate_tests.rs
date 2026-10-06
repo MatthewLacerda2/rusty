@@ -45,3 +45,33 @@ fn bake_lightmaps_takes_the_scenes_settings_for_missing_arguments() {
     .apply(base);
     assert_eq!((merged.samples, merged.bounces), (9, 2));
 }
+
+#[test]
+fn bake_lightmaps_applies_every_named_argument_and_clamps() {
+    use super::Overrides;
+    use crate::scene::lighting::lightmap::BakeSettings;
+    let base = BakeSettings {
+        directional: true,
+        ..Default::default()
+    };
+    let named = Overrides {
+        texels_per_unit: Some(3.0),
+        samples: Some(7),
+        bounces: Some(2),
+        seed: Some(11),
+        directional: Some(false),
+    }
+    .apply(base);
+    let got = (named.texels_per_unit, named.samples, named.bounces);
+    assert_eq!(got, (3.0, 7, 2));
+    assert_eq!((named.seed, named.directional), (11, false));
+    let clamped = Overrides {
+        texels_per_unit: Some(0.0),
+        samples: Some(0),
+        bounces: Some(0),
+        ..Default::default()
+    }
+    .apply(base);
+    let got = (clamped.texels_per_unit, clamped.samples, clamped.bounces);
+    assert_eq!(got, (0.01, 1, 1));
+}

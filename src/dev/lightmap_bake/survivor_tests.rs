@@ -5,12 +5,12 @@
 use super::tests::{quick, scene, scene_path};
 use super::*;
 
-/// The sRGB texels `pixels` (one row) written as a PNG in a fresh temp dir.
-fn png(name: &str, pixels: &[[u8; 4]]) -> String {
+/// The sRGB texels `pixels` (`rows` equal rows) written as a PNG in a fresh temp dir.
+fn png(name: &str, pixels: &[[u8; 4]], rows: usize) -> String {
     let dir = Path::new(&scene_path(name)).parent().unwrap().to_path_buf();
     let path = dir.join("albedo.png");
-    let bytes = pixels.concat();
-    image::RgbaImage::from_raw(pixels.len() as u32, 1, bytes)
+    let bytes = pixels.concat().repeat(rows);
+    image::RgbaImage::from_raw(pixels.len() as u32, rows as u32, bytes)
         .unwrap()
         .save(&path)
         .unwrap();
@@ -20,7 +20,8 @@ fn png(name: &str, pixels: &[[u8; 4]]) -> String {
 #[test]
 fn texture_average_is_the_linear_mean_of_its_texels() {
     // 188 is past the sRGB toe (≈ 0.5029 linear), 10 is inside it (10/255/12.92).
-    let path = png("albedo", &[[188, 10, 0, 255], [188, 10, 255, 255]]);
+    // Two rows (#894): a 2×1 image can't tell `w * h` texels from `w / h`.
+    let path = png("albedo", &[[188, 10, 0, 255], [188, 10, 255, 255]], 2);
     let average = texture_average(&path).expect("a readable PNG");
     assert!((average.x - 0.502_886).abs() < 1e-4, "{average}");
     assert!((average.y - 0.003_035_3).abs() < 1e-6, "{average}");

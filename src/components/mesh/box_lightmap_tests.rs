@@ -1,5 +1,6 @@
 //! A Box's lightmap cells pinned exactly (#820): each face owns a padded cell of a
-//! 3×2 grid, so a bleed-free border surrounds every face in the atlas.
+//! 3×2 grid, so a bleed-free border surrounds every face in the atlas. And its
+//! faces' corners (#894): four distinct points spanning the whole face.
 
 use super::primitives::generate_box;
 
@@ -33,4 +34,23 @@ fn the_first_face_fills_the_padded_bottom_left_cell() {
 fn the_fifth_face_starts_one_padded_cell_over_and_up() {
     let (min, _) = cell(4);
     assert!(near(min, [(1.0 + PAD) / 3.0, (1.0 + PAD) / 2.0]), "{min:?}");
+}
+
+#[test]
+fn every_box_face_spans_its_whole_side() {
+    let half = glam::Vec3::new(1.0, 2.0, 3.0);
+    let (vertices, _) = generate_box(2.0, 4.0, 6.0);
+    for quad in vertices.chunks(4) {
+        let normal = glam::Vec3::from(quad[0].normal);
+        let corners: Vec<glam::Vec3> = quad.iter().map(|v| v.position.into()).collect();
+        for (i, c) in corners.iter().enumerate() {
+            assert!(corners[..i].iter().all(|o| o != c), "{corners:?}");
+            assert_eq!(c.dot(normal), half.dot(normal.abs()), "{c} off the face");
+        }
+        for axis in (0..3).filter(|&a| normal[a] == 0.0) {
+            let along = corners.iter().map(|c| c[axis]);
+            let (lo, hi) = along.fold((f32::MAX, f32::MIN), |(lo, hi), x| (lo.min(x), hi.max(x)));
+            assert_eq!((lo, hi), (-half[axis], half[axis]), "normal {normal}");
+        }
+    }
 }
