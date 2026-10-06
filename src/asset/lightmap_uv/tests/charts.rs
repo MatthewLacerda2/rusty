@@ -15,12 +15,19 @@ fn a_cube_unwraps_into_six_separate_padded_charts() {
     // One face is 2 × 2 world units: UV units per world unit, from its rectangle.
     let per_world = (rects[0].1 - rects[0].0).max_element() / 2.0;
     let margin = on().pack_margin / REFERENCE_TEXELS_PER_UNIT * per_world;
+    let mut smallest = f32::INFINITY;
     for (i, a) in rects.iter().enumerate() {
         for b in &rects[i + 1..] {
             let gap = (b.0 - a.1).max(a.0 - b.1).max_element();
             assert!(gap >= margin * 0.999, "charts {gap} apart, margin {margin}");
+            smallest = smallest.min(gap);
         }
     }
+    // And no wider than asked: the margin is Unity's Pack Margin, not a multiple.
+    assert!(
+        smallest <= margin * 2.0,
+        "closest charts {smallest} apart, margin {margin}"
+    );
 }
 
 #[test]
