@@ -1,7 +1,7 @@
 //! src/dev/lighting_bake.rs — One-button lighting bake: auto-place + bake both sets.
 //!
-//! The orchestration behind `Lighting.Bake()` (the script verb) and the editor's
-//! "Bake Lighting" button (#246). In ONE action it:
+//! The orchestration behind `Lighting.Bake()` (the script verb) and the probe step
+//! of the editor's Generate Lighting button (#246, #832). In ONE action it:
 //!   1. auto-places light probes (a grid through the navigable volume / static AABB)
 //!      and reflection probes (one per coarse region of the static AABB) — UNLESS that
 //!      set is already manually authored, in which case its placement is left untouched;

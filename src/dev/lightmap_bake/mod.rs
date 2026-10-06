@@ -1,9 +1,10 @@
 //! src/dev/lightmap_bake/ — the lightmap bake as an authoring action (#438).
 //!
-//! The one path behind `Lighting.BakeLightmaps()` and the editor's "Bake Lightmaps"
-//! button, so the two never drift. It gathers the static scene, runs the CPU bake
-//! (`scene::lighting::lightmap`, pure and seeded), writes each lightmap as an RGBM
-//! PNG beside the scene, and points the scene's `lightmaps` at them. Saving the scene
+//! The one path behind `Lighting.BakeLightmaps()` and the lightmap step of the
+//! editor's Generate Lighting button (#832), so the two never drift. It gathers the
+//! static scene, runs the CPU bake (`scene::lighting::lightmap`, pure and seeded),
+//! writes each lightmap as an RGBM PNG beside the scene, and points the scene's
+//! `lightmaps` at them. Saving the scene (or Generate Lighting, which writes them)
 //! then persists those references. Headless: no GPU is involved.
 //!
 //! The lightmaps are packed into atlas pages (`lightmap::atlas`), written to

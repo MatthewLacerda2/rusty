@@ -67,8 +67,8 @@ fn register_reflection<'scope>(
 }
 
 /// `Lighting.Bake([probeSpacing], [reflectionRegion], [cap])`: auto-place then bake
-/// both sets (#246), through the same orchestration as the editor's "Bake Lighting"
-/// button. `true` when at least one bake ran on the GPU; errors only when a bake's own
+/// both sets (#246), the probe step of the editor's Generate Lighting button (#832).
+/// `true` when at least one bake ran on the GPU; errors only when a bake's own
 /// contract fails (reflections need a saved scene path).
 fn register_lighting<'scope>(
     lua: &Lua,
@@ -113,7 +113,7 @@ fn bake_params(
 /// normal maps reshape baked light. An argument left out takes the scene's lighting
 /// settings (#832).
 /// `Lighting.ClearLightmaps()` drops them all, back to probe / ambient lighting. The
-/// same path as the editor's "Bake Lightmaps" button.
+/// lightmap step of the editor's Generate Lighting button (#832).
 fn register_lightmaps<'scope>(
     lua: &Lua,
     scope: &'scope mlua::Scope<'scope, '_>,

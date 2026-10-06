@@ -2,7 +2,10 @@
 //! result in the scene file. The probe step skips without a GPU adapter, so the
 //! probe-bake flags are not asserted; the bakes themselves are tested beside them.
 
+use glam::Vec3;
+
 use super::{generate_lighting, GenerateReport, UNSAVED};
+use crate::components::{ColliderComponent, ColliderShape};
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
 use crate::scene::{LightingSave, Scene};
 
@@ -17,6 +20,20 @@ fn saved_floor(name: &str) -> (Scene, String) {
         .world
         .set_mesh(floor, primitive_mesh_component(Primitive::Plane));
     scene.world.set_static(floor, true);
+    // A collider gives probe placement static bounds to fill.
+    let shape = ColliderShape::Box {
+        size: Vec3::new(10.0, 4.0, 10.0),
+    };
+    let collider = ColliderComponent {
+        active: true,
+        shape,
+        is_trigger: false,
+        material: Default::default(),
+        aabb_min: Vec3::ZERO,
+        aabb_max: Vec3::ZERO,
+    };
+    scene.world.set_collider(floor, Some(collider));
+    scene.update_entity_collider(floor);
     let s = &mut scene.lighting_settings.lightmaps;
     (s.texels_per_unit, s.samples, s.bounces, s.max_resolution) = (2.0, 4, 1, 16);
     scene.save_to_file(&path).unwrap();

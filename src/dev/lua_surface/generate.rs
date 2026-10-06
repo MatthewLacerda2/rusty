@@ -96,3 +96,7 @@ pub(super) fn register<'scope>(
         }),
     )
 }
+
+#[cfg(test)]
+#[path = "generate_tests.rs"]
+mod tests;

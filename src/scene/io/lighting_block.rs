@@ -57,8 +57,13 @@ fn parse(json: &str) -> Result<Value, String> {
     serde_json::from_str(json).map_err(|e| format!("Failed to parse scene file: {e}"))
 }
 
+/// `data` as the file would hold it. Through the text, not `serde_json::to_value`:
+/// an `f32` is written as its shortest decimal, which reads back as a different `f64`
+/// than the `f32` widened directly.
 fn to_value(data: &SceneData) -> Result<Value, String> {
-    serde_json::to_value(data).map_err(|e| format!("Failed to serialize scene: {e}"))
+    let json =
+        serde_json::to_string(data).map_err(|e| format!("Failed to serialize scene: {e}"))?;
+    parse(&json)
 }
 
 #[cfg(test)]
