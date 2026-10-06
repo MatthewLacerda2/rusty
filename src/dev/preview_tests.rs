@@ -64,10 +64,11 @@ fn gpu_capture_writes_a_square_png_at_the_requested_resolution() {
         resolution: 64,
         ..PreviewOptions::default()
     };
-    let Ok(true) = capture_asset(SHADER, &out, options) else {
+    // An `Err` (including no adapter under RUSTY_REQUIRE_GPU=1, #885) fails here.
+    if !capture_asset(SHADER, &out, options).expect("preview must not error") {
         eprintln!("no GPU adapter — skipping the render half of this test");
         return;
-    };
+    }
 
     // The nested directory was created for us, and the image is what was asked for.
     let image = image::open(&out).expect("a readable PNG landed on disk");

@@ -144,7 +144,12 @@ Where they actually run is not uniform, and it is worth knowing before you rely 
 **CI requires an adapter.** Those jobs set `RUSTY_REQUIRE_GPU=1`, which turns one
 canary test (`render::test_gpu::tests::gpu_adapter_present_when_required`) from a skip into
 a failure when no adapter is found — so a runner image that loses its driver goes red
-instead of quietly skipping every GPU test. Without the variable (any local machine)
+instead of quietly skipping every GPU test. The dev capture layer answers to the same
+variable (#885): `dev::capture::no_adapter` turns a capture's "no adapter" (a
+screenshot, `Debug.Preview`, an editor capture) into an `Err`, so every visual test
+under `tests/gpu/` fails rather than skips, and
+`dev::capture::capture_required_tests::gpu_capture_renders_when_required` fails if a
+capture path wrongly reports no adapter. Without the variable (any local machine)
 the skip contract above is unchanged.
 
 **Running them on a GPU-less Linux box** (a container, a cloud session): install

@@ -16,6 +16,17 @@ use crate::render::Renderer;
 /// screenshot matches the window.
 pub const OFFSCREEN_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 
+/// Set to `1` where a missing adapter is a failure, not a skip — CI sets it (#489).
+/// Read through [`gpu_required`]; the in-crate canary and the dev capture layer both
+/// answer to it (#885).
+pub const REQUIRE_GPU_ENV: &str = "RUSTY_REQUIRE_GPU";
+
+/// Whether this process was told a GPU or software adapter must be present
+/// ([`REQUIRE_GPU_ENV`] is `1`). Without it, "no adapter" stays a graceful skip.
+pub fn gpu_required() -> bool {
+    std::env::var(REQUIRE_GPU_ENV).as_deref() == Ok("1")
+}
+
 /// The backends a headless renderer may use: Vulkan, Metal and DX12 — never GL.
 ///
 /// Every headless renderer creates its own `wgpu::Instance`, and several live at

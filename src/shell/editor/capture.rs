@@ -119,7 +119,7 @@ pub fn capture_into(
     let (width, height) = (opts.width.max(1), opts.height.max(1));
     let ui = &mut initial_ui(game, opts)?;
     let Some(renderer) = host.renderer(width, height) else {
-        log::warn!("[EditorCapture] no GPU/software adapter available — skipping capture");
+        crate::dev::capture::no_adapter("capture the editor")?;
         return Ok(false);
     };
     let mut egui_renderer = egui_wgpu::Renderer::new(
