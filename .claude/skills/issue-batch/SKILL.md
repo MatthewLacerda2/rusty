@@ -192,6 +192,9 @@ one at a time however many are written.
 worktree (seen 2026-09-30). What works is a **one-off cloud routine** — the
 `RemoteTrigger` tool (the `schedule` skill has the body shape) with `run_once_at` a
 minute or two out, the repository as its source, and the whole brief as its prompt.
+Compute that time, never type it: `date -u -v+2M +%Y-%m-%dT%H:%M:00Z` on macOS
+(`date -u -d '+2 min' …` on Linux). On 2026-10-05 a hand-typed time fired 45
+minutes late, and the API refuses a time already past.
 Two traps decide whether it is really remote:
 
 - **Pick the `anthropic_cloud` environment, never a `bridge` one.** The environment
@@ -328,7 +331,10 @@ CI) at once, not from stacking work in one.
 something (#487, #492, #497, #552 each put a before/after table in their pull
 request), fixes that need its real GPU (#518's driver race), and the
 orchestrator's own compile checks. Don't let the orchestrator compile while a
-local agent is timing builds; it skews the numbers.
+local agent is timing builds; it skews the numbers. **Once the local-only proof is in
+the PR, the rest can go to the cloud.** On 2026-10-05 #834's Metal bench numbers were
+in PR #865 when disk ran short (8 GB in its worktree, 7.7 GB free). A cloud routine
+did the rebase, gates and ready, and the local worktree was deleted.
 
 **Every cloud brief carries** step 0 inline, then a pointer to
 [`cloud-brief.md`](cloud-brief.md) — the standing rules (foreground builds,
@@ -373,6 +379,10 @@ they hold for any repo running this workflow.
   minutes lost on 2026-10-02). Wait on a PID you hold, or on the watch's own
   exit. With one `make queue ARGS=--watch` there is nothing to chain: it takes
   every ready PR, and the order lives on GitHub, not in a list.
+- **Never stop the watch by pattern.** Other repos on this machine run the same
+  command line (`merge-queue.py --watch`): on 2026-10-05 a `pkill -f` meant for
+  rusty's watch killed scorsese's too. Find rusty's by its working directory
+  (`lsof -a -p <pid> -d cwd` = the queue worktree) and kill that PID.
 - **Watch each PR's head commit, not only its draft/ready state.** A rebased PR
   stays *ready* the whole time, so a watcher keyed on state never sees the push.
   The queue's watch keys on the head for exactly this reason; your own reading
