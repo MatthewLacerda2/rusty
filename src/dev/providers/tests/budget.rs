@@ -69,3 +69,10 @@ fn a_ledger_that_does_not_parse_refuses_rather_than_resets() {
     let refusal = permit(false, Provider::ElevenLabs, 1, &keyed(), &path).unwrap_err();
     assert!(matches!(refusal, Refusal::Ledger(_)), "got {refusal:?}");
 }
+
+#[test]
+fn a_ledger_that_exists_but_cannot_be_read_refuses_rather_than_resets() {
+    // Reading a directory fails with a non-`NotFound` error on macOS and Linux.
+    let refusal = Ledger::load(&scratch("unreadable")).unwrap_err();
+    assert!(matches!(refusal, Refusal::Ledger(_)), "got {refusal:?}");
+}

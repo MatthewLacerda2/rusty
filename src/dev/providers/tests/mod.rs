@@ -123,3 +123,9 @@ fn play_is_checked_before_the_key() {
 fn the_ledger_lives_at_the_project_root() {
     assert_eq!(ledger::path(), PathBuf::from("provider_budget.json"));
 }
+
+#[test]
+fn the_environment_reads_the_process_environment() {
+    // Only reads, so it is safe beside other test threads.
+    assert!(environment().get("PATH").is_some());
+}
