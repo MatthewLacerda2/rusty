@@ -96,3 +96,7 @@ fn report_to_lua(lua: &Lua, report: &Report) -> LuaResult<Table> {
     out.set("metrics", metrics)?;
     Ok(out)
 }
+
+#[cfg(test)]
+#[path = "lua_tests.rs"]
+mod lua_tests;

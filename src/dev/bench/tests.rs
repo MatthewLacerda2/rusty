@@ -76,9 +76,17 @@ fn gpu_bench_reports_frame_render_and_counter_rows() {
     assert_eq!(report.frames, 3);
     let row = |k: &str| report.metrics.iter().find(|(m, _)| m == k).map(|r| r.1);
     assert!(row("frame_ms").is_some() && row("update_scripts").is_some());
-    let Some(_) = row("renderer_ms") else {
-        return; // no adapter on this machine
-    };
+    // The clock hold and the frame share the harness's renderer: without one both
+    // skip, which is only allowed where no GPU is required (#885).
+    let rendered = h.renderer().is_some();
+    assert_eq!(row("renderer_ms").is_some(), rendered);
+    if !rendered {
+        assert!(
+            !crate::render::gpu_required(),
+            "no adapter, but one is required"
+        );
+        return;
+    }
     assert!(row("draw_calls").is_some_and(|s| s.avg > 0.0));
     assert!(row("triangles").is_some_and(|s| s.avg > 0.0));
     let timed = h.stats.borrow().get("gpu_ms").is_some();
