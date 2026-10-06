@@ -41,6 +41,11 @@ fn a_prop_heavy_level_renders_in_few_draw_calls() {
         .unwrap_or(1);
     for _ in 0..frames {
         if !h.screenshot(out.join("props.png")) {
+            // The harness folds errors into `false`; only a real skip may pass (#885).
+            assert!(
+                !rusty::render::gpu_required(),
+                "RUSTY_REQUIRE_GPU=1 but no shot"
+            );
             eprintln!("[instancing] no GPU/software adapter — skipping");
             return;
         }

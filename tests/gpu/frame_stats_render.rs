@@ -10,6 +10,11 @@ fn a_screenshot_records_render_counters() {
     let mut h = Harness::new(&out, "");
     h.step(2);
     if !h.screenshot(out.join("shot.png")) {
+        // The harness folds errors into `false`; only a real skip may pass (#885).
+        assert!(
+            !rusty::render::gpu_required(),
+            "RUSTY_REQUIRE_GPU=1 but no shot"
+        );
         eprintln!("[stats] no GPU/software adapter — skipping render counters");
         return;
     }
