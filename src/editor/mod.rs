@@ -16,6 +16,7 @@ pub mod hierarchy;
 mod hierarchy_tree;
 pub mod inspector;
 mod menu_create;
+pub mod project_picker;
 pub mod theme;
 pub mod viewport;
 

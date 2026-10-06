@@ -8,14 +8,17 @@
 //! to the frontend (the editor's Scene-view look, #745) and to the game while it has
 //! input, a redraw request each time the loop goes idle.
 
+use std::sync::Arc;
+
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::window::WindowId;
+use winit::window::{Window, WindowId};
 
 use super::{boot, input, settings, Frontend, Shell};
 use crate::app::GameWorld;
 use crate::core::video::VideoSettings;
+use crate::render::Renderer;
 
 /// Everything a frontend decides before the window exists.
 pub struct Launch<M> {
@@ -27,11 +30,37 @@ pub struct Launch<M> {
     pub frontend: M,
 }
 
-/// The loop's state: the launch until the first `resumed`, then the running shell.
-struct App<F, M> {
+/// The loop's state: the launch until the shell starts, then the running shell.
+pub(super) struct App<F, M> {
     game: GameWorld,
     launch: Option<Launch<M>>,
     running: Option<(Shell, F)>,
+}
+
+impl<F, M> App<F, M>
+where
+    F: Frontend,
+    M: FnOnce(&Shell, &GameWorld) -> F,
+{
+    pub(super) fn new(game: GameWorld, launch: Launch<M>) -> Self {
+        Self {
+            game,
+            launch: Some(launch),
+            running: None,
+        }
+    }
+
+    /// Boot the shell and the frontend on an open window: the one `resumed` made, or
+    /// the one a [`super::prelude`] stage ran in (it gets the launch's title).
+    pub(super) fn start(&mut self, window: Arc<Window>, renderer: Renderer) {
+        let Some(launch) = self.launch.take() else {
+            return;
+        };
+        window.set_title(&launch.title);
+        let shell = Shell::new(window, renderer, &self.game, launch.video_defaults);
+        let frontend = (launch.frontend)(&shell, &self.game);
+        self.running = Some((shell, frontend));
+    }
 }
 
 /// Run the event loop until the window closes or the game quits. Persists the
@@ -43,11 +72,7 @@ where
 {
     let event_loop = EventLoop::new().expect("the OS refused an event loop");
     event_loop.set_control_flow(ControlFlow::Poll);
-    let mut app = App {
-        game,
-        launch: Some(launch),
-        running: None,
-    };
+    let mut app = App::new(game, launch);
     if let Err(err) = event_loop.run_app(&mut app) {
         eprintln!("[Engine] The event loop failed: {err}");
     }
@@ -61,15 +86,13 @@ where
     /// The first resume opens the window and boots the shell; desktop platforms
     /// resume once, so later ones (mobile) keep the shell they have.
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let Some(launch) = self.launch.take() else {
+        let Some(launch) = self.launch.as_ref() else {
             return;
         };
         let size = launch.video_defaults.resolution();
         let window = boot::create_window(event_loop, &launch.title, size);
         let renderer = boot::init_renderer(&window);
-        let shell = Shell::new(window, renderer, &self.game, launch.video_defaults);
-        let frontend = (launch.frontend)(&shell, &self.game);
-        self.running = Some((shell, frontend));
+        self.start(window, renderer);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {

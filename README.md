@@ -79,7 +79,8 @@ the game for you, and only open a window when you want to.
 
 ## Running it
 
-- `cargo run` — the editor.
+- `cargo run` — the editor, starting on the project picker (`-- --project <dir>`
+  skips it).
 - `cargo run --bin player` — the standalone player: the project's startup scene,
   straight into Play, full-window, no editor (see *Shipping a build* below).
 - `cargo run --bin play --features dev -- [--project <dir>] <scenario.lua> <out_dir>` — the headless
@@ -103,10 +104,21 @@ cargo run --bin play --features dev -- --project ~/games/horde \
     ~/games/horde/scenarios/smoke.lua out/
 ```
 
-Without `--project` a binary opens `./project` (created if missing). Opening a folder
-that doesn't exist yet creates it: that is *New Project*. The engine writes the
-folder and nothing else — no `git init`; version control is yours. A project looks
-like Unity's and Unreal's:
+Without `--project` the **editor** starts on the **project picker**, Unity Hub's
+Projects page: the projects opened before (most recent first, with when; a folder
+that has gone is greyed out and can be removed from the list), *New Project* (a name
+and a parent folder) and *Open* (an existing project folder: one holding
+`project.rusty` or `assets/`). A project last opened by a different engine asks
+before it opens. The list is yours, not the project's: it lives in
+`$XDG_CONFIG_HOME/rusty/recent_projects.json` (default `~/.config/rusty/`) on Linux and
+`~/Library/Application Support/rusty/` on macOS, and every project the editor opens,
+with the picker or `--project`, goes to its top.
+
+The other binaries (`player`, `play`, `session`, `session-mcp`) never show it: without
+`--project` they open a packaged `project/` beside the executable, else `./project`
+(created if missing). Opening a folder that doesn't exist yet creates it, as *New
+Project* does. The engine writes the folder and nothing else — no `git init`; version
+control is yours. A project looks like Unity's and Unreal's:
 
 ```text
 <project>/

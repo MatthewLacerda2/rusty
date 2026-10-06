@@ -14,17 +14,20 @@ mod cursor_release;
 mod game_focus;
 mod icon;
 mod paint;
+mod start;
 mod viewport;
+
+#[cfg(feature = "dev")]
+pub use start::capture_picker;
+pub use start::{launch, launch_picker};
 
 use winit::event::WindowEvent;
 use winit::keyboard::KeyCode;
 
 use super::frame::Host;
-use super::{boot, Frontend, Launch, Shell};
+use super::{Frontend, Shell};
 use crate::app::{GameWorld, PlayTransition};
 use crate::core::input::CursorState;
-use crate::core::project::{Opened, PROJECT_FILE};
-use crate::core::video::VideoSettings;
 use crate::editor::{EditorUi, ViewportInteraction, ViewportTab};
 use crate::render::RenderView;
 use crate::scene::SceneId;
@@ -258,34 +261,4 @@ impl Frontend for EditorFrontend {
 
         self.paint(shell, target);
     }
-}
-
-/// Boot the editor on the seeded default scene and run until the window closes.
-/// `opened` is what opening the project found; an engine mismatch is logged to the
-/// editor console as well as stderr.
-pub fn launch(opened: &Opened) {
-    println!("[Engine] Starting rusty 3D engine...");
-    boot::seed_project_workspace();
-    let scene_path = crate::scene::DEFAULT_SCENE_PATH.to_string();
-    let game = boot::load_game(&scene_path);
-    // Bound: the File → Build Settings window and `Application.Set*` write the file.
-    let bound = game.resources.application.borrow_mut().open(PROJECT_FILE);
-    if let Err(err) = bound {
-        game.console().borrow_mut().error(err);
-    }
-    if let Some(warning) = opened.engine.warning() {
-        game.console()
-            .borrow_mut()
-            .warn(format!("[Project] {warning}"));
-    }
-
-    let launch = Launch {
-        title: "Rusty 3D Game Engine & Editor".to_string(),
-        video_defaults: VideoSettings::default(),
-        frontend: |shell: &Shell, game: &GameWorld| {
-            icon::apply(&shell.window);
-            EditorFrontend::new(shell, game, scene_path)
-        },
-    };
-    super::run(game, launch);
 }

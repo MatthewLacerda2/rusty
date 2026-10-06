@@ -31,6 +31,7 @@ mod focus;
 pub mod frame;
 pub mod input;
 pub mod player;
+mod prelude;
 pub mod settings;
 
 #[cfg(feature = "editor")]
@@ -50,6 +51,7 @@ use crate::render::Renderer;
 
 pub use event_loop::{run, Launch};
 use frame::{FrameClock, Host, QuitAction};
+pub use prelude::{run_after, Prelude};
 
 /// The frontend-independent window state threaded through the event loop.
 pub struct Shell {

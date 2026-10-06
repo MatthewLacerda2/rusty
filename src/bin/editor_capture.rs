@@ -16,6 +16,9 @@
 //!   --play              draw the Play-mode chrome (the sim is not stepped)
 //!   --game              show the Game tab instead of the Scene tab
 //!   --size <W>x<H>      capture size (default 1600x900)
+//!   --picker [<page>]   the project picker the editor starts on (#854), over a
+//!                       sample recent list; <page> is `new`, `open` or
+//!                       `mismatch` (the different-engine prompt)
 //! ```
 //!
 //! Deterministic: a fixed size, scale and frame count. Exits 0 when written, 1 when the
@@ -27,13 +30,23 @@ use rusty::core::project::Access;
 use rusty::dev::session::Session;
 use rusty::editor::ViewportTab;
 use rusty::shell::editor::capture::{self, EditorCaptureOptions};
+use rusty::shell::editor::capture_picker;
+
+#[path = "editor_capture/sample_picker.rs"]
+mod sample_picker;
 
 fn main() {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let project = rusty::core::project::take_flag(&mut args).unwrap_or_else(|e| fail(&e));
-    let (out, scene, opts) = parse(&args).unwrap_or_else(|e| fail(&e));
+    let (out, scene, opts, page) = parse(&args).unwrap_or_else(|e| fail(&e));
     // `--out` is named from the launch directory; opening the project moves it.
     let out = std::path::absolute(&out).map_or(out, |p| p.to_string_lossy().into_owned());
+    if let Some(page) = page {
+        let mut picker = sample_picker::build(&page).unwrap_or_else(|e| fail(&e));
+        let size = (opts.width, opts.height);
+        let written = capture_picker(&mut picker, sample_picker::NOW, &out, size);
+        return report(written, &out);
+    }
     let opened = rusty::core::project::open(&rusty::core::project::locate(project), Access::Run);
     opened.unwrap_or_else(|e| fail(&e));
     let written = match scene {
@@ -43,6 +56,10 @@ fn main() {
         }
         None => capture::capture(&capture::default_world(), &out, &opts),
     };
+    report(written, &out);
+}
+
+fn report(written: Result<bool, String>, out: &str) {
     match written {
         Ok(true) => println!("editor-capture: wrote {out}"),
         Ok(false) => {
@@ -53,12 +70,19 @@ fn main() {
     }
 }
 
-/// `(out, scene, options)` from the command line.
-fn parse(args: &[String]) -> Result<(String, Option<String>, EditorCaptureOptions), String> {
+/// What the command line asked for: `(out, scene, options, picker page)`.
+type Parsed = (String, Option<String>, EditorCaptureOptions, Option<String>);
+
+fn parse(args: &[String]) -> Result<Parsed, String> {
     let mut out = "editor-capture.png".to_string();
-    let (mut scene, mut opts) = (None, EditorCaptureOptions::default());
-    let mut it = args.iter();
+    let (mut scene, mut opts, mut picker) = (None, EditorCaptureOptions::default(), None);
+    let mut it = args.iter().peekable();
     while let Some(flag) = it.next() {
+        if flag == "--picker" {
+            let page = it.next_if(|v| sample_picker::PAGES.contains(&v.as_str()));
+            picker = Some(page.map_or("projects", |v| v.as_str()).to_string());
+            continue;
+        }
         let mut value = || it.next().cloned().ok_or(format!("{flag} needs a value"));
         match flag.as_str() {
             "--out" => out = value()?,
@@ -77,7 +101,7 @@ fn parse(args: &[String]) -> Result<(String, Option<String>, EditorCaptureOption
             other => return Err(format!("unknown argument {other}")),
         }
     }
-    Ok((out, scene, opts))
+    Ok((out, scene, opts, picker))
 }
 
 fn fail(msg: &str) -> ! {
