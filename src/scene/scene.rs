@@ -102,6 +102,8 @@ pub struct Scene {
     /// Baked lightmaps (#438): which RGBM lightmap file each static mesh wears. A mesh
     /// absent from it keeps probe / ambient lighting.
     pub lightmaps: crate::scene::lighting::lightmap::LightmapSet,
+    /// What Generate Lighting bakes with (#832), saved with the scene.
+    pub lighting_settings: crate::scene::lighting::LightingSettings,
     /// Ids queued for deferred destruction by play-mode `Scene.DestroyEntity`
     /// (#323); drained in `runtime::destroy_queue`. Transient, never serialized.
     pub pending_destroy: Vec<u32>,
@@ -146,6 +148,7 @@ impl Default for Scene {
             probes: crate::scene::lighting::probe::ProbeVolume::new(),
             reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet::new(),
             lightmaps: Default::default(),
+            lighting_settings: Default::default(),
             pending_destroy: Vec::new(),
             pending_load: None,
             persistent: std::collections::BTreeSet::new(),

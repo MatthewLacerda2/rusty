@@ -2,13 +2,12 @@
 pub mod bake;
 #[cfg(not(feature = "dev"))]
 mod bake {
-    /// No-op bake buttons in a ship build (the bakes are dev-only actions).
+    /// No Generate Lighting button in a ship build (the bakes are dev-only actions).
     pub fn draw(
         _: &mut egui::Ui,
         _: &mut crate::editor::EditorUi,
         _: &mut crate::scene::Scene,
         _: &mut crate::scripting::ConsoleLogs,
-        _: &crate::navigation::NavigationGraph,
         _: &str,
     ) {
     }
@@ -45,7 +44,7 @@ pub fn draw(
 
     draw_scene_operations(ui, editor, scene, console, path, filename);
     draw_navmesh(ui, scene, nav);
-    bake::draw(ui, editor, scene, console, nav, path);
+    bake::draw(ui, editor, scene, console, path);
 }
 
 /// The per-scene Navmesh bake settings section (#276): edit agent radius, agent height,
