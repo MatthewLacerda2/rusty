@@ -67,8 +67,9 @@ pub struct RenderCounters {
     pub shadow_draws: u32,
     /// Point/spot lights given a shadow in the atlas this frame (#468).
     pub shadowed_lights: u32,
-    /// Point/spot lights that cast shadows and reach the view but found no room in
-    /// the atlas (#468): they shade unshadowed. The least important are dropped.
+    /// Point/spot lights that cast shadows and are shaded (the base camera's light
+    /// budget keeps them, #873) but found no room in the atlas (#468): they shade
+    /// unshadowed. The least important are dropped.
     pub shadow_lights_dropped: u32,
     /// Atlas tiles drawn this frame: one per spotlight, six per point light (#468).
     pub shadow_atlas_tiles: u32,
