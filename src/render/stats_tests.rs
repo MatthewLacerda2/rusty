@@ -1,5 +1,5 @@
 use super::*;
-use crate::components::LightComponent;
+use crate::components::{LightComponent, LightMode};
 use glam::Vec3;
 
 fn light(light_type: LightType) -> LightComponent {
@@ -29,6 +29,25 @@ fn lights_past_the_forward_slots_count_as_dropped() {
     // Points and spots are clustered (#434): only the 5th sun and the first
     // ambient (overwritten by the second) have no slot.
     assert_eq!(count_lights(&scene), (15, 2));
+}
+
+#[test]
+fn baked_suns_take_no_slot_so_never_count_as_dropped() {
+    let mut scene = Scene::new();
+    for (i, mode) in [LightMode::Baked; 2]
+        .into_iter()
+        .chain([LightMode::Realtime; 4])
+        .enumerate()
+    {
+        let id = scene.world.spawn(format!("Sun{i}"));
+        let sun = LightComponent {
+            mode,
+            ..light(LightType::Directional)
+        };
+        scene.world.set_light(id, Some(sun));
+    }
+    // Four live suns fill the four slots; the two baked ones never wanted one.
+    assert_eq!(count_lights(&scene), (6, 0));
 }
 
 #[test]

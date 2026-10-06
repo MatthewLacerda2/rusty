@@ -10,11 +10,14 @@
 //! and shades only that cluster's lights. This is the shape of Unity URP's
 //! Forward+ and of most modern forward renderers.
 //!
-//! **Budget.** A camera shades at most [`MAX_VISIBLE_LIGHTS`] local lights (Unity
-//! URP Forward+'s desktop figure). Past it, the lights nearest the camera win and
-//! the rest are counted in `RenderCounters::lights_dropped` — never silent.
+//! **Budget (#834).** A camera shades at most [`MAX_VISIBLE_LIGHTS`] local lights,
+//! and one cluster — so one pixel — at most [`MAX_CLUSTER_LIGHTS`]. Past either,
+//! the lights that contribute most win: brightness (intensity × colour luminance)
+//! with a range falloff, measured over the view for the camera cut and at the
+//! cluster for the cluster cut. The rest are counted, never silent: per camera in
+//! `RenderCounters::lights_dropped`, per cluster in `cluster_lights_dropped`.
 //! Lights outside a camera's frustum are culled before binning and cost that
-//! camera nothing (`lights_culled`).
+//! camera nothing (`lights_culled`). Decals share the binner with their own budget.
 //!
 //! **Consumers.** The forward pass (`shader.wgsl`, and through it every authored
 //! surface shader and the transparent pass) and lit particles (`particles.wgsl`)
@@ -38,13 +41,21 @@ pub(crate) const GRID: [u32; 3] = [16, 9, 24];
 /// Clusters in the grid.
 pub(crate) const CLUSTER_COUNT: usize = (GRID[0] * GRID[1] * GRID[2]) as usize;
 
-/// The most local (point + spot) lights one camera shades (Unity URP Forward+'s
-/// desktop limit). The nearest win; the rest are reported as dropped.
-pub(crate) const MAX_VISIBLE_LIGHTS: usize = 256;
+/// The most local (point + spot) lights one camera shades (#834). The ones that
+/// contribute most to the view win; the rest are reported as dropped. Levels light
+/// mostly with baked light plus a handful of realtime ones, so 64 is generous.
+pub(crate) const MAX_VISIBLE_LIGHTS: usize = 64;
+
+/// The most local lights one cluster lists, which bounds the per-pixel light loop
+/// (#834). The ones that contribute most to the cluster win.
+pub(crate) const MAX_CLUSTER_LIGHTS: usize = 32;
 
 #[cfg(test)]
 #[path = "bin_tests.rs"]
 mod bin_tests;
+#[cfg(test)]
+#[path = "budget_tests.rs"]
+mod budget_tests;
 #[cfg(test)]
 #[path = "gpu_tests.rs"]
 mod gpu_tests;

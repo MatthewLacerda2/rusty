@@ -57,6 +57,13 @@ impl LocalLight {
         })
     }
 
+    /// How bright the light is, for ranking it against others (#834): intensity
+    /// times its colour's Rec. 709 luminance.
+    pub(crate) fn brightness(&self) -> f32 {
+        let [r, g, b] = self.color;
+        self.intensity * (0.2126 * r + 0.7152 * g + 0.0722 * b)
+    }
+
     /// The bounding sphere the binner tests: centre and range. A spotlight is
     /// bounded by its whole range sphere, which is conservative.
     pub(crate) fn sphere(&self) -> (Vec3, f32) {

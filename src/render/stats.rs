@@ -31,10 +31,15 @@ pub struct RenderCounters {
     pub lod_hidden_entities: u32,
     /// Active lights in the scene.
     pub lights: u32,
-    /// Lights left unlit: directional lights past the 4 slots, every ambient light
-    /// but the last, and per camera the point/spot lights in view past the
-    /// clustered budget (256, the farthest dropped; #434). Summed over the stack.
+    /// Lights left unlit: realtime directional lights past the 4 slots, every
+    /// ambient light but the last, and per camera the point/spot lights in view
+    /// past the clustered budget (64, the least contributing dropped; #434, #834).
+    /// Summed over the stack.
     pub lights_dropped: u32,
+    /// (cluster, light) entries cut because more point/spot lights reached one
+    /// cluster than its budget of 32 (the least contributing there dropped; #834):
+    /// non-zero means some corner of the view is over budget. Summed over the stack.
+    pub cluster_lights_dropped: u32,
     /// Point/spot lights binned into at least one light cluster (#434), summed
     /// over the camera stack.
     pub lights_visible: u32,
@@ -107,6 +112,7 @@ impl RenderCounters {
             ("lod_hidden_entities", self.lod_hidden_entities.into()),
             ("lights", self.lights.into()),
             ("lights_dropped", self.lights_dropped.into()),
+            ("cluster_lights_dropped", self.cluster_lights_dropped.into()),
             ("lights_visible", self.lights_visible.into()),
             ("lights_culled", self.lights_culled.into()),
             ("light_cluster_refs", self.light_cluster_refs),
@@ -179,10 +185,11 @@ impl Renderer {
 }
 
 /// `(active lights, lights with no uniform slot)` — mirrors `apply_scene_lights`,
-/// which keeps four directional lights and the last ambient. Point and spot lights
-/// are clustered (#434); the binning stage counts the ones a camera drops.
+/// which keeps four of the directional lights a frame draws live (`Baked` ones
+/// never take a slot, #809) and the last ambient. Point and spot lights are
+/// clustered (#434); the binning stage counts the ones a camera drops.
 pub(crate) fn count_lights(scene: &Scene) -> (u32, u32) {
-    let mut per_type = [0u32; 4];
+    let mut per_type = [0u32; 5];
     for id in scene.world.ids_with_light() {
         if !scene.world.is_active(id) {
             continue;
@@ -192,6 +199,8 @@ pub(crate) fn count_lights(scene: &Scene) -> (u32, u32) {
         };
         per_type[match light.light_type {
             LightType::Point => 0,
+            // A `Baked` sun takes no slot (#809): counted, never dropped.
+            LightType::Directional if !light.mode.renders_live(false) => 4,
             LightType::Directional => 1,
             LightType::Spotlight => 2,
             LightType::Ambient => 3,
