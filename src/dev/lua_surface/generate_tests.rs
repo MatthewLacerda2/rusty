@@ -34,8 +34,10 @@ fn generate_needs_a_saved_scene() {
 #[test]
 fn bake_lightmaps_takes_the_scenes_settings_for_missing_arguments() {
     use super::Overrides;
-    let mut base = crate::scene::lighting::lightmap::BakeSettings::default();
-    base.samples = 9;
+    let base = crate::scene::lighting::lightmap::BakeSettings {
+        samples: 9,
+        ..Default::default()
+    };
     let merged = Overrides {
         bounces: Some(2),
         ..Default::default()
