@@ -50,6 +50,8 @@ mod spatial;
 mod spatial_tests;
 mod through;
 #[cfg(test)]
+mod through_edge_tests;
+#[cfg(test)]
 mod through_tests;
 mod triangles;
 mod trigger_events;
