@@ -26,6 +26,11 @@
 # survivors" from "no answer", and the run's conclusion is what it reads.
 # Survivors are a result and never turn it red.
 #
+# When the branch has an open pull request, the report is also posted on it,
+# as one comment each later run edits in place (#912): a cloud coder ends at
+# ready and is gone before its run finishes, and the pull request is where the
+# orchestrator and the reviewer look.
+#
 # A `workflow_dispatch` workflow can be dispatched only once the file is on
 # the default branch; `--ref` then picks the code it runs against.
 name: mutants-on-request
@@ -50,6 +55,11 @@ permissions:
 jobs:
   mutants:
     runs-on: ubuntu-latest
+    # Job-level, so only this job's token may comment: `pull-requests: write`
+    # is for posting the report on the branch's pull request (#912).
+    permissions:
+      contents: read
+      pull-requests: write
     # One runner: a request is a file or a branch's diff, usually tens of
     # mutants at ~2 min each. A scope too big for the budget below is stopped
     # by it, and the report says how many planned mutants it never reached.
@@ -147,6 +157,21 @@ jobs:
           # And in the log, for a caller with no `gh` to download the artifact
           # (a cloud session reads the job log through its GitHub tools).
           cat report/report.md report/survivors.diff
+
+      # The same report on the branch's open pull request, one comment edited
+      # in place by each later run; no open pull request, no comment (#912).
+      # `continue-on-error`: a comment that could not be posted is a lost
+      # delivery, not a lost measurement, and survivors never turn this run
+      # red, so neither may this. The report is still in the summary and log.
+      - name: Post the report on the pull request
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 .github/scripts/mutants-pr-comment.py report/report.md \
+            --repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --run-url "$RUN_URL"
 
       - name: Keep the report
         uses: actions/upload-artifact@v7
