@@ -34,6 +34,7 @@ pub mod ledger;
 mod refusal;
 pub mod sfx;
 pub mod speech;
+pub mod voices;
 
 #[cfg(test)]
 mod tests;

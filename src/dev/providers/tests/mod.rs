@@ -5,6 +5,7 @@ mod budget;
 mod generated;
 mod sfx;
 mod speech;
+mod voices;
 
 use std::cell::RefCell;
 use std::path::PathBuf;

@@ -17,6 +17,7 @@ mod debug;
 mod generate;
 mod sfx;
 mod speech;
+mod voices;
 
 use std::sync::Once;
 
@@ -31,7 +32,7 @@ pub fn install_api() {
 }
 
 /// The [`api::Extension`] itself: `Debug`, then the bake verbs on the tables `api`
-/// already registered, then `Speech` (#386) and `Sfx` (#388).
+/// already registered, then `Speech` (#386) with its voice verbs (#387), and `Sfx` (#388).
 fn register<'scope>(
     lua: &Lua,
     scope: &'scope mlua::Scope<'scope, '_>,
@@ -41,8 +42,11 @@ fn register<'scope>(
     bake::register(lua, scope, ctx)?;
     generate::register(lua, scope, ctx)?;
     speech::register(lua, scope, ctx)?;
-    sfx::register(lua, scope, ctx)
+    sfx::register(lua, scope, ctx)?;
+    voices::register(lua, scope, ctx)
 }
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod voices_tests;

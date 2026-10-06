@@ -15,11 +15,14 @@ never bills.
 | Function | Signature | Returns |
 |---|---|---|
 | `Speech.Generate` | `(brief)` | the generated `.wav`'s path; or `nil, why` when the brief is not finished |
+| `Speech.Voices` | `([refresh])` | `voices, source`: every voice on the account (free) |
+| `Speech.FindVoice` | `(query [, refresh])` | `voices, source`: those whose name or a label contains `query` |
+| `Speech.VoiceInfo` | `(id)` | the voice; or `nil, why` when it is withdrawn or not on this plan |
 
 ```lua
 local wav = Speech.Generate({
   text  = "Contact, second floor.",
-  voice = "<voice id>",           -- required: there is no default voice
+  voice = "<voice id>",           -- required, no default: see Speech.Voices below
   model = "eleven_flash_v2_5",    -- optional; this is the default
 })
 Audio.PlayAt(wav, 0, 1.6, 4)
@@ -66,3 +69,42 @@ Audio.PlayAt(wav, 0, 1.6, 4)
 
 No GUI: generation is a verb an agent calls (over MCP it is one `eval`); the WAV it
 leaves behind is an ordinary audio asset with its own component and inspector.
+
+### Where a voice id comes from
+
+**Never hardcode one.** Every ElevenLabs default voice expires on **2026-12-31**, so
+the engine ships no voice id and neither should a project: list them at authoring
+time and pick (#387). Listing is **free** (no credits, no budget charge), but needs
+the same key, and is refused during Play like every provider verb.
+
+```lua
+local voices, source = Speech.FindVoice("british")
+for _, v in ipairs(voices) do
+  print(v.id, v.name, table.concat(v.traits, ", "))
+end
+print(source)  -- "3 ElevenLabs voices, out of the project's cache, read today. …"
+```
+
+- **`Speech.Voices([refresh])`** — every voice on the account (premade, cloned,
+  designed), **all pages** of the vendor's listing. Each voice is
+  `{ id, name, traits = {…}, description, preview }`: `traits` are the vendor's own
+  labels (accent, age, gender, use case…), `preview` an MP3 URL to hear it.
+- **`Speech.FindVoice(query [, refresh])`** — the same list, kept to the voices whose
+  name or a trait contains `query`, ignoring case. An empty query raises.
+- **`Speech.VoiceInfo(id)`** — asks the vendor about one id, **never from the cache**.
+  A voice that is gone returns `nil, "voice <id> is withdrawn: …"`; one the account's
+  plan may not use returns `nil, "… not on this plan …"`. **Nothing is ever
+  substituted.** No key, a key without `voices_read`, or a vendor that cannot be
+  reached raise instead: those say nothing about the voice.
+
+**The cache, and its staleness.** The list is kept per project under
+`cache/voices/` (gitignored, per-account, rebuildable). It is re-read when it is
+more than 7 days old, or whenever `refresh` is `true`; a voice added in ElevenLabs'
+own UI shows up after `Speech.Voices(true)`. The second return value, `source`,
+always says whether the list was just read or cached and how old it is. If the
+vendor cannot be asked and a cached list exists, that list is returned and `source`
+says why it was not refreshed. A cold cache with no key raises, naming where it
+looked.
+
+`Speech.Generate` with a withdrawn voice raises the vendor's own "no voice `<id>`"
+sentence and spends nothing.
