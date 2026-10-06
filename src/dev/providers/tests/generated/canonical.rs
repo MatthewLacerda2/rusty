@@ -113,7 +113,7 @@ fn today_counts_whole_days_since_the_epoch() {
 
 #[test]
 fn civil_date_matches_a_day_by_day_gregorian_walk_to_2401() {
-    let leap = |y: u64| y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+    let leap = |y: u64| y.is_multiple_of(4) && (!y.is_multiple_of(100) || y.is_multiple_of(400));
     let (mut year, mut month, mut day, mut n) = (1970, 1, 1, 0);
     while year < 2401 {
         assert_eq!(civil_date(n), format!("{year:04}-{month:02}-{day:02}"));
