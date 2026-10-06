@@ -131,6 +131,19 @@ pub fn open(dir: &Path, access: Access) -> Result<Opened, String> {
     Ok(Opened { root, engine })
 }
 
+/// The engine check of the project at `dir`, without opening it or writing anything:
+/// what a picker shows before it opens a project last opened by another engine.
+pub fn inspect(dir: &Path) -> Result<EngineCheck, String> {
+    file::inspect(dir)
+}
+
+/// Whether `dir` already holds a project: its [`PROJECT_FILE`], or (from before the
+/// file existed) an `assets/` folder. A picker opens only these, so a stray folder
+/// is never filled with a skeleton by accident.
+pub fn is_project(dir: &Path) -> bool {
+    dir.join(PROJECT_FILE).is_file() || dir.join(ASSETS_DIR).is_dir()
+}
+
 /// The open project's root: the working directory, which [`open`] made the root.
 /// (The in-process tests never open one; for them it is wherever they run.)
 pub fn root() -> PathBuf {

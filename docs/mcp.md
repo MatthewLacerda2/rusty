@@ -108,8 +108,9 @@ To have the agent drive the engine **in front of you**, open the window yourself
 register the bridge in **attach** mode:
 
 ```
-# 1. open the editor window (its command socket binds on boot):
-cargo run --bin rusty --features dev
+# 1. open the editor window on a project (its command socket binds once a
+#    project is open; without --project, pick one in the project picker first):
+cargo run --bin rusty --features dev -- --project /path/to/project
 
 # 2. register the bridge in attach mode (build once, or run from source):
 claude mcp add rusty -- /path/to/rusty/target/debug/session-mcp --attach

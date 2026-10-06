@@ -181,7 +181,7 @@ fn initial_ui(game: &GameWorld, opts: &EditorCaptureOptions) -> Result<EditorUi,
 }
 
 /// A frame's input: the fixed screen rect and a synthetic 60 Hz clock, nothing else.
-fn raw_input(width: u32, height: u32, frame: u32) -> egui::RawInput {
+pub(super) fn raw_input(width: u32, height: u32, frame: u32) -> egui::RawInput {
     let size = egui::vec2(width as f32, height as f32);
     egui::RawInput {
         screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
@@ -243,7 +243,7 @@ fn render_viewport(
 }
 
 /// Tessellate `output` and paint it over a cleared `width × height` offscreen target.
-fn paint(
+pub(super) fn paint(
     renderer: &crate::render::Renderer,
     egui_renderer: &mut egui_wgpu::Renderer,
     ctx: &egui::Context,
