@@ -161,3 +161,7 @@ pub fn asset_mesh_component(reference: &str) -> crate::scene::MeshComponent {
         is_dirty: crate::scene::DirtyFlag::new(true),
     }
 }
+
+#[cfg(test)]
+#[path = "rehydrate_tests.rs"]
+mod rehydrate_tests;
