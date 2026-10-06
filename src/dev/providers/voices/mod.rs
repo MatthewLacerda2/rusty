@@ -13,7 +13,7 @@
 //! project's `cache/voices/` (re-read after [`REFRESH_AFTER_DAYS`] or on demand,
 //! and every answer saying how old it is), the fallback to a stale list when the
 //! vendor cannot be asked, and the sorting of a 404 into [`Unusable::Gone`]. rusty
-//! adds the account-wide paginated listing ([`account`]), the name/label filter and
+//! adds the account-wide paginated listing ([`Account`], [`every_page`]), the name/label filter and
 //! the Play check.
 
 mod account;
