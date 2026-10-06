@@ -14,13 +14,13 @@
 //!
 //! Integration tests (`tests/*.rs`) do not use this: they reach the renderer through
 //! the dev layer (`screenshot::capture`, `Debug.Preview`, the probe bakes), which owns
-//! its own skip handling. The budget in [`super::setup::budget`] covers both, because
+//! its own skip handling (`dev::capture::no_adapter`, failing under the same variable,
+//! #885). The budget in [`super::setup::budget`] covers both, because
 //! it sits inside the constructor rather than in this helper.
 
 use crate::render::Renderer;
 
-/// Set to `1` where a missing adapter is a failure, not a skip — CI sets it (#489).
-pub(crate) const REQUIRE_GPU_ENV: &str = "RUSTY_REQUIRE_GPU";
+use crate::render::REQUIRE_GPU_ENV;
 
 /// A headless renderer, or `None` when this machine has no GPU or software adapter.
 ///
@@ -45,7 +45,7 @@ mod tests {
     /// silent `None` path and still report green — the state #489 fixed.
     #[test]
     fn gpu_adapter_present_when_required() {
-        if std::env::var(super::REQUIRE_GPU_ENV).as_deref() != Ok("1") {
+        if !crate::render::gpu_required() {
             return;
         }
         assert!(

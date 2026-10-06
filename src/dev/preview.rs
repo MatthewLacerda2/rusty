@@ -121,7 +121,7 @@ fn capture_subject_into(
     let resolution = options.clamped_resolution();
 
     let Some((renderer, view)) = host.frame(resolution, resolution) else {
-        log::warn!("[Preview] no GPU/software adapter available — skipping preview of {label}");
+        super::capture::no_adapter(&format!("preview {label}"))?;
         return Ok(false);
     };
     let Some(target_view) = view.color_target_view() else {

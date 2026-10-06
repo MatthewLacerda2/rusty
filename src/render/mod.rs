@@ -40,7 +40,7 @@ pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
 pub use ibl::probe_bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
 pub use ibl::probe_bounce::{BounceReport, CONVERGENCE_EPSILON, MAX_BOUNCES};
 pub use ibl::reflection_bake::DEFAULT_REFLECTION_RESOLUTION;
-pub use setup::headless::OFFSCREEN_FORMAT;
+pub use setup::headless::{gpu_required, OFFSCREEN_FORMAT, REQUIRE_GPU_ENV};
 pub use stats::RenderCounters;
 pub use timing::{GpuPass, GpuTimes};
 pub use view::RenderView;

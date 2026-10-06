@@ -88,6 +88,7 @@ pub fn capture_picker(
     use crate::shell::editor::capture;
     let mut host = crate::dev::capture::CaptureHost::new();
     let Some(renderer) = host.renderer(width, height) else {
+        crate::dev::capture::no_adapter("capture the project picker")?;
         return Ok(false);
     };
     let mut egui_renderer = egui_wgpu::Renderer::new(

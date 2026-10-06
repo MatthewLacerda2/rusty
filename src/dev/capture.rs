@@ -23,15 +23,35 @@
 //! shader compile. This is the step-5 proof the shared/per-view/per-scene boundaries are
 //! drawn in the right places: if they weren't, the second shot would come out wrong.
 //!
-//! **No adapter is a skip, not a failure.** On a machine with no GPU or software driver
-//! the host reports `None` and its callers return `Ok(false)` — the same contract
-//! `Renderer::new_headless` has always had, kept in one place. The probe is attempted
-//! once; a box with no adapter does not retry per shot.
+//! **No adapter is a skip, not a failure — unless a GPU is required.** On a machine with
+//! no GPU or software driver the host reports `None` and its callers return `Ok(false)`
+//! — the same contract `Renderer::new_headless` has always had. Under
+//! `RUSTY_REQUIRE_GPU=1` (every CI job) the same answer is an `Err` instead, decided in
+//! one place, [`no_adapter`], so a capture path that wrongly reports "no adapter" fails
+//! the visual tests rather than turning them all into silent skips (#885). The probe is
+//! attempted once; a box with no adapter does not retry per shot.
 
 use std::path::Path;
 
-use crate::render::{readback, GpuTimes, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
+use crate::render::{
+    gpu_required, readback, GpuTimes, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT,
+    REQUIRE_GPU_ENV,
+};
 use crate::scene::{Camera, Scene};
+
+/// What a capture does when this box has no GPU or software adapter, decided once for
+/// every dev-layer capture (#885): `Ok(())` after a warning — the caller then skips
+/// with its own `Ok(false)` / `Ok(None)` — or, under [`REQUIRE_GPU_ENV`]`=1`, an `Err`
+/// naming `what` could not be done, so a missing adapter cannot pass as a skip.
+pub fn no_adapter(what: &str) -> Result<(), String> {
+    if gpu_required() {
+        return Err(format!(
+            "{REQUIRE_GPU_ENV}=1 but no GPU or software adapter was found — cannot {what}"
+        ));
+    }
+    log::warn!("no GPU/software adapter available — skipping {what}");
+    Ok(())
+}
 
 /// What one captured frame cost (#433, #835).
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -115,7 +135,8 @@ impl CaptureHost {
 
     /// Render `scene` from `camera` into the host's view at `width` x `height`, and
     /// wait for the GPU to finish it. An offline frame, so its GPU times are read
-    /// back at once instead of a frame or two later. `Ok(None)` without an adapter.
+    /// back at once instead of a frame or two later. `Ok(None)` without an adapter, or
+    /// `Err` when one is required ([`no_adapter`]).
     pub fn draw(
         &mut self,
         scene: &Scene,
@@ -124,6 +145,7 @@ impl CaptureHost {
         height: u32,
     ) -> Result<Option<RenderedFrame>, String> {
         let Some((renderer, view)) = self.frame(width, height) else {
+            no_adapter("draw a capture")?;
             return Ok(None);
         };
         let target = view
@@ -170,3 +192,7 @@ impl CaptureHost {
 #[cfg(test)]
 #[path = "capture_tests.rs"]
 mod capture_tests;
+
+#[cfg(test)]
+#[path = "capture_required_tests.rs"]
+mod capture_required_tests;

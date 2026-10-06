@@ -14,8 +14,8 @@
 //! which is N wgpu devices.
 //!
 //! Runtime caveat: needs a GPU or software adapter (e.g. lavapipe) in the
-//! container. When none is available, these return `Ok(false)` after a clear log —
-//! they NEVER panic, and the rest of the dev layer (Step / StepUntil / state) needs no
+//! container. When none is available, these return `Ok(false)` after a clear log
+//! (`Err` under `RUSTY_REQUIRE_GPU=1`, #885) — they NEVER panic, and the rest of the dev layer (Step / StepUntil / state) needs no
 //! GPU at all.
 
 use std::path::Path;
@@ -33,8 +33,8 @@ pub const DEFAULT_HEIGHT: u32 = 720;
 /// `host`'s shared renderer.
 ///
 /// Returns `Ok(true)` when a frame was captured and written, `Ok(false)` when no
-/// GPU/software adapter is available (skipped gracefully), or `Err` only on an
-/// actual I/O / encode failure once a frame has been produced.
+/// GPU/software adapter is available (skipped gracefully), or `Err` on an I/O /
+/// encode failure — or on a missing adapter under `RUSTY_REQUIRE_GPU=1` (#885).
 pub fn capture_into(
     host: &mut CaptureHost,
     scene: &Scene,
@@ -43,11 +43,8 @@ pub fn capture_into(
     width: u32,
     height: u32,
 ) -> Result<bool, String> {
+    // `draw` already warned, or failed under `RUSTY_REQUIRE_GPU=1` (#885).
     if host.draw(scene, camera, width, height)?.is_none() {
-        log::warn!(
-            "[Screenshot] no GPU/software adapter available — skipping capture of {}",
-            path.as_ref().display()
-        );
         return Ok(false);
     }
     host.write_png(path)?;
