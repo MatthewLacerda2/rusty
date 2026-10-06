@@ -10,9 +10,11 @@
 //!
 //! opens the game project at `<dir>` (default `./project`, created if missing; #829).
 
+use rusty::core::project::Access;
+
 fn main() {
     env_logger::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
-    rusty::core::project::open_from_args(&mut args);
-    rusty::shell::editor::launch();
+    let opened = rusty::core::project::open_from_args(&mut args, Access::Edit);
+    rusty::shell::editor::launch(&opened);
 }

@@ -23,6 +23,7 @@
 
 use std::process::exit;
 
+use rusty::core::project::Access;
 use rusty::dev::session::Session;
 use rusty::editor::ViewportTab;
 use rusty::shell::editor::capture::{self, EditorCaptureOptions};
@@ -33,7 +34,7 @@ fn main() {
     let (out, scene, opts) = parse(&args).unwrap_or_else(|e| fail(&e));
     // `--out` is named from the launch directory; opening the project moves it.
     let out = std::path::absolute(&out).map_or(out, |p| p.to_string_lossy().into_owned());
-    let opened = rusty::core::project::open(&rusty::core::project::locate(project));
+    let opened = rusty::core::project::open(&rusty::core::project::locate(project), Access::Run);
     opened.unwrap_or_else(|e| fail(&e));
     let written = match scene {
         Some(path) => {

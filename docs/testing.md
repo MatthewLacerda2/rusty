@@ -23,10 +23,12 @@
   binary is the one harness that runs a real project (`--project <dir>`, default
   `./project`; `Harness::in_user_workspace`): an agent play-tests its game.
 - **The test-fixture project** is `tests/fixtures/project/` (#829): the committed
-  scenarios, the bot-player script and build settings, opened like any other
+  scenarios, the bot-player script and its `project.rusty`, opened like any other
   project — `cargo run --bin play --features dev -- --project tests/fixtures/project
   tests/fixtures/project/scenarios/smoke.lua out/`. What the engine seeds into it
-  when opened is git-ignored. In-process tests run with the checkout as their
+  when opened is git-ignored. `play` opens a project without writing its
+  `project.rusty`, so the fixture's recorded engine commit is stale by design: a
+  run prints the mismatch line and carries on (#853). In-process tests run with the checkout as their
   working directory, so anything they seed lands under the git-ignored `/assets/`.
   A test's own scripts go in that workspace too, attached by workspace-relative
   path, so its snapshot carries no machine path (#783).

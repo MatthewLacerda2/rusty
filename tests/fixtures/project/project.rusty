@@ -1,0 +1,8 @@
+{
+  "engine_commit": "35da0c0fbb81c5f5d315be9a87e17ead2eade380",
+  "build": {
+    "startup_scene": "assets/scenes/default.scene",
+    "product_name": "rusty game",
+    "window_mode": "Windowed"
+  }
+}

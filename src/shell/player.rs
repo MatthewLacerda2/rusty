@@ -9,7 +9,8 @@
 use super::frame::Host;
 use super::{boot, Frontend, Launch, Shell};
 use crate::app::GameWorld;
-use crate::core::application::{BuildSettings, WindowMode, BUILD_SETTINGS_PATH};
+use crate::core::application::{BuildSettings, WindowMode};
+use crate::core::project::{self, ProjectFile};
 use crate::core::video::VideoSettings;
 use crate::render::RenderView;
 
@@ -80,8 +81,8 @@ pub fn video_defaults(build: &BuildSettings) -> VideoSettings {
 /// Boot the standalone player and run until the game quits or the window closes.
 pub fn launch() {
     boot::seed_project_workspace();
-    let build = match BuildSettings::read(BUILD_SETTINGS_PATH.as_ref()) {
-        Ok(build) => build,
+    let build = match ProjectFile::load(&project::root()) {
+        Ok(file) => file.build,
         Err(err) => {
             eprintln!("[Player] {err} — using the default build settings");
             BuildSettings::default()

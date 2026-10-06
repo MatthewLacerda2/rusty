@@ -110,7 +110,7 @@ impl Session {
 /// scene argument.
 pub fn boot_scene_from_args(args: &[String]) -> String {
     let mut rest = args.to_vec();
-    crate::core::project::open_from_args(&mut rest);
+    crate::core::project::open_from_args(&mut rest, crate::core::project::Access::Edit);
     match rest.first().map(String::as_str) {
         Some("--empty") => String::new(),
         Some(path) => path.to_string(),

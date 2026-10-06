@@ -1,6 +1,6 @@
 //! src/bin/player.rs — the standalone player: run a rusty game without the editor.
 //!
-//! Boots the startup scene named in `build_settings.json` straight into Play,
+//! Boots the startup scene named in the project's `project.rusty` straight into Play,
 //! renders it full-window, and exits when the game calls `Application.Quit()` or the
 //! window closes. Ship it built without the editor:
 //!
@@ -16,6 +16,6 @@
 fn main() {
     env_logger::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
-    rusty::core::project::open_from_args(&mut args);
+    rusty::core::project::open_from_args(&mut args, rusty::core::project::Access::Run);
     rusty::shell::player::launch();
 }

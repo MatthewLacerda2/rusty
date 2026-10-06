@@ -5,9 +5,9 @@
 //!
 //! * **[`BuildSettings`]** — Unity's "Build Settings / Player Settings", minimal: which
 //!   scene a shipped build boots into, the product name (the player's window title) and
-//!   the default window mode. They live in a small **tracked** project file,
-//!   [`BUILD_SETTINGS_PATH`], so they travel with the project in git instead of with a
-//!   developer's local save. The editor edits them (File → Build Settings) and scripts
+//!   the default window mode. They live in the project's **tracked** `project.rusty`
+//!   ([`PROJECT_FILE`](crate::core::project::PROJECT_FILE), #853, under `"build"`), so
+//!   they travel with the project in git instead of with a developer's local save. The editor edits them (File → Build Settings) and scripts
 //!   through the `Application` namespace — one surface, per the parity rule.
 //! * **The quit request** — `Application.Quit()` only *records* that the game asked to
 //!   quit. What that means is the host's call: the player closes the window, the editor
@@ -27,8 +27,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-/// The tracked project file the build settings live in.
-pub const BUILD_SETTINGS_PATH: &str = "build_settings.json";
+use crate::core::project::ProjectFile;
 
 /// The startup scene when none is configured: the seeded demo scene. Kept equal to
 /// `scene::DEFAULT_SCENE_PATH` (a unit test pins it) without `core` importing `scene`.
@@ -103,16 +102,10 @@ impl BuildSettings {
         text
     }
 
-    /// Read settings from `path`. A missing file is the normal case for a project that
-    /// never configured a build, so it yields the defaults; an unreadable or malformed
-    /// file is an error.
+    /// Read the settings from the project file at `path`. A missing file yields the
+    /// defaults; an unreadable or malformed one is an error.
     pub fn read(path: &Path) -> Result<Self, String> {
-        if !path.exists() {
-            return Ok(Self::default());
-        }
-        let text = std::fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read build settings: {e}"))?;
-        Self::from_json(&text)
+        Ok(ProjectFile::read(path)?.unwrap_or_default().build)
     }
 }
 
@@ -132,14 +125,15 @@ impl Application {
         Self::default()
     }
 
-    /// Read `path` without binding it (the player): setters change the in-memory
+    /// Read the project file at `path` without binding it: setters change the in-memory
     /// settings only, so a shipped game never rewrites its build settings.
     pub fn load(&mut self, path: impl AsRef<Path>) -> Result<(), String> {
         self.build = BuildSettings::read(path.as_ref())?;
         Ok(())
     }
 
-    /// Read `path` and bind it (the editor), so every setter writes it back.
+    /// Read the project file at `path` and bind it (the editor), so every setter writes
+    /// the settings back into it.
     pub fn open(&mut self, path: impl Into<PathBuf>) -> Result<(), String> {
         let path = path.into();
         let read = BuildSettings::read(&path);
@@ -165,7 +159,8 @@ impl Application {
         self.save()
     }
 
-    /// Write the settings to the bound file. A no-op when unbound.
+    /// Write the settings into the bound project file, keeping the rest of it. A
+    /// no-op when unbound.
     fn save(&self) -> Result<(), String> {
         let Some(path) = &self.path else {
             return Ok(());
@@ -173,8 +168,9 @@ impl Application {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).ok();
         }
-        std::fs::write(path, self.build.to_json())
-            .map_err(|e| format!("Failed to write build settings: {e}"))
+        let mut file = ProjectFile::read(path)?.unwrap_or_default();
+        file.build = self.build.clone();
+        file.write(path)
     }
 
     /// Record that the game asked to quit (`Application.Quit()`).
