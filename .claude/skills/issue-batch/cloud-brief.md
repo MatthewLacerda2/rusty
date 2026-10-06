@@ -1,8 +1,8 @@
 # Cloud brief: the standing rules
 
 Every cloud coder the batch launches reads this file (#568). Its routine prompt
-carries only step 0 (which runs before this file is read), a pointer here, and what
-is specific to its issue. When a lesson changes how cloud coders must work, change
+carries only step 0 (which runs before this file is read), a pointer here, and the
+issue number; what is specific to the issue is a `Brief` comment on it (#910). When a lesson changes how cloud coders must work, change
 it **here**, once, not in the next prompt.
 
 **Nobody can talk to you; the pull request is your only report.** Never send the operator a push notification: a hand-back or a decision goes in the PR description and an issue comment, where the orchestrator reads it and decides. Most "needs your call" questions are the orchestrator's to answer, and a phone alert at night is not how the batch works. Use the GitHub
@@ -26,8 +26,11 @@ Before writing code, read the issue body for "Blocked by" and check each blocker
 
 ## Read first
 
-`CLAUDE.md`, your issue(s), and `.claude/skills/ci-merge/SKILL.md`. The prompt may
-name more.
+`CLAUDE.md`, your issue(s), your brief, and `.claude/skills/ci-merge/SKILL.md`.
+**Your brief is the newest comment on your issue whose first line is `Brief`**
+(#910): your branch name, what to build on, the siblings whose files to stay
+out of, and decisions already made. A later `Brief` supersedes an earlier one.
+It may name more to read.
 
 ## Your job ends at "ready"
 

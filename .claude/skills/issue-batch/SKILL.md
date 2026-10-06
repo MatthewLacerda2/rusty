@@ -191,7 +191,8 @@ one at a time however many are written.
 `isolation: "remote"`: in a local session that silently falls back to a local
 worktree (seen 2026-09-30). What works is a **one-off cloud routine** — the
 `RemoteTrigger` tool (the `schedule` skill has the body shape) with `run_once_at` a
-minute or two out, the repository as its source, and the whole brief as its prompt.
+minute or two out, the repository as its source, and the short fixed prompt below
+(the brief itself is an issue comment, #910).
 Compute that time, never type it: `date -u -v+2M +%Y-%m-%dT%H:%M:00Z` on macOS
 (`date -u -d '+2 min' …` on Linux). On 2026-10-05 a hand-typed time fired 45
 minutes late, and the API refuses a time already past.
@@ -313,7 +314,8 @@ that, and one chain was cancelled by mistake). Its loop per pull request:
    kept a variable #699 still used, and only a later CI round caught it. A
    resolution that needs a compile to trust (a file split, a dispatcher over the
    cap, two systems' order, a `Cargo.lock`) goes to a cloud routine instead: a
-   fresh one briefed to rebase or fix the pushed branch, pointing at the PR's
+   fresh one briefed to rebase or fix the pushed branch — a new `Brief` comment
+   on the issue naming the paths and what merged, pointing at the PR's
    description (its *Seam* and decisions) for the design, with "force-push
    authorised". Coders never push to a ready branch on their own (#823), so a
    push the queue did not make is one you briefed.
@@ -336,13 +338,29 @@ the PR, the rest can go to the cloud.** On 2026-10-05 #834's Metal bench numbers
 in PR #865 when disk ran short (8 GB in its worktree, 7.7 GB free). A cloud routine
 did the rebase, gates and ready, and the local worktree was deleted.
 
-**Every cloud brief carries** step 0 inline, then a pointer to
-[`cloud-brief.md`](cloud-brief.md) — the standing rules (foreground builds,
-ending at ready, the repo's rules, the PR's *Gates* and *Seam* sections, "do not
-merge") live there, versioned with this skill (#568) — and only what is specific
-to its issue. `RemoteTrigger` echoes a prompt back three times, so standing text
-copied into each one fills the orchestrator's context; a change to the rules goes
-in the file, once. The prompt:
+**The brief is a comment on the issue, the prompt only points at it** (#910).
+`RemoteTrigger` echoes a prompt back about three times (create, then each read
+of the routine), so every line in it is paid for three times in the
+orchestrator's context: on 2026-10-05/06 the per-issue part alone came to
+roughly 4–5k tokens per launch, ~150k over the batch. So the issue-specific part
+goes on the issue as a comment whose first line is `Brief`, where it is also
+durable — a relaunch, a rebase routine or a later reader finds the decisions
+next to the issue body. The standing rules (foreground builds, ending at ready,
+the repo's rules, the PR's *Gates* and *Seam* sections, "do not merge") live in
+[`cloud-brief.md`](cloud-brief.md), versioned with this skill (#568); a change
+to them goes in that file, once. The comment:
+
+```text
+Brief
+
+Branch: `N-short-slug`.
+Builds on: <what merged that it must build on, as "PR #N, Seam" where that
+PR wrote one; line numbers in issues go stale within hours>.
+Siblings in flight: <branch/issue → the files it edits; stay out of them>.
+Decisions: <anything already settled, or "none">.
+```
+
+The routine prompt is then the same few lines for every coder:
 
 ```text
 STEP 0 — before anything else, prove you are a cloud session. Run
@@ -351,16 +369,13 @@ exactly `true`, or the path is under the operator's home, STOP: touch nothing,
 end with "LOCAL — aborted" and that output.
 
 Then read `.claude/skills/issue-batch/cloud-brief.md` and follow it.
-
-Issue(s): #N — <one line>. Branch: `N-short-slug`.
-Builds on: <what merged that it must build on, as "PR #N, Seam" where that
-PR wrote one; line numbers in issues go stale within hours>.
-Siblings in flight: <branch/issue → the files it edits; stay out of them>.
-Decisions: <anything already settled, or "none">.
+Issue(s): #N. Your brief is the newest comment on it that starts with `Brief`.
 ```
 
-No helper script fills it: `RemoteTrigger` is a tool the orchestrator calls, not
-an API a script can reach, and five slots don't need one.
+A re-brief (a rebase request, a new sibling to avoid) is a new `Brief` comment
+and a fresh routine, never an edit to an old prompt. No helper script fills
+either: `RemoteTrigger` is a tool the orchestrator calls, not an API a script
+can reach, and five slots don't need one.
 
 ### What the orchestrator keeps, and where
 
