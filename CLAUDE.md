@@ -143,10 +143,12 @@ is wrong.
   scales with **how separate their files are**: two branches appending to the same enum
   or registry cost more than five in separate modules, because every branch behind
   another in the merge queue pays a rebase per merge ahead of it, and only a colliding
-  rebase is expensive. The number in flight is decided by what is actually there — this
-  machine's disk and memory for local branches, the cloud sessions actually running for
-  the rest (they lift the local build limit) — with about five a suggestion, not a rule.
-  Merging stays **one at a time**, whatever the count. **One worktree per branch** under
+  rebase is expensive. **Three kinds of agent, three limits:** **cloud coders ≈10**,
+  paced by token spend and by how many diffs one orchestrator can read, not by
+  hardware; **local coders ≤2**, because the queue merges one PR per CI run and a third
+  local coder finishes nothing sooner; **read-only agents** (research, review,
+  planning) without limit, since they build nothing. Merging stays **one at a time**,
+  whatever the count. **One worktree per branch** under
   `.claude/worktrees/`, off the latest `main`, removed the moment it merges, and **never
   a shared `CARGO_TARGET_DIR`** (worktrees
   overwrite each other's artifacts and a green gate stops meaning this branch compiled).
@@ -157,10 +159,13 @@ is wrong.
   don't propose tooling built for that. Each worktree compiles into its own `target/`,
   and one cold build fills every core and several GB of memory. Parallelise the work,
   stagger the compiles, and check the machine you are on (`df -h`, free memory) before starting a
-  build — never a figure written down somewhere. A batch may also hand GPU-free,
-  module-separate branches to **cloud sessions** as extra coders: that lifts the local
-  build limit, never the one-at-a-time merge. The `issue-batch` skill says when, and
-  how to prove a session really is remote.
+  build — never a figure written down somewhere. So **a branch is written in a cloud
+  session by default**: everything a container can prove (lavapipe runs the GPU tests,
+  #826) goes there, which lifts the local build limit, never the one-at-a-time merge.
+  A branch goes local only when it needs the machine: a real GPU (Metal, performance,
+  driver races), the display, the speakers, the operator's files or keys, or a
+  measurement. The `issue-batch` skill says how to launch one and prove it really is
+  remote.
 - **The lightest batch keeps only the merge queue local.** With the coding in cloud
   sessions, `make queue ARGS=--no-check` skips the local compile check of each rebased
   head and lets CI judge it, so merging costs this machine `git` and GitHub calls, not a

@@ -20,13 +20,19 @@ cost three, four cost six. A rebase buys no correctness. Over separate files the
 same rebases are seconds of `git` each, so the count barely matters there.
 
 So the number of branches in flight is set by **how separate their files are**
-(next section), then by what is actually available: this machine's disk and
-memory for local branches (*Each branch gets its own worktree*), and the cloud
-sessions actually running for the rest (*Cloud sessions are extra coders*).
-**About five** is a suggestion, not a rule — the 2026-10-02 batch ran six to
-eight cloud coders over one serialized queue, limited by file collisions, GitHub
-runners and the usage limit, not by this machine. The minimum shape is still
-**one in the merge queue, one being written**: nothing idles through a CI run.
+(next section), then by the kind of agent writing them (CLAUDE.md, *Coding
+parallelises*):
+
+- **Cloud coders ≈10.** Paced by token spend and by how many diffs one
+  orchestrator can read, not by hardware. The 2026-10-02 batch ran six to eight
+  over one serialized queue, limited by file collisions, GitHub runners and the
+  usage limit, not by this machine.
+- **Local coders ≤2.** The queue merges one PR per CI run, so a third local coder
+  finishes nothing sooner; it only competes for this machine's cores and disk.
+- **Read-only agents: no limit.** Research, review and planning build nothing.
+
+The minimum shape is still **one in the merge queue, one being written**: nothing
+idles through a CI run.
 
 **The merge queue is `make queue ARGS=--watch`** (the `ci-merge` skill has the
 detail): started once, in the background, it takes each pull request the moment
@@ -39,11 +45,16 @@ run) **skips that pull request and the watch carries on** with the rest (#751),
 printing `queue: HANDED BACK #N: …` as it happens; a fix pushed to the branch
 re-queues it. It exits on the machine failing, its deadline, or when nothing is
 left, with status 1 if anything was handed back and 3 if the machine or GitHub
-failed. Run it under a `Monitor` that wakes on `HANDED BACK` to hear of a
-hand-back at once; otherwise the exit wakes you. The watch also prints a
+failed. **Run the watch as a background command writing to a log, and put a
+`Monitor` on `tail -F <log> | grep --line-buffered 'HANDED BACK'`**, never the
+watch itself under the `Monitor`: a `Monitor` dies at 30 minutes and kills its
+command, and the watch runs 70 (MatthewLacerda2/scorsese#845). Check `ps` for an
+orphaned watch before starting one. Without the `Monitor` the watch's exit still
+wakes you. The watch also prints a
 line per pull-request transition (`watch: #N opened as a draft`, `turned
-ready`, `back to draft`, `closed`; #909), so that one `Monitor` on its output
-is the orchestrator's whole view: no separate pull-request poller. Start it with `--for 70` (#697; `ci-merge` has why 70, and when to
+ready`, `back to draft`, `closed`; #909), so that one log (widen the `grep` to
+`watch:` lines when you want them) is the orchestrator's whole view: no separate
+pull-request poller. Start it with `--for 70` (#697; `ci-merge` has why 70, and when to
 trade it for a longer per-PR `--deadline`). The watch ends itself first, between
 pull requests, with the last line `watch ended: deadline reached …` — relaunch it
 as it was, nothing to read. It never resolves a conflict: a hand-back naming paths goes back to the
@@ -163,29 +174,28 @@ failure.
 worktree with uncommitted or unpushed work, and reports free disk; run it at each
 wave (`ARGS=--dry-run` to look first) (#913).
 
-## Cloud sessions are extra coders, not extra merges
+## Cloud sessions are the default coders, not extra merges
 
 The build limits above are this machine's cores and memory, not the workflow's. A **cloud
 session** brings its own CPU, memory and disk, so it lifts the cap on how many
 branches can be *written* at once. It does nothing for merging — that queue is
-still one CI run at a time, here — so reach for cloud when writing is the
-bottleneck (hours-long foundation branches), never when the queue is.
+still one CI run at a time, here. **A branch is written in the cloud by default**
+(#924); local is the exception that needs a reason.
 
 **Where a branch runs:**
 
-- **Local:** the batch's own session; every merge; any branch whose proof needs a
-  **real** GPU (Metal-specific behaviour, performance, anything a software driver
-  can't stand in for); anything that needs files only this machine has. Ordinary
-  render/screenshot/probe-bake tests run in a cloud container on Mesa's
-  lavapipe, which its SessionStart hook installs (#826), exactly as Linux CI
-  does (#489).
-- **Cloud:** a branch that needs no real GPU to prove **and** sits in modules no other
-  in-flight branch touches. The collision list above still decides that; cloud
-  removes the build-slot limit, not the rebase cost.
+- **Local:** the batch's own session; every merge; any branch that needs **the
+  machine**: a **real** GPU (Metal-specific behaviour, performance, driver races,
+  anything a software driver can't stand in for), the display, the speakers, the
+  operator's files or keys, or a measurement. At most two at a time.
+- **Cloud:** everything else. Ordinary render/screenshot/probe-bake tests run in a
+  cloud container on Mesa's lavapipe, which its SessionStart hook installs (#826),
+  exactly as Linux CI does (#489). The collision list above still decides which
+  cloud branches run together; cloud removes the build-slot limit, not the rebase
+  cost.
 
-**How many:** as many as there are branches in **genuinely separate files** and
-sessions to run them — about five is a suggestion, not a cap (scorsese runs the
-same way). Local ones stay within this machine's limits above. Each one behind
+**How many:** as many as there are branches in **genuinely separate files**, up to
+about ten cloud coders (scorsese runs the same way). Each one behind
 another still pays a rebase per merge ahead of it, and the queue drains about one
 pull request per 10–15 minutes (one CI run each, seen 2026-09-30), so five
 finishing together leave the last waiting about an hour. That wait is cheap when
@@ -202,6 +212,16 @@ minute or two out, the repository as its source, and the short fixed prompt belo
 Compute that time, never type it: `date -u -v+2M +%Y-%m-%dT%H:%M:00Z` on macOS
 (`date -u -d '+2 min' …` on Linux). On 2026-10-05 a hand-typed time fired 45
 minutes late, and the API refuses a time already past.
+Set two fields **on purpose**, never from the example body:
+
+- **The model.** The `schedule` skill's example body defaults to a smaller model,
+  so a routine copied from it runs the coder on that. Coding is judgement work
+  (*Model, as a hint*): name the strongest model.
+- **`allowed_tools`** must leave room for `ToolSearch` and the GitHub MCP tools
+  the brief uses (`issue_read`, `create_pull_request`, `update_pull_request`,
+  `add_issue_comment`, `actions_run_trigger`); a coder without them cannot read
+  its brief or report.
+
 Two traps decide whether it is really remote:
 
 - **Pick the `anthropic_cloud` environment, never a `bridge` one.** The environment
@@ -268,8 +288,8 @@ ARGS="--watch --no-check --for 70"` in the background** (from a worktree under
 `.claude/worktrees/`), relaunches it unchanged each time it exits on its
 deadline (`watch ended: deadline reached`, #697: the first overnight watch was
 killed at the two-hour background cap mid-CI-wait), and is otherwise woken only
-by a `HANDED BACK` line (a `Monitor` on the watch's output) or when the watch
-exits — never a
+by a `HANDED BACK` line (a `Monitor` tailing the watch's log, see above) or when
+the watch exits — never a
 per-PR polling loop or a chain of `make queue PRS=N` runs (#664: the 2026-09-30
 batch spent about 69 queue invocations and dozens of hand-built watchers on
 that, and one chain was cancelled by mistake). Its loop per pull request:
@@ -392,6 +412,16 @@ they hold for any repo running this workflow.
   the scratchpad lives there, and a reboot wipes it. A machine crash mid-batch
   on scorsese took its queue list and routine table with it, and the batch
   resumed from GitHub alone.
+- **Warn of a near-full file in the next brief.** When a merge leaves a file that
+  siblings share within a few lines of the 300-line cap, say so in the next
+  `Brief` of every sibling that touches it; two branches each adding a few lines
+  pass alone and fail together (#699/#703; MatthewLacerda2/scorsese#1046).
+- **Read the run log before calling a routine stalled.** `get_run_log` shows
+  what it is doing; idle with a pending background task is waiting, not stalled.
+- **A retro reads each cloud coder's run log**, not only its PR description: the
+  time sinks (a build killed at the ten-minute tool limit, a gate run three
+  times) show only there, and that is how scorsese found the lessons now in
+  `cloud-brief.md`, *The container*.
 - **Never wait on another process by `pgrep -f <text>`.** The waiting shell's
   own command line contains the text, so it waits on itself forever (about 25
   minutes lost on 2026-10-02). Wait on a PID you hold, or on the watch's own
