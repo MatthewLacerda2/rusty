@@ -152,7 +152,7 @@ worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standin
   not hold it. A cargo bump (lockfile only) is taken as before.
 - **A watch runs the script it started with** (#824). Python reads the queue's
   code once, at launch, so after merging any change to
-  `.github/scripts/merge-queue.py`, `queue_watch.py` or `mergeable.py`, stop
+  `.github/scripts/merge-queue.py`, `mergeable.py` or `merging/`, stop
   the watch (safe while it only waits on CI; never mid-push or mid-merge),
   update its worktree to `origin/main`, and relaunch it. Otherwise the old code
   keeps deciding merges: on 2026-10-04 #751 (skip a hand-back) and #753
@@ -311,8 +311,8 @@ otherwise fail at merge time:
   `tools/lint/src/components/waivers.rs` with a written rationale. `--components`
   discovers it from `Entity` itself, so it cannot be slipped past.
 - **A migrated inspector card keeps routing through `scene::authoring`.**
-  `--parity` fails on a direct field write, *and* on a stale baseline line for a
-  card that is now routed. Burn baselines down; never add to one.
+  `--parity` fails on a direct field write. Nothing is grandfathered: no gate
+  reads a baseline file (#926).
 
 And one that is not a gate but bites the same way: **a branch adding a new
 top-level `src/<dir>/` must add it to the `UNFLOORED` list in `coverage.yml`'s

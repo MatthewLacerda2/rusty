@@ -25,15 +25,13 @@
 //! a routed card only ever takes the guard to hand `&mut c` into a shared op.
 //! Detach on remove (`.set_<field>(id, None)`) is not a field mutation.
 //!
-//! ## Enforcement (teeth + burn-down)
-//!   * A **direct** card NOT in `parity_baseline.txt` → violation (drift: a direct
-//!     mutation was added/kept without grandfathering it).
-//!   * A component in the baseline whose card is actually **routed** → violation
-//!     (stale entry: you migrated the card but left it baselined — remove the line).
-//!   * A **routed** card NOT in the baseline → ok (the migrated capability; `material`
-//!     is the first one, and this is the gate's teeth — reverting it to direct fails).
-//!   * A **direct** card in the baseline → ok (grandfathered, awaiting migration).
+//! ## Enforcement
+//!   * A **direct** card → violation (drift: a direct mutation was added or kept).
+//!   * A **routed** card → ok (every card is routed today; reverting one fails).
 //!   * A component with no inspector card → skipped (not a parity concern here).
+//!
+//! Nothing is grandfathered (#926): the burn-down list this gate once read emptied
+//! under #287 and was retired. A card that cannot route yet is a card to fix.
 //!
 //! Std-only and coarse (substring scans), matching the size/determinism/components
 //! gates' philosophy.
@@ -50,7 +48,6 @@ use crate::components;
 /// scan to this directory is exact: a grep confirms no other editor file takes a
 /// component's mutable accessor, so the cards are the sole authoring surface.
 const CARDS_DIR: &str = "src/editor/inspector/components";
-const BASELINE: &str = "tools/lint/parity_baseline.txt";
 const REPORT: &str = ".lint/report.txt";
 
 /// How a component's inspector card mutates the component.
@@ -66,18 +63,14 @@ enum Card {
     Direct,
 }
 
-/// Entry point: classify every discovered component's card and fail on drift or a
-/// stale baseline entry.
+/// Entry point: classify every discovered component's card and fail on drift.
 pub fn run() {
     let components = components::discover();
     let blob = cards_blob();
-    let baseline = load_baseline();
 
     let mut violations = Vec::new();
     for field in &components {
-        let card = classify(field, &blob);
-        let listed = baseline.iter().any(|b| b == field);
-        if let Some(v) = violation(field, card, listed) {
+        if let Some(v) = violation(field, classify(field, &blob)) {
             violations.push(v);
         }
     }
@@ -90,23 +83,15 @@ pub fn run() {
 }
 
 /// The enforcement table (pure, so it is exhaustively testable): given a card's
-/// classification and whether the component is baselined, return a violation or `None`.
-fn violation(field: &str, card: Card, baselined: bool) -> Option<String> {
-    match (card, baselined) {
-        // Drift: a direct card must be grandfathered, or it is unaccounted-for.
-        (Card::Direct, false) => Some(format!(
+/// classification, return a violation or `None`.
+fn violation(field: &str, card: Card) -> Option<String> {
+    match card {
+        Card::Direct => Some(format!(
             "PARITY_DRIFT `{field}` card mutates the component directly \
-             (`{field}_mut` without its `scene::authoring` ops) but is not in \
-             {BASELINE} — route it through a shared op, or (exceptionally) baseline \
-             it with justification"
+             (`{field}_mut` without its `scene::authoring` ops) — route it through a \
+             shared op"
         )),
-        // Stale: a migrated (routed) card must not stay on the burn-down list.
-        (Card::Routed, true) => Some(format!(
-            "PARITY_STALE_BASELINE `{field}` card is routed through a shared op but is \
-             still listed in {BASELINE} — remove the line (burn-down hygiene)"
-        )),
-        // direct+baselined = grandfathered; routed+unbaselined = migrated; no card = skip.
-        _ => None,
+        Card::Routed | Card::None => None,
     }
 }
 
@@ -160,17 +145,6 @@ fn read<P: AsRef<Path>>(path: P) -> String {
     fs::read_to_string(path).unwrap_or_default()
 }
 
-/// Baseline entries are bare component names (one per line); `#` comments and blank
-/// lines are ignored — same format as `components_baseline.txt`.
-fn load_baseline() -> Vec<String> {
-    read(BASELINE)
-        .lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .map(String::from)
-        .collect()
-}
-
 fn report(violations: &[String]) {
     let mut body = if violations.is_empty() {
         String::from("parity: ok\n")
@@ -187,8 +161,7 @@ fn report(violations: &[String]) {
         eprint!("{body}");
         eprintln!(
             "\n{} editor-card parity issue(s). Route the card through a shared \
-             `scene::authoring` op (and drop its {BASELINE} line), or fix the \
-             baseline — see docs/linting.md.",
+             `scene::authoring` op — see docs/linting.md.",
             violations.len()
         );
     }
@@ -226,32 +199,23 @@ mod tests {
         );
     }
 
-    /// The enforcement table: drift, stale baseline, and the two ok cases.
+    /// The enforcement table: a direct card fails; routed and absent ones pass.
     #[test]
     fn enforcement_table() {
-        // Direct + not baselined → drift violation.
-        assert!(violation("light", Card::Direct, false).is_some());
-        // Direct + baselined → grandfathered, ok.
-        assert!(violation("light", Card::Direct, true).is_none());
-        // Routed + still baselined → stale-baseline violation.
-        assert!(violation("material", Card::Routed, true).is_some());
-        // Routed + not baselined → the migrated capability, ok.
-        assert!(violation("material", Card::Routed, false).is_none());
-        // No card → never a violation, baselined or not.
-        assert!(violation("mesh", Card::None, false).is_none());
-        assert!(violation("mesh", Card::None, true).is_none());
+        assert!(violation("light", Card::Direct).is_some());
+        assert!(violation("material", Card::Routed).is_none());
+        assert!(violation("mesh", Card::None).is_none());
     }
 
-    /// The teeth: reintroducing a direct `MaterialComponent` mutation into the (un-
-    /// baselined) material card is flagged. We model "material went direct" as a card
-    /// that takes the mutable accessor with no shared ops in scope; with material
-    /// absent from the baseline, that is a drift violation — exactly what stops the
-    /// migration from being reverted.
+    /// The teeth: reintroducing a direct `MaterialComponent` mutation into the
+    /// material card is flagged. We model "material went direct" as a card that
+    /// takes the mutable accessor with no shared ops in scope — a drift violation,
+    /// exactly what stops the migration from being reverted.
     #[test]
     fn material_regression_to_direct_is_flagged() {
         let regressed = "let mut mat = world.material_mut(id).unwrap();\n\
                          mat.material = \"other\".to_string();";
         assert_eq!(classify("material", regressed), Card::Direct);
-        assert!(violation("material", Card::Direct, false).is_some());
+        assert!(violation("material", Card::Direct).is_some());
     }
 }

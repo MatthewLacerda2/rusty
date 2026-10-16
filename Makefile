@@ -66,9 +66,9 @@ gates: $(SELF_CHECKS) $(GATES) ## Everything CI blocks on, fastest-failing first
 check: target-dir fmt size ## Fast edit loop: formatting, size gate, dev-feature clippy
 	cargo clippy --all-targets --features dev
 
-pre-commit: ## What the commit hook runs: formatting + size gate on staged .rs files
+pre-commit: ## What the commit hook runs: formatting + size gate on staged .rs and .py files
 	@cargo fmt --all --check
-	@files="$$(git diff --cached --name-only --diff-filter=ACMR -- '*.rs')"; \
+	@files="$$(git diff --cached --name-only --diff-filter=ACMR -- '*.rs' '*.py')"; \
 		if [ -n "$$files" ]; then $(LINT) -- $$files; fi
 
 # ---- self-checks ----------------------------------------------------------
@@ -104,7 +104,7 @@ fmt: ## [gate] rustfmt, engine and tools/lint
 	cargo fmt --all --check
 	cargo fmt --manifest-path tools/lint/Cargo.toml --check
 
-size: ## [gate] File-length cap, full scan (tools/lint)
+size: ## [gate] File-length cap on .rs and .py, full scan (tools/lint)
 	$(LINT)
 
 rules: ## [gate] Finding-based rules with inline allows: prefix-group (tools/lint/src/rules)
@@ -160,7 +160,7 @@ deny: ## [gate] Advisories, bans, sources, licenses (cargo-deny)
 # second — and a gate, because `mergeable` is the only thing between a red PR
 # and `main` while it has no required checks (#491).
 scripts: ## [gate] Tests of the merge and mutation helpers in .github/scripts
-	python3 -m unittest discover --start-directory .github/scripts/tests --quiet
+	python3 -m unittest discover --start-directory .github/scripts/tests --top-level-directory .github/scripts --quiet
 
 # Did CI really run, and pass, on this PR's head commit? Both workflows' gates,
 # a gated job that genuinely ran, and no red run beside a green one. The last

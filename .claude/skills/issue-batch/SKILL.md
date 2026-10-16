@@ -96,9 +96,8 @@ The files where everything collides are the ones every feature appends to:
   branches documenting different namespaces no longer collide.
 - `docs/api-faithfulness.md` — the setter catalog.
 - `src/scripting/callbacks.rs` — the one lifecycle-callback list.
-- The burn-down baselines (`tools/lint/baseline.txt`,
-  `components_baseline.txt`, `parity_baseline.txt`, `coverage-baseline.txt`),
-  where two branches each *removing* lines is a conflict nobody expects.
+- `coverage-baseline.txt`, where two branches each *removing* lines is a
+  conflict nobody expects.
 
 Two branches landing in any of those at once is the case to avoid.
 
