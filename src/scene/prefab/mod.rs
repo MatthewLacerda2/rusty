@@ -16,6 +16,7 @@
 
 pub mod apply;
 mod extract;
+pub mod instance;
 pub mod link;
 pub mod overrides;
 

@@ -20,6 +20,7 @@ use std::collections::BTreeMap;
 use serde_json::Value;
 
 use crate::components::Entity;
+use crate::scene::prefab::instance::{self, instance_members};
 use crate::scene::prefab::overrides::apply_overrides;
 use crate::scene::prefab::{read_prefab_file, write_prefab_file};
 use crate::scene::{reimport_instance, revert_instance_overrides, PrefabData, Scene};
@@ -124,41 +125,20 @@ fn to_local_refs(
         .collect()
 }
 
-/// The entity ids of the instance rooted at `root_id` (root + descendants sharing its
-/// prefab source). Errors if `root_id` is not a linked instance root.
+/// The instance rooted at `root_id` ([`instance_members`]). Errors if `root_id` is not
+/// a linked instance root.
 fn instance_ids(scene: &Scene, root_id: u32) -> Result<Vec<u32>, String> {
-    let source = link_source(scene, root_id)?;
-    let mut ids = Vec::new();
-    let mut stack = vec![root_id];
-    while let Some(id) = stack.pop() {
-        if scene
-            .world
-            .prefab_link(id)
-            .is_some_and(|l| l.source == source)
-        {
-            ids.push(id);
-            stack.extend(scene.world.children(id));
-        }
-    }
-    Ok(ids)
+    instance_members(scene, root_id).ok_or_else(|| not_linked(root_id))
 }
 
-/// The instance ROOT for any member `id`: walk up while the parent shares `id`'s prefab
-/// source. Errors if `id` is not a linked instance entity.
+/// The instance root for any member `id` ([`instance::instance_root`]). Errors if
+/// `id` is not a linked instance entity.
 fn instance_root(scene: &Scene, id: u32) -> Result<u32, String> {
-    let source = link_source(scene, id)?;
-    let shares = |p: u32| {
-        scene
-            .world
-            .prefab_link(p)
-            .is_some_and(|l| l.source == source)
-    };
-    Ok(scene
-        .world
-        .ancestors(id)
-        .take_while(|&p| shares(p))
-        .last()
-        .unwrap_or(id))
+    instance::instance_root(scene, id).ok_or_else(|| not_linked(id))
+}
+
+fn not_linked(id: u32) -> String {
+    format!("entity {id} is not a linked prefab instance")
 }
 
 /// The source `.prefab` path entity `id` links to, or an error if it isn't linked.
@@ -167,7 +147,7 @@ fn link_source(scene: &Scene, id: u32) -> Result<String, String> {
         .world
         .prefab_link(id)
         .map(|l| l.source.clone())
-        .ok_or_else(|| format!("entity {id} is not a linked prefab instance"))
+        .ok_or_else(|| not_linked(id))
 }
 
 /// The source `local_id` recorded on entity `id`, if it is linked.

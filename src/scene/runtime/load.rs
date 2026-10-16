@@ -41,19 +41,10 @@ impl Scene {
     /// The entities a load carries across: every live marked entity and all of its
     /// descendants.
     pub fn load_survivors(&self) -> BTreeSet<u32> {
-        let mut survivors = BTreeSet::new();
-        let mut stack: Vec<u32> = self
-            .persistent
+        self.persistent
             .iter()
-            .copied()
-            .filter(|&id| self.world.contains(id))
-            .collect();
-        while let Some(id) = stack.pop() {
-            if survivors.insert(id) {
-                stack.extend(self.world.children(id));
-            }
-        }
-        survivors
+            .flat_map(|&id| self.world.self_and_descendants(id))
+            .collect()
     }
 
     /// Replace the World with `data` (the document read from `path`), carrying

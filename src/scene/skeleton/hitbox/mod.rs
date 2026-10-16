@@ -136,9 +136,7 @@ impl Scene {
     /// The bone a hit on `id` struck: `id` itself when it is a bone, else its
     /// nearest bone ancestor (the bone a hitbox hangs from); `None` off-skeleton.
     pub fn hit_bone(&self, id: u32) -> Option<u32> {
-        self.world
-            .self_and_ancestors(id)
-            .find(|&c| self.bone_owner(c).is_some())
+        self.world.self_and_ancestors(id).find(|&c| self.is_bone(c))
     }
 
     /// The top of `id`'s hierarchy (Unity's `Transform.root`): `id` itself when it

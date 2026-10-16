@@ -109,9 +109,7 @@ impl Scene {
     /// under `id`, ascending.
     pub fn ragdoll_bones(&self, id: u32) -> Vec<u32> {
         let mut out = Vec::new();
-        let mut stack = vec![id];
-        while let Some(e) = stack.pop() {
-            stack.extend(self.world.children(e));
+        for e in self.world.self_and_descendants(id) {
             if let Some(mesh) = self.world.mesh(e) {
                 out.extend(mesh.skeleton.bones.iter().copied());
             }

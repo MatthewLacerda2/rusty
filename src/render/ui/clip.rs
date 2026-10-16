@@ -109,15 +109,10 @@ impl Inherited {
     /// A root canvas's starting state: visible only when it and every ancestor are
     /// active.
     pub(super) fn root(world: &World, id: u32) -> Self {
-        let mut visible = true;
-        let mut cur = Some(id);
-        for _ in 0..=world.len() {
-            let Some(c) = cur else { break };
-            visible &= world.is_active(c);
-            cur = world.parent_id(c);
-        }
+        // The event system's rule (`ui::events::tree::is_visible`): a dangling parent
+        // ends the chain (#991).
         Self {
-            visible,
+            visible: world.self_and_ancestors(id).all(|c| world.is_active(c)),
             alpha: 1.0,
             clip: None,
             mask: None,

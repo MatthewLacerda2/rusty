@@ -113,9 +113,7 @@ pub fn selection_bounds(scene: &Scene, id: u32) -> Option<(Vec3, f32)> {
         return None;
     }
     let mut bounds: Option<(Vec3, Vec3)> = None;
-    let mut stack = vec![id];
-    while let Some(next) = stack.pop() {
-        stack.extend(scene.world.children(next));
+    for next in scene.world.self_and_descendants(id) {
         let Some(mesh) = scene.world.mesh(next) else {
             continue;
         };

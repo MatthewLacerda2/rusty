@@ -62,7 +62,7 @@ impl Scene {
             self.world
                 .children(bone)
                 .into_iter()
-                .filter(|&c| self.bone_owner(c).is_none()),
+                .filter(|&c| !self.is_bone(c)),
         );
         let parts: Vec<u32> = parts
             .filter(|&p| self.world.has_collider(p) && self.world.layer(p) == from)

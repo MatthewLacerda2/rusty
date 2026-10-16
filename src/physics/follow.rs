@@ -57,7 +57,8 @@ impl PhysicsWorld {
     }
 }
 
-/// Whether `id` is a bone or sits anywhere under one.
+/// Whether `id` is a bone or sits anywhere under one (`bones` is [`Scene::bone_ids`],
+/// the set form of [`Scene::is_bone`]).
 fn hangs_from_bone(scene: &Scene, bones: &BTreeSet<u32>, id: u32) -> bool {
     scene
         .world
