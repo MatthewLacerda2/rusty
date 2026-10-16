@@ -29,7 +29,7 @@ def pr(number: int, *, bot=False, files=(), head=None) -> dict:
     return {
         "number": number, "isDraft": False, "headRefOid": head or f"sha{number}", "baseRefName": "main",
         "author": {"login": "app/dependabot" if bot else "someone"},
-        "files": [{"path": f} for f in files],
+        "files": [{"path": f} for f in files], "labels": [{"name": "queue"}],
     }
 
 

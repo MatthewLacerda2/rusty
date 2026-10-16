@@ -45,7 +45,11 @@ to see what it said.
 ## The merge, one branch at a time
 
 `make queue ARGS=--watch` (#664) is how a batch runs it: started once, it takes
-every open pull request as it turns **ready**, **the one that textually
+every open pull request that is **ready and labelled `queue`** — the
+orchestrator's go-ahead, added once it has read the description and the diff,
+and removed to pull a PR out of line (#925; Dependabot's cargo bumps label
+themselves, its Actions bumps don't); `make queue PRS=N` takes what it names,
+label or not — **the one that textually
 conflicts with the fewest others in line first** (#753: `git merge-tree
 --write-tree` per pair of ready heads, no checkout). Reordering cannot make a
 conflict go away, but it decides how many hand-backs a set costs: the broad pull
@@ -62,8 +66,8 @@ head is remembered (under the checkout's git directory) and passed over, by
 this watch and later ones, until it moves — pushing a fix is the whole of
 re-queueing it. **A new run attempt on that head counts as moving** (#869): `gh
 run rerun --failed ID` re-queues it, no push, no relaunch. A run is judged by its **latest attempt** (#881): when the runs listing still shows an older attempt than the run's jobs do, the jobs' attempt is the run, so a green re-run that landed before the verdict is not handed back. The watch **exits** on the machine failing (below), on its
-`--for` deadline, or when nothing is left (no open pull request, or only drafts
-and handed-back heads, none moved for `--idle` minutes, default 90). Its exit
+`--for` deadline, or when nothing is left (no open pull request, or only drafts,
+unlabelled and handed-back heads, none moved for `--idle` minutes, default 90). Its exit
 status says what to do: **0** nothing to read, **1** something was handed back
 (grep the output for `HANDED BACK`), **3** the machine or GitHub failed and
 nothing is known about the branches; the most urgent wins. A transient `gh`
@@ -240,10 +244,10 @@ once per workflow. To look by hand, ask about the commit:
 Absent and passing are different states; a loop counting non-completed checks
 finds zero of each. `make queue` is that loop, written so it cannot.
 
-*(GitHub's **native** merge queue would replace `make queue` — both workflows
-already trigger on `merge_group` with collapsed gates — but it needs an
+*(GitHub's **native** merge queue would replace `make queue`, but it needs an
 organization-owned repository, and moving the repo is the user's call, #486.
-`make mergeable` stays useful either way.)*
+The workflows' `merge_group` triggers were removed as dead config in #930, so
+adopting it means adding them back. `make mergeable` stays useful either way.)*
 
 ## A red ready pull request stays ready
 

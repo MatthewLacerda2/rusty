@@ -1,4 +1,4 @@
-"""`merge-queue.py --watch` — take each pull request as it turns ready (#664).
+"""`merge-queue.py --watch` — take each pull request given the go-ahead (#664, #925).
 
 A cloud coder's only report is its pull request, so "done" is visible only as
 the flip from draft to ready. Before this, the orchestrator noticed each flip
@@ -30,8 +30,8 @@ It exits on:
 
 - **the machine failing** (#584's stop, or GitHub unreachable for [`FAILS`]
   listings in a row);
-- **nothing left**: no open pull request, or none ready and no head among the
-  rest (drafts, remembered hand-backs) has moved for `--idle` minutes;
+- **nothing left**: no open pull request, or none ready and labelled, and no
+  head among the rest (drafts, unlabelled, remembered hand-backs) has moved for `--idle` minutes;
 - **its own deadline** (`--for MINUTES`, #697): past it, the watch takes no new
   pull request. It is checked only between takes, never during one, so the one
   in hand finishes (merged or handed back) and the exit always lands between
@@ -55,6 +55,19 @@ open**: a pair git cannot answer about counts as clean, so the worst case is
 plain label order; the order is an optimisation and never stops the queue. When
 the count changes who goes first, the watch says so in one line ([`reordered`]).
 
+**Ready is not enough: the watch takes only a pull request labelled
+[`QUEUE_LABEL`]** (#925). A cloud coder readies its own pull request the moment
+its gates are green, before anyone has read the diff, and a green gate does not
+read code (the 2026-09-30 batch caught an `unreachable!` in a `Display` impl
+only by reading it). So the orchestrator reads the description and the diff and
+then adds the label; that is the go-ahead, and removing it pulls a pull request
+out of line. An approving review would say the same, but GitHub refuses
+self-approval and the pull requests are opened under the owner's account
+(scorsese#690 took the label for that reason). Dependabot's cargo bumps add the
+label themselves (`dependabot.yml`); its GitHub Actions bumps do not, and are
+[`held`] besides. `make queue PRS=N` names its pull requests, which is the
+go-ahead, so it does not ask for the label.
+
 The tiebreak is the label, read from the pull request's own labels and the
 issues it closes (rusty labels issues, not pull requests): infrastructure →
 architecture → bug → foundation → feature, then anything else, oldest number
@@ -74,8 +87,8 @@ the bumps from `dependabot.yml`: the PR still arrives with its changelog and its
 diff, and the hold costs nothing until one does.
 
 **It also says what changed on the board** (#909): one line per pull request
-that opened (as a draft or ready), turned ready, went back to draft, or closed
-without this watch merging it ([`transitions`]). The first listing after a
+that opened (as a draft or ready), turned ready, went back to draft, gained or
+lost the [`QUEUE_LABEL`], or closed without this watch merging it ([`transitions`]). The first listing after a
 launch says nothing, so a relaunch does not replay the board. Before this the
 orchestrator ran a second monitor, a `gh pr list` poller, to hear of a coder's
 draft or its flip to ready; with these lines one `Monitor` on the watch's
@@ -108,6 +121,9 @@ DEADLINE = "deadline reached"
 # What `gh pr list` is asked for, and the issues whose labels give the priority.
 # `files` is what [`held`] reads.
 LIST_FIELDS = "number,isDraft,headRefOid,baseRefName,author,labels,closingIssuesReferences,files"
+
+# The go-ahead (#925): the watch takes a ready pull request only with this label.
+QUEUE_LABEL = "queue"
 
 # A bot pull request touching anything under here waits for the orchestrator.
 WORKFLOWS = ".github/workflows/"
@@ -186,11 +202,16 @@ def passed_over(pull: dict, memory: dict[int, str], done: set[int]) -> bool:
     return number in done or memory.get(number) == pull.get("headRefOid")
 
 
+def queued(pull: dict) -> bool:
+    """Whether the orchestrator has given this pull request the go-ahead."""
+    return QUEUE_LABEL in names(pull.get("labels"))
+
+
 def ready(pulls: list[dict], memory: dict[int, str], done: set[int], bots: tuple[str, ...]) -> list[dict]:
     """The pull requests the watch may take now, unordered."""
     return [
         p for p in pulls
-        if not p.get("isDraft") and p.get("baseRefName", "main") == "main"
+        if not p.get("isDraft") and queued(p) and p.get("baseRefName", "main") == "main"
         and not passed_over(p, memory, done) and not held(p, bots)
     ]
 
@@ -258,19 +279,20 @@ def clashing(pulls: list[dict], git, known: dict[frozenset[str], bool], bots: tu
     return {frozenset(pair) for pair in pairs if known.get(key(*pair), False)}
 
 
-def heads(pulls: list[dict]) -> dict[int, tuple[bool, str]]:
-    """What counts as movement: a push, or a flip between draft and ready."""
-    return {p.get("number"): (bool(p.get("isDraft")), p.get("headRefOid", "")) for p in pulls}
+def heads(pulls: list[dict]) -> dict[int, tuple[bool, str, bool]]:
+    """What counts as movement: a push, a flip between draft and ready, or the
+    [`QUEUE_LABEL`] added or removed."""
+    return {p.get("number"): (bool(p.get("isDraft")), p.get("headRefOid", ""), queued(p)) for p in pulls}
 
 
 def transitions(
-    before: dict[int, tuple[bool, str]] | None, after: dict[int, tuple[bool, str]], landed: set[int]
+    before: dict[int, tuple[bool, str, bool]] | None, after: dict[int, tuple[bool, str, bool]], landed: set[int]
 ) -> list[str]:
     """One line per pull request that changed between two [`heads`] listings
     (#909). `before` is `None` on the first listing, which announces nothing;
     a pull request in `landed` (this watch merged it) is not reported closed.
     Each line has its own word to grep: `opened`, `turned ready`, `back to
-    draft`, `closed`."""
+    draft`, `closed`, `queued`, `unqueued` (the label, #925)."""
     if before is None:
         return []
     lines = []
@@ -284,6 +306,8 @@ def transitions(
             lines.append(f"watch: #{number} turned ready.")
         elif after[number][0] and not before[number][0]:
             lines.append(f"watch: #{number} back to draft.")
+        if number in before and number in after and before[number][2] != after[number][2]:
+            lines.append(f"watch: #{number} {'queued' if after[number][2] else 'unqueued'}.")
     return lines
 
 
@@ -297,7 +321,7 @@ def finished(pulls: list[dict], quiet: float, idle: float) -> str | None:
         return "no open pull request is left."
     if quiet >= idle:
         return (
-            f"nothing is ready, and none of the {len(pulls)} open pull request(s) has moved"
+            f"nothing is ready and labelled `{QUEUE_LABEL}`, and none of the {len(pulls)} open pull request(s) has moved"
             f" in {idle / 60:.0f} minutes: " + ", ".join(f"#{p.get('number')}" for p in pulls) + "."
         )
     return None
