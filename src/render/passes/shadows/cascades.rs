@@ -21,7 +21,7 @@ use crate::components::ShadowSettings;
 use crate::scene::Camera;
 
 /// The most cascades the shadow map holds (its array layers).
-pub const MAX_CASCADES: usize = 4;
+pub const MAX_CASCADES: usize = ShadowSettings::MAX_CASCADES as usize;
 /// Blend between the practical split scheme's logarithmic (1.0) and uniform (0.0)
 /// splits. Logarithmic spends resolution where perspective needs it; the uniform
 /// share keeps the first slice from collapsing to a sliver near the lens.

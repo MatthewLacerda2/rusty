@@ -12,6 +12,7 @@
 
 use glam::Vec3;
 
+use crate::scene::camera::MAX_PITCH;
 use crate::scene::Camera;
 
 /// Degrees per point of horizontal/vertical drag.
@@ -20,7 +21,6 @@ const DRAG_SENSITIVITY: f32 = 0.4;
 const ZOOM_SENSITIVITY: f32 = 0.01;
 const MIN_DISTANCE: f32 = 0.5;
 const MAX_DISTANCE: f32 = 20.0;
-const MAX_PITCH: f32 = 89.0;
 
 /// Orbit-camera state for the preview scene, persisted on [`crate::editor::EditorUi`]
 /// across frames so drag/zoom accumulate. Always orbits the world origin — the

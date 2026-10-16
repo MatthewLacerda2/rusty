@@ -65,7 +65,7 @@ pub fn engine_shader_dir() -> &'static str {
 /// The default output dir for authored shaders, relative to the project root: the
 /// same pattern as authored textures/scripts. A material naming a baked surface
 /// variant renders with it (#396); bakes never touch the engine's set.
-pub const DEFAULT_OUT_DIR: &str = "assets/shaders";
+pub const DEFAULT_OUT_DIR: &str = crate::core::project::SHADERS_DIR;
 
 #[cfg(test)]
 mod gameplay_tests;
