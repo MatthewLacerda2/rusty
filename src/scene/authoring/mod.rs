@@ -190,8 +190,8 @@ pub use crate::scene::authoring::components::{add_component, remove_component, C
 // remove cascade, the inspector's per-frame reconcile, and scene load all reach the
 // one enforcement path through this shared authoring entry point.
 pub use crate::scene::authoring::dependency::{
-    add_with_requirements, enforce_requirements, reconcile_requirements, remove_with_cascade,
-    satisfy_requirements,
+    add_with_requirements, enforce_requirements, has_kind, reconcile_requirements,
+    remove_with_cascade, satisfy_requirements,
 };
 
 // The prefab structural verbs live in `scene::prefab` (#215) and `scene::prefab_link`

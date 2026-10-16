@@ -1,15 +1,10 @@
-//! src/editor/inspector/components/add/mod.rs — the Add Component menu; the
-//! in-game UI entries live in `ui.rs`.
-
-mod ui;
+//! src/editor/inspector/components/add/mod.rs — the Add Component menu: the
+//! project's script behaviours, then one table of first-class components (#939).
 
 use egui_phosphor::regular as icon;
 
 use crate::scene::authoring::{self, ComponentKind};
-use crate::scene::{
-    AudioSourceComponent, MaterialComponent, ParticleEmitterComponent, ScriptComponent,
-    DEFAULT_SCRIPTS_DEST_DIR,
-};
+use crate::scene::{ScriptComponent, DEFAULT_SCRIPTS_DEST_DIR};
 
 /// 3F. Add Component — Unity-style full-width pill that opens the component menu.
 pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
@@ -31,150 +26,100 @@ fn add_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
     // built-ins are the burn-down in #82); helper modules without a lifecycle
     // table are not. An entity can hold many scripts (#83), so each pick appends.
     add_script_menu(ui, world, id);
-    add_lighting_combat(ui, world, id);
-    add_physics_components(ui, world, id);
-    add_render_components(ui, world, id);
-    add_audio(ui, world, id);
-    ui::add_ui_components(ui, world, id);
-    ui::add_layout_components(ui, world, id);
-}
-
-/// Add-menu entries for the AudioSource (#212) and AudioReverbZone (#469)
-/// components. Each is offered only when absent.
-fn add_audio(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
-    if !world.has_audio(id)
-        && ui
-            .button(format!("{}  Audio Source", icon::SPEAKER_HIGH))
-            .clicked()
-    {
-        world.set_audio(id, Some(AudioSourceComponent::default()));
-        ui.close();
-    }
-    let zone = format!("{}  Audio Reverb Zone", icon::WAVEFORM);
-    if !world.has_reverb_zone(id) && ui.button(zone).clicked() {
-        authoring::add_with_requirements(world, id, ComponentKind::ReverbZone);
-        ui.close();
+    for &(kind, glyph, name) in ENTRIES {
+        if authoring::has_kind(world, id, kind) {
+            continue;
+        }
+        let label = if glyph.is_empty() {
+            name.to_string()
+        } else {
+            format!("{glyph}  {name}")
+        };
+        if ui.button(label).clicked() {
+            authoring::add_with_requirements(world, id, kind);
+            ui.close();
+        }
     }
 }
 
-/// Add-menu entries for light, animator and collider. Each entry is offered only
-/// when absent. Animator has its own entry (#82) and is added/removed
-/// independently.
-fn add_lighting_combat(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
-    if !world.has_light(id) && ui.button("Light Component").clicked() {
-        world.set_light(id, Some(authoring::default_light()));
-        ui.close();
-    }
-    if !world.has_animator(id) && ui.button("Animator Component").clicked() {
-        world.set_animator(id, Some(authoring::default_animator()));
-        ui.close();
-    }
-    if !world.has_collider(id) && ui.button("Collider Component").clicked() {
-        world.set_collider(id, Some(authoring::default_collider()));
-        ui.close();
-    }
-}
-
-/// Add-menu entries for rigidbody, material/texture, nav-agent, nav-obstacle,
-/// off-mesh link, joint
-/// and character controller. Each entry is offered only when absent. A Joint declares `requires(RigidBody)` (#449), so it
-/// goes through the shared dependency verb, matching `Scene.AddComponent`.
-fn add_physics_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
-    if !world.has_rigidbody(id) && ui.button("RigidBody Component").clicked() {
-        world.set_rigidbody(id, Some(authoring::default_rigidbody()));
-        ui.close();
-    }
-    if !world.has_material(id) && ui.button("Material / Texture Component").clicked() {
-        attach_default_material(world, id);
-        ui.close();
-    }
-    if !world.has_nav_agent(id) && ui.button("NavMesh Agent Component").clicked() {
-        world.set_nav_agent(id, Some(authoring::default_nav_agent()));
-        ui.close();
-    }
-    let cone = format!("{}  NavMesh Obstacle", icon::TRAFFIC_CONE);
-    if !world.has_nav_obstacle(id) && ui.button(cone).clicked() {
-        authoring::add_with_requirements(world, id, ComponentKind::NavMeshObstacle);
-        ui.close();
-    }
-    let ladder = format!("{}  Off-Mesh Link", icon::LADDER_SIMPLE);
-    if !world.has_offmesh_link(id) && ui.button(ladder).clicked() {
-        authoring::add_with_requirements(world, id, ComponentKind::OffMeshLink);
-        ui.close();
-    }
-    let volume = format!("{}  NavMesh Modifier Volume", icon::SELECTION);
-    if !world.has_nav_modifier(id) && ui.button(volume).clicked() {
-        authoring::add_with_requirements(world, id, ComponentKind::NavMeshModifierVolume);
-        ui.close();
-    }
-    if !world.has_joint(id) && ui.button(format!("{}  Joint", icon::LINK)).clicked() {
-        authoring::add_with_requirements(world, id, ComponentKind::Joint);
-        ui.close();
-    }
-    let walker = format!("{}  Character Controller", icon::PERSON_SIMPLE_WALK);
-    if !world.has_character_controller(id) && ui.button(walker).clicked() {
-        authoring::add_with_requirements(world, id, ComponentKind::CharacterController);
-        ui.close();
-    }
-}
-
-/// Attach a `MaterialComponent` referencing a fresh per-entity library material.
-/// The Add menu has only the entity (not the scene), so the default `MaterialAsset`
-/// rides along as the entity's staged pending material; the inspector folds it into
-/// `scene.materials` once the entity guard drops (where the library is reachable).
-fn attach_default_material(world: &mut crate::ecs::World, id: u32) {
-    let key = format!("entity_{id}_material");
-    world.set_material(id, Some(MaterialComponent { material: key }));
-    world.stage_pending_material(id, authoring::default_material());
-}
-
-/// The rendering half of the Add Component menu: camera, particles, trail and line
-/// renderers (#441) and the visual correction stack. Each entry is offered only when absent. `VisualCorrection`
-/// declares `requires(Camera)` (#359), so picking it auto-adds a `Camera` if missing
-/// through the shared dependency verb — the menu no longer gates the entry on a camera
-/// being present, matching the `Scene.AddComponent` API exactly.
-fn add_render_components(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
-    if !world.has_camera(id) && ui.button("Camera Component").clicked() {
-        world.set_camera(id, Some(authoring::default_camera()));
-        ui.close();
-    }
-    if !world.has_particles(id)
-        && ui
-            .button(format!("{}  Particle System", icon::SPARKLE))
-            .clicked()
-    {
-        world.set_particles(id, Some(ParticleEmitterComponent::default()));
-        ui.close();
-    }
-    if !world.has_trail(id)
-        && ui
-            .button(format!("{}  Trail Renderer", icon::WIND))
-            .clicked()
-    {
-        authoring::add_with_requirements(world, id, ComponentKind::Trail);
-        ui.close();
-    }
-    if !world.has_line(id)
-        && ui
-            .button(format!("{}  Line Renderer", icon::LINE_SEGMENTS))
-            .clicked()
-    {
-        authoring::add_with_requirements(world, id, ComponentKind::Line);
-        ui.close();
-    }
-    if !world.has_visual_correction(id) && ui.button("Visual Correction Component").clicked() {
-        authoring::add_with_requirements(world, id, ComponentKind::VisualCorrection);
-        ui.close();
-    }
-    if !world.has_lod_group(id)
-        && ui
-            .button(format!("{}  LOD Group", icon::STACK_SIMPLE))
-            .clicked()
-    {
-        authoring::add_with_requirements(world, id, ComponentKind::LodGroup);
-        ui.close();
-    }
-}
+/// The first-class entries of the Add Component menu, in menu order: the kind, its
+/// glyph (empty for none yet, the burn-down in #82) and its label. Each is offered
+/// only when absent, and picking one goes through the shared dependency verb, so the
+/// menu adds exactly what `Scene.AddComponent` adds, requirements included (#359).
+/// Material stages its default library asset on the entity; the inspector folds it
+/// into `scene.materials` once the entity guard drops.
+const ENTRIES: &[(ComponentKind, &str, &str)] = &[
+    (ComponentKind::Light, "", "Light Component"),
+    (ComponentKind::Animator, "", "Animator Component"),
+    (ComponentKind::Collider, "", "Collider Component"),
+    (ComponentKind::RigidBody, "", "RigidBody Component"),
+    (ComponentKind::Texture, "", "Material / Texture Component"),
+    (ComponentKind::NavMeshAgent, "", "NavMesh Agent Component"),
+    (
+        ComponentKind::NavMeshObstacle,
+        icon::TRAFFIC_CONE,
+        "NavMesh Obstacle",
+    ),
+    (
+        ComponentKind::OffMeshLink,
+        icon::LADDER_SIMPLE,
+        "Off-Mesh Link",
+    ),
+    (
+        ComponentKind::NavMeshModifierVolume,
+        icon::SELECTION,
+        "NavMesh Modifier Volume",
+    ),
+    (ComponentKind::Joint, icon::LINK, "Joint"),
+    (
+        ComponentKind::CharacterController,
+        icon::PERSON_SIMPLE_WALK,
+        "Character Controller",
+    ),
+    (ComponentKind::Camera, "", "Camera Component"),
+    (ComponentKind::Particles, icon::SPARKLE, "Particle System"),
+    (ComponentKind::Trail, icon::WIND, "Trail Renderer"),
+    (ComponentKind::Line, icon::LINE_SEGMENTS, "Line Renderer"),
+    (
+        ComponentKind::VisualCorrection,
+        "",
+        "Visual Correction Component",
+    ),
+    (ComponentKind::LodGroup, icon::STACK_SIMPLE, "LOD Group"),
+    (ComponentKind::Audio, icon::SPEAKER_HIGH, "Audio Source"),
+    (
+        ComponentKind::ReverbZone,
+        icon::WAVEFORM,
+        "Audio Reverb Zone",
+    ),
+    // The in-game UI (#417–#421, #425, #426, #428): a Canvas makes the entity a UI
+    // root, a RectTransform a UI element; the graphics, masks, Selectable and the
+    // layout pair require a RectTransform.
+    (ComponentKind::Canvas, icon::MONITOR, "Canvas"),
+    (
+        ComponentKind::RectTransform,
+        icon::FRAME_CORNERS,
+        "Rect Transform",
+    ),
+    (ComponentKind::Image, icon::IMAGE, "Image"),
+    (ComponentKind::CanvasGroup, icon::STACK, "Canvas Group"),
+    (ComponentKind::Text, icon::TEXT_T, "Text"),
+    (ComponentKind::Shape, icon::SHAPES, "Shape"),
+    (ComponentKind::RectMask, icon::CROP, "Rect Mask"),
+    (ComponentKind::Mask, icon::CIRCLE_DASHED, "Mask"),
+    (
+        ComponentKind::BackdropFilter,
+        icon::DROP_HALF,
+        "Backdrop Filter",
+    ),
+    (ComponentKind::Selectable, icon::CURSOR_CLICK, "Selectable"),
+    (ComponentKind::LayoutGroup, icon::LAYOUT, "Layout Group"),
+    (
+        ComponentKind::LayoutElement,
+        icon::ARROWS_OUT,
+        "Layout Element",
+    ),
+];
 
 /// List the project's MonoBehaviour scripts (any `.lua` exposing a lifecycle
 /// table) under the moon glyph; picking one appends a `ScriptComponent` to the
