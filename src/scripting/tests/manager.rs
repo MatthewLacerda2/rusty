@@ -13,8 +13,8 @@ use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
 
-use super::console::ConsoleLogs;
-use super::manager::ScriptManager;
+use crate::scripting::console::ConsoleLogs;
+use crate::scripting::manager::ScriptManager;
 
 fn make_manager() -> ScriptManager {
     ScriptManager::new(

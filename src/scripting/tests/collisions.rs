@@ -9,7 +9,7 @@ use std::rc::Rc;
 
 use glam::Vec3;
 
-use super::tests_lifecycle::{manager_with_entity, write_script};
+use super::lifecycle::{manager_with_entity, write_script};
 use crate::physics::{CollisionEvents, CollisionPair, Contact, PhysicsEvents, TriggerEvents};
 
 /// `id` resting on entity 9: `id` sees the floor push up and close at 3 m/s.

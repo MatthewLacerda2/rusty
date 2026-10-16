@@ -1,4 +1,4 @@
-use super::console::{ConsoleLogs, LogLevel};
+use crate::scripting::console::{ConsoleLogs, LogLevel};
 
 #[test]
 fn all_three_severity_methods_produce_correct_level() {

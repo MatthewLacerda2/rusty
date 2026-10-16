@@ -3,7 +3,7 @@
 //! post param (#671) — each through the setter's op, so the strict errors are the
 //! setters' own.
 
-use super::tests_timers::{counted, rig, tick};
+use super::timers::{counted, rig, tick};
 use crate::scene::authoring::defaults;
 use crate::shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
 
@@ -30,7 +30,7 @@ impl Drop for Baked {
 }
 
 /// `expr` rounded to 3 decimals (f32 steps sum inexactly).
-pub(super) fn eval(m: &super::manager::ScriptManager, expr: &str) -> String {
+pub(super) fn eval(m: &crate::scripting::manager::ScriptManager, expr: &str) -> String {
     m.eval(&format!("math.floor(({expr}) * 1000 + 0.5) / 1000"))
         .unwrap()
 }

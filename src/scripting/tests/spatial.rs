@@ -6,14 +6,14 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::console::ConsoleLogs;
-use super::manager::ScriptManager;
 use crate::components::{ColliderComponent, ColliderShape};
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
 use crate::scene::Camera;
 use crate::scene::Scene;
+use crate::scripting::console::ConsoleLogs;
+use crate::scripting::manager::ScriptManager;
 use crate::time::Time;
 use glam::Vec3;
 
@@ -125,34 +125,4 @@ fn sphere_cast_hits_with_thickness_and_skips_ignored() {
         .unwrap();
     assert!(miss.starts_with("false"), "ignore skips the target: {miss}");
     let _ = a;
-}
-
-#[test]
-fn point_queries_match_the_collider_geometry() {
-    let (m, a, _) = spatial_runtime();
-    // `a` spans [-1,1]³: from (5,0,0) the closest point is its +X face.
-    assert_eq!(
-        m.eval(&format!("Physics.ClosestPoint({a}, 5,0,0)"))
-            .unwrap(),
-        "true, 1, 0, 0"
-    );
-    assert_eq!(
-        m.eval(&format!("Physics.ContainsPoint({a}, 0,0,0)"))
-            .unwrap(),
-        "true"
-    );
-    assert_eq!(
-        m.eval(&format!("Physics.ContainsPoint({a}, 0,0,3)"))
-            .unwrap(),
-        "false"
-    );
-    // GetBounds surfaces the cached world AABB: [-1,1] on every axis.
-    assert_eq!(
-        m.eval(&format!("Physics.GetBounds({a})")).unwrap(),
-        "true, -1, -1, -1, 1, 1, 1"
-    );
-    assert!(m
-        .eval("Physics.GetBounds(9999)")
-        .unwrap()
-        .starts_with("false"));
 }

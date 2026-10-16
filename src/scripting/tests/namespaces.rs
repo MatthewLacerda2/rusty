@@ -1,12 +1,15 @@
+//! Smoke tests for the core Lua namespaces a script sees: `Time`, `Camera`,
+//! `Input`, `Storage`, `Assets`, `Physics`.
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::console::ConsoleLogs;
-use super::manager::ScriptManager;
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::Camera;
 use crate::scene::Scene;
+use crate::scripting::console::ConsoleLogs;
+use crate::scripting::manager::ScriptManager;
 use crate::time::Time;
 use glam::Vec3;
 

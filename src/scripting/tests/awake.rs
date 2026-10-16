@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use crate::components::ScriptComponent;
 
-use super::tests_lifecycle::{manager_with_entity, write_script};
+use super::lifecycle::{manager_with_entity, write_script};
 
 /// Appends one letter per callback (plus the entity id) to a shared global, so
 /// tests can assert the exact dispatch order.

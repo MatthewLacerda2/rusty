@@ -2,8 +2,8 @@
 //! on the scaled clock (unless `unscaled`), honour the one-tick rule and their
 //! delay, call `on_complete`, and die with a killed handle or a deactivated entity.
 
-use super::manager::ScriptManager;
-use super::tests_timers::{counted, rig, tick};
+use super::timers::{counted, rig, tick};
+use crate::scripting::manager::ScriptManager;
 
 /// `Transform.GetPosition(id)`'s x, rounded to 3 decimals (f32 steps sum inexactly).
 fn x(m: &ScriptManager, id: u32) -> String {

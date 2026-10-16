@@ -4,14 +4,14 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::console::ConsoleLogs;
-use super::manager::ScriptManager;
 use crate::components::{CapsuleAxis, ColliderShape, CombineMode, PhysicsMaterial};
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
 use crate::scene::authoring::defaults::default_collider;
 use crate::scene::{Camera, Scene};
+use crate::scripting::console::ConsoleLogs;
+use crate::scripting::manager::ScriptManager;
 use crate::time::Time;
 use glam::Vec3;
 

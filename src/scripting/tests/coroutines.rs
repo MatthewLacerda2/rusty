@@ -3,16 +3,16 @@
 //! (or, realtime, ignores) the time scale, stops with its entity, surfaces its
 //! errors on the console, and replays identically.
 
-use super::tests_timers::{counted, rig, tick};
+use super::timers::{counted, rig, tick};
 
 /// Start a coroutine logging `__t` around the waits in `body`.
-fn co(body: &str) -> String {
+pub(super) fn co(body: &str) -> String {
     counted(&format!(
         "Timer.StartCoroutine(id, function(id)\n{body}\nend)"
     ))
 }
 
-fn log(m: &super::manager::ScriptManager) -> String {
+pub(super) fn log(m: &crate::scripting::manager::ScriptManager) -> String {
     m.eval("__log").unwrap()
 }
 
@@ -77,61 +77,6 @@ fn stop_all_coroutines_and_cancel_end_pending_coroutines() {
     tick(&mut m, 3);
     assert_eq!(log(&m), "2,");
     assert!(m.timers.borrow().is_empty());
-}
-
-#[test]
-fn coroutine_errors_surface_on_the_console() {
-    let (mut m, id) = rig("co_err", &co("coroutine.yield() error('boom') "));
-    m.eval(&format!(
-        "Timer.StartCoroutine({id}, function() coroutine.yield(42) end)"
-    ))
-    .unwrap();
-    tick(&mut m, 3);
-    let logs: Vec<String> = m
-        .console
-        .borrow()
-        .messages
-        .iter()
-        .map(|l| l.0.clone())
-        .collect();
-    assert!(
-        logs.iter()
-            .any(|l| l.contains("Coroutine on entity") && l.contains("boom")),
-        "{logs:?}"
-    );
-    assert!(
-        logs.iter().any(|l| l.contains("unsupported integer")),
-        "{logs:?}"
-    );
-    assert!(m.timers.borrow().is_empty(), "failed coroutines retire");
-}
-
-#[test]
-fn a_failing_invoke_keeps_repeating_and_a_failing_predicate_retires() {
-    let pred = "coroutine.yield(Timer.WaitUntil(function() error('pred') end))";
-    let (mut m, id) = rig("co_errs", &co(pred));
-    let rep = "function() __log = __log .. 'r' error('x') end";
-    m.eval(&format!("Timer.InvokeRepeating({id}, {rep}, 0, 1 / 60)"))
-        .unwrap();
-    tick(&mut m, 4);
-    assert_eq!(log(&m), "rrr", "an erroring repeat keeps its schedule");
-    let logs: Vec<String> = m
-        .console
-        .borrow()
-        .messages
-        .iter()
-        .map(|l| l.0.clone())
-        .collect();
-    assert!(
-        logs.iter()
-            .any(|l| l.contains("Coroutine") && l.contains("pred")),
-        "{logs:?}"
-    );
-    assert!(
-        logs.iter().any(|l| l.contains("Invoke on entity")),
-        "{logs:?}"
-    );
-    assert_eq!(m.eval(&format!("Timer.IsInvoking({id})")).unwrap(), "true");
 }
 
 /// The run as a string: two runtimes, same script, same ticks → same bytes.

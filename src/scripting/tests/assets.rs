@@ -6,12 +6,12 @@ use std::rc::Rc;
 
 use glam::Vec3;
 
-use super::{ConsoleLogs, ScriptManager};
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::asset_instance::instantiate_asset;
 use crate::scene::asset_instance::lightmap_test_support::{has_lightmap_uv, quad_model};
 use crate::scene::{Camera, Scene};
+use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
 
 #[test]

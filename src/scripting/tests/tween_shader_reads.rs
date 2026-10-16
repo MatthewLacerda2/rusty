@@ -3,8 +3,8 @@
 //! a UI tween stops once its graphic switches shader, and a wrong-arity target
 //! names the path it was given. Pins the survivors of #661's mutation run.
 
-use super::tests_timers::{counted, rig, tick};
-use super::tests_tween_shaders::{eval, Baked};
+use super::timers::{counted, rig, tick};
+use super::tween_shaders::{eval, Baked};
 
 #[test]
 fn a_material_tween_starts_from_the_entitys_current_override() {

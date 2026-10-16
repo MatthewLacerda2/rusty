@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 use glam::Vec3;
 
-use super::tests_lifecycle::{manager_with_entity, write_script};
+use super::lifecycle::{manager_with_entity, write_script};
 
 /// `LateUpdate` is handed the same scaled `dt` the tick gives `Update`.
 #[test]

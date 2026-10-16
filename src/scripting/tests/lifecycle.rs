@@ -10,8 +10,8 @@ use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
 
-use super::console::ConsoleLogs;
-use super::manager::ScriptManager;
+use crate::scripting::console::ConsoleLogs;
+use crate::scripting::manager::ScriptManager;
 
 pub(super) fn manager_with_entity() -> (ScriptManager, u32) {
     let mut scene = Scene::new();

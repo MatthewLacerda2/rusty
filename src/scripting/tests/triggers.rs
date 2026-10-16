@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use super::tests_lifecycle::{manager_with_entity, write_script};
+use super::lifecycle::{manager_with_entity, write_script};
 use crate::physics::TriggerEvents;
 
 #[test]

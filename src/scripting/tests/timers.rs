@@ -6,8 +6,8 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use super::manager::ScriptManager;
-use super::tests_lifecycle::{manager_with_entity, write_script};
+use super::lifecycle::{manager_with_entity, write_script};
+use crate::scripting::manager::ScriptManager;
 
 pub(super) const DT: f32 = 1.0 / 60.0;
 
@@ -122,34 +122,4 @@ fn deactivate_and_destroy_drop_pending_timers() {
     m.apply_pending_destroys();
     assert!(m.timers.borrow().is_empty(), "destroy stops timers");
     assert_eq!(m.eval("__log").unwrap(), "");
-}
-
-#[test]
-fn bad_targets_are_refused_or_logged() {
-    let (mut m, id) = rig("timer_bad", &counted("Timer.Invoke(id, 'Nope', 0)"));
-    tick(&mut m, 2);
-    let logs = m
-        .console
-        .borrow()
-        .messages
-        .iter()
-        .map(|l| l.0.clone())
-        .collect::<Vec<_>>();
-    assert!(
-        logs.iter()
-            .any(|l| l.contains("Invoke on entity") && l.contains("Nope")),
-        "{logs:?}"
-    );
-    assert!(
-        m.eval("Timer.Invoke(999, 'Beat', 0)").is_err(),
-        "missing entity"
-    );
-    assert!(m
-        .eval(&format!("Timer.InvokeRepeating({id}, 'Beat', 0, 0)"))
-        .is_err());
-    m.scene.borrow_mut().world.set_active(id, false);
-    assert!(
-        m.eval(&format!("Timer.Invoke({id}, 'Beat', 0)")).is_err(),
-        "inactive"
-    );
 }
