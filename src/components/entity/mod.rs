@@ -1,4 +1,4 @@
-//! src/components/entity.rs — the GameObject document shape.
+//! src/components/entity/mod.rs — the GameObject document shape.
 //!
 //! `Entity` is no longer live storage (#345 split it into real per-component
 //! hecs columns — see `ecs::world`); it survives as the *document* shape one

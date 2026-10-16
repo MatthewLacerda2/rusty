@@ -22,14 +22,6 @@ pub(super) const WAIVERS: &[(&str, &str, &str)] = &[
          look is driven via the `Material` namespace instead.",
     ),
     (
-        "material",
-        "api",
-        "Served by the `Material` namespace (SetTexture/SetMetallic/SetRoughness \
-         and their map variants) — the `material` field is a reference to a shared \
-         library material, and a dedicated `Material`-field namespace would just \
-         restate the same surface.",
-    ),
-    (
         "collider",
         "api",
         "Served by the `Physics` namespace: the collider is queried via \
@@ -67,6 +59,29 @@ pub(super) fn waived(field: &str, axis: &str) -> bool {
     WAIVERS.iter().any(|(c, a, _)| *c == field && *a == axis)
 }
 
+/// `STALE_WAIVER` for each row that no longer waives anything: its component is
+/// not discovered (renamed or removed), or `present` says the axis is met after
+/// all — then the row hides nothing and must go, so the gate demands the axis
+/// again should it ever regress.
+pub(super) fn stale_waivers(
+    components: &[String],
+    present: impl Fn(&str, &str) -> bool,
+) -> Vec<String> {
+    WAIVERS
+        .iter()
+        .filter_map(|&(c, a, _)| {
+            let why = if !components.iter().any(|f| f == c) {
+                "is not a discovered component"
+            } else if present(c, a) {
+                "axis is present"
+            } else {
+                return None;
+            };
+            Some(format!("STALE_WAIVER `{c}` `{a}`: {why} — delete the row"))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,6 +98,22 @@ mod tests {
         assert!(!waived("collider", "inspector"));
         // A component with no waiver (e.g. particles) is never waived.
         assert!(!waived("particles", "api"));
+    }
+
+    #[test]
+    fn stale_waivers_are_flagged() {
+        let all: Vec<String> = WAIVERS.iter().map(|(c, _, _)| c.to_string()).collect();
+        // Every waived axis absent → nothing stale.
+        assert!(stale_waivers(&all, |_, _| false).is_empty());
+        // A waived axis that is met after all is stale.
+        let met = stale_waivers(&all, |c, a| c == "mesh" && a == "api");
+        assert_eq!(met.len(), 1);
+        assert!(met[0].starts_with("STALE_WAIVER `mesh` `api`"));
+        // A waiver for a component no longer discovered is stale.
+        let gone: Vec<String> = all.iter().filter(|c| *c != "rigidbody").cloned().collect();
+        let stale = stale_waivers(&gone, |_, _| false);
+        assert_eq!(stale.len(), 1);
+        assert!(stale[0].contains("`rigidbody`"));
     }
 
     #[test]

@@ -10,11 +10,12 @@ const EDITOR_DIR: &str = "src/editor";
 const API_DIR: &str = "src/api";
 
 /// Axis 2: a standalone Add Component entry guards on absence via the #344
-/// accessor facade (`!world.has_<field>(id)`). A component only added as a
+/// accessor facade — `!world.has_<field>(id)`, or a table of entries each naming
+/// its `has_<field>` check (`|w, id| w.has_mask(id)`). A component only added as a
 /// side-effect of another has no such guard and is reported until it gets its
 /// own entry (#82).
 pub(super) fn has_add_menu(field: &str, add_src: &str) -> bool {
-    add_src.contains(&format!("!world.has_{field}(id)"))
+    add_src.contains(&format!(".has_{field}(id)"))
 }
 
 /// Axis 3: some editor file other than the Add menu edits the component in a
@@ -26,12 +27,14 @@ pub(super) fn has_inspector(field: &str, editor_blob: &str) -> bool {
 }
 
 /// Axis 4: an API namespace named after the component (its field, or the singular
-/// of a plural field) exists, is registered in `api/mod.rs`, and is documented.
+/// of a plural field) exists, is registered in `api/mod.rs`, and is documented —
+/// the docs name it as written or in its Lua spelling (`layout_group` is
+/// `LayoutGroup`, lowercased `layoutgroup`).
 pub(super) fn has_api(field: &str, api_stems: &[String], api_mod: &str, docs_lower: &str) -> bool {
     candidates(field).iter().any(|c| {
         api_stems.iter().any(|s| s == c)
             && api_mod.contains(&format!("{c}::register"))
-            && docs_lower.contains(c.as_str())
+            && (docs_lower.contains(c.as_str()) || docs_lower.contains(&c.replace('_', "")))
     })
 }
 
@@ -142,9 +145,19 @@ mod tests {
     #[test]
     fn add_menu_axis_needs_a_standalone_guard() {
         assert!(has_add_menu("particles", "if !world.has_particles(id) {"));
+        assert!(has_add_menu("mask", "|w, id| w.has_mask(id),"));
         assert!(!has_add_menu(
             "animator",
             "world.set_animator(id, Some(x));"
         ));
+    }
+
+    #[test]
+    fn api_axis_accepts_the_lua_spelling_in_docs() {
+        let stems = vec!["layout_group".to_string()];
+        let reg = "layout_group::register(lua, scope, scene)?;";
+        assert!(has_api("layout_group", &stems, reg, "# layoutgroup"));
+        assert!(!has_api("layout_group", &stems, reg, "# nothing here"));
+        assert!(!has_api("layout_group", &stems, "", "# layoutgroup"));
     }
 }

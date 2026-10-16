@@ -320,7 +320,7 @@ concrete type — that inventory lives in the rustdoc reference (`cargo doc --no
 and the script surface in `docs/api/`. Everything in the engine is one of
 five kinds of moving part (Unity analogs in parentheses):
 
-A **GameObject** is one entity (`Entity` in `components/entity.rs`): a mandatory
+A **GameObject** is one entity (`Entity` in `components/entity/`): a mandatory
 `Transform` plus any mix of the optional first-class components below, and a place in
 the parent/child hierarchy. It can be **empty** — a Transform and nothing else, used as
 a grouping pivot or a spawn marker. Or it can be configured: instantiating a glTF

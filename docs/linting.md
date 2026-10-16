@@ -246,9 +246,14 @@ A first-class component is only "done" when it appears on all four axes that
 deliberately live in non-dependent layers: a field on `Entity`, an Add Component
 entry (`inspector/components/add/`), an inspector card (some `inspector/components/*.rs`), and an API
 namespace (`src/api/<x>.rs` registered in `api/mod.rs` and documented in
-`docs/api/`). The gate discovers components from `Entity`'s
-`Option<…Component>` fields — so a new one can't slip through — and fails on any
-missing axis. Nothing is grandfathered: the burn-down list emptied under #82 (every
+`docs/api/`, as the field or its Lua spelling: `layout_group` is `LayoutGroup`). The
+gate discovers components from `Entity`'s `Option<…Component>` fields — so a new one
+can't slip through — and fails on any missing axis. It *finds* `pub struct Entity`
+under `src/components/` rather than reading a fixed path, and fails loudly
+(`NO_ENTITY` / `NO_COMPONENTS`) when it can't or when the struct yields no
+component fields: for weeks after `entity.rs` became `entity/mod.rs` both gates
+checked zero components and printed ok (#959). A test-lint test runs discovery on
+the real tree. Nothing is grandfathered: the burn-down list emptied under #82 (every
 gap closed or waived) and was retired in #926, so a missing axis is closed or waived.
 
 ### Closed vs waived (#82)
@@ -263,11 +268,14 @@ An axis can be satisfied in two ways:
   doing it standalone would fragment the one stable API surface. Waivers live in the
   `WAIVERS` table in `tools/lint/src/components/waivers.rs` as `(component, axis, rationale)`
   rows: `mesh add_menu`/`mesh api` (mesh is content-grid/glTF-driven),
-  `texture api` (→ `Material`), `collider api` + `rigidbody api` (→ `Physics`),
-  `nav_agent api` (→ `NavMeshAgent`), `visual_correction api` (→ `Graphics`).
+  `collider api` + `rigidbody api` (→ `Physics`), `nav_agent api`
+  (→ `NavMeshAgent`), `visual_correction api` (→ `Graphics`).
 
 **`WAIVERS`** is for axes we have decided not to implement standalone, never for an
-axis not closed yet: that one fails until it is. A waiver is never a silent skip — its rationale lives in code and is reviewable in
+axis not closed yet: that one fails until it is. A row that no longer waives anything
+fails too (`STALE_WAIVER`): its component is no longer discovered, or the axis is
+present after all (`material api` was, once `src/api/material/` landed), so a
+waiver can't outlive its reason and hide a later regression. A waiver is never a silent skip — its rationale lives in code and is reviewable in
 `git`. To add one, add a row to `WAIVERS` with a clear justification; to revisit one,
 delete the row and the gate will demand the artifact again. The particle system is on
 neither list — it is the gate's first fully-green component, satisfied on all axes.
@@ -294,9 +302,10 @@ that has an inspector card, classifies the card as:
   ops for that component in scope, and writes fields through egui widgets — the
   regression shape this gate exists to stop.
 
-The detection signal is facade-shaped (#344): `.<field>_mut(` present in the cards
-with no `authoring::<field>` ops import marks a direct card. Coarse substring scan,
-matching the other gates.
+The detection signal is facade-shaped (#344) and judged per card file: a file that
+takes `.<field>_mut(` and imports no `scene::authoring` ops marks a direct card,
+whatever the ops module is called (`nav::agent` serves `nav_agent`, `backdrop`
+serves `backdrop_filter`). Coarse substring scan, matching the other gates.
 
 ### Routed vs direct (#287)
 Every card is routed: the burn-down list of direct cards emptied under #287 and was
