@@ -16,7 +16,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-WORKFLOW = Path(__file__).resolve().parents[2] / "workflows" / "mutants-sweep.yml"
+WORKFLOW = Path(__file__).resolve().parents[3] / "workflows" / "mutants-sweep.yml"
 
 
 def plan_script() -> str:
