@@ -25,6 +25,10 @@ pub const UI_SCRIPTS: &[(&str, &str)] = &[
         include_str!("../../../engine/scripts/ui/dropdown.lua"),
     ),
     (
+        "dropdown_item.lua",
+        include_str!("../../../engine/scripts/ui/dropdown_item.lua"),
+    ),
+    (
         "input_field.lua",
         include_str!("../../../engine/scripts/ui/input_field.lua"),
     ),

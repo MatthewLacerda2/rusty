@@ -7,7 +7,9 @@
 -- Unity's. On a world or camera canvas (#429) the list opens on that canvas
 -- instead, as its top-most child, and the blocker covers that canvas.
 -- The list holds one `Item` per option (a Selectable, so it highlights);
--- click one, or pick it with the arrows and Enter. Escape closes it.
+-- click one, or pick it with the arrows and Enter. Escape closes it. The items'
+-- and the blocker's clicks arrive through `dropdown_item.lua` (#996), so they
+-- follow the event system's click and drag rules.
 --
 -- `options` is the list, `|`-separated in the inspector; `value` is 0-based.
 --
@@ -17,6 +19,8 @@
 --   set_value(i) / set_value_without_notify(i)
 --   get_options() / set_options({ "Low", "High" })
 --   show() / hide() / is_expanded()
+--   select_item(i)                               -- what a list click calls: pick option i
+--                                                -- (0-based) and close, or just close for -1
 
 local Dropdown = {
     fields = {
@@ -28,13 +32,13 @@ local Dropdown = {
 }
 
 local POPUP_ORDER = 30000
-local DRAG_SLOP = 10
+local ITEM_SCRIPT = "assets/scripts/ui/dropdown_item.lua"
 local self_id, label, template
 local list = {}                   -- the options
 local items = {}                  -- item entity per option, built on open
 local stale = true                -- items no longer match the options
 local popup, blocker, home        -- open state: popup canvas, blocker, template's own placement
-local opened_tick, press_at
+local opened_tick
 
 local function split(s)
     local out = {}
@@ -95,6 +99,7 @@ local function build_items()
         Scene.AddComponent(e, "LayoutElement")
         LayoutElement.SetPreferredSize(e, nil, Dropdown.item_height)
         Scene.SetParent(e, content)
+        Scene.AddScript(e, ITEM_SCRIPT, { dropdown = self_id, index = i - 1 })
         local mark = child(e, "Item Checkmark", 0, 0)
         RectTransform.SetAnchorMax(mark, 0, 1)
         RectTransform.SetSizeDelta(mark, 12, -Dropdown.item_height + 12)
@@ -151,6 +156,7 @@ function Dropdown.show()
     blocker = child(popup, "Blocker", 0, 0)
     Scene.AddComponent(blocker, "Image")
     Image.SetColor(blocker, 0, 0, 0, 0)
+    Scene.AddScript(blocker, ITEM_SCRIPT, { dropdown = self_id, index = -1 })
     local _, height = RectTransform.GetSizeDelta(template)
     home = {
         { RectTransform.GetAnchorMin(template) }, { RectTransform.GetAnchorMax(template) },
@@ -188,9 +194,9 @@ function Dropdown.hide()
     UI.SetSelected(self_id)
 end
 
-local function choose(i)
+function Dropdown.select_item(i)
     Dropdown.hide()
-    Dropdown.set_value(i - 1)
+    if i >= 0 then Dropdown.set_value(i) end
 end
 
 function Dropdown.Awake(id)
@@ -210,26 +216,13 @@ function Dropdown.OnSubmit(id)
     Dropdown.show()
 end
 
--- While open: the list's own clicks, Enter and Escape (the items carry no script).
+-- While open: Enter on the focused item, and Escape. Clicks come from the items.
 function Dropdown.Update(id)
     if not popup or Time.frameCount() == opened_tick then return end
     if Input.GetKeyDown("ESCAPE") then return Dropdown.hide() end
     local picked = item_of(UI.GetSelected())
     if picked and (Input.GetKeyDown("ENTER") or Input.GetKeyDown("KEYPADENTER")) then
-        return choose(picked)
-    end
-    local mx, my = Input.GetMousePosition()
-    local _, sh = UI.GetScreenSize()
-    local hit = UI.Raycast(mx, sh - my)
-    if Input.GetKeyDown("MOUSE0") then
-        press_at = { mx, my }
-        if hit == blocker then return Dropdown.hide() end
-    end
-    if Input.GetKeyUp("MOUSE0") and press_at then
-        local still = math.abs(mx - press_at[1]) + math.abs(my - press_at[2]) <= DRAG_SLOP
-        press_at = nil
-        local i = still and item_of(hit)
-        if i then choose(i) end
+        return Dropdown.select_item(picked - 1)
     end
 end
 
