@@ -10,6 +10,7 @@
 //!   - `DestroyEntity(id)` — **really** removes the entity (the editor's Destroy).
 //!   - `AddComponent(id, kind)` / `RemoveComponent(id, kind)` — the Add Component
 //!     menu's set, with the inspector's default values.
+//!   - `AddScript(id, path, [fields])` — the Add Component menu's script entries.
 //!   - `SetParent(id, parent)` / `ClearParent(id)` — parenting (`parent_id`).
 //!   - `Save([path])` — persist the live world (write-back to the current scene
 //!     path when no path is given).
@@ -22,10 +23,12 @@
 //! Each verb returns its outcome instead, which the REPL echoes.
 
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::components::ScriptFieldValue;
 use crate::scene::authoring::{self, ComponentKind, Primitive};
 use crate::scene::Scene;
 
@@ -126,7 +129,8 @@ fn register_destroy<'scope>(
     )
 }
 
-/// `AddComponent` / `RemoveComponent` over the Add Component menu's set.
+/// `AddComponent` / `RemoveComponent` over the Add Component menu's set, and
+/// `AddScript` for its script entries.
 fn register_components<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -160,7 +164,49 @@ fn register_components<'scope>(
                 parsed,
             ))
         }),
+    )?;
+
+    put(
+        table,
+        "AddScript",
+        scope.create_function(
+            |_, (id, path, fields): (u32, String, Option<mlua::Table>)| {
+                let values = field_values(fields)?;
+                Ok(authoring::add_script(
+                    &mut scene.borrow_mut().world,
+                    id,
+                    &path,
+                    values,
+                ))
+            },
+        ),
     )
+}
+
+/// `AddScript`'s `fields` table as the inspector's stored field values.
+fn field_values(fields: Option<mlua::Table>) -> mlua::Result<BTreeMap<String, ScriptFieldValue>> {
+    let Some(fields) = fields else {
+        return Ok(BTreeMap::new());
+    };
+    fields
+        .pairs::<String, mlua::Value>()
+        .map(|pair| {
+            let (name, value) = pair?;
+            let value = match value {
+                mlua::Value::Integer(n) => ScriptFieldValue::Number(n as f64),
+                mlua::Value::Number(n) => ScriptFieldValue::Number(n),
+                mlua::Value::Boolean(b) => ScriptFieldValue::Boolean(b),
+                mlua::Value::String(s) => ScriptFieldValue::Text(s.to_str()?.to_string()),
+                other => {
+                    return Err(mlua::Error::RuntimeError(format!(
+                        "Scene.AddScript: field '{name}' is a {}; fields are numbers, booleans or strings",
+                        other.type_name()
+                    )))
+                }
+            };
+            Ok((name, value))
+        })
+        .collect()
 }
 
 /// `SetParent` / `ClearParent` (the `parent_id` graph, cycle-checked by `Scene`).
