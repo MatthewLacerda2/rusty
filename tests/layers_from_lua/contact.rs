@@ -17,12 +17,8 @@ fn body(scene: &mut Scene, pos: Vec3, size: Vec3, dynamic: bool) -> u32 {
     let id = scene.add_entity("Body".to_string());
     scene.world.transform_mut(id).unwrap().position = pos;
     let collider = ColliderComponent {
-        active: true,
         shape: ColliderShape::Box { size },
-        is_trigger: false,
-        material: Default::default(),
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
+        ..rusty::scene::authoring::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     if dynamic {

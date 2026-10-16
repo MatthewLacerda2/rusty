@@ -24,12 +24,8 @@ fn add(scene: &mut Scene, parent: Option<u32>, pos: Vec3, collider: bool) -> u32
     if collider {
         let shape = ColliderShape::Box { size: Vec3::ONE };
         let c = ColliderComponent {
-            active: true,
             shape,
-            is_trigger: false,
-            material: Default::default(),
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
+            ..crate::scene::authoring::default_collider()
         };
         scene.world.set_collider(id, Some(c));
     }
@@ -39,13 +35,10 @@ fn add(scene: &mut Scene, parent: Option<u32>, pos: Vec3, collider: bool) -> u32
 /// Give `id` a gravity-free Rigidbody (dynamic unless `kinematic`).
 fn rigidbody(scene: &mut Scene, id: u32, kinematic: bool, velocity: Vec3) {
     let rb = RigidBodyComponent {
-        active: true,
         is_kinematic: kinematic,
-        mass: 1.0,
         velocity,
-        angular_velocity: Vec3::ZERO,
         use_gravity: false,
-        collision_detection: Default::default(),
+        ..crate::scene::authoring::default_rigidbody()
     };
     scene.world.set_rigidbody(id, Some(rb));
 }

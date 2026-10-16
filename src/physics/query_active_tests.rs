@@ -20,12 +20,8 @@ fn add_box(scene: &mut Scene, parent: Option<u32>, pos: Vec3, size: Vec3) -> u32
         scene.set_parent(id, Some(p)).unwrap();
     }
     let collider = ColliderComponent {
-        active: true,
         shape: ColliderShape::Box { size },
-        is_trigger: false,
-        material: Default::default(),
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
+        ..crate::scene::authoring::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     id
@@ -34,13 +30,9 @@ fn add_box(scene: &mut Scene, parent: Option<u32>, pos: Vec3, size: Vec3) -> u32
 /// Give `id` a gravity-free kinematic Rigidbody, making it a compound owner.
 fn kinematic(scene: &mut Scene, id: u32) {
     let rb = RigidBodyComponent {
-        active: true,
         is_kinematic: true,
-        mass: 1.0,
-        velocity: Vec3::ZERO,
-        angular_velocity: Vec3::ZERO,
         use_gravity: false,
-        collision_detection: Default::default(),
+        ..crate::scene::authoring::default_rigidbody()
     };
     scene.world.set_rigidbody(id, Some(rb));
 }

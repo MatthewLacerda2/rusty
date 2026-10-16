@@ -12,14 +12,11 @@ const DT: f32 = 1.0 / 60.0;
 
 fn box_collider(size: f32, is_trigger: bool) -> ColliderComponent {
     ColliderComponent {
-        active: true,
         shape: ColliderShape::Box {
             size: Vec3::splat(size),
         },
         is_trigger,
-        material: Default::default(),
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
+        ..crate::scene::authoring::default_collider()
     }
 }
 
@@ -41,13 +38,10 @@ fn step_surfaces_enter_stay_exit_edges() {
     scene.world.set_rigidbody(
         walker,
         Some(RigidBodyComponent {
-            active: true,
             is_kinematic: true,
-            mass: 1.0,
-            velocity: Vec3::ZERO,
-            angular_velocity: Vec3::ZERO,
             use_gravity: false,
             collision_detection: crate::components::CollisionDetection::Discrete,
+            ..crate::scene::authoring::default_rigidbody()
         }),
     );
 
