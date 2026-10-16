@@ -26,6 +26,8 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     `stale_code()` names the queue's files that changed on `main` since launch
     ([`freshness.changed`]); asked before each take, a non-empty answer ends the
     watch ([`ending.relaunch`]) with the pull request untaken.
+    `stop_requested()` says whether [`ending.STOP_FILE`] asked it to stop (and
+    removes the file); it is asked at the top of each pass, so only between takes.
     `opts.for_minutes` (`--for`) is checked at the top of each pass, so only
     between takes; `opts.since` (`--since`) limits the board lines ([`board.recent`]).
     """
@@ -76,6 +78,10 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     last, moved = None, fx.clock()
     started = moved
     while True:
+        if fx.stop_requested():
+            save()
+            count = sum(1 for _, state, _ in results if state == fx.merged)
+            return results, f"{ending.STOP}; {count} merged, nothing in hand.", ending.status(handed, False, stopped=True)
         if ending.overdue(started, fx.clock(), opts.for_minutes):
             save()
             return results, ending.deadline_reached(results, opts.for_minutes, fx.merged), ending.status(handed, False)

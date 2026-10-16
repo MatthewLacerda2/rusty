@@ -107,15 +107,21 @@ briefs coders, reads diffs and labels. GitHub is the batch's state: open PRs,
 their comments and `RemoteTrigger list` resume a batch from nothing, so nothing
 lives only in the scratchpad.
 
-**Start the watch once a draft exists** (it exits at once when no PR is open):
-`make queue ARGS="--watch --no-check --for 70 --since <batch start>"`, in the
-background from a worktree under `.claude/worktrees/`, writing to a log. Put a
-`Monitor` on `tail -F <log> | grep --line-buffered 'HANDED BACK'`, never on the
-watch itself (a `Monitor` dies at 30 minutes and takes its command with it). On a
-deadline exit, run its `watch: resume:` line; on `relaunch:` (status 5), update
-the worktree to `origin/main` first. The log's `watch:` lines are the whole view
-of the coders: no second poller. Wait on and stop the watch by its PID, never by
-pattern: `pgrep -f` matches its own shell, `pkill -f` kills scorsese's watch too.
+**Start the queue once a draft exists, under its supervisor** (#908):
+`make queue-daemon ARGS="--no-check --since <batch start>"`, from a worktree under
+`.claude/worktrees/`. It detaches (a background command dies at two hours), logs
+to `.git/merge-queue/queue.log`, moves its worktree to `origin/main` before each
+watch, and restarts the watch by itself on every planned exit: the deadline and a
+hand-back at once, "nothing left" after ten minutes, `relaunch:` (status 5, the
+queue's own code changed, #967) at once, the machine or GitHub failing with a
+backoff, five times in a row at most. Put a `Monitor` on `tail -F
+.git/merge-queue/queue.log | grep --line-buffered -E 'HANDED BACK|supervisor:.*stopped'`,
+never on the watch itself (a `Monitor` dies at 30 minutes and takes its command
+with it). The log's `watch:` lines are the whole view of the coders: no second
+poller. **Stop it with `make queue-stop`**, between pull requests; never by
+pattern: `pkill -f` kills scorsese's watch too. Run bare (`make queue ARGS="--watch
+--no-check --for 70"` in the background), the watch needs relaunching by hand on
+each exit: its last line is `watch: resume: <command>`.
 `ci-merge` has everything else about the queue.
 
 Per pull request:
