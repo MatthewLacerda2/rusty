@@ -73,5 +73,14 @@ fn bake_lightmaps_applies_every_named_argument_and_clamps() {
     }
     .apply(base);
     let got = (clamped.texels_per_unit, clamped.samples, clamped.bounces);
-    assert_eq!(got, (0.01, 1, 1));
+    assert_eq!(got, (0.25, 1, 1), "the editor's lower bounds");
+    let huge = Overrides {
+        texels_per_unit: Some(f32::INFINITY),
+        samples: Some(1_000_000),
+        bounces: Some(99),
+        ..Default::default()
+    }
+    .apply(base);
+    let got = (huge.texels_per_unit, huge.samples, huge.bounces);
+    assert_eq!(got, (8.0, 4096, 16), "upper bounds; +inf takes the default");
 }

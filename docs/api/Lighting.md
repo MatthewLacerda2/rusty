@@ -22,8 +22,9 @@ path. The two individual verbs stay for a script that wants only one of them.
   bounces, seed and the directional mode are saved in the scene file's
   `lighting_settings` block, so a rebake never asks for them again.
   `Lighting.SetSettings{ samples = 256 }` changes only the fields it names (each clamped
-  to a bakeable value: at least 1 sample and 1 bounce, at least `0.01` texels per unit);
-  the editor's card edits the same fields under the button. A scene whose settings are all
+  to the editor's range: `0.25`–`64` texels per unit, `1`–`4096` samples, `1`–`16`
+  bounces; a NaN or infinite density takes the default `8`); the editor's card edits the
+  same fields under the button. A scene whose settings are all
   at their defaults leaves the block out of its file. `Lighting.BakeLightmaps` takes the
   same settings for every argument it is not given.
 - **The result is written at once**, as Unity writes its lighting data asset: the

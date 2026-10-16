@@ -14,8 +14,8 @@ picture whatever the lighting.
 
 | Function | Signature |
 |---|---|
-| `Material.SetMetallic` | `(id, value)` |
-| `Material.SetRoughness` | `(id, value)` |
+| `Material.SetMetallic` | `(id, value)` — clamped to `[0,1]` (NaN or `math.huge` reads as 0) |
+| `Material.SetRoughness` | `(id, value)` — clamped to `[0,1]` (NaN or `math.huge` reads as 0) |
 | `Material.SetEmissive` | `(id, {r, g, b})` — the flat emissive factor (self-illumination; values >1.0 bloom on the HDR target) |
 | `Material.SetMetallicMap` | `(id, path)` — sampled by the renderer; the map's blue channel scales the metallic value (glTF metallic-roughness convention) |
 | `Material.SetRoughnessMap` | `(id, path)` — sampled by the renderer; the map's green channel scales the roughness value |

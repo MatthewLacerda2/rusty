@@ -11,9 +11,10 @@
 use glam::Vec3;
 
 use crate::components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
+use crate::scene::authoring::sanitize::{at_least, non_negative, MIN_EXTENT};
 
 /// The smallest extent a box side, radius or height may have.
-pub const MIN_SIZE: f32 = 1e-3;
+pub const MIN_SIZE: f32 = MIN_EXTENT;
 
 /// Enable or disable the obstacle (Unity's `enabled`).
 pub fn set_active(o: &mut Obstacle, active: bool) {
@@ -61,21 +62,12 @@ pub fn set_carve_only_stationary(o: &mut Obstacle, only: bool) {
 
 /// Set the distance that counts as moving, floored at 0.
 pub fn set_move_threshold(o: &mut Obstacle, metres: f32) {
-    o.move_threshold = at_least(metres, 0.0);
+    o.move_threshold = non_negative(metres);
 }
 
 /// Set the seconds of standing still before carving, floored at 0.
 pub fn set_time_to_stationary(o: &mut Obstacle, seconds: f32) {
-    o.time_to_stationary = at_least(seconds, 0.0);
-}
-
-/// `v` floored at `min`; a NaN reads as `min`.
-fn at_least(v: f32, min: f32) -> f32 {
-    if v.is_nan() {
-        min
-    } else {
-        v.max(min)
-    }
+    o.time_to_stationary = non_negative(seconds);
 }
 
 #[cfg(test)]
@@ -97,6 +89,10 @@ mod tests {
         assert_eq!(o.move_threshold, 0.0);
         set_time_to_stationary(&mut o, 2.0);
         assert_eq!(o.time_to_stationary, 2.0);
+        set_time_to_stationary(&mut o, f32::INFINITY);
+        assert_eq!(o.time_to_stationary, 0.0, "+inf is refused like NaN");
+        set_radius(&mut o, f32::INFINITY);
+        assert_eq!(o.radius, MIN_SIZE);
         set_center(&mut o, Vec3::Y);
         set_center(&mut o, Vec3::INFINITY);
         assert_eq!(o.center, Vec3::Y);

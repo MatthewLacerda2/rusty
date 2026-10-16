@@ -21,6 +21,7 @@ use crate::editor::inspector::components::card::component_card;
 use crate::editor::inspector::preview::{self, PreviewSubject};
 use crate::editor::EditorUi;
 use crate::scene::authoring::material as mat_ops;
+use crate::scene::authoring::material::FACTOR_RANGE;
 use crate::scene::{MaterialAsset, RenderMode};
 
 /// 3B2. Render the Material card for the entity `id`, editing the shared `MaterialAsset`
@@ -128,29 +129,15 @@ fn draw_material_factors(
         }
     });
 
-    let mut metallic = materials[key].metallic;
-    ui.horizontal(|ui| {
-        ui.label("Metallic:");
-        if ui
-            .add(egui::Slider::new(&mut metallic, 0.0..=1.0))
-            .changed()
-        {
-            mat_ops::set_metallic(materials, key, metallic);
-            *is_dirty = true;
-        }
-    });
+    if let Some(metallic) = factor_slider(ui, "Metallic:", materials[key].metallic) {
+        mat_ops::set_metallic(materials, key, metallic);
+        *is_dirty = true;
+    }
 
-    let mut roughness = materials[key].roughness;
-    ui.horizontal(|ui| {
-        ui.label("Roughness:");
-        if ui
-            .add(egui::Slider::new(&mut roughness, 0.0..=1.0))
-            .changed()
-        {
-            mat_ops::set_roughness(materials, key, roughness);
-            *is_dirty = true;
-        }
-    });
+    if let Some(roughness) = factor_slider(ui, "Roughness:", materials[key].roughness) {
+        mat_ops::set_roughness(materials, key, roughness);
+        *is_dirty = true;
+    }
 
     let mut emissive = materials[key].emissive;
     ui.horizontal(|ui| {
@@ -199,25 +186,28 @@ fn draw_material_transparency(
     });
 
     if render_mode == RenderMode::Transparent {
-        let mut alpha = materials[key].alpha;
-        ui.horizontal(|ui| {
-            ui.label("Alpha:");
-            if ui.add(egui::Slider::new(&mut alpha, 0.0..=1.0)).changed() {
-                mat_ops::set_alpha(materials, key, alpha);
-                *is_dirty = true;
-            }
-        });
+        if let Some(alpha) = factor_slider(ui, "Alpha:", materials[key].alpha) {
+            mat_ops::set_alpha(materials, key, alpha);
+            *is_dirty = true;
+        }
     }
     if render_mode == RenderMode::Cutout {
-        let mut cutoff = materials[key].alpha_cutoff;
-        ui.horizontal(|ui| {
-            ui.label("Alpha Cutoff:");
-            if ui.add(egui::Slider::new(&mut cutoff, 0.0..=1.0)).changed() {
-                mat_ops::set_alpha_cutoff(materials, key, cutoff);
-                *is_dirty = true;
-            }
-        });
+        if let Some(cutoff) = factor_slider(ui, "Alpha Cutoff:", materials[key].alpha_cutoff) {
+            mat_ops::set_alpha_cutoff(materials, key, cutoff);
+            *is_dirty = true;
+        }
     }
+}
+
+/// A labelled slider over [`FACTOR_RANGE`]; the new value when the user moved it.
+fn factor_slider(ui: &mut egui::Ui, label: &str, mut value: f32) -> Option<f32> {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        ui.add(egui::Slider::new(&mut value, FACTOR_RANGE))
+            .changed()
+    })
+    .inner
+    .then_some(value)
 }
 
 /// Which optional map a checkbox controls — selects the shared setter + the field to

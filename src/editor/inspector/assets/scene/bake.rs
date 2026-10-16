@@ -70,21 +70,21 @@ fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
             ui.label(label);
         });
     };
-    let texels = egui::DragValue::new(&mut s.texels_per_unit).range(0.25..=64.0);
+    let texels = egui::DragValue::new(&mut s.texels_per_unit).range(BakeSettings::TEXELS_PER_UNIT);
     row(
         ui,
         texels.speed(0.1),
         "Texels per unit",
         "Lightmap resolution",
     );
-    let samples = egui::DragValue::new(&mut s.samples).range(1..=4096);
+    let samples = egui::DragValue::new(&mut s.samples).range(BakeSettings::SAMPLES);
     row(
         ui,
         samples,
         "Samples",
         "Paths traced per texel; more is smoother and slower",
     );
-    let bounces = egui::DragValue::new(&mut s.bounces).range(1..=16);
+    let bounces = egui::DragValue::new(&mut s.bounces).range(BakeSettings::BOUNCES);
     row(
         ui,
         bounces,

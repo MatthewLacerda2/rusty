@@ -2,10 +2,16 @@
 //! a value from Lua, the editor or a scene file is finite and in range before it is
 //! stored. A NaN or infinite input becomes the rule's fallback, never the field.
 //!
-//! Some setters (the character controller, the nav obstacle, the reverb zone) still
-//! let `+inf` through with an `is_nan` test; folding them in changes behaviour (#993).
+//! Every setter uses these, so `+inf` from Lua (`math.huge`) is refused the same way
+//! everywhere: it takes the fallback, as NaN does, and never reaches a field (#993).
 
 use glam::Vec4;
+
+/// The smallest size a box side, radius, height or scale may have: one floor for the
+/// one idea, shared by the nav obstacle and modifier, the LOD group, the canvas and
+/// the UI gradient (#993). The character controller keeps its own, smaller one: its
+/// floor is the collide-and-slide gap, not a visible extent.
+pub const MIN_EXTENT: f32 = 1e-3;
 
 /// `v`, or `0.0` when it is NaN or infinite.
 pub(super) fn finite(v: f32) -> f32 {

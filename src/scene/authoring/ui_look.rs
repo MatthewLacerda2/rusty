@@ -9,7 +9,7 @@
 
 use glam::Vec2;
 
-use super::sanitize::{finite, unit_color};
+use super::sanitize::{finite, unit_color, MIN_EXTENT};
 use crate::components::{GradientKind, UiBlend, UiGradient, MAX_GRADIENT_STOPS};
 
 /// The blend mode's name.
@@ -52,7 +52,7 @@ pub fn sanitize_gradient(mut g: UiGradient) -> Option<UiGradient> {
     g.stops.sort_by(|a, b| a.t.total_cmp(&b.t));
     g.angle = finite(g.angle);
     g.center = Vec2::new(finite(g.center.x), finite(g.center.y));
-    g.radius = finite(g.radius).max(1e-3);
+    g.radius = finite(g.radius).max(MIN_EXTENT);
     Some(g)
 }
 

@@ -24,6 +24,22 @@ fn scalar_and_color_ops_write_through() {
 }
 
 #[test]
+fn factors_clamp_to_the_factor_range_and_refuse_non_finite() {
+    let mut materials = one();
+    set_metallic(&mut materials, "k", 5.0);
+    set_roughness(&mut materials, "k", -1.0);
+    set_alpha(&mut materials, "k", f32::NAN);
+    set_alpha_cutoff(&mut materials, "k", f32::INFINITY);
+    let m = &materials["k"];
+    assert_eq!((m.metallic, m.roughness), (1.0, 0.0));
+    assert_eq!(
+        (m.alpha, m.alpha_cutoff),
+        (0.0, 0.0),
+        "non-finite reads as 0"
+    );
+}
+
+#[test]
 fn map_ops_set_and_clear() {
     let mut materials = one();
     set_base_color_map(&mut materials, "k", "albedo.png".to_string());

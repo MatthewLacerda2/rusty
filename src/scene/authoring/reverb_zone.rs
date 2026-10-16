@@ -8,6 +8,7 @@
 //!
 //! Pure.
 
+use super::sanitize::non_negative;
 use crate::components::{ReverbParams, ReverbPreset, ReverbZoneComponent};
 
 /// Set the full-effect radius, floored at 0; the fade radius grows to keep up.
@@ -35,15 +36,6 @@ pub fn set_params(z: &mut ReverbZoneComponent, params: ReverbParams) {
     z.preset = ReverbPreset::Custom;
 }
 
-/// `v` floored at 0; a NaN reads as 0.
-fn non_negative(v: f32) -> f32 {
-    if v.is_nan() {
-        0.0
-    } else {
-        v.max(0.0)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -58,6 +50,8 @@ mod tests {
         set_min_distance(&mut z, f32::NAN);
         set_max_distance(&mut z, 30.0);
         assert_eq!((z.min_distance, z.max_distance), (0.0, 30.0));
+        set_max_distance(&mut z, f32::INFINITY);
+        assert_eq!(z.max_distance, 0.0, "+inf is refused like NaN");
     }
 
     #[test]

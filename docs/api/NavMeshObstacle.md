@@ -45,5 +45,8 @@ setters are then no-ops. Add one with `Scene.AddComponent(id, "NavMeshObstacle")
 | `NavMeshObstacle.GetCarveOnlyStationary` / `SetCarveOnlyStationary` | `(id)` / `(id, bool)` | carve only after standing still |
 | `NavMeshObstacle.GetMoveThreshold` / `SetMoveThreshold` | `(id)` / `(id, metres)` | how far it moves before it counts as moving (≥ 0) |
 | `NavMeshObstacle.GetTimeToStationary` / `SetTimeToStationary` | `(id)` / `(id, seconds)` | how long still before it carves (≥ 0) |
+
+A NaN or infinite value (`math.huge`) given to a number setter takes its floor: `0.001`
+for the radius and height, `0` for the thresholds.
 | `NavMeshObstacle.IsCarving` | `(id)` | whether it cuts the navmesh right now |
 | `NavMeshObstacle.GetVelocity` | `(id)` | `x, y, z`: its world velocity over the last play tick |

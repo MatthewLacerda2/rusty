@@ -3,7 +3,8 @@
 //! The ONE place the engine knows how to mutate a library `MaterialAsset` field by
 //! field (the PBR factors, the glTF-PBR map paths, and the transparency story —
 //! render mode + alpha + cutoff, #242), including the validation that belongs to
-//! each write (the `[0, 1]` clamp on `alpha`/`alpha_cutoff`).
+//! each write (the [`FACTOR_RANGE`] clamp on metallic, roughness, alpha and cutoff,
+//! which the editor's sliders read too, #993).
 //!
 //! BOTH callers route through here so the editor and the API can never drift: the
 //! inspector's Material card (`editor::inspector::components::material`) and the Lua
@@ -20,6 +21,7 @@ mod maps;
 mod shader_params;
 
 use std::collections::BTreeMap;
+use std::ops::RangeInclusive;
 
 pub use maps::{bake_maps, rebake_maps, MAPS_DIR};
 pub use shader_params::{
@@ -28,7 +30,13 @@ pub use shader_params::{
     shader_param,
 };
 
+use super::sanitize::unit;
 use crate::scene::{MaterialAsset, MaterialComponent, RenderMode, Scene};
+
+/// The range of the `[0, 1]` factors (metallic, roughness, alpha, alpha cutoff): the
+/// setters clamp to it (a non-finite value reads as 0) and the editor's sliders span
+/// it, so the limit lives here once, as `rigidbody::set_mass`'s does (#993).
+pub const FACTOR_RANGE: RangeInclusive<f32> = 0.0..=1.0;
 
 /// The scene's material library: library key -> shared asset. Matches
 /// `Scene.materials`; aliased here so callers name one type.
@@ -88,10 +96,10 @@ pub fn set_base_color_map(materials: &mut MaterialLibrary, key: &str, path: Stri
     }
 }
 
-/// Set the metallic scalar factor.
+/// Set the metallic scalar factor, clamped to [`FACTOR_RANGE`].
 pub fn set_metallic(materials: &mut MaterialLibrary, key: &str, value: f32) {
     if let Some(m) = materials.get_mut(key) {
-        m.metallic = value;
+        m.metallic = unit(value);
     }
 }
 
@@ -102,10 +110,10 @@ pub fn set_metallic_map(materials: &mut MaterialLibrary, key: &str, path: Option
     }
 }
 
-/// Set the roughness scalar factor.
+/// Set the roughness scalar factor, clamped to [`FACTOR_RANGE`].
 pub fn set_roughness(materials: &mut MaterialLibrary, key: &str, value: f32) {
     if let Some(m) = materials.get_mut(key) {
-        m.roughness = value;
+        m.roughness = unit(value);
     }
 }
 
@@ -144,19 +152,19 @@ pub fn set_render_mode(materials: &mut MaterialLibrary, key: &str, mode: RenderM
     }
 }
 
-/// Set the base-color alpha, clamped to `[0, 1]`. The clamp validation lives HERE,
-/// once — both the editor slider and the `Material.SetAlpha` binding inherit it.
+/// Set the base-color alpha, clamped to [`FACTOR_RANGE`]. The clamp validation lives
+/// HERE, once — both the editor slider and the `Material.SetAlpha` binding inherit it.
 pub fn set_alpha(materials: &mut MaterialLibrary, key: &str, value: f32) {
     if let Some(m) = materials.get_mut(key) {
-        m.alpha = value.clamp(0.0, 1.0);
+        m.alpha = unit(value);
     }
 }
 
-/// Set the alpha-test cutoff, clamped to `[0, 1]` (the single source of that
+/// Set the alpha-test cutoff, clamped to [`FACTOR_RANGE`] (the single source of that
 /// validation, shared by the editor slider and `Material.SetAlphaCutoff`).
 pub fn set_alpha_cutoff(materials: &mut MaterialLibrary, key: &str, value: f32) {
     if let Some(m) = materials.get_mut(key) {
-        m.alpha_cutoff = value.clamp(0.0, 1.0);
+        m.alpha_cutoff = unit(value);
     }
 }
 
