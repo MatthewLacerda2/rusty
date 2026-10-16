@@ -39,6 +39,13 @@ once `make setup` (or the cloud session-start hook) has pointed
 The full list is deliberately **not** run before every push. Checkpoint commits
 stay cheap.
 
+**Human-only checks go under a `For a human` heading** in the description, as
+`- [ ]` items (a real window, speakers, a repository setting). They never hold
+the merge; `make checks SINCE=<time>` gathers the unticked ones from every PR
+merged since then (#929), and it reads only a heading that starts "For a
+human". Nothing for a human: no heading, or a sentence under it, never a
+`- [ ]` saying so.
+
 **Failures land in `.lint/report.txt`** — read it rather than re-running the tool
 to see what it said.
 
