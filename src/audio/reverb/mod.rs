@@ -9,7 +9,7 @@
 //! at its edge, and two full-weight zones average instead of doubling.
 //!
 //! This is the sim-side half: a pure function of the listener's position and the
-//! zones, resolved each `LateUpdate` (`app/audio.rs`) and readable headlessly
+//! zones, resolved each `LateUpdate` (`app/audio/`) and readable headlessly
 //! (`Audio.GetReverbState`). The device renders it on the reverb bus every mixer
 //! group sends into (`device/reverb.rs`).
 

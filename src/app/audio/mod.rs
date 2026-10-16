@@ -1,4 +1,4 @@
-//! src/app/audio.rs — audio play-mode system (#212).
+//! src/app/audio/mod.rs — audio play-mode system (#212).
 //!
 //! A `Startup`-stage system: when the world enters Play, start every
 //! `AudioSource` flagged `play_on_start` (Unity's "Play On Awake"). And a

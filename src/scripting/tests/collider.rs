@@ -1,4 +1,4 @@
-//! src/scripting/tests_collider.rs — the collider shape + physics material
+//! src/scripting/tests/collider.rs — the collider shape + physics material
 //! bindings (#447): `Physics.Get/SetColliderShape`, `Physics.Get/SetPhysicsMaterial`.
 
 use std::cell::RefCell;

@@ -1,4 +1,4 @@
-//! src/editor/inspector/components/gameplay/nav_obstacle.rs — the NavMesh
+//! src/editor/inspector/components/gameplay/nav/obstacle.rs — the NavMesh
 //! Obstacle card (#456).
 //!
 //! A THIN client (#287): widgets read a snapshot and route every write through the

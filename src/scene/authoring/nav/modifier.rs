@@ -1,4 +1,4 @@
-//! src/scene/authoring/nav_modifier.rs — Shared NavMeshModifierVolume authoring ops (#460).
+//! src/scene/authoring/nav/modifier.rs — Shared NavMeshModifierVolume authoring ops (#460).
 //!
 //! The ONE place the engine mutates an entity's `NavMeshModifierVolumeComponent`.
 //! The editor's card and the Lua `NavMeshModifierVolume.*` setters both route

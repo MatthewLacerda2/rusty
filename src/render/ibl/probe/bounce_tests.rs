@@ -1,9 +1,9 @@
-//! Tests for the multi-bounce probe solve (#285). Sibling of `probe_bounce.rs`;
+//! Tests for the multi-bounce probe solve (#285). Sibling of `bounce.rs`;
 //! shares its 300-line source cap.
 //!
 //! The convergence logic (`field_delta` / `pass_converged`) is pure and always runs,
 //! so the early-out decision is covered on any host. The GPU multi-bounce bakes skip
-//! gracefully when no adapter is present — same contract as `probe_bake_tests.rs`.
+//! gracefully when no adapter is present — same contract as `bake_tests.rs`.
 
 use glam::Vec3;
 

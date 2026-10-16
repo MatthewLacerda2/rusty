@@ -2,8 +2,8 @@
 //! materials and skin bindings.
 //!
 //! Reads static geometry, base-color material values, the skin (issue #79):
-//! per-vertex `JOINTS_0`/`WEIGHTS_0` plus the skeleton (`gltf_skin`), and the
-//! animation clips that drive that skeleton (issue #80, `gltf_anim`). Pure data —
+//! per-vertex `JOINTS_0`/`WEIGHTS_0` plus the skeleton (`skin`), and the
+//! animation clips that drive that skeleton (issue #80, `anim`). Pure data —
 //! the `gltf` crate + `glam`, never wgpu/egui/mlua.
 //!
 //! Each glTF *mesh* becomes one addressable `SubMesh`; its primitives are merged

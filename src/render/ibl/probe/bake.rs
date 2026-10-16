@@ -11,7 +11,7 @@
 //!
 //! A single capture/projection here is ONE bounce (the static scene lit by direct
 //! light only). The true multi-bounce solve that iterates these passes and folds the
-//! probe field back into each capture lives in `probe_bounce.rs` (#285); `bake_probes`
+//! probe field back into each capture lives in `bounce.rs` (#285); `bake_probes`
 //! drives it.
 //!
 //! Pure render layer: a function of (static scene, probe positions, resolution),
@@ -43,7 +43,7 @@ impl Renderer {
     /// writing each probe's converged SH in place. The probe positions and grid layout
     /// are untouched — only the SH coefficients change, so a later
     /// `save_lighting_sidecar` persists the bounce next to the scene. Thin wrapper over
-    /// [`Renderer::bake_probes_multibounce`] (the iteration lives in `probe_bounce.rs`);
+    /// [`Renderer::bake_probes_multibounce`] (the iteration lives in `bounce.rs`);
     /// the discarded [`crate::render::ibl::probe_bounce::BounceReport`] is available
     /// from that method when the caller wants the bounce count.
     pub fn bake_probes(&mut self, scene: &mut Scene, resolution: u32) {

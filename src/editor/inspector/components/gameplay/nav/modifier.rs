@@ -1,4 +1,4 @@
-//! src/editor/inspector/components/gameplay/nav_modifier.rs — the NavMesh Modifier
+//! src/editor/inspector/components/gameplay/nav/modifier.rs — the NavMesh Modifier
 //! Volume card (#460).
 //!
 //! A THIN client (#287): widgets read a snapshot and route every write through the

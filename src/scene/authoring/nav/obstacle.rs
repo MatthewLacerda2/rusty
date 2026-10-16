@@ -1,4 +1,4 @@
-//! src/scene/authoring/nav_obstacle.rs — Shared NavMeshObstacle authoring ops (#456).
+//! src/scene/authoring/nav/obstacle.rs — Shared NavMeshObstacle authoring ops (#456).
 //!
 //! The ONE place the engine mutates an entity's `NavMeshObstacleComponent`'s
 //! authored fields. The editor's card and the Lua `NavMeshObstacle.*` setters both

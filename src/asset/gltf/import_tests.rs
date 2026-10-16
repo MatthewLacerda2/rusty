@@ -1,4 +1,4 @@
-//! src/asset/gltf_import_tests.rs — glTF topology normalization tests (#317):
+//! src/asset/gltf/import_tests.rs — glTF topology normalization tests (#317):
 //! every triangle primitive mode imports as the same triangle list, and the
 //! non-surface modes are skipped instead of being misread as triangles.
 

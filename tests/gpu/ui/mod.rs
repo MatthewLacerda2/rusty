@@ -1,0 +1,9 @@
+mod backdrop_screenshot;
+mod hud_scene;
+mod hud_screenshot;
+mod marker_screenshot;
+mod mask_scene;
+mod mask_screenshot;
+mod shapes_scene;
+mod shapes_screenshot;
+mod text_screenshot;

@@ -9,7 +9,7 @@ use rusty::components::{LineComponent, ParticleBlend, RibbonStyle, TrailComponen
 use rusty::dev::capture::CaptureHost;
 use rusty::scene::{FogMode, Scene};
 
-use super::fog_scene::{assert_close, centre, srgb8, wall_scene};
+use super::fog::scene::{assert_close, centre, srgb8, wall_scene};
 
 const DISTANCE: f32 = 20.0;
 const RED: [f32; 4] = [1.0, 0.2, 0.2, 1.0];

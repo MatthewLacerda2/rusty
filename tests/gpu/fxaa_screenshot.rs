@@ -3,7 +3,7 @@
 //! the chain is a byte-stable pass-through — the composite writes the output directly,
 //! exactly as it did before this pass existed.
 //!
-//! Its own file rather than an arm of `postfx_screenshot.rs` only because test files
+//! Its own file rather than an arm of `postfx/screenshot.rs` only because test files
 //! are capped at 150 lines; it is the same kind of test, pinning a different knob.
 //!
 //! When no adapter is available `capture` returns `Ok(false)` and the test passes

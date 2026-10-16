@@ -1,4 +1,4 @@
-//! src/editor/inspector/components/gameplay/nav_agent.rs — the NavMesh Agent
+//! src/editor/inspector/components/gameplay/nav/agent.rs — the NavMesh Agent
 //! inspector card, split from `physics` to stay under the size cap.
 //!
 //! A THIN client (#287): widgets read fields from a snapshot and route every write

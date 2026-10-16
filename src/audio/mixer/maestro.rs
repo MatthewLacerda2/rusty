@@ -4,7 +4,7 @@
 //! sim-side [`Mixer`] first, then the resolved [`GroupMix`] of every group it moved
 //! goes to the backend, so the device and the read-back never disagree. The
 //! per-frame [`AudioMaestro::advance_mixer`] runs as a `LateUpdate` system on sim
-//! time (`app/audio.rs`).
+//! time (`app/audio/`).
 
 use super::{Duck, GroupId, GroupPatch, GroupState, Mixer};
 use crate::audio::reverb::ReverbState;

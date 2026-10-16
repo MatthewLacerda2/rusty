@@ -1,4 +1,4 @@
-//! src/app/scene_load.rs — the scene-load phase (#432), Unity's `SceneManager.LoadScene`.
+//! src/app/scene_load/mod.rs — the scene-load phase (#432), Unity's `SceneManager.LoadScene`.
 //!
 //! Play-mode `Scene.Load(path)` only queues the path on the scene. This system,
 //! registered at the tick's tail right after the destroy phase, drains it: the

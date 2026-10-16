@@ -1,4 +1,4 @@
-//! src/scene/authoring/nav_agent.rs — Shared nav-agent-authoring ops.
+//! src/scene/authoring/nav/agent.rs — Shared nav-agent-authoring ops.
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `NavMeshAgentComponent` field by field: the `active` flag, the motion tuning

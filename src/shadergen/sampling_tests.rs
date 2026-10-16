@@ -1,7 +1,7 @@
 //! src/shadergen/sampling_tests.rs — the sampling / animated postfx blocks (#402)
 //! chain with the grades and keep their declared defaults. Each block composing
 //! alone is `tests::every_catalogued_block_bakes_into_a_composing_module`; the
-//! pixel behaviour is pinned by `tests/gpu/postfx_blocks_screenshot.rs`.
+//! pixel behaviour is pinned by `tests/gpu/postfx/blocks_screenshot.rs`.
 
 use std::collections::BTreeMap;
 

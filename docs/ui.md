@@ -314,7 +314,7 @@ follow-up — put a `Shape` behind it for a frame, glow or shadow.
 
 **Recipe — a Cyberpunk panel.** Dark glass with cut corners, a neon edge and glow, a
 gradient header strip and an additive dashed scan line (`hud` is a canvas; this exact
-script is exercised by `tests/ui_look_api.rs`):
+script is exercised by `tests/ui/look_api.rs`):
 
 ```lua
 -- A Cyberpunk panel: dark glass with cut corners, a neon edge and glow, a

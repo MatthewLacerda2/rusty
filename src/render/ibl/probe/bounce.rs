@@ -1,6 +1,6 @@
 //! src/render/ibl/probe/bounce.rs — Multi-bounce light-probe solve (#285).
 //!
-//! The iteration that turns the single-capture probe bake (`probe_bake.rs`) into a
+//! The iteration that turns the single-capture probe bake (`bake.rs`) into a
 //! true multi-bounce GI bake. Each pass re-captures every probe and projects the
 //! captured radiance into SH; from bounce 2 on, the capture re-lights the STATIC
 //! scene with the *previous* pass's probe field (`capture_static_cubemap_lit`), so

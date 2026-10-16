@@ -1,5 +1,5 @@
 //! `Physics.Raycast` / `SphereCast` hit info and `Physics.RaycastAll` from
-//! script (#446), over `tests_spatial`'s two boxes: `a` spanning [-1,1]³ on
+//! script (#446), over `spatial`'s two boxes: `a` spanning [-1,1]³ on
 //! layer 0 and `b` spanning z ∈ [9,11] on layer 3.
 
 use super::spatial::spatial_runtime;
