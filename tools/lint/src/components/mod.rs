@@ -12,10 +12,9 @@
 //!
 //! Components are DISCOVERED from `Entity`'s `Option<…Component>` fields, so a new
 //! component can't dodge the gate. Axis 1 is the discovery source (always present);
-//! the other three are checked here by scanning the source. Today's incomplete
-//! components are grandfathered in `tools/lint/components_baseline.txt` — a burn-down
-//! list of `component axis` lines (#82) — with the particle system deliberately
-//! excluded so it is the gate's first fully-green component.
+//! the other three are checked here by scanning the source. Nothing is grandfathered
+//! (#926): the burn-down list of incomplete axes emptied under #82 and was retired, so
+//! a missing axis is either closed or a written waiver below.
 //!
 //! Std-only, like the size gate and the determinism guard. The scan is coarse
 //! (substring matches on source), matching the existing lint philosophy.
@@ -25,12 +24,11 @@
 //! fragment the engine's one stable API surface
 //! (`Transform`/`Input`/`Time`/`Physics`/`Scene`/`Animator`/`Nav`/
 //! `Camera`/`Material`/…). Those live in [`waivers::WAIVERS`] — an auditable, in-code list
-//! of `(component, axis, rationale)` rows. A waived axis counts as satisfied, but
-//! unlike the burn-down baseline each waiver carries its written justification
-//! right here in the gate, so the decision is reviewable in `git` and can never
-//! be a silent skip. The baseline file is the burn-down list for axes we still
-//! intend to close; [`waivers::WAIVERS`] is for axes deliberately served by a shared
-//! namespace that we will not re-implement standalone.
+//! of `(component, axis, rationale)` rows. A waived axis counts as satisfied, and
+//! each waiver carries its written justification right here in the gate, so the
+//! decision is reviewable in `git` and can never be a silent skip. It is for axes
+//! deliberately served by a shared namespace that we will not re-implement
+//! standalone, never for an axis not closed yet.
 //!
 //! Layout: `discover` (the Entity-field scan), `axes` (the three checkable axes),
 //! `waivers` (the deliberate-waiver table); this module runs them and reports.
@@ -54,13 +52,12 @@ use waivers::waived;
 const ADD_MENU: &str = "src/editor/inspector/components/add";
 const API_MOD: &str = "src/api/mod.rs";
 const DOCS: &str = "docs/api";
-const BASELINE: &str = "tools/lint/components_baseline.txt";
 const REPORT: &str = ".lint/report.txt";
 
 /// The checkable axes (axis 1, the `Entity` field, is the discovery source).
 const AXES: &[&str] = &["add_menu", "inspector", "api"];
 
-/// Entry point: discover every component and fail on any unbaselined missing axis.
+/// Entry point: discover every component and fail on any unwaived missing axis.
 pub fn run() {
     let components = discover();
     let add_src = add_menu_src();
@@ -68,7 +65,6 @@ pub fn run() {
     let api_stems = api_stems();
     let api_mod = read(API_MOD);
     let docs = read_md_dir(DOCS).to_lowercase();
-    let baseline = load_baseline();
 
     let mut violations = Vec::new();
     for field in &components {
@@ -79,7 +75,7 @@ pub fn run() {
                 "api" => has_api(field, &api_stems, &api_mod, &docs),
                 _ => true,
             };
-            if !ok && !waived(field, axis) && !baselined(field, axis, &baseline) {
+            if !ok && !waived(field, axis) {
                 violations.push(format!(
                     "INCOMPLETE_COMPONENT `{field}` missing `{axis}` axis"
                 ));
@@ -92,22 +88,6 @@ pub fn run() {
     } else {
         exit(1);
     }
-}
-
-/// Baseline entries are `component axis` pairs (whitespace-separated); `#` comments
-/// and blank lines are ignored.
-fn load_baseline() -> Vec<(String, String)> {
-    read(BASELINE)
-        .lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .filter_map(|l| l.split_once(char::is_whitespace))
-        .map(|(c, a)| (c.trim().to_string(), a.trim().to_string()))
-        .collect()
-}
-
-fn baselined(field: &str, axis: &str, baseline: &[(String, String)]) -> bool {
-    baseline.iter().any(|(c, a)| c == field && a == axis)
 }
 
 fn report(violations: &[String]) {
@@ -125,8 +105,8 @@ fn report(violations: &[String]) {
     if !violations.is_empty() {
         eprint!("{body}");
         eprintln!(
-            "\n{} incomplete component axis(es). Complete the axis, or add a \
-             `component axis` line to {BASELINE} (burn-down only — see docs/linting.md).",
+            "\n{} incomplete component axis(es). Complete the axis, or waive it in \
+             `waivers::WAIVERS` with its reason — see docs/linting.md.",
             violations.len()
         );
     }

@@ -458,7 +458,8 @@ readying a PR (`make help` lists the verbs, `make check` is the fast edit loop).
 Failures from `tools/lint` are written to `.lint/report.txt`. See **docs/linting.md**.
 - **The commit hook** (`.githooks/pre-commit`, activated once per clone by `make
   setup`) runs formatting and the size gate only, so it stays under a second.
-- Size gate: files ≤ 300 lines, test/fixture files ≤ 150. Style is rustfmt;
+- Size gate: files ≤ 300 lines, test/fixture files ≤ 150 — every line of a `.rs`
+  file, the lines of code of a `.py` one (docstrings and comments free, #926). Style is rustfmt;
   **clippy is a hard gate** (`-D warnings`: default, `dev`, and the no-editor player
   build); the lint policy
   lives in `Cargo.toml`'s `[lints]`, not in flags.
@@ -473,8 +474,9 @@ Failures from `tools/lint` are written to `.lint/report.txt`. See **docs/linting
   `crate::render`, `crate::editor`, `wgpu` or `egui`; the arrow is render/editor → sim.
 - `make gates` refuses to run when cargo's target dir is outside the worktree — a
   shared one is a false green.
-- `tools/lint/baseline.txt` grandfathers the files that currently exceed the size
-  cap. It's a **burn-down list** — remove entries as you split them, never add to it.
+- **Nothing is grandfathered.** A file over its cap is split, not excused; no gate
+  reads a baseline file (#926). An exception a check needs is written inline, with its
+  reason.
 
 ## Overrides
 Any rule in this file may be overridden by the user's explicit say-so — in the current

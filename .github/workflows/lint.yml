@@ -65,7 +65,7 @@ jobs:
         run: |
           cargo fmt --all --check
           cargo fmt --manifest-path tools/lint/Cargo.toml --check
-      - name: Size gate (full scan; legacy grandfathered via baseline)
+      - name: Size gate (full scan, .rs and .py; nothing grandfathered)
         if: needs.changes.outputs.code != 'false'
         run: cargo run --quiet --manifest-path tools/lint/Cargo.toml
       - name: Rules (prefix-group; shared Finding + inline allow)

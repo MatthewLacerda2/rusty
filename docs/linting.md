@@ -11,15 +11,15 @@ agent can read exactly what failed.
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build) |
 | Merge helpers | `unittest` (`make scripts`) | **hard gate**: `.github/scripts/tests` pass — `make mergeable` is the only thing between a red PR and `main` while it has no required checks (#486, #491) |
 | Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]` |
-| File length | `tools/lint` | <= 300 lines |
-| Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
+| File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py` one (docstrings, comments and blank lines free, #926); nothing grandfathered |
+| Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`, and every `.py` under a `tests/` directory); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix. Prints the ≲10-files-per-directory signal beside it, never failing on it (#934) |
 | Module layering | `tools/lint -- --layers` | every `crate::<module>` import and every external crate a module names matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724, #938) |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
 | Dependency direction | `tools/lint -- --direction` | the table's sim modules never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
 | Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`/`ui`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
-| Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), minus the baseline |
-| Editor↔shared-op parity | `tools/lint -- --parity` | every *migrated* first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard), minus the burn-down baseline |
+| Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
+| Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
 
 ## The `*_tests.rs` sibling rule
@@ -70,10 +70,30 @@ stay in `clippy.toml`. Module-scoped rules stay module-scoped — the sim module
 `#![deny(clippy::unwrap_used)]` below is deliberately not crate-wide. `tools/lint`
 has no `[lints]` table: it is not clippy-gated, so one would be dead config.
 
-## The baseline (burn-down list)
-`tools/lint/baseline.txt` grandfathers the files that already exceed the cap. It is a
-**TODO list, not a pardon**: as a file is split, remove its entry. Never add new
-entries. When the file is empty, the size gate is fully on.
+## What the size gate measures, and nothing grandfathered (#926)
+The size gate walks `src/`, `tests/`, `fuzz/`, `tools/` and `.github/` and measures
+two languages. A `.rs` file counts every line. A `.py` file counts its **lines of
+code**: blank lines, `#` comments and docstrings are free, as scorsese's gate counts
+them, because a Python file's prose grows with how carefully it explains itself and
+the merge scripts do that on purpose. A string that is data (`X = """…"""`) is code.
+A docstring is recognised as a triple-quoted string that opens a line; a
+triple-quoted *argument* opening a line inside a call reads as free too, a limit
+the scripts never hit. The violation line says `(lines of code)` so nobody compares
+it with `wc -l`.
+
+The merge path in `.github/scripts/` is why `.py` is measured: it is the most
+agent-edited code outside `src/`, and `merge-queue.py` had reached 1,074 lines
+before the gate could see it. It is now `.github/scripts/merging/`, one
+responsibility per module.
+
+**Nothing is grandfathered.** A file over its cap is split by responsibility, never
+excused: there is no baseline file, for the size gate or any other. The size,
+component and parity burn-down lists had all emptied, and an empty list is
+machinery for an exception that no longer exists, so #926 retired them. An exception
+a check does need is written inline beside what it excuses, with its reason (the
+component `WAIVERS`, the rules gate's `lint: allow`), never in an unread list.
+
+`.lua` and `.wgsl` are not measured yet.
 
 ## Rules, findings and inline allows (`--rules`)
 `--rules` runs every check built on one shared shape (#934): a rule reports
@@ -212,9 +232,8 @@ entry (`inspector/components/add/`), an inspector card (some `inspector/componen
 namespace (`src/api/<x>.rs` registered in `api/mod.rs` and documented in
 `docs/api/`). The gate discovers components from `Entity`'s
 `Option<…Component>` fields — so a new one can't slip through — and fails on any
-missing axis. `tools/lint/components_baseline.txt` grandfathers incomplete
-components as `<component> <axis>` lines (the same burn-down rule as above). As of
-#82 that file is **empty** — every grandfathered gap was either closed or waived.
+missing axis. Nothing is grandfathered: the burn-down list emptied under #82 (every
+gap closed or waived) and was retired in #926, so a missing axis is closed or waived.
 
 ### Closed vs waived (#82)
 An axis can be satisfied in two ways:
@@ -231,9 +250,8 @@ An axis can be satisfied in two ways:
   `texture api` (→ `Material`), `collider api` + `rigidbody api` (→ `Physics`),
   `nav_agent api` (→ `NavMeshAgent`), `visual_correction api` (→ `Graphics`).
 
-The difference is intent: the **baseline** is a burn-down list of axes we still mean
-to implement; **`WAIVERS`** is for axes we have decided not to implement standalone.
-A waiver is never a silent skip — its rationale lives in code and is reviewable in
+**`WAIVERS`** is for axes we have decided not to implement standalone, never for an
+axis not closed yet: that one fails until it is. A waiver is never a silent skip — its rationale lives in code and is reviewable in
 `git`. To add one, add a row to `WAIVERS` with a clear justification; to revisit one,
 delete the row and the gate will demand the artifact again. The particle system is on
 neither list — it is the gate's first fully-green component, satisfied on all axes.
@@ -264,25 +282,17 @@ The detection signal is facade-shaped (#344): `.<field>_mut(` present in the car
 with no `authoring::<field>` ops import marks a direct card. Coarse substring scan,
 matching the other gates.
 
-### Routed vs direct, and the burn-down (#287)
-`tools/lint/parity_baseline.txt` grandfathers the not-yet-migrated cards as bare
-component names (the same burn-down rule as the other baselines). Enforcement:
+### Routed vs direct (#287)
+Every card is routed: the burn-down list of direct cards emptied under #287 and was
+retired in #926. Enforcement:
 
-- A **direct** card *not* in the baseline → **violation** (drift: a direct mutation
-  was added without grandfathering it).
-- A component in the baseline whose card is actually **routed** → **violation** (stale
-  entry — you migrated the card but left it listed; remove the line). This forces
-  burn-down hygiene, exactly like the size/components baselines.
-- A **routed** card *not* in the baseline → ok. This is the gate's **teeth**:
-  `material` is absent and must pass as routed, so reverting it to a direct mutation
-  fails the build.
-- A **direct** card *in* the baseline → ok (grandfathered, awaiting migration).
+- A **direct** card → **violation** (drift: a direct mutation was added or kept).
+- A **routed** card → ok. This is the gate's **teeth**: reverting `material` (or any
+  card) to a direct mutation fails the build.
 
-This is a **hard gate** (CI `--parity` step, both in the lint workflow): correctness
-of the no-drift invariant, green-to-merge. Burn it down by migrating a card to a
-shared op and removing its baseline line — never add a new line (a new direct card is
-fresh drift to fix, not to grandfather; baseline only, exceptionally, with written
-justification).
+This is a **hard gate** (CI `--parity` step, in the lint workflow): correctness of the
+no-drift invariant, green-to-merge. A new direct card is fresh drift to fix by routing
+it through a shared op, never to grandfather.
 
 ## The function-length cap (`too_many_lines`)
 The 50-line per-function cap is a **hard clippy gate** (`too_many_lines = "deny"` in

@@ -1,12 +1,13 @@
 //! tools/lint — project size gate (the custom part clippy can't do).
 //!
-//! Counts per-file lines and fails on any file over its cap. Function-length and
-//! code-smell checks are clippy's job (see clippy.toml); this binary only enforces
-//! the per-file / per-test-file size rules. Dependency-free, std-only.
+//! Measures each `.rs` and `.py` file and fails on any over its cap; nothing is
+//! grandfathered (#926). Function-length and code-smell checks are clippy's job
+//! (see clippy.toml); without a flag this binary enforces the per-file / per-test-file
+//! size rules, and the flags below run the other gates. Dependency-free, std-only.
 //!
 //! Usage:
-//!   cargo run --manifest-path tools/lint/Cargo.toml            # scan size::SCAN_ROOTS, minus baseline
-//!   cargo run --manifest-path tools/lint/Cargo.toml -- a.rs b.rs   # check just these files
+//!   cargo run --manifest-path tools/lint/Cargo.toml                  # scan every size root
+//!   cargo run --manifest-path tools/lint/Cargo.toml -- a.rs b.py     # check just these files
 //!
 //! Output: result to stdout and `.lint/report.txt`; exit code 1 on any violation.
 
@@ -44,7 +45,7 @@ fn main() {
 
     // `--components` runs the 4-axis component-completeness gate (#81): every
     // first-class component must have an Entity field, an Add Component entry, an
-    // inspector card, and an API namespace, or be grandfathered in the baseline.
+    // inspector card, and an API namespace, or a written waiver (`waivers.rs`).
     if args.iter().any(|a| a == "--components") {
         components::run();
         return;
@@ -52,8 +53,7 @@ fn main() {
 
     // `--parity` runs the editor↔shared-op parity gate (#287): every *migrated*
     // first-class component's inspector card must route its mutations through a
-    // shared `scene::authoring` op (no direct `&mut entity.<field>`); cards not yet
-    // migrated are grandfathered in `parity_baseline.txt` (a burn-down list).
+    // shared `scene::authoring` op (no direct `&mut entity.<field>`).
     if args.iter().any(|a| a == "--parity") {
         parity::run();
         return;
