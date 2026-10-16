@@ -14,6 +14,8 @@
 //! `write_components`/`entity_document` decompose/recompose against.
 
 pub mod access;
+#[cfg(test)]
+mod ancestors_tests;
 mod bundle;
 pub mod core;
 mod epoch;

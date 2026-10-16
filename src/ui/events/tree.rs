@@ -3,23 +3,18 @@
 //! Every rule that depends on an entity's ancestors lives here, once: whether it is
 //! visible (it and every ancestor `active`), whether a `CanvasGroup` above it stops
 //! the pointer or disables its selectables, and the ancestor-or-self walk event
-//! bubbling follows. Each walk is bounded by the entity count, so a malformed parent
-//! cycle cannot hang the sim.
+//! bubbling follows. The walk is `World::self_and_ancestors`, bounded by the entity
+//! count, so a malformed parent cycle cannot hang the sim; it stops at an id no
+//! longer in the world.
 
 use crate::ecs::World;
 
 /// `id`, then its parent, grandparent, … up to the scene root.
 pub fn ancestors_or_self(world: &World, id: u32) -> Vec<u32> {
-    let mut chain = Vec::new();
-    let mut cur = Some(id);
-    while let Some(c) = cur {
-        if chain.len() > world.len() || !world.contains(c) {
-            break;
-        }
-        chain.push(c);
-        cur = world.parent_id(c);
-    }
-    chain
+    world
+        .self_and_ancestors(id)
+        .take_while(|&c| world.contains(c))
+        .collect()
 }
 
 /// Whether `id` and every ancestor are active — the rule drawing uses too.

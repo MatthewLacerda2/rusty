@@ -128,15 +128,7 @@ pub fn create_ui(scene: &mut Scene, kind: UiWidget, parent: Option<u32>) -> u32 
 /// Whether `id` or an ancestor carries a `Canvas` (bounded against parent cycles).
 fn under_canvas(scene: &Scene, id: u32) -> bool {
     let world = &scene.world;
-    let mut at = Some(id);
-    for _ in 0..=world.len() {
-        let Some(c) = at else { return false };
-        if world.has_canvas(c) {
-            return true;
-        }
-        at = world.parent_id(c);
-    }
-    false
+    world.self_and_ancestors(id).any(|c| world.has_canvas(c))
 }
 
 /// The first canvas (in scene order) with no canvas above it.
