@@ -7,7 +7,7 @@ import functools
 import subprocess
 import time
 
-from merging.queue import checks, dependabot, gitio, landing, outcomes, pulls, rebase, waiting
+from merging.queue import checks, dependabot, gitio, landing, outcomes, pulls, rebase, stamping, waiting
 from merging.verdict import closing, decide, github, protocol
 
 
@@ -65,6 +65,7 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
 
     if rebase.push_needed(head, fresh):
         outcomes.say(f"#{number}: now at {fresh[:7]}; waiting for CI.")
+        stamping.stamp(repo, pull, fresh, opts.root)
     else:
         outcomes.say(f"#{number}: {notes[0] if notes else 'already on `main`; the run on record is a run on it.'}")
 

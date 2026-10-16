@@ -150,8 +150,8 @@ a coder real time.
 Beyond what changed, why, the effect and the decisions:
 
 - **A `Gates` line:** what ran green, on which head commit, and what didn't run
-  and why (no real GPU, a human check). After a rebase it is re-run or marked
-  stale.
+  and why (no real GPU, a human check). After your own rebase it is re-run or
+  marked stale; a rebase the merge queue pushes later dates it for you (#968).
 - **A `Seam` section** when the PR creates something later branches build on:
   the types, functions, files and invariants a sibling should use. The
   orchestrator's next brief points at "PR #N, *Seam*" instead of re-describing
