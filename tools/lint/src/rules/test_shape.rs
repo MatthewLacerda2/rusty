@@ -1,0 +1,81 @@
+//! The `tests/` source-shape locks (#980): three `docs/testing.md` rules that keep
+//! a test from silently not running, or from depending on the machine it runs on.
+//!
+//! - **`test-inner-cfg`** — a dev-only `tests/` file is gated where it is declared,
+//!   `#[cfg(feature = "dev")] mod …;`. An inner `#![cfg(…)]` compiles the file away
+//!   while its `mod` line still reads as "this runs".
+//! - **`test-user-workspace`** — a test never reads a developer's game project
+//!   (#782): `Harness::in_user_workspace` and `scenario::run(` are the CLI's; a test
+//!   runs a scenario with `scenario::run_isolated`.
+//! - **`test-gpu-entry`** — test code asks for a GPU only through
+//!   `crate::render::test_gpu::headless_or_skip`, the one place that decides what
+//!   "no GPU here" means; a direct `Renderer::new_headless` drifts from it.
+//!
+//! Test code is everything under `tests/`, a `tests.rs` or `*_tests.rs` file, and a
+//! file's lines from its first `#[cfg(test)]` on (the inline `mod tests` shape).
+//! Comment lines never count, so a doc may name the calls.
+
+use super::finding::Finding;
+
+pub const INNER_CFG: &str = "test-inner-cfg";
+pub const USER_WORKSPACE: &str = "test-user-workspace";
+pub const GPU_ENTRY: &str = "test-gpu-entry";
+
+/// The one file that may call `new_headless` from test code.
+const GPU_HELPER: &str = "src/render/test_gpu.rs";
+
+/// Is the whole of `path` test code?
+fn test_file(path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    path.starts_with("tests/") || name == "tests.rs" || name.ends_with("_tests.rs")
+}
+
+/// Every break of the three locks in `path` (under `src/` or `tests/`; other roots
+/// are not the engine's tests).
+pub fn check(path: &str, source: &str) -> Vec<Finding> {
+    if !(path.starts_with("src/") || path.starts_with("tests/")) {
+        return Vec::new();
+    }
+    let mut in_test = test_file(path);
+    let mut found = Vec::new();
+    let mut flag = |line: usize, rule: &'static str, message: &str| {
+        found.push(Finding {
+            path: path.to_string(),
+            line,
+            rule,
+            message: message.to_string(),
+        });
+    };
+    for (i, line) in source.lines().enumerate() {
+        let code = line.trim_start();
+        if code.starts_with("#[cfg(test)]") {
+            in_test = true;
+        }
+        if !in_test || code.starts_with("//") {
+            continue;
+        }
+        if path.starts_with("tests/") && code.starts_with("#![cfg(") {
+            flag(
+                i + 1,
+                INNER_CFG,
+                "gate the file at its `mod` line (`#[cfg(feature = \"dev\")] mod …;`), \
+                 not with an inner `#![cfg]`",
+            );
+        }
+        if code.contains("in_user_workspace") || code.contains("scenario::run(") {
+            flag(
+                i + 1,
+                USER_WORKSPACE,
+                "a test never reads the developer's project; use `scenario::run_isolated`",
+            );
+        }
+        if path != GPU_HELPER && code.contains("new_headless(") {
+            flag(
+                i + 1,
+                GPU_ENTRY,
+                "ask for a GPU through `crate::render::test_gpu::headless_or_skip`",
+            );
+        }
+    }
+    found
+}

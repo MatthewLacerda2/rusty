@@ -21,7 +21,9 @@
   project's scripts and the bundled ones, and the scene's relative script paths
   resolve there; a test runs a scenario with `scenario::run_isolated`. The `play`
   binary is the one harness that runs a real project (`--project <dir>`, default
-  `./project`; `Harness::in_user_workspace`): an agent play-tests its game.
+  `./project`; `Harness::in_user_workspace`): an agent play-tests its game. Test code
+  that names `in_user_workspace` or `scenario::run(` fails `make rules`
+  (`test-user-workspace`, #980).
 - **The test-fixture project** is `tests/fixtures/project/` (#829): the committed
   scenarios, the bot-player script and its `project.rusty`, opened like any other
   project — `cargo run --bin play --features dev -- --project tests/fixtures/project
@@ -77,7 +79,8 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   Cargo no longer discovers it. `tests/layout.rs` fails the suite, naming the file, if
   one is forgotten, so a file can't silently never run.
 - **Dev-only files are gated at the declaration**, `#[cfg(feature = "dev")] mod …;`,
-  not by a `#![cfg]` inside the file.
+  not by a `#![cfg]` inside the file. `make rules` (`test-inner-cfg`) fails on one,
+  and its sibling locks hold the user-workspace and GPU-entry rules below (#980).
 - **Tests that render live in `tests/gpu/`**, so they share the `gpu::` module path and
   a runner can identify them by name (see the budget below).
 - **Every module can share one process.** nextest gives each test its own, but
@@ -138,9 +141,10 @@ units points to the machine, not the crate.
 ## GPU tests and the headless budget
 Tests that need a real device call `Renderer::new_headless`, which returns `None`
 when no adapter is present — so **every GPU test skips gracefully** rather than
-failing. In-crate tests should acquire one through
+failing. In-crate tests acquire one through
 `crate::render::test_gpu::headless_or_skip`, which carries that skip contract in one
-place; the `let Some(r) = … else { return }` shape is the whole convention.
+place; the `let Some(r) = … else { return }` shape is the whole convention. A direct
+`new_headless` in test code fails `make rules` (`test-gpu-entry`, #980).
 
 Where they actually run is not uniform, and it is worth knowing before you rely on one:
 
