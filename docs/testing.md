@@ -99,10 +99,11 @@ dev-dependency switches on a feature that the normal build leaves off, `cargo te
 compiles its own copy of that crate, of everything above it, and of rusty. proptest
 did this to `getrandom`'s `std` feature, and that doubled ahash, hecs, wgpu and egui
 (#552). `Cargo.toml` now names `getrandom` with `std` directly to close the gap.
-**Don't let a dev-dependency turn on a feature the normal build lacks.** After adding
-or bumping one, compare the two resolutions. Test-only crates (proptest and its
+**Don't let a dev-dependency turn on a feature the normal build lacks.** The
+`feature-split` gate (`make feature-split`, `.github/scripts/feature_split.py`, #979)
+compares the two resolutions on every run. Test-only crates (proptest and its
 tree) appear only in the second, which is fine. A crate that appears in **both**
-with a longer feature list in the second is the split:
+with a feature only the second has is the split. By hand:
 
     cargo tree -e normal,build --features dev -f '{p} [{f}]' --prefix none | sort -u
     cargo tree -e normal,build,dev --features dev -f '{p} [{f}]' --prefix none | sort -u
