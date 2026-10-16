@@ -44,7 +44,7 @@ impl Renderer {
     /// are untouched — only the SH coefficients change, so a later
     /// `save_lighting_sidecar` persists the bounce next to the scene. Thin wrapper over
     /// [`Renderer::bake_probes_multibounce`] (the iteration lives in `bounce.rs`);
-    /// the discarded [`crate::render::ibl::probe_bounce::BounceReport`] is available
+    /// the discarded [`crate::render::ibl::probe::bounce::BounceReport`] is available
     /// from that method when the caller wants the bounce count.
     pub fn bake_probes(&mut self, scene: &mut Scene, resolution: u32) {
         self.bake_probes_multibounce(scene, resolution);

@@ -6,5 +6,5 @@ mod layout_api;
 mod look_api;
 mod mask_api;
 mod text_api;
-pub(crate) mod widgets;
+pub mod widgets;
 mod world_api;
