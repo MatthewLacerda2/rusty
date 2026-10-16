@@ -117,14 +117,10 @@ pub fn floor(scene: &mut Scene) -> u32 {
     scene.world.set_collider(
         id,
         Some(ColliderComponent {
-            active: true,
             shape: ColliderShape::Box {
                 size: Vec3::new(40.0, 1.0, 40.0),
             },
-            is_trigger: false,
-            material: Default::default(),
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
+            ..rusty::scene::authoring::default_collider()
         }),
     );
     id

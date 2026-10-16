@@ -19,12 +19,8 @@ fn cube(scene: &mut Scene, pos: Vec3) -> u32 {
     scene.world.transform_mut(id).unwrap().position = pos;
     let shape = ColliderShape::Box { size: Vec3::ONE };
     let collider = ColliderComponent {
-        active: true,
         shape,
-        is_trigger: false,
-        material: Default::default(),
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
+        ..crate::scene::authoring::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     let rb = RigidBodyComponent {

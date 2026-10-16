@@ -109,13 +109,9 @@ fn add_force_applies_dt_scaled_velocity() {
         s.world.set_rigidbody(
             1,
             Some(crate::components::RigidBodyComponent {
-                active: true,
-                is_kinematic: false,
                 mass: 2.0,
-                velocity: Vec3::ZERO,
-                angular_velocity: Vec3::ZERO,
-                use_gravity: true,
                 collision_detection: crate::components::CollisionDetection::Discrete,
+                ..crate::scene::authoring::default_rigidbody()
             }),
         );
     }

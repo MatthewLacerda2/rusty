@@ -25,12 +25,8 @@ fn welded(break_force: f32, break_torque: f32) -> (Scene, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Cube".to_string());
     let collider = ColliderComponent {
-        active: true,
         shape: ColliderShape::Box { size: Vec3::ONE },
-        is_trigger: false,
-        material: Default::default(),
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
+        ..crate::scene::authoring::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     let rb = RigidBodyComponent {

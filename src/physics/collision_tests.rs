@@ -12,12 +12,8 @@ const DT: f32 = 1.0 / 60.0;
 
 fn collider(shape: ColliderShape) -> ColliderComponent {
     ColliderComponent {
-        active: true,
         shape,
-        is_trigger: false,
-        material: Default::default(),
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
+        ..crate::scene::authoring::default_collider()
     }
 }
 

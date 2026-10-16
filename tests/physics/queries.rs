@@ -17,12 +17,8 @@ fn static_box(scene: &mut Scene, pos: Vec3, size: Vec3) -> u32 {
     scene.world.set_collider(
         id,
         Some(ColliderComponent {
-            active: true,
             shape: ColliderShape::Box { size },
-            is_trigger: false,
-            material: Default::default(),
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
+            ..rusty::scene::authoring::default_collider()
         }),
     );
     id

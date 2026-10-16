@@ -59,13 +59,9 @@ fn constraints_save_without_their_runtime_target() {
 
 fn body(kinematic: bool) -> RigidBodyComponent {
     RigidBodyComponent {
-        active: true,
         is_kinematic: kinematic,
-        mass: 1.0,
-        velocity: Vec3::ZERO,
-        angular_velocity: Vec3::ZERO,
         use_gravity: false,
-        collision_detection: Default::default(),
+        ..rusty::scene::authoring::default_rigidbody()
     }
 }
 
