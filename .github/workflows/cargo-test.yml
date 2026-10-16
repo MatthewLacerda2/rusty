@@ -1,0 +1,78 @@
+name: cargo-test
+# Plain `cargo test` on `main`, weekly (#981). A signal, never a gate (CLAUDE.md,
+# *Gates vs. signals*): nextest is the gate. docs/testing.md promises the suite
+# is runner-independent: nextest gives each test its own process, but
+# `cargo test` runs a whole binary in one, so a test that leans on having its
+# process to itself (`set_var`, `set_current_dir`, a shared scratch path) passes
+# the gate and races here. Nothing else runs it on the default feature set; the
+# weekly mutation sweep's baseline covers `dev` only when that sweep runs.
+#
+# A red run files itself on the board through `main-health.yml`: a failure here
+# is the finding. Never on pull requests (the batch brief for #981); dispatch it
+# on a branch to measure that branch: `gh workflow run cargo-test.yml --ref <branch>`.
+#
+# `schedule:` fires only from the default branch, and GitHub disables it after
+# 60 days without repository activity; check the Actions tab if a week passes
+# with no run.
+on:
+  # Sundays, 04:17 UTC: off the hour, clear of `ci.yml`'s nightly `deny` (03:07),
+  # a day after `mutants-sweep.yml` starts (Saturdays 04:41) and a day before
+  # `coverage.yml` (Mondays 05:23).
+  schedule:
+    - cron: '17 4 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-test:
+    runs-on: ubuntu-24.04
+    # Two cold builds and two runs; measured ~12 min in a 4-core container.
+    timeout-minutes: 60
+    env:
+      # A missing adapter fails the canary test instead of skipping every GPU test
+      # (#489): under `cargo test` the in-process headless budget is what bounds
+      # them, and this is the only run that exercises it on Linux.
+      RUSTY_REQUIRE_GPU: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Toolchain (from rust-toolchain.toml)
+        run: rustup show
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: System libs for winit/wgpu builds
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
+      - name: Software Vulkan driver (lavapipe)
+        run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
+      # Both feature sets, as `make test` runs them. Each step keeps its log so the
+      # summary below can name the failing tests instead of pointing at the raw log.
+      - name: cargo test (default)
+        run: cargo test --locked 2>&1 | tee test-default.log
+        shell: bash -o pipefail {0}
+      - name: cargo test (dev features)
+        if: always()
+        run: cargo test --locked --features dev 2>&1 | tee test-dev.log
+        shell: bash -o pipefail {0}
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '### Plain `cargo test` on `main` (weekly signal, #981)'
+            echo ''
+            for fs in default dev; do
+              log="test-$fs.log"
+              if [ ! -f "$log" ]; then echo "- \`$fs\`: did not run"; continue; fi
+              failed=$(grep -E '^test .* \.\.\. FAILED$' "$log" | sed -E 's/^test (.*) \.\.\. FAILED$/\1/' || true)
+              if [ -n "$failed" ]; then
+                echo "- \`$fs\`: **failed** (if nextest passes it on this commit, suspect shared process state):"
+                echo "$failed" | sed 's/^/  - `/; s/$/`/'
+              elif grep -q '^test result: FAILED' "$log" || ! grep -q '^test result: ok' "$log"; then
+                echo "- \`$fs\`: **red before any test failed** (build or a crashed binary); see the step log"
+              else
+                echo "- \`$fs\`: green ($(grep -c '^test result: ok' "$log") binaries)"
+              fi
+            done
+          } | tee -a "$GITHUB_STEP_SUMMARY"

@@ -9,7 +9,8 @@ name: main-health
 # when they fail to *run* — main-health.sh says how a finding is told apart;
 # and the nightly `windows` signal (#741), which files when it fails to run or
 # goes red, since a red Windows build *is* its finding and nothing else
-# reports it. Not `docs`: its only failure today is the Pages deploy (Pages is not
+# reports it; likewise the weekly `cargo-test` signal (#981), where a red run
+# is a test that leans on nextest's process-per-test. Not `docs`: its only failure today is the Pages deploy (Pages is not
 # enabled — #509, a human task), which would re-file on every merge, and the
 # rustdoc build it runs is already proven by lint.yml's rustdoc gate. Once #509 lands, adding
 # `docs` here and to WATCHED in the script is the whole change.
@@ -20,7 +21,7 @@ name: main-health
 # edits.
 on:
   workflow_run:
-    workflows: [ci, lint, mutants-sweep, coverage, windows]
+    workflows: [ci, lint, mutants-sweep, coverage, windows, cargo-test]
     types: [completed]
     branches: [main]
   # Replay any past run to see what this would file. Dry-run by default, so a

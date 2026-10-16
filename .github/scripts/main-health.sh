@@ -12,7 +12,7 @@
 # rebuild), so the fix PR closes the issue, not this script.
 set -euo pipefail
 
-WATCHED='ci lint mutants-sweep coverage windows'
+WATCHED='ci lint mutants-sweep coverage windows cargo-test'
 LABEL=bug
 
 run=$(gh api "repos/$REPO/actions/runs/$RUN_ID")
@@ -44,6 +44,7 @@ shard_had_findings() {
 # `mutants-report` only summarises — so their failure is always
 # infrastructural. The nightly `windows` signal is the exception on purpose: a
 # red Windows build is the finding, and this issue is where it lands (#741).
+# The weekly `cargo-test` signal (#981) is the same: its red is the finding.
 failed=()
 while IFS=$'\t' read -r name concl; do
   case "$concl" in success | skipped | neutral) continue ;; esac
