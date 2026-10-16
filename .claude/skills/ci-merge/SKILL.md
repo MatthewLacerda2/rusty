@@ -244,10 +244,10 @@ once per workflow. To look by hand, ask about the commit:
 Absent and passing are different states; a loop counting non-completed checks
 finds zero of each. `make queue` is that loop, written so it cannot.
 
-*(GitHub's **native** merge queue would replace `make queue` — both workflows
-already trigger on `merge_group` with collapsed gates — but it needs an
+*(GitHub's **native** merge queue would replace `make queue`, but it needs an
 organization-owned repository, and moving the repo is the user's call, #486.
-`make mergeable` stays useful either way.)*
+The workflows' `merge_group` triggers were removed as dead config in #930, so
+adopting it means adding them back. `make mergeable` stays useful either way.)*
 
 ## A red ready pull request stays ready
 
