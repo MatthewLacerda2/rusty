@@ -75,7 +75,10 @@ go-ahead, so it does not ask for the label.
 The tiebreak is the label, read from the pull request's own labels and the
 issues it closes (rusty labels issues, not pull requests): infrastructure →
 architecture → bug → foundation → feature, then anything else, oldest number
-first within a rank. Dependabot goes after every one of those, whatever its
+first within a rank; a `bug` whose files are all tooling ranks as
+infrastructure ([`order.tooling`], #969). Of two open pull requests editing
+`Cargo.toml` or `Cargo.lock`, drafts included, the younger waits for the older
+to merge or close ([`board.lock_waits`], #969). Dependabot goes after every one of those, whatever its
 conflicts, and its conflicts count against nobody: it rebases itself. A pull
 request whose base is not `main` is never taken: the queue rebases onto `main`.
 

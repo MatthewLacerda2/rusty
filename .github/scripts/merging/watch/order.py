@@ -9,6 +9,15 @@ from merging.watch import board
 
 PRIORITY = ("infrastructure", "architecture", "bug", "foundation", "feature")
 
+# Where the development tooling lives (#969): a `bug` pull request touching only
+# these ranks as infrastructure, as CLAUDE.md orders it, whatever its label.
+TOOLING = (".github/", ".githooks/", "tools/", ".config/", ".claude/")
+TOOLING_FILES = ("Makefile", "clippy.toml", "deny.toml", ".gitignore")
+
+
+def tooling(path: str) -> bool:
+    return path.startswith(TOOLING) or path in TOOLING_FILES
+
 
 def rank(
     pull: dict, issue_labels: dict[int, set[str]], bots: tuple[str, ...], counts: dict[int, int] | None = None,
@@ -17,10 +26,14 @@ def rank(
     """The sort key: Dependabot last, then those in `aged` ([`aging.Line.aged`],
     whose conflicts no longer count), then the fewest conflicts in line
     (`counts`, from [`conflict_counts`]; none given is label order), then the
-    best priority label, then age."""
+    best priority label (a `bug` touching only [`tooling`] ranks as
+    infrastructure, #969), then age."""
     labels = board.names(pull.get("labels"))
     for issue in pull.get("closingIssuesReferences") or []:
         labels |= issue_labels.get(issue.get("number"), set())
+    files = board.paths(pull)
+    if "bug" in labels and files and all(tooling(path) for path in files):
+        labels.add("infrastructure")
     best = min((PRIORITY.index(label) for label in labels if label in PRIORITY), default=len(PRIORITY))
     number = pull.get("number", 0)
     old = number in aged
@@ -42,11 +55,13 @@ def passed_over(pull: dict, memory: dict[int, str], done: set[int]) -> bool:
 
 
 def ready(pulls: list[dict], memory: dict[int, str], done: set[int], bots: tuple[str, ...]) -> list[dict]:
-    """The pull requests the watch may take now, unordered."""
+    """The pull requests the watch may take now, unordered: not one waiting
+    on another's lockfile ([`board.lock_waits`])."""
+    waits = board.lock_waits(pulls, bots)
     return [
         p for p in pulls
         if not p.get("isDraft") and board.queued(p) and p.get("baseRefName", "main") == "main"
-        and not passed_over(p, memory, done) and not board.held(p, bots)
+        and not passed_over(p, memory, done) and not board.held(p, bots) and p.get("number") not in waits
     ]
 
 

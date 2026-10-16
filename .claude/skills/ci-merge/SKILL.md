@@ -55,8 +55,12 @@ conflicts with the fewest others in line first** (#753: `git merge-tree
 conflict go away, but it decides how many hand-backs a set costs: the broad pull
 request lands last and takes the one rebase. A tie goes to the label —
 infrastructure → architecture → bug → foundation → feature, read from the pull
-request's labels and the issues it closes — then unlabelled, oldest first;
-Dependabot after all of them, whatever it conflicts with. When the count
+request's labels and the issues it closes, a `bug` touching only tooling
+(`.github/`, `.githooks/`, `tools/`, `.config/`, `.claude/`, `Makefile`,
+`clippy.toml`, `deny.toml`, `.gitignore`) ranking as infrastructure (#969) — then unlabelled, oldest first;
+Dependabot after all of them, whatever it conflicts with. Of two open pull
+requests editing `Cargo.toml`/`Cargo.lock` (drafts included), the younger waits
+for the older to merge or close (#969, `watch: LOCKFILE …`). When the count
 overrides the label the watch says so in one line (`watch: #A goes before #B,
 …`). A pair git cannot answer about counts as no conflict: the order is an
 optimisation and never stops the queue. A **hand-back skips that pull request and the

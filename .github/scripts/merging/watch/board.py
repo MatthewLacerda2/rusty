@@ -33,7 +33,7 @@ def held(pull: dict, bots: tuple[str, ...]) -> list[str]:
     it (#825); empty for anyone else's, or a bot's that edits none."""
     if not is_bot(pull, bots):
         return []
-    return sorted(p for p in (f.get("path", "") for f in pull.get("files") or []) if p.startswith(WORKFLOWS))
+    return sorted(p for p in paths(pull) if p.startswith(WORKFLOWS))
 
 
 def held_line(pull: dict, workflows: list[str]) -> str:
@@ -42,6 +42,38 @@ def held_line(pull: dict, workflows: list[str]) -> str:
         f"{HELD_LINE} #{pull.get('number')}: Dependabot edits {', '.join(workflows)}, which a pull-request"
         " run does not prove. Review it, dispatch those workflows on its branch, then `make queue PRS=N`."
     )
+
+
+# The files one pull request at a time may edit (#969): two branches resolving
+# dependencies separately conflict in `Cargo.lock`, which is never hand-merged
+# (`ci-merge`). On 2026-10-04 seven lockfile PRs merged within five hours and
+# #767 was handed back three times.
+LOCKFILES = ("Cargo.toml", "Cargo.lock")
+
+# How the line saying who waits on whom begins.
+LOCKFILE_LINE = "LOCKFILE"
+
+
+def paths(pull: dict) -> list[str]:
+    """The files a pull request edits, from `gh`'s `files`."""
+    return [f.get("path", "") for f in pull.get("files") or []]
+
+
+def lock_waits(pulls: list[dict], bots: tuple[str, ...]) -> dict[int, int]:
+    """Each pull request held behind an older one that edits a lockfile too,
+    mapped to that owner (#969). Drafts count, as owner and as waiter: the
+    owner's resolution is the one the rest rebase onto. Dependabot is
+    neither: it rebases itself."""
+    editing = sorted(
+        p.get("number") for p in pulls
+        if not is_bot(p, bots) and any(path in LOCKFILES for path in paths(p))
+    )
+    return {number: editing[0] for number in editing[1:]}
+
+
+def lock_line(waiter: int, owner: int) -> str:
+    """The one line per waiter and owner, beginning [`LOCKFILE_LINE`]."""
+    return f"watch: {LOCKFILE_LINE} #{owner} owns Cargo.lock; #{waiter} waits until it merges or closes."
 
 
 def queued(pull: dict) -> bool:
