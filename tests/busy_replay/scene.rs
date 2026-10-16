@@ -4,7 +4,7 @@
 //! work to do, so an iteration order that leaks into behaviour shows in the result.
 
 use glam::Vec3;
-use rusty::components::{ColliderComponent, ColliderShape, CollisionDetection, RigidBodyComponent};
+use rusty::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
 use rusty::dev::harness::Harness;
 use rusty::scene::{NavMeshAgentComponent, Scene, ScriptComponent};
 
@@ -53,24 +53,15 @@ fn add_box(scene: &mut Scene, pos: Vec3, script: &str) {
     scene.world.set_collider(
         id,
         Some(ColliderComponent {
-            active: true,
             shape,
-            is_trigger: false,
-            material: Default::default(),
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
+            ..rusty::scene::authoring::default_collider()
         }),
     );
     scene.world.set_rigidbody(
         id,
         Some(RigidBodyComponent {
-            active: true,
-            is_kinematic: false,
-            mass: 1.0,
-            velocity: Vec3::ZERO,
             angular_velocity: Vec3::new(0.3, 0.0, 0.2),
-            use_gravity: true,
-            collision_detection: CollisionDetection::Discrete,
+            ..rusty::scene::authoring::default_rigidbody()
         }),
     );
     scene.world.scripts_mut(id).unwrap().push(ScriptComponent {

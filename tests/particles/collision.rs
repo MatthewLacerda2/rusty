@@ -25,14 +25,10 @@ fn scene_with_wall(response: CollisionResponse) -> (Scene, u32) {
     scene.world.set_collider(
         wall,
         Some(ColliderComponent {
-            active: true,
             shape: ColliderShape::Box {
                 size: Vec3::new(1.0, 4.0, 4.0),
             },
-            is_trigger: false,
-            material: Default::default(),
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
+            ..rusty::scene::authoring::default_collider()
         }),
     );
     scene.update_entity_collider(wall);
