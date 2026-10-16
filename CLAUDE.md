@@ -71,6 +71,8 @@ is wrong.
     lean**: not for style points but because clear, well-shaped code is cheaper to reason about
     (fewer tokens, fewer wrong turns) and faster for the next agent to extend. Strip avoidable
     blockages and keep CI fast. This is part of **Craft**, not a trade-off against it.
+    **Efficiency over familiarity:** do what works best for the project, not what fits
+    the user's mental model of how it should be done.
   - **A convention a machine can check is a gate, not a sentence.** Finding what can be
     enforced is Claude's job, not the operator's. A written rule that a check could hold
     gets that check on Claude's own say-so, and a new convention ships with its check.
@@ -180,6 +182,11 @@ is wrong.
   concurrently; use your best judgment. There are no rigid batches: the dependency graph
   *is* the plan. Any issue with no open blockers is fair game, and independent issues can
   be worked in parallel — stay flexible and efficient.
+- **Memory is the developer's; what the project follows lives in the project.**
+  Claude's local memory holds only personal preferences and machine setup. Every rule
+  the project follows goes into this file, a skill or a doc: cloud coders and other
+  machines never see a local memory, so a rule kept only there is a rule they break.
+  A project rule found in memory is moved into the repo and pruned from memory.
 - **Gates vs. signals — block on correctness, inform on quality.** Keep the bar high
   *without* stalling the agents. A check that proves **correctness** — build, test, clippy,
   the determinism guard, the size gate — is a **hard gate**: green-to-merge, no exceptions. A
@@ -429,6 +436,15 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   flat directories is sprawl by construction, and Rust modules nest for free. **One
   exception:** flat registries where one file *is* one public unit (e.g. each `api/`
   file is one Lua namespace) stay flat — there the flat list *is* the documentation.
+- **Test content is primitive; levels are Dust2-sized.** Test levels and fixtures are
+  built from primitive shapes (cubes, planes, capsules), not authored art, so they cost
+  nothing to make and nothing to change. The size target for a level is CS:GO's Dust2:
+  a feature that has to handle "a whole map" (navigation, lighting, streaming, a
+  bake) is proven at that scale.
+- **No machine state in repo docs.** Never write a machine's specs or a free-space or
+  memory figure into a doc as the number to plan by; write "check the machine"
+  (`df -h`, free memory). A figure quoted as evidence of a past incident, dated, is
+  history, not a limit.
 - **Asset sources are glTF/OBJ, never `.blend`.** Authored 3D content comes from
   Blender's native glTF 2.0 export (or `glTF`/`glb`/`obj`/`fbx` from elsewhere). The
   engine reads those interchange formats directly and **never parses `.blend` nor
