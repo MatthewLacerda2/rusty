@@ -189,6 +189,10 @@ jobs:
           echo "$rc" > mutants.out/exit-code
           case "$rc" in
             124|137) echo "::warning::shard ${{ matrix.shard }} stopped at its ${budget}s budget; the matrix needs more shards" ;;
+            # 2 (missed mutants) and 3 (timeouts) are findings, not a failed run:
+            # the report job reads them from exit-code, and a red shard would make
+            # main-health file "red main" for a signal that worked (#918).
+            2|3) rc=0 ;;
           esac
           exit "$rc"
       - name: Record the shard count for the merge job
