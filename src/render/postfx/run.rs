@@ -8,7 +8,7 @@ use crate::render::timing::GpuPass;
 
 impl PostFx {
     /// Run the full chain. `depth_view` is the scene depth (for SSR + motion blur),
-    /// `skybox_view` the cubemap fallback, `output` the final swapchain/screenshot
+    /// `skybox` the panorama SSR falls back to, `output` the final swapchain/screenshot
     /// view. `passes` says which optional passes run this frame.
     pub fn run(
         &mut self,
@@ -46,7 +46,7 @@ impl PostFx {
             &self.scene_hdr.view,
             &self.bloom_b.view,
             ctx.depth_view,
-            ctx.skybox_view,
+            ctx.skybox,
         );
         let followed = fxaa_enabled || !effects.is_empty();
         let composite_target = if followed { &self.ldr.view } else { ctx.output };
@@ -68,7 +68,7 @@ impl PostFx {
                 &finished.view,
                 &self.bloom_b.view,
                 ctx.depth_view,
-                ctx.skybox_view,
+                ctx.skybox,
             );
             let last = (pipeline, ctx.timer.writes(GpuPass::PostFx));
             Self::fullscreen(&mut encoder, last, &[&bg], ctx.output);
@@ -97,7 +97,7 @@ impl PostFx {
                 &src.view,
                 &self.custom.history.view,
                 ctx.depth_view,
-                ctx.skybox_view,
+                ctx.skybox,
             );
             let pass = (&effect.pipeline, ctx.timer.writes(GpuPass::PostFx));
             Self::fullscreen(encoder, pass, &[&bg, &effect.params], &dst.view);
@@ -119,7 +119,7 @@ impl PostFx {
         encoder: &mut wgpu::CommandEncoder,
         ctx: &PostFxContext<'_>,
     ) {
-        let (depth_view, skybox_view) = (ctx.depth_view, ctx.skybox_view);
+        let (depth_view, skybox) = (ctx.depth_view, ctx.skybox);
         // The aux "bloom" binding (slot 3) is unused by the bright/blur passes, so
         // it points at scene_hdr (never a render target here) to avoid a sampled-
         // texture / color-target usage conflict.
@@ -128,7 +128,7 @@ impl PostFx {
             &self.scene_hdr.view,
             &self.scene_hdr.view,
             depth_view,
-            skybox_view,
+            skybox,
         );
         let bright = (&self.bright_pipeline, ctx.timer.writes(GpuPass::PostFx));
         Self::fullscreen(encoder, bright, &[&bright_bg], &self.bloom_a.view);
@@ -138,7 +138,7 @@ impl PostFx {
             &self.bloom_a.view,
             &self.scene_hdr.view,
             depth_view,
-            skybox_view,
+            skybox,
         );
         let blur = (&self.blur_pipeline, ctx.timer.writes(GpuPass::PostFx));
         Self::fullscreen(encoder, blur, &[&blur_bg], &self.bloom_b.view);
@@ -159,7 +159,7 @@ impl PostFx {
             &self.scene_hdr.view,
             &self.bloom_b.view,
             ctx.depth_view,
-            ctx.skybox_view,
+            ctx.skybox,
         );
         // The UI's backdrop source, so its time is the UI's.
         let composite = (&self.composite_pipeline, ctx.timer.writes(GpuPass::Ui));
@@ -173,14 +173,15 @@ impl PostFx {
     }
 
     /// Build a bind group: params + color(1) + sampler(2) + bloom(3) + depth(4) +
-    /// skybox(5). `color` is the texture the pass reads, `bloom` an aux texture.
+    /// skybox(5) + its sampler(6). `color` is the texture the pass reads, `bloom` an
+    /// aux texture.
     fn io_bind_group(
         &self,
         device: &wgpu::Device,
         color: &wgpu::TextureView,
         bloom: &wgpu::TextureView,
         depth: &wgpu::TextureView,
-        skybox: &wgpu::TextureView,
+        (skybox, skybox_sampler): (&wgpu::TextureView, &wgpu::Sampler),
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("PostFX IO Bind Group"),
@@ -209,6 +210,10 @@ impl PostFx {
                 wgpu::BindGroupEntry {
                     binding: 5,
                     resource: wgpu::BindingResource::TextureView(skybox),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: wgpu::BindingResource::Sampler(skybox_sampler),
                 },
             ],
         })
