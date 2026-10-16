@@ -1,5 +1,9 @@
-// assets/shaders/common.wgsl — shared GPU struct definitions and helpers imported by
-// the forward, shadow, skybox, particle and post-FX passes via `#import "common"`.
+// engine/shaders/common.wgsl — shared GPU struct definitions and helpers imported by
+// the forward, shadow, skybox, particle and post-FX passes via `#import common::{…}`.
+// Every name here is part of what a baked shader may import, so none ever moves out;
+// a helper only common itself calls may live in a module of its own (`sky/noise.wgsl`).
+
+#import sky::noise::sky_fbm
 
 // The scene's distance + height fog (#437). Mirrors the Rust `FogUniform`
 // byte-for-byte (naga_oil rejects imported names ending `_<digit>`, hence `_pad_a`).
@@ -416,37 +420,7 @@ fn equirect_uv(dir: vec3<f32>) -> vec2<f32> {
 // static cloud layer. ONE function, two callers: the sky pass draws it when no
 // panorama is bound (`sky_gradient.wgsl`), and the forward pass reflects it in the
 // same case (#718), so a metal surface mirrors the sky that is actually on screen.
-
-fn sky_hash(p: vec2<f32>) -> f32 {
-    // Deterministic 2D -> 1D hash in [0, 1). No engine RNG: this is the platform
-    // (render) layer, and the result is a pure function of direction.
-    let h = dot(p, vec2<f32>(127.1, 311.7));
-    return fract(sin(h) * 43758.5453);
-}
-
-fn sky_value_noise(p: vec2<f32>) -> f32 {
-    let i = floor(p);
-    let f = fract(p);
-    // Smoothstep interpolation weights for C1-continuous cells.
-    let u = f * f * (3.0 - 2.0 * f);
-    let a = sky_hash(i + vec2<f32>(0.0, 0.0));
-    let b = sky_hash(i + vec2<f32>(1.0, 0.0));
-    let c = sky_hash(i + vec2<f32>(0.0, 1.0));
-    let d = sky_hash(i + vec2<f32>(1.0, 1.0));
-    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-}
-
-fn sky_fbm(p: vec2<f32>) -> f32 {
-    var sum = 0.0;
-    var amp = 0.5;
-    var freq = p;
-    for (var i = 0; i < 5; i = i + 1) {
-        sum = sum + amp * sky_value_noise(freq);
-        freq = freq * 2.0;
-        amp = amp * 0.5;
-    }
-    return sum;
-}
+// Its clouds are `sky_fbm` (`sky/noise.wgsl`).
 
 fn procedural_sky(sky_color: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     // Ground is the darker quarter of the sky tint, exactly as the forward pass's

@@ -66,9 +66,9 @@ gates: $(SELF_CHECKS) $(GATES) ## Everything CI blocks on, fastest-failing first
 check: target-dir fmt size ## Fast edit loop: formatting, size gate, dev-feature clippy
 	cargo clippy --all-targets --features dev
 
-pre-commit: ## What the commit hook runs: formatting + size gate on staged .rs and .py files
+pre-commit: ## What the commit hook runs: formatting + size gate on staged .rs, .py, .lua and .wgsl files
 	@cargo fmt --all --check
-	@files="$$(git diff --cached --name-only --diff-filter=ACMR -- '*.rs' '*.py')"; \
+	@files="$$(git diff --cached --name-only --diff-filter=ACMR -- '*.rs' '*.py' '*.lua' '*.wgsl')"; \
 		if [ -n "$$files" ]; then $(LINT) -- $$files; fi
 
 # ---- self-checks ----------------------------------------------------------
