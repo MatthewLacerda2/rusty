@@ -42,8 +42,9 @@ orchestrator and the merge queue (#823). There is no check-in to schedule and
 nothing to wait for.
 
 - Run builds, tests and `make gates` in the **foreground**, with long timeouts,
-  split across calls when needed. A session that starts a build in the background
-  and ends its turn to wait is never woken.
+  split across calls as *The container* says (a call dies at ten minutes). A
+  session that starts a build in the background and ends its turn to wait is
+  never woken.
 - **Never schedule a `send_later` check-in.** Each one is a fresh cloud session
   reading state the orchestrator already has, and on 2026-10-04 check-ins were
   most of the late churn: green branches sat in draft waiting on them, and one
@@ -72,6 +73,50 @@ nothing to wait for.
   notice after readying goes in a comment on the issue. (#560 on 2026-09-30: a
   test-only push landed mid-queue and the queue handed the PR back.)
 
+## The container
+
+Lessons from cloud coders' run logs (rusty's and scorsese's, #924). Each one cost
+a coder real time.
+
+- **A foreground tool call dies silently at ten minutes.** This was scorsese's
+  coders' single largest time sink (MatthewLacerda2/scorsese#781), and rusty's
+  `make gates` builds three feature sets plus the lavapipe GPU tests, so it bites
+  harder here. A cold `make gates` in a 4-core container took about 16 minutes
+  (2026-10-16): the quick gates ~25 s, `clippy` 4m25s (three feature sets),
+  `doc` 1m, `deny` 2 s, and **`make test` 10m21s on its own**: building the
+  default test binaries 5m15s, running them 56 s, building the `dev` ones 2m09s,
+  running them 1m52s. So split it, one call each, every one well under ten
+  minutes even cold:
+  1. `make fmt size layers determinism direction components parity test-lint scripts`
+     (seconds);
+  2. `make clippy`;
+  3. `make doc deny`;
+  4. `cargo nextest run --locked --no-run` (warms the default test build);
+  5. `cargo nextest run --locked --features dev --no-run` (warms the `dev` one);
+  6. `make test` (now only runs: about 3 minutes).
+  On a warm branch, after an edit, one call per gate is enough.
+- **Run each heavy gate once, into a log, then grep it**:
+  `make test > target/test.log 2>&1; echo exit=$?`, then `grep` the log for what
+  failed. Re-running a gate to see a different slice of its output pays the
+  whole run again.
+- **Exit 137 means out of memory**, not a failed test: rerun with
+  `CARGO_BUILD_JOBS=2`.
+- **GitHub GraphQL and search answer 403** in the container. `gh` works over REST
+  (`gh api repos/...`, `gh workflow run`, `gh label create`), and so do the GitHub
+  MCP tools; `gh pr` and `gh issue` subcommands that use GraphQL do not.
+- **The container cannot delete a branch** (neither `git push --delete` nor the
+  REST refs API is allowed). A throwaway branch you pushed goes in the PR's human
+  checklist for the operator to delete.
+- **`git status --short --ignored` lists nothing you wrote** before readying: a
+  `.gitignore` pattern silently kept a source file out of a commit once
+  (MatthewLacerda2/scorsese#872).
+- **Rebase once, last.** After a rebase over unrelated merges, `cargo check`, the
+  size gate and your own tests are enough; the whole gate list again is not
+  needed (MatthewLacerda2/scorsese#862).
+- **Blessings come from the container's Mesa, not CI's.** A capture or snapshot
+  blessed here may differ from what CI renders: bless nothing from a container
+  without saying so in the PR.
+
 ## The repo's rules that trip cloud coders
 
 - `tests/` is **one integration binary** rooted at `tests/main.rs`; a new test file
@@ -86,10 +131,11 @@ nothing to wait for.
   and on the branch (`ARGS="--select <entity>"` to open its inspector) and show both
   in the PR description, the way `docs/testing.md` § Editor captures says. Never
   leave a PNG on the branch that merges. (#731; #725 did it by hand.)
-- `make gates` (foreground) before readying.
+- `make gates` (foreground, split as *The container* says) before readying.
 - Never fall back to `cargo test`: CI runs nextest, and its per-test process
   isolation and the `gpu` test group are what the gate measures.
-- Rebase onto the latest `origin/main` before readying.
+- Rebase onto the latest `origin/main` before readying, once, last (*The
+  container*).
 - Don't run `cargo mutants` locally; ask for a scoped run (above).
 - **A refactor that claims no behaviour change proves it by comparison**:
   capture the output before (a scene dump, a bake, a capture, a test's printed
