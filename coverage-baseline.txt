@@ -1,6 +1,6 @@
 # Per-module line-coverage floors — the ratchet baseline (see docs/testing.md).
 #
-# The `coverage` CI job (post-merge on main) measures each floored module and
+# The weekly `coverage` workflow (coverage.yml, #750) measures each floored module and
 # flags — informationally, never blocking — any drop below its floor.
 # Format: `<module> <floor-percent>`, one per line; `#` lines are comments.
 #

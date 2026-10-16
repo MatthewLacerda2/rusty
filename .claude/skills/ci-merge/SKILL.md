@@ -314,10 +314,11 @@ otherwise fail at merge time:
   `--parity` fails on a direct field write. Nothing is grandfathered: no gate
   reads a baseline file (#926).
 
-And one that is not a gate but bites the same way: **a branch adding a new
-top-level `src/<dir>/` must add it to the `UNFLOORED` list in `coverage.yml`'s
-ratchet step.** A missing directory leaks into every floored module's number —
-`audio`, `procgen` and `shadergen` each did exactly that.
+A new top-level `src/<dir>/` owes the coverage ratchet nothing: the step derives
+its lists from `src/` and `coverage-baseline.txt` (`.github/scripts/coverage-ignore.py`,
+#965), so the module is left out of every floored number the day it lands. (When
+the lists were typed by hand, `audio`, `procgen`, `shadergen` and `preview` each
+leaked into all of them.) A new *floor* is one line in the baseline.
 
 There is no version constant to bump here — rusty has no format version and no
 bake version. What plays that role is the **determinism guard**: a wall-clock read
