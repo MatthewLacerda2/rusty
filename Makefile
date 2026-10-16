@@ -107,7 +107,7 @@ fmt: ## [gate] rustfmt, engine and tools/lint
 size: ## [gate] File-length cap on .rs and .py, full scan (tools/lint)
 	$(LINT)
 
-rules: ## [gate] Finding-based rules with inline allows: prefix-group, markers, skip, ignored (tools/lint/src/rules)
+rules: ## [gate] Finding-based rules with inline allows: prefix-group, markers, skip, ignored, test-temp-dir (tools/lint/src/rules)
 	$(LINT) -- --rules
 
 layers: ## [gate] Module imports and external crates match the declared layer table (tools/lint/src/layers/table.rs)

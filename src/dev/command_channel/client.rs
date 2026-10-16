@@ -112,6 +112,7 @@ mod tests {
     fn connect_to_an_absent_address_is_an_io_error_not_a_panic() {
         // Nothing is listening here, so the dial must fail cleanly.
         #[cfg(unix)]
+        // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
         let absent = std::env::temp_dir()
             .join(format!("rusty-client-absent-{}.sock", std::process::id()))
             .display()

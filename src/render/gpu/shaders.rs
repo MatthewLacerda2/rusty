@@ -119,7 +119,7 @@ mod tests {
             assert_eq!(baked, loaded, "{name}: bake and load disagree");
         }
 
-        let dir = std::env::temp_dir().join(format!("rusty-722-{}", std::process::id()));
+        let dir = crate::test_temp::dir().join("rusty-722");
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::copy("engine/shaders/common.wgsl", dir.join("common.wgsl")).unwrap();
         // Names a `common` struct that does not exist: naga rejects the unknown type.

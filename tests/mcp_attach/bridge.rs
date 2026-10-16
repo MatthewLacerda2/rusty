@@ -39,6 +39,7 @@ fn resources_read_works_without_any_engine() {
     let bogus = if cfg!(windows) {
         "127.0.0.1:1".to_string()
     } else {
+        // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
         std::env::temp_dir()
             .join("rusty-attach-noengine.sock")
             .display()

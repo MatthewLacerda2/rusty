@@ -90,7 +90,7 @@ fn ui_runtime_params_get_slots_by_canonical_name() {
 
 #[test]
 fn bake_writes_a_ui_module_and_its_sidecar() {
-    let dir = std::env::temp_dir().join(format!("rusty_ui_bake_{}", std::process::id()));
+    let dir = crate::test_temp::dir().join("ui_bake");
     let out = dir.to_string_lossy().to_string();
     let path = super::bake_recipe(&recipe(&["noise_flicker"]), ENGINE_SHADERS, &out).unwrap();
     let sidecar = super::params::sidecar_path(std::path::Path::new(&path));
@@ -101,7 +101,7 @@ fn bake_writes_a_ui_module_and_its_sidecar() {
 
 #[test]
 fn a_crlf_checkout_of_the_base_still_splices() {
-    let dir = std::env::temp_dir().join(format!("rusty_ui_crlf_{}", std::process::id()));
+    let dir = crate::test_temp::dir().join("ui_crlf");
     std::fs::create_dir_all(&dir).unwrap();
     let base = base_source(PassKind::Ui, ENGINE_SHADERS).unwrap();
     std::fs::write(dir.join("ui.wgsl"), base.replace('\n', "\r\n")).unwrap();
