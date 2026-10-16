@@ -10,6 +10,7 @@ pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth3
 
 pub(crate) mod bind_layouts;
 pub(crate) mod draw_buffers;
+pub(crate) mod fullscreen;
 pub(crate) mod global_group;
 pub(crate) mod grow_buffer;
 pub(crate) mod layout_entries;

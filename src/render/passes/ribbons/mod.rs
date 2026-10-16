@@ -17,11 +17,9 @@ pub(crate) mod draw;
 pub(crate) mod strip;
 
 use crate::components::ParticleBlend;
-use crate::render::gpu::layout_entries::uniform_entry;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::gpu::uniforms::FogUniform;
-use crate::render::gpu::DEPTH_FORMAT;
-use crate::render::postfx::HDR_FORMAT;
+use crate::render::passes::blended::{BlendPipelines, Globals};
 use crate::render::{GpuTexture, Renderer};
 use strip::RibbonVertex;
 
@@ -37,8 +35,7 @@ pub(crate) struct RibbonGlobals {
 
 /// Every GPU resource for the ribbon pass. One per `Renderer`.
 pub struct RibbonRenderer {
-    alpha_pipeline: wgpu::RenderPipeline,
-    additive_pipeline: wgpu::RenderPipeline,
+    pipelines: BlendPipelines,
     pub(crate) globals_buffer: wgpu::Buffer,
     pub(crate) globals_bind_group: wgpu::BindGroup,
     /// What a ribbon with no texture samples, so its colour is its style alone.
@@ -55,89 +52,30 @@ impl RibbonRenderer {
         registry: &mut ShaderRegistry,
     ) -> Self {
         let shader = registry.load(device, "ribbons.wgsl", "Ribbon Shader");
-        let globals_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Ribbon Globals Layout"),
-            entries: &[uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT)],
-        });
-        let globals_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Ribbon Globals"),
-            size: std::mem::size_of::<RibbonGlobals>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let globals_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Ribbon Globals Bind Group"),
-            layout: &globals_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: globals_buffer.as_entire_binding(),
-            }],
-        });
+        let globals = Globals::new(
+            device,
+            "Ribbon",
+            std::mem::size_of::<RibbonGlobals>() as u64,
+        );
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Ribbon Pipeline Layout"),
-            bind_group_layouts: &[Some(&globals_layout), Some(texture_layout)],
+            bind_group_layouts: &[Some(&globals.layout), Some(texture_layout)],
             immediate_size: 0,
         });
-        let pipeline = |blend, entry| Self::pipeline(device, &shader, &layout, (blend, entry));
         Self {
-            alpha_pipeline: pipeline(wgpu::BlendState::ALPHA_BLENDING, "fs_alpha"),
-            additive_pipeline: pipeline(super::particles::additive_blend(), "fs_additive"),
-            globals_buffer,
-            globals_bind_group,
+            pipelines: BlendPipelines::new(
+                device,
+                "Ribbon Pipeline",
+                (&shader, &layout),
+                RibbonVertex::desc(),
+            ),
+            globals_buffer: globals.buffer,
+            globals_bind_group: globals.bind_group,
             white: Renderer::create_white_texture(device, queue, texture_layout),
         }
     }
 
-    fn pipeline(
-        device: &wgpu::Device,
-        shader: &wgpu::ShaderModule,
-        layout: &wgpu::PipelineLayout,
-        (blend, fragment_entry): (wgpu::BlendState, &str),
-    ) -> wgpu::RenderPipeline {
-        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Ribbon Pipeline"),
-            layout: Some(layout),
-            vertex: wgpu::VertexState {
-                module: shader,
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &[Some(RibbonVertex::desc())],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: shader,
-                entry_point: Some(fragment_entry),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: HDR_FORMAT,
-                    blend: Some(blend),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            // Both faces: which way a strip winds depends on the view.
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                cull_mode: None,
-                ..Default::default()
-            },
-            // Occluded by solids, but never writing depth: overlapping
-            // translucent ribbons all blend.
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: DEPTH_FORMAT,
-                depth_write_enabled: Some(false),
-                depth_compare: Some(wgpu::CompareFunction::LessEqual),
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        })
-    }
-
     pub(crate) fn pipeline_for(&self, blend: ParticleBlend) -> &wgpu::RenderPipeline {
-        match blend {
-            ParticleBlend::Alpha => &self.alpha_pipeline,
-            ParticleBlend::Additive => &self.additive_pipeline,
-        }
+        self.pipelines.pipeline_for(blend)
     }
 }

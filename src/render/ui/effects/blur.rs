@@ -21,6 +21,7 @@
 use std::collections::HashMap;
 
 use super::backdrop::blur_level;
+use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::postfx::PostFxContext;
 use crate::render::timing::GpuTimer;
 use crate::render::{RenderView, Renderer};
@@ -141,27 +142,14 @@ impl BlurPipelines {
             return;
         }
         let build = |entry: &str| {
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("UI Blur Pipeline"),
-                layout: Some(&self.pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &self.shader,
-                    entry_point: Some("vs_full"),
-                    compilation_options: Default::default(),
-                    buffers: &[],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &self.shader,
-                    entry_point: Some(entry),
-                    compilation_options: Default::default(),
-                    targets: &[Some(format.into())],
-                }),
-                primitive: wgpu::PrimitiveState::default(),
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState::default(),
-                multiview_mask: None,
-                cache: None,
-            })
+            let pass = Fullscreen {
+                label: "UI Blur Pipeline",
+                shader: &self.shader,
+                layout: &self.pipeline_layout,
+                vs: "vs_full",
+                fs: entry,
+            };
+            pass.colour(device, &[Some(format.into())])
         };
         let pair = (build("fs_down"), build("fs_up"));
         self.pipelines.insert(format, pair);

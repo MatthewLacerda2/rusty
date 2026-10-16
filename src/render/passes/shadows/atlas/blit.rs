@@ -6,6 +6,7 @@
 //! for a copy, the far plane for a clear. Depth passes straight through (`Always`,
 //! no bias), so a copied tile is bit-identical to the static atlas it came from.
 
+use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::depth_entry;
 
 /// The two tile blits and the static atlas the copy reads.
@@ -72,31 +73,21 @@ fn pipeline(
         bind_group_layouts: &layouts.iter().copied().map(Some).collect::<Vec<_>>(),
         immediate_size: 0,
     });
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("Shadow Atlas Blit Pipeline"),
-        layout: Some(&layout),
-        vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: Some("vs_fullscreen"),
-            compilation_options: Default::default(),
-            buffers: &[],
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: Some(fs_entry),
-            compilation_options: Default::default(),
-            targets: &[],
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: Some(wgpu::DepthStencilState {
+    let pass = Fullscreen {
+        label: "Shadow Atlas Blit Pipeline",
+        shader,
+        layout: &layout,
+        vs: "vs_fullscreen",
+        fs: fs_entry,
+    };
+    pass.depth_only(
+        device,
+        wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth32Float,
             depth_write_enabled: Some(true),
             depth_compare: Some(wgpu::CompareFunction::Always),
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
-        }),
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
+        },
+    )
 }

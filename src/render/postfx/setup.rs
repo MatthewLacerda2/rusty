@@ -1,6 +1,7 @@
 //! Resource construction for the post-process chain: bind-group layout, the five
 //! fullscreen pipelines, the params buffer, sampler, and the render targets.
 
+use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{
     depth_entry, sampler_entry, texture_entry, uniform_entry,
 };
@@ -192,31 +193,21 @@ impl PostFx {
         (vs_entry, fs_entry): (&str, &str),
         format: wgpu::TextureFormat,
     ) -> wgpu::RenderPipeline {
-        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("PostFX Pipeline"),
-            layout: Some(layout),
-            vertex: wgpu::VertexState {
-                module: shader,
-                entry_point: Some(vs_entry),
-                compilation_options: Default::default(),
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: shader,
-                entry_point: Some(fs_entry),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        })
+        let pass = Fullscreen {
+            label: "PostFX Pipeline",
+            shader,
+            layout,
+            vs: vs_entry,
+            fs: fs_entry,
+        };
+        pass.colour(
+            device,
+            &[Some(wgpu::ColorTargetState {
+                format,
+                blend: Some(wgpu::BlendState::REPLACE),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        )
     }
 
     fn create_io_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {

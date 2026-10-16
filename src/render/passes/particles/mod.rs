@@ -22,10 +22,8 @@ use std::collections::HashMap;
 use wgpu::util::DeviceExt;
 
 use crate::components::particle::ParticleBlend;
-use crate::render::gpu::layout_entries::uniform_entry;
 use crate::render::gpu::shaders::ShaderRegistry;
-use crate::render::gpu::DEPTH_FORMAT;
-use crate::render::postfx::HDR_FORMAT;
+use crate::render::passes::blended::{BlendPipelines, Globals};
 use crate::render::MeshId;
 use instance::{ParticleGlobals, ParticleInstance};
 
@@ -40,8 +38,7 @@ pub(crate) struct SharedLayouts<'a> {
 
 /// Owns every GPU resource for the particle pass. One per `Renderer`.
 pub struct ParticleRenderer {
-    alpha_pipeline: wgpu::RenderPipeline,
-    additive_pipeline: wgpu::RenderPipeline,
+    pipelines: BlendPipelines,
     pub(crate) globals_buffer: wgpu::Buffer,
     pub(crate) globals_bind_group: wgpu::BindGroup,
     pub(crate) index_buffer: wgpu::Buffer,
@@ -60,26 +57,16 @@ impl ParticleRenderer {
     ) -> Self {
         let shader = registry.load(device, "particles.wgsl", "Particle Shader");
 
-        let globals_layout = Self::globals_layout(device);
-        let globals_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Particle Globals"),
-            size: std::mem::size_of::<ParticleGlobals>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let globals_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Particle Globals Bind Group"),
-            layout: &globals_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: globals_buffer.as_entire_binding(),
-            }],
-        });
+        let globals = Globals::new(
+            device,
+            "Particle",
+            std::mem::size_of::<ParticleGlobals>() as u64,
+        );
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Particle Pipeline Layout"),
             bind_group_layouts: &[
-                Some(&globals_layout),
+                Some(&globals.layout),
                 Some(layouts.texture),
                 Some(layouts.depth),
                 Some(layouts.camera_lighting),
@@ -87,14 +74,12 @@ impl ParticleRenderer {
             immediate_size: 0,
         });
 
-        let alpha_pipeline = Self::pipeline(
+        let pipelines = BlendPipelines::new(
             device,
-            &shader,
-            &layout,
-            (wgpu::BlendState::ALPHA_BLENDING, "fs_alpha"),
+            "Particle Pipeline",
+            (&shader, &layout),
+            ParticleInstance::desc(),
         );
-        let additive_pipeline =
-            Self::pipeline(device, &shader, &layout, (additive_blend(), "fs_additive"));
 
         // Two triangles (a quad) shared by every billboard instance.
         let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
@@ -105,86 +90,15 @@ impl ParticleRenderer {
         });
 
         Self {
-            alpha_pipeline,
-            additive_pipeline,
-            globals_buffer,
-            globals_bind_group,
+            pipelines,
+            globals_buffer: globals.buffer,
+            globals_bind_group: globals.bind_group,
             index_buffer,
             meshes: HashMap::new(),
         }
     }
 
-    fn globals_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Particle Globals Layout"),
-            entries: &[uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT)],
-        })
-    }
-
-    fn pipeline(
-        device: &wgpu::Device,
-        shader: &wgpu::ShaderModule,
-        layout: &wgpu::PipelineLayout,
-        (blend, fragment_entry): (wgpu::BlendState, &str),
-    ) -> wgpu::RenderPipeline {
-        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Particle Pipeline"),
-            layout: Some(layout),
-            vertex: wgpu::VertexState {
-                module: shader,
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &[Some(ParticleInstance::desc())],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: shader,
-                entry_point: Some(fragment_entry),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: HDR_FORMAT,
-                    blend: Some(blend),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                cull_mode: None,
-                ..Default::default()
-            },
-            // Depth-test against the scene depth (so particles are occluded by
-            // solids) but DON'T write depth — overlapping transparent sprites must
-            // all blend, not z-fight. Read-only, so the same depth can also be bound
-            // as the soft-particle texture.
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: DEPTH_FORMAT,
-                depth_write_enabled: Some(false),
-                depth_compare: Some(wgpu::CompareFunction::LessEqual),
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        })
-    }
-
     pub(crate) fn pipeline_for(&self, blend: ParticleBlend) -> &wgpu::RenderPipeline {
-        match blend {
-            ParticleBlend::Alpha => &self.alpha_pipeline,
-            ParticleBlend::Additive => &self.additive_pipeline,
-        }
-    }
-}
-
-/// Additive blend (src + dst), keeping dst alpha. Sparks/fire brighten the HDR
-/// target so the bloom pass picks them up.
-pub(crate) fn additive_blend() -> wgpu::BlendState {
-    wgpu::BlendState {
-        color: wgpu::BlendComponent {
-            src_factor: wgpu::BlendFactor::SrcAlpha,
-            dst_factor: wgpu::BlendFactor::One,
-            operation: wgpu::BlendOperation::Add,
-        },
-        alpha: wgpu::BlendComponent::OVER,
+        self.pipelines.pipeline_for(blend)
     }
 }
