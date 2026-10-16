@@ -23,6 +23,9 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     `stops` (the machine's failure, [`queue.stopping.Stopped`]) and `skips` (it
     turned draft or closed after the listing). Anything else is a hand-back: it is
     remembered, announced ([`ending.handed_back`]) and passed over.
+    `stale_code()` names the queue's files that changed on `main` since launch
+    ([`freshness.changed`]); asked before each take, a non-empty answer ends the
+    watch ([`ending.relaunch`]) with the pull request untaken.
     `opts.for_minutes` (`--for`) is checked at the top of each pass, so only
     between takes; `opts.since` (`--since`) limits the board lines ([`board.recent`]).
     """
@@ -121,6 +124,10 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             fx.sleep(opts.poll)
             continue
         number = chosen["number"]
+        moved_code = fx.stale_code()
+        if moved_code:
+            save()
+            return results, ending.relaunch(moved_code, results, fx.merged), ending.status(handed, False, True)
         unaged = order.pick(pulls, labels, memory, done, fx.bots, clashes)
         if unaged is not chosen:
             fx.say(line.said(number, fx.clock()))

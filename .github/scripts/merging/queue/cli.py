@@ -48,7 +48,8 @@ def parse(argv: list[str]) -> argparse.Namespace:
             "name no PR: take each ready one labelled `queue`, fewest conflicts in line first, then label priority; a hand-back is skipped and announced"
             f" ('{ending.HANDED_BACK_LINE} #N'); exit when nothing is left: 1 if anything was handed back,"
             f" {ending.MACHINE_STATUS} if the machine or GitHub failed,"
-            f" {lock.LOCKED_STATUS} if another watch holds the lock; the last line is '{ending.RESUME} <command>'"
+            f" {lock.LOCKED_STATUS} if another watch holds the lock, {ending.RELAUNCH_STATUS} if its own code changed on main"
+            " (update the checkout, then relaunch); the last line is '{ending.RESUME} <command>'"
         ),
     )
     parser.add_argument(

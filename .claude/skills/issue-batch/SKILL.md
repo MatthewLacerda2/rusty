@@ -291,7 +291,9 @@ briefs cloud coders, reviews and merges. It **starts `make queue
 ARGS="--watch --no-check --for 70 --since <batch start>"` in the background** (from a worktree under
 `.claude/worktrees/`), relaunches it unchanged (its `watch: resume:` line) each time it exits on its
 deadline (`watch ended: deadline reached`, #697: the first overnight watch was
-killed at the two-hour background cap mid-CI-wait), and is otherwise woken only
+killed at the two-hour background cap mid-CI-wait) or, after updating that
+worktree to `origin/main`, on `relaunch:` (status 5: the queue's own code
+changed on `main`, #967), and is otherwise woken only
 by a `HANDED BACK` line (a `Monitor` tailing the watch's log, see above) or when
 the watch exits — never a
 per-PR polling loop or a chain of `make queue PRS=N` runs (#664: the 2026-09-30

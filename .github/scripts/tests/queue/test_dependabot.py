@@ -95,7 +95,7 @@ class WorkflowBumps(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             fx = argparse.Namespace(
                 pulls=pulls, issue_labels=dict, clashes=lambda p: set(),
-                main_conflicts=lambda p: {}, turn=lambda n, tick: taken.append(n) or (n, outcomes.MERGED, "why"), head=lambda n: None,
+                main_conflicts=lambda p: {}, stale_code=list, turn=lambda n, tick: taken.append(n) or (n, outcomes.MERGED, "why"), head=lambda n: None,
                 attempts=lambda n, sha: None,
                 clock=lambda: now[0], sleep=sleep, say=lambda *a: said.append(a[0]),
                 memory=Path(tmp, handbacks.MEMORY), bots=BOTS, merged=outcomes.MERGED,
