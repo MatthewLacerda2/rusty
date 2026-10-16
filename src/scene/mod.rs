@@ -38,7 +38,10 @@ pub mod nav_settings;
 pub mod prefab;
 pub mod rehydrate;
 pub mod runtime;
-#[allow(clippy::module_inception)]
+#[expect(
+    clippy::module_inception,
+    reason = "`scene::scene` holds the `Scene` type; renaming the file churns every import for no gain"
+)]
 pub mod scene;
 pub mod serialize;
 pub mod shader_overrides;

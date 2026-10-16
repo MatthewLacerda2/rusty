@@ -16,7 +16,10 @@ use crate::scene::authoring::rigidbody as rigidbody_ops;
 use crate::scene::CollisionDetection;
 
 /// A checkbox row that routes its write through a shared rigidbody op (#287).
-#[allow(clippy::too_many_arguments)] // (world, id) replaced the single &mut Entity handle
+#[expect(
+    clippy::too_many_arguments,
+    reason = "(world, id) replaced the single &mut Entity handle"
+)]
 fn rb_checkbox(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,

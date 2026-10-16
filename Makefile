@@ -115,7 +115,7 @@ rules: ## [gate] Finding-based rules with inline allows: prefix-group, markers, 
 layers: ## [gate] Module imports and external crates match the declared layer table (tools/lint/src/layers/table.rs)
 	$(LINT) -- --layers
 
-determinism: ## [gate] Only platform module roots opt out of clippy's clock/RNG ban (clippy.toml)
+determinism: ## [gate] Lint policy: only platform roots opt out of the clock/RNG ban; locked escapes; reasons denied
 	$(LINT) -- --determinism
 
 direction: ## [gate] Sim modules never import render/editor/wgpu/egui

@@ -5,7 +5,11 @@
 
 // The bake-time measurements time the bake with the wall clock; the sim under test
 // never reads it. Integration tests sit outside the clock ban's gate (#757).
-#![allow(clippy::disallowed_methods, clippy::disallowed_types)]
+#![allow(
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    reason = "the bake-time measurements time the bake with the wall clock (#757)"
+)]
 
 mod bridge;
 mod building;

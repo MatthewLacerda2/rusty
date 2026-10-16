@@ -12,7 +12,10 @@
 
 use std::{env, path::Path};
 
-#[allow(dead_code)]
+#[expect(
+    dead_code,
+    reason = "the build script uses only the git helpers of the shared file"
+)]
 #[path = "src/core/project/commit.rs"]
 mod commit;
 
