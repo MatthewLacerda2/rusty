@@ -21,11 +21,11 @@ _spec.loader.exec_module(watch)
 BOTS = ("app/dependabot",)
 
 
-def pr(number: int, *, draft=False, closes=(), labels=(), bot=False, head=None, base="main") -> dict:
+def pr(number: int, *, draft=False, closes=(), labels=(), bot=False, head=None, base="main", queued=True) -> dict:
     return {
         "number": number, "isDraft": draft, "headRefOid": head or f"sha{number}", "baseRefName": base,
         "author": {"login": "app/dependabot" if bot else "someone"},
-        "labels": [{"name": n} for n in labels],
+        "labels": [{"name": n} for n in (*labels, *([watch.QUEUE_LABEL] if queued else []))],
         "closingIssuesReferences": [{"number": n} for n in closes],
     }
 
@@ -67,6 +67,11 @@ class PassedOver(unittest.TestCase):
         self.assertIsNone(pick([pr(1, draft=True)]))
         self.assertEqual(pick([pr(1, draft=True, labels=["infrastructure"]), pr(2)]), 2)
 
+    def test_ready_without_the_queue_label_is_never_taken(self):
+        # #925: the label is the go-ahead, added once the diff is read.
+        self.assertIsNone(pick([pr(1, queued=False, labels=["infrastructure"])]))
+        self.assertEqual(pick([pr(1, queued=False, labels=["infrastructure"]), pr(2)]), 2)
+
     def test_a_base_other_than_main_is_never_taken(self):
         self.assertIsNone(pick([pr(1, base="other")]))
 
@@ -105,6 +110,7 @@ class Finished(unittest.TestCase):
         before = watch.heads([pr(1, draft=True, head="a")])
         self.assertNotEqual(before, watch.heads([pr(1, draft=True, head="b")]))
         self.assertNotEqual(before, watch.heads([pr(1, draft=False, head="a")]))
+        self.assertNotEqual(before, watch.heads([pr(1, draft=True, head="a", queued=False)]))
         self.assertEqual(before, watch.heads([pr(1, draft=True, head="a")]))
 
 

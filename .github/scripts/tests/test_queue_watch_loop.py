@@ -23,8 +23,9 @@ _spec.loader.exec_module(queue)
 watch = queue.queue_watch
 
 
-def pr(number: int, draft=False, head=None) -> dict:
-    return {"number": number, "isDraft": draft, "headRefOid": head or f"sha{number}", "author": {"login": "x"}}
+def pr(number: int, draft=False, head=None, queued=True) -> dict:
+    labels = [{"name": watch.QUEUE_LABEL}] if queued else []
+    return {"number": number, "isDraft": draft, "headRefOid": head or f"sha{number}", "author": {"login": "x"}, "labels": labels}
 
 
 class World:

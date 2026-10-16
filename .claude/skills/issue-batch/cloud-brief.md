@@ -53,7 +53,9 @@ nothing to wait for.
 ## Ready means finished
 
 - Mark the PR ready **only when the branch is truly finished**: the orchestrator
-  merges a ready PR the moment its CI is green.
+  reads it, labels it `queue`, and the watch merges it the moment its CI is
+  green. **Never add the `queue` label yourself**: it is the orchestrator's
+  go-ahead after reading your diff (#925).
 - For a proof run on a draft, dispatch the workflow on the branch instead of
   readying: `gh workflow run ci.yml --ref <branch>` (without `gh`, the GitHub MCP
   `actions_run_trigger` does the same). It runs the gates and nothing else.

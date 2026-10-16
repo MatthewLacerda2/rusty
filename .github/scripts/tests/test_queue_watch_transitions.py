@@ -40,6 +40,16 @@ class Lines(unittest.TestCase):
             "watch: #5 opened as ready.",
         ])
 
+    def test_the_queue_label_coming_and_going_has_its_line(self):
+        before = board(pr(1, queued=False), pr(2), pr(3, draft=True, queued=False))
+        after = board(pr(1), pr(2, queued=False), pr(3, queued=True))
+        self.assertEqual(watch.transitions(before, after, set()), [
+            "watch: #1 queued.",
+            "watch: #2 unqueued.",
+            "watch: #3 turned ready.",
+            "watch: #3 queued.",
+        ])
+
     def test_a_push_alone_is_not_a_transition(self):
         self.assertEqual(watch.transitions(board(pr(1, head="a")), board(pr(1, head="b")), set()), [])
 
@@ -48,6 +58,16 @@ class Lines(unittest.TestCase):
 
 
 class Loop(unittest.TestCase):
+    def test_a_ready_pull_request_waits_for_its_label(self):
+        listings = [[pr(1, queued=False)], [pr(1, queued=False)], [pr(1)]]
+        with tempfile.TemporaryDirectory() as tmp:
+            world = loop.World(tmp, listings, {1: queue.MERGED})
+            said = []
+            world.fx.say = lambda line, *rest: said.append(line)
+            watch.run(world.fx, loop.opts(idle=1, poll=30))
+        self.assertEqual(world.taken, [1])
+        self.assertIn("watch: #1 queued.", said)
+
     def test_the_watch_prints_the_board_changes_as_it_polls(self):
         listings = [
             [pr(1, draft=True), pr(2, draft=True)],

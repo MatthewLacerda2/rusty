@@ -13,7 +13,8 @@ scorsese (#486); its incidents are cited as scorsese#N.
 Invoked, never a service: it runs when somebody types `make queue`, on the pull
 requests they name, in the order they name them. `--dry-run` does every read
 and the local rebase, and writes nothing to GitHub. `--watch` (#664) names
-none: it takes each pull request as it turns ready, the one conflicting with the
+none: it takes each ready pull request labelled `queue`, the go-ahead the
+orchestrator adds after reading the diff (#925), the one conflicting with the
 fewest others in line first, then by label priority (#753),
 and is still invoked, never a service — a hand-back skips that pull request
 and it carries on (#751); it exits on the machine failing, when nothing is
@@ -897,7 +898,7 @@ def parse(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--watch", action="store_true",
         help=(
-            "name no PR: take each one as it turns ready, fewest conflicts in line first, then label priority; a hand-back is skipped and announced"
+            "name no PR: take each ready one labelled `queue`, fewest conflicts in line first, then label priority; a hand-back is skipped and announced"
             f" ('{queue_watch.HANDED_BACK_LINE} #N'); exit when nothing is left: 1 if anything was handed back,"
             f" {queue_watch.MACHINE_STATUS} if the machine or GitHub failed"
         ),

@@ -31,6 +31,10 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+    # The go-ahead the merge queue's watch asks for (#925). A lockfile-only bump
+    # has no diff worth reading before CI; the actions entry above stays
+    # unlabelled, for a person.
+    labels: ["queue"]
     groups:
       cargo-compatible:
         patterns: ["*"]

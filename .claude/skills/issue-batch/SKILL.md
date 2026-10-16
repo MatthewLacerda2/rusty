@@ -35,12 +35,13 @@ The minimum shape is still **one in the merge queue, one being written**: nothin
 idles through a CI run.
 
 **The merge queue is `make queue ARGS=--watch`** (the `ci-merge` skill has the
-detail): started once, in the background, it takes each pull request the moment
-it turns ready, the one conflicting with the fewest others in line first, then
+detail): started once, in the background, it takes each ready pull request the
+moment it carries the **`queue` label** (#925: the orchestrator's go-ahead,
+added after reading the diff), the one conflicting with the fewest others in line first, then
 by label priority (#753), and rebases, pushes, waits for CI
 on the new head, asks `make mergeable` and squash-merges, one at a time — so the
 session running the batch is not the one sitting through each run, nor the one
-noticing each draft flip to ready (#664). A **hand-back** (conflict, red, no
+noticing each label go on (#664). A **hand-back** (conflict, red, no
 run) **skips that pull request and the watch carries on** with the rest (#751),
 printing `queue: HANDED BACK #N: …` as it happens; a fix pushed to the branch
 re-queues it. It exits on the machine failing, its deadline, or when nothing is
@@ -52,9 +53,9 @@ command, and the watch runs 70 (MatthewLacerda2/scorsese#845). Check `ps` for an
 orphaned watch before starting one. Without the `Monitor` the watch's exit still
 wakes you. The watch also prints a
 line per pull-request transition (`watch: #N opened as a draft`, `turned
-ready`, `back to draft`, `closed`; #909), so that one log (widen the `grep` to
-`watch:` lines when you want them) is the orchestrator's whole view: no separate
-pull-request poller. Start it with `--for 70` (#697; `ci-merge` has why 70, and when to
+ready`, `back to draft`, `closed`, `queued`, `unqueued`; #909), so that one log (widen
+the `grep` to `watch:` lines when you want them) is the orchestrator's whole view: no
+separate pull-request poller. Start it with `--for 70` (#697; `ci-merge` has why 70, and when to
 trade it for a longer per-PR `--deadline`). The watch ends itself first, between
 pull requests, with the last line `watch ended: deadline reached …` — relaunch it
 as it was, nothing to read. It never resolves a conflict: a hand-back naming paths goes back to the
@@ -294,8 +295,14 @@ per-PR polling loop or a chain of `make queue PRS=N` runs (#664: the 2026-09-30
 batch spent about 69 queue invocations and dozens of hand-built watchers on
 that, and one chain was cancelled by mistake). Its loop per pull request:
 
-1. Read the description. Check the decisions against the issue, and note any
+1. **Read the description and the diff, then add the `queue` label** (#925).
+   The watch takes nothing without it, so this read never races the merge: a
+   coder readies its own PR the moment its gates are green, and a green gate
+   does not read code. Check the decisions against the issue, and note any
    human-only checks (a window, speakers) as a checklist; don't hold for them.
+   What the read turns up goes back to the coder unlabelled; removing the label
+   pulls a PR out of line. Dependabot's cargo bumps arrive labelled; its GitHub
+   Actions bumps never do (they are held anyway, #825).
    If the coder dispatched a scoped mutation run, read its report when it
    finishes (`ci-merge`, *Triaging a survivor*); launch a follow-up routine only
    for survivors in code the branch wrote (#823).
@@ -435,8 +442,8 @@ they hold for any repo running this workflow.
   stays *ready* the whole time, so a watcher keyed on state never sees the push.
   The queue's watch keys on the head for exactly this reason; your own reading
   of a re-pushed PR still waits for the coder's PR comment ("rebased, gates
-  green"). If a push should *not* be retaken yet, flip the PR back to draft
-  first: rusty's queue takes ready PRs, there is no `queue` label.
+  green"). If a push should *not* be retaken yet, remove its `queue` label
+  first: the watch takes only labelled PRs (#925).
 
 ## Starting
 
