@@ -122,7 +122,8 @@ It **hands back** — names why, skips that entry and carries on, named pull
 requests and `--watch` alike — on a
 conflict (naming the paths; it never resolves one), a rebased head that fails
 the local check (never pushed), a red run, a run that never
-appears, a head somebody else moved, a draft, or a merge GitHub refused. A 502 on
+appears, a head somebody else moved, a draft, a description that claims what it
+may not (next section; checked before any push), or a merge GitHub refused. A 502 on
 the merge call is followed by asking whether it merged. Exit status is non-zero
 if anything was handed back. **A runner outage is not a red run** (#869): when the
 only jobs not green are `cancelled` (or a gate failed because the job it gates
@@ -213,6 +214,14 @@ otherwise:
 What it asks, so its answers read plainly (`.github/scripts/mergeable.py` has the
 incidents behind each):
 
+- **What the pull request claims, before any run** (#927, `merging/verdict/closing.py`
+  and `protocol.py`). It refuses a pull request that closes a `planning` or `human`
+  issue, with the labels read **at merge time** (the operator removing the label
+  greenlights it, no push needed); a closing keyword pointing at a pull request, a
+  closed issue or a number that does not exist; and a head branch `N-…` whose
+  description neither closes #N nor says `Refs #N`. Each is fixed by editing the
+  description or a label, never by a push. A description with no **Gates** line
+  passes with a warning.
 - **Both workflows, on the head SHA.** `ci-gate` (from `ci.yml`) and `lint-gate`
   (from `lint.yml`) each collapse their workflow's gating jobs; a green `ci` beside
   a missing `lint` is half a check.

@@ -8,7 +8,7 @@ import subprocess
 import time
 
 from merging.queue import checks, dependabot, gitio, landing, outcomes, pulls, rebase, waiting
-from merging.verdict import decide, github
+from merging.verdict import closing, decide, github, protocol
 
 
 def dry(repo: str, pull: dict, fresh: str, notes: list[str]) -> tuple[int, str, str]:
@@ -37,6 +37,12 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
     if pull.get("isDraft"):
         # Before any push: a draft is not a claim, so there is nothing to check.
         return number, outcomes.HANDED_BACK, outcomes.A_DRAFT
+    # Also before any push: what the pull request claims (#927), with the issues'
+    # labels as they stand now, so a greenlight given since it was queued counts.
+    refused = protocol.refusal({**pull, "closes": closing.closed_by(repo, pull)})
+    if refused:
+        outcomes.say(f"#{number}: {refused[0]}", *refused[1:])
+        return number, outcomes.HANDED_BACK, refused[0]
 
     branch, head = pull["headRefName"], pull["headRefOid"]
     gitio.remote("fetch", "--quiet", "origin", "main", cwd=opts.root)

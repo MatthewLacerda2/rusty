@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import sys
 
-from merging.verdict import decide, github
+from merging.verdict import closing, decide, github
 
 
 def main() -> int:
@@ -30,6 +30,7 @@ def main() -> int:
     try:
         repo = github.gh("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
         pull = github.gh("pr", "view", number, "--json", github.PULL_FIELDS)
+        pull["closes"] = closing.closed_by(repo, pull)
         runs, jobs = github.evidence(repo, pull["headRefOid"])
     except github.Unreachable as down:
         sys.exit(f"mergeable: GitHub unreachable after {len(github.RETRIES)} retries: {down}")

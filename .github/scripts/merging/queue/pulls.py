@@ -29,7 +29,7 @@ def look(number: int) -> dict:
     """The pull request, in the fields every step below reads."""
     return github.gh(
         "pr", "view", str(number), "--json",
-        github.PULL_FIELDS + ",headRefName,state,title,author",
+        github.PULL_FIELDS + ",state,title,author",
     )
 
 
