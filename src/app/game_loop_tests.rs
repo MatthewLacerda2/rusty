@@ -61,7 +61,7 @@ fn runtime_spawned_prefab_scripts_run_from_the_next_tick() {
     gw.set_playing(true);
 
     gw.tick(DT); // spawn tick: the enemy entity exists, its script untouched
-    let eval = |gw: &GameWorld, line: &str| gw.script_manager().eval(line).unwrap();
+    let eval = |gw: &super::GameWorld, line: &str| gw.script_manager().eval(line).unwrap();
     assert_eq!(eval(&gw, "__spawned"), "true");
     assert_eq!(eval(&gw, "__enemy_log"), "nil", "no load in the spawn tick");
 
