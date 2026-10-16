@@ -16,6 +16,7 @@
 use super::blend::blend_state;
 use super::vertex::vertex_layout;
 use crate::components::UiBlend;
+use crate::render::gpu::DEPTH_FORMAT;
 use crate::render::postfx::HDR_FORMAT;
 
 /// Which UI pass a pipeline draws in.
@@ -52,7 +53,7 @@ pub(crate) fn build_entry(
             "fs_world",
             HDR_FORMAT,
             Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth32Float,
+                format: DEPTH_FORMAT,
                 depth_write_enabled: Some(false),
                 depth_compare: Some(wgpu::CompareFunction::LessEqual),
                 stencil: wgpu::StencilState::default(),

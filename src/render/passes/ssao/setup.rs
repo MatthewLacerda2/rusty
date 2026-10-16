@@ -2,6 +2,7 @@
 //! occlusion and blur pipelines, and the white no-AO fallback.
 
 use super::{SsaoRenderer, AO_FORMAT};
+use crate::render::gpu::layout_entries::{depth_entry, texture_entry, uniform_entry};
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::timing::{GpuPass, GpuTimer};
 
@@ -118,31 +119,12 @@ impl SsaoRenderer {
 /// Uniform (both stages' params), the prepass depth, and the raw occlusion — all read
 /// with `textureLoad`, so no sampler.
 fn create_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    let texture = |binding, sample_type| wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Texture {
-            sample_type,
-            view_dimension: wgpu::TextureViewDimension::D2,
-            multisampled: false,
-        },
-        count: None,
-    };
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("SSAO Layout"),
         entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-            texture(1, wgpu::TextureSampleType::Depth),
-            texture(2, wgpu::TextureSampleType::Float { filterable: true }),
+            uniform_entry(0, wgpu::ShaderStages::FRAGMENT),
+            depth_entry(1, wgpu::TextureViewDimension::D2),
+            texture_entry(2, wgpu::TextureViewDimension::D2),
         ],
     })
 }

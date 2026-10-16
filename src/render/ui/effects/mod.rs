@@ -28,6 +28,7 @@ use self::backdrop::UiBackdrop;
 use super::cache::UiViewCache;
 use super::mesh::{UiBatch, UiClip};
 use crate::render::gpu::grow_buffer::GrowBuffer;
+use crate::render::gpu::layout_entries::{dynamic_uniform_entry, sampler_entry, texture_entry};
 use crate::render::timing::{GpuPass, GpuTimer};
 use crate::render::Renderer;
 
@@ -109,35 +110,16 @@ impl UiEffects {
 /// The batch group's layout: the dynamic uniform, the mask and backdrop textures,
 /// and their sampler.
 pub(crate) fn batch_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    let texture = |binding| wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Texture {
-            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-            view_dimension: wgpu::TextureViewDimension::D2,
-            multisampled: false,
-        },
-        count: None,
-    };
-    let uniform = wgpu::BindGroupLayoutEntry {
-        binding: 0,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Uniform,
-            has_dynamic_offset: true,
-            min_binding_size: wgpu::BufferSize::new(SLOT),
-        },
-        count: None,
-    };
-    let sampler = wgpu::BindGroupLayoutEntry {
-        binding: 3,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-        count: None,
-    };
+    let uniform = dynamic_uniform_entry(0, wgpu::ShaderStages::FRAGMENT, SLOT);
+    let sampler = sampler_entry(3);
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("UI Batch Layout"),
-        entries: &[uniform, texture(1), texture(2), sampler],
+        entries: &[
+            uniform,
+            texture_entry(1, wgpu::TextureViewDimension::D2),
+            texture_entry(2, wgpu::TextureViewDimension::D2),
+            sampler,
+        ],
     })
 }
 

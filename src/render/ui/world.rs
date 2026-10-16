@@ -26,6 +26,7 @@ use super::effects::GroupKey;
 use super::pipeline::{self, UiPass};
 use crate::components::UiBlend;
 use crate::render::gpu::grow_buffer::GrowBuffer;
+use crate::render::gpu::layout_entries::dynamic_uniform_entry;
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::timing::{GpuPass, GpuTimer};
 use crate::render::{RenderView, Renderer};
@@ -60,18 +61,11 @@ impl WorldUiPipeline {
     ) -> Self {
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("World UI Layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: true,
-                    min_binding_size: wgpu::BufferSize::new(
-                        std::mem::size_of::<WorldUiUniform>() as u64
-                    ),
-                },
-                count: None,
-            }],
+            entries: &[dynamic_uniform_entry(
+                0,
+                wgpu::ShaderStages::VERTEX_FRAGMENT,
+                std::mem::size_of::<WorldUiUniform>() as u64,
+            )],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("World UI Pipeline Layout"),

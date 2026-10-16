@@ -1,6 +1,9 @@
 //! Resource construction for the post-process chain: bind-group layout, the five
 //! fullscreen pipelines, the params buffer, sampler, and the render targets.
 
+use crate::render::gpu::layout_entries::{
+    depth_entry, sampler_entry, texture_entry, uniform_entry,
+};
 use crate::render::gpu::shaders::ShaderRegistry;
 
 use super::custom::CustomChain;
@@ -217,50 +220,17 @@ impl PostFx {
     }
 
     fn create_io_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-        let tex = |binding: u32| wgpu::BindGroupLayoutEntry {
-            binding,
-            visibility: wgpu::ShaderStages::FRAGMENT,
-            ty: wgpu::BindingType::Texture {
-                sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                view_dimension: wgpu::TextureViewDimension::D2,
-                multisampled: false,
-            },
-            count: None,
-        };
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("PostFX IO Layout"),
             entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                tex(1),
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-                tex(3),
+                uniform_entry(0, wgpu::ShaderStages::FRAGMENT),
+                texture_entry(1, wgpu::TextureViewDimension::D2),
+                sampler_entry(2),
+                texture_entry(3, wgpu::TextureViewDimension::D2),
                 // Depth is read via textureLoad on a depth view of the
                 // Depth32Float target (point sampling — no sampler needed).
-                wgpu::BindGroupLayoutEntry {
-                    binding: 4,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Depth,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                tex(5),
+                depth_entry(4, wgpu::TextureViewDimension::D2),
+                texture_entry(5, wgpu::TextureViewDimension::D2),
             ],
         })
     }

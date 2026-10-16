@@ -5,6 +5,7 @@
 
 use super::{SsaoUniform, AO_FORMAT};
 use crate::render::gpu::bind_layouts::create_shadow_bind_group;
+use crate::render::gpu::DEPTH_FORMAT;
 use crate::render::Renderer;
 
 /// One view's SSAO state. Its bind groups reference the renderer's long-lived
@@ -35,7 +36,8 @@ impl SsaoTargets {
     pub(super) fn new(r: &Renderer, width: u32, height: u32, divisor: u32) -> Self {
         let device = &r.device;
         let raw_size = (width.div_ceil(divisor), height.div_ceil(divisor));
-        let (depth_tex, depth) = target(device, "SSAO Prepass Depth", (width, height), DEPTH);
+        let (depth_tex, depth) =
+            target(device, "SSAO Prepass Depth", (width, height), DEPTH_FORMAT);
         let (raw_tex, raw) = target(device, "SSAO Raw Occlusion", raw_size, AO_FORMAT);
         let (ao_tex, ao) = target(device, "SSAO Occlusion", (width, height), AO_FORMAT);
         let uniform = device.create_buffer(&wgpu::BufferDescriptor {
@@ -64,8 +66,6 @@ impl SsaoTargets {
         }
     }
 }
-
-const DEPTH: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 /// A render target the SSAO passes also sample, and its default view.
 fn target(

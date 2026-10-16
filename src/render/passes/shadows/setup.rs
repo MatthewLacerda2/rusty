@@ -5,7 +5,7 @@
 
 use super::cascades::MAX_CASCADES;
 use super::ShadowRenderer;
-use crate::render::gpu::bind_layouts::storage_entry;
+use crate::render::gpu::layout_entries::{dynamic_uniform_entry, storage_entry, uniform_entry};
 use crate::render::gpu::mesh::vertex_layout;
 
 /// The two cascade depth arrays and their views.
@@ -149,28 +149,10 @@ fn global_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Shadow Global Layout"),
         entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: LIGHT_BINDING,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: true,
-                    min_binding_size: wgpu::BufferSize::new(64),
-                },
-                count: None,
-            },
+            dynamic_uniform_entry(LIGHT_BINDING, wgpu::ShaderStages::VERTEX, 64),
             // The forward `camera` slot, holding only the game time: a cutting
             // variant's UV chain reads `camera.time` (#648).
-            wgpu::BindGroupLayoutEntry {
-                binding: TIME_BINDING,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
+            uniform_entry(TIME_BINDING, wgpu::ShaderStages::FRAGMENT),
         ],
     })
 }
