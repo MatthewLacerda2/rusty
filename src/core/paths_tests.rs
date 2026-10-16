@@ -86,3 +86,12 @@ fn the_verbatim_prefix_is_stripped_so_a_slash_join_reads_on_windows() {
         assert_eq!(strip_verbatim(plain), plain);
     }
 }
+
+#[test]
+fn to_slash_turns_every_backslash_into_a_slash() {
+    assert_eq!(
+        to_slash(Path::new(r"assets\scripts/a.lua")),
+        "assets/scripts/a.lua"
+    );
+    assert_eq!(to_slash(Path::new("/tmp/x")), "/tmp/x");
+}

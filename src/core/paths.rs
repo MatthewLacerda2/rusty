@@ -59,6 +59,12 @@ pub fn canonicalize(path: &Path) -> std::io::Result<PathBuf> {
     })
 }
 
+/// `path` as a `/`-separated string, the form scenes and the editor store (#939):
+/// every `\` becomes `/`, whatever the OS. Non-UTF-8 bytes are replaced lossily.
+pub fn to_slash(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
+}
+
 /// `path` without a verbatim prefix: `\\?\C:\x` → `C:\x`, `\\?\UNC\host\share`
 /// → `\\host\share`. Any other path, `/`-rooted ones included, comes back as is.
 pub fn strip_verbatim(path: &str) -> String {

@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use crate::core::input::InputState;
+use crate::core::paths;
 use crate::navigation::NavigationGraph;
 use crate::scene::{Scene, ScriptComponent};
 use crate::scripting::ConsoleLogs;
@@ -18,12 +19,12 @@ use super::super::GameWorld;
 pub(super) fn write_scenes(tag: &str) -> (String, String) {
     let dir = crate::test_temp::dir().join(format!("rusty_432_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
-    let path = |name: &str| dir.join(name).to_string_lossy().replace('\\', "/");
+    let path = |name: &str| paths::to_slash(&dir.join(name));
     let level = path("level.scene");
     let script = |name: &str, code: String| -> String {
         let p: PathBuf = dir.join(name);
         std::fs::write(&p, code).unwrap();
-        p.to_string_lossy().replace('\\', "/")
+        paths::to_slash(&p)
     };
     let menu_lua = script(
         "menu.lua",

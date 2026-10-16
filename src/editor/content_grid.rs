@@ -6,6 +6,7 @@ use std::path::Path;
 
 use egui_phosphor::regular as icon;
 
+use crate::core::paths;
 use crate::editor::content_browser::{extension, file_name, ROOT};
 use crate::editor::theme::Theme;
 use crate::editor::EditorUi;
@@ -55,7 +56,7 @@ fn read_entries(dir: &str) -> Option<Vec<(String, bool)>> {
         .flatten()
         .map(|e| {
             let p = e.path();
-            (p.to_string_lossy().replace('\\', "/"), p.is_dir())
+            (paths::to_slash(&p), p.is_dir())
         })
         .collect();
     entries.sort_by(|a, b| b.1.cmp(&a.1).then(file_name(&a.0).cmp(&file_name(&b.0))));
@@ -123,7 +124,7 @@ fn collect_tiles(
                 glyph: icon::ARROW_BEND_LEFT_UP,
                 color: t.text_secondary,
                 selected: false,
-                path: parent.to_string_lossy().replace('\\', "/"),
+                path: paths::to_slash(parent),
                 kind: TileKind::Up,
             });
         }

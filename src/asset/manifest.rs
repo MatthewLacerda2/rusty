@@ -18,6 +18,8 @@ use std::path::Path;
 
 use glam::Vec3;
 
+use crate::core::paths;
+
 use super::{import_file, is_model_path, AssetRef, SubMesh};
 
 /// One addressable sub-object within a source file, with the footprint an agent
@@ -133,7 +135,7 @@ fn collect_model_paths(dir: &Path, out: &mut Vec<String>) {
         if path.is_dir() {
             collect_model_paths(&path, out);
         } else {
-            let as_str = path.to_string_lossy().replace('\\', "/");
+            let as_str = paths::to_slash(&path);
             if is_model_path(&as_str) {
                 out.push(as_str);
             }
