@@ -8,8 +8,8 @@
 use egui::{Align, Layout, RichText, Ui};
 use egui_phosphor::regular as icon;
 
-use super::recent::{ago, RecentProject};
 use super::{Action, Page, ProjectPicker};
+use crate::core::project::bench::recent::{ago, RecentProject};
 use crate::editor::theme::{self, chrome, fonts, Theme};
 
 /// The title strip's text size.

@@ -47,6 +47,28 @@ the session in-process — no subprocess, no async runtime, no extra dependency.
 - `snapshot` — return a JSON snapshot of the live world (entities, components,
   transforms, play state). A convenience wrapper for `Debug.Snapshot()`; no arguments.
 
+**rusty bench** (#942) — the editor's project picker (Unity Hub's Projects page) as
+tools, so an agent manages projects without the window. They share the picker's code
+(`core::project::bench`) and the user's recent list (README § Game projects):
+
+- `bench_list` — the projects opened before, most recent first: `name`, `path`,
+  `opened_at` (Unix seconds), `ago` ("3 days ago") and `missing` (the folder is gone).
+- `bench_create` — make the project `name` under the folder `parent`, the editor's
+  *New Project*: the same checks (a plain name, an empty or new folder) and the same
+  skeleton and `project.rusty`. It goes to the top of the list but is not opened.
+- `bench_open` — open the project at `path` (one holding `project.rusty` or
+  `assets/`). One last opened by a different engine is reported in-band instead of
+  opened; call again with `confirm: true` to open it anyway (the picker's *Open
+  anyway*). In **embed** mode the bridge then drives that project: like Unity's *Open
+  Project*, the current one closes (unsaved scene edits are lost) and a fresh session
+  boots on the new root's default scene, exactly as `--project <path>` would. In
+  **attach** mode the window can't change project from here, so the answer carries
+  `relaunch`, the command that starts the editor on it.
+- `bench_forget` — take `path` off the recent list. The folder is left alone.
+
+Each answers with JSON text. Paths are best absolute: a relative one resolves against
+the open project's root.
+
 A tool whose Lua *fails* reports the error in-band (`isError: true` with the message
 as text), per MCP convention — the agent sees it and recovers, the server stays up.
 

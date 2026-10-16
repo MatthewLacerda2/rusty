@@ -1,4 +1,4 @@
-//! src/editor/project_picker/recent.rs — the projects opened before (#854).
+//! src/core/project/bench/recent.rs — the projects opened before (#854).
 //!
 //! Per-user engine state, never project state: one JSON file in the user's config
 //! directory ([`config_dir`]), Unity Hub's project list. The editor records a project

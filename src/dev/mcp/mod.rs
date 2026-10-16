@@ -28,11 +28,14 @@
 //! ends only at EOF (stdin closed).
 
 pub mod attach;
+pub mod bench;
+pub mod embed;
 pub mod protocol;
 pub mod resources;
 pub mod tools;
 
 use std::io::{BufRead, Write};
+use std::path::Path;
 
 use serde_json::{json, Value};
 
@@ -45,12 +48,20 @@ use protocol::Incoming;
 /// Two backends implement it, giving the `session-mcp` bin its two modes — both still
 /// running one line through the *same* evaluator, so the MCP surface, the console and
 /// the headless session can never drift apart:
-///   - [`Session`] (**embed**): evaluate in-process against a headless edit-mode world.
+///   - [`embed::Embedded`] (**embed**): evaluate in-process against a headless
+///     edit-mode world ([`Session`], which is a backend on its own in tests).
 ///   - [`attach::SocketClient`] (**attach**): forward the line to a *running window's*
 ///     command socket (#282) and unwrap its framed reply (#307).
 pub trait EvalBackend {
     /// Evaluate one Lua API line; `Ok` is the rendered result, `Err` the message.
     fn eval(&self, line: &str) -> Result<String, String>;
+
+    /// Make `root` the open project and drive it from now on (`bench_open`, #942).
+    /// `None` when this backend cannot: attach mode drives a window, which has to be
+    /// relaunched on the project instead.
+    fn reopen(&self, _root: &Path) -> Option<Result<(), String>> {
+        None
+    }
 }
 
 impl EvalBackend for Session {

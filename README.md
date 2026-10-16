@@ -114,6 +114,10 @@ before it opens. The list is yours, not the project's: it lives in
 `~/Library/Application Support/rusty/` on macOS, and every project the editor opens,
 with the picker or `--project`, goes to its top.
 
+**rusty bench** is the same picker for agents: the session MCP's `bench_list`,
+`bench_create`, `bench_open` and `bench_forget` tools list, make, open and forget
+projects over that same list, with the same checks (see `docs/mcp.md`).
+
 The other binaries (`player`, `play`, `session`, `session-mcp`) never show it: without
 `--project` they open a packaged `project/` beside the executable, else `./project`
 (created if missing). Opening a folder that doesn't exist yet creates it, as *New
