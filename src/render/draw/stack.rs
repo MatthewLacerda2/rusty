@@ -79,14 +79,10 @@ impl Renderer {
         post_params.misc[2] = 1.0 / view.post_fx.bloom_size.1 as f32;
         view.post_fx.prev_view_proj = post.view_proj;
 
-        let skybox_view = self
-            .skybox_texture
-            .as_ref()
-            .map(|tex| &tex.view)
-            .unwrap_or(&self.default_texture.view);
+        let sky = self.sky_panorama();
         let ctx = PostFxContext {
             depth_view: &view.depth_view,
-            skybox_view,
+            skybox: (&sky.view, &sky.sampler),
             output,
             timer: &self.gpu_timer,
         };

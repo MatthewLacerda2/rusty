@@ -19,7 +19,7 @@ use glam::Vec3;
 
 use self::stack::StackPass;
 use crate::render::lod::LodSelection;
-use crate::render::{build_camera_stack, texture_cameras, RenderView, Renderer};
+use crate::render::{build_camera_stack, texture_cameras, GpuTexture, RenderView, Renderer};
 use crate::scene::{Camera, Scene};
 
 impl Renderer {
@@ -149,6 +149,14 @@ impl Renderer {
             self.skybox_texture = None;
             self.global_bind_group_dirty = true;
         }
+    }
+
+    /// The skybox panorama every pass that reads the sky binds (forward reflections,
+    /// post-FX's SSR fallback), or the default texture when the scene has none.
+    pub(crate) fn sky_panorama(&self) -> &GpuTexture {
+        self.skybox_texture
+            .as_deref()
+            .unwrap_or(&self.default_texture)
     }
 
     /// Bind (or clear) the active reflection probe's baked cubemap for `camera_pos` (#245):
