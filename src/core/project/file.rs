@@ -19,17 +19,13 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use super::commit::{engine_commit, UNKNOWN_COMMIT};
 use crate::core::application::BuildSettings;
 
 /// The project file, at the project root.
 pub const PROJECT_FILE: &str = "project.rusty";
 /// Where the build settings lived before [`PROJECT_FILE`] absorbed them.
 pub const LEGACY_BUILD_SETTINGS: &str = "build_settings.json";
-/// The engine commit this binary was built from (`build.rs`): a full git hash,
-/// `-dirty` when the tree had changes, or [`UNKNOWN_COMMIT`] when built without git.
-pub const ENGINE_COMMIT: &str = env!("RUSTY_ENGINE_COMMIT");
-/// The commit of a build made without git.
-pub const UNKNOWN_COMMIT: &str = "unknown";
 const DIRTY: &str = "-dirty";
 
 /// What `project.rusty` holds. Every field is `#[serde(default)]`, so a partial file
@@ -46,7 +42,7 @@ pub struct ProjectFile {
 impl Default for ProjectFile {
     fn default() -> Self {
         Self {
-            engine_commit: ENGINE_COMMIT.to_string(),
+            engine_commit: engine_commit().to_string(),
             build: BuildSettings::default(),
         }
     }
@@ -118,7 +114,7 @@ pub struct EngineCheck {
     /// The commit the project recorded; `None` when it recorded none (a new project,
     /// or one from before `project.rusty`).
     pub recorded: Option<String>,
-    /// The running engine's commit ([`ENGINE_COMMIT`]).
+    /// The running engine's commit ([`engine_commit`]).
     pub running: String,
 }
 
@@ -127,7 +123,7 @@ impl EngineCheck {
     pub fn against(recorded: Option<&str>) -> Self {
         Self {
             recorded: recorded.filter(|c| !c.is_empty()).map(str::to_string),
-            running: ENGINE_COMMIT.to_string(),
+            running: engine_commit().to_string(),
         }
     }
 
@@ -178,8 +174,8 @@ pub(super) fn record(root: &Path) -> Result<(EngineCheck, Vec<String>), String> 
     let check = EngineCheck::against(Some(&file.engine_commit));
     let mut lines = Vec::new();
     // An `unknown` build can't say which engine it is: keep the last known record.
-    if ENGINE_COMMIT != UNKNOWN_COMMIT || file.engine_commit.is_empty() {
-        file.engine_commit = ENGINE_COMMIT.to_string();
+    if engine_commit() != UNKNOWN_COMMIT || file.engine_commit.is_empty() {
+        file.engine_commit = engine_commit().to_string();
     }
     file.write(&path)?;
     if !existed {

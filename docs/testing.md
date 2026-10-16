@@ -358,9 +358,10 @@ be added undocumented nor advertised when the engine never dispatches it.
 
 Both gates read the reference **assembled**: `docs/api/` is `index.md` plus one file
 per namespace (#569, so branches documenting different namespaces never collide), and
-`build.rs` concatenates it — index first, then the files in the order the index links
-them — into the one document the gates parse and MCP serves. `tests/api_doc_layout.rs`
-keeps the split honest: every `docs/api/<Name>.md` opens with the `` ## `<Name>` ``
+`scripting::api_doc` concatenates it at run time — index first, then the files in the
+order the index links them — into the one document the gates parse and MCP serves. It
+is read, not embedded, so a doc edit reruns the gates without rebuilding the crate (#931).
+`tests/api_doc_layout.rs` keeps the split honest: every `docs/api/<Name>.md` opens with the `` ## `<Name>` ``
 heading and is linked from the index.
 
 ## Example (unit, in-module)

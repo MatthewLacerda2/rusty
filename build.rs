@@ -1,78 +1,43 @@
-//! Build script: assemble the scripting-API reference (#569).
+//! Build script: stamp the engine commit into **release** builds only (#853, #931).
 //!
-//! The reference lives in `docs/api/` — `index.md` plus one file per Lua namespace, so
-//! two branches documenting different namespaces never touch the same file. The drift
-//! gates and the MCP resource still want it whole, so this concatenates the directory
-//! into `$OUT_DIR/scripting-api.md`: the index first, then every namespace file in the
-//! order the index links them, then any file the index forgot (sorted). Consumers embed
-//! it with `include_str!(concat!(env!("OUT_DIR"), "/scripting-api.md"))`.
+//! A shipped binary has no checkout to ask, so a release build carries its commit as
+//! `RUSTY_ENGINE_COMMIT`, which a project's `project.rusty` records. A debug build
+//! stamps nothing and asks git at run time (`src/core/project/commit.rs`): a stamped
+//! value, and the `HEAD` it reruns on, are part of the crate's fingerprint, so every
+//! commit, checkout and rebase would rebuild the whole crate once per feature set.
 //!
-//! It also embeds the engine's git commit as `RUSTY_ENGINE_COMMIT` (#853), which a
-//! project's `project.rusty` records — see [`engine_commit`].
+//! The scripting-API reference (`docs/api/`) is no longer assembled here: the drift
+//! gates and the MCP resource read it at run time (`scripting::api_doc`), so a doc
+//! edit reruns tests, never the compiler.
 
-use std::{env, fs, path::Path, process::Command};
+use std::{env, path::Path};
+
+#[allow(dead_code)]
+#[path = "src/core/project/commit.rs"]
+mod commit;
 
 fn main() {
-    engine_commit();
-    let dir = Path::new("docs/api");
-    println!("cargo:rerun-if-changed={}", dir.display());
-    let index = fs::read_to_string(dir.join("index.md")).expect("docs/api/index.md");
-
-    let mut order: Vec<String> = index
-        .split("](")
-        .skip(1)
-        .filter_map(|rest| rest.split_once(')'))
-        .map(|(target, _)| target.to_string())
-        .filter(|t| t.ends_with(".md") && !t.contains('/') && dir.join(t).is_file())
-        .collect();
-    let mut rest: Vec<String> = fs::read_dir(dir)
-        .expect("docs/api/")
-        .filter_map(|e| e.ok()?.file_name().into_string().ok())
-        .filter(|n| n.ends_with(".md") && n != "index.md" && !order.contains(n))
-        .collect();
-    rest.sort();
-    order.dedup();
-    order.extend(rest);
-
-    let mut doc = index;
-    for name in &order {
-        let text = fs::read_to_string(dir.join(name)).expect("docs/api file");
-        doc.push_str("\n---\n\n");
-        doc.push_str(&text);
-    }
-    let out = Path::new(&env::var("OUT_DIR").expect("OUT_DIR")).join("scripting-api.md");
-    fs::write(out, doc).expect("write the assembled scripting-API reference");
-}
-
-/// Export `RUSTY_ENGINE_COMMIT`: `git rev-parse HEAD`, suffixed `-dirty` when the tree
-/// had changes, or `unknown` without git (a source tarball still builds).
-///
-/// It reruns only when HEAD moves — `HEAD` itself (a checkout) and the ref it points
-/// to (a commit) — never on every edited file, so normal edits don't rerun it. The
-/// price: `-dirty` is as fresh as the last commit or checkout, not the last edit.
-fn engine_commit() {
-    let git = |args: &[&str]| -> Option<String> {
-        let out = Command::new("git").args(args).output().ok()?;
-        let text = String::from_utf8(out.stdout).ok()?;
-        out.status.success().then(|| text.trim().to_string())
-    };
-    let Some(commit) = git(&["rev-parse", "HEAD"]) else {
-        println!("cargo:rustc-env=RUSTY_ENGINE_COMMIT=unknown");
+    // Without this line cargo reruns the script on any change in the package.
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=src/core/project/commit.rs");
+    if env::var("PROFILE").as_deref() != Ok("release") {
         return;
-    };
-    let dirty =
-        git(&["status", "--porcelain", "--untracked-files=no"]).is_some_and(|s| !s.is_empty());
-    let suffix = if dirty { "-dirty" } else { "" };
-    println!("cargo:rustc-env=RUSTY_ENGINE_COMMIT={commit}{suffix}");
+    }
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let stamp = commit::git_commit(root).unwrap_or_else(|| commit::UNKNOWN_COMMIT.into());
+    println!("cargo:rustc-env=RUSTY_ENGINE_COMMIT={stamp}");
 
-    // A rerun-if-changed path that doesn't exist reruns every build, so only name
-    // the files git really has (a packed ref has no loose file; packed-refs covers it).
-    let head_ref = git(&["symbolic-ref", "-q", "HEAD"]);
+    // Rerun when HEAD moves: `HEAD` itself (a checkout) and the ref it points to (a
+    // commit). A rerun-if-changed path that doesn't exist reruns every build, so only
+    // name the files git really has (a packed ref has no loose file; packed-refs
+    // covers it). `-dirty` is as fresh as the last commit or checkout, not the last edit.
+    let head_ref = commit::git(root, &["symbolic-ref", "-q", "HEAD"]);
     let watched = ["HEAD", head_ref.as_deref().unwrap_or("HEAD"), "packed-refs"];
     for name in watched {
-        if let Some(path) = git(&["rev-parse", "--git-path", name]) {
-            if Path::new(&path).exists() {
-                println!("cargo:rerun-if-changed={path}");
+        if let Some(path) = commit::git(root, &["rev-parse", "--git-path", name]) {
+            let path = root.join(path);
+            if path.exists() {
+                println!("cargo:rerun-if-changed={}", path.display());
             }
         }
     }

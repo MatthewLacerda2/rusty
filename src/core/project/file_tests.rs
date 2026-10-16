@@ -42,14 +42,14 @@ fn only_two_known_different_commits_mismatch() {
 fn an_empty_record_is_no_record() {
     assert_eq!(EngineCheck::against(Some("")).recorded, None);
     assert_eq!(EngineCheck::against(Some(A)).recorded.as_deref(), Some(A));
-    assert_eq!(EngineCheck::against(None).running, ENGINE_COMMIT);
+    assert_eq!(EngineCheck::against(None).running, engine_commit());
 }
 
 #[test]
 fn a_partial_file_keeps_the_defaults() {
     let file = ProjectFile::from_json(r#"{ "build": { "product_name": "Neon" } }"#).unwrap();
     assert_eq!(file.build.product_name, "Neon");
-    assert_eq!(file.engine_commit, ENGINE_COMMIT);
+    assert_eq!(file.engine_commit, engine_commit());
     assert_eq!(ProjectFile::from_json(&file.to_json()).unwrap(), file);
     assert!(ProjectFile::from_json("{ not json").is_err());
 }
@@ -76,11 +76,11 @@ fn opening_folds_the_legacy_settings_in_once() {
         .unwrap()
         .unwrap();
     assert_eq!(file.build.product_name, "Neon");
-    assert_eq!(file.engine_commit, ENGINE_COMMIT);
+    assert_eq!(file.engine_commit, engine_commit());
 
     let (again, lines) = record(&root).unwrap();
     assert!(lines.is_empty(), "{lines:?}");
-    assert_eq!(again.recorded.as_deref(), Some(ENGINE_COMMIT));
+    assert_eq!(again.recorded.as_deref(), Some(engine_commit()));
     assert!(again.matches());
 }
 
@@ -119,10 +119,10 @@ fn opening_for_edit_records_the_running_engine() {
         "the check sees the old record"
     );
     let now = ProjectFile::read(&path).unwrap().unwrap().engine_commit;
-    let expected = if ENGINE_COMMIT == UNKNOWN_COMMIT {
+    let expected = if engine_commit() == UNKNOWN_COMMIT {
         A
     } else {
-        ENGINE_COMMIT
+        engine_commit()
     };
     assert_eq!(now, expected);
 }

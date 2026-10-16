@@ -27,15 +27,15 @@
 //! The engine's own content (shaders, bundled scripts, the preview model) is not the
 //! project's: it is found by [`engine_dir`], wherever the project is.
 
+mod commit;
 mod file;
 mod locate;
 mod migrate;
 
 use std::path::{Path, PathBuf};
 
-pub use file::{
-    EngineCheck, ProjectFile, ENGINE_COMMIT, LEGACY_BUILD_SETTINGS, PROJECT_FILE, UNKNOWN_COMMIT,
-};
+pub use commit::{engine_commit, UNKNOWN_COMMIT};
+pub use file::{EngineCheck, ProjectFile, LEGACY_BUILD_SETTINGS, PROJECT_FILE};
 pub use locate::{engine_dir, engine_path, locate, packaged_project};
 
 /// The project's content folder, relative to its root (Unity's `Assets/`).

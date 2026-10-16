@@ -58,7 +58,7 @@ fn another_engines_project_asks_first_and_cancel_keeps_the_picker() {
     project_with_commit(&dir, "0123456789abcdef0123456789abcdef01234567");
     let warning = check_existing(&dir).unwrap();
     // A build without git can't compare, so it never asks.
-    if crate::core::project::ENGINE_COMMIT == crate::core::project::UNKNOWN_COMMIT {
+    if crate::core::project::engine_commit() == crate::core::project::UNKNOWN_COMMIT {
         assert_eq!(warning, None);
         return;
     }
@@ -75,7 +75,7 @@ fn another_engines_project_asks_first_and_cancel_keeps_the_picker() {
 #[test]
 fn a_matching_project_opens_at_once_and_new_returns_its_folder() {
     let dir = fresh("match");
-    project_with_commit(&dir, crate::core::project::ENGINE_COMMIT);
+    project_with_commit(&dir, crate::core::project::engine_commit());
     let mut picker = ProjectPicker::new(RecentProjects::default(), None, dir.clone());
     assert_eq!(
         picker.apply(Action::OpenRecent(dir.clone())),
