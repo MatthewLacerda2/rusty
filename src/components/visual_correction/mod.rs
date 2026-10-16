@@ -1,4 +1,4 @@
-//! src/components/visual_correction.rs — Post-process component
+//! src/components/visual_correction/ — Post-process component
 //!
 //! bloom/exposure/SSR settings. Unity: post-process volume. Moved verbatim from
 //! the legacy `core/scene.rs`, then extended (phase-3) so the renderer's post-FX
@@ -8,28 +8,9 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-/// Tonemapping operator applied as the final color-correction step.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Tonemap {
-    /// No tonemap — clamp only. Mostly useful for debugging.
-    None,
-    /// Reinhard `c / (1 + c)` — cheap, soft rolloff.
-    Reinhard,
-    /// Filmic ACES fit — the default, richer contrast in highlights.
-    #[default]
-    Aces,
-}
+mod tonemap;
 
-impl Tonemap {
-    /// Stable index handed to the shader as a `u32`.
-    pub fn to_index(self) -> u32 {
-        match self {
-            Tonemap::None => 0,
-            Tonemap::Reinhard => 1,
-            Tonemap::Aces => 2,
-        }
-    }
-}
+pub use tonemap::Tonemap;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(from = "VisualCorrectionFile")]

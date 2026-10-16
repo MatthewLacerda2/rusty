@@ -33,8 +33,9 @@ mod state;
 
 use mlua::Lua;
 
-use self::state::{parse_tonemap, register_quality, tonemap_name, with_vc, with_vc_mut};
+use self::state::{register_quality, with_vc, with_vc_mut};
 use super::{put, Reg};
+use crate::components::Tonemap;
 use crate::core::quality::QualityPreset;
 use crate::scene::authoring::visual_correction as vc_ops;
 use crate::scene::Scene;
@@ -186,7 +187,7 @@ fn register_saturation_gamma<'scope>(
     )
 }
 
-/// Tonemap operator: `SetTonemap` / `GetTonemap` (defaulting to Aces).
+/// Tonemap operator: `SetTonemap` / `GetTonemap` (defaulting to ACES).
 fn register_tonemap<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -196,7 +197,7 @@ fn register_tonemap<'scope>(
         table,
         "SetTonemap",
         scope.create_function(|_, name: String| {
-            if let Some(tm) = parse_tonemap(&name) {
+            if let Some(tm) = Tonemap::parse(&name) {
                 with_vc_mut(scene, |e| vc_ops::set_tonemap(e, tm));
             }
             Ok(())
@@ -206,8 +207,10 @@ fn register_tonemap<'scope>(
         table,
         "GetTonemap",
         scope.create_function(|_, ()| {
-            Ok(with_vc(scene, |vc| tonemap_name(vc.tonemap).to_string())
-                .unwrap_or_else(|| "Aces".to_string()))
+            Ok(with_vc(scene, |vc| vc.tonemap)
+                .unwrap_or_default()
+                .name()
+                .to_string())
         }),
     )
 }

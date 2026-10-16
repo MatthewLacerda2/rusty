@@ -109,12 +109,9 @@ fn draw_apply_to_entity(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Sc
 /// entity's existing referenced material when present so its other params survive.
 fn apply_albedo_to_entity(scene: &mut Scene, entity_id: u32, path: &str) {
     if !scene.world.has_material(entity_id)
-        && !scene.world.set_material(
-            entity_id,
-            Some(MaterialComponent {
-                material: format!("entity_{entity_id}_material"),
-            }),
-        )
+        && !scene
+            .world
+            .set_material(entity_id, Some(MaterialComponent::for_entity(entity_id)))
     {
         return;
     }

@@ -18,7 +18,7 @@ use crate::scripting::ConsoleLogs;
 /// `editor` is released before the action mutates it).
 enum TileAction {
     Navigate(String),
-    Load(String, String),
+    Load(String),
     Select(String),
 }
 
@@ -43,7 +43,8 @@ pub fn draw(
 
     match action {
         Some(TileAction::Navigate(d)) => editor.current_dir = d,
-        Some(TileAction::Load(p, n)) => load_scene(editor, scene, console, &p, &n),
+        // The content grid is an edit-mode panel, so its load is never a play-mode one.
+        Some(TileAction::Load(p)) => editor.open_scene(scene, console, &p, false),
         Some(TileAction::Select(p)) => select_asset(editor, p),
         None => {}
     }
@@ -164,9 +165,7 @@ fn tile_action(tile: &Tile, resp: &egui::Response) -> Option<TileAction> {
         TileKind::Up | TileKind::Folder if resp.clicked() => {
             Some(TileAction::Navigate(tile.path.clone()))
         }
-        TileKind::Scene if resp.double_clicked() => {
-            Some(TileAction::Load(tile.path.clone(), tile.name.clone()))
-        }
+        TileKind::Scene if resp.double_clicked() => Some(TileAction::Load(tile.path.clone())),
         TileKind::Scene | TileKind::File if resp.clicked() => {
             Some(TileAction::Select(tile.path.clone()))
         }
@@ -238,25 +237,4 @@ fn select_asset(editor: &mut EditorUi, path: String) {
         }
     }
     editor.selected_asset_path = Some(path);
-}
-
-/// Load a scene file into the live World and focus the inspector on its settings
-/// (clearing the selections makes the inspector fall through to Scene Settings).
-fn load_scene(
-    editor: &mut EditorUi,
-    scene: &mut Scene,
-    console: &mut ConsoleLogs,
-    path: &str,
-    filename: &str,
-) {
-    match scene.load_from_file(path) {
-        Ok(_) => {
-            editor.current_scene_path = Some(path.to_string());
-            editor.selected_entity_id = None;
-            editor.selected_asset_path = None;
-            editor.is_dirty = true;
-            console.info(format!("Loaded scene from {}", filename));
-        }
-        Err(e) => console.error(format!("Failed to load scene: {}", e)),
-    }
 }

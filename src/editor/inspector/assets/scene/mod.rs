@@ -42,7 +42,7 @@ pub fn draw(
     ui.separator();
     ui.add_space(5.0);
 
-    draw_scene_operations(ui, editor, scene, console, path, filename);
+    draw_scene_operations(ui, editor, scene, console, path);
     draw_navmesh(ui, scene, nav);
     bake::draw(ui, editor, scene, console, path);
 }
@@ -200,7 +200,6 @@ fn draw_scene_operations(
     scene: &mut Scene,
     console: &mut ConsoleLogs,
     path: &str,
-    filename: &str,
 ) {
     ui.heading("Scene Operations");
     ui.add_space(8.0);
@@ -213,18 +212,8 @@ fn draw_scene_operations(
         )
         .clicked()
     {
-        match scene.load_from_file(path) {
-            Ok(_) => {
-                editor.current_scene_path = Some(path.to_string());
-                editor.selected_entity_id = None;
-                editor.selected_asset_path = None;
-                editor.is_dirty = true;
-                console.info(format!("Successfully loaded scene from {}", filename));
-            }
-            Err(e) => {
-                console.error(format!("Failed to load scene: {}", e));
-            }
-        }
+        // The inspector is an edit-mode panel, so its load is never a play-mode one.
+        editor.open_scene(scene, console, path, false);
     }
 
     ui.add_space(8.0);
@@ -237,13 +226,6 @@ fn draw_scene_operations(
         )
         .clicked()
     {
-        match scene.save_to_file(path) {
-            Ok(_) => {
-                console.info(format!("Overwrote scene file: {}", filename));
-            }
-            Err(e) => {
-                console.error(format!("Failed to save scene: {}", e));
-            }
-        }
+        editor.save_scene_to(scene, console, path);
     }
 }
