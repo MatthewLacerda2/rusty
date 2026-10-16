@@ -16,8 +16,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use rusty::app::GameWorld;
-use rusty::core::input::InputState;
-use rusty::navigation::NavigationGraph;
 use rusty::scene::authoring::ui_widgets::{self, create_ui, UiWidget};
 use rusty::scene::Scene;
 use rusty::scripting::ConsoleLogs;
@@ -39,13 +37,8 @@ impl Ui {
         let mut scene = Scene::new();
         build(&mut scene);
         let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-        let nav = NavigationGraph::new(-1.0, 1.0, -1.0, 1.0, 1.0);
-        let mut game = GameWorld::new(
-            Rc::new(RefCell::new(scene)),
-            Rc::new(RefCell::new(InputState::new())),
-            Rc::new(RefCell::new(nav)),
-            Rc::clone(&console),
-        );
+        let scene = Rc::new(RefCell::new(scene));
+        let mut game = crate::play::world(scene, 1.0, Rc::clone(&console));
         game.resources.screen.borrow_mut().set_game_view(1920, 1080);
         game.set_playing(true);
         let mut ui = Self { game, console };

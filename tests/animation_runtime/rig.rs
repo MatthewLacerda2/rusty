@@ -5,16 +5,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use glam::{Mat4, Vec3};
-use rusty::app::GameWorld;
 use rusty::asset::anim_data::{AnimationClip, Interpolation, JointTrack, Track};
 use rusty::asset::mesh_data::{JointTransform, SkinData};
 use rusty::components::{AnimatorComponent, MeshComponent};
-use rusty::core::input::InputState;
-use rusty::navigation::NavigationGraph;
 use rusty::scene::{DirtyFlag, Scene, ScriptComponent};
-use rusty::scripting::ConsoleLogs;
-
-pub const DT: f32 = 1.0 / 60.0;
 
 /// A one-joint skin, `hand`, whose clip slides it +X over [0, 1] s — the smallest
 /// rig that produces a non-identity pose.
@@ -90,17 +84,7 @@ pub fn armed_scene(script: Option<&str>) -> (Scene, u32, u32, u32) {
 /// Play `scene` for `ticks` fixed steps through the real schedule.
 pub fn play(scene: Scene, ticks: usize) -> Rc<RefCell<Scene>> {
     let scene = Rc::new(RefCell::new(scene));
-    let mut gw = GameWorld::new(
-        scene.clone(),
-        Rc::new(RefCell::new(InputState::new())),
-        Rc::new(RefCell::new(NavigationGraph::new(
-            -5.0, 5.0, -5.0, 5.0, 1.0,
-        ))),
-        Rc::new(RefCell::new(ConsoleLogs::new())),
-    );
-    gw.set_playing(true);
-    for _ in 0..ticks {
-        gw.tick(DT);
-    }
+    let mut gw = crate::play::playing(scene.clone(), 5.0);
+    crate::play::run(&mut gw, ticks);
     scene
 }

@@ -6,12 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use glam::Vec3;
-use rusty::app::GameWorld;
 use rusty::components::AnimatorComponent;
-use rusty::core::input::InputState;
-use rusty::navigation::NavigationGraph;
-use rusty::scene::ScriptComponent;
-use rusty::scripting::ConsoleLogs;
 
 use super::{ragdolled, rig};
 
@@ -37,25 +32,15 @@ fn run(ik: bool, enable: bool) -> Vec<Vec3> {
     scene
         .world
         .set_animator(id, Some(AnimatorComponent::default()));
-    let path = crate::temp::dir().join(format!("rusty_461_466_{ik}_{enable}.lua"));
-    std::fs::write(&path, script(ik, enable)).unwrap();
-    *scene.world.scripts_mut(id).unwrap() = vec![ScriptComponent {
-        path: path.to_string_lossy().replace('\\', "/"),
-        ..Default::default()
-    }];
-    let scene = Rc::new(RefCell::new(scene));
-    let mut gw = GameWorld::new(
-        scene.clone(),
-        Rc::new(RefCell::new(InputState::new())),
-        Rc::new(RefCell::new(NavigationGraph::new(
-            -5.0, 5.0, -5.0, 5.0, 1.0,
-        ))),
-        Rc::new(RefCell::new(ConsoleLogs::new())),
+    crate::play::attach_script(
+        &mut scene,
+        id,
+        &format!("rusty_461_466_{ik}_{enable}.lua"),
+        &script(ik, enable),
     );
-    gw.set_playing(true);
-    for _ in 0..60 {
-        gw.tick(1.0 / 60.0);
-    }
+    let scene = Rc::new(RefCell::new(scene));
+    let mut gw = crate::play::playing(scene.clone(), 5.0);
+    crate::play::run(&mut gw, 60);
     let s = scene.borrow();
     assert_eq!(s.ragdoll_enabled(id), enable);
     [

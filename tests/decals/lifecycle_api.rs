@@ -8,10 +8,7 @@ use std::rc::Rc;
 use glam::Vec3;
 use mlua::Lua;
 use rusty::app::GameWorld;
-use rusty::core::input::InputState;
-use rusty::navigation::NavigationGraph;
 use rusty::scene::Scene;
-use rusty::scripting::ConsoleLogs;
 
 const DT: f32 = 1.0 / 60.0;
 
@@ -24,14 +21,7 @@ fn eval<T: mlua::FromLuaMulti>(scene: &RefCell<Scene>, script: &str) -> mlua::Re
 }
 
 fn playing(scene: Scene) -> GameWorld {
-    let nav = NavigationGraph::new(-20.0, 20.0, -20.0, 20.0, 1.0);
-    let mut game = GameWorld::new(
-        Rc::new(RefCell::new(scene)),
-        Rc::new(RefCell::new(InputState::new())),
-        Rc::new(RefCell::new(nav)),
-        Rc::new(RefCell::new(ConsoleLogs::new())),
-    );
-    game.set_playing(true);
+    let mut game = crate::play::playing(Rc::new(RefCell::new(scene)), 20.0);
     game.tick(DT); // enter Play
     game
 }
