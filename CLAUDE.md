@@ -362,7 +362,7 @@ per-bone overrides and what hangs from a bone.
 
 One thing sits outside those five: **zimmer**, the synthesiser behind `Sound.*`, is
 an external crate from [scorsese](https://github.com/MatthewLacerda2/scorsese), a git
-dependency pinned to a commit (#413) — not a vendored module. `src/api/sound/` is
+dependency pinned to a commit (#413; `deny.toml` requires a `rev` on every git dependency) — not a vendored module. `src/api/sound/` is
 only its adapter (Lua → zimmer document, file writes, patch-path resolution).
 
 ## Conventions that matter
@@ -424,7 +424,8 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   provider sits behind a trait and tests use mocks. Every cost figure is an
   estimate. Keys come from the environment or a gitignored `.env`; see
   `docs/providers.md`.
-- **Use `glam`** for all math; keep egui / wgpu / mlua decoupled.
+- **Use `glam`** for all math (`deny.toml` bans `nalgebra` outside the physics stack, and
+  `cgmath`); keep egui / wgpu / mlua decoupled.
 - **Single crate.**
 - **Ships for macOS and Linux; Windows comes later.** Those two are the platforms rusty
   is used on and shipped to, so a change that works on only one of them is not done.
@@ -459,6 +460,8 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   parser and no promise of support without it. Running Blender is **authoring only**
   (editor, MCP, dev tools): a shipped game reads the cached glTF and never runs Blender,
   and the sim only ever sees glTF. The engine never parses `.blend` itself.
+  The `subprocess` rule (`make rules`) holds where a process may start: `src/` never
+  names `std::process::Command` without an inline reason (#975).
 
 ## Commit gate (programmatic — no AI needed)
 `make gates` runs everything CI blocks on, fastest-failing first; run it before
