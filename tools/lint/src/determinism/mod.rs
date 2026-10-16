@@ -16,8 +16,14 @@
 //!   `layers/table.rs`) may name those lints, or allow the groups that hold them;
 //! - `clippy.toml` still lists every banned item, and `Cargo.toml` still denies them.
 //!
+//! It also holds the rest of the lint policy (#961): `Cargo.toml` still denies an
+//! `#[allow]` and an exception without a `reason`, `clippy.toml` still lets test
+//! code unwrap, and the locked lints keep their exact escapes (`escapes.rs`).
+//!
 //! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --determinism`
 //! Exit code 1 on any violation; report mirrored to `.lint/report.txt`.
+
+mod escapes;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -46,7 +52,14 @@ const BANNED: &[&str] = &[
 const DENIES: &[&str] = &[
     "disallowed_methods = \"deny\"",
     "disallowed_types = \"deny\"",
+    // Every exception carries its reason (#961): `#[expect(lint, reason = "…")]`.
+    "allow_attributes = \"deny\"",
+    "allow_attributes_without_reason = \"deny\"",
 ];
+
+/// The `clippy.toml` lines the policy rests on: test code unwraps freely, so the
+/// sim's `unwrap_used` ban needs no per-test exception (#961).
+const SETTINGS: &[&str] = &["allow-unwrap-in-tests = true"];
 
 /// Names that switch the ban off: the two lints, and the groups that contain them.
 const OPT_OUTS: &[&str] = &[
@@ -71,6 +84,18 @@ pub fn run() {
         let content = fs::read_to_string(&path).unwrap_or_default();
         violations.extend(opt_out_violations(&norm, &content, &roots));
     }
+    let mut files = Vec::new();
+    for root in escapes::ROOTS {
+        walk(Path::new(root), &mut files);
+    }
+    files.sort();
+    for path in files {
+        let norm = path.to_string_lossy().replace('\\', "/");
+        violations.extend(escapes::violations(
+            &norm,
+            &fs::read_to_string(&path).unwrap_or_default(),
+        ));
+    }
     report(&violations);
     if violations.is_empty() {
         println!("determinism: ok");
@@ -81,6 +106,10 @@ pub fn run() {
 
 /// The banned items missing from `clippy.toml`, and the lints `Cargo.toml` no longer denies.
 fn config_violations(clippy_toml: &str, cargo_toml: &str) -> Vec<String> {
+    let unset = SETTINGS
+        .iter()
+        .filter(|s| !clippy_toml.lines().any(|l| l.trim() == **s))
+        .map(|s| format!("UNSET `{s}` — missing from clippy.toml"));
     let missing = BANNED
         .iter()
         .filter(|p| !clippy_toml.contains(&format!("path = \"{p}\"")))
@@ -89,7 +118,7 @@ fn config_violations(clippy_toml: &str, cargo_toml: &str) -> Vec<String> {
         .iter()
         .filter(|d| !cargo_toml.lines().any(|l| l.trim() == **d))
         .map(|d| format!("UNDENIED `{d}` — missing from Cargo.toml's [lints.clippy]"));
-    missing.chain(undenied).collect()
+    missing.chain(undenied).chain(unset).collect()
 }
 
 /// Every line of `path` that opts out of the ban, unless `path` is a platform root.
@@ -119,7 +148,12 @@ fn names_lint(code: &str, name: &str) -> bool {
     })
 }
 
+/// Every `.rs` file under `dir`, or `dir` itself when it is one (`build.rs`).
 fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
+    if dir.is_file() {
+        out.push(dir.to_path_buf());
+        return;
+    }
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
@@ -157,13 +191,15 @@ fn report(violations: &[String]) {
     if !violations.is_empty() {
         eprint!("{}", body);
         eprintln!(
-            "\n{} hole(s) in the sim's clock and RNG ban. Restore clippy.toml / Cargo.toml, \
-             or move the clock read to a platform module (its root carries the allow).",
+            "\n{} hole(s) in the lint policy. Restore clippy.toml / Cargo.toml, move a clock \
+             read to a platform module (its root carries the allow), or fix the code a \
+             locked lint flags (docs/linting.md).",
             violations.len()
         );
     }
 }
 
 #[cfg(test)]
-#[path = "determinism_tests.rs"]
+mod escapes_tests;
+#[cfg(test)]
 mod tests;

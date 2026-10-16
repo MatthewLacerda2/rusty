@@ -138,7 +138,10 @@ fn draw_entity_inspector(
 
 /// The Unity-style object header card: name + active/static toggles + layer combo.
 /// Widgets edit local snapshots and write back through the facade on change (#344).
-#[allow(clippy::too_many_arguments)] // (world, id) replaced the single &mut Entity handle
+#[expect(
+    clippy::too_many_arguments,
+    reason = "(world, id) replaced the single &mut Entity handle"
+)]
 fn draw_object_header(
     ui: &mut egui::Ui,
     t: crate::editor::theme::Theme,
@@ -209,7 +212,10 @@ fn draw_layer_combo(
 
 /// The per-component card chain (mesh, material, light, gameplay, camera, …) plus
 /// the Add Component menu, in the canonical inspector order.
-#[allow(clippy::too_many_arguments)] // (world, id) replaced the single &mut Entity handle
+#[expect(
+    clippy::too_many_arguments,
+    reason = "(world, id) replaced the single &mut Entity handle"
+)]
 fn draw_components(
     ui: &mut egui::Ui,
     editor: &mut EditorUi,

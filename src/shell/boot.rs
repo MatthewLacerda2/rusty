@@ -87,7 +87,10 @@ pub fn load_game(scene_path: &str) -> GameWorld {
     // Baked over the scene's own bounds (#452) — the same path the headless harness takes.
     let nav = Rc::new(RefCell::new(NavigationGraph::from_scene(&scene.borrow())));
     let input = Rc::new(RefCell::new(InputState::new()));
-    #[cfg_attr(not(feature = "dev"), allow(unused_mut))] // the dev probe install mutates it
+    #[cfg_attr(
+        not(feature = "dev"),
+        expect(unused_mut, reason = "the dev probe install mutates it")
+    )]
     let mut game = GameWorld::new(scene, input, nav, console);
     // Dev builds time the schedule so `Debug.Stats()` answers in a playtest (#433),
     // and add `Debug.*` and the bake verbs to the console's surface (#737).
