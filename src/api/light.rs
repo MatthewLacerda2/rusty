@@ -137,7 +137,7 @@ fn register_type<'scope>(
             let name = scene
                 .world
                 .light(id)
-                .map(|l| type_name(&l.light_type))
+                .map(|l| l.light_type.name())
                 .unwrap_or("None");
             Ok(name.to_string())
         }),
@@ -149,7 +149,7 @@ fn register_type<'scope>(
         scope.create_function(|_, (id, name): (u32, String)| {
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.light_mut(id) {
-                if let Some(t) = parse_type(&name) {
+                if let Some(t) = LightType::parse(&name) {
                     light_ops::set_type(&mut c, t);
                 }
             }
@@ -216,27 +216,6 @@ fn register_mode<'scope>(
             Ok(())
         }),
     )
-}
-
-/// Canonical name for a [`LightType`] (the value `GetType` returns / `SetType` takes).
-fn type_name(t: &LightType) -> &'static str {
-    match t {
-        LightType::Ambient => "Ambient",
-        LightType::Directional => "Directional",
-        LightType::Point => "Point",
-        LightType::Spotlight => "Spotlight",
-    }
-}
-
-/// Parse a light-type name (case-insensitive); `None` for an unknown name.
-fn parse_type(name: &str) -> Option<LightType> {
-    match name.to_lowercase().as_str() {
-        "ambient" => Some(LightType::Ambient),
-        "directional" => Some(LightType::Directional),
-        "point" => Some(LightType::Point),
-        "spotlight" => Some(LightType::Spotlight),
-        _ => None,
-    }
 }
 
 #[cfg(test)]

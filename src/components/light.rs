@@ -14,6 +14,33 @@ pub enum LightType {
     Spotlight,
 }
 
+impl LightType {
+    /// Every type, in declaration order.
+    pub const ALL: [LightType; 4] = [
+        LightType::Ambient,
+        LightType::Directional,
+        LightType::Point,
+        LightType::Spotlight,
+    ];
+
+    /// The type's name, as the API and the scene snapshot spell it.
+    pub fn name(&self) -> &'static str {
+        match self {
+            LightType::Ambient => "Ambient",
+            LightType::Directional => "Directional",
+            LightType::Point => "Point",
+            LightType::Spotlight => "Spotlight",
+        }
+    }
+
+    /// Parse a type name, case-insensitively; `None` for an unknown one.
+    pub fn parse(name: &str) -> Option<LightType> {
+        Self::ALL
+            .into_iter()
+            .find(|t| t.name().eq_ignore_ascii_case(name))
+    }
+}
+
 /// How a light takes part in baked lighting (#438) — Unity's Light Mode.
 ///
 /// * `Realtime` — direct light and shadows every frame; neither the lightmap bake nor
