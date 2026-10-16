@@ -182,7 +182,7 @@ What is not one row's lives in `tools/lint/src/layers/externs/policy.rs`:
   `egui` crates only under `src/editor` and `src/shell/editor` (the `editor`
   feature, #431), the provider crates only under `src/dev/providers` (#383).
 - **`exceptions`** — a use the rules forbid but the code still has, each naming its
-  open issue: `render → winit` (#988), `dev → wgpu` (#989).
+  open issue: `dev → wgpu` (#989).
 
 The lint reads `Cargo.toml`'s `[dependencies]` (and per-target ones) and reports
 `UNDECLARED_CRATE` (a module names a crate its row lacks), `STALE_CRATE`,

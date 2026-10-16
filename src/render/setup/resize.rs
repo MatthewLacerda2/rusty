@@ -4,7 +4,7 @@
 //! settings changing *after* the renderer exists.
 
 use crate::core::quality::QualityPreset;
-use crate::render::Renderer;
+use crate::render::{PixelSize, Renderer};
 
 impl Renderer {
     /// Switch the scalability tier. Each [`crate::render::RenderView`] re-sizes its own
@@ -53,7 +53,7 @@ impl Renderer {
     /// per-view offscreen targets whose sizes each [`crate::render::RenderView`] owns,
     /// so a surface resize never disturbs a view's targets (#355). No-op headless / on
     /// a zero-size request.
-    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+    pub fn resize(&mut self, new_size: PixelSize) {
         if new_size.width > 0 && new_size.height > 0 {
             self.config.width = new_size.width;
             self.config.height = new_size.height;

@@ -141,11 +141,13 @@ pub(super) fn handle_window_event<F: Frontend>(
 ) {
     match event {
         WindowEvent::CloseRequested => elwt.exit(),
-        WindowEvent::Resized(size) => shell.renderer.resize(*size),
+        WindowEvent::Resized(size) => shell.renderer.resize(boot::pixel_size(*size)),
         // A DPI / display change (e.g. dragging between Retina and non-Retina
         // monitors) can invalidate the swapchain without a Resized event.
         WindowEvent::ScaleFactorChanged { .. } => {
-            shell.renderer.resize(shell.window.inner_size());
+            shell
+                .renderer
+                .resize(boot::pixel_size(shell.window.inner_size()));
         }
         WindowEvent::Focused(focused) => focus::changed(shell, game, *focused),
         WindowEvent::ModifiersChanged(modifiers) => shell.modifiers = modifiers.state(),

@@ -110,7 +110,7 @@ fn apply_video(shell: &mut Shell, next: VideoSettings, previous: &VideoSettings)
         // event reconfigures the surface. Fullscreen ignores inner-size requests,
         // so reconfigure the surface directly to the requested framebuffer.
         if next.fullscreen {
-            shell.renderer.resize(winit::dpi::PhysicalSize::new(w, h));
+            shell.renderer.resize(crate::render::PixelSize::new(w, h));
         } else {
             let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(w, h));
         }
