@@ -11,7 +11,7 @@ mod markers;
 mod prefix;
 mod skip;
 
-pub use finding::Finding;
+pub use finding::{allowed, Finding};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
