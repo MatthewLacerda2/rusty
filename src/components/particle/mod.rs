@@ -57,6 +57,26 @@ pub enum ParticleBlend {
     Additive,
 }
 
+impl ParticleBlend {
+    /// Every blend, in inspector order.
+    pub const ALL: [ParticleBlend; 2] = [ParticleBlend::Alpha, ParticleBlend::Additive];
+
+    /// The blend's name, as the API and the inspector spell it.
+    pub fn name(self) -> &'static str {
+        match self {
+            ParticleBlend::Alpha => "Alpha",
+            ParticleBlend::Additive => "Additive",
+        }
+    }
+
+    /// Parse a blend name, case-insensitively; `None` for an unknown one.
+    pub fn parse(name: &str) -> Option<ParticleBlend> {
+        Self::ALL
+            .into_iter()
+            .find(|b| b.name().eq_ignore_ascii_case(name))
+    }
+}
+
 /// What a particle does when its motion segment hits a collider.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CollisionResponse {

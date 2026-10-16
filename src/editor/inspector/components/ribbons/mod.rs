@@ -65,10 +65,7 @@ fn draw_style(ui: &mut egui::Ui, s: &RibbonStyle) -> Option<StyleEdit> {
         edit = Some(StyleEdit::Mode(mode));
     }
     let mut blend = s.blend;
-    let blends = [
-        (ParticleBlend::Alpha, "Alpha"),
-        (ParticleBlend::Additive, "Additive"),
-    ];
+    let blends = ParticleBlend::ALL.map(|b| (b, b.name()));
     if combo(ui, "Blend", &mut blend, &blends) {
         edit = Some(StyleEdit::Blend(blend));
     }
