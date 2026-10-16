@@ -139,6 +139,6 @@ fn a_complete_brief_under_test_is_refused_for_want_of_a_key() {
         "Sfx.Generate({ text = 'frag 974', seconds = 1 })",
     ] {
         let err = session().eval(&format!("return {call}")).unwrap_err();
-        assert!(err.contains("ELEVENLABS_API_KEY"), "{call}: {err}");
+        assert!(err.contains("no key for ElevenLabs"), "{call}: {err}");
     }
 }
