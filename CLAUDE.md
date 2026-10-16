@@ -405,10 +405,11 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   the shell, once — never copied into a frontend.
 - **One declared layering.** Which module may import which is written once, in
   `tools/lint/src/layers/table.rs` (#724): one row per `src/<module>`, bottom-up,
-  each naming the modules it may use. Rows also mark which modules are **sim**; the
-  rest are the platform layer. `make layers` checks the code against it. Read the
-  table, not a file header, to answer "may X use Y?", and change the table in the same
-  PR that adds a new module-to-module import.
+  each naming the modules it may use and the external crates it may name (#938).
+  Rows also mark which modules are **sim**; the rest are the platform layer.
+  `make layers` checks the code against it. Read the table, not a file header, to
+  answer "may X use Y?", and change the table in the same PR that adds a new
+  module-to-module import or a crate use.
 - **Determinism.** The sim is a pure function of (seed, inputs, fixed dt). Wall-clock
   reads, unseeded RNG and `std`'s randomly seeded `HashMap`/`HashSet` are banned from
   the sim modules (the table's `sim` rows; maps go through `core::collections`); the

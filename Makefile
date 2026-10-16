@@ -110,7 +110,7 @@ size: ## [gate] File-length cap, full scan (tools/lint)
 rules: ## [gate] Finding-based rules with inline allows: prefix-group (tools/lint/src/rules)
 	$(LINT) -- --rules
 
-layers: ## [gate] Module imports match the declared layer table (tools/lint/src/layers/table.rs)
+layers: ## [gate] Module imports and external crates match the declared layer table (tools/lint/src/layers/table.rs)
 	$(LINT) -- --layers
 
 determinism: ## [gate] Only platform module roots opt out of clippy's clock/RNG ban (clippy.toml)

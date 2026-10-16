@@ -14,7 +14,7 @@ agent can read exactly what failed.
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix. Prints the ≲10-files-per-directory signal beside it, never failing on it (#934) |
-| Module layering | `tools/lint -- --layers` | every `crate::<module>` import matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724) |
+| Module layering | `tools/lint -- --layers` | every `crate::<module>` import and every external crate a module names matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724, #938) |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
 | Dependency direction | `tools/lint -- --direction` | the table's sim modules never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
 | Sim panic-freedom | clippy `unwrap_used` | **hard gate**: `#![deny(clippy::unwrap_used)]` in `app`/`scripting`/`physics`/`navigation`/`ui`; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`) |
@@ -131,6 +131,33 @@ and direction guards, `CLAUDE.md` and these docs each kept.
 
 A new import between modules is one edit to the row, in the same PR. If the edge
 breaks the order or leaves the sim, move the code down a layer instead.
+
+### External crates (#938)
+Each row also names the external crates its module may use (`.uses(&[…])`, the
+crate name as code writes it: `egui_wgpu`, not `egui-wgpu`), so `wgpu` stays in
+`render`, `winit` in `shell`, `kira` in `audio`, `mlua` in `scripting`/`api`/`dev`.
+What is not one row's lives in `tools/lint/src/layers/externs/policy.rs`:
+
+- **`common`** — the vocabulary any module may name unlisted: `glam`, `serde`,
+  `serde_json`, `log`.
+- **`unscoped`** — dependencies no module names, each with why it is in
+  `Cargo.toml` (`env_logger`: the binaries; `getrandom`: a feature pin, #552).
+- **`confined`** — crates only some subtrees may name, finer than a module: the
+  `egui` crates only under `src/editor` and `src/shell/editor` (the `editor`
+  feature, #431), the provider crates only under `src/dev/providers` (#383).
+- **`exceptions`** — a use the rules forbid but the code still has, each naming its
+  open issue: `render → winit` (#988), `dev → wgpu` (#989).
+
+The lint reads `Cargo.toml`'s `[dependencies]` (and per-target ones) and reports
+`UNDECLARED_CRATE` (a module names a crate its row lacks), `STALE_CRATE`,
+`CONFINED_CRATE`, `UNCLAIMED_CRATE` (a dependency no row, `common` or `unscoped`
+accounts for, so a **new dependency** needs a table decision in the same PR),
+`UNKNOWN_CRATE`, `REDUNDANT_CRATE` (a row listing a common crate) and
+`STALE_EXCEPTION`. It counts the first segment of a `use` path and any `name::`
+path elsewhere, outside comments and test code. A file that declares `mod image;`
+or imports a local `image` means its own module by `image::`, so that name is not
+counted there; glob imports are not followed, the one place a local name could
+pass for a crate.
 
 ## Sim determinism (clippy + `--determinism`)
 The sim is a pure function of (seed, inputs, fixed dt), so a wall-clock read or an

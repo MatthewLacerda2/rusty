@@ -66,7 +66,7 @@ pub fn edges(src: &Path) -> Vec<Edge> {
 }
 
 /// The top-level module a file belongs to; `None` for crate roots and binaries.
-fn owner(src: &Path, file: &Path) -> Option<String> {
+pub fn owner(src: &Path, file: &Path) -> Option<String> {
     let rel = file.strip_prefix(src).ok()?;
     let first = rel.components().next()?.as_os_str().to_str()?;
     let name = first.strip_suffix(".rs").unwrap_or(first);

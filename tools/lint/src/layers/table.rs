@@ -9,14 +9,27 @@
 //! lets only the platform rows opt out of clippy's clock ban, instead of either
 //! keeping copies (see [`super::sim_dirs`], [`super::platform_roots`]).
 //!
+//! Each row also names the external crates its module may use (#938); the rest of
+//! that policy (crates every module shares, confined ones) is in
+//! [`super::externs::policy`].
+//!
 //! The table is exact, not a ceiling: a dep nothing references any more is
 //! reported as stale, so this file never claims more than the code does.
 
-/// One top-level module under `src/` and the modules it may import.
+/// One top-level module under `src/`, the modules it may import and the external
+/// crates it may name (#938), beyond the common ones in [`super::externs::policy`].
 pub struct Layer {
     pub module: &'static str,
     pub sim: bool,
     pub deps: &'static [&'static str],
+    pub crates: &'static [&'static str],
+}
+
+impl Layer {
+    /// The external crates this module names (`-` written as `_`).
+    const fn uses(self, crates: &'static [&'static str]) -> Self {
+        Layer { crates, ..self }
+    }
 }
 
 const fn sim(module: &'static str, deps: &'static [&'static str]) -> Layer {
@@ -24,6 +37,7 @@ const fn sim(module: &'static str, deps: &'static [&'static str]) -> Layer {
         module,
         sim: true,
         deps,
+        crates: &[],
     }
 }
 
@@ -32,28 +46,31 @@ const fn platform(module: &'static str, deps: &'static [&'static str]) -> Layer 
         module,
         sim: false,
         deps,
+        crates: &[],
     }
 }
 
 pub const LAYERS: &[Layer] = &[
     // The data the sim runs on.
-    sim("core", &[]),
+    sim("core", &[]).uses(&["rustc_hash"]),
     sim("time", &[]),
-    sim("asset", &["core"]),
-    sim("procgen", &["core"]),
+    // Decoding is the asset pipeline's: models, and clips through symphonia (#545);
+    // only `audio` plays them.
+    sim("asset", &["core"]).uses(&["bevy_mikktspace", "gltf", "symphonia", "tobj"]),
+    sim("procgen", &["core"]).uses(&["image"]),
     // Shader authoring; GPU-free composition lives here so `render` imports it (#722).
-    sim("shadergen", &["core"]),
-    sim("components", &["asset", "core", "procgen"]),
-    sim("ecs", &["components"]),
+    sim("shadergen", &["core"]).uses(&["naga", "naga_oil"]),
+    sim("components", &["asset", "core", "procgen"]).uses(&["bytemuck"]),
+    sim("ecs", &["components"]).uses(&["hecs"]),
     // A sim `Resource` stepped by sim time; its device thread never reads a clock.
-    sim("audio", &["asset", "components", "core"]),
+    sim("audio", &["asset", "components", "core"]).uses(&["kira"]),
     sim(
         "scene",
         &["asset", "components", "core", "ecs", "procgen", "shadergen"],
     ),
     // The in-game UI's layout runs headless inside the sim (#417).
-    sim("ui", &["components", "core", "ecs", "scene"]),
-    sim("physics", &["components", "core", "ecs", "scene", "time"]),
+    sim("ui", &["components", "core", "ecs", "scene"]).uses(&["ab_glyph", "image", "ttf_parser"]),
+    sim("physics", &["components", "core", "ecs", "scene", "time"]).uses(&["rapier3d"]),
     sim("navigation", &["components", "core", "physics", "scene"]),
     // `scripting` and `api` are one layer (see PEERS): scripting installs the Lua
     // surface, and the surface reads runtime state scripting owns.
@@ -71,7 +88,8 @@ pub const LAYERS: &[Layer] = &[
             "time",
             "ui",
         ],
-    ),
+    )
+    .uses(&["mlua"]),
     sim(
         "api",
         &[
@@ -89,7 +107,8 @@ pub const LAYERS: &[Layer] = &[
             "time",
             "ui",
         ],
-    ),
+    )
+    .uses(&["mlua", "zimmer"]),
     sim(
         "app",
         &[
@@ -118,7 +137,13 @@ pub const LAYERS: &[Layer] = &[
             "shadergen",
             "ui",
         ],
-    ),
+    )
+    .uses(&[
+        "ab_glyph", "bytemuck", "image", "ktx2", "naga_oil", "pollster", "wgpu",
+    ]),
+    // The dev-only Lua namespaces (`Debug.*`, the provider ones) bind here because
+    // `api` is sim and may not import `dev` (#737); the harness drives the VM too.
+    // Its one wgpu file is an exception (#989).
     platform(
         "dev",
         &[
@@ -134,7 +159,14 @@ pub const LAYERS: &[Layer] = &[
             "scripting",
             "ui",
         ],
-    ),
+    )
+    .uses(&[
+        "image",
+        "mlua",
+        "pollster",
+        "scorsese_core",
+        "scorsese_providers",
+    ]),
     platform(
         "editor",
         &[
@@ -151,7 +183,10 @@ pub const LAYERS: &[Layer] = &[
             "shadergen",
             "ui",
         ],
-    ),
+    )
+    .uses(&["egui", "egui_phosphor"]),
+    // The window owner: winit, the OS input crates, and wgpu only where it presents
+    // frames and hosts the editor's egui-wgpu painter.
     platform(
         "shell",
         &[
@@ -169,7 +204,22 @@ pub const LAYERS: &[Layer] = &[
             "scripting",
             "time",
         ],
-    ),
+    )
+    .uses(&[
+        "arboard",
+        "egui",
+        "egui_wgpu",
+        "egui_winit",
+        "gilrs",
+        "image",
+        "objc2",
+        "objc2_app_kit",
+        "objc2_foundation",
+        "pollster",
+        "smithay_clipboard",
+        "wgpu",
+        "winit",
+    ]),
 ];
 
 /// Pairs declared as one layer: they may reference each other in either order.

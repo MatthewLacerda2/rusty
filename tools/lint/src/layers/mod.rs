@@ -1,6 +1,7 @@
 //! Layering lint (#724): the source's `crate::<module>` references must match the
 //! declared table in [`table`] — no undeclared dep, no stale one, no cycle, and no
-//! sim module importing a platform one, directly or through another module.
+//! sim module importing a platform one, directly or through another module. The
+//! [`externs`] half checks each module's external crates against its row (#938).
 //!
 //! Test code is exempt, as in the other guards. The table also feeds
 //! [`sim_dirs`], the one sim set the direction guard scans, and [`platform_roots`],
@@ -10,6 +11,7 @@
 //! Exit code 1 on any violation; report mirrored to `.lint/report.txt`.
 
 mod check;
+mod externs;
 mod graph;
 mod scan;
 mod table;
@@ -45,13 +47,18 @@ pub fn platform_roots() -> Vec<String> {
 pub fn run() {
     let src = Path::new("src");
     let edges = graph::edges(src);
-    let violations = check::all(
+    let mut violations = check::all(
         table::LAYERS,
         table::PEERS,
         table::EXCEPTIONS,
         &graph::modules(src),
         &edges,
     );
+    violations.extend(externs::violations(
+        table::LAYERS,
+        Path::new("Cargo.toml"),
+        src,
+    ));
     report(&violations);
     if violations.is_empty() {
         println!("layers: ok");
@@ -76,7 +83,7 @@ fn report(violations: &[String]) {
         eprint!("{body}");
         eprintln!(
             "\n{} layering violation(s). The table is tools/lint/src/layers/table.rs: \
-             move the code down a layer, or (if the new edge is right) declare it there.",
+             move the code down a layer, or (if the new edge or crate use is right) declare it there.",
             violations.len()
         );
     }
