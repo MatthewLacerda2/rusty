@@ -3,6 +3,7 @@
 
 mod budget;
 mod generated;
+mod keys;
 mod sfx;
 mod speech;
 mod voices;
