@@ -54,3 +54,33 @@ pub fn assemble(dir: &Path) -> Result<String, String> {
     }
     Ok(doc)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `assemble` keeps the index's links in their order, drops a link that is not a
+    /// sibling `.md` file, then appends the unlinked `.md` files, each exactly once.
+    #[test]
+    fn assemble_keeps_linked_then_unlinked_namespace_files_once() {
+        let dir = std::env::temp_dir().join(format!("rusty_api_doc_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("sub")).unwrap();
+        let index = "# Index\n[z](z.md) [a](a.md) [b](sub/b.md) [n](notes.txt) [m](missing.md)\n";
+        for (name, text) in [
+            ("index.md", index),
+            ("z.md", "Z\n"),
+            ("a.md", "A\n"),
+            ("extra.md", "E\n"),
+            ("notes.txt", "N\n"),
+            ("sub/b.md", "B\n"),
+        ] {
+            fs::write(dir.join(name), text).unwrap();
+        }
+        let doc = assemble(&dir);
+        let _ = fs::remove_dir_all(&dir);
+        let part = |text: &str| format!("\n---\n\n{text}");
+        let want = [index.to_string(), part("Z\n"), part("A\n"), part("E\n")].concat();
+        assert_eq!(doc, Ok(want));
+    }
+}

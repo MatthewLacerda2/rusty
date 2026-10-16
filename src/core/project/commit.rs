@@ -68,6 +68,52 @@ mod tests {
         );
     }
 
+    /// A fresh repository with one commit of `tracked.txt`, under the temp dir.
+    fn scratch_repo(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("rusty_{name}_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("tracked.txt"), "one").unwrap();
+        let commit = [
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-qm",
+            "c",
+        ];
+        for args in [&["init", "-q"][..], &["add", "tracked.txt"], &commit] {
+            let ran = git(&dir, args);
+            assert!(ran.is_some(), "git {args:?} failed in {}", dir.display());
+        }
+        dir
+    }
+
+    #[test]
+    fn a_clean_checkout_reports_its_full_hash() {
+        let dir = scratch_repo("git_commit_clean");
+        let commit = git_commit(&dir).expect("a repository has a commit");
+        assert_eq!(commit.len(), 40, "{commit}");
+        assert!(commit.chars().all(|c| c.is_ascii_hexdigit()), "{commit}");
+        std::fs::write(dir.join("untracked.txt"), "new").unwrap();
+        assert_eq!(
+            git_commit(&dir),
+            Some(commit),
+            "untracked files are not dirt"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_changed_tracked_file_marks_the_commit_dirty() {
+        let dir = scratch_repo("git_commit_dirty");
+        let head = git(&dir, &["rev-parse", "HEAD"]).expect("a repository has a HEAD");
+        std::fs::write(dir.join("tracked.txt"), "two").unwrap();
+        assert_eq!(git_commit(&dir), Some(format!("{head}-dirty")));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn outside_a_repository_there_is_no_commit() {
         assert_eq!(git_commit(Path::new("/")), None);
