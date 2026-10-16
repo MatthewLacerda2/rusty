@@ -64,9 +64,9 @@ pub use lighting::io::{
     LightingData,
 };
 pub use lighting::probe::{Probe, ProbeGrid, ProbeVolume};
-pub use lighting::probe_fill::{analytic_fill, AnalyticEnv};
+pub use lighting::probe_fill::analytic_fill;
 pub use lighting::reflection_probe::{ReflectionProbe, ReflectionProbeSet};
-pub use lighting::sh::{Sh9, SH_COEFFS};
+pub use lighting::sh::Sh9;
 pub use prefab::apply::{apply_instance_field_to_source, apply_instance_to_source};
 pub use prefab::link::{
     list_instance_overrides, record_instance_overrides, reimport_all_linked_instances,

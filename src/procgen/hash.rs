@@ -24,7 +24,7 @@ fn mix64(mut z: u64) -> u64 {
 /// and the seed are folded into one 64-bit word with distinct odd primes so that
 /// `(x, y)` and `(y, x)` (and different seeds) decorrelate.
 #[inline]
-pub fn hash2(x: i64, y: i64, seed: u64) -> u32 {
+fn hash2(x: i64, y: i64, seed: u64) -> u32 {
     let h = seed
         .wrapping_mul(0x9e37_79b9_7f4a_7c15)
         .wrapping_add((x as u64).wrapping_mul(0xff51_afd7_ed55_8ccd))
@@ -36,14 +36,14 @@ pub fn hash2(x: i64, y: i64, seed: u64) -> u32 {
 /// several independent values (e.g. a Voronoi cell's x and y jitter, or RGB white
 /// noise) without them correlating.
 #[inline]
-pub fn hash3(x: i64, y: i64, channel: u64, seed: u64) -> u32 {
+fn hash3(x: i64, y: i64, channel: u64, seed: u64) -> u32 {
     hash2(x, y, seed ^ channel.wrapping_mul(0xd6e8_feb8_6659_fd93))
 }
 
 /// A `u32` hash mapped to `[0, 1)` as `f32`. The top 24 bits feed the f32 mantissa
 /// so the result is uniform across representable values in the unit interval.
 #[inline]
-pub fn to_unit_f32(h: u32) -> f32 {
+fn to_unit_f32(h: u32) -> f32 {
     (h >> 8) as f32 / (1u32 << 24) as f32
 }
 

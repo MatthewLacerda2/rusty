@@ -19,7 +19,7 @@ use crate::scene::lighting::sh::Sh9;
 use crate::scene::Scene;
 
 /// Suffix appended to a scene path to locate its lighting sidecar.
-pub const LIGHTING_SIDECAR_SUFFIX: &str = ".lighting.json";
+const LIGHTING_SIDECAR_SUFFIX: &str = ".lighting.json";
 
 /// The on-disk sidecar: the baked SH for each probe, index-aligned with the scene's
 /// `ProbeVolume::probes`. Deliberately minimal — just the coefficients.

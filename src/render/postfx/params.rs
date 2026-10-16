@@ -105,7 +105,7 @@ pub fn custom_effects(scene: &Scene) -> Vec<String> {
 }
 
 /// The runtime params of those effects (#671), from the same volume. Empty without one.
-pub fn post_param_values(scene: &Scene) -> BTreeMap<String, Vec<f32>> {
+fn post_param_values(scene: &Scene) -> BTreeMap<String, Vec<f32>> {
     with_active_volume(scene, |vc| vc.post_params.clone()).unwrap_or_default()
 }
 

@@ -77,11 +77,6 @@ impl Keymap {
             .map(String::as_str)
     }
 
-    /// Whether the keymap is pure identity (no overrides).
-    pub fn is_identity(&self) -> bool {
-        self.overrides.is_empty()
-    }
-
     /// The overrides as a flat JSON object of `{ physical: logical }`, suitable for
     /// `Storage::set`. Identity (no overrides) serializes to an empty object.
     pub fn to_json(&self) -> Value {
@@ -115,7 +110,7 @@ mod tests {
     #[test]
     fn identity_passes_through_unmapped_keys() {
         let keymap = Keymap::new();
-        assert!(keymap.is_identity());
+        assert!(keymap.overrides.is_empty());
         assert_eq!(keymap.resolve("W"), "W");
         assert_eq!(keymap.resolve("space"), "SPACE");
         assert!(keymap.get("W").is_none());
@@ -127,7 +122,7 @@ mod tests {
         keymap.bind("up", "w");
         assert_eq!(keymap.resolve("UP"), "W");
         assert_eq!(keymap.get("up"), Some("W"));
-        assert!(!keymap.is_identity());
+        assert!(!keymap.overrides.is_empty());
         // An untouched key still maps to itself.
         assert_eq!(keymap.resolve("D"), "D");
     }
@@ -136,10 +131,10 @@ mod tests {
     fn binding_a_key_to_itself_is_identity() {
         let mut keymap = Keymap::new();
         keymap.bind("W", "W");
-        assert!(keymap.is_identity());
+        assert!(keymap.overrides.is_empty());
         keymap.bind("W", "A");
         keymap.bind("w", "w");
-        assert!(keymap.is_identity());
+        assert!(keymap.overrides.is_empty());
     }
 
     #[test]

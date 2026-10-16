@@ -11,7 +11,7 @@ use crate::components::mesh::Vertex;
 use crate::components::MeshComponent;
 
 /// The mesh-cache key every soldier shares: one GPU buffer pair for all of them.
-pub const PRIMITIVE: &str = "BenchSoldier";
+const PRIMITIVE: &str = "BenchSoldier";
 /// The clip every soldier plays.
 pub const WALK: &str = "Walk";
 

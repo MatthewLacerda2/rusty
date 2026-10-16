@@ -34,7 +34,7 @@ pub mod job;
 pub use job::{BakeOutcome, LightmapBakeJob};
 
 /// Suffix of the folder beside a scene file that holds its lightmaps.
-pub const LIGHTMAP_DIR_SUFFIX: &str = ".lightmaps";
+const LIGHTMAP_DIR_SUFFIX: &str = ".lightmaps";
 
 /// The lightmap folder for a scene: `foo.scene` → `foo.scene.lightmaps/`.
 pub fn lightmap_dir(scene_path: &str) -> PathBuf {

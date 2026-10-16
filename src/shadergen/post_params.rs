@@ -41,6 +41,7 @@ impl PostChain {
     }
 
     /// A chain over already-read layouts.
+    #[cfg(test)]
     pub fn from_layouts(layouts: Vec<ParamLayout>) -> Self {
         Self { layouts }
     }

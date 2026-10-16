@@ -11,7 +11,7 @@ use glam::{Vec2, Vec3};
 
 /// The seed every Play session starts from. Fixed, so two runs of the same scene
 /// with the same inputs draw the same numbers.
-pub const DEFAULT_SEED: u64 = 0x5EED_0000_0000_0443;
+const DEFAULT_SEED: u64 = 0x5EED_0000_0000_0443;
 
 /// Seeded SplitMix64 generator — the per-World gameplay RNG resource.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,7 +37,7 @@ impl Random {
     }
 
     /// The next raw 64-bit value (SplitMix64).
-    pub fn next_u64(&mut self) -> u64 {
+    fn next_u64(&mut self) -> u64 {
         self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.state;
         z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);

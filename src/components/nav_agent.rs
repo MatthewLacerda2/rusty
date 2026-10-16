@@ -11,9 +11,9 @@ use super::OffMeshLinkData;
 /// Unity's default `avoidancePriority`: the middle of the 0–99 range.
 pub const DEFAULT_AVOIDANCE_PRIORITY: u8 = 50;
 /// Unity's default `angularSpeed`, degrees/second.
-pub const DEFAULT_ANGULAR_SPEED: f32 = 120.0;
+const DEFAULT_ANGULAR_SPEED: f32 = 120.0;
 /// The default yaw-rate ramp, degrees/second²: 0 → 120°/s in 1/6 s.
-pub const DEFAULT_ANGULAR_ACCELERATION: f32 = 720.0;
+const DEFAULT_ANGULAR_ACCELERATION: f32 = 720.0;
 /// The highest (least important) avoidance priority, as in Unity.
 pub const MAX_AVOIDANCE_PRIORITY: u8 = 99;
 

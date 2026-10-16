@@ -21,7 +21,7 @@ pub struct Slot {
 }
 
 /// The `mask` slot's group-2 binding (after the param uniform at 6).
-pub const MASK_BINDING: u32 = 7;
+const MASK_BINDING: u32 = 7;
 
 /// Every extra texture slot, in binding order.
 pub const SLOTS: &[Slot] = &[Slot {

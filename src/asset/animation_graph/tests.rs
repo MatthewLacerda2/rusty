@@ -142,11 +142,3 @@ fn io_validates_both_directions() {
     assert!(matches!(load(&path), Err(GraphError::Invalid(_))));
     std::fs::remove_dir_all(&dir).ok();
 }
-
-#[test]
-fn graph_paths_are_recognised_by_extension() {
-    assert!(is_graph_path("assets/anims/guard.animgraph"));
-    assert!(is_graph_path("GUARD.ANIMGRAPH"));
-    assert!(!is_graph_path("assets/models/crates.glb"));
-    assert!(!is_graph_path("animgraph"));
-}

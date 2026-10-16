@@ -45,7 +45,7 @@ impl GameViewRect {
 }
 
 /// Pixels of a touchpad scroll that count as one wheel line.
-pub const PIXELS_PER_LINE: f64 = 20.0;
+const PIXELS_PER_LINE: f64 = 20.0;
 
 /// The vertical wheel motion in lines (positive = away from the user / scroll up).
 /// Touchpads report pixels, which are scaled into lines.

@@ -21,7 +21,7 @@ mod retry;
 
 /// The `.meta` extension appended to the full source filename (Unity-style), so
 /// `crates.glb` → `crates.glb.meta`.
-pub const META_EXTENSION: &str = "meta";
+const META_EXTENSION: &str = "meta";
 
 /// How a sub-object's baked mesh collider is shaped (#77). `TriMesh` is an exact
 /// triangle mesh (static geometry); `Convex` is a convex hull (cheaper, usable on

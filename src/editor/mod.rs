@@ -208,7 +208,7 @@ impl EditorUi {
     /// Apply the active theme: register the editor fonts once, then push the
     /// token-derived [`egui::Style`] for this frame — tinted toward the accent while
     /// `playing`, as Unity tints its editor in Play mode. See [`theme::Theme`].
-    pub fn apply_theme(&mut self, ctx: &egui::Context, playing: bool) {
+    fn apply_theme(&mut self, ctx: &egui::Context, playing: bool) {
         if !self.fonts_installed {
             theme::Theme::install_fonts(ctx);
             self.fonts_installed = true;
@@ -219,7 +219,7 @@ impl EditorUi {
     }
 
     /// Read local assets folders to populate Asset Browser (legacy scan, kept for compatibility)
-    pub fn scan_assets(&mut self) {
+    fn scan_assets(&mut self) {
         self.assets_scripts.clear();
         self.assets_textures.clear();
 

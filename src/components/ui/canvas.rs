@@ -32,7 +32,7 @@ pub enum CanvasRenderMode {
 }
 
 /// Unity's default world-canvas density: 100 reference units to the metre.
-pub const DEFAULT_PIXELS_PER_UNIT: f32 = 100.0;
+const DEFAULT_PIXELS_PER_UNIT: f32 = 100.0;
 
 /// The `ScreenSpaceCamera` sway's runtime state — never saved (#429). Written by
 /// the sway system each tick, read by the renderer and the hit-test.
@@ -46,7 +46,7 @@ pub struct CanvasSway {
 }
 
 /// Unity's default *Scale With Screen Size* reference resolution.
-pub const DEFAULT_REFERENCE_RESOLUTION: Vec2 = Vec2::new(1920.0, 1080.0);
+const DEFAULT_REFERENCE_RESOLUTION: Vec2 = Vec2::new(1920.0, 1080.0);
 
 /// A UI root (Unity's `Canvas` + `CanvasScaler`). See the module docs.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

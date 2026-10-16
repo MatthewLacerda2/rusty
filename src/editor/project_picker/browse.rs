@@ -99,7 +99,7 @@ impl FolderBrowser {
 }
 
 /// The visible subfolders of `dir`, sorted case-insensitively.
-pub fn list_subdirs(dir: &Path) -> Vec<String> {
+fn list_subdirs(dir: &Path) -> Vec<String> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
     };

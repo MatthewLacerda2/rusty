@@ -59,7 +59,7 @@ pub struct FrameStats {
 }
 
 /// Whether `key` names a wall-clock timing (non-deterministic) rather than a count.
-pub fn is_timing(key: &str) -> bool {
+fn is_timing(key: &str) -> bool {
     key.ends_with("_ms")
 }
 

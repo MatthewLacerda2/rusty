@@ -49,7 +49,7 @@ pub const PLAYER_CONTROLLER_SCRIPT: &str = "assets/scripts/player_controller.lua
 pub const BOT_SCRIPT: &str = "assets/scripts/bot.lua";
 /// How far from the Player (centre to centre) Enemy_1 stops: its 0.65 m half-width
 /// plus the Player's 0.5 m radius plus clearance, so the two never overlap (#743).
-pub const ENEMY_STOPPING_DISTANCE: f32 = 1.5;
+const ENEMY_STOPPING_DISTANCE: f32 = 1.5;
 
 /// Build the default scene into `scene`. `bot_script` is Enemy_1's Lua brain; empty
 /// leaves it unscripted (the harness's default, so a test drives the enemy itself).

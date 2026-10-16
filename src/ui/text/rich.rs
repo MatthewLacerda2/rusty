@@ -104,7 +104,7 @@ fn pop_count(n: &mut u32) -> bool {
 }
 
 /// `#rrggbb` (keeping `alpha`) or `#rrggbbaa` → display-space RGBA in `[0, 1]`.
-pub fn parse_hex(hex: &str, alpha: f32) -> Option<Vec4> {
+fn parse_hex(hex: &str, alpha: f32) -> Option<Vec4> {
     let digits = hex.strip_prefix('#')?;
     if !matches!(digits.len(), 6 | 8) || !digits.is_ascii() {
         return None;
