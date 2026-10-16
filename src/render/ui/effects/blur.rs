@@ -213,10 +213,10 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("UI Backdrop Encoder"),
             });
-        let skybox = self.skybox_texture.as_ref().map(|t| &t.view);
+        let sky = self.sky_panorama();
         let ctx = PostFxContext {
             depth_view: &view.depth_view,
-            skybox_view: skybox.unwrap_or(&self.default_texture.view),
+            skybox: (&sky.view, &sky.sampler),
             output: &targets.downs[0].view,
             timer: &self.gpu_timer,
         };
