@@ -145,9 +145,13 @@ impl ScriptManager {
         }
     }
 
-    /// Resolve the scene's relative script paths against `root` from now on.
+    /// Resolve the scene's relative script paths, and `require`d modules, against
+    /// `root` from now on.
     pub fn set_workspace_root(&mut self, root: impl Into<PathBuf>) {
         self.workspace = root.into();
+        if let Some(lua) = &self.lua {
+            super::sandbox::point_require(lua, &self.workspace).ok();
+        }
     }
 
     /// Where the script at `path` lives: `path` under the workspace root, or
@@ -172,6 +176,7 @@ impl ScriptManager {
         // Deterministic sandbox (#443): no `os`/`io`, `math.random` over the
         // seeded RNG — which restarts from its default seed with every fresh VM.
         let lua = super::sandbox::new_sim_vm()?;
+        super::sandbox::point_require(&lua, &self.workspace)?;
         *self.random.borrow_mut() = Random::default();
         *self.event_system.borrow_mut() = EventSystem::default();
 
