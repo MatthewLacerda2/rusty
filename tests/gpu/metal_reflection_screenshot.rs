@@ -5,12 +5,15 @@
 //!
 //! The scene has **no lights** and a blue ambient tint, so the only thing that can
 //! light a white metal sphere is the reflected sky: its centre must be well above
-//! black and blue-dominant like that sky. With SSR on, the same must still hold.
-//! Without an adapter `capture` returns `Ok(false)` and the test skips.
+//! black and blue-dominant like that sky. With SSR on, the same must still hold; SSR
+//! runs only on the High tier, so that shot sets it (the default tier would leave the
+//! pass off and the test vacuous). Without an adapter the test skips.
 
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
-use rusty::dev::screenshot::capture;
+use rusty::core::quality::QualityPreset;
+use rusty::dev::capture::CaptureHost;
+use rusty::dev::screenshot::capture_into;
 use rusty::scene::authoring::{create_entity, default_visual_correction, Primitive};
 use rusty::scene::{Camera, Scene};
 
@@ -61,7 +64,11 @@ fn centre_rgb(path: &std::path::Path) -> [f64; 3] {
 fn assert_reflects_sky(label: &str, ssr: bool) {
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
     let path = crate::temp::dir().join(format!("rusty_metal_{label}.png"));
-    if !capture(&scene(ssr), &cam, &path, 96, 96).expect("capture") {
+    let mut host = CaptureHost::new();
+    if let (true, Some(renderer)) = (ssr, host.renderer(96, 96)) {
+        renderer.set_quality(QualityPreset::High);
+    }
+    if !capture_into(&mut host, &scene(ssr), &cam, &path, 96, 96).expect("capture") {
         eprintln!("[metal] no GPU/software adapter — skipping visual assertion");
         return;
     }
