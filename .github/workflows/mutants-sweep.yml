@@ -50,8 +50,9 @@ jobs:
   # `mutants-report` saw every shard complete and wrote `sweep-complete` into
   # its artifact; a sweep with a cut-off shard left mutants unmeasured and does
   # not count. Fails open: if the lookup itself errors, the sweep runs (a wasted
-  # day beats a silent gap), and this job never fails, so a skipped sweep reads
-  # as `skipped` — not red — to main-health. `force` bypasses the lookup.
+  # day beats a silent gap), and this job never fails on main, so a skipped sweep
+  # reads as `skipped` — not red — to main-health. `force` bypasses the lookup.
+  # Any ref but `main` is refused, red, before anything else (#972).
   mutants-plan:
     runs-on: ubuntu-latest
     permissions:
@@ -67,11 +68,20 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
           FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
+          REF: ${{ github.ref }}
         run: |
           decide() {
             echo "sweep=$1" >> "$GITHUB_OUTPUT"
             echo "$2" | tee -a "$GITHUB_STEP_SUMMARY"
           }
+          # `main` only, `force` or not (#972): a dispatch on a branch would hold
+          # five runners for most of a day the batch's gates need (#705). Red, so
+          # the dispatcher sees the refusal; main-health files only main's runs.
+          if [ "$REF" != refs/heads/main ]; then
+            decide false "Mutation sweep refused: it sweeps \`main\` only, and this run is on \`$REF\`. Mutate a branch with \`mutants-on-request.yml\` (\`make mutants-remote SCOPE=diff\`)."
+            echo "::error::mutants-sweep runs on main only; use mutants-on-request.yml for $REF"
+            exit 1
+          fi
           if [ "$FORCE" = true ]; then
             decide true "Mutation sweep forced by \`force\`."; exit 0
           fi
