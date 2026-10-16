@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 from merging.queue import gitio, outcomes, pulls, stopping, taking
-from merging.watch import board, freshness, handbacks, mainline, order
+from merging.watch import board, ending, freshness, handbacks, mainline, order
 
 
 def merge_tree_git(root: str, *args: str) -> tuple[int, str]:
@@ -24,6 +24,15 @@ def merge_tree_git(root: str, *args: str) -> tuple[int, str]:
 def git_at(*args: str, cwd: str) -> tuple[int, str]:
     """[`watch.freshness`]'s `git`, run in `cwd`."""
     return merge_tree_git(cwd, *args)
+
+
+def consume(path: Path) -> bool:
+    """Whether `path` exists, removing it if so: a request obeyed once."""
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return False
+    return True
 
 
 def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
@@ -42,6 +51,7 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
         main_conflicts=functools.partial(
             mainline.conflicts, git=functools.partial(merge_tree_git, opts.root), known={}, bots=pulls.BOTS
         ),
+        stop_requested=lambda: consume(Path(opts.root, common, ending.STOP_FILE)),
         stale_code=lambda: freshness.changed(code, functools.partial(merge_tree_git, opts.root)),
         turn=lambda number, tick: taking.unready(
             stopping.drain([number], lambda n: taking.take(repo, n, opts, tick=tick))[0]

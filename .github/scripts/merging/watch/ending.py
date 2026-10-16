@@ -44,6 +44,16 @@ MACHINE_STATUS = 3
 # The queue's code changed on `main` ([`RELAUNCH`]): relaunch from the new code.
 RELAUNCH_STATUS = 5
 
+# Somebody asked the watch to stop ([`STOP_FILE`], #908): do not relaunch it.
+STOPPED_STATUS = 6
+
+# The file that asks it, under the checkout's common git directory: `make
+# queue-stop` writes it, the watch and its supervisor remove it as they obey.
+STOP_FILE = "merge-queue/stop"
+
+# How the exit begins when it was asked.
+STOP = "stop requested"
+
 
 def finished(pulls: list[dict], quiet: float, idle: float) -> str | None:
     """Why to exit with nothing to take, or `None` to keep watching.
@@ -71,10 +81,13 @@ def deadline_reached(results: list[tuple[int, str, str]], minutes: float, merged
     return f"{DEADLINE} ({minutes:g} minutes); {count} merged, nothing in hand. Relaunch the watch."
 
 
-def status(handed: list[int], machine: bool, relaunch: bool = False) -> int:
+def status(handed: list[int], machine: bool, relaunch: bool = False, stopped: bool = False) -> int:
     """The watch's exit status: the most urgent thing its starter has to do.
     A relaunch outranks a hand-back: its lines are already printed, and the
-    next watch must not run the old code."""
+    next watch must not run the old code. A requested stop outranks both:
+    nobody is to start it again."""
+    if stopped:
+        return STOPPED_STATUS
     if machine:
         return MACHINE_STATUS
     if relaunch:

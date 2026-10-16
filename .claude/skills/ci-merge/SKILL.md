@@ -44,7 +44,8 @@ to see what it said.
 
 ## The merge, one branch at a time
 
-`make queue ARGS=--watch` (#664) is how a batch runs it: started once, it takes
+`make queue ARGS=--watch` (#664) is how a batch runs it, under its supervisor
+`make queue-daemon` (#908; `issue-batch` says how): started once, it takes
 every open pull request that is **ready and labelled `queue`** — the
 orchestrator's go-ahead, added once it has read the description and the diff,
 and removed to pull a PR out of line (#925; Dependabot's cargo bumps label
@@ -77,7 +78,8 @@ batch runs `ARGS="--watch --no-check --for 70"`. **`--for MINUTES`** (#697) is
 the watch's own deadline: once it passes, the watch takes no new pull request,
 finishes the one in hand (merged or handed back) and exits with a last
 line `watch ended: deadline reached (…); N merged, nothing in hand.` That exit
-is not a report — **relaunch the watch** with the same arguments. It exists
+is not a report — **relaunch the watch** with the same arguments (the supervisor
+does, by itself). It exists
 because a background command is killed at two hours wherever it is, a push or
 a merge included. The deadline is checked only before taking a pull request,
 so the take in hand can outlast it by up to the per-PR `--deadline` (45 min),
