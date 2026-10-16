@@ -2,25 +2,9 @@
 //! generator + color ops are covered in `ops.rs`. Each op is exercised through
 //! the public runner (`evaluate`) so the test pins observable pixel behaviour.
 
-use rusty::procgen::recipe::{GradientKind, Node, OpKind, TextureRecipe};
-use rusty::procgen::{evaluate, Image};
+use rusty::procgen::recipe::{GradientKind, OpKind};
 
-fn run(nodes: Vec<Node>, output: &str, resolution: u32) -> Image {
-    let recipe = TextureRecipe::new(resolution, nodes).with_output(output);
-    evaluate(&recipe).expect("recipe evaluates")
-}
-
-fn node(id: &str, op: OpKind, inputs: &[&str]) -> Node {
-    Node {
-        id: id.into(),
-        op,
-        inputs: inputs.iter().map(|s| s.to_string()).collect(),
-    }
-}
-
-fn constant(id: &str, c: [f32; 4]) -> Node {
-    node(id, OpKind::Constant { color: c }, &[])
-}
+use super::{constant, node, run};
 
 #[test]
 fn clamp_bounds_each_channel() {
