@@ -6,7 +6,7 @@ use glam::Vec3;
 
 use crate::components::{MaterialAsset, MaterialComponent};
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use crate::scene::{Camera, DirtyFlag, MeshComponent, Scene};
+use crate::scene::{Camera, MeshComponent, Scene};
 use crate::shadergen::assemble::assemble;
 use crate::shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 
@@ -39,21 +39,9 @@ fn glowing_box() -> Scene {
     scene.skybox_path = String::new();
     let id = scene.add_entity("Glow".to_string());
     let (vertices, indices) = crate::components::mesh::primitives::generate_box(8.0, 8.0, 8.0);
-    scene.world.set_mesh(
-        id,
-        Some(MeshComponent {
-            primitive_type: "Box".to_string(),
-            asset_ref: None,
-            vertices,
-            indices,
-            bind_palette: Vec::new(),
-            skin: None,
-            clips: Vec::new(),
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
-            is_dirty: DirtyFlag::new(true),
-        }),
-    );
+    scene
+        .world
+        .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
     scene.world.set_material(
         id,
         Some(MaterialComponent {

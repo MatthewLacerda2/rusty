@@ -46,18 +46,7 @@ pub(super) fn scene(material: MaterialAsset) -> Scene {
     s.ambient_intensity = 1.0;
     let id = s.add_entity("Plane".to_string());
     let (vertices, indices) = rusty::components::mesh::primitives::generate_plane(16.0, 16.0);
-    let mesh = MeshComponent {
-        primitive_type: "Plane".to_string(),
-        asset_ref: None,
-        vertices,
-        indices,
-        bind_palette: Vec::new(),
-        skin: None,
-        clips: Vec::new(),
-        pose_palette: Vec::new(),
-        skeleton: Default::default(),
-        is_dirty: rusty::scene::DirtyFlag::new(true),
-    };
+    let mesh = MeshComponent::new("Plane", vertices, indices);
     let mat = MaterialComponent {
         material: "mat".to_string(),
     };

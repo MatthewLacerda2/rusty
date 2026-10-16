@@ -8,7 +8,7 @@ use super::freshness::MISS_RETRY_FRAMES;
 use crate::components::{MaterialAsset, MaterialComponent, Tonemap};
 use crate::procgen::{bake::bake_to_png, Image, Slot};
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use crate::scene::{Camera, DirtyFlag, MeshComponent, Scene};
+use crate::scene::{Camera, MeshComponent, Scene};
 
 /// A box filling the view lit only by a white emissive modulated by `map`, with
 /// every post-FX knob neutral, so the centre pixel is the map's colour.
@@ -18,18 +18,7 @@ fn emissive_scene(map: &str) -> Scene {
     scene.ambient_intensity = 0.0;
     let id = scene.add_entity("Box".to_string());
     let (vertices, indices) = crate::components::mesh::primitives::generate_box(8.0, 8.0, 8.0);
-    let mesh = MeshComponent {
-        primitive_type: "Box".to_string(),
-        asset_ref: None,
-        vertices,
-        indices,
-        bind_palette: Vec::new(),
-        skin: None,
-        clips: Vec::new(),
-        pose_palette: Vec::new(),
-        skeleton: Default::default(),
-        is_dirty: DirtyFlag::new(true),
-    };
+    let mesh = MeshComponent::new("Box", vertices, indices);
     scene.world.set_mesh(id, Some(mesh));
     let material = "glow".to_string();
     scene

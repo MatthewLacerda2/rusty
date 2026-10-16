@@ -82,18 +82,7 @@ fn add_red_box(scene: &mut Scene) {
 fn add_box(scene: &mut Scene, name: &str, material: &str) -> u32 {
     let id = scene.add_entity(name.to_string());
     let (vertices, indices) = rusty::components::mesh::primitives::generate_box(2.0, 2.0, 2.0);
-    let mesh = MeshComponent {
-        primitive_type: "Box".to_string(),
-        asset_ref: None,
-        vertices,
-        indices,
-        bind_palette: Vec::new(),
-        skin: None,
-        clips: Vec::new(),
-        pose_palette: Vec::new(),
-        skeleton: Default::default(),
-        is_dirty: rusty::scene::DirtyFlag::new(true),
-    };
+    let mesh = MeshComponent::new("Box", vertices, indices);
     scene.world.set_mesh(id, Some(mesh));
     let material = MaterialComponent {
         material: material.to_string(),
@@ -115,9 +104,8 @@ fn add_pip_image(scene: &mut Scene) {
         anchor_min: Vec2::ZERO,
         anchor_max: Vec2::ZERO,
         pivot: Vec2::ZERO,
-        anchored_position: Vec2::ZERO,
         size_delta: Vec2::new(SIZE as f32 / 2.0, SIZE as f32),
-        world_anchor: None,
+        ..RectTransformComponent::default()
     };
     scene.world.set_rect_transform(id, Some(rt));
     let image = ImageComponent {

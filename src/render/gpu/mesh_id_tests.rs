@@ -6,16 +6,9 @@ use crate::scene::{DirtyFlag, MeshComponent};
 
 fn mesh(primitive: &str, asset: Option<&str>) -> MeshComponent {
     MeshComponent {
-        primitive_type: primitive.to_string(),
         asset_ref: asset.map(String::from),
-        vertices: Vec::new(),
-        indices: Vec::new(),
-        bind_palette: Vec::new(),
-        skin: None,
-        clips: Vec::new(),
-        pose_palette: Vec::new(),
-        skeleton: Default::default(),
         is_dirty: DirtyFlag::new(false),
+        ..MeshComponent::new(primitive.to_string(), Vec::new(), Vec::new())
     }
 }
 

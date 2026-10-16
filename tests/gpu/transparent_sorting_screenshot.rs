@@ -13,7 +13,7 @@
 //! without asserting (matching `material_maps_screenshot.rs`).
 
 use glam::Vec3;
-use rusty::components::{MaterialAsset, MaterialComponent, RenderMode, Tonemap};
+use rusty::components::{MaterialAsset, MaterialComponent, RenderMode};
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
@@ -24,22 +24,11 @@ fn tmp(name: &str) -> std::path::PathBuf {
 
 fn vc() -> VisualCorrectionComponent {
     VisualCorrectionComponent {
-        active: true,
         bloom_active: false,
-        bloom_intensity: 1.0,
         bloom_threshold: 0.6,
-        exposure: 0.0,
-        contrast: 1.0,
-        saturation: 1.0,
         ssr_active: false,
-        ssr_quality: "High".to_string(),
         ssr_temporal_upsampling: false,
-        tonemap: Tonemap::Aces,
-        gamma: 1.0,
-        shadows: Default::default(),
-        ssao: Default::default(),
-        custom_effects: Vec::new(),
-        post_params: Default::default(),
+        ..rusty::scene::authoring::default_visual_correction()
     }
 }
 
@@ -49,21 +38,9 @@ fn add_quad(scene: &mut Scene, name: &str, z: f32, color: [f32; 3], alpha: f32) 
     let id = scene.add_entity(name.to_string());
     let (vertices, indices) = rusty::components::mesh::primitives::generate_box(8.0, 8.0, 0.1);
     scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 0.0, z);
-    scene.world.set_mesh(
-        id,
-        Some(MeshComponent {
-            primitive_type: "Box".to_string(),
-            asset_ref: None,
-            vertices,
-            indices,
-            bind_palette: Vec::new(),
-            skin: None,
-            clips: Vec::new(),
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
-            is_dirty: rusty::scene::DirtyFlag::new(true),
-        }),
-    );
+    scene
+        .world
+        .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
     scene.world.set_material(
         id,
         Some(MaterialComponent {

@@ -57,13 +57,12 @@ fn scene(dir: &std::path::Path) -> Scene {
         sun,
         Some(LightComponent {
             light_type: LightType::Directional,
-            color: Vec3::ONE,
             intensity: 2.0,
             range: 0.0,
             inner_cone: 0.0,
             outer_cone: 0.0,
-            cast_shadows: false,
             mode: LightMode::Baked,
+            ..rusty::scene::authoring::default_light()
         }),
     );
     let down = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);

@@ -148,7 +148,7 @@ pub fn fxaa_enabled(scene: &Scene) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::{CameraComponent, ClearFlags, Tonemap, VisualCorrectionComponent};
+    use crate::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
     use crate::scene::Scene;
 
     fn scene_with_vc(vc: VisualCorrectionComponent, cam: Option<CameraComponent>) -> Scene {
@@ -161,39 +161,24 @@ mod tests {
 
     fn vc() -> VisualCorrectionComponent {
         VisualCorrectionComponent {
-            active: true,
-            bloom_active: true,
             bloom_intensity: 2.0,
             bloom_threshold: 0.7,
             exposure: 1.5,
             contrast: 1.2,
             saturation: 0.8,
-            ssr_active: true,
-            ssr_quality: "High".to_string(),
             ssr_temporal_upsampling: false,
             tonemap: Tonemap::Reinhard,
             gamma: 1.3,
-            shadows: Default::default(),
-            ssao: Default::default(),
-            custom_effects: Vec::new(),
-            post_params: Default::default(),
+            ..crate::scene::authoring::default_visual_correction()
         }
     }
 
     fn cam() -> CameraComponent {
         CameraComponent {
-            active: true,
-            fov: 45.0,
-            near: 0.1,
             far: 100.0,
-            culling_mask: u32::MAX,
-            render_order: 0,
-            clear_flags: ClearFlags::Skybox,
             motion_blur_active: true,
             motion_blur_samples: 16,
-            fxaa_active: true,
-            projection: Default::default(),
-            target_texture: None,
+            ..CameraComponent::default()
         }
     }
 

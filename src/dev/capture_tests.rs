@@ -11,7 +11,7 @@ use glam::Vec3;
 use super::CaptureHost;
 use crate::dev::screenshot;
 use crate::scene::Camera;
-use crate::scene::{DirtyFlag, MeshComponent, Scene};
+use crate::scene::{MeshComponent, Scene};
 
 /// A scene holding one lit box, at `ambient` ambient intensity — the knob the two
 /// scenes differ on, because it moves the whole frame's brightness and so survives
@@ -22,21 +22,9 @@ fn box_scene(ambient: f32) -> Scene {
     scene.ambient_intensity = ambient;
     let id = scene.add_entity("Box".to_string());
     let (vertices, indices) = crate::components::mesh::primitives::generate_box(2.0, 2.0, 2.0);
-    scene.world.set_mesh(
-        id,
-        Some(MeshComponent {
-            primitive_type: "Box".to_string(),
-            asset_ref: None,
-            vertices,
-            indices,
-            bind_palette: Vec::new(),
-            skin: None,
-            clips: Vec::new(),
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
-            is_dirty: DirtyFlag::new(true),
-        }),
-    );
+    scene
+        .world
+        .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
     scene
 }
 

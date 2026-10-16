@@ -82,6 +82,7 @@ fn masks_and_backdrops_survive_save_and_load() {
         tint: Vec4::new(0.1, 0.2, 0.3, 0.4),
         saturation: 0.5,
         brightness: 0.8,
+        ..BackdropFilterComponent::default()
     };
     scene.world.set_backdrop_filter(id, Some(glass.clone()));
     let path = crate::temp::dir()

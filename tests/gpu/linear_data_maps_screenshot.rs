@@ -11,7 +11,7 @@
 //! without asserting (matching `material_maps_screenshot.rs`).
 
 use glam::Vec3;
-use rusty::components::{LightComponent, LightType, MaterialAsset};
+use rusty::components::{LightComponent, MaterialAsset};
 use rusty::dev::screenshot::capture;
 use rusty::scene::{Camera, Scene};
 
@@ -34,14 +34,11 @@ fn scene(material: MaterialAsset) -> Scene {
     let lamp = s.add_entity("Lamp".to_string());
     s.world.transform_mut(lamp).expect("transform").position = Vec3::new(1.0, 3.0, 0.0);
     let light = LightComponent {
-        light_type: LightType::Point,
-        color: Vec3::ONE,
         intensity: 20.0,
         range: 30.0,
         inner_cone: 0.0,
         outer_cone: 0.0,
-        cast_shadows: false,
-        mode: Default::default(),
+        ..rusty::scene::authoring::default_light()
     };
     s.world.set_light(lamp, Some(light));
     s

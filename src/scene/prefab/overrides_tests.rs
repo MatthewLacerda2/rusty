@@ -1,7 +1,7 @@
 //! Tests for the generic per-instance override diff (#216).
 
 use super::*;
-use crate::components::{CameraComponent, ClearFlags, MaterialComponent};
+use crate::components::{CameraComponent, MaterialComponent};
 
 /// A bare entity baseline with one local id.
 fn base() -> Entity {
@@ -15,18 +15,12 @@ fn base() -> Entity {
 /// rebuilt over a `None` baseline (the apply path does not grow JSON arrays).
 fn camera() -> CameraComponent {
     CameraComponent {
-        active: true,
         fov: 75.0,
-        near: 0.1,
         far: 100.0,
-        culling_mask: u32::MAX,
-        render_order: 0,
-        clear_flags: ClearFlags::Skybox,
         motion_blur_active: true,
         motion_blur_samples: 64,
         fxaa_active: false,
-        projection: Default::default(),
-        target_texture: None,
+        ..CameraComponent::default()
     }
 }
 
