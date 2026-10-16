@@ -53,7 +53,8 @@ as text), per MCP convention — the agent sees it and recovers, the server stay
 **Resources** (`resources/list`, `resources/read`):
 
 - `rusty://scripting-api.md` — the full Lua API reference (`docs/api/`, assembled into one
-  document by `build.rs`), embedded in the binary at compile time so it always matches the build. The agent
+  document by `scripting::api_doc`), read from the engine checkout on each request so it is always
+  the checkout's current doc (#931: an embedded doc rebuilt the crate on every doc edit). The agent
   reads it to learn the namespaces and functions available to `eval`.
 
 The transport is MCP stdio: newline-delimited JSON-RPC 2.0. **stdout carries only

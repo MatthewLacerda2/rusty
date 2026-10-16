@@ -1,19 +1,15 @@
 //! src/dev/mcp/resources.rs — the MCP `resources/list` and `resources/read` handlers.
 //!
 //! One resource is exposed: the engine's Lua scripting-API reference — `docs/api/`,
-//! assembled into one document by `build.rs` (#569) — embedded at compile time with
-//! `include_str!` so the binary always serves the doc that matches
-//! its own build (no path lookup, no drift). The agent reads it to learn the
-//! namespaces and functions it can drive through the `eval` tool.
+//! assembled into one document (#569) — read from the engine checkout on each request
+//! (#931), so it is always the doc the checkout holds and a doc edit rebuilds
+//! nothing. The agent reads it to learn the namespaces and functions it can drive
+//! through the `eval` tool.
 
 use serde_json::{json, Value};
 
 /// The canonical URI for the scripting-API reference resource.
 const SCRIPTING_API_URI: &str = "rusty://scripting-api.md";
-
-/// The scripting-API reference, baked into the binary so it ships with the build and
-/// can never lag the engine it documents.
-const SCRIPTING_API: &str = include_str!(concat!(env!("OUT_DIR"), "/scripting-api.md"));
 
 /// The `resources/list` result: the single scripting-API reference resource.
 pub fn resources_list() -> Value {
@@ -28,15 +24,17 @@ pub fn resources_list() -> Value {
 }
 
 /// Handle `resources/read`. `Ok` is the MCP result with the resource contents; `Err`
-/// is a JSON-RPC protocol error `(code, message)` for an unknown URI.
+/// is a JSON-RPC protocol error `(code, message)` for an unknown URI, or an internal
+/// error when the checkout's `docs/api/` can't be read.
 pub fn resources_read(params: &Value) -> Result<Value, (i64, String)> {
     let uri = params.get("uri").and_then(Value::as_str).unwrap_or("");
     if uri == SCRIPTING_API_URI {
+        let text = crate::scripting::api_doc::api_reference().map_err(|e| (-32603, e))?;
         Ok(json!({
             "contents": [{
                 "uri": SCRIPTING_API_URI,
                 "mimeType": "text/markdown",
-                "text": SCRIPTING_API,
+                "text": text,
             }]
         }))
     } else {
@@ -56,11 +54,11 @@ mod tests {
     }
 
     #[test]
-    fn read_returns_the_embedded_markdown() {
+    fn read_returns_the_assembled_markdown() {
         let params = json!({ "uri": SCRIPTING_API_URI });
         let result = resources_read(&params).expect("known uri reads");
         let text = result["contents"][0]["text"].as_str().unwrap();
-        assert!(!text.is_empty(), "the embedded doc must have content");
+        assert!(!text.is_empty(), "the assembled doc must have content");
         assert_eq!(result["contents"][0]["uri"], SCRIPTING_API_URI);
     }
 

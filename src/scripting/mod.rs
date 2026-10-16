@@ -5,14 +5,16 @@
 //! (runtime init / live-state), `loader` (script compile + the queued spawn
 //! scan), `lifecycle` (the hook dispatch: init/update/trigger), `eval` (the
 //! REPL evaluator + API-surface walk), `timers` (the `Timer` scheduler: invokes
-//! and coroutines, #444) and `callbacks` (the lifecycle-callback
-//! names, kept public and namespaced) — and re-exported here so the public
+//! and coroutines, #444), `callbacks` (the lifecycle-callback
+//! names, kept public and namespaced) and `api_doc` (the `docs/api/` reference,
+//! assembled for the drift gates and MCP) — and re-exported here so the public
 //! surface stays a flat `crate::scripting::*`.
 
 // Panic-free sim core (#195): bare `.unwrap()` is denied here (use `?` or a
 // documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
 #![deny(clippy::unwrap_used)]
 
+pub mod api_doc;
 pub mod callbacks;
 mod cells;
 mod console;

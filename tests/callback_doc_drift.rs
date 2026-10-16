@@ -13,9 +13,11 @@ use std::collections::BTreeSet;
 
 use rusty::scripting::callbacks::LIFECYCLE_CALLBACKS;
 
-/// The committed scripting-API doc, `docs/api/` assembled by `build.rs` (#569) and
-/// embedded at build time, so the test reads exactly what ships in the repo.
-const DOC: &str = include_str!(concat!(env!("OUT_DIR"), "/scripting-api.md"));
+/// The committed scripting-API doc, `docs/api/` assembled (#569) and read at run time
+/// (#931), so the test reads exactly what is in the repo and a doc edit rebuilds nothing.
+fn reference() -> String {
+    rusty::scripting::api_doc::api_reference().expect("docs/api/ reads")
+}
 
 /// The heading the callback table lives under. Deliberately not backticked, so
 /// the namespace gate's parser never mistakes the section for a namespace.
@@ -23,7 +25,8 @@ const HEADING: &str = "## Script lifecycle callbacks";
 
 #[test]
 fn doc_matches_dispatched_callbacks() {
-    let doc = parse_documented_callbacks(DOC);
+    let text = reference();
+    let doc = parse_documented_callbacks(&text);
     let live: BTreeSet<&str> = LIFECYCLE_CALLBACKS.iter().copied().collect();
     assert!(
         !doc.is_empty(),

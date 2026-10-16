@@ -4,7 +4,7 @@
 
 use std::path::{Path, PathBuf};
 
-use rusty::core::project::{EngineCheck, ProjectFile, ENGINE_COMMIT, PROJECT_FILE};
+use rusty::core::project::{engine_commit, EngineCheck, ProjectFile, PROJECT_FILE};
 use rusty::editor::project_picker::recent::RecentProjects;
 use rusty::editor::project_picker::ProjectPicker;
 
@@ -25,9 +25,9 @@ pub fn build(page: &str) -> Result<ProjectPicker, String> {
     let mut recent = RecentProjects::default();
     // Oldest first: each touch goes to the top.
     recent.touch(&root.join("old").join("prototype"), NOW - 62 * DAY);
-    recent.touch(&project(&games, "sandbox", ENGINE_COMMIT)?, NOW - 9 * DAY);
+    recent.touch(&project(&games, "sandbox", engine_commit())?, NOW - 9 * DAY);
     recent.touch(
-        &project(&games, "offline-cs", ENGINE_COMMIT)?,
+        &project(&games, "offline-cs", engine_commit())?,
         NOW - 3 * DAY,
     );
     let horde = project(&games, "horde", OTHER_ENGINE)?;
@@ -39,7 +39,7 @@ pub fn build(page: &str) -> Result<ProjectPicker, String> {
         "mismatch" => {
             let check = EngineCheck {
                 recorded: Some(OTHER_ENGINE.to_string()),
-                running: ENGINE_COMMIT.to_string(),
+                running: engine_commit().to_string(),
             };
             let warning = check
                 .warning()
