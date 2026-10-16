@@ -2,6 +2,7 @@
 //! layouts these pipelines reference live in `bind_layouts` (behavior unchanged).
 
 use crate::render::gpu::mesh::vertex_layout;
+use crate::render::gpu::DEPTH_FORMAT;
 
 pub(crate) mod surface;
 
@@ -212,7 +213,7 @@ fn make_pipeline(
             ..Default::default()
         },
         depth_stencil: Some(wgpu::DepthStencilState {
-            format: wgpu::TextureFormat::Depth32Float,
+            format: DEPTH_FORMAT,
             depth_write_enabled: Some(spec.depth_write_enabled),
             depth_compare: Some(spec.depth_compare),
             stencil: wgpu::StencilState::default(),
@@ -251,7 +252,7 @@ fn make_prepass(
         }),
         primitive: wgpu::PrimitiveState::default(),
         depth_stencil: Some(wgpu::DepthStencilState {
-            format: wgpu::TextureFormat::Depth32Float,
+            format: DEPTH_FORMAT,
             depth_write_enabled: Some(true),
             depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: wgpu::StencilState::default(),

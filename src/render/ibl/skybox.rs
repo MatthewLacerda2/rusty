@@ -1,5 +1,6 @@
 use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::gpu::DEPTH_FORMAT;
 use crate::render::GpuTexture;
 use wgpu::util::DeviceExt;
 
@@ -93,7 +94,7 @@ impl SkyboxRenderer {
                 ..Default::default()
             },
             depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth32Float,
+                format: DEPTH_FORMAT,
                 depth_write_enabled: Some(false), // Don't write to depth buffer
                 depth_compare: Some(wgpu::CompareFunction::LessEqual),
                 stencil: wgpu::StencilState::default(),

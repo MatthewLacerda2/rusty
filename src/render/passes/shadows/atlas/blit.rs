@@ -6,6 +6,8 @@
 //! for a copy, the far plane for a clear. Depth passes straight through (`Always`,
 //! no bias), so a copied tile is bit-identical to the static atlas it came from.
 
+use crate::render::gpu::layout_entries::depth_entry;
+
 /// The two tile blits and the static atlas the copy reads.
 pub(super) struct TileBlit {
     copy: wgpu::RenderPipeline,
@@ -23,16 +25,7 @@ impl TileBlit {
     ) -> Self {
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Shadow Atlas Blit Layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Depth,
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    multisampled: false,
-                },
-                count: None,
-            }],
+            entries: &[depth_entry(0, wgpu::TextureViewDimension::D2)],
         });
         let source = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Shadow Atlas Blit Source"),

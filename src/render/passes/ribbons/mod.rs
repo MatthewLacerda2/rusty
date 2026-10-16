@@ -17,8 +17,10 @@ pub(crate) mod draw;
 pub(crate) mod strip;
 
 use crate::components::ParticleBlend;
+use crate::render::gpu::layout_entries::uniform_entry;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::gpu::uniforms::FogUniform;
+use crate::render::gpu::DEPTH_FORMAT;
 use crate::render::postfx::HDR_FORMAT;
 use crate::render::{GpuTexture, Renderer};
 use strip::RibbonVertex;
@@ -55,16 +57,7 @@ impl RibbonRenderer {
         let shader = registry.load(device, "ribbons.wgsl", "Ribbon Shader");
         let globals_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Ribbon Globals Layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
+            entries: &[uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT)],
         });
         let globals_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Ribbon Globals"),
@@ -129,7 +122,7 @@ impl RibbonRenderer {
             // Occluded by solids, but never writing depth: overlapping
             // translucent ribbons all blend.
             depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth32Float,
+                format: DEPTH_FORMAT,
                 depth_write_enabled: Some(false),
                 depth_compare: Some(wgpu::CompareFunction::LessEqual),
                 stencil: wgpu::StencilState::default(),

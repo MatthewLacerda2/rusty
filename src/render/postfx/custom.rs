@@ -26,6 +26,7 @@ use std::collections::{BTreeMap, HashMap};
 use naga_oil::compose::Composer;
 
 use super::{PfxTarget, PostFx};
+use crate::render::gpu::layout_entries::uniform_entry;
 use crate::shadergen::params::{PackedParams, ParamLayout};
 use crate::shadergen::{bake_generation, compose, engine_shader_dir, DEFAULT_OUT_DIR};
 
@@ -56,16 +57,7 @@ impl CustomChain {
     ) -> Self {
         let params_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("PostFX Custom Params Layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
+            entries: &[uniform_entry(0, wgpu::ShaderStages::FRAGMENT)],
         });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("PostFX Custom Layout"),

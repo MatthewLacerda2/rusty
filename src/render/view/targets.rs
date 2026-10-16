@@ -1,9 +1,7 @@
 //! src/render/view/targets.rs — a view's owned GPU targets: the depth buffer and the
 //! offscreen colour target (with the UI pass's display-space alias, #418).
 
-/// The depth target's format — a depth buffer sampled by the decal + post-FX passes,
-/// so it needs `TEXTURE_BINDING` alongside `RENDER_ATTACHMENT`.
-const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+use crate::render::gpu::DEPTH_FORMAT;
 
 /// Allocate a depth texture (+ its default view) at `width` x `height`. Sampled by the
 /// decal and post-FX passes, hence `TEXTURE_BINDING`.

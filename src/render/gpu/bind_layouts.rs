@@ -2,44 +2,9 @@
 //! constructors split out of `pipelines.rs` to keep each file under the size cap;
 //! `pipelines` consumes these to build the pipeline layouts (behavior unchanged).
 
-/// A uniform-buffer layout entry at `binding`, seen by `visibility`.
-fn uniform_entry(binding: u32, visibility: wgpu::ShaderStages) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility,
-        ty: wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Uniform,
-            has_dynamic_offset: false,
-            min_binding_size: None,
-        },
-        count: None,
-    }
-}
-
-/// A FRAGMENT-visible filterable texture layout entry at `binding`, of the given view
-/// dimension (2D for the skybox, Cube for the reflection probe).
-fn texture_entry(binding: u32, dim: wgpu::TextureViewDimension) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Texture {
-            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-            view_dimension: dim,
-            multisampled: false,
-        },
-        count: None,
-    }
-}
-
-/// A FRAGMENT-visible filtering-sampler layout entry at `binding`.
-fn sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-        count: None,
-    }
-}
+use super::layout_entries::{
+    depth_entry, dynamic_uniform_entry, sampler_entry, storage_entry, texture_entry, uniform_entry,
+};
 
 /// Group 0: Camera (0), Lighting (1), Skybox Texture (2), Skybox Sampler (3), Reflection
 /// Probe Cube (4), Reflection Probe Sampler (5), the light clusters (#434): the
@@ -94,42 +59,15 @@ pub(crate) fn create_entity_bones_layout(device: &wgpu::Device) -> wgpu::BindGro
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Entity & Bones Layout"),
         entries: &[
-            dynamic_uniform_entry(0, std::mem::size_of::<EntityUniform>()),
+            dynamic_uniform_entry(
+                0,
+                wgpu::ShaderStages::VERTEX_FRAGMENT,
+                std::mem::size_of::<EntityUniform>() as u64,
+            ),
             storage_entry(1, wgpu::ShaderStages::VERTEX),
             storage_entry(2, wgpu::ShaderStages::VERTEX_FRAGMENT),
         ],
     })
-}
-
-/// A vertex+fragment uniform entry bound at a dynamic offset, `size` bytes wide.
-fn dynamic_uniform_entry(binding: u32, size: usize) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-        ty: wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Uniform,
-            has_dynamic_offset: true,
-            min_binding_size: wgpu::BufferSize::new(size as u64),
-        },
-        count: None,
-    }
-}
-
-/// A read-only storage-buffer entry at `binding` (an instance array, #470).
-pub(crate) fn storage_entry(
-    binding: u32,
-    visibility: wgpu::ShaderStages,
-) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility,
-        ty: wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Storage { read_only: true },
-            has_dynamic_offset: false,
-            min_binding_size: None,
-        },
-        count: None,
-    }
 }
 
 /// Group 2 (single-texture): Texture (0) & Sampler (1). Kept for `GpuTexture`'s own
@@ -164,16 +102,7 @@ pub(crate) const PARAMS_SIZE: u64 =
 
 /// A filterable 2D texture bind-group-layout entry at `binding`, FRAGMENT-visible.
 fn material_texture_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Texture {
-            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-            view_dimension: wgpu::TextureViewDimension::D2,
-            multisampled: false,
-        },
-        count: None,
-    }
+    texture_entry(binding, wgpu::TextureViewDimension::D2)
 }
 
 /// Group 2 (per-entity material): albedo (0), shared sampler (1), metallic map (2),
@@ -237,20 +166,6 @@ pub(crate) fn create_shadow_layout(device: &wgpu::Device) -> wgpu::BindGroupLayo
             storage_entry(5, wgpu::ShaderStages::FRAGMENT),
         ],
     })
-}
-
-/// A FRAGMENT-visible depth texture entry at `binding`, sampled by comparison.
-fn depth_entry(binding: u32, dim: wgpu::TextureViewDimension) -> wgpu::BindGroupLayoutEntry {
-    wgpu::BindGroupLayoutEntry {
-        binding,
-        visibility: wgpu::ShaderStages::FRAGMENT,
-        ty: wgpu::BindingType::Texture {
-            sample_type: wgpu::TextureSampleType::Depth,
-            view_dimension: dim,
-            multisampled: false,
-        },
-        count: None,
-    }
 }
 
 /// The forward pass's group 3 over [`create_shadow_layout`]: the cascade `uniform`,

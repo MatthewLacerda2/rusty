@@ -33,6 +33,7 @@ use uniforms::SLOT;
 use super::cache::UiViewCache;
 use super::pipeline::{self, UiPass};
 use crate::components::UiBlend;
+use crate::render::gpu::layout_entries::dynamic_uniform_entry;
 use crate::shadergen::params::{self, ParamLayout};
 use crate::shadergen::{bake_generation, compose, engine_shader_dir, DEFAULT_OUT_DIR};
 
@@ -79,16 +80,7 @@ impl UiShaders {
     ) -> Self {
         let shade_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("UI Shade Layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: true,
-                    min_binding_size: wgpu::BufferSize::new(SLOT),
-                },
-                count: None,
-            }],
+            entries: &[dynamic_uniform_entry(0, wgpu::ShaderStages::FRAGMENT, SLOT)],
         });
         let empty_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("UI Empty Layout"),

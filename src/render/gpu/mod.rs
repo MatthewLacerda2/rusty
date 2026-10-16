@@ -3,10 +3,16 @@
 //! and the per-frame instancing buffers + material cache (#470). Grouped here so the render root
 //! lists subsystems, not individual resource files.
 
+/// The format of every view depth target and of each pipeline that draws into one
+/// (forward, prepass, skybox, particles, ribbons, world UI). Shadow maps keep their
+/// own format in `passes::shadows`.
+pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+
 pub(crate) mod bind_layouts;
 pub(crate) mod draw_buffers;
 pub(crate) mod global_group;
 pub(crate) mod grow_buffer;
+pub(crate) mod layout_entries;
 pub(crate) mod lightmaps;
 pub(crate) mod material_cache;
 pub mod mesh;

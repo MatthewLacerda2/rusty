@@ -22,7 +22,9 @@ use std::collections::HashMap;
 use wgpu::util::DeviceExt;
 
 use crate::components::particle::ParticleBlend;
+use crate::render::gpu::layout_entries::uniform_entry;
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::gpu::DEPTH_FORMAT;
 use crate::render::postfx::HDR_FORMAT;
 use crate::render::MeshId;
 use instance::{ParticleGlobals, ParticleInstance};
@@ -115,16 +117,7 @@ impl ParticleRenderer {
     fn globals_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Particle Globals Layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
+            entries: &[uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT)],
         })
     }
 
@@ -163,7 +156,7 @@ impl ParticleRenderer {
             // all blend, not z-fight. Read-only, so the same depth can also be bound
             // as the soft-particle texture.
             depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth32Float,
+                format: DEPTH_FORMAT,
                 depth_write_enabled: Some(false),
                 depth_compare: Some(wgpu::CompareFunction::LessEqual),
                 stencil: wgpu::StencilState::default(),
