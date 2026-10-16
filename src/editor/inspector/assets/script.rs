@@ -1,5 +1,6 @@
 use crate::editor::EditorUi;
-use crate::scene::{Scene, ScriptComponent};
+use crate::scene::authoring;
+use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 use egui_phosphor::regular as icon;
 use std::fs;
@@ -120,13 +121,8 @@ fn draw_attach_to_entity(
         });
 
     if let Some(entity_id) = clicked_entity_id {
-        if let Some(mut scripts) = scene.world.scripts_mut(entity_id) {
-            // An entity can hold many scripts (#83); append rather than replace.
-            scripts.push(ScriptComponent {
-                path: path.to_string(),
-                is_loaded: false,
-                ..Default::default()
-            });
+        // An entity can hold many scripts (#83); this appends rather than replaces.
+        if authoring::add_script(&mut scene.world, entity_id, path, Default::default()) {
             editor.is_dirty = true;
             console.info(format!(
                 "Attached script {} to {}",
