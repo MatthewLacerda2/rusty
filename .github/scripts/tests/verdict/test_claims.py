@@ -24,6 +24,16 @@ def issue(*labels: str, state: str = "open", **fields: object) -> dict:
     return {"state": state, "labels": [{"name": name} for name in labels], **fields}
 
 
+def answers(issues: dict[int, dict], blockers: dict[int, list[dict]] | None = None):
+    """A fake `github.gh` answering `issues/N` and `issues/N/dependencies/blocked_by`."""
+    def gh(_api: str, path: str, missing=None):
+        number = int(path.split("/issues/")[1].split("/")[0].split("?")[0])
+        if "blocked_by" in path:
+            return (blockers or {}).get(number, [])
+        return issues.get(number, missing)
+    return gh
+
+
 def claiming(closes: dict[int, dict], body: str = f"Closes #927\n\n{GATED}", branch: str = "927-checks") -> dict:
     return {**READY, "headRefName": branch, "body": body, "closes": closes}
 
@@ -102,7 +112,7 @@ class Taken(unittest.TestCase):
     def test_the_queue_hands_back_before_any_rebase(self):
         pull = {**claiming({}), "state": "OPEN", "title": "t", "author": {"login": "x"}}
         with mock.patch.object(pulls, "look", return_value=pull), \
-            mock.patch.object(github, "gh", return_value=issue("human")), \
+            mock.patch.object(github, "gh", side_effect=answers({927: issue("human")})), \
             mock.patch.object(rebase, "advance") as rebased, mock.patch("builtins.print"):
             _, state, why = taking.take("o/r", 927, cli.parse(["927"]))
         self.assertEqual(state, outcomes.HANDED_BACK)

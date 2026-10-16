@@ -115,7 +115,8 @@ worktree open:
    run on this exact commit.
 4. Wait for the runs **on the rebased head** to exist and conclude.
 5. Ask `make mergeable`'s judgement of that head — see the next section.
-6. Squash-merge with the house-style title (`Title (#issue) (#pr)`) and
+6. Squash-merge with the house-style title (`Title (#issue) (#pr)`; the queue
+   adds each closed issue the title lacks, #966) and
    `--match-head-commit`, so a push after the verdict makes GitHub refuse.
 
 It **hands back** — names why, skips that entry and carries on, named pull
@@ -219,9 +220,14 @@ incidents behind each):
   issue, with the labels read **at merge time** (the operator removing the label
   greenlights it, no push needed); a closing keyword pointing at a pull request, a
   closed issue or a number that does not exist; and a head branch `N-…` whose
-  description neither closes #N nor says `Refs #N`. Each is fixed by editing the
-  description or a label, never by a push. A description with no **Gates** line
-  passes with a warning.
+  description neither closes #N nor says `Refs #N`. Since #966 (`carried.py`) also:
+  a closing keyword anywhere but on a line of its own (quoted back); an issue it
+  closes with an open recorded blocker (`blocked_by`, read at merge time); an
+  issue-less pull request whose diff touches anything but Markdown, or `docs/api/`,
+  unless labelled `bug` or Dependabot's; and an image (`png`, `jpg`, `hdr`, `exr`,
+  `ktx2`) the diff adds outside `IMAGES_ALLOWED`. Each is fixed by editing the
+  description, a label or a relationship (a stray image by a deleting commit). A
+  description with no **Gates** line passes with a warning.
 - **Both workflows, on the head SHA.** `ci-gate` (from `ci.yml`) and `lint-gate`
   (from `lint.yml`) each collapse their workflow's gating jobs; a green `ci` beside
   a missing `lint` is half a check.

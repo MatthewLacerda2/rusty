@@ -168,7 +168,8 @@ Beyond what changed, why, the effect and the decisions:
   explained that #769 "stays open until one is chosen" and still closed it on
   merge. The match ignores formatting, so never write the keyword next to a number
   you don't mean to close, even quoted or in backticks: the retro PR that added this
-  rule closed #769 a second time by quoting it.
+  rule closed #769 a second time by quoting it. The merge path now refuses a keyword that is not alone on
+  its line (#966), so write `Closes #N` on a line of its own.
 - Commit messages end with
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Push often: a dead container takes its uncommitted work with it.

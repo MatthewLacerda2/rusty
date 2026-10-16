@@ -14,6 +14,9 @@ scorsese both were missed: two of one batch's nine pull requests left out
   CI just made is the proof a merge needs), but it is said every time, so the
   habit is corrected where it is formed.
 
+- **A closing keyword means it only on its own line** ([`stray`], #966), and what
+  the diff carries is judged in [`carried`] (#966).
+
 Pure functions of the pull request's `headRefName` and `body`. A pull request
 read without those fields is not judged on them.
 """
@@ -22,7 +25,7 @@ from __future__ import annotations
 
 import re
 
-from merging.verdict import closing
+from merging.verdict import carried, closing
 
 
 # A head branch named for an issue: its leading number.
@@ -31,6 +34,9 @@ BRANCH = re.compile(r"^(\d+)-")
 # The keywords GitHub closes an issue on, and `refs`, the brief's way of saying
 # an issue is deliberately left open.
 KEYWORDS = r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs)"
+
+# A line that is a closing keyword and its number, and nothing else (#966).
+OWN_LINE = re.compile(r"^\s*(?:[-*]\s+)?(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+#\d+\s*$", re.IGNORECASE)
 
 # A Gates line: `Gates:`, `**Gates**`, or a `Gates` heading, at a line start.
 GATES = re.compile(r"^\s*(?:#+\s*)?(?:[-*]\s+)?\**Gates\b", re.MULTILINE)
@@ -66,6 +72,26 @@ def unnamed(pull: dict) -> list[str]:
     ]
 
 
+def stray(pull: dict) -> list[str]:
+    """The lines where a closing keyword sits inside a sentence, or nothing (#966).
+
+    GitHub closes on the keyword wherever it stands, so "close #769 with this
+    diagnosis" closed #769 (#777), and quoting "its `Closes #769`" closed it again
+    (#812). Only a line that is nothing but the keyword and its number counts as
+    meaning it; any other is handed back, quoted, for a one-edit fix.
+    """
+    lines = (pull.get("body") or "").splitlines()
+    found = [line.strip() for line in lines if closing.KEYWORD.search(line) and not OWN_LINE.match(line)]
+    if not found:
+        return []
+    return [
+        f"a closing keyword sits inside a sentence: \"{found[0]}\".",
+        *(f"Also: \"{line}\"." for line in found[1:]),
+        "GitHub closes on it wherever it stands. Put `Closes #N` on a line of its own"
+        " to mean it; otherwise reword (`Refs #N`, or drop the keyword).",
+    ]
+
+
 def gates(pull: dict) -> list[str]:
     """A warning when the description has no Gates line, or nothing."""
     if "body" not in pull or GATES.search(pull["body"] or ""):
@@ -79,4 +105,10 @@ def refusal(pull: dict) -> list[str]:
     `pull["closes"]`, when present, is [`closing.closed_by`]: labels and states
     as they stand now. A caller that did not read them is not judged on them.
     """
-    return closing.refusal(pull.get("closes") or {}) + unnamed(pull)
+    return (
+        closing.refusal(pull.get("closes") or {})
+        + unnamed(pull)
+        + stray(pull)
+        + carried.issueless(pull)
+        + carried.images(pull)
+    )

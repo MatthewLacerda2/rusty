@@ -6,7 +6,7 @@ import json
 import subprocess
 
 from merging.queue import outcomes
-from merging.verdict import github, runlist
+from merging.verdict import closing, github, runlist
 from merging.watch import board, handbacks
 
 
@@ -20,16 +20,24 @@ def is_bot(pull: dict) -> bool:
 
 
 def subject(pull: dict) -> str:
-    """The squash commit's title: the PR title carrying `(#N)`, once."""
-    title, tag = pull.get("title", "").strip(), f"(#{pull.get('number')})"
-    return title if title.endswith(tag) else f"{title} {tag}"
+    """The squash commit's title, house style: `Title (#issue) (#pr)`.
+
+    Each issue it closes that the title lacks is added (#966: `Bump rustls …
+    (#943)` came from branch `919-…`), then the pull request's own number, once.
+    """
+    tag = f"(#{pull.get('number')})"
+    title = pull.get("title", "").strip().removesuffix(tag).rstrip()
+    for n in closing.referenced(pull):
+        if f"(#{n})" not in title:
+            title += f" (#{n})"
+    return f"{title} {tag}"
 
 
 def look(number: int) -> dict:
     """The pull request, in the fields every step below reads."""
     return github.gh(
         "pr", "view", str(number), "--json",
-        github.PULL_FIELDS + ",state,title,author",
+        github.PULL_FIELDS + ",state,title",
     )
 
 

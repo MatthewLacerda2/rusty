@@ -11,7 +11,10 @@ remove it and greenlight the work, and the same pull request then merges.
 
 The same pass refuses a closing keyword that points at a pull request, at an
 issue already closed, or at a number that does not exist: a typo'd number
-closes nothing, and the issue that was meant stays open after the merge.
+closes nothing, and the issue that was meant stays open after the merge. And it
+refuses closing an issue with an open recorded blocker (#966): CLAUDE.md's
+*Dependencies* makes only an unblocked issue fair game. `blocked_by` is read at
+merge time too, so closing the blocker or removing the relationship unblocks it.
 
 Which issues a pull request closes is read two ways and joined, because each
 misses something: GitHub's `closingIssuesReferences` holds issues linked in the
@@ -70,18 +73,33 @@ def refusal(closes: dict[int, dict]) -> list[str]:
         elif issue.get("state") == "closed":
             wrong.append(f"it closes #{number}, which is already closed.")
         staged += [f"it closes #{number}, which is labelled `{stage}`." for stage in STAGES if stage in labels(issue)]
+        staged += [f"it closes #{number}, which is blocked by #{b} (open)." for b in open_blockers(issue)]
     lines = staged + wrong
     if staged:
         lines.append(
             "`planning` and `human` mean do not start (CLAUDE.md, *Overrides*: never"
-            " with `planning` on). Only the operator removes the label; queue it again"
-            " once they have."
+            " with `planning` on), and neither does an open blocker (*Dependencies*)."
+            " Only the operator removes the label or the block; queue it again once"
+            " they have."
         )
     if wrong:
         lines.append("Fix the number, or write `Refs #N` for an issue left open; editing the description needs no push.")
     return lines
 
 
+def open_blockers(issue: dict) -> list[int]:
+    """The open issues recorded as blocking this one ([`closed_by`] reads them)."""
+    return sorted(b["number"] for b in issue.get("blocked_by") or [] if b.get("state") == "open")
+
+
 def closed_by(repo: str, pull: dict) -> dict[int, dict]:
-    """GitHub's answer for every number [`referenced`] finds, [`MISSING`] for a 404."""
-    return {n: github.gh("api", f"repos/{repo}/issues/{n}", missing=MISSING) for n in referenced(pull)}
+    """GitHub's answer for every number [`referenced`] finds, [`MISSING`] for a 404,
+    each open issue with its recorded `blocked_by` beside it."""
+    closes = {}
+    for n in referenced(pull):
+        issue = github.gh("api", f"repos/{repo}/issues/{n}", missing=MISSING)
+        if issue.get("state") == "open" and "pull_request" not in issue:
+            path = f"repos/{repo}/issues/{n}/dependencies/blocked_by?per_page=100"
+            issue = {**issue, "blocked_by": github.gh("api", path, missing=[])}
+        closes[n] = issue
+    return closes
