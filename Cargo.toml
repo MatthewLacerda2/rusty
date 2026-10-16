@@ -75,6 +75,11 @@ editor = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor"]
 # the sim modules' `#![deny(clippy::unwrap_used)]` stays module-scoped (#195).
 [lints.clippy]
 too_many_lines = "deny"
+# Exceptions are inline, with a written reason (#961): `#[expect(lint, reason = "…")]`,
+# which also goes stale loudly once the lint stops firing. A module-root `#![allow]`
+# (the determinism opt-outs) still needs its `reason`.
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
 # The determinism ban (#757); the banned items and the reason live in clippy.toml.
 disallowed_methods = "deny"
 disallowed_types = "deny"

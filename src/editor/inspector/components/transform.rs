@@ -4,7 +4,10 @@ use glam::Mat4;
 use crate::editor::inspector::components::card::component_card;
 
 /// Transform editor with integrated parenting controls.
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the inspector card contract: (world, id) plus the shared editor state each card draws from"
+)]
 pub fn draw(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -32,7 +35,10 @@ pub fn draw(
     });
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the body takes what `draw` takes, minus nothing: it is `draw` without the card frame"
+)]
 fn draw_body(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,

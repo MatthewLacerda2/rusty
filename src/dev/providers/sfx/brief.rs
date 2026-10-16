@@ -119,7 +119,10 @@ impl Draft {
     }
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)] // serde's skip_serializing_if signature
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde's skip_serializing_if signature takes a reference"
+)]
 fn is_false(b: &bool) -> bool {
     !*b
 }

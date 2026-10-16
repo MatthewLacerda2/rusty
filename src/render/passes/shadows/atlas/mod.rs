@@ -56,7 +56,10 @@ impl ShadowTile {
 pub(crate) struct ShadowAtlas {
     /// The active atlas texture; only the tests read it back, everything else draws
     /// and samples it through `view`.
-    #[cfg_attr(not(test), allow(dead_code))]
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "only the tests read the atlas texture back")
+    )]
     pub(super) texture: wgpu::Texture,
     /// The whole active atlas: the frame's depth pass's target and the forward
     /// shader's input.

@@ -13,6 +13,8 @@ path = "src/main.rs"
 # Held to the policy it enforces (#935): clippy-gated by `make clippy`, and the same
 # nothing-temporary denies as the engine's `[lints]`.
 [lints.clippy]
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
 dbg_macro = "deny"
 todo = "deny"
 unimplemented = "deny"
