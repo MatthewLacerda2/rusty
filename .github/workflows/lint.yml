@@ -127,7 +127,7 @@ jobs:
       # that breaks its judgement is a gate failure. Stdlib `unittest`, no build.
       - name: Merge helper tests (.github/scripts)
         if: needs.changes.outputs.code != 'false'
-        run: python3 -m unittest discover --start-directory .github/scripts/tests --verbose
+        run: python3 -m unittest discover --start-directory .github/scripts/tests --top-level-directory .github/scripts --verbose
 
   # The single required status check for lint.yml (issue #229) — the lint-workflow
   # analog of ci.yml's `ci-gate`. Branch protection requires this job, not `lint` by

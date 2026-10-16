@@ -11,19 +11,16 @@ because tests parse it (`docs/api/`, #525, #587).
 
 from __future__ import annotations
 
-import importlib.util
 import re
 import unittest
 from pathlib import Path
 
+from merging.queue import rebase
+from merging.verdict import changes
+
 SCRIPTS = Path(__file__).resolve().parents[1]
 WORKFLOW_DIR = SCRIPTS.parent / "workflows"
 GATING = ("ci.yml", "lint.yml")
-
-_spec = importlib.util.spec_from_file_location("merge_queue_hygiene", SCRIPTS / "merge-queue.py")
-queue = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(queue)
-mergeable = queue.mergeable
 
 
 def jobs(workflow: str) -> dict[str, str]:
@@ -70,20 +67,20 @@ class DocsThatAreCode(unittest.TestCase):
     def test_ci_path_filter_reincludes_exactly_the_code_docs(self):
         body = jobs("ci.yml")["changes"]
         reincluded = re.findall(r"^\s+- '([^'!][^']*)'$", body, flags=re.M)
-        self.assertEqual(sorted(reincluded), sorted(f"{p}**" for p in mergeable.CODE_DOCS))
+        self.assertEqual(sorted(reincluded), sorted(f"{p}**" for p in changes.CODE_DOCS))
 
     def test_mergeable_counts_them_as_code(self):
-        for prefix in mergeable.CODE_DOCS:
+        for prefix in changes.CODE_DOCS:
             path = f"{prefix}Transform.md"
             with self.subTest(path=path):
-                self.assertFalse(mergeable.inert([path]))
-                self.assertTrue(mergeable.needs_drift_run([path]))
+                self.assertFalse(changes.inert([path]))
+                self.assertTrue(changes.needs_drift_run([path]))
 
     def test_the_queue_rebases_over_them(self):
-        for prefix in mergeable.CODE_DOCS:
+        for prefix in changes.CODE_DOCS:
             with self.subTest(prefix=prefix):
-                self.assertFalse(queue.docs_advance(f">abc\n{prefix}Transform.md\n"))
-        self.assertTrue(queue.docs_advance(">abc\nREADME.md\n"))
+                self.assertFalse(rebase.docs_advance(f">abc\n{prefix}Transform.md\n"))
+        self.assertTrue(rebase.docs_advance(">abc\nREADME.md\n"))
 
 
 if __name__ == "__main__":

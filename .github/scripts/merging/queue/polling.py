@@ -1,0 +1,122 @@
+"""One poll's answer: wait, go, re-run, or hand back ([`progress`]).
+
+## A runner outage is re-run, not handed back
+
+When GitHub's hosted runners stop being acquired, every run in flight comes
+back red at once with nothing compiled (2026-10-05, #869): the only jobs not
+green are `cancelled`, or a gate that failed because the job it gates was. That
+is GitHub's failure, not the branch's, so [`waiting.wait_for`] re-runs those runs once
+(`gh run rerun --failed`, [`rerun_step`]) and keeps waiting inside the same
+`--deadline`; only a second cancellation hands back, as [`outcomes.RUNNERS`]. A red with
+any job `failure` besides a gate is the code's, and hands back at once as ever.
+"""
+
+from __future__ import annotations
+
+from merging.queue import outcomes
+from merging.verdict import absent, decide, runlist, runners
+
+
+# How long "nothing has built this yet" is read as *not yet*. A push and the
+# runs it creates are not simultaneous, and the listing is eventually
+# consistent; after this, the silence is the answer ([`verdict.absent.no_run`]).
+RUN_APPEARS_SECONDS = 300
+
+
+def head_state(seen: str, pushed: str, before: str, waited: float) -> tuple[str, list[str]]:
+    """Whether the head GitHub reports is the one this queue is watching.
+
+    The pushed head goes; the pre-push head waits while the grace lasts
+    (GitHub's view lags the push); a third sha is somebody else and stops —
+    merging a commit this queue never watched is not given the benefit of the
+    doubt.
+    """
+    if seen == pushed:
+        return outcomes.GO, []
+    if seen == before and waited < RUN_APPEARS_SECONDS:
+        return outcomes.WAIT, [f"GitHub still reports {before[:7]}; it has not caught up with the push yet."]
+    return outcomes.STOP, [
+        f"the head is {seen[:7]}, not the {pushed[:7]} this queue is watching.",
+        "Somebody else pushed. Handed back rather than merging a commit this"
+        " queue never watched.",
+    ]
+
+
+def sighted(pull: dict, runs: list[dict]) -> set[str]:
+    """The workflows with a run on the head that GitHub has shown, by the runs
+    listing or by the pull request's own checks ([`verdict.absent.in_rollup`])."""
+    sha = pull.get("headRefOid", "")
+    return {
+        w for w in runlist.WORKFLOWS if runlist.runs_for(runs, sha, w) or absent.in_rollup(pull, w)
+    }
+
+
+def rerun_step(stalled: list[dict], rerun: dict[int, int], short: str) -> tuple[str, list[str]]:
+    """What to do about runs red only for the runners (#869): re-run them,
+    wait for the re-run to show, or hand back as [`outcomes.RUNNERS`].
+
+    `rerun` maps each run this wait re-ran to the attempt it had then. A run
+    not in it is re-run ([`outcomes.RERUN`]); one whose listed attempt is not past
+    that is the listing lagging the re-run, and waits; one already re-run
+    and red again is the hand-back. Once per run, inside the same deadline.
+    """
+    names = ", ".join(sorted({f"`{r.get('name')}`" for r in stalled}))
+    if any(r.get("id") not in rerun for r in stalled):
+        return outcomes.RERUN, [
+            f"{names} on {short} came back cancelled with nothing failed: GitHub's runners, not the branch.",
+            "Re-running the cancelled jobs once (#869).",
+        ]
+    if any(r.get("run_attempt", 1) <= rerun[r.get("id")] for r in stalled):
+        return outcomes.WAIT, [f"the re-run of {names} on {short} has not shown up yet."]
+    return outcomes.STOP, [
+        f"{outcomes.RUNNERS}: {names} on {short} was cancelled again after one re-run, with nothing failed.",
+        "The branch is not known to be wrong. Once GitHub's runners are back, re-run it"
+        " (`gh run rerun --failed ID`): a new run attempt re-queues it, no push needed.",
+    ]
+
+
+def progress(
+    pull: dict, runs: list[dict], jobs: dict[int, list[dict]], files: list[str], waited: float,
+    seen: frozenset[str] | set[str] = frozenset(), rerun: dict[int, int] | None = None,
+) -> tuple[str, list[str]]:
+    """Whether to wait, merge, or hand this branch back — and why.
+
+    The verdict is [`verdict.decide.judge`]; this adds what a polling loop needs and
+    a one-shot check does not: *not yet* against *no*. A failure anywhere stops
+    at once — a red run is not eventually consistent. A run in flight waits.
+    A workflow in `seen` ([`sighted`] on an earlier poll) that is absent now
+    is the listing flickering, and waits until the deadline (#592). Any other
+    absence — no run, or only runs that built nothing — waits out
+    [`RUN_APPEARS_SECONDS`], because the commit was pushed seconds ago and
+    scorsese watched the runs listing omit a live run beside a skipped one.
+    A red that is only cancelled jobs is the runners' ([`rerun_step`]).
+    """
+    if pull.get("isDraft"):
+        return outcomes.STOP, ["the pull request is a draft.", "CI does not check drafts. Mark it ready before queueing it."]
+
+    sha = pull.get("headRefOid", "")
+    stalled = runners.outage(pull, runs, jobs)
+    if stalled:
+        return rerun_step(stalled, rerun or {}, sha[:7])
+    states = [
+        decide.assess(pull, w, runlist.runs_for(runs, sha, w), jobs) for w in runlist.WORKFLOWS
+    ]
+    for state, lines in states:
+        if state == decide.FAILED:
+            return outcomes.STOP, lines
+    for state, lines in states:
+        if state == decide.RUNNING:
+            return outcomes.WAIT, lines
+    for w, (state, _) in zip(runlist.WORKFLOWS, states):
+        if state == decide.ABSENT and w in seen:
+            return outcomes.WAIT, [
+                f"the `{w}` run seen on {sha[:7]} has dropped out of the runs listing.",
+                "The listing is eventually consistent and flickers; a run seen once"
+                " is not gone (#592). Waiting for it to come back.",
+            ]
+    if any(state in (decide.ABSENT, decide.UNBUILT) for state, _ in states):
+        if waited < RUN_APPEARS_SECONDS:
+            return outcomes.WAIT, [f"nothing has built {sha[:7]} yet.", "Ordinary this soon after a push, and not yet an answer."]
+
+    ok, lines = decide.judge(pull, runs, jobs, files)
+    return (outcomes.GO if ok else outcomes.STOP), lines
