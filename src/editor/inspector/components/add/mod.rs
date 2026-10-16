@@ -7,25 +7,27 @@ use crate::scene::authoring::{self, ComponentKind};
 use crate::scene::{ScriptComponent, DEFAULT_SCRIPTS_DEST_DIR};
 
 /// 3F. Add Component — Unity-style full-width pill that opens the component menu.
-pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
+/// A pick marks the scene unsaved, as every card's Remove does (#992).
+pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty: &mut bool) {
     ui.add_space(crate::editor::theme::from_ui(ui).space_sm);
     // A justified layout stretches the menu button to the full panel width.
     ui.with_layout(
         egui::Layout::top_down_justified(egui::Align::Center),
         |ui| {
             ui.menu_button(format!("{}  Add Component", icon::PLUS), |ui| {
-                add_menu(ui, world, id);
+                *is_dirty |= add_menu(ui, world, id);
             });
         },
     );
 }
 
-fn add_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
+/// The menu's entries; returns whether one was picked.
+fn add_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) -> bool {
     // Every project `.lua` that exposes a lifecycle table is a MonoBehaviour and
     // is offered here with the moon glyph (the per-type icons for the other
     // built-ins are the burn-down in #82); helper modules without a lifecycle
     // table are not. An entity can hold many scripts (#83), so each pick appends.
-    add_script_menu(ui, world, id);
+    let mut added = add_script_menu(ui, world, id);
     for &(kind, glyph, name) in ENTRIES {
         if authoring::has_kind(world, id, kind) {
             continue;
@@ -36,10 +38,11 @@ fn add_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
             format!("{glyph}  {name}")
         };
         if ui.button(label).clicked() {
-            authoring::add_with_requirements(world, id, kind);
+            added |= authoring::add_with_requirements(world, id, kind);
             ui.close();
         }
     }
+    added
 }
 
 /// The first-class entries of the Add Component menu, in menu order: the kind, its
@@ -124,16 +127,18 @@ const ENTRIES: &[(ComponentKind, &str, &str)] = &[
 /// List the project's MonoBehaviour scripts (any `.lua` exposing a lifecycle
 /// table) under the moon glyph; picking one appends a `ScriptComponent` to the
 /// entity's `scripts` (#83). Duplicates are allowed, mirroring Unity. When the
-/// project has no such scripts, a disabled hint is shown instead.
-fn add_script_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
+/// project has no such scripts, a disabled hint is shown instead. Returns whether
+/// a script was added.
+fn add_script_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) -> bool {
     let scripts = crate::scripting::monobehaviour_scripts(DEFAULT_SCRIPTS_DEST_DIR);
     if scripts.is_empty() {
         ui.add_enabled(
             false,
             egui::Button::new(format!("{}  No script behaviours found", icon::MOON)),
         );
-        return;
+        return false;
     }
+    let mut added = false;
     for path in scripts {
         let label = crate::scripting::script_label(&path);
         if ui.button(format!("{}  {}", icon::MOON, label)).clicked() {
@@ -143,8 +148,10 @@ fn add_script_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
                     is_loaded: false,
                     ..Default::default()
                 });
+                added = true;
             }
             ui.close();
         }
     }
+    added
 }

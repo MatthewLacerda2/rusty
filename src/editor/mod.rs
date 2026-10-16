@@ -31,9 +31,8 @@ pub use inspector::preview::{OrbitState, PreviewCache, PreviewMesh, PreviewReque
 pub use dev_state::DevEditorState;
 pub use viewport::{ViewportInteraction, ViewportTab};
 
-/// What the Inspector panel is currently showing. The three modes are mutually
-/// exclusive; the editor derives this from its selection state each frame so the
-/// inspector dispatches on an explicit target rather than an implicit fall-through.
+/// What the Inspector panel shows: three mutually exclusive modes, derived from the
+/// selection each frame so the inspector dispatches on an explicit target.
 pub enum InspectorTarget {
     Entity(u32),
     Asset(String),
@@ -282,6 +281,8 @@ impl EditorUi {
             #[cfg(feature = "dev")]
             bottom_panel::draw_play_console(self, ctx, console);
         } else {
+            // One diffing navmesh sync per edit-mode frame catches every edit (#992).
+            nav.sync(scene);
             // 2. LEFT PANEL: Scene Hierarchy
             hierarchy::draw(self, ui, scene);
             // 3. RIGHT PANEL: Properties Inspector
@@ -296,3 +297,7 @@ impl EditorUi {
         viewport::draw(self, ui, viewport_texture, scene)
     }
 }
+
+#[cfg(test)]
+#[path = "nav_sync_tests.rs"]
+mod nav_sync_tests;

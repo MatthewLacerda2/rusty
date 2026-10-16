@@ -1,5 +1,7 @@
 //! src/editor/inspector/components/ribbons/trail.rs — the Trail card (#441).
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::draw_style;
@@ -49,7 +51,6 @@ pub fn draw_trail(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, dir
         }
     });
     if remove {
-        world.set_trail(id, None);
-        *dirty = true;
+        remove_component(world, id, ComponentKind::Trail, dirty);
     }
 }

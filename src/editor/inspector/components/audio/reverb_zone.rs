@@ -6,6 +6,8 @@
 //! picking a preset writes its params and editing a param makes the zone `Custom`
 //! in one place.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use crate::components::reverb_zone::{DECAY_RANGE, MAX_PRE_DELAY};
@@ -51,8 +53,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         },
     );
     if remove {
-        world.set_reverb_zone(id, None);
-        *is_dirty = true;
+        remove_component(world, id, ComponentKind::ReverbZone, is_dirty);
     }
 }
 

@@ -6,6 +6,8 @@
 //! NavMesh Modifier Volume card in `nav_modifier`, the Joint card in `joint`, the
 //! CharacterController card in `character_controller`.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 use std::path::Path;
 
@@ -41,12 +43,11 @@ pub fn draw_navigation(
     world: &mut crate::ecs::World,
     id: u32,
     is_dirty: &mut bool,
-    pending_nav_bake: &mut bool,
 ) {
     draw_nav_agent(ui, world, id, is_dirty);
-    draw_nav_obstacle(ui, world, id, is_dirty, &mut *pending_nav_bake);
-    draw_offmesh_link(ui, world, id, is_dirty, &mut *pending_nav_bake);
-    draw_nav_modifier(ui, world, id, is_dirty, pending_nav_bake);
+    draw_nav_obstacle(ui, world, id, is_dirty);
+    draw_offmesh_link(ui, world, id, is_dirty);
+    draw_nav_modifier(ui, world, id, is_dirty);
 }
 
 /// 3D. Script bindings — one card per attached script (#83). An entity can carry
@@ -112,8 +113,7 @@ pub fn draw_animator(
         |ui| animator_card_body(ui, world, id, &anim, is_dirty),
     );
     if remove {
-        world.set_animator(id, None);
-        *is_dirty = true;
+        remove_component(world, id, ComponentKind::Animator, is_dirty);
     }
 }
 

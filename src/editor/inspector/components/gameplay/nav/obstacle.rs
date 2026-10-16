@@ -3,9 +3,11 @@
 //!
 //! A THIN client (#287): widgets read a snapshot and route every write through the
 //! shared `authoring::nav::obstacle` ops the `NavMeshObstacle.*` Lua setters call.
-//! A carving obstacle changes the navmesh, so every edit asks for a nav rebake
-//! (incremental: only the obstacle's cells).
+//! A carving obstacle changes the navmesh: the editor's per-frame nav sync (#992)
+//! rebakes only the obstacle's cells after an edit.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::super::physics::vec3_row;
@@ -13,18 +15,17 @@ use crate::components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
 use crate::editor::inspector::components::card::component_card;
 use crate::scene::authoring::nav::obstacle as obstacle_ops;
 
-/// Route one edit through the shared ops, mark the scene dirty, ask for a rebake.
+/// Route one edit through the shared ops and mark the scene dirty.
 fn write(
     world: &mut crate::ecs::World,
     id: u32,
-    flags: (&mut bool, &mut bool),
+    is_dirty: &mut bool,
     op: impl FnOnce(&mut Obstacle),
 ) {
     if let Some(mut o) = world.nav_obstacle_mut(id) {
         op(&mut o);
     }
-    *flags.0 = true;
-    *flags.1 = true;
+    *is_dirty = true;
 }
 
 /// One labelled drag row; `Some(new)` when it was edited.
@@ -44,7 +45,6 @@ pub fn draw_nav_obstacle(
     world: &mut crate::ecs::World,
     id: u32,
     is_dirty: &mut bool,
-    pending_nav_bake: &mut bool,
 ) {
     let Some(o) = world.nav_obstacle(id).map(|o| o.clone()) else {
         return;
@@ -58,19 +58,17 @@ pub fn draw_nav_obstacle(
         |ui| {
             let mut active = o.active;
             if ui.checkbox(&mut active, "Active").changed() {
-                write(world, id, (is_dirty, pending_nav_bake), |o| {
+                write(world, id, &mut *is_dirty, |o| {
                     obstacle_ops::set_active(o, active)
                 });
             }
-            draw_shape(ui, world, id, &o, (is_dirty, pending_nav_bake));
-            draw_carving(ui, world, id, &o, (is_dirty, pending_nav_bake));
+            draw_shape(ui, world, id, &o, &mut *is_dirty);
+            draw_carving(ui, world, id, &o, &mut *is_dirty);
             ui.label(format!("Carving now: {}", o.is_carving()));
         },
     );
     if remove {
-        world.set_nav_obstacle(id, None);
-        *is_dirty = true;
-        *pending_nav_bake = true;
+        remove_component(world, id, ComponentKind::NavMeshObstacle, is_dirty);
     }
 }
 
@@ -80,9 +78,8 @@ fn draw_shape(
     world: &mut crate::ecs::World,
     id: u32,
     o: &Obstacle,
-    f: (&mut bool, &mut bool),
+    d: &mut bool,
 ) {
-    let (d, b) = f;
     let mut shape = o.shape;
     egui::ComboBox::from_label("Shape")
         .selected_text(shape.as_str())
@@ -92,29 +89,23 @@ fn draw_shape(
             }
         });
     if shape != o.shape {
-        write(world, id, (&mut *d, &mut *b), |o| {
-            obstacle_ops::set_shape(o, shape)
-        });
+        write(world, id, &mut *d, |o| obstacle_ops::set_shape(o, shape));
     }
     if let Some(v) = vec3_row(ui, "Center:", o.center) {
-        write(world, id, (&mut *d, &mut *b), |o| {
-            obstacle_ops::set_center(o, v)
-        });
+        write(world, id, &mut *d, |o| obstacle_ops::set_center(o, v));
     }
     match o.shape {
         ObstacleShape::Box => {
             if let Some(v) = vec3_row(ui, "Size:", o.size) {
-                write(world, id, (d, b), |o| obstacle_ops::set_size(o, v));
+                write(world, id, d, |o| obstacle_ops::set_size(o, v));
             }
         }
         ObstacleShape::Capsule => {
             if let Some(v) = drag_row(ui, "Radius:", o.radius, 0.02) {
-                write(world, id, (&mut *d, &mut *b), |o| {
-                    obstacle_ops::set_radius(o, v)
-                });
+                write(world, id, &mut *d, |o| obstacle_ops::set_radius(o, v));
             }
             if let Some(v) = drag_row(ui, "Height:", o.height, 0.05) {
-                write(world, id, (d, b), |o| obstacle_ops::set_height(o, v));
+                write(world, id, d, |o| obstacle_ops::set_height(o, v));
             }
         }
     }
@@ -126,32 +117,27 @@ fn draw_carving(
     world: &mut crate::ecs::World,
     id: u32,
     o: &Obstacle,
-    f: (&mut bool, &mut bool),
+    d: &mut bool,
 ) {
-    let (d, b) = f;
     let mut carve = o.carve;
     if ui.checkbox(&mut carve, "Carve").changed() {
-        write(world, id, (&mut *d, &mut *b), |o| {
-            obstacle_ops::set_carve(o, carve)
-        });
+        write(world, id, &mut *d, |o| obstacle_ops::set_carve(o, carve));
     }
     if !o.carve {
         return;
     }
     let mut only = o.carve_only_stationary;
     if ui.checkbox(&mut only, "Carve Only Stationary").changed() {
-        write(world, id, (&mut *d, &mut *b), |o| {
+        write(world, id, &mut *d, |o| {
             obstacle_ops::set_carve_only_stationary(o, only)
         });
     }
     if let Some(v) = drag_row(ui, "Move Threshold:", o.move_threshold, 0.01) {
-        write(world, id, (&mut *d, &mut *b), |o| {
+        write(world, id, &mut *d, |o| {
             obstacle_ops::set_move_threshold(o, v)
         });
     }
     if let Some(v) = drag_row(ui, "Time To Stationary:", o.time_to_stationary, 0.05) {
-        write(world, id, (d, b), |o| {
-            obstacle_ops::set_time_to_stationary(o, v)
-        });
+        write(world, id, d, |o| obstacle_ops::set_time_to_stationary(o, v));
     }
 }
