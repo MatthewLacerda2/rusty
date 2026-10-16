@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import shlex
+
 from merging.watch import board
 
 
@@ -16,6 +18,13 @@ FAILS = 10
 
 # How the `--for` exit begins, so the starter can tell it from "nothing left".
 DEADLINE = "deadline reached"
+
+# What a background command survives: the harness kills it at two hours,
+# wherever it is (#697). `--for` plus the per-PR `--deadline` must fit in it.
+BACKGROUND_MINUTES = 120
+
+# How the last line begins: the command that starts this watch again (#928).
+RESUME = "watch: resume:"
 
 # How each hand-back's line begins, the moment it happens: grep for this.
 HANDED_BACK_LINE = "HANDED BACK"
@@ -65,3 +74,21 @@ def status(handed: list[int], machine: bool) -> int:
 def handed_back(number: int, why: str) -> str:
     """The line a hand-back prints as it happens, beginning [`HANDED_BACK_LINE`]."""
     return f"{HANDED_BACK_LINE} #{number}: {why} Passed over until its head moves; the watch carries on."
+
+
+def over_budget(for_minutes: float | None, deadline: float) -> str | None:
+    """Why `--for` and `--deadline` cannot both fit in a background command's
+    life ([`BACKGROUND_MINUTES`]), or `None`. The take in hand at the deadline
+    can run a whole `--deadline` past it, so the two add up."""
+    if for_minutes is None or for_minutes + deadline <= BACKGROUND_MINUTES:
+        return None
+    return (
+        f"--for {for_minutes:g} plus --deadline {deadline:g} is {for_minutes + deadline:g} minutes, past the"
+        f" {BACKGROUND_MINUTES} a background command survives; the take in hand could be killed mid-push."
+        f" Lower one, e.g. --for {max(BACKGROUND_MINUTES - deadline, 0):g}."
+    )
+
+
+def resume(cwd: str, script: str, argv: list[str]) -> str:
+    """The last line: [`RESUME`] and the exact command that starts this watch again."""
+    return f"{RESUME} cd {shlex.quote(cwd)} && {shlex.join(['python3', script, *argv])}"

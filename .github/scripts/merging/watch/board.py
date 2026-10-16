@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 
 # What `gh pr list` is asked for, and the issues whose labels give the priority.
-# `files` is what [`held`] reads.
-LIST_FIELDS = "number,isDraft,headRefOid,baseRefName,author,labels,closingIssuesReferences,files"
+# `files` is what [`held`] reads; `createdAt`, what [`recent`] does.
+LIST_FIELDS = "number,isDraft,headRefOid,baseRefName,author,labels,closingIssuesReferences,files,createdAt"
 
 # The go-ahead (#925): the watch takes a ready pull request only with this label.
 QUEUE_LABEL = "queue"
@@ -45,6 +47,15 @@ def held_line(pull: dict, workflows: list[str]) -> str:
 def queued(pull: dict) -> bool:
     """Whether the orchestrator has given this pull request the go-ahead."""
     return QUEUE_LABEL in names(pull.get("labels"))
+
+
+def recent(pulls: list[dict], since: datetime | None) -> list[dict]:
+    """The pull requests opened at or after `since` (`--since`, #928): the batch's
+    own, so the board lines leave older ones out. All of them without it, and a
+    pull request GitHub gave no time for is kept."""
+    if since is None:
+        return pulls
+    return [p for p in pulls if not p.get("createdAt") or datetime.fromisoformat(p["createdAt"]) >= since]
 
 
 def heads(pulls: list[dict]) -> dict[int, tuple[bool, str, bool]]:

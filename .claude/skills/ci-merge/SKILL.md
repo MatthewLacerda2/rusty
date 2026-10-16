@@ -86,7 +86,19 @@ which a Dependabot pull request's rebase wait and CI wait share (#825):
 requests. When many coders push at once, runs wait for GitHub runners
 (2026-10-02: a run's first job started 13 minutes in, and #699 was handed back
 green-but-unfinished at 45); then raise `--deadline` and lower `--for` together,
-keeping the sum under two hours: `--for 50 --deadline 60`. `make queue PRS="a b c"` takes named
+keeping the sum under two hours: `--for 50 --deadline 60`; the watch refuses to
+start on a pair past 120 (#928). Its last line is always `watch: resume:
+<command>`, the exact command that starts it again. **Only one watch runs at a
+time** (#928): it holds an `fcntl.flock` on `.git/merge-queue.lock` (the common
+git directory, so every worktree shares it), and a second exits with status
+**4**, naming the holder's PID; the kernel drops the lock however the first
+dies. **No pull request starves** (#928): one that has waited 60 minutes in line,
+or seen three others taken ahead of it, goes first whatever it conflicts with
+(`watch: #N has waited …`). **A ready pull request that already conflicts with
+`main`** (`git merge-tree` against `origin/main`) is handed back at once, naming
+the files, instead of waiting its turn to find out. The board lines keep coming
+during a take's CI wait, one listing per poll, and `--since <ISO time>` limits
+them to pull requests opened since then: the batch's own. `make queue PRS="a b c"` takes named
 pull requests instead, in the order given. Either way, the loop is one pull
 request at a time — so no agent sits through a ten-minute run holding a
 worktree open:

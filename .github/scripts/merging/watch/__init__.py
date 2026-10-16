@@ -94,6 +94,19 @@ orchestrator ran a second monitor, a `gh pr list` poller, to hear of a coder's
 draft or its flip to ready; with these lines one `Monitor` on the watch's
 output is the whole view.
 
+**No pull request starves, none waits to learn it conflicts with `main`, and
+one watch runs at a time** (#928). The conflict-first order passes a pull
+request with one conflict over for every clean one, so past [`aging.AGE_MINUTES`]
+in line or [`aging.AGE_PASSES`] takes ahead of it, it goes first whatever it
+conflicts with ([`aging.Line`]). A ready head that conflicts with `origin/main`
+itself is handed back before any take, naming the files ([`mainline.conflicts`]).
+The watch holds an `fcntl.flock` for its whole life ([`lock.hold`]), so a second
+one exits naming the first's PID. During a take's CI wait the board is still
+listed once a poll (the `tick` [`queue.waiting.wait_for`] calls), `--since`
+keeps its lines to the batch's own pull requests ([`board.recent`]), `--for` with
+`--deadline` must fit in a background command's life ([`ending.over_budget`]),
+and the last line is always [`ending.RESUME`] and the command to start it again.
+
 The decisions are pure functions over plain dictionaries; [`loop.run`] takes every
 effect as an argument, so the loop is tested without a network.
 """

@@ -49,7 +49,7 @@ class Skips(unittest.TestCase):
             world = fakes.World(tmp, listings, {1: outcomes.HANDED_BACK})
             ends = iter([outcomes.HANDED_BACK, outcomes.MERGED])
 
-            def turn(number):
+            def turn(number, tick=None):
                 world.taken.append(number)
                 return number, next(ends), "why"
 
@@ -78,7 +78,7 @@ class Status(unittest.TestCase):
             with unittest.mock.patch.object(world, "effects", fake), \
                     unittest.mock.patch.object(github, "gh", lambda *a: {"nameWithOwner": "o/r"}), \
                     unittest.mock.patch("builtins.print"):
-                self.assertEqual(cli.main(["--watch", "--no-check", "--idle=1", "--poll=30"]), ending.HANDED_BACK_STATUS)
+                self.assertEqual(cli.main(["--watch", "--no-check", "--idle=1", "--poll=30", f"--root={tmp}"]), ending.HANDED_BACK_STATUS)
 
 
 if __name__ == "__main__":

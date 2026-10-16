@@ -28,8 +28,9 @@ def dry(repo: str, pull: dict, fresh: str, notes: list[str]) -> tuple[int, str, 
     return number, outcomes.DRY, f"{moved}; head {head[:7]} is {'mergeable' if ok else 'not mergeable'}."
 
 
-def take(repo: str, number: int, opts: argparse.Namespace) -> tuple[int, str, str]:
-    """One pull request, from where it is to merged or handed back."""
+def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[int, str, str]:
+    """One pull request, from where it is to merged or handed back. `tick()`,
+    when given, is called on each poll of the CI wait ([`waiting.wait_for`])."""
     pull = pulls.look(number)
     if pull.get("state") != "OPEN":
         return number, outcomes.HANDED_BACK, outcomes.NOT_OPEN.format(str(pull.get("state")).lower())
@@ -64,7 +65,7 @@ def take(repo: str, number: int, opts: argparse.Namespace) -> tuple[int, str, st
     # A bot's rebase wait came out of the same `--deadline`; a rebase from
     # here is local work, and its CI wait gets the whole deadline as before.
     spent = time.monotonic() - began if pulls.is_bot(pull) else 0.0
-    state, lines = waiting.wait_for(repo, number, fresh, head, dependabot.left(opts.deadline, spent), opts.poll)
+    state, lines = waiting.wait_for(repo, number, fresh, head, dependabot.left(opts.deadline, spent), opts.poll, tick)
     outcomes.say(f"#{number}: {lines[0]}", *lines[1:])
     if state != outcomes.GO:
         return number, outcomes.HANDED_BACK, lines[0]

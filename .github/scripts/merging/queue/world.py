@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 from merging.queue import gitio, outcomes, pulls, stopping, taking
-from merging.watch import board, handbacks, order
+from merging.watch import board, handbacks, mainline, order
 
 
 def merge_tree_git(root: str, *args: str) -> tuple[int, str]:
@@ -32,7 +32,12 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
         clashes=functools.partial(
             order.clashing, git=functools.partial(merge_tree_git, opts.root), known={}, bots=pulls.BOTS
         ),
-        turn=lambda number: taking.unready(stopping.drain([number], lambda n: taking.take(repo, n, opts))[0]),
+        main_conflicts=functools.partial(
+            mainline.conflicts, git=functools.partial(merge_tree_git, opts.root), known={}, bots=pulls.BOTS
+        ),
+        turn=lambda number, tick: taking.unready(
+            stopping.drain([number], lambda n: taking.take(repo, n, opts, tick=tick))[0]
+        ),
         head=lambda number: (pulls.quietly("pr", "view", str(number), "--json", "headRefOid") or {}).get("headRefOid"),
         attempts=lambda number, sha: pulls.head_runs(repo, sha),
         clock=time.monotonic,

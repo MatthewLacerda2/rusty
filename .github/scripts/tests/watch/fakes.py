@@ -25,8 +25,10 @@ class World:
     def __init__(self, tmp: str, listings: list, verdicts: dict[int, str]):
         self.listings, self.verdicts, self.now, self.taken = listings, verdicts, 0.0, []
         self.clashes: set[frozenset[int]] = set()
+        self.stale: dict[int, list[str]] = {}  # conflicts with `main`, by pull request
         self.fx = argparse.Namespace(
             pulls=self.pulls, issue_labels=dict, clashes=lambda pulls: self.clashes,
+            main_conflicts=lambda pulls: {p["number"]: self.stale[p["number"]] for p in pulls if p["number"] in self.stale},
             turn=self.turn, head=lambda n: f"pushed{n}", attempts=lambda n, sha: "",
             clock=lambda: self.now, sleep=self.sleep, say=lambda *a: None,
             memory=Path(tmp, handbacks.MEMORY), bots=pulls.BOTS, merged=outcomes.MERGED,
@@ -40,7 +42,7 @@ class World:
     def merged(self):
         return {n for n, s in zip(self.taken, (self.verdicts[n] for n in self.taken)) if s == outcomes.MERGED}
 
-    def turn(self, number):
+    def turn(self, number, tick=None):
         self.taken.append(number)
         return number, self.verdicts[number], "why"
 

@@ -24,7 +24,7 @@ class SlowWorld(fakes.World):
         super().__init__(tmp, listings, verdicts)
         self.minutes = minutes
 
-    def turn(self, number):
+    def turn(self, number, tick=None):
         self.now += self.minutes * 60
         return super().turn(number)
 
@@ -78,10 +78,10 @@ class Deadline(unittest.TestCase):
 
 class Arguments(unittest.TestCase):
     def test_for_needs_watch(self):
-        self.assertEqual(cli.parse(["--watch", "--for", "110"]).for_minutes, 110)
+        self.assertEqual(cli.parse(["--watch", "--for", "70"]).for_minutes, 70)
         self.assertIsNone(cli.parse(["--watch"]).for_minutes)
         with self.assertRaises(SystemExit), unittest.mock.patch("sys.stderr"):
-            cli.parse(["524", "--for", "110"])
+            cli.parse(["524", "--for", "70"])
 
 
 if __name__ == "__main__":
