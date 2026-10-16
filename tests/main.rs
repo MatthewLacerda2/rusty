@@ -52,6 +52,7 @@ mod proptest_scene;
 mod ragdoll;
 mod reflection_probes;
 mod ribbons;
+mod scene_format;
 mod scene_roundtrip;
 mod selectable_api;
 mod sound_api;
