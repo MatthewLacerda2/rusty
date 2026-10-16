@@ -231,6 +231,8 @@ impl PostFx {
                 // Depth32Float target (point sampling — no sampler needed).
                 depth_entry(4, wgpu::TextureViewDimension::D2),
                 texture_entry(5, wgpu::TextureViewDimension::D2),
+                // The skybox's own sampler: the panorama wraps at its seam (#995).
+                sampler_entry(6),
             ],
         })
     }

@@ -1,4 +1,4 @@
-#import common::{CameraUniforms, Decal, DecalSurface, LightingUniforms, LocalLight, NO_SHADOW, ShadowTile, VertexInput, apply_decal, apply_fog, blend_joints, cluster_index, local_light_radiance, local_shadow_tile, procedural_sky, sample_local_shadow}
+#import common::{CameraUniforms, Decal, DecalSurface, LightingUniforms, LocalLight, NO_SHADOW, PI, ShadowTile, VertexInput, apply_decal, apply_fog, blend_joints, cluster_index, equirect_uv, local_light_radiance, local_shadow_tile, procedural_sky, sample_local_shadow}
 
 struct EntityUniforms {
     model_matrix: mat4x4<f32>,
@@ -224,7 +224,6 @@ fn vs_main(model: VertexInput, @builtin(instance_index) instance: u32) -> Vertex
     return out;
 }
 
-const PI: f32 = 3.14159265359;
 // RGBM's range (#438); mirrors `RGBM_RANGE` in src/scene/lighting/lightmap/encode.rs.
 const LIGHTMAP_RGBM_RANGE: f32 = 8.0;
 
@@ -411,9 +410,9 @@ fn eval_sh(N: vec3<f32>, instance: u32) -> vec3<f32> {
     b[6] = 0.31539157 * (3.0 * z * z - 1.0);
     b[7] = -1.0925484 * x * z;
     b[8] = 0.5462742 * (x * x - y * y);
-    let a0 = 3.1415927;
-    let a1 = 2.0943952; // 2*pi/3
-    let a2 = 0.7853982; // pi/4
+    let a0 = PI;
+    let a1 = 2.0 * PI / 3.0;
+    let a2 = PI / 4.0;
     var lobe: array<f32, 9>;
     lobe[0] = a0;
     lobe[1] = a1; lobe[2] = a1; lobe[3] = a1;
@@ -462,9 +461,7 @@ fn environment_reflection(world_pos: vec3<f32>, raw_r: vec3<f32>, roughness: f32
     }
     if (lighting.sky_textured > 0.5) {
         // The equirectangular panorama, mapped as the skybox pass maps it.
-        let phi = atan2(R.z, R.x);
-        let theta = acos(clamp(R.y, -1.0, 1.0));
-        return textureSample(t_skybox, s_skybox, vec2<f32>((phi + PI) / (2.0 * PI), theta / PI)).rgb;
+        return textureSample(t_skybox, s_skybox, equirect_uv(R)).rgb;
     }
     return procedural_sky(lighting.ambient.color, R);
 }
