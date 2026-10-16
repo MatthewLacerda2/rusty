@@ -10,8 +10,8 @@
 //! An effect's bind group is the chain's shared IO layout: binding 1 is the colour
 //! so far, binding 2 its sampler, and binding 3 the **previous frame's** result of
 //! this chain (black on the first frame and after a resize; only written while
-//! effects run) — the history a feedback effect (#402) reads. Bindings 0, 4 and 5 are the post params, depth and
-//! skybox, as for every other post pass. Group 1 is the effect's own **runtime-param
+//! effects run) — the history a feedback effect (#402) reads. Bindings 0, 4, 5 and 6 are the post params, depth,
+//! skybox and the skybox's sampler, as for every other post pass. Group 1 is the effect's own **runtime-param
 //! uniform** (#671, `shadergen::params::POSTFX_UNIFORM_DECL`): packed every frame from
 //! the volume's `post_params` against the module's baked layout, so a script changing
 //! a value costs one buffer write — never a re-bake or a pipeline rebuild.

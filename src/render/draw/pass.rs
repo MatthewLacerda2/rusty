@@ -170,9 +170,7 @@ impl Renderer {
             return;
         }
         self.global_bind_group_dirty = false;
-        let skybox = self.skybox_texture.as_deref();
-        let skybox_view = skybox.map_or(&self.default_texture.view, |t| &t.view);
-        let skybox_sampler = skybox.map_or(&self.default_texture.sampler, |t| &t.sampler);
+        let sky = self.sky_panorama();
         // The active reflection probe's cube at binding 4, else the black fallback cube —
         // the shader picks skybox vs cube via the `refl_has_cubemap` flag, so a fallback
         // here is never sampled but keeps the bind group valid against the layout.
@@ -183,7 +181,7 @@ impl Renderer {
         self.global_bind_group = GlobalGroup {
             camera: &self.camera_buffer,
             lighting: &self.lighting_buffer,
-            skybox: (skybox_view, skybox_sampler),
+            skybox: (&sky.view, &sky.sampler),
             cube: (&cube.view, &cube.sampler),
             clusters: &self.clusters,
             decals: &self.decals,

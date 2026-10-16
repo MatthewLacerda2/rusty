@@ -1,4 +1,4 @@
-#import common::{CameraUniforms, VertexInput, sky_fog}
+#import common::{CameraUniforms, VertexInput, equirect_uv, sky_fog}
 
 @group(0) @binding(0)
 var<uniform> camera: CameraUniforms;
@@ -27,17 +27,10 @@ var t_skybox: texture_2d<f32>;
 @group(1) @binding(1)
 var s_skybox: sampler;
 
-const PI: f32 = 3.14159265359;
-
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let dir = normalize(in.view_dir);
-    // Convert 3D direction to spherical texture mapping (panoramic projection)
-    let phi = atan2(dir.z, dir.x);
-    let theta = acos(dir.y);
-    let u = (phi + PI) / (2.0 * PI);
-    let v = theta / PI;
-    let sky = textureSample(t_skybox, s_skybox, vec2<f32>(u, v));
+    let sky = textureSample(t_skybox, s_skybox, equirect_uv(dir));
     // Blend toward the scene fog at the horizon (#437) so fogged geometry doesn't
     // silhouette against a clear sky.
     return vec4<f32>(sky_fog(camera.fog, sky.rgb, dir, camera.camera_pos), sky.a);

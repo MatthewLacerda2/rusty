@@ -11,7 +11,7 @@ agent can read exactly what failed.
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build), plus `tools/lint` itself (#935) |
 | Merge helpers | `unittest` (`make scripts`) | **hard gate**: `.github/scripts/tests` pass — `make mergeable` is the only thing between a red PR and `main` while it has no required checks (#486, #491) |
 | Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]` |
-| File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py` one (docstrings, comments and blank lines free, #926); nothing grandfathered |
+| File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
 | Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`, and every `.py` under a `tests/` directory); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix. Prints the ≲10-files-per-directory signal beside it, never failing on it (#934) |
 | Nothing temporary | clippy `dbg_macro`/`todo`/`unimplemented` + `tools/lint -- --rules` (`markers`) | **hard gate**: the three are denied in `Cargo.toml`'s `[lints]` (and `tools/lint`'s); a marker word (`TODO`, `FIXME`, `XXX`, `HACK`) in a scanned `.rs` file fails — an unfinished thing is an issue (#935) |
@@ -36,12 +36,14 @@ from *two* places. To keep cohesion, a `<x>_tests.rs` **sibling** shares its sou
 (singular), `tests/`, and `fixtures/` forms keep the tight 150-line cap (#211).
 
 ## What the size gate scans
-The full scan (`make size`, CI's `lint` job) walks `src/`, `tests/`, `fuzz/` and
-`tools/` (`SCAN_ROOTS` in `tools/lint/src/size.rs`); until #535 it walked only `src/`,
+The full scan (`make size`, CI's `lint` job) walks `src/`, `tests/`, `fuzz/`,
+`tools/`, `.github/` (the merge scripts, #926) and `engine/` (the shipped shaders and
+script components, #1015) — `SIZE_ROOTS` in `tools/lint/src/size/mod.rs`. `assets/` is
+not walked: it is gitignored, the open project's seeded and baked copies. Until #535 it walked only `src/`,
 so oversized integration-test files passed unseen, and until #541 it skipped `tools/`,
 so the lint crate itself could drift past the cap. Any `target/` directory (cargo
 build output, e.g. `tools/lint/target/` or `fuzz/target/`) is never descended into.
-The commit hook checks whatever `.rs` files are staged, wherever they live.
+The commit hook checks whatever `.rs`, `.py`, `.lua` and `.wgsl` files are staged, wherever they live.
 
 ## Run it
 ```
@@ -76,8 +78,8 @@ is held to the same policy (#935): `make clippy` and CI clippy it with `-D warni
 and its own `[lints]` carries the nothing-temporary denies.
 
 ## What the size gate measures, and nothing grandfathered (#926)
-The size gate walks `src/`, `tests/`, `fuzz/`, `tools/` and `.github/` and measures
-two languages. A `.rs` file counts every line. A `.py` file counts its **lines of
+The size gate walks `src/`, `tests/`, `fuzz/`, `tools/`, `.github/` and `engine/`, and
+measures four languages. A `.rs` file counts every line. A `.py` file counts its **lines of
 code**: blank lines, `#` comments and docstrings are free, as scorsese's gate counts
 them, because a Python file's prose grows with how carefully it explains itself and
 the merge scripts do that on purpose. A string that is data (`X = """…"""`) is code.
@@ -90,6 +92,20 @@ The merge path in `.github/scripts/` is why `.py` is measured: it is the most
 agent-edited code outside `src/`, and `merge-queue.py` had reached 1,074 lines
 before the gate could see it. It is now `.github/scripts/merging/`, one
 responsibility per module.
+
+`.lua` and `.wgsl` count lines of code the same way (#1015): Lua's `--` and
+`--[[ … ]]` comments are free (a long string `[[ … ]]` is data, so code), and so are
+WGSL's `//` and nested `/* … */` comments, which carry a shader's maths. The engine's
+shaders and script components are edited by agents like any other code: before
+#1015 `shader.wgsl` was 462 lines of code and `input_field.lua` 306.
+
+A shader splits through **naga_oil modules**, since WGSL has no `#include`. A module
+names itself with `#define_import_path` (`forward::bindings`, `forward::lighting`,
+`sky::noise`) and is listed in `shadergen::compose::MODULES`, in dependency order,
+so every engine shader, bake and preview composes against it. **No name ever leaves
+`common`**: a baked shader on disk imports from it by name, so only a helper common
+alone calls can move out (`sky_fbm`). A shader split is proven pixel-identical against
+the GPU test suite's readbacks before and after, never blessed.
 
 **Nothing is grandfathered.** A file over its cap is split by responsibility, never
 excused: there is no baseline file, for the size gate or any other. The size,

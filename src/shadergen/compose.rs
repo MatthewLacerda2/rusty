@@ -16,28 +16,42 @@ use naga_oil::compose::{ComposableModuleDescriptor, Composer, NagaModuleDescript
 /// A composed, validated shader module — the IR wgpu takes as `ShaderSource::Naga`.
 pub use naga::Module;
 
-/// Build a composer pre-loaded with `<base>/common.wgsl` as the `"common"` module,
-/// the context every engine shader is compiled in.
+/// The composable modules every engine shader is compiled against, in dependency
+/// order (a module is registered after those it imports), as paths under the shader
+/// base. `common.wgsl` names itself here (its import name is `common`); every other
+/// module names itself with `#define_import_path` (#1015).
+pub const MODULES: &[&str] = &[
+    "sky/noise.wgsl",
+    "common.wgsl",
+    "forward/bindings.wgsl",
+    "forward/lighting.wgsl",
+];
+
+/// Build a composer pre-loaded with [`MODULES`] under `base`: `common.wgsl` as the
+/// `"common"` module, the context every engine shader is compiled in, and the
+/// modules it and the forward pass import.
 ///
-/// Returns a message if `common.wgsl` is missing or fails to compose.
+/// Returns a message if a module is missing or fails to compose.
 pub fn composer_with_common(base: &str) -> Result<Composer, String> {
     let mut composer = Composer::default();
-    let common_path = format!("{base}/common.wgsl");
-    let common_src = std::fs::read_to_string(&common_path)
-        .map_err(|e| format!("cannot read {common_path}: {e}"))?;
-    composer
-        .add_composable_module(ComposableModuleDescriptor {
-            source: &common_src,
-            file_path: "common",
-            // The module's import name. naga_oil derives it from a
-            // `#define_import_path` directive in the source or this field;
-            // `common.wgsl` has neither directive, so name it here or
-            // `add_composable_module` fails with `NoModuleName` and every
-            // `#import "common"` is unresolvable.
-            as_name: Some("common".to_owned()),
-            ..Default::default()
-        })
-        .map_err(|e| format!("common.wgsl failed to compose: {e:?}"))?;
+    for module in MODULES {
+        let path = format!("{base}/{module}");
+        let source =
+            std::fs::read_to_string(&path).map_err(|e| format!("cannot read {path}: {e}"))?;
+        composer
+            .add_composable_module(ComposableModuleDescriptor {
+                source: &source,
+                file_path: module,
+                // The module's import name. naga_oil derives it from a
+                // `#define_import_path` directive in the source or this field;
+                // `common.wgsl` has no directive, so name it here or
+                // `add_composable_module` fails with `NoModuleName` and every
+                // `#import common::…` is unresolvable.
+                as_name: (*module == "common.wgsl").then(|| "common".to_owned()),
+                ..Default::default()
+            })
+            .map_err(|e| format!("{module} failed to compose: {e:?}"))?;
+    }
     Ok(composer)
 }
 
