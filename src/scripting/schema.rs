@@ -22,7 +22,7 @@
 
 use std::collections::BTreeMap;
 
-use mlua::{Lua, Table, Value};
+use mlua::{Table, Value};
 
 use crate::components::ScriptFieldValue;
 
@@ -56,7 +56,7 @@ pub struct ScriptField {
 /// declared fields sorted by name; an empty vec if the script has no schema or
 /// fails to compile (the inspector then simply shows no field controls).
 pub fn parse_fields(code: &str) -> Vec<ScriptField> {
-    let lua = Lua::new();
+    let lua = super::sandbox::inspection_vm();
     let Ok(table) = lua.load(code).eval::<Table>() else {
         return Vec::new();
     };

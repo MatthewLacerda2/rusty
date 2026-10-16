@@ -33,6 +33,10 @@ pub const UI_SCRIPTS: &[(&str, &str)] = &[
         include_str!("../../../engine/scripts/ui/input_field.lua"),
     ),
     (
+        "range_axis.lua",
+        include_str!("../../../engine/scripts/ui/range_axis.lua"),
+    ),
+    (
         "scroll_view.lua",
         include_str!("../../../engine/scripts/ui/scroll_view.lua"),
     ),
