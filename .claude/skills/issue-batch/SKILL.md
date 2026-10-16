@@ -457,6 +457,10 @@ they hold for any repo running this workflow.
 
 - Run `make blockers ARGS=--fix` once at the start of a batch: it records every
   "Blocked by #N" an issue body states but GitHub never recorded (#624).
+- Read `make board` beside it (#971; it also runs weekly into `board.yml`'s run
+  summary): branches with commits and no PR, merged branches still standing,
+  off-convention names, assignments with no branch or PR, issues with no type
+  label. Close out what it names before the batch adds to it.
 - Assign the user the moment work begins — unassigned means fair game.
 - **Unassign** if it turns out the issue was never started.
 - Branch `{issue_number}-short-slug` off the latest `main`; an issue-less pull

@@ -1,0 +1,37 @@
+name: board
+# The board audit, weekly (#971): branches with commits and no PR, merged
+# branches still standing, branch names off the convention, assignments with
+# no branch or PR, open issues with no type label. A signal, never a gate
+# (CLAUDE.md, *Gates vs. signals*): it is about the board, and no merge waits
+# on it. The findings go to the run summary. The run goes red only when the
+# audit could not run (exit 2), never on a finding (exit 1), like coverage.yml.
+# Locally: `make board`. The logic and its exceptions: .github/scripts/board.py.
+#
+# `schedule:` fires only from the default branch, and GitHub disables it after
+# 60 days without repository activity.
+on:
+  # Mondays, 06:41 UTC: off the hour, after coverage.yml (05:23).
+  schedule:
+    - cron: '41 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  board:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Audit the board into the run summary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rc=0
+          python3 .github/scripts/board.py > board.md || rc=$?
+          cat board.md
+          cat board.md >> "$GITHUB_STEP_SUMMARY"
+          [ "$rc" -le 1 ]
