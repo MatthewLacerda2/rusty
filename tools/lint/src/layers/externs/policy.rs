@@ -53,14 +53,7 @@ pub const POLICY: Policy = Policy {
             within: &["src/dev/providers"],
         },
     ],
-    exceptions: &[
-        // `dev::bench::clock` builds its own GPU pipeline; it belongs in render::timing.
-        CrateException {
-            module: "dev",
-            krate: "wgpu",
-            issue: 989,
-        },
-    ],
+    exceptions: &[],
 };
 
 const fn egui(krate: &'static str) -> Confined {

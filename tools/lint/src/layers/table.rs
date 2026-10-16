@@ -143,7 +143,6 @@ pub const LAYERS: &[Layer] = &[
     ]),
     // The dev-only Lua namespaces (`Debug.*`, the provider ones) bind here because
     // `api` is sim and may not import `dev` (#737); the harness drives the VM too.
-    // Its one wgpu file is an exception (#989).
     platform(
         "dev",
         &[
