@@ -372,6 +372,18 @@ naming `file:line` and the Lua error. Fence markers opt a block down — `no-run
 (`with=gun,cam:Camera`); `docs/api/index.md` lists them. A block that can run
 should: prefer `with=` or completing the example over `no-run`.
 
+## Scene-format fingerprint
+`tests/scene_format/` (#941, both feature sets) pins what a `.scene` or `.prefab`
+file holds. A serde tracer walks `SceneData`'s read side (every field, every enum
+variant, legacy aliases included) into `tests/scene_format/scene.fingerprint`, one
+`path: kind` line per place a file can hold a value. A renamed, retyped, added or
+removed field or variant fails the test, which lists the changed lines and asks
+whether files already saved need a migration. Decide, say so in the PR, then
+re-bless by name: `RUSTY_BLESS_SCENE_FORMAT=1 cargo nextest run -E
+'test(scene_format)'`. What serde hides from the tracer (a `#[serde(flatten)]`
+struct's own fields, a type that parses a whole `serde_json::Value`) is listed by
+hand in `hidden.rs`; an unlisted flatten struct fails the test by name.
+
 ## Example (unit, in-module)
 See `tools/lint/src/size.rs` — a `#[cfg(test)] mod tests` block testing the
 size-cap selection and path normalization.
