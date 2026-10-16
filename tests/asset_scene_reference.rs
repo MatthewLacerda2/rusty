@@ -2,6 +2,7 @@
 //! stored as a path-based reference (`path::sub_object`) and rehydrated by
 //! RE-IMPORTING the source file on load — never by inlining GPU buffers.
 
+use crate::temp::file as tmp;
 use rusty::scene::Scene;
 
 const QUAD_OBJ: &str = "\
@@ -14,12 +15,6 @@ vn 0.0 1.0 0.0
 f 1//1 2//1 3//1
 f 1//1 3//1 4//1
 ";
-
-fn tmp(name: &str) -> std::path::PathBuf {
-    let mut p = crate::temp::dir();
-    p.push(name);
-    p
-}
 
 #[test]
 fn asset_mesh_reference_rehydrates_on_load() {

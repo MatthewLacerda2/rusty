@@ -11,15 +11,14 @@
 //! No GPU/software adapter: `capture` returns `Ok(false)` and the test passes without
 //! asserting (matching `material_maps_screenshot.rs`).
 
+use crate::gpu::mean_brightness;
+use crate::temp::file as tmp;
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
 
-fn tmp(name: &str) -> std::path::PathBuf {
-    crate::temp::dir().join(name)
-}
 /// Write a 2x2 solid-RGB PNG (alpha 255).
 fn write_png(path: &std::path::Path, rgb: [u8; 3]) {
     let mut img = image::RgbaImage::new(2, 2);
@@ -66,15 +65,6 @@ pub(super) fn scene(material: MaterialAsset) -> Scene {
     s.world.set_visual_correction(id, Some(vc()));
     s.materials.insert("mat".to_string(), material);
     s
-}
-
-fn mean_brightness(path: &std::path::Path) -> f64 {
-    let img = image::open(path).expect("open").to_rgb8();
-    let total: u64 = img
-        .pixels()
-        .map(|p| p[0] as u64 + p[1] as u64 + p[2] as u64)
-        .sum();
-    total as f64 / (img.pixels().len() as f64 * 3.0)
 }
 
 /// Camera looking straight down at the plane from above.

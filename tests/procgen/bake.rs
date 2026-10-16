@@ -2,6 +2,7 @@
 //! PNG path, the glTF channel conventions, tiling, determinism, and that a baked file
 //! loads back through the same `image` crate the renderer's `load_texture` uses.
 
+use crate::temp::path as tmp;
 use rusty::procgen::bake::{encode, Slot};
 use rusty::procgen::recipe::{Node, NoiseKind, OpKind, TextureRecipe};
 use rusty::procgen::{bake_recipe, evaluate};
@@ -22,10 +23,6 @@ fn noise_recipe(resolution: u32, seed: u64) -> TextureRecipe {
         }],
     )
     .with_seed(seed)
-}
-
-fn tmp(name: &str) -> String {
-    crate::temp::dir().join(name).to_str().unwrap().to_string()
 }
 
 #[test]

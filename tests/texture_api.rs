@@ -5,20 +5,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::temp::lua_path as tmp;
 use mlua::Lua;
 use rusty::scene::Scene;
-
-fn tmp(name: &str) -> String {
-    // Forward slashes: a Windows temp path (`C:\Users\…`) interpolated into a Lua
-    // string literal trips Lua's escape parser (`\U`). Windows accepts `/` for std/
-    // `image` file I/O, and the same normalized string is used in the assertions, so
-    // the round-trip still matches on every platform.
-    crate::temp::dir()
-        .join(name)
-        .to_str()
-        .unwrap()
-        .replace('\\', "/")
-}
 
 #[test]
 fn baked_texture_feeds_a_material_slot() {

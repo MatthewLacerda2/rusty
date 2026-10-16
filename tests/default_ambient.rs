@@ -5,11 +5,8 @@
 //! lock in (a) the fresh-scene defaults and (b) that a pre-#256 save file omitting
 //! the ambient fields rehydrates with the SAME defaults — i.e. one source of truth.
 
+use crate::temp::path as tmp;
 use rusty::scene::{Scene, DEFAULT_AMBIENT_COLOR, DEFAULT_AMBIENT_INTENSITY};
-
-fn tmp(name: &str) -> String {
-    crate::temp::dir().join(name).to_string_lossy().into_owned()
-}
 
 #[test]
 fn fresh_scene_uses_brightened_ambient_defaults() {

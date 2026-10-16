@@ -6,12 +6,9 @@
 //! irradiance — the directional bounced light that replaces the old flat ambient
 //! constant. No GPU; the analytic fill is pure scene-value math.
 
+use crate::temp::path as tmp;
 use glam::Vec3;
 use rusty::scene::{analytic_fill, sidecar_path, Scene};
-
-fn tmp(name: &str) -> String {
-    crate::temp::dir().join(name).to_string_lossy().into_owned()
-}
 
 /// The whole-path acceptance: a height-varying analytic fill makes the sampled
 /// ambient depend on POSITION, unlike the old constant hemispherical term.

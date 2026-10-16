@@ -104,3 +104,8 @@ pub fn shoot(
         .counters;
     Some((img, counters))
 }
+
+/// Pixel `(x, y)` of a [`SIZE`]-square capture, `y` up from the bottom row.
+pub fn px(img: &image::RgbImage, x: u32, y: u32) -> [u8; 3] {
+    img.get_pixel(x, SIZE - 1 - y).0
+}

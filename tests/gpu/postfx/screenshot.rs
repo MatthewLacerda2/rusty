@@ -5,15 +5,13 @@
 //! returns `Ok(false)` and the test passes without asserting (GPU verification
 //! simply wasn't possible in this environment).
 
+use crate::gpu::mean_brightness;
+use crate::temp::file as tmp;
 use glam::Vec3;
 use rusty::components::Tonemap;
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
-
-fn tmp(name: &str) -> std::path::PathBuf {
-    crate::temp::dir().join(name)
-}
 
 fn vc(exposure: f32) -> VisualCorrectionComponent {
     VisualCorrectionComponent {
@@ -60,15 +58,6 @@ fn scene_with_exposure(exposure: f32) -> Scene {
     scene
 }
 
-fn mean_brightness(path: &std::path::Path) -> Option<f64> {
-    let img = image::open(path).ok()?.to_rgb8();
-    let total: u64 = img
-        .pixels()
-        .map(|p| p[0] as u64 + p[1] as u64 + p[2] as u64)
-        .sum();
-    Some(total as f64 / (img.pixels().len() as f64 * 3.0))
-}
-
 #[test]
 fn exposure_visibly_changes_the_rendered_image() {
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), 180.0, 0.0);
@@ -87,8 +76,8 @@ fn exposure_visibly_changes_the_rendered_image() {
         return;
     }
 
-    let b_dark = mean_brightness(&dark).expect("dark png readable");
-    let b_bright = mean_brightness(&bright).expect("bright png readable");
+    let b_dark = mean_brightness(&dark);
+    let b_bright = mean_brightness(&bright);
     eprintln!("[postfx] mean brightness: exposure -2 = {b_dark:.2}, +2 = {b_bright:.2}");
     assert!(
         b_bright > b_dark + 1.0,

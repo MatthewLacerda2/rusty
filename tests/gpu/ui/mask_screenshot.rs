@@ -9,7 +9,7 @@ use rusty::components::{ImageComponent, RectMaskComponent, ShapeComponent, Shape
 use rusty::scene::Scene;
 
 use super::super::render_texture_scene::screen_camera;
-use super::mask_scene::SIZE;
+use super::mask_scene::px;
 use super::mask_scene::{element, hidden_mask, minimap_world, overlay, shoot, soft_circle};
 
 const WHITE: Vec4 = Vec4::ONE;
@@ -21,10 +21,6 @@ fn black_canvas() -> (Scene, u32) {
     let root = overlay(&mut scene);
     element(&mut scene, root, [0.0, 0.0, 128.0, 128.0], BLACK);
     (scene, root)
-}
-
-fn px(img: &image::RgbImage, x: u32, y: u32) -> [u8; 3] {
-    img.get_pixel(x, SIZE - 1 - y).0
 }
 
 fn is_red(p: [u8; 3]) -> bool {

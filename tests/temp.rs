@@ -24,6 +24,23 @@ pub fn dir() -> PathBuf {
     dir
 }
 
+/// `name` inside [`dir`].
+pub fn file(name: &str) -> PathBuf {
+    dir().join(name)
+}
+
+/// [`file`] as a string.
+pub fn path(name: &str) -> String {
+    file(name).to_string_lossy().into_owned()
+}
+
+/// [`file`] with `/` separators, safe inside a Lua string literal: a Windows temp
+/// path (`C:\Users\…`) trips Lua's escape parser at `\U`. Windows accepts `/` for
+/// file I/O, so the same string serves the assertions too.
+pub fn lua_path(name: &str) -> String {
+    path(name).replace('\\', "/")
+}
+
 /// The running test's name as one path component (`a::b` → `a-b`).
 fn test_name() -> String {
     let thread = std::thread::current();

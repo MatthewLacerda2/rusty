@@ -74,7 +74,7 @@ fn scene(dir: &std::path::Path) -> Scene {
 /// The floor baked with `directional` and seen from above; `None` without an adapter.
 fn shot(directional: bool) -> Option<image::RgbImage> {
     let name = format!("rusty_gpu_dir_lightmap_{directional}");
-    let dir = std::env::temp_dir().join(&name);
+    let dir = crate::temp::dir().join(&name);
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let mut scene = scene(&dir);

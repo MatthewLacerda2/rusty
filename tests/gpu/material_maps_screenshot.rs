@@ -16,15 +16,13 @@
 //! When no GPU/software adapter is present, `capture` returns `Ok(false)` and the
 //! test passes without asserting (matching `postfx/screenshot.rs`).
 
+use crate::gpu::mean_brightness;
+use crate::temp::file as tmp;
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent, Tonemap};
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
-
-fn tmp(name: &str) -> std::path::PathBuf {
-    crate::temp::dir().join(name)
-}
 
 /// 2x2 black RGBA PNG. Metallic reads the BLUE channel (glTF convention), so
 /// `.b = 0` drives metallic to zero.
@@ -101,15 +99,6 @@ fn scene(metallic: f32, metallic_map: Option<String>) -> Scene {
     scene
 }
 
-fn mean_brightness(path: &std::path::Path) -> Option<f64> {
-    let img = image::open(path).ok()?.to_rgb8();
-    let total: u64 = img
-        .pixels()
-        .map(|p| p[0] as u64 + p[1] as u64 + p[2] as u64)
-        .sum();
-    Some(total as f64 / (img.pixels().len() as f64 * 3.0))
-}
-
 #[test]
 fn metallic_map_visibly_changes_the_rendered_image() {
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), 180.0, 0.0);
@@ -129,9 +118,9 @@ fn metallic_map_visibly_changes_the_rendered_image() {
         return;
     }
 
-    let bright = mean_brightness(&p_bright).expect("png");
-    let dark = mean_brightness(&p_dark).expect("png");
-    let mapped = mean_brightness(&p_mapped).expect("png");
+    let bright = mean_brightness(&p_bright);
+    let dark = mean_brightness(&p_dark);
+    let mapped = mean_brightness(&p_mapped);
     eprintln!("[material-maps] metallic scalar0={bright:.3} scalar1={dark:.3} mapped={mapped:.3}");
     assert!(
         bright > dark + 2.0,

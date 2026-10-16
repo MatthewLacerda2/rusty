@@ -6,12 +6,9 @@
 //! inside a probe's box reflects that probe (tracking the room as the camera moves),
 //! and points outside every box fall back (no probe → skybox).
 
+use crate::temp::path as tmp;
 use glam::Vec3;
 use rusty::scene::Scene;
-
-fn tmp(name: &str) -> String {
-    crate::temp::dir().join(name).to_string_lossy().into_owned()
-}
 
 /// Positions, parallax boxes, and cubemap paths all live in the scene document and
 /// survive a save → load round-trip. No sidecar: the cubemap is a referenced file.

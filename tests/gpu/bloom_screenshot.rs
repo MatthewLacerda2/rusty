@@ -6,6 +6,7 @@
 //!
 //! Skips without a GPU/software adapter, unless one is required.
 
+use crate::gpu::mean_brightness;
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::screenshot::capture;
@@ -61,12 +62,6 @@ fn scene(bloom: bool) -> Scene {
     scene
 }
 
-fn mean(path: &std::path::Path) -> f64 {
-    let img = image::open(path).expect("png").to_rgb8();
-    let total: u64 = img.as_raw().iter().map(|&c| c as u64).sum();
-    total as f64 / img.as_raw().len() as f64
-}
-
 #[test]
 fn bloom_spreads_a_bright_surface_onto_its_surroundings() {
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
@@ -83,7 +78,7 @@ fn bloom_spreads_a_bright_surface_onto_its_surroundings() {
         );
         return;
     }
-    let (off, on) = (mean(&off), mean(&on));
+    let (off, on) = (mean_brightness(&off), mean_brightness(&on));
     eprintln!("[bloom] off={off:.3} on={on:.3}");
     assert!(
         on > off + 5.0,

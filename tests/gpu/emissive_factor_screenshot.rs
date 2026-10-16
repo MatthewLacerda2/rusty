@@ -11,15 +11,13 @@
 //! When no GPU/software adapter is present, `capture` returns `Ok(false)` and the test
 //! passes without asserting (matching `material_maps_screenshot.rs`).
 
+use crate::gpu::mean_brightness;
+use crate::temp::file as tmp;
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent, Tonemap};
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
-
-fn tmp(name: &str) -> std::path::PathBuf {
-    crate::temp::dir().join(name)
-}
 
 fn vc(bloom: bool) -> VisualCorrectionComponent {
     VisualCorrectionComponent {
@@ -83,15 +81,6 @@ fn scene(emissive: [f32; 3], bloom: bool) -> Scene {
     scene
 }
 
-fn mean_brightness(path: &std::path::Path) -> Option<f64> {
-    let img = image::open(path).ok()?.to_rgb8();
-    let total: u64 = img
-        .pixels()
-        .map(|p| p[0] as u64 + p[1] as u64 + p[2] as u64)
-        .sum();
-    Some(total as f64 / (img.pixels().len() as f64 * 3.0))
-}
-
 #[test]
 fn emissive_factor_visibly_lights_an_otherwise_dark_surface() {
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), 180.0, 0.0);
@@ -108,9 +97,9 @@ fn emissive_factor_visibly_lights_an_otherwise_dark_surface() {
         return;
     }
 
-    let off = mean_brightness(&p_off).expect("png");
-    let dim = mean_brightness(&p_dim).expect("png");
-    let bloom = mean_brightness(&p_bloom).expect("png");
+    let off = mean_brightness(&p_off);
+    let dim = mean_brightness(&p_dim);
+    let bloom = mean_brightness(&p_bloom);
     eprintln!("[emissive] off={off:.3} dim={dim:.3} bloom={bloom:.3}");
 
     assert!(

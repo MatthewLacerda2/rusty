@@ -2,17 +2,8 @@
 //! owns rather than the synthesiser — resolving a track's patch *by path* (zimmer
 //! does no I/O, so rusty supplies the resolver) and writing the mixed WAV.
 
+use crate::temp::lua_path as tmp;
 use mlua::Lua;
-
-fn tmp(name: &str) -> String {
-    // Forward slashes: a Windows temp path interpolated into a Lua string literal
-    // trips Lua's escape parser (`\U`).
-    crate::temp::dir()
-        .join(name)
-        .to_str()
-        .unwrap()
-        .replace('\\', "/")
-}
 
 const PLUCK: &str = r#"{
     source = { kind = "karplus" },
