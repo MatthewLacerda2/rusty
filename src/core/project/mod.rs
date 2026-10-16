@@ -36,7 +36,7 @@ mod migrate;
 use std::path::{Path, PathBuf};
 
 pub use commit::{engine_commit, UNKNOWN_COMMIT};
-pub use file::{EngineCheck, ProjectFile, LEGACY_BUILD_SETTINGS, PROJECT_FILE};
+pub use file::{EngineCheck, ProjectFile, PROJECT_FILE};
 pub use locate::{engine_dir, engine_path, locate};
 
 /// The project's content folder, relative to its root (Unity's `Assets/`).

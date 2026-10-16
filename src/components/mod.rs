@@ -50,9 +50,7 @@ pub use light::{LightComponent, LightMode, LightType};
 pub use lod_group::{LodGroupComponent, LodLevel};
 pub use material::{DecalBlend, MaterialAsset, MaterialComponent, RenderMode};
 pub use mesh::{DirtyFlag, MeshComponent};
-pub use nav_agent::{
-    NavMeshAgentComponent, NavPathStatus, DEFAULT_AVOIDANCE_PRIORITY, MAX_AVOIDANCE_PRIORITY,
-};
+pub use nav_agent::{NavMeshAgentComponent, NavPathStatus, MAX_AVOIDANCE_PRIORITY};
 pub use nav_modifier::NavMeshModifierVolumeComponent;
 pub use nav_obstacle::{NavMeshObstacleComponent, ObstacleShape};
 pub use offmesh_link::{

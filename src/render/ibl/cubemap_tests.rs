@@ -1,4 +1,4 @@
-//! Headless tests for the KTX2 cubemap parser (no GPU): a hand-built minimal cubemap
+//! Headless tests for the KTX2 cubemap loader (no GPU): a hand-built minimal cubemap
 //! blob parses to six faces; garbage / non-cube / non-RGBA8 inputs are rejected.
 
 use super::*;
@@ -54,37 +54,37 @@ const R16G16B16A16_SFLOAT: u32 = 97; // an HDR format we must reject
 #[test]
 fn parses_valid_rgba8_cubemap() {
     let bytes = build_cubemap_ktx2(2, R8G8B8A8_UNORM, 6);
-    let cube = parse_ktx2_cubemap(&bytes).expect("should parse");
+    let cube = parse_ktx2_cubemap_mips(&bytes).expect("should parse");
     assert_eq!(cube.size, 2);
-    assert_eq!(cube.faces_rgba8.len(), 2 * 2 * 4 * 6);
+    assert_eq!(cube.mips[0].len(), 2 * 2 * 4 * 6);
     // Face order preserved: face f tagged with red = f at its start.
     let face_bytes = 2 * 2 * 4;
-    assert_eq!(cube.faces_rgba8[0], 0);
-    assert_eq!(cube.faces_rgba8[face_bytes], 1);
-    assert_eq!(cube.faces_rgba8[5 * face_bytes], 5);
+    assert_eq!(cube.mips[0][0], 0);
+    assert_eq!(cube.mips[0][face_bytes], 1);
+    assert_eq!(cube.mips[0][5 * face_bytes], 5);
 }
 
 #[test]
 fn accepts_srgb_too() {
     let bytes = build_cubemap_ktx2(1, R8G8B8A8_SRGB, 6);
-    assert!(parse_ktx2_cubemap(&bytes).is_some());
+    assert!(parse_ktx2_cubemap_mips(&bytes).is_some());
 }
 
 #[test]
 fn rejects_non_cube() {
     // A 2D texture (1 face) is not a cubemap.
     let bytes = build_cubemap_ktx2(1, R8G8B8A8_UNORM, 1);
-    assert!(parse_ktx2_cubemap(&bytes).is_none());
+    assert!(parse_ktx2_cubemap_mips(&bytes).is_none());
 }
 
 #[test]
 fn rejects_hdr_format() {
     let bytes = build_cubemap_ktx2(1, R16G16B16A16_SFLOAT, 6);
-    assert!(parse_ktx2_cubemap(&bytes).is_none());
+    assert!(parse_ktx2_cubemap_mips(&bytes).is_none());
 }
 
 #[test]
 fn rejects_garbage() {
-    assert!(parse_ktx2_cubemap(b"not a ktx2 file at all").is_none());
-    assert!(parse_ktx2_cubemap(&[]).is_none());
+    assert!(parse_ktx2_cubemap_mips(b"not a ktx2 file at all").is_none());
+    assert!(parse_ktx2_cubemap_mips(&[]).is_none());
 }

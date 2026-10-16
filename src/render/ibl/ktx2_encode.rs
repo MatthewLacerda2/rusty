@@ -2,7 +2,7 @@
 //!
 //! The `ktx2` crate (0.3.0) is PARSE-ONLY — it has a `Reader` but no writer — so the
 //! reflection bake hand-rolls the encode over the same binary layout the crate's `Reader`
-//! validates and parses (`render::cubemap::parse_ktx2_cubemap`, #244). A KTX2 file is a
+//! validates and parses (`cubemap::parse_ktx2_cubemap_mips`, #244). A KTX2 file is a
 //! fixed 80-byte header, a level index (one 24-byte entry per mip, largest mip first), a
 //! Basic Data Format Descriptor, then the level data. We emit exactly that for an LDR
 //! RGBA8 cubemap with a full roughness mip chain, so the loader reads back what we wrote.
@@ -23,7 +23,8 @@ const VK_FORMAT_R8G8B8A8_SRGB: u32 = 43;
 
 /// Encode a prefiltered cubemap into KTX2 bytes: an `R8G8B8A8_SRGB` cubemap with one level
 /// per roughness mip (largest first), each level holding the six faces packed in
-/// `CubemapFace::ALL` order. The bytes parse with `ktx2::Reader` / `parse_ktx2_cubemap`.
+/// `CubemapFace::ALL` order. The bytes parse with `ktx2::Reader` and
+/// `parse_ktx2_cubemap_mips`.
 pub fn encode_cubemap(cube: &PrefilteredCubemap) -> Vec<u8> {
     debug_assert!(
         crate::render::ibl::reflection_prefilter::validate_layout(cube),
