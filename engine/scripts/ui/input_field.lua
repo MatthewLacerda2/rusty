@@ -63,6 +63,15 @@ local function locate(p)
 end
 
 local function line_start(p) local _, _, s = locate(p); return s end
+-- The character position where line `n` (0-based) starts, and the lines walked.
+local function line_pos(n)
+    local p, l = 0, 0
+    while l < n and p < #chars do
+        if chars[p + 1] == "\n" then l = l + 1 end
+        p = p + 1
+    end
+    return p, l
+end
 local function line_end(p)
     local k = p
     while k < #chars and chars[k + 1] ~= "\n" do k = k + 1 end
@@ -113,6 +122,23 @@ local function accepts(c)
     return c == "\n" or c:byte() >= 32
 end
 
+-- Paste `s` over the selection, one character at a time through `accepts`, so the
+-- content type and char limit hold and SingleLine drops line breaks.
+local function paste(s)
+    local changed = delete_selection()
+    for _, code in utf8.codes(s) do
+        local c = utf8.char(code)
+        if (c ~= "\n" or multiline()) and accepts(c) then
+            table.insert(chars, pos + 1, c)
+            pos, anchor = pos + 1, pos + 1
+            changed = true
+        end
+    end
+    return changed
+end
+
+-- Typed text: Backspace deletes, Tab is ignored, and every other character is
+-- pasted (SingleLine's Enter is not text: it submits).
 local function type_text(s)
     local changed = false
     for _, code in utf8.codes(s) do
@@ -124,27 +150,7 @@ local function type_text(s)
             end
             changed = true
         elseif c ~= "\t" and (c ~= "\n" or multiline()) then
-            changed = delete_selection() or changed
-            if accepts(c) then
-                table.insert(chars, pos + 1, c)
-                pos, anchor = pos + 1, pos + 1
-                changed = true
-            end
-        end
-    end
-    return changed
-end
-
--- Paste `s` over the selection, one character at a time through `accepts`, so the
--- content type and char limit hold and SingleLine drops line breaks.
-local function paste(s)
-    local changed = delete_selection()
-    for _, code in utf8.codes(s) do
-        local c = utf8.char(code)
-        if (c ~= "\n" or multiline()) and accepts(c) then
-            table.insert(chars, pos + 1, c)
-            pos, anchor = pos + 1, pos + 1
-            changed = true
+            changed = paste(c) or changed
         end
     end
     return changed
@@ -180,16 +186,9 @@ local function index_at(event)
     local at = event.canvas_position
     if not r or not at then return pos end
     local x = at.x - r.x
-    local line = 0
-    if multiline() then
-        line = math.max(0, math.floor(((r.y + r.height) - at.y) / pitch()))
-    end
-    local p, l = 0, 0
-    while l < line and p < #chars do
-        if chars[p + 1] == "\n" then l = l + 1 end
-        p = p + 1
-    end
-    local s, e = p, line_end(p)
+    local line = multiline() and math.max(0, math.floor(((r.y + r.height) - at.y) / pitch())) or 0
+    local s = line_pos(line)
+    local e = line_end(s)
     local best, best_d = s, math.huge
     for k = s, e do
         local d = math.abs(width(s + 1, k) - x)
@@ -320,19 +319,14 @@ function Field.OnMove(id, event)
     if not text_id then return end
     local d, ext = event.direction, shift()
     if (d == "Left" or d == "Right") and pos ~= anchor and not ext then
-        local a, b = math.min(pos, anchor), math.max(pos, anchor)
-        move_to(d == "Left" and a or b, false)
+        move_to((d == "Left" and math.min or math.max)(pos, anchor), false)
     elseif d == "Left" then move_to(pos - 1, ext)
     elseif d == "Right" then move_to(pos + 1, ext)
     elseif not multiline() then move_to(d == "Up" and 0 or #chars, ext)
     else
         local line, col = locate(pos)
         local target = d == "Up" and line - 1 or line + 1
-        local p, l = 0, 0
-        while l < target and p < #chars do
-            if chars[p + 1] == "\n" then l = l + 1 end
-            p = p + 1
-        end
+        local p, l = line_pos(target)
         if target < 0 then p = 0 elseif l < target then p = #chars
         else p = math.min(p + col, line_end(p)) end
         move_to(p, ext)

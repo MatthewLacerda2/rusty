@@ -6,8 +6,8 @@ conforms to the engine's existing pass + bind-group contract. This is the shader
 leg of the authoring layer; it works in *text*, not pixels (cf. `Texture`).
 
 The bake **validates the assembled module by composing it through `naga_oil`** — the
-**same loader path the engine uses** (`ShaderRegistry`, with `common.wgsl`
-registered) — and **rejects a module that won't compile, writing no file**. So a bad
+**same loader path the engine uses** (`ShaderRegistry`, with `common.wgsl` and the
+engine's other shader modules registered) — and **rejects a module that won't compile, writing no file**. So a bad
 shader is caught at authoring time and never ships. On success the module is written
 to the authored-shader workspace (`assets/shaders/<name>.wgsl` by default),
 registered by name. A **surface** module is then used by naming it on a material —

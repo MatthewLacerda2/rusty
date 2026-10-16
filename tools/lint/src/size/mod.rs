@@ -1,10 +1,13 @@
 //! The size gate: per-file caps over [`SIZE_ROOTS`] (or an explicit file list).
 //! Result to stdout and `.lint/report.txt`.
 //!
-//! It measures Rust (`.rs`, every line) and Python (`.py`, lines of code: docstrings,
-//! comments and blank lines are free, [`python::code_lines`]). The merge path in
-//! `.github/scripts/` is the most agent-edited code outside `src/`, and until #926
-//! the gate could not see it: `merge-queue.py` had reached 1,074 lines unseen.
+//! It measures Rust (`.rs`, every line) and, by lines of code (comments, docstrings
+//! and blank lines free), Python (`.py`, [`python::code_lines`]), the engine's Lua
+//! (`.lua`, [`lua::code_lines`]) and its shaders (`.wgsl`, [`wgsl::code_lines`]).
+//! The merge path in `.github/scripts/` is the most agent-edited code outside
+//! `src/`, and until #926 the gate could not see it: `merge-queue.py` had reached
+//! 1,074 lines unseen. The shaders and the engine's script components had reached
+//! twice the cap the same way before #1015.
 //!
 //! **Nothing is grandfathered** (#926). A file over its cap is split, never excused;
 //! the burn-down list this gate once read emptied and was retired.
@@ -13,9 +16,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
+mod lua;
 mod python;
 #[cfg(test)]
 mod tests;
+mod wgsl;
 
 const MAX_FILE_LINES: usize = 300;
 /// Test/fixture files get a looser cap than source: Rust test files legitimately
@@ -27,8 +32,10 @@ const MAX_TEST_FILE_LINES: usize = 150;
 /// walks these too.
 pub(crate) const SCAN_ROOTS: &[&str] = &["src", "tests", "fuzz", "tools"];
 /// What the size gate walks: [`SCAN_ROOTS`] plus `.github`, where the merge and
-/// mutation scripts live (#926).
-const SIZE_ROOTS: &[&str] = &["src", "tests", "fuzz", "tools", ".github"];
+/// mutation scripts live (#926), and `engine`, the shipped shaders and script
+/// components (#1015). `assets/` is not one: it is gitignored, the open project's
+/// seeded and baked copies, so nothing in it is ever pushed.
+const SIZE_ROOTS: &[&str] = &["src", "tests", "fuzz", "tools", ".github", "engine"];
 const REPORT: &str = ".lint/report.txt";
 
 /// The languages the size gate measures.
@@ -36,6 +43,8 @@ const REPORT: &str = ".lint/report.txt";
 enum Lang {
     Rust,
     Python,
+    Lua,
+    Wgsl,
 }
 
 impl Lang {
@@ -43,16 +52,20 @@ impl Lang {
         match path.extension()?.to_str()? {
             "rs" => Some(Lang::Rust),
             "py" => Some(Lang::Python),
+            "lua" => Some(Lang::Lua),
+            "wgsl" => Some(Lang::Wgsl),
             _ => None,
         }
     }
 
     /// The length the cap is held against: every line of Rust (#926 leaves Rust's
-    /// counting as it was), Python's lines of code.
+    /// counting as it was), the lines of code of the rest.
     fn measure(self, content: &str) -> usize {
         match self {
             Lang::Rust => content.lines().count(),
             Lang::Python => python::code_lines(content),
+            Lang::Lua => lua::code_lines(content),
+            Lang::Wgsl => wgsl::code_lines(content),
         }
     }
 }
@@ -179,8 +192,8 @@ fn check_file(path: &Path) -> Option<String> {
     if lines <= limit {
         return None;
     }
-    // Python's count is not `wc -l`'s, so the line says which it is.
-    let unit = if lang == Lang::Python {
+    // A lines-of-code count is not `wc -l`'s, so the line says which it is.
+    let unit = if lang != Lang::Rust {
         " (lines of code)"
     } else {
         ""
