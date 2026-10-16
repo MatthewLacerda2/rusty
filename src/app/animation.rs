@@ -26,7 +26,6 @@ pub(crate) mod graph;
 mod layers;
 mod motion;
 
-pub use blend_tree::tree_weights;
 pub use clip::sample_palette;
 pub use events::{Crossed, END_EVENT};
 pub use motion::Pose;

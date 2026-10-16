@@ -129,9 +129,6 @@ pub struct NavMeshAgentComponent {
     /// The link the agent is on now, if any (Unity's `isOnOffMeshLink`).
     #[serde(skip)]
     pub off_mesh_link: Option<OffMeshLinkData>,
-    /// How far (world units) auto-traversal has carried the agent along that link.
-    #[serde(skip)]
-    pub link_progress: f32,
     /// The signed yaw rate the agent is turning at, degrees/second (+ is
     /// counter-clockwise seen from above); zero when it isn't turning.
     #[serde(skip)]
@@ -196,7 +193,6 @@ impl Default for NavMeshAgentComponent {
             path_status: NavPathStatus::Invalid,
             path_links: Vec::new(),
             off_mesh_link: None,
-            link_progress: 0.0,
             angular_velocity: 0.0,
         }
     }

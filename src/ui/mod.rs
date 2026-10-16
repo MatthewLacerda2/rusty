@@ -36,4 +36,3 @@ pub use events::EventSystem;
 pub use layout::{UiLayout, UiRect};
 pub use screen::ScreenSize;
 pub use space::{CanvasSpace, UiPointer, UiView};
-pub use sway::SWAY_RECOVERY;

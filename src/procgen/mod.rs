@@ -36,7 +36,7 @@ pub use bake::Slot;
 pub use bake_set::bake_set;
 pub use image_buf::Image;
 pub use recipe::TextureRecipe;
-pub use runner::{evaluate, evaluate_many, RunError};
+pub use runner::{evaluate, RunError};
 
 /// Evaluate `recipe` and bake it to a `.png` at `path` for the named `slot`. The
 /// one-call front door the API surface drives: recipe → buffer → encoded PNG.

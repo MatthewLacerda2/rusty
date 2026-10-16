@@ -3,7 +3,7 @@
 //! loader can PARSE back (the bake -> write -> load round-trip the issue requires).
 
 use super::*;
-use crate::render::ibl::cubemap::{parse_ktx2_cubemap, parse_ktx2_cubemap_mips};
+use crate::render::ibl::cubemap::parse_ktx2_cubemap_mips;
 use crate::render::ibl::reflection_prefilter::PrefilteredCubemap;
 
 /// A tiny prefiltered cube: `base`-edge mip0 down to 1×1, each level six solid faces tinted
@@ -35,13 +35,13 @@ fn encode_round_trips_through_loader() {
     let cube = tiny_cube(4);
     let bytes = encode_cubemap(&cube);
 
-    let parsed = parse_ktx2_cubemap(&bytes).expect("encoded KTX2 should parse");
+    let parsed = parse_ktx2_cubemap_mips(&bytes).expect("encoded KTX2 should parse");
     assert_eq!(parsed.size, 4);
     let face_bytes = (4 * 4 * 4) as usize;
-    assert_eq!(parsed.faces_rgba8.len(), face_bytes * 6);
+    assert_eq!(parsed.mips[0].len(), face_bytes * 6);
     // Face f's first pixel red channel is f*40 (the tint), proving face order survived.
     for f in 0..6 {
-        assert_eq!(parsed.faces_rgba8[f * face_bytes], (f as u8) * 40);
+        assert_eq!(parsed.mips[0][f * face_bytes], (f as u8) * 40);
     }
 }
 
