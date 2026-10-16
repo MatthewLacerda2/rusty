@@ -2,10 +2,6 @@ name: ci
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
-  # GitHub fires `merge_group` when a PR is queued via the merge queue; CI must
-  # run on it so the required checks validate the speculative merged state before
-  # it lands. The gating jobs below opt in via their `if`.
-  merge_group:
   # Gates only (#750). Mutation and coverage are signals and have their own
   # workflows, off pull requests and off every merge: `mutants-sweep.yml` and
   # `coverage.yml` run weekly, and `mutants-on-request.yml` mutates exactly what
@@ -27,15 +23,19 @@ on:
   # A proof run of a branch: the gates, nothing else.
   workflow_dispatch:
 
-# Cancel superseded runs (#482): a new push to a PR makes its previous run stale,
-# so that run is cancelled instead of finishing beside the new one. Only
-# `pull_request` runs share a group; every other event (push to `main`, the
-# nightly schedule, merge_group, manual) is keyed on its own run id, so each of
-# those runs finishes — a shared group would still let a newer run replace a
-# *pending* one, even with cancel-in-progress off.
+# Cancel superseded runs (#482), and only those (#930): a new push to a ready PR
+# makes its previous run stale, so that run is cancelled instead of finishing
+# beside the new one. Only a *ready* PR's runs share a group; a draft's runs
+# (whose gating jobs skip anyway) and every other event (push to `main`, the
+# nightly schedule, manual) are keyed on their own run id, so each of those
+# finishes — a shared group would still let a newer run replace a *pending*
+# one, even with cancel-in-progress off. Only a push (`synchronize`) cancels:
+# `ready_for_review` and `reopened` carry the same commit as the run they would
+# meet, so cancelling it would throw away a run of the head. `mergeable`'s
+# `superseded` (#515, #562) still tells the two apart, as a safety net.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action == 'synchronize' }}
 
 jobs:
   # Detect whether the PR changes anything other than Markdown. On a Markdown-only
@@ -47,7 +47,8 @@ jobs:
   # guarding the required job's steps on `code`, never by skipping the job itself.
   # See the merging note in CLAUDE.md.
   changes:
-    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    runs-on: ubuntu-24.04
     outputs:
       code: ${{ steps.filter.outputs.code || 'true' }}
     steps:
@@ -75,7 +76,7 @@ jobs:
   # The Linux build+test. Kept as its own job (not folded into the OS matrix
   # below) so the `build-test` status-check name — referenced by the branch
   # ruleset as a required check — is preserved exactly. The job ALWAYS runs on a
-  # non-draft PR / merge_group so the required check reports `success` (never
+  # non-draft PR so the required check reports `success` (never
   # `skipped`); the build/test steps are guarded on `code`, so a Markdown-only PR
   # is a fast no-op success (issue #218).
   #
@@ -86,11 +87,11 @@ jobs:
   # purpose: it builds the commit that actually landed on `main`.
   build-test:
     needs: changes
-    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
     if: >-
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'merge_group' ||
       (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
     # No debuginfo override here: Cargo.toml's `[profile.dev]` (#487) strips the
     # dependency debuginfo that overflowed this runner's disk on #329/#332, so CI
@@ -102,11 +103,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         if: needs.changes.outputs.code != 'false'
-      - name: Free runner disk (drop preinstalled toolchains we never use)
-        if: needs.changes.outputs.code != 'false'
-        # Hosted runners ship Android/.NET/Haskell toolchains that eat ~25 GB of
-        # the disk this job needs for two full engine builds.
-        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost
       - name: Toolchain (from rust-toolchain.toml)
         if: needs.changes.outputs.code != 'false'
         run: rustup show
@@ -129,6 +125,12 @@ jobs:
       - name: Software Vulkan driver (lavapipe)
         if: needs.changes.outputs.code != 'false'
         run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
+      # lavapipe comes from the image's apt archive, so the driver under the GPU
+      # tests can change with nothing in any diff (#930; compare #769's black
+      # frames). The log names the one this run rendered with.
+      - name: Driver version (Mesa / lavapipe)
+        if: needs.changes.outputs.code != 'false'
+        run: dpkg-query -W mesa-vulkan-drivers libvulkan1
       - name: Install cargo-nextest
         if: needs.changes.outputs.code != 'false'
         uses: taiki-e/install-action@v2
@@ -167,23 +169,30 @@ jobs:
       - name: Test (lint xtask)
         if: needs.changes.outputs.code != 'false'
         run: cargo test --manifest-path tools/lint/Cargo.toml --locked
+      # The "Free runner disk" step that ran first here (#329/#332) is gone (#930):
+      # since #487 both feature sets fit the stock runner. This is the evidence,
+      # printed after both builds so a creeping `target/` shows before it fails.
+      - name: Disk headroom
+        if: always() && needs.changes.outputs.code != 'false'
+        run: df -h / && du -sh target 2>/dev/null || true
 
   # Verify the wgpu cross-platform claim (issue #121): the same build + test on
   # macOS (Metal), the other shipped platform, so the portability premise is
   # checked, not assumed. Separate from `build-test` to avoid renaming that
   # required check. Windows is not a shipped platform yet, so its run is a signal
   # in `windows.yml` (#741), outside this gate; keep the two jobs' steps in step.
-  # Still a one-entry matrix so the check keeps its `(macos-latest)` name.
+  # A one-entry matrix, so the check is named `build-test-cross (macos-26)`;
+  # `mergeable` reads it by its base name.
   build-test-cross:
     needs: changes
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest]
+        os: [macos-26]
+    timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'merge_group' ||
       ((github.event_name == 'push' ||
         (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) &&
        needs.changes.outputs.code != 'false')
@@ -235,11 +244,11 @@ jobs:
   # The one gating job that also runs nightly — see the `schedule` trigger note.
   deny:
     needs: changes
-    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
     if: >-
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'merge_group' ||
       ((github.event_name == 'push' ||
         (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) &&
        needs.changes.outputs.code != 'false')
@@ -275,7 +284,8 @@ jobs:
     # reaches this gate and fails it, but a run cancelled because a newer push
     # superseded it (#482) leaves no red `ci-gate` beside the live one.
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    runs-on: ubuntu-24.04
     steps:
       - name: Gate on the correctness jobs (success or skipped passes)
         env:
