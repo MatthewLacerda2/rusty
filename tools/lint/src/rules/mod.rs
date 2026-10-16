@@ -6,7 +6,10 @@
 //! Exit code 1 on any finding; report mirrored to `.lint/report.txt`.
 
 mod finding;
+mod ignored;
+mod markers;
 mod prefix;
+mod skip;
 
 pub use finding::Finding;
 use std::collections::BTreeMap;
@@ -36,10 +39,17 @@ pub fn run() {
             .or_insert_with(|| fs::read_to_string(path).unwrap_or_default())
             .clone()
     };
+    for path in &files {
+        let src = source(path);
+        findings.extend(markers::check(path, &src));
+        findings.extend(skip::check(path, &src));
+    }
     findings.retain(|f| !finding::allowed(&source(&f.path), f.line, f.rule));
     for path in &files {
         findings.extend(finding::unexplained(path, &source(path)));
     }
+    // After the retain: an `ignored` file has no allow (the fix is the pattern).
+    findings.extend(ignored::check(".", &files));
 
     let body = render(&findings, &crowded(&dirs));
     fs::create_dir_all(".lint").ok();
@@ -98,4 +108,12 @@ fn render(findings: &[Finding], crowded: &[(&str, usize)]) -> String {
 }
 
 #[cfg(test)]
+mod ignored_tests;
+#[cfg(test)]
+mod lockfile_tests;
+#[cfg(test)]
+mod markers_tests;
+#[cfg(test)]
 mod prefix_tests;
+#[cfg(test)]
+mod skip_tests;

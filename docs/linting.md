@@ -8,12 +8,16 @@ agent can read exactly what failed.
 | Check | Tool | Rule |
 |---|---|---|
 | Style | rustfmt (`rustfmt.toml`) | `cargo fmt --check` |
-| Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build) |
+| Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build), plus `tools/lint` itself (#935) |
 | Merge helpers | `unittest` (`make scripts`) | **hard gate**: `.github/scripts/tests` pass — `make mergeable` is the only thing between a red PR and `main` while it has no required checks (#486, #491) |
 | Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]` |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py` one (docstrings, comments and blank lines free, #926); nothing grandfathered |
 | Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`, and every `.py` under a `tests/` directory); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix. Prints the ≲10-files-per-directory signal beside it, never failing on it (#934) |
+| Nothing temporary | clippy `dbg_macro`/`todo`/`unimplemented` + `tools/lint -- --rules` (`markers`) | **hard gate**: the three are denied in `Cargo.toml`'s `[lints]` (and `tools/lint`'s); a marker word (`TODO`, `FIXME`, `XXX`, `HACK`) in a scanned `.rs` file fails — an unfinished thing is an issue (#935) |
+| Skipped tests | `tools/lint -- --rules` (`skip`) | **hard gate**: `#[ignore]` / `#[cfg_attr(…, ignore)]` needs `// lint: allow(skip) <why>` (#935) |
+| Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
+| `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
 | Module layering | `tools/lint -- --layers` | every `crate::<module>` import and every external crate a module names matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724, #938) |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
 | Dependency direction | `tools/lint -- --direction` | the table's sim modules never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
@@ -68,7 +72,8 @@ flags: a plain `cargo clippy`, rust-analyzer and CI then all read the same polic
 so nothing is green locally and red in CI. CI adds only `-D warnings`. Thresholds
 stay in `clippy.toml`. Module-scoped rules stay module-scoped — the sim modules'
 `#![deny(clippy::unwrap_used)]` below is deliberately not crate-wide. `tools/lint`
-has no `[lints]` table: it is not clippy-gated, so one would be dead config.
+is held to the same policy (#935): `make clippy` and CI clippy it with `-D warnings`,
+and its own `[lints]` carries the nothing-temporary denies.
 
 ## What the size gate measures, and nothing grandfathered (#926)
 The size gate walks `src/`, `tests/`, `fuzz/`, `tools/` and `.github/` and measures
@@ -117,6 +122,17 @@ or baseline.
   exempts (`src/api/`, one file per Lua namespace; `src/components/`, one file per
   first-class component) are listed in `rules/prefix.rs` with the reason, and the
   exemption covers that directory only, not its subfolders.
+- **`markers`** — nothing in rusty is temporary. A marker word (`TODO`, `FIXME`,
+  `XXX`, `HACK`) standing alone in a scanned `.rs` file fails, comment or not;
+  part of a longer identifier (`TODOS`, `MY_HACK`) does not. File an issue instead.
+- **`skip`** — an ignored test reads as passing to anyone who reads only the
+  summary. `#[ignore]` and `#[cfg_attr(…, ignore)]` fail unless an allow says why:
+  `// lint: allow(skip) a timing measurement, run by hand` right above it.
+- **`ignored`** — what you push must be what CI builds. A scanned `.rs` file that
+  `git check-ignore --no-index` matches fails, tracked or not, because the next
+  new file beside it is the one a push silently drops
+  (MatthewLacerda2/scorsese#872). It takes **no allow**: anchor the pattern
+  (`/out/`, not `out/`) or move the file. A failed `git` call is a finding too.
 - **The ≲10-files-per-directory signal** prints after the findings: every scanned
   directory holding more than ten `.rs` files (`mod.rs` aside), most crowded first.
   CLAUDE.md says "aim for", so it never fails the gate; it tells you where to

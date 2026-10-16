@@ -38,6 +38,7 @@ fn busy_scene_replays_across_processes() {
 
 /// The child half of the cross-process test; a no-op unless that test spawned it.
 #[test]
+// lint: allow(skip) the child half: busy_scene_replays_across_processes runs it
 #[ignore = "run by busy_scene_replays_across_processes in a child process"]
 fn child_run() {
     if let Some(out) = std::env::var_os(OUT_VAR) {

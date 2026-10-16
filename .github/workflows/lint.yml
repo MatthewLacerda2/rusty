@@ -108,6 +108,10 @@ jobs:
       - name: Clippy (hard gate, player ship build — no editor)
         if: needs.changes.outputs.code != 'false'
         run: cargo clippy --all-targets --no-default-features -- -D warnings
+      # tools/lint is held to the policy it enforces (#935).
+      - name: Clippy (hard gate, tools/lint)
+        if: needs.changes.outputs.code != 'false'
+        run: cargo clippy --manifest-path tools/lint/Cargo.toml --all-targets --locked -- -D warnings
       # Rustdoc is a HARD gate (#482): `cargo doc` is the Rust API reference agents
       # are pointed at, so a broken intra-doc link or a doc linking a private item
       # fails the PR instead of silently publishing a broken reference. Both

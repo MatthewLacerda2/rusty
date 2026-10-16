@@ -9,3 +9,10 @@ edition = "2021"
 [[bin]]
 name = "lint"
 path = "src/main.rs"
+
+# Held to the policy it enforces (#935): clippy-gated by `make clippy`, and the same
+# nothing-temporary denies as the engine's `[lints]`.
+[lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"

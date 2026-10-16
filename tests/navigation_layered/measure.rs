@@ -33,6 +33,7 @@ fn level_bakes_three_floors_and_connects_street_to_roof() {
 
 /// `cargo test --release --features dev --test integration -- --ignored --nocapture measure`
 #[test]
+// lint: allow(skip) a timing measurement, meaningful only in release; run by hand
 #[ignore = "measurement for the PR record; run in release"]
 fn measure_bake_time_and_memory() {
     for spacing in [1.0, 0.5, 0.25] {

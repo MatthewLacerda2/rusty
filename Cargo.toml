@@ -78,6 +78,10 @@ too_many_lines = "deny"
 # The determinism ban (#757); the banned items and the reason live in clippy.toml.
 disallowed_methods = "deny"
 disallowed_types = "deny"
+# Nothing temporary ships (#935): debug prints and unfinished stubs are issues, not code.
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
 
 [dependencies]
 winit = { version = "0.30.13" }

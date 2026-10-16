@@ -60,7 +60,7 @@ fn main() {
     }
 
     // `--rules` runs every rule built on the shared `Finding` + inline-allow
-    // mechanism (#934): today `prefix-group`, plus the ≲10-files-per-directory signal.
+    // mechanism (#934): `prefix-group`, `markers`, `skip`, `ignored`, and the ≲10-files signal.
     if args.iter().any(|a| a == "--rules") {
         rules::run();
         return;

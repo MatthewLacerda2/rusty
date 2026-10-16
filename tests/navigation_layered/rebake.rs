@@ -62,6 +62,7 @@ fn level_edits_rebake_locally_and_match_a_full_bake() {
 
 /// `cargo test --release --features dev --test integration -- --ignored --nocapture measure_rebake`
 #[test]
+// lint: allow(skip) a timing measurement, meaningful only in release; run by hand
 #[ignore = "measurement for the PR record; run in release"]
 fn measure_rebake_full_vs_incremental() {
     for spacing in [1.0, 0.5, 0.25] {
