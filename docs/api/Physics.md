@@ -81,7 +81,7 @@ exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` 
   Like the overlaps it takes an optional `layer_mask` but no `ignore_id` — skip
   the shooter's own id while walking the list.
 
-  ```lua
+  ```lua no-run
   for _, h in ipairs(Physics.RaycastAll(ox,oy,oz, dx,dy,dz, 100)) do
     if h.id ~= self_id then
       Decals.Spawn(h.point.x, h.point.y, h.point.z, h.normal.x, h.normal.y, h.normal.z)
@@ -110,7 +110,7 @@ exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` 
   - **Triggers** are listed like any collider (smoke blocks sight), so skip them
     — or leave their layer out of the mask — when pricing bullets.
 
-  ```lua
+  ```lua no-run
   local power = 1.0                       -- penetration budget; game data, not engine
   for _, s in ipairs(Physics.RaycastThrough(ox,oy,oz, dx,dy,dz, 100, SHOT)) do
     if s.root ~= self_id then
@@ -196,6 +196,8 @@ outside `0..31` is a script error.
 
 ```lua
 -- Gibs and shell casings never block the player.
+Layers.SetName(9, "Debris")   -- or name them in Scene Settings
+Layers.SetName(10, "Player")
 local debris = Layers.NameToIndex("Debris")
 Physics.IgnoreLayerCollision(debris, Layers.NameToIndex("Player"))
 Physics.IgnoreLayerCollision(debris, debris)
@@ -317,7 +319,7 @@ entries carry `bone`, `bone_name` and `root`.
 character's movement capsule (its `CharacterController` or collider) on a layer
 the shot's `layer_mask` leaves out, and the hitbox layer in it:
 
-```lua
+```lua no-run
 local SHOT = (1 << Layers.NameToIndex("Default")) | (1 << Layers.NameToIndex("Hitbox"))
 local hit, id, dist, px, py, pz, nx, ny, nz, bone, part, root =
   Physics.Raycast(ox, oy, oz, dx, dy, dz, self_id, SHOT)
@@ -351,7 +353,7 @@ per call, like `AddForce`). Both are no-ops on a kinematic body or without a
 Rigidbody; outside Play only the linear part applies. Pass the hit point a
 `Raycast` returned:
 
-```lua
+```lua no-run
 local hit, _, _, px, py, pz, _, _, _, bone, _, root = Physics.Raycast(ox, oy, oz, dx, dy, dz, me, SHOT)
 if hit and bone then
   Ragdoll.Enable(root)                                   -- first: Enable sets each body's velocity

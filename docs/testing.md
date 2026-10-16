@@ -364,6 +364,14 @@ is read, not embedded, so a doc edit reruns the gates without rebuilding the cra
 `tests/api_doc_layout.rs` keeps the split honest: every `docs/api/<Name>.md` opens with the `` ## `<Name>` ``
 heading and is linked from the index.
 
+Existence is not correctness: an example with a renamed argument or a stale return
+shape passes both gates. `tests/doc_examples/` (dev-only, #937) **runs** every
+```` ```lua ```` block in `docs/api/`, each in a fresh empty `Session`, and fails
+naming `file:line` and the Lua error. Fence markers opt a block down — `no-run`
+(compiled only), `ignore` (not Lua) — or give it the entities it names
+(`with=gun,cam:Camera`); `docs/api/index.md` lists them. A block that can run
+should: prefer `with=` or completing the example over `no-run`.
+
 ## Example (unit, in-module)
 See `tools/lint/src/size.rs` — a `#[cfg(test)] mod tests` block testing the
 size-cap selection and path normalization.

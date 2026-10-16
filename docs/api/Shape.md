@@ -33,7 +33,7 @@ Name setters are case-insensitive; an unrecognized name is ignored.
 **Gradients** (shared with `Image.SetGradient`) are a table — or the same document
 as a JSON string:
 
-```lua
+```lua with=id
 Shape.SetGradient(id, {
   kind = "Linear",          -- or "Radial"
   angle = 90,               -- Linear: degrees counter-clockwise from +x (90 = bottom → top)

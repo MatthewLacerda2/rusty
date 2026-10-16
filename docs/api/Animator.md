@@ -154,7 +154,7 @@ own). `time` is in the clip's own seconds, whatever the playback speed.
   "events": [ { "time": 0.9, "name": "MagOut" }, { "time": 1.6, "name": "MagIn" } ] }
 ```
 
-```lua
+```lua no-run
 function M.OnAnimationEvent(id, name)
   if name == "MagIn" then ammo = MAG_SIZE end
   if name == "End" then reloading = false end
@@ -266,7 +266,7 @@ IK post-processes each step's pose: what it wrote last step is put back first
 does not drift. A constraint touching a bone carried by a **dynamic
 `Rigidbody`** (a ragdolled limb) is skipped: physics wins. IK runs in Play only.
 
-```lua
+```lua no-run
 -- Start: an enemy that looks at the player and keeps its left hand on the gun.
 Animator.AddAimIK(id, "Look", { "spine", "chest", "neck", "head" },
   { weights = { 0.2, 0.3, 0.2, 0.3 }, clamp = 70 })

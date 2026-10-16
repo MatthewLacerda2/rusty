@@ -19,7 +19,7 @@ never bills.
 | `Speech.FindVoice` | `(query [, refresh])` | `voices, source`: those whose name or a label contains `query` |
 | `Speech.VoiceInfo` | `(id)` | the voice; or `nil, why` when it is withdrawn or not on this plan |
 
-```lua
+```lua no-run
 local wav = Speech.Generate({
   text  = "Contact, second floor.",
   voice = "<voice id>",           -- required, no default: see Speech.Voices below
@@ -45,7 +45,7 @@ Audio.PlayAt(wav, 0, 1.6, 4)
    unknown `model`, `language` on `eleven_multilingual_v2`. Each returns
    `nil, why` naming the field, and **does not raise**, so a loop over twenty lines
    loses none to one unfinished brief:
-   ```lua
+   ```lua no-run
    for _, line in ipairs(barks) do
      local wav, why = Speech.Generate(line)
      if not wav then Debug.Warn(why) end
@@ -77,7 +77,7 @@ the engine ships no voice id and neither should a project: list them at authorin
 time and pick (#387). Listing is **free** (no credits, no budget charge), but needs
 the same key, and is refused during Play like every provider verb.
 
-```lua
+```lua no-run
 local voices, source = Speech.FindVoice("british")
 for _, v in ipairs(voices) do
   print(v.id, v.name, table.concat(v.traits, ", "))

@@ -55,7 +55,7 @@ are then no-ops. Add or remove one with `Scene.AddComponent(id, "Joint")` /
 | `Joint.GetBreakTorque` / `SetBreakTorque` | `(id)` / `(id, newtonMetres)` | the breaking torque (`0` = never, ≥ 0) |
 | `Joint.GetEnableCollision` / `SetEnableCollision` | `(id)` / `(id, bool)` | whether the joined bodies collide |
 
-```lua
+```lua with=door,arm:Joint,lamp:Joint
 -- A door: hinged to the world about its left edge, swinging 0..110 degrees.
 Scene.AddComponent(door, "Joint")
 Joint.SetKind(door, "Hinge")

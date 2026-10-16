@@ -17,7 +17,7 @@ canvases alike. Add or remove one with `Scene.AddComponent(id, "Mask")` /
 
 A round minimap — a render texture shown through an ellipse:
 
-```lua
+```lua with=hud
 local frame = UI.Create("Image", hud)            -- place and size its rect
 Scene.RemoveComponent(frame, "Image")            -- an Image would win over the Shape
 Scene.AddComponent(frame, "Shape")               -- an ellipse filling the rect

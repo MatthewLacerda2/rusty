@@ -103,7 +103,7 @@ or intensity `0` — skips every one of those passes.
 stack runs custom post effects: damage vignettes, a low-health grayscale, CRT
 scanlines on a menu camera.
 
-```lua
+```lua no-run
 Shader.Bake({ pass = "postfx", name = "hurt",
   blocks = { { id = "vignette", params = { strength = 0.8, radius = 0.6 } },
              { id = "tint", params = { color = {1.0, 0.6, 0.6} } } } })
@@ -140,7 +140,7 @@ Graphics.SetCustomEffects({})           -- off again
 **Post params** (#671) drive a custom effect's **runtime** block params per frame —
 the strengths a game fades with gameplay (`*` in `Shader.md`'s postfx list):
 
-```lua
+```lua no-run
 Shader.Bake({ pass = "postfx", name = "hurt",
   blocks = { { id = "damage_vignette", params = { color = {0.8, 0, 0} } } } })
 Graphics.SetCustomEffects({ "hurt" })

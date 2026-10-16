@@ -95,7 +95,7 @@ The stages at a glance (field-level detail is in zimmer's rustdoc, `zimmer::patc
 
 Example — bake a gunshot and fire it where the shot happened:
 
-```lua
+```lua no-run
 local clip = Sound.Bake({
   source = { kind = "noise" },
   amp    = { a = 0.0, d = 0.09, s = 0.0, r = 0.06 },
@@ -129,7 +129,7 @@ The shape is **tracker-style** (the MOD/XM lineage), not a flat piano roll: patt
 are named blocks you list in the arrangement, so a piece that repeats stays short
 enough to write, diff and iterate on by hand.
 
-```lua
+```lua no-run
 local theme = {
   bpm = 120,
   seed = 7,
@@ -195,7 +195,7 @@ ring-out either sits there as a gap every pass or, cut short, clicks at the loop
 Three optional song fields say how the piece ends; all absent bakes exactly what it
 always did.
 
-```lua
+```lua no-run
 Sound.BakeSong({ bpm = 96, tail = "wrap", --[[ tracks, patterns, arrangement ]] },
                "assets/sounds/combat_bed.wav")
 ```
@@ -240,7 +240,7 @@ comparing against.
 | `sections` | The clip **over time** — a list of rows with the fields above plus `label`, `from`, `to` (seconds). |
 | `tracks` | The mix **track by track** — a list of rows with the fields above plus `name` and that track's own `sections`. |
 
-```lua
+```lua no-run
 local clip, level = Sound.Bake(pistol, "C2", "assets/sounds/pistol.wav")
 local step = Sound.Level("assets/sounds/footstep.wav")
 print(("pistol %.1f dBFS, footstep %.1f dBFS"):format(level.mean, step.mean))
@@ -291,7 +291,7 @@ One number for a whole bake hides three things, and the report carries each:
 A field is `nil` when either side had nothing to compare (a silence has no level and
 no balance); `nil` is not zero.
 
-```lua
+```lua no-run
 local _, level = Sound.BakeSong(theme, "assets/sounds/theme.wav")
 for _, t in ipairs(level.tracks) do
   print(("%-6s mean %.1f  low %d%%  mid %d%%  high %d%%"):format(
@@ -331,7 +331,7 @@ anything else is a patch. Inline entries are named `#1`, `#2`, … by position.
 | `skipped` | `{ name, error }` for each document that could not be read or parsed. The rest of the set is still surveyed. |
 | `rollup` | Across the set: `patches`, `songs`, `sources` (per kind: `source`, `patches`, `songs`, `loudest`, and `cutoff = { low, high }` over its patches), `tempo = { low, high }`, `register`. **`nil` for a set of one** — a summary of one row repeats it. |
 
-```lua
+```lua no-run
 local report = Sound.Survey({
   "assets/sounds/impact_wood.json",
   "assets/sounds/impact_metal.json",

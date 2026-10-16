@@ -244,7 +244,7 @@ The blocks (`*` = runtime, settable per graphic with `UI.SetShaderParam`):
   clock sweep around the rect's centre from `start` degrees (90: twelve o'clock),
   clockwise unless `clockwise` is 0.
 
-```lua
+```lua no-run
 Shader.Bake({ pass = "ui", name = "holo_call",
               blocks = { { id = "hologram", params = { hue = 185 } }, { id = "scanlines" } } })
 UI.SetShader(callScreen, "holo_call")
@@ -282,7 +282,7 @@ it with slot `data`: a mask holds values, not colour, so the renderer samples it
 bytes raw (a mid-grey 128 reads ≈ 0.5), like every data map (#647). A render
 texture reads as the linear values its camera shaded.
 
-```lua
+```lua no-run
 Shader.Bake({ pass = "surface", name = "enemy_die",
               blocks = { { id = "dissolve", params = { edge_color = {1, 0.4, 0.1} } } } })
 Material.SetShader(enemy, "enemy_die")
@@ -303,7 +303,7 @@ only: a Cutout material's alpha-tested shadow keeps the unscrolled cut-out.
 
 Example — bake a stylized surface variant and load it by name:
 
-```lua
+```lua no-run
 Shader.Bake({
   pass = "surface", name = "enemy_toon",
   blocks = {

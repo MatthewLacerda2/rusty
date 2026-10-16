@@ -40,7 +40,7 @@ Omit `max` for a constant.
 oriented by the emitter's direction, so aiming a hemisphere of sparks along an
 impact normal is one `SetDirection` call:
 
-```lua
+```lua no-run
 Particles.SetShape(sparks, "Hemisphere", { radius = 0.05 })
 Particles.SetDirection(sparks, nx, ny, nz)
 Particles.Burst(sparks)
@@ -83,7 +83,7 @@ sprites show their own colour — right for fire and muzzle flashes, wrong for s
 Alpha-blended particles are drawn back to front within each emitter, and emitters
 back to front among themselves.
 
-```lua
+```lua with=sparks,smoke,casings
 Particles.SetRenderMode(sparks, "stretched")
 Particles.SetStretch(sparks, 1, 0.05)
 Particles.SetFlipbook(smoke, 4, 4, { random_start = true })

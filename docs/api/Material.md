@@ -52,7 +52,7 @@ The **recipe** is a table (or that table's JSON string — both decode alike) wh
 (every field optional — omit one to take its default), bounded to exactly what the
 renderer samples:
 
-```lua
+```lua with=id
 Material.DefineAsset("brick", {
   base_color   = {0.5, 0.25, 0.125},   -- albedo tint (rgb)
   base_color_map = "brick_albedo.png", -- albedo map
@@ -97,7 +97,7 @@ document `Texture.BakeSet` takes, `outputs` and all). `DefineAsset` bakes it onc
 `Texture.BakeSet` result table in `Texture.md` lists which slot fills which key —
 `metallic_roughness` fills both `metallic_map` and `roughness_map`):
 
-```lua
+```lua no-run
 Material.DefineAsset("rusty_panel", {
   roughness = 1.0, metallic = 1.0,            -- factors scale the maps, as always
   normal_map = "hand_made_n.png",             -- an explicit map key wins over the bake
@@ -205,7 +205,7 @@ resolves to the project's `assets/shaders/enemy_toon.wgsl` (where bakes land), e
 the engine's `engine/shaders/enemy_toon.wgsl`. No name (the default) is the standard forward
 shader.
 
-```lua
+```lua no-run
 Shader.Bake({ pass = "surface", name = "enemy_toon",
               blocks = { { id = "toon_ramp", params = { steps = 3 } } } })
 Material.SetShader(enemy, "enemy_toon")   -- or `shader = "enemy_toon"` in a recipe
@@ -232,7 +232,7 @@ into the shader, they are read at draw time, so a script drives them every frame
 Unity's `material.SetFloat`. A hit flash that fades, a rim that glows with a
 shield's charge:
 
-```lua
+```lua no-run
 Shader.Bake({ pass = "surface", name = "enemy_hit",
               blocks = { { id = "toon_ramp" },
                          { id = "hit_flash", params = { color = {1, 0.2, 0.1} } } } })
@@ -284,7 +284,7 @@ A surface shader's blocks may sample an **extra texture** the material names —
 noise for `dissolve`, a grime map for `detail_overlay` (see `Shader.md`, *Extra
 textures*): Unity's `material.SetTexture("_Mask", …)`.
 
-```lua
+```lua with=enemy
 Material.SetShaderTexture(enemy, "mask", "assets/textures/noise.png")
 -- or in a recipe:
 Material.DefineAsset("enemy_die", { shader = "enemy_die",

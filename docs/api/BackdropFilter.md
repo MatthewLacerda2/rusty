@@ -23,7 +23,7 @@ are then no-ops.
 
 A pause screen on a blurred, darkened game:
 
-```lua
+```lua with=pause_canvas
 local shade = UI.Create("Image", pause_canvas)   -- stretch it over the canvas
 Image.SetColor(shade, 0, 0, 0, 0.25)
 Scene.AddComponent(shade, "BackdropFilter")

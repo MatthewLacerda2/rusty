@@ -132,7 +132,7 @@ All of it is resolved in the sim (deterministic, same on the headless harness as
 the editor); the device only applies the result. **Stop** resets the settings.
 Material transmission, diffraction and portals are not modelled.
 
-```lua
+```lua with=radio:AudioSource
 Audio.SetOcclusionSettings({ layer_mask = ~(1 << 8) })  -- all but layer 8 (characters)
 Audio.SetOcclusionEnabled(radio, false)   -- this one carries through walls
 ```

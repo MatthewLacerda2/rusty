@@ -46,7 +46,7 @@ through the setter's own op. A tween ends quietly if the component goes, or — 
 `UI.` — the graphic is switched to another shader. UI shaders animate on unscaled
 time, so `unscaled = true` is the natural pairing for a `UI.` tween.
 
-```lua
+```lua no-run
 -- On hit: flash this enemy and let it fade.
 Tween.KillAll(enemy)
 Tween.To(enemy, "Material.hit_flash.amount", 0, 0.15, { from = 1, ease = "quad_out" })
@@ -73,7 +73,7 @@ does.
 | `unscaled` | `false` | Tick on unscaled time, so it keeps moving under `Time.SetTimeScale(0)` — a pause menu's own animations. |
 | `on_complete` | — | `fn(id)`, called once when the last cycle lands on its end value. |
 
-```lua
+```lua with=menu:CanvasGroup+RectTransform,marker:RectTransform
 -- A pause menu that slides in and fades up while the game is frozen.
 Time.SetTimeScale(0)
 Tween.To(menu, "CanvasGroup.alpha", 1, 0.2, { from = 0, unscaled = true })
@@ -94,7 +94,7 @@ staggered entrance is written. Every step is validated before any starts; an
 endless (`loops = -1`) step is an error. `Kill` / `IsPlaying` on the returned
 handle cover the whole sequence; each step keeps its own `on_complete`.
 
-```lua
+```lua with=title:CanvasGroup,play:RectTransform,options:RectTransform,quit:RectTransform
 Tween.Sequence{
     {title, "CanvasGroup.alpha", 1, 0.3, from = 0},
     0.1,

@@ -41,7 +41,7 @@ list) and setters do nothing. Add one with `Scene.AddComponent(id, "Trail")`.
 | `Trail.GetTextureMode` / `SetTextureMode` | `(id)` / `(id, mode)` | `"Stretch"` (one copy over the length) or `"Tile"` (repeats every world unit) |
 | `Trail.GetBlend` / `SetBlend` | `(id)` / `(id, blend)` | `"Alpha"` or `"Additive"` (unknown names are ignored) |
 
-```lua
+```lua with=bullet
 -- A bright tracer that lives a tenth of a second.
 Scene.AddComponent(bullet, "Trail")
 Trail.SetTime(bullet, 0.1)

@@ -27,7 +27,7 @@ with `Layers.SetName`, the matrix with
 mask with [`Camera.SetCullingMask`](Camera.md#camera-entities-projection-and-render-textures-430).
 They write the same values as the editor and persist with the scene.
 
-```lua
+```lua with=gun,worldCam:Camera,gunCam:Camera
 -- A viewmodel: the gun on its own layer, drawn only by the stacked gun camera.
 Layers.SetName(8, "Viewmodel")
 local vm = Layers.NameToIndex("Viewmodel")

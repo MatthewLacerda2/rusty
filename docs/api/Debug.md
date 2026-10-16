@@ -23,7 +23,7 @@ tab shows a human — one stand-in mesh, a procedural sky, one key light — and
 to a PNG, **headlessly**. That closes the authoring loop for shaders in particular:
 `Shader.Bake` proves a module *compiles*, and this shows what it *renders*.
 
-```lua
+```lua no-run
 -- bake -> preview -> look -> iterate, in one line
 local png = Debug.Preview(Shader.Bake(recipe), "out/preview.png")
 
@@ -47,7 +47,7 @@ baked defaults) and its extra texture slots such as `mask`. An `rt:<name>` rende
 texture in any slot samples **white** here: the preview scene is isolated and has no
 camera drawing that texture. A name the library doesn't hold raises, naming it.
 
-```lua
+```lua no-run
 -- define -> look -> iterate
 Material.DefineAsset("brick", { base_color_map = "brick_albedo.png", roughness = 0.8 })
 Debug.PreviewMaterial("brick", "out/brick_mat.png", { mesh = "cube" })
@@ -72,11 +72,15 @@ the call **returns `nil`** after a warning rather than failing the run.
 `Debug.Stats()` is the perf read: the numbers an agent needs to prove a rendering or
 gameplay change is cheaper, since it never *feels* the frame rate. Each metric is a
 `{ last, min, avg, max, samples }` table summarising every frame of the **current Play
-session** (the stats restart when Play starts):
+session** (the stats restart when Play starts). Until the first frame runs there is
+nothing to summarise: `frames` is `0`, `systems` is empty and every metric is absent
+(`nil`), so check `frames` before reading one:
 
 ```lua
 local s = Debug.Stats()
-print(s.frames, s.fixed_update_ms.avg, s.systems.update_scripts.max, s.entities.last)
+if s.frames > 0 then
+  print(s.frames, s.fixed_update_ms.avg, s.systems.update_scripts.max, s.entities.last)
+end
 ```
 
 | Metric | What it counts |
