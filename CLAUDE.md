@@ -47,6 +47,36 @@ and the skill is how to keep it. Where they disagree, this file wins and the ski
 is wrong.
 
 ## How we work
+- **The project serves its development first** (the operator, 2026-10-16; scorsese
+  adopted it first). Claude is never tied to the current way of doing things. First it looks for a
+  more scalable way to improve the project faster; then it improves the project itself —
+  its tools, structure and infrastructure; only then does it use it. Everything we do runs
+  inside a framework that says how it is done, and the more of it is automated the better.
+  The one carve-out is a session spent building or playtesting a game *with* rusty: there
+  findings are noted and dealt with afterwards, so the game is not derailed. Three rules
+  keep the principle:
+  - **Infrastructure- then architecture-first (NOT "make it up as we go").** We do **not**
+    improvise or pile on features ad hoc. Whenever we find a problem — something that
+    already bites or will bite more than once, a pattern worth adopting, or a gold-standard
+    practice we should have had — we **document it and implement it right away**, before
+    continuing. We do **not** have the right to add more features/shenanigans until the
+    infrastructure/architecture itself is improved first. Infrastructure (the tools we build
+    with) outranks architecture (how things are organized) — make building cheap and safe
+    before reshaping what gets built, so every later change runs on the faster, safer loop
+    instead of burning compile time overnight — and both outrank features. See *Issues,
+    labels & priority* for the full order. Fix the foundation, then build on it. Each such
+    fix gets its own issue when it carries its own responsibility.
+  - **Agent velocity is first-class.** This workflow is agents driving the engine and each
+    other, often unattended — throughput counts. Write code that is **readable by design and
+    lean**: not for style points but because clear, well-shaped code is cheaper to reason about
+    (fewer tokens, fewer wrong turns) and faster for the next agent to extend. Strip avoidable
+    blockages and keep CI fast. This is part of **Craft**, not a trade-off against it.
+  - **A convention a machine can check is a gate, not a sentence.** Finding what can be
+    enforced is Claude's job, not the operator's. A written rule that a check could hold
+    gets that check on Claude's own say-so, and a new convention ships with its check.
+    Every check has a case it must flag and a case it must pass, runs in `make gates` and
+    CI, and takes exceptions **inline, with a written reason**, never as an unread list in
+    a config file. Where a check would misfire, the prose says so and why.
 - **The gates (push back before you build).** An idea becomes an issue only when all
   three hold; if any fails, **push back instead of complying**:
   1. **Understanding.** Claude actually understands the idea — the user has a clear
@@ -61,10 +91,12 @@ is wrong.
   or improve the development of the game engine itself — Claude does not wait to be told
   to take initiative of improving the codebase. The user follows Claude's recommendations,
   and implementing then validating later beats waiting: a clear win without a downside is
-  **implemented**, not proposed. The one exception is a change to the **engine's design
-  itself** (the five kinds, the one API surface, the determinism rule, the conventions in
-  this file) — there Claude proposes and the user decides, unless one option is a plain
-  win-win, which Claude takes. Initiative still runs through the normal flow (an issue,
+  **implemented**, not proposed. The one exception is **changing a decision**: the
+  engine's design (the five kinds, the one API surface, the determinism rule) or a
+  convention in this file — there Claude proposes and the user decides, unless one option
+  is a plain win-win, which Claude takes. **Making a description true or complete is never
+  the exception:** a stale or incomplete doc, README, module doc, comment, CLI help, MCP or
+  API description, skill or line of this file is fixed on Claude's own say-so and merged. Initiative still runs through the normal flow (an issue,
   or an issue-less PR where that is allowed; a branch; a PR; the gates), and a
   **`planning`** issue is still never started.
 - **Flow:** discuss the idea (if needed) → (usually) write a GitHub issue for it → mark
@@ -135,17 +167,6 @@ is wrong.
   build. Prefer it whenever the machine has other work. The price is that a rebase broken
   by a merge ahead (rare: a few in 126 PRs) is caught by CI a round later, not before
   the push.
-- **Infrastructure- then architecture-first (NOT "make it up as we go").** We do **not**
-  improvise or pile on features ad hoc. Whenever we find a problem — something that
-  already bites or will bite more than once, a pattern worth adopting, or a gold-standard
-  practice we should have had — we **document it and implement it right away**, before
-  continuing. We do **not** have the right to add more features/shenanigans until the
-  infrastructure/architecture itself is improved first. Infrastructure (the tools we build
-  with) outranks architecture (how things are organized) — make building cheap and safe
-  before reshaping what gets built, so every later change runs on the faster, safer loop
-  instead of burning compile time overnight — and both outrank features. See *Issues,
-  labels & priority* for the full order. Fix the foundation, then build on it. Each such
-  fix gets its own issue when it carries its own responsibility.
 - **Dependencies (not batches).** Once an issue is written, record how it relates to the
   others using GitHub's native issue **relationships** — set `Blocked by` / `Blocks`
   directly on the issue, and use GitHub **sub-issues** when one issue is literal
@@ -164,11 +185,6 @@ is wrong.
   keep when it's **surfaced where the agent acts on it** (a report printed in the terminal
   or a job summary read in-context), not buried in an artifact nobody opens. Don't
   reach for a hard gate where an informational signal does the job.
-- **Agent velocity is first-class.** This workflow is agents driving the engine and each
-  other, often unattended — throughput counts. Write code that is **readable by design and
-  lean**: not for style points but because clear, well-shaped code is cheaper to reason about
-  (fewer tokens, fewer wrong turns) and faster for the next agent to extend. Strip avoidable
-  blockages and keep CI fast. This is part of **Craft**, not a trade-off against it.
 - The user writes plenty of Github Issues and then does them in batches, asking you to do
   them as you see fit (regarding how many batches and which issues take priority). In those
   cases, it's best to, when in doubt of something, write a comment in the Issue, and then resume
