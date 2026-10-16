@@ -51,3 +51,25 @@ pub fn git(dir: &Path, args: &[&str]) -> Option<String> {
     let text = String::from_utf8(out.stdout).ok()?;
     out.status.success().then(|| text.trim().to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_unstamped_build_reports_the_checkout_commit() {
+        if option_env!("RUSTY_ENGINE_COMMIT").is_some() {
+            return; // a release build reports its stamp instead
+        }
+        let checkout = git_commit(Path::new(env!("CARGO_MANIFEST_DIR")));
+        assert_eq!(
+            engine_commit(),
+            checkout.as_deref().unwrap_or(UNKNOWN_COMMIT)
+        );
+    }
+
+    #[test]
+    fn outside_a_repository_there_is_no_commit() {
+        assert_eq!(git_commit(Path::new("/")), None);
+    }
+}
