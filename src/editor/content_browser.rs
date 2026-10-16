@@ -6,6 +6,7 @@ use std::path::Path;
 
 use egui_phosphor::regular as icon;
 
+use crate::core::paths;
 use crate::editor::content_grid;
 use crate::editor::EditorUi;
 use crate::scene::Scene;
@@ -126,7 +127,7 @@ fn read_subdirs(path: &str) -> Vec<String> {
         .flatten()
         .map(|e| e.path())
         .filter(|p| p.is_dir())
-        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .map(|p| paths::to_slash(&p))
         .collect();
     dirs.sort_by_key(|p| file_name(p));
     dirs

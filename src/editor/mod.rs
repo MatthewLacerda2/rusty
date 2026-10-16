@@ -20,6 +20,7 @@ pub mod project_picker;
 pub mod theme;
 pub mod viewport;
 
+use crate::core::paths;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
@@ -227,7 +228,8 @@ impl EditorUi {
             for entry in entries.flatten() {
                 if let Some(path_str) = entry.path().to_str() {
                     if path_str.ends_with(".lua") {
-                        self.assets_scripts.push(path_str.replace("\\", "/"));
+                        self.assets_scripts
+                            .push(paths::to_slash(std::path::Path::new(path_str)));
                     }
                 }
             }
@@ -239,7 +241,8 @@ impl EditorUi {
                 if let Some(path_str) = entry.path().to_str() {
                     let path_lower = path_str.to_lowercase();
                     if path_lower.ends_with(".png") || path_lower.ends_with(".tga") {
-                        self.assets_textures.push(path_str.replace("\\", "/"));
+                        self.assets_textures
+                            .push(paths::to_slash(std::path::Path::new(path_str)));
                     }
                 }
             }

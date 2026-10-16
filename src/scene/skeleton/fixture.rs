@@ -17,7 +17,7 @@ pub(super) fn animated_model(tag: &str) -> String {
     std::fs::write(dir.join("anim.bin"), animated_buffer()).unwrap();
     let path = dir.join("model.gltf");
     std::fs::write(&path, ANIMATED_GLTF).unwrap();
-    format!("{}::Animated", path.to_string_lossy().replace('\\', "/"))
+    format!("{}::Animated", crate::core::paths::to_slash(&path))
 }
 
 /// Instantiate the animated fixture as `Hero`, skeleton and all.

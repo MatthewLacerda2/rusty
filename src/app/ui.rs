@@ -163,7 +163,7 @@ mod tests {
             .world
             .set_image(panel, Some(ImageComponent::default()));
         *scene.world.scripts_mut(panel).expect("scripts") = vec![ScriptComponent {
-            path: script.to_string_lossy().replace('\\', "/"),
+            path: crate::core::paths::to_slash(&script),
             ..Default::default()
         }];
         scene.set_parent(panel, Some(root)).expect("parent exists");
