@@ -9,6 +9,7 @@
 
 use glam::{Vec2, Vec4};
 
+use super::sanitize::unit_color;
 use super::ui_look::sanitize_gradient;
 use crate::components::{
     ShapeComponent, ShapeCorner, ShapeGlow, ShapeKind, ShapeShadow, UiBlend, UiGradient,
@@ -51,7 +52,7 @@ pub fn set_dash(s: &mut ShapeComponent, dash: f32, gap: f32) {
 
 /// Set the fill colour, clamped to `[0, 1]`.
 pub fn set_color(s: &mut ShapeComponent, color: Vec4) {
-    s.color = unit(color);
+    s.color = unit_color(color);
 }
 
 /// Set (or clear, `None`) the gradient fill; one with fewer than two stops clears it.
@@ -61,7 +62,7 @@ pub fn set_gradient(s: &mut ShapeComponent, g: Option<UiGradient>) {
 
 /// Set the border band's width (≥ 0) and colour.
 pub fn set_border(s: &mut ShapeComponent, width: f32, color: Vec4) {
-    (s.border_width, s.border_color) = (width.max(0.0), unit(color));
+    (s.border_width, s.border_color) = (width.max(0.0), unit_color(color));
 }
 
 /// Set the drop shadow (blur ≥ 0; a transparent colour turns it off).
@@ -69,7 +70,7 @@ pub fn set_shadow(s: &mut ShapeComponent, offset: Vec2, blur: f32, color: Vec4) 
     s.shadow = ShapeShadow {
         offset,
         blur: blur.max(0.0),
-        color: unit(color),
+        color: unit_color(color),
     };
 }
 
@@ -78,7 +79,7 @@ pub fn set_glow(s: &mut ShapeComponent, size: f32, intensity: f32, color: Vec4) 
     s.glow = ShapeGlow {
         size: size.max(0.0),
         intensity: intensity.max(0.0),
-        color: unit(color),
+        color: unit_color(color),
     };
 }
 
@@ -90,11 +91,6 @@ pub fn set_blend(s: &mut ShapeComponent, blend: UiBlend) {
 /// Set whether the pointer can hit it.
 pub fn set_raycast_target(s: &mut ShapeComponent, target: bool) {
     s.raycast_target = target;
-}
-
-/// `c` clamped to `[0, 1]`.
-fn unit(c: Vec4) -> Vec4 {
-    c.clamp(Vec4::ZERO, Vec4::ONE)
 }
 
 /// The kind's name.

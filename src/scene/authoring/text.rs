@@ -10,6 +10,7 @@
 
 use glam::{Vec2, Vec4};
 
+use super::sanitize::{at_least, unit_color};
 use crate::components::{TextAlignment, TextComponent, TextOverflow};
 
 /// The smallest size a text can be set to, in reference units.
@@ -41,12 +42,12 @@ pub fn set_font(t: &mut TextComponent, slot: FontSlot, path: Option<String>) {
 
 /// Set the em size in reference units, kept ≥ [`MIN_FONT_SIZE`].
 pub fn set_font_size(t: &mut TextComponent, size: f32) {
-    t.font_size = positive(size);
+    t.font_size = at_least(size, MIN_FONT_SIZE);
 }
 
 /// Set the fill colour, each channel clamped to `[0, 1]`.
 pub fn set_color(t: &mut TextComponent, color: Vec4) {
-    t.color = unit(color);
+    t.color = unit_color(color);
 }
 
 /// Set where the block sits in the rect.
@@ -76,7 +77,7 @@ pub fn set_letter_spacing(t: &mut TextComponent, spacing: f32) {
 
 /// Set auto-size and its size range; both bounds stay positive and `min ≤ max`.
 pub fn set_auto_size(t: &mut TextComponent, enabled: bool, min: f32, max: f32) {
-    let (min, max) = (positive(min), positive(max));
+    let (min, max) = (at_least(min, MIN_FONT_SIZE), at_least(max, MIN_FONT_SIZE));
     t.auto_size = enabled;
     t.auto_size_min = min.min(max);
     t.auto_size_max = max.max(min);
@@ -100,31 +101,19 @@ pub fn set_blend(t: &mut TextComponent, blend: crate::components::UiBlend) {
 /// Set the outline: thickness in ems (≥ 0) and colour.
 pub fn set_outline(t: &mut TextComponent, width: f32, color: Vec4) {
     t.outline_width = width.max(0.0);
-    t.outline_color = unit(color);
+    t.outline_color = unit_color(color);
 }
 
 /// Set the drop shadow: offset in reference units and colour.
 pub fn set_shadow(t: &mut TextComponent, offset: Vec2, color: Vec4) {
     t.shadow_offset = offset;
-    t.shadow_color = unit(color);
+    t.shadow_color = unit_color(color);
 }
 
 /// Set the glow: reach in ems (≥ 0) and colour.
 pub fn set_glow(t: &mut TextComponent, size: f32, color: Vec4) {
     t.glow_size = size.max(0.0);
-    t.glow_color = unit(color);
-}
-
-fn positive(size: f32) -> f32 {
-    if size.is_finite() {
-        size.max(MIN_FONT_SIZE)
-    } else {
-        MIN_FONT_SIZE
-    }
-}
-
-fn unit(c: Vec4) -> Vec4 {
-    c.clamp(Vec4::ZERO, Vec4::ONE)
+    t.glow_color = unit_color(color);
 }
 
 /// Parse an alignment name (case-insensitive), e.g. `"MiddleCenter"`.

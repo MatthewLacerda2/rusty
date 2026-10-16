@@ -6,7 +6,7 @@
 //!
 //! Pure.
 
-use super::ribbon::non_negative;
+use super::sanitize::non_negative;
 use crate::components::TrailComponent;
 
 /// Start or stop recording new points (the existing trail still ages out).
