@@ -5,11 +5,11 @@
 
 use std::cell::RefCell;
 
-use mlua::Lua;
 use rusty::asset::animation_graph::{self, AnimationGraph};
 use rusty::components::AnimatorComponent;
 use rusty::scene::Scene;
-use rusty::scripting::ConsoleLogs;
+
+use super::run;
 
 const GRAPH: &str = r#"{
   "nodes": [ { "name": "Run", "clip": "Run" } ], "entry": "Run",
@@ -31,17 +31,6 @@ fn layered_scene() -> (RefCell<Scene>, u32) {
     };
     scene.world.set_animator(id, Some(anim));
     (RefCell::new(scene), id)
-}
-
-/// Run `script` against `scene`'s `Animator` namespace, its value via `tostring`.
-fn run(scene: &RefCell<Scene>, script: &str) -> String {
-    let console = RefCell::new(ConsoleLogs::new());
-    let lua = Lua::new();
-    lua.scope(|s| {
-        rusty::api::animator::register(&lua, s, scene, &console).unwrap();
-        lua.load(format!("return tostring(({script}))")).eval()
-    })
-    .unwrap()
 }
 
 #[test]

@@ -6,19 +6,11 @@
 use std::cell::RefCell;
 
 use mlua::Lua;
-use rusty::components::{AnimatorComponent, AnimatorParameter};
+use rusty::components::AnimatorParameter;
 use rusty::scene::{apply_scene_data, to_scene_data, Scene};
 use rusty::scripting::ConsoleLogs;
 
-/// A scene holding one entity with a default animator; returns its id.
-fn scene_with_animator() -> (RefCell<Scene>, u32) {
-    let mut scene = Scene::new();
-    let id = scene.add_entity("Rig".to_string());
-    scene
-        .world
-        .set_animator(id, Some(AnimatorComponent::default()));
-    (RefCell::new(scene), id)
-}
+use super::scene_with_animator;
 
 /// Register the `Animator` namespace against `scene` and run `script`.
 fn run(scene: &RefCell<Scene>, console: &RefCell<ConsoleLogs>, script: &str) {

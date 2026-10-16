@@ -15,6 +15,7 @@
 //! physics files (`cargo test --test integration physics_` works too).
 
 mod layout;
+mod lua;
 mod temp;
 
 // ── Both feature sets ────────────────────────────────────────────────────────────
