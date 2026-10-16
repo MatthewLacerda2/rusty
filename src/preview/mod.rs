@@ -28,16 +28,14 @@ pub use scene::{build_preview_scene, suzanne_path, PreviewMesh, PreviewSubject};
 /// card builds it from the entity's `MaterialComponent`; `Debug.PreviewMaterial` from
 /// the library by name, #404).
 pub fn subject_for_path(path: &str) -> Option<PreviewSubject> {
-    let extension = std::path::Path::new(path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-    match extension.as_str() {
-        "png" | "tga" | "jpg" | "jpeg" => Some(PreviewSubject::Texture(path.to_string())),
-        "fbx" | "obj" | "gltf" | "glb" => Some(PreviewSubject::Model(path.to_string())),
-        "wgsl" => Some(PreviewSubject::Shader(path.to_string())),
-        _ => None,
+    if crate::asset::is_image_path(path) {
+        Some(PreviewSubject::Texture(path.to_string()))
+    } else if crate::asset::is_model_path(path) {
+        Some(PreviewSubject::Model(path.to_string()))
+    } else if crate::core::paths::has_extension(path, "wgsl") {
+        Some(PreviewSubject::Shader(path.to_string()))
+    } else {
+        None
     }
 }
 

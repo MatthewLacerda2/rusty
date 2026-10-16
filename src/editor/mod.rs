@@ -227,7 +227,7 @@ impl EditorUi {
         if let Ok(entries) = fs::read_dir("assets/scripts") {
             for entry in entries.flatten() {
                 if let Some(path_str) = entry.path().to_str() {
-                    if path_str.ends_with(".lua") {
+                    if paths::has_extension(path_str, "lua") {
                         self.assets_scripts
                             .push(paths::to_slash(std::path::Path::new(path_str)));
                     }
@@ -239,8 +239,7 @@ impl EditorUi {
         if let Ok(entries) = fs::read_dir("assets/textures") {
             for entry in entries.flatten() {
                 if let Some(path_str) = entry.path().to_str() {
-                    let path_lower = path_str.to_lowercase();
-                    if path_lower.ends_with(".png") || path_lower.ends_with(".tga") {
+                    if crate::asset::is_image_path(path_str) {
                         self.assets_textures
                             .push(paths::to_slash(std::path::Path::new(path_str)));
                     }

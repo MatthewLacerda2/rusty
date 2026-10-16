@@ -95,3 +95,16 @@ fn to_slash_turns_every_backslash_into_a_slash() {
     );
     assert_eq!(to_slash(Path::new("/tmp/x")), "/tmp/x");
 }
+
+#[test]
+fn extension_matching_ignores_case() {
+    assert!(has_extension("assets/scripts/Enemy.LUA", "lua"));
+    assert!(has_extension(Path::new("a/b.Lua"), "lua"));
+    assert!(
+        !has_extension("a/lua", "lua"),
+        "a bare name has no extension"
+    );
+    assert!(!has_extension("a/b.luac", "lua"));
+    assert_eq!(extension("Crate.GLB"), "glb");
+    assert_eq!(extension("noext"), "");
+}

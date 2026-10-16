@@ -140,11 +140,3 @@ pub(crate) fn file_name(path: &str) -> String {
         .unwrap_or(path)
         .to_string()
 }
-
-pub(crate) fn extension(path: &str) -> String {
-    Path::new(path)
-        .extension()
-        .and_then(|s| s.to_str())
-        .unwrap_or("")
-        .to_lowercase()
-}

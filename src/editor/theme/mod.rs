@@ -110,7 +110,7 @@ impl Theme {
     /// the content browser to color-badge tiles by type.
     pub fn asset_color(&self, ext: &str) -> Color32 {
         match ext {
-            "png" | "tga" | "jpg" | "jpeg" => self.accent,
+            e if crate::asset::IMAGE_EXTENSIONS.contains(&e) => self.accent,
             "wav" | "mp3" | "ogg" => self.teal,
             "scene" => self.warning,
             "lua" => self.text_primary,
