@@ -133,7 +133,7 @@ fn has_word(s: &str, word: &str) -> bool {
     })
 }
 
-fn is_ident(c: char) -> bool {
+pub fn is_ident(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
@@ -141,9 +141,21 @@ fn is_ident(c: char) -> bool {
 /// `#[cfg(test)]` items. `crate::{a, b::C}` yields both `a` and `b`.
 pub fn refs(content: &str) -> Vec<Ref> {
     let mut out = Vec::new();
+    let mut group: Option<i32> = None;
+    for (line, code) in live_lines(content) {
+        for module in crate_refs(code, &mut group) {
+            out.push(Ref { line, module });
+        }
+    }
+    out
+}
+
+/// The lines of `content` that are live (non-test) code, numbered from 1, each with
+/// its `//` comment stripped. Shared with the external-crate scan.
+pub fn live_lines(content: &str) -> Vec<(usize, &str)> {
+    let mut out = Vec::new();
     let mut skip_item = false;
     let mut depth = 0i32;
-    let mut group: Option<i32> = None;
     for (i, raw) in content.lines().enumerate() {
         let code = strip_comment(raw);
         let trimmed = code.trim();
@@ -158,12 +170,7 @@ pub fn refs(content: &str) -> Vec<Ref> {
             }
             continue;
         }
-        for module in crate_refs(code, &mut group) {
-            out.push(Ref {
-                line: i + 1,
-                module,
-            });
-        }
+        out.push((i + 1, code));
     }
     out
 }

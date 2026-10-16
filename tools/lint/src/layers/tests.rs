@@ -48,16 +48,19 @@ const ROWS: &[Layer] = &[
         module: "core",
         sim: true,
         deps: &[],
+        crates: &[],
     },
     Layer {
         module: "scene",
         sim: true,
         deps: &["core"],
+        crates: &[],
     },
     Layer {
         module: "render",
         sim: false,
         deps: &["scene"],
+        crates: &[],
     },
 ];
 
@@ -88,16 +91,19 @@ fn flags_cycles_and_sim_leaks() {
             module: "core",
             sim: true,
             deps: &["scene"],
+            crates: &[],
         },
         Layer {
             module: "scene",
             sim: true,
             deps: &["render"],
+            crates: &[],
         },
         Layer {
             module: "render",
             sim: false,
             deps: &[],
+            crates: &[],
         },
     ];
     let v = run(&rows, &[edge("core", "scene"), edge("scene", "render")]);
