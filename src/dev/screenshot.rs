@@ -25,9 +25,8 @@ use crate::app::GameWorld;
 use crate::scene::Camera;
 use crate::scene::Scene;
 
-/// Default screenshot dimensions (16:9), matching the editor window aspect.
-pub const DEFAULT_WIDTH: u32 = 1280;
-pub const DEFAULT_HEIGHT: u32 = 720;
+/// Default screenshot dimensions: the default windowed framebuffer (16:9).
+pub use crate::core::video::{DEFAULT_HEIGHT, DEFAULT_WIDTH};
 
 /// Render `scene` from `camera` into a PNG at `path`, `width` x `height`, through
 /// `host`'s shared renderer.

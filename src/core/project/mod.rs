@@ -51,16 +51,23 @@ pub const DEFAULT_PROJECT_DIR: &str = "project";
 /// The command-line flag every binary takes to name its project.
 pub const PROJECT_FLAG: &str = "--project";
 
+/// Where a project keeps its Lua scripts, relative to the root.
+pub const SCRIPTS_DIR: &str = "assets/scripts";
+/// Where a project keeps its textures (baked material maps included).
+pub const TEXTURES_DIR: &str = "assets/textures";
+/// Where a project keeps its generated and authored shaders.
+pub const SHADERS_DIR: &str = "assets/shaders";
+
 /// The folders [`create_skeleton`] makes, relative to the root.
 pub const SKELETON: &[&str] = &[
     "assets/scenes",
-    "assets/scripts",
+    SCRIPTS_DIR,
     "assets/prefabs",
     "assets/models",
-    "assets/textures",
+    TEXTURES_DIR,
     "assets/audio",
     "assets/materials",
-    "assets/shaders",
+    SHADERS_DIR,
     CACHE_DIR,
     SAVED_DIR,
 ];

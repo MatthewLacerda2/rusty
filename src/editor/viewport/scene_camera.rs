@@ -12,10 +12,8 @@
 use glam::{Vec2, Vec3};
 
 use crate::scene::camera::DEFAULT_FOV;
+pub use crate::scene::camera::MAX_PITCH;
 use crate::scene::Camera;
-
-/// Pitch limit, short of straight up/down where yaw stops meaning anything.
-pub const MAX_PITCH: f32 = 89.0;
 /// The closest the eye gets to the pivot; zooming in past it pushes the pivot ahead.
 pub const MIN_DISTANCE: f32 = 0.05;
 /// The farthest zoom-out.

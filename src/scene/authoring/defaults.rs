@@ -150,9 +150,9 @@ pub fn default_nav_agent() -> NavMeshAgentComponent {
 pub fn default_camera() -> CameraComponent {
     CameraComponent {
         active: true,
-        fov: 45.0,
-        near: 0.1,
-        far: 200.0,
+        fov: crate::components::camera::DEFAULT_FOV,
+        near: crate::components::camera::DEFAULT_NEAR,
+        far: crate::components::camera::DEFAULT_FAR,
         culling_mask: u32::MAX,
         render_order: 0,
         clear_flags: ClearFlags::Skybox,

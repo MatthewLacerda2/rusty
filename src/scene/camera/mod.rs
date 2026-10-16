@@ -37,12 +37,12 @@ pub struct Camera {
     pub projection: Projection,
 }
 
-/// Default vertical field of view, in degrees.
-pub const DEFAULT_FOV: f32 = 45.0;
-/// Default near/far clip planes — the free-fly editor camera's clip range, and the
-/// fallback when no scene camera is authoritative.
-pub const DEFAULT_NEAR: f32 = 0.1;
-pub const DEFAULT_FAR: f32 = 200.0;
+pub use crate::components::camera::{DEFAULT_FAR, DEFAULT_FOV, DEFAULT_NEAR};
+
+/// Pitch limit, in degrees, for every pitch a person or script sets: short of
+/// straight up/down, where the look-at basis degenerates and yaw stops meaning
+/// anything.
+pub const MAX_PITCH: f32 = 89.0;
 
 impl Camera {
     pub fn new(position: Vec3, yaw: f32, pitch: f32) -> Self {

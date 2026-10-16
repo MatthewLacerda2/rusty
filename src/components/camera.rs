@@ -77,15 +77,22 @@ pub struct CameraComponent {
     pub target_texture: Option<RenderTarget>,
 }
 
+/// Default vertical field of view, in degrees.
+pub const DEFAULT_FOV: f32 = 45.0;
+/// Default near/far clip planes — the free-fly editor camera's clip range, and the
+/// fallback when no scene camera is authoritative.
+pub const DEFAULT_NEAR: f32 = 0.1;
+pub const DEFAULT_FAR: f32 = 200.0;
+
 impl Default for CameraComponent {
     /// A plain perspective screen camera: the scene defaults' lens, every layer,
     /// skybox clear, FXAA on, motion blur off.
     fn default() -> Self {
         Self {
             active: true,
-            fov: 45.0,
-            near: 0.1,
-            far: 200.0,
+            fov: DEFAULT_FOV,
+            near: DEFAULT_NEAR,
+            far: DEFAULT_FAR,
             culling_mask: default_culling_mask(),
             render_order: 0,
             clear_flags: default_clear_flags(),

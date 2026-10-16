@@ -15,6 +15,7 @@ use glam::{Vec2, Vec3};
 use mlua::Lua;
 
 use super::{put, ApiScopedCtx, Reg};
+use crate::scene::camera::MAX_PITCH;
 use crate::scene::Camera;
 
 /// Register the `Camera` namespace onto `lua`.
@@ -112,7 +113,7 @@ fn register_orientation<'scope>(
         table,
         "SetPitch",
         scope.create_function(|_, pitch: f32| {
-            camera.borrow_mut().pitch = pitch.clamp(-89.0, 89.0);
+            camera.borrow_mut().pitch = pitch.clamp(-MAX_PITCH, MAX_PITCH);
             Ok(())
         }),
     )

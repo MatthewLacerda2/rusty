@@ -18,7 +18,7 @@ pub const DEFAULT_SCENE_PATH: &str = "assets/scenes/default.scene";
 
 /// Where the bundled scripts are seeded, so scenes referencing
 /// `assets/scripts/<name>.lua` resolve on boot.
-pub const DEFAULT_SCRIPTS_DEST_DIR: &str = "assets/scripts";
+pub const DEFAULT_SCRIPTS_DEST_DIR: &str = crate::core::project::SCRIPTS_DIR;
 
 /// Build the engine's current default scene into a fresh `scene`, replacing what was
 /// there, and return its path. File ▸ Reset Scene goes through here, never through
