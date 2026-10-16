@@ -74,5 +74,5 @@ impl PhysicsWorld {
 
 /// How many ancestors `id` has.
 fn depth(scene: &Scene, id: u32) -> usize {
-    std::iter::successors(scene.world.parent_id(id), |&p| scene.world.parent_id(p)).count()
+    scene.world.ancestors(id).count()
 }

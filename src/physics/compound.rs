@@ -44,16 +44,11 @@ pub(super) struct WorldPose {
 /// `id` (its own body). A CharacterController is a body of its own (#451), so
 /// hitboxes parented under a character ride its body.
 pub(super) fn body_owner(scene: &Scene, id: u32) -> u32 {
-    let mut current = id;
-    loop {
-        if scene.world.has_rigidbody(current) || scene.world.has_character_controller(current) {
-            return current;
-        }
-        match scene.world.parent_id(current) {
-            Some(parent) => current = parent,
-            None => return id,
-        }
-    }
+    scene
+        .world
+        .self_and_ancestors(id)
+        .find(|&c| scene.world.has_rigidbody(c) || scene.world.has_character_controller(c))
+        .unwrap_or(id)
 }
 
 /// Group every active collider — and every CharacterController's capsule — under

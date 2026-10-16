@@ -59,12 +59,8 @@ impl PhysicsWorld {
 
 /// Whether `id` is a bone or sits anywhere under one.
 fn hangs_from_bone(scene: &Scene, bones: &BTreeSet<u32>, id: u32) -> bool {
-    let mut current = Some(id);
-    while let Some(c) = current {
-        if bones.contains(&c) {
-            return true;
-        }
-        current = scene.world.parent_id(c);
-    }
-    false
+    scene
+        .world
+        .self_and_ancestors(id)
+        .any(|c| bones.contains(&c))
 }

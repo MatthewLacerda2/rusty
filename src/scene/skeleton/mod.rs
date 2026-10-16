@@ -68,17 +68,11 @@ impl Scene {
     /// The skinned entity whose skeleton `id` is a bone of, found by walking up
     /// the hierarchy; `None` for an entity that is not a bone.
     pub fn bone_owner(&self, id: u32) -> Option<u32> {
-        let mut current = self.world.parent_id(id)?;
-        loop {
-            let owns = self
-                .world
-                .mesh(current)
-                .is_some_and(|m| m.skeleton.bones.contains(&id));
-            if owns {
-                return Some(current);
-            }
-            current = self.world.parent_id(current)?;
-        }
+        self.world.ancestors(id).find(|&c| {
+            self.world
+                .mesh(c)
+                .is_some_and(|m| m.skeleton.bones.contains(&id))
+        })
     }
 
     /// Despawn `owner`'s bones and everything under them — a skinned entity's

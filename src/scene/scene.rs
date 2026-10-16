@@ -230,12 +230,8 @@ impl Scene {
             }
 
             // Traverse up from parent_id to check if entity_id is an ancestor
-            let mut current = p_id;
-            while let Some(ancestor_parent) = self.world.parent_id(current) {
-                if ancestor_parent == entity_id {
-                    return Err("Circular parenting detected (ancestor loop).".to_string());
-                }
-                current = ancestor_parent;
+            if self.world.ancestors(p_id).any(|a| a == entity_id) {
+                return Err("Circular parenting detected (ancestor loop).".to_string());
             }
         }
 

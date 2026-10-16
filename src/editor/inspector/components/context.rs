@@ -68,15 +68,6 @@ fn collect_valid_parents(scene: &Scene, selected_id: u32) -> Vec<(u32, String)> 
         .into_iter()
         .filter(|&id| id != selected_id)
         .filter_map(|id| scene.world.name(id).map(|n| (id, n.clone())))
-        .filter(|(id, _)| {
-            let mut curr = *id;
-            while let Some(ancestor) = scene.world.parent_id(curr) {
-                if ancestor == selected_id {
-                    return false;
-                }
-                curr = ancestor;
-            }
-            true
-        })
+        .filter(|(id, _)| !scene.world.ancestors(*id).any(|a| a == selected_id))
         .collect()
 }

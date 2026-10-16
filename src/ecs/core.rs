@@ -91,6 +91,18 @@ impl World {
         self.component::<Core>(id).and_then(|c| c.parent_id)
     }
 
+    /// `id`'s parent, grandparent, … up to the root — every hierarchy walk upward
+    /// goes through here (#939). At most [`World::len`] steps, so a malformed parent
+    /// cycle ends the walk instead of hanging it.
+    pub fn ancestors(&self, id: u32) -> impl Iterator<Item = u32> + '_ {
+        std::iter::successors(self.parent_id(id), |&p| self.parent_id(p)).take(self.len())
+    }
+
+    /// `id`, then [`World::ancestors`].
+    pub fn self_and_ancestors(&self, id: u32) -> impl Iterator<Item = u32> + '_ {
+        std::iter::once(id).chain(self.ancestors(id))
+    }
+
     /// Write the raw parent link. Hierarchy INVARIANTS (cycle checks, the
     /// parent's `children` list) are `Scene::set_parent`'s job; this is the
     /// storage-level write it and scene rehydration route through.

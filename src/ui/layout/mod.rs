@@ -163,16 +163,10 @@ struct Node {
 /// its UI lays out under. Bounded by the entity count, so a malformed parent cycle
 /// cannot hang it.
 fn root_canvas_of(world: &World, id: u32) -> Option<u32> {
-    let mut root = None;
-    let mut cur = Some(id);
-    for _ in 0..=world.len() {
-        let Some(c) = cur else { break };
-        if world.has_canvas(c) {
-            root = Some(c);
-        }
-        cur = world.parent_id(c);
-    }
-    root
+    world
+        .self_and_ancestors(id)
+        .filter(|&c| world.has_canvas(c))
+        .last()
 }
 
 /// A root canvas spans the screen (or, `WorldSpace`, its reference resolution) in

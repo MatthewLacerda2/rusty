@@ -147,18 +147,18 @@ fn instance_ids(scene: &Scene, root_id: u32) -> Result<Vec<u32>, String> {
 /// source. Errors if `id` is not a linked instance entity.
 fn instance_root(scene: &Scene, id: u32) -> Result<u32, String> {
     let source = link_source(scene, id)?;
-    let mut current = id;
-    while let Some(parent) = scene.world.parent_id(current) {
-        let shares = scene
+    let shares = |p: u32| {
+        scene
             .world
-            .prefab_link(parent)
-            .is_some_and(|l| l.source == source);
-        if !shares {
-            break;
-        }
-        current = parent;
-    }
-    Ok(current)
+            .prefab_link(p)
+            .is_some_and(|l| l.source == source)
+    };
+    Ok(scene
+        .world
+        .ancestors(id)
+        .take_while(|&p| shares(p))
+        .last()
+        .unwrap_or(id))
 }
 
 /// The source `.prefab` path entity `id` links to, or an error if it isn't linked.

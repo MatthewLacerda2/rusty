@@ -200,18 +200,18 @@ pub fn instance_root(scene: &Scene, selected_id: u32) -> u32 {
     else {
         return selected_id;
     };
-    let mut current = selected_id;
-    while let Some(parent) = scene.world.parent_id(current) {
-        let parent_linked = scene
+    let linked = |p: u32| {
+        scene
             .world
-            .prefab_link(parent)
-            .is_some_and(|l| l.source == source);
-        if !parent_linked {
-            break;
-        }
-        current = parent;
-    }
-    current
+            .prefab_link(p)
+            .is_some_and(|l| l.source == source)
+    };
+    scene
+        .world
+        .ancestors(selected_id)
+        .take_while(|&p| linked(p))
+        .last()
+        .unwrap_or(selected_id)
 }
 
 /// Apply a [`PrefabAction`] against the live scene, routing through the shared

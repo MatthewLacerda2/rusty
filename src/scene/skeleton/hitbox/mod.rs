@@ -136,24 +136,15 @@ impl Scene {
     /// The bone a hit on `id` struck: `id` itself when it is a bone, else its
     /// nearest bone ancestor (the bone a hitbox hangs from); `None` off-skeleton.
     pub fn hit_bone(&self, id: u32) -> Option<u32> {
-        let mut current = Some(id);
-        while let Some(c) = current {
-            if self.bone_owner(c).is_some() {
-                return Some(c);
-            }
-            current = self.world.parent_id(c);
-        }
-        None
+        self.world
+            .self_and_ancestors(id)
+            .find(|&c| self.bone_owner(c).is_some())
     }
 
     /// The top of `id`'s hierarchy (Unity's `Transform.root`): `id` itself when it
     /// has no parent. For a hitbox, the character it belongs to.
     pub fn root_of(&self, id: u32) -> u32 {
-        let mut current = id;
-        while let Some(parent) = self.world.parent_id(current) {
-            current = parent;
-        }
-        current
+        self.world.ancestors(id).last().unwrap_or(id)
     }
 }
 
