@@ -549,7 +549,7 @@ because the next session starts without it. So every lesson ends as exactly one 
 
 - **fixed**: a pull request that removes the cause;
 - **enforced**: a lint, gate or test that makes it impossible to repeat;
-- **documented**: this skill, `ci-merge`, `issue-write` or CLAUDE.md, for what the
+- **documented**: this skill, `ci-merge` or CLAUDE.md, for what the
   repo can't change (a platform behaviour, a procedure);
 - **tracked**: an issue with the evidence (run ids, PR numbers, measurements) and a
   proposed fix, never just the symptom.

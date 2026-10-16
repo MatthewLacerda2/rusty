@@ -36,8 +36,8 @@ not the engine calling third-party APIs: tooling that reaches an external servic
 - **auxmd.md** *(gitignored)* — the operator's short-term scratchpad; read it if a
   session points you there.
 
-**Three skills carry the working protocols** — `issue-write`, `issue-batch` and
-`ci-merge` — so this file can hold the reasoning and they can hold the steps. Each
+**Two skills carry the working protocols** — `issue-batch` and `ci-merge` — so
+this file can hold the reasoning and they can hold the steps. Each
 one names its own scope and when to reach for it, so this file does not restate
 them; invoke them rather than reconstructing a procedure from memory, and name
 them when briefing a subagent.
@@ -198,15 +198,26 @@ is wrong.
   can ask your questions right away.
 
 ## Issues, labels & priority
-- **Issues come before PRs.** The unit of work is a well-specified issue — a clear
-  statement of **what** to set up or change, **why we want it in the project** (the
-  project-level justification the label then classifies), and the **roadmap, not the
-  implementation intrinsics**. A good issue description is **documentation of what was
-  thought of**: it captures the reasoning so a future Claude can read it cold — no prior
-  context, no deep digging — and say *"I understand the assignment and have a good idea
-  what to do."* That's what lets Claude Code pick an issue up and run it unattended, even
-  overnight. So defining issues well outranks opening PRs: get the roadmap right and the
-  doing is the easy part.
+How an issue reads is Claude's call. What follows are this repo's rules about issues,
+the ones tooling or a past mistake depends on.
+- **Issues come before PRs.** The unit of work is an issue a future Claude can read
+  cold — no prior context — and run unattended, even overnight. So defining issues
+  well outranks opening PRs.
+- **Point at code by symbol and path, never a bare line number.**
+  `physics::build::collider_inputs` survives the edits that land before the issue is
+  picked up; `src/main.rs:210` does not. On 2026-09-30 `src/main.rs` split into
+  `src/shell/` mid-batch and nearly every brief had to warn its coder that the
+  issue's line references were stale. A line number is fine as a hint *beside* a
+  symbol.
+- **Record relationships on GitHub**, not only in prose: `Blocked by` / `Blocks`, and
+  sub-issues for literal groundwork (*Dependencies*, above). `make blockers` reads
+  them, and `make blockers ARGS=--fix` records a "Blocked by #N" an issue body states
+  but GitHub doesn't.
+- **The closing-keyword trap.** GitHub closes an issue on `closes #N` (and its
+  synonyms) anywhere in a PR description, even quoted, in backticks or negated. A PR
+  that leaves an issue open writes `Refs #N`, and never puts the keyword next to a
+  number it doesn't mean to close. Check the number: a typo'd one silently closes the
+  wrong issue.
 - **Assign yourself when you start.** The moment Claude begins actively working an issue,
   **assign the user to that issue** so it's visibly taken — everyone can see it's being
   worked on right now, not just sitting in the backlog. An unassigned issue is fair game;
@@ -293,11 +304,8 @@ started by any means. If a planning issue would implement something that affects
 issue — changing how it gets implemented, or even how it's thought of — that other issue
 must be marked **blocked by** the planning issue.
 
-**The `issue-write` skill** has the rest: what a good issue body contains, the
-evidence that makes one worth reading cold, how relationships are recorded, and
-when Claude may file one unprompted. **`issue-batch`** turns the priority order
-above into a running batch, and **`ci-merge`** takes each finished branch from
-green to merged.
+**`issue-batch`** turns the priority order above into a running batch, and
+**`ci-merge`** takes each finished branch from green to merged.
 
 ## Architecture — the conceptual model
 A high-level map of how the engine is shaped. It deliberately doesn't enumerate every
