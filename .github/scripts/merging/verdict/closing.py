@@ -28,8 +28,7 @@ pull request number too, and says so with a `pull_request` key).
 
 from __future__ import annotations
 
-import re
-
+import ghrest
 from merging.verdict import github
 
 
@@ -39,7 +38,7 @@ STAGES = ("planning", "human")
 # GitHub's closing keywords, then `#N` in this repository. GitHub matches them
 # anywhere in a description, quoted or negated alike, so this does too: a pull
 # request meaning to leave an issue open writes `Refs #N`.
-KEYWORD = re.compile(r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b:?\s+#(\d+)\b", re.IGNORECASE)
+KEYWORD = ghrest.CLOSING
 
 # What [`closed_by`] records for a number GitHub does not know.
 MISSING = {"missing": True}

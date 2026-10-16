@@ -5,9 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 
 
-# What `gh pr list` is asked for, and the issues whose labels give the priority.
-# `files` is what [`held`] reads; `createdAt`, what [`recent`] does.
-LIST_FIELDS = "number,isDraft,headRefOid,baseRefName,author,labels,closingIssuesReferences,files,createdAt"
+# The listing is [`queue.pulls.open_pulls`] (REST, #970), in GraphQL's field
+# names: `files` is what [`held`] reads; `createdAt`, what [`recent`] does.
 
 # The go-ahead (#925): the watch takes a ready pull request only with this label.
 QUEUE_LABEL = "queue"

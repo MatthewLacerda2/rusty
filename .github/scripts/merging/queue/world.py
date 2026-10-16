@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 from merging.queue import gitio, outcomes, pulls, stopping, taking
-from merging.watch import board, freshness, handbacks, mainline, order
+from merging.watch import freshness, handbacks, mainline, order
 
 
 def merge_tree_git(root: str, *args: str) -> tuple[int, str]:
@@ -32,9 +32,7 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
     code = freshness.launched(freshness.running(), git_at)
     common = gitio.git("rev-parse", "--git-common-dir", cwd=opts.root).stdout.strip() or ".git"
     return argparse.Namespace(
-        pulls=lambda: pulls.quietly(
-            "pr", "list", "--state", "open", "--limit", "200", "--json", board.LIST_FIELDS
-        ),
+        pulls=functools.partial(pulls.open_pulls, repo),
         issue_labels=pulls.issue_labels,
         clashes=functools.partial(
             order.clashing, git=functools.partial(merge_tree_git, opts.root), known={}, bots=pulls.BOTS
@@ -46,7 +44,7 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
         turn=lambda number, tick: taking.unready(
             stopping.drain([number], lambda n: taking.take(repo, n, opts, tick=tick))[0]
         ),
-        head=lambda number: (pulls.quietly("pr", "view", str(number), "--json", "headRefOid") or {}).get("headRefOid"),
+        head=functools.partial(pulls.head_of, repo),
         attempts=lambda number, sha: pulls.head_runs(repo, sha),
         clock=time.monotonic,
         sleep=time.sleep,

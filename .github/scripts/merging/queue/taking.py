@@ -79,9 +79,11 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
     if opts.no_merge:
         return number, outcomes.GREEN, lines[0]
 
+    # REST's merge (#970); `sha` is `--match-head-commit`: a push after the
+    # verdict makes GitHub refuse.
     done = subprocess.run(
-        ["gh", "pr", "merge", str(number), "--squash",
-         "--match-head-commit", fresh, "--subject", pulls.subject(pull)],
+        ["gh", "api", "--method", "PUT", f"repos/{repo}/pulls/{number}/merge",
+         "-f", "merge_method=squash", "-f", f"sha={fresh}", "-f", f"commit_title={pulls.subject(pull)}"],
         capture_output=True, text=True, check=False,
     )
     if done.returncode != 0:

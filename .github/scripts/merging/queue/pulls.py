@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 import subprocess
 
+import ghrest
 from merging.queue import outcomes
 from merging.verdict import closing, github, runlist
 from merging.watch import board, handbacks
 
 
-# How `gh pr view --json author` names Dependabot, and the command it obeys.
+# How GitHub names Dependabot as an author (REST says `dependabot[bot]`).
 BOTS = ("app/dependabot", "dependabot[bot]", "dependabot")
 
 
@@ -34,11 +35,8 @@ def subject(pull: dict) -> str:
 
 
 def look(number: int) -> dict:
-    """The pull request, in the fields every step below reads."""
-    return github.gh(
-        "pr", "view", str(number), "--json",
-        github.PULL_FIELDS + ",state,title",
-    )
+    """The pull request, in the fields every step below reads (REST, #970)."""
+    return github.pull(ghrest.slug(), number)
 
 
 def quietly(*args: str) -> object | None:
@@ -55,8 +53,34 @@ def quietly(*args: str) -> object | None:
 
 def issue_labels() -> dict[int, set[str]]:
     """Every open issue's labels: the priority [`watch.order.rank`] reads."""
-    issues = quietly("issue", "list", "--state", "open", "--limit", "1000", "--json", "number,labels") or []
-    return {i["number"]: board.names(i.get("labels")) for i in issues}
+    issues = ghrest.pages(lambda path: quietly("api", path), f"repos/{ghrest.slug()}/issues?state=open") or []
+    return {i["number"]: board.names(i.get("labels")) for i in issues if "pull_request" not in i}
+
+
+def open_pulls(repo: str) -> list[dict] | None:
+    """The open pull requests as the watch lists them, `None` when GitHub failed.
+
+    Shaped by [`ghrest.pull`]. Only a bot's carries `files`: [`watch.board.held`]
+    is all that reads them, and a call per pull request per poll is not free.
+    """
+    listed = ghrest.pages(lambda path: quietly("api", path), f"repos/{repo}/pulls?state=open")
+    if listed is None:
+        return None
+    shaped = []
+    for rest in listed:
+        pull = ghrest.pull(rest)
+        if is_bot(pull):
+            files = ghrest.pages(lambda path: quietly("api", path), f"repos/{repo}/pulls/{pull['number']}/files")
+            if files is None:
+                return None
+            pull = ghrest.pull(rest, files)
+        shaped.append(pull)
+    return shaped
+
+
+def head_of(repo: str, number: int) -> str | None:
+    """The head commit of pull request `number`, `None` when GitHub failed."""
+    return ((quietly("api", f"repos/{repo}/pulls/{number}") or {}).get("head") or {}).get("sha")
 
 
 def head_runs(repo: str, sha: str) -> str | None:

@@ -8,13 +8,15 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from tests.reclaim.fixtures import MAIN, Facts, FakeMachine, Worktree, reclaim, run
+from tests.reclaim.fixtures import MAIN, Facts, FakeMachine, Worktree, reclaim, rest_pull, run
 
 
 class Unpushed(unittest.TestCase):
     def facts(self, stray: str, in_pr: bool) -> Facts:
         def answer(argv, **_):
-            out = {"gh": json.dumps([{"state": "MERGED", "headRefOid": "pr"}])}.get(argv[0], "")
+            out = {"gh": json.dumps([rest_pull("MERGED", "pr")])}.get(argv[0], "")
+            if "get-url" in argv:
+                out = "git@github.com:o/r.git"
             if "rev-list" in argv:
                 out = stray
             code = 1 if "--is-ancestor" in argv and not in_pr else 0

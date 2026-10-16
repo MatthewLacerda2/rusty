@@ -44,6 +44,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import ghrest
+
 USAGE = "usage: reclaim.py [--dry-run]"
 
 
@@ -153,9 +155,13 @@ class Machine:
         return self.run("git", "-C", str(cwd), "merge-base", "--is-ancestor", commit, of).returncode == 0
 
     def pulls(self, branch: str) -> list[dict] | None:
-        done = self.run("gh", "pr", "list", "--state", "all", "--head", branch,
-                        "--json", "state,headRefOid")
-        return json.loads(done.stdout or "[]") if done.returncode == 0 else None
+        """`branch`'s pull requests in any state, over REST (#970); `None` if unknown."""
+        repo = ghrest.slug_of(self.run("git", "remote", "get-url", "origin").stdout)
+        if repo is None:
+            return None
+        owner = repo.split("/")[0]
+        done = self.run("gh", "api", f"repos/{repo}/pulls?state=all&head={owner}:{branch}&per_page=100")
+        return [ghrest.pull(p) for p in json.loads(done.stdout or "[]")] if done.returncode == 0 else None
 
     def cwds(self) -> list[tuple[int, Path]] | None:
         """Every process's working directory: /proc on Linux, lsof elsewhere."""
