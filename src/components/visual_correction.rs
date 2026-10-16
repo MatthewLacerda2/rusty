@@ -150,7 +150,7 @@ impl Default for SsaoSettings {
 /// What the pre-#415 `gamma` field held as its neutral value. Dividing an old
 /// value by it keeps the user's deviation from neutral: `c^(1/g_old)` ≈
 /// `srgb(c^(2.2/g_old))`, i.e. a new tweak of `g_old / 2.2`.
-const LEGACY_NEUTRAL_GAMMA: f32 = 2.2;
+pub const LEGACY_NEUTRAL_GAMMA: f32 = 2.2;
 
 fn default_gamma() -> f32 {
     1.0

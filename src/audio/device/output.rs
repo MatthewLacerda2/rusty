@@ -29,7 +29,7 @@ use kira::{Decibels, Frame, Mix, Tween};
 use crate::audio::SpeakerMode;
 
 /// How much of each channel headphones mode bleeds into the other.
-const CROSSFEED: f32 = 0.15;
+pub const CROSSFEED: f32 = 0.15;
 
 /// TV compressor: threshold (dBFS), ratio, makeup (dB), attack / release.
 const THRESHOLD_DB: f64 = -24.0;
@@ -87,7 +87,7 @@ pub fn shape_frame(mode: SpeakerMode, l: f32, r: f32) -> (f32, f32) {
 }
 
 /// The crossfeed / limiter effect (see the module docs).
-struct Shaper(Arc<OutputControl>);
+pub struct Shaper(Arc<OutputControl>);
 
 impl Effect for Shaper {
     fn process(&mut self, input: &mut [Frame], _dt: f64, _info: &Info) {

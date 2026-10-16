@@ -69,7 +69,7 @@ impl PreviewOptions {
 /// GPU/software adapter is available (skipped gracefully, matching `screenshot`), and
 /// `Err` for a caller mistake — an asset that doesn't exist or has no preview story —
 /// so an agent gets a clear message instead of a plausible picture of nothing.
-fn capture_asset_into(
+pub fn capture_asset_into(
     host: &mut CaptureHost,
     asset_path: &str,
     out_png: impl AsRef<Path>,

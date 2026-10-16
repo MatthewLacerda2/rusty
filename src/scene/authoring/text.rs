@@ -14,7 +14,7 @@ use super::sanitize::{at_least, unit_color};
 use crate::components::{TextAlignment, TextComponent, TextOverflow};
 
 /// The smallest size a text can be set to, in reference units.
-const MIN_FONT_SIZE: f32 = 0.5;
+pub const MIN_FONT_SIZE: f32 = 0.5;
 
 /// Set the string drawn.
 pub fn set_text(t: &mut TextComponent, text: String) {

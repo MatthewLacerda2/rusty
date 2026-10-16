@@ -11,7 +11,7 @@ use glam::{Vec2, Vec3};
 
 /// The seed every Play session starts from. Fixed, so two runs of the same scene
 /// with the same inputs draw the same numbers.
-const DEFAULT_SEED: u64 = 0x5EED_0000_0000_0443;
+pub const DEFAULT_SEED: u64 = 0x5EED_0000_0000_0443;
 
 /// Seeded SplitMix64 generator — the per-World gameplay RNG resource.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -27,7 +27,7 @@ use crate::scene::layers::LAYER_COUNT;
 use crate::scene::Scene;
 
 /// The name of the child entity a generated hitbox lives on, under its bone.
-const HITBOX_NAME: &str = "Hitbox";
+pub const HITBOX_NAME: &str = "Hitbox";
 
 impl Scene {
     /// Generate (or regenerate) `owner`'s per-bone hitboxes and return them as

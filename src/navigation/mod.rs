@@ -37,7 +37,9 @@ pub(crate) mod test_support;
 mod walkable_tests;
 
 pub use agents::complete_off_mesh_link;
-pub use agents::state::{is_at_target, remaining_corners, remaining_distance, reset_path};
+pub use agents::state::{
+    is_at_target, remaining_corners, remaining_distance, reset_path, WARP_SNAP_DISTANCE,
+};
 pub use areas::{
     area_index, cost_table, default_areas, in_mask, NavArea, ALL_AREAS, MAX_AREAS, MIN_AREA_COST,
     NOT_WALKABLE_AREA, WALKABLE_AREA,
@@ -50,4 +52,5 @@ pub use offmesh::{LinkEnd, OffMeshLink, OffMeshLinkData, OffMeshLinkKind};
 pub use path::{path_length, NavPath, NavPathStatus, NavRaycastHit};
 // The bake settings are scene data (#721): the scene saves them, navigation reads them.
 pub use crate::scene::nav_settings::{NavMeshSettings, DEFAULT_AGENT_HEIGHT};
+pub use snap::SNAP_RINGS;
 pub use surface::Surface;

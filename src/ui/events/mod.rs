@@ -48,7 +48,7 @@ use crate::ui::{UiLayout, UiPointer, UiView};
 
 use focus::MoveRepeat;
 pub use focus::{find_selectable, NavAction};
-pub use raycast::raycast_pointer;
+pub use raycast::{raycast, raycast_pointer};
 
 /// How far behind a wall's surface a world canvas still counts as in front of it —
 /// a sign authored flush on a wall stays clickable (#429).

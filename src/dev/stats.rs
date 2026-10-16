@@ -39,7 +39,7 @@ fn stage_key(stage: Stage) -> &'static str {
 }
 
 /// Times every system the schedule runs and records a frame's worth of stats.
-struct TimingProbe {
+pub struct TimingProbe {
     stats: Rc<RefCell<FrameStats>>,
     /// This frame's CPU ms per stage, indexed by [`Stage::FRAME_ORDER`] position.
     stage_ms: [f64; 4],
