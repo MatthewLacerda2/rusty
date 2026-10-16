@@ -13,6 +13,7 @@ import io
 import json
 import subprocess
 import unittest
+from unittest import mock
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parent.parent / "blockers.py"
@@ -37,10 +38,9 @@ class FakeGh:
 
     def __call__(self, argv, **_):
         args = argv[1:]
-        if args[:2] == ["repo", "view"]:
-            out = {"nameWithOwner": REPO}
-        elif args[:2] == ["issue", "list"]:
-            out = [{"number": n, "body": b} for n, b in self.bodies.items()]
+        if "/issues?state=open" in args[-1]:
+            listed = [{"number": n, "body": b} for n, b in self.bodies.items()]
+            out = listed + [{"number": 999, "body": "Blocked by #1", "pull_request": {}}]
         elif "POST" in args:
             self.posts.append((args[3], args[5]))
             out = {}
@@ -54,7 +54,8 @@ class FakeGh:
 def run(fake: FakeGh, *argv: str) -> tuple[int, str]:
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
-        code = blockers.main(list(argv), blockers.Gh(fake))
+        with mock.patch.object(blockers.ghrest, "slug", return_value=REPO):
+            code = blockers.main(list(argv), blockers.Gh(fake))
     return code, out.getvalue()
 
 

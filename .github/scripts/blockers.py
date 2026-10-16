@@ -11,7 +11,8 @@ This lists every open issue whose body says `Blocked by #N` (any case, lists
 like "#396 and #397" included) where N is an **open issue** that the issue's
 recorded `dependencies/blocked_by` does not hold. Closed blockers, pull
 requests and self-references are skipped: none of them blocks anything now.
-With `--fix` it records each one through the REST API.
+With `--fix` it records each one through the REST API. Every call is REST, so
+it runs from a cloud session too (#970).
 
 Recording touches `planning` issues too, deliberately: writing down a blocker
 the prose already states changes nobody's scope, it only makes it visible.
@@ -26,6 +27,8 @@ import json
 import re
 import subprocess
 import sys
+
+import ghrest
 
 # "Blocked by" (optionally bold, optionally with a colon) and the issue list
 # after it: "#396", "#396, #397", "#396 and #397", "#396 & #397", and items
@@ -66,8 +69,8 @@ def mentioned(body: str | None) -> list[int]:
 
 def missing(gh: Gh, repo: str) -> list[tuple[int, dict]]:
     """(issue, blocker) pairs the prose states and GitHub does not record."""
-    issues = gh("issue", "list", "--repo", repo, "--state", "open",
-                "--limit", "1000", "--json", "number,body")
+    listed = ghrest.pages(lambda path: gh("api", path), f"repos/{repo}/issues?state=open") or []
+    issues = [i for i in listed if "pull_request" not in i]
     blockers: dict[int, dict] = {}
     gaps = []
     for issue in sorted(issues, key=lambda i: i["number"]):
@@ -98,7 +101,7 @@ def main(argv: list[str], gh: Gh | None = None) -> int:
     unknown = [a for a in argv if a != "--fix"]
     if unknown:
         sys.exit(f"blockers: unknown argument(s) {' '.join(unknown)}; usage: blockers.py [--fix]")
-    repo = gh("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
+    repo = ghrest.slug()
     gaps = missing(gh, repo)
     for issue, blocker in gaps:
         if fix:

@@ -111,7 +111,7 @@ def judge(
 ) -> tuple[bool, list[str]]:
     """Whether this pull request may be merged, and why not when it may not.
 
-    Pure, and the whole of the decision. `pull` is `gh pr view --json`, `runs`
+    Pure, and the whole of the decision. `pull` is [`github.pull`], `runs`
     every workflow run on the head commit (any workflow — this filters),
     `jobs` maps a run's id to its jobs (with steps), `files` is the changed
     paths. What the pull request claims is judged before any run

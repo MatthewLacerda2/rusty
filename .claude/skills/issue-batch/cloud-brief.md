@@ -105,7 +105,9 @@ a coder real time.
   `CARGO_BUILD_JOBS=2`.
 - **GitHub GraphQL and search answer 403** in the container. `gh` works over REST
   (`gh api repos/...`, `gh workflow run`, `gh label create`), and so do the GitHub
-  MCP tools; `gh pr` and `gh issue` subcommands that use GraphQL do not.
+  MCP tools; `gh pr` and `gh issue` subcommands that use GraphQL do not. The
+  repo's own scripts are REST-only (#970, `.github/scripts/ghrest.py`), so
+  `make blockers`, `make mergeable` and `make queue` run here too.
 - **The container cannot delete a branch** (neither `git push --delete` nor the
   REST refs API is allowed). A throwaway branch you pushed goes in the PR's human
   checklist for the operator to delete.

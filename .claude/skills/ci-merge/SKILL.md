@@ -263,7 +263,7 @@ answer "did this run build the head I am about to merge?", and it blends runs â€
 skipped job sits in the same list as a real one, and `changes` appears **twice**,
 once per workflow. To look by hand, ask about the commit:
 
-    SHA=$(gh pr view N --json headRefOid -q .headRefOid)
+    SHA=$(gh api repos/:owner/:repo/pulls/N --jq .head.sha)
     gh api "repos/:owner/:repo/commits/$SHA/check-runs" \
       --jq '.check_runs[] | "\(.name)\t\(.status)\t\(.conclusion)"' | sort
 
