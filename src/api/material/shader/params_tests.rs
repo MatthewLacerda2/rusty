@@ -54,7 +54,7 @@ pub(super) fn scene_with(shader: &str) -> (RefCell<Scene>, u32) {
 pub(super) fn run(scene: &RefCell<Scene>, script: &str) -> Result<(), String> {
     let lua = Lua::new();
     lua.scope(|s| {
-        super::super::register(&lua, s, scene).unwrap();
+        crate::api::material::register(&lua, s, scene).unwrap();
         lua.load(script).exec()
     })
     .map_err(|e| e.to_string())

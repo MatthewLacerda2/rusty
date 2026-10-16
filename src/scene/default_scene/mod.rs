@@ -35,8 +35,8 @@ mod yard;
 use glam::{Quat, Vec3};
 
 use crate::scene::authoring::{
-    self, add_component, animator, character_controller as cc, collider, create_entity, nav_agent,
-    ComponentKind, Primitive,
+    self, add_component, animator, character_controller as cc, collider, create_entity,
+    nav::agent as nav_agent, ComponentKind, Primitive,
 };
 use crate::scene::{ColliderShape, MaterialComponent, Scene, ScriptComponent};
 

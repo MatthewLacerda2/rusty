@@ -10,7 +10,7 @@ use mlua::Lua;
 
 use super::super::{put, Reg};
 use crate::navigation::{is_at_target, NavigationGraph};
-use crate::scene::authoring::nav_agent as nav_ops;
+use crate::scene::authoring::nav::agent as nav_ops;
 use crate::scene::Scene;
 
 /// `NavMeshAgent.*` target / speed / radius accessors over the nav-agent component, and

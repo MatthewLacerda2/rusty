@@ -2,9 +2,9 @@
 //! (Blender's second UV map) lands in `MeshVertex::lightmap_uv`, and a mesh without
 //! one imports all-zero lightmap UVs, the bake's "no lightmap" signal.
 
-use super::fixtures::quad_mode_gltf;
-use super::import_file;
-use super::mesh_data::SubMesh;
+use crate::asset::fixtures::quad_mode_gltf;
+use crate::asset::import_file;
+use crate::asset::mesh_data::SubMesh;
 
 const UV0: [[f32; 2]; 3] = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]];
 const UV1: [[f32; 2]; 3] = [[0.1, 0.2], [0.9, 0.2], [0.1, 0.8]];
@@ -68,7 +68,8 @@ fn a_mesh_without_texcoord_1_has_zero_lightmap_uvs() {
 /// The bake's input for one imported mesh, placed at the origin under a white sky.
 fn bake_input(mesh: &SubMesh) -> crate::scene::lighting::lightmap::BakeScene {
     use crate::scene::lighting::lightmap::{BakeMesh, BakeScene};
-    let field = |f: fn(&super::MeshVertex) -> glam::Vec3| mesh.vertices.iter().map(f).collect();
+    let field =
+        |f: fn(&crate::asset::MeshVertex) -> glam::Vec3| mesh.vertices.iter().map(f).collect();
     BakeScene {
         meshes: vec![BakeMesh {
             entity: 1,
@@ -100,11 +101,11 @@ fn ticking_generate_lightmap_uvs_makes_a_mesh_without_texcoord_1_bake() {
 
     let dir = std::env::temp_dir().join("rusty_uv2_gen_on");
     std::fs::create_dir_all(&dir).unwrap();
-    let on = super::LightmapUvSettings {
+    let on = crate::asset::LightmapUvSettings {
         generate: true,
         ..Default::default()
     };
-    super::sidecar::set_lightmap_uvs(&dir.join("quad.gltf"), on).unwrap();
+    crate::asset::sidecar::set_lightmap_uvs(&dir.join("quad.gltf"), on).unwrap();
     let mesh = import_pair(
         "rusty_uv2_gen_on",
         "quad",

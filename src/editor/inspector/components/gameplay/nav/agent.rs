@@ -2,16 +2,16 @@
 //! inspector card, split from `physics` to stay under the size cap.
 //!
 //! A THIN client (#287): widgets read fields from a snapshot and route every write
-//! through `authoring::nav_agent`, the same ops the `NavMeshAgent.*` Lua setters call.
+//! through `authoring::nav::agent`, the same ops the `NavMeshAgent.*` Lua setters call.
 
 use egui_phosphor::regular as icon;
 use glam::Vec3;
 
-use super::physics::vec3_row;
+use super::super::physics::vec3_row;
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::nav_agent as nav_ops;
+use crate::scene::authoring::nav::agent as nav_ops;
 
-/// A shared `authoring::nav_agent` scalar setter, one per clamped drag row.
+/// A shared `authoring::nav::agent` scalar setter, one per clamped drag row.
 type NavOp = fn(&mut crate::components::NavMeshAgentComponent, f32);
 
 /// 3EH. NavMeshAgent Component

@@ -1,4 +1,4 @@
-//! src/render/ibl/probe_bounce.rs — Multi-bounce light-probe solve (#285).
+//! src/render/ibl/probe/bounce.rs — Multi-bounce light-probe solve (#285).
 //!
 //! The iteration that turns the single-capture probe bake (`probe_bake.rs`) into a
 //! true multi-bounce GI bake. Each pass re-captures every probe and projects the
@@ -122,7 +122,7 @@ impl Renderer {
                 } else {
                     self.capture_static_cubemap(scene, p, resolution)
                 };
-                crate::render::ibl::probe_bake::project_cubemap(&capture)
+                crate::render::ibl::probe::bake::project_cubemap(&capture)
             })
             .collect()
     }
@@ -178,9 +178,9 @@ pub fn pass_converged(prev: &[Sh9], next: &[Sh9], epsilon: f32) -> bool {
 }
 
 #[cfg(test)]
-#[path = "probe_bounce_tests.rs"]
+#[path = "bounce_tests.rs"]
 mod probe_bounce_tests;
 
 #[cfg(test)]
-#[path = "probe_modes_tests.rs"]
+#[path = "modes_tests.rs"]
 mod probe_modes_tests;

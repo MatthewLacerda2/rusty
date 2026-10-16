@@ -1,4 +1,4 @@
-//! src/asset/gltf_skin.rs — glTF `skin` (skeleton) extraction for #79/#80.
+//! src/asset/gltf/skin.rs — glTF `skin` (skeleton) extraction for #79/#80.
 //!
 //! Turns a glTF `skin` into a pure-data [`SkinData`]: inverse-bind matrices, the
 //! bind-pose joint globals (#79), and — for the animation runtime (#80) — each
@@ -12,7 +12,7 @@
 //! hierarchy, then re-expressed relative to the skinned node (its inverse) so the
 //! resulting palette is mesh-local — exactly what the GPU skinning path expects.
 
-use super::mesh_data::{JointTransform, SkinData};
+use crate::asset::mesh_data::{JointTransform, SkinData};
 use crate::core::collections::Map;
 use glam::{Mat4, Quat, Vec3};
 

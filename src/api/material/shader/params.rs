@@ -1,4 +1,4 @@
-//! src/api/material/shader_params.rs — runtime shader params from Lua (#399, #670).
+//! src/api/material/shader/params.rs — runtime shader params from Lua (#399, #670).
 //!
 //! - `SetShaderParam(id, name, v)` / `GetShaderParam(id, name)` /
 //!   `ClearShaderParam(id [, name])` — entity `id`'s **override** (#670, Unity's
@@ -17,7 +17,7 @@ use std::cell::RefCell;
 
 use mlua::{IntoLua, Lua, Value};
 
-use super::{put, Reg};
+use super::super::{put, Reg};
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
@@ -108,9 +108,9 @@ fn err(message: String) -> mlua::Error {
 }
 
 #[cfg(test)]
-#[path = "shader_params_tests.rs"]
+#[path = "params_tests.rs"]
 mod tests;
 
 #[cfg(test)]
-#[path = "shader_overrides_tests.rs"]
+#[path = "overrides_tests.rs"]
 mod overrides_tests;

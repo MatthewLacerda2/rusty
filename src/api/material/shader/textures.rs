@@ -1,4 +1,4 @@
-//! src/api/material/shader_textures.rs — `Material.SetShaderTexture` (#400): the
+//! src/api/material/shader/textures.rs — `Material.SetShaderTexture` (#400): the
 //! texture an extra shader slot samples (a baked noise behind `dissolve`), Unity's
 //! `material.SetTexture("_Mask", …)`.
 //!
@@ -7,7 +7,7 @@
 
 use std::cell::RefCell;
 
-use super::{put, Reg};
+use super::super::{put, Reg};
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
@@ -40,7 +40,7 @@ mod tests {
     fn run(scene: &RefCell<Scene>, script: &str) -> mlua::Result<()> {
         let lua = Lua::new();
         lua.scope(|s| {
-            super::super::register(&lua, s, scene).unwrap();
+            crate::api::material::register(&lua, s, scene).unwrap();
             lua.load(script).exec()
         })
     }

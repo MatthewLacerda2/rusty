@@ -1,4 +1,4 @@
-//! src/render/probe_bake.rs — Light-probe capture + SH projection (#241).
+//! src/render/ibl/probe/bake.rs — Light-probe capture + SH projection (#241).
 //!
 //! The rendered-capture counterpart to the analytic stand-in (`scene::probe_fill`).
 //! For each probe we capture the STATIC scene to a 6-face cubemap from the probe's
@@ -153,5 +153,5 @@ fn srgb_to_linear(b: u8) -> f32 {
 }
 
 #[cfg(test)]
-#[path = "probe_bake_tests.rs"]
+#[path = "bake_tests.rs"]
 mod probe_bake_tests;

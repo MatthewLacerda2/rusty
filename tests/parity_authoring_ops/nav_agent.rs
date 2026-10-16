@@ -1,4 +1,4 @@
-//! `NavMeshAgent.*` bindings vs `authoring::nav_agent`.
+//! `NavMeshAgent.*` bindings vs `authoring::nav::agent`.
 
 use std::cell::RefCell;
 
@@ -6,7 +6,7 @@ use glam::Vec3;
 use mlua::Lua;
 use rusty::components::NavMeshAgentComponent;
 use rusty::navigation::NavigationGraph;
-use rusty::scene::authoring::nav_agent as nav_ops;
+use rusty::scene::authoring::nav::agent as nav_ops;
 use rusty::scene::Scene;
 
 /// Attach a default nav-agent to a fresh entity; returns its id.

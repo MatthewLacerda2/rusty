@@ -136,13 +136,13 @@ pub(super) fn start_sources(world: &World, res: &Resources, admit: impl Fn(u32) 
 }
 
 #[cfg(test)]
-#[path = "audio_tests.rs"]
+#[path = "tests.rs"]
 mod audio_tests;
 
 #[cfg(test)]
-#[path = "audio_occlusion_tests.rs"]
+#[path = "occlusion_tests.rs"]
 mod audio_occlusion_tests;
 
 #[cfg(test)]
-#[path = "audio_reverb_tests.rs"]
+#[path = "reverb_tests.rs"]
 mod audio_reverb_tests;

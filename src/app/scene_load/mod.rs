@@ -124,11 +124,11 @@ fn stop_voices(world: &World, res: &Resources, ids: &[u32]) {
 }
 
 #[cfg(test)]
-#[path = "scene_load_fixture.rs"]
+#[path = "fixture.rs"]
 mod fixture;
 #[cfg(test)]
-#[path = "scene_load_api_tests.rs"]
+#[path = "api_tests.rs"]
 mod scene_load_api_tests;
 #[cfg(test)]
-#[path = "scene_load_tests.rs"]
+#[path = "tests.rs"]
 mod scene_load_tests;

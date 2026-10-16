@@ -253,8 +253,8 @@ fn link_source(scene: &Scene, root_id: u32) -> Result<String, String> {
 }
 
 #[cfg(test)]
-#[path = "prefab_link_tests.rs"]
+#[path = "link_tests.rs"]
 mod prefab_link_tests;
 #[cfg(test)]
-#[path = "prefab_refs_tests.rs"]
+#[path = "refs_tests.rs"]
 mod prefab_refs_tests;

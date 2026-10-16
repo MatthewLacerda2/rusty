@@ -2,16 +2,16 @@
 //! Obstacle card (#456).
 //!
 //! A THIN client (#287): widgets read a snapshot and route every write through the
-//! shared `authoring::nav_obstacle` ops the `NavMeshObstacle.*` Lua setters call.
+//! shared `authoring::nav::obstacle` ops the `NavMeshObstacle.*` Lua setters call.
 //! A carving obstacle changes the navmesh, so every edit asks for a nav rebake
 //! (incremental: only the obstacle's cells).
 
 use egui_phosphor::regular as icon;
 
-use super::physics::vec3_row;
+use super::super::physics::vec3_row;
 use crate::components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
 use crate::editor::inspector::components::card::component_card;
-use crate::scene::authoring::nav_obstacle as obstacle_ops;
+use crate::scene::authoring::nav::obstacle as obstacle_ops;
 
 /// Route one edit through the shared ops, mark the scene dirty, ask for a rebake.
 fn write(

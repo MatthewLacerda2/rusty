@@ -7,7 +7,7 @@ use std::cell::RefCell;
 
 use mlua::{IntoLua, Value};
 
-use super::super::material::shader_params::floats;
+use super::super::material::shader::params::floats;
 use super::super::{put, Reg};
 use super::state::{with_vc, with_vc_mut};
 use crate::scene::authoring::visual_correction as vc_ops;

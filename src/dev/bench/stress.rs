@@ -11,8 +11,8 @@ use super::rig;
 use crate::components::{AnimatorComponent, MaterialComponent, ScriptComponent};
 use crate::core::curve::Range;
 use crate::scene::authoring::{
-    self, add_component, character_controller as cc, create_entity, nav_agent, particles,
-    ComponentKind, Primitive,
+    self, add_component, character_controller as cc, create_entity, nav::agent as nav_agent,
+    particles, ComponentKind, Primitive,
 };
 use crate::scene::decal::DecalSpec;
 use crate::scene::default_scene::layout::{ground_at, YARD_HALF};

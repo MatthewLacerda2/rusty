@@ -1,4 +1,4 @@
-//! src/asset/gltf_import.rs — glTF 2.0 import (`.gltf` + `.glb`), meshes,
+//! src/asset/gltf/import.rs — glTF 2.0 import (`.gltf` + `.glb`), meshes,
 //! materials and skin bindings.
 //!
 //! Reads static geometry, base-color material values, the skin (issue #79):
@@ -13,9 +13,9 @@
 //! `TRIANGLE_STRIP`, `TRIANGLE_FAN`) becomes a plain triangle list, and
 //! non-surface modes (`POINTS`/`LINES`/`LINE_*`) are skipped with a warning.
 
-use super::mesh_data::{ImportedAsset, MaterialData, MeshVertex, SkinData, SubMesh};
-use super::ImportError;
-use super::{gltf_anim, gltf_skin};
+use super::{anim, skin};
+use crate::asset::mesh_data::{ImportedAsset, MaterialData, MeshVertex, SkinData, SubMesh};
+use crate::asset::ImportError;
 use gltf::mesh::Mode;
 use std::path::Path;
 
@@ -31,7 +31,7 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
         .materials()
         .map(|m| material_data(m, base_dir))
         .collect();
-    let skins = gltf_skin::skins_by_mesh(&document, &buffers);
+    let skins = skin::skins_by_mesh(&document, &buffers);
 
     let sub_meshes = document
         .meshes()
@@ -128,7 +128,7 @@ fn sub_mesh_from_gltf(
     // Clips are keyed to this skin's joint slots, so only a skinned mesh carries
     // them (a static mesh has nothing for a channel to pose).
     let clips = match &skin {
-        Some(s) => gltf_anim::clips_for_skin(document, buffers, &s.joint_nodes),
+        Some(s) => anim::clips_for_skin(document, buffers, &s.joint_nodes),
         None => Vec::new(),
     };
 

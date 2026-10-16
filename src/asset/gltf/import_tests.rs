@@ -2,9 +2,9 @@
 //! every triangle primitive mode imports as the same triangle list, and the
 //! non-surface modes are skipped instead of being misread as triangles.
 
-use super::fixtures::quad_mode_gltf;
-use super::import_file;
-use super::mesh_data::SubMesh;
+use crate::asset::fixtures::quad_mode_gltf;
+use crate::asset::import_file;
+use crate::asset::mesh_data::SubMesh;
 
 // glTF 2.0 `primitive.mode` values.
 const POINTS: u32 = 0;

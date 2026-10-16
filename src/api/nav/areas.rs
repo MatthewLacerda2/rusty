@@ -15,7 +15,7 @@ use mlua::Table;
 
 use super::super::{put, Reg};
 use crate::navigation::{area_index, NavMeshSettings, NavigationGraph};
-use crate::scene::authoring::nav_agent as nav_ops;
+use crate::scene::authoring::nav::agent as nav_ops;
 use crate::scene::Scene;
 
 /// Apply `edit` to the scene's area table and hand the new costs to the graph,

@@ -10,7 +10,7 @@ use mlua::{FromLua, IntoLua, Table};
 
 use super::super::{put, Reg};
 use crate::components::NavMeshAgentComponent;
-use crate::scene::authoring::nav_agent as nav_ops;
+use crate::scene::authoring::nav::agent as nav_ops;
 use crate::scene::Scene;
 
 /// The turning getters and setters on `NavMeshAgent`.

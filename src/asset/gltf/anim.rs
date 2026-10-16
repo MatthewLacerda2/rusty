@@ -1,12 +1,12 @@
-//! src/asset/gltf_anim.rs — glTF `animation` → [`AnimationClip`] extraction (#80).
+//! src/asset/gltf/anim.rs — glTF `animation` → [`AnimationClip`] extraction (#80).
 //!
 //! Reads the document's `animations` into named clips whose tracks are keyed by the
-//! *joint slot* of a given skin (the same order #79's [`SkinData`](super::SkinData) uses), so the
+//! *joint slot* of a given skin (the same order #79's [`SkinData`](crate::asset::SkinData) uses), so the
 //! sampler can pose the skeleton directly. A channel that targets a node outside the
 //! skin's joints is ignored (it can't drive this mesh's palette). Pure data — the
 //! `gltf` crate + `glam`, never wgpu/egui/mlua.
 
-use super::anim_data::{AnimationClip, Interpolation, JointTrack, Track};
+use crate::asset::anim_data::{AnimationClip, Interpolation, JointTrack, Track};
 use crate::core::collections::Map;
 use glam::{Quat, Vec3};
 

@@ -227,5 +227,5 @@ pub fn load_and_instantiate_linked(
 }
 
 #[cfg(test)]
-#[path = "prefab_tests.rs"]
+#[path = "tests.rs"]
 mod prefab_tests;

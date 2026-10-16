@@ -2,17 +2,17 @@
 //! Volume card (#460).
 //!
 //! A THIN client (#287): widgets read a snapshot and route every write through the
-//! shared `authoring::nav_modifier` ops the `NavMeshModifierVolume.*` Lua setters
+//! shared `authoring::nav::modifier` ops the `NavMeshModifierVolume.*` Lua setters
 //! call. A volume assigns areas at bake time, so every edit asks for a nav rebake
 //! (incremental: only the volume's cells).
 
 use egui_phosphor::regular as icon;
 
-use super::physics::vec3_row;
+use super::super::physics::vec3_row;
 use crate::components::NavMeshModifierVolumeComponent as Volume;
 use crate::editor::inspector::components::card::component_card;
 use crate::navigation::MAX_AREAS;
-use crate::scene::authoring::nav_modifier as volume_ops;
+use crate::scene::authoring::nav::modifier as volume_ops;
 
 /// Route one edit through the shared ops, mark the scene dirty, ask for a rebake.
 fn write(

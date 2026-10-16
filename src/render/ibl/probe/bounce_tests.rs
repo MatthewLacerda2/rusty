@@ -7,7 +7,7 @@
 
 use glam::Vec3;
 
-use crate::render::ibl::probe_bounce::{field_delta, pass_converged};
+use crate::render::ibl::probe::bounce::{field_delta, pass_converged};
 use crate::render::MAX_BOUNCES;
 use crate::scene::lighting::sh::Sh9;
 use crate::scene::Scene;

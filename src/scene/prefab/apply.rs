@@ -192,5 +192,5 @@ fn drop_override(scene: &mut Scene, id: u32, path: &str) {
 }
 
 #[cfg(test)]
-#[path = "prefab_apply_tests.rs"]
+#[path = "apply_tests.rs"]
 mod prefab_apply_tests;
