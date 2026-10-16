@@ -8,6 +8,7 @@
 //!
 //! Pure.
 
+use super::sanitize::{non_negative, unit};
 use crate::components::{ParticleBlend, RibbonStyle, TextureMode};
 use crate::core::curve::{Curve, Gradient};
 
@@ -50,22 +51,6 @@ pub fn set_texture_mode(s: &mut RibbonStyle, mode: TextureMode) {
 /// Set the blend (alpha or additive).
 pub fn set_blend(s: &mut RibbonStyle, blend: ParticleBlend) {
     s.blend = blend;
-}
-
-pub(super) fn non_negative(v: f32) -> f32 {
-    if v.is_finite() {
-        v.max(0.0)
-    } else {
-        0.0
-    }
-}
-
-fn unit(v: f32) -> f32 {
-    if v.is_finite() {
-        v.clamp(0.0, 1.0)
-    } else {
-        0.0
-    }
 }
 
 #[cfg(test)]

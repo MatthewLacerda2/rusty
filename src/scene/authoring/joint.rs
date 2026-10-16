@@ -10,6 +10,7 @@
 
 use glam::{Vec2, Vec3};
 
+use super::sanitize::{clamped, non_negative};
 use crate::components::{JointComponent, JointKind};
 
 /// The widest angle (degrees) a limit may name: just short of a half-turn, where
@@ -97,19 +98,7 @@ pub fn set_enable_collision(j: &mut JointComponent, enable: bool) {
 }
 
 fn clamp_angle(degrees: f32) -> f32 {
-    if degrees.is_finite() {
-        degrees.clamp(-MAX_ANGLE, MAX_ANGLE)
-    } else {
-        0.0
-    }
-}
-
-fn non_negative(v: f32) -> f32 {
-    if v.is_finite() {
-        v.max(0.0)
-    } else {
-        0.0
-    }
+    clamped(degrees, -MAX_ANGLE, MAX_ANGLE)
 }
 
 #[cfg(test)]

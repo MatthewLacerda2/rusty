@@ -40,6 +40,7 @@ pub mod rect_transform;
 pub mod reverb_zone;
 pub mod ribbon;
 pub mod rigidbody;
+mod sanitize;
 pub mod selectable;
 pub mod shape;
 pub mod text;

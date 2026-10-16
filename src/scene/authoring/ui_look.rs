@@ -7,8 +7,9 @@
 //!
 //! Pure.
 
-use glam::{Vec2, Vec4};
+use glam::Vec2;
 
+use super::sanitize::{finite, unit_color};
 use crate::components::{GradientKind, UiBlend, UiGradient, MAX_GRADIENT_STOPS};
 
 /// The blend mode's name.
@@ -46,7 +47,7 @@ pub fn sanitize_gradient(mut g: UiGradient) -> Option<UiGradient> {
     }
     for s in &mut g.stops {
         s.t = finite(s.t).clamp(0.0, 1.0);
-        s.color = s.color.clamp(Vec4::ZERO, Vec4::ONE);
+        s.color = unit_color(s.color);
     }
     g.stops.sort_by(|a, b| a.t.total_cmp(&b.t));
     g.angle = finite(g.angle);
@@ -55,19 +56,11 @@ pub fn sanitize_gradient(mut g: UiGradient) -> Option<UiGradient> {
     Some(g)
 }
 
-/// `v`, or 0 when it is NaN or infinite.
-fn finite(v: f32) -> f32 {
-    if v.is_finite() {
-        v
-    } else {
-        0.0
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::components::GradientStop;
+    use glam::Vec4;
 
     fn stop(t: f32) -> GradientStop {
         GradientStop {

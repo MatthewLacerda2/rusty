@@ -10,6 +10,7 @@
 
 use glam::Vec2;
 
+use super::sanitize::at_least;
 use crate::components::{CanvasComponent, CanvasRenderMode};
 
 /// Set where the canvas draws.
@@ -34,20 +35,12 @@ pub fn set_match_width_or_height(c: &mut CanvasComponent, value: f32) {
 
 /// Set the `WorldSpace` density (reference units per metre), kept above zero.
 pub fn set_pixels_per_unit(c: &mut CanvasComponent, value: f32) {
-    c.pixels_per_unit = if value.is_finite() {
-        value.max(1e-3)
-    } else {
-        1e-3
-    };
+    c.pixels_per_unit = at_least(value, 1e-3);
 }
 
 /// Set the `ScreenSpaceCamera` plane's distance in metres, kept ≥ 0.01.
 pub fn set_plane_distance(c: &mut CanvasComponent, value: f32) {
-    c.plane_distance = if value.is_finite() {
-        value.max(0.01)
-    } else {
-        0.01
-    };
+    c.plane_distance = at_least(value, 0.01);
 }
 
 /// Set the `ScreenSpaceCamera` tilt in degrees, each axis clamped to ±89.
