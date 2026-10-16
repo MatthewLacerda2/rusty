@@ -17,7 +17,7 @@ TEST := cargo nextest run --locked
 
 # The gates, in the order `make gates` runs them. `deny` sits last: its failures
 # are about dependencies (and it needs the network), so a code failure reports first.
-GATES := fmt size rules layers determinism direction components parity test-lint scripts clippy doc test deny
+GATES := fmt size rules layers determinism direction components parity test-lint scripts feature-split clippy doc test deny
 # Checks on the gate runner itself, run before any gate.
 SELF_CHECKS := target-dir inventory
 
@@ -127,6 +127,11 @@ parity: ## [gate] Migrated inspector cards route through scene::authoring
 
 test-lint: ## [gate] tools/lint's own tests
 	cargo test --manifest-path tools/lint/Cargo.toml --locked
+
+# A dev-dependency that turns on a feature the normal build lacks makes `cargo test`
+# rebuild that crate and everything above it (#552). No build: `cargo tree` twice.
+feature-split: ## [gate] No dev-dependency turns on a feature the normal build lacks (docs/testing.md)
+	python3 .github/scripts/feature_split.py
 
 clippy: ## [gate] Clippy: default, dev, the no-editor player build, and tools/lint
 	cargo clippy --all-targets -- -D warnings

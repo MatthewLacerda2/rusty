@@ -86,6 +86,11 @@ jobs:
       - name: Editor↔shared-op parity gate (migrated cards route through authoring ops)
         if: needs.changes.outputs.code != 'false'
         run: cargo run --quiet --manifest-path tools/lint/Cargo.toml -- --parity
+      # A dev-dependency turning on a feature the normal build lacks doubles the
+      # test build (#552, #979). `cargo tree` only, no build.
+      - name: Feature split (no dev-dependency adds a feature the normal build lacks)
+        if: needs.changes.outputs.code != 'false'
+        run: python3 .github/scripts/feature_split.py
       # Clippy is a HARD gate: every warning fails CI, for every feature set.
       # The 50-line function cap (clippy::too_many_lines, threshold in clippy.toml)
       # is denied crate-wide in Cargo.toml's [lints] table (#485). The legacy burn-down
