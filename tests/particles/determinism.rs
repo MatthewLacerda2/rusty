@@ -11,8 +11,6 @@ use glam::Vec3;
 use rusty::app::GameWorld;
 use rusty::components::particle::{EmitMode, ParticleBlend, ParticleEmitterComponent};
 use rusty::core::curve::Range;
-use rusty::core::input::InputState;
-use rusty::navigation::NavigationGraph;
 use rusty::scene::Scene;
 use rusty::scripting::ConsoleLogs;
 
@@ -59,13 +57,9 @@ fn run_emitter(seed: u64, frames: u32) -> Vec<(Vec3, f32, f32)> {
 }
 
 fn build_world(scene: Scene) -> Rc<RefCell<GameWorld>> {
-    let scene = Rc::new(RefCell::new(scene));
-    let input = Rc::new(RefCell::new(InputState::new()));
-    let nav = Rc::new(RefCell::new(NavigationGraph::new(
-        -20.0, 20.0, -20.0, 20.0, 1.0,
-    )));
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-    Rc::new(RefCell::new(GameWorld::new(scene, input, nav, console)))
+    let world = crate::play::world(Rc::new(RefCell::new(scene)), 20.0, console);
+    Rc::new(RefCell::new(world))
 }
 
 #[test]

@@ -7,11 +7,8 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use rusty::app::GameWorld;
-use rusty::core::input::InputState;
-use rusty::navigation::NavigationGraph;
 use rusty::scene::skeleton::{RagdollOptions, RAGDOLL_LAYER};
-use rusty::scene::{Scene, ScriptComponent};
-use rusty::scripting::ConsoleLogs;
+use rusty::scene::Scene;
 
 use super::rig;
 
@@ -29,22 +26,9 @@ fn running() -> (GameWorld, Rc<RefCell<Scene>>, u32) {
     scene
         .build_ragdoll(rig, &RagdollOptions::default())
         .unwrap();
-    let path = crate::temp::dir().join("rusty_466_switch.lua");
-    std::fs::write(&path, SWITCH).unwrap();
-    *scene.world.scripts_mut(rig).unwrap() = vec![ScriptComponent {
-        path: path.to_string_lossy().replace('\\', "/"),
-        ..Default::default()
-    }];
+    crate::play::attach_script(&mut scene, rig, "rusty_466_switch.lua", SWITCH);
     let scene = Rc::new(RefCell::new(scene));
-    let mut gw = GameWorld::new(
-        scene.clone(),
-        Rc::new(RefCell::new(InputState::new())),
-        Rc::new(RefCell::new(NavigationGraph::new(
-            -5.0, 5.0, -5.0, 5.0, 1.0,
-        ))),
-        Rc::new(RefCell::new(ConsoleLogs::new())),
-    );
-    gw.set_playing(true);
+    let gw = crate::play::playing(scene.clone(), 5.0);
     (gw, scene, rig)
 }
 

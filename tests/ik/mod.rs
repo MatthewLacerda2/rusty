@@ -13,10 +13,7 @@ use std::rc::Rc;
 use glam::Vec3;
 use rusty::app::GameWorld;
 use rusty::components::AnimatorComponent;
-use rusty::core::input::InputState;
-use rusty::navigation::NavigationGraph;
-use rusty::scene::{Scene, ScriptComponent};
-use rusty::scripting::ConsoleLogs;
+use rusty::scene::Scene;
 
 use crate::hitboxes::rig;
 
@@ -36,12 +33,12 @@ pub fn rig_with(script: &str, setup: impl FnOnce(&mut Scene, u32)) -> (Scene, u3
     scene
         .world
         .set_animator(id, Some(AnimatorComponent::default()));
-    let path = crate::temp::dir().join(format!("rusty_461_{:x}.lua", hash(script)));
-    std::fs::write(&path, script).unwrap();
-    *scene.world.scripts_mut(id).unwrap() = vec![ScriptComponent {
-        path: path.to_string_lossy().replace('\\', "/"),
-        ..Default::default()
-    }];
+    crate::play::attach_script(
+        &mut scene,
+        id,
+        &format!("rusty_461_{:x}.lua", hash(script)),
+        script,
+    );
     setup(&mut scene, id);
     (scene, id)
 }
@@ -54,18 +51,8 @@ fn hash(s: &str) -> u64 {
 
 /// Play `scene` for `ticks` fixed steps; the world is returned for its physics.
 pub fn play(scene: Scene, ticks: usize) -> GameWorld {
-    let mut gw = GameWorld::new(
-        Rc::new(RefCell::new(scene)),
-        Rc::new(RefCell::new(InputState::new())),
-        Rc::new(RefCell::new(NavigationGraph::new(
-            -5.0, 5.0, -5.0, 5.0, 1.0,
-        ))),
-        Rc::new(RefCell::new(ConsoleLogs::new())),
-    );
-    gw.set_playing(true);
-    for _ in 0..ticks {
-        gw.tick(1.0 / 60.0);
-    }
+    let mut gw = crate::play::playing(Rc::new(RefCell::new(scene)), 5.0);
+    crate::play::run(&mut gw, ticks);
     gw
 }
 

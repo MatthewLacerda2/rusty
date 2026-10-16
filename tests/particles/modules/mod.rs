@@ -9,20 +9,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use rusty::app::GameWorld;
-use rusty::core::input::InputState;
-use rusty::navigation::NavigationGraph;
 use rusty::scene::Scene;
 use rusty::scripting::ConsoleLogs;
 
 /// Enter Play on `scene` and step it `frames` fixed 60 Hz ticks.
 fn play(scene: Scene, frames: u32) -> Rc<RefCell<GameWorld>> {
-    let scene = Rc::new(RefCell::new(scene));
-    let input = Rc::new(RefCell::new(InputState::new()));
-    let nav = Rc::new(RefCell::new(NavigationGraph::new(
-        -20.0, 20.0, -20.0, 20.0, 1.0,
-    )));
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-    let world = Rc::new(RefCell::new(GameWorld::new(scene, input, nav, console)));
+    let world = crate::play::world(Rc::new(RefCell::new(scene)), 20.0, console);
+    let world = Rc::new(RefCell::new(world));
     step(&world, frames);
     world
 }

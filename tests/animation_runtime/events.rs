@@ -5,14 +5,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use rusty::app::GameWorld;
 use rusty::asset::animation_graph::{self, AnimationGraph};
-use rusty::core::input::InputState;
-use rusty::navigation::NavigationGraph;
 use rusty::scene::ScriptComponent;
 use rusty::scripting::ConsoleLogs;
 
-use super::rig::{armed_scene, DT};
+use super::rig::armed_scene;
 
 const GRAPH: &str = r#"{
   "nodes": [ { "name": "Slide", "clip": "Slide", "is_loop": true, "events": [
@@ -54,18 +51,9 @@ fn event_log(tag: &str, ticks: usize) -> Vec<String> {
         ..Default::default()
     }];
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-    let mut game = GameWorld::new(
-        Rc::new(RefCell::new(scene)),
-        Rc::new(RefCell::new(InputState::new())),
-        Rc::new(RefCell::new(NavigationGraph::new(
-            -5.0, 5.0, -5.0, 5.0, 1.0,
-        ))),
-        Rc::clone(&console),
-    );
+    let mut game = crate::play::world(Rc::new(RefCell::new(scene)), 5.0, Rc::clone(&console));
     game.set_playing(true);
-    for _ in 0..ticks {
-        game.tick(DT);
-    }
+    crate::play::run(&mut game, ticks);
     let log = console.borrow();
     let lines = log.messages.iter().map(|(m, _)| m.clone());
     lines.filter(|m| m.starts_with('[')).collect()

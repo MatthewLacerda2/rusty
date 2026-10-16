@@ -1,15 +1,10 @@
 //! Input through the real sim tick (#416): edges published by `GameWorld::tick`,
 //! the Play cursor default, and injected input replaying identically headless.
 
-use rusty::dev::console::evaluate_line;
 use rusty::dev::harness::Harness;
 use rusty::dev::scenario;
 
-/// Evaluate `line` in the harness world's gameplay VM.
-fn eval(h: &Harness, line: &str) -> String {
-    let world = h.world.borrow();
-    evaluate_line(world.script_manager(), world.console(), line).expect("line evaluates")
-}
+use crate::play::eval;
 
 #[test]
 fn edges_are_per_sim_tick_and_play_locks_the_cursor() {

@@ -2,14 +2,9 @@
 //! edge, peaking ≈1.1 m — and left mouse (`Mouse0`) shoots once per press.
 
 use rusty::dev::botplayer::attach_player_bot;
-use rusty::dev::console::evaluate_line;
 use rusty::dev::harness::Harness;
 
-/// Evaluate `line` in the harness world's gameplay VM.
-fn eval(h: &Harness, line: &str) -> String {
-    let world = h.world.borrow();
-    evaluate_line(world.script_manager(), world.console(), line).expect("line evaluates")
-}
+use crate::play::eval;
 
 /// The Player's height, read through the same API the scripts use.
 fn player_y(h: &Harness) -> f32 {
