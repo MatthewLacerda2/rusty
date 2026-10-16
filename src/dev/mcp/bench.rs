@@ -125,6 +125,7 @@ fn open(
         None => Ok(json!({
             "root": root,
             "opened": false,
+            "warning": warning,
             "relaunch": format!("rusty --project {}", root.display()),
             "why": "attach mode drives a running window: relaunch it on the project",
         })),

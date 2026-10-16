@@ -52,7 +52,7 @@ fn create_lists_the_project_and_forget_takes_it_off() {
     let list = run(&Window, &mut bench, "bench_list", json!({})).unwrap();
     assert_eq!(list[0]["name"], "Horde");
     assert_eq!(list[0]["missing"], json!(false));
-    assert_eq!(list[0]["ago"], "1 minute ago");
+    assert_eq!(list[0]["ago"], "just now");
     let forgot = run(&Window, &mut bench, "bench_forget", json!({ "path": root }));
     assert_eq!(forgot.unwrap()["removed"], json!(true));
     assert_eq!(
