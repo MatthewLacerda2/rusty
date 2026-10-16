@@ -36,7 +36,7 @@ fn draw_frame(scene: &mut Scene, nav: &mut NavigationGraph, mut playing: bool) {
         16.0,
         None,
     );
-    let _ = ctx.end_pass();
+    ctx.end_pass().textures_delta.clear();
 }
 
 #[test]
