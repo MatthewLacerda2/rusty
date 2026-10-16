@@ -33,7 +33,7 @@ pub const SPEAKER_MODE_KEY: &str = "speaker_mode";
 
 /// How much of a voice's pan survives in headphones mode: a hard-left voice pans to
 /// `-0.6`, so the right ear still hears it at 40 %.
-pub const HEADPHONE_WIDTH: f32 = 0.6;
+const HEADPHONE_WIDTH: f32 = 0.6;
 
 /// The output profile the final mix is shaped for. See the module docs.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]

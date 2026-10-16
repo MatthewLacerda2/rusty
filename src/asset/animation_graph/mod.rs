@@ -29,7 +29,7 @@ mod validate_motion;
 
 pub use blend_tree::{BlendChild1D, BlendChild2D, BlendTree};
 pub use event::AnimationEvent;
-pub use io::{is_graph_path, load, save};
+pub use io::{load, save};
 pub use layer::{GraphLayer, LayerBlending};
 pub use validate::GraphError;
 

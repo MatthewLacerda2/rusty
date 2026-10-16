@@ -17,7 +17,7 @@ pub const MIN_SECONDS: f64 = 0.5;
 /// The longest effect the endpoint makes, in seconds.
 pub const MAX_SECONDS: f64 = 30.0;
 /// How closely the vendor follows the words when a brief does not say: its default.
-pub const DEFAULT_PROMPT_INFLUENCE: f64 = 0.3;
+const DEFAULT_PROMPT_INFLUENCE: f64 = 0.3;
 /// The one sound-effects model the vendor lists. Pinned in every brief, so a model
 /// the vendor adds later can never quietly change what a cached brief meant.
 pub const MODEL: &str = "eleven_text_to_sound_v2";

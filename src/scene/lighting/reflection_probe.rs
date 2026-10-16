@@ -62,7 +62,7 @@ impl ReflectionProbe {
 
     /// Squared distance from `point` to the probe's capture position — the
     /// nearest-probe tiebreak metric.
-    pub fn distance_sq(&self, point: Vec3) -> f32 {
+    fn distance_sq(&self, point: Vec3) -> f32 {
         self.position.distance_squared(point)
     }
 

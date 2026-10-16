@@ -33,7 +33,7 @@ mod sync;
 
 use std::collections::BTreeSet;
 
-pub use hitbox::{fit_hitboxes, HitboxFit, HitboxOptions, HITBOX_NAME};
+pub use hitbox::{fit_hitboxes, HitboxFit, HitboxOptions};
 pub use ik::{solve_aim, solve_two_bone, AimSettings, BonePose};
 pub use persist::{strip_bones, take_bone_parents};
 pub use ragdoll::{RagdollOptions, RAGDOLL_LAYER};

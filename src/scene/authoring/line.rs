@@ -10,7 +10,7 @@ use glam::Vec3;
 use crate::components::LineComponent;
 
 /// The most points a line holds — a guard against a runaway script loop.
-pub const MAX_POSITIONS: usize = 4096;
+const MAX_POSITIONS: usize = 4096;
 
 /// Replace every point (non-finite ones dropped, capped at [`MAX_POSITIONS`]).
 pub fn set_positions(l: &mut LineComponent, positions: &[Vec3]) {

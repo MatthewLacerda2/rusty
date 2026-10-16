@@ -38,7 +38,7 @@ impl ScriptManager {
 
     /// `OnJointBreak(id, force, torque)` on the scripts of each entity whose
     /// joint broke this tick (#449), in the list's ascending order.
-    pub fn dispatch_joint_breaks(&mut self, breaks: &[JointBreak]) {
+    fn dispatch_joint_breaks(&mut self, breaks: &[JointBreak]) {
         self.with_api_scope(|lua| {
             for b in breaks {
                 for key in self.awoken_keys_for(b.id) {

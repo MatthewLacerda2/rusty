@@ -81,7 +81,7 @@ pub fn write_text(text: &str, game: &GameWorld) {
 /// What a key's OS text contributes to `GetTextInput`, Unity's `inputString` rules:
 /// printable characters, backspace as `"\b"`, Enter as `"\n"`, Tab as `"\t"`; any
 /// other control character (Esc, Delete, …) is dropped.
-pub fn typed_text(text: &str) -> String {
+fn typed_text(text: &str) -> String {
     text.chars()
         .filter_map(|c| match c {
             '\r' => Some('\n'),

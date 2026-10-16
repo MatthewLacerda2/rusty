@@ -63,7 +63,7 @@ pub struct Spawned {
 
 /// Where the Player stands: 3 m in from its spawn, so the follow camera 4.5 m
 /// behind it is inside the yard and looks down its length at the whole scene.
-pub const PLAYER_AT: Vec3 = Vec3::new(0.0, 1.5, -15.0);
+const PLAYER_AT: Vec3 = Vec3::new(0.0, 1.5, -15.0);
 
 /// Spawn `spec` into `scene` (already holding the yard), and stand the Player at
 /// [`PLAYER_AT`].

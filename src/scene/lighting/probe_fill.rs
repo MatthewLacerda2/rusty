@@ -20,7 +20,7 @@ use crate::scene::{LightType, Scene};
 /// at most one directional sun. Extracted from the scene so the projection is a pure
 /// function of these values (and easy to unit-test in isolation).
 #[derive(Clone, Copy, Debug)]
-pub struct AnalyticEnv {
+struct AnalyticEnv {
     /// Uniform sky radiance (the scene's `ambient_color * ambient_intensity`).
     pub sky: Vec3,
     /// Sun direction *toward* the light (normalized) and its radiance, if any.

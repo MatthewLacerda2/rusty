@@ -13,12 +13,12 @@ use super::rich::{self, Style};
 use crate::components::TextComponent;
 
 /// Extra advance a synthesized bold adds, in ems (the dilated stroke is wider).
-pub const FAUX_BOLD_ADVANCE: f32 = 0.03;
+const FAUX_BOLD_ADVANCE: f32 = 0.03;
 
 /// The face slots: the regular, bold and italic fonts a text names.
-pub const REGULAR: usize = 0;
-pub const BOLD: usize = 1;
-pub const ITALIC: usize = 2;
+const REGULAR: usize = 0;
+const BOLD: usize = 1;
+const ITALIC: usize = 2;
 
 /// One measured character.
 #[derive(Clone, Copy, Debug)]

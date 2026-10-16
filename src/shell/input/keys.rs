@@ -11,7 +11,7 @@ use winit::event::MouseButton;
 use winit::keyboard::KeyCode;
 
 /// Every forwarded key and its engine name.
-pub const KEY_NAMES: &[(KeyCode, &str)] = &[
+const KEY_NAMES: &[(KeyCode, &str)] = &[
     (KeyCode::KeyA, "A"),
     (KeyCode::KeyB, "B"),
     (KeyCode::KeyC, "C"),

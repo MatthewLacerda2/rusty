@@ -35,7 +35,7 @@ impl ParticleEmitterComponent {
     /// Build one particle at `origin` from the current config: shape offset and
     /// launch direction, direction jitter, then every start range, all drawn from
     /// the seeded stream.
-    pub fn spawn_particle(&mut self, origin: Vec3) -> Particle {
+    fn spawn_particle(&mut self, origin: Vec3) -> Particle {
         let axis = self.direction.normalize_or_zero();
         let rng = &mut self.runtime.rng;
         let (offset, launch) = self.shape.sample(self.emit_from, axis, rng);

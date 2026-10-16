@@ -251,7 +251,7 @@ impl Mixer {
     }
 
     /// The gain group `id`'s ducks apply right now.
-    pub fn duck_gain(&self, id: GroupId) -> f32 {
+    fn duck_gain(&self, id: GroupId) -> f32 {
         self.ducks
             .iter()
             .filter(|d| d.target == id)
