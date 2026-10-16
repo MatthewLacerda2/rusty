@@ -32,6 +32,10 @@ jobs:
     # A red run means the instrument broke (llvm-cov, a flag), never that a
     # floor dropped: the ratchet step does not exit non-zero on a regression.
     timeout-minutes: 60
+    env:
+      # A missing adapter fails the canary test instead of skipping every GPU
+      # test (#489), which here would silently zero render coverage (#978).
+      RUSTY_REQUIRE_GPU: "1"
     steps:
       - uses: actions/checkout@v7
       - name: Toolchain (from rust-toolchain.toml)
