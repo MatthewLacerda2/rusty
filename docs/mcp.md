@@ -39,6 +39,7 @@ the session in-process — no subprocess, no async runtime, no extra dependency.
 
 ## What it exposes
 
+<!-- docrefs: allow MCP's JSON-RPC method names, not repo paths -->
 **Tools** (`tools/list`, `tools/call`):
 
 - `eval` — evaluate one line of the rusty Lua API against the live edit-mode world
