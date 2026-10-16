@@ -9,10 +9,12 @@ it **here**, once, not in the next prompt.
 MCP tools (`issue_read`, `create_pull_request`, `update_pull_request`,
 `add_issue_comment`); load them with ToolSearch.
 
-**A bug you find is yours to deal with.** Fix it in this branch when it's in
+**A finding is yours to deal with.** Fold it into this branch when it's in
 your way or small, or file an issue with the evidence (the `issue-write` skill)
 and keep going. Either way it never goes unrecorded: the operator expects coders
-to file issues mid-batch.
+to file issues mid-batch. Every issue you file carries the **`agent`** label, and
+`planning` too when it fails CLAUDE.md's *approval test* (a stored format, a
+migration, or how an existing game behaves).
 
 **Need a sibling's tool for your own proof? Patch it locally, don't commit it.**
 If your PR's captures or measurements need something another in-flight issue is

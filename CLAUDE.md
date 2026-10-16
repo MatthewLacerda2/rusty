@@ -213,14 +213,30 @@ is wrong.
   asking it again when work begins adds nothing.
 - **Issue-less PRs are allowed only** for documentation updates or bug fixes; everything
   else starts as an issue.
-- **File what you notice.** Claude may open an issue unprompted for anything that will
-  recur, or that a tool would solve more than once — when the benefit outweighs the cost
-  of building it. The strongest issues come out of doing the work. **A bug is always
-  filable**: that test is about whether something is worth *building*, never whether a
-  defect is worth *recording*. If the bug questions a decision or exposes a foundational
-  crack, tell the user; otherwise keep it brief and carry on. Found outside the branch in
-  hand? **File it rather than fix it** — a branch that grows to cover everything it
-  noticed is a branch nobody can review.
+- **Filing what you notice is a duty, not an option.** Every finding is either folded
+  into the task in hand or filed, never dropped. Small findings, or ones in the way (a
+  stale doc included), are folded in; anything outside the branch is **filed rather
+  than fixed** — a branch that grows to cover everything it noticed is a branch nobody
+  can review. Whether something is worth *building* is a cost/benefit call; whether a
+  defect is worth *recording* never is: **a bug is always filed**. If it questions a
+  decision or exposes a foundational crack, tell the user; otherwise keep it brief and
+  carry on. The strongest issues come out of doing the work.
+- **Every issue Claude files unprompted carries the `agent` label.** It says only who
+  decided to file it, and never stops work.
+- **The approval test.** A finding is filed with `planning`, and never folded in, when
+  it:
+  - changes a scene, prefab or save format, or another stored format;
+  - needs a migration; or
+  - changes how an existing game behaves.
+- **Bug and doc fixes merge without waiting.** They are filed without `planning` and
+  merged like any other ready PR, even when the fix changes how an existing scene plays.
+  **Guard:** a change to the five kinds, the one API surface or the determinism rule
+  never slips in under a `bug` label; it is a decision, and goes through the test above.
+- **Decisions are written down, not waited on.** An issue that needs a decision states
+  each one with a recommendation. The user answers, the answers go into the issue, and
+  it is filed startable. The one `planning` Claude applies itself is to an *unattended*
+  finding that fails the approval test; it is raised with the user at the next
+  check-in.
 - **Priority by label.** When choosing what to do next, the order is
   **infrastructure → architecture → bug → foundation → feature.** It encodes how the whole
   project is built, in three stages:
@@ -242,6 +258,9 @@ is wrong.
   **documentation** can be done at any time and never waits its turn.
 
 ### Labels
+- **agent** — *Written autonomously by an agent (not asked for by a person).* Says who
+  decided to file the issue, nothing more: it is never a stop, and combines with any
+  other label.
 - **architecture** — *How we define stuff.* Intrinsic changes to the engine: a new module,
   a significant structural improvement, a convention we adopt, or a guardrail baked into
   the engine's **design** (e.g. the determinism rule, the five-kinds model, the four-axis
