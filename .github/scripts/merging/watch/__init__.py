@@ -32,6 +32,10 @@ It exits on:
   listings in a row);
 - **nothing left**: no open pull request, or none ready and labelled, and no
   head among the rest (drafts, unlabelled, remembered hand-backs) has moved for `--idle` minutes;
+- **its own code changing on `main`** (#967): before each take it compares the
+  files it runs with `origin/main` ([`freshness.changed`]) and on a difference
+  exits [`ending.RELAUNCH`], status 5, with nothing in hand, so a merge that fixes
+  the queue is never followed by more merges under the old code;
 - **its own deadline** (`--for MINUTES`, #697): past it, the watch takes no new
   pull request. It is checked only between takes, never during one, so the one
   in hand finishes (merged or handed back) and the exit always lands between

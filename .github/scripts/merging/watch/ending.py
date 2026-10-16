@@ -23,6 +23,10 @@ DEADLINE = "deadline reached"
 # wherever it is (#697). `--for` plus the per-PR `--deadline` must fit in it.
 BACKGROUND_MINUTES = 120
 
+# How the exit begins when the queue's own code changed on `main` (#967):
+# update the checkout to `origin/main`, then start the watch again.
+RELAUNCH = "relaunch"
+
 # How the last line begins: the command that starts this watch again (#928).
 RESUME = "watch: resume:"
 
@@ -36,6 +40,9 @@ HANDED_BACK_LINE = "HANDED BACK"
 HANDED_BACK_STATUS = 1
 
 MACHINE_STATUS = 3
+
+# The queue's code changed on `main` ([`RELAUNCH`]): relaunch from the new code.
+RELAUNCH_STATUS = 5
 
 
 def finished(pulls: list[dict], quiet: float, idle: float) -> str | None:
@@ -64,11 +71,24 @@ def deadline_reached(results: list[tuple[int, str, str]], minutes: float, merged
     return f"{DEADLINE} ({minutes:g} minutes); {count} merged, nothing in hand. Relaunch the watch."
 
 
-def status(handed: list[int], machine: bool) -> int:
-    """The watch's exit status: the most urgent thing its starter has to do."""
+def status(handed: list[int], machine: bool, relaunch: bool = False) -> int:
+    """The watch's exit status: the most urgent thing its starter has to do.
+    A relaunch outranks a hand-back: its lines are already printed, and the
+    next watch must not run the old code."""
     if machine:
         return MACHINE_STATUS
+    if relaunch:
+        return RELAUNCH_STATUS
     return HANDED_BACK_STATUS if handed else 0
+
+
+def relaunch(paths: list[str], results: list[tuple[int, str, str]], merged: str) -> str:
+    """Why the watch ends when its own code changed on `main` (#967)."""
+    count = sum(1 for _, state, _ in results if state == merged)
+    return (
+        f"{RELAUNCH}: the queue's code changed on main ({', '.join(paths)}); {count} merged, nothing in hand."
+        " Update this checkout to origin/main and start the watch again."
+    )
 
 
 def handed_back(number: int, why: str) -> str:
