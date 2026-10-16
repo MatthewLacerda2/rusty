@@ -129,3 +129,16 @@ fn sfx_generate_during_play_raises() {
         .unwrap_err();
     assert!(err.contains("Play"), "{err}");
 }
+
+#[test]
+fn a_complete_brief_under_test_is_refused_for_want_of_a_key() {
+    // #974: edit mode, nothing missing, so only the blanked key stands between
+    // these and the real vendor. They fail closed, before any request is built.
+    for call in [
+        "Speech.Generate({ text = 'Frag out!', voice = 'v974' })",
+        "Sfx.Generate({ text = 'frag 974', seconds = 1 })",
+    ] {
+        let err = session().eval(&format!("return {call}")).unwrap_err();
+        assert!(err.contains("no key for ElevenLabs"), "{call}: {err}");
+    }
+}

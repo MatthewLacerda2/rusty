@@ -21,7 +21,9 @@
 //!   our arithmetic over scorsese's dated rate tables ([`prices`]), so the names say
 //!   `estimate`.
 //! - **No test ever makes a real call.** scorsese puts every provider behind a trait;
-//!   tests here use mocks, and nothing in this module touches a network.
+//!   tests here use mocks, and nothing in this module touches a network. The live
+//!   surface does call the real vendor, so inside a test [`environment`] hands out no
+//!   keys at all ([`keys_blanked`], #974): a complete brief is refused, never sent.
 //!
 //! Every verb that spends goes through [`permit`] first and, once the vendor has
 //! answered, [`Permit::record`]s what it spent. What it made is addressed by the
@@ -41,7 +43,7 @@ mod tests;
 
 use std::path::Path;
 
-pub use credentials::{environment, resolve};
+pub use credentials::{environment, keys_blanked, resolve};
 pub use ledger::Ledger;
 pub use refusal::Refusal;
 pub use scorsese_providers::credentials::{Environment, Provider, Secret};

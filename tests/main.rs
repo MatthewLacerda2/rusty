@@ -95,6 +95,8 @@ mod player_controller;
 #[cfg(feature = "dev")]
 mod proptest_harness;
 #[cfg(feature = "dev")]
+mod provider_keys;
+#[cfg(feature = "dev")]
 mod script_timers;
 #[cfg(feature = "dev")]
 mod structural_authoring;
