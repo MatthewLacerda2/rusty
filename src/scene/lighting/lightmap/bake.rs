@@ -15,7 +15,8 @@ use super::input::BakeScene;
 use super::progress::BakeProgress;
 use super::raster::{dilate, lightmap_size, rasterize, world_per_uv, TexelPoint};
 use super::rng::Rng;
-use super::trace::{luminance, TexelLight, Tracer};
+use super::trace::{TexelLight, Tracer};
+use crate::core::color::luminance;
 
 /// Rings of empty texels dilation fills around each chart.
 const DILATE_PASSES: u32 = 3;

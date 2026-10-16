@@ -20,7 +20,7 @@ use std::f32::consts::PI;
 
 use glam::{Vec2, Vec3};
 
-use crate::render::ibl::cube_sample::{linear_to_srgb, sample_linear, FaceProjections};
+use crate::render::ibl::cube_sample::{face_uv, linear_to_srgb, sample_linear, FaceProjections};
 use crate::render::{CubemapCapture, CubemapFace};
 
 /// Number of importance samples per output texel for the rough mips. A few hundred taps
@@ -113,7 +113,7 @@ fn filter_mip(
         let mut out = vec![0u8; (size * size * 4) as usize];
         for py in 0..size {
             for px in 0..size {
-                let (u, v) = texel_ndc(px, py, size);
+                let (u, v) = face_uv(px, py, size);
                 let n = proj.direction(face, u, v);
                 let color = convolve(proj, src, src_res, n, roughness);
                 write_texel(&mut out, px, py, size, color);
@@ -121,14 +121,6 @@ fn filter_mip(
         }
         out
     })
-}
-
-/// Face-NDC in [-1, 1] for pixel `(px, py)` of a `size`-wide face (`u` right, `v` up;
-/// image rows top-to-bottom). Matches `probe_bake::face_uv`.
-fn texel_ndc(px: u32, py: u32, size: u32) -> (f32, f32) {
-    let u = ((px as f32 + 0.5) / size as f32) * 2.0 - 1.0;
-    let v = 1.0 - ((py as f32 + 0.5) / size as f32) * 2.0;
-    (u, v)
 }
 
 /// Pack a linear-RGB colour into an output texel (sRGB-encoded, opaque).

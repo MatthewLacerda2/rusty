@@ -1,9 +1,11 @@
 pub mod application;
 pub mod clipboard;
 pub mod collections;
+pub mod color;
 pub mod curve;
 pub mod frame_stats;
 pub mod gamepad;
+pub mod hash;
 pub mod input;
 pub mod keymap;
 pub mod paths;

@@ -19,6 +19,7 @@
 use image::{ImageBuffer, Rgba};
 
 use super::image_buf::Image;
+use crate::core::color::linear_to_srgb;
 
 /// The material slot a bake targets — selects color space and channel packing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -101,16 +102,6 @@ impl Slot {
     /// Whether this slot's color channels are sRGB-encoded on bake.
     fn is_srgb(self) -> bool {
         matches!(self, Slot::BaseColor | Slot::Emissive)
-    }
-}
-
-/// Linear → sRGB transfer (IEC 61966-2-1), for a single channel in `[0, 1]`.
-fn linear_to_srgb(c: f32) -> f32 {
-    let c = c.clamp(0.0, 1.0);
-    if c <= 0.003_130_8 {
-        c * 12.92
-    } else {
-        1.055 * c.powf(1.0 / 2.4) - 0.055
     }
 }
 
