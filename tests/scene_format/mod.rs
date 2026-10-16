@@ -7,13 +7,13 @@
 //! `path: kind`. Paths go `.field`, `[]` for a list element, `{key}`/`{}` for a map
 //! key and value, `<Variant>` for an enum variant's contents; enum lines list every
 //! tag. Every enum variant is walked, so a renamed field, a retyped value, an added
-//! or removed variant all change it. Two blind spots, both serde's: an untagged
-//! enum or a `serde_json::Value` reads as `any`, and a `#[serde(flatten)]` struct's
-//! own fields are the list in `flatten.rs`.
+//! or removed variant all change it. The blind spots are serde's: an untagged
+//! enum, a `serde_json::Value` or a type that parses one itself reads as `any`, and a
+//! `#[serde(flatten)]` struct's own fields are the list in `hidden.rs`.
 
 mod access;
 mod de;
-mod flatten;
+mod hidden;
 mod trace;
 
 use std::collections::BTreeSet;
@@ -55,7 +55,7 @@ fn scene_format_matches_its_fingerprint() {
     );
 }
 
-/// `flatten.rs` must list every field of a flattened struct: a field it misses is a
+/// `hidden.rs` must list every field of a flattened struct: a field it misses is a
 /// part of the format the fingerprint would not see. Whatever the built value
 /// writes must be either a listed field or the flattened part's.
 #[test]
@@ -64,7 +64,7 @@ fn scene_format_flatten_list_is_complete() {
         name: &str,
         flat: serde_json::Value,
     ) {
-        let (own, _) = flatten::registry(name).expect("listed");
+        let (own, _) = hidden::registry(name).expect("listed");
         let (_, built) = trace::trace::<T>("x");
         let serde_json::Value::Object(written) = serde_json::to_value(built).unwrap() else {
             panic!("{name} writes an object");
@@ -75,7 +75,7 @@ fn scene_format_flatten_list_is_complete() {
         for key in written.keys() {
             assert!(
                 own.contains(&key.as_str()) || flat.contains_key(key),
-                "{name}.{key} is not listed in tests/scene_format/flatten.rs"
+                "{name}.{key} is not listed in tests/scene_format/hidden.rs"
             );
         }
     }

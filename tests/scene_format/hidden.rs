@@ -1,3 +1,5 @@
+//! What serde hides from the tracer, listed by hand.
+//!
 //! Structs with a `#[serde(flatten)]` field. serde reads the flattened part from its
 //! own buffer, out of the tracer's reach, and never names the struct's fields; so
 //! each such struct is listed here: its own fields, traced as usual, and the
@@ -64,7 +66,7 @@ pub fn visit<'de, V: Visitor<'de>>(
     v: V,
 ) -> Result<V::Value, Error> {
     let (own, inner) = registry(name).unwrap_or_else(|| {
-        panic!("{name} has a #[serde(flatten)] field: list it in tests/scene_format/flatten.rs")
+        panic!("{name} has a #[serde(flatten)] field: list it in tests/scene_format/hidden.rs")
     });
     let (lines, sample) = inner(&pass.path);
     pass.lines.extend(lines);
@@ -121,4 +123,12 @@ impl<'de> MapAccess<'de> for Flat<'_, '_> {
             Next::Flat(value) => seed.deserialize(value).map_err(Error::custom),
         }
     }
+}
+
+/// Places whose type reads a whole `serde_json::Value` and parses it itself, so the
+/// tracer sees only `any`: each gets one valid sample. A procgen recipe node is its
+/// own format (strictly parsed, its op internally tagged), not the scene's.
+pub fn opaque(path: &str) -> Option<Value> {
+    path.ends_with(".maps.nodes[]")
+        .then(|| serde_json::json!({ "id": "n", "op": "constant", "color": [0.0, 0.0, 0.0, 1.0] }))
 }

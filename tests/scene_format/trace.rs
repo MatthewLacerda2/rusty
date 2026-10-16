@@ -16,11 +16,15 @@ pub struct Pass<'s> {
     pub path: String,
     pub script: &'s BTreeMap<String, usize>,
     pub any: &'s BTreeMap<String, usize>,
+    /// Field places not to fill: aliases, which serde lists beside the field.
+    pub aliases: &'s BTreeSet<String>,
     pub lines: BTreeSet<String>,
     /// Every enum place this pass met, with its variant count.
     pub enums: Vec<(String, usize)>,
     /// The last opaque place answered, blamed when the pass fails.
     pub last_any: Option<String>,
+    /// The last field place filled, blamed when serde reports it twice.
+    pub last_field: Option<String>,
 }
 
 impl Pass<'_> {
@@ -50,6 +54,7 @@ pub fn trace<T: DeserializeOwned>(root: &str) -> (BTreeSet<String>, T) {
     let mut lines = BTreeSet::new();
     let mut seen = BTreeSet::new();
     let mut any = BTreeMap::new();
+    let mut aliases = BTreeSet::new();
     let mut first = None;
     let mut scripts = vec![BTreeMap::new()];
     while let Some(script) = scripts.pop() {
@@ -58,12 +63,20 @@ pub fn trace<T: DeserializeOwned>(root: &str) -> (BTreeSet<String>, T) {
                 path: root.to_string(),
                 script: &script,
                 any: &any,
+                aliases: &aliases,
                 lines: BTreeSet::new(),
                 enums: Vec::new(),
                 last_any: None,
+                last_field: None,
             };
             match T::deserialize(&mut pass) {
                 Ok(value) => break (pass.lines, pass.enums, value),
+                Err(e) if e.0.starts_with("duplicate field") => {
+                    let alias = pass
+                        .last_field
+                        .unwrap_or_else(|| panic!("trace failed: {e}"));
+                    aliases.insert(alias);
+                }
                 Err(e) => {
                     let place = pass.last_any.unwrap_or_else(|| panic!("trace failed: {e}"));
                     let answer = any.entry(place.clone()).or_insert(0);

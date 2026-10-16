@@ -80,8 +80,16 @@ impl<'de> MapAccess<'de> for Fields<'_, '_> {
         &mut self,
         seed: K,
     ) -> Result<Option<K::Value>, Error> {
-        let Some(&field) = self.fields.next() else {
-            return Ok(None);
+        let field = loop {
+            let Some(&field) = self.fields.next() else {
+                return Ok(None);
+            };
+            let place = format!("{}.{field}", self.pass.path);
+            if !self.pass.aliases.contains(&place) {
+                self.pass.last_field = Some(place);
+                break field;
+            }
+            self.pass.lines.insert(format!("{place}: alias"));
         };
         self.current = field;
         seed.deserialize(field.into_deserializer()).map(Some)

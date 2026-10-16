@@ -18,10 +18,10 @@ impl<'de, V: Visitor<'de>> std::fmt::Display for Expecting<'_, V> {
 }
 
 macro_rules! leaf {
-    ($($method:ident => $kind:literal $visit:ident($sample:expr);)*) => {$(
+    ($($method:ident => $kind:literal $visit:ident($($sample:expr)?);)*) => {$(
         fn $method<V: Visitor<'de>>(self, v: V) -> Result<V::Value, Error> {
             self.line($kind);
-            v.$visit($sample)
+            v.$visit($($sample)?)
         }
     )*};
 }
@@ -52,6 +52,10 @@ impl<'de> Deserializer<'de> for &mut Pass<'_> {
     /// Opaque to serde: answer by the place's current guess (see `ANY_ANSWERS`).
     fn deserialize_any<V: Visitor<'de>>(self, v: V) -> Result<V::Value, Error> {
         self.line("any");
+        if let Some(sample) = super::hidden::opaque(&self.path) {
+            return serde::Deserializer::deserialize_any(sample, v)
+                .map_err(serde::de::Error::custom);
+        }
         self.last_any = Some(self.path.clone());
         match self.any.get(&self.path).copied().unwrap_or(0) {
             0 => v.visit_f64(0.5),
@@ -98,7 +102,7 @@ impl<'de> Deserializer<'de> for &mut Pass<'_> {
     fn deserialize_map<V: Visitor<'de>>(self, v: V) -> Result<V::Value, Error> {
         let expecting = Expecting(&v).to_string();
         if let Some(name) = expecting.strip_prefix("struct ") {
-            return super::flatten::visit(self, name, v);
+            return super::hidden::visit(self, name, v);
         }
         self.line("map");
         v.visit_map(One::map(self))
