@@ -3,6 +3,7 @@
 //! linked instances record/revert overrides, unpacked copies carry no link, and
 //! the error paths (bad root, missing file, bad parent arg) reject cleanly.
 
+mod field_revert;
 mod linked;
 mod rejections;
 

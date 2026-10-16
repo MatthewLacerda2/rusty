@@ -41,6 +41,7 @@ pub mod reverb_zone;
 pub mod ribbon;
 pub mod rigidbody;
 mod sanitize;
+pub mod script;
 pub mod selectable;
 pub mod shape;
 pub mod text;
@@ -184,6 +185,7 @@ pub fn create_entity(scene: &mut Scene, name: &str, primitive: Option<Primitive>
 // `authoring_components` (size-cap split); re-exported so existing
 // `authoring::{ComponentKind, add_component, remove_component}` paths still resolve.
 pub use crate::scene::authoring::components::{add_component, remove_component, ComponentKind};
+pub use crate::scene::authoring::script::attach_script;
 
 // The component-dependency mechanism (#359, rusty's `RequireComponent`) lives in
 // `authoring::dependency`; re-exported so the editor Add menu, the camera card's
@@ -199,7 +201,9 @@ pub use crate::scene::authoring::dependency::{
 // itself; re-exported here so editor and API reach extract / instantiate (unpacked
 // and linked) and the apply/revert/list verbs through this one shared authoring entry
 // point.
-pub use crate::scene::prefab::apply::{apply_instance_field_to_source, apply_instance_to_source};
+pub use crate::scene::prefab::apply::{
+    apply_instance_field_to_source, apply_instance_to_source, revert_instance_field,
+};
 pub use crate::scene::prefab::link::{
     list_instance_overrides, record_instance_overrides, reimport_instance,
     revert_instance_overrides,

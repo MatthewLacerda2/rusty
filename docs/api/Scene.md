@@ -13,6 +13,7 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.DestroyEntity` | `(id)` | `true` if an entity existed at `id` |
 | `Scene.AddComponent` | `(id, kind)` | `true` if the entity exists |
 | `Scene.RemoveComponent` | `(id, kind)` | `true` if the entity exists |
+| `Scene.AddScript` | `(id, path)` | `true` if the entity exists (errors, naming `path`, if there is no file there) — see below |
 | `Scene.SetParent` | `(id, parent_id)` | — (errors on a parenting cycle) |
 | `Scene.ClearParent` | `(id)` | — |
 | `Scene.SetActive` | `(id, active)` | `true` if an entity existed at `id` — Unity's `SetActive`; its callbacks follow the edge (`OnEnable` / `OnDisable`) |
@@ -33,6 +34,7 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.ReimportPrefab` | `(instanceRootId)` | — (re-baseline from source, re-apply overrides) |
 | `Scene.ApplyPrefabToSource` | `(instanceRootId)` | count of entities written back into the `.prefab` |
 | `Scene.ApplyPrefabFieldToSource` | `(entityId, jsonPointer)` | — (writes one leaf to the `.prefab`) |
+| `Scene.RevertPrefabField` | `(entityId, jsonPointer)` | `true` if an override was reverted, `false` if there was none at `jsonPointer` |
 | `Scene.ListPrefabOverrides` | `(instanceRootId)` | array of `"localId:json-pointer"` strings |
 
 **Hierarchy reads (#422).** `FindChild` walks one level per `/`-separated
@@ -67,8 +69,12 @@ case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `Joint.SetKind`), `CharacterController` (alias `Character`), `LODGroup` (alias `LOD`), `Trail` (alias `TrailRenderer`),
 `Line` (alias `LineRenderer`).
 Each is added with the inspector's default values; adding an
-existing kind replaces it. (Scripts attach by path, not as a defaulted kind — a
-separate concern.)
+existing kind replaces it. Scripts attach by path, not as a defaulted kind:
+**`Scene.AddScript(id, path)`** appends the script at `path` (a MonoBehaviour-style
+`.lua`, e.g. `"assets/scripts/spin.lua"`) to the entity's scripts, with its fields at
+their defaults. An entity holds many scripts and may hold the same one twice, as in
+Unity; it is the Add Component menu's script list. Attached during play, the script
+loads at the head of the next tick (see the spawn note in [`index.md`](index.md)).
 
 **Component dependencies (`RequireComponent`).** A first-class component may
 *declare that it requires another* — rusty's analog of Unity's
@@ -239,6 +245,14 @@ Apply-to-source (the Unity "Apply → Prefab" direction):
   re-tracks the source (the instance's other overrides are untouched). `entityId` may be
   any instance entity — root or child; the verb resolves the instance root itself. Errors
   if the entity carries no override at `jsonPointer`.
+
+Its per-field opposite:
+
+- **`Scene.RevertPrefabField(entityId, jsonPointer)`** — Unity's *Revert* on one
+  property: drop just that override and reimport, so the leaf tracks the source again
+  (the instance's other overrides are untouched). `entityId` may be any instance
+  entity. Returns `false`, changing nothing, when there is no override at
+  `jsonPointer`. The prefab card's per-field revert button.
 
 The verbs error if `instanceRootId` (or, for the field form, `entityId`) is not a
 **linked** instance entity. **Scope (#216):** a flat instance of a flat prefab —

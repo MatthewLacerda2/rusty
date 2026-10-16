@@ -4,7 +4,7 @@
 use egui_phosphor::regular as icon;
 
 use crate::scene::authoring::{self, ComponentKind};
-use crate::scene::{ScriptComponent, DEFAULT_SCRIPTS_DEST_DIR};
+use crate::scene::DEFAULT_SCRIPTS_DEST_DIR;
 
 /// 3F. Add Component — Unity-style full-width pill that opens the component menu.
 pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
@@ -137,13 +137,7 @@ fn add_script_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) {
     for path in scripts {
         let label = crate::scripting::script_label(&path);
         if ui.button(format!("{}  {}", icon::MOON, label)).clicked() {
-            if let Some(mut scripts) = world.scripts_mut(id) {
-                scripts.push(ScriptComponent {
-                    path,
-                    is_loaded: false,
-                    ..Default::default()
-                });
-            }
+            authoring::attach_script(world, id, &path, Default::default());
             ui.close();
         }
     }

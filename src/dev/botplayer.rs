@@ -9,7 +9,8 @@
 //! only documents the pattern and hosts the small shared helpers the harness needs to
 //! wire a bot onto the Player at run time.
 
-use crate::scene::{Scene, ScriptComponent};
+use crate::scene::authoring::attach_script;
+use crate::scene::Scene;
 
 /// Canonical path to the example bot-player script (attached to the Player).
 pub const PLAYER_BOT_SCRIPT: &str = "assets/scripts/bot_player.lua";
@@ -26,12 +27,7 @@ pub fn attach_player_bot(scene: &mut Scene, script_path: &str) -> bool {
         return false;
     };
     if let Some(mut scripts) = scene.world.scripts_mut(player_id) {
-        *scripts = vec![ScriptComponent {
-            path: script_path.to_string(),
-            is_loaded: false,
-            ..Default::default()
-        }];
-        return true;
+        scripts.clear();
     }
-    false
+    attach_script(&mut scene.world, player_id, script_path, Default::default())
 }
