@@ -107,7 +107,7 @@ fmt: ## [gate] rustfmt, engine and tools/lint
 size: ## [gate] File-length cap on .rs and .py, full scan (tools/lint)
 	$(LINT)
 
-rules: ## [gate] Finding-based rules with inline allows: prefix-group (tools/lint/src/rules)
+rules: ## [gate] Finding-based rules with inline allows: prefix-group, markers, skip, ignored (tools/lint/src/rules)
 	$(LINT) -- --rules
 
 layers: ## [gate] Module imports and external crates match the declared layer table (tools/lint/src/layers/table.rs)
@@ -128,10 +128,11 @@ parity: ## [gate] Migrated inspector cards route through scene::authoring
 test-lint: ## [gate] tools/lint's own tests
 	cargo test --manifest-path tools/lint/Cargo.toml --locked
 
-clippy: ## [gate] Clippy: default, dev, and the no-editor player build
+clippy: ## [gate] Clippy: default, dev, the no-editor player build, and tools/lint
 	cargo clippy --all-targets -- -D warnings
 	cargo clippy --all-targets --features dev -- -D warnings
 	cargo clippy --all-targets --no-default-features -- -D warnings
+	cargo clippy --manifest-path tools/lint/Cargo.toml --all-targets --locked -- -D warnings
 
 # No separate build gate: `cargo test` compiles every binary its feature set
 # enables, exactly as CI relies on (#482).

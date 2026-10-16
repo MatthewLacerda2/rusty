@@ -74,6 +74,7 @@ fn a_drop_off_the_first_floor_is_a_shortcut_to_the_street() {
 
 /// `cargo test --release --features dev --test integration -- --ignored --nocapture measure_links`
 #[test]
+// lint: allow(skip) a timing measurement, meaningful only in release; run by hand
 #[ignore = "measurement for the PR record; run in release"]
 fn measure_links_bake_and_rebake() {
     for spacing in [1.0, 0.5, 0.25] {
