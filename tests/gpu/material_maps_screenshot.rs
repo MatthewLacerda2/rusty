@@ -14,7 +14,7 @@
 //!   binding is validated GPU-free by `all_shaders_compose`.
 //!
 //! When no GPU/software adapter is present, `capture` returns `Ok(false)` and the
-//! test passes without asserting (matching `postfx_screenshot.rs`).
+//! test passes without asserting (matching `postfx/screenshot.rs`).
 
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent, Tonemap};

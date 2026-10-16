@@ -12,7 +12,7 @@ const MAX_FILE_LINES: usize = 300;
 const MAX_TEST_FILE_LINES: usize = 150;
 /// The directories the full scan walks: the engine, its integration suite, and the
 /// fuzz targets (#535), and the dev-tool crates under `tools/` (#541).
-const SCAN_ROOTS: &[&str] = &["src", "tests", "fuzz", "tools"];
+pub(crate) const SCAN_ROOTS: &[&str] = &["src", "tests", "fuzz", "tools"];
 const BASELINE: &str = "tools/lint/baseline.txt";
 const REPORT: &str = ".lint/report.txt";
 
@@ -45,7 +45,7 @@ pub fn run(args: &[String]) {
     }
 }
 
-fn scan_dir(dir: &Path) -> Vec<PathBuf> {
+pub(crate) fn scan_dir(dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     walk(dir, &mut out);
     out

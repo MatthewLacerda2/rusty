@@ -15,6 +15,7 @@ mod determinism;
 mod direction;
 mod layers;
 mod parity;
+mod rules;
 mod size;
 
 fn main() {
@@ -55,6 +56,13 @@ fn main() {
     // migrated are grandfathered in `parity_baseline.txt` (a burn-down list).
     if args.iter().any(|a| a == "--parity") {
         parity::run();
+        return;
+    }
+
+    // `--rules` runs every rule built on the shared `Finding` + inline-allow
+    // mechanism (#934): today `prefix-group`, plus the ≲10-files-per-directory signal.
+    if args.iter().any(|a| a == "--rules") {
+        rules::run();
         return;
     }
 

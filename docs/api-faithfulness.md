@@ -89,7 +89,7 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `RecordPrefabOverrides` | ✅ | round-trip — records the instance↔source diff into `prefab_link.overrides`; observable via `ListPrefabOverrides` and re-applied by propagation |
 | `RevertPrefabOverrides` / `ReimportPrefab` | ✅ | rebuild each instance entity from a fresh source baseline (re-applying overrides on reimport); the resulting component values feed the same renderer/sim read-sites as any edited entity |
 | `ApplyPrefabToSource` / `ApplyPrefabFieldToSource` | ✅ | write the instance's overrides into the source `.prefab` on disk (reusing the override setter + the one `.prefab` writer), then clear them — other instances pick the edit up on reload/reimport (#268) |
-| `SetActive` | ✅ | sim + renderer — the same `active` flag `DestroyEntity` clears: the script lifecycle's `OnEnable`/`OnDisable` edge sweep, layout groups, UI hit-testing and drawing all read it; round-trips (`tests/ui_widgets/reads.rs`, #422) |
+| `SetActive` | ✅ | sim + renderer — the same `active` flag `DestroyEntity` clears: the script lifecycle's `OnEnable`/`OnDisable` edge sweep, layout groups, UI hit-testing and drawing all read it; round-trips (`tests/ui/widgets/reads.rs`, #422) |
 
 ### `Navigation` — over `Scene.nav_settings`
 
@@ -165,7 +165,7 @@ the live rapier world, not setters, so it doesn't add to the count. Its
 faithfulness claim is script↔engine **agreement**: every query routes through the
 same `PhysicsWorld` query pipeline the engine uses, proven by
 `src/physics/spatial_tests.rs` (the queries against hand-computed geometry) and
-`src/scripting/tests_spatial.rs` (the Lua bindings return those same answers,
+`src/scripting/tests/spatial.rs` (the Lua bindings return those same answers,
 including the #91 layer-mask filter). `GetBounds` reads the collider's cached
 world AABB — the `calculate_world_aabb` value the scene recomputes on transform
 edits and each physics step.)
@@ -213,7 +213,7 @@ edits and each physics step.)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `To` / `Sequence` | ✅ | each tick writes through the property's own authoring op (`Transform` fields directly, with the collider re-sync), so the read-site is that component's setter row above/below — `CanvasGroup.SetAlpha`, `Image.SetColor`, `Light.SetIntensity`, … (`src/scripting/tests_tweens.rs`, `tests/tweens.rs`) |
+| `To` / `Sequence` | ✅ | each tick writes through the property's own authoring op (`Transform` fields directly, with the collider re-sync), so the read-site is that component's setter row above/below — `CanvasGroup.SetAlpha`, `Image.SetColor`, `Light.SetIntensity`, … (`src/scripting/tests/tweens.rs`, `tests/tweens.rs`) |
 
 ### `Camera` — over the shared `scene::Camera`
 
@@ -296,14 +296,14 @@ fields (incl. the spatial fields stored for #213) round-trip through `SceneData`
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetMinDistance` / `SetMaxDistance` / `SetPreset` / `SetParams` | ✅ | sim — `app/audio.rs::resolve_reverb` blends every active zone around the camera each `LateUpdate`, then the device's reverb bus retunes (`device/reverb.rs`); observable via `Audio.GetReverbState`, round-trips via the getters and `Debug.Snapshot` |
+| `SetMinDistance` / `SetMaxDistance` / `SetPreset` / `SetParams` | ✅ | sim — `app/audio/mod.rs::resolve_reverb` blends every active zone around the camera each `LateUpdate`, then the device's reverb bus retunes (`device/reverb.rs`); observable via `Audio.GetReverbState`, round-trips via the getters and `Debug.Snapshot` |
 
 ### `Decals` — over `Scene.decals`
 
 | Setter | Status | Read-site |
 |---|---|---|
 | `Spawn` | ✅ | renderer — `render/decals/gpu.rs` uploads each decal and loads its maps into the decal atlas; the clusters bin it and `fs_main` folds it into the surface's material (#638); its `owner` / `lifetime` / `fade` (#639) are read by `Scene::decal_pose` each frame and aged by `app/decals.rs::tick_decals` on the fixed tick |
-| `Remove` | ✅ | sim + renderer — drops the decal (or retires it to fade out) from `Scene.decals`, which the upload reads (`tests/decals_lifecycle_api.rs`) |
+| `Remove` | ✅ | sim + renderer — drops the decal (or retires it to fade out) from `Scene.decals`, which the upload reads (`tests/decals/lifecycle_api.rs`) |
 | `Clear` | ✅ | renderer — empties the uploaded set |
 
 ### `Layers` — over `Entity.layer`
@@ -354,7 +354,7 @@ renderer's texture loader: a baked PNG path handed to any `Material.Set*Map` is
 loaded by `draw::upload_scene_assets` → `load_texture(path)` and bound for sampling,
 exactly like an imported map. Proven by `tests/texture_api.rs` (a baked map wired
 into a slot decodes at the requested resolution) and the bake tests
-(`tests/procgen_bake.rs`: byte-identical determinism, per-slot sRGB/linear encoding,
+(`tests/procgen/bake.rs`: byte-identical determinism, per-slot sRGB/linear encoding,
 metallic→B/roughness→G packing, seamless tiling).
 
 | Setter | Status | Read-site |
@@ -420,28 +420,28 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 |---|---|---|
 | `SetRenderMode` | ✅ | round-trips; single-valued (`ScreenSpaceOverlay`) until #429 adds the modes the UI render pass (#418) will branch on |
 | `SetSortOrder` | ✅ | sim — `ui::UiLayout::compute` orders root canvases by it (draw / hit order); round-trips |
-| `SetReferenceResolution` | ✅ | sim — `CanvasComponent::scale_factor` / `size` in the layout pass; round-trips (`tests/ui_api.rs`) |
+| `SetReferenceResolution` | ✅ | sim — `CanvasComponent::scale_factor` / `size` in the layout pass; round-trips (`tests/ui/api.rs`) |
 | `SetMatchWidthOrHeight` | ✅ | sim — same scaler read; round-trips |
 
 ### `RectTransform` — over `Entity.rect_transform` (#417)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetAnchorMin` / `SetAnchorMax` / `SetPivot` / `SetAnchoredPosition` / `SetSizeDelta` | ✅ | sim — `RectTransformComponent::layout_in` in the `LateUpdate` layout pass (`Resources::ui_layout`) and `UI.GetRect`; round-trips (`tests/ui_api.rs`) |
+| `SetAnchorMin` / `SetAnchorMax` / `SetPivot` / `SetAnchoredPosition` / `SetSizeDelta` | ✅ | sim — `RectTransformComponent::layout_in` in the `LateUpdate` layout pass (`Resources::ui_layout`) and `UI.GetRect`; round-trips (`tests/ui/api.rs`) |
 
 ### `Image` — over `Entity.image` (#418)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetColor` / `SetTexture` / `SetType` / `SetBorder` / `SetFillMethod` / `SetFillOrigin` / `SetFillAmount` / `SetFillClockwise` / `SetPreserveAspect` | ✅ | render — `render::ui::mesh::build_canvas_meshes` + `render::ui::geometry::image_triangles` in the UI pass (`tests/gpu/ui_hud_screenshot.rs`); round-trips (`tests/ui_graphics_api.rs`) |
+| `SetColor` / `SetTexture` / `SetType` / `SetBorder` / `SetFillMethod` / `SetFillOrigin` / `SetFillAmount` / `SetFillClockwise` / `SetPreserveAspect` | ✅ | render — `render::ui::mesh::build_canvas_meshes` + `render::ui::geometry::image_triangles` in the UI pass (`tests/gpu/ui/hud_screenshot.rs`); round-trips (`tests/ui/graphics_api.rs`) |
 | `SetRaycastTarget` | ✅ | sim — `ui::events::raycast` (`UI.Raycast`, pointer dispatch; `src/ui/events/raycast_tests.rs`); round-trips |
-| `SetGradient` / `SetBlend` | ✅ | render — `render::ui::vertex::Fill` (the stops per vertex) and the batch's blend pipeline (`render::ui::blend`) in the UI pass (`tests/gpu/ui_shapes_screenshot.rs`); round-trips (`tests/ui_look_api.rs`) |
+| `SetGradient` / `SetBlend` | ✅ | render — `render::ui::vertex::Fill` (the stops per vertex) and the batch's blend pipeline (`render::ui::blend`) in the UI pass (`tests/gpu/ui/shapes_screenshot.rs`); round-trips (`tests/ui/look_api.rs`) |
 
 ### `CanvasGroup` — over `Entity.canvas_group` (#418)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetAlpha` | ✅ | render — multiplied down the subtree in `render::ui::mesh` (`tests/gpu/ui_hud_screenshot.rs`) |
+| `SetAlpha` | ✅ | render — multiplied down the subtree in `render::ui::mesh` (`tests/gpu/ui/hud_screenshot.rs`) |
 | `SetInteractable` / `SetBlocksRaycasts` | ✅ | sim — `ui::events::is_interactable` (Selectable `Disabled`, interaction gating) and `ui::events::raycast` (pass-through); round-trips |
 
 ### `RectMask` — over `Entity.rect_mask` (#418)
@@ -449,34 +449,34 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 | Setter | Status | Read-site |
 |---|---|---|
 | `SetPadding` | ✅ | render — the subtree's scissor rect in `render::ui::mesh`; round-trips |
-| `SetFeather` | ✅ | render — the batch's soft clip (`render::ui::clip`, cut in `ui.wgsl`; `tests/gpu/ui_mask_screenshot.rs`); round-trips (`tests/ui_mask_api.rs`) |
+| `SetFeather` | ✅ | render — the batch's soft clip (`render::ui::clip`, cut in `ui.wgsl`; `tests/gpu/ui/mask_screenshot.rs`); round-trips (`tests/ui/mask_api.rs`) |
 
 ### `Mask` — over `Entity.mask` (#428)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetShowMaskGraphic` | ✅ | render — whether `render::ui::mesh` batches the mask's own graphic (`tests/gpu/ui_mask_screenshot.rs`); round-trips (`tests/ui_mask_api.rs`) |
+| `SetShowMaskGraphic` | ✅ | render — whether `render::ui::mesh` batches the mask's own graphic (`tests/gpu/ui/mask_screenshot.rs`); round-trips (`tests/ui/mask_api.rs`) |
 
 ### `BackdropFilter` — over `Entity.backdrop_filter` (#426)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetBlurRadius` / `SetTint` / `SetSaturation` / `SetBrightness` | ✅ | render — the backdrop batch and its blur level in `render::ui::backdrop`, filtered in `ui.wgsl` (`tests/gpu/ui_backdrop_screenshot.rs`); round-trips (`tests/ui_mask_api.rs`) |
+| `SetBlurRadius` / `SetTint` / `SetSaturation` / `SetBrightness` | ✅ | render — the backdrop batch and its blur level in `render::ui::backdrop`, filtered in `ui.wgsl` (`tests/gpu/ui/backdrop_screenshot.rs`); round-trips (`tests/ui/mask_api.rs`) |
 
 ### `Text` — over `Entity.text` (#419)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetText` / `SetFont` / `SetBoldFont` / `SetItalicFont` / `SetFontSize` / `SetColor` / `SetAlignment` / `SetWrap` / `SetOverflow` / `SetLineSpacing` / `SetLetterSpacing` / `SetAutoSize` / `SetRichText` | ✅ | sim — `ui::text::layout_text` (also `Text.GetLayout` / `GetPreferredSize`); render — `render::ui::text::quads` in the UI pass; round-trips (`tests/ui_text_api/`) |
-| `SetOutline` / `SetShadow` / `SetGlow` | ✅ | render — the SDF parameters and shadow quads of `render::ui::text::quads`, cut in `ui.wgsl` (`tests/gpu/ui_text_screenshot.rs`); round-trips |
-| `SetBlend` | ✅ | render — the batch's blend pipeline (`render::ui::blend`); round-trips (`tests/ui_look_api.rs`) |
+| `SetText` / `SetFont` / `SetBoldFont` / `SetItalicFont` / `SetFontSize` / `SetColor` / `SetAlignment` / `SetWrap` / `SetOverflow` / `SetLineSpacing` / `SetLetterSpacing` / `SetAutoSize` / `SetRichText` | ✅ | sim — `ui::text::layout_text` (also `Text.GetLayout` / `GetPreferredSize`); render — `render::ui::text::quads` in the UI pass; round-trips (`tests/ui/text_api/`) |
+| `SetOutline` / `SetShadow` / `SetGlow` | ✅ | render — the SDF parameters and shadow quads of `render::ui::text::quads`, cut in `ui.wgsl` (`tests/gpu/ui/text_screenshot.rs`); round-trips |
+| `SetBlend` | ✅ | render — the batch's blend pipeline (`render::ui::blend`); round-trips (`tests/ui/look_api.rs`) |
 | `SetRaycastTarget` | ✅ | sim — `ui::events::raycast`; round-trips |
 
 ### `Shape` — over `Entity.shape` (#425)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetKind` / `SetCorner` / `SetRadius` / `SetInnerRadius` / `SetArc` / `SetThickness` / `SetDash` / `SetColor` / `SetGradient` / `SetBorder` / `SetShadow` / `SetGlow` / `SetBlend` | ✅ | render — `render::ui::shape` (the SDF quads) cut by `shape_distance` / `sdf_shape` in `ui.wgsl` (`tests/gpu/ui_shapes_screenshot.rs`); round-trips (`tests/ui_look_api.rs`) |
+| `SetKind` / `SetCorner` / `SetRadius` / `SetInnerRadius` / `SetArc` / `SetThickness` / `SetDash` / `SetColor` / `SetGradient` / `SetBorder` / `SetShadow` / `SetGlow` / `SetBlend` | ✅ | render — `render::ui::shape` (the SDF quads) cut by `shape_distance` / `sdf_shape` in `ui.wgsl` (`tests/gpu/ui/shapes_screenshot.rs`); round-trips (`tests/ui/look_api.rs`) |
 | `SetRaycastTarget` | ✅ | sim — `ui::events::raycast`; round-trips |
 
 ### `Selectable` — over `Entity.selectable` (#420)
@@ -505,9 +505,9 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetSelected` | ✅ | sim — `EventSystem::process` announces it (`OnDeselect` / `OnSelect`) and navigation moves from it (`tests/ui_events.rs`); runtime state, not saved |
-| `Click` | ✅ | sim — writes `Input`'s pointer + `Mouse0` edges, read by the next tick's pointer dispatch (`tests/ui_events.rs`) |
-| `Create` | ✅ | builds the widget tree through `ui_widgets::create_ui` (the Create ▸ UI menu's path): ordinary entities and components every UI read-site sees, plus the widget script the next tick loads; round-trips (`tests/ui_widgets/create.rs`, #422) |
+| `SetSelected` | ✅ | sim — `EventSystem::process` announces it (`OnDeselect` / `OnSelect`) and navigation moves from it (`tests/ui/events.rs`); runtime state, not saved |
+| `Click` | ✅ | sim — writes `Input`'s pointer + `Mouse0` edges, read by the next tick's pointer dispatch (`tests/ui/events.rs`) |
+| `Create` | ✅ | builds the widget tree through `ui_widgets::create_ui` (the Create ▸ UI menu's path): ordinary entities and components every UI read-site sees, plus the widget script the next tick loads; round-trips (`tests/ui/widgets/create.rs`, #422) |
 
 ### `Debug` (dev-only) — over `ConsoleLogs`
 

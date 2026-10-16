@@ -12,7 +12,7 @@ use std::cell::RefCell;
 
 use mlua::{IntoLua, Value};
 
-use super::super::material::shader_params::floats;
+use super::super::material::shader::params::floats;
 use super::super::{put, Reg};
 use crate::scene::authoring::ui_shader as ops;
 use crate::scene::Scene;

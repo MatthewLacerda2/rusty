@@ -3,7 +3,7 @@
 //! Unity's `NavMeshObstacle`: the shape (box or upright capsule), whether it
 //! carves the navmesh and how (only once stationary, the move threshold, the time
 //! to stationary), plus what the play tick found (`IsCarving`, `GetVelocity`).
-//! Every setter routes through the shared `scene::authoring::nav_obstacle` ops the
+//! Every setter routes through the shared `scene::authoring::nav::obstacle` ops the
 //! inspector card uses. Getters return a neutral default without an obstacle;
 //! setters are then no-ops. Attach one with
 //! `Scene.AddComponent(id, "NavMeshObstacle")`.
@@ -15,7 +15,7 @@ use mlua::{Lua, Table};
 
 use super::{put, Reg};
 use crate::components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
-use crate::scene::authoring::nav_obstacle as ops;
+use crate::scene::authoring::nav::obstacle as ops;
 use crate::scene::Scene;
 
 type SceneCell<'s> = &'s RefCell<Scene>;

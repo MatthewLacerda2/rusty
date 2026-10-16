@@ -1,6 +1,6 @@
 //! src/render/reflection_bake.rs — Reflection-probe bake driver (#245).
 //!
-//! The specular sibling of the light-probe bake (`probe_bake.rs`). For each reflection
+//! The specular sibling of the light-probe bake (`probe/bake.rs`). For each reflection
 //! probe it captures the STATIC scene to a 6-face cubemap from the probe position
 //! (`capture_static_cubemap`, #243), GGX-prefilters it into a roughness mip chain
 //! (`reflection_prefilter`), encodes the result to KTX2 (`ktx2_encode`), writes that file

@@ -18,7 +18,7 @@ use super::super::{put, Reg};
 use super::set_and_rebake;
 use crate::components::OffMeshLinkData;
 use crate::navigation::{complete_off_mesh_link, NavMeshSettings, NavigationGraph};
-use crate::scene::authoring::nav_agent as nav_ops;
+use crate::scene::authoring::nav::agent as nav_ops;
 use crate::scene::Scene;
 
 fn point(lua: &Lua, p: Vec3) -> mlua::Result<Table> {

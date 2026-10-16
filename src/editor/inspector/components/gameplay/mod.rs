@@ -12,18 +12,14 @@ use std::path::Path;
 mod character_controller;
 mod collider;
 mod joint;
-mod nav_agent;
-mod nav_modifier;
-mod nav_obstacle;
+mod nav;
 mod offmesh_link;
 mod physics;
 
 pub use character_controller::draw_character_controller;
 pub use collider::draw_collider;
 pub use joint::draw_joint;
-pub use nav_agent::draw_nav_agent;
-pub use nav_modifier::draw_nav_modifier;
-pub use nav_obstacle::draw_nav_obstacle;
+pub use nav::{draw_nav_agent, draw_nav_modifier, draw_nav_obstacle};
 pub use offmesh_link::draw_offmesh_link;
 pub use physics::draw_rigidbody;
 

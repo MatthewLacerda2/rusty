@@ -22,9 +22,7 @@
 pub mod anim_data;
 pub mod animation_graph;
 pub mod audio;
-pub mod gltf_anim;
-pub mod gltf_import;
-pub mod gltf_skin;
+pub mod gltf;
 pub mod lightmap_uv;
 pub mod lod;
 pub mod manifest;
@@ -119,7 +117,7 @@ fn parse_file(path: &Path) -> Result<ImportedAsset, ImportError> {
         .unwrap_or("")
         .to_lowercase();
     match ext.as_str() {
-        "gltf" | "glb" => gltf_import::import(path),
+        "gltf" | "glb" => gltf::import::import(path),
         "obj" => obj_import::import(path),
         other => Err(ImportError::UnsupportedFormat(other.to_string())),
     }
@@ -168,10 +166,6 @@ pub fn import_sub_mesh(reference: &str) -> Result<SubMesh, ImportError> {
 pub(crate) mod fixtures;
 #[cfg(test)]
 pub(crate) mod fixtures_anim;
-#[cfg(test)]
-mod gltf_import_tests;
-#[cfg(test)]
-mod gltf_uv2_tests;
 #[cfg(test)]
 mod manifest_tests;
 #[cfg(test)]

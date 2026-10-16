@@ -176,7 +176,7 @@ impl Renderer {
 
 /// A [`Camera`] at `position` aimed down `face`'s axis with a 90° vertical FOV — the
 /// exact lens that tiles six faces into a seamless cube. `pub(crate)` so the probe
-/// bake (`probe_bake.rs`) reconstructs the *same* per-texel world directions the
+/// bake (`probe/bake.rs`) reconstructs the *same* per-texel world directions the
 /// capture rendered, keeping projection and capture in lockstep.
 pub(crate) fn face_camera(position: Vec3, face: CubemapFace) -> Camera {
     let (yaw, pitch) = face.yaw_pitch();

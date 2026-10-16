@@ -28,8 +28,7 @@
 
 mod asset;
 mod from_lua;
-pub(crate) mod shader_params;
-mod shader_textures;
+pub(crate) mod shader;
 
 use std::cell::RefCell;
 
@@ -52,8 +51,8 @@ pub fn register<'scope>(
     register_maps(scope, &table, scene)?;
     register_transparency(scope, &table, scene)?;
     asset::register(scope, &table, scene)?;
-    shader_params::register(scope, &table, scene)?;
-    shader_textures::register(scope, &table, scene)?;
+    shader::params::register(scope, &table, scene)?;
+    shader::textures::register(scope, &table, scene)?;
     put(
         &table,
         "SetShader",

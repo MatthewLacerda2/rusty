@@ -12,7 +12,7 @@ use rusty::dev::capture::CaptureHost;
 use rusty::scene::Scene;
 use rusty::shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
 
-use super::fog_scene::{centre, srgb8, wall_scene};
+use super::fog::scene::{centre, srgb8, wall_scene};
 
 /// Bake a postfx module that zeroes red and blue, keeping green.
 fn bake_green(name: &str) {

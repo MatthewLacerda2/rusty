@@ -13,6 +13,7 @@ agent can read exactly what failed.
 | Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]` |
 | File length | `tools/lint` | <= 300 lines |
 | Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
+| Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix. Prints the ≲10-files-per-directory signal beside it, never failing on it (#934) |
 | Module layering | `tools/lint -- --layers` | every `crate::<module>` import matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724) |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
 | Dependency direction | `tools/lint -- --direction` | the table's sim modules never reference `crate::render`, `crate::editor`, `wgpu` or `egui` — the arrow is render/editor → sim (#494) |
@@ -73,6 +74,33 @@ has no `[lints]` table: it is not clippy-gated, so one would be dead config.
 `tools/lint/baseline.txt` grandfathers the files that already exceed the cap. It is a
 **TODO list, not a pardon**: as a file is split, remove its entry. Never add new
 entries. When the file is empty, the size gate is fully on.
+
+## Rules, findings and inline allows (`--rules`)
+`--rules` runs every check built on one shared shape (#934): a rule reports
+`path:line: [rule] message`, and code that breaks a rule on purpose says why with an
+inline comment, on the flagged line or in the comment/attribute lines right above it:
+
+```
+// lint: allow(prefix-group) the three mirror Unity's NavMesh* component names
+```
+
+The reason is required; an allow without one is itself a finding (`[allow]`). A new
+rule is one more call in `tools/lint/src/rules/mod.rs`: no new flag, gate, CI step
+or baseline.
+
+- **`prefix-group`** — CLAUDE.md's "group by subfolder, not by filename prefix".
+  Three or more sibling `.rs` files whose names start with the same word (up to the
+  first `_` or `-`) fail. Files count by stem, so `x.rs` and `x_tests.rs` are one,
+  and a bare `nav.rs` counts with the `nav_*` files beside it; `mod.rs`, `main.rs`
+  and `lib.rs` never count. The finding anchors on the first `mod` line that
+  declares the group, which is where its allow goes. The flat registries CLAUDE.md
+  exempts (`src/api/`, one file per Lua namespace; `src/components/`, one file per
+  first-class component) are listed in `rules/prefix.rs` with the reason, and the
+  exemption covers that directory only, not its subfolders.
+- **The ≲10-files-per-directory signal** prints after the findings: every scanned
+  directory holding more than ten `.rs` files (`mod.rs` aside), most crowded first.
+  CLAUDE.md says "aim for", so it never fails the gate; it tells you where to
+  cluster by responsibility when you next work in that directory.
 
 ## Module layering (`--layers`)
 Which module may import which is declared once, in `tools/lint/src/layers/table.rs`

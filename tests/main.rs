@@ -19,18 +19,14 @@ mod temp;
 
 // ── Both feature sets ────────────────────────────────────────────────────────────
 mod animation_runtime;
-mod animator_graph_api;
-mod animator_layers_api;
-mod animator_parameters;
+mod animator;
 mod api_doc_layout;
 mod asset_scene_reference;
 mod audio_api;
 mod callback_doc_drift;
 mod camera_target_api;
 mod character_controller;
-mod decals_api;
-mod decals_lifecycle_api;
-mod decals_opts_api;
+mod decals;
 mod default_ambient;
 mod gamepad_api;
 mod graphics_api;
@@ -44,34 +40,14 @@ mod light_probes;
 mod lod_group_api;
 mod material_authoring;
 mod material_library;
-mod nav_accel;
-mod nav_agents_values;
-mod nav_avoidance;
-mod nav_avoidance_door;
-mod nav_obstacle_door;
-mod nav_off_floor;
-mod nav_turn;
+mod nav;
 mod navigation_layered;
 mod navmesh_settings;
 mod parity_authoring_ops;
-mod particles_api;
-mod particles_collision;
-mod particles_determinism;
-mod particles_modules;
-mod physics_character;
-mod physics_contacts;
-mod physics_gravity;
-mod physics_queries;
-mod physics_rapier;
+mod particles;
+mod physics;
 mod prefab_api;
-mod procgen_bake;
-mod procgen_hard_surface;
-mod procgen_ops;
-mod procgen_ops_math;
-mod procgen_organic;
-mod procgen_resolution;
-mod procgen_seams;
-mod procgen_weathering;
+mod procgen;
 mod proptest_scene;
 mod ragdoll;
 mod reflection_probes;
@@ -83,16 +59,7 @@ mod sound_song_api;
 mod starter_materials;
 mod texture_api;
 mod transform_api;
-mod ui_anchor_preset_api;
-mod ui_api;
-mod ui_events;
-mod ui_graphics_api;
-mod ui_layout_api;
-mod ui_look_api;
-mod ui_mask_api;
-mod ui_text_api;
-mod ui_widgets;
-mod ui_world_api;
+mod ui;
 mod video_api;
 
 // ── Dev layer only (harness, session, MCP, `Debug.*`) ────────────────────────────
@@ -118,8 +85,6 @@ mod lua_determinism;
 mod mcp_attach;
 #[cfg(feature = "dev")]
 mod mcp_bridge;
-#[cfg(feature = "dev")]
-mod nav_bounds_boot;
 #[cfg(feature = "dev")]
 mod pause_step;
 #[cfg(feature = "dev")]

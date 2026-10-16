@@ -216,5 +216,5 @@ fn unescape(token: &str) -> String {
 }
 
 #[cfg(test)]
-#[path = "prefab_overrides_tests.rs"]
+#[path = "overrides_tests.rs"]
 mod prefab_overrides_tests;
