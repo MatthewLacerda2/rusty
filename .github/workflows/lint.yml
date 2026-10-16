@@ -2,9 +2,6 @@ name: lint
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
-  # Run on the merge queue's speculative merge so the lint gate validates the
-  # state that will actually land (see ci.yml for the same rationale).
-  merge_group:
   # Post-merge on `main` (#482): this is the only run that may save the lint job's
   # cache (see the cache step), so without it every PR's lint job would start
   # cold. It also lints the commit that actually landed.
@@ -12,11 +9,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Cancel superseded PR runs; every other event keys on its own run id and always
-# finishes. Same shape and rationale as ci.yml's `concurrency` block (#482).
+# Cancel a ready PR's run only when a push supersedes it; every other event keys
+# on its own run id and always finishes. Same shape and rationale as ci.yml's
+# `concurrency` block (#482, #930).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action == 'synchronize' }}
 
 jobs:
   # Markdown-only PRs skip the Rust lint/format/clippy *steps*, but the required
@@ -25,7 +23,8 @@ jobs:
   # under the branch ruleset (skipped ≠ pass), wedging docs-only PRs (issue #218),
   # so we guard the steps on `code` instead. See CLAUDE.md.
   changes:
-    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    runs-on: ubuntu-24.04
     outputs:
       code: ${{ steps.filter.outputs.code || 'true' }}
     steps:
@@ -39,13 +38,13 @@ jobs:
 
   lint:
     needs: changes
-    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    runs-on: ubuntu-24.04
     # Events listed explicitly, as in ci.yml (#480): a bare
     # `github.event.pull_request.draft == false` also matches `push` (null == false).
     if: >-
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'merge_group' ||
       (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
     steps:
       - uses: actions/checkout@v7
@@ -141,7 +140,8 @@ jobs:
     needs: [changes, lint]
     # `!cancelled()`, not `always()` (#515): see `ci-gate` in ci.yml.
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    runs-on: ubuntu-24.04
     steps:
       - name: Gate on the lint job (success or skipped passes)
         env:

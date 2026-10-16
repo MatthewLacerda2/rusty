@@ -405,7 +405,7 @@ class Workflows(unittest.TestCase):
     def test_macos_still_gates(self):
         # The other shipped platform: in `ci-gate`'s `needs:` and on its runner.
         self.assertIn("build-test-cross", gate_needs("ci.yml", "ci-gate"))
-        self.assertRegex((WORKFLOW_DIR / "ci.yml").read_text(), r"os: \[macos-latest\]")
+        self.assertRegex((WORKFLOW_DIR / "ci.yml").read_text(), r"os: \[macos-\d+\]")
 
     def test_build_test_still_has_the_step_the_drift_check_looks_for(self):
         text = (WORKFLOW_DIR / "ci.yml").read_text()
