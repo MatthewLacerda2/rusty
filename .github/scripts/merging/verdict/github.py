@@ -87,10 +87,11 @@ def evidence(repo: str, sha: str) -> tuple[list[dict], dict[int, list[dict]]]:
 
 # The pull-request fields every caller reads. `mergeable` to `statusCheckRollup`
 # only matter when there is no run to judge, and make that answer specific
-# (#429, #592); the last three are what the pull request claims (#927).
+# (#429, #592); the rest are what the pull request claims and who it is from
+# (#927, #966).
 PULL_FIELDS = (
     "isDraft,headRefOid,number,files,mergeable,mergeStateStatus,statusCheckRollup,"
-    "headRefName,body,closingIssuesReferences"
+    "headRefName,body,closingIssuesReferences,labels,author"
 )
 
 
