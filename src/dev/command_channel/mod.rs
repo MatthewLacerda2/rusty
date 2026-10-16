@@ -221,6 +221,7 @@ mod tests {
     fn start_binds_a_unix_socket_then_drops_cleanly() {
         // Point the channel at an isolated path so the test never collides with a
         // running engine or another test.
+        // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
         let dir = std::env::temp_dir();
         let path = dir.join(format!("rusty-cmd-test-{}.sock", std::process::id()));
         // The path goes to the bind directly: setting `RUSTY_CMD_SOCK` would leak

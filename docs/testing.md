@@ -95,6 +95,9 @@ count and filled `target/` with near-identical binaries (#483). So `Cargo.toml` 
   (`clippy.toml`'s `disallowed-methods`, #977): pass the value as a parameter
   instead. Production code that really owns the process (`project::open` moving
   the working directory) opts out inline with `#[expect(…, reason = "…")]`.
+  In-crate tests have the same helper,
+  `crate::test_temp::dir()` (#999); the `test-temp-dir` rule fails a bare
+  `std::env::temp_dir()` in test code (see `linting.md`).
 - Filtering works by module path: `cargo nextest run -E 'binary(integration)' physics_`.
 
 ## Build and test share one dependency graph

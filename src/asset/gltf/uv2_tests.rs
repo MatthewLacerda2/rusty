@@ -42,7 +42,7 @@ fn two_uv_triangle() -> (String, Vec<u8>) {
 
 /// Write a JSON + `<stem>.bin` pair into its own temp dir and import its one mesh.
 fn import_pair(dir: &str, stem: &str, (json, bin): (String, Vec<u8>)) -> SubMesh {
-    let dir = std::env::temp_dir().join(dir);
+    let dir = crate::test_temp::dir().join(dir);
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join(format!("{stem}.bin")), bin).unwrap();
     let path = dir.join(format!("{stem}.gltf"));
@@ -99,7 +99,7 @@ fn ticking_generate_lightmap_uvs_makes_a_mesh_without_texcoord_1_bake() {
     );
     assert!(bake(&bake_input(&plain), &settings).is_empty());
 
-    let dir = std::env::temp_dir().join("rusty_uv2_gen_on");
+    let dir = crate::test_temp::dir().join("rusty_uv2_gen_on");
     std::fs::create_dir_all(&dir).unwrap();
     let on = crate::asset::LightmapUvSettings {
         generate: true,

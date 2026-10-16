@@ -21,6 +21,7 @@ agent can read exactly what failed.
 | Skipped tests | `tools/lint -- --rules` (`skip`) | **hard gate**: `#[ignore]` / `#[cfg_attr(…, ignore)]` needs `// lint: allow(skip) <why>` (#935) |
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
+| Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `crate::test_temp::dir()` / `crate::temp::dir()`, never a bare `std::env::temp_dir()` (#999) |
 | Module layering | `tools/lint -- --layers` | every `crate::<module>` import and every external crate a module names matches the declared table (`tools/lint/src/layers/table.rs`): nothing undeclared, nothing stale, no cycle, no sim → platform edge (#724, #938) |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
 | No shared process state | clippy `disallowed_methods` + `tools/lint -- --determinism` | **hard gate**: `std::env::{set_var, remove_var, set_current_dir}` are banned crate-wide in `clippy.toml`, tests included, since `cargo test` runs every in-crate test in one process; production opts out inline with a reason (`project::open`), and `--determinism` keeps the three on the list (#977) |
@@ -169,6 +170,15 @@ or baseline.
   `#![deny(clippy::unwrap_used)]`, and no file under a sim module may `allow`,
   `expect` or `warn` `clippy::unwrap_used` (or the `clippy::restriction` group).
   A new sim row is covered the day it is added. Platform files are not scanned.
+- **`test-temp-dir`** — a path under `std::env::temp_dir()` is shared by every test
+  process, every worktree and (under `cargo test` and cargo-mutants) every test
+  thread, so a fixed or process-keyed name races. Test code under `src/` and
+  `tests/` calls `crate::test_temp::dir()` (in-crate) or `crate::temp::dir()`
+  (integration) instead: both key on the process *and* the running test (#709,
+  #999). Test code is all of `tests/`, every `tests.rs` / `*_tests.rs`, and a
+  file's lines from its first `#[cfg(test)]` on; comment lines never count. The
+  helper itself and Unix socket paths (which must stay short) carry an inline
+  allow. `tools/` is not scanned: the lint crate's own tests are not the engine's.
 - **The ≲10-files-per-directory signal** prints after the findings: every scanned
   directory holding more than ten `.rs` files (`mod.rs` aside), most crowded first.
   CLAUDE.md says "aim for", so it never fails the gate; it tells you where to

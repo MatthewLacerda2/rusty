@@ -41,7 +41,7 @@ pub(super) fn quick() -> BakeSettings {
 
 /// A fresh temp dir and a scene path inside it.
 pub(super) fn scene_path(name: &str) -> String {
-    let dir = std::env::temp_dir().join(format!("rusty_lightmap_{name}"));
+    let dir = crate::test_temp::dir().join(format!("rusty_lightmap_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir.join("level.scene").to_string_lossy().into_owned()

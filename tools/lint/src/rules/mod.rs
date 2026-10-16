@@ -14,6 +14,7 @@ mod skip;
 mod test_code;
 mod test_shape;
 mod unwrap;
+mod temp_dir;
 
 pub use finding::{allowed, Finding};
 use std::collections::BTreeMap;
@@ -57,6 +58,7 @@ pub fn run() {
         findings.extend(skip::check(path, &src));
         findings.extend(test_shape::check(path, &src));
         findings.extend(unwrap::check(path, &src, &sim_dirs));
+        findings.extend(temp_dir::check_file(path, &src));
     }
     findings.retain(|f| !finding::allowed(&source(&f.path), f.line, f.rule));
     for path in &files {
@@ -137,3 +139,5 @@ mod skip_tests;
 mod test_shape_tests;
 #[cfg(test)]
 mod unwrap_tests;
+#[cfg(test)]
+mod temp_dir_tests;

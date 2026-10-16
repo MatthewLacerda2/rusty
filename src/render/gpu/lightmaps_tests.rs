@@ -11,9 +11,9 @@ use crate::render::test_gpu::headless_or_skip;
 use crate::scene::lighting::lightmap::LightmapEntry;
 use crate::scene::Scene;
 
-/// Write a black `edge`² PNG named `name` under a per-process temp dir.
+/// Write a black `edge`² PNG named `name` under the test's temp dir.
 fn page(name: &str, edge: u32) -> String {
-    let dir = std::env::temp_dir().join(format!("rusty_888_{}", std::process::id()));
+    let dir = crate::test_temp::dir().join("rusty_888");
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(name);
     image::RgbaImage::new(edge, edge).save(&path).unwrap();
