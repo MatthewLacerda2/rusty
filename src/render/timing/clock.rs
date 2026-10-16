@@ -48,18 +48,7 @@ impl ClockProbe {
         if !device.features().contains(wgpu::Features::TIMESTAMP_QUERY) {
             return None;
         }
-        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Bench clock probe"),
-            source: wgpu::ShaderSource::Wgsl(SHADER.into()),
-        });
-        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("Bench clock probe"),
-            layout: None,
-            module: &module,
-            entry_point: Some("main"),
-            compilation_options: Default::default(),
-            cache: None,
-        });
+        let pipeline = pipeline(device);
         let buffer = |label, size, usage| {
             device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(label),
@@ -131,6 +120,22 @@ impl ClockProbe {
         let ms = ticks[1].saturating_sub(ticks[0]) as f64 * self.period_ns / 1e6;
         (ms > 0.0).then_some(ms)
     }
+}
+
+/// The fixed load's compute pipeline, its bind group layout inferred from [`SHADER`].
+fn pipeline(device: &wgpu::Device) -> wgpu::ComputePipeline {
+    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("Bench clock probe"),
+        source: wgpu::ShaderSource::Wgsl(SHADER.into()),
+    });
+    device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+        label: Some("Bench clock probe"),
+        layout: None,
+        module: &module,
+        entry_point: Some("main"),
+        compilation_options: Default::default(),
+        cache: None,
+    })
 }
 
 #[cfg(test)]
