@@ -144,7 +144,7 @@ an override — so it is on you.
 operator's 8-core / 15 GB machine on 2026-09-30 (#497 has the raw numbers; on a
 different machine, re-measure rather than trust them):
 
-- **Three local agents at most, and at most two heavy builds at once.** A heavy
+- **Two local coders at most, and at most two heavy builds at once.** A heavy
   build is a cold build of a fresh `target/` or a `make gates` run; an incremental
   rebuild after an edit (seconds, about 1 GB) is not one. A third heavy build fits
   in memory but buys nothing: one cold build already fills 8 cores, so two side by
