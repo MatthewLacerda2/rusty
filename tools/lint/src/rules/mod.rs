@@ -11,6 +11,7 @@ mod ignored;
 mod markers;
 mod prefix;
 mod skip;
+mod subprocess;
 mod temp_dir;
 mod test_code;
 mod test_shape;
@@ -59,6 +60,7 @@ pub fn run() {
         findings.extend(test_shape::check(path, &src));
         findings.extend(unwrap::check(path, &src, &sim_dirs));
         findings.extend(temp_dir::check_file(path, &src));
+        findings.extend(subprocess::check(path, &src));
     }
     findings.retain(|f| !finding::allowed(&source(&f.path), f.line, f.rule));
     for path in &files {
@@ -135,6 +137,8 @@ mod markers_tests;
 mod prefix_tests;
 #[cfg(test)]
 mod skip_tests;
+#[cfg(test)]
+mod subprocess_tests;
 #[cfg(test)]
 mod temp_dir_tests;
 #[cfg(test)]
