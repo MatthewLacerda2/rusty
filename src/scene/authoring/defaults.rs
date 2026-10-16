@@ -8,6 +8,7 @@
 
 use glam::Vec3;
 
+use crate::components::material::entity_material_key;
 use crate::components::Playback;
 use crate::scene::{
     AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape,
@@ -28,8 +29,8 @@ pub(crate) fn light(
         color,
         intensity,
         range,
-        inner_cone: 30.0,
-        outer_cone: 45.0,
+        inner_cone: super::light::DEFAULT_CONES.0,
+        outer_cone: super::light::DEFAULT_CONES.1,
         cast_shadows: false,
         mode: Default::default(),
     }
@@ -113,22 +114,25 @@ pub fn material_asset_from_import(data: &crate::asset::MaterialData) -> Material
     }
 }
 
-/// Attach a `MaterialComponent` to entity `id` referencing a freshly-created default
-/// library material (keyed `entity_{id}_material`), inserting it into the scene's
-/// library. Returns `false` if the entity does not exist. Material is the one
-/// "Add Component" verb that creates a shared library asset, not just entity data.
+/// Attach a `MaterialComponent` to entity `id` referencing its own library material
+/// (keyed [`entity_material_key`]), creating a default one in the scene's library
+/// when none is there. A surviving asset under that key (the entity's material from
+/// before a remove, possibly shared by others) is kept, never reset: the same rule as
+/// `Material.Set*`'s resolve-or-create (#997), and Unity's, where adding a renderer
+/// never touches a material asset. Returns `false` if the entity does not exist.
+/// Material is the one "Add Component" verb that creates a shared library asset, not
+/// just entity data.
 pub fn attach_default_material(scene: &mut Scene, id: u32) -> bool {
-    let key = format!("entity_{id}_material");
-    let attached = scene.world.set_material(
-        id,
-        Some(MaterialComponent {
-            material: key.clone(),
-        }),
-    );
-    if !attached {
+    if !scene
+        .world
+        .set_material(id, Some(MaterialComponent::for_entity(id)))
+    {
         return false;
     }
-    scene.materials.insert(key, default_material());
+    scene
+        .materials
+        .entry(entity_material_key(id))
+        .or_insert_with(default_material);
     true
 }
 

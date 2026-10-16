@@ -23,18 +23,23 @@ impl LightType {
         LightType::Spotlight,
     ];
 
-    /// The type's name, as the API and the scene snapshot spell it.
+    /// The type's name, as the editor, the API and the scene snapshot spell it —
+    /// Unity's (`LightType.Spot`, #997).
     pub fn name(&self) -> &'static str {
         match self {
             LightType::Ambient => "Ambient",
             LightType::Directional => "Directional",
             LightType::Point => "Point",
-            LightType::Spotlight => "Spotlight",
+            LightType::Spotlight => "Spot",
         }
     }
 
-    /// Parse a type name, case-insensitively; `None` for an unknown one.
+    /// Parse a type name, case-insensitively; `None` for an unknown one. The
+    /// pre-#997 API name `"Spotlight"` still parses, so older scripts keep working.
     pub fn parse(name: &str) -> Option<LightType> {
+        if name.eq_ignore_ascii_case("spotlight") {
+            return Some(LightType::Spotlight);
+        }
         Self::ALL
             .into_iter()
             .find(|t| t.name().eq_ignore_ascii_case(name))
@@ -137,6 +142,16 @@ mod tests {
         assert!(!LightMode::Realtime.bakes_indirect() && !LightMode::Realtime.bakes_direct());
         assert!(LightMode::Mixed.bakes_indirect() && !LightMode::Mixed.bakes_direct());
         assert!(LightMode::Baked.bakes_indirect() && LightMode::Baked.bakes_direct());
+    }
+
+    #[test]
+    fn type_names_round_trip_and_spotlight_still_parses() {
+        for t in LightType::ALL {
+            assert_eq!(LightType::parse(&t.name().to_lowercase()), Some(t));
+        }
+        assert_eq!(LightType::Spotlight.name(), "Spot", "Unity's name (#997)");
+        assert_eq!(LightType::parse("Spotlight"), Some(LightType::Spotlight));
+        assert_eq!(LightType::parse("Area"), None);
     }
 
     #[test]

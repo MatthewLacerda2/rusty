@@ -268,13 +268,9 @@ fn decelerate(agent: &mut NavMeshAgentComponent, delta_time: f32) {
 }
 
 /// `from` moved toward `to` by at most `max_delta`, landing on it exactly when
-/// within reach (glam's `move_towards`, which this glam predates).
+/// within reach: glam's `move_towards`, the one `Transform.MoveTowards` uses too
+/// (#997). A negative step (a negative acceleration) holds still rather than
+/// steering away.
 fn move_towards(from: Vec2, to: Vec2, max_delta: f32) -> Vec2 {
-    let gap = to - from;
-    let len = gap.length();
-    if len <= max_delta || len <= f32::EPSILON {
-        to
-    } else {
-        from + gap / len * max_delta.max(0.0)
-    }
+    from.move_towards(to, max_delta.max(0.0))
 }

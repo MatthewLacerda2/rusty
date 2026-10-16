@@ -35,6 +35,9 @@ pub struct Camera {
     pub clear_flags: ClearFlags,
     /// Perspective (through `fov`) or orthographic (#430).
     pub projection: Projection,
+    /// Whether a scene `CameraComponent` set the lens on the last sync, so the
+    /// fallback knows to hand the free camera its own fov back (#997).
+    scene_lens: bool,
 }
 
 pub use crate::components::camera::{DEFAULT_FAR, DEFAULT_FOV, DEFAULT_NEAR};
@@ -56,6 +59,7 @@ impl Camera {
             culling_mask: u32::MAX,
             clear_flags: ClearFlags::Skybox,
             projection: Projection::Perspective,
+            scene_lens: false,
         }
     }
 
@@ -128,6 +132,7 @@ pub fn sync_lens_from_scene(camera: &mut Camera, scene: &Scene, is_playing: bool
         }
     }
 
+    let had_scene_lens = std::mem::replace(&mut camera.scene_lens, lens.is_some());
     match lens {
         Some((fov, near, far, mask, projection)) => {
             camera.projection = projection;
@@ -137,6 +142,12 @@ pub fn sync_lens_from_scene(camera: &mut Camera, scene: &Scene, is_playing: bool
             camera.culling_mask = mask;
         }
         None => {
+            // The fov goes back to the default only when a scene camera stops
+            // driving it, so `Camera.SetFov` on the free camera survives the per-frame
+            // sync; there is no API for the free camera's clip planes.
+            if had_scene_lens {
+                camera.fov = DEFAULT_FOV;
+            }
             camera.projection = Projection::Perspective;
             camera.near = DEFAULT_NEAR;
             camera.far = DEFAULT_FAR;
@@ -194,6 +205,10 @@ pub fn apply_lens(cam: &mut Camera, c: &crate::components::CameraComponent) {
     cam.culling_mask = c.culling_mask;
     cam.clear_flags = c.clear_flags;
 }
+
+#[cfg(test)]
+#[path = "sync_tests.rs"]
+mod sync_tests;
 
 /// Yaw/pitch (degrees) of a world matrix's forward (-Z) axis, the inverse of
 /// [`Camera::forward`], so a camera entity's orientation maps onto the render camera.

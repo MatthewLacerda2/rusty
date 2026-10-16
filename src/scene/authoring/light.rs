@@ -32,9 +32,18 @@ pub fn set_range(l: &mut LightComponent, value: f32) {
     l.range = value.max(0.0);
 }
 
+/// The cone angles (degrees) a new light carries, and a spot seeds when it has none.
+pub const DEFAULT_CONES: (f32, f32) = (30.0, 45.0);
+
 /// Set the light's kind (typed — string parsing stays in the API adapter / card).
+/// Turning a light into a spot whose cones are both still zero seeds
+/// [`DEFAULT_CONES`], so the spot is visible at once whichever surface switched it
+/// (#997).
 pub fn set_type(l: &mut LightComponent, light_type: LightType) {
     l.light_type = light_type;
+    if l.light_type == LightType::Spotlight && l.inner_cone == 0.0 && l.outer_cone == 0.0 {
+        set_cones(l, DEFAULT_CONES.0, DEFAULT_CONES.1);
+    }
 }
 
 /// Set how the light takes part in baked lighting (Realtime / Mixed / Baked, #438).
@@ -96,6 +105,20 @@ mod tests {
         assert_eq!(l.outer_cone, 40.0);
         assert_eq!(l.inner_cone, 40.0, "inner clamps to outer");
         assert_eq!(l.mode, LightMode::Baked);
+    }
+
+    /// Switching to a spot seeds zero cones, whichever surface switched it (#997);
+    /// authored cones are left alone.
+    #[test]
+    fn spot_seeds_only_zero_cones() {
+        let (mut scene, id) = scene_with_light();
+        let mut e = scene.world.light_mut(id).unwrap();
+        set_cones(&mut e, 0.0, 0.0);
+        set_type(&mut e, LightType::Spotlight);
+        assert_eq!((e.inner_cone, e.outer_cone), DEFAULT_CONES);
+        set_cones(&mut e, 10.0, 20.0);
+        set_type(&mut e, LightType::Spotlight);
+        assert_eq!((e.inner_cone, e.outer_cone), (10.0, 20.0));
     }
 
     #[test]

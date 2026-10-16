@@ -204,8 +204,7 @@ pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool
 /// editor Add menu's material path (the World holds no library, so the default asset
 /// rides along as `pending_material`, folded in once the guard drops).
 fn attach_default_material_world(world: &mut World, id: u32) -> bool {
-    let key = format!("entity_{id}_material");
-    if !world.set_material(id, Some(MaterialComponent { material: key })) {
+    if !world.set_material(id, Some(MaterialComponent::for_entity(id))) {
         return false;
     }
     world.stage_pending_material(id, default_material());

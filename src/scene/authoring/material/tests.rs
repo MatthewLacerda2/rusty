@@ -110,7 +110,7 @@ fn ensure_material_key_resolves_then_creates() {
     let mut scene = Scene::new();
     let id = scene.add_entity("Box".to_string());
     let key = ensure_material_key(&mut scene, id).expect("entity exists");
-    assert_eq!(key, format!("entity_{id}_material"));
+    assert_eq!(key, entity_material_key(id));
     assert!(scene.materials.contains_key(&key), "library entry created");
     assert!(scene.world.has_material(id), "ref attached");
     // Idempotent: a second resolve returns the same key, no duplicate entry.
@@ -119,4 +119,28 @@ fn ensure_material_key_resolves_then_creates() {
         Some(key.as_str())
     );
     assert_eq!(scene.materials.len(), 1);
+}
+
+/// Removing a Material and adding it back keeps the library asset under the entity's
+/// key, whichever surface re-adds it: one rule (#997).
+#[test]
+fn re_adding_a_material_keeps_the_library_asset() {
+    let mut scene = Scene::new();
+    let id = scene.add_entity("Box".to_string());
+    let key = ensure_material_key(&mut scene, id).unwrap();
+    set_metallic(&mut scene.materials, &key, 0.6);
+    scene.world.set_material(id, None);
+    assert!(crate::scene::authoring::attach_default_material(
+        &mut scene, id
+    ));
+    assert_eq!(
+        scene.materials[&key].metallic, 0.6,
+        "Scene.AddComponent kept it"
+    );
+    scene.world.set_material(id, None);
+    assert_eq!(
+        ensure_material_key(&mut scene, id).as_deref(),
+        Some(key.as_str())
+    );
+    assert_eq!(scene.materials[&key].metallic, 0.6, "Material.Set* kept it");
 }

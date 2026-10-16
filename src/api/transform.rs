@@ -128,7 +128,9 @@ fn register_scale<'scope>(
     )
 }
 
-/// `MoveTowards` — step toward a target, snapping when within `step` (or ~0).
+/// `MoveTowards` — step toward a target, snapping when within `step`: glam's
+/// `move_towards` (Unity's `Vector3.MoveTowards`), which a negative `step` walks away
+/// from the target (#997).
 fn register_move_towards<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -140,15 +142,7 @@ fn register_move_towards<'scope>(
         scope.create_function(|_, (id, tx, ty, tz, step): (u32, f32, f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
             if let Some(mut t) = scene.world.transform_mut(id) {
-                let pos = t.position;
-                let target = Vec3::new(tx, ty, tz);
-                let dir = target - pos;
-                let len = dir.length();
-                if len <= step || len < 0.001 {
-                    t.position = target;
-                } else {
-                    t.position += dir.normalize() * step;
-                }
+                t.position = t.position.move_towards(Vec3::new(tx, ty, tz), step);
             }
             scene.update_entity_collider(id);
             Ok(())

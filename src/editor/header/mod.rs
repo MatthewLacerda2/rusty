@@ -30,7 +30,7 @@ pub fn draw(
                 .stroke(egui::Stroke::new(1.0, t.border)),
         )
         .show(ui, |ui| {
-            draw_menu_bar(editor, ui, scene, console);
+            draw_menu_bar(editor, ui, scene, console, *is_playing);
             ui.add_space(2.0);
             transport::draw(editor, ui, scene, is_playing);
         });
@@ -44,12 +44,13 @@ fn draw_menu_bar(
     ui: &mut egui::Ui,
     scene: &mut Scene,
     console: &mut ConsoleLogs,
+    is_playing: bool,
 ) {
     // egui 0.27 menus stayed open until an item closed them or the user clicked
     // outside; keep that so the Config menu's toggles don't dismiss it.
     let config = MenuConfig::new().close_behavior(PopupCloseBehavior::CloseOnClickOutside);
     egui::MenuBar::new().config(config).ui(ui, |ui| {
-        file_menu(editor, ui, scene, console);
+        file_menu(editor, ui, scene, console, is_playing);
 
         // The GameObject menu — the Unity-style home for creating objects (#255).
         menu_create::game_object_menu(editor, ui, scene);
@@ -71,6 +72,7 @@ fn file_menu(
     ui: &mut egui::Ui,
     scene: &mut Scene,
     console: &mut ConsoleLogs,
+    is_playing: bool,
 ) {
     ui.menu_button("File", |ui| {
         if ui.button(format!("{}  New Scene", icon::FILE)).clicked() {
@@ -88,7 +90,7 @@ fn file_menu(
             .button(format!("{}  Load Scene", icon::FOLDER_OPEN))
             .clicked()
         {
-            scene_io::load_scene(editor, scene, console);
+            scene_io::load_scene(editor, scene, console, is_playing);
             ui.close();
         }
         if ui
