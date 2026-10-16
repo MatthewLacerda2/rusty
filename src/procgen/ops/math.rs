@@ -74,5 +74,5 @@ pub fn rgb_to_bw(mut img: Image) -> Image {
 /// Rec. 709 luma of a linear RGBA pixel.
 #[inline]
 pub fn luminance(p: Rgba) -> f32 {
-    0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]
+    crate::core::color::luminance([p[0], p[1], p[2]])
 }

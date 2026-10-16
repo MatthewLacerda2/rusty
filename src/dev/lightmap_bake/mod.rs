@@ -160,9 +160,7 @@ fn write_page(
 
 /// FNV-1a over the texels, folded to 32 bits: the file name's content tag.
 fn fnv1a(bytes: &[u8]) -> u32 {
-    let hash = bytes.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, &b| {
-        (h ^ b as u64).wrapping_mul(0x0100_0000_01b3)
-    });
+    let hash = crate::core::hash::fnv1a64(bytes);
     (hash ^ (hash >> 32)) as u32
 }
 
@@ -185,14 +183,7 @@ fn clear_old_lightmaps(dir: &Path) -> Result<(), String> {
 fn texture_average(path: &str) -> Option<Vec3> {
     let rgba = image::open(path).ok()?.to_rgba8();
     let count = (rgba.width() * rgba.height()).max(1) as f32;
-    let to_linear = |b: u8| {
-        let c = b as f32 / 255.0;
-        if c <= 0.04045 {
-            c / 12.92
-        } else {
-            ((c + 0.055) / 1.055).powf(2.4)
-        }
-    };
+    let to_linear = crate::core::color::srgb_to_linear;
     let sum = rgba.pixels().fold(Vec3::ZERO, |acc, p| {
         acc + Vec3::new(to_linear(p[0]), to_linear(p[1]), to_linear(p[2]))
     });

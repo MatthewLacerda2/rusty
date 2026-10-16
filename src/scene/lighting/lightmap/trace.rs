@@ -23,6 +23,7 @@ use glam::Vec3;
 use super::bvh::{Bvh, Hit};
 use super::input::{BakeLight, BakeScene, LightShape};
 use super::rng::Rng;
+use crate::core::color::luminance;
 
 /// Ray offset along the surface normal, against self-intersection, in world units.
 const SURFACE_OFFSET: f32 = 1e-3;
@@ -159,11 +160,6 @@ impl Tracer<'_> {
         let ground = self.scene.sky * 0.25;
         ground.lerp(self.scene.sky, dir.y * 0.5 + 0.5)
     }
-}
-
-/// Rec. 709 luminance: how much a colour weighs when averaging light directions.
-pub(super) fn luminance(c: Vec3) -> f32 {
-    c.dot(Vec3::new(0.2126, 0.7152, 0.0722))
 }
 
 /// Unit direction to `light`, distance to it, and the radiance arriving at `point`

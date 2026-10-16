@@ -24,6 +24,8 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::core::hash::fnv1a64;
+
 /// The manifest's place, relative to the project root.
 pub const SEED_MANIFEST_PATH: &str = ".seeded";
 
@@ -63,11 +65,11 @@ impl SeedManifest {
     /// line when a file is refreshed or kept; `hint` says how to take the new default.
     pub fn seed(&mut self, dest: &Path, bundled: &[u8], hint: &str) -> SeedOutcome {
         let key = dest.to_string_lossy().into_owned();
-        let want = fnv1a(bundled);
+        let want = fnv1a64(bundled);
         let outcome = match std::fs::read(dest) {
             Err(_) => SeedOutcome::Written,
-            Ok(current) if fnv1a(&current) == want => SeedOutcome::UpToDate,
-            Ok(current) if self.entries.get(&key) == Some(&fnv1a(&current)) => {
+            Ok(current) if fnv1a64(&current) == want => SeedOutcome::UpToDate,
+            Ok(current) if self.entries.get(&key) == Some(&fnv1a64(&current)) => {
                 SeedOutcome::Refreshed
             }
             Ok(_) => SeedOutcome::Kept,
@@ -121,14 +123,6 @@ fn read_entries(path: &Path) -> BTreeMap<String, u64> {
             Some((key.to_string(), u64::from_str_radix(hash, 16).ok()?))
         })
         .collect()
-}
-
-/// FNV-1a, 64-bit: stable across Rust releases and platforms (std's `DefaultHasher`
-/// is not), and enough to tell one version of a file from another.
-pub(crate) fn fnv1a(bytes: &[u8]) -> u64 {
-    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |h, b| {
-        (h ^ u64::from(*b)).wrapping_mul(0x0000_0100_0000_01b3)
-    })
 }
 
 /// Write `bytes` beside `dest` and rename it into place, so a reader in another

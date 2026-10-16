@@ -18,9 +18,10 @@
 //! no wall-clock / RNG — exempt from (and clean under) the determinism guard, like
 //! the capture primitive it stands on.
 
-use glam::{Mat4, Vec3, Vec4, Vec4Swizzles};
+use glam::Vec3;
 
-use crate::render::ibl::cubemap_capture::face_camera;
+use crate::core::color::srgb_to_linear;
+use crate::render::ibl::cube_sample::{face_uv, FaceProjections};
 use crate::render::{CubemapCapture, CubemapFace, Renderer};
 use crate::scene::lighting::sh::Sh9;
 use crate::scene::Scene;
@@ -58,66 +59,32 @@ impl Renderer {
 pub fn project_cubemap(capture: &CubemapCapture) -> Sh9 {
     let res = capture.resolution.max(1);
     let mut sh = Sh9::zero();
+    let proj = FaceProjections::new();
     for face in CubemapFace::ALL {
-        accumulate_face(&mut sh, capture.face(face), face, res);
+        accumulate_face(&mut sh, &proj, capture.face(face), face, res);
     }
     sh
 }
 
 /// Accumulate one face's texels into `sh`. Each texel contributes its decoded linear
 /// radiance aimed down `texel_dir`, weighted by the texel's solid angle.
-fn accumulate_face(sh: &mut Sh9, pixels: &[u8], face: CubemapFace, res: u32) {
-    let basis = FaceBasis::new(face);
+fn accumulate_face(
+    sh: &mut Sh9,
+    proj: &FaceProjections,
+    pixels: &[u8],
+    face: CubemapFace,
+    res: u32,
+) {
     for py in 0..res {
         for px in 0..res {
             let (u, v) = face_uv(px, py, res);
-            let dir = basis.direction(u, v);
+            let dir = proj.direction(face, u, v);
             let weight = texel_solid_angle(u, v, res);
             let idx = ((py * res + px) * 4) as usize;
             let rgb = decode_linear(&pixels[idx..idx + 3]);
             sh.add_sample(dir, rgb, weight);
         }
     }
-}
-
-/// Reconstructs the world direction each face texel actually saw, by inverting the
-/// exact view-projection `capture_static_cubemap` rendered the face with. Using the
-/// real matrix (not a hand-rolled basis) keeps projection in lockstep with the
-/// capture's empirically-tuned per-face orientation (#243) — a texel's direction is
-/// always the ray the GPU sampled for that pixel, flips and all.
-struct FaceBasis {
-    inv_view_proj: Mat4,
-    eye: Vec3,
-}
-
-impl FaceBasis {
-    fn new(face: CubemapFace) -> Self {
-        let camera = face_camera(Vec3::ZERO, face);
-        // Square faces → aspect 1. The capture renders at this exact lens.
-        let view_proj = camera.build_view_projection(1.0);
-        Self {
-            inv_view_proj: view_proj.inverse(),
-            eye: camera.position,
-        }
-    }
-
-    /// World direction for a face texel at face coords `(u, v)` in [-1, 1], which are
-    /// the clip-space NDC of that pixel (x right, y up). Unproject a far-plane point
-    /// and take the ray from the eye through it.
-    fn direction(&self, u: f32, v: f32) -> Vec3 {
-        let clip = Vec4::new(u, v, 1.0, 1.0);
-        let world = self.inv_view_proj * clip;
-        let point = world.xyz() / world.w;
-        (point - self.eye).normalize_or_zero()
-    }
-}
-
-/// Face coords in [-1, 1] for pixel `(px, py)` of a `res`-wide face. `u` runs right,
-/// `v` runs up (image rows are top-to-bottom, so the top row maps to `v ≈ +1`).
-fn face_uv(px: u32, py: u32, res: u32) -> (f32, f32) {
-    let u = ((px as f32 + 0.5) / res as f32) * 2.0 - 1.0;
-    let v = 1.0 - ((py as f32 + 0.5) / res as f32) * 2.0;
-    (u, v)
 }
 
 /// Differential solid angle of a cube texel at face coords `(u, v)`. A texel spans
@@ -140,16 +107,6 @@ fn decode_linear(bytes: &[u8]) -> Vec3 {
         srgb_to_linear(bytes[1]),
         srgb_to_linear(bytes[2]),
     )
-}
-
-/// Inverse-sRGB transfer for one 8-bit channel.
-fn srgb_to_linear(b: u8) -> f32 {
-    let c = b as f32 / 255.0;
-    if c <= 0.040_45 {
-        c / 12.92
-    } else {
-        ((c + 0.055) / 1.055).powf(2.4)
-    }
 }
 
 #[cfg(test)]
