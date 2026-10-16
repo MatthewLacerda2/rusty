@@ -28,7 +28,7 @@ pub fn monobehaviour_scripts(dir: &str) -> Vec<String> {
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("lua") {
+            if !crate::core::paths::has_extension(&path, "lua") {
                 return None;
             }
             let code = std::fs::read_to_string(&path).ok()?;

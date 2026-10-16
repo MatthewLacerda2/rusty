@@ -40,6 +40,7 @@ pub use manifest::{build_manifest, AssetEntry, AssetManifest, SubObjectEntry};
 pub use mesh_data::{ImportedAsset, JointTransform, MaterialData, MeshVertex, SkinData, SubMesh};
 pub use sidecar::{import_and_sync_sidecar, ImportSettings, MeshColliderKind};
 
+use crate::core::paths;
 use std::path::Path;
 
 /// The separator between a source path and a sub-object id in a scene reference:
@@ -73,18 +74,26 @@ impl std::fmt::Display for ImportError {
 
 impl std::error::Error for ImportError {}
 
+/// The source model formats [`import_file`] reads, lowercase (#983, #994). The one
+/// list: the editor's content grid, inspector and preview read it rather than
+/// spelling their own, so nothing offers a model the importer would reject. FBX is
+/// not here: no importer exists for it yet.
+pub const MODEL_EXTENSIONS: &[&str] = &["gltf", "glb", "obj"];
+
+/// The image formats a texture is decoded from, lowercase (#994): what the
+/// renderer's `image` decoders are built with (`Cargo.toml`'s `image` features).
+pub const IMAGE_EXTENSIONS: &[&str] = &["png", "tga", "jpg", "jpeg"];
+
 /// True if `path` looks like a source 3D asset this importer can read
-/// (`.gltf`/`.glb`/`.obj`). Case-insensitive.
-pub fn is_model_path(path: &str) -> bool {
-    matches!(extension(path).as_str(), "gltf" | "glb" | "obj")
+/// ([`MODEL_EXTENSIONS`]). Case-insensitive.
+pub fn is_model_path(path: impl AsRef<Path>) -> bool {
+    MODEL_EXTENSIONS.contains(&paths::extension(path).as_str())
 }
 
-fn extension(path: &str) -> String {
-    Path::new(path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase()
+/// True if `path` looks like a texture image ([`IMAGE_EXTENSIONS`]).
+/// Case-insensitive.
+pub fn is_image_path(path: impl AsRef<Path>) -> bool {
+    IMAGE_EXTENSIONS.contains(&paths::extension(path).as_str())
 }
 
 /// Import a whole source file into its addressable sub-meshes + materials,
@@ -111,12 +120,7 @@ pub fn import_file(path: &Path) -> Result<ImportedAsset, ImportError> {
 
 /// Parse a source file into sub-meshes + materials by its extension, as authored.
 fn parse_file(path: &Path) -> Result<ImportedAsset, ImportError> {
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-    match ext.as_str() {
+    match paths::extension(path).as_str() {
         "gltf" | "glb" => gltf::import::import(path),
         "obj" => obj_import::import(path),
         other => Err(ImportError::UnsupportedFormat(other.to_string())),

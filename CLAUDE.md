@@ -462,6 +462,7 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   parser and no promise of support without it. Running Blender is **authoring only**
   (editor, MCP, dev tools): a shipped game reads the cached glTF and never runs Blender,
   and the sim only ever sees glTF. The engine never parses `.blend` itself.
+  `asset::MODEL_EXTENSIONS` is the one list of what the importer reads.
 
 ## Commit gate (programmatic — no AI needed)
 `make gates` runs everything CI blocks on, fastest-failing first; run it before
