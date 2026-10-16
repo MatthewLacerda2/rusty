@@ -22,7 +22,7 @@ use std::path::Path;
 
 use mlua::{Lua, LuaOptions, StdLib, Table};
 
-use crate::scene::DEFAULT_SCRIPTS_DEST_DIR;
+use crate::core::project::SCRIPTS_DIR;
 
 /// `math.random` / `math.randomseed` rewritten over `Random`. Looked up at call
 /// time, so a script caching `local random = math.random` still works: `Random`
@@ -65,7 +65,7 @@ pub(super) fn new_sim_vm() -> Result<Lua, String> {
 /// loads `<workspace>/assets/scripts/ui/range_axis.lua`, and nothing else is
 /// searched.
 pub(super) fn point_require(lua: &Lua, workspace: &Path) -> Result<(), String> {
-    let pattern = workspace.join(DEFAULT_SCRIPTS_DEST_DIR).join("?.lua");
+    let pattern = workspace.join(SCRIPTS_DIR).join("?.lua");
     let package: Table = lua.globals().get("package").map_err(|e| e.to_string())?;
     package
         .set("path", pattern.to_string_lossy().as_ref())
