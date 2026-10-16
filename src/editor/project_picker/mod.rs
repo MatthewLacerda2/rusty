@@ -8,18 +8,21 @@
 //!
 //! [`ProjectPicker::draw`] returns the folder to open only once it is safe to: an
 //! existing folder must already be a project ([`core::project::is_project`]), and
-//! one last opened by another engine asks first ([`check_existing`]).
+//! one last opened by another engine asks first ([`check_existing`]). Both rules,
+//! and the recent list, are rusty bench's (`core::project::bench`, #942), shared with
+//! the session MCP.
 //!
 //! [`core::project::is_project`]: crate::core::project::is_project
 
 pub mod browse;
 mod pages;
-pub mod recent;
 
 use std::path::{Path, PathBuf};
 
 use browse::FolderBrowser;
-use recent::RecentProjects;
+
+use crate::core::project::bench::{check_existing, new_project_dir};
+use crate::core::project::bench::{recent, RecentProjects};
 
 /// The name *New Project* suggests, Unity Hub's default.
 pub const DEFAULT_NEW_NAME: &str = "My project";
@@ -182,41 +185,6 @@ impl ProjectPicker {
             .find_map(|p| p.path.parent().map(Path::to_path_buf))
             .unwrap_or_else(|| self.home.clone())
     }
-}
-
-/// The folder *New Project* makes: `name` under `parent`. Refused when the name is
-/// empty, hidden or a path, or when the folder already holds something (Unity Hub
-/// refuses a non-empty folder too).
-pub fn new_project_dir(parent: &Path, name: &str) -> Result<PathBuf, String> {
-    let name = name.trim();
-    if name.is_empty() {
-        return Err("Name the project".to_string());
-    }
-    if name.starts_with('.') || name.contains(['/', '\\']) {
-        return Err(format!("{name:?} is not a folder name"));
-    }
-    let dir = parent.join(name);
-    let occupied = std::fs::read_dir(&dir).is_ok_and(|mut entries| entries.next().is_some());
-    if occupied || dir.is_file() {
-        return Err(format!("{} already exists and is not empty", dir.display()));
-    }
-    Ok(dir)
-}
-
-/// Whether an existing folder may be opened: `Err` when it is not a project, else
-/// the engine warning to confirm first (`None` when the engines match).
-pub fn check_existing(dir: &Path) -> Result<Option<String>, String> {
-    if !dir.is_dir() {
-        return Err(format!("{} does not exist", dir.display()));
-    }
-    if !crate::core::project::is_project(dir) {
-        let file = crate::core::project::PROJECT_FILE;
-        return Err(format!(
-            "{} is not a rusty project (no {file} or assets/): use New Project to make one",
-            dir.display()
-        ));
-    }
-    Ok(crate::core::project::inspect(dir)?.warning())
 }
 
 #[cfg(test)]

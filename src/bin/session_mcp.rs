@@ -33,7 +33,7 @@
 use std::io::{self, BufReader};
 use std::process::exit;
 
-use rusty::dev::mcp::{self, attach::SocketClient, EvalBackend};
+use rusty::dev::mcp::{self, attach::SocketClient, embed::Embedded, EvalBackend};
 use rusty::dev::session::{self, Session};
 
 fn main() {
@@ -43,7 +43,7 @@ fn main() {
     // otherwise boot an in-process headless world (honouring `--project` / scene args).
     let backend: Box<dyn EvalBackend> = match attach_address(&args) {
         Some(addr) => Box::new(SocketClient::new(addr)),
-        None => Box::new(boot_embedded(&args)),
+        None => Box::new(Embedded::new(boot_embedded(&args))),
     };
 
     let stdin = io::stdin();

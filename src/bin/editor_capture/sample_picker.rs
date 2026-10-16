@@ -4,8 +4,8 @@
 
 use std::path::{Path, PathBuf};
 
+use rusty::core::project::bench::RecentProjects;
 use rusty::core::project::{engine_commit, EngineCheck, ProjectFile, PROJECT_FILE};
-use rusty::editor::project_picker::recent::RecentProjects;
 use rusty::editor::project_picker::ProjectPicker;
 
 /// The fixed "now" the sample is dated against (Unix seconds).

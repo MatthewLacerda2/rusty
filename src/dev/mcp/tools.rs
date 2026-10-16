@@ -5,15 +5,16 @@
 //! `Debug.Snapshot()`). Both ultimately call the active [`EvalBackend`], so the MCP
 //! surface is the same control surface the console and the headless session already
 //! drive — no second engine API exists, and the embed and attach modes go through one
-//! code path here.
+//! code path here. The `bench_*` tools (rusty bench, #942) manage projects instead
+//! and live in [`super::bench`].
 
 use serde_json::{json, Value};
 
 use super::EvalBackend;
 
-/// The `tools/list` result: the two tools and their JSON-Schema input shapes.
+/// The `tools/list` result: the tools and their JSON-Schema input shapes.
 pub fn tools_list() -> Value {
-    json!({
+    let mut list = json!({
         "tools": [
             {
                 "name": "eval",
@@ -46,7 +47,11 @@ pub fn tools_list() -> Value {
                 }
             }
         ]
-    })
+    });
+    if let Some(tools) = list["tools"].as_array_mut() {
+        tools.extend(super::bench::tools());
+    }
+    list
 }
 
 /// Handle `tools/call`. `Ok` is the MCP result value (including the in-band
@@ -56,6 +61,9 @@ pub fn tools_list() -> Value {
 pub fn tools_call(backend: &dyn EvalBackend, params: &Value) -> Result<Value, (i64, String)> {
     let name = params.get("name").and_then(Value::as_str).unwrap_or("");
     let arguments = params.get("arguments").cloned().unwrap_or(Value::Null);
+    if let Some(outcome) = super::bench::call(backend, name, &arguments) {
+        return outcome;
+    }
 
     match name {
         "eval" => {

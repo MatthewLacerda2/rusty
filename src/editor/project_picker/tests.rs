@@ -20,39 +20,6 @@ fn project_with_commit(dir: &Path, commit: &str) {
 }
 
 #[test]
-fn a_new_project_needs_a_plain_name_and_an_empty_folder() {
-    let parent = fresh("new");
-    assert_eq!(
-        new_project_dir(&parent, " Horde "),
-        Ok(parent.join("Horde"))
-    );
-    assert!(new_project_dir(&parent, "  ").is_err());
-    assert!(new_project_dir(&parent, ".hidden").is_err());
-    assert!(new_project_dir(&parent, "a/b").is_err());
-    std::fs::create_dir_all(parent.join("empty")).unwrap();
-    assert!(
-        new_project_dir(&parent, "empty").is_ok(),
-        "an empty folder is fine"
-    );
-    std::fs::write(parent.join("empty/x"), "").unwrap();
-    assert!(new_project_dir(&parent, "empty").is_err());
-}
-
-#[test]
-fn only_a_project_folder_opens() {
-    let dir = fresh("open");
-    assert!(check_existing(&dir.join("gone")).is_err());
-    let err = check_existing(&dir).unwrap_err();
-    assert!(err.contains("not a rusty project"), "{err}");
-    std::fs::create_dir_all(dir.join("assets")).unwrap();
-    assert_eq!(
-        check_existing(&dir),
-        Ok(None),
-        "a pre-project.rusty project"
-    );
-}
-
-#[test]
 fn another_engines_project_asks_first_and_cancel_keeps_the_picker() {
     let dir = fresh("mismatch");
     project_with_commit(&dir, "0123456789abcdef0123456789abcdef01234567");

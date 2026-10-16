@@ -27,6 +27,7 @@
 //! The engine's own content (shaders, bundled scripts, the preview model) is not the
 //! project's: it is found by [`engine_dir`], wherever the project is.
 
+pub mod bench;
 mod commit;
 mod file;
 mod locate;
@@ -110,6 +111,20 @@ pub struct Opened {
 ///
 /// Progress goes to stderr: `session-mcp`'s stdout carries only JSON-RPC.
 pub fn open(dir: &Path, access: Access) -> Result<Opened, String> {
+    let (opened, mut lines) = prepare(dir, access)?;
+    let root = &opened.root;
+    std::env::set_current_dir(root).map_err(|e| format!("{}: {e}", root.display()))?;
+    lines.push(format!("Opened {}", root.display()));
+    lines.extend(opened.engine.warning());
+    for line in lines {
+        eprintln!("[Project] {line}");
+    }
+    Ok(opened)
+}
+
+/// Everything [`open`] does but move the working directory: make the folder a project
+/// and check its engine. Returns what it found and the progress lines to report.
+pub(crate) fn prepare(dir: &Path, access: Access) -> Result<(Opened, Vec<String>), String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let root =
         crate::core::paths::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
@@ -123,13 +138,7 @@ pub fn open(dir: &Path, access: Access) -> Result<Opened, String> {
         }
         Access::Run => file::inspect(&root)?,
     };
-    std::env::set_current_dir(&root).map_err(|e| format!("{}: {e}", root.display()))?;
-    lines.push(format!("Opened {}", root.display()));
-    lines.extend(engine.warning());
-    for line in lines {
-        eprintln!("[Project] {line}");
-    }
-    Ok(Opened { root, engine })
+    Ok((Opened { root, engine }, lines))
 }
 
 /// The engine check of the project at `dir`, without opening it or writing anything:
