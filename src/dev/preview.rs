@@ -164,7 +164,9 @@ fn resolve_subject(asset_path: &str) -> Result<PreviewSubject, String> {
     preview::subject_for_path(asset_path).ok_or_else(|| {
         format!(
             "no preview for {asset_path} — previewable kinds are models \
-             (gltf/glb/obj/fbx), textures (png/tga/jpg/jpeg) and shaders (wgsl)"
+             ({}), textures ({}) and shaders (wgsl)",
+            crate::asset::MODEL_EXTENSIONS.join("/"),
+            crate::asset::IMAGE_EXTENSIONS.join("/"),
         )
     })
 }
