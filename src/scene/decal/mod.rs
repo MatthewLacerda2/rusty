@@ -23,7 +23,7 @@ mod pose;
 mod registry;
 
 pub use pose::DecalPose;
-pub use registry::DecalSet;
+pub use registry::{DecalSet, EVICTION_FADE, EVICTION_HEADROOM, MAX_DECALS};
 
 /// How a decal is stamped, beyond where: everything `Decals.Spawn` takes after the
 /// hit point and normal. [`Default`] is the positional form's defaults.

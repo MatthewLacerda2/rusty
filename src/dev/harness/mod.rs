@@ -62,10 +62,10 @@ pub fn tick_unless_quit(world: &mut GameWorld) -> bool {
 
 /// The engine checkout's test-fixture project (#829): the committed scenarios, the
 /// bot-player script and build settings, opened with `--project` like any other.
-const FIXTURE_PROJECT: &str = "tests/fixtures/project";
+pub const FIXTURE_PROJECT: &str = "tests/fixtures/project";
 
 /// [`FIXTURE_PROJECT`] in the checkout this binary belongs to, from any directory.
-fn fixture_project() -> PathBuf {
+pub fn fixture_project() -> PathBuf {
     let engine = crate::core::project::engine_dir();
     engine.parent().unwrap_or(engine).join(FIXTURE_PROJECT)
 }
