@@ -13,6 +13,7 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.DestroyEntity` | `(id)` | `true` if an entity existed at `id` |
 | `Scene.AddComponent` | `(id, kind)` | `true` if the entity exists |
 | `Scene.RemoveComponent` | `(id, kind)` | `true` if the entity exists |
+| `Scene.AddScript` | `(id, path, [fields])` | `true` if the entity exists — see below |
 | `Scene.SetParent` | `(id, parent_id)` | — (errors on a parenting cycle) |
 | `Scene.ClearParent` | `(id)` | — |
 | `Scene.SetActive` | `(id, active)` | `true` if an entity existed at `id` — Unity's `SetActive`; its callbacks follow the edge (`OnEnable` / `OnDisable`) |
@@ -67,8 +68,18 @@ case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `Joint.SetKind`), `CharacterController` (alias `Character`), `LODGroup` (alias `LOD`), `Trail` (alias `TrailRenderer`),
 `Line` (alias `LineRenderer`).
 Each is added with the inspector's default values; adding an
-existing kind replaces it. (Scripts attach by path, not as a defaulted kind — a
-separate concern.)
+existing kind replaces it. (Scripts attach by path, not as a defaulted kind: see
+`AddScript`.)
+
+**`AddScript(id, path, [fields])`** is the Add Component menu's script entries:
+it appends the script at `path` (project-relative, as the inspector stores it:
+`"assets/scripts/ui/dropdown_item.lua"`) to the entity's scripts, never replacing
+one, since an entity holds many. `fields` sets the script's `fields` values away
+from their defaults, as the inspector does: numbers, booleans and strings only
+(anything else is an error and attaches nothing), and a name the script does not
+declare is ignored. In Play the script loads at the head of the next tick, like a
+spawned entity's, so `GetScript` sees it from then on. The engine's Dropdown
+attaches its list items' click script this way.
 
 **Component dependencies (`RequireComponent`).** A first-class component may
 *declare that it requires another* — rusty's analog of Unity's

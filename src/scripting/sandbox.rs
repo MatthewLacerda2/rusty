@@ -10,10 +10,19 @@
 //!   `Random` namespace, so the Lua habit keeps working but draws from the one
 //!   per-World stream instead of Lua 5.4's randomly seeded generator.
 //!
+//! - **`require` reads the project's `assets/scripts/` only** (#996): a helper
+//!   module (`require("ui.range_axis")`) is a file beside the scripts, found from
+//!   the workspace root and never from the process's working directory; native
+//!   (C) modules are off.
+//!
 //! The console REPL evaluates against this same VM, so it gets the same
 //! stdlib — one surface, three callers.
 
-use mlua::{Lua, LuaOptions, StdLib};
+use std::path::Path;
+
+use mlua::{Lua, LuaOptions, StdLib, Table};
+
+use crate::scene::DEFAULT_SCRIPTS_DEST_DIR;
 
 /// `math.random` / `math.randomseed` rewritten over `Random`. Looked up at call
 /// time, so a script caching `local random = math.random` still works: `Random`
@@ -50,4 +59,29 @@ pub(super) fn new_sim_vm() -> Result<Lua, String> {
         .exec()
         .map_err(|e| e.to_string())?;
     Ok(lua)
+}
+
+/// Point `require` at `workspace`'s scripts folder: `require("ui.range_axis")`
+/// loads `<workspace>/assets/scripts/ui/range_axis.lua`, and nothing else is
+/// searched.
+pub(super) fn point_require(lua: &Lua, workspace: &Path) -> Result<(), String> {
+    let pattern = workspace.join(DEFAULT_SCRIPTS_DEST_DIR).join("?.lua");
+    let package: Table = lua.globals().get("package").map_err(|e| e.to_string())?;
+    package
+        .set("path", pattern.to_string_lossy().as_ref())
+        .and_then(|_| package.set("cpath", ""))
+        .map_err(|e| e.to_string())
+}
+
+/// A throwaway VM for *reading* a script's returned table (its `fields` schema,
+/// its callbacks) without running it. `require` hands back an empty table, so a
+/// script that loads a helper module at its top level (#996) still evaluates
+/// here; nothing is read from disk.
+pub(super) fn inspection_vm() -> Lua {
+    let lua = Lua::new();
+    let stub = lua.create_function(|lua, _: mlua::MultiValue| lua.create_table());
+    if let Ok(stub) = stub {
+        lua.globals().set("require", stub).ok();
+    }
+    lua
 }

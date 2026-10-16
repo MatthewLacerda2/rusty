@@ -5,6 +5,7 @@
 //! then reload the saved file into a fresh scene and assert it round-trips.
 //! Gated on `dev`: a no-op under a plain `cargo test`, real under `--features dev`.
 
+use rusty::components::ScriptFieldValue;
 use rusty::dev::session::Session;
 use rusty::scene::Scene;
 
@@ -105,4 +106,29 @@ fn remove_component_round_trips_through_api() {
     let eid: u32 = id.parse().unwrap();
     let scene = session.world().scene().borrow();
     assert!(!scene.world.has_collider(eid));
+}
+
+#[test]
+fn add_script_appends_a_script_with_its_fields() {
+    let session = Session::new("").expect("session boots");
+    let id = ok(&session, "Scene.CreateEntity(\"Bot\")");
+    let script =
+        "Scene.AddScript({id}, 'assets/scripts/bot.lua', { speed = 3, tag = 'red', on = true })";
+    assert_eq!(ok(&session, &script.replace("{id}", &id)), "true");
+    assert_eq!(ok(&session, "Scene.AddScript(999999, 'x.lua')"), "false");
+    let err = session.eval(&format!("Scene.AddScript({id}, 'x.lua', {{ bad = {{}} }})"));
+    assert!(
+        err.is_err_and(|e| e.contains("field 'bad'")),
+        "a table field is refused"
+    );
+
+    let eid: u32 = id.parse().unwrap();
+    let scene = session.world().scene().borrow();
+    let scripts = scene.world.scripts(eid).expect("scripts");
+    assert_eq!(scripts.len(), 1, "the refused call attached nothing");
+    assert_eq!(scripts[0].path, "assets/scripts/bot.lua");
+    let v = |k: &str| scripts[0].values.get(k).cloned();
+    assert_eq!(v("speed"), Some(ScriptFieldValue::Number(3.0)));
+    assert_eq!(v("tag"), Some(ScriptFieldValue::Text("red".into())));
+    assert_eq!(v("on"), Some(ScriptFieldValue::Boolean(true)));
 }
