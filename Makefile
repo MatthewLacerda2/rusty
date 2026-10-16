@@ -23,7 +23,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote editor-capture bench
+.PHONY: help setup compile-cache check gates pre-commit $(SELF_CHECKS) $(GATES) mergeable queue queue-daemon queue-stop blockers checks reclaim mutants-remote dead-pub editor-capture bench
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -243,6 +243,14 @@ mutants-remote: ## Mutation on GitHub's runners, scoped. make mutants-remote SCO
 		echo "                e.g. make mutants-remote SCOPE='src/navigation/**'" >&2; \
 		exit 1; }
 	@python3 .github/scripts/mutants-remote.py '$(SCOPE)'
+
+# `pub` items nothing in the project uses, and items only tests use (#1003): rustc's
+# dead_code over a copy of the tree (under target/dead-pub/) with the lib's modules
+# crate-private and every bin and the integration suite folded in. A signal, never a
+# gate: it prints the report (and .lint/dead-pub.txt) and exits 0. About a minute
+# warm; the first run checks the copied crate's dependencies once.
+dead-pub: ## Signal: pub items nothing uses, and items only tests use (tools/lint --dead-pub)
+	$(LINT) -- --dead-pub
 
 # The whole editor, headless, to a PNG (#731): what an editor-visible PR attaches.
 # Needs a GPU or lavapipe. ARGS passes the binary's options (--select, --play, ...).
