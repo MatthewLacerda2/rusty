@@ -25,6 +25,11 @@ the first dry run one was, while `make queue` stood in it. Kept worktrees print 
 and free disk before and after. Anything under `.claude/worktrees/` that is
 not a git worktree (`.cargo/`, tarballs) is left alone.
 
+A linked worktree **outside** `.claude/worktrees/` breaks the one-checkout-per-
+branch rule and is never reclaimed, while its `target/` keeps its GBs (#982).
+It is never touched either, only named: `OUTSIDE: <path> (<branch>, <target/>)`,
+so the disk nobody would get back at least shows up.
+
 `--dry-run` decides and prints the same, and deletes nothing.
 """
 
@@ -125,6 +130,10 @@ def gib(n_bytes: int) -> str:
     return f"{n_bytes / 2**30:.1f} GiB"
 
 
+def describe(wt: Worktree) -> str:
+    return wt.branch or "detached " + wt.head[:8]
+
+
 class Machine:
     """Every effect reclaim has; tests inject a fake `runner` and replace the rest."""
 
@@ -203,6 +212,11 @@ class Machine:
         self.git(main, "worktree", "remove", str(wt))
 
 
+def shown_target(machine: Machine, wt: Path) -> str:
+    size = machine.target_size(wt)
+    return f"target/ {gib(size)}" if size is not None else "no target/"
+
+
 def main(argv: list[str], machine: Machine | None = None, here: Path | None = None) -> int:
     machine = machine or Machine()
     unknown = [a for a in argv if a != "--dry-run"]
@@ -216,23 +230,26 @@ def main(argv: list[str], machine: Machine | None = None, here: Path | None = No
     before = machine.free(main_checkout)
     machine.run("git", "-C", str(main_checkout), "fetch", "--quiet", "origin")
 
-    worktrees = [wt for wt in parse_worktrees(machine.git(main_checkout, "worktree", "list", "--porcelain"))
-                 if root in wt.path.parents]
+    listed = parse_worktrees(machine.git(main_checkout, "worktree", "list", "--porcelain"))
+    worktrees = [wt for wt in listed if root in wt.path.parents]
+    outside = [wt for wt in listed if root not in wt.path.parents and wt.path != main_checkout]
     cwds = machine.cwds()
     removed = 0
     for wt in worktrees:
         action, why = verdict(wt, machine.facts(wt, here, cwds))
-        name = f"{wt.path.name} ({wt.branch or 'detached ' + wt.head[:8]})"
+        name = f"{wt.path.name} ({describe(wt)})"
         if action == "remove":
             if not dry:
                 machine.remove(main_checkout, wt.path)
             removed += 1
             print(f"{'would remove' if dry else 'removed'}: {name}: {why}")
         else:
-            size = machine.target_size(wt.path)
-            shown = f"target/ {gib(size)}" if size is not None else "no target/"
             label = "PROTECTED" if action == "protect" else "kept"
-            print(f"{label}: {name}: {why}; {shown}")
+            print(f"{label}: {name}: {why}; {shown_target(machine, wt.path)}")
+
+    for wt in outside:
+        print(f"OUTSIDE: {wt.path} ({describe(wt)}, {shown_target(machine, wt.path)}): "
+              f"not under {root}, so never reclaimed")
 
     if not dry:
         machine.git(main_checkout, "worktree", "prune")

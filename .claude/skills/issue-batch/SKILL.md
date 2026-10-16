@@ -137,8 +137,8 @@ features and profile — never by source path — so worktrees pointed at one ta
 directory overwrite each other's output and produce a false *green*: gates
 reported on code that was never compiled, which is exactly the claim a **ready**
 pull request makes. Cargo's default is already right, so the rule is to stop
-overriding it. Nothing in this repo enforces that — no gate refuses to run under
-an override — so it is on you.
+overriding it. `make target-dir` holds it: `make gates` refuses to run when cargo
+builds outside the worktree it runs in.
 
 **Cores and memory bound the builds now, not disk.** The limits, measured on the
 operator's 8-core / 15 GB machine on 2026-09-30 (#497 has the raw numbers; on a
@@ -172,7 +172,9 @@ and remove the worktree. Disposal is what keeps disk from becoming the overnight
 failure.
 `make reclaim` does it for every merged or closed branch at once, refuses any
 worktree with uncommitted or unpushed work, and reports free disk; run it at each
-wave (`ARGS=--dry-run` to look first) (#913).
+wave (`ARGS=--dry-run` to look first) (#913). It only reclaims worktrees under
+`.claude/worktrees/`; a linked worktree anywhere else prints as `OUTSIDE: <path>`
+with its `target/` size, for you to move or remove by hand (#982).
 
 ## Cloud sessions are the default coders, not extra merges
 

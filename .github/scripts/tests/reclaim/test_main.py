@@ -41,7 +41,17 @@ class Main(unittest.TestCase):
         self.assertIn("target/ 3.0 GiB", out)
         self.assertIn("PROTECTED: queue (detached q111", out)
         self.assertIn("(pid 42)", out)
-        self.assertNotIn("elsewhere", out)
+        self.assertNotIn("would remove: merged-too", out)
+
+    def test_a_worktree_outside_the_root_is_named_never_removed(self):
+        machine, out = run()
+        self.assertNotIn("merged-too", machine.removed)
+        self.assertIn("OUTSIDE: /elsewhere/merged-too (4-elsewhere, target/ 3.0 GiB)", out)
+
+    def test_the_main_checkout_and_the_root_s_worktrees_are_not_outside(self):
+        _, out = run("--dry-run")
+        outside = [line for line in out.splitlines() if line.startswith("OUTSIDE")]
+        self.assertEqual(len(outside), 1, outside)
 
     def test_removes_only_finished_safe_worktrees_then_prunes(self):
         machine, out = run()
