@@ -45,7 +45,7 @@ round a wall turns only where the wall is in the way. A straight leg only ever c
 walkable spans, so the smoothed path keeps the agent-radius clearance the bake eroded
 off every wall. A path is a table:
 
-```lua
+```lua ignore
 { status = "complete" | "partial" | "invalid",
   corners = { {x=, y=, z=}, ... },   -- start first, end last; y is the floor height
   length = n }                       -- world units along the corners
@@ -102,7 +102,7 @@ smoothing never pulls a straight run across a link. Two sources:
 the authored ones by entity id) — the way to see where agents can drop and jump. A link
 table is:
 
-```lua
+```lua ignore
 { type = "manual" | "drop" | "jump",
   startPos = {x=, y=, z=}, endPos = {x=, y=, z=},  -- snapped onto the navmesh
   owner = id | nil,                                -- the OffMeshLink's entity
@@ -155,7 +155,7 @@ inspector's **Navmesh** section (editor↔API parity).
 | `Navigation.SetAreaCost` | `(name, cost)` | sets the cost (clamped to at least `1`); no rebake, agents re-plan; errors on an unknown area or a non-finite cost |
 | `Navigation.GetAreas` | `()` | a list of `{index =, name =, cost =}`, one per area in id order |
 
-```lua
+```lua with=molotovZone,bot
 local fire = Navigation.DefineArea("Fire", 1)
 NavMeshModifierVolume.SetArea(molotovZone, fire)   -- where the fire is
 Navigation.SetAreaCost("Fire", 50)                 -- burning: avoid unless trapped

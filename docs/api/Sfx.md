@@ -30,7 +30,7 @@ project's budget, and every cost is an estimate, never a bill.
 |---|---|---|
 | `Sfx.Generate` | `(brief)` | the generated `.wav`'s path; or `nil, why` when the brief is not finished |
 
-```lua
+```lua no-run
 local wav = Sfx.Generate({
   text    = "heavy metal door slamming shut in a concrete stairwell",
   seconds = 2.0,                  -- required: the length is part of the brief
@@ -64,7 +64,7 @@ it is part of the brief's hash.
    `prompt_influence` outside 0 to 1. Each returns `nil, why` naming the field and
    **does not raise**, so a loop over a weapon's twenty sounds loses none to one
    unfinished brief:
-   ```lua
+   ```lua no-run
    for _, fx in ipairs(rifle_sounds) do
      local wav, why = Sfx.Generate(fx)
      if not wav then Debug.Warn(why) end

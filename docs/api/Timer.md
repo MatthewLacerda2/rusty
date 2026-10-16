@@ -28,7 +28,7 @@ Every timer and coroutine is **owned by an entity** (`id`) and gets an integer
 A coroutine is a plain Lua function that yields an instruction — Unity's
 `yield return new WaitForSeconds(0.5)`:
 
-```lua
+```lua no-run
 function Gun.Reload(id)
     Timer.StartCoroutine(id, function(id)
         Animator.Play(id, "reload")

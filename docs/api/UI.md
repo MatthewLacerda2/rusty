@@ -31,7 +31,7 @@ name it on a graphic, and drive its runtime params the way
 `Material.SetShaderParam` drives a material's — same names (`"block.param"`, or
 `"block.index.param"` when the block repeats), same values, no re-bake:
 
-```lua
+```lua no-run
 UI.SetShader(panel, "hud_dissolve")
 UI.SetShaderParam(panel, "dissolve.amount", 0.5)   -- half burnt away
 -- or ease it over time on the UI's unscaled clock (#661, see Tween.md):
@@ -55,7 +55,7 @@ APIs are in [Widgets in `docs/ui.md`](../ui.md#widgets).
 gameplay pointer input with `UI.IsPointerConsumed()` — UI callbacks run before
 `Update`, so it is already settled for the tick:
 
-```lua
+```lua no-run
 function Weapon.Update(id, dt)
   if Input.IsKeyDown("Mouse0") and not UI.IsPointerConsumed() then fire(id) end
 end

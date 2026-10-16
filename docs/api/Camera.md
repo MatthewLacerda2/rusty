@@ -26,7 +26,7 @@ sim's (`UI.GetScreenSize`), so the answer is the same headless as in the window.
   `Physics.Raycast` to pick what is under the mouse, or use `UI.GetScreenSize()`'s
   centre for a crosshair.
 
-```lua
+```lua no-run
 local x, y, depth, onScreen = Camera.WorldToScreen(ex, ey + 2, ez, hud)
 if onScreen then RectTransform.SetAnchoredPosition(label, x, y) end
 ```
@@ -73,7 +73,7 @@ a UI `Image` (`Image.SetTexture(id, "rt:minimap")`) or a material map
   view camera supplies) renders from its own entity — parent a viewmodel camera to
   the player's head and it follows.
 
-```lua
+```lua with=minimapCam:Camera,minimapImage
 -- A top-down minimap in the HUD's corner.
 Camera.SetProjection(minimapCam, "Orthographic", 40)
 Camera.SetTargetTexture(minimapCam, "minimap", 256, 256)

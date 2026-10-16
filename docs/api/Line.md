@@ -36,7 +36,7 @@ list) and setters do nothing. Add one with `Scene.AddComponent(id, "Line")`.
 | `Line.GetTextureMode` / `SetTextureMode` | `(id)` / `(id, mode)` | `"Stretch"` (one copy over the length) or `"Tile"` (repeats every world unit) |
 | `Line.GetBlend` / `SetBlend` | `(id)` / `(id, blend)` | `"Alpha"` or `"Additive"` (unknown names are ignored) |
 
-```lua
+```lua with=gun
 -- A red laser sight on the gun, pointing down its barrel (local -Z).
 Scene.AddComponent(gun, "Line")
 Line.SetUseWorldSpace(gun, false)

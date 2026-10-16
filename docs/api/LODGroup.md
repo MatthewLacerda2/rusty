@@ -48,7 +48,7 @@ empty levels at `0.5` and `0.01`).
 | `LODGroup.AddLevel` | `(id)` | appends a coarser, empty level at half the last threshold; returns its index |
 | `LODGroup.RemoveLevel` | `(id, level)` | — (its renderers are no longer managed) |
 
-```lua
+```lua no-run
 -- A crate that swaps to a box past a few metres and disappears when tiny.
 local crate = Scene.Instantiate("assets/props.glb::Crate")
 LODGroup.SetLevelHeight(crate, 0, 0.4)

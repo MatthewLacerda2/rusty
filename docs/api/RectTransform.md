@@ -37,7 +37,7 @@ A destroyed target hides the marker. Markers only apply on `ScreenSpaceOverlay` 
 layout use the active one). The option setters do nothing to a non-marker; saving
 a prefab keeps a target inside it and drops one outside.
 
-```lua
+```lua with=bar,enemy
 -- A health bar floating 2 m above an enemy, clamped to the screen edge.
 RectTransform.SetWorldAnchor(bar, enemy, 0, 2, 0)
 RectTransform.SetWorldAnchorClamp(bar, true, 24)

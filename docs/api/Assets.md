@@ -57,7 +57,7 @@ sibling already exists (a refresh never overwrites a file) or when it does not d
 (a file still being copied in; the next refresh retries it). An `AudioSource` or
 `PlayAt` that still names `foo.mp3` after conversion plays `foo.wav`.
 
-```lua
+```lua no-run
 local r = Assets.Refresh()
 for _, wav in ipairs(r.converted) do print("imported " .. wav) end
 for _, s in ipairs(r.skipped) do print(s.path .. ": " .. s.reason) end
@@ -86,7 +86,7 @@ with no sidecar yet gets one. Skinned meshes are never unwrapped (they are never
 lightmapped). The unwrap is deterministic: the same mesh and settings always give the
 same UVs, so a bake stays byte-identical across machines.
 
-```lua
+```lua no-run
 Assets.SetLightmapUVSettings("project/levels/warehouse.glb", { generate = true })
 print(Assets.GetLightmapUVSettings("project/levels/warehouse.glb").hardAngle)  -- 88
 Lighting.BakeLightmaps()

@@ -11,7 +11,7 @@ normal the cast already returns, and pass the entity it hit as the `owner` so th
 mark moves with it. The registry is a bounded FIFO (256): past the cap the oldest
 decal fades out rather than vanishing.
 
-```lua
+```lua no-run
 local hit, id, dist, px, py, pz, nx, ny, nz = Physics.Raycast(ox,oy,oz, dx,dy,dz, self_id)
 if hit then Decals.Spawn(px, py, pz, nx, ny, nz, { owner = id }) end
 ```
@@ -37,7 +37,7 @@ library material (`Material.DefineAsset`) the decal stamps — plus the lifecycl
 keys `owner`, `lifetime` and `fade` (below). An unknown key, a material that does
 not exist, or an `owner` entity that does not exist is an error and stamps nothing.
 
-```lua
+```lua no-run
 Material.DefineAsset("blood", {
   base_color = {0.35, 0.0, 0.0}, base_color_map = "decals/blood.png",
   roughness = 0.1,                 -- wet
@@ -68,7 +68,7 @@ Decals.Spawn(px, py, pz, nx, ny, nz, { material = "blood", size = 1.2, rotation 
   stamps a second, sustained) is the oldest dropped outright, so the frame never
   holds more than 320.
 
-```lua
+```lua no-run
 -- blood that dries off a moving enemy's arm after 20 s
 local hit, id, _, px, py, pz, nx, ny, nz = Physics.Raycast(ox,oy,oz, dx,dy,dz, self_id)
 if hit then

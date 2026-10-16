@@ -50,7 +50,7 @@ A PBR material needs albedo, normal and roughness derived from the **same** patt
 run once), bakes each output with its slot's encoding to `<prefix>_<slot>.png`, and
 returns canonical slot → path:
 
-```lua
+```lua ignore
 local maps = Texture.BakeSet({
   resolution = 1024, seed = 7,
   nodes = { ...one brick+noise graph... },
@@ -234,7 +234,7 @@ tuned at, e.g. `4.0` at 512² → `0.0078`); fractional counts in the table abov
 Example — a packed metallic-roughness map baked in one shot (red = metallic,
 green = roughness, routed to B/G by the `metallic_roughness` slot):
 
-```lua
+```lua no-run
 Texture.Bake({
   resolution = 512, seed = 1,
   nodes = {
@@ -249,7 +249,7 @@ Texture.Bake({
 Example — a riveted floor plate's normal map: a bevelled rounded panel with a
 jittered grid of domed rivets added on top at half height, turned into normals:
 
-```lua
+```lua no-run
 Texture.Bake({
   resolution = 512, seed = 3,
   nodes = {
@@ -266,7 +266,7 @@ Texture.Bake({
 Example — worn, grimy painted metal: curvature finds the raised edges, a noisy mask
 chips the paint off them to show bare metal, and cavity darkens the grooves:
 
-```lua
+```lua no-run
 Texture.Bake({
   resolution = 512, seed = 4,
   nodes = {

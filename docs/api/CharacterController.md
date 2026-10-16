@@ -52,7 +52,7 @@ then (`0, 1, 0` when airborne). Getters return a neutral default (`false`, zeros
 Defaults are Unity's: height `2`, radius `0.5`, centre `0, 0, 0`, step offset `0.3`,
 slope limit `45`, skin width `0.08`, min move distance `0.001`.
 
-```lua
+```lua with=id:CharacterController
 -- Walk, fall and jump: the script owns the vertical speed.
 local Walker = { vy = 0.0 }
 local GRAVITY, JUMP, SPEED = 20.0, 7.0, 5.0

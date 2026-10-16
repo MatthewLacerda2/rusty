@@ -20,6 +20,14 @@ return a sensible default (zeros, or `(1,1,1)` for scale) instead of erroring.
 > [`api-faithfulness.md`](../api-faithfulness.md), so the surface never grows a
 > write-only no-op that silently fails headless authoring (issue #178).
 
+> **Examples run** (#937): every ```` ```lua ```` block in `docs/api/` is run by
+> `tests/doc_examples/` in a fresh headless edit-mode session and must not raise, so
+> what you copy from here works. Words after `lua` on the fence change that:
+> `no-run` compiles it without running it (it writes files, calls a provider, or
+> uses game-side variables it doesn't define), `ignore` skips a shape sketch that
+> isn't Lua, and `with=door,arm:Joint` creates an entity per name, bound to that
+> global, with the components after `:` (joined by `+`), before the block runs.
+
 ---
 
 ## Driving a headless session
