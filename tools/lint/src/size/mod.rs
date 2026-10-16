@@ -116,7 +116,8 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>, wanted: &dyn Fn(&Path) -> bool) {
 
 /// The cap a file is measured against.
 ///
-/// Standalone test/fixture files (`tests/`, `fixtures/`, `*_test.rs`, `test_*`) get
+/// Standalone test/fixture files (`tests/`, `fixtures/`, `*_test.rs`, a `*_tests.rs`
+/// with no source beside it, `test_*`) get
 /// the tighter [`MAX_TEST_FILE_LINES`] cap, because over-splitting a bundle of
 /// `#[test]`s hurts readability more than it helps. The same holds for Python:
 /// everything under a `tests/` directory is a test file.
@@ -126,18 +127,21 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>, wanted: &dyn Fn(&Path) -> bool) {
 /// unit. Splitting a source file's tests between an inline `#[cfg(test)] mod tests`
 /// AND such a sibling, purely to fit the tight cap, fragments that unit — so the
 /// sibling carries the source cap ([`MAX_FILE_LINES`]), letting all of one source's
-/// tests live in one place. (See issue #211.)
+/// tests live in one place. (See issue #211.) Only a real sibling earns it (#960).
 fn limit_for(path: &Path) -> usize {
     let p = normalize(path);
     let name = path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
-    if is_tests_sibling(&name) {
+    if is_tests_sibling(path) {
         return MAX_FILE_LINES;
     }
     let in_test_dir = p.split('/').any(|seg| seg == "tests" || seg == "fixtures");
-    let is_test = in_test_dir || name.ends_with("_test.rs") || name.starts_with("test_");
+    let is_test = in_test_dir
+        || name.ends_with("_test.rs")
+        || name.ends_with("_tests.rs")
+        || name.starts_with("test_");
     if is_test {
         MAX_TEST_FILE_LINES
     } else {
@@ -145,13 +149,25 @@ fn limit_for(path: &Path) -> usize {
     }
 }
 
-/// Is `name` a `<x>_tests.rs` file — the dedicated test home for a `<x>.rs` source
-/// beside it? Such a sibling is part of that source's logical unit (the source cap),
-/// not an over-split standalone test file. The naming convention (`_tests.rs`, the
-/// plural sibling form, distinct from the standalone `_test.rs`) is the marker, so
-/// the rule holds whether the lint scans `src/` or checks an explicit file list.
-fn is_tests_sibling(name: &str) -> bool {
-    name.ends_with("_tests.rs")
+/// Is `path` a `<x>_tests.rs` file with its source beside it — `<x>.rs`, or a `<x>/`
+/// module directory (which holds `<x>/mod.rs`)? Such a sibling is part of that
+/// source's logical unit (the source cap), not an over-split standalone test file.
+///
+/// The suffix alone is not enough (#960): it once granted the source cap to any
+/// `_tests.rs`, and ten files with no source beside them had grown past the tight
+/// cap on that free pass. The check reads the disk beside `path`, so it holds
+/// whether the lint scans the roots or checks an explicit file list.
+fn is_tests_sibling(path: &Path) -> bool {
+    let Some(stem) = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .and_then(|n| n.strip_suffix("_tests.rs"))
+        .filter(|stem| !stem.is_empty())
+    else {
+        return false;
+    };
+    let dir = path.parent().unwrap_or(Path::new(""));
+    dir.join(format!("{stem}.rs")).is_file() || dir.join(stem).is_dir()
 }
 
 /// The violation line for `path`, or `None` when it fits (or is not measured).

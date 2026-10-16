@@ -295,5 +295,5 @@ impl GameWorld {
 mod game_tests;
 
 #[cfg(test)]
-#[path = "game_play_tests.rs"]
-mod game_play_tests;
+#[path = "game_loop_tests.rs"]
+mod game_loop_tests;

@@ -2,7 +2,7 @@
 //! fields pass through to zimmer's `Song`, and the file comes out the length —
 //! in samples — that each one promises.
 
-use super::bake_tests::{lua_with_sound, tmp};
+use super::fixture::{lua_with_sound, tmp};
 
 /// Four beats at 120 bpm: exactly two seconds, so 88,200 frames at 44.1 kHz.
 const LOOP_FRAMES: usize = 88_200;

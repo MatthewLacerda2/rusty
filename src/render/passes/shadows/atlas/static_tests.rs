@@ -5,7 +5,7 @@
 
 use glam::Vec3;
 
-use super::gpu_tests::{dark, lamp};
+use super::gpu_fixture::{dark, lamp};
 use super::ATLAS_SIZE;
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, Primitive};

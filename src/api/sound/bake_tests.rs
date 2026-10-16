@@ -1,33 +1,8 @@
 //! Tests for the `Sound` namespace, driven the way a script drives it: author a
 //! patch as a Lua table, bake a note, check the file that came out.
 
+use super::fixture::{lua_with_sound, tmp, IMPACT_PATCH};
 use super::*;
-use mlua::Lua;
-
-/// A temp path with forward slashes: a Windows path (`C:\Users\…`) interpolated
-/// into a Lua string literal trips Lua's escape parser (`\U`), and Windows accepts
-/// `/` for file I/O, so the round-trip matches on every platform.
-pub(super) fn tmp(name: &str) -> String {
-    crate::test_temp::dir()
-        .join(name)
-        .to_str()
-        .expect("utf-8 temp path")
-        .replace('\\', "/")
-}
-
-/// A percussive noise patch — the shape every impact / footstep SFX takes.
-pub(super) const IMPACT_PATCH: &str = r#"{
-    source = { kind = "noise" },
-    amp = { a = 0.001, d = 0.08, s = 0.0, r = 0.05 },
-    filter = { kind = "lowpass", cutoff = 400, resonance = 0.3, env_octaves = 3.5,
-               adsr = { a = 0.0, d = 0.06, s = 0.0, r = 0.05 } },
-}"#;
-
-pub(super) fn lua_with_sound() -> Lua {
-    let lua = Lua::new();
-    register(&lua).expect("the namespace registers");
-    lua
-}
 
 #[test]
 fn bake_writes_a_playable_wav_and_returns_its_path() {

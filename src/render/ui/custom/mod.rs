@@ -287,5 +287,9 @@ mod fixture;
 mod blocks_tests;
 
 #[cfg(test)]
-#[path = "gpu_tests.rs"]
-mod gpu_tests;
+#[path = "gpu_bake_tests.rs"]
+mod gpu_bake_tests;
+
+#[cfg(test)]
+#[path = "gpu_draw_tests.rs"]
+mod gpu_draw_tests;

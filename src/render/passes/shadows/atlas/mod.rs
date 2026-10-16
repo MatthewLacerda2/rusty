@@ -172,6 +172,9 @@ fn depth_texture(device: &wgpu::Device, label: &str) -> wgpu::Texture {
 #[path = "clip_tests.rs"]
 mod clip_tests;
 #[cfg(test)]
+#[path = "gpu_fixture.rs"]
+mod gpu_fixture;
+#[cfg(test)]
 #[path = "gpu_tests.rs"]
 mod gpu_tests;
 #[cfg(test)]

@@ -58,15 +58,35 @@ fn one_binary_test_layout_keeps_the_tight_cap() {
 
 #[test]
 fn tests_sibling_gets_the_source_cap_not_the_tight_one() {
-    // A `<x>_tests.rs` sibling is one source's single test home (issue #211), so
-    // it shares `<x>.rs`'s source cap — keeping all of a source's tests in one
-    // place rather than spilling them into an inline block to fit the tight cap.
-    assert_eq!(
-        limit_for(Path::new("src/physics/build_tests.rs")),
-        MAX_FILE_LINES
-    );
+    // A `<x>_tests.rs` beside its `<x>.rs` is one source's single test home (issue
+    // #211), so it shares the source cap: `bar.rs` + `bar_tests.rs` at 250 passes.
+    let tmp = Scratch::new("960-sibling");
+    tmp.file("src/bar.rs", "//\n");
+    let tests = tmp.file("src/bar_tests.rs", &"//\n".repeat(250));
+    assert_eq!(limit_for(&tests), MAX_FILE_LINES);
+    assert_eq!(check_file(&tests), None);
+    // A module directory is a source too: `<x>/` beside it (it holds `<x>/mod.rs`).
+    tmp.file("src/baz/mod.rs", "//\n");
+    assert_eq!(limit_for(&tmp.file("src/baz_tests.rs", "")), MAX_FILE_LINES);
     // The standalone `_test.rs` (singular) form still gets the tight cap.
     assert_eq!(limit_for(Path::new("src/bar_test.rs")), MAX_TEST_FILE_LINES);
+}
+
+#[test]
+fn an_orphan_tests_file_gets_the_tight_cap() {
+    // #960: the suffix alone once earned the source cap. With no `foo.rs` or `foo/`
+    // beside it, `foo_tests.rs` is a standalone test file, and 151 lines fail.
+    let tmp = Scratch::new("960-orphan");
+    let orphan = tmp.file("src/foo_tests.rs", &"//\n".repeat(MAX_TEST_FILE_LINES + 1));
+    tmp.file("src/foo_other.rs", "//\n");
+    assert_eq!(limit_for(&orphan), MAX_TEST_FILE_LINES);
+    let line = check_file(&orphan).expect("an orphan over the tight cap must fail");
+    assert!(line.ends_with("151/150"), "{line}");
+    // A bare `_tests.rs` has no source name at all.
+    assert_eq!(
+        limit_for(&tmp.file("src/_tests.rs", "")),
+        MAX_TEST_FILE_LINES
+    );
 }
 
 #[test]

@@ -3,7 +3,7 @@
 
 use mlua::{Lua, Table};
 
-use crate::api::sound::bake_tests::{lua_with_sound, tmp};
+use crate::api::sound::fixture::{lua_with_sound, tmp};
 
 /// A noise impact under a lowpass at `cutoff` Hz — the one-shot a shooter has
 /// hundreds of.

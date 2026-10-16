@@ -12,7 +12,7 @@ agent can read exactly what failed.
 | Merge helpers | `unittest` (`make scripts`) | **hard gate**: `.github/scripts/tests` pass — `make mergeable` is the only thing between a red PR and `main` while it has no required checks (#486, #491) |
 | Function ("endpoint") length | clippy `too_many_lines` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]` |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py` one (docstrings, comments and blank lines free, #926); nothing grandfathered |
-| Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`, and every `.py` under a `tests/` directory); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
+| Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`, a `*_tests.rs` with no source beside it, and every `.py` under a `tests/` directory); a `<x>_tests.rs` **sibling** of `<x>.rs` (or of a `<x>/` module directory) shares the 300-line source cap |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix. Prints the ≲10-files-per-directory signal beside it, never failing on it (#934) |
 | Nothing temporary | clippy `dbg_macro`/`todo`/`unimplemented` + `tools/lint -- --rules` (`markers`) | **hard gate**: the three are denied in `Cargo.toml`'s `[lints]` (and `tools/lint`'s); a marker word (`TODO`, `FIXME`, `XXX`, `HACK`) in a scanned `.rs` file fails — an unfinished thing is an issue (#935) |
 | Skipped tests | `tools/lint -- --rules` (`skip`) | **hard gate**: `#[ignore]` / `#[cfg_attr(…, ignore)]` needs `// lint: allow(skip) <why>` (#935) |
@@ -36,9 +36,16 @@ from *two* places. To keep cohesion, a `<x>_tests.rs` **sibling** shares its sou
 300-line cap (source + sibling read as one logical unit); the standalone `*_test.rs`
 (singular), `tests/`, and `fixtures/` forms keep the tight 150-line cap (#211).
 
+The source has to be there (#960): the gate grants the 300 cap only when `<x>.rs` or a
+`<x>/` module directory sits beside `<x>_tests.rs`. A `_tests.rs` with no source of
+that name — a second test file mounted with `#[path]`, a `gpu_tests.rs` testing its
+directory's `mod.rs` — is a standalone test file at 150. Past that, merge it into the
+source's real sibling, give it a sibling (split the code it tests into `<x>.rs`), or
+split it by responsibility.
+
 ## What the size gate scans
 The full scan (`make size`, CI's `lint` job) walks `src/`, `tests/`, `fuzz/` and
-`tools/` (`SCAN_ROOTS` in `tools/lint/src/size.rs`); until #535 it walked only `src/`,
+`tools/` (`SCAN_ROOTS` in `tools/lint/src/size/mod.rs`); until #535 it walked only `src/`,
 so oversized integration-test files passed unseen, and until #541 it skipped `tools/`,
 so the lint crate itself could drift past the cap. Any `target/` directory (cargo
 build output, e.g. `tools/lint/target/` or `fuzz/target/`) is never descended into.

@@ -398,8 +398,8 @@ struct's own fields, a type that parses a whole `serde_json::Value`) is listed b
 hand in `hidden.rs`; an unlisted flatten struct fails the test by name.
 
 ## Example (unit, in-module)
-See `tools/lint/src/size.rs` — a `#[cfg(test)] mod tests` block testing the
-size-cap selection and path normalization.
+See `tools/lint/src/size/` — `mod.rs` mounts a `#[cfg(test)] mod tests` (`tests.rs`)
+testing the size-cap selection and path normalization.
 
 ## Coverage
 Coverage is measured with [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov),
