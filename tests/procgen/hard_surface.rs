@@ -2,9 +2,9 @@
 //! keep the two procgen promises (seamless, resolution-independent) and bake
 //! byte-identically for a seed. The generators' seams are swept in `procgen_seams`.
 
-use rusty::procgen::recipe::{BrickOutput, Node, OpKind, ShapeKind, TextureRecipe};
-use rusty::procgen::{evaluate, Image};
+use rusty::procgen::recipe::{BrickOutput, Node, OpKind, ShapeKind};
 
+use crate::procgen::bake_seeded;
 use crate::procgen::resolution::assert_resolution_independent;
 use crate::procgen::seams::{assert_seamless, bake, node};
 
@@ -37,11 +37,6 @@ fn brick(output: BrickOutput) -> Vec<Node> {
         output,
     };
     vec![node("b", op, &[])]
-}
-
-fn bake_seeded(nodes: &[Node], seed: u64) -> Image {
-    let recipe = TextureRecipe::new(64, nodes.to_vec()).with_seed(seed);
-    evaluate(&recipe).expect("recipe evaluates")
 }
 
 /// #407's brick outputs and shapes, at sizes that clip at the tile edge.

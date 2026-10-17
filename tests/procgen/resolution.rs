@@ -3,22 +3,13 @@
 //! op whose params used to be in pixels (`blur`, `bump_to_normal`) or that resampled
 //! nearest-neighbour (`mapping`) is exercised.
 
-use rusty::procgen::recipe::{Node, NoiseKind, OpKind, TextureRecipe};
-use rusty::procgen::{evaluate, Image};
+use rusty::procgen::recipe::{Node, NoiseKind, OpKind};
+use rusty::procgen::Image;
 
-pub fn node(id: &str, op: OpKind, inputs: &[&str]) -> Node {
-    let inputs = inputs.iter().map(|s| s.to_string()).collect();
-    Node {
-        id: id.into(),
-        op,
-        inputs,
-    }
-}
+use super::node;
 
 fn bake(nodes: &[Node], resolution: u32) -> Image {
-    let nodes = nodes.to_vec();
-    let recipe = TextureRecipe::new(resolution, nodes).with_seed(3);
-    evaluate(&recipe).expect("recipe evaluates")
+    super::bake(nodes.to_vec(), resolution, 3)
 }
 
 /// Average each `k`×`k` block of `img` into one pixel.

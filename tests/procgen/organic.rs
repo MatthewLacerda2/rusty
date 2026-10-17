@@ -2,9 +2,9 @@
 //! keep the two procgen promises (seamless, resolution-independent) and bake
 //! byte-identically for a seed. The generators' seams are swept in `procgen_seams`.
 
-use rusty::procgen::recipe::{Node, NoiseKind, OpKind, TextureRecipe, VoronoiOutput};
-use rusty::procgen::{evaluate, Image};
+use rusty::procgen::recipe::{Node, NoiseKind, OpKind, VoronoiOutput};
 
+use crate::procgen::bake_seeded;
 use crate::procgen::resolution::assert_resolution_independent;
 use crate::procgen::seams::{assert_seamless, bake, node};
 
@@ -28,11 +28,6 @@ fn warped(strength: f32) -> Vec<Node> {
         node("d", OpKind::CombineRgb, &["dx", "dy", "dx"]),
         node("out", OpKind::Warp { strength }, &["a", "d"]),
     ]
-}
-
-fn bake_seeded(nodes: &[Node], seed: u64) -> Image {
-    let recipe = TextureRecipe::new(64, nodes.to_vec()).with_seed(seed);
-    evaluate(&recipe).expect("recipe evaluates")
 }
 
 #[test]

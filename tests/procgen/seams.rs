@@ -3,24 +3,16 @@
 //! biggest jump between two neighbouring pixels inside the tile. Params deliberately
 //! include fractional counts, the values that used to open a seam.
 
-use rusty::procgen::recipe::{GradientKind, Node, NoiseKind, OpKind, TextureRecipe};
+use rusty::procgen::recipe::{GradientKind, Node, NoiseKind, OpKind};
 use rusty::procgen::recipe::{NoiseKind::*, VoronoiOutput::*, WaveKind};
-use rusty::procgen::{evaluate, Image};
+use rusty::procgen::Image;
+
+pub use super::node;
 
 const RES: u32 = 64;
 
-pub fn node(id: &str, op: OpKind, inputs: &[&str]) -> Node {
-    let inputs = inputs.iter().map(|s| s.to_string()).collect();
-    Node {
-        id: id.into(),
-        op,
-        inputs,
-    }
-}
-
 pub fn bake(nodes: Vec<Node>) -> Image {
-    let recipe = TextureRecipe::new(RES, nodes).with_seed(7);
-    evaluate(&recipe).expect("recipe evaluates")
+    super::bake(nodes, RES, 7)
 }
 
 /// Biggest per-channel RGB difference between two pixels.

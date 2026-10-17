@@ -2,26 +2,9 @@
 //! covered in `ops_math.rs`. Each op is exercised through the public runner
 //! (`evaluate`) on a tiny recipe, so the test pins observable pixel behaviour.
 
-use rusty::procgen::recipe::{BlendMode, GradientKind, Node, OpKind, TextureRecipe};
-use rusty::procgen::{evaluate, Image};
+use rusty::procgen::recipe::{BlendMode, GradientKind, OpKind};
 
-/// Build a recipe from `nodes` with `output` and evaluate it.
-fn run(nodes: Vec<Node>, output: &str, resolution: u32) -> Image {
-    let recipe = TextureRecipe::new(resolution, nodes).with_output(output);
-    evaluate(&recipe).expect("recipe evaluates")
-}
-
-fn node(id: &str, op: OpKind, inputs: &[&str]) -> Node {
-    Node {
-        id: id.into(),
-        op,
-        inputs: inputs.iter().map(|s| s.to_string()).collect(),
-    }
-}
-
-fn constant(id: &str, c: [f32; 4]) -> Node {
-    node(id, OpKind::Constant { color: c }, &[])
-}
+use super::{constant, node, run};
 
 #[test]
 fn constant_fills_a_flat_color() {
