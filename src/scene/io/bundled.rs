@@ -62,3 +62,14 @@ pub const UI_SCRIPTS: &[(&str, &str)] = &[
 pub const STARTER_MATERIALS: &[u8] = include_bytes!("../../../engine/materials/starter.gltf");
 /// Where [`STARTER_MATERIALS`] is seeded, relative to the project root.
 pub const STARTER_MATERIALS_PATH: &str = "assets/materials/starter.gltf";
+
+/// The bundled script at `rel`, a path under `engine/scripts/` (`bot.lua`,
+/// `ui/range_axis.lua`): what `require` falls back to when the project has no copy
+/// (#1062).
+pub fn script(rel: &str) -> Option<&'static str> {
+    let (list, name) = match rel.strip_prefix("ui/") {
+        Some(name) => (UI_SCRIPTS, name),
+        None => (SCRIPTS, rel),
+    };
+    list.iter().find(|(n, _)| *n == name).map(|(_, code)| *code)
+}

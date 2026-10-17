@@ -627,7 +627,8 @@ by editing its components or forks its behaviour by copying its script.
   `dropdown_item.lua` is what a Dropdown attaches to its list items and blocker,
   and `range_axis.lua` is a helper module Slider and Scrollbar load with
   `require("ui.range_axis")` (`require` looks in the project's `assets/scripts/`
-  and nowhere else). A forked Slider or Scrollbar keeps its `require`.
+  first, then the engine's bundled scripts; see `docs/api/Random.md`). A forked
+  Slider or Scrollbar keeps its `require`.
 - **Wiring one up.** A widget raises its events by calling function fields its
   owner sets — no event bus. The owner reaches the widget's script instance with
   `Scene.GetScript(id, name)` (Unity's `GetComponent<T>()`, `name` the file stem),

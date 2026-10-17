@@ -10,19 +10,19 @@
 //!   `Random` namespace, so the Lua habit keeps working but draws from the one
 //!   per-World stream instead of Lua 5.4's randomly seeded generator.
 //!
-//! - **`require` reads the project's `assets/scripts/` only** (#996): a helper
-//!   module (`require("ui.range_axis")`) is a file beside the scripts, found from
-//!   the workspace root and never from the process's working directory; native
-//!   (C) modules are off.
+//! - **`require`, `dofile` and `loadfile` read against the project** (#996,
+//!   #1062; [`files`]): `require` searches the project's scripts folder, then the
+//!   engine's bundled scripts, then `package.path`; a read outside the project is
+//!   allowed but warns once per file in the console. Native (C) modules are off.
 //!
 //! The console REPL evaluates against this same VM, so it gets the same
 //! stdlib — one surface, three callers.
 
-use std::path::Path;
+use mlua::{Lua, LuaOptions, StdLib};
 
-use mlua::{Lua, LuaOptions, StdLib, Table};
+mod files;
 
-use crate::core::project::SCRIPTS_DIR;
+pub(super) use files::install as install_file_access;
 
 /// `math.random` / `math.randomseed` rewritten over `Random`. Looked up at call
 /// time, so a script caching `local random = math.random` still works: `Random`
@@ -59,18 +59,6 @@ pub(super) fn new_sim_vm() -> Result<Lua, String> {
         .exec()
         .map_err(|e| e.to_string())?;
     Ok(lua)
-}
-
-/// Point `require` at `workspace`'s scripts folder: `require("ui.range_axis")`
-/// loads `<workspace>/assets/scripts/ui/range_axis.lua`, and nothing else is
-/// searched.
-pub(super) fn point_require(lua: &Lua, workspace: &Path) -> Result<(), String> {
-    let pattern = workspace.join(SCRIPTS_DIR).join("?.lua");
-    let package: Table = lua.globals().get("package").map_err(|e| e.to_string())?;
-    package
-        .set("path", pattern.to_string_lossy().as_ref())
-        .and_then(|_| package.set("cpath", ""))
-        .map_err(|e| e.to_string())
 }
 
 /// A throwaway VM for *reading* a script's returned table (its `fields` schema,
