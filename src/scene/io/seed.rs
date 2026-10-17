@@ -108,7 +108,7 @@ fn lua_files(source: &Path, dest: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     };
     let mut files = Vec::new();
     for path in entries.flatten().map(|e| e.path()) {
-        let is_lua = path.extension().and_then(|e| e.to_str()) == Some("lua");
+        let is_lua = crate::core::paths::has_extension(&path, "lua");
         let (Some(name), true) = (path.file_name(), is_lua) else {
             continue;
         };
