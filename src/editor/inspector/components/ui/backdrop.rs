@@ -1,6 +1,8 @@
 //! The Backdrop Filter inspector card (#426): blur radius, tint, saturation and
 //! brightness. Every write routes through `scene::authoring::backdrop`.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use crate::editor::inspector::components::card::component_card;
@@ -45,7 +47,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         },
     );
     if remove {
-        world.set_backdrop_filter(id, None);
+        remove_component(world, id, ComponentKind::BackdropFilter, is_dirty);
     }
     *is_dirty |= remove || changed;
 }

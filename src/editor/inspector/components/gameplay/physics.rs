@@ -8,6 +8,8 @@
 //! `Physics.*` Lua setters call the same ops, so the panels and the
 //! bindings share one write.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 use glam::Vec3;
 
@@ -101,8 +103,7 @@ pub fn draw_rigidbody(
         draw_rb_collision_detection(ui, world, id, rb.collision_detection, is_dirty);
     });
     if remove {
-        world.set_rigidbody(id, None);
-        *is_dirty = true;
+        remove_component(world, id, ComponentKind::RigidBody, is_dirty);
     }
 }
 

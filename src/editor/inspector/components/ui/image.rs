@@ -3,6 +3,8 @@
 //! look (#425): a gradient tint and the blend mode. Widgets
 //! edit a snapshot; every write routes through `scene::authoring::image`.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::look::{blend_row, gradient_editor};
@@ -44,7 +46,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         }
     }
     if remove {
-        world.set_image(id, None);
+        remove_component(world, id, ComponentKind::Image, is_dirty);
     }
     *is_dirty |= remove || changed;
 }

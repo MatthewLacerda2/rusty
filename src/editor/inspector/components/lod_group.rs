@@ -6,6 +6,8 @@
 //! entities it shows (by name, each removable), an id field to add one, and a button
 //! to drop the level.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use crate::components::{LodGroupComponent, LodLevel};
@@ -59,8 +61,7 @@ pub fn draw_lod_group(ui: &mut egui::Ui, world: &mut World, id: u32, is_dirty: &
         },
     );
     if remove {
-        world.set_lod_group(id, None);
-        *is_dirty = true;
+        remove_component(world, id, ComponentKind::LodGroup, is_dirty);
     }
 }
 

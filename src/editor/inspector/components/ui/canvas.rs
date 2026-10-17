@@ -2,6 +2,8 @@
 //! Screen Size* scaler, plus the world / camera canvas knobs of the chosen mode
 //! (#429). Every write routes through `scene::authoring::canvas`.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::{combo, vec2_row};
@@ -50,7 +52,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         changed |= draw_scaler(ui, world, id, &c);
     });
     if remove {
-        world.set_canvas(id, None);
+        remove_component(world, id, ComponentKind::Canvas, is_dirty);
     }
     *is_dirty |= remove || changed;
 }

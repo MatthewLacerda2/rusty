@@ -13,6 +13,8 @@
 
 mod shader_params;
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use std::collections::BTreeMap;
 
 use egui_phosphor::regular as icon;
@@ -56,7 +58,7 @@ pub fn draw_material_card(
     }
 
     if draw_material(ui, materials, &key, &mut editor.is_dirty) {
-        world.set_material(id, None);
+        remove_component(world, id, ComponentKind::Texture, &mut editor.is_dirty);
     }
 }
 

@@ -6,6 +6,8 @@
 //! setters call. The grounded state is what the last `Move` found, so it is shown
 //! read-only.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::physics::vec3_row;
@@ -56,8 +58,7 @@ pub fn draw_character_controller(
         },
     );
     if remove {
-        world.set_character_controller(id, None);
-        *is_dirty = true;
+        remove_component(world, id, ComponentKind::CharacterController, is_dirty);
     }
 }
 

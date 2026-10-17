@@ -5,6 +5,8 @@
 //! apply to the chosen kind (the axis and limits of a Fixed joint, the swing of a
 //! Hinge) are hidden, not cleared, so switching kinds back loses nothing.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::physics::vec3_row;
@@ -40,8 +42,7 @@ pub fn draw_joint(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_
         draw_breaking(ui, world, id, &j, is_dirty);
     });
     if remove {
-        world.set_joint(id, None);
-        *is_dirty = true;
+        remove_component(world, id, ComponentKind::Joint, is_dirty);
     }
 }
 

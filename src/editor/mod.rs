@@ -3,8 +3,6 @@
 // platform rows may opt out (`make determinism`).
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
-use std::fs;
-
 pub mod bottom_panel;
 pub mod build_settings;
 mod content_browser;
@@ -20,7 +18,6 @@ pub mod project_picker;
 pub mod theme;
 pub mod viewport;
 
-use crate::core::paths;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
@@ -31,9 +28,8 @@ pub use inspector::preview::{OrbitState, PreviewCache, PreviewMesh, PreviewReque
 pub use dev_state::DevEditorState;
 pub use viewport::{ViewportInteraction, ViewportTab};
 
-/// What the Inspector panel is currently showing. The three modes are mutually
-/// exclusive; the editor derives this from its selection state each frame so the
-/// inspector dispatches on an explicit target rather than an implicit fall-through.
+/// What the Inspector panel shows: three mutually exclusive modes, derived from the
+/// selection each frame so the inspector dispatches on an explicit target.
 pub enum InspectorTarget {
     Entity(u32),
     Asset(String),
@@ -48,8 +44,6 @@ pub struct EditorUi {
     pub current_scene_path: Option<String>,
     pub current_dir: String,
     pub is_dirty: bool,
-    assets_scripts: Vec<String>,
-    assets_textures: Vec<String>,
 
     // Custom asset inspector properties
     pub asset_image_wrap: String,
@@ -146,8 +140,6 @@ impl EditorUi {
             current_scene_path: None,
             current_dir: crate::editor::content_browser::ROOT.to_string(),
             is_dirty: true,
-            assets_scripts: Vec::new(),
-            assets_textures: Vec::new(),
 
             asset_image_wrap: "Repeat".to_string(),
             asset_image_filter: "Linear".to_string(),
@@ -218,37 +210,6 @@ impl EditorUi {
         self.theme.apply(ctx);
     }
 
-    /// Read local assets folders to populate Asset Browser (legacy scan, kept for compatibility)
-    pub fn scan_assets(&mut self) {
-        self.assets_scripts.clear();
-        self.assets_textures.clear();
-
-        // Scan scripts
-        if let Ok(entries) = fs::read_dir("assets/scripts") {
-            for entry in entries.flatten() {
-                if let Some(path_str) = entry.path().to_str() {
-                    if path_str.ends_with(".lua") {
-                        self.assets_scripts
-                            .push(paths::to_slash(std::path::Path::new(path_str)));
-                    }
-                }
-            }
-        }
-
-        // Scan textures
-        if let Ok(entries) = fs::read_dir("assets/textures") {
-            for entry in entries.flatten() {
-                if let Some(path_str) = entry.path().to_str() {
-                    let path_lower = path_str.to_lowercase();
-                    if path_lower.ends_with(".png") || path_lower.ends_with(".tga") {
-                        self.assets_textures
-                            .push(paths::to_slash(std::path::Path::new(path_str)));
-                    }
-                }
-            }
-        }
-    }
-
     // The live engine state (scene, console, nav, play flag) plus the frame's HUD
     // metrics: distinct mutable borrows. Legacy signature, pending App/Resources.
     #[allow(clippy::too_many_arguments)]
@@ -264,7 +225,6 @@ impl EditorUi {
         viewport_texture: Option<egui::TextureId>,
     ) -> ViewportInteraction {
         self.apply_theme(ctx, *is_playing);
-        self.scan_assets();
         // Set by the Preview tab if it shows (#352); `None` skips its offscreen render.
         self.preview_request = None;
 
@@ -282,6 +242,10 @@ impl EditorUi {
             #[cfg(feature = "dev")]
             bottom_panel::draw_play_console(self, ctx, console);
         } else {
+            // One diffing navmesh sync per edit-mode frame catches every edit since
+            // the last one, whoever made it: a card, the gizmo, the console, MCP
+            // (#992). It rebakes only changed cells; play mode has `rebake_nav`.
+            nav.sync(scene);
             // 2. LEFT PANEL: Scene Hierarchy
             hierarchy::draw(self, ui, scene);
             // 3. RIGHT PANEL: Properties Inspector
@@ -296,3 +260,7 @@ impl EditorUi {
         viewport::draw(self, ui, viewport_texture, scene)
     }
 }
+
+#[cfg(test)]
+#[path = "nav_sync_tests.rs"]
+mod nav_sync_tests;

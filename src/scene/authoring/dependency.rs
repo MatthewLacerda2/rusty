@@ -43,7 +43,7 @@ use crate::scene::{AudioSourceComponent, MaterialComponent, ParticleEmitterCompo
 
 /// Does entity `id` carry a component of `kind`? The dependency machinery's presence
 /// probe, one arm per first-class kind.
-pub(crate) fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
+pub fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
     match kind {
         ComponentKind::Light => world.has_light(id),
         ComponentKind::Animator => world.has_animator(id),

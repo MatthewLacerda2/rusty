@@ -2,6 +2,8 @@
 //! fill (colour or gradient), border, shadow, glow, blend mode and raycast target.
 //! Widgets edit a snapshot; every write routes through `scene::authoring::shape`.
 
+use crate::editor::inspector::components::card::remove_component;
+use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 
 use super::look::{blend_row, color_row, drag_row, gradient_editor, vec2_edit};
@@ -41,7 +43,7 @@ pub fn draw(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_dirty:
         }
     }
     if remove {
-        world.set_shape(id, None);
+        remove_component(world, id, ComponentKind::Shape, is_dirty);
     }
     *is_dirty |= remove || changed;
 }
