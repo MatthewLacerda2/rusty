@@ -1,4 +1,4 @@
-"""Which ready pull request goes next: fewest conflicts in line, then label, then age (#753)."""
+"""Which ready pull request goes next: the aged first, then fewest conflicts in line, then label, then age (#753, #928)."""
 
 from __future__ import annotations
 
@@ -11,9 +11,11 @@ PRIORITY = ("infrastructure", "architecture", "bug", "foundation", "feature")
 
 
 def rank(
-    pull: dict, issue_labels: dict[int, set[str]], bots: tuple[str, ...], counts: dict[int, int] | None = None
-) -> tuple[int, int, int, int]:
-    """The sort key: Dependabot last, then the fewest conflicts in line
+    pull: dict, issue_labels: dict[int, set[str]], bots: tuple[str, ...], counts: dict[int, int] | None = None,
+    aged: set[int] | frozenset[int] = frozenset(),
+) -> tuple[int, int, int, int, int]:
+    """The sort key: Dependabot last, then those in `aged` ([`aging.Line.aged`],
+    whose conflicts no longer count), then the fewest conflicts in line
     (`counts`, from [`conflict_counts`]; none given is label order), then the
     best priority label, then age."""
     labels = board.names(pull.get("labels"))
@@ -21,7 +23,8 @@ def rank(
         labels |= issue_labels.get(issue.get("number"), set())
     best = min((PRIORITY.index(label) for label in labels if label in PRIORITY), default=len(PRIORITY))
     number = pull.get("number", 0)
-    return int(board.is_bot(pull, bots)), (counts or {}).get(number, 0), best, number
+    old = number in aged
+    return int(board.is_bot(pull, bots)), int(not old), 0 if old else (counts or {}).get(number, 0), best, number
 
 
 def conflict_counts(numbers: list[int], clashes: set[frozenset[int]]) -> dict[int, int]:
@@ -54,12 +57,14 @@ def pick(
     done: set[int],
     bots: tuple[str, ...],
     clashes: set[frozenset[int]] = frozenset(),
+    aged: set[int] | frozenset[int] = frozenset(),
 ) -> dict | None:
     """The next pull request to take, or `None`. `clashes` holds the pairs of
-    pull requests whose heads conflict ([`clashing`])."""
+    pull requests whose heads conflict ([`clashing`]); `aged`, those that have
+    waited too long to be passed over again ([`aging.Line.aged`])."""
     waiting = ready(pulls, memory, done, bots)
     counts = conflict_counts([p.get("number") for p in waiting], clashes)
-    return min(waiting, key=lambda p: rank(p, issue_labels, bots, counts)) if waiting else None
+    return min(waiting, key=lambda p: rank(p, issue_labels, bots, counts, aged)) if waiting else None
 
 
 def reordered(chosen: dict | None, by_label: dict | None, counts: dict[int, int]) -> str | None:

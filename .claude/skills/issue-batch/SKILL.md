@@ -49,16 +49,18 @@ left, with status 1 if anything was handed back and 3 if the machine or GitHub
 failed. **Run the watch as a background command writing to a log, and put a
 `Monitor` on `tail -F <log> | grep --line-buffered 'HANDED BACK'`**, never the
 watch itself under the `Monitor`: a `Monitor` dies at 30 minutes and kills its
-command, and the watch runs 70 (MatthewLacerda2/scorsese#845). Check `ps` for an
-orphaned watch before starting one. Without the `Monitor` the watch's exit still
+command, and the watch runs 70 (MatthewLacerda2/scorsese#845). Only one watch runs
+at a time: a second refuses to start, naming the first's PID, with status 4
+(#928, a lock on `.git/merge-queue.lock`). Without the `Monitor` the watch's exit still
 wakes you. The watch also prints a
 line per pull-request transition (`watch: #N opened as a draft`, `turned
 ready`, `back to draft`, `closed`, `queued`, `unqueued`; #909), so that one log (widen
 the `grep` to `watch:` lines when you want them) is the orchestrator's whole view: no
-separate pull-request poller. Start it with `--for 70` (#697; `ci-merge` has why 70, and when to
-trade it for a longer per-PR `--deadline`). The watch ends itself first, between
-pull requests, with the last line `watch ended: deadline reached …` — relaunch it
-as it was, nothing to read. It never resolves a conflict: a hand-back naming paths goes back to the
+separate pull-request poller; `--since <batch start>` keeps those lines to the
+batch's own pull requests (#928). Start it with `--for 70` (#697; `ci-merge` has why 70, and when to
+trade it for a longer per-PR `--deadline`; the watch refuses a pair past two hours). The watch ends itself first, between
+pull requests, with `watch ended: deadline reached …` — relaunch it
+as it was, nothing to read: its last line is always `watch: resume: <command>`, the exact command to run. It never resolves a conflict: a hand-back naming paths goes back to the
 branch's author. `make queue PRS="a b c"` still takes named pull requests in the
 order given (a hand-back there skips the entry and the rest carry on), and
 `ARGS=--dry-run` shows what either would do and writes nothing.
@@ -286,8 +288,8 @@ day). Each role does what only it can do.
 
 **The orchestrator (this session, local)** writes no feature code. It picks work,
 briefs cloud coders, reviews and merges. It **starts `make queue
-ARGS="--watch --no-check --for 70"` in the background** (from a worktree under
-`.claude/worktrees/`), relaunches it unchanged each time it exits on its
+ARGS="--watch --no-check --for 70 --since <batch start>"` in the background** (from a worktree under
+`.claude/worktrees/`), relaunches it unchanged (its `watch: resume:` line) each time it exits on its
 deadline (`watch ended: deadline reached`, #697: the first overnight watch was
 killed at the two-hour background cap mid-CI-wait), and is otherwise woken only
 by a `HANDED BACK` line (a `Monitor` tailing the watch's log, see above) or when

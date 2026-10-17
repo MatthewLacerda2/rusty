@@ -27,7 +27,7 @@ def run(runs_seen, ends_in, listings=None, recalled=None):
         world.fx.attempts = lambda n, sha: last.__setitem__(0, next(seen, last[0])) or last[0]
         world.fx.say = lambda line, *rest: said.append(line)
 
-        def turn(number):
+        def turn(number, tick=None):
             world.taken.append(number)
             world.verdicts[number] = next(ends)  # a merge drops it from the listing
             return number, world.verdicts[number], "why"

@@ -10,7 +10,7 @@ from merging.verdict import github, runners
 
 
 def wait_for(
-    repo: str, number: int, sha: str, before: str, deadline: float, poll: float
+    repo: str, number: int, sha: str, before: str, deadline: float, poll: float, tick=None
 ) -> tuple[str, list[str]]:
     """Poll until the runs on `sha` settle, or the deadline says stop.
 
@@ -19,6 +19,9 @@ def wait_for(
     [`polling.sighted`] on `sha` is remembered across polls, so a run the listing
     drops is waited for rather than declared lost (#592). A red only the
     runners caused is re-run once ([`polling.rerun_step`]) on the same clock.
+    `tick()`, when given, runs once per poll: the watch reports its board
+    there, so a pull request turning ready during a long run is heard of
+    within a poll, not when the take ends (#928).
     """
     began, seen, rerun = time.monotonic(), set(), {}
     while True:
@@ -44,6 +47,8 @@ def wait_for(
                 "Handed back with the run still out. Nothing is red; nothing is green either.",
             ]
         outcomes.say(f"#{number}: {lines[0]}")
+        if tick is not None:
+            tick()
         time.sleep(poll)
 
 
