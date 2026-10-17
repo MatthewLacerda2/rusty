@@ -45,18 +45,21 @@ def transient(stderr: str) -> bool:
     return any(sign in low for sign in TRANSIENT)
 
 
-def gh(*args: str, runner=subprocess.run, sleep=time.sleep) -> object:
+def gh(*args: str, runner=subprocess.run, sleep=time.sleep, missing: object = None) -> object:
     """`gh` with `--json`-shaped output, parsed.
 
     A transient failure is retried ([`RETRIES`]) and raises [`Unreachable`]
     once they run out; any other failure is fatal at once, because asking
-    again would get the same answer.
+    again would get the same answer. A caller that expects a 404 (a typo'd
+    issue number) passes `missing`, returned for one instead.
     """
     for wait in (*RETRIES, None):
         done = runner(["gh", *args], capture_output=True, text=True, check=False)
         if done.returncode == 0:
             return json.loads(done.stdout)
         failure = f"gh {' '.join(args)}: {done.stderr.strip()}"
+        if missing is not None and "http 404" in done.stderr.lower():
+            return missing
         if not transient(done.stderr):
             sys.exit(f"mergeable: {failure}")
         if wait is None:
@@ -82,9 +85,13 @@ def evidence(repo: str, sha: str) -> tuple[list[dict], dict[int, list[dict]]]:
     return runs, jobs
 
 
-# The pull-request fields every caller reads. The last three only matter when
-# there is no run to judge, and they make that answer specific (#429, #592).
-PULL_FIELDS = "isDraft,headRefOid,number,files,mergeable,mergeStateStatus,statusCheckRollup"
+# The pull-request fields every caller reads. `mergeable` to `statusCheckRollup`
+# only matter when there is no run to judge, and make that answer specific
+# (#429, #592); the last three are what the pull request claims (#927).
+PULL_FIELDS = (
+    "isDraft,headRefOid,number,files,mergeable,mergeStateStatus,statusCheckRollup,"
+    "headRefName,body,closingIssuesReferences"
+)
 
 
 def paths(pull: dict) -> list[str]:
