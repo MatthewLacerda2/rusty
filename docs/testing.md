@@ -51,7 +51,9 @@ cargo-nextest` (CI uses `taiki-e/install-action`). What it buys over `cargo test
 - **No retries.** A retried pass is still green, and a flaky test is a bug.
 
 `cargo test` still works and is still correct — nothing in the suite depends on the
-runner — but the gate is nextest. One guarantee is nextest's alone: **a test never
+runner — but the gate is nextest. A weekly signal holds the promise: `cargo-test.yml`
+runs plain `cargo test`, both feature sets, on `main` every Sunday, and a red run files
+itself through `main-health` (#981). One guarantee is nextest's alone: **a test never
 holds a provider key** (#974). Inside a unit test, or any process nextest starts (it
 sets `NEXTEST`), `dev::providers::environment()` drops every `*_API_KEY` and skips the
 `.env`; the integration binary under plain `cargo test` gets neither signal, so on a
