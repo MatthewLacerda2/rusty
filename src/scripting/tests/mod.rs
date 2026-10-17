@@ -8,6 +8,7 @@ mod collider;
 mod collisions;
 mod console;
 mod coroutines;
+mod files;
 mod late_update;
 mod lifecycle;
 mod manager;
