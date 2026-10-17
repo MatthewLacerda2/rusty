@@ -1,5 +1,9 @@
 """Whether pull request N has really been checked ([`decide.judge`]).
 
+Before any run is read, whether it may claim what it claims: [`closing`] (never
+close a `planning` or `human` issue, or a wrong number) and [`protocol`] (a branch
+named for an issue names it; a missing **Gates** line is a warning), #927.
+
 Exits 0 when CI genuinely ran on the head commit and passed, and non-zero with
 a reason otherwise. It is the last thing the merge routine does before
 `gh pr merge`, and it exists because "the checks look green" and "the checks

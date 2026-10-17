@@ -12,14 +12,16 @@ Run it:
 this decision rather than restating it. The decision is [`merging.verdict.decide.judge`], pure over
 plain dictionaries, so all of it is tested without a network
 (`make scripts`). Python, stdlib only, because it is a few `gh` calls and a
-decision — and `.github/scripts/` is where that lives.
+decision — and `.github/scripts/` is where that lives. Every call is REST, so it
+runs from a cloud session too (#970).
 """
 
 from __future__ import annotations
 
 import sys
 
-from merging.verdict import decide, github
+import ghrest
+from merging.verdict import closing, decide, github
 
 
 def main() -> int:
@@ -28,8 +30,9 @@ def main() -> int:
     number = sys.argv[1]
 
     try:
-        repo = github.gh("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
-        pull = github.gh("pr", "view", number, "--json", github.PULL_FIELDS)
+        repo = ghrest.slug()
+        pull = github.pull(repo, number)
+        pull["closes"] = closing.closed_by(repo, pull)
         runs, jobs = github.evidence(repo, pull["headRefOid"])
     except github.Unreachable as down:
         sys.exit(f"mergeable: GitHub unreachable after {len(github.RETRIES)} retries: {down}")

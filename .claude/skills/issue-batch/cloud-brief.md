@@ -105,7 +105,9 @@ a coder real time.
   `CARGO_BUILD_JOBS=2`.
 - **GitHub GraphQL and search answer 403** in the container. `gh` works over REST
   (`gh api repos/...`, `gh workflow run`, `gh label create`), and so do the GitHub
-  MCP tools; `gh pr` and `gh issue` subcommands that use GraphQL do not.
+  MCP tools; `gh pr` and `gh issue` subcommands that use GraphQL do not. The
+  repo's own scripts are REST-only (#970, `.github/scripts/ghrest.py`), so
+  `make blockers`, `make mergeable` and `make queue` run here too.
 - **The container cannot delete a branch** (neither `git push --delete` nor the
   REST refs API is allowed). A throwaway branch you pushed goes in the PR's human
   checklist for the operator to delete.
@@ -168,7 +170,8 @@ Beyond what changed, why, the effect and the decisions:
   explained that #769 "stays open until one is chosen" and still closed it on
   merge. The match ignores formatting, so never write the keyword next to a number
   you don't mean to close, even quoted or in backticks: the retro PR that added this
-  rule closed #769 a second time by quoting it.
+  rule closed #769 a second time by quoting it. The merge path now refuses a keyword that is not alone on
+  its line (#966), so write `Closes #N` on a line of its own.
 - Commit messages end with
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Push often: a dead container takes its uncommitted work with it.

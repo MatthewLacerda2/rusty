@@ -30,7 +30,7 @@ it is: no rebase, no push, and the run on record stands ([`rebase.docs_advance`]
 single compiled or tested byte, which is why CLAUDE.md lets them merge
 unserialized. On 2026-09-30 merging the Markdown-only #586 cost #584, waiting
 behind it, a rebase and a ten-minute CI round. The squash merge still lands on
-the newer `main`; a branch editing the same `.md` file gets `gh pr merge`'s
+the newer `main`; a branch editing the same `.md` file gets GitHub's merge
 conflict, handed back as any refused merge is.
 
 ## The three things it must not do

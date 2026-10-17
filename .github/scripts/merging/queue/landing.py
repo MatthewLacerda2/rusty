@@ -17,6 +17,7 @@ import re
 import subprocess
 import time
 
+import ghrest
 from merging.queue import outcomes
 
 
@@ -75,15 +76,16 @@ def merge_record(number: int) -> dict | None:
     """The merge fields, or `None` if GitHub did not answer — asked during the
     very outage that made it necessary, so never through the fatal `gh`."""
     done = subprocess.run(
-        ["gh", "pr", "view", str(number), "--json", "state,mergedAt"],
+        ["gh", "api", f"repos/{ghrest.slug()}/pulls/{number}"],
         capture_output=True, text=True, check=False,
     )
     if done.returncode != 0:
         return None
     try:
-        return json.loads(done.stdout)
+        pull = ghrest.pull(json.loads(done.stdout))
     except json.JSONDecodeError:
         return None
+    return {"state": pull["state"], "mergedAt": pull["mergedAt"]}
 
 
 def confirm(number: int, poll: float) -> tuple[str, list[str]]:

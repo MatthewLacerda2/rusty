@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 import subprocess
 
+import ghrest
 from merging.queue import outcomes
-from merging.verdict import github, runlist
+from merging.verdict import closing, github, runlist
 from merging.watch import board, handbacks
 
 
-# How `gh pr view --json author` names Dependabot, and the command it obeys.
+# How GitHub names Dependabot as an author (REST says `dependabot[bot]`).
 BOTS = ("app/dependabot", "dependabot[bot]", "dependabot")
 
 
@@ -20,17 +21,22 @@ def is_bot(pull: dict) -> bool:
 
 
 def subject(pull: dict) -> str:
-    """The squash commit's title: the PR title carrying `(#N)`, once."""
-    title, tag = pull.get("title", "").strip(), f"(#{pull.get('number')})"
-    return title if title.endswith(tag) else f"{title} {tag}"
+    """The squash commit's title, house style: `Title (#issue) (#pr)`.
+
+    Each issue it closes that the title lacks is added (#966: `Bump rustls …
+    (#943)` came from branch `919-…`), then the pull request's own number, once.
+    """
+    tag = f"(#{pull.get('number')})"
+    title = pull.get("title", "").strip().removesuffix(tag).rstrip()
+    for n in closing.referenced(pull):
+        if f"(#{n})" not in title:
+            title += f" (#{n})"
+    return f"{title} {tag}"
 
 
 def look(number: int) -> dict:
-    """The pull request, in the fields every step below reads."""
-    return github.gh(
-        "pr", "view", str(number), "--json",
-        github.PULL_FIELDS + ",headRefName,state,title,author",
-    )
+    """The pull request, in the fields every step below reads (REST, #970)."""
+    return github.pull(ghrest.slug(), number)
 
 
 def quietly(*args: str) -> object | None:
@@ -47,8 +53,34 @@ def quietly(*args: str) -> object | None:
 
 def issue_labels() -> dict[int, set[str]]:
     """Every open issue's labels: the priority [`watch.order.rank`] reads."""
-    issues = quietly("issue", "list", "--state", "open", "--limit", "1000", "--json", "number,labels") or []
-    return {i["number"]: board.names(i.get("labels")) for i in issues}
+    issues = ghrest.pages(lambda path: quietly("api", path), f"repos/{ghrest.slug()}/issues?state=open") or []
+    return {i["number"]: board.names(i.get("labels")) for i in issues if "pull_request" not in i}
+
+
+def open_pulls(repo: str) -> list[dict] | None:
+    """The open pull requests as the watch lists them, `None` when GitHub failed.
+
+    Shaped by [`ghrest.pull`]. Only a bot's carries `files`: [`watch.board.held`]
+    is all that reads them, and a call per pull request per poll is not free.
+    """
+    listed = ghrest.pages(lambda path: quietly("api", path), f"repos/{repo}/pulls?state=open")
+    if listed is None:
+        return None
+    shaped = []
+    for rest in listed:
+        pull = ghrest.pull(rest)
+        if is_bot(pull):
+            files = ghrest.pages(lambda path: quietly("api", path), f"repos/{repo}/pulls/{pull['number']}/files")
+            if files is None:
+                return None
+            pull = ghrest.pull(rest, files)
+        shaped.append(pull)
+    return shaped
+
+
+def head_of(repo: str, number: int) -> str | None:
+    """The head commit of pull request `number`, `None` when GitHub failed."""
+    return ((quietly("api", f"repos/{repo}/pulls/{number}") or {}).get("head") or {}).get("sha")
 
 
 def head_runs(repo: str, sha: str) -> str | None:

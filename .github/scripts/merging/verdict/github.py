@@ -1,7 +1,9 @@
 """The `gh` calls the verdict needs, retried through a network blip (#847).
 
-[`gh`] parses `--json` output and retries a transient failure; [`evidence`] reads
-every gating run on a commit with each run's jobs.
+[`gh`] parses `gh api`'s JSON and retries a transient failure; [`evidence`] reads
+every gating run on a commit with each run's jobs; [`pull`] reads a pull request.
+Every call is REST (`gh api`), never GraphQL, so all of it runs from a cloud
+session too (#970, `ghrest`).
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ import subprocess
 import sys
 import time
 
+import ghrest
 from merging.verdict import runlist
 
 
@@ -45,18 +48,21 @@ def transient(stderr: str) -> bool:
     return any(sign in low for sign in TRANSIENT)
 
 
-def gh(*args: str, runner=subprocess.run, sleep=time.sleep) -> object:
-    """`gh` with `--json`-shaped output, parsed.
+def gh(*args: str, runner=subprocess.run, sleep=time.sleep, missing: object = None) -> object:
+    """`gh` with JSON output, parsed.
 
     A transient failure is retried ([`RETRIES`]) and raises [`Unreachable`]
     once they run out; any other failure is fatal at once, because asking
-    again would get the same answer.
+    again would get the same answer. A caller that expects a 404 (a typo'd
+    issue number) passes `missing`, returned for one instead.
     """
     for wait in (*RETRIES, None):
         done = runner(["gh", *args], capture_output=True, text=True, check=False)
         if done.returncode == 0:
             return json.loads(done.stdout)
         failure = f"gh {' '.join(args)}: {done.stderr.strip()}"
+        if missing is not None and "http 404" in done.stderr.lower():
+            return missing
         if not transient(done.stderr):
             sys.exit(f"mergeable: {failure}")
         if wait is None:
@@ -82,11 +88,31 @@ def evidence(repo: str, sha: str) -> tuple[list[dict], dict[int, list[dict]]]:
     return runs, jobs
 
 
-# The pull-request fields every caller reads. The last three only matter when
-# there is no run to judge, and they make that answer specific (#429, #592).
-PULL_FIELDS = "isDraft,headRefOid,number,files,mergeable,mergeStateStatus,statusCheckRollup"
+def rollup(repo: str, sha: str, fetch=None) -> list[dict]:
+    """The head's check runs as GraphQL's `statusCheckRollup` named them: each
+    with the workflow its job belongs to, by [`runlist.WORKFLOWS`] (#970).
+
+    `absent.in_rollup` reads it as a second witness to the runs listing (#592).
+    """
+    fetch = fetch or gh
+    listed = ghrest.pages(lambda path: fetch("api", path), f"repos/{repo}/commits/{sha}/check-runs", "check_runs") or []
+    owner = {job: w for w, (gate, gated) in runlist.WORKFLOWS.items() for job in (gate, *gated)}
+    return [
+        {"name": c.get("name", ""), "workflowName": owner[runlist.base(c.get("name", ""))]}
+        for c in listed
+        if runlist.base(c.get("name", "")) in owner
+    ]
+
+
+def pull(repo: str, number: int | str, fetch=None) -> dict:
+    """Pull request `number` over REST (#970), in the field names [`decide.judge`]
+    reads: the pull, its changed files and its head's check runs."""
+    fetch = fetch or gh
+    rest = fetch("api", f"repos/{repo}/pulls/{number}")
+    files = ghrest.pages(lambda path: fetch("api", path), f"repos/{repo}/pulls/{number}/files")
+    return ghrest.pull(rest, files, rollup(repo, rest["head"]["sha"], fetch))
 
 
 def paths(pull: dict) -> list[str]:
-    """The changed paths from `gh pr view --json files`."""
+    """The changed paths of a pull request read by [`pull`]."""
     return [f.get("path", "") for f in pull.get("files") or []]

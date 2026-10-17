@@ -74,11 +74,10 @@ class Taking(unittest.TestCase):
         (_, state, _), _, called, _ = self.take()
         self.assertEqual(state, outcomes.MERGED)
         argv = called.call_args.args[0]
-        self.assertEqual(argv[:4], ["gh", "pr", "merge", "524"])
-        self.assertIn("--squash", argv)
-        self.assertEqual(argv[argv.index("--match-head-commit") + 1], SHA)
-        self.assertEqual(argv[argv.index("--subject") + 1], "Port make mergeable and make queue (#486) (#524)")
-        self.assertNotIn("--delete-branch", argv)
+        self.assertEqual(argv[:5], ["gh", "api", "--method", "PUT", "repos/o/r/pulls/524/merge"])
+        self.assertIn("merge_method=squash", argv)
+        self.assertIn(f"sha={SHA}", argv)
+        self.assertIn("commit_title=Port make mergeable and make queue (#486) (#524)", argv)
 
     def test_a_dry_run_pushes_comments_and_merges_nothing(self):
         (_, state, why), rebased, called, _ = self.take("--dry-run", advance=("1" * 40, []))
@@ -130,7 +129,7 @@ class Taking(unittest.TestCase):
             mock.patch.object(time, "sleep"), mock.patch("builtins.print"):
             fresh, _ = dependabot.bot_head(524, SHA, ".", opts)
         self.assertEqual(fresh, "3" * 40)
-        self.assertIn(dependabot.BOT_REBASE, called.call_args.args[0])
+        self.assertIn(f"body={dependabot.BOT_REBASE}", called.call_args.args[0])
 
     def test_a_dry_run_on_dependabot_behind_main_says_what_it_would_do(self):
         bot = {**READY, "author": {"login": "app/dependabot"}}

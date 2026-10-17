@@ -15,6 +15,7 @@ import argparse
 import subprocess
 import time
 
+import ghrest
 from merging.queue import outcomes, pulls, rebase
 
 
@@ -39,7 +40,10 @@ def bot_head(number: int, head: str, root: str, opts: argparse.Namespace) -> tup
     if opts.dry_run:
         return head, [f"would comment `{BOT_REBASE}` and wait for Dependabot's rebase."]
     # Not the fatal `gh`: if the comment fails, the wait below still answers.
-    subprocess.run(["gh", "pr", "comment", str(number), "--body", BOT_REBASE], capture_output=True, check=False)
+    subprocess.run(
+        ["gh", "api", f"repos/{ghrest.slug()}/issues/{number}/comments", "-f", f"body={BOT_REBASE}"],
+        capture_output=True, check=False,
+    )
     began = time.monotonic()
     while time.monotonic() - began < opts.deadline * 60:
         time.sleep(opts.poll)

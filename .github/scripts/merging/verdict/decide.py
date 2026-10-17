@@ -6,7 +6,7 @@ queue polls on the same states rather than restating them.
 
 from __future__ import annotations
 
-from merging.verdict import absent, changes, runlist
+from merging.verdict import absent, changes, protocol, runlist
 
 
 # The per-workflow states [`assess`] returns, most decisive first. A polling
@@ -111,10 +111,11 @@ def judge(
 ) -> tuple[bool, list[str]]:
     """Whether this pull request may be merged, and why not when it may not.
 
-    Pure, and the whole of the decision. `pull` is `gh pr view --json`, `runs`
+    Pure, and the whole of the decision. `pull` is [`github.pull`], `runs`
     every workflow run on the head commit (any workflow — this filters),
     `jobs` maps a run's id to its jobs (with steps), `files` is the changed
-    paths.
+    paths. What the pull request claims is judged before any run
+    ([`protocol.refusal`]): it is wrong whatever CI says.
     """
     sha = pull.get("headRefOid", "")
     if pull.get("isDraft"):
@@ -123,6 +124,9 @@ def judge(
             "CI does not check drafts, so nothing here has checked it. A draft"
             " makes no claim to pass; mark it ready and let CI answer.",
         ]
+    refused = protocol.refusal(pull)
+    if refused:
+        return False, refused
 
     states = {w: assess(pull, w, runlist.runs_for(runs, sha, w), jobs) for w in runlist.WORKFLOWS}
     for worst in (FAILED, RUNNING, ABSENT, UNBUILT):
@@ -148,4 +152,4 @@ def judge(
             ]
     elif changes.markdown_only(files):
         lines.append("Markdown-only: CI's jobs ran with their build steps skipped, by design.")
-    return True, lines
+    return True, lines + protocol.gates(pull)
