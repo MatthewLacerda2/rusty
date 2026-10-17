@@ -120,13 +120,14 @@ fn draw_folder_node(editor: &mut EditorUi, ui: &mut egui::Ui, path: String) {
     }
 }
 
+/// The folders under `path`, by name, without the import cache (#1024).
 fn read_subdirs(path: &str) -> Vec<String> {
     let mut dirs: Vec<String> = std::fs::read_dir(path)
         .into_iter()
         .flatten()
         .flatten()
         .map(|e| e.path())
-        .filter(|p| p.is_dir())
+        .filter(|p| p.is_dir() && !crate::asset::convert::is_import_cache(p))
         .map(|p| paths::to_slash(&p))
         .collect();
     dirs.sort_by_key(|p| file_name(p));

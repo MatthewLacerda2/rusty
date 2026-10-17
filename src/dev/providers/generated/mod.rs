@@ -33,10 +33,7 @@ pub use sidecar::{today, Sidecar};
 
 use crate::asset::audio::{decode_bytes, wav};
 
-/// Where generated assets live, relative to the project root, which is the working
-/// directory (#829). The one place this module names it. Whether a game's repo
-/// versions these files is still open (#866).
-pub const GENERATED_DIR: &str = "assets/generated";
+pub use crate::core::project::GENERATED_DIR;
 
 /// Where a brief's output lives, relative to the working directory.
 pub fn address<B: Brief + ?Sized>(brief: &B) -> serde_json::Result<PathBuf> {

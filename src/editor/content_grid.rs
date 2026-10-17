@@ -50,11 +50,12 @@ pub fn draw(
 }
 
 /// Read the folder into `(path, is_dir)` pairs sorted folders-first, then
-/// alphabetically. Returns `None` if the directory can't be read.
+/// alphabetically. The import cache is left out: its source is the asset (#1024). Returns `None` if the directory can't be read.
 fn read_entries(dir: &str) -> Option<Vec<(String, bool)>> {
     let read = std::fs::read_dir(dir).ok()?;
     let mut entries: Vec<(String, bool)> = read
         .flatten()
+        .filter(|e| !crate::asset::convert::is_import_cache(&e.path()))
         .map(|e| {
             let p = e.path();
             (paths::to_slash(&p), p.is_dir())

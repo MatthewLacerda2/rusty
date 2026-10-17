@@ -2,7 +2,8 @@
 
 The project's importable assets — the "see what I can place" half of authoring.
 `Assets.Manifest()` (alias `Assets.List()`) walks the open project's `assets/` folder, imports
-every model file (`.gltf`/`.glb`/`.obj`), and returns a structured catalogue of the
+every model file (`.gltf`/`.glb`/`.obj`/`.fbx`; an `.fbx` is read through the glTF it
+is converted to and cached in `assets/generated/imported/`, which the walk skips), and returns a structured catalogue of the
 addressable sub-objects inside each file plus their footprint (so the agent can lay
 things out without overlap) and material count. Unlike the rest of the surface,
 this returns a Lua **table** (not a scalar triple): the result is nested data.

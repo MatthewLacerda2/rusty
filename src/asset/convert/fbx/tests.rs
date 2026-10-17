@@ -97,3 +97,14 @@ fn converting_twice_writes_the_same_bytes() {
     super::convert(&fixture(), &b).unwrap();
     assert_eq!(std::fs::read(a).unwrap(), std::fs::read(b).unwrap());
 }
+
+#[test]
+fn a_texture_uri_climbs_out_of_the_cache_folder() {
+    let dir = crate::test_temp::dir().join("fbx_uri");
+    std::fs::create_dir_all(dir.join("cache/models")).unwrap();
+    std::fs::create_dir_all(dir.join("textures")).unwrap();
+    std::fs::write(dir.join("textures/skin.png"), b"").unwrap();
+    let uri =
+        super::material::relative_uri(&dir.join("cache/models"), &dir.join("textures/skin.png"));
+    assert_eq!(uri.as_deref(), Some("../../textures/skin.png"));
+}

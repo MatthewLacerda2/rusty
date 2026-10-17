@@ -111,3 +111,6 @@ pub struct Skin {
     pub joints: Vec<usize>,
     pub inverse_bind: Vec<[f32; 16]>,
 }
+
+#[cfg(test)]
+mod tests;

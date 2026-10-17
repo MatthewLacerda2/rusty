@@ -30,7 +30,8 @@ use super::ImportError;
 use crate::core::{hash, paths, project};
 use std::path::{Path, PathBuf};
 
-/// Where an open project keeps converted sources, relative to its root.
+/// Where an open project keeps converted sources, relative to its root: a folder
+/// of [`project::GENERATED_DIR`].
 pub const IMPORT_CACHE_DIR: &str = "assets/generated/imported";
 
 /// One source format the importer converts to glTF.
