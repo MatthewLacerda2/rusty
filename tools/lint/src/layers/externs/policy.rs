@@ -54,12 +54,6 @@ pub const POLICY: Policy = Policy {
         },
     ],
     exceptions: &[
-        // Only `shell` owns the window; render takes winit's window and size type.
-        CrateException {
-            module: "render",
-            krate: "winit",
-            issue: 988,
-        },
         // `dev::bench::clock` builds its own GPU pipeline; it belongs in render::timing.
         CrateException {
             module: "dev",

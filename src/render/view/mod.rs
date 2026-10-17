@@ -18,13 +18,15 @@
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::postfx::PostFx;
 
+mod size;
 mod targets;
+pub use size::PixelSize;
 use targets::{create_color_target, create_depth};
 
 /// Per-view render targets + post-FX chain. See the module docs for why this is owned
 /// per view rather than shared on the `Renderer`.
 pub struct RenderView {
-    size: winit::dpi::PhysicalSize<u32>,
+    size: PixelSize,
     /// Colour format this view composites into (the swapchain format for the editor
     /// viewport/preview, the offscreen format for screenshots) — its post-FX composite
     /// pipeline and owned colour target are built against it.
@@ -130,7 +132,7 @@ impl RenderView {
         let target = owns_target.then(|| create_color_target(device, format, width, height));
         let (color_target, ui_format) = target.unzip();
         Self {
-            size: winit::dpi::PhysicalSize::new(width, height),
+            size: PixelSize::new(width, height),
             format,
             bloom_divisor,
             depth_texture,
@@ -160,7 +162,7 @@ impl RenderView {
         {
             return;
         }
-        self.size = winit::dpi::PhysicalSize::new(width, height);
+        self.size = PixelSize::new(width, height);
         self.bloom_divisor = bloom_divisor;
         let (depth_texture, depth_view) = create_depth(device, width, height);
         self.depth_texture = depth_texture;
@@ -175,7 +177,7 @@ impl RenderView {
     }
 
     /// This view's pixel size — drives the projection aspect and the target sizes.
-    pub fn size(&self) -> winit::dpi::PhysicalSize<u32> {
+    pub fn size(&self) -> PixelSize {
         self.size
     }
 

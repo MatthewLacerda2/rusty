@@ -6,20 +6,29 @@ pub(crate) mod resize;
 pub(crate) mod textures;
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use self::build::GpuResources;
-use crate::render::Renderer;
+use crate::render::{PixelSize, Renderer};
+
+/// What [`Renderer::new`] presents to: a window wgpu can build a surface from, whose
+/// display handle also goes to the instance. `shell` hands in its `Arc` of the OS
+/// window, so render never names the windowing crate (#988).
+pub trait SurfaceWindow:
+    wgpu::WindowHandle + wgpu::rwh::HasDisplayHandle + std::fmt::Debug + Clone + 'static
+{
+}
+impl<W> SurfaceWindow for W where
+    W: wgpu::WindowHandle + wgpu::rwh::HasDisplayHandle + std::fmt::Debug + Clone + 'static
+{
+}
 
 impl Renderer {
     /// Build the windowed renderer. Returns `Err` with a human-readable message
     /// when surface/adapter/device acquisition fails (unsupported or broken GPU
     /// drivers), so `main` can report it cleanly and exit instead of unwinding
     /// through a panic + backtrace. Mirrors the graceful headless path in
-    /// `setup_headless.rs`.
-    pub async fn new(window: Arc<winit::window::Window>) -> Result<Self, String> {
-        let size = window.inner_size();
-
+    /// `setup_headless.rs`. `size` is the window's inner size in physical pixels.
+    pub async fn new(window: impl SurfaceWindow, size: PixelSize) -> Result<Self, String> {
         // 1. Create wgpu Instance
         // The window's display handle goes in with the instance: the GL backend
         // needs it to present (Wayland especially); Vulkan and Metal ignore it.
@@ -232,10 +241,7 @@ impl Renderer {
 /// Build the swapchain config for a window of `size` from the surface caps: prefer
 /// an sRGB format, and boot with vsync on (`Fifo`, supported on every backend).
 /// Vsync is toggled later via [`Renderer::set_vsync`] (issue #89).
-fn surface_config(
-    caps: &wgpu::SurfaceCapabilities,
-    size: winit::dpi::PhysicalSize<u32>,
-) -> wgpu::SurfaceConfiguration {
+fn surface_config(caps: &wgpu::SurfaceCapabilities, size: PixelSize) -> wgpu::SurfaceConfiguration {
     let format = caps
         .formats
         .iter()

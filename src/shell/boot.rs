@@ -16,7 +16,7 @@ use crate::core::input::InputState;
 use crate::core::keymap::{Keymap, KEYBINDINGS_KEY, KEYBINDINGS_NAMESPACE};
 use crate::core::video::VideoSettings;
 use crate::navigation::NavigationGraph;
-use crate::render::Renderer;
+use crate::render::{PixelSize, Renderer};
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
@@ -61,7 +61,8 @@ pub fn create_window(
 
 /// Build the renderer on `window`. Exits the process if no compatible GPU exists.
 pub fn init_renderer(window: &Arc<winit::window::Window>) -> Renderer {
-    match pollster::block_on(Renderer::new(Arc::clone(window))) {
+    let size = pixel_size(window.inner_size());
+    match pollster::block_on(Renderer::new(Arc::clone(window), size)) {
         Ok(r) => r,
         Err(err) => {
             eprintln!("[Engine] Could not initialize the renderer: {err}");
@@ -69,6 +70,12 @@ pub fn init_renderer(window: &Arc<winit::window::Window>) -> Renderer {
             std::process::exit(1);
         }
     }
+}
+
+/// winit's physical size as the renderer's own [`PixelSize`]: render never names
+/// winit (#988), so the shell converts at the boundary.
+pub fn pixel_size(size: winit::dpi::PhysicalSize<u32>) -> PixelSize {
+    PixelSize::new(size.width, size.height)
 }
 
 /// Build the simulation around the scene at `scene_path`: shared engine state, baked

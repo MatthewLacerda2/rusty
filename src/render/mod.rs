@@ -41,9 +41,10 @@ pub use ibl::probe::bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
 pub use ibl::probe::bounce::{BounceReport, CONVERGENCE_EPSILON, MAX_BOUNCES};
 pub use ibl::reflection_bake::DEFAULT_REFLECTION_RESOLUTION;
 pub use setup::headless::{gpu_required, OFFSCREEN_FORMAT, REQUIRE_GPU_ENV};
+pub use setup::SurfaceWindow;
 pub use stats::RenderCounters;
 pub use timing::{GpuPass, GpuTimes};
-pub use view::RenderView;
+pub use view::{PixelSize, RenderView};
 
 // GPU uniform memory layouts live in `gpu/uniforms.rs` (split out to keep files under
 // the size cap); re-imported here so the render module body still names them directly.

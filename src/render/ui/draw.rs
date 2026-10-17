@@ -108,7 +108,7 @@ impl Renderer {
         cache: &UiViewCache,
         target: &wgpu::TextureView,
         format: wgpu::TextureFormat,
-        size: winit::dpi::PhysicalSize<u32>,
+        size: crate::render::PixelSize,
     ) {
         let ui = &self.ui_renderer;
         let screen = || {

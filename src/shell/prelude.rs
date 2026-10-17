@@ -186,8 +186,10 @@ where
         prelude.on_window_event(window, &event);
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::Resized(size) => renderer.resize(size),
-            WindowEvent::ScaleFactorChanged { .. } => renderer.resize(window.inner_size()),
+            WindowEvent::Resized(size) => renderer.resize(boot::pixel_size(size)),
+            WindowEvent::ScaleFactorChanged { .. } => {
+                renderer.resize(boot::pixel_size(window.inner_size()))
+            }
             WindowEvent::RedrawRequested => self.prelude_frame(),
             _ => {}
         }
