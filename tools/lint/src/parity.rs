@@ -20,8 +20,8 @@
 //!     still do it.
 //!
 //! Post-#344 the cards reach components through the accessor facade, so the signal
-//! is facade-shaped: a card that takes a mutable accessor (`.<field>_mut(`) without
-//! importing that component's `scene::authoring` ops is mutating fields directly;
+//! is facade-shaped: a card file that takes a mutable accessor (`.<field>_mut(`)
+//! without importing any `scene::authoring` ops is mutating fields directly;
 //! a routed card only ever takes the guard to hand `&mut c` into a shared op.
 //! Detach on remove (`.set_<field>(id, None)`) is not a field mutation.
 //!
@@ -66,11 +66,11 @@ enum Card {
 /// Entry point: classify every discovered component's card and fail on drift.
 pub fn run() {
     let components = components::discover();
-    let blob = cards_blob();
+    let cards = card_sources();
 
     let mut violations = Vec::new();
     for field in &components {
-        if let Some(v) = violation(field, classify(field, &blob)) {
+        if let Some(v) = violation(field, classify_all(field, &cards)) {
             violations.push(v);
         }
     }
@@ -95,36 +95,47 @@ fn violation(field: &str, card: Card) -> Option<String> {
     }
 }
 
-/// Classify `field`'s inspector card from the concatenated cards source.
+/// Classify `field`'s card across every card source: direct if any file is, else
+/// routed if any file touches the component, else no card.
+fn classify_all(field: &str, sources: &[String]) -> Card {
+    let cards = sources.iter().map(|src| classify(field, src));
+    cards.fold(Card::None, |acc, c| match (acc, c) {
+        (Card::Direct, _) | (_, Card::Direct) => Card::Direct,
+        (Card::Routed, _) | (_, Card::Routed) => Card::Routed,
+        _ => Card::None,
+    })
+}
+
+/// Classify `field`'s inspector card in one card source file.
 ///
-/// A card "exists" when some card source touches the component through the #344
-/// facade (mirrors the completeness gate's inspector axis). It is **direct** when
-/// it takes the mutable accessor (`.<field>_mut(`) with no `scene::authoring` ops
-/// for that component in scope — a routed card only takes the guard to hand
-/// `&mut c` into a shared op it imported (`authoring::<field>` / `<field> as
-/// <x>_ops`), and a read-only-plus-remove card never takes it at all.
-fn classify(field: &str, blob: &str) -> Card {
-    let takes_mut = blob.contains(&format!(".{field}_mut("));
+/// A card "exists" when the file touches the component through the #344 facade
+/// (mirrors the completeness gate's inspector axis). It is **direct** when it takes
+/// the mutable accessor (`.<field>_mut(`) in a file that imports no
+/// `scene::authoring` ops — a routed card only takes the guard to hand `&mut c`
+/// into a shared op it imported, whatever that op module is called (`nav::agent`
+/// for `nav_agent`, `backdrop` for `backdrop_filter`), and a read-only-plus-remove
+/// card never takes it at all. Judged per file: the old whole-tree name match
+/// misread every card whose ops module isn't named after its field (#959).
+fn classify(field: &str, src: &str) -> Card {
+    let takes_mut = src.contains(&format!(".{field}_mut("));
     let exists = takes_mut
-        || blob.contains(&format!(".set_{field}("))
-        || blob.contains(&format!(".has_{field}("));
+        || src.contains(&format!(".set_{field}("))
+        || src.contains(&format!(".has_{field}("));
     if !exists {
         return Card::None;
     }
-    let has_ops =
-        blob.contains(&format!("authoring::{field}")) || blob.contains(&format!("{field} as "));
-    if takes_mut && !has_ops {
+    if takes_mut && !src.contains("scene::authoring::") {
         Card::Direct
     } else {
         Card::Routed
     }
 }
 
-/// Concatenate every inspector-card source under [`CARDS_DIR`].
-fn cards_blob() -> String {
+/// Every inspector-card source under [`CARDS_DIR`], one string per file.
+fn card_sources() -> Vec<String> {
     let mut files = Vec::new();
     walk(Path::new(CARDS_DIR), &mut files);
-    files.iter().map(read).collect::<Vec<_>>().join("\n")
+    files.iter().map(read).collect()
 }
 
 fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -188,6 +199,20 @@ mod tests {
         // Read-only + detach-on-remove (the mesh card's shape) stays routed.
         let read_only = "if world.has_mesh(id) { world.set_mesh(id, None); }";
         assert_eq!(classify("mesh", read_only), Card::Routed);
+    }
+
+    /// The ops module need not be named after the field, and a direct file is
+    /// not excused by a routed one elsewhere.
+    #[test]
+    fn routing_is_judged_per_file() {
+        let routed = "use crate::scene::authoring::nav::agent as nav_ops;\n\
+                      if let Some(mut a) = world.nav_agent_mut(id) { nav_ops::set(&mut a); }";
+        assert_eq!(classify("nav_agent", routed), Card::Routed);
+        let direct = "let mut a = world.nav_agent_mut(id).unwrap(); a.speed = 2.0;";
+        let both = [routed.to_string(), direct.to_string()];
+        assert_eq!(classify_all("nav_agent", &both), Card::Direct);
+        assert_eq!(classify_all("nav_agent", &both[..1]), Card::Routed);
+        assert_eq!(classify_all("nav_agent", &[]), Card::None);
     }
 
     /// A component no card references is skipped (not a parity concern).

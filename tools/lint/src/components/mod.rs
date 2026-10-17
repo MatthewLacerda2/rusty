@@ -2,7 +2,7 @@
 //!
 //! Every first-class component must satisfy four axes that deliberately live in layers
 //! which don't depend on each other:
-//!   1. a field on `Entity` (`src/components/entity.rs`) — the discovery source,
+//!   1. a field on `Entity` (located under `src/components/`) — the discovery source,
 //!   2. an Add Component entry (`src/editor/inspector/components/add/`),
 //!      guarding on absence through the #344 accessor facade,
 //!   3. an inspector card (some `src/editor/inspector/components/*.rs`) writing
@@ -46,7 +46,7 @@ use axes::{
     add_menu_src, api_stems, editor_blob, has_add_menu, has_api, has_inspector, read, read_md_dir,
 };
 pub(crate) use discover::discover;
-use waivers::waived;
+use waivers::{stale_waivers, waived};
 
 /// The Add Component menu: a module directory, every `.rs` under it.
 const ADD_MENU: &str = "src/editor/inspector/components/add";
@@ -66,22 +66,23 @@ pub fn run() {
     let api_mod = read(API_MOD);
     let docs = read_md_dir(DOCS).to_lowercase();
 
+    let present = |field: &str, axis: &str| match axis {
+        "add_menu" => has_add_menu(field, &add_src),
+        "inspector" => has_inspector(field, &editor_blob),
+        "api" => has_api(field, &api_stems, &api_mod, &docs),
+        _ => true,
+    };
     let mut violations = Vec::new();
     for field in &components {
         for axis in AXES {
-            let ok = match *axis {
-                "add_menu" => has_add_menu(field, &add_src),
-                "inspector" => has_inspector(field, &editor_blob),
-                "api" => has_api(field, &api_stems, &api_mod, &docs),
-                _ => true,
-            };
-            if !ok && !waived(field, axis) {
+            if !present(field, axis) && !waived(field, axis) {
                 violations.push(format!(
                     "INCOMPLETE_COMPONENT `{field}` missing `{axis}` axis"
                 ));
             }
         }
     }
+    violations.extend(stale_waivers(&components, present));
     report(&violations);
     if violations.is_empty() {
         println!("components: ok");
@@ -105,8 +106,9 @@ fn report(violations: &[String]) {
     if !violations.is_empty() {
         eprint!("{body}");
         eprintln!(
-            "\n{} incomplete component axis(es). Complete the axis, or waive it in \
-             `waivers::WAIVERS` with its reason — see docs/linting.md.",
+            "\n{} component gate issue(s). Complete the axis, or waive it in \
+             `waivers::WAIVERS` with its reason (a stale waiver: delete its row) — \
+             see docs/linting.md.",
             violations.len()
         );
     }

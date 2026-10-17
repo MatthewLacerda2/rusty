@@ -76,7 +76,7 @@ will collide every time.
 
 The files where everything collides are the ones every feature appends to:
 
-- `src/components/entity.rs` — the `Option<…Component>` fields, twice over (the
+- `src/components/entity/mod.rs` — the `Option<…Component>` fields, twice over (the
   live struct and its serde mirror).
 - `src/scene/authoring/components.rs` — the `ComponentKind` variant list (`ALL`
   is generated from it, so keeping both sides' variants is the whole resolution).

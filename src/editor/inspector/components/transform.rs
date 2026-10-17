@@ -2,6 +2,7 @@ use egui_phosphor::regular as icon;
 use glam::Mat4;
 
 use crate::editor::inspector::components::card::component_card;
+use crate::scene::authoring::collider as collider_ops;
 
 /// Transform editor with integrated parenting controls.
 #[allow(clippy::too_many_arguments)]
@@ -62,9 +63,7 @@ fn draw_body(
                 None => local,
             };
             if let Some(mut col) = world.collider_mut(id) {
-                let (min, max) = col.calculate_world_aabb(wm);
-                col.aabb_min = min;
-                col.aabb_max = max;
+                collider_ops::refresh_aabb(&mut col, wm);
             }
         }
         *is_dirty = true;
