@@ -9,8 +9,8 @@ use serde_json::{json, Value};
 use super::vec3;
 use crate::components::{
     AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, LayerState,
-    LightComponent, LightType, MaterialAsset, MeshComponent, NavMeshAgentComponent,
-    ParticleEmitterComponent, RigidBodyComponent,
+    LightComponent, MaterialAsset, MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent,
+    RigidBodyComponent,
 };
 use crate::components::{
     CharacterControllerComponent, JointComponent, LineComponent, LodGroupComponent, RibbonStyle,
@@ -54,18 +54,9 @@ pub(crate) fn material_value(m: &MaterialAsset) -> Value {
 }
 
 /// Light kind as a stable string.
-fn light_type_str(kind: &LightType) -> &'static str {
-    match kind {
-        LightType::Ambient => "Ambient",
-        LightType::Directional => "Directional",
-        LightType::Point => "Point",
-        LightType::Spotlight => "Spotlight",
-    }
-}
-
 pub(crate) fn light_value(l: &LightComponent) -> Value {
     json!({
-        "type": light_type_str(&l.light_type),
+        "type": l.light_type.name(),
         "color": vec3(l.color),
         "intensity": l.intensity,
         "range": l.range,

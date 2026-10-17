@@ -7,7 +7,7 @@
 use std::cell::RefCell;
 
 use super::super::{put, Reg};
-use crate::components::{CameraComponent, Tonemap, VisualCorrectionComponent};
+use crate::components::{CameraComponent, VisualCorrectionComponent};
 use crate::core::quality::QualityPreset;
 use crate::scene::Scene;
 
@@ -104,23 +104,6 @@ pub(super) fn with_cam_mut(scene: &RefCell<Scene>, f: impl FnOnce(&mut CameraCom
     let guard = scene.world.camera_mut(id);
     if let Some(mut c) = guard {
         f(&mut c);
-    }
-}
-
-pub(super) fn parse_tonemap(name: &str) -> Option<Tonemap> {
-    match name.to_ascii_lowercase().as_str() {
-        "none" => Some(Tonemap::None),
-        "reinhard" => Some(Tonemap::Reinhard),
-        "aces" => Some(Tonemap::Aces),
-        _ => None,
-    }
-}
-
-pub(super) fn tonemap_name(tm: Tonemap) -> &'static str {
-    match tm {
-        Tonemap::None => "None",
-        Tonemap::Reinhard => "Reinhard",
-        Tonemap::Aces => "Aces",
     }
 }
 

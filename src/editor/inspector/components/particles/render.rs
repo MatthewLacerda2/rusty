@@ -29,10 +29,7 @@ pub(super) fn draw(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterCompon
 fn draw_blend(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
     let mut changed = false;
     let mut blend = p.blend;
-    let blends = [
-        (ParticleBlend::Alpha, "Alpha"),
-        (ParticleBlend::Additive, "Additive"),
-    ];
+    let blends = ParticleBlend::ALL.map(|b| (b, b.name()));
     if combo(ui, "Blend", &mut blend, &blends) {
         apply(cx, |c| particle_ops::set_blend(c, blend));
         changed = true;

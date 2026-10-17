@@ -55,7 +55,7 @@ mod tests {
             &format!(r#"Material.SetShaderTexture({id}, "mask", "n.png")"#),
         )
         .unwrap();
-        let key = format!("entity_{id}_material");
+        let key = crate::scene::authoring::material::entity_material_key(id);
         let mask = |s: &RefCell<Scene>| {
             s.borrow().materials[&key]
                 .shader_textures

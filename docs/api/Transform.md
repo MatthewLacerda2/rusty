@@ -11,4 +11,4 @@ entity's collider.
 | `Transform.SetRotation` | `(id, x, y, z)` | — |
 | `Transform.GetScale` | `(id)` | `x, y, z` |
 | `Transform.SetScale` | `(id, x, y, z)` | — |
-| `Transform.MoveTowards` | `(id, tx, ty, tz, step)` | — (steps toward target, snaps within `step`) |
+| `Transform.MoveTowards` | `(id, tx, ty, tz, step)` | — (steps toward target, snaps within `step`; a negative `step` moves away, like Unity's `Vector3.MoveTowards`) |

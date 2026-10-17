@@ -198,6 +198,22 @@ pub struct MaterialComponent {
     pub material: String,
 }
 
+impl MaterialComponent {
+    /// The reference to entity `id`'s own library material, keyed
+    /// [`entity_material_key`] — what every "give this entity a material" path attaches.
+    pub fn for_entity(id: u32) -> Self {
+        Self {
+            material: entity_material_key(id),
+        }
+    }
+}
+
+/// The library key of entity `id`'s own material (`entity_{id}_material`): the one
+/// spelling every surface that creates a per-entity material uses (#997).
+pub fn entity_material_key(id: u32) -> String {
+    format!("entity_{id}_material")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
