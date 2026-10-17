@@ -5,6 +5,7 @@
 //! [`BakeProgress`] can watch them go by or stop the bake (#808) without changing a
 //! completed bake's bytes.
 
+use std::ops::RangeInclusive;
 use std::thread;
 
 use glam::Vec3;
@@ -59,6 +60,33 @@ impl Default for BakeSettings {
             max_resolution: 512,
             filter_radius: 3,
             directional: true,
+        }
+    }
+}
+
+impl BakeSettings {
+    /// The texel densities a bake takes (Unity's Lightmap Resolution, in miniature).
+    pub const TEXELS_PER_UNIT: RangeInclusive<f32> = 0.25..=64.0;
+    /// The samples per texel a bake takes.
+    pub const SAMPLES: RangeInclusive<u32> = 1..=4096;
+    /// The bounces a bake takes.
+    pub const BOUNCES: RangeInclusive<u32> = 1..=16;
+
+    /// These settings with each authored knob clamped into its range: the one place
+    /// those limits live, applied by `Lighting.SetSettings` / `BakeLightmaps` and
+    /// spanned by the editor's fields (#993). A non-finite density takes the default.
+    pub fn sanitized(self) -> Self {
+        let texels = match self.texels_per_unit.is_finite() {
+            true => self.texels_per_unit,
+            false => Self::default().texels_per_unit,
+        };
+        let clamp = |v: u32, r: RangeInclusive<u32>| v.clamp(*r.start(), *r.end());
+        Self {
+            texels_per_unit: texels
+                .clamp(*Self::TEXELS_PER_UNIT.start(), *Self::TEXELS_PER_UNIT.end()),
+            samples: clamp(self.samples, Self::SAMPLES),
+            bounces: clamp(self.bounces, Self::BOUNCES),
+            ..self
         }
     }
 }

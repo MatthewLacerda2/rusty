@@ -12,10 +12,12 @@
 
 use glam::Vec3;
 
+use super::sanitize::{at_least, non_negative};
 use crate::components::CharacterControllerComponent;
 
 /// The smallest radius / skin a capsule may have: a zero would make the sweep
-/// degenerate.
+/// degenerate. Smaller than `sanitize::MIN_EXTENT` on purpose: it is the sweep's
+/// contact gap, not a visible extent.
 pub const MIN_SIZE: f32 = 1e-4;
 
 /// Set the capsule's full height, floored at 0 (under `2 * radius` it is a
@@ -57,20 +59,6 @@ pub fn set_min_move_distance(c: &mut CharacterControllerComponent, distance: f32
     c.min_move_distance = non_negative(distance);
 }
 
-/// `v` floored at 0; a NaN reads as 0.
-fn non_negative(v: f32) -> f32 {
-    at_least(v, 0.0)
-}
-
-/// `v` floored at `min`; a NaN reads as `min`.
-fn at_least(v: f32, min: f32) -> f32 {
-    if v.is_nan() {
-        min
-    } else {
-        v.max(min)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,6 +74,10 @@ mod tests {
         assert_eq!(c.slope_limit, 180.0);
         set_skin_width(&mut c, f32::NAN);
         assert_eq!(c.skin_width, MIN_SIZE);
+        set_skin_width(&mut c, f32::INFINITY);
+        assert_eq!(c.skin_width, MIN_SIZE, "+inf is refused like NaN");
+        set_slope_limit(&mut c, f32::INFINITY);
+        assert_eq!(c.slope_limit, 0.0);
         set_step_offset(&mut c, -0.2);
         assert_eq!(c.step_offset, 0.0);
         set_min_move_distance(&mut c, -3.0);

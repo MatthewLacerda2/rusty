@@ -87,7 +87,8 @@ pub fn register<'scope>(
 /// Define `asset` under `name` in the library, applying the validation-bearing fields
 /// through the shared `authoring::material::set_*` ops so their parse/clamp stays
 /// single-sourced. We insert the base asset first (so the per-field ops have a target),
-/// then route each authored validated field through its shared op.
+/// then route each authored validated field, and the metallic/roughness factors serde
+/// decoded, through its shared op.
 fn define(
     scene: &RefCell<Scene>,
     name: &str,
@@ -97,7 +98,10 @@ fn define(
     mat_ops::bake_maps(&mut asset, name, Path::new(mat_ops::MAPS_DIR))?;
     let mut scene = scene.borrow_mut();
     let materials = &mut scene.materials;
+    let (metallic, roughness) = (asset.metallic, asset.roughness);
     mat_ops::define_asset(materials, name, asset);
+    mat_ops::set_metallic(materials, name, metallic);
+    mat_ops::set_roughness(materials, name, roughness);
     if let Some(mode) = validated.render_mode {
         mat_ops::set_render_mode(materials, name, parse_render_mode(&mode));
     }
@@ -190,6 +194,7 @@ mod tests {
             &scene,
             r#"Material.DefineAsset("glass", {
                 render_mode = "transparent", alpha = 2.0, alpha_cutoff = -1.0,
+                metallic = 5.0, roughness = -1.0,
             })"#,
         );
         let scene = scene.borrow();
@@ -197,6 +202,11 @@ mod tests {
         assert_eq!(m.render_mode, RenderMode::Transparent);
         assert_eq!(m.alpha, 1.0, "clamped by shared set_alpha");
         assert_eq!(m.alpha_cutoff, 0.0, "clamped by shared set_alpha_cutoff");
+        assert_eq!(
+            (m.metallic, m.roughness),
+            (1.0, 0.0),
+            "clamped by the shared ops"
+        );
     }
 
     #[test]

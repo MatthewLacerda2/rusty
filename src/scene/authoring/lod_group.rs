@@ -12,7 +12,7 @@
 use crate::components::lod_group::{default_thresholds, LodGroupComponent, LodLevel};
 
 /// The smallest group size, in metres: a zero size would make every level cull.
-pub const MIN_SIZE: f32 = 0.001;
+pub const MIN_SIZE: f32 = super::sanitize::MIN_EXTENT;
 
 /// Set the group's world-space size, floored at [`MIN_SIZE`]. A non-finite size is
 /// ignored.

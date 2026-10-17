@@ -36,9 +36,9 @@ the entity. Add or remove one with `Scene.AddComponent(id, "AudioReverbZone")`
 | Function | Signature | Returns |
 |---|---|---|
 | `AudioReverbZone.GetMinDistance` | `(id)` | `number` — the full-effect radius in metres |
-| `AudioReverbZone.SetMinDistance` | `(id, d)` | — floored at 0; `max_distance` grows to stay at or past it |
+| `AudioReverbZone.SetMinDistance` | `(id, d)` | — floored at 0 (NaN or `math.huge` reads as 0); `max_distance` grows to stay at or past it |
 | `AudioReverbZone.GetMaxDistance` | `(id)` | `number` — the radius where the effect has faded out |
-| `AudioReverbZone.SetMaxDistance` | `(id, d)` | — never under `min_distance` |
+| `AudioReverbZone.SetMaxDistance` | `(id, d)` | — never under `min_distance` (NaN or `math.huge` reads as 0, so as `min_distance`) |
 | `AudioReverbZone.GetPreset` | `(id)` | `string` — the preset name (`Custom` after a param edit) |
 | `AudioReverbZone.SetPreset` | `(id, name)` | — writes the preset's params (`Custom` keeps the params); case-insensitive, an unknown name is an error listing the presets |
 | `AudioReverbZone.GetPresets` | `()` | `{string}` — every preset name, in menu order |

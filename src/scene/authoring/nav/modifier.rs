@@ -13,7 +13,7 @@ use crate::components::NavMeshModifierVolumeComponent as Volume;
 use crate::scene::nav_settings::MAX_AREAS;
 
 /// The smallest extent a box side may have.
-pub const MIN_SIZE: f32 = 1e-3;
+pub const MIN_SIZE: f32 = crate::scene::authoring::sanitize::MIN_EXTENT;
 
 /// Enable or disable the volume.
 pub fn set_active(v: &mut Volume, active: bool) {

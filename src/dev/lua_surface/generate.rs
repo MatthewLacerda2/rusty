@@ -19,19 +19,18 @@ pub(super) struct Overrides {
 }
 
 impl Overrides {
-    /// `base` with these overrides applied, each clamped to a bakeable value.
+    /// `base` with these overrides applied, then clamped into
+    /// [`BakeSettings::sanitized`]'s ranges, the editor's.
     pub(super) fn apply(&self, base: BakeSettings) -> BakeSettings {
         BakeSettings {
-            texels_per_unit: self
-                .texels_per_unit
-                .unwrap_or(base.texels_per_unit)
-                .max(0.01),
-            samples: self.samples.unwrap_or(base.samples).max(1),
-            bounces: self.bounces.unwrap_or(base.bounces).max(1),
+            texels_per_unit: self.texels_per_unit.unwrap_or(base.texels_per_unit),
+            samples: self.samples.unwrap_or(base.samples),
+            bounces: self.bounces.unwrap_or(base.bounces),
             seed: self.seed.unwrap_or(base.seed),
             directional: self.directional.unwrap_or(base.directional),
             ..base
         }
+        .sanitized()
     }
 
     fn from_table(t: &Table) -> mlua::Result<Self> {
