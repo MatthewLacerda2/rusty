@@ -88,6 +88,8 @@ mod lua_determinism;
 #[cfg(feature = "dev")]
 mod mcp_attach;
 #[cfg(feature = "dev")]
+mod mcp_bench_embed;
+#[cfg(feature = "dev")]
 mod mcp_bridge;
 #[cfg(feature = "dev")]
 mod pause_step;

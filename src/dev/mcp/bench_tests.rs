@@ -1,9 +1,9 @@
 //! rusty bench on the MCP (#942): the four tools over a bench held in memory.
 
+use std::cell::RefCell;
+
 use super::*;
 use crate::core::project::{engine_commit, ProjectFile, PROJECT_FILE, UNKNOWN_COMMIT};
-use crate::dev::mcp::embed::Embedded;
-use crate::dev::session::Session;
 
 /// Attach mode's shape: evaluates nothing, cannot move to another project.
 struct Window;
@@ -109,18 +109,32 @@ fn another_engines_project_opens_only_when_confirmed() {
     assert!(opened["warning"].is_string());
 }
 
+/// Embed mode's shape, minus the move: records the root `bench_open` hands it. The
+/// real `Embedded::switch` moves the process's working directory, so it is proven in
+/// its own process instead (`tests/mcp_bench_embed.rs`, #1042).
+#[derive(Default)]
+struct Mover(RefCell<Option<PathBuf>>);
+
+impl EvalBackend for Mover {
+    fn eval(&self, _line: &str) -> Result<String, String> {
+        Ok(String::new())
+    }
+
+    fn reopen(&self, root: &Path) -> Option<Result<(), String>> {
+        *self.0.borrow_mut() = Some(root.to_path_buf());
+        Some(Ok(()))
+    }
+}
+
 #[test]
-fn embed_mode_drives_the_opened_project() {
+fn embed_mode_hands_the_opened_root_to_the_backend() {
     let dir = fresh("embed");
     let mut bench = Bench::at(None);
     let root = bench.create(&dir, "Horde", 1).unwrap();
-    let embedded = Embedded::new(Session::new("").unwrap());
-    let opened = run(&embedded, &mut bench, "bench_open", json!({ "path": root })).unwrap();
+    let mover = Mover::default();
+    let opened = run(&mover, &mut bench, "bench_open", json!({ "path": root })).unwrap();
     assert_eq!(opened["opened"], json!(true));
-    assert_eq!(crate::core::project::root(), root);
-    assert!(
-        root.join(crate::scene::DEFAULT_SCENE_PATH).is_file(),
-        "seeded"
-    );
-    assert_eq!(embedded.eval("1 + 1"), Ok("2".to_string()));
+    assert_eq!(opened["root"], json!(root));
+    assert_eq!(mover.0.take(), Some(root.clone()));
+    assert_eq!(bench.recent.projects[0].path, root);
 }
