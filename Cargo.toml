@@ -108,6 +108,10 @@ image = { version = "0.25.10", default-features = false, features = ["jpeg", "pn
 ktx2 = { version = "0.3.0" }
 tobj = { version = "4.0.2" }
 gltf = { version = "1.4.1", default-features = false, features = ["import", "utils", "names"] }
+# FBX import (#1024): the official bindings to ufbx (MIT/Unlicense), the library
+# Godot and Bevy's FBX loader read FBX with. An `.fbx` is converted to a cached glTF
+# at import (`asset::convert`), so nothing past the importer reads FBX.
+ufbx = "0.11.5"
 bytemuck = { version = "1.16.1", features = ["derive"] }
 env_logger = "0.11.3"
 log = "0.4.22"

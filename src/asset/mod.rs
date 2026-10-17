@@ -1,7 +1,7 @@
 //! src/asset/ — the headless 3D-asset importer (issue #74).
 //!
-//! Turns an authored source file (glTF 2.0 `.gltf`/`.glb`, or Wavefront `.obj`)
-//! into addressable, scene-referenceable sub-meshes — WITHOUT ever inlining GPU
+//! Turns an authored source file (glTF 2.0 `.gltf`/`.glb`, Wavefront `.obj`, or an
+//! `.fbx` read through the glTF it is converted to, `convert`) into addressable, scene-referenceable sub-meshes — WITHOUT ever inlining GPU
 //! buffers into the scene document. Scenes store a path-based REFERENCE
 //! (`path::sub_object`); the geometry is re-imported on scene load, exactly like a
 //! primitive mesh is rebuilt from its `primitive_type`.
@@ -14,7 +14,7 @@
 //! Audio import (`audio`, #385) lives here too: MP3 is a source format, converted to
 //! WAV on arrival, and the one decoder every clip goes through.
 //!
-//! Purity: this module depends only on `glam` + the `gltf`/`tobj`/`serde`/`symphonia`
+//! Purity: this module depends only on `glam` + the `gltf`/`tobj`/`ufbx`/`serde`/`symphonia`
 //! crates — never wgpu/egui/mlua — so it stays a pure data transform. It lives outside the
 //! determinism-guarded sim trees (`app`/`scripting`/`physics`/`navigation`); a
 //! scene-load re-import is deterministic given the same file.
@@ -22,6 +22,7 @@
 pub mod anim_data;
 pub mod animation_graph;
 pub mod audio;
+pub mod convert;
 pub mod gltf;
 pub mod lightmap_uv;
 pub mod lod;
@@ -76,9 +77,9 @@ impl std::error::Error for ImportError {}
 
 /// The source model formats [`import_file`] reads, lowercase (#983, #994). The one
 /// list: the editor's content grid, inspector and preview read it rather than
-/// spelling their own, so nothing offers a model the importer would reject. FBX is
-/// not here: no importer exists for it yet.
-pub const MODEL_EXTENSIONS: &[&str] = &["gltf", "glb", "obj"];
+/// spelling their own, so nothing offers a model the importer would reject. `fbx`
+/// is read through a cached glTF ([`convert`], #1024).
+pub const MODEL_EXTENSIONS: &[&str] = &["gltf", "glb", "obj", "fbx"];
 
 /// The image formats a texture is decoded from, lowercase (#994): what the
 /// renderer's `image` decoders are built with (`Cargo.toml`'s `image` features).
@@ -123,6 +124,9 @@ fn parse_file(path: &Path) -> Result<ImportedAsset, ImportError> {
     match paths::extension(path).as_str() {
         "gltf" | "glb" => gltf::import::import(path),
         "obj" => obj_import::import(path),
+        _ if convert::converter_for(path).is_some() => {
+            gltf::import::import(&convert::cached_gltf(path)?)
+        }
         other => Err(ImportError::UnsupportedFormat(other.to_string())),
     }
 }
