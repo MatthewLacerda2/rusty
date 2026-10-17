@@ -23,6 +23,14 @@ ignore = [
 [bans]
 multiple-versions = "warn"
 wildcards = "allow"
+# Design locks (#975), each a rule from CLAUDE.md that held by accident until now:
+# - "Use `glam` for all math": nalgebra is in the tree only for the physics stack
+#   (rapier3d, and glamx's conversions to it), so naming it directly fails;
+#   cgmath is not in the tree at all. A wrapper is a crate allowed to depend on it.
+deny = [
+  { crate = "nalgebra", wrappers = ["rapier3d", "glamx"], reason = "rusty uses glam for all math (CLAUDE.md); nalgebra is the physics stack's own" },
+  { crate = "cgmath", reason = "rusty uses glam for all math (CLAUDE.md)" },
+]
 
 [licenses]
 # Explicit allow-list: a dependency under any other license fails CI. Add a
@@ -65,4 +73,8 @@ exceptions = [
 # fetches it without credentials (if it ever goes private, CI needs a token).
 unknown-registry = "deny"
 unknown-git = "deny"
+# Every git dependency names a commit (`rev = …`), never a branch or a tag (#975):
+# zimmer's SYNTH_VERSION moves when a recipe would render differently, so rusty's
+# bakes change only when someone moves the pin on purpose (CLAUDE.md, #413).
+required-git-spec = "rev"
 allow-git = ["https://github.com/MatthewLacerda2/scorsese"]

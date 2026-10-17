@@ -10,6 +10,7 @@
 //! same way.
 
 use std::path::Path;
+// lint: allow(subprocess) asks git which commit a debug build's checkout is; a release build is stamped and never runs it
 use std::process::Command;
 
 /// The commit of a build that can't say which commit it is (no git, no checkout).
