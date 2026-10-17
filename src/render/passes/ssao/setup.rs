@@ -2,6 +2,7 @@
 //! occlusion and blur pipelines, and the white no-AO fallback.
 
 use super::{SsaoRenderer, AO_FORMAT};
+use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{depth_entry, texture_entry, uniform_entry};
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::timing::{GpuPass, GpuTimer};
@@ -19,33 +20,20 @@ impl SsaoRenderer {
             bind_group_layouts: &[Some(&layout)],
             immediate_size: 0,
         });
-        let pipeline = |label, entry_point| {
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some(label),
-                layout: Some(&pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &shader,
-                    entry_point: Some("vs_fullscreen"),
-                    compilation_options: Default::default(),
-                    buffers: &[],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    compilation_options: Default::default(),
-                    module: &shader,
-                    entry_point,
-                    targets: &[Some(AO_FORMAT.into())],
-                }),
-                primitive: wgpu::PrimitiveState::default(),
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState::default(),
-                multiview_mask: None,
-                cache: None,
-            })
+        let pipeline = |label, fs| {
+            let pass = Fullscreen {
+                label,
+                shader: &shader,
+                layout: &pipeline_layout,
+                vs: "vs_fullscreen",
+                fs,
+            };
+            pass.colour(device, &[Some(AO_FORMAT.into())])
         };
         let (no_ao_texture, no_ao) = white_texture(device, queue);
         Self {
-            ao_pipeline: pipeline("SSAO Occlusion Pipeline", Some("fs_ao")),
-            blur_pipeline: pipeline("SSAO Blur Pipeline", Some("fs_blur")),
+            ao_pipeline: pipeline("SSAO Occlusion Pipeline", "fs_ao"),
+            blur_pipeline: pipeline("SSAO Blur Pipeline", "fs_blur"),
             layout,
             _no_ao_texture: no_ao_texture,
             no_ao,
