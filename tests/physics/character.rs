@@ -3,30 +3,22 @@
 //! — because collide-and-slide belongs to the `CharacterController` alone.
 
 use glam::Vec3;
-use rusty::components::{ColliderComponent, ColliderShape, CollisionDetection, RigidBodyComponent};
+use rusty::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
 use rusty::physics::PhysicsWorld;
 use rusty::scene::Scene;
 
 fn box_collider(size: Vec3) -> ColliderComponent {
     ColliderComponent {
-        active: true,
         shape: ColliderShape::Box { size },
-        is_trigger: false,
-        material: Default::default(),
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
+        ..rusty::scene::authoring::default_collider()
     }
 }
 
 fn kinematic_body(use_gravity: bool) -> RigidBodyComponent {
     RigidBodyComponent {
-        active: true,
         is_kinematic: true,
-        mass: 1.0,
-        velocity: Vec3::ZERO,
-        angular_velocity: Vec3::ZERO,
         use_gravity,
-        collision_detection: CollisionDetection::Discrete,
+        ..rusty::scene::authoring::default_rigidbody()
     }
 }
 

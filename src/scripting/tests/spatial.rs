@@ -26,14 +26,10 @@ fn add_box(scene: &mut Scene, name: &str, pos: Vec3, layer: u8) -> u32 {
     scene.world.set_collider(
         id,
         Some(ColliderComponent {
-            active: true,
             shape: ColliderShape::Box {
                 size: Vec3::splat(2.0),
             },
-            is_trigger: false,
-            material: Default::default(),
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
+            ..crate::scene::authoring::default_collider()
         }),
     );
     scene.update_entity_collider(id);

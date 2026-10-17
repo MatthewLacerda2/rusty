@@ -22,7 +22,7 @@ fn element(scene: &mut Scene, parent: u32, pos: Vec2, size: Vec2) -> u32 {
         pivot: Vec2::ZERO,
         anchored_position: pos,
         size_delta: size,
-        world_anchor: None,
+        ..RectTransformComponent::default()
     };
     scene.world.set_rect_transform(id, Some(rt));
     scene.world.set_image(id, Some(ImageComponent::default()));

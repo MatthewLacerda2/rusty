@@ -6,7 +6,6 @@
 //! simply wasn't possible in this environment).
 
 use glam::Vec3;
-use rusty::components::Tonemap;
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
@@ -17,22 +16,11 @@ fn tmp(name: &str) -> std::path::PathBuf {
 
 fn vc(exposure: f32) -> VisualCorrectionComponent {
     VisualCorrectionComponent {
-        active: true,
-        bloom_active: true,
-        bloom_intensity: 1.0,
         bloom_threshold: 0.6,
         exposure,
-        contrast: 1.0,
-        saturation: 1.0,
         ssr_active: false,
-        ssr_quality: "High".to_string(),
         ssr_temporal_upsampling: false,
-        tonemap: Tonemap::Aces,
-        gamma: 1.0,
-        shadows: Default::default(),
-        ssao: Default::default(),
-        custom_effects: Vec::new(),
-        post_params: Default::default(),
+        ..rusty::scene::authoring::default_visual_correction()
     }
 }
 
@@ -41,21 +29,9 @@ fn scene_with_exposure(exposure: f32) -> Scene {
     scene.ambient_intensity = 1.0;
     let id = scene.add_entity("Box".to_string());
     let (vertices, indices) = rusty::components::mesh::primitives::generate_box(2.0, 2.0, 2.0);
-    scene.world.set_mesh(
-        id,
-        Some(MeshComponent {
-            primitive_type: "Box".to_string(),
-            asset_ref: None,
-            vertices,
-            indices,
-            bind_palette: Vec::new(),
-            skin: None,
-            clips: Vec::new(),
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
-            is_dirty: rusty::scene::DirtyFlag::new(true),
-        }),
-    );
+    scene
+        .world
+        .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
     scene.world.set_visual_correction(id, Some(vc(exposure)));
     scene
 }

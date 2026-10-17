@@ -4,25 +4,16 @@ use std::cell::RefCell;
 
 use glam::Vec3;
 use mlua::Lua;
-use rusty::components::{CollisionDetection, RigidBodyComponent};
+use rusty::components::CollisionDetection;
 use rusty::scene::authoring::rigidbody as rb_ops;
 use rusty::scene::Scene;
 
 /// Attach a default rigidbody to a fresh entity; returns its id.
 fn entity_with_rb(scene: &mut Scene, name: &str) -> u32 {
     let id = scene.add_entity(name.to_string());
-    scene.world.set_rigidbody(
-        id,
-        Some(RigidBodyComponent {
-            active: true,
-            is_kinematic: false,
-            mass: 1.0,
-            velocity: Vec3::ZERO,
-            angular_velocity: Vec3::ZERO,
-            use_gravity: true,
-            collision_detection: CollisionDetection::Discrete,
-        }),
-    );
+    scene
+        .world
+        .set_rigidbody(id, Some(rusty::scene::authoring::default_rigidbody()));
     id
 }
 

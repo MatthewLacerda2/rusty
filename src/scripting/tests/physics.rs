@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::components::{ColliderComponent, ColliderShape, CollisionDetection, RigidBodyComponent};
+use crate::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::physics::PhysicsWorld;
@@ -24,14 +24,10 @@ fn raycast_matches_engine_cast_through_rapier() {
     raw.world.set_collider(
         target,
         Some(ColliderComponent {
-            active: true,
             shape: ColliderShape::Box {
                 size: Vec3::splat(2.0),
             },
-            is_trigger: false,
-            material: Default::default(),
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
+            ..crate::scene::authoring::default_collider()
         }),
     );
     let scene = Rc::new(RefCell::new(raw));
@@ -79,13 +75,8 @@ fn manager_with_dynamic_body() -> (ScriptManager, Rc<RefCell<Option<PhysicsWorld
     raw.world.set_rigidbody(
         id,
         Some(RigidBodyComponent {
-            active: true,
-            is_kinematic: false,
-            mass: 1.0,
-            velocity: Vec3::ZERO,
-            angular_velocity: Vec3::ZERO,
             use_gravity: false,
-            collision_detection: CollisionDetection::Discrete,
+            ..crate::scene::authoring::default_rigidbody()
         }),
     );
     let scene = Rc::new(RefCell::new(raw));

@@ -8,7 +8,7 @@ use super::bin::{bin_spheres, Binned, Budget};
 use super::grid::AabbCache;
 use super::*;
 use crate::components::{LightComponent, TransformComponent};
-use crate::scene::{Camera, LightType};
+use crate::scene::Camera;
 
 fn grid() -> ClusterGrid {
     ClusterGrid::new(&Camera::new(Vec3::ZERO, -90.0, 0.0), 16.0 / 9.0)
@@ -22,14 +22,11 @@ fn light(at: Vec3, range: f32, intensity: f32) -> LocalLight {
         ..Default::default()
     };
     let light = LightComponent {
-        light_type: LightType::Point,
-        color: Vec3::ONE,
         intensity,
         range,
         inner_cone: 20.0,
         outer_cone: 30.0,
-        cast_shadows: false,
-        mode: Default::default(),
+        ..crate::scene::authoring::default_light()
     };
     LocalLight::new(&transform, &light).expect("a local light")
 }

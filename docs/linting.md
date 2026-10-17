@@ -15,6 +15,7 @@ agent can read exactly what failed.
 | Test / fixture file length | `tools/lint` | <= 150 lines (standalone `*_test.rs` / `tests/` / `fixtures/`, and every `.py` under a `tests/` directory); a `<x>_tests.rs` **sibling** of `<x>.rs` shares the 300-line source cap |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix. Prints the ≲10-files-per-directory signal beside it, never failing on it (#934) |
 | Nothing temporary | clippy `dbg_macro`/`todo`/`unimplemented` + `tools/lint -- --rules` (`markers`) | **hard gate**: the three are denied in `Cargo.toml`'s `[lints]` (and `tools/lint`'s); a marker word (`TODO`, `FIXME`, `XXX`, `HACK`) in a scanned `.rs` file fails — an unfinished thing is an issue (#935) |
+| Full component literals in tests | `tools/lint -- --rules` (`full-literal`) | **hard gate**: test code builds a first-class component with `..rest` or a constructor, never a literal naming every field (#663, #976) |
 | Skipped tests | `tools/lint -- --rules` (`skip`) | **hard gate**: `#[ignore]` / `#[cfg_attr(…, ignore)]` needs `// lint: allow(skip) <why>` (#935) |
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | `tools/lint` stays std-only | `make test-lint` | its `Cargo.lock` names one package, itself (#935) |
@@ -128,6 +129,13 @@ or baseline.
 - **`skip`** — an ignored test reads as passing to anyone who reads only the
   summary. `#[ignore]` and `#[cfg_attr(…, ignore)]` fail unless an allow says why:
   `// lint: allow(skip) a timing measurement, run by hand` right above it.
+- **`full-literal`** (#976) — a test builds a first-class component (a `…Component`
+  type `Entity` names, with three or more fields) through a constructor or a
+  `..rest`, never a struct expression naming every field: such a literal breaks the
+  day the component gains a field. Test code is `tests/`, `tests.rs` /
+  `*_tests.rs`, and a file's lines from its first `#[cfg(test)]` on
+  (`rules/test_code.rs`). When every field is the point, say so:
+  `// lint: allow(full-literal) <why>` (`rules/full_literal.rs`).
 - **`ignored`** — what you push must be what CI builds. A scanned `.rs` file that
   `git check-ignore --no-index` matches fails, tracked or not, because the next
   new file beside it is the one a push silently drops

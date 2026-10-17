@@ -1,17 +1,13 @@
 use super::*;
 use crate::components::{LightComponent, LightMode};
-use glam::Vec3;
 
 fn light(light_type: LightType) -> LightComponent {
     LightComponent {
         light_type,
-        color: Vec3::ONE,
         intensity: 1.0,
-        range: 10.0,
         inner_cone: 20.0,
         outer_cone: 30.0,
-        cast_shadows: false,
-        mode: Default::default(),
+        ..crate::scene::authoring::default_light()
     }
 }
 

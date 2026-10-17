@@ -178,22 +178,12 @@ mod tests {
         let mut scene = Scene::new();
         let id = scene.add_entity("Volume".to_string());
         let c = VisualCorrectionComponent {
-            active: true,
             bloom_active: false,
-            bloom_intensity: 1.0,
             bloom_threshold: 1.0,
-            exposure: 0.0,
-            contrast: 1.0,
-            saturation: 1.0,
             ssr_active: false,
             ssr_quality: "Medium".to_string(),
             ssr_temporal_upsampling: false,
-            tonemap: Tonemap::Aces,
-            gamma: 1.0,
-            shadows: Default::default(),
-            ssao: Default::default(),
-            custom_effects: Vec::new(),
-            post_params: Default::default(),
+            ..crate::scene::authoring::default_visual_correction()
         };
         scene.world.set_visual_correction(id, Some(c));
         (scene, id)

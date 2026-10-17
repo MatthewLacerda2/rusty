@@ -11,7 +11,7 @@ use std::rc::Rc;
 
 use glam::Vec3;
 
-use crate::components::{ColliderComponent, ColliderShape, CollisionDetection, RigidBodyComponent};
+use crate::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
 use crate::core::input::InputState;
 use crate::navigation::NavigationGraph;
 use crate::scene::{Scene, ScriptComponent};
@@ -41,13 +41,9 @@ fn falling_body_world() -> GameWorld {
     s.world.set_rigidbody(
         id,
         Some(RigidBodyComponent {
-            active: true,
-            is_kinematic: false,
-            mass: 1.0,
             velocity: Vec3::new(0.0, -12.0, 0.0),
-            angular_velocity: Vec3::ZERO,
             use_gravity: false,
-            collision_detection: CollisionDetection::Discrete,
+            ..crate::scene::authoring::default_rigidbody()
         }),
     );
     // A collider gives the dynamic body mass so rapier integrates it (a
@@ -55,14 +51,10 @@ fn falling_body_world() -> GameWorld {
     s.world.set_collider(
         id,
         Some(ColliderComponent {
-            active: true,
             shape: ColliderShape::Box {
                 size: Vec3::splat(1.0),
             },
-            is_trigger: false,
-            material: Default::default(),
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
+            ..crate::scene::authoring::default_collider()
         }),
     );
     // Forward slashes: a Windows `\` would be a Lua escape in the path literal.

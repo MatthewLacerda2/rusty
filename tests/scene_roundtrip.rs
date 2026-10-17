@@ -16,18 +16,11 @@ fn save_load_preserves_values_and_rehydrates_mesh() {
     scene.world.transform_mut(id).unwrap().position = Vec3::new(1.0, 2.0, 3.0);
     scene.world.set_mesh(
         id,
-        Some(rusty::scene::MeshComponent {
-            primitive_type: "Box".to_string(),
-            asset_ref: None,
-            vertices: Vec::new(),
-            indices: Vec::new(),
-            bind_palette: Vec::new(),
-            skin: None,
-            clips: Vec::new(),
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
-            is_dirty: rusty::scene::DirtyFlag::new(true),
-        }),
+        Some(rusty::scene::MeshComponent::new(
+            "Box",
+            Vec::new(),
+            Vec::new(),
+        )),
     );
     let path = tmp("rusty_scene_roundtrip.scene");
     scene.save_to_file(&path).unwrap();

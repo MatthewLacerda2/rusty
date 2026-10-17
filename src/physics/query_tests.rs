@@ -15,14 +15,11 @@ fn add_wall(scene: &mut Scene, x: f32, is_trigger: bool) -> u32 {
     scene.world.transform_mut(id).unwrap().position = Vec3::new(x, 0.0, 0.0);
     scene.world.set_static(id, true);
     let collider = ColliderComponent {
-        active: true,
         shape: ColliderShape::Box {
             size: Vec3::new(1.0, 4.0, 4.0),
         },
         is_trigger,
-        material: Default::default(),
-        aabb_min: Vec3::ZERO,
-        aabb_max: Vec3::ZERO,
+        ..crate::scene::authoring::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
     id

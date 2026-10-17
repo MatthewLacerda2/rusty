@@ -1,0 +1,70 @@
+use super::finding::allowed;
+use super::full_literal::{Components, RULE};
+
+const ENTITY: &str = "pub struct Entity {\n    pub id: u32,\n    pub transform: TransformComponent,\n    \
+                      pub collider: Option<ColliderComponent>,\n    pub material: Option<MaterialComponent>,\n}\n";
+const COLLIDER: &str = "pub struct ColliderComponent {\n    /// The shape.\n    pub shape: Shape,\n    \
+                        #[serde(default)]\n    pub is_trigger: bool,\n    pub(crate) active: bool,\n}\n\
+                        pub struct MaterialComponent {\n    pub name: String,\n}\n";
+
+fn components() -> Components {
+    Components::load([
+        ("src/components/entity/mod.rs", ENTITY),
+        ("src/components/collider/mod.rs", COLLIDER),
+    ])
+}
+
+fn lines(path: &str, src: &str) -> Vec<usize> {
+    components()
+        .check(path, src)
+        .iter()
+        .map(|f| f.line)
+        .collect()
+}
+
+#[test]
+fn a_literal_naming_every_field_is_flagged() {
+    // The `tests/physics_gravity.rs` shape: every field, multi-line, shorthand too.
+    let src = "let c = ColliderComponent {\n    shape: Shape::Cube { half: Vec3::ONE },\n    \
+               is_trigger: false,\n    active,\n};\n\
+               let d = Some(rusty::components::ColliderComponent { shape, is_trigger: true, active: true });\n";
+    assert_eq!(lines("tests/physics/gravity.rs", src), [1, 6]);
+    let f = &components().check("tests/a.rs", src)[0];
+    assert_eq!(f.rule, RULE);
+    assert!(f.message.contains("all 3 fields"), "{}", f.message);
+}
+
+#[test]
+fn a_rest_a_constructor_or_a_partial_literal_passes() {
+    let src = "let a = ColliderComponent { is_trigger: true, ..Default::default() };\n\
+               let b = ColliderComponent::from_mesh_bounds(true, min, max);\n\
+               let c = ColliderComponent { shape, active: true, ..default_collider() };\n\
+               let ColliderComponent { shape, .. } = c;\n";
+    assert!(lines("tests/a.rs", src).is_empty());
+}
+
+#[test]
+fn only_test_code_counts_and_headers_are_not_literals() {
+    let full = "ColliderComponent { shape, is_trigger, active }";
+    let prod = format!(
+        "pub struct ColliderComponent {{\nfn f() -> ColliderComponent {{\n    {full}\n}}\n"
+    );
+    assert!(
+        lines("src/physics/build.rs", &prod).is_empty(),
+        "production code"
+    );
+    let inline = format!("{prod}#[cfg(test)]\nmod tests {{\n    fn t() {{ {full}; }}\n}}\n");
+    assert_eq!(lines("src/physics/build.rs", &inline), [7]);
+    assert_eq!(lines("src/physics/build_tests.rs", &prod), [3]);
+    let header = "impl Default for ColliderComponent {\nfn d() -> ColliderComponent {\n";
+    assert!(lines("tests/a.rs", header).is_empty());
+}
+
+#[test]
+fn small_components_and_reasoned_exceptions_pass() {
+    assert!(lines("tests/a.rs", "MaterialComponent { name }\n").is_empty());
+    let src = "// lint: allow(full-literal) every field is what the round-trip compares\n\
+               let c = ColliderComponent { shape, is_trigger, active };\n";
+    assert_eq!(lines("tests/a.rs", src), [2]);
+    assert!(allowed(src, 2, RULE), "`rules::run` applies the allow");
+}

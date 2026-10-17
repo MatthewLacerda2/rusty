@@ -24,21 +24,9 @@ pub fn wall_scene(distance: f32, color: [f32; 3]) -> Scene {
     let id = scene.add_entity("Wall".to_string());
     let (vertices, indices) = rusty::components::mesh::primitives::generate_box(400.0, 400.0, 0.1);
     scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 0.0, 5.0 - distance);
-    scene.world.set_mesh(
-        id,
-        Some(MeshComponent {
-            primitive_type: "Box".to_string(),
-            asset_ref: None,
-            vertices,
-            indices,
-            bind_palette: Vec::new(),
-            skin: None,
-            clips: Vec::new(),
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
-            is_dirty: rusty::scene::DirtyFlag::new(true),
-        }),
-    );
+    scene
+        .world
+        .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
     let material = "wall".to_string();
     scene.world.set_material(
         id,
@@ -64,26 +52,19 @@ pub fn wall_scene(distance: f32, color: [f32; 3]) -> Scene {
 
 fn neutral_volume() -> VisualCorrectionComponent {
     VisualCorrectionComponent {
-        active: true,
         bloom_active: false,
         bloom_intensity: 0.0,
         bloom_threshold: 1.0,
-        exposure: 0.0,
-        contrast: 1.0,
-        saturation: 1.0,
         ssr_active: false,
         ssr_quality: "Low".to_string(),
         ssr_temporal_upsampling: false,
         tonemap: Tonemap::None,
-        gamma: 1.0,
-        shadows: Default::default(),
         // Neutral means no AO either: the fog tests read exact surface colours.
         ssao: rusty::components::SsaoSettings {
             active: false,
             ..Default::default()
         },
-        custom_effects: Vec::new(),
-        post_params: Default::default(),
+        ..rusty::scene::authoring::default_visual_correction()
     }
 }
 

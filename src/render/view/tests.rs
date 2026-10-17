@@ -8,28 +8,16 @@ use glam::Vec3;
 use super::RenderView;
 use crate::render::OFFSCREEN_FORMAT;
 use crate::scene::Camera;
-use crate::scene::{DirtyFlag, MeshComponent, Scene};
+use crate::scene::{MeshComponent, Scene};
 
 fn box_scene() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let id = scene.add_entity("Box".to_string());
     let (vertices, indices) = crate::components::mesh::primitives::generate_box(1.0, 1.0, 1.0);
-    scene.world.set_mesh(
-        id,
-        Some(MeshComponent {
-            primitive_type: "Box".to_string(),
-            asset_ref: None,
-            vertices,
-            indices,
-            bind_palette: Vec::new(),
-            skin: None,
-            clips: Vec::new(),
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
-            is_dirty: DirtyFlag::new(true),
-        }),
-    );
+    scene
+        .world
+        .set_mesh(id, Some(MeshComponent::new("Box", vertices, indices)));
     scene
 }
 

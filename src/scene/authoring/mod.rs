@@ -134,18 +134,7 @@ fn primitive_mesh_name(primitive: Primitive) -> Option<&'static str> {
 pub fn primitive_mesh_component(primitive: Primitive) -> Option<MeshComponent> {
     let name = primitive_mesh_name(primitive)?;
     let (vertices, indices) = primitive_geometry(primitive)?;
-    Some(MeshComponent {
-        primitive_type: name.to_string(),
-        asset_ref: None,
-        vertices,
-        indices,
-        bind_palette: Vec::new(),
-        skin: None,
-        clips: Vec::new(),
-        pose_palette: Vec::new(),
-        skeleton: Default::default(),
-        is_dirty: crate::scene::DirtyFlag::new(true),
-    })
+    Some(MeshComponent::new(name, vertices, indices))
 }
 
 /// The default light for a light primitive (the hierarchy toolbar's values).

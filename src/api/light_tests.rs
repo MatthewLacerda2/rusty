@@ -3,25 +3,14 @@
 use std::cell::RefCell;
 
 use super::*;
-use crate::components::LightComponent;
 
 /// Build a scene with one light-bearing entity; returns `(scene, id)`.
 fn scene_with_light() -> (RefCell<Scene>, u32) {
     let mut scene = Scene::default();
     let id = scene.add_entity("Lamp".to_string());
-    scene.world.set_light(
-        id,
-        Some(LightComponent {
-            light_type: LightType::Point,
-            color: Vec3::ONE,
-            intensity: 1.5,
-            range: 10.0,
-            inner_cone: 30.0,
-            outer_cone: 45.0,
-            cast_shadows: false,
-            mode: Default::default(),
-        }),
-    );
+    scene
+        .world
+        .set_light(id, Some(crate::scene::authoring::default_light()));
     (RefCell::new(scene), id)
 }
 

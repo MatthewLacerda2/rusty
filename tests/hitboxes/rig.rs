@@ -120,16 +120,11 @@ pub fn character(scene: &mut Scene, at: Vec3, swinging: bool) -> u32 {
     scene.world.set_mesh(
         id,
         Some(MeshComponent {
-            primitive_type: "Asset".to_string(),
-            asset_ref: None,
-            vertices: vertices(),
-            indices: Vec::new(),
             bind_palette: skin.bind_palette(),
             skin: Some(skin),
             clips: vec![swing()],
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
             is_dirty: Default::default(),
+            ..MeshComponent::new("Asset", vertices(), Vec::new())
         }),
     );
     if swinging {

@@ -5,7 +5,7 @@ use glam::{Vec2, Vec3};
 
 use super::tests::{floor, mean, settings};
 use super::*;
-use crate::components::{LightComponent, LightMode, LightType};
+use crate::components::{LightComponent, LightMode};
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
 use crate::scene::Scene;
 
@@ -72,14 +72,11 @@ fn gather_takes_static_meshes_and_baked_in_lights_only() {
     for mode in [LightMode::Realtime, LightMode::Mixed, LightMode::Baked] {
         let id = scene.add_entity(mode.name().to_string());
         let light = LightComponent {
-            light_type: LightType::Point,
-            color: Vec3::ONE,
             intensity: 2.0,
-            range: 10.0,
             inner_cone: 0.0,
             outer_cone: 0.0,
-            cast_shadows: false,
             mode,
+            ..crate::scene::authoring::default_light()
         };
         scene.world.set_light(id, Some(light));
     }

@@ -57,21 +57,13 @@ pub fn set_collision_detection(rb: &mut RigidBodyComponent, mode: CollisionDetec
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::RigidBodyComponent;
+
     use crate::scene::Scene;
 
     fn scene_with_rb() -> (Scene, u32) {
         let mut scene = Scene::new();
         let id = scene.add_entity("Body".to_string());
-        let c = RigidBodyComponent {
-            active: true,
-            is_kinematic: false,
-            mass: 1.0,
-            velocity: Vec3::ZERO,
-            angular_velocity: Vec3::ZERO,
-            use_gravity: true,
-            collision_detection: CollisionDetection::Discrete,
-        };
+        let c = crate::scene::authoring::default_rigidbody();
         scene.world.set_rigidbody(id, Some(c));
         (scene, id)
     }

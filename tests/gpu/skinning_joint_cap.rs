@@ -11,7 +11,7 @@
 use glam::{Mat4, Vec3};
 use rusty::components::{MaterialAsset, MaterialComponent};
 use rusty::dev::screenshot::capture;
-use rusty::scene::{Camera, DirtyFlag, MeshComponent, Scene};
+use rusty::scene::{Camera, MeshComponent, Scene};
 
 const JOINTS: usize = 100;
 const LAST: u32 = JOINTS as u32 - 1;
@@ -31,16 +31,8 @@ fn scene(last: Mat4) -> Scene {
     scene.world.set_mesh(
         id,
         Some(MeshComponent {
-            primitive_type: "Box".to_string(),
-            asset_ref: None,
-            vertices,
-            indices,
             bind_palette,
-            skin: None,
-            clips: Vec::new(),
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
-            is_dirty: DirtyFlag::new(true),
+            ..MeshComponent::new("Box", vertices, indices)
         }),
     );
     let material = MaterialComponent {

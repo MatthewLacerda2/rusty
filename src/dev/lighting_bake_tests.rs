@@ -22,14 +22,10 @@ fn room_scene() -> Scene {
     scene.world.set_collider(
         id,
         Some(ColliderComponent {
-            active: true,
             shape: ColliderShape::Box {
                 size: Vec3::new(20.0, 6.0, 20.0),
             },
-            is_trigger: false,
-            material: Default::default(),
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
+            ..crate::scene::authoring::default_collider()
         }),
     );
     scene.update_entity_collider(id);

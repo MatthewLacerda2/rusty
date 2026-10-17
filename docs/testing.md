@@ -35,7 +35,11 @@
 - A test builds an engine struct through a constructor or `..Default::default()`,
   never a literal naming every field, unless every field is the point of the test:
   a new field then breaks only the tests that use it (#663; e.g.
-  `TextureRecipe::new(res, nodes).with_seed(7)`).
+  `TextureRecipe::new(res, nodes).with_seed(7)`). For the first-class components
+  `make rules` holds it (`full-literal`, #976): build one from its default
+  (`..CameraComponent::default()`, `..scene::authoring::default_light()`) or a
+  constructor (`MeshComponent::new(primitive, vertices, indices)`), or say why every
+  field is the point with `// lint: allow(full-literal) <why>`.
 
 ## The test runner: cargo-nextest
 `make test` and CI run the suite with [cargo-nextest](https://nexte.st) (#484),

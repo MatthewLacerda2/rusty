@@ -27,7 +27,7 @@ fn element(scene: &mut Scene, parent: u32, pos: Vec2, size: Vec2, texture: Optio
         pivot: Vec2::ZERO,
         anchored_position: pos,
         size_delta: size,
-        world_anchor: None,
+        ..RectTransformComponent::default()
     };
     scene.world.set_rect_transform(id, Some(rt));
     let image = ImageComponent {

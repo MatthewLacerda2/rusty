@@ -93,16 +93,11 @@ pub fn character(scene: &mut Scene, at: Vec3, running: bool) -> u32 {
     scene.world.set_mesh(
         id,
         Some(MeshComponent {
-            primitive_type: "Asset".to_string(),
-            asset_ref: None,
-            vertices: vertices(),
-            indices: Vec::new(),
             bind_palette: skin.bind_palette(),
             skin: Some(skin),
             clips: vec![run_clip()],
-            pose_palette: Vec::new(),
-            skeleton: Default::default(),
             is_dirty: Default::default(),
+            ..MeshComponent::new("Asset", vertices(), Vec::new())
         }),
     );
     if running {
@@ -122,14 +117,10 @@ pub fn floor(scene: &mut Scene) -> u32 {
     scene.world.set_collider(
         id,
         Some(ColliderComponent {
-            active: true,
             shape: ColliderShape::Box {
                 size: Vec3::new(40.0, 1.0, 40.0),
             },
-            is_trigger: false,
-            material: Default::default(),
-            aabb_min: Vec3::ZERO,
-            aabb_max: Vec3::ZERO,
+            ..rusty::scene::authoring::default_collider()
         }),
     );
     id

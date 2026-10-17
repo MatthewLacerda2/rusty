@@ -28,16 +28,11 @@ fn skinned_sphere(pose: Vec3) -> MeshComponent {
         names: vec!["root".into()],
     };
     MeshComponent {
-        primitive_type: "SkinnedCullSphere".to_string(),
-        asset_ref: None,
-        vertices,
-        indices,
         bind_palette: skin.bind_palette(),
         skin: Some(skin),
-        clips: Vec::new(),
         pose_palette: vec![Mat4::from_translation(pose)],
-        skeleton: Default::default(),
         is_dirty: Default::default(),
+        ..MeshComponent::new("SkinnedCullSphere", vertices, indices)
     }
 }
 
