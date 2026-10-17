@@ -51,7 +51,7 @@ fn uniform_sky_sh(l: f32) -> Sh9 {
 /// Mean red level of the frame's centre block, `None` without an adapter.
 fn centre_level(scene: &Scene, name: &str) -> Option<f64> {
     let camera = Camera::new(Vec3::new(0.0, 2.0, 0.0), 0.0, -89.0);
-    let path = std::env::temp_dir().join(format!("rusty_gpu_probe_ambient_{name}.png"));
+    let path = crate::temp::dir().join(format!("rusty_gpu_probe_ambient_{name}.png"));
     capture(scene, &camera, &path, SIZE, SIZE)
         .expect("capture")
         .then_some(())?;

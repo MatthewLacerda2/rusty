@@ -4,12 +4,9 @@
 //! pre-#276 save file that omits the `nav_settings` block rehydrates with those defaults
 //! (back-compat), and (c) authored settings survive a save→load round-trip.
 
+use crate::temp::path as tmp;
 use rusty::navigation::{default_areas, NavArea, NavBounds, NavMeshSettings};
 use rusty::scene::Scene;
-
-fn tmp(name: &str) -> String {
-    crate::temp::dir().join(name).to_string_lossy().into_owned()
-}
 
 #[test]
 fn fresh_scene_uses_default_nav_settings() {

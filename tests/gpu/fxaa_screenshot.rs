@@ -9,15 +9,12 @@
 //! When no adapter is available `capture` returns `Ok(false)` and the test passes
 //! without asserting — only a GPU-less machine; every CI job has an adapter (#489).
 
+use crate::temp::file as tmp;
 use glam::Vec3;
 use rusty::components::{CameraComponent, ClearFlags};
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
 use rusty::scene::{DirtyFlag, MeshComponent, Scene};
-
-fn tmp(name: &str) -> std::path::PathBuf {
-    crate::temp::dir().join(name)
-}
 
 /// A lit box plus a camera carrying the FXAA knob. No `VisualCorrection` volume at
 /// all, which is itself part of the point: FXAA is read off the camera, so it must

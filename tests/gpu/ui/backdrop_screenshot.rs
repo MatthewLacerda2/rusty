@@ -8,11 +8,7 @@ use rusty::components::BackdropFilterComponent;
 use rusty::scene::{Camera, Scene};
 
 use super::super::world_ui::scene::{dark_scene, emissive_box};
-use super::mask_scene::{element, overlay, shoot, SIZE};
-
-fn px(img: &image::RgbImage, x: u32, y: u32) -> [u8; 3] {
-    img.get_pixel(x, SIZE - 1 - y).0
-}
+use super::mask_scene::{element, overlay, px, shoot};
 
 /// Red left of x = 0, blue right of it, filling the view of [`camera`].
 fn split_world() -> Scene {

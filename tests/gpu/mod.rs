@@ -10,6 +10,19 @@
 //!
 //! [`Renderer`]: rusty::render::Renderer
 
+use std::path::Path;
+
+/// The mean of every RGB channel of the PNG at `path`, in `0..=255`.
+pub fn mean_brightness(path: &Path) -> f64 {
+    mean(&image::open(path).expect("open the capture").to_rgb8())
+}
+
+/// The mean of every RGB channel of `img`, in `0..=255`.
+pub fn mean(img: &image::RgbImage) -> f64 {
+    let sum: u64 = img.pixels().flat_map(|p| p.0).map(u64::from).sum();
+    sum as f64 / (img.pixels().len() * 3) as f64
+}
+
 mod bloom_screenshot;
 mod cascaded_shadows_screenshot;
 mod custom_postfx_screenshot;

@@ -7,6 +7,7 @@
 
 use std::cell::RefCell;
 
+use crate::temp::lua_path as tmp;
 use glam::Vec3;
 use mlua::Lua;
 use rusty::audio::{AudioEventKind, AudioMaestro};
@@ -23,16 +24,6 @@ const GUNSHOT: &str = r#"{
                adsr = { a = 0.0, d = 0.05, s = 0.0, r = 0.05 } },
     fx = { { fx = "reverb", size = 0.4, damp = 0.6, mix = 0.15 } },
 }"#;
-
-fn tmp(name: &str) -> String {
-    // Forward slashes: a Windows temp path (`C:\Users\…`) interpolated into a Lua
-    // string literal trips Lua's escape parser (`\U`).
-    crate::temp::dir()
-        .join(name)
-        .to_str()
-        .unwrap()
-        .replace('\\', "/")
-}
 
 #[test]
 fn a_baked_one_shot_plays_through_the_audio_namespace() {

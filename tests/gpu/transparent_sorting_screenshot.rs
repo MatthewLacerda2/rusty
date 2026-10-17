@@ -12,15 +12,12 @@
 //! No GPU/software adapter -> `capture` returns `Ok(false)` and the test passes
 //! without asserting (matching `material_maps_screenshot.rs`).
 
+use crate::temp::file as tmp;
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent, RenderMode, Tonemap};
 use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene, VisualCorrectionComponent};
-
-fn tmp(name: &str) -> std::path::PathBuf {
-    crate::temp::dir().join(name)
-}
 
 fn vc() -> VisualCorrectionComponent {
     VisualCorrectionComponent {

@@ -9,6 +9,7 @@
 //!
 //! Skips (passes without asserting) when no GPU / software adapter is present.
 
+use crate::gpu::mean;
 use glam::{Quat, Vec3};
 use rusty::components::{LightComponent, LightMode, LightType};
 use rusty::dev::lightmap_bake::bake_scene_lightmaps;
@@ -71,7 +72,7 @@ fn scene(ambient: f32) -> Scene {
 
 /// Bake `scene`'s lightmaps into a temp folder named `name`.
 fn bake(scene: &mut Scene, name: &str) {
-    let dir = std::env::temp_dir().join(format!("rusty_gpu_lightmap_{name}"));
+    let dir = crate::temp::dir().join(format!("rusty_gpu_lightmap_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("level.scene").to_string_lossy().into_owned();
@@ -90,16 +91,11 @@ fn bake(scene: &mut Scene, name: &str) {
 
 /// `scene` seen from `camera`; `None` without an adapter.
 fn shot(scene: &Scene, camera: &Camera, name: &str) -> Option<image::RgbImage> {
-    let path = std::env::temp_dir().join(format!("rusty_gpu_lightmap_{name}.png"));
+    let path = crate::temp::dir().join(format!("rusty_gpu_lightmap_{name}.png"));
     capture(scene, camera, &path, SIZE, SIZE)
         .expect("capture")
         .then_some(())?;
     Some(image::open(&path).unwrap().to_rgb8())
-}
-
-fn mean(img: &image::RgbImage) -> f64 {
-    let sum: u64 = img.pixels().flat_map(|p| p.0).map(u64::from).sum();
-    sum as f64 / (img.pixels().len() * 3) as f64
 }
 
 #[test]
