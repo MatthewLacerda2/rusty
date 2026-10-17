@@ -6,6 +6,7 @@ mod trail;
 
 use std::cell::RefCell;
 
+use crate::lua::eval;
 use mlua::Lua;
 use rusty::scene::Scene;
 
@@ -19,13 +20,6 @@ fn with_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
         Ok(())
     })
     .unwrap();
-}
-
-/// Evaluate `code` and render its results as `Debug` values, comma-joined.
-fn eval(lua: &Lua, code: &str) -> String {
-    let v: mlua::MultiValue = lua.load(code).eval().unwrap();
-    let parts: Vec<String> = v.iter().map(|x| format!("{x:?}")).collect();
-    parts.join(", ")
 }
 
 /// Save `scene` to a temp file and load it back.

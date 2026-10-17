@@ -5,6 +5,7 @@
 
 use std::cell::RefCell;
 
+use crate::lua::eval;
 use glam::Vec4;
 use mlua::Lua;
 use rusty::components::{
@@ -22,12 +23,6 @@ fn with_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
         Ok(())
     })
     .unwrap();
-}
-
-fn eval(lua: &Lua, code: &str) -> String {
-    let v: mlua::MultiValue = lua.load(code).eval().unwrap();
-    let parts: Vec<String> = v.iter().map(|x| format!("{x:?}")).collect();
-    parts.join(", ")
 }
 
 #[test]

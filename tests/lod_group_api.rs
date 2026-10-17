@@ -5,6 +5,7 @@
 
 use std::cell::RefCell;
 
+use crate::lua::eval;
 use mlua::Lua;
 use rusty::components::{Entity, LodGroupComponent, LodLevel};
 use rusty::scene::authoring::{add_component, ComponentKind};
@@ -18,12 +19,6 @@ fn with_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
         Ok(())
     })
     .unwrap();
-}
-
-fn eval(lua: &Lua, code: &str) -> String {
-    let v: mlua::MultiValue = lua.load(code).eval().unwrap();
-    let parts: Vec<String> = v.iter().map(|x| format!("{x:?}")).collect();
-    parts.join(", ")
 }
 
 #[test]
