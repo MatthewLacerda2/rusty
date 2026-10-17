@@ -142,7 +142,7 @@ impl Renderer {
         if !scene.skybox_path.is_empty() && self.skybox_path != scene.skybox_path {
             let path = scene.skybox_path.clone();
             self.skybox_path = path.clone();
-            self.skybox_texture = Some(self.load_texture(&path));
+            self.skybox_texture = Some(self.load_panorama(&path));
             self.global_bind_group_dirty = true;
         } else if scene.skybox_path.is_empty() && self.skybox_texture.is_some() {
             self.skybox_path = "".to_string();
